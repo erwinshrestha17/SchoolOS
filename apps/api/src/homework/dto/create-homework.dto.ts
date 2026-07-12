@@ -1,4 +1,4 @@
-import { HomeworkAssignmentStatus } from '@prisma/client';
+import { HomeworkAssignmentStatus, HomeworkSubmissionMethod } from '@prisma/client';
 import {
   IsArray,
   IsBoolean,
@@ -91,6 +91,15 @@ export class CreateHomeworkDto {
   @IsOptional()
   @IsBoolean()
   submissionRequired?: boolean;
+
+  @IsOptional()
+  @IsEnum(HomeworkSubmissionMethod)
+  submissionMethod?: HomeworkSubmissionMethod;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  parentInstructions?: string;
 
   @IsOptional()
   @IsArray()

@@ -222,9 +222,13 @@ describe("SchoolOS web production contracts", () => {
     assert.match(form, /api\.listClasses/);
     assert.match(form, /api\.listSections/);
     assert.match(form, /api\.listSubjects/);
-    assert.match(form, /dueDate,/);
-    assert.match(form, /dueAt: dueDate/);
-    assert.match(form, /submissionRequired: formData\.submissionRequired/);
+    assert.match(form, /dueAt: dueDateIso/);
+    // submissionRequired is now derived from the submission-method select
+    // (Nepal-schools redesign) rather than a separate standalone toggle.
+    assert.match(
+      form,
+      /submissionRequired: formData\.submissionMethod !== 'NO_SUBMISSION_REQUIRED'/,
+    );
     assert.match(form, /saveAsTemplate: formData\.saveAsTemplate/);
     assert.match(form, /templateName: formData\.saveAsTemplate/);
     assert.match(form, /recurrence: formData\.recurrenceEnabled/);
@@ -239,7 +243,14 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps the W4A homework workspace route-backed and real API backed", () => {
+  it("keeps the homework workspace route-backed and real API backed", () => {
+    // Post-redesign (fuzzy-gliding-hopper.md), /dashboard/homework is a
+    // standalone, single-route, 4-tab (Today/All Homework/Completion/
+    // Templates) workspace decoupled from the timetable module — it no
+    // longer links out to /dashboard/timetable/* builder/conflicts/versions
+    // routes, and it has no on-page reminder-batch-history panel (P0 scope
+    // cut; the reminder APIs still exist and remain reachable from the
+    // homework detail page).
     const page = read("app/dashboard/homework/page.tsx");
     const academicsApi = read("lib/api/academics.ts");
     const workloadRoute = read("app/dashboard/timetable/workload/page.tsx");
@@ -247,13 +258,11 @@ describe("SchoolOS web production contracts", () => {
     assert.match(page, /ModuleHeader/);
     assert.match(page, /KpiGrid/);
     assert.match(page, /ModuleTabs/);
+    assert.match(page, /api\.getHomeworkSummaryToday/);
+    assert.match(page, /api\.listHomeworkPage/);
     assert.match(page, /api\.listHomeworkTemplates/);
-    assert.match(page, /api\.listHomeworkReminderBatches/);
     assert.match(page, /api\.getHomeworkCompletionReport/);
-    assert.match(page, /api\.getHomeworkMissingLateReport/);
-    assert.match(page, /\/dashboard\/timetable\/workload/);
-    assert.match(page, /\/dashboard\/timetable\/conflicts/);
-    assert.match(page, /\/dashboard\/timetable\/versions/);
+    assert.doesNotMatch(page, /\/dashboard\/timetable/);
     assert.match(workloadRoute, /initialSection="Teacher Workload"/);
     assert.match(academicsApi, /\/homework\/\$\{encodeURIComponent\(id\)\}\/publish/);
     assert.match(academicsApi, /openProtectedFile\(access\.fileAssetId/);
@@ -480,19 +489,25 @@ describe("SchoolOS web production contracts", () => {
   });
 
   it("exposes Phase 2B homework and timetable workflow controls without fake production data", () => {
+    // As of the M6 homework redesign (see fuzzy-gliding-hopper.md), the
+    // teacher-facing homework list/detail/grading UI that used to live inside
+    // the timetable component tree (components/timetable/tabs/homework-tab.tsx,
+    // student-homework-tab.tsx) has been deleted and consolidated into
+    // app/dashboard/homework/page.tsx + components/homework/*. Assertions
+    // below were repointed at the surviving/introduced files rather than the
+    // deleted ones.
     const timetableBuilder = read(
       "components/timetable/tabs/timetable-builder-tab.tsx",
     );
-    const homeworkTab = read("components/timetable/tabs/homework-tab.tsx");
     const homeworkPage = read("app/dashboard/homework/page.tsx");
+    const homeworkCreateForm = read(
+      "components/homework/homework-create-form.tsx",
+    );
     const homeworkDetailPage = read(
       "components/homework/homework-detail-page.tsx",
     );
     const homeworkReviewModal = read(
       "components/homework/homework-review-modal.tsx",
-    );
-    const studentHomeworkTab = read(
-      "components/timetable/tabs/student-homework-tab.tsx",
     );
     const teacherWorkloadTab = read(
       "components/timetable/tabs/teacher-workload-tab.tsx",
@@ -514,19 +529,16 @@ describe("SchoolOS web production contracts", () => {
       assert.match(timetableBuilder, new RegExp(label));
     }
 
-    for (const label of ["Send Reminder", "Assign", "Close", "All Statuses"]) {
-      assert.match(homeworkTab, new RegExp(label));
-    }
-    assert.match(
-      homeworkTab,
-      /onSave=\{\(data\) => createHomeworkMutation\.mutate\(data\)\}/,
-    );
-    assert.match(homeworkTab, /onSave\(\{/);
-    assert.match(homeworkTab, /bg-black\/40/);
-    assert.doesNotMatch(
-      homeworkTab,
-      /bg-slate-900|bg-slate-950|shadow-xl|shadow-2xl|rounded-3xl|rounded-\[/,
-    );
+    // Give Homework (full-page form, not a modal) is real-API-backed.
+    assert.match(homeworkCreateForm, /api\.createHomework/);
+    assert.match(homeworkCreateForm, /api\.assignHomework/);
+    // Today's homework list still supports filtering across every status.
+    assert.match(homeworkPage, /All Statuses/);
+    assert.match(homeworkPage, /"CLOSED"/);
+    // Register + reminder actions on the detail page are real-API-backed.
+    assert.match(homeworkDetailPage, /api\.bulkCompleteHomeworkRegister/);
+    assert.match(homeworkDetailPage, /api\.updateHomeworkSubmissionStatus/);
+    assert.match(homeworkDetailPage, /Send Reminders/);
     assert.doesNotMatch(homeworkPage, /\/edit/);
     assert.doesNotMatch(homeworkDetailPage, /Edit Assignment/);
     assert.match(
@@ -534,13 +546,16 @@ describe("SchoolOS web production contracts", () => {
       /Teacher feedback is required before requesting a correction/,
     );
 
-    assert.match(studentHomeworkTab, /openHomeworkAttachmentDownload/);
-    assert.match(studentHomeworkTab, /student-homework-attachment-download/);
+    // The attachment-download capability that used to live only in
+    // student-homework-tab.tsx now lives on the student/parent read-only
+    // view inside homeworkPage.
+    assert.match(homeworkPage, /openHomeworkAttachmentDownload/);
+    assert.match(homeworkPage, /student-homework-attachment-download/);
     assert.match(homeworkDetailPage, /openHomeworkAttachmentPreview/);
     assert.match(homeworkReviewModal, /openHomeworkAttachmentPreview/);
     assert.doesNotMatch(homeworkDetailPage, /getFileView\(attachment\.fileAssetId\)/);
     assert.doesNotMatch(homeworkReviewModal, /getFileView\(attachment\.fileAssetId\)/);
-    assert.doesNotMatch(studentHomeworkTab, /fileAsset\?\.publicUrl/);
+    assert.doesNotMatch(homeworkPage, /fileAsset\?\.publicUrl/);
     assert.doesNotMatch(activitySurfaces, /Private object key/);
     assert.doesNotMatch(activitySurfaces, /Photo Reference/);
     assert.match(teacherWorkloadTab, /teacher-workload-distribution/);
@@ -554,7 +569,7 @@ describe("SchoolOS web production contracts", () => {
     assert.doesNotMatch(weeklyRequirementsList, /window\.confirm|alert\(/);
 
     assert.doesNotMatch(
-      `${timetableBuilder}\n${homeworkTab}\n${homeworkPage}\n${homeworkDetailPage}\n${homeworkReviewModal}\n${studentHomeworkTab}\n${teacherWorkloadTab}\n${weeklyRequirementsList}\n${activitySurfaces}`,
+      `${timetableBuilder}\n${homeworkPage}\n${homeworkCreateForm}\n${homeworkDetailPage}\n${homeworkReviewModal}\n${teacherWorkloadTab}\n${weeklyRequirementsList}\n${activitySurfaces}`,
       /demo-|fake-|placeholderId/i,
     );
   });

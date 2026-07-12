@@ -156,6 +156,11 @@ export class ActivityFeedService {
       include: {
         class: true,
         section: true,
+        createdBy: {
+          select: {
+            staff: { select: { firstName: true, lastName: true } },
+          },
+        },
         attachments: {
           orderBy: { sortOrder: 'asc' },
         },
@@ -391,6 +396,11 @@ export class ActivityFeedService {
       include: {
         class: true,
         section: true,
+        createdBy: {
+          select: {
+            staff: { select: { firstName: true, lastName: true } },
+          },
+        },
         attachments: {
           orderBy: { sortOrder: 'asc' },
         },
@@ -847,49 +857,47 @@ export class ActivityFeedService {
       this.validateActivityAttachment(attachment);
     }
 
-    if (!dto.studentIds?.length) {
-      throw new BadRequestException(
-        'Tag every student visible in activity media before uploading',
-      );
-    }
-
-    const students = await this.prisma.student.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        classId: dto.classId,
-        ...(dto.sectionId ? { sectionId: dto.sectionId } : {}),
-        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
-        id: { in: dto.studentIds },
-      },
-      select: {
-        id: true,
-        guardianLinks: {
-          include: {
-            guardian: {
-              include: {
-                consents: {
-                  where: { consentType: ConsentType.PHOTO_USAGE },
-                  orderBy: { capturedAt: 'desc' },
-                  take: 1,
+    if (dto.studentIds?.length) {
+      const students = await this.prisma.student.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          classId: dto.classId,
+          ...(dto.sectionId ? { sectionId: dto.sectionId } : {}),
+          lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+          id: { in: dto.studentIds },
+        },
+        select: {
+          id: true,
+          guardianLinks: {
+            include: {
+              guardian: {
+                include: {
+                  consents: {
+                    where: { consentType: ConsentType.PHOTO_USAGE },
+                    orderBy: { capturedAt: 'desc' },
+                    take: 1,
+                  },
                 },
               },
             },
           },
         },
-      },
-    });
+      });
 
-    if (students.length !== dto.studentIds.length) {
-      throw new NotFoundException(
-        'One or more tagged students were not active in this class/section',
-      );
-    }
-    if (
-      students.some((student) => !hasCurrentPhotoConsent(student.guardianLinks))
-    ) {
-      throw new ForbiddenException(
-        'Activity media cannot be uploaded for a student without active photo consent',
-      );
+      if (students.length !== dto.studentIds.length) {
+        throw new NotFoundException(
+          'One or more tagged students were not active in this class/section',
+        );
+      }
+      if (
+        students.some(
+          (student) => !hasCurrentPhotoConsent(student.guardianLinks),
+        )
+      ) {
+        throw new ForbiddenException(
+          'Activity media cannot be uploaded for a student without active photo consent',
+        );
+      }
     }
 
     if (dto.clientSubmissionId) {
@@ -965,6 +973,11 @@ export class ActivityFeedService {
       const audienceType = dto.studentIds?.length
         ? AudienceType.STUDENT
         : (dto.audienceType ?? defaultAudienceType);
+      const category = dto.category ?? ActivityCategory.GENERAL;
+      const requiresApproval = activityPostRequiresApproval(
+        audienceType,
+        category,
+      );
 
       post = await this.prisma.activityPost.create({
         data: {
@@ -975,8 +988,12 @@ export class ActivityFeedService {
           clientSubmissionId: dto.clientSubmissionId,
           title: dto.title,
           caption: dto.caption,
-          category: dto.category ?? ActivityCategory.GENERAL,
+          askAtHome: dto.askAtHome ?? null,
+          category,
           audienceType,
+          status: requiresApproval
+            ? ActivityPostStatus.PENDING_APPROVAL
+            : ActivityPostStatus.APPROVED,
           publishedAt: new Date(),
           attachments: {
             create: storedAttachments.map((attachment) => ({
@@ -1039,21 +1056,23 @@ export class ActivityFeedService {
         ),
       );
 
-      await this.communicationsService.recordDeliveryRecords({
-        actor,
-        sourceType: 'activity_post',
-        sourceId: post.id,
-        activityPostId: post.id,
-        audienceType,
-        classId: post.classId,
-        sectionId: post.sectionId,
-        studentIds: dto.studentIds,
-        title: post.title,
-        body: post.caption,
-        channels: [NotificationChannel.PUSH],
-        requiredConsentTypes: [ConsentType.PHOTO_USAGE],
-        activeStudentsOnly: true,
-      });
+      if (!requiresApproval) {
+        await this.communicationsService.recordDeliveryRecords({
+          actor,
+          sourceType: 'activity_post',
+          sourceId: post.id,
+          activityPostId: post.id,
+          audienceType,
+          classId: post.classId,
+          sectionId: post.sectionId,
+          studentIds: dto.studentIds,
+          title: post.title,
+          body: post.caption,
+          channels: [NotificationChannel.PUSH],
+          requiredConsentTypes: [ConsentType.PHOTO_USAGE],
+          activeStudentsOnly: true,
+        });
+      }
 
       await this.auditService.record({
         action: 'create',
@@ -1064,6 +1083,7 @@ export class ActivityFeedService {
         after: {
           classId: post.classId,
           sectionId: post.sectionId,
+          requiresApproval,
           attachmentCount: post.attachments.length,
           taggedStudentCount: post.studentTags.length,
         },
@@ -1977,10 +1997,18 @@ export class ActivityFeedService {
   private serializePostForActor<
     TPost extends {
       attachments: ActivityAttachment[];
+      createdBy?: {
+        staff?: { firstName: string; lastName: string } | null;
+      } | null;
     },
   >(post: TPost, mediaAccess: ActorMediaAccess) {
+    const { createdBy, ...rest } = post;
+    const teacherName = createdBy?.staff
+      ? `${createdBy.staff.firstName} ${createdBy.staff.lastName}`.trim()
+      : null;
     return {
-      ...post,
+      ...rest,
+      teacherName,
       attachments: post.attachments.map((attachment) =>
         this.serializeAttachmentForActor(attachment, mediaAccess),
       ),
@@ -2057,6 +2085,22 @@ function normalizeStudentIds(studentIds?: string | string[]) {
         .map((value) => value.trim())
         .filter(Boolean),
     ),
+  );
+}
+
+const CATEGORIES_REQUIRING_APPROVAL = new Set<ActivityCategory>([
+  ActivityCategory.COMPETITION,
+  ActivityCategory.ACHIEVEMENT,
+]);
+
+function activityPostRequiresApproval(
+  audienceType: AudienceType,
+  category: ActivityCategory,
+) {
+  return (
+    audienceType === AudienceType.STUDENT ||
+    audienceType === AudienceType.ALL ||
+    CATEGORIES_REQUIRING_APPROVAL.has(category)
   );
 }
 

@@ -253,15 +253,39 @@ export type SectionFormInput = z.input<typeof sectionFormSchema>;
 
 // ─── Compiled from validation/activity.ts ───
 
+export const activityCategoryValues = [
+  'CLASSROOM_LEARNING',
+  'ART_AND_CRAFT',
+  'MUSIC_AND_DANCE',
+  'SPORTS',
+  'SCIENCE_AND_PRACTICAL',
+  'PROJECT_WORK',
+  'EDUCATIONAL_TOUR',
+  'HEALTH_AND_HYGIENE',
+  'COMPETITION',
+  'ASSEMBLY',
+  'CLUB_ACTIVITY',
+  'COMMUNITY_SERVICE',
+  'FESTIVAL_AND_CULTURE',
+  'NATIONAL_PROGRAMME',
+  'ACHIEVEMENT',
+  'PRESCHOOL_ACTIVITY',
+  'OTHER',
+  // Legacy values kept for backward compatibility with existing posts.
+  'LEARNING',
+  'OUTDOOR_PLAY',
+  'CELEBRATION',
+  'GENERAL',
+] as const;
+
 export const activityPostFormSchema = z.object({
   clientSubmissionId: z.string().uuid().optional(),
   classId: z.string().min(1),
   sectionId: z.string().optional().nullable(),
   title: z.string().min(2),
   caption: z.string().min(2),
-  category: z
-    .enum(['LEARNING', 'OUTDOOR_PLAY', 'ART_AND_CRAFT', 'CELEBRATION', 'SPORTS', 'GENERAL'])
-    .default('GENERAL'),
+  askAtHome: z.string().max(280).optional().nullable(),
+  category: z.enum(activityCategoryValues).default('OTHER'),
   studentIds: z.array(z.string()).default([]),
   attachments: z.array(studentDocumentFormSchema.pick({
     fileName: true,

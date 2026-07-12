@@ -20,9 +20,17 @@ export type ActivityPost = {
   title: string;
   body?: string;
   caption?: string;
+  askAtHome?: string | null;
+  teacherName?: string | null;
   category: string;
   audienceType: string;
-  status?: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'ARCHIVED';
+  status?:
+    | 'DRAFT'
+    | 'PENDING_APPROVAL'
+    | 'APPROVED'
+    | 'REJECTED'
+    | 'NEEDS_CORRECTION'
+    | 'ARCHIVED';
   moderationReason?: string | null;
   moderatedAt?: string | null;
   editedAt?: string | null;

@@ -5,7 +5,6 @@ import {
   AuthMethod,
   ConsentType,
   DevelopmentalMilestoneStatus,
-  NotificationChannel,
   StudentLifecycleStatus,
   StorageProvider,
 } from '@prisma/client';
@@ -239,20 +238,16 @@ describe('ActivityFeedService', () => {
       'file-asset-1',
       'teacher-1',
     );
-    expect(communicationsService.recordDeliveryRecords).toHaveBeenCalledWith(
-      expect.objectContaining({
-        actor,
-        audienceType: AudienceType.STUDENT,
-        channels: [NotificationChannel.PUSH],
-        studentIds: ['student-1'],
-        activeStudentsOnly: true,
-      }),
-    );
+    // Individually-tagged posts require approval, so guardian delivery is
+    // deferred until a moderator approves the post rather than firing at
+    // creation time.
+    expect(communicationsService.recordDeliveryRecords).not.toHaveBeenCalled();
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'create',
         resource: 'activity_post',
         tenantId: 'tenant-1',
+        after: expect.objectContaining({ requiresApproval: true }),
       }),
     );
   });

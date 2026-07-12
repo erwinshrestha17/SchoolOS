@@ -64,6 +64,11 @@ export class UpdateHomeworkSubmissionDto {
 export class UpdateHomeworkSubmissionStatusDto {
   @IsEnum(HomeworkSubmissionStatus)
   status!: HomeworkSubmissionStatus;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(3000)
+  teacherRemarks?: string;
 }
 
 export class ReviewHomeworkSubmissionDto {

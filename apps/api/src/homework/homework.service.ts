@@ -39,6 +39,8 @@ import {
   UpdateHomeworkSubmissionStatusDto,
 } from './dto/submission.dto';
 import { UpdateHomeworkDto } from './dto/update-homework.dto';
+import type { HomeworkPublishNotifyChoice } from './dto/publish-homework.dto';
+import { BulkCompleteRegisterDto } from './dto/register.dto';
 import {
   LegacyReviewHomeworkSubmissionDto,
   LegacySubmitHomeworkDto,
@@ -445,6 +447,238 @@ export class HomeworkService {
     return mapHomeworkAssignmentDetail(assignment);
   }
 
+  async getHomeworkSummaryToday(
+    actor: AuthContext,
+    query: { date?: string },
+  ) {
+    if (actor.roles.includes('student') || actor.roles.includes('parent')) {
+      throw new ForbiddenException(
+        'Homework summary is limited to authorized staff',
+      );
+    }
+    const date = query.date ? parseRequiredDate(query.date, 'date') : new Date();
+    const dayStart = startOfDay(date);
+    const dayEnd = endOfDay(date);
+
+    const scopeFilter = await this.resolveHomeworkAssignmentScopeFilter(actor);
+    if (scopeFilter === null) {
+      return {
+        givenToday: 0,
+        dueToday: 0,
+        notChecked: 0,
+        incompleteStudents: 0,
+        classesWithoutHomework: 0,
+      };
+    }
+
+    const [
+      givenToday,
+      dueToday,
+      notChecked,
+      incompleteStudentRows,
+      scopedSections,
+      todaysAssignments,
+    ] = await Promise.all([
+      this.prisma.homeworkAssignment.count({
+        where: {
+          tenantId: actor.tenantId,
+          assignedDate: { gte: dayStart, lte: dayEnd },
+          status: { not: HomeworkAssignmentStatus.CANCELLED },
+          ...scopeFilter,
+        },
+      }),
+      this.prisma.homeworkAssignment.count({
+        where: {
+          tenantId: actor.tenantId,
+          dueDate: { gte: dayStart, lte: dayEnd },
+          status: HomeworkAssignmentStatus.ASSIGNED,
+          ...scopeFilter,
+        },
+      }),
+      this.prisma.homeworkAssignment.count({
+        where: {
+          tenantId: actor.tenantId,
+          status: HomeworkAssignmentStatus.ASSIGNED,
+          dueDate: { lt: dayStart },
+          submissions: {
+            some: { status: HomeworkSubmissionStatus.NOT_SUBMITTED },
+          },
+          ...scopeFilter,
+        },
+      }),
+      this.prisma.homeworkSubmission.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          status: {
+            in: [
+              HomeworkSubmissionStatus.INCOMPLETE,
+              HomeworkSubmissionStatus.NOT_SUBMITTED,
+              HomeworkSubmissionStatus.ABSENT,
+            ],
+          },
+          homework: { dueDate: { lte: dayEnd }, ...scopeFilter },
+        },
+        distinct: ['studentId'],
+        select: { studentId: true },
+      }),
+      this.resolveScopedSections(actor),
+      this.prisma.homeworkAssignment.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          assignedDate: { gte: dayStart, lte: dayEnd },
+          status: { not: HomeworkAssignmentStatus.CANCELLED },
+          ...scopeFilter,
+        },
+        select: { classId: true, sectionId: true },
+      }),
+    ]);
+
+    const classWideToday = new Set(
+      todaysAssignments.filter((a) => !a.sectionId).map((a) => a.classId),
+    );
+    const sectionSpecificToday = new Set(
+      todaysAssignments.filter((a) => a.sectionId).map((a) => a.sectionId),
+    );
+    const relevantSections =
+      scopedSections === 'ALL'
+        ? await this.prisma.section.findMany({
+            where: { tenantId: actor.tenantId },
+            select: { id: true, classId: true },
+          })
+        : scopedSections;
+    const sectionsWithHomework = relevantSections.filter(
+      (section) =>
+        sectionSpecificToday.has(section.id) ||
+        classWideToday.has(section.classId),
+    ).length;
+
+    return {
+      givenToday,
+      dueToday,
+      notChecked,
+      incompleteStudents: incompleteStudentRows.length,
+      classesWithoutHomework: Math.max(
+        relevantSections.length - sectionsWithHomework,
+        0,
+      ),
+    };
+  }
+
+  async getHomeworkWorkload(
+    actor: AuthContext,
+    query: { classId: string; sectionId?: string; date?: string },
+  ) {
+    const date = query.date ? parseRequiredDate(query.date, 'date') : new Date();
+    const dayStart = startOfDay(date);
+    const dayEnd = endOfDay(date);
+
+    const count = await this.prisma.homeworkAssignment.count({
+      where: {
+        tenantId: actor.tenantId,
+        classId: query.classId,
+        status: { not: HomeworkAssignmentStatus.CANCELLED },
+        dueDate: { gte: dayStart, lte: dayEnd },
+        ...(query.sectionId
+          ? { OR: [{ sectionId: query.sectionId }, { sectionId: null }] }
+          : {}),
+      },
+    });
+
+    const level: 'LIGHT' | 'NORMAL' | 'HEAVY' =
+      count <= 1 ? 'LIGHT' : count <= 3 ? 'NORMAL' : 'HEAVY';
+
+    return {
+      classId: query.classId,
+      sectionId: query.sectionId ?? null,
+      date: dayStart.toISOString(),
+      count,
+      level,
+    };
+  }
+
+  async getHomeworkRegister(actor: AuthContext, id: string) {
+    if (actor.roles.includes('student') || actor.roles.includes('parent')) {
+      throw new ForbiddenException(
+        'The completion register is limited to authorized staff',
+      );
+    }
+    const assignment = await this.findAssignmentOrThrow(actor, id);
+    await this.ensureHomeworkRegisterReadAccess(actor, assignment);
+    await this.ensureAssignmentSubmissions(assignment.id, actor);
+
+    const submissions = await this.prisma.homeworkSubmission.findMany({
+      where: { tenantId: actor.tenantId, homeworkId: assignment.id },
+      include: { student: { select: homeworkStudentSelect() } },
+      orderBy: [{ student: { rollNumber: 'asc' } }],
+    });
+
+    const followUpFlags = await this.computeFollowUpFlags(
+      actor,
+      submissions.map((submission) => submission.studentId),
+    );
+
+    return {
+      homeworkId: assignment.id,
+      submissionMethod: assignment.submissionMethod,
+      roster: submissions.map((submission) => ({
+        submissionId: submission.id,
+        studentId: submission.studentId,
+        studentName:
+          `${submission.student.firstNameEn} ${submission.student.lastNameEn}`.trim(),
+        rollNumber: submission.student.rollNumber,
+        status: submission.status,
+        teacherRemarks: submission.teacherRemarks,
+        followUp: followUpFlags.get(submission.studentId) ?? {
+          flagged: false,
+          incompleteCount: 0,
+          consideredCount: 0,
+        },
+      })),
+    };
+  }
+
+  async bulkCompleteHomeworkRegister(
+    id: string,
+    dto: BulkCompleteRegisterDto,
+    actor: AuthContext,
+  ) {
+    const assignment = await this.findAssignmentOrThrow(actor, id);
+    await this.ensureSubjectTeacherScope(
+      actor,
+      assignment,
+      await this.resolveActorStaffId(actor),
+    );
+    await this.ensureAssignmentSubmissions(assignment.id, actor);
+
+    const excludeSet = new Set(dto.excludeStudentIds ?? []);
+    const where: Prisma.HomeworkSubmissionWhereInput = {
+      tenantId: actor.tenantId,
+      homeworkId: assignment.id,
+      ...(dto.studentIds?.length
+        ? { studentId: { in: dto.studentIds } }
+        : {}),
+      ...(excludeSet.size
+        ? { studentId: { notIn: [...excludeSet] } }
+        : {}),
+    };
+
+    const result = await this.prisma.homeworkSubmission.updateMany({
+      where,
+      data: { status: HomeworkSubmissionStatus.COMPLETED },
+    });
+
+    await this.auditService.record({
+      action: 'bulk_complete_register',
+      resource: 'homework_assignment',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: assignment.id,
+      after: { updatedCount: result.count },
+    });
+
+    return this.getHomeworkRegister(actor, id);
+  }
+
   async listTemplates(
     actor: AuthContext,
     query: HomeworkTemplateQueryDto = {},
@@ -612,6 +846,8 @@ export class HomeworkService {
             dueAt: occurrence.dueAt,
             maxScore: dto.maxScore,
             submissionRequired: dto.submissionRequired,
+            submissionMethod: dto.submissionMethod,
+            parentInstructions: dto.parentInstructions,
             status: HomeworkAssignmentStatus.DRAFT,
             attachmentMetadata: buildHomeworkMetadata(dto.attachmentMetadata, {
               saveAsTemplate: dto.saveAsTemplate,
@@ -704,6 +940,8 @@ export class HomeworkService {
               : undefined,
           maxScore: dto.maxScore,
           submissionRequired: dto.submissionRequired,
+          submissionMethod: dto.submissionMethod,
+          parentInstructions: dto.parentInstructions,
         },
       });
 
@@ -751,7 +989,11 @@ export class HomeworkService {
     return mapHomeworkAssignmentDetail(refreshed);
   }
 
-  async assignHomework(homeworkId: string, actor: AuthContext) {
+  async assignHomework(
+    homeworkId: string,
+    actor: AuthContext,
+    notify?: HomeworkPublishNotifyChoice,
+  ) {
     const assignment = await this.findAssignmentOrThrow(actor, homeworkId);
     await this.ensureSubjectTeacherScopeForRead(actor, assignment);
     if (assignment.status !== HomeworkAssignmentStatus.DRAFT) {
@@ -767,7 +1009,7 @@ export class HomeworkService {
       },
       include: homeworkAssignmentInclude(),
     });
-    await this.notifyHomeworkAssigned(updated.id, actor);
+    await this.notifyHomeworkAssigned(updated.id, actor, notify ?? 'NOTIFY_NOW');
 
     await this.auditService.record({
       action: 'assign',
@@ -1154,10 +1396,16 @@ export class HomeworkService {
     actor: AuthContext,
   ) {
     const submission = await this.findSubmissionOrThrow(actor, submissionId);
+    await this.ensureSubjectTeacherScope(
+      actor,
+      submission.homework,
+      await this.resolveActorStaffId(actor),
+    );
     const updated = await this.prisma.homeworkSubmission.update({
       where: { id: submission.id },
       data: {
         status: dto.status,
+        teacherRemarks: dto.teacherRemarks ?? submission.teacherRemarks,
         submittedAt:
           dto.status === HomeworkSubmissionStatus.SUBMITTED ||
           dto.status === HomeworkSubmissionStatus.LATE
@@ -1435,6 +1683,170 @@ export class HomeworkService {
       homework,
       await this.resolveActorStaffId(actor),
     );
+  }
+
+  private async resolveHomeworkAssignmentScopeFilter(
+    actor: AuthContext,
+  ): Promise<Prisma.HomeworkAssignmentWhereInput | null> {
+    if (
+      actor.roles.some((role) =>
+        ['admin', 'principal', 'platform_super_admin'].includes(role),
+      )
+    ) {
+      return {};
+    }
+    if (isTeacherActor(actor)) {
+      const scope = await this.getTeacherScopeForActor(actor);
+      if (scope.length === 0) return null;
+      return { AND: [{ OR: scope }] };
+    }
+    return null;
+  }
+
+  private async resolveScopedSections(
+    actor: AuthContext,
+  ): Promise<'ALL' | Array<{ id: string; classId: string }>> {
+    if (
+      actor.roles.some((role) =>
+        ['admin', 'principal', 'platform_super_admin'].includes(role),
+      )
+    ) {
+      return 'ALL';
+    }
+    if (!isTeacherActor(actor)) return [];
+
+    const staffId = await this.resolveActorStaffId(actor);
+    if (!staffId) return [];
+
+    const assignments = await this.prisma.subjectTeacherAssignment.findMany({
+      where: { tenantId: actor.tenantId, staffId },
+      select: { classId: true, sectionId: true },
+    });
+
+    const explicitSectionIds = new Set(
+      assignments.filter((a) => a.sectionId).map((a) => a.sectionId as string),
+    );
+    const classIdsNeedingExpansion = [
+      ...new Set(
+        assignments.filter((a) => !a.sectionId).map((a) => a.classId),
+      ),
+    ];
+
+    const expandedSections = classIdsNeedingExpansion.length
+      ? await this.prisma.section.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            classId: { in: classIdsNeedingExpansion },
+          },
+          select: { id: true, classId: true },
+        })
+      : [];
+
+    const explicitSections = explicitSectionIds.size
+      ? await this.prisma.section.findMany({
+          where: { tenantId: actor.tenantId, id: { in: [...explicitSectionIds] } },
+          select: { id: true, classId: true },
+        })
+      : [];
+
+    const merged = new Map<string, { id: string; classId: string }>();
+    for (const section of [...expandedSections, ...explicitSections]) {
+      merged.set(section.id, section);
+    }
+    return [...merged.values()];
+  }
+
+  private async isClassTeacherOfSection(
+    actor: AuthContext,
+    sectionId: string | null,
+  ): Promise<boolean> {
+    if (!sectionId) return false;
+    const staffId = await this.resolveActorStaffId(actor);
+    if (!staffId) return false;
+    const section = await this.prisma.section.findFirst({
+      where: { tenantId: actor.tenantId, id: sectionId, classTeacherId: staffId },
+      select: { id: true },
+    });
+    return Boolean(section);
+  }
+
+  private async ensureHomeworkRegisterReadAccess(
+    actor: AuthContext,
+    homework: {
+      academicYearId?: string;
+      classId: string;
+      sectionId: string | null;
+      subjectId: string;
+    },
+  ) {
+    if (
+      actor.roles.some((role) =>
+        ['admin', 'principal', 'platform_super_admin'].includes(role),
+      )
+    ) {
+      return;
+    }
+    if (isTeacherActor(actor)) {
+      const isClassTeacher = await this.isClassTeacherOfSection(
+        actor,
+        homework.sectionId,
+      );
+      if (isClassTeacher) return;
+      await this.ensureSubjectTeacherScope(
+        actor,
+        homework,
+        await this.resolveActorStaffId(actor),
+      );
+      return;
+    }
+    throw new ForbiddenException(
+      'Not authorized to view this homework register',
+    );
+  }
+
+  private async computeFollowUpFlags(actor: AuthContext, studentIds: string[]) {
+    const flags = new Map<
+      string,
+      { flagged: boolean; incompleteCount: number; consideredCount: number }
+    >();
+    const uniqueStudentIds = [...new Set(studentIds)];
+    if (uniqueStudentIds.length === 0) return flags;
+
+    const CONCERNING_STATUSES: readonly HomeworkSubmissionStatus[] = [
+      HomeworkSubmissionStatus.INCOMPLETE,
+      HomeworkSubmissionStatus.NOT_SUBMITTED,
+      HomeworkSubmissionStatus.ABSENT,
+    ];
+
+    const recentSubmissions = await this.prisma.homeworkSubmission.findMany({
+      where: { tenantId: actor.tenantId, studentId: { in: uniqueStudentIds } },
+      select: { studentId: true, status: true, homework: { select: { dueDate: true } } },
+      orderBy: [{ homework: { dueDate: 'desc' } }],
+      take: uniqueStudentIds.length * 30,
+    });
+
+    const byStudent = new Map<string, HomeworkSubmissionStatus[]>();
+    for (const submission of recentSubmissions) {
+      const list = byStudent.get(submission.studentId) ?? [];
+      if (list.length < 7) {
+        list.push(submission.status);
+        byStudent.set(submission.studentId, list);
+      }
+    }
+
+    for (const studentId of uniqueStudentIds) {
+      const recent = byStudent.get(studentId) ?? [];
+      const incompleteCount = recent.filter((status) =>
+        CONCERNING_STATUSES.includes(status),
+      ).length;
+      flags.set(studentId, {
+        flagged: incompleteCount >= 3,
+        incompleteCount,
+        consideredCount: recent.length,
+      });
+    }
+
+    return flags;
   }
 
   private async auditSubmission(
@@ -1988,7 +2400,14 @@ export class HomeworkService {
     return batch;
   }
 
-  private async notifyHomeworkAssigned(homeworkId: string, actor: AuthContext) {
+  private async notifyHomeworkAssigned(
+    homeworkId: string,
+    actor: AuthContext,
+    notify: HomeworkPublishNotifyChoice = 'NOTIFY_NOW',
+  ) {
+    if (notify === 'DO_NOT_SEND') {
+      return;
+    }
     const assignment = await this.findAssignmentOrThrow(actor, homeworkId);
     await this.communicationsService.recordDeliveryRecords({
       actor,
@@ -2552,6 +2971,18 @@ function normalizeJsonObject(value: Record<string, unknown> | undefined) {
 function shiftDate(date: Date, days: number) {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
+  return next;
+}
+
+function startOfDay(date: Date) {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function endOfDay(date: Date) {
+  const next = new Date(date);
+  next.setHours(23, 59, 59, 999);
   return next;
 }
 

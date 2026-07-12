@@ -16,13 +16,29 @@ import { FormField, Input, Select, TextArea } from '../../../../components/ui/fo
 import type { ActivityAudiencePreview } from '../../../../lib/api/activity';
 
 const activityCategories = [
-  'LEARNING',
-  'OUTDOOR_PLAY',
+  'CLASSROOM_LEARNING',
   'ART_AND_CRAFT',
-  'CELEBRATION',
+  'MUSIC_AND_DANCE',
   'SPORTS',
-  'GENERAL',
+  'SCIENCE_AND_PRACTICAL',
+  'PROJECT_WORK',
+  'EDUCATIONAL_TOUR',
+  'HEALTH_AND_HYGIENE',
+  'COMPETITION',
+  'ASSEMBLY',
+  'CLUB_ACTIVITY',
+  'COMMUNITY_SERVICE',
+  'FESTIVAL_AND_CULTURE',
+  'NATIONAL_PROGRAMME',
+  'ACHIEVEMENT',
+  'PRESCHOOL_ACTIVITY',
+  'OTHER',
 ] as const;
+
+const audienceModes = ['whole', 'students'] as const;
+type AudienceMode = (typeof audienceModes)[number];
+
+const categoriesRequiringApproval = new Set(['COMPETITION', 'ACHIEVEMENT']);
 
 const steps = ['Audience & consent', 'Content & media', 'Review & submit'] as const;
 type Step = 0 | 1 | 2;
@@ -33,7 +49,9 @@ type ComposerState = {
   sectionId: string;
   title: string;
   caption: string;
+  askAtHome: string;
   category: (typeof activityCategories)[number];
+  audienceMode: AudienceMode;
   studentIds: string[];
 };
 
@@ -55,7 +73,9 @@ export default function ActivityComposerPage() {
     sectionId: '',
     title: '',
     caption: '',
-    category: 'GENERAL',
+    askAtHome: '',
+    category: 'CLASSROOM_LEARNING',
+    audienceMode: 'whole',
     studentIds: [],
   });
   const [files, setFiles] = useState<File[]>([]);
@@ -96,6 +116,7 @@ export default function ActivityComposerPage() {
   });
   const audienceStudents: ActivityAudiencePreview['students'] =
     audiencePreviewQuery.data?.students ?? [];
+  const audienceMediaConsent = audiencePreviewQuery.data?.mediaConsent ?? null;
   const selectedStudents = audienceStudents.filter((student) =>
     post.studentIds.includes(student.id),
   );
@@ -145,7 +166,14 @@ export default function ActivityComposerPage() {
   }
 
   const audienceValid =
-    Boolean(post.classId) && post.studentIds.length > 0 && consentBlockedSelected.length === 0;
+    post.audienceMode === 'whole'
+      ? Boolean(post.classId)
+      : Boolean(post.classId) &&
+        post.studentIds.length > 0 &&
+        consentBlockedSelected.length === 0;
+  const willRequireApproval =
+    post.audienceMode === 'students' ||
+    categoriesRequiringApproval.has(post.category);
   const contentValid =
     post.title.trim().length >= 2 &&
     post.caption.trim().length >= 2 &&
@@ -163,9 +191,9 @@ export default function ActivityComposerPage() {
       sectionId: post.sectionId || null,
       title: post.title.trim(),
       caption: post.caption.trim(),
+      askAtHome: post.askAtHome.trim() || null,
       category: post.category,
-      audienceType: 'STUDENT',
-      studentIds: post.studentIds,
+      studentIds: post.audienceMode === 'students' ? post.studentIds : [],
       attachments,
     });
   }
@@ -174,7 +202,7 @@ export default function ActivityComposerPage() {
     <DashboardPageShell>
       <PageHeader
         title="Create activity"
-        description="Audience, consent, content, and media in one guided submission. Guardians are notified after moderation approves the post."
+        description="Whole-class and section updates publish immediately. Individually-tagged, achievement, and competition posts go to moderation first."
         actions={
           <button
             type="button"
@@ -214,6 +242,7 @@ export default function ActivityComposerPage() {
           classes={classes}
           sections={postSections}
           students={audienceStudents}
+          mediaConsent={audienceMediaConsent}
           isLoading={audiencePreviewQuery.isLoading}
           toggleStudent={toggleStudent}
           consentBlockedSelected={consentBlockedSelected}
@@ -242,6 +271,7 @@ export default function ActivityComposerPage() {
             postSections.find((item) => item.id === post.sectionId)?.name ?? 'Whole class'
           }
           fileCount={files.length}
+          willRequireApproval={willRequireApproval}
           isPending={postMutation.isPending}
           mutationError={postMutation.isError ? postMutation.error.message : null}
           canSubmit={audienceValid && contentValid && !postMutation.isPending}
@@ -281,6 +311,7 @@ function AudienceStep({
   classes,
   sections,
   students,
+  mediaConsent,
   isLoading,
   toggleStudent,
   consentBlockedSelected,
@@ -290,6 +321,7 @@ function AudienceStep({
   classes: Array<{ id: string; name: string }>;
   sections: SectionSummaryForUi[];
   students: ActivityAudiencePreview['students'];
+  mediaConsent: ActivityAudiencePreview['mediaConsent'] | null;
   isLoading: boolean;
   toggleStudent: (studentId: string) => void;
   consentBlockedSelected: ActivityAudiencePreview['students'];
@@ -299,8 +331,27 @@ function AudienceStep({
       <div>
         <h2 className="text-lg font-black text-slate-950">Audience and consent</h2>
         <p className="mt-1 text-sm text-slate-500">
-          Select the assigned class/section and tag every student visible in the media.
+          Most updates go to the whole class or section. Tag individual students only for
+          achievements, competitions, or student-specific notes.
         </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {audienceModes.map((mode) => (
+          <button
+            key={mode}
+            type="button"
+            onClick={() => setPost((current) => ({ ...current, audienceMode: mode }))}
+            className={cn(
+              'inline-flex h-10 items-center gap-2 rounded-xl border px-4 text-xs font-black uppercase tracking-widest transition-colors',
+              post.audienceMode === mode
+                ? 'border-[var(--color-mod-activity-accent)] bg-[var(--color-mod-activity-accent)] text-white'
+                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+            )}
+          >
+            {mode === 'whole' ? 'Whole class / section' : 'Selected students'}
+          </button>
+        ))}
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -345,53 +396,73 @@ function AudienceStep({
         </FormField>
       </div>
 
-      <div className="space-y-4 rounded-xl border border-slate-100 bg-slate-50 p-6">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-bold text-slate-900">Tagged students</p>
-          <Badge variant="secondary" className="text-xs font-bold">
-            {post.studentIds.length} selected
-          </Badge>
-        </div>
-        <div className="flex flex-wrap gap-2">
+      {post.audienceMode === 'whole' ? (
+        <div className="space-y-2 rounded-xl border border-slate-100 bg-slate-50 p-6">
+          <p className="text-sm font-bold text-slate-900">
+            {Boolean(post.classId) ? 'Posting to the whole class/section' : 'Select a class to continue'}
+          </p>
           {isLoading ? (
             <LoadingState />
-          ) : students.length > 0 ? (
-            students.map((student) => {
-              const selected = post.studentIds.includes(student.id);
-              return (
-                <button
-                  key={student.id}
-                  type="button"
-                  disabled={!student.mediaConsentGranted}
-                  onClick={() => toggleStudent(student.id)}
-                  className={cn(
-                    'inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-xs font-bold transition-all disabled:cursor-not-allowed disabled:opacity-50',
-                    selected
-                      ? 'bg-[var(--color-mod-activity-accent)] text-white shadow-sm'
-                      : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-300',
-                  )}
-                >
-                  {!student.mediaConsentGranted ? <Lock className="h-3.5 w-3.5" /> : null}
-                  {student.fullName}
-                </button>
-              );
-            })
-          ) : (
-            <EmptyState
-              title="No students"
-              description="No students found for this class/section."
-              className="bg-white"
-            />
-          )}
+          ) : mediaConsent && (mediaConsent.grantedStudentCount + mediaConsent.blockedStudentCount > 0) ? (
+            <p className="text-xs font-medium text-slate-600">
+              {mediaConsent.grantedStudentCount} of{' '}
+              {mediaConsent.grantedStudentCount + mediaConsent.blockedStudentCount} students have
+              active photo consent.
+              {mediaConsent.blockedStudentCount > 0
+                ? ` ${mediaConsent.blockedStudentCount} student${mediaConsent.blockedStudentCount === 1 ? '' : 's'} without consent won't see media in this post — switch to "Selected students" to tag individuals directly.`
+                : ''}
+            </p>
+          ) : null}
         </div>
-        {consentBlockedSelected.length > 0 ? (
-          <p className="rounded-lg border border-danger-100 bg-danger-50 px-4 py-3 text-xs font-bold text-danger-700">
-            {consentBlockedSelected.length} tagged student
-            {consentBlockedSelected.length === 1 ? '' : 's'} lack active photo consent and must be
-            removed before publishing.
-          </p>
-        ) : null}
-      </div>
+      ) : (
+        <div className="space-y-4 rounded-xl border border-slate-100 bg-slate-50 p-6">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-bold text-slate-900">Tagged students</p>
+            <Badge variant="secondary" className="text-xs font-bold">
+              {post.studentIds.length} selected
+            </Badge>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {isLoading ? (
+              <LoadingState />
+            ) : students.length > 0 ? (
+              students.map((student) => {
+                const selected = post.studentIds.includes(student.id);
+                return (
+                  <button
+                    key={student.id}
+                    type="button"
+                    disabled={!student.mediaConsentGranted}
+                    onClick={() => toggleStudent(student.id)}
+                    className={cn(
+                      'inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-xs font-bold transition-all disabled:cursor-not-allowed disabled:opacity-50',
+                      selected
+                        ? 'bg-[var(--color-mod-activity-accent)] text-white shadow-sm'
+                        : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-300',
+                    )}
+                  >
+                    {!student.mediaConsentGranted ? <Lock className="h-3.5 w-3.5" /> : null}
+                    {student.fullName}
+                  </button>
+                );
+              })
+            ) : (
+              <EmptyState
+                title="No students"
+                description="No students found for this class/section."
+                className="bg-white"
+              />
+            )}
+          </div>
+          {consentBlockedSelected.length > 0 ? (
+            <p className="rounded-lg border border-danger-100 bg-danger-50 px-4 py-3 text-xs font-bold text-danger-700">
+              {consentBlockedSelected.length} tagged student
+              {consentBlockedSelected.length === 1 ? '' : 's'} lack active photo consent and must be
+              removed before publishing.
+            </p>
+          ) : null}
+        </div>
+      )}
     </section>
   );
 }
@@ -456,6 +527,21 @@ function ContentStep({
           onChange={(event) => setPost((current) => ({ ...current, caption: event.target.value }))}
           placeholder="What happened in class today?"
         />
+      </FormField>
+
+      <FormField label="Ask your child about... (optional)">
+        <TextArea
+          rows={2}
+          value={post.askAtHome}
+          onChange={(event) =>
+            setPost((current) => ({ ...current, askAtHome: event.target.value }))
+          }
+          placeholder="e.g. Ask your child to name one object of each colour they found today."
+          maxLength={280}
+        />
+        <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+          Shown to parents as a simple way to talk about school at home.
+        </p>
       </FormField>
 
       <FormField label="Photos">
@@ -541,6 +627,7 @@ function ReviewStep({
   className,
   sectionName,
   fileCount,
+  willRequireApproval,
   isPending,
   mutationError,
   canSubmit,
@@ -552,6 +639,7 @@ function ReviewStep({
   className: string;
   sectionName: string;
   fileCount: number;
+  willRequireApproval: boolean;
   isPending: boolean;
   mutationError: string | null;
   canSubmit: boolean;
@@ -562,8 +650,9 @@ function ReviewStep({
       <div>
         <h2 className="text-lg font-black text-slate-950">Review and submit</h2>
         <p className="mt-1 text-sm text-slate-500">
-          Submitting sends this activity to the moderation queue for approval before guardians see
-          it.
+          {willRequireApproval
+            ? 'This post tags individual students or is an achievement/competition update, so it goes to moderation before guardians see it.'
+            : 'This publishes immediately to guardians in the selected class/section — no moderation queue.'}
         </p>
       </div>
 
@@ -575,13 +664,22 @@ function ReviewStep({
       </dl>
 
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
-        <p className="mb-2 text-xs font-bold text-slate-500">Tagged students</p>
+        <p className="mb-2 text-xs font-bold text-slate-500">Audience</p>
         <p className="text-xs font-medium leading-relaxed text-slate-700">
-          {selectedStudents.length > 0
-            ? selectedStudents.map((student) => student.fullName).join(', ')
-            : 'No students tagged yet.'}
+          {post.audienceMode === 'whole'
+            ? `Whole ${sectionName === 'Whole class' ? 'class' : 'section'} (${className} / ${sectionName})`
+            : selectedStudents.length > 0
+              ? selectedStudents.map((student) => student.fullName).join(', ')
+              : 'No students tagged yet.'}
         </p>
       </div>
+
+      {post.askAtHome.trim() ? (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+          <p className="mb-2 text-xs font-bold text-slate-500">Ask your child about...</p>
+          <p className="text-xs font-medium leading-relaxed text-slate-700">{post.askAtHome}</p>
+        </div>
+      ) : null}
 
       {consentBlockedSelected.length > 0 ? (
         <p className="rounded-lg border border-danger-100 bg-danger-50 px-4 py-3 text-xs font-bold text-danger-700">
@@ -602,7 +700,7 @@ function ReviewStep({
         onClick={onSubmit}
         className="h-14 w-full rounded-xl bg-[var(--color-mod-activity-accent)] text-xs font-bold uppercase tracking-widest text-white shadow-sm transition-all hover:bg-[var(--color-mod-activity-text)] disabled:opacity-50"
       >
-        {isPending ? 'Submitting...' : 'Submit for approval'}
+        {isPending ? 'Submitting...' : willRequireApproval ? 'Submit for approval' : 'Publish'}
       </button>
     </section>
   );

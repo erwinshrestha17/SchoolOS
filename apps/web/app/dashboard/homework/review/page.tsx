@@ -1,16 +1,15 @@
 'use client';
 
-import { PageHeader } from '../../../../components/ui/page-header';
-import { TimetableWorkspace } from '../../../../components/timetable/timetable-workspace';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { LoadingState } from '../../../../components/ui/loading-state';
 
 export default function HomeworkReviewPage() {
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Homework Review"
-        description="Review submissions, record feedback, and manage correction workflow from the live Homework workspace."
-      />
-      <TimetableWorkspace initialSection="Homework" />
-    </div>
-  );
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace('/dashboard/homework?tab=completion');
+  }, [router]);
+
+  return <LoadingState variant="page" label="Redirecting to Homework..." />;
 }

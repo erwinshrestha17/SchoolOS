@@ -25,18 +25,30 @@ import { StatusBadge } from '../../../components/ui/status-badge';
 import { Select } from '../../../components/ui/form-field';
 
 const activityCategories = [
-  'LEARNING',
-  'OUTDOOR_PLAY',
+  'CLASSROOM_LEARNING',
   'ART_AND_CRAFT',
-  'CELEBRATION',
+  'MUSIC_AND_DANCE',
   'SPORTS',
-  'GENERAL',
+  'SCIENCE_AND_PRACTICAL',
+  'PROJECT_WORK',
+  'EDUCATIONAL_TOUR',
+  'HEALTH_AND_HYGIENE',
+  'COMPETITION',
+  'ASSEMBLY',
+  'CLUB_ACTIVITY',
+  'COMMUNITY_SERVICE',
+  'FESTIVAL_AND_CULTURE',
+  'NATIONAL_PROGRAMME',
+  'ACHIEVEMENT',
+  'PRESCHOOL_ACTIVITY',
+  'OTHER',
 ] as const;
 
 const activityStatuses = [
   'DRAFT',
   'PENDING_APPROVAL',
   'APPROVED',
+  'NEEDS_CORRECTION',
   'REJECTED',
   'ARCHIVED',
 ] as const;

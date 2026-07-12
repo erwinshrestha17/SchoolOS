@@ -10,4 +10,9 @@ export class UpdateActivityPostDto {
   @IsString()
   @MaxLength(2000)
   caption?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(280)
+  askAtHome?: string;
 }

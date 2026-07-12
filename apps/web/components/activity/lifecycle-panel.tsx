@@ -49,7 +49,8 @@ export function LifecyclePanel({
     !post.status ||
     post.status === 'DRAFT' ||
     post.status === 'PENDING_APPROVAL' ||
-    post.status === 'REJECTED';
+    post.status === 'REJECTED' ||
+    post.status === 'NEEDS_CORRECTION';
   const needsRejectReason = moderationReason.trim().length >= 5;
   const canDelete = deleteReason.trim().length >= 5;
   const canRestore = Boolean(post.softDeletedAt) || post.status === 'REJECTED';
@@ -123,6 +124,14 @@ export function LifecyclePanel({
             className="h-10 rounded-xl bg-emerald-600 px-4 text-xs font-black uppercase tracking-widest text-white disabled:opacity-50"
           >
             Approve
+          </button>
+          <button
+            type="button"
+            onClick={() => onModerate('NEEDS_CORRECTION')}
+            disabled={isModerating || !needsRejectReason}
+            className="h-10 rounded-xl bg-amber-600 px-4 text-xs font-black uppercase tracking-widest text-white disabled:opacity-50"
+          >
+            Request correction
           </button>
           <button
             type="button"

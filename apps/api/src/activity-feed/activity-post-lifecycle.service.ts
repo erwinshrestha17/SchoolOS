@@ -3,10 +3,15 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ActivityPostStatus, Prisma } from '@prisma/client';
+import {
+  ActivityPostStatus,
+  ConsentType,
+  NotificationChannel,
+} from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
+import { CommunicationsService } from '../communications/communications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   DeleteActivityPostDto,
@@ -20,6 +25,7 @@ export class ActivityPostLifecycleService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly communicationsService: CommunicationsService,
   ) {}
 
   async updatePost(
@@ -48,10 +54,12 @@ export class ActivityPostLifecycleService {
       data: {
         title: dto.title,
         caption: dto.caption,
+        askAtHome: dto.askAtHome,
         editedAt: new Date(),
         editedById: actor.userId,
         status:
-          post.status === ActivityPostStatus.REJECTED
+          post.status === ActivityPostStatus.REJECTED ||
+          post.status === ActivityPostStatus.NEEDS_CORRECTION
             ? ActivityPostStatus.PENDING_APPROVAL
             : undefined,
       },
@@ -174,9 +182,19 @@ export class ActivityPostLifecycleService {
       throw new ForbiddenException('Deleted activity post cannot be moderated');
     }
 
-    if (dto.status === ActivityPostStatus.REJECTED && !dto.reason?.trim()) {
-      throw new ForbiddenException('Rejection reason is required');
+    if (
+      (dto.status === ActivityPostStatus.REJECTED ||
+        dto.status === ActivityPostStatus.NEEDS_CORRECTION) &&
+      !dto.reason?.trim()
+    ) {
+      throw new ForbiddenException(
+        'A reason is required to reject or request a correction',
+      );
     }
+
+    const isNewlyApproved =
+      dto.status === ActivityPostStatus.APPROVED &&
+      post.status !== ActivityPostStatus.APPROVED;
 
     const updated = await this.prisma.activityPost.update({
       where: { id: postId },
@@ -191,6 +209,29 @@ export class ActivityPostLifecycleService {
             : post.publishedAt,
       },
     });
+
+    if (isNewlyApproved) {
+      const studentTags = await this.prisma.activityPostStudent.findMany({
+        where: { activityPostId: post.id, tenantId: actor.tenantId },
+        select: { studentId: true },
+      });
+
+      await this.communicationsService.recordDeliveryRecords({
+        actor,
+        sourceType: 'activity_post',
+        sourceId: post.id,
+        activityPostId: post.id,
+        audienceType: post.audienceType,
+        classId: post.classId,
+        sectionId: post.sectionId,
+        studentIds: studentTags.map((tag) => tag.studentId),
+        title: post.title,
+        body: post.caption,
+        channels: [NotificationChannel.PUSH],
+        requiredConsentTypes: [ConsentType.PHOTO_USAGE],
+        activeStudentsOnly: true,
+      });
+    }
 
     await this.auditService.record({
       action: 'moderate',

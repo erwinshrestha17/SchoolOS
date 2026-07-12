@@ -36,6 +36,12 @@ import {
   SendHomeworkReminderDto,
 } from './dto/reminder.dto';
 import { UpdateHomeworkDto } from './dto/update-homework.dto';
+import { PublishHomeworkDto } from './dto/publish-homework.dto';
+import { BulkCompleteRegisterDto } from './dto/register.dto';
+import {
+  HomeworkSummaryQueryDto,
+  HomeworkWorkloadQueryDto,
+} from './dto/homework-summary-query.dto';
 import { HomeworkAttachmentAccessService } from './homework-attachment-access.service';
 import { HomeworkService } from './homework.service';
 
@@ -77,6 +83,24 @@ export class HomeworkController {
     return this.homeworkService.listTemplates(auth, query);
   }
 
+  @Get('summary/today')
+  @Permissions('homework:read')
+  getSummaryToday(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: HomeworkSummaryQueryDto,
+  ) {
+    return this.homeworkService.getHomeworkSummaryToday(auth, query);
+  }
+
+  @Get('workload')
+  @Permissions('homework:read')
+  getWorkload(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: HomeworkWorkloadQueryDto,
+  ) {
+    return this.homeworkService.getHomeworkWorkload(auth, query);
+  }
+
   @Get(':id')
   @Permissions('homework:read')
   getHomework(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
@@ -101,8 +125,12 @@ export class HomeworkController {
 
   @Patch(':id/publish')
   @Permissions('homework:update')
-  publishHomework(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
-    return this.homeworkService.assignHomework(id, auth);
+  publishHomework(
+    @Param('id') id: string,
+    @Body() dto: PublishHomeworkDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.homeworkService.assignHomework(id, auth, dto.notify);
   }
 
   @Patch(':id/close')
@@ -186,6 +214,38 @@ export class HomeworkController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.homeworkService.requestCorrection(submissionId, dto, auth);
+  }
+
+  // --- Completion register ---
+
+  @Get(':id/register')
+  @Permissions('homework:read')
+  getRegister(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
+    return this.homeworkService.getHomeworkRegister(auth, id);
+  }
+
+  @Patch(':id/register/bulk-complete')
+  @Permissions('homework:submit')
+  bulkCompleteRegister(
+    @Param('id') id: string,
+    @Body() dto: BulkCompleteRegisterDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.homeworkService.bulkCompleteHomeworkRegister(id, dto, auth);
+  }
+
+  @Patch('submissions/:submissionId/status')
+  @Permissions('homework:submit')
+  updateSubmissionStatusRoute(
+    @Param('submissionId') submissionId: string,
+    @Body() dto: UpdateHomeworkSubmissionStatusDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.homeworkService.updateSubmissionStatus(
+      submissionId,
+      dto,
+      auth,
+    );
   }
 
   // --- Reminders ---

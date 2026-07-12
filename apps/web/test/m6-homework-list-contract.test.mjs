@@ -5,6 +5,10 @@ import { describe, it } from "node:test";
 const webRoot = new URL("../", import.meta.url);
 const read = (path) => readFileSync(new URL(path, webRoot), "utf8");
 
+// Rewritten for the M6 homework redesign (fuzzy-gliding-hopper.md): homework
+// is now a standalone, single-route, 4-tab workspace fully decoupled from
+// timetable, with 5 backend-driven KPI cards and no "Supporting homework
+// tools" disclosure — Templates and Completion are real tabs now.
 describe("M6 homework list contract", () => {
   it("uses the backend page contract with URL-backed filters and pagination", () => {
     const page = read("app/dashboard/homework/page.tsx");
@@ -20,7 +24,7 @@ describe("M6 homework list contract", () => {
     assert.match(page, /filters\.sectionId/);
     assert.match(page, /filters\.subjectId/);
     assert.match(page, /filters\.status/);
-    assert.match(page, /limit: HOMEWORK_PAGE_SIZE/);
+    assert.match(page, /HOMEWORK_PAGE_SIZE/);
     assert.match(page, /<TablePagination/);
     assert.match(page, /homeworkMeta\.total/);
     assert.match(page, /setFilters\(\{ page \}\)/);
@@ -43,7 +47,7 @@ describe("M6 homework list contract", () => {
   it("uses backend submission counts instead of a fabricated progress bar", () => {
     const page = read("app/dashboard/homework/page.tsx");
 
-    assert.match(page, /row\.submissionSummary\?\.total/);
+    assert.match(page, /submissionSummary\?\.total/);
     assert.doesNotMatch(page, /row\.submissions\?\.length/);
     assert.doesNotMatch(page, /Math\.min\(100,[\s\S]*submissions/);
   });
@@ -61,59 +65,45 @@ describe("M6 homework list contract", () => {
     assert.match(page, /canReviewHomework/);
   });
 
-  it("sources the Due Today and Substitutions KPI cards from the real M6 operational summary", () => {
+  it("sources the 5 summary cards from the real per-role backend endpoint", () => {
     const page = read("app/dashboard/homework/page.tsx");
-    const shell = read("components/layout/dashboard-shell.tsx");
 
-    // The generic bounded operational-summary contract already computes
-    // these two metrics — no more hardcoded "no contract exposed" text.
-    assert.match(page, /api\.getModuleSummary\("homework-timetable"\)/);
-    assert.match(page, /homeworkDueToday/);
-    assert.match(page, /unassignedSubstitutionsToday/);
-    assert.doesNotMatch(
-      page,
-      /No module-owned due-soon summary contract is exposed/,
-    );
-    assert.doesNotMatch(page, /Open the scoped substitution workspace/);
-    assert.match(page, /href="\/dashboard\/homework"/);
-    assert.match(page, /href="\/dashboard\/timetable\/substitutions"/);
-    assert.match(page, /loading=\{operationalSummaryQuery\.isLoading\}/);
-    assert.doesNotMatch(page, /return "Loading"/);
-    assert.doesNotMatch(page, /isOperationalSummaryReady/);
-    assert.doesNotMatch(
-      shell,
-      /'\/dashboard\/(?:homework|timetable)':\s*'homework-timetable'/,
-    );
+    // Regression guard for the recurring "loading-literal" KPI bug: value
+    // must never fall back to the bare string "Loading" — a separate
+    // `loading` prop drives the spinner state instead.
+    assert.doesNotMatch(page, /value=\{isLoading \? ['"]Loading['"]/);
+    assert.match(page, /api\.getHomeworkSummaryToday\(\)/);
+    assert.match(page, /summary\?\.givenToday/);
+    assert.match(page, /summary\?\.dueToday/);
+    assert.match(page, /summary\?\.notChecked/);
+    assert.match(page, /summary\?\.incompleteStudents/);
+    assert.match(page, /summary\?\.classesWithoutHomework/);
+    assert.doesNotMatch(page, /api\.getModuleSummary\("homework-timetable"\)/);
   });
 
-  it("keeps the M6 header within the tab and KPI budgets", () => {
+  it("keeps the header within the 4-tab / 5-KPI budget and fully decoupled from timetable", () => {
     const page = read("app/dashboard/homework/page.tsx");
 
-    assert.equal((page.match(/href: "\/dashboard\/(?:homework|timetable)/g) ?? []).length, 6);
-    assert.match(page, /label: "Timetable"/);
-    assert.doesNotMatch(page, /label: "Reports"/);
-    assert.equal((page.match(/<KpiCard/g) ?? []).length, 6);
+    assert.equal(
+      (page.match(/\{ value: "(?:today|all|completion|templates)", label: /g) ?? [])
+        .length,
+      4,
+    );
+    assert.equal((page.match(/<KpiCard/g) ?? []).length, 5);
     assert.doesNotMatch(page, /title="Homework Assigned"/);
     assert.doesNotMatch(page, /title="Pending Submissions"/);
     assert.doesNotMatch(page, /title="Timetable Conflicts"/);
     assert.doesNotMatch(page, /title="Teacher Workload"/);
+    assert.doesNotMatch(page, /\/dashboard\/timetable/);
+    assert.doesNotMatch(page, /Supporting homework tools/);
   });
 
-  it("loads lower-page supporting tools only after explicit disclosure", () => {
+  it("gates the Templates and Completion tabs' queries behind the active tab", () => {
     const page = read("app/dashboard/homework/page.tsx");
 
-    assert.match(page, /type SupportingHomeworkView/);
-    assert.match(page, /Supporting homework tools/);
-    assert.match(page, /<SupportingToolButton/);
-    assert.match(page, /aria-pressed=\{selected\}/);
-    assert.match(page, /supportingView === "templates" \? \(/);
-    assert.match(page, /supportingView === "reminders" \? \(/);
-    assert.match(page, /supportingView === "reports" \? \(/);
-    assert.match(page, /enabled: supportingView === "templates"/);
-    assert.match(page, /enabled: supportingView === "reminders"/);
-    assert.match(
-      page,
-      /supportingView === "reports" && Boolean\(filters\.academicYearId\)/,
-    );
+    assert.match(page, /enabled: activeTab === "templates"/);
+    assert.match(page, /enabled: activeTab === "completion"/);
+    assert.match(page, /api\.listHomeworkTemplates/);
+    assert.match(page, /api\.getHomeworkCompletionReport/);
   });
 });

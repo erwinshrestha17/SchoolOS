@@ -77,6 +77,7 @@ function ParentActivityCard({ post }: { post: ActivityPost }) {
             </h2>
             <p className="mt-1 text-xs font-bold uppercase tracking-widest text-slate-400">
               {post.publishedAt ? formatDateTime(post.publishedAt) : "Shared"}
+              {post.teacherName ? ` · ${post.teacherName}` : ""}
             </p>
           </div>
           <Badge variant="info">{formatLabel(post.category)}</Badge>
@@ -85,6 +86,17 @@ function ParentActivityCard({ post }: { post: ActivityPost }) {
         <p className="text-sm leading-6 text-slate-600">
           {post.caption ?? post.body ?? "No activity note was added."}
         </p>
+
+        {post.askAtHome ? (
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-emerald-800">
+            <p className="text-xs font-black uppercase tracking-widest">
+              Ask your child about
+            </p>
+            <p className="mt-1 text-xs font-semibold leading-5">
+              {post.askAtHome}
+            </p>
+          </div>
+        ) : null}
 
         {hiddenMediaCount > 0 ? (
           <div className="flex items-start gap-3 rounded-2xl border border-amber-100 bg-amber-50 p-3 text-amber-800">

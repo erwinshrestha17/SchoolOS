@@ -8,7 +8,6 @@ import {
   ActivityPostStatus,
   AudienceType,
   ConsentType,
-  NotificationChannel,
   StorageProvider,
 } from '@prisma/client';
 import { Job } from 'bullmq';
@@ -176,6 +175,7 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
       prisma as unknown as PrismaService,
       auditService as unknown as AuditService,
       eventEmitter as unknown as EventEmitter2,
+      communicationsService as unknown as CommunicationsService,
     );
     mediaProcessor = new ActivityMediaProcessor(
       prisma as unknown as PrismaService,
@@ -236,17 +236,10 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
         fileAssetId: 'file-asset-1',
       }),
     ]);
-    expect(communicationsService.recordDeliveryRecords).toHaveBeenCalledWith(
-      expect.objectContaining({
-        actor: teacherActor,
-        sourceType: 'activity_post',
-        sourceId: post.id,
-        activityPostId: post.id,
-        channels: [NotificationChannel.PUSH],
-        requiredConsentTypes: [ConsentType.PHOTO_USAGE],
-        studentIds: ['student-1'],
-      }),
-    );
+    // Individually-tagged posts (audienceType STUDENT) require moderator
+    // approval, so guardian delivery is deferred until approval rather than
+    // dispatched at creation time.
+    expect(communicationsService.recordDeliveryRecords).not.toHaveBeenCalled();
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'create',

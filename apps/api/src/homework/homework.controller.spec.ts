@@ -90,7 +90,7 @@ describe('HomeworkController M6 contracts', () => {
     homeworkService.closeHomework.mockReturnValue({ status: 'CLOSED' });
     homeworkService.cancelHomework.mockReturnValue({ status: 'CANCELLED' });
 
-    expect(controller.publishHomework('homework-1', actor)).toEqual({
+    expect(controller.publishHomework('homework-1', {}, actor)).toEqual({
       status: 'ASSIGNED',
     });
     expect(controller.closeHomework('homework-1', actor)).toEqual({
@@ -102,6 +102,7 @@ describe('HomeworkController M6 contracts', () => {
     expect(homeworkService.assignHomework).toHaveBeenCalledWith(
       'homework-1',
       actor,
+      undefined,
     );
     expect(homeworkService.closeHomework).toHaveBeenCalledWith(
       'homework-1',

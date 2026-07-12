@@ -351,6 +351,21 @@ enum ActivityCategory {
   CELEBRATION
   SPORTS
   GENERAL
+  CLASSROOM_LEARNING
+  MUSIC_AND_DANCE
+  SCIENCE_AND_PRACTICAL
+  PROJECT_WORK
+  EDUCATIONAL_TOUR
+  HEALTH_AND_HYGIENE
+  COMPETITION
+  ASSEMBLY
+  CLUB_ACTIVITY
+  COMMUNITY_SERVICE
+  FESTIVAL_AND_CULTURE
+  NATIONAL_PROGRAMME
+  ACHIEVEMENT
+  PRESCHOOL_ACTIVITY
+  OTHER
 }
 
 enum MoodValue {
@@ -460,6 +475,20 @@ enum HomeworkSubmissionStatus {
   REVIEWED
   NEEDS_CORRECTION
   EXCUSED
+  COMPLETED
+  INCOMPLETE
+  PARTIALLY_COMPLETED
+  ABSENT
+}
+
+enum HomeworkSubmissionMethod {
+  PHYSICAL_NOTEBOOK
+  CLASSWORK_COPY
+  PROJECT_FILE
+  ORAL_PREPARATION
+  MEMORIZATION
+  ONLINE_ATTACHMENT
+  NO_SUBMISSION_REQUIRED
 }
 
 enum TimetableVersionStatus {
@@ -714,6 +743,7 @@ enum ActivityPostStatus {
   PENDING_APPROVAL
   APPROVED
   REJECTED
+  NEEDS_CORRECTION
   ARCHIVED
 }
 
@@ -1574,6 +1604,7 @@ model ActivityPost {
   clientSubmissionId String?
   title            String
   caption          String
+  askAtHome        String?
   category         ActivityCategory   @default(GENERAL)
   audienceType     AudienceType       @default(CLASS)
   status           ActivityPostStatus @default(PENDING_APPROVAL)
@@ -4136,6 +4167,8 @@ model HomeworkAssignment {
   dueAt              DateTime
   status             HomeworkAssignmentStatus @default(DRAFT)
   submissionRequired Boolean                  @default(true)
+  submissionMethod   HomeworkSubmissionMethod @default(PHYSICAL_NOTEBOOK)
+  parentInstructions String?
   attachmentMetadata Json?
   maxScore           Decimal?                 @db.Decimal(8, 2)
   createdAt          DateTime                 @default(now())

@@ -7,6 +7,7 @@ model ActivityPost {
   clientSubmissionId String?
   title            String
   caption          String
+  askAtHome        String?
   category         ActivityCategory   @default(GENERAL)
   audienceType     AudienceType       @default(CLASS)
   status           ActivityPostStatus @default(PENDING_APPROVAL)

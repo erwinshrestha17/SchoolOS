@@ -103,6 +103,51 @@ export type HomeworkMissingLateReportRow = {
   status: string;
 };
 
+export type HomeworkSummaryToday = {
+  givenToday: number;
+  dueToday: number;
+  notChecked: number;
+  incompleteStudents: number;
+  classesWithoutHomework: number;
+};
+
+export type HomeworkWorkloadLevel = 'LIGHT' | 'NORMAL' | 'HEAVY';
+
+export type HomeworkWorkload = {
+  classId: string;
+  sectionId: string | null;
+  date: string;
+  count: number;
+  level: HomeworkWorkloadLevel;
+};
+
+export type HomeworkPublishNotifyChoice =
+  | 'NOTIFY_NOW'
+  | 'DO_NOT_SEND'
+  | 'IN_APP_ONLY';
+
+export type HomeworkFollowUpFlag = {
+  flagged: boolean;
+  incompleteCount: number;
+  consideredCount: number;
+};
+
+export type HomeworkRegisterRow = {
+  submissionId: string;
+  studentId: string;
+  studentName: string;
+  rollNumber?: string | null;
+  status: string;
+  teacherRemarks?: string | null;
+  followUp: HomeworkFollowUpFlag;
+};
+
+export type HomeworkRegister = {
+  homeworkId: string;
+  submissionMethod: string;
+  roster: HomeworkRegisterRow[];
+};
+
 export type HomeworkListParams = {
   studentId?: string;
   classId?: string;
@@ -654,20 +699,20 @@ export const academicsApi = {
       method: 'PATCH',
       json: body,
     }),
-  publishHomework: (id: string) =>
+  publishHomework: (id: string, notify?: HomeworkPublishNotifyChoice) =>
     request<HomeworkAssignmentSummary>(
       `/homework/${encodeURIComponent(id)}/publish`,
       {
         method: 'PATCH',
-        json: {},
+        json: notify ? { notify } : {},
       },
     ),
-  assignHomework: (id: string) =>
+  assignHomework: (id: string, notify?: HomeworkPublishNotifyChoice) =>
     request<HomeworkAssignmentSummary>(
       `/homework/${encodeURIComponent(id)}/publish`,
       {
         method: 'PATCH',
-        json: {},
+        json: notify ? { notify } : {},
       },
     ),
   closeHomework: (id: string) =>
@@ -732,6 +777,35 @@ export const academicsApi = {
     request<HomeworkMissingLateReportRow[]>(
       withQuery('/homework/reports/missing-late', params),
     ),
+  getHomeworkSummaryToday: (params?: { date?: string }) =>
+    request<HomeworkSummaryToday>(
+      withQuery('/homework/summary/today', params ?? {}),
+    ),
+  getHomeworkWorkload: (params: {
+    classId: string;
+    sectionId?: string;
+    date?: string;
+  }) => request<HomeworkWorkload>(withQuery('/homework/workload', params)),
+  getHomeworkRegister: (homeworkId: string) =>
+    request<HomeworkRegister>(
+      `/homework/${encodeURIComponent(homeworkId)}/register`,
+    ),
+  bulkCompleteHomeworkRegister: (
+    homeworkId: string,
+    body: { studentIds?: string[]; excludeStudentIds?: string[] } = {},
+  ) =>
+    request<HomeworkRegister>(
+      `/homework/${encodeURIComponent(homeworkId)}/register/bulk-complete`,
+      { method: 'PATCH', json: body },
+    ),
+  updateHomeworkSubmissionStatus: (
+    submissionId: string,
+    body: { status: string; teacherRemarks?: string },
+  ) =>
+    request<HomeworkSubmissionSummary>(
+      `/homework/submissions/${encodeURIComponent(submissionId)}/status`,
+      { method: 'PATCH', json: body },
+    ),
   getHomeworkAttachmentPreviewUrl: (attachmentId: string) =>
     request<HomeworkAttachmentAccess>(
       `/homework/attachments/${encodeURIComponent(attachmentId)}/preview-url`,
@@ -773,7 +847,11 @@ export const academicsApi = {
       `/homework/submissions/${encodeURIComponent(submissionId)}/request-correction`,
       { method: 'PATCH', json: body },
     ),
-  submitHomework: (body: { submissionId: string; content?: string }) =>
+  submitHomework: (body: {
+    submissionId: string;
+    content?: string;
+    attachmentIds?: string[];
+  }) =>
     request<HomeworkSubmissionSummary>('/homework/submit', {
       method: 'POST',
       json: body,

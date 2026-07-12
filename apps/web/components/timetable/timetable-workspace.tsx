@@ -7,19 +7,15 @@ import { useSession } from '../session-provider';
 import { TimetableBuilderTab } from './tabs/timetable-builder-tab';
 import { TeacherWorkloadTab } from './tabs/teacher-workload-tab';
 import { SubstitutionsTab } from './tabs/substitutions-tab';
-import { HomeworkTab } from './tabs/homework-tab';
-import { StudentHomeworkTab } from './tabs/student-homework-tab';
 import { StudentTimetableTab } from './tabs/student-timetable-tab';
 
 const adminSections = [
   'Timetable Builder',
   'Teacher Workload',
   'Substitutions',
-  'Homework',
 ] as const;
 
 const studentSections = [
-  'My Homework',
   'My Timetable',
 ] as const;
 
@@ -92,24 +88,6 @@ export function TimetableWorkspace({ initialSection }: TimetableWorkspaceProps =
 
   if (section === 'Substitutions') {
     return <SubstitutionsTab />;
-  }
-
-  if (section === 'Homework') {
-    return (
-      <HomeworkTab
-        academicYears={academicYearsQuery.data ?? []}
-        classes={classesQuery.data ?? []}
-        allSections={sectionsQuery.data ?? []}
-        subjects={subjectsQuery.data ?? []}
-        staff={staffQuery.data ?? []}
-        classId={classId}
-        setClassId={setClassId}
-      />
-    );
-  }
-
-  if (section === 'My Homework') {
-    return <StudentHomeworkTab />;
   }
 
   return <StudentTimetableTab />;

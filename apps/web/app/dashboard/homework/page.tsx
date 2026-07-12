@@ -1,21 +1,17 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import {
   AlertCircle,
   BarChart3,
-  Bell,
   BookOpen,
   Calendar,
   CheckCircle2,
-  ClipboardCheck,
+  ClipboardList,
   FileText,
   Plus,
-  RefreshCcw,
   Search,
-  Settings,
   Users,
 } from "lucide-react";
 import Link from "next/link";
@@ -26,11 +22,7 @@ import {
 } from "@schoolos/core";
 
 import { ApiRequestError, api } from "../../../lib/api";
-import type {
-  HomeworkCompletionReportRow,
-  HomeworkMissingLateReportRow,
-  HomeworkReminderBatchSummary,
-} from "../../../lib/api";
+import type { HomeworkCompletionReportRow } from "../../../lib/api";
 import { DashboardPageShell } from "../../../components/dashboard/dashboard-page-shell";
 import { FilterBar } from "../../../components/dashboard/filter-bar";
 import { DataTable } from "../../../components/ui/data-table";
@@ -44,7 +36,7 @@ import { Input } from "../../../components/ui/input";
 import { Select } from "../../../components/ui/select";
 import { PermissionDenied } from "../../../components/ui/permission-denied";
 import { useSession } from "../../../components/session-provider";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ModuleHeader } from "../../../components/ui/module-header";
 import { KpiCard, KpiGrid } from "../../../components/ui/kpi-card";
 import { ModuleTabs } from "../../../components/dashboard/module-tabs";
@@ -55,14 +47,17 @@ import { Drawer } from "../../../components/ui/drawer";
 import { Toast, type ToastTone } from "../../../components/ui/toast";
 
 const HOMEWORK_PAGE_SIZE = 20;
+// When a specific day is selected we can't ask the backend to filter by
+// assignedDate (no such query param exists yet), so we pull a wider window
+// and filter/paginate client-side. This is a deliberate P0 simplification —
+// see the plan at fuzzy-gliding-hopper.md for the backend follow-up.
+const DATE_FILTER_FETCH_LIMIT = 200;
 
-type HomeworkNotice = {
-  title: string;
-  description?: string;
-  tone: ToastTone;
-};
+type ActiveTab = "today" | "all" | "completion" | "templates";
 
-type SupportingHomeworkView = "templates" | "reminders" | "reports";
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 function formatDate(value?: string | Date | null, fallback = "Date not set") {
   if (!value) return fallback;
@@ -90,84 +85,151 @@ function formatPercent(value?: number | null) {
   return `${Math.round(value)}%`;
 }
 
+function statusLabel(status?: string | null) {
+  switch (status) {
+    case "ASSIGNED":
+      return "Published";
+    case "DRAFT":
+      return "Draft";
+    case "CLOSED":
+      return "Closed";
+    case "CANCELLED":
+      return "Cancelled";
+    default:
+      return status || "Draft";
+  }
+}
+
+function teacherName(row: HomeworkAssignmentSummary) {
+  return row.assignedByStaff
+    ? `${row.assignedByStaff.firstName} ${row.assignedByStaff.lastName}`.trim()
+    : "Staff not assigned";
+}
+
 export default function HomeworkPage() {
-  const router = useRouter();
   const { session } = useSession();
-  const queryClient = useQueryClient();
+  const roles = session?.user.roles ?? [];
+  const isStudentOrParent =
+    roles.includes("student") || roles.includes("parent");
+
+  if (isStudentOrParent) {
+    return <StudentHomeworkView />;
+  }
+
+  return <HomeworkWorkspace />;
+}
+
+/* ------------------------------------------------------------------ */
+/* Staff / admin workspace                                             */
+/* ------------------------------------------------------------------ */
+
+const VALID_TABS: ActiveTab[] = ["today", "all", "completion", "templates"];
+
+function HomeworkWorkspace() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { session } = useSession();
+  const requestedTab = searchParams.get("tab") as ActiveTab | null;
+  const [activeTab, setActiveTab] = useState<ActiveTab>(
+    requestedTab && VALID_TABS.includes(requestedTab) ? requestedTab : "today",
+  );
+  const [templateSearch, setTemplateSearch] = useState("");
+  const [selectedHomework, setSelectedHomework] =
+    useState<HomeworkAssignmentSummary | null>(null);
+  const [notice, setNotice] = useState<{
+    title: string;
+    description?: string;
+    tone: ToastTone;
+  } | null>(null);
+
   const [filters, setFilters] = useUrlFilters({
-    academicYearId: "",
     classId: "",
     sectionId: "",
     subjectId: "",
+    teacherId: "",
     status: "",
     search: "",
+    date: "",
     page: 1,
   });
-  const [templateSearch, setTemplateSearch] = useState("");
-  const [supportingView, setSupportingView] =
-    useState<SupportingHomeworkView | null>(null);
-  const [selectedHomework, setSelectedHomework] =
-    useState<HomeworkAssignmentSummary | null>(null);
-  const [notice, setNotice] = useState<HomeworkNotice | null>(null);
+
   const grantedPermissions = new Set(session?.user.permissions ?? []);
   const canCreateHomework = grantedPermissions.has("homework:create");
   const canReviewHomework = grantedPermissions.has("homework:review");
 
-  const operationalSummaryQuery = useQuery({
-    queryKey: ["operational-summary", "homework-timetable"],
-    queryFn: () => api.getModuleSummary("homework-timetable"),
+  const summaryQuery = useQuery({
+    queryKey: ["homework-summary-today"],
+    queryFn: () => api.getHomeworkSummaryToday(),
   });
-  const operationalSummary = operationalSummaryQuery.data;
-  const operationalMetric = (key: string) => {
-    const value = operationalSummary?.summary[key];
-    return value === null || value === undefined ? "Unavailable" : value;
-  };
+  const summary = summaryQuery.data;
 
+  const classesQuery = useQuery({ queryKey: ["classes"], queryFn: api.listClasses });
+  const sectionsQuery = useQuery({ queryKey: ["sections"], queryFn: api.listSections });
+  const subjectsQuery = useQuery({
+    queryKey: ["subjects", filters.classId],
+    queryFn: () => api.listSubjects({ classId: filters.classId || undefined }),
+  });
+  const staffQuery = useQuery({ queryKey: ["staff"], queryFn: api.listStaff });
   const academicYearsQuery = useQuery({
     queryKey: ["academic-years"],
     queryFn: api.listAcademicYears,
   });
 
-  const classesQuery = useQuery({
-    queryKey: ["classes"],
-    queryFn: api.listClasses,
-  });
-
-  const sectionsQuery = useQuery({
-    queryKey: ["sections", filters.classId],
-    queryFn: api.listSections,
-  });
-
-  const subjectsQuery = useQuery({
-    queryKey: ["subjects", filters.classId],
-    queryFn: () => api.listSubjects({ classId: filters.classId || undefined }),
-  });
+  const isTodayTab = activeTab === "today";
+  const effectiveDate = isTodayTab
+    ? filters.date || todayIso()
+    : filters.date || undefined;
+  const useClientDateFilter = Boolean(effectiveDate);
 
   const homeworkQuery = useQuery({
     queryKey: [
       "homework",
       "page",
-      filters.academicYearId,
+      effectiveDate,
+      useClientDateFilter,
       filters.classId,
       filters.sectionId,
       filters.subjectId,
+      filters.teacherId,
       filters.status,
       filters.search,
-      filters.page,
+      useClientDateFilter ? "client-paged" : filters.page,
     ],
     queryFn: () =>
       api.listHomeworkPage({
-        academicYearId: filters.academicYearId || undefined,
         classId: filters.classId || undefined,
         sectionId: filters.sectionId || undefined,
         subjectId: filters.subjectId || undefined,
+        teacherId: filters.teacherId || undefined,
         status: filters.status || undefined,
         search: filters.search.trim() || undefined,
-        page: Math.max(1, filters.page),
-        limit: HOMEWORK_PAGE_SIZE,
-        sortBy: "dueDate",
+        sortBy: "assignedDate",
         sortOrder: "desc",
+        page: useClientDateFilter ? 1 : Math.max(1, filters.page),
+        limit: useClientDateFilter ? DATE_FILTER_FETCH_LIMIT : HOMEWORK_PAGE_SIZE,
       }),
+    enabled: activeTab === "today" || activeTab === "all",
+  });
+
+  const currentAcademicYearId =
+    academicYearsQuery.data?.find((year) => year.isCurrent)?.id ??
+    academicYearsQuery.data?.[0]?.id ??
+    "";
+
+  const completionReportQuery = useQuery({
+    queryKey: [
+      "homework-completion-report",
+      currentAcademicYearId,
+      filters.classId,
+      filters.sectionId,
+    ],
+    queryFn: () =>
+      api.getHomeworkCompletionReport({
+        academicYearId: currentAcademicYearId,
+        classId: filters.classId || undefined,
+        sectionId: filters.sectionId || undefined,
+      }),
+    enabled: activeTab === "completion" && Boolean(currentAcademicYearId),
   });
 
   const templatesQuery = useQuery({
@@ -184,54 +246,7 @@ export default function HomeworkPage() {
         search: templateSearch.trim() || undefined,
         limit: 12,
       }),
-    enabled: supportingView === "templates",
-  });
-
-  const reminderBatchesQuery = useQuery({
-    queryKey: ["homework-reminder-batches"],
-    queryFn: () => api.listHomeworkReminderBatches({ limit: 5 }),
-    enabled: supportingView === "reminders",
-  });
-
-  const completionReportQuery = useQuery({
-    queryKey: [
-      "homework-completion-report",
-      filters.academicYearId,
-      filters.classId,
-      filters.sectionId,
-    ],
-    queryFn: () =>
-      api.getHomeworkCompletionReport({
-        academicYearId: filters.academicYearId,
-        classId: filters.classId || undefined,
-        sectionId: filters.sectionId || undefined,
-      }),
-    enabled:
-      supportingView === "reports" && Boolean(filters.academicYearId),
-  });
-
-  const missingLateReportQuery = useQuery({
-    queryKey: [
-      "homework-missing-late-report",
-      filters.academicYearId,
-      filters.classId,
-    ],
-    queryFn: () =>
-      api.getHomeworkMissingLateReport({
-        academicYearId: filters.academicYearId,
-        classId: filters.classId || undefined,
-      }),
-    enabled:
-      supportingView === "reports" && Boolean(filters.academicYearId),
-  });
-
-  const retryReminderMutation = useMutation({
-    mutationFn: api.retryHomeworkReminderBatch,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: ["homework-reminder-batches"],
-      });
-    },
+    enabled: activeTab === "templates",
   });
 
   if (
@@ -247,34 +262,106 @@ export default function HomeworkPage() {
     );
   }
 
-  const homeworkItems = homeworkQuery.data?.items ?? [];
-  const homeworkMeta = homeworkQuery.data?.meta;
-  const completionRows = completionReportQuery.data ?? [];
-  const missingLateRows = missingLateReportQuery.data ?? [];
+  const rawItems = homeworkQuery.data?.items ?? [];
+  const dateFilteredItems = useClientDateFilter
+    ? rawItems.filter(
+        (item) => (item.assignedDate ?? "").slice(0, 10) === effectiveDate,
+      )
+    : rawItems;
+  const homeworkItems = useClientDateFilter
+    ? dateFilteredItems.slice(
+        (Math.max(1, filters.page) - 1) * HOMEWORK_PAGE_SIZE,
+        Math.max(1, filters.page) * HOMEWORK_PAGE_SIZE,
+      )
+    : dateFilteredItems;
+  const homeworkMeta = useClientDateFilter
+    ? {
+        page: Math.max(1, filters.page),
+        limit: HOMEWORK_PAGE_SIZE,
+        total: dateFilteredItems.length,
+        totalPages: Math.max(
+          1,
+          Math.ceil(dateFilteredItems.length / HOMEWORK_PAGE_SIZE),
+        ),
+      }
+    : homeworkQuery.data?.meta
+      ? {
+          page: homeworkQuery.data.meta.page,
+          limit: homeworkQuery.data.meta.limit,
+          total: homeworkQuery.data.meta.total,
+          totalPages: homeworkQuery.data.meta.totalPages,
+        }
+      : undefined;
+
   const hasActiveHomeworkFilters = Boolean(
-    filters.academicYearId ||
-      filters.classId ||
+    filters.classId ||
       filters.sectionId ||
       filters.subjectId ||
+      filters.teacherId ||
       filters.status ||
-      filters.search.trim(),
+      filters.search.trim() ||
+      (activeTab === "all" && filters.date),
   );
-  const submittedFromReport = completionRows.reduce(
-    (sum: number, item: HomeworkCompletionReportRow) => sum + item.completed,
-    0,
-  );
-  const totalExpectedFromReport = completionRows.reduce(
-    (sum: number, item: HomeworkCompletionReportRow) =>
-      sum + item.totalSubmissions,
-    0,
-  );
-  const completionRate =
-    totalExpectedFromReport > 0
-      ? (submittedFromReport / totalExpectedFromReport) * 100
-      : 0;
+
+  const needsFollowUpRows = (completionReportQuery.data ?? [])
+    .filter((row: HomeworkCompletionReportRow) => row.completed < row.totalSubmissions)
+    .sort((a, b) => a.completionRate - b.completionRate);
+
+  async function openHomeworkAttachment(attachmentId: string) {
+    try {
+      await api.openHomeworkAttachmentPreview(attachmentId);
+    } catch {
+      setNotice({
+        title: "Attachment unavailable",
+        description:
+          "This protected file could not be opened. It may still be processing, restricted, or no longer available.",
+        tone: "danger",
+      });
+    }
+  }
+
+  function clearHomeworkFilters() {
+    setFilters(
+      {
+        classId: "",
+        sectionId: "",
+        subjectId: "",
+        teacherId: "",
+        status: "",
+        search: "",
+        date: "",
+        page: 1,
+      },
+      { resetPage: true },
+    );
+  }
+
   const columns = [
     {
-      header: "Title",
+      header: "Class",
+      accessorKey: "class.name",
+      cell: (row: HomeworkAssignmentSummary) => (
+        <div className="flex flex-col">
+          <span className="font-medium text-slate-700">
+            {row.class?.name?.trim() || "Class not set"}
+          </span>
+          <span className="text-xs text-slate-500">
+            {row.section?.name?.trim() || "All sections"}
+          </span>
+        </div>
+      ),
+    },
+    {
+      header: "Subject",
+      accessorKey: "subject.name",
+      cell: (row: HomeworkAssignmentSummary) => (
+        <span className="text-sm font-medium text-slate-700">
+          {row.subject?.name?.trim() || "Subject not set"}
+        </span>
+      ),
+    },
+    {
+      header: "Homework",
       accessorKey: "title",
       cell: (row: HomeworkAssignmentSummary) => (
         <div className="flex flex-col">
@@ -292,35 +379,7 @@ export default function HomeworkPage() {
       ),
     },
     {
-      header: "Subject",
-      accessorKey: "subject.name",
-      cell: (row: HomeworkAssignmentSummary) => (
-        <div className="flex flex-col">
-          <span className="font-medium text-slate-700">
-            {row.subject?.name?.trim() || "Subject not set"}
-          </span>
-          <span className="text-xs text-slate-500">
-            {row.class?.name?.trim() || "Class not set"}
-            {row.section?.name?.trim()
-              ? ` - ${row.section.name.trim()}`
-              : " - All sections"}
-          </span>
-        </div>
-      ),
-    },
-    {
-      header: "Assigned By",
-      accessorKey: "assignedByStaff.firstName",
-      cell: (row: HomeworkAssignmentSummary) => (
-        <span className="text-sm text-slate-600">
-          {row.assignedByStaff
-            ? `${row.assignedByStaff.firstName} ${row.assignedByStaff.lastName}`
-            : "System"}
-        </span>
-      ),
-    },
-    {
-      header: "Due Date",
+      header: "Due date",
       accessorKey: "dueAt",
       cell: (row: HomeworkAssignmentSummary) => (
         <div className="flex flex-col">
@@ -334,22 +393,16 @@ export default function HomeworkPage() {
       ),
     },
     {
-      header: "Status",
-      accessorKey: "status",
+      header: "Teacher",
       cell: (row: HomeworkAssignmentSummary) => (
-        <StatusBadge status={row.status || "DRAFT"} />
+        <span className="text-sm text-slate-600">{teacherName(row)}</span>
       ),
     },
     {
-      header: "Submissions",
-      accessorKey: "submissionSummary",
+      header: "Status",
+      accessorKey: "status",
       cell: (row: HomeworkAssignmentSummary) => (
-        <div className="flex flex-col">
-          <span className="text-sm font-bold text-slate-800">
-            {row.submissionSummary?.total ?? "Unavailable"}
-          </span>
-          <span className="text-xs text-slate-500">submission records</span>
-        </div>
+        <StatusBadge status={row.status || "DRAFT"} label={statusLabel(row.status)} />
       ),
     },
     {
@@ -389,38 +442,12 @@ export default function HomeworkPage() {
     <Link href="/dashboard/homework/new">
       <Button className="rounded-xl bg-[var(--color-mod-homework-accent)] text-white shadow-sm hover:bg-[var(--color-mod-homework-text)] focus-visible:ring-[var(--color-mod-homework-border)]">
         <Plus className="mr-2 h-5 w-5" />
-        Create Homework
+        Give Homework
       </Button>
     </Link>
   ) : undefined;
 
-  function clearHomeworkFilters() {
-    setFilters(
-      {
-        academicYearId: "",
-        classId: "",
-        sectionId: "",
-        subjectId: "",
-        status: "",
-        search: "",
-        page: 1,
-      },
-      { resetPage: true },
-    );
-  }
-
-  async function openHomeworkAttachment(attachmentId: string) {
-    try {
-      await api.openHomeworkAttachmentPreview(attachmentId);
-    } catch {
-      setNotice({
-        title: "Attachment unavailable",
-        description:
-          "This protected file could not be opened. It may still be processing, restricted, or no longer available.",
-        tone: "danger",
-      });
-    }
-  }
+  const isListTab = activeTab === "today" || activeTab === "all";
 
   return (
     <DashboardPageShell>
@@ -435,615 +462,428 @@ export default function HomeworkPage() {
       ) : null}
 
       <ModuleHeader
-        title="Homework & Timetable"
-        description={`Assign homework, manage submissions, build timetables, and handle substitutions${session?.tenant.name ? ` for ${session.tenant.name}` : ""}.`}
+        title="Homework"
+        description={`Give homework, track completion, and follow up on incomplete students${session?.tenant.name ? ` for ${session.tenant.name}` : ""}.`}
         primaryAction={primaryAction}
         moreActionItems={[
-          ...(canReviewHomework
-            ? [
-                {
-                  label: "Review Submissions",
-                  icon: <CheckCircle2 size={16} />,
-                  onClick: () => router.push("/dashboard/homework/review"),
-                },
-              ]
-            : []),
           {
-            label: "Timetable Builder",
-            icon: <Settings size={16} />,
-            onClick: () => router.push("/dashboard/timetable/builder"),
+            label: "Use template",
+            icon: <FileText size={16} />,
+            onClick: () => setActiveTab("templates"),
           },
           {
-            label: "Timetable Conflicts",
-            icon: <AlertCircle size={16} />,
-            onClick: () => router.push("/dashboard/timetable/conflicts"),
+            label: "View homework calendar",
+            icon: <Calendar size={16} />,
+            disabled: true,
+            onClick: () => {},
           },
           {
-            label: "Timetable Versions",
-            icon: <ClipboardCheck size={16} />,
-            onClick: () => router.push("/dashboard/timetable/versions"),
-          },
-          {
-            label: "Substitutions",
+            label: "View incomplete students",
             icon: <Users size={16} />,
-            onClick: () => router.push("/dashboard/timetable/substitutions"),
+            onClick: () => setActiveTab("completion"),
           },
           {
-            label: "Teacher Workload",
+            label: "Export homework report",
             icon: <BarChart3 size={16} />,
-            onClick: () => router.push("/dashboard/timetable/workload"),
+            onClick: () => setActiveTab("completion"),
           },
         ]}
       >
         <ModuleTabs
           items={[
-            { href: "/dashboard/homework", label: "Homework", icon: BookOpen },
-            {
-              href: "/dashboard/homework/review",
-              label: "Submissions",
-              icon: CheckCircle2,
-            },
-            {
-              href: "/dashboard/timetable",
-              label: "Timetable",
-              icon: Calendar,
-            },
-            {
-              href: "/dashboard/timetable/builder",
-              label: "Builder",
-              icon: Settings,
-            },
-            {
-              href: "/dashboard/timetable/substitutions",
-              label: "Substitution",
-              icon: Users,
-            },
-            {
-              href: "/dashboard/timetable/workload",
-              label: "Teacher Workload",
-              icon: BarChart3,
-            },
+            { value: "today", label: "Today", icon: Calendar },
+            { value: "all", label: "All Homework", icon: BookOpen },
+            { value: "completion", label: "Completion", icon: CheckCircle2 },
+            { value: "templates", label: "Templates", icon: FileText },
           ]}
+          activeValue={activeTab}
+          onValueChange={(value) => setActiveTab(value as ActiveTab)}
           accentColor="blue"
           variant="light"
         />
-        <KpiGrid className="mt-5 sm:grid-cols-2">
+
+        <KpiGrid className="mt-5 sm:grid-cols-2 xl:grid-cols-5">
           <KpiCard
-            title="Homework Due Today"
-            value={operationalMetric("homeworkDueToday")}
-            loading={operationalSummaryQuery.isLoading}
-            icon={<Bell size={20} />}
-            tone={
-              Number(operationalSummary?.summary.homeworkDueToday) > 0
-                ? "warning"
-                : "neutral"
-            }
-            href="/dashboard/homework"
+            title="Given Today"
+            value={summary?.givenToday ?? "Unavailable"}
+            loading={summaryQuery.isLoading}
+            icon={<BookOpen size={20} />}
+            tone="info"
+            description="Homework assigned with today's assigned date."
+          />
+          <KpiCard
+            title="Due Today"
+            value={summary?.dueToday ?? "Unavailable"}
+            loading={summaryQuery.isLoading}
+            icon={<Calendar size={20} />}
+            tone="neutral"
             description="Published homework due by end of today."
           />
           <KpiCard
-            title="Unassigned Substitutions"
-            value={operationalMetric("unassignedSubstitutionsToday")}
-            loading={operationalSummaryQuery.isLoading}
+            title="Not Checked"
+            value={summary?.notChecked ?? "Unavailable"}
+            loading={summaryQuery.isLoading}
+            icon={<ClipboardList size={20} />}
+            tone={Number(summary?.notChecked) > 0 ? "warning" : "neutral"}
+            description="Overdue homework with unchecked student rows."
+          />
+          <KpiCard
+            title="Incomplete Students"
+            value={summary?.incompleteStudents ?? "Unavailable"}
+            loading={summaryQuery.isLoading}
+            icon={<AlertCircle size={20} />}
+            tone={Number(summary?.incompleteStudents) > 0 ? "warning" : "neutral"}
+            description="Students with incomplete or missing homework due."
+          />
+          <KpiCard
+            title="Classes Without Homework"
+            value={summary?.classesWithoutHomework ?? "Unavailable"}
+            loading={summaryQuery.isLoading}
             icon={<Users size={20} />}
-            tone={
-              Number(
-                operationalSummary?.summary.unassignedSubstitutionsToday,
-              ) > 0
-                ? "warning"
-                : "neutral"
-            }
-            href="/dashboard/timetable/substitutions"
-            description="Today's substitutions still needing a covering teacher."
+            tone={Number(summary?.classesWithoutHomework) > 0 ? "warning" : "neutral"}
+            description="Sections with no homework assigned today."
           />
         </KpiGrid>
       </ModuleHeader>
 
-      <FilterBar>
-        <div className="grid flex-1 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <Input
-              value={filters.search}
-              onChange={(event) =>
-                setFilters(
-                  { search: event.target.value },
-                  { resetPage: true },
-                )
-              }
-              placeholder="Search title, instructions, or subject"
-              aria-label="Search homework"
-              className="pl-9"
-            />
-          </div>
-
-          <Select
-            value={filters.academicYearId}
-            onChange={(e) =>
-              setFilters(
-                { academicYearId: e.target.value },
-                { resetPage: true },
-              )
-            }
-            aria-label="Filter by academic year"
-          >
-            <option value="">All Years</option>
-            {academicYearsQuery.data?.map((y) => (
-              <option key={y.id} value={y.id}>
-                {y.name}
-              </option>
-            ))}
-          </Select>
-
-          <Select
-            value={filters.classId}
-            onChange={(e) =>
-              setFilters(
-                {
-                  classId: e.target.value,
-                  sectionId: "",
-                },
-                { resetPage: true },
-              )
-            }
-            aria-label="Filter by class"
-          >
-            <option value="">All Classes</option>
-            {classesQuery.data?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </Select>
-
-          <Select
-            value={filters.sectionId}
-            onChange={(e) =>
-              setFilters(
-                { sectionId: e.target.value },
-                { resetPage: true },
-              )
-            }
-            disabled={!filters.classId}
-            aria-label="Filter by section"
-          >
-            <option value="">All Sections</option>
-            {sectionsQuery.data
-              ?.filter((s) => !filters.classId || s.classId === filters.classId)
-              .map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-          </Select>
-
-          <Select
-            value={filters.subjectId}
-            onChange={(e) =>
-              setFilters(
-                { subjectId: e.target.value },
-                { resetPage: true },
-              )
-            }
-            aria-label="Filter by subject"
-          >
-            <option value="">All Subjects</option>
-            {subjectsQuery.data?.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </Select>
-
-          <Select
-            value={filters.status}
-            onChange={(e) =>
-              setFilters({ status: e.target.value }, { resetPage: true })
-            }
-            aria-label="Filter by homework status"
-          >
-            <option value="">All Statuses</option>
-            <option value="DRAFT">Draft</option>
-            <option value="ASSIGNED">Assigned</option>
-            <option value="CLOSED">Closed</option>
-            <option value="CANCELLED">Cancelled</option>
-          </Select>
-        </div>
-      </FilterBar>
-
-      <div className="space-y-6">
-        <SectionCard
-          title="Assignments"
-          description="Filter and open homework assignments from the live homework API."
-          headerAction={
-            <StatusBadge
-              status="INFO"
-              label={
-                homeworkQuery.isLoading
-                  ? "Loading"
-                  : homeworkQuery.isFetching
-                    ? "Refreshing"
-                    : homeworkMeta
-                      ? `${homeworkMeta.total} assignments · ${homeworkQuery.isStale ? "May be stale · " : ""}Updated ${formatDateTime(new Date(homeworkQuery.dataUpdatedAt))}`
-                      : "Assignment count unavailable"
-              }
-              tone="info"
-            />
-          }
-        >
-          {homeworkQuery.isLoading ? (
-            <LoadingState label="Loading homework assignments..." />
-          ) : homeworkQuery.isError ? (
-            <ErrorState
-              title="Unable to load homework"
-              message="Homework assignments could not be loaded. Please retry after checking your access and module status."
-              onRetry={() => void homeworkQuery.refetch()}
-            />
-          ) : homeworkItems.length === 0 ? (
-            <EmptyState
-              title={
-                homeworkMeta && homeworkMeta.total > 0
-                  ? "This page has no assignments"
-                  : hasActiveHomeworkFilters
-                    ? "No homework matches these filters"
-                    : "No homework assignments yet"
-              }
-              description={
-                homeworkMeta && homeworkMeta.total > 0
-                  ? "The shared link points past the available assignment pages. Return to the last available page."
-                  : hasActiveHomeworkFilters
-                    ? "Clear or adjust the filters while keeping your assignment scope protected by the backend."
-                    : canCreateHomework
-                      ? "Create the first homework assignment for an assigned class and subject."
-                      : "Homework assignments will appear here when an authorized teacher publishes them."
-              }
-              icon={<BookOpen className="h-8 w-8" />}
-              action={
-                homeworkMeta && homeworkMeta.total > 0 ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="rounded-xl"
-                    onClick={() =>
-                      setFilters({ page: homeworkMeta.totalPages })
-                    }
-                  >
-                    Go to last page
-                  </Button>
-                ) : hasActiveHomeworkFilters ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="rounded-xl"
-                    onClick={clearHomeworkFilters}
-                  >
-                    Clear filters
-                  </Button>
-                ) : canCreateHomework ? (
-                  <Link href="/dashboard/homework/new">
-                    <Button variant="outline" className="rounded-xl">
-                      <Plus className="mr-2 h-4 w-4" />
-                      Create Homework
-                    </Button>
-                  </Link>
-                ) : undefined
-              }
-            />
-          ) : (
-            <div className="overflow-hidden rounded-2xl border border-slate-100">
-              <DataTable
-                columns={columns}
-                data={homeworkItems}
-                getRowKey={(row) => row.id}
-                className="rounded-none border-0"
-              />
-              {homeworkMeta ? (
-                <TablePagination
-                  page={homeworkMeta.page}
-                  pageSize={homeworkMeta.limit}
-                  total={homeworkMeta.total}
-                  onPageChange={(page) => setFilters({ page })}
-                />
-              ) : null}
-            </div>
-          )}
-        </SectionCard>
-
-        <section
-          aria-labelledby="supporting-homework-tools"
-          className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4"
-        >
-          <div>
-            <p
-              id="supporting-homework-tools"
-              className="text-sm font-bold text-slate-950"
-            >
-              Supporting homework tools
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              Open a secondary workspace only when you need it. Its data loads
-              on demand.
-            </p>
-          </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <SupportingToolButton
-              title="Template Library"
-              description="Reuse metadata-backed assignment templates."
-              icon={<FileText className="h-5 w-5" />}
-              selected={supportingView === "templates"}
-              onClick={() =>
-                setSupportingView((current) =>
-                  current === "templates" ? null : "templates",
-                )
-              }
-            />
-            <SupportingToolButton
-              title="Reminder History"
-              description="Inspect and retry recent reminder batches."
-              icon={<Bell className="h-5 w-5" />}
-              selected={supportingView === "reminders"}
-              onClick={() =>
-                setSupportingView((current) =>
-                  current === "reminders" ? null : "reminders",
-                )
-              }
-            />
-            <SupportingToolButton
-              title="Completion Reports"
-              description="Review completion, missing, and late records."
-              icon={<BarChart3 className="h-5 w-5" />}
-              selected={supportingView === "reports"}
-              onClick={() =>
-                setSupportingView((current) =>
-                  current === "reports" ? null : "reports",
-                )
-              }
-            />
-          </div>
-        </section>
-
-        {supportingView === "templates" ? (
-          <SectionCard
-            title="Template Library"
-            description="Browse metadata-backed homework templates with the filtered backend endpoint."
-            headerAction={
-              <div className="relative w-full max-w-xs">
+      {isListTab ? (
+        <>
+          <FilterBar>
+            <div className="grid flex-1 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <Input
-                  value={templateSearch}
-                  onChange={(event) => setTemplateSearch(event.target.value)}
-                  placeholder="Search templates"
+                  value={filters.search}
+                  onChange={(event) =>
+                    setFilters(
+                      { search: event.target.value },
+                      { resetPage: true },
+                    )
+                  }
+                  placeholder="Search title, instructions, or subject"
+                  aria-label="Search homework"
                   className="pl-9"
                 />
               </div>
-            }
-          >
-            {templatesQuery.isLoading ? (
-              <LoadingState label="Loading homework templates..." />
-            ) : templatesQuery.isError ? (
-              <ErrorState
-                title="Unable to load templates"
-                message="The homework template library could not be loaded."
+
+              <Input
+                type="date"
+                value={filters.date || (activeTab === "today" ? todayIso() : "")}
+                onChange={(e) =>
+                  setFilters({ date: e.target.value }, { resetPage: true })
+                }
+                aria-label="Filter by date"
               />
-            ) : templatesQuery.data?.length === 0 ? (
-              <EmptyState
-                title="No templates found"
-                description="Templates appear after assignments are saved with homework template metadata."
-                icon={<FileText className="h-8 w-8" />}
-              />
-            ) : (
-              <div className="space-y-3">
-                {templatesQuery.data?.map((template) => (
-                  <button
-                    key={template.id}
-                    type="button"
-                    onClick={() =>
-                      router.push(`/dashboard/homework/${template.id}`)
-                    }
-                    className="w-full rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-[var(--color-mod-homework-border)] hover:bg-[var(--color-mod-homework-bg)]"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-bold text-slate-950">
-                          {template.title}
-                        </p>
-                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">
-                          {template.instructions?.trim() ||
-                            "Template instructions not set."}
-                        </p>
-                      </div>
-                      <StatusBadge status={template.status || "DRAFT"} />
-                    </div>
-                    <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      {template.class?.name?.trim() || "Class not set"} ·{" "}
-                      {template.subject?.name?.trim() || "Subject not set"}
-                    </p>
-                  </button>
+
+              <Select
+                value={filters.classId}
+                onChange={(e) =>
+                  setFilters(
+                    { classId: e.target.value, sectionId: "" },
+                    { resetPage: true },
+                  )
+                }
+                aria-label="Filter by class"
+              >
+                <option value="">All Classes</option>
+                {classesQuery.data?.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
                 ))}
-              </div>
-            )}
-          </SectionCard>
-        ) : null}
+              </Select>
 
-        {supportingView === "reminders" ? (
-          <SectionCard
-            title="Reminder History"
-            description="Inspect the latest reminder batches and retry failed batches through the backend route."
-          >
-            {reminderBatchesQuery.isLoading ? (
-              <LoadingState label="Loading reminder batches..." />
-            ) : reminderBatchesQuery.isError ? (
-              <ErrorState
-                title="Unable to load reminders"
-                message="Homework reminder batch history could not be loaded."
-              />
-            ) : reminderBatchesQuery.data?.length === 0 ? (
-              <EmptyState
-                title="No reminder batches"
-                description="Sent homework reminders will appear here."
-                icon={<Bell className="h-8 w-8" />}
-              />
-            ) : (
-              <div className="space-y-3">
-                {reminderBatchesQuery.data?.map(
-                  (batch: HomeworkReminderBatchSummary) => (
-                    <div
-                      key={batch.id}
-                      className="rounded-xl border border-slate-200 bg-white p-4"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-bold text-slate-950">
-                            {batch.reminderType.replace(/_/g, " ")}
-                          </p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            {formatDateTime(
-                              batch.createdAt,
-                              "Created date unavailable",
-                            )}
-                          </p>
-                        </div>
-                        <StatusBadge status={batch.status || "PENDING"} />
-                      </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-600">
-                        <span>
-                          Targets: {batch.targetCount ?? "Unavailable"}
-                        </span>
-                        <span>
-                          Delivered: {batch.deliveryCount ?? "Unavailable"}
-                        </span>
-                        <span>
-                          Skipped: {batch.skippedCount ?? "Unavailable"}
-                        </span>
-                      </div>
-                      {batch.failedReason ? (
-                        <p className="mt-3 text-xs text-danger-700">
-                          Reminder failed. Retry is available after reviewing
-                          the failure state.
-                        </p>
-                      ) : null}
-                      {batch.status === "FAILED" ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="mt-3 rounded-xl"
-                          disabled={retryReminderMutation.isPending}
-                          onClick={() => retryReminderMutation.mutate(batch.id)}
-                        >
-                          <RefreshCcw className="mr-2 h-4 w-4" />
-                          Retry Batch
+              <Select
+                value={filters.sectionId}
+                onChange={(e) =>
+                  setFilters({ sectionId: e.target.value }, { resetPage: true })
+                }
+                disabled={!filters.classId}
+                aria-label="Filter by section"
+              >
+                <option value="">All Sections</option>
+                {sectionsQuery.data
+                  ?.filter(
+                    (s) => !filters.classId || s.classId === filters.classId,
+                  )
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+              </Select>
+
+              <Select
+                value={filters.subjectId}
+                onChange={(e) =>
+                  setFilters({ subjectId: e.target.value }, { resetPage: true })
+                }
+                aria-label="Filter by subject"
+              >
+                <option value="">All Subjects</option>
+                {subjectsQuery.data?.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </Select>
+
+              <Select
+                value={filters.teacherId}
+                onChange={(e) =>
+                  setFilters({ teacherId: e.target.value }, { resetPage: true })
+                }
+                aria-label="Filter by teacher"
+              >
+                <option value="">All Teachers</option>
+                {staffQuery.data?.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.firstName} {s.lastName}
+                  </option>
+                ))}
+              </Select>
+
+              <Select
+                value={filters.status}
+                onChange={(e) =>
+                  setFilters({ status: e.target.value }, { resetPage: true })
+                }
+                aria-label="Filter by homework status"
+              >
+                <option value="">All Statuses</option>
+                <option value="DRAFT">Draft</option>
+                <option value="ASSIGNED">Published</option>
+                <option value="CLOSED">Closed</option>
+                <option value="CANCELLED">Cancelled</option>
+              </Select>
+            </div>
+          </FilterBar>
+
+          <div className="space-y-6">
+            <SectionCard
+              title={activeTab === "today" ? "Today's homework" : "All homework"}
+              description={
+                activeTab === "today"
+                  ? "Homework assigned on the selected date."
+                  : "The full homework history for the filtered scope."
+              }
+              headerAction={
+                <StatusBadge
+                  status="INFO"
+                  label={
+                    homeworkQuery.isLoading
+                      ? "Loading"
+                      : homeworkQuery.isFetching
+                        ? "Refreshing"
+                        : homeworkMeta
+                          ? `${homeworkMeta.total} assignments · ${homeworkQuery.isStale ? "May be stale · " : ""}Updated ${formatDateTime(new Date(homeworkQuery.dataUpdatedAt))}`
+                          : "Assignment count unavailable"
+                  }
+                  tone="info"
+                />
+              }
+            >
+              {homeworkQuery.isLoading ? (
+                <LoadingState label="Loading homework assignments..." />
+              ) : homeworkQuery.isError ? (
+                <ErrorState
+                  title="Unable to load homework"
+                  message="Homework assignments could not be loaded. Please retry after checking your access and module status."
+                  onRetry={() => void homeworkQuery.refetch()}
+                />
+              ) : homeworkItems.length === 0 ? (
+                <EmptyState
+                  title={
+                    homeworkMeta && homeworkMeta.total > 0
+                      ? "This page has no assignments"
+                      : hasActiveHomeworkFilters
+                        ? "No homework matches these filters"
+                        : activeTab === "today"
+                          ? "No homework given for this day yet"
+                          : "No homework assignments yet"
+                  }
+                  description={
+                    homeworkMeta && homeworkMeta.total > 0
+                      ? "The shared link points past the available assignment pages. Return to the last available page."
+                      : hasActiveHomeworkFilters
+                        ? "Clear or adjust the filters while keeping your assignment scope protected by the backend."
+                        : canCreateHomework
+                          ? "Give the first homework assignment for an assigned class and subject."
+                          : "Homework assignments will appear here when an authorized teacher publishes them."
+                  }
+                  icon={<BookOpen className="h-8 w-8" />}
+                  action={
+                    homeworkMeta && homeworkMeta.total > 0 ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-xl"
+                        onClick={() =>
+                          setFilters({ page: homeworkMeta.totalPages })
+                        }
+                      >
+                        Go to last page
+                      </Button>
+                    ) : hasActiveHomeworkFilters ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-xl"
+                        onClick={clearHomeworkFilters}
+                      >
+                        Clear filters
+                      </Button>
+                    ) : canCreateHomework ? (
+                      <Link href="/dashboard/homework/new">
+                        <Button variant="outline" className="rounded-xl">
+                          <Plus className="mr-2 h-4 w-4" />
+                          Give Homework
                         </Button>
-                      ) : null}
-                    </div>
-                  ),
-                )}
-              </div>
-            )}
-          </SectionCard>
-        ) : null}
+                      </Link>
+                    ) : undefined
+                  }
+                />
+              ) : (
+                <div className="overflow-hidden rounded-2xl border border-slate-100">
+                  <DataTable
+                    columns={columns}
+                    data={homeworkItems}
+                    getRowKey={(row) => row.id}
+                    className="rounded-none border-0"
+                  />
+                  {homeworkMeta ? (
+                    <TablePagination
+                      page={homeworkMeta.page}
+                      pageSize={homeworkMeta.limit}
+                      total={homeworkMeta.total}
+                      onPageChange={(page) => setFilters({ page })}
+                    />
+                  ) : null}
+                </div>
+              )}
+            </SectionCard>
+          </div>
+        </>
+      ) : null}
 
-        {supportingView === "reports" ? (
-          <SectionCard
-            title="Completion Reports"
-            description="Use backend report routes for assignment completion and missing or late submission review."
-          >
-          {!filters.academicYearId ? (
+      {activeTab === "completion" ? (
+        <SectionCard
+          title="Needs follow-up"
+          description="Published homework with unchecked or incomplete student rows. Open an assignment to reach its completion register."
+        >
+          {!currentAcademicYearId ? (
             <EmptyState
-              title="Select an academic year"
-              description="Completion and missing or late submission reports require an academic year filter."
+              title="No academic year available"
+              description="Completion follow-up requires at least one academic year to be configured."
               icon={<BarChart3 className="h-8 w-8" />}
             />
-          ) : completionReportQuery.isLoading ||
-            missingLateReportQuery.isLoading ? (
-            <LoadingState label="Loading homework reports..." />
-          ) : completionReportQuery.isError ||
-            missingLateReportQuery.isError ? (
+          ) : completionReportQuery.isLoading ? (
+            <LoadingState label="Loading completion data..." />
+          ) : completionReportQuery.isError ? (
             <ErrorState
-              title="Unable to load reports"
-              message="Homework completion reports could not be loaded from the backend."
+              title="Unable to load completion data"
+              message="The homework completion report could not be loaded from the backend."
+              onRetry={() => void completionReportQuery.refetch()}
+            />
+          ) : needsFollowUpRows.length === 0 ? (
+            <EmptyState
+              title="Nothing needs follow-up"
+              description="Every homework assignment in this scope is fully completed or checked."
+              icon={<CheckCircle2 className="h-8 w-8" />}
             />
           ) : (
-            <div className="space-y-5">
-              <KpiGrid className="sm:grid-cols-2 xl:grid-cols-4">
-                <KpiCard
-                  title="Assignments"
-                  value={completionRows.length}
-                  icon={<BookOpen size={20} />}
-                  tone="info"
-                  description="Assignments returned by the completion report."
-                />
-                <KpiCard
-                  title="Completed"
-                  value={submittedFromReport}
-                  icon={<CheckCircle2 size={20} />}
-                  tone="success"
-                  description="Completed or reviewed submissions from the report."
-                />
-                <KpiCard
-                  title="Completion"
-                  value={formatPercent(completionRate)}
-                  icon={<BarChart3 size={20} />}
-                  tone={completionRate >= 80 ? "success" : "warning"}
-                  description="Backend report completion rate for the selected scope."
-                />
-                <KpiCard
-                  title="Missing or Late"
-                  value={missingLateRows.length}
-                  icon={<AlertCircle size={20} />}
-                  tone={missingLateRows.length ? "warning" : "neutral"}
-                  description="Rows from the missing or late report."
-                />
-              </KpiGrid>
-
-              <div className="grid gap-4 lg:grid-cols-2">
-                <ReportList
-                  title="Completion by Assignment"
-                  rows={completionRows}
-                  renderRow={(row: HomeworkCompletionReportRow) => (
-                    <>
-                      <div>
-                        <p className="text-sm font-bold text-slate-950">
-                          {row.title}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {row.class}
-                          {row.section ? ` - ${row.section}` : ""} ·{" "}
-                          {row.subject} · Due {formatDate(row.dueDate)}
-                        </p>
-                      </div>
-                      <StatusBadge
-                        status="INFO"
-                        label={`${row.completed}/${row.totalSubmissions} · ${formatPercent(row.completionRate)}`}
-                        tone={row.completionRate >= 80 ? "approved" : "pending"}
-                      />
-                    </>
-                  )}
-                />
-                <ReportList
-                  title="Missing or Late"
-                  rows={missingLateRows}
-                  renderRow={(row: HomeworkMissingLateReportRow) => (
-                    <>
-                      <div>
-                        <p className="text-sm font-bold text-slate-950">
-                          {row.studentName}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {row.assignmentTitle} · {row.subject} · Due{" "}
-                          {formatDate(row.dueDate)}
-                        </p>
-                      </div>
-                      <StatusBadge status={row.status} />
-                    </>
-                  )}
-                />
-              </div>
+            <div className="space-y-2">
+              {needsFollowUpRows.map((row) => (
+                <button
+                  key={row.id}
+                  type="button"
+                  onClick={() => router.push(`/dashboard/homework/${row.id}`)}
+                  className="flex w-full items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-[var(--color-mod-homework-border)] hover:bg-[var(--color-mod-homework-bg)]"
+                >
+                  <div>
+                    <p className="text-sm font-bold text-slate-950">
+                      {row.title}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {row.class}
+                      {row.section ? ` - ${row.section}` : ""} · {row.subject} ·
+                      Due {formatDate(row.dueDate)}
+                    </p>
+                  </div>
+                  <StatusBadge
+                    status="INFO"
+                    label={`${row.completed}/${row.totalSubmissions} · ${formatPercent(row.completionRate)}`}
+                    tone={row.completionRate >= 80 ? "approved" : "pending"}
+                  />
+                </button>
+              ))}
             </div>
           )}
-          </SectionCard>
-        ) : null}
-      </div>
+        </SectionCard>
+      ) : null}
+
+      {activeTab === "templates" ? (
+        <SectionCard
+          title="Template Library"
+          description="Browse metadata-backed homework templates with the filtered backend endpoint."
+          headerAction={
+            <div className="relative w-full max-w-xs">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                value={templateSearch}
+                onChange={(event) => setTemplateSearch(event.target.value)}
+                placeholder="Search templates"
+                className="pl-9"
+              />
+            </div>
+          }
+        >
+          {templatesQuery.isLoading ? (
+            <LoadingState label="Loading homework templates..." />
+          ) : templatesQuery.isError ? (
+            <ErrorState
+              title="Unable to load templates"
+              message="The homework template library could not be loaded."
+            />
+          ) : templatesQuery.data?.length === 0 ? (
+            <EmptyState
+              title="No templates found"
+              description="Templates appear after assignments are saved with homework template metadata."
+              icon={<FileText className="h-8 w-8" />}
+            />
+          ) : (
+            <div className="space-y-3">
+              {templatesQuery.data?.map((template) => (
+                <button
+                  key={template.id}
+                  type="button"
+                  onClick={() =>
+                    router.push(`/dashboard/homework/${template.id}`)
+                  }
+                  className="w-full rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-[var(--color-mod-homework-border)] hover:bg-[var(--color-mod-homework-bg)]"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-bold text-slate-950">
+                        {template.title}
+                      </p>
+                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">
+                        {template.instructions?.trim() ||
+                          "Template instructions not set."}
+                      </p>
+                    </div>
+                    <StatusBadge status={template.status || "DRAFT"} />
+                  </div>
+                  <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {template.class?.name?.trim() || "Class not set"} ·{" "}
+                    {template.subject?.name?.trim() || "Subject not set"}
+                  </p>
+                </button>
+              ))}
+            </div>
+          )}
+        </SectionCard>
+      ) : null}
 
       <HomeworkQuickViewDrawer
         homework={selectedHomework}
@@ -1095,7 +935,10 @@ function HomeworkQuickViewDrawer({
       {homework ? (
         <div className="space-y-6">
           <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge status={homework.status || "DRAFT"} />
+            <StatusBadge
+              status={homework.status || "DRAFT"}
+              label={statusLabel(homework.status)}
+            />
             <StatusBadge
               status="INFO"
               label={`${homework.attachmentCount ?? homework.attachments?.length ?? 0} attachments`}
@@ -1116,18 +959,8 @@ function HomeworkQuickViewDrawer({
               label="Subject"
               value={homework.subject?.name?.trim() || "Subject not set"}
             />
-            <QuickViewField
-              label="Due"
-              value={formatDateTime(homework.dueAt)}
-            />
-            <QuickViewField
-              label="Assigned by"
-              value={
-                homework.assignedByStaff
-                  ? `${homework.assignedByStaff.firstName} ${homework.assignedByStaff.lastName}`.trim()
-                  : "Staff record unavailable"
-              }
-            />
+            <QuickViewField label="Due" value={formatDateTime(homework.dueAt)} />
+            <QuickViewField label="Teacher" value={teacherName(homework)} />
             <QuickViewField
               label="Submission records"
               value={
@@ -1186,9 +1019,7 @@ function HomeworkQuickViewDrawer({
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() =>
-                            void onOpenAttachment(attachment.id)
-                          }
+                          onClick={() => void onOpenAttachment(attachment.id)}
                         >
                           Open
                         </Button>
@@ -1229,69 +1060,197 @@ function QuickViewField({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SupportingToolButton({
-  title,
-  description,
-  icon,
-  selected,
-  onClick,
-}: {
-  title: string;
-  description: string;
-  icon: ReactNode;
-  selected: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={selected}
-      onClick={onClick}
-      className={`rounded-xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mod-homework-border)] ${
-        selected
-          ? "border-[var(--color-mod-homework-accent)] bg-[var(--color-mod-homework-bg)] text-[var(--color-mod-homework-text)] shadow-sm"
-          : "border-slate-200 bg-white text-slate-700 hover:border-[var(--color-mod-homework-border)] hover:bg-white"
-      }`}
-    >
-      <span className="flex items-center gap-2 text-sm font-bold">
-        {icon}
-        {title}
-      </span>
-      <span className="mt-2 block text-xs leading-5 text-slate-500">
-        {description}
-      </span>
-    </button>
-  );
-}
+/* ------------------------------------------------------------------ */
+/* Student / parent read-only view                                     */
+/*                                                                       */
+/* Absorbs components/timetable/tabs/student-homework-tab.tsx. That file */
+/* is left in place for now (a later task deletes it once the register/  */
+/* submission flow in homework-detail-page.tsx is confirmed to cover the */
+/* same ground) but its protected-attachment download capability is      */
+/* ported here so read-only viewers don't lose the ability to open files */
+/* attached to their own/their child's homework.                         */
+/* ------------------------------------------------------------------ */
 
-function ReportList<T>({
-  title,
-  rows,
-  renderRow,
-}: {
-  title: string;
-  rows: T[];
-  renderRow: (row: T) => ReactNode;
-}) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-      <h3 className="text-sm font-bold text-slate-950">{title}</h3>
-      {rows.length === 0 ? (
-        <p className="mt-3 text-sm text-slate-500">
-          No report rows for the selected scope.
-        </p>
-      ) : (
-        <div className="mt-3 space-y-2">
-          {rows.slice(0, 8).map((row, index) => (
-            <div
-              key={index}
-              className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3"
-            >
-              {renderRow(row)}
-            </div>
-          ))}
+function StudentHomeworkView() {
+  const { session } = useSession();
+  const router = useRouter();
+  const isParent = session?.user.roles.includes("parent") ?? false;
+  const [openingAttachmentId, setOpeningAttachmentId] = useState<string | null>(
+    null,
+  );
+  const [notice, setNotice] = useState<{
+    title: string;
+    description?: string;
+    tone: ToastTone;
+  } | null>(null);
+
+  const homeworkQuery = useQuery({
+    queryKey: ["homework", "my-homework"],
+    queryFn: () =>
+      api.listHomeworkPage({
+        sortBy: "dueDate",
+        sortOrder: "desc",
+        limit: 50,
+      }),
+  });
+
+  if (
+    homeworkQuery.error instanceof ApiRequestError &&
+    homeworkQuery.error.statusCode === 403
+  ) {
+    return (
+      <PermissionDenied
+        showNavigation={false}
+        title="Homework access restricted"
+        description="Your account cannot view homework in this school."
+      />
+    );
+  }
+
+  const items = homeworkQuery.data?.items ?? [];
+
+  async function openAttachment(attachmentId: string) {
+    setOpeningAttachmentId(attachmentId);
+    try {
+      await api.openHomeworkAttachmentDownload(attachmentId);
+    } catch {
+      setNotice({
+        title: "Attachment unavailable",
+        description:
+          "This file could not be opened. It may still be processing or no longer available.",
+        tone: "danger",
+      });
+    } finally {
+      setOpeningAttachmentId(null);
+    }
+  }
+
+  const columns = [
+    {
+      header: "Homework",
+      cell: (row: HomeworkAssignmentSummary) => (
+        <div className="flex flex-col">
+          <button
+            type="button"
+            className="w-fit text-left font-bold text-slate-900 hover:text-[var(--color-mod-homework-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mod-homework-border)]"
+            onClick={() => router.push(`/dashboard/homework/${row.id}`)}
+          >
+            {row.title}
+          </button>
+          <span className="text-xs text-slate-500">
+            {row.class?.name?.trim() || "Class not set"}
+            {row.section?.name?.trim() ? ` · ${row.section.name.trim()}` : ""}
+          </span>
         </div>
-      )}
-    </div>
+      ),
+    },
+    {
+      header: "Subject",
+      cell: (row: HomeworkAssignmentSummary) => (
+        <span className="text-sm font-medium text-slate-700">
+          {row.subject?.name?.trim() || "Subject not set"}
+        </span>
+      ),
+    },
+    {
+      header: "Due date",
+      cell: (row: HomeworkAssignmentSummary) => (
+        <span className="text-sm text-slate-700">
+          {formatDate(row.dueAt)}
+        </span>
+      ),
+    },
+    {
+      header: "Teacher",
+      cell: (row: HomeworkAssignmentSummary) => (
+        <span className="text-sm text-slate-600">{teacherName(row)}</span>
+      ),
+    },
+    {
+      header: "Status",
+      cell: (row: HomeworkAssignmentSummary) => (
+        <StatusBadge status={row.status || "DRAFT"} label={statusLabel(row.status)} />
+      ),
+    },
+    {
+      header: "Attachments",
+      cell: (row: HomeworkAssignmentSummary) =>
+        row.attachments?.length ? (
+          <div className="flex flex-col gap-1">
+            {row.attachments.map((attachment) => {
+              const file = attachment.fileAsset;
+              const isAvailable = file?.status === "UPLOADED";
+              return (
+                <button
+                  key={attachment.id}
+                  type="button"
+                  data-testid="student-homework-attachment-download"
+                  disabled={
+                    !isAvailable || openingAttachmentId === attachment.id
+                  }
+                  onClick={() => void openAttachment(attachment.id)}
+                  className="flex items-center gap-1.5 text-xs font-bold text-[var(--color-mod-homework-text)] hover:underline disabled:cursor-not-allowed disabled:text-slate-400 disabled:no-underline"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  {openingAttachmentId === attachment.id
+                    ? "Opening..."
+                    : file?.originalFilename?.trim() || "Attachment"}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <span className="text-xs text-slate-400">None</span>
+        ),
+    },
+  ];
+
+  return (
+    <DashboardPageShell>
+      {notice ? (
+        <Toast
+          title={notice.title}
+          description={notice.description}
+          tone={notice.tone}
+          onDismiss={() => setNotice(null)}
+          className="max-w-none"
+        />
+      ) : null}
+
+      <ModuleHeader
+        title="Homework"
+        description={`Homework assigned to ${isParent ? "your child" : "you"}${session?.tenant.name ? ` at ${session.tenant.name}` : ""}.`}
+      />
+
+      <SectionCard
+        title="Homework"
+        description="A read-only list of published homework. Open an assignment to see full instructions."
+      >
+        {homeworkQuery.isLoading ? (
+          <LoadingState label="Loading homework..." />
+        ) : homeworkQuery.isError ? (
+          <ErrorState
+            title="Unable to load homework"
+            message="Homework could not be loaded. Please retry in a moment."
+            onRetry={() => void homeworkQuery.refetch()}
+          />
+        ) : items.length === 0 ? (
+          <EmptyState
+            title="No homework yet"
+            description="Published homework will appear here as soon as a teacher assigns it."
+            icon={<BookOpen className="h-8 w-8" />}
+          />
+        ) : (
+          <div className="overflow-hidden rounded-2xl border border-slate-100">
+            <DataTable
+              columns={columns}
+              data={items}
+              getRowKey={(row) => row.id}
+              className="rounded-none border-0"
+            />
+          </div>
+        )}
+      </SectionCard>
+    </DashboardPageShell>
   );
 }

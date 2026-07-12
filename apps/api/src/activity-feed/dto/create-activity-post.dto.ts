@@ -8,6 +8,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   MinLength,
   ValidateNested,
 } from 'class-validator';
@@ -47,6 +48,11 @@ export class CreateActivityPostDto {
   @IsString()
   @MinLength(2)
   caption!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(280)
+  askAtHome?: string;
 
   @IsOptional()
   @IsEnum(ActivityCategory)

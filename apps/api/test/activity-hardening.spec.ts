@@ -119,6 +119,7 @@ describe('Activity Hardening Verification', () => {
       prisma,
       auditService,
       eventEmitter,
+      communicationsService,
     );
 
     mediaProcessor = new ActivityMediaProcessor(prisma, storageService, {
@@ -157,7 +158,28 @@ describe('Activity Hardening Verification', () => {
           { status: ActivityPostStatus.REJECTED, reason: '' },
           adminActor,
         ),
-      ).rejects.toThrow('Rejection reason is required');
+      ).rejects.toThrow(
+        'A reason is required to reject or request a correction',
+      );
+    });
+
+    it('requires a reason for requesting a correction', async () => {
+      prisma.activityPost.findFirst.mockResolvedValue({
+        id: 'post-1',
+        tenantId,
+        status: ActivityPostStatus.PENDING_APPROVAL,
+        softDeletedAt: null,
+      });
+
+      await expect(
+        lifecycleService.moderatePost(
+          'post-1',
+          { status: ActivityPostStatus.NEEDS_CORRECTION, reason: '' },
+          adminActor,
+        ),
+      ).rejects.toThrow(
+        'A reason is required to reject or request a correction',
+      );
     });
 
     it('soft deletes a post and audits the action', async () => {
