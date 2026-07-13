@@ -19,6 +19,7 @@ import { AdjustLeaveBalanceDto } from './dto/adjust-leave-balance.dto';
 import { CorrectStaffAttendanceDto } from './dto/correct-staff-attendance.dto';
 import { CreateStaffLeaveRequestDto } from './dto/create-staff-leave-request.dto';
 import { ListStaffAttendanceSummaryDto } from './dto/list-staff-attendance-summary.dto';
+import { ReviewStaffLeaveDecisionDto } from './dto/review-staff-leave-decision.dto';
 import { ReviewStaffLeaveRequestDto } from './dto/review-staff-leave-request.dto';
 import { SubmitStaffAttendanceDto } from './dto/submit-staff-attendance.dto';
 import { AttendanceService } from './attendance.service';
@@ -146,12 +147,12 @@ export class HrAttendanceController {
   @Permissions('hr:leave:approve')
   approveLeave(
     @Param('id') id: string,
-    @Body() dto: ReviewStaffLeaveRequestDto,
+    @Body() dto: ReviewStaffLeaveDecisionDto,
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.attendanceService.reviewLeaveRequest(
       id,
-      { ...dto, status: 'APPROVED' },
+      { reviewNote: dto.reviewNote, status: 'APPROVED' },
       auth,
     );
   }
@@ -160,12 +161,12 @@ export class HrAttendanceController {
   @Permissions('hr:leave:approve')
   rejectLeave(
     @Param('id') id: string,
-    @Body() dto: ReviewStaffLeaveRequestDto,
+    @Body() dto: ReviewStaffLeaveDecisionDto,
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.attendanceService.reviewLeaveRequest(
       id,
-      { ...dto, status: 'REJECTED' },
+      { reviewNote: dto.reviewNote, status: 'REJECTED' },
       auth,
     );
   }

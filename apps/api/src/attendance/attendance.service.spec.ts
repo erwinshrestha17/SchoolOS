@@ -1598,6 +1598,32 @@ describe('attendance production hardening', () => {
     expect(tx.staffLeaveBalance.upsert).not.toHaveBeenCalled();
   });
 
+  it('requires a review note when rejecting a leave request', async () => {
+    const leaveRequest = {
+      id: 'leave-1',
+      tenantId: adminActor.tenantId,
+      staffId: 'staff-1',
+      leaveType: 'SICK',
+      isPaid: true,
+      startsOn: new Date('2026-04-28T00:00:00.000Z'),
+      endsOn: new Date('2026-04-29T00:00:00.000Z'),
+      days: new Prisma.Decimal(2),
+      status: 'PENDING',
+    };
+    const { service, tx } = buildService({ leaveRequest });
+
+    await expect(
+      service.reviewLeaveRequest(
+        'leave-1',
+        {
+          status: 'REJECTED',
+        },
+        adminActor,
+      ),
+    ).rejects.toThrow(ConflictException);
+    expect(tx.staffLeaveRequest.update).not.toHaveBeenCalled();
+  });
+
   it('deduplicates daily escalation warnings by source type and source id', async () => {
     const sessionA = buildAttendanceSession({
       id: 'session-a',

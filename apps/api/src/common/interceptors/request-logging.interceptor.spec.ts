@@ -1,4 +1,10 @@
-import { CallHandler, ExecutionContext } from '@nestjs/common';
+import {
+  BadRequestException,
+  CallHandler,
+  ConflictException,
+  ExecutionContext,
+  ForbiddenException,
+} from '@nestjs/common';
 import { of, throwError } from 'rxjs';
 import { RequestLoggingInterceptor } from './request-logging.interceptor';
 
@@ -43,8 +49,33 @@ describe('RequestLoggingInterceptor', () => {
     });
   });
 
-  it('logs failed requests and rethrows the original error', (done) => {
-    const context = makeContext();
+  it('continues to log the actual successful status for a POST request', (done) => {
+    const context = makeContext({
+      method: 'POST',
+      originalUrl: '/api/v1/hr/leaves/leave-1/approve',
+      responseStatusCode: 201,
+    });
+    const handler: CallHandler = { handle: () => of({ status: 'APPROVED' }) };
+
+    interceptor.intercept(context, handler).subscribe(() => {
+      const payload = JSON.parse(logSpy.mock.calls[0][0]);
+      expect(payload).toEqual(
+        expect.objectContaining({
+          method: 'POST',
+          path: '/api/v1/hr/leaves/leave-1/approve',
+          statusCode: 201,
+        }),
+      );
+      done();
+    });
+  });
+
+  it('defaults unknown errors to HTTP 500 instead of the pre-set response status', (done) => {
+    const context = makeContext({
+      method: 'POST',
+      originalUrl: '/api/v1/hr/leaves/leave-1/approve',
+      responseStatusCode: 201,
+    });
     const error = new Error('Database unavailable');
     const handler: CallHandler = { handle: () => throwError(() => error) };
 
@@ -56,6 +87,7 @@ describe('RequestLoggingInterceptor', () => {
         expect(payload).toEqual(
           expect.objectContaining({
             requestId: 'req-1',
+            statusCode: 500,
             error: 'Database unavailable',
           }),
         );
@@ -63,20 +95,78 @@ describe('RequestLoggingInterceptor', () => {
       },
     });
   });
+
+  it('logs the actual 400 status for a BadRequestException, not the pre-set 201', (done) => {
+    const context = makeContext({
+      method: 'POST',
+      originalUrl: '/api/v1/hr/leaves/leave-1/approve',
+      responseStatusCode: 201,
+    });
+    const error = new BadRequestException(
+      'status must be one of the following values: APPROVED, REJECTED',
+    );
+    const handler: CallHandler = { handle: () => throwError(() => error) };
+
+    interceptor.intercept(context, handler).subscribe({
+      error: () => {
+        const payload = JSON.parse(warnSpy.mock.calls[0][0]);
+        expect(payload.statusCode).toBe(400);
+        done();
+      },
+    });
+  });
+
+  it('logs the actual 403 status for a ForbiddenException', (done) => {
+    const context = makeContext({ responseStatusCode: 200 });
+    const error = new ForbiddenException('Not entitled');
+    const handler: CallHandler = { handle: () => throwError(() => error) };
+
+    interceptor.intercept(context, handler).subscribe({
+      error: () => {
+        const payload = JSON.parse(warnSpy.mock.calls[0][0]);
+        expect(payload.statusCode).toBe(403);
+        done();
+      },
+    });
+  });
+
+  it('logs the actual 409 status for a ConflictException', (done) => {
+    const context = makeContext({
+      method: 'POST',
+      originalUrl: '/api/v1/hr/leaves/leave-1/reject',
+      responseStatusCode: 201,
+    });
+    const error = new ConflictException(
+      'A review note is required when rejecting a leave request',
+    );
+    const handler: CallHandler = { handle: () => throwError(() => error) };
+
+    interceptor.intercept(context, handler).subscribe({
+      error: () => {
+        const payload = JSON.parse(warnSpy.mock.calls[0][0]);
+        expect(payload.statusCode).toBe(409);
+        done();
+      },
+    });
+  });
 });
 
-function makeContext() {
+function makeContext(overrides?: {
+  method?: string;
+  originalUrl?: string;
+  responseStatusCode?: number;
+}) {
   const request = {
     requestId: 'req-1',
-    method: 'GET',
-    originalUrl: '/api/v1/students',
+    method: overrides?.method ?? 'GET',
+    originalUrl: overrides?.originalUrl ?? '/api/v1/students',
     auth: {
       tenantId: 'tenant-1',
       userId: 'user-1',
       roles: ['school_admin'],
     },
   };
-  const response = { statusCode: 200 };
+  const response = { statusCode: overrides?.responseStatusCode ?? 200 };
 
   return {
     switchToHttp: () => ({
