@@ -351,7 +351,11 @@ test("M1 student roster uses a focused backend summary, safe filters, and pagina
   assert.equal((directory.match(/<KpiCard/g) ?? []).length, 4);
   assert.doesNotMatch(directory, /title="Pending Applications"/);
   assert.doesNotMatch(directory, /title="QR Active"/);
-  assert.match(directory, /Page \{currentPage\} of \{totalPages\}/);
+  // Server pagination footer is the shared TablePagination component (not a
+  // second hand-rolled Previous/Next implementation).
+  assert.match(directory, /from '\.\.\/ui\/table-pagination'/);
+  assert.match(directory, /<TablePagination/);
+  assert.match(directory, /onPageChange=\{\(page\) =>/);
   assert.match(directory, /value="ARCHIVED"/);
   assert.match(directory, /value="MERGED"/);
   assert.doesNotMatch(

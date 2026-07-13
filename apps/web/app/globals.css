@@ -1,5 +1,6 @@
 /* font loaded via next/font/google in root layout */
 @import "tailwindcss";
+@import "tw-animate-css";
 
 /* ─── Global design tokens used by components ─── */
 :root {
@@ -25,6 +26,34 @@
 
   /* Focus ring derived from brand primary */
   --focus-ring: rgba(21, 94, 239, 0.18);
+
+  /*
+   * ─── Shadcn semantic token bridge ───
+   * These aliases feed the Shadcn/Radix primitive layer (components/ui/primitives)
+   * without renaming or reinterpreting the SchoolOS tokens above. Where a Shadcn
+   * slot would collide with an existing token that means something else
+   * (--secondary is the purple brand accent, not a neutral button treatment;
+   * --muted is a text color, not a surface), a distinct raw variable is
+   * introduced instead of overloading the existing one.
+   */
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --primary-foreground: #FFFFFF;
+  --secondary-surface: #F1F5F9;
+  --secondary-surface-foreground: var(--ink);
+  --muted-surface: #F1F5F9;
+  --muted-surface-foreground: var(--muted);
+  --accent: var(--primary-soft);
+  --accent-foreground: var(--primary-dark);
+  --destructive: var(--danger);
+  --destructive-foreground: #FFFFFF;
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--primary);
+  --radius: 0.75rem;
 }
 
 /* ─── Tailwind v4 theme configuration ─── */
@@ -179,6 +208,35 @@
   --radius-xl: 0.75rem;
   --radius-2xl: 1rem;
   --radius-3xl: 1.5rem;
+}
+
+/*
+ * ─── Shadcn/Radix primitive theme bridge (Tailwind v4) ───
+ * Maps the :root token bridge above into Tailwind utility color/radius
+ * tokens (bg-background, text-foreground, bg-primary, border-border, ...)
+ * consumed by components/ui/primitives/*. Declared with `inline` because
+ * the values reference other CSS custom properties via var().
+ */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary-surface);
+  --color-secondary-foreground: var(--secondary-surface-foreground);
+  --color-muted: var(--muted-surface);
+  --color-muted-foreground: var(--muted-surface-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
 }
 
 /* ─── Base resets ─── */

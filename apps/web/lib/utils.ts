@@ -1,3 +1,5 @@
+import { type ClassValue, clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 import {
   formatBsAcademicYear,
   formatBsDate,
@@ -7,11 +9,8 @@ import {
   formatNepalTime,
 } from '@schoolos/core';
 
-export function cn(...inputs: any[]) {
-  return inputs
-    .flat()
-    .filter((x) => typeof x === 'string' && x.length > 0)
-    .join(' ');
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
 }
 
 /**

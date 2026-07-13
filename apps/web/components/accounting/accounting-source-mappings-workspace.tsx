@@ -9,7 +9,7 @@ import {
   type AccountingSourceMappingSummary,
 } from '@schoolos/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, ChevronLeft, ChevronRight, Plus, Waypoints } from 'lucide-react';
+import { AlertTriangle, Plus, Waypoints } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useDeferredValue, useState } from 'react';
 import { api } from '../../lib/api';
@@ -17,12 +17,15 @@ import { useSession } from '../session-provider';
 import { Badge } from '../ui/badge';
 import { BsDateField } from '../ui/bs-date-field';
 import { Button } from '../ui/button';
-import { EmptyState } from '../ui/empty-state';
 import { FormField } from '../ui/form-field';
 import { Input } from '../ui/input';
 import { PageState } from '../ui/page-state';
 import { SectionCard } from '../ui/section-card';
 import { Select } from '../ui/select';
+import {
+  PaginatedDataTable,
+  type PaginatedDataTableColumn,
+} from '../schoolos/data/paginated-data-table';
 
 const sourceModules = ['FEES', 'PAYROLL', 'CANTEEN', 'LIBRARY', 'TRANSPORT'] as const;
 type SourceModule = (typeof sourceModules)[number];
@@ -159,8 +162,51 @@ export function AccountingSourceMappingsWorkspace() {
 
   const mappings = mappingsQuery.data?.items ?? [];
   const total = mappingsQuery.data?.total ?? 0;
-  const hasNextPage = mappingsQuery.data?.hasNextPage ?? false;
   const activeAccounts = (accountsQuery.data ?? []).filter((account) => account.isActive !== false);
+
+  const mappingColumns: PaginatedDataTableColumn<AccountingSourceMappingSummary>[] = [
+    {
+      id: 'source',
+      header: 'Source',
+      cell: (item) => (
+        <>
+          <Badge variant="info">{item.sourceModule}</Badge>
+          <p className="mt-2 font-bold text-slate-950">{item.sourceType}</p>
+          {item.description ? <p className="mt-1 max-w-xs text-xs text-slate-500">{item.description}</p> : null}
+        </>
+      ),
+    },
+    {
+      id: 'posting',
+      header: 'Posting',
+      cell: (item) => <span className="font-semibold text-slate-700">{item.postingType}</span>,
+    },
+    {
+      id: 'debitAccount',
+      header: 'Debit account',
+      cell: (item) => <AccountCell account={item.debitAccount} />,
+    },
+    {
+      id: 'creditAccount',
+      header: 'Credit account',
+      cell: (item) => <AccountCell account={item.creditAccount} />,
+    },
+    {
+      id: 'effectivePeriod',
+      header: 'Effective period',
+      cell: (item) => (
+        <div className="text-xs text-slate-600">
+          <p>{formatBsDate(item.effectiveFrom)}</p>
+          <p className="mt-1">to {item.effectiveTo ? formatBsDate(item.effectiveTo) : 'open-ended'}</p>
+        </div>
+      ),
+    },
+    {
+      id: 'status',
+      header: 'Status',
+      cell: (item) => <Badge variant={item.isActive ? 'success' : 'neutral'}>{item.isActive ? 'Active' : 'Archived'}</Badge>,
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -263,79 +309,30 @@ export function AccountingSourceMappingsWorkspace() {
           </FormField>
         </div>
 
-        {mappingsQuery.isLoading ? (
-          <PageState tone="loading" title="Loading source mappings" className="mt-5" />
-        ) : mappingsQuery.isError ? (
-          <PageState
-            tone="danger"
-            title="Source mappings could not be loaded"
-            description="Your filters have been preserved. Retry when the accounting service is available."
-            actionLabel="Retry"
-            onAction={() => void mappingsQuery.refetch()}
-            className="mt-5"
-          />
-        ) : mappings.length === 0 ? (
-          <EmptyState
-            title="No source mappings match these filters"
-            description="Clear the filters or add a reviewed, effective-dated mapping if you have accounting settings permission."
-          />
-        ) : (
-          <div className="mt-5 overflow-x-auto">
-            <table className="min-w-[980px] w-full text-left text-sm">
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th className="px-4 py-3">Source</th>
-                  <th className="px-4 py-3">Posting</th>
-                  <th className="px-4 py-3">Debit account</th>
-                  <th className="px-4 py-3">Credit account</th>
-                  <th className="px-4 py-3">Effective period</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {mappings.map((item) => (
-                  <tr key={item.id} className="align-top hover:bg-slate-50/70">
-                    <td className="px-4 py-4">
-                      <Badge variant="info">{item.sourceModule}</Badge>
-                      <p className="mt-2 font-bold text-slate-950">{item.sourceType}</p>
-                      {item.description ? <p className="mt-1 max-w-xs text-xs text-slate-500">{item.description}</p> : null}
-                    </td>
-                    <td className="px-4 py-4 font-semibold text-slate-700">{item.postingType}</td>
-                    <AccountCell account={item.debitAccount} />
-                    <AccountCell account={item.creditAccount} />
-                    <td className="px-4 py-4 text-xs text-slate-600">
-                      <p>{formatBsDate(item.effectiveFrom)}</p>
-                      <p className="mt-1">to {item.effectiveTo ? formatBsDate(item.effectiveTo) : 'open-ended'}</p>
-                    </td>
-                    <td className="px-4 py-4"><Badge variant={item.isActive ? 'success' : 'neutral'}>{item.isActive ? 'Active' : 'Archived'}</Badge></td>
-                    <td className="px-4 py-4 text-right">
-                      {item.isActive && canManage ? (
-                        <Button type="button" size="sm" variant="outline" onClick={() => { setArchiveTarget(item); setArchiveReason(''); }}>
-                          Archive
-                        </Button>
-                      ) : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {total > 0 ? (
-          <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
-            <p className="text-sm text-slate-600">Page {page} · {total} mapping(s)</p>
-            <div className="flex gap-2">
-              <Button type="button" size="sm" variant="outline" disabled={page <= 1} onClick={() => updateFilters({ page: String(page - 1) })}>
-                <ChevronLeft className="h-4 w-4" />Previous
+        <PaginatedDataTable
+          columns={mappingColumns}
+          items={mappings}
+          getRowId={(item) => item.id}
+          status={mappingsQuery.isError ? 'error' : mappingsQuery.isLoading ? 'loading' : 'ready'}
+          page={page}
+          pageSize={limit}
+          totalItems={total}
+          onPageChange={(nextPage) => updateFilters({ page: String(nextPage) })}
+          onRetry={() => void mappingsQuery.refetch()}
+          errorMessage="Your filters have been preserved. Retry when the accounting service is available."
+          emptyTitle="No source mappings match these filters"
+          emptyDescription="Clear the filters or add a reviewed, effective-dated mapping if you have accounting settings permission."
+          className="mt-5"
+          rowActions={(item) =>
+            item.isActive && canManage ? (
+              <Button type="button" size="sm" variant="outline" onClick={() => { setArchiveTarget(item); setArchiveReason(''); }}>
+                Archive
               </Button>
-              <Button type="button" size="sm" variant="outline" disabled={!hasNextPage} onClick={() => updateFilters({ page: String(page + 1) })}>
-                Next<ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        ) : null}
+            ) : (
+              <span className="text-slate-400">—</span>
+            )
+          }
+        />
       </SectionCard>
 
       {createOpen ? (
@@ -386,7 +383,13 @@ function HealthMetric({ label, value, tone }: { label: string; value: string | n
 }
 
 function AccountCell({ account }: { account: AccountingSourceMappingSummary['debitAccount'] }) {
-  return <td className="px-4 py-4"><p className="font-mono text-xs font-bold text-slate-500">{account.code}</p><p className="mt-1 font-semibold text-slate-900">{account.name}</p>{account.isActive === false ? <Badge variant="warning" className="mt-2">Inactive account</Badge> : null}</td>;
+  return (
+    <>
+      <p className="font-mono text-xs font-bold text-slate-500">{account.code}</p>
+      <p className="mt-1 font-semibold text-slate-900">{account.name}</p>
+      {account.isActive === false ? <Badge variant="warning" className="mt-2">Inactive account</Badge> : null}
+    </>
+  );
 }
 
 function positiveInt(value: string | null, fallback: number) {

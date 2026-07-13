@@ -25,6 +25,10 @@ import {
   PayrollActionDialog,
   PayrollActionType,
 } from './payroll-action-dialog';
+import {
+  PaginatedDataTable,
+  type PaginatedDataTableColumn,
+} from '../schoolos/data/paginated-data-table';
 
 type PayrollLineView = {
   id?: string;
@@ -202,7 +206,6 @@ export function PayrollRuns() {
     : (runs.find((run) => run.id === selectedRunKey) ?? null);
   const selectedRunActions = selectedRun?.allowedActions;
   const totalItems = runsQuery.data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(totalItems / limit));
 
   const createDraftMutation = useMutation({
     mutationFn: () =>
@@ -249,6 +252,50 @@ export function PayrollRuns() {
     { length: 5 },
     (_, index) => currentYear - 2 + index,
   );
+
+  const runColumns: PaginatedDataTableColumn<PayrollRunView>[] = [
+    {
+      id: 'period',
+      header: 'Period',
+      cell: (run) => (
+        <>
+          <p className="font-bold text-gray-900">{formatPeriod(run.periodMonth, run.periodYear)}</p>
+          <p className="text-[10px] text-gray-500">{run.lineCount ?? 0} staff lines</p>
+        </>
+      ),
+    },
+    {
+      id: 'status',
+      header: 'Status',
+      cell: (run) => (
+        <span
+          className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${statusClasses(run.status)}`}
+        >
+          {run.status}
+        </span>
+      ),
+    },
+    {
+      id: 'gross',
+      header: 'Gross',
+      align: 'right',
+      cell: (run) => <span className="text-gray-700">{formatMoney(run.grossAmount)}</span>,
+    },
+    {
+      id: 'deductions',
+      header: 'Deductions',
+      align: 'right',
+      cell: (run) => <span className="text-danger-600">-{formatMoney(run.deductionAmount)}</span>,
+    },
+    {
+      id: 'net',
+      header: 'Net',
+      align: 'right',
+      cell: (run) => (
+        <span className="font-bold text-[var(--color-mod-hr-text)]">{formatMoney(run.netAmount)}</span>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -529,147 +576,29 @@ export function PayrollRuns() {
               controlled M11 accrual action.
             </p>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50/60">
-                  <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wider text-gray-500">
-                    Period
-                  </th>
-                  <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wider text-gray-500">
-                    Status
-                  </th>
-                  <th className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">
-                    Gross
-                  </th>
-                  <th className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">
-                    Deductions
-                  </th>
-                  <th className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-wider text-[var(--color-mod-hr-text)]">
-                    Net
-                  </th>
-                  <th className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">
-                    Action
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {runsQuery.isLoading ? (
-                  Array.from({ length: 5 }).map((_, index) => (
-                    <tr key={index} className="animate-pulse">
-                      <td className="px-5 py-4">
-                        <div className="h-4 w-32 rounded bg-gray-100" />
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="h-6 w-20 rounded-full bg-gray-100" />
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="ml-auto h-4 w-20 rounded bg-gray-100" />
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="ml-auto h-4 w-20 rounded bg-gray-100" />
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="ml-auto h-4 w-20 rounded bg-gray-100" />
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="ml-auto h-4 w-16 rounded bg-gray-100" />
-                      </td>
-                    </tr>
-                  ))
-                ) : runsQuery.error ? (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="px-5 py-12 text-center text-danger-600"
-                    >
-                      Failed to load payroll runs. Please check your permissions
-                      or connection.
-                    </td>
-                  </tr>
-                ) : runs.length > 0 ? (
-                  runs.map((run) => (
-                    <tr
-                      key={run.id}
-                      className="transition-colors hover:bg-gray-50/60"
-                    >
-                      <td className="px-5 py-4">
-                        <p className="font-bold text-gray-900">
-                          {formatPeriod(run.periodMonth, run.periodYear)}
-                        </p>
-                        <p className="text-[10px] text-gray-500">
-                          {run.lineCount ?? 0} staff lines
-                        </p>
-                      </td>
-                      <td className="px-5 py-4">
-                        <span
-                          className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${statusClasses(run.status)}`}
-                        >
-                          {run.status}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4 text-right text-gray-700">
-                        {formatMoney(run.grossAmount)}
-                      </td>
-                      <td className="px-5 py-4 text-right text-danger-600">
-                        -{formatMoney(run.deductionAmount)}
-                      </td>
-                      <td className="px-5 py-4 text-right font-bold text-[var(--color-mod-hr-text)]">
-                        {formatMoney(run.netAmount)}
-                      </td>
-                      <td className="px-5 py-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedRunId(run.id)}
-                          className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--color-mod-hr-text)] hover:text-[var(--color-mod-hr-accent)]"
-                        >
-                          <Eye size={15} /> View
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="px-5 py-12 text-center text-gray-500"
-                    >
-                      No payroll runs yet. Create the first draft run from a
-                      preview.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          {totalItems > 0 && (
-            <div className="flex items-center justify-between border-t border-gray-100 px-5 py-4">
-              <p className="text-xs font-semibold text-gray-500">
-                Showing {(page - 1) * limit + 1} to{' '}
-                {Math.min(page * limit, totalItems)} of {totalItems} runs
-              </p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPage((current) => Math.max(1, current - 1))}
-                  disabled={page === 1}
-                  className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-bold text-gray-600 disabled:opacity-40"
-                >
-                  Previous
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPage((current) => Math.min(totalPages, current + 1))
-                  }
-                  disabled={page >= totalPages}
-                  className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-bold text-gray-600 disabled:opacity-40"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
+          <PaginatedDataTable
+            columns={runColumns}
+            items={runs}
+            getRowId={(run) => run.id}
+            status={runsQuery.error ? 'error' : runsQuery.isLoading ? 'loading' : 'ready'}
+            page={page}
+            pageSize={limit}
+            totalItems={totalItems}
+            onPageChange={setPage}
+            onRetry={() => void runsQuery.refetch()}
+            errorMessage="Failed to load payroll runs. Please check your permissions or connection."
+            emptyTitle="No payroll runs yet"
+            emptyDescription="Create the first draft run from a preview."
+            rowActions={(run) => (
+              <button
+                type="button"
+                onClick={() => setSelectedRunId(run.id)}
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--color-mod-hr-text)] hover:text-[var(--color-mod-hr-accent)]"
+              >
+                <Eye size={15} /> View
+              </button>
+            )}
+          />
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">

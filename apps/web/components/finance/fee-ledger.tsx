@@ -1,7 +1,12 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { DataTable } from "@/components/ui/data-table";
+import {
+  PaginatedDataTable,
+  type PaginatedDataTableColumn,
+  type PaginatedDataTableSort,
+} from "@/components/schoolos/data/paginated-data-table";
+import { Button } from "@/components/ui/primitives/button";
 import { Eye, Printer } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ReprintDialog } from "./reprint-dialog";
@@ -30,9 +35,25 @@ interface Invoice {
   };
 }
 
+/**
+ * sortBy is constrained to what ListInvoicesQueryDto actually accepts
+ * (apps/api/src/finance/dto/list-finance-records.query.dto.ts) — do not add
+ * a `sortable: true` column here without confirming the backend enum first.
+ */
+type InvoiceSortColumn = "invoiceNumber" | "dueDate" | "totalAmount";
+
 interface FeeLedgerProps {
   invoices: Invoice[];
   isLoading?: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  onPageChange: (page: number) => void;
+  hasActiveFilters?: boolean;
+  sort?: PaginatedDataTableSort | null;
+  onSortChange?: (sort: PaginatedDataTableSort | null) => void;
 }
 
 const formatCurrency = (amount: number) => {
@@ -45,7 +66,19 @@ const formatCurrency = (amount: number) => {
 
 const formatDate = (value: string) => formatBsDate(value);
 
-export function FeeLedger({ invoices, isLoading }: FeeLedgerProps) {
+export function FeeLedger({
+  invoices,
+  isLoading,
+  isError,
+  onRetry,
+  page,
+  pageSize,
+  totalItems,
+  onPageChange,
+  hasActiveFilters,
+  sort,
+  onSortChange,
+}: FeeLedgerProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -77,10 +110,12 @@ export function FeeLedger({ invoices, isLoading }: FeeLedgerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoices, isLoading, selectedInvoiceId]);
 
-  const columns = [
+  const columns: PaginatedDataTableColumn<Invoice>[] = [
     {
+      id: "invoiceNumber",
       header: "Invoice #",
-      cell: (inv: Invoice) => (
+      sortable: true,
+      cell: (inv) => (
         <div className="flex flex-col">
           <span className="font-bold text-slate-900">{inv.invoiceNumber}</span>
           <span className="text-[0.65rem] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
@@ -92,8 +127,9 @@ export function FeeLedger({ invoices, isLoading }: FeeLedgerProps) {
       ),
     },
     {
+      id: "student",
       header: "Student",
-      cell: (inv: Invoice) => (
+      cell: (inv) => (
         <div className="flex flex-col">
           <span className="text-sm font-bold text-slate-900">
             {inv.student?.name || "Student name not set"}
@@ -105,8 +141,10 @@ export function FeeLedger({ invoices, isLoading }: FeeLedgerProps) {
       ),
     },
     {
+      id: "dueDate",
       header: "Due Date",
-      cell: (inv: Invoice) => (
+      sortable: true,
+      cell: (inv) => (
         <span
           className={cn(
             "text-xs font-bold",
@@ -120,24 +158,29 @@ export function FeeLedger({ invoices, isLoading }: FeeLedgerProps) {
       ),
     },
     {
+      id: "totalAmount",
       header: "Total",
-      cell: (inv: Invoice) => (
+      sortable: true,
+      cell: (inv) => (
         <span className="font-black text-slate-900 text-sm">
           {formatCurrency(inv.totalAmount)}
         </span>
       ),
     },
     {
+      id: "paidAmount",
       header: "Paid",
-      cell: (inv: Invoice) => (
+      cell: (inv) => (
         <span className="text-sm font-black text-emerald-600">
           {formatCurrency(inv.paidAmount ?? 0)}
         </span>
       ),
     },
     {
+      id: "outstandingAmount",
       header: "Outstanding",
-      cell: (inv: Invoice) => (
+      align: "right",
+      cell: (inv) => (
         <span className="block text-right text-sm font-bold text-slate-950 tabular-nums">
           {typeof inv.outstandingAmount === "number"
             ? formatCurrency(inv.outstandingAmount)
@@ -146,54 +189,68 @@ export function FeeLedger({ invoices, isLoading }: FeeLedgerProps) {
       ),
     },
     {
+      id: "status",
       header: "Status",
-      cell: (inv: Invoice) => (
-        <StatusBadge status={inv.status} className="h-6" />
-      ),
-    },
-    {
-      header: "Actions",
-      cell: (inv: Invoice) => (
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-950"
-            onClick={() => setSelectedInvoice(inv.id)}
-          >
-            <Eye size={15} aria-hidden />
-            View
-          </button>
-          {inv.receiptNumber && (
-            <button
-              type="button"
-              className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-slate-900 transition-all active:scale-90"
-              title="Print Receipt"
-              aria-label="Print Receipt"
-              onClick={() =>
-                setSelectedReceipt({
-                  id: inv.receiptId!,
-                  number: inv.receiptNumber!,
-                })
-              }
-            >
-              <Printer size={16} />
-            </button>
-          )}
-        </div>
-      ),
+      cell: (inv) => <StatusBadge status={inv.status} className="h-6" />,
     },
   ];
 
+  function renderRowActions(inv: Invoice) {
+    return (
+      <div className="flex items-center justify-end gap-1">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="gap-1.5 text-slate-600 hover:text-slate-950"
+          onClick={() => setSelectedInvoice(inv.id)}
+        >
+          <Eye size={15} aria-hidden />
+          View
+        </Button>
+        {inv.receiptNumber && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            title="Print Receipt"
+            aria-label="Print Receipt"
+            onClick={() =>
+              setSelectedReceipt({
+                id: inv.receiptId!,
+                number: inv.receiptNumber!,
+              })
+            }
+          >
+            <Printer size={16} />
+          </Button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-slate-100 overflow-hidden bg-white shadow-sm">
-        <DataTable
-          columns={columns}
-          data={invoices}
-          isLoading={isLoading}
-          emptyMessage="No financial records found."
-        />
-      </div>
+      <PaginatedDataTable
+        columns={columns}
+        items={invoices}
+        getRowId={(inv) => inv.id}
+        status={isError ? "error" : isLoading ? "loading" : "ready"}
+        page={page}
+        pageSize={pageSize}
+        totalItems={totalItems}
+        onPageChange={onPageChange}
+        sort={sort}
+        onSortChange={onSortChange}
+        rowActions={renderRowActions}
+        onRetry={onRetry}
+        errorMessage="Billing history could not load. Your filters were preserved — retry to load the tenant-scoped invoice page."
+        emptyTitle="No invoices yet"
+        emptyDescription="Invoices will appear here once billing runs generate them."
+        hasActiveFilters={hasActiveFilters}
+        noResultsTitle="No matching invoices"
+        noResultsDescription="Try a different search term or clear the status filter."
+      />
 
       {selectedReceipt && (
         <ReprintDialog

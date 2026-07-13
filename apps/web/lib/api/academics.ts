@@ -483,8 +483,16 @@ export const academicsApi = {
         params ?? {},
       ),
     ),
-  listTeacherWorkload: () =>
-    request<TeacherWorkloadPage>('/timetable/workload'),
+  listTeacherWorkload: (params?: {
+    academicYearId?: string;
+    versionId?: string;
+    teacherId?: string;
+    classId?: string;
+    sectionId?: string;
+    page?: number;
+    limit?: number;
+  }) =>
+    request<TeacherWorkloadPage>(withQuery('/timetable/workload', params ?? {})),
   createTimetableSlot: (body: JsonBody) =>
     request<TimetableSlotSummary>('/timetable', { method: 'POST', json: body }),
   listTimetablePeriods: (params?: { academicYearId?: string }) =>

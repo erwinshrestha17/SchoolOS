@@ -9,6 +9,7 @@ import { useRecentlyViewed } from '@/lib/hooks/use-recently-viewed';
 import { LoadingState } from '@/components/ui/loading-state';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ActionMenu } from '@/components/ui/action-menu';
+import { useBreadcrumbLabel } from '@/components/schoolos/navigation/breadcrumb-label-context';
 import { ProfileHeader } from './profile/profile-header';
 import { LifecyclePanel } from './profile/lifecycle-panel';
 import { StudentEditCard } from './profile/student-edit-card';
@@ -103,17 +104,21 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
     enabled: Boolean(studentId),
   });
 
+  const loadedStudent = profileQuery.data?.student;
+  const loadedStudentLabel = loadedStudent
+    ? loadedStudent.fullNameEn ||
+      `${loadedStudent.firstNameEn ?? ''} ${loadedStudent.lastNameEn ?? ''}`.trim() ||
+      'Student'
+    : null;
+
+  useBreadcrumbLabel(loadedStudentLabel);
+
   useEffect(() => {
-    const student = profileQuery.data?.student;
-    if (!student) return;
-    const label =
-      student.fullNameEn ||
-      `${student.firstNameEn ?? ''} ${student.lastNameEn ?? ''}`.trim() ||
-      'Student';
+    if (!loadedStudent || !loadedStudentLabel) return;
     recordRecentlyViewed({
       kind: 'student',
       id: studentId,
-      label,
+      label: loadedStudentLabel,
       href: `/dashboard/students/${studentId}`,
     });
     // Only record when the loaded student identity changes, not on every

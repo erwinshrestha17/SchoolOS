@@ -10,6 +10,7 @@ import {
   formatBsDateTime,
   getNepalNow,
   toBsDateFromGregorian,
+  type AttendanceCorrectionRequest,
 } from "@schoolos/core";
 import {
   AlertTriangle,
@@ -60,8 +61,59 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  PaginatedDataTable,
+  type PaginatedDataTableColumn,
+} from "@/components/schoolos/data/paginated-data-table";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
+
+const correctionColumns: PaginatedDataTableColumn<AttendanceCorrectionRequest>[] = [
+  {
+    id: "id",
+    header: "Request",
+    cell: (item) => (
+      <span className="font-bold text-blue-700">{item.id.slice(0, 8)}</span>
+    ),
+  },
+  {
+    id: "student",
+    header: "Student",
+    cell: (item) => correctionStudentName(item),
+  },
+  {
+    id: "previousStatus",
+    header: "Original",
+    cell: (item) => item.previousStatus ?? "No record",
+  },
+  {
+    id: "requestedStatus",
+    header: "Requested",
+    cell: (item) => item.requestedStatus,
+  },
+  {
+    id: "status",
+    header: "Status",
+    cell: (item) => (
+      <Badge variant={item.status === "PENDING" ? "warning" : "success"}>
+        {item.status}
+      </Badge>
+    ),
+  },
+  {
+    id: "review",
+    header: "Review",
+    cell: (item) => (
+      <Link
+        className="text-sm font-bold text-blue-700"
+        href={`/dashboard/attendance/corrections/${item.id}`}
+      >
+        Open review
+      </Link>
+    ),
+  },
+];
 
 const nepalNow = getNepalNow();
 const today = `${nepalNow.year}-${String(nepalNow.month).padStart(2, "0")}-${String(nepalNow.day).padStart(2, "0")}`;
@@ -636,14 +688,27 @@ export function AttendanceRegisterWorkspace({
 
 const AUDIT_LOG_VIEW = "AUDIT" as const;
 
+const CORRECTIONS_PAGE_SIZE = 25;
+
 export function AttendanceCorrectionsQueueWorkspace() {
   const [status, setStatus] = useState("PENDING");
+  const [page, setPage] = useState(1);
   const showAuditLog = status === AUDIT_LOG_VIEW;
   const correctionsQuery = useQuery({
-    queryKey: ["attendance-corrections", status],
-    queryFn: () => api.listAttendanceCorrections({ status, limit: 25 }),
+    queryKey: ["attendance-corrections", status, page],
+    queryFn: () =>
+      api.listAttendanceCorrections({
+        status,
+        limit: CORRECTIONS_PAGE_SIZE,
+        page,
+      }),
     enabled: !showAuditLog,
   });
+
+  function handleStatusChange(nextStatus: string) {
+    setStatus(nextStatus);
+    setPage(1);
+  }
   const auditQuery = useQuery({
     queryKey: ["attendance-m2-correction-audit", thirtyDaysAgo, today],
     queryFn: () =>
@@ -672,7 +737,7 @@ export function AttendanceCorrectionsQueueWorkspace() {
         accentColor="emerald"
         variant="light"
       />
-      <Tabs value={status} onValueChange={setStatus}>
+      <Tabs value={status} onValueChange={handleStatusChange}>
         <TabsList aria-label="Correction queue view">
           <TabsTrigger value="PENDING">Inbox</TabsTrigger>
           <TabsTrigger value="APPROVED">Reviewed</TabsTrigger>
@@ -760,12 +825,24 @@ export function AttendanceCorrectionsQueueWorkspace() {
           )}
         </SectionCard>
       ) : status === "PENDING" ? (
-        <AttendanceCorrectionReview
-          corrections={correctionsQuery.data?.items ?? []}
-          isLoading={correctionsQuery.isLoading}
-          total={correctionsQuery.data?.total ?? 0}
-          detailHref={(id) => `/dashboard/attendance/corrections/${id}`}
-        />
+        <div className="space-y-3">
+          <AttendanceCorrectionReview
+            corrections={correctionsQuery.data?.items ?? []}
+            isLoading={correctionsQuery.isLoading}
+            total={correctionsQuery.data?.total ?? 0}
+            detailHref={(id) => `/dashboard/attendance/corrections/${id}`}
+          />
+          {!correctionsQuery.isLoading && (correctionsQuery.data?.total ?? 0) > 0 ? (
+            <div className="rounded-2xl border border-slate-100 bg-white">
+              <TablePagination
+                page={page}
+                pageSize={CORRECTIONS_PAGE_SIZE}
+                total={correctionsQuery.data?.total ?? 0}
+                onPageChange={setPage}
+              />
+            </div>
+          ) : null}
+        </div>
       ) : (
         <SectionCard
           title={status === "APPROVED" ? "Reviewed Corrections" : "Escalated Corrections"}
@@ -776,62 +853,26 @@ export function AttendanceCorrectionsQueueWorkspace() {
             </Badge>
           }
         >
-          {correctionsQuery.isLoading ? (
-            <LoadingState label="Loading correction requests..." />
-          ) : correctionsQuery.isError ? (
-            <ErrorState
-              title="Corrections unavailable"
-              onRetry={() => void correctionsQuery.refetch()}
-            />
-          ) : (correctionsQuery.data?.items ?? []).length === 0 ? (
-            <EmptyState
-              title="No corrections in this queue"
-              description="Requests matching this status will appear here."
-              icon={<ClipboardCheck size={32} />}
-            />
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Request</TableHead>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Original</TableHead>
-                  <TableHead>Requested</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Review</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(correctionsQuery.data?.items ?? []).map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-bold text-blue-700">
-                      {item.id.slice(0, 8)}
-                    </TableCell>
-                    <TableCell>{correctionStudentName(item)}</TableCell>
-                    <TableCell>{item.previousStatus ?? "No record"}</TableCell>
-                    <TableCell>{item.requestedStatus}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          item.status === "PENDING" ? "warning" : "success"
-                        }
-                      >
-                        {item.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Link
-                        className="text-sm font-bold text-blue-700"
-                        href={`/dashboard/attendance/corrections/${item.id}`}
-                      >
-                        Open review
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+          <PaginatedDataTable
+            columns={correctionColumns}
+            items={correctionsQuery.data?.items ?? []}
+            getRowId={(item) => item.id}
+            status={
+              correctionsQuery.isError
+                ? "error"
+                : correctionsQuery.isLoading
+                  ? "loading"
+                  : "ready"
+            }
+            page={page}
+            pageSize={CORRECTIONS_PAGE_SIZE}
+            totalItems={correctionsQuery.data?.total ?? 0}
+            onPageChange={setPage}
+            onRetry={() => void correctionsQuery.refetch()}
+            errorMessage="Corrections could not load. Retry to load this tenant-scoped queue."
+            emptyTitle="No corrections in this queue"
+            emptyDescription="Requests matching this status will appear here."
+          />
         </SectionCard>
       )}
     </DashboardPageShell>

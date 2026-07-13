@@ -36,15 +36,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LoadingState } from '@/components/ui/loading-state';
 import { Select } from '@/components/ui/select';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { TablePagination } from '@/components/ui/table-pagination';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  PaginatedDataTable,
+  type PaginatedDataTableColumn,
+} from '@/components/schoolos/data/paginated-data-table';
 
 const PAGE_SIZE = 20;
 
@@ -92,6 +94,90 @@ const EMPTY_FORM: ActionForm = {
   decision: '',
   reason: '',
 };
+
+const retakeColumns: PaginatedDataTableColumn<AssessmentRetakeSummary>[] = [
+  {
+    id: 'student',
+    header: 'Student',
+    cell: (retake) => (
+      <>
+        <p className="font-bold text-slate-900">{studentName(retake)}</p>
+        <p className="mt-1 text-xs text-slate-500">
+          {retake.student?.studentSystemId ?? retake.studentId}
+          {' | '}
+          {retake.class?.name ?? 'Class'}
+          {retake.section?.name ? ` - ${retake.section.name}` : ''}
+        </p>
+      </>
+    ),
+  },
+  {
+    id: 'assessment',
+    header: 'Assessment',
+    cell: (retake) => (
+      <>
+        <p className="font-semibold text-slate-900">
+          {retake.subject?.name ?? 'Subject'}
+        </p>
+        <p className="mt-1 text-xs text-slate-500">
+          {retake.examTerm?.name ?? 'Exam term'}
+          {' | '}
+          {retake.assessmentComponent?.name ?? 'Component'}
+        </p>
+      </>
+    ),
+  },
+  {
+    id: 'type',
+    header: 'Type',
+    cell: (retake) => (
+      <span className="font-semibold text-slate-700">
+        {displayType(retake.type)}
+      </span>
+    ),
+  },
+  {
+    id: 'status',
+    header: 'Status',
+    cell: (retake) => (
+      <StatusBadge status={retake.status} tone={statusTone(retake.status)} />
+    ),
+  },
+  {
+    id: 'schedule',
+    header: 'Schedule',
+    cell: (retake) =>
+      retake.scheduledStartsAt ? (
+        <>
+          <p className="font-semibold text-slate-700">
+            {formatBsDateTime(retake.scheduledStartsAt)}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            {retake.room ?? 'Room not assigned'}
+          </p>
+        </>
+      ) : (
+        <span className="text-slate-400">Not scheduled</span>
+      ),
+  },
+  {
+    id: 'attempt',
+    header: 'Attempt',
+    cell: (retake) =>
+      retake.attemptMarks === null ? (
+        <span className="text-slate-400">Pending</span>
+      ) : (
+        <>
+          <p className="font-bold text-slate-900">
+            {retake.attemptMarks} / {retake.assessmentComponent?.maxMarks ?? '-'}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            {displayDecision(retake.resultDecision)}
+          </p>
+        </>
+      ),
+  },
+];
 
 export function AssessmentRetakesTab() {
   const queryClient = useQueryClient();
@@ -287,128 +373,40 @@ export function AssessmentRetakesTab() {
         </div>
       ) : null}
 
-      {retakesQuery.isLoading ? (
-        <LoadingState
-          variant="skeleton"
-          label="Loading retest and make-up queue"
-        />
-      ) : retakesQuery.isError ? (
-        <ErrorState
-          title="Could not load the retest queue"
-          message={
-            retakesQuery.error instanceof Error
-              ? retakesQuery.error.message
-              : 'Retry the queue.'
-          }
-          onRetry={() => void retakesQuery.refetch()}
-        />
-      ) : retakesQuery.data?.items.length === 0 ? (
-        <EmptyState
-          title="No retest or make-up records"
-          description="Requests created from saved marks will appear here for review."
-          icon={<ShieldCheck className="h-7 w-7" />}
-        />
-      ) : (
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <div className="overflow-x-auto">
-            <table className="min-w-[1080px] w-full text-left text-sm">
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
-                <tr>
-                  <th className="px-4 py-3">Student</th>
-                  <th className="px-4 py-3">Assessment</th>
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Schedule</th>
-                  <th className="px-4 py-3">Attempt</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {retakesQuery.data?.items.map((retake) => (
-                  <tr key={retake.id} className="align-top hover:bg-slate-50">
-                    <td className="px-4 py-4">
-                      <p className="font-bold text-slate-900">
-                        {studentName(retake)}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {retake.student?.studentSystemId ?? retake.studentId}
-                        {' | '}
-                        {retake.class?.name ?? 'Class'}
-                        {retake.section?.name
-                          ? ` - ${retake.section.name}`
-                          : ''}
-                      </p>
-                    </td>
-                    <td className="px-4 py-4">
-                      <p className="font-semibold text-slate-900">
-                        {retake.subject?.name ?? 'Subject'}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {retake.examTerm?.name ?? 'Exam term'}
-                        {' | '}
-                        {retake.assessmentComponent?.name ?? 'Component'}
-                      </p>
-                    </td>
-                    <td className="px-4 py-4 font-semibold text-slate-700">
-                      {displayType(retake.type)}
-                    </td>
-                    <td className="px-4 py-4">
-                      <StatusBadge
-                        status={retake.status}
-                        tone={statusTone(retake.status)}
-                      />
-                    </td>
-                    <td className="px-4 py-4 text-slate-700">
-                      {retake.scheduledStartsAt ? (
-                        <>
-                          <p className="font-semibold">
-                            {formatBsDateTime(retake.scheduledStartsAt)}
-                          </p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            {retake.room ?? 'Room not assigned'}
-                          </p>
-                        </>
-                      ) : (
-                        <span className="text-slate-400">Not scheduled</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-4">
-                      {retake.attemptMarks === null ? (
-                        <span className="text-slate-400">Pending</span>
-                      ) : (
-                        <>
-                          <p className="font-bold text-slate-900">
-                            {retake.attemptMarks} /{' '}
-                            {retake.assessmentComponent?.maxMarks ?? '-'}
-                          </p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            {displayDecision(retake.resultDecision)}
-                          </p>
-                        </>
-                      )}
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex justify-end gap-1">
-                        <IconAction
-                          title="View retake details"
-                          icon={<Eye className="h-4 w-4" />}
-                          onClick={() => setDetailId(retake.id)}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <TablePagination
-            page={retakesQuery.data?.meta.page ?? page}
-            pageSize={retakesQuery.data?.meta.limit ?? PAGE_SIZE}
-            total={retakesQuery.data?.meta.total ?? 0}
-            onPageChange={setPage}
+      <PaginatedDataTable
+        columns={retakeColumns}
+        items={retakesQuery.data?.items ?? []}
+        getRowId={(retake) => retake.id}
+        status={
+          retakesQuery.isError
+            ? 'error'
+            : retakesQuery.isLoading
+              ? 'loading'
+              : 'ready'
+        }
+        page={retakesQuery.data?.meta.page ?? page}
+        pageSize={retakesQuery.data?.meta.limit ?? PAGE_SIZE}
+        totalItems={retakesQuery.data?.meta.total ?? 0}
+        onPageChange={setPage}
+        onRetry={() => void retakesQuery.refetch()}
+        errorMessage={
+          retakesQuery.error instanceof Error
+            ? retakesQuery.error.message
+            : 'Retry the queue.'
+        }
+        emptyTitle="No retest or make-up records"
+        emptyDescription="Requests created from saved marks will appear here for review."
+        hasActiveFilters={Boolean(status || type)}
+        noResultsTitle="No matching retest or make-up records"
+        noResultsDescription="Try a different status or type filter."
+        rowActions={(retake) => (
+          <IconAction
+            title="View retake details"
+            icon={<Eye className="h-4 w-4" />}
+            onClick={() => setDetailId(retake.id)}
           />
-        </div>
-      )}
+        )}
+      />
 
       <RetakeDetailDialog
         retake={detailQuery.data ?? null}

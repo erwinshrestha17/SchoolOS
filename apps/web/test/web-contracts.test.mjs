@@ -994,7 +994,6 @@ describe("SchoolOS web production contracts", () => {
     const shell = read("components/layout/dashboard-shell.tsx");
     const globals = read("app/globals.css");
     const layoutBasics = readMany([
-      "components/layout/breadcrumbs.tsx",
       "components/layout/dashboard-shell.tsx",
       "components/layout/global-student-search.tsx",
       "components/layout/header.tsx",

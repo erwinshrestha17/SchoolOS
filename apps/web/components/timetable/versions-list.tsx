@@ -3,17 +3,22 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ActionMenu } from "@/components/ui/action-menu";
-import { LoadingState } from "@/components/ui/loading-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Toast, type ToastTone } from "@/components/ui/toast";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CheckCircle2, Lock, Archive } from "lucide-react";
 import { formatBsDate } from "@schoolos/core";
+import {
+  PaginatedDataTable,
+  type PaginatedDataTableColumn,
+} from "@/components/schoolos/data/paginated-data-table";
 
 type VersionAction = "publish" | "lock" | "archive";
+type TimetableVersionRow = Awaited<ReturnType<typeof api.listTimetableVersions>>["items"][number];
+
+const PAGE_SIZE = 20;
 
 export function TimetableVersionsList({
   academicYearId,
@@ -31,10 +36,11 @@ export function TimetableVersionsList({
     id: string;
     versionName: string;
   } | null>(null);
+  const [page, setPage] = useState(1);
 
   const versionsQuery = useQuery({
-    queryKey: ["timetable-versions", academicYearId],
-    queryFn: () => api.listTimetableVersions({ academicYearId }),
+    queryKey: ["timetable-versions", academicYearId, page],
+    queryFn: () => api.listTimetableVersions({ academicYearId, page, limit: PAGE_SIZE }),
     enabled: Boolean(academicYearId),
   });
 
@@ -139,62 +145,58 @@ export function TimetableVersionsList({
     );
   }
 
-  if (versionsQuery.isLoading) return <LoadingState />;
-
-  const columns = [
+  const columns: PaginatedDataTableColumn<TimetableVersionRow>[] = [
     {
+      id: "versionName",
       header: "Version Name",
-      accessorKey: "versionName",
-      cell: (row: any) => (
-        <span className="font-bold text-slate-900">{row.versionName}</span>
-      ),
+      cell: (row) => <span className="font-bold text-slate-900">{row.versionName}</span>,
     },
     {
+      id: "effectiveFrom",
       header: "Effective From",
-      accessorKey: "effectiveFrom",
-      cell: (row: any) => formatBsDate(row.effectiveFrom),
+      cell: (row) => formatBsDate(row.effectiveFrom),
     },
     {
+      id: "status",
       header: "Status",
-      accessorKey: "status",
-      cell: (row: any) => <StatusBadge status={row.status} />,
+      cell: (row) => <StatusBadge status={row.status} />,
     },
     {
+      id: "slots",
       header: "Slots",
-      accessorKey: "_count.slots",
-      cell: (row: any) => row.slots?.length || 0,
-    },
-    {
-      header: "Actions",
-      cell: (row: any) => (
-        <ActionMenu
-          items={[
-            {
-              label: "Publish",
-              icon: <CheckCircle2 className="h-4 w-4" />,
-              onClick: () =>
-                setConfirmTarget({ action: "publish", id: row.id, versionName: row.versionName }),
-              disabled: row.status === "PUBLISHED" || row.status === "ARCHIVED",
-            },
-            {
-              label: "Lock",
-              icon: <Lock className="h-4 w-4" />,
-              onClick: () =>
-                setConfirmTarget({ action: "lock", id: row.id, versionName: row.versionName }),
-              disabled: row.status === "LOCKED" || row.status === "ARCHIVED",
-            },
-            {
-              label: "Archive",
-              icon: <Archive className="h-4 w-4" />,
-              onClick: () =>
-                setConfirmTarget({ action: "archive", id: row.id, versionName: row.versionName }),
-              disabled: row.status === "ARCHIVED",
-            },
-          ]}
-        />
-      ),
+      cell: (row) => row.slots?.length || 0,
     },
   ];
+
+  function renderRowActions(row: TimetableVersionRow) {
+    return (
+      <ActionMenu
+        items={[
+          {
+            label: "Publish",
+            icon: <CheckCircle2 className="h-4 w-4" />,
+            onClick: () =>
+              setConfirmTarget({ action: "publish", id: row.id, versionName: row.versionName }),
+            disabled: row.status === "PUBLISHED" || row.status === "ARCHIVED",
+          },
+          {
+            label: "Lock",
+            icon: <Lock className="h-4 w-4" />,
+            onClick: () =>
+              setConfirmTarget({ action: "lock", id: row.id, versionName: row.versionName }),
+            disabled: row.status === "LOCKED" || row.status === "ARCHIVED",
+          },
+          {
+            label: "Archive",
+            icon: <Archive className="h-4 w-4" />,
+            onClick: () =>
+              setConfirmTarget({ action: "archive", id: row.id, versionName: row.versionName }),
+            disabled: row.status === "ARCHIVED",
+          },
+        ]}
+      />
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -208,14 +210,21 @@ export function TimetableVersionsList({
         />
       ) : null}
 
-      {(versionsQuery.data?.items.length ?? 0) === 0 ? (
-        <EmptyState
-          title="No versions found"
-          description="Create your first timetable version to start scheduling classes."
-        />
-      ) : (
-        <DataTable columns={columns} data={versionsQuery.data?.items ?? []} />
-      )}
+      <PaginatedDataTable
+        columns={columns}
+        items={versionsQuery.data?.items ?? []}
+        getRowId={(row) => row.id}
+        status={versionsQuery.isError ? "error" : versionsQuery.isLoading ? "loading" : "ready"}
+        page={page}
+        pageSize={PAGE_SIZE}
+        totalItems={versionsQuery.data?.meta.total ?? 0}
+        onPageChange={setPage}
+        onRetry={() => void versionsQuery.refetch()}
+        errorMessage="Timetable versions could not load. Please try again."
+        emptyTitle="No versions found"
+        emptyDescription="Create your first timetable version to start scheduling classes."
+        rowActions={renderRowActions}
+      />
 
       <ConfirmDialog
         isOpen={confirmTarget !== null}

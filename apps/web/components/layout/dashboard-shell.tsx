@@ -12,6 +12,7 @@ import { LoadingState } from '../ui/loading-state';
 import { ErrorBoundary } from '../ui/error-boundary';
 import { ModuleOperationalSummary } from '../ui/module-operational-summary';
 import { SupportOverrideBanner } from '../platform/SupportOverrideBanner';
+import { SchoolBreadcrumbs } from '../schoolos/navigation/school-breadcrumbs';
 
 // Students, attendance, fees, academics, homework, timetable, notices, and
 // messages already
@@ -93,6 +94,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           <div className="mx-auto w-full max-w-[1600px] px-4 py-5 sm:px-6 lg:px-7 xl:px-8">
             <div className="animate-fade-in transition-all duration-300">
               <ErrorBoundary>
+                <SchoolBreadcrumbs className="mb-4" />
                 {summaryModule ? <ModuleOperationalSummary module={summaryModule} /> : null}
                 {children}
               </ErrorBoundary>

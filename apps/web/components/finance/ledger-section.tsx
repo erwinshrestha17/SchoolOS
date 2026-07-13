@@ -14,6 +14,7 @@ import { ReprintDialog } from "./reprint-dialog";
 import { useSession } from "@/components/session-provider";
 import { formatBsDateTime } from "@schoolos/core";
 import { StatusBadge } from "@/components/ui/status-badge";
+import type { PaginatedDataTableSort } from "@/components/schoolos/data/paginated-data-table";
 
 export function LedgerSection({
   mode = "all",
@@ -27,6 +28,17 @@ export function LedgerSection({
   const search = searchParams.get("ledgerSearch") ?? "";
   const status = searchParams.get("ledgerStatus") ?? "";
   const page = Math.max(1, Number(searchParams.get("ledgerPage") ?? "1") || 1);
+  const pageSize = 25;
+  const ledgerSortByParam = searchParams.get("ledgerSortBy");
+  const ledgerSortDirectionParam = searchParams.get("ledgerSortDirection");
+  // Default matches the pre-migration hardcoded query (sortBy: "issuedAt",
+  // sortDirection: "desc"). "issuedAt" isn't one of the sortable table
+  // columns, so no column header shows an active sort indicator by default —
+  // this preserves the original default ordering exactly.
+  const sort: PaginatedDataTableSort | null =
+    ledgerSortByParam && (ledgerSortDirectionParam === "asc" || ledgerSortDirectionParam === "desc")
+      ? { columnId: ledgerSortByParam, direction: ledgerSortDirectionParam }
+      : { columnId: "issuedAt", direction: "desc" };
   const receiptSearch = searchParams.get("receiptSearch") ?? "";
   const receiptPage = Math.max(
     1,
@@ -37,15 +49,15 @@ export function LedgerSection({
     receiptNumber: string;
   } | null>(null);
   const invoicesQuery = useQuery({
-    queryKey: ["invoices", "ledger", page, search, status],
+    queryKey: ["invoices", "ledger", page, search, status, sort?.columnId, sort?.direction],
     queryFn: () =>
       api.listInvoicesPage({
         page,
-        limit: 25,
+        limit: pageSize,
         search: search || undefined,
         status: status || undefined,
-        sortBy: "issuedAt",
-        sortDirection: "desc",
+        sortBy: sort?.columnId,
+        sortDirection: sort?.direction,
       }),
     enabled: mode !== "receipts",
   });
@@ -68,7 +80,7 @@ export function LedgerSection({
       if (!value || value === 1) params.delete(key);
       else params.set(key, String(value));
     }
-    if ("ledgerSearch" in updates || "ledgerStatus" in updates) {
+    if ("ledgerSearch" in updates || "ledgerStatus" in updates || "ledgerSortBy" in updates) {
       params.delete("ledgerPage");
     }
     if ("receiptSearch" in updates) params.delete("receiptPage");
@@ -119,41 +131,24 @@ export function LedgerSection({
         title="Billing History"
         description="Server-paginated invoices and their current backend status."
       >
-        {invoicesQuery.isError ? (
-          <ErrorState
-            title="Billing history could not load"
-            message="Your filters were preserved. Retry to load the tenant-scoped invoice page."
-            onRetry={() => void invoicesQuery.refetch()}
-          />
-        ) : (
-          <FeeLedger
-            invoices={invoicesQuery.data?.items ?? []}
-            isLoading={invoicesQuery.isLoading}
-          />
-        )}
-        {invoicesQuery.data?.total ? (
-          <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4 text-xs font-bold text-slate-500">
-            <span>{invoicesQuery.data.total} invoices</span>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                disabled={page <= 1}
-                onClick={() => updateFilters({ ledgerPage: page - 1 })}
-                className="rounded-lg border border-slate-200 px-3 py-2 disabled:opacity-40"
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                disabled={!invoicesQuery.data.hasNextPage}
-                onClick={() => updateFilters({ ledgerPage: page + 1 })}
-                className="rounded-lg border border-slate-200 px-3 py-2 disabled:opacity-40"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        ) : null}
+        <FeeLedger
+          invoices={invoicesQuery.data?.items ?? []}
+          isLoading={invoicesQuery.isLoading}
+          isError={invoicesQuery.isError}
+          onRetry={() => void invoicesQuery.refetch()}
+          page={page}
+          pageSize={pageSize}
+          totalItems={invoicesQuery.data?.total ?? 0}
+          onPageChange={(nextPage) => updateFilters({ ledgerPage: nextPage })}
+          hasActiveFilters={Boolean(search || status)}
+          sort={sort}
+          onSortChange={(nextSort) =>
+            updateFilters({
+              ledgerSortBy: nextSort?.columnId ?? "",
+              ledgerSortDirection: nextSort?.direction ?? "",
+            })
+          }
+        />
       </SectionCard> : null}
 
       {mode !== "invoices" ? <div id="receipt-history"><SectionCard

@@ -40,6 +40,7 @@ import {
 import { api } from "../../lib/api";
 import { KpiCard, KpiGrid } from "../ui/kpi-card";
 import { EmptyState } from "../ui/empty-state";
+import { ErrorState } from "../ui/error-state";
 import { LoadingState } from "../ui/loading-state";
 import { StatusBadge, type StatusTone } from "../ui/status-badge";
 import { cn } from "../../lib/utils";
@@ -641,6 +642,8 @@ export function LibraryWorkspace({
             createBookMutation.isPending || updateBookMutation.isPending
           }
           error={createBookMutation.error || updateBookMutation.error}
+          queryError={booksQuery.isError ? (booksQuery.error as Error) : null}
+          onRetryQuery={() => void booksQuery.refetch()}
           meta={booksQuery.data?.meta}
           onPageChange={setBookPage}
         />
@@ -694,6 +697,8 @@ export function LibraryWorkspace({
             copyStatusMutation.error ||
             archiveCopyMutation.error
           }
+          queryError={copiesQuery.isError ? (copiesQuery.error as Error) : null}
+          onRetryQuery={() => void copiesQuery.refetch()}
           meta={copiesQuery.data?.meta}
           onPageChange={setCopyPage}
         />
@@ -767,6 +772,8 @@ export function LibraryWorkspace({
           }
           isResolvingCopyScan={resolveCopyScanMutation.isPending}
           scanError={resolveCopyScanMutation.error}
+          queryError={issuesQuery.isError ? (issuesQuery.error as Error) : null}
+          onRetryQuery={() => void issuesQuery.refetch()}
           meta={issuesQuery.data?.meta}
           onPageChange={setIssuePage}
         />
@@ -807,6 +814,8 @@ export function LibraryWorkspace({
             fulfillReservationMutation.error ||
             reservationsQuery.error
           }
+          queryError={reservationsQuery.isError ? (reservationsQuery.error as Error) : null}
+          onRetryQuery={() => void reservationsQuery.refetch()}
           meta={reservationsQuery.data?.meta}
           onPageChange={setReservationPage}
         />
@@ -819,6 +828,8 @@ export function LibraryWorkspace({
           isSending={remindersMutation.isPending}
           onSendReminders={() => remindersMutation.mutate()}
           error={remindersMutation.error}
+          queryError={overdueQuery.isError ? (overdueQuery.error as Error) : null}
+          onRetryQuery={() => void overdueQuery.refetch()}
           meta={overdueQuery.data?.meta}
           onPageChange={setOverduePage}
         />
@@ -835,6 +846,8 @@ export function LibraryWorkspace({
           }
           isPosting={postFineToFeesMutation.isPending}
           postError={postFineToFeesMutation.error}
+          queryError={finesQuery.isError ? (finesQuery.error as Error) : null}
+          onRetryQuery={() => void finesQuery.refetch()}
           meta={finesQuery.data?.meta}
           onPageChange={setFinePage}
         />
@@ -1030,6 +1043,8 @@ function BooksPanel(props: {
   isLoading: boolean;
   isSaving: boolean;
   error: Error | null;
+  queryError: Error | null;
+  onRetryQuery: () => void;
   meta?: LibraryPaginationMeta;
   onPageChange: (page: number) => void;
 }) {
@@ -1086,16 +1101,21 @@ function BooksPanel(props: {
           </select>
         </div>
         <div className="mt-5 space-y-3">
-          {props.isLoading && (
+          {props.queryError ? (
+            <ErrorState
+              title="Book catalogue could not load"
+              error={props.queryError}
+              onRetry={props.onRetryQuery}
+            />
+          ) : props.isLoading ? (
             <LoadingState label="Loading book catalogue..." />
-          )}
-          {!props.isLoading && visibleBooks.length === 0 && (
+          ) : visibleBooks.length === 0 ? (
             <EmptyState
               title="No books found"
               description="Add your first library book or adjust the filters."
             />
-          )}
-          {visibleBooks.map((book) => {
+          ) : null}
+          {!props.queryError && visibleBooks.map((book) => {
             const bookCopies = props.copies.filter(
               (copy) => copy.bookId === book.id,
             );
@@ -1298,6 +1318,8 @@ function CopiesPanel(props: {
   isLoading: boolean;
   isSaving: boolean;
   error: Error | null;
+  queryError: Error | null;
+  onRetryQuery: () => void;
   meta?: LibraryPaginationMeta;
   onPageChange: (page: number) => void;
 }) {
@@ -1335,14 +1357,21 @@ function CopiesPanel(props: {
           </select>
         </div>
         <div className="mt-5 space-y-3">
-          {props.isLoading && <LoadingState label="Loading copies..." />}
-          {!props.isLoading && props.copies.length === 0 && (
+          {props.queryError ? (
+            <ErrorState
+              title="Copies could not load"
+              error={props.queryError}
+              onRetry={props.onRetryQuery}
+            />
+          ) : props.isLoading ? (
+            <LoadingState label="Loading copies..." />
+          ) : props.copies.length === 0 ? (
             <EmptyState
               title="No copies found"
               description="Add barcode copies from the form."
             />
-          )}
-          {props.copies.map((copy) => (
+          ) : null}
+          {!props.queryError && props.copies.map((copy) => (
             <div
               key={copy.id}
               className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
@@ -1618,6 +1647,8 @@ function IssuesPanel(props: {
   isLoading: boolean;
   isSaving: boolean;
   error: Error | null;
+  queryError: Error | null;
+  onRetryQuery: () => void;
   onResolveCopyScan: (code: string) => Promise<LibraryCopy>;
   isResolvingCopyScan: boolean;
   scanError: Error | null;
@@ -1740,14 +1771,21 @@ function IssuesPanel(props: {
           </select>
         </div>
         <div className="mt-5 space-y-4">
-          {props.isLoading && <LoadingState label="Loading issue history..." />}
-          {!props.isLoading && props.issues.length === 0 && (
+          {props.queryError ? (
+            <ErrorState
+              title="Issue history could not load"
+              error={props.queryError}
+              onRetry={props.onRetryQuery}
+            />
+          ) : props.isLoading ? (
+            <LoadingState label="Loading issue history..." />
+          ) : props.issues.length === 0 ? (
             <EmptyState
               title="No issue records"
               description="Issue an available copy to start circulation history."
             />
-          )}
-          {props.issues.map((issue) => {
+          ) : null}
+          {!props.queryError && props.issues.map((issue) => {
             const draft = props.returnDrafts[issue.id] ?? {};
             const active = ["ISSUED", "OVERDUE"].includes(issue.status);
             return (
@@ -2010,6 +2048,8 @@ function ReservationsPanel(props: {
   isLoading: boolean;
   isSaving: boolean;
   error: Error | null;
+  queryError: Error | null;
+  onRetryQuery: () => void;
   meta?: LibraryPaginationMeta;
   onPageChange: (page: number) => void;
 }) {
@@ -2044,14 +2084,21 @@ function ReservationsPanel(props: {
         {props.error && <ErrorNotice message={props.error.message} />}
 
         <div className="mt-5 space-y-3">
-          {props.isLoading && <LoadingState label="Loading reservations..." />}
-          {!props.isLoading && props.reservations.length === 0 && (
+          {props.queryError ? (
+            <ErrorState
+              title="Reservations could not load"
+              error={props.queryError}
+              onRetry={props.onRetryQuery}
+            />
+          ) : props.isLoading ? (
+            <LoadingState label="Loading reservations..." />
+          ) : props.reservations.length === 0 ? (
             <EmptyState
               title="No reservations found"
               description="Create a reservation from the form or adjust the status filter."
             />
-          )}
-          {props.reservations.map((reservation) => {
+          ) : null}
+          {!props.queryError && props.reservations.map((reservation) => {
             const active = reservation.status === "ACTIVE";
             const draft = props.fulfillmentDrafts[reservation.id] ?? {};
             const defaultCopyId =
@@ -2507,6 +2554,8 @@ function OverduePanel({
   isSending,
   onSendReminders,
   error,
+  queryError,
+  onRetryQuery,
   meta,
   onPageChange,
 }: {
@@ -2515,6 +2564,8 @@ function OverduePanel({
   isSending: boolean;
   onSendReminders: () => void;
   error: Error | null;
+  queryError: Error | null;
+  onRetryQuery: () => void;
   meta?: LibraryPaginationMeta;
   onPageChange: (page: number) => void;
 }) {
@@ -2536,14 +2587,21 @@ function OverduePanel({
       </div>
       {error && <ErrorNotice message={error.message} />}
       <div className="mt-5 space-y-3">
-        {isLoading && <LoadingState label="Loading overdue issues..." />}
-        {!isLoading && overdueIssues.length === 0 && (
+        {queryError ? (
+          <ErrorState
+            title="Overdue issues could not load"
+            error={queryError}
+            onRetry={onRetryQuery}
+          />
+        ) : isLoading ? (
+          <LoadingState label="Loading overdue issues..." />
+        ) : overdueIssues.length === 0 ? (
           <EmptyState
             title="No overdue issues"
             description="No active library issues are past their due date."
           />
-        )}
-        {overdueIssues.map((issue) => (
+        ) : null}
+        {!queryError && overdueIssues.map((issue) => (
           <div
             key={issue.id}
             className="rounded-2xl border border-red-100 bg-red-50/60 p-4"
@@ -2924,6 +2982,8 @@ function FinesPanel({
   onPostFineToFees,
   isPosting,
   postError,
+  queryError,
+  onRetryQuery,
   meta,
   onPageChange,
 }: {
@@ -2934,6 +2994,8 @@ function FinesPanel({
   onPostFineToFees: (id: string, reason: string) => void;
   isPosting: boolean;
   postError: Error | null;
+  queryError: Error | null;
+  onRetryQuery: () => void;
   meta?: LibraryPaginationMeta;
   onPageChange: (page: number) => void;
 }) {
@@ -2951,14 +3013,21 @@ function FinesPanel({
       />
       {postError && <ErrorNotice message={postError.message} />}
       <div className="mt-5 space-y-3">
-        {isLoading && <LoadingState label="Loading fines..." />}
-        {!isLoading && fines.length === 0 && (
+        {queryError ? (
+          <ErrorState
+            title="Fines could not load"
+            error={queryError}
+            onRetry={onRetryQuery}
+          />
+        ) : isLoading ? (
+          <LoadingState label="Loading fines..." />
+        ) : fines.length === 0 ? (
           <EmptyState
             title="No fines found"
             description="Library circulation is currently clear of outstanding fines."
           />
-        )}
-        {fines.map((fine) => {
+        ) : null}
+        {!queryError && fines.map((fine) => {
           const linkedInvoiceId =
             fine.feeInvoiceId ?? fine.issue?.invoiceId ?? null;
           const canPostToFees =

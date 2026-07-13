@@ -10,9 +10,13 @@ import { Badge } from '../../ui/badge';
 import { EmptyState } from '../../ui/empty-state';
 import { LoadingState } from '../../ui/loading-state';
 import { cn } from '../../../lib/utils';
-import { 
-  Users, 
-  Clock, 
+import {
+  PaginatedDataTable,
+  type PaginatedDataTableColumn,
+} from '../../schoolos/data/paginated-data-table';
+import {
+  Users,
+  Clock,
   Calendar,
   AlertCircle,
   BarChart3,
@@ -26,6 +30,115 @@ type WorkloadSummary = {
   totalWeeklyHours: number;
 };
 
+function workloadColumns(selectedTeacherId: string): PaginatedDataTableColumn<TeacherWorkloadSummary>[] {
+  return [
+    {
+      id: 'teacher',
+      header: 'Teacher',
+      cell: (item) => {
+        const isSelected = selectedTeacherId === item.staffId;
+        const employeeId = item.employeeId?.trim();
+        const staffInitial = item.staffName.trim().charAt(0) || '?';
+        return (
+          <div className="flex items-center gap-3">
+            <div
+              className={cn(
+                'h-10 w-10 rounded-full flex items-center justify-center font-black text-[11px] shadow-sm transition-colors',
+                isSelected
+                  ? 'border border-[var(--color-mod-homework-border)] bg-white text-[var(--color-mod-homework-text)]'
+                  : 'bg-slate-100 text-slate-500',
+              )}
+            >
+              {staffInitial}
+            </div>
+            <div>
+              <p
+                className={cn(
+                  'font-black uppercase tracking-tight text-sm',
+                  isSelected ? 'text-[var(--color-mod-homework-text)]' : 'text-slate-900',
+                )}
+              >
+                {item.staffName}
+              </p>
+              <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500">
+                {employeeId || 'Employee ID not set'}
+              </p>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      id: 'slots',
+      header: 'Slots',
+      cell: (item) => {
+        const isSelected = selectedTeacherId === item.staffId;
+        return (
+          <span className={cn('text-sm font-bold', isSelected ? 'text-[var(--color-mod-homework-text)]' : 'text-slate-700')}>
+            {item.slotCount}
+          </span>
+        );
+      },
+    },
+    {
+      id: 'hours',
+      header: 'Time (Hrs)',
+      cell: (item) => {
+        const hours = item.teachingMinutes / 60;
+        const isOverloaded = hours > 30;
+        const isSelected = selectedTeacherId === item.staffId;
+        return (
+          <div className="flex items-center gap-2">
+            <span className={cn('text-sm font-bold', isSelected ? 'text-[var(--color-mod-homework-text)]' : 'text-slate-700')}>
+              {hours.toFixed(1)}h
+            </span>
+            {isOverloaded && (
+              <Badge variant={isSelected ? 'secondary' : 'warning'} className="text-[8px] py-0 px-1 font-black uppercase">
+                High
+              </Badge>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      id: 'homeworks',
+      header: 'Homeworks',
+      cell: (item) => {
+        const isSelected = selectedTeacherId === item.staffId;
+        return (
+          <span className={cn('text-sm font-bold', isSelected ? 'text-[var(--color-mod-homework-text)]' : 'text-slate-700')}>
+            {item.homeworkCount}
+          </span>
+        );
+      },
+    },
+    {
+      id: 'capacity',
+      header: 'Capacity',
+      align: 'right',
+      cell: (item) => {
+        const hours = item.teachingMinutes / 60;
+        const isOverloaded = hours > 30;
+        const isSelected = selectedTeacherId === item.staffId;
+        return (
+          <div
+            className={cn(
+              'inline-flex h-2 w-20 overflow-hidden rounded-full',
+              isSelected ? 'bg-[var(--color-mod-homework-border)]' : 'bg-slate-100',
+            )}
+          >
+            <div
+              className={cn('h-full rounded-full transition-all duration-1000', isOverloaded ? 'bg-amber-500' : 'bg-emerald-500')}
+              style={{ width: `${Math.min(100, (hours / 40) * 100)}%` }}
+            />
+          </div>
+        );
+      },
+    },
+  ];
+}
+
 type Props = {
   workload: TeacherWorkloadSummary[];
   // Backend-owned totals across the full filtered set. `workload` itself is
@@ -33,9 +146,25 @@ type Props = {
   // once a school has more teachers than fit on one page.
   summary?: WorkloadSummary;
   isLoading: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  onPageChange: (page: number) => void;
 };
 
-export function TeacherWorkloadTab({ workload, summary, isLoading }: Props) {
+export function TeacherWorkloadTab({
+  workload,
+  summary,
+  isLoading,
+  isError,
+  onRetry,
+  page,
+  pageSize,
+  totalItems,
+  onPageChange,
+}: Props) {
   const [selectedTeacherId, setSelectedTeacherId] = useState('');
 
   const availabilityQuery = useQuery({
@@ -85,105 +214,26 @@ export function TeacherWorkloadTab({ workload, summary, isLoading }: Props) {
           description="Monitoring teaching capacity and assignment density across staff."
           className="lg:col-span-2"
         >
-          {isLoading ? (
-            <LoadingState />
-          ) : workload.length === 0 ? (
-            <EmptyState 
-              title="No workload data" 
-              description="Assign slots in the Timetable Builder to see analytics here." 
-              className="bg-slate-50/50"
-            />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-slate-100">
-                    <th className="pb-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Teacher</th>
-                    <th className="pb-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Slots</th>
-                    <th className="pb-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Time (Hrs)</th>
-                    <th className="pb-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Homeworks</th>
-                    <th className="pb-4 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Capacity</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {workload.map((item) => {
-                    const hours = (item.teachingMinutes / 60);
-                    const isOverloaded = hours > 30;
-                    const isSelected = selectedTeacherId === item.staffId;
-                    const employeeId = item.employeeId?.trim();
-                    const staffInitial = item.staffName.trim().charAt(0) || '?';
-
-                    return (
-                      <tr 
-                        key={item.staffId} 
-                        onClick={() => setSelectedTeacherId(item.staffId)}
-                        className={cn(
-                          "group cursor-pointer transition-colors duration-200",
-                          isSelected
-                            ? "bg-[var(--color-mod-homework-bg)] text-[var(--color-mod-homework-text)]"
-                            : "hover:bg-slate-50/50"
-                        )}
-                      >
-                        <td className="py-5">
-                          <div className="flex items-center gap-3">
-                            <div className={cn(
-                              "h-10 w-10 rounded-full flex items-center justify-center font-black text-[11px] shadow-sm transition-colors",
-                              isSelected
-                                ? "border border-[var(--color-mod-homework-border)] bg-white text-[var(--color-mod-homework-text)]"
-                                : "bg-slate-100 text-slate-500"
-                            )}>
-                              {staffInitial}
-                            </div>
-                            <div>
-                              <p className={cn("font-black uppercase tracking-tight text-sm", isSelected ? "text-[var(--color-mod-homework-text)]" : "text-slate-900")}>
-                                {item.staffName}
-                              </p>
-                              <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500">
-                                {employeeId || 'Employee ID not set'}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-5">
-                          <span className={cn("text-sm font-bold", isSelected ? "text-[var(--color-mod-homework-text)]" : "text-slate-700")}>
-                            {item.slotCount}
-                          </span>
-                        </td>
-                        <td className="py-5">
-                          <div className="flex items-center gap-2">
-                            <span className={cn("text-sm font-bold", isSelected ? "text-[var(--color-mod-homework-text)]" : "text-slate-700")}>
-                              {hours.toFixed(1)}h
-                            </span>
-                            {isOverloaded && (
-                              <Badge variant={isSelected ? "secondary" : "warning"} className="text-[8px] py-0 px-1 font-black uppercase">
-                                High
-                              </Badge>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-5">
-                          <span className={cn("text-sm font-bold", isSelected ? "text-[var(--color-mod-homework-text)]" : "text-slate-700")}>
-                            {item.homeworkCount}
-                          </span>
-                        </td>
-                        <td className="py-5 text-right">
-                          <div className={cn("inline-flex h-2 w-20 overflow-hidden rounded-full", isSelected ? "bg-[var(--color-mod-homework-border)]" : "bg-slate-100")}>
-                            <div
-                              className={cn(
-                                "h-full rounded-full transition-all duration-1000",
-                                isOverloaded ? "bg-amber-500" : "bg-emerald-500"
-                              )}
-                              style={{ width: `${Math.min(100, (hours / 40) * 100)}%` }}
-                            />
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <PaginatedDataTable
+            columns={workloadColumns(selectedTeacherId)}
+            items={workload}
+            getRowId={(item) => item.staffId}
+            status={isError ? 'error' : isLoading ? 'loading' : 'ready'}
+            page={page}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            onPageChange={onPageChange}
+            onRetry={onRetry}
+            errorMessage="Teacher workload could not load. Please try again."
+            emptyTitle="No workload data"
+            emptyDescription="Assign slots in the Timetable Builder to see analytics here."
+            onRowClick={(item) => setSelectedTeacherId(item.staffId)}
+            getRowClassName={(item) =>
+              selectedTeacherId === item.staffId
+                ? 'bg-[var(--color-mod-homework-bg)]'
+                : undefined
+            }
+          />
         </SectionCard>
 
         {/* Details Sidebar */}

@@ -2,15 +2,86 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { Search, UserPlus, Mail, Briefcase, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, UserPlus, Mail, Briefcase } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import { Input } from '../ui/input';
 import { Select } from '../ui/select';
-import { EmptyState } from '../ui/empty-state';
 import { StaffCreateDialog } from './staff-create-dialog';
 import { Badge } from '../ui/badge';
+import { Button } from '../ui/primitives/button';
 import { cn } from '../../lib/utils';
+import {
+  PaginatedDataTable,
+  type PaginatedDataTableColumn,
+} from '../schoolos/data/paginated-data-table';
+
+type StaffDirectoryRow = Awaited<ReturnType<typeof api.listStaffDirectory>>['items'][number];
+
+const staffColumns: PaginatedDataTableColumn<StaffDirectoryRow>[] = [
+  {
+    id: 'employee',
+    header: 'Employee',
+    cell: (staff) => {
+      const formatAssignedText = (value: string | null | undefined, fallback: string) =>
+        value?.trim() || fallback;
+      return (
+        <div className="flex items-center gap-5">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200 bg-slate-100 text-lg font-black text-slate-400 shadow-inner">
+            {staff.firstName[0]}
+            {staff.lastName[0]}
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <p className="font-black text-slate-900 text-lg">
+                {staff.firstName} {staff.lastName}
+              </p>
+              <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200">
+                {staff.employeeId}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-slate-500">
+              <span className="flex items-center gap-1.5">
+                <Mail size={12} className="text-slate-400" />
+                {staff.email}
+              </span>
+              {staff.contractType && (
+                <span className="flex items-center gap-1.5">
+                  <Briefcase size={12} className="text-slate-400" />
+                  {staff.contractType}
+                </span>
+              )}
+              {(staff.department || staff.designation) && (
+                <span className="text-slate-400">
+                  {formatAssignedText(staff.designation, 'Designation not set')} &bull;{' '}
+                  {formatAssignedText(staff.department, 'Department not set')}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    },
+  },
+  {
+    id: 'status',
+    header: 'Status',
+    cell: (staff) => (
+      <Badge
+        className={cn(
+          'font-black uppercase tracking-widest text-[9px] px-2.5 py-0.5',
+          staff.status === 'ACTIVE' || !staff.status
+            ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/10'
+            : staff.status === 'TERMINATED'
+              ? 'bg-rose-500/10 text-rose-600 border-rose-500/10'
+              : 'bg-slate-100 text-slate-500',
+        )}
+      >
+        {staff.status || 'ACTIVE'}
+      </Badge>
+    ),
+  },
+];
 
 export function StaffList() {
   const [search, setSearch] = useState('');
@@ -23,8 +94,6 @@ export function StaffList() {
   // Pagination states
   const [page, setPage] = useState(1);
   const limit = 10;
-  const formatAssignedText = (value: string | null | undefined, fallback: string) =>
-    value?.trim() || fallback;
 
   const staffQuery = useQuery({
     queryKey: [
@@ -51,10 +120,6 @@ export function StaffList() {
 
   const paginatedStaff = staffQuery.data?.items ?? [];
   const totalItems = staffQuery.data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(totalItems / limit));
-
-  const handlePrevPage = () => setPage((p) => Math.max(1, p - 1));
-  const handleNextPage = () => setPage((p) => Math.min(totalPages, p + 1));
 
   return (
     <div className="space-y-6">
@@ -137,142 +202,30 @@ export function StaffList() {
       </div>
 
       {/* Directory Table */}
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-slate-50/50 border-b border-slate-200">
-                <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-slate-400">Employee</th>
-                <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-slate-400">Status</th>
-                <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-slate-400 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {staffQuery.isLoading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i} className="animate-pulse">
-                    <td className="px-8 py-6">
-                      <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 rounded-2xl bg-slate-100" />
-                        <div className="space-y-2">
-                          <div className="h-4 w-32 bg-slate-100 rounded" />
-                          <div className="h-3 w-24 bg-slate-50 rounded" />
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-8 py-6">
-                      <div className="h-6 w-16 bg-slate-100 rounded-full" />
-                    </td>
-                    <td className="px-8 py-6 text-right">
-                      <div className="h-8 w-24 bg-slate-100 rounded-xl ml-auto" />
-                    </td>
-                  </tr>
-                ))
-              ) : paginatedStaff.length > 0 ? (
-                paginatedStaff.map((staff) => (
-                  <tr key={staff.id} className="hover:bg-slate-50/30 transition-all group">
-                    <td className="px-8 py-6">
-                      <div className="flex items-center gap-5">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200 bg-slate-100 text-lg font-black text-slate-400 shadow-inner transition-colors group-hover:border-[var(--color-mod-hr-border)] group-hover:bg-[var(--color-mod-hr-soft)] group-hover:text-[var(--color-mod-hr-text)]">
-                          {staff.firstName[0]}
-                          {staff.lastName[0]}
-                        </div>
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <p className="font-black text-slate-900 text-lg">
-                              {staff.firstName} {staff.lastName}
-                            </p>
-                            <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200">
-                              {staff.employeeId}
-                            </span>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-slate-500">
-                            <span className="flex items-center gap-1.5">
-                              <Mail size={12} className="text-slate-400" />
-                              {staff.email}
-                            </span>
-                            {staff.contractType && (
-                              <span className="flex items-center gap-1.5">
-                                <Briefcase size={12} className="text-slate-400" />
-                                {staff.contractType}
-                              </span>
-                            )}
-                            {(staff.department || staff.designation) && (
-                              <span className="text-slate-400">
-                                {formatAssignedText(staff.designation, 'Designation not set')} &bull; {formatAssignedText(staff.department, 'Department not set')}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-8 py-6">
-                      <Badge
-                        className={cn(
-                          'font-black uppercase tracking-widest text-[9px] px-2.5 py-0.5',
-                          staff.status === 'ACTIVE' || !staff.status
-                            ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/10'
-                            : staff.status === 'TERMINATED'
-                            ? 'bg-rose-500/10 text-rose-600 border-rose-500/10'
-                            : 'bg-slate-100 text-slate-500'
-                        )}
-                      >
-                        {staff.status || 'ACTIVE'}
-                      </Badge>
-                    </td>
-                    <td className="px-8 py-6 text-right">
-                      <Link
-                        href={`/dashboard/hr/staff/${staff.id}`}
-                        className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-mod-hr-accent)] px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-[var(--color-mod-hr-text)] active:scale-95"
-                      >
-                        Profile
-                      </Link>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={3} className="px-8 py-20 text-center">
-                    <EmptyState
-                      title="No staff members found"
-                      description={
-                        search
-                          ? `No results matching "${search}"`
-                          : 'Try modifying filters to find staff members.'
-                      }
-                    />
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination Controls */}
-        {totalItems > 0 && (
-          <div className="flex items-center justify-between border-t border-slate-100 px-8 py-4 bg-slate-50/50">
-            <span className="text-xs font-bold text-slate-500">
-              Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalItems)} of {totalItems} members
-            </span>
-            <div className="flex gap-2">
-              <button
-                onClick={handlePrevPage}
-                disabled={page === 1}
-                className="p-2 border border-slate-200 rounded-xl bg-white text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-colors"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <button
-                onClick={handleNextPage}
-                disabled={page === totalPages}
-                className="p-2 border border-slate-200 rounded-xl bg-white text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-colors"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          </div>
+      <PaginatedDataTable
+        columns={staffColumns}
+        items={paginatedStaff}
+        getRowId={(staff) => staff.id}
+        status={staffQuery.isError ? 'error' : staffQuery.isLoading ? 'loading' : 'ready'}
+        page={page}
+        pageSize={limit}
+        totalItems={totalItems}
+        onPageChange={setPage}
+        onRetry={() => void staffQuery.refetch()}
+        errorMessage="The staff directory could not load. Please try again."
+        emptyTitle="No staff members yet"
+        emptyDescription="Add your first staff member to build the directory."
+        hasActiveFilters={Boolean(
+          search || statusFilter !== 'ALL' || contractFilter !== 'ALL' || deptFilter || desigFilter,
         )}
-      </div>
+        noResultsTitle="No staff members found"
+        noResultsDescription={search ? `No results matching "${search}"` : 'Try modifying filters to find staff members.'}
+        rowActions={(staff) => (
+          <Button type="button" size="sm" asChild>
+            <Link href={`/dashboard/hr/staff/${staff.id}`}>Profile</Link>
+          </Button>
+        )}
+      />
 
       <StaffCreateDialog isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} />
     </div>

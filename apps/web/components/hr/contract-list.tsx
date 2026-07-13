@@ -8,16 +8,19 @@ import {
   parseBsDateInput,
   toGregorianDateFromBs,
 } from '@schoolos/core';
-import { ChevronLeft, ChevronRight, Plus, Search } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import { useDeferredValue, useState } from 'react';
 import { Input } from '../ui/input';
 import { Select } from '../ui/select';
 import { FormField } from '../ui/form-field';
-import { LoadingState } from '../ui/loading-state';
-import { EmptyState } from '../ui/empty-state';
 import { useSession } from '../session-provider';
 import { BsDateField } from '../ui/bs-date-field';
-import { ErrorState } from '../ui/error-state';
+import {
+  PaginatedDataTable,
+  type PaginatedDataTableColumn,
+} from '../schoolos/data/paginated-data-table';
+
+type StaffContractRow = Awaited<ReturnType<typeof api.listStaffContractsPage>>['items'][number];
 
 const moneyFormatter = new Intl.NumberFormat('en-NP', {
   style: 'currency',
@@ -116,7 +119,62 @@ export function ContractList() {
 
   const contracts = contractsQuery.data?.items ?? [];
   const totalItems = contractsQuery.data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(totalItems / limit));
+
+  const contractColumns: PaginatedDataTableColumn<StaffContractRow>[] = [
+    {
+      id: 'contractNumber',
+      header: 'Contract #',
+      cell: (contract) => (
+        <span className="font-mono text-xs font-bold text-slate-500">{contract.contractNumber}</span>
+      ),
+    },
+    {
+      id: 'position',
+      header: 'Staff / Position',
+      cell: (contract) => (
+        <div>
+          <p className="font-bold text-slate-900">{contract.position}</p>
+          <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-slate-400">
+            Starts {formatBsDate(contract.startDate)}
+            {contract.endDate ? ` · Ends ${formatBsDate(contract.endDate)}` : ' · Open-ended'}
+          </p>
+        </div>
+      ),
+    },
+    {
+      id: 'baseSalary',
+      header: 'Base Salary',
+      cell: (contract) => (
+        <span className="text-sm font-bold text-slate-900">
+          {canViewPayrollAmounts ? moneyFormatter.format(Number(contract.baseSalary)) : 'Restricted'}
+        </span>
+      ),
+    },
+    {
+      id: 'allowances',
+      header: 'Allowances',
+      cell: (contract) => (
+        <span className="text-sm font-medium text-slate-500">
+          {canViewPayrollAmounts ? moneyFormatter.format(Number(contract.allowances)) : 'Restricted'}
+        </span>
+      ),
+    },
+    {
+      id: 'status',
+      header: 'Status',
+      cell: (contract) => (
+        <span
+          className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tight ${
+            contract.status === 'ACTIVE'
+              ? 'bg-emerald-100 text-emerald-700 border border-emerald-200/50'
+              : 'bg-slate-100 text-slate-600 border border-slate-200/50'
+          }`}
+        >
+          {contract.status}
+        </span>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -248,112 +306,23 @@ export function ContractList() {
         </div>
       )}
 
-      <div className="shell-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th className="px-6 py-4 text-[0.65rem] font-bold uppercase tracking-wider text-slate-400">Contract #</th>
-                <th className="px-6 py-4 text-[0.65rem] font-bold uppercase tracking-wider text-slate-400">Staff / Position</th>
-                <th className="px-6 py-4 text-[0.65rem] font-bold uppercase tracking-wider text-slate-400">Base Salary</th>
-                <th className="px-6 py-4 text-[0.65rem] font-bold uppercase tracking-wider text-slate-400">Allowances</th>
-                <th className="px-6 py-4 text-[0.65rem] font-bold uppercase tracking-wider text-slate-400">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {contractsQuery.isLoading ? (
-                <tr>
-                  <td colSpan={5} className="p-0">
-                    <LoadingState variant="spinner" label="Loading contracts..." />
-                  </td>
-                </tr>
-              ) : contractsQuery.isError ? (
-                <tr>
-                  <td colSpan={5} className="p-4">
-                    <ErrorState
-                      title="Contracts could not be loaded"
-                      message="Please retry. Your filters and page selection have been preserved."
-                      onRetry={() => void contractsQuery.refetch()}
-                    />
-                  </td>
-                </tr>
-              ) : contracts.length > 0 ? (
-                contracts.map((contract) => (
-                  <tr key={contract.id} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="px-6 py-4 font-mono text-xs font-bold text-slate-500">{contract.contractNumber}</td>
-                    <td className="px-6 py-4">
-                      <div>
-                        <p className="font-bold text-slate-900">{contract.position}</p>
-                        <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                          Starts {formatBsDate(contract.startDate)}
-                          {contract.endDate
-                            ? ` · Ends ${formatBsDate(contract.endDate)}`
-                            : ' · Open-ended'}
-                        </p>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm font-bold text-slate-900">
-                      {canViewPayrollAmounts
-                        ? moneyFormatter.format(Number(contract.baseSalary))
-                        : 'Restricted'}
-                    </td>
-                    <td className="px-6 py-4 text-sm font-medium text-slate-500">
-                      {canViewPayrollAmounts
-                        ? moneyFormatter.format(Number(contract.allowances))
-                        : 'Restricted'}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tight ${
-                        contract.status === 'ACTIVE' 
-                          ? 'bg-emerald-100 text-emerald-700 border border-emerald-200/50' 
-                          : 'bg-slate-100 text-slate-600 border border-slate-200/50'
-                      }`}>
-                        {contract.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={5} className="p-0">
-                    <EmptyState 
-                      title="No contracts found" 
-                      description={search ? `No results for "${search}"` : "Create a new contract to get started."}
-                    />
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        {totalItems > 0 && (
-          <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4">
-            <span className="text-xs font-bold text-slate-500">
-              Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalItems)} of {totalItems} contracts
-            </span>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setPage((current) => Math.max(1, current - 1))}
-                disabled={page === 1}
-                className="p-2 border border-slate-200 rounded-xl bg-white text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-colors"
-                aria-label="Previous contract page"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <button
-                type="button"
-                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
-                disabled={page >= totalPages}
-                className="p-2 border border-slate-200 rounded-xl bg-white text-slate-600 disabled:opacity-40 hover:bg-slate-50 transition-colors"
-                aria-label="Next contract page"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+      <PaginatedDataTable
+        columns={contractColumns}
+        items={contracts}
+        getRowId={(contract) => contract.id}
+        status={contractsQuery.isError ? 'error' : contractsQuery.isLoading ? 'loading' : 'ready'}
+        page={page}
+        pageSize={limit}
+        totalItems={totalItems}
+        onPageChange={setPage}
+        onRetry={() => void contractsQuery.refetch()}
+        errorMessage="Please retry. Your filters and page selection have been preserved."
+        emptyTitle="No contracts yet"
+        emptyDescription="Create a new contract to get started."
+        hasActiveFilters={Boolean(search)}
+        noResultsTitle="No matching contracts"
+        noResultsDescription={`No results for "${search}"`}
+      />
     </div>
   );
 }

@@ -41,6 +41,8 @@ export function TimetableWorkspace({ initialSection }: TimetableWorkspaceProps =
     : sections[0];
 
   const [classId, setClassId] = useState('');
+  const [workloadPage, setWorkloadPage] = useState(1);
+  const WORKLOAD_PAGE_SIZE = 25;
 
   const academicYearsQuery = useQuery({ queryKey: ['academic-years'], queryFn: api.listAcademicYears });
   const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
@@ -49,8 +51,8 @@ export function TimetableWorkspace({ initialSection }: TimetableWorkspaceProps =
   const subjectsQuery = useQuery({ queryKey: ['subjects'], queryFn: () => api.listSubjects() });
 
   const workloadQuery = useQuery({
-    queryKey: ['teacher-workload'],
-    queryFn: api.listTeacherWorkload,
+    queryKey: ['teacher-workload', workloadPage],
+    queryFn: () => api.listTeacherWorkload({ page: workloadPage, limit: WORKLOAD_PAGE_SIZE }),
     enabled: !isStudent && section === 'Teacher Workload',
   });
 
@@ -82,6 +84,12 @@ export function TimetableWorkspace({ initialSection }: TimetableWorkspaceProps =
         workload={workloadQuery.data?.items ?? []}
         summary={workloadQuery.data?.summary}
         isLoading={workloadQuery.isLoading}
+        isError={workloadQuery.isError}
+        onRetry={() => void workloadQuery.refetch()}
+        page={workloadPage}
+        pageSize={WORKLOAD_PAGE_SIZE}
+        totalItems={workloadQuery.data?.meta.total ?? 0}
+        onPageChange={setWorkloadPage}
       />
     );
   }

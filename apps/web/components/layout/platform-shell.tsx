@@ -26,6 +26,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
+import { SchoolBreadcrumbs } from "../schoolos/navigation/school-breadcrumbs";
 
 type PlatformNavItem = {
   href: string;
@@ -335,6 +336,7 @@ export function PlatformShell({ children }: { children: ReactNode }) {
           tabIndex={-1}
         >
           <div className="mx-auto w-full max-w-7xl px-4 py-6 lg:px-8">
+            <SchoolBreadcrumbs rootHref="/platform" rootLabel="Platform" className="mb-4" />
             {children}
           </div>
         </main>

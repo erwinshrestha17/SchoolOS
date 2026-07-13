@@ -23,6 +23,7 @@ import { EmptyState } from '../ui/empty-state';
 import { ErrorState } from '../ui/error-state';
 import { FilterBar } from '../ui/filter-bar';
 import { KpiCard, KpiGrid } from '../ui/kpi-card';
+import { TablePagination } from '../ui/table-pagination';
 import { ActionMenu } from '../ui/action-menu';
 import {
   BookOpenText,
@@ -115,8 +116,6 @@ export function StudentDirectory({
   const totalStudents = studentsResponse?.total ?? 0;
   const currentPage = studentsResponse?.page ?? 1;
   const pageSize = studentsResponse?.limit ?? 25;
-  const hasNextPage = studentsResponse?.hasNextPage ?? false;
-  const totalPages = Math.max(1, Math.ceil(totalStudents / pageSize));
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -683,36 +682,21 @@ export function StudentDirectory({
               );
             })}
             {totalStudents > students.length && (
-              <div className="flex items-center justify-between border-t border-slate-100 p-4">
-                <p className="text-xs font-bold text-slate-500">
-                  Showing {(currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, totalStudents)} of {totalStudents} records
-                </p>
-                <div className="flex items-center gap-2">
-                  <button
-                    disabled={currentPage === 1}
-                    onClick={() => onFilterChange({ 
-                      academicYearId, classId, sectionId, status, search: deferredSearch, 
-                      page: currentPage - 1 
-                    })}
-                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-30"
-                  >
-                    Previous
-                  </button>
-                  <span className="min-w-20 text-center text-xs font-bold text-slate-900">
-                    Page {currentPage} of {totalPages}
-                  </span>
-                  <button
-                    disabled={!hasNextPage}
-                    onClick={() => onFilterChange({ 
-                      academicYearId, classId, sectionId, status, search: deferredSearch, 
-                      page: currentPage + 1 
-                    })}
-                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-30"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
+              <TablePagination
+                page={currentPage}
+                pageSize={pageSize}
+                total={totalStudents}
+                onPageChange={(page) =>
+                  onFilterChange({
+                    academicYearId,
+                    classId,
+                    sectionId,
+                    status,
+                    search: deferredSearch,
+                    page,
+                  })
+                }
+              />
             )}
           </div>
         ) : (
