@@ -98,6 +98,9 @@ export class PlatformQueuesService {
     @Optional()
     @InjectQueue('accounting-reports')
     private readonly accountingReportsQueue?: Queue,
+    @Optional()
+    @InjectQueue('accounting-bank-import')
+    private readonly accountingBankImportQueue?: Queue,
   ) {
     this.queues = new Map([
       ['notifications', notificationsQueue],
@@ -108,6 +111,11 @@ export class PlatformQueuesService {
       ['reports', reportsQueue],
       ...(accountingReportsQueue
         ? ([['accounting-reports', accountingReportsQueue]] as Array<
+            [string, Queue]
+          >)
+        : []),
+      ...(accountingBankImportQueue
+        ? ([['accounting-bank-import', accountingBankImportQueue]] as Array<
             [string, Queue]
           >)
         : []),

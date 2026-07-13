@@ -11,6 +11,8 @@ import type {
   BankStatementImportLine,
   BankStatementImportPreview,
   BankStatementImportResult,
+  BankStatementImportJobQueuedResult,
+  BankStatementImportJobStatus,
   BankStatementLineSummary,
   AccountingPeriodSummary,
   AccountingReport,
@@ -245,6 +247,22 @@ export const accountingApi = {
       method: "POST",
         json: { lines, fingerprint },
       },
+    ),
+  queueBankStatementImport: (
+    accountId: string,
+    lines: BankStatementImportLine[],
+  ) =>
+    request<BankStatementImportJobQueuedResult>(
+      `/accounting/bank-reconciliation/${accountId}/import-queue`,
+      { method: "POST", json: { lines } },
+    ),
+  listBankImportJobs: (accountId: string) =>
+    request<BankStatementImportJobStatus[]>(
+      `/accounting/bank-reconciliation/${accountId}/import-jobs`,
+    ),
+  getBankImportJob: (jobId: string) =>
+    request<BankStatementImportJobStatus>(
+      `/accounting/bank-reconciliation/import-jobs/${jobId}`,
     ),
   getUnreconciledStatements: (accountId: string) =>
     request<BankStatementLineSummary[]>(

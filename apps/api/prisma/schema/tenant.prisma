@@ -99,6 +99,7 @@ model Tenant {
   salaryComponents              SalaryComponent[]
   accountingPeriods             AccountingPeriod[]
   bankStatementImportBatches    BankStatementImportBatch[]
+  bankStatementImportJobs       BankStatementImportJob[]
   fiscalYears                   FiscalYear[]
   fiscalPeriods                 FiscalPeriod[]
   conversations                 Conversation[]

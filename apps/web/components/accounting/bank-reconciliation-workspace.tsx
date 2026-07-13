@@ -15,14 +15,17 @@ import {
   Landmark,
   Download,
 } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { cn, formatDateTime } from '../../lib/utils';
 import { ReportTable } from './report-table';
 import { Input } from '../ui/input';
 import { ConfirmDialog } from '../ui/confirm-dialog';
 import type {
   BankStatementImportLine,
   BankStatementImportPreview,
+  BankStatementImportJobStatus,
 } from '@schoolos/core';
+
+const BANK_IMPORT_SYNC_ROW_LIMIT = 500;
 
 export function BankReconciliationWorkspace() {
   const queryClient = useQueryClient();
@@ -41,6 +44,9 @@ export function BankReconciliationWorkspace() {
   >([]);
   const [importPreview, setImportPreview] =
     useState<BankStatementImportPreview | null>(null);
+  const [queuedJobMessage, setQueuedJobMessage] = useState<string | null>(
+    null,
+  );
 
   const accountsQuery = useQuery({
     queryKey: ['chart-accounts'],
@@ -89,6 +95,21 @@ export function BankReconciliationWorkspace() {
     enabled: false,
   });
 
+  const importJobsQuery = useQuery({
+    queryKey: ['bank-import-jobs', selectedAccountId],
+    queryFn: () => api.listBankImportJobs(selectedAccountId),
+    enabled: !!selectedAccountId,
+    refetchInterval: (query) => {
+      const jobs = query.state.data as
+        | BankStatementImportJobStatus[]
+        | undefined;
+      const hasActiveJob = jobs?.some(
+        (job) => job.status === 'QUEUED' || job.status === 'RUNNING',
+      );
+      return hasActiveJob ? 2000 : false;
+    },
+  });
+
   const previewImportMutation = useMutation({
     mutationFn: (lines: BankStatementImportLine[]) =>
       api.previewBankStatementImport(selectedAccountId, lines),
@@ -130,6 +151,26 @@ export function BankReconciliationWorkspace() {
     onError: (err: any) => {
       setError(err.message || 'Import failed');
       setMessage(null);
+    },
+  });
+
+  const queueImportMutation = useMutation({
+    mutationFn: (lines: BankStatementImportLine[]) =>
+      api.queueBankStatementImport(selectedAccountId, lines),
+    onSuccess: (result) => {
+      setQueuedJobMessage(
+        result.reused
+          ? `This large statement import was already ${result.status.toLowerCase()}. Check Large Import Jobs below for status.`
+          : `Queued a background import of ${result.totalRows} rows. Track progress in Large Import Jobs below.`,
+      );
+      setError(null);
+      queryClient.invalidateQueries({
+        queryKey: ['bank-import-jobs', selectedAccountId],
+      });
+    },
+    onError: (err: any) => {
+      setError(err.message || 'Queued import failed');
+      setQueuedJobMessage(null);
     },
   });
 
@@ -182,8 +223,13 @@ export function BankReconciliationWorkspace() {
           });
 
         if (lines.length === 0) throw new Error('No valid lines found in CSV');
-        setPendingImportLines(lines);
-        previewImportMutation.mutate(lines);
+        setQueuedJobMessage(null);
+        if (lines.length > BANK_IMPORT_SYNC_ROW_LIMIT) {
+          queueImportMutation.mutate(lines);
+        } else {
+          setPendingImportLines(lines);
+          previewImportMutation.mutate(lines);
+        }
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -199,6 +245,15 @@ export function BankReconciliationWorkspace() {
         <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4 text-sm font-medium text-emerald-800 flex items-center gap-2">
           <CheckCircle2 size={16} />
           {message}
+        </div>
+      )}
+      {queuedJobMessage && (
+        <div
+          className="rounded-xl bg-[var(--color-mod-accounting-bg)] border border-[var(--color-mod-accounting-border)] p-4 text-sm font-medium text-[var(--color-mod-accounting-text)] flex items-center gap-2"
+          data-testid="bank-import-queued-message"
+        >
+          <CheckCircle2 size={16} />
+          {queuedJobMessage}
         </div>
       )}
       {error && (
@@ -239,15 +294,17 @@ export function BankReconciliationWorkspace() {
           <div className="flex gap-2 w-full md:w-auto">
             <label className="flex flex-1 md:flex-none items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer transition-all">
               <Upload size={16} />
-              {importing || previewImportMutation.isPending
-                ? 'Validating...'
-                : 'Import CSV Statement'}
+              {queueImportMutation.isPending
+                ? 'Queuing background import...'
+                : importing || previewImportMutation.isPending
+                  ? 'Validating...'
+                  : 'Import CSV Statement'}
               <input
                 type="file"
                 accept=".csv"
                 className="hidden"
                 onChange={handleFileUpload}
-                disabled={importing}
+                disabled={importing || queueImportMutation.isPending}
               />
             </label>
             <button
@@ -314,6 +371,46 @@ export function BankReconciliationWorkspace() {
                   : `Commit ${importPreview.lineCount} rows`}
               </button>
             </div>
+          </div>
+        </SectionCard>
+      )}
+
+      {selectedAccountId && (importJobsQuery.data?.length ?? 0) > 0 && (
+        <SectionCard
+          title="Large Import Jobs"
+          description="Statement files with more than 500 rows are imported in the background. This list refreshes automatically while a job is queued or running."
+        >
+          <div className="space-y-2" data-testid="bank-import-jobs">
+            {importJobsQuery.data!.map((job) => (
+              <div
+                key={job.id}
+                data-testid={`bank-import-job-${job.id}`}
+                className="flex items-center justify-between rounded-xl border border-slate-100 bg-white p-3 text-sm"
+              >
+                <div>
+                  <div className="font-bold text-slate-800">
+                    {job.processedRows} / {job.totalRows} rows processed
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    Queued {formatDateTime(job.createdAt)}
+                    {job.errorSummary ? ` · ${job.errorSummary}` : ''}
+                  </div>
+                </div>
+                <span
+                  data-testid="bank-import-job-status"
+                  className={cn(
+                    'rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide',
+                    job.status === 'COMPLETED' &&
+                      'bg-emerald-100 text-emerald-700',
+                    job.status === 'FAILED' && 'bg-rose-100 text-rose-700',
+                    (job.status === 'QUEUED' || job.status === 'RUNNING') &&
+                      'bg-amber-100 text-amber-700',
+                  )}
+                >
+                  {job.status}
+                </span>
+              </div>
+            ))}
           </div>
         </SectionCard>
       )}

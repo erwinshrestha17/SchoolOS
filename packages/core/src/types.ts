@@ -1466,6 +1466,34 @@ export type BankStatementImportResult = {
   statements: BankStatementLineSummary[];
 };
 
+export type BankStatementImportJobQueuedResult = {
+  jobId: string | null;
+  status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+  importBatchId: string | null;
+  totalRows: number;
+  processedRows: number;
+  syncThreshold?: number;
+  backgroundThreshold?: number;
+  reused: boolean;
+};
+
+export type BankStatementImportJobStatus = {
+  id: string;
+  tenantId: string;
+  accountId: string;
+  status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+  totalRows: number;
+  processedRows: number;
+  insertedRows: number | null;
+  duplicateRows: number | null;
+  errorRows: number | null;
+  errorSummary: string | null;
+  importBatchId: string | null;
+  requestedBy: string;
+  createdAt: string;
+  completedAt: string | null;
+};
+
 export type BankStatementLineSummary = {
   id: string;
   accountId: string;

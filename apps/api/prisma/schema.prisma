@@ -1424,6 +1424,7 @@ model ChartAccount {
   accountingReportMappings AccountingReportAccountMapping[]
   bankStatements           BankStatement[]
   bankStatementImportBatches BankStatementImportBatch[]
+  bankStatementImportJobs  BankStatementImportJob[]
   sourceDebitMappings      AccountingSourceMapping[] @relation("AccountingSourceMappingDebitAccount")
   sourceCreditMappings     AccountingSourceMapping[] @relation("AccountingSourceMappingCreditAccount")
 
@@ -1703,6 +1704,32 @@ model BankStatementImportBatch {
 
   @@unique([tenantId, accountId, fingerprint])
   @@index([tenantId, accountId, createdAt])
+}
+
+model BankStatementImportJob {
+  id            String             @id @default(uuid())
+  tenantId      String
+  accountId     String
+  fingerprint   String
+  status        ReportExportStatus @default(QUEUED)
+  totalRows     Int
+  processedRows Int                @default(0)
+  insertedRows  Int?
+  duplicateRows Int?
+  errorRows     Int?
+  errorSummary  String?
+  fileAssetId   String?
+  importBatchId String?
+  requestedBy   String
+  createdAt     DateTime           @default(now())
+  completedAt   DateTime?
+
+  tenant  Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  account ChartAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, accountId, fingerprint])
+  @@index([tenantId, accountId, createdAt])
+  @@index([tenantId, status])
 }
 
 
@@ -6339,6 +6366,7 @@ model Tenant {
   salaryComponents              SalaryComponent[]
   accountingPeriods             AccountingPeriod[]
   bankStatementImportBatches    BankStatementImportBatch[]
+  bankStatementImportJobs       BankStatementImportJob[]
   fiscalYears                   FiscalYear[]
   fiscalPeriods                 FiscalPeriod[]
   conversations                 Conversation[]

@@ -66,6 +66,8 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
       .useValue(createQueueMock())
       .overrideProvider(getQueueToken('accounting-reports'))
       .useValue(createQueueMock())
+      .overrideProvider(getQueueToken('accounting-bank-import'))
+      .useValue(createQueueMock())
       .overrideProvider(getQueueToken('canteen-alerts'))
       .useValue(createQueueMock())
       .compile();
@@ -1039,7 +1041,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
   describe('Queue & Provider Hardening Checks', () => {
     it('lists queue health for all configured queues', async () => {
       const health = await platformService.getQueueHealth();
-      expect(health).toHaveLength(8);
+      expect(health).toHaveLength(9);
       const queueNames = health.map((q) => q.name);
       expect(queueNames).toContain('notifications');
       expect(queueNames).toContain('finance');
@@ -1048,6 +1050,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
       expect(queueNames).toContain('homework');
       expect(queueNames).toContain('reports');
       expect(queueNames).toContain('accounting-reports');
+      expect(queueNames).toContain('accounting-bank-import');
       expect(queueNames).toContain('canteen-alerts');
     });
 

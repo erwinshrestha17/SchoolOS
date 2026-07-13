@@ -32,6 +32,7 @@ import { PlatformBillingLifecycleService } from './platform-billing-lifecycle.se
       { name: 'homework' },
       { name: 'reports' },
       { name: 'accounting-reports' },
+      { name: 'accounting-bank-import' },
       { name: 'canteen-alerts' },
     ),
   ],

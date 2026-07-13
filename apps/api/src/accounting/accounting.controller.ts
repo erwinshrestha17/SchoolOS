@@ -19,6 +19,7 @@ import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { FinanceService } from '../finance/finance.service';
 import { AccountingService } from './accounting.service';
+import { AccountingBankImportJobsService } from './accounting-bank-import-jobs.service';
 import { AccountingSourceMappingService } from './accounting-source-mapping.service';
 import { AccountingActionDto } from './dto/accounting-action.dto';
 import { CreateAccountingPeriodDto } from './dto/create-accounting-period.dto';
@@ -45,6 +46,7 @@ import {
   ReconcileBankStatementDto,
   UnreconcileBankStatementDto,
 } from './dto/import-bank-statement.dto';
+import { QueueImportBankStatementDto } from './dto/queue-import-bank-statement.dto';
 import {
   ExpenseVoucherDto,
   PaymentVoucherDto,
@@ -65,6 +67,7 @@ export class AccountingController {
     private readonly accountingService: AccountingService,
     private readonly financeService: FinanceService,
     private readonly sourceMappings: AccountingSourceMappingService,
+    private readonly bankImportJobsService: AccountingBankImportJobsService,
   ) {}
 
   @Get('dashboard-summary')
@@ -577,6 +580,38 @@ export class AccountingController {
       auth,
       body.fingerprint,
     );
+  }
+
+  @Post('bank-reconciliation/:accountId/import-queue')
+  @Permissions('accounting:settings:update')
+  queueBankStatementImport(
+    @Param('accountId') accountId: string,
+    @Body() body: QueueImportBankStatementDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.bankImportJobsService.queueBankStatementImport(
+      accountId,
+      body.lines,
+      auth,
+    );
+  }
+
+  @Get('bank-reconciliation/:accountId/import-jobs')
+  @Permissions('accounting:reports:read')
+  listBankImportJobs(
+    @Param('accountId') accountId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.bankImportJobsService.listBankImportJobs(accountId, auth);
+  }
+
+  @Get('bank-reconciliation/import-jobs/:jobId')
+  @Permissions('accounting:reports:read')
+  getBankImportJob(
+    @Param('jobId') jobId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.bankImportJobsService.getBankImportJob(jobId, auth);
   }
 
   @Get('bank-reconciliation/:accountId/unreconciled')
