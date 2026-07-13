@@ -15,7 +15,7 @@ async function validationProperties(dto: object) {
 describe('M7 payroll DTO hardening', () => {
   it('rejects invalid staff contract dates and negative salary values', async () => {
     const dto = plainToInstance(CreateStaffContractDto, {
-      staffId: 'staff-1',
+      staffId: '11111111-1111-4111-8111-111111111111',
       contractNumber: 'CNT-001',
       position: 'Teacher',
       startDate: 'not-a-date',
@@ -38,7 +38,7 @@ describe('M7 payroll DTO hardening', () => {
 
   it('accepts valid staff contract date and non-negative money values', async () => {
     const dto = plainToInstance(CreateStaffContractDto, {
-      staffId: 'staff-1',
+      staffId: '11111111-1111-4111-8111-111111111111',
       contractNumber: 'CNT-001',
       position: 'Teacher',
       startDate: '2026-05-01',

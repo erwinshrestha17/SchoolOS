@@ -9,7 +9,12 @@ import { FormField, TextArea } from '../ui/form-field';
 import { Toast } from '../ui/toast';
 import { X, ShieldAlert, Landmark, ShieldCheck, Ban } from 'lucide-react';
 
-export type PayrollActionType = 'SUBMIT_REVIEW' | 'APPROVE' | 'REJECT' | 'POST';
+export type PayrollActionType =
+  | 'SUBMIT_REVIEW'
+  | 'COMPLETE_REVIEW'
+  | 'APPROVE'
+  | 'REJECT'
+  | 'POST';
 
 interface PayrollActionDialogProps {
   isOpen: boolean;
@@ -37,6 +42,8 @@ export function PayrollActionDialog({
       switch (actionType) {
         case 'SUBMIT_REVIEW':
           return api.submitPayrollRunReview(runId);
+        case 'COMPLETE_REVIEW':
+          return api.reviewPayrollRun(runId);
         case 'APPROVE':
           return api.approvePayrollRun(runId);
         case 'REJECT':
@@ -81,14 +88,28 @@ export function PayrollActionDialog({
           confirmText: 'Approve',
           confirmVariant: 'default' as const,
         };
+      case 'COMPLETE_REVIEW':
+        return {
+          title: 'Complete Payroll Review',
+          description:
+            'Mark the administrative review complete and make this run eligible for approval.',
+          icon: <ShieldCheck size={20} className="text-[var(--color-mod-hr-text)]" />,
+          warning:
+            'This does not approve or post payroll. A user with approval permission must still approve the reviewed run.',
+          requiresReason: false,
+          confirmText: 'Complete Review',
+          confirmVariant: 'default' as const,
+        };
       case 'REJECT':
         return {
-          title: 'Reject Payroll',
-          description: 'Reject this payroll run and return it to generated draft state.',
+          title: 'Return Payroll for Correction',
+          description:
+            'Return this payroll run to generated state so authorised payroll staff can correct it.',
           icon: <Ban size={20} className="text-red-500" />,
-          warning: 'Rejection returns the run to generated/draft state for recalculation or modifications.',
+          warning:
+            'The correction reason is audited. The run must pass submission and review again before approval.',
           requiresReason: true,
-          confirmText: 'Reject Run',
+          confirmText: 'Return for Correction',
           confirmVariant: 'destructive' as const,
         };
       case 'POST':

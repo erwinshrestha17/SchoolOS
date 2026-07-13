@@ -208,7 +208,7 @@ export class PayrollController {
   @Post('runs/:id/submit-review')
   @Permissions('payroll:run:review')
   submitReview(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
-    return this.payrollService.reviewPayrollRun(id, auth);
+    return this.payrollService.submitPayrollRunForReview(id, auth);
   }
 
   @Post('runs/:id/reject')

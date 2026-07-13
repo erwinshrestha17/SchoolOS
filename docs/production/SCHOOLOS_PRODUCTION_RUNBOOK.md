@@ -290,7 +290,7 @@ This section outlines onboarding a controlled-pilot school onto the agreed suppo
    pnpm dev
    ```
 
-Use the current idempotent development seed and retrieve local QA credentials from the seed implementation or approved secure development configuration. Do not reuse seed credentials in staging or production.
+Use the current idempotent development seed and retrieve local QA credentials from the seed implementation or approved secure development configuration. Routine reseeds preserve existing demo passwords and their completed temporary-password state. Set `SCHOOLOS_DEMO_RESET_CREDENTIALS_ON_SEED=true` or `PLATFORM_SEED_RESET_CREDENTIALS_ON_SEED=true` only for an intentional local credential reset. Do not reuse seed credentials in staging or production.
 
 Expected URLs:
 - Web: `http://localhost:3000`

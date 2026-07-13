@@ -19,6 +19,8 @@ const platformEmail = process.env.PLATFORM_SEED_EMAIL || 'admin@schoolos.io';
 const platformPassword = process.env.PLATFORM_SEED_PASSWORD || 'SchoolOS@2026';
 const platformSeedMustChangePassword =
   process.env.PLATFORM_SEED_PASSWORD_REQUIRE_CHANGE !== 'false';
+const resetPlatformCredentialsOnSeed =
+  process.env.PLATFORM_SEED_RESET_CREDENTIALS_ON_SEED === 'true';
 const platformRole = 'platform_super_admin';
 
 async function main() {
@@ -57,8 +59,12 @@ async function main() {
       },
     },
     update: {
-      passwordHash,
-      mustChangePassword: platformSeedMustChangePassword,
+      ...(resetPlatformCredentialsOnSeed
+        ? {
+            passwordHash,
+            mustChangePassword: platformSeedMustChangePassword,
+          }
+        : {}),
       status: UserStatus.ACTIVE,
     },
     create: {

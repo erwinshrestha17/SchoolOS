@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { 
-  TrendingUp, Calculator, Wallet, Landmark, 
+  Calculator, Wallet, Landmark,
   BarChart3, FileText, PieChart, History, 
   ArrowRight, CheckCircle2, AlertCircle, Settings, Clock, XCircle
 } from 'lucide-react';
@@ -19,45 +19,42 @@ import { cn } from '../../lib/utils';
 import { PageState } from '../ui/page-state';
 import { AuditInfo } from '../ui/audit-info';
 import { ReportTable } from './report-table';
-import { VoucherDialog } from './voucher-dialog';
+import { VoucherDialog, type VoucherType } from './voucher-dialog';
+
+const nprFormatter = new Intl.NumberFormat('en-NP', {
+  style: 'currency',
+  currency: 'NPR',
+  maximumFractionDigits: 2,
+});
+
+function formatMoney(amount?: string | number | null) {
+  if (amount === undefined || amount === null) return 'Unavailable';
+  const numericAmount = typeof amount === 'number' ? amount : Number(amount);
+  return Number.isFinite(numericAmount)
+    ? nprFormatter.format(numericAmount)
+    : 'Unavailable';
+}
 
 export function AccountingDashboardView() {
   const router = useRouter();
   const summaryQuery = useQuery({
-    queryKey: ['accounting-summary'],
-    queryFn: () => api.listAccountingReports({}),
+    queryKey: ['accounting-dashboard-summary'],
+    queryFn: () => api.getAccountingDashboardSummary(),
+    staleTime: 60_000,
   });
 
-  const journalsQuery = useQuery({
-    queryKey: ['ledger-entries-recent'],
-    queryFn: () => api.listJournalEntries(),
-  });
-
-  const fiscalYearsQuery = useQuery({
-    queryKey: ['fiscal-years'],
-    queryFn: () => api.listFiscalYears(),
-  });
+  const [voucherType, setVoucherType] = useState<VoucherType | null>(null);
 
   const accountsQuery = useQuery({
     queryKey: ['chart-accounts'],
     queryFn: () => api.listChartAccounts(),
+    enabled: voucherType !== null,
   });
 
-  const [isVoucherDialogOpen, setIsVoucherDialogOpen] = useState(false);
+  const activeFiscalYear = summaryQuery.data?.activeFiscalYear;
+  const activePeriod = summaryQuery.data?.activePeriod;
 
-  const activeFiscalYear = (fiscalYearsQuery.data ?? []).find(y => y.status === 'OPEN') ?? fiscalYearsQuery.data?.[0];
-  const activePeriod = activeFiscalYear?.periods?.find((p: any) => p.status === 'OPEN');
-
-  const formatMoney = (amount?: number | null) => {
-    if (amount === undefined || amount === null) return 'Unavailable';
-    return new Intl.NumberFormat('en-NP', {
-      style: 'currency',
-      currency: 'NPR',
-      maximumFractionDigits: 2,
-    }).format(amount);
-  };
-
-  const noFiscalYear = fiscalYearsQuery.isSuccess && (fiscalYearsQuery.data ?? []).length === 0;
+  const noFiscalYear = summaryQuery.isSuccess && !activeFiscalYear;
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500 pb-10">
@@ -67,7 +64,7 @@ export function AccountingDashboardView() {
         primaryAction={
           <button
             type="button"
-            onClick={() => setIsVoucherDialogOpen(true)}
+            onClick={() => router.push('/dashboard/accounting/journals')}
             className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--color-mod-accounting-accent)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-accounting-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-accounting-border)] focus:ring-offset-2"
           >
             <FileText className="h-4 w-4" />
@@ -82,12 +79,12 @@ export function AccountingDashboardView() {
         ]}
       >
         <KpiGrid className="sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-          <KpiCard title="Fiscal Year Status" loading={fiscalYearsQuery.isLoading} value={activeFiscalYear?.status ?? 'Unavailable'} icon={<Clock size={20} />} tone={activeFiscalYear?.status === 'OPEN' ? 'success' : 'neutral'} description={activeFiscalYear?.name ?? 'Fiscal year is not configured.'} />
-          <KpiCard title="Pending Journals" value="Unavailable" icon={<FileText size={20} />} tone="neutral" description="Needs a bounded journal summary." />
-          <KpiCard title="Unreconciled Items" value="Unavailable" icon={<Landmark size={20} />} tone="neutral" description="Select an account in reconciliation." />
-          <KpiCard title="Mapping Issues" value="Unavailable" icon={<AlertCircle size={20} />} tone="neutral" description="Needs a bounded M11 mapping summary." />
-          <KpiCard title="Export Jobs" value="Unavailable" icon={<History size={20} />} tone="neutral" description="Open reports for backend job status." />
-          <KpiCard title="Trial Balance Readiness" loading={summaryQuery.isLoading} value={summaryQuery.data ? (summaryQuery.data.balanced ? 'Ready' : 'Needs review') : 'Unavailable'} icon={<CheckCircle2 size={20} />} tone={summaryQuery.data?.balanced ? 'success' : 'warning'} description="Backend double-entry balance check." />
+          <KpiCard title="Fiscal Year Status" loading={summaryQuery.isLoading} value={activeFiscalYear?.status ?? 'Unavailable'} icon={<Clock size={20} />} tone={activeFiscalYear?.status === 'OPEN' ? 'success' : 'neutral'} description={activeFiscalYear?.name ?? 'Fiscal year is not configured.'} href="/dashboard/accounting/fiscal-periods" />
+          <KpiCard title="Pending Approvals" loading={summaryQuery.isLoading} value={summaryQuery.data?.pendingJournalApprovals ?? 'Unavailable'} icon={<FileText size={20} />} tone={(summaryQuery.data?.pendingJournalApprovals ?? 0) > 0 ? 'warning' : 'success'} description="Submitted journals awaiting approval." href="/dashboard/accounting/journals?status=SUBMITTED" />
+          <KpiCard title="Unreconciled Items" loading={summaryQuery.isLoading} value={summaryQuery.data?.unreconciledBankItems ?? 'Unavailable'} icon={<Landmark size={20} />} tone={(summaryQuery.data?.unreconciledBankItems ?? 0) > 0 ? 'warning' : 'success'} description="Bank statement rows awaiting review." href="/dashboard/accounting/reconciliation" />
+          <KpiCard title="Mapping Issues" loading={summaryQuery.isLoading} value={summaryQuery.data?.sourceMappingIssueCount ?? 'Unavailable'} icon={<AlertCircle size={20} />} tone={(summaryQuery.data?.sourceMappingIssueCount ?? 0) > 0 ? 'danger' : 'success'} description="Missing source references or active source mappings." href="/dashboard/accounting/source-mappings" />
+          <KpiCard title="Active Export Jobs" loading={summaryQuery.isLoading} value={summaryQuery.data?.activeExportJobs ?? 'Unavailable'} icon={<History size={20} />} tone={(summaryQuery.data?.failedExportJobs ?? 0) > 0 ? 'danger' : 'neutral'} description={summaryQuery.data?.failedExportJobs ? `${summaryQuery.data.failedExportJobs} failed export job(s).` : 'Queued and processing accounting exports.'} href="/dashboard/accounting/reports" />
+          <KpiCard title="Trial Balance Readiness" loading={summaryQuery.isLoading} value={summaryQuery.data ? (summaryQuery.data.trialBalance.balanced ? 'Ready' : 'Needs review') : 'Unavailable'} icon={<CheckCircle2 size={20} />} tone={summaryQuery.data?.trialBalance.balanced ? 'success' : 'warning'} description="Backend Decimal totals across posted journals." href="/dashboard/accounting/reports?report=trial-balance" />
         </KpiGrid>
       </ModuleHeader>
 
@@ -104,6 +101,16 @@ export function AccountingDashboardView() {
         accentColor="emerald"
         variant="light"
       />
+
+      {summaryQuery.isError ? (
+        <PageState
+          tone="danger"
+          title="Unable to load the accounting operating summary"
+          description={summaryQuery.error?.message ?? 'The bounded M11 summary could not be loaded.'}
+          actionLabel="Retry summary"
+          onAction={() => void summaryQuery.refetch()}
+        />
+      ) : null}
 
       {noFiscalYear && (
         <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 shadow-sm animate-in slide-in-from-top-4">
@@ -135,12 +142,13 @@ export function AccountingDashboardView() {
             title="Operational Quick Actions" 
             description="Execute standard financial transactions and vouchers."
           >
-            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
               {[
-                { label: 'Journal Voucher', desc: 'Manual ledger posting', icon: FileText, color: 'bg-[var(--color-mod-accounting-accent)]', action: () => setIsVoucherDialogOpen(true) },
-                { label: 'Expense Voucher', desc: 'Direct school expenses', icon: Calculator, color: 'bg-rose-600', action: () => setIsVoucherDialogOpen(true) },
-                { label: 'Payment Voucher', desc: 'Vendor/Staff payments', icon: Wallet, color: 'bg-[var(--color-mod-accounting-accent)]', action: () => setIsVoucherDialogOpen(true) },
-                { label: 'Receipt Voucher', desc: 'Inward cash/bank receipts', icon: CheckCircle2, color: 'bg-emerald-600', action: () => setIsVoucherDialogOpen(true) },
+                { label: 'Journal Voucher', desc: 'Balanced multi-line draft', icon: FileText, color: 'bg-[var(--color-mod-accounting-accent)]', action: () => router.push('/dashboard/accounting/journals') },
+                { label: 'Expense Voucher', desc: 'Direct school expenses', icon: Calculator, color: 'bg-rose-600', action: () => setVoucherType('EXPENSE') },
+                { label: 'Payment Voucher', desc: 'Vendor or staff payment', icon: Wallet, color: 'bg-[var(--color-mod-accounting-accent)]', action: () => setVoucherType('PAYMENT') },
+                { label: 'Receipt Voucher', desc: 'Inward cash or bank receipt', icon: CheckCircle2, color: 'bg-emerald-600', action: () => setVoucherType('RECEIPT') },
+                { label: 'Contra Voucher', desc: 'Cash and bank transfer', icon: ArrowRight, color: 'bg-cyan-600', action: () => setVoucherType('CONTRA') },
               ].map((action, idx) => (
                 <button
                   key={idx}
@@ -204,28 +212,28 @@ export function AccountingDashboardView() {
               </Link>
             }
           >
-            {journalsQuery.isLoading ? (
+            {summaryQuery.isLoading ? (
               <PageState
                 tone="loading"
                 title="Loading journal entries"
                 description="Fetching recent ledger postings from the backend."
               />
-            ) : journalsQuery.isError ? (
+            ) : summaryQuery.isError ? (
               <PageState
                 tone="danger"
                 title="Unable to load journal entries"
-                description={journalsQuery.error?.message ?? 'Recent ledger postings could not be loaded.'}
+                description={summaryQuery.error?.message ?? 'Recent ledger postings could not be loaded.'}
               />
             ) : (
               <ReportTable
                 headers={['Date', 'Number', 'Narration', 'Amount']}
-                rows={(journalsQuery.data ?? []).slice(0, 5).map((entry) => ({
+                rows={(summaryQuery.data?.recentJournals ?? []).map((entry) => ({
                   id: entry.id,
                   cells: [
                     { value: entry.entryDate, type: 'date' },
                     { value: entry.entryNumber, bold: true },
                     { value: entry.narration },
-                    { value: entry.totalDebit ?? entry.totalCredit ?? 0, type: 'currency' }
+                    { value: entry.totalDebit, type: 'currency' }
                   ],
                 }))}
               />
@@ -292,7 +300,7 @@ export function AccountingDashboardView() {
             <div className="space-y-4">
               <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
                 <span className="text-xs font-bold text-slate-600">Ledger Balanced</span>
-                {summaryQuery.data?.balanced ? (
+                {summaryQuery.data?.trialBalance.balanced ? (
                   <CheckCircle2 size={18} className="text-emerald-500" />
                 ) : (
                   <XCircle size={18} className="text-rose-500" />
@@ -306,12 +314,12 @@ export function AccountingDashboardView() {
                 <div className="mt-3 flex justify-between items-end">
                   <div>
                     <p className="text-[10px] text-[var(--color-mod-accounting-text)]/70 uppercase font-bold">Debit</p>
-                    <p className="text-sm font-bold">{formatMoney(summaryQuery.data?.totals?.debit)}</p>
+                    <p className="text-sm font-bold">{formatMoney(summaryQuery.data?.trialBalance.totalDebit)}</p>
                   </div>
                   <div className="h-8 w-px bg-[var(--color-mod-accounting-border)]" />
                   <div className="text-right">
                     <p className="text-[10px] text-[var(--color-mod-accounting-text)]/70 uppercase font-bold">Credit</p>
-                    <p className="text-sm font-bold">{formatMoney(summaryQuery.data?.totals?.credit)}</p>
+                    <p className="text-sm font-bold">{formatMoney(summaryQuery.data?.trialBalance.totalCredit)}</p>
                   </div>
                 </div>
               </div>
@@ -321,9 +329,10 @@ export function AccountingDashboardView() {
       </div>
 
       <VoucherDialog 
-        isOpen={isVoucherDialogOpen} 
-        onClose={() => setIsVoucherDialogOpen(false)} 
+        isOpen={voucherType !== null}
+        onClose={() => setVoucherType(null)}
         accounts={accountsQuery.data ?? []} 
+        voucherType={voucherType ?? 'EXPENSE'}
       />
     </div>
   );

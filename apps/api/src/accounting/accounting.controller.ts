@@ -19,6 +19,7 @@ import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { FinanceService } from '../finance/finance.service';
 import { AccountingService } from './accounting.service';
+import { AccountingSourceMappingService } from './accounting-source-mapping.service';
 import { AccountingActionDto } from './dto/accounting-action.dto';
 import { CreateAccountingPeriodDto } from './dto/create-accounting-period.dto';
 import { CreateChartAccountDto } from './dto/create-chart-account.dto';
@@ -48,6 +49,11 @@ import {
   ReceiptVoucherDto,
   ContraVoucherDto,
 } from './dto/voucher.dto';
+import {
+  ArchiveAccountingSourceMappingDto,
+  CreateAccountingSourceMappingDto,
+  ListAccountingSourceMappingsQueryDto,
+} from './dto/accounting-source-mapping.dto';
 
 @Controller('accounting')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
@@ -56,7 +62,48 @@ export class AccountingController {
   constructor(
     private readonly accountingService: AccountingService,
     private readonly financeService: FinanceService,
+    private readonly sourceMappings: AccountingSourceMappingService,
   ) {}
+
+  @Get('dashboard-summary')
+  @Permissions('accounting:reports:read')
+  dashboardSummary(@CurrentAuth() auth: AuthContext) {
+    return this.accountingService.getDashboardSummary(auth);
+  }
+
+  @Get('source-mappings')
+  @Permissions('accounting:reports:read')
+  listSourceMappings(
+    @Query() query: ListAccountingSourceMappingsQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.sourceMappings.listMappings(auth, query);
+  }
+
+  @Get('source-mappings/health')
+  @Permissions('accounting:reports:read')
+  sourceMappingHealth(@CurrentAuth() auth: AuthContext) {
+    return this.sourceMappings.getSourceMappingHealth(auth);
+  }
+
+  @Post('source-mappings')
+  @Permissions('accounting:settings:update')
+  createSourceMapping(
+    @Body() dto: CreateAccountingSourceMappingDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.sourceMappings.createMapping(dto, auth);
+  }
+
+  @Post('source-mappings/:id/archive')
+  @Permissions('accounting:settings:update')
+  archiveSourceMapping(
+    @Param('id') id: string,
+    @Body() dto: ArchiveAccountingSourceMappingDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.sourceMappings.archiveMapping(id, dto, auth);
+  }
 
   @Get('accounts')
   @Permissions('accounting:accounts:read')

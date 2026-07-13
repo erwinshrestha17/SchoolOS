@@ -21,6 +21,7 @@ function createController() {
     createPayrollRun: jest.fn(),
     approvePayrollRun: jest.fn(),
     reviewPayrollRun: jest.fn(),
+    submitPayrollRunForReview: jest.fn(),
     rejectPayrollRun: jest.fn(),
     postPayrollRun: jest.fn(),
     markPayrollRunPaid: jest.fn(),
@@ -96,13 +97,19 @@ describe('PayrollController M7 contracts', () => {
   it('delegates strict payroll run lifecycle actions', () => {
     const { controller, payrollService } = createController();
     const actionDto = { reason: 'Ready', paymentAccountCode: 'BANK-001' };
-    payrollService.reviewPayrollRun.mockReturnValue({ status: 'UNDER_REVIEW' });
+    payrollService.submitPayrollRunForReview.mockReturnValue({
+      status: 'UNDER_REVIEW',
+    });
+    payrollService.reviewPayrollRun.mockReturnValue({ status: 'REVIEWED' });
     payrollService.approvePayrollRun.mockReturnValue({ status: 'APPROVED' });
     payrollService.postPayrollRun.mockReturnValue({ status: 'POSTED' });
     payrollService.markPayrollRunPaid.mockReturnValue({ status: 'PAID' });
     payrollService.rejectPayrollRun.mockReturnValue({ status: 'CANCELLED' });
 
     expect(controller.reviewRun('run-1', actor)).toEqual({
+      status: 'REVIEWED',
+    });
+    expect(controller.submitReview('run-1', actor)).toEqual({
       status: 'UNDER_REVIEW',
     });
     expect(controller.approveRun('run-1', actor)).toEqual({
@@ -119,6 +126,10 @@ describe('PayrollController M7 contracts', () => {
       status: 'CANCELLED',
     });
     expect(payrollService.reviewPayrollRun).toHaveBeenCalledWith(
+      'run-1',
+      actor,
+    );
+    expect(payrollService.submitPayrollRunForReview).toHaveBeenCalledWith(
       'run-1',
       actor,
     );

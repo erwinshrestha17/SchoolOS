@@ -88,7 +88,7 @@ export function JournalEntriesView() {
           )}
         >
           <Plus size={18} />
-          Create Voucher
+          Create Expense Voucher
         </button>
       </div>
 
@@ -141,6 +141,7 @@ export function JournalEntriesView() {
         isOpen={voucherOpen} 
         onClose={() => setVoucherOpen(false)} 
         accounts={accountsQuery.data ?? []} 
+        voucherType="EXPENSE"
       />
 
       <JournalDetailDialog

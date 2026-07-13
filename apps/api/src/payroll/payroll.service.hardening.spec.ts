@@ -42,6 +42,117 @@ describe('PayrollService hardening boundaries', () => {
     expect(prisma.staffContract.create).not.toHaveBeenCalled();
   });
 
+  it('effective-dates a current contract when a future replacement is created', async () => {
+    const currentContract = buildStaffContract({
+      id: 'contract-current',
+      startDate: new Date('2026-01-01T00:00:00.000Z'),
+      endDate: null,
+      status: 'ACTIVE',
+    });
+    const replacement = buildStaffContract({
+      id: 'contract-replacement',
+      contractNumber: 'CNT-002',
+      startDate: new Date('2026-08-01T00:00:00.000Z'),
+      endDate: null,
+      status: 'ACTIVE',
+    });
+    const { service, tx, auditService } = buildService({
+      staffContracts: [currentContract],
+      createdStaffContract: replacement,
+    });
+
+    await expect(
+      service.createContract(
+        {
+          staffId: 'staff-1',
+          contractNumber: ' CNT-002 ',
+          position: ' Senior Teacher ',
+          startDate: '2026-08-01',
+          baseSalary: 50000,
+        },
+        actor as never,
+      ),
+    ).resolves.toEqual(replacement);
+
+    expect(tx.staffContract.update).toHaveBeenCalledWith({
+      where: { id: 'contract-current', tenantId: actor.tenantId },
+      data: { endDate: new Date('2026-07-31T00:00:00.000Z') },
+    });
+    expect(tx.staffContract.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'INACTIVE' }),
+      }),
+    );
+    expect(tx.staffContract.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          contractNumber: 'CNT-002',
+          position: 'Senior Teacher',
+          startDate: new Date('2026-08-01T00:00:00.000Z'),
+          status: 'ACTIVE',
+        }),
+      }),
+    );
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'supersede',
+        resourceId: 'contract-current',
+        after: expect.objectContaining({
+          supersededByContractId: 'contract-replacement',
+        }),
+      }),
+    );
+  });
+
+  it('rejects a contract that overlaps an active contract with the same or later start date', async () => {
+    const scheduledContract = buildStaffContract({
+      id: 'contract-scheduled',
+      startDate: new Date('2026-08-01T00:00:00.000Z'),
+      endDate: null,
+      status: 'ACTIVE',
+    });
+    const { service, tx } = buildService({
+      staffContracts: [scheduledContract],
+    });
+
+    await expect(
+      service.createContract(
+        {
+          staffId: 'staff-1',
+          contractNumber: 'CNT-002',
+          position: 'Teacher',
+          startDate: '2026-07-01',
+          endDate: '2026-12-31',
+          baseSalary: 50000,
+        },
+        actor as never,
+      ),
+    ).rejects.toThrow('overlaps another active or scheduled contract');
+
+    expect(tx.staffContract.update).not.toHaveBeenCalled();
+    expect(tx.staffContract.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a staff contract with an end date before its start date', async () => {
+    const { service, prisma } = buildService({});
+
+    await expect(
+      service.createContract(
+        {
+          staffId: 'staff-1',
+          contractNumber: 'CNT-002',
+          position: 'Teacher',
+          startDate: '2026-08-01',
+          endDate: '2026-07-31',
+          baseSalary: 50000,
+        },
+        actor as never,
+      ),
+    ).rejects.toThrow('Contract end date cannot be before the start date');
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   it('rejects overlapping ACTIVE salary structures for the same staff period', async () => {
     const structure = buildSalaryStructure({
       id: 'salary-1',
@@ -162,7 +273,67 @@ describe('PayrollService hardening boundaries', () => {
     expect(prisma.payslip.createMany).not.toHaveBeenCalled();
   });
 
-  it('rejects paid payroll runs instead of mutating them through rejection', async () => {
+  it('requires submission and completed review before approval', async () => {
+    const generatedRun = buildPayrollRun({
+      status: PayrollRunStatus.GENERATED,
+    });
+    const { service, prisma } = buildService({ payrollRun: generatedRun });
+
+    await expect(
+      service.approvePayrollRun('run-1', actor as never),
+    ).rejects.toThrow(
+      'Payroll run in GENERATED status cannot be approved',
+    );
+
+    expect(prisma.payrollLine.updateMany).not.toHaveBeenCalled();
+    expect(prisma.payslip.createMany).not.toHaveBeenCalled();
+  });
+
+  it('separates review submission from review completion', async () => {
+    const generatedRun = buildPayrollRun({
+      status: PayrollRunStatus.GENERATED,
+    });
+    const underReviewRun = buildPayrollRun({
+      status: PayrollRunStatus.UNDER_REVIEW,
+    });
+    const { service, prisma, auditService } = buildService({
+      payrollRunFindFirstQueue: [generatedRun, underReviewRun],
+      updatedPayrollRunQueue: [
+        underReviewRun,
+        buildPayrollRun({ status: PayrollRunStatus.REVIEWED }),
+      ],
+    });
+
+    await expect(
+      service.submitPayrollRunForReview('run-1', actor as never),
+    ).resolves.toMatchObject({ status: PayrollRunStatus.UNDER_REVIEW });
+    await expect(
+      service.reviewPayrollRun('run-1', actor as never),
+    ).resolves.toMatchObject({ status: PayrollRunStatus.REVIEWED });
+
+    expect(prisma.payrollRun.update).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        where: { id: 'run-1' },
+        data: { status: PayrollRunStatus.UNDER_REVIEW },
+      }),
+    );
+    expect(prisma.payrollRun.update).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        where: { id: 'run-1' },
+        data: { status: PayrollRunStatus.REVIEWED },
+      }),
+    );
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'submit_review' }),
+    );
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'complete_review' }),
+    );
+  });
+
+  it('rejects paid payroll runs instead of mutating them through correction return', async () => {
     const run = buildPayrollRun({ status: PayrollRunStatus.PAID });
     const { service, prisma } = buildService({ payrollRun: run });
 
@@ -172,7 +343,22 @@ describe('PayrollService hardening boundaries', () => {
         { reason: 'Should not mutate paid payroll' },
         actor as never,
       ),
-    ).rejects.toThrow('Approved, posted, or paid payroll cannot be rejected');
+    ).rejects.toThrow(
+      'Payroll run in PAID status cannot be returned for correction',
+    );
+
+    expect(prisma.payrollRun.update).not.toHaveBeenCalled();
+  });
+
+  it('requires an audited reason before returning a reviewed run for correction', async () => {
+    const reviewedRun = buildPayrollRun({
+      status: PayrollRunStatus.REVIEWED,
+    });
+    const { service, prisma } = buildService({ payrollRun: reviewedRun });
+
+    await expect(
+      service.rejectPayrollRun('run-1', { reason: '   ' }, actor as never),
+    ).rejects.toThrow('Correction reason is required');
 
     expect(prisma.payrollRun.update).not.toHaveBeenCalled();
   });
@@ -927,11 +1113,14 @@ describe('PayrollService hardening boundaries', () => {
 
 function buildService(options: {
   staff?: unknown;
+  staffContracts?: unknown[];
+  createdStaffContract?: unknown;
   salaryStructureFindFirstQueue?: unknown[];
   salaryStructures?: unknown[];
   payrollLineCount?: number;
   payrollRun?: unknown;
   payrollRunFindFirstQueue?: unknown[];
+  updatedPayrollRunQueue?: unknown[];
   payrollRuns?: unknown[];
   payrollRunCount?: number;
   payrollRunStatusGroups?: unknown[];
@@ -953,12 +1142,32 @@ function buildService(options: {
   const payrollRunFindFirstQueue = [
     ...(options.payrollRunFindFirstQueue ?? []),
   ];
+  const updatedPayrollRunQueue = [...(options.updatedPayrollRunQueue ?? [])];
   const staffCountQueue = [...(options.staffCountQueue ?? [])];
   const staffLeaveRequestCountQueue = [
     ...(options.staffLeaveRequestCountQueue ?? []),
   ];
 
   const tx = {
+    staffContract: {
+      findMany: jest.fn().mockResolvedValue(options.staffContracts ?? []),
+      update: jest
+        .fn()
+        .mockImplementation(
+          async ({ data }: { data: Record<string, unknown> }) => ({
+            ...buildStaffContract(),
+            ...(options.staffContracts?.[0] as
+              | Record<string, unknown>
+              | undefined),
+            ...data,
+          }),
+        ),
+      create: jest
+        .fn()
+        .mockResolvedValue(
+          options.createdStaffContract ?? buildStaffContract(),
+        ),
+    },
     payrollLine: {
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
@@ -1024,7 +1233,11 @@ function buildService(options: {
         .fn()
         .mockResolvedValue(options.payrollRunStatusGroups ?? []),
       create: jest.fn().mockResolvedValue(buildPayrollRun()),
-      update: jest.fn().mockResolvedValue(buildPayrollRun()),
+      update: jest.fn().mockImplementation(async () =>
+        updatedPayrollRunQueue.length > 0
+          ? updatedPayrollRunQueue.shift()
+          : buildPayrollRun(),
+      ),
     },
     payrollLine: {
       count: jest.fn().mockResolvedValue(options.payrollLineCount ?? 0),

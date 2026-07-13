@@ -108,8 +108,16 @@ export class PrismaClient {
   readonly __mock = true;
 }
 
+export const TransactionIsolationLevel = {
+  ReadUncommitted: 'ReadUncommitted',
+  ReadCommitted: 'ReadCommitted',
+  RepeatableRead: 'RepeatableRead',
+  Serializable: 'Serializable',
+} as const;
+
 export const Prisma = {
   Decimal,
+  TransactionIsolationLevel,
   sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({
     strings,
     values,

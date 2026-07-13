@@ -2,15 +2,22 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { formatBsDate } from '@schoolos/core';
+import {
+  formatBsDate,
+  formatBsDateForInput,
+  parseBsDateInput,
+  toGregorianDateFromBs,
+} from '@schoolos/core';
 import { ChevronLeft, ChevronRight, Plus, Search } from 'lucide-react';
-import { useState } from 'react';
+import { useDeferredValue, useState } from 'react';
 import { Input } from '../ui/input';
 import { Select } from '../ui/select';
 import { FormField } from '../ui/form-field';
 import { LoadingState } from '../ui/loading-state';
 import { EmptyState } from '../ui/empty-state';
 import { useSession } from '../session-provider';
+import { BsDateField } from '../ui/bs-date-field';
+import { ErrorState } from '../ui/error-state';
 
 const moneyFormatter = new Intl.NumberFormat('en-NP', {
   style: 'currency',
@@ -22,6 +29,7 @@ export function ContractList() {
   const queryClient = useQueryClient();
   const { hasPermissions } = useSession();
   const [search, setSearch] = useState('');
+  const deferredSearch = useDeferredValue(search.trim());
   const [page, setPage] = useState(1);
   const limit = 10;
   const canCreateContracts = hasPermissions(['hr:manage']);
@@ -29,12 +37,12 @@ export function ContractList() {
     hasPermissions(['payroll:read']) || hasPermissions(['payroll:manage']);
   
   const contractsQuery = useQuery({
-    queryKey: ['staff-contracts', page, limit, search],
+    queryKey: ['staff-contracts', page, limit, deferredSearch],
     queryFn: () =>
       api.listStaffContractsPage({
         page,
         limit,
-        search: search.trim() || undefined,
+        search: deferredSearch || undefined,
       }),
   });
 
@@ -43,11 +51,13 @@ export function ContractList() {
     staffId: '',
     contractNumber: '',
     position: '',
-    startDate: new Date().toISOString().split('T')[0],
+    startDateBs: formatBsDateForInput(new Date()),
+    endDateBs: '',
     baseSalary: 0,
     allowances: 0,
     deductions: 0,
   });
+  const [formError, setFormError] = useState<string | null>(null);
 
   const staffQuery = useQuery({
     queryKey: ['staff'],
@@ -63,13 +73,46 @@ export function ContractList() {
         staffId: '',
         contractNumber: '',
         position: '',
-        startDate: new Date().toISOString().split('T')[0],
+        startDateBs: formatBsDateForInput(new Date()),
+        endDateBs: '',
         baseSalary: 0,
         allowances: 0,
         deductions: 0,
       });
+      setFormError(null);
+    },
+    onError: (error) => {
+      setFormError(
+        error instanceof Error
+          ? error.message
+          : 'The contract could not be created. Review the dates and try again.',
+      );
     },
   });
+
+  const submitContract = () => {
+    setFormError(null);
+    try {
+      const startDate = gregorianDateString(newContract.startDateBs);
+      const endDate = newContract.endDateBs.trim()
+        ? gregorianDateString(newContract.endDateBs)
+        : undefined;
+      createMutation.mutate({
+        staffId: newContract.staffId,
+        contractNumber: newContract.contractNumber.trim(),
+        position: newContract.position.trim(),
+        startDate,
+        ...(endDate ? { endDate } : {}),
+        baseSalary: newContract.baseSalary,
+        allowances: newContract.allowances,
+        deductions: newContract.deductions,
+      });
+    } catch (error) {
+      setFormError(
+        error instanceof Error ? error.message : 'Enter valid BS contract dates.',
+      );
+    }
+  };
 
   const contracts = contractsQuery.data?.items ?? [];
   const totalItems = contractsQuery.data?.total ?? 0;
@@ -130,14 +173,19 @@ export function ContractList() {
                     onChange={(e) => setNewContract({ ...newContract, contractNumber: e.target.value })}
                   />
                 </FormField>
-                <FormField label="Start Date">
-                  <Input
-                    type="date"
-                    value={newContract.startDate}
-                    onChange={(e) => setNewContract({ ...newContract, startDate: e.target.value })}
-                  />
-                </FormField>
+                <BsDateField
+                  label="Start date (BS)"
+                  value={newContract.startDateBs}
+                  onChange={(value) => setNewContract({ ...newContract, startDateBs: value })}
+                  required
+                />
               </div>
+
+              <BsDateField
+                label="End date (BS, optional)"
+                value={newContract.endDateBs}
+                onChange={(value) => setNewContract({ ...newContract, endDateBs: value })}
+              />
 
               <FormField label="Position">
                 <Input
@@ -172,6 +220,12 @@ export function ContractList() {
                 </FormField>
               </div>
 
+              {formError ? (
+                <p className="text-sm font-semibold text-rose-700" role="alert">
+                  {formError}
+                </p>
+              ) : null}
+
               <div className="flex gap-3 mt-4">
                 <button
                   type="button"
@@ -182,12 +236,8 @@ export function ContractList() {
                 </button>
                 <button
                   type="button"
-                  disabled={!newContract.staffId || !newContract.contractNumber.trim() || !newContract.position || createMutation.isPending}
-                  onClick={() => createMutation.mutate({
-                    ...newContract,
-                    contractNumber: newContract.contractNumber.trim(),
-                    startDate: new Date(newContract.startDate).toISOString(),
-                  })}
+                  disabled={!newContract.staffId || !newContract.contractNumber.trim() || !newContract.position.trim() || !newContract.startDateBs.trim() || createMutation.isPending}
+                  onClick={submitContract}
                   className="flex-1 rounded-2xl bg-[var(--color-mod-hr-accent)] px-5 py-3 text-sm font-bold text-white shadow-sm transition-all hover:bg-[var(--color-mod-hr-text)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {createMutation.isPending ? 'Saving...' : 'Create Contract'}
@@ -217,6 +267,16 @@ export function ContractList() {
                     <LoadingState variant="spinner" label="Loading contracts..." />
                   </td>
                 </tr>
+              ) : contractsQuery.isError ? (
+                <tr>
+                  <td colSpan={5} className="p-4">
+                    <ErrorState
+                      title="Contracts could not be loaded"
+                      message="Please retry. Your filters and page selection have been preserved."
+                      onRetry={() => void contractsQuery.refetch()}
+                    />
+                  </td>
+                </tr>
               ) : contracts.length > 0 ? (
                 contracts.map((contract) => (
                   <tr key={contract.id} className="hover:bg-slate-50/50 transition-colors group">
@@ -226,6 +286,9 @@ export function ContractList() {
                         <p className="font-bold text-slate-900">{contract.position}</p>
                         <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-slate-400">
                           Starts {formatBsDate(contract.startDate)}
+                          {contract.endDate
+                            ? ` · Ends ${formatBsDate(contract.endDate)}`
+                            : ' · Open-ended'}
                         </p>
                       </div>
                     </td>
@@ -293,4 +356,9 @@ export function ContractList() {
       </div>
     </div>
   );
+}
+
+function gregorianDateString(value: string) {
+  const gregorian = toGregorianDateFromBs(parseBsDateInput(value));
+  return `${gregorian.year}-${String(gregorian.month).padStart(2, '0')}-${String(gregorian.day).padStart(2, '0')}`;
 }

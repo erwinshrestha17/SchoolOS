@@ -1,6 +1,9 @@
 import type {
+  AccountingDashboardSummary,
   AccountingPeriodSummary,
   AccountingReport,
+  AccountingSourceMappingHealth,
+  AccountingSourceMappingSummary,
   ChartAccountSummary,
   FiscalPeriodSummary,
   FiscalYearSummary,
@@ -17,6 +20,8 @@ import {
 } from "./client";
 
 export const accountingApi = {
+  getAccountingDashboardSummary: () =>
+    request<AccountingDashboardSummary>('/accounting/dashboard-summary'),
   listLedgerEntriesPage: (params?: {
     page?: number;
     limit?: number;
@@ -156,26 +161,26 @@ export const accountingApi = {
   getOpeningBalance: (fiscalYearId: string) =>
     request<any>(`/accounting/opening-balance/${fiscalYearId}`),
   createExpenseVoucher: (body: JsonBody) =>
-    request<any>("/accounting/vouchers/expense", {
+    request<JournalEntryView>("/accounting/vouchers/expense", {
       method: "POST",
       json: body,
     }),
   createPaymentVoucher: (body: JsonBody) =>
-    request<any>("/accounting/vouchers/payment", {
+    request<JournalEntryView>("/accounting/vouchers/payment", {
       method: "POST",
       json: body,
     }),
   createReceiptVoucher: (body: JsonBody) =>
-    request<any>("/accounting/vouchers/receipt", {
+    request<JournalEntryView>("/accounting/vouchers/receipt", {
       method: "POST",
       json: body,
     }),
   createContraVoucher: (body: JsonBody) =>
-    request<any>("/accounting/vouchers/contra", { method: "POST", json: body }),
+    request<JournalEntryView>("/accounting/vouchers/contra", { method: "POST", json: body }),
   closeFiscalYear: (id: string) =>
-    request<any>(`/accounting/fiscal-years/${id}/close`, { method: "POST" }),
+    request<any>(`/accounting/fiscal-years/${id}/close-year`, { method: "POST" }),
   reopenFiscalYear: (id: string, body: JsonBody) =>
-    request<any>(`/accounting/fiscal-years/${id}/reopen`, {
+    request<any>(`/accounting/fiscal-years/${id}/reopen-year`, {
       method: "POST",
       json: body,
     }),
@@ -196,6 +201,28 @@ export const accountingApi = {
   getReconciliationSummary: (accountId: string) =>
     request<any>(`/accounting/bank-reconciliation/${accountId}/summary`),
   listJournalEntries: () => request<JournalEntryView[]>("/accounting/journals"),
+  listAccountingSourceMappings: (params?: {
+    page?: number;
+    limit?: number;
+    sourceModule?: string;
+    status?: 'ACTIVE' | 'ARCHIVED';
+    search?: string;
+  }) =>
+    request<PaginatedResult<AccountingSourceMappingSummary>>(
+      withQuery('/accounting/source-mappings', params ?? {}),
+    ),
+  getAccountingSourceMappingHealth: () =>
+    request<AccountingSourceMappingHealth>('/accounting/source-mappings/health'),
+  createAccountingSourceMapping: (body: JsonBody) =>
+    request<AccountingSourceMappingSummary>('/accounting/source-mappings', {
+      method: 'POST',
+      json: body,
+    }),
+  archiveAccountingSourceMapping: (id: string, reason: string) =>
+    request<AccountingSourceMappingSummary>(
+      `/accounting/source-mappings/${encodeURIComponent(id)}/archive`,
+      { method: 'POST', json: { reason } },
+    ),
   createManualJournal: (body: JsonBody) =>
     request<JournalEntryView>("/accounting/journals", {
       method: "POST",

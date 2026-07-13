@@ -59,20 +59,34 @@ describe('payroll calculations', () => {
     expect(getPayrollRunActions('DRAFT')).toEqual({
       canEdit: true,
       canReview: true,
+      canSubmitReview: true,
+      canCompleteReview: false,
       canApprove: false,
+      canReject: false,
       canPost: false,
       canPay: false,
       canReverse: false,
       isLocked: false,
     });
     expect(getPayrollRunActions('UNDER_REVIEW')).toMatchObject({
+      canEdit: false,
       canReview: false,
+      canSubmitReview: false,
+      canCompleteReview: true,
+      canApprove: false,
+      canReject: true,
+      canPost: false,
+    });
+    expect(getPayrollRunActions('REVIEWED')).toMatchObject({
+      canCompleteReview: false,
       canApprove: true,
+      canReject: true,
       canPost: false,
     });
     expect(getPayrollRunActions('APPROVED')).toMatchObject({
       canReview: false,
       canApprove: false,
+      canReject: false,
       canPost: true,
     });
   });

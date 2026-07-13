@@ -96,3 +96,99 @@ export type AccountingReport = {
   };
   balanced: boolean;
 };
+
+export type AccountingDashboardSummary = {
+  generatedAt: string;
+  staleAfterSeconds: number;
+  activeFiscalYear: {
+    id: string;
+    name: string;
+    startDate: string;
+    endDate: string;
+    status: string;
+  } | null;
+  activePeriod: {
+    id: string;
+    label: string;
+    periodNumber: number;
+    startDate: string;
+    endDate: string;
+    status: string;
+  } | null;
+  journalsByStatus: Record<string, number>;
+  pendingJournalSubmissions: number;
+  pendingJournalApprovals: number;
+  approvedButUnpostedJournals: number;
+  unreconciledBankItems: number;
+  activeSourceMappings: number;
+  sourceMappingIssueCount: number;
+  postedSourceEntries: number;
+  postedSourceEntriesWithoutId: number;
+  exportJobsByStatus: Record<string, number>;
+  activeExportJobs: number;
+  failedExportJobs: number;
+  failedSourcePostings: null;
+  failedSourcePostingsAvailability: 'NEEDS_POSTING_FAILURE_CONTRACT';
+  trialBalance: {
+    totalDebit: string;
+    totalCredit: string;
+    balanced: boolean;
+  };
+  closingBlockerCount: number;
+  recentJournals: Array<{
+    id: string;
+    entryNumber: string | null;
+    entryDate: string;
+    narration: string;
+    status: string;
+    sourceModule: string | null;
+    sourceType: string;
+    sourceId: string | null;
+    reversalOfId: string | null;
+    correctionOfId: string | null;
+    totalDebit: string;
+  }>;
+};
+
+export type AccountingSourceMappingSummary = {
+  id: string;
+  sourceModule: 'FEES' | 'PAYROLL' | 'CANTEEN' | 'LIBRARY' | 'TRANSPORT';
+  sourceType: string;
+  postingType: string;
+  description: string | null;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  isActive: boolean;
+  archivedAt: string | null;
+  debitAccount: Pick<
+    ChartAccountSummary,
+    'id' | 'code' | 'name' | 'type' | 'isActive'
+  >;
+  creditAccount: Pick<
+    ChartAccountSummary,
+    'id' | 'code' | 'name' | 'type' | 'isActive'
+  >;
+};
+
+export type AccountingSourceMappingHealth = {
+  checkedAt: string;
+  sampledPostedSourceEntries: number;
+  sampleLimit: number;
+  missingSourceId: {
+    count: number;
+    samples: Array<{
+      id: string;
+      entryNumber: string | null;
+      sourceModule: string | null;
+      sourceType: string;
+    }>;
+  };
+  modules: Array<{
+    sourceModule: AccountingSourceMappingSummary['sourceModule'];
+    postedCount: number;
+    missingSourceIdCount: number;
+    sampleEntryIds: string[];
+    configuredMappingCount: number;
+  }>;
+  isClean: boolean;
+};

@@ -13,8 +13,8 @@ import { AccountingReportExportsService } from './accounting-report-exports.serv
 import { AccountingReportsProcessor } from './accounting-reports.processor';
 import { AccountingM9Controller } from './accounting-m9.controller';
 import { AccountingM9Service } from './accounting-m9.service';
-import { M9SourceService } from './m9-source.service';
 import { M9TemplateService } from './m9-template.service';
+import { AccountingSourceMappingService } from './accounting-source-mapping.service';
 
 @Module({
   imports: [
@@ -38,16 +38,16 @@ import { M9TemplateService } from './m9-template.service';
     AccountingReportExportsService,
     AccountingReportsProcessor,
     AccountingM9Service,
-    M9SourceService,
     M9TemplateService,
+    AccountingSourceMappingService,
   ],
   exports: [
     AccountingService,
     AccountingPostingModule,
     AccountingReportsService,
     AccountingM9Service,
-    M9SourceService,
     M9TemplateService,
+    AccountingSourceMappingService,
   ],
 })
 export class AccountingModule {}

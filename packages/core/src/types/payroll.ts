@@ -28,6 +28,19 @@ export type SalaryStructureSummary = {
   staff?: StaffSummary;
 };
 
+export type PayrollRunAllowedActions = {
+  canEdit: boolean;
+  canReview: boolean;
+  canSubmitReview: boolean;
+  canCompleteReview: boolean;
+  canApprove: boolean;
+  canReject: boolean;
+  canPost: boolean;
+  canPay: boolean;
+  canReverse: boolean;
+  isLocked: boolean;
+};
+
 export type PayrollRunSummary = {
   id: string;
   periodMonth: number;
@@ -43,6 +56,7 @@ export type PayrollRunSummary = {
   payslipCount?: number;
   journalEntryId: string | null;
   disbursementJournalEntryId?: string | null;
+  allowedActions: PayrollRunAllowedActions;
   lines?: PayrollLineSummary[];
 };
 
@@ -182,15 +196,7 @@ export type PayrollDashboardSummary = {
     pfEmployeeAmount: PayrollMoneyAmount;
     pfEmployerAmount: PayrollMoneyAmount;
     tdsAmount: PayrollMoneyAmount;
-    approvalReadiness: {
-      canEdit: boolean;
-      canReview: boolean;
-      canApprove: boolean;
-      canPost: boolean;
-      canPay: boolean;
-      canReverse: boolean;
-      isLocked: boolean;
-    };
+    approvalReadiness: PayrollRunAllowedActions;
     postingReadiness: {
       canPost: boolean;
       accountingJournalId: string | null;

@@ -89,6 +89,20 @@ function formatPeriod(month: number, year: number) {
   return `${monthLabels[month - 1] ?? `Month ${month}`} ${year}`;
 }
 
+function payrollStageRank(status: string) {
+  const stageRanks: Record<string, number> = {
+    DRAFT: 0,
+    GENERATED: 0,
+    UNDER_REVIEW: 1,
+    REVIEWED: 2,
+    APPROVED: 3,
+    POSTED: 4,
+    PAID: 5,
+  };
+
+  return stageRanks[status] ?? -1;
+}
+
 function statusClasses(status: string) {
   switch (status) {
     case 'DRAFT':
@@ -173,6 +187,7 @@ export function PayrollRuns() {
   const selectedRun = selectedRunQuery.data
     ? normalizeRun(selectedRunQuery.data)
     : runs.find((run) => run.id === selectedRunKey) ?? null;
+  const selectedRunActions = selectedRun?.allowedActions;
   const totalItems = runsQuery.data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalItems / limit));
 
@@ -554,28 +569,34 @@ export function PayrollRuns() {
               {/* Status Stepper */}
               <div className="flex items-center justify-between px-2 py-4">
                 {[
-                  { label: 'Draft', active: true },
-                  { label: 'Approved', active: ['APPROVED', 'POSTED', 'PAID'].includes(selectedRun.status) },
-                  { label: 'Posted', active: ['POSTED', 'PAID'].includes(selectedRun.status) },
-                  { label: 'Paid', active: selectedRun.status === 'PAID' },
+                  { label: 'Draft', rank: 0 },
+                  { label: 'Review', rank: 1 },
+                  { label: 'Reviewed', rank: 2 },
+                  { label: 'Approved', rank: 3 },
+                  { label: 'Posted', rank: 4 },
+                  { label: 'Paid', rank: 5 },
                 ].map((step, idx, arr) => (
                   <div key={step.label} className="flex items-center flex-1 last:flex-none">
                     <div className="flex flex-col items-center gap-1">
                       <div className={cn(
                         "h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-black",
-                        step.active ? "bg-[var(--color-mod-hr-accent)] text-white" : "bg-slate-100 text-slate-400"
+                        payrollStageRank(selectedRun.status) >= step.rank
+                          ? "bg-[var(--color-mod-hr-accent)] text-white"
+                          : "bg-slate-100 text-slate-400"
                       )}>
-                        {step.active ? <CheckCircle2 size={12} /> : idx + 1}
+                        {payrollStageRank(selectedRun.status) >= step.rank ? <CheckCircle2 size={12} /> : idx + 1}
                       </div>
                       <span className={cn(
                         "text-[9px] font-black uppercase tracking-widest",
-                        step.active ? "text-slate-900" : "text-slate-400"
+                        payrollStageRank(selectedRun.status) >= step.rank ? "text-slate-900" : "text-slate-400"
                       )}>{step.label}</span>
                     </div>
                     {idx < arr.length - 1 && (
                       <div className={cn(
                         "h-[2px] flex-1 mx-2 mb-4",
-                        arr[idx+1].active ? "bg-[var(--color-mod-hr-accent)]" : "bg-slate-100"
+                        payrollStageRank(selectedRun.status) >= arr[idx + 1].rank
+                          ? "bg-[var(--color-mod-hr-accent)]"
+                          : "bg-slate-100"
                       )} />
                     )}
                   </div>
@@ -590,68 +611,71 @@ export function PayrollRuns() {
               </div>
 
               <div className="flex flex-col gap-2">
-                {/* Actions for DRAFT / GENERATED */}
-                {['DRAFT', 'GENERATED'].includes(selectedRun.status) && (
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      disabled={!canReviewRun}
-                      onClick={() => {
-                        setActionType('SUBMIT_REVIEW');
-                        setIsActionDialogOpen(true);
-                      }}
-                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--color-mod-hr-accent)] px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-[var(--color-mod-hr-text)] disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <ShieldAlert size={14} />
-                      Submit Review
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!canApproveRun}
-                      onClick={() => {
-                        setActionType('APPROVE');
-                        setIsActionDialogOpen(true);
-                      }}
-                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-success-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-success-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <CheckCircle2 size={14} />
-                      Approve Run
-                    </button>
+                {selectedRunActions?.canSubmitReview && (
+                  <button
+                    type="button"
+                    disabled={!canReviewRun}
+                    onClick={() => {
+                      setActionType('SUBMIT_REVIEW');
+                      setIsActionDialogOpen(true);
+                    }}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--color-mod-hr-accent)] px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-[var(--color-mod-hr-text)] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <ShieldAlert size={14} />
+                    Submit for Review
+                  </button>
+                )}
+
+                {(selectedRunActions?.canCompleteReview ||
+                  selectedRunActions?.canApprove ||
+                  selectedRunActions?.canReject) && (
+                  <div className="flex flex-wrap gap-2">
+                    {selectedRunActions.canCompleteReview && (
+                      <button
+                        type="button"
+                        disabled={!canReviewRun}
+                        onClick={() => {
+                          setActionType('COMPLETE_REVIEW');
+                          setIsActionDialogOpen(true);
+                        }}
+                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--color-mod-hr-accent)] px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-[var(--color-mod-hr-text)] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <ShieldCheck size={14} />
+                        Complete Review
+                      </button>
+                    )}
+                    {selectedRunActions.canReject && (
+                      <button
+                        type="button"
+                        disabled={!canReviewRun}
+                        onClick={() => {
+                          setActionType('REJECT');
+                          setIsActionDialogOpen(true);
+                        }}
+                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Ban size={14} />
+                        Return for Correction
+                      </button>
+                    )}
+                    {selectedRunActions.canApprove && (
+                      <button
+                        type="button"
+                        disabled={!canApproveRun}
+                        onClick={() => {
+                          setActionType('APPROVE');
+                          setIsActionDialogOpen(true);
+                        }}
+                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-success-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-success-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <CheckCircle2 size={14} />
+                        Approve Run
+                      </button>
+                    )}
                   </div>
                 )}
 
-                {/* Actions for UNDER_REVIEW / REVIEWED */}
-                {['UNDER_REVIEW', 'REVIEWED'].includes(selectedRun.status) && (
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      disabled={!canReviewRun}
-                      onClick={() => {
-                        setActionType('REJECT');
-                        setIsActionDialogOpen(true);
-                      }}
-                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <Ban size={14} />
-                      Reject (Draft)
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!canApproveRun}
-                      onClick={() => {
-                        setActionType('APPROVE');
-                        setIsActionDialogOpen(true);
-                      }}
-                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-success-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-success-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <CheckCircle2 size={14} />
-                      Approve Run
-                    </button>
-                  </div>
-                )}
-
-                {/* Actions for APPROVED */}
-                {selectedRun.status === 'APPROVED' && (
+                {selectedRunActions?.canPost && (
                   <button
                     type="button"
                     disabled={!canPostRun}

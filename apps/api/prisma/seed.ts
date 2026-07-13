@@ -105,6 +105,8 @@ const localDemoPassword =
   process.env.SCHOOLOS_DEMO_PASSWORD ?? 'schoolos-local-demo-only';
 const demoAccountsMustChangePassword =
   process.env.SCHOOLOS_DEMO_PASSWORDS_REQUIRE_CHANGE !== 'false';
+const resetDemoCredentialsOnSeed =
+  process.env.SCHOOLOS_DEMO_RESET_CREDENTIALS_ON_SEED === 'true';
 const schoolAdminPassword =
   process.env.SCHOOLOS_DEMO_ADMIN_PASSWORD ?? localDemoPassword;
 const principalPassword =
@@ -1065,8 +1067,12 @@ async function ensureSeedUserWithRole({
       },
     },
     update: {
-      passwordHash,
-      mustChangePassword: demoAccountsMustChangePassword,
+      ...(resetDemoCredentialsOnSeed
+        ? {
+            passwordHash,
+            mustChangePassword: demoAccountsMustChangePassword,
+          }
+        : {}),
       authMethod: AuthMethod.PASSWORD,
       status,
       failedLoginCount: 0,

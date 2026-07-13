@@ -1390,9 +1390,42 @@ model ChartAccount {
   journalLines             JournalLine[]
   accountingReportMappings AccountingReportAccountMapping[]
   bankStatements           BankStatement[]
+  sourceDebitMappings      AccountingSourceMapping[] @relation("AccountingSourceMappingDebitAccount")
+  sourceCreditMappings     AccountingSourceMapping[] @relation("AccountingSourceMappingCreditAccount")
 
   @@unique([tenantId, code])
   @@index([tenantId, fiscalYearId])
+}
+
+model AccountingSourceMapping {
+  id              String   @id @default(uuid())
+  tenantId        String
+  sourceModule    String
+  sourceType      String
+  postingType     String   @default("DEFAULT")
+  debitAccountId  String
+  creditAccountId String
+  description     String?
+  effectiveFrom   DateTime @default(now())
+  effectiveTo     DateTime?
+  isActive        Boolean  @default(true)
+  archivedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdById     String?
+  updatedById     String?
+
+  tenant        Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  debitAccount  ChartAccount @relation("AccountingSourceMappingDebitAccount", fields: [debitAccountId], references: [id], onDelete: Restrict)
+  creditAccount ChartAccount @relation("AccountingSourceMappingCreditAccount", fields: [creditAccountId], references: [id], onDelete: Restrict)
+  createdBy     User?        @relation("CreatedAccountingSourceMappings", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy     User?        @relation("UpdatedAccountingSourceMappings", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, sourceModule, sourceType, postingType, effectiveFrom])
+  @@index([tenantId, sourceModule, sourceType, postingType, isActive])
+  @@index([tenantId, effectiveFrom, effectiveTo])
+  @@index([tenantId, debitAccountId])
+  @@index([tenantId, creditAccountId])
 }
 
 model JournalEntry {
@@ -2620,6 +2653,8 @@ model User {
   reviewedAttendanceCorrections  AttendanceCorrectionRequest[]    @relation("ReviewedAttendanceCorrections")
   createdAccountMappings         AccountingReportAccountMapping[] @relation("CreatedAccountMappings")
   updatedAccountMappings         AccountingReportAccountMapping[] @relation("UpdatedAccountMappings")
+  createdAccountingSourceMappings AccountingSourceMapping[]       @relation("CreatedAccountingSourceMappings")
+  updatedAccountingSourceMappings AccountingSourceMapping[]       @relation("UpdatedAccountingSourceMappings")
   reconciledBankStatements       BankStatement[]                  @relation("ReconciledBankStatements")
   verifiedStaffDocuments         StaffDocument[]                  @relation("VerifiedStaffDocuments")
   createdStaffLifecycleEvents    StaffLifecycleEvent[]            @relation("CreatedStaffLifecycleEvents")
@@ -6257,6 +6292,7 @@ model Tenant {
   studentDocumentHistory        StudentDocumentHistory[]
   attendanceCorrectionRequests  AttendanceCorrectionRequest[]
   accountingReportMappings      AccountingReportAccountMapping[]
+  accountingSourceMappings      AccountingSourceMapping[]
   bankStatements                BankStatement[]
   studentQrCredentials          StudentQrCredential[]
   admissionImportBatches        AdmissionImportBatch[]

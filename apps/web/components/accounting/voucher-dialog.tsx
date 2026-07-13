@@ -1,25 +1,36 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
 import { Input } from '../ui/input';
 import { Select } from '../ui/select';
-import { Loader2, Plus, Trash2, AlertCircle } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { Loader2, AlertCircle } from 'lucide-react';
 
-type VoucherType = 'EXPENSE' | 'PAYMENT' | 'RECEIPT' | 'CONTRA';
+export type VoucherType = 'EXPENSE' | 'PAYMENT' | 'RECEIPT' | 'CONTRA';
 
 interface VoucherDialogProps {
   isOpen: boolean;
   onClose: () => void;
   accounts: any[];
+  voucherType: VoucherType;
 }
 
-export function VoucherDialog({ isOpen, onClose, accounts }: VoucherDialogProps) {
+const voucherLabels: Record<VoucherType, string> = {
+  EXPENSE: 'Expense Voucher',
+  PAYMENT: 'Payment Voucher',
+  RECEIPT: 'Receipt Voucher',
+  CONTRA: 'Contra Voucher',
+};
+
+export function VoucherDialog({
+  isOpen,
+  onClose,
+  accounts,
+  voucherType,
+}: VoucherDialogProps) {
   const queryClient = useQueryClient();
-  const [type, setType] = useState<VoucherType>('EXPENSE');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,14 +50,15 @@ export function VoucherDialog({ isOpen, onClose, accounts }: VoucherDialogProps)
 
   const mutation = useMutation({
     mutationFn: (data: any) => {
-      if (type === 'EXPENSE') return api.createExpenseVoucher(data);
-      if (type === 'PAYMENT') return api.createPaymentVoucher(data);
-      if (type === 'RECEIPT') return api.createReceiptVoucher(data);
+      if (voucherType === 'EXPENSE') return api.createExpenseVoucher(data);
+      if (voucherType === 'PAYMENT') return api.createPaymentVoucher(data);
+      if (voucherType === 'RECEIPT') return api.createReceiptVoucher(data);
       return api.createContraVoucher(data);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['ledger-entries'] });
       void queryClient.invalidateQueries({ queryKey: ['accounting-summary'] });
+      void queryClient.invalidateQueries({ queryKey: ['accounting-dashboard-summary'] });
       void queryClient.invalidateQueries({ queryKey: ['accounting-report'] });
       onClose();
     },
@@ -55,6 +67,12 @@ export function VoucherDialog({ isOpen, onClose, accounts }: VoucherDialogProps)
     },
     onSettled: () => setLoading(false),
   });
+
+  useEffect(() => {
+    if (isOpen) {
+      setError(null);
+    }
+  }, [isOpen, voucherType]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,16 +86,16 @@ export function VoucherDialog({ isOpen, onClose, accounts }: VoucherDialogProps)
       reference: formData.reference,
     };
 
-    if (type === 'EXPENSE') {
+    if (voucherType === 'EXPENSE') {
       payload.expenseAccountId = formData.expenseAccountId;
       payload.paymentAccountId = formData.paymentAccountId;
-    } else if (type === 'PAYMENT') {
+    } else if (voucherType === 'PAYMENT') {
       payload.payeeAccountId = formData.payeeAccountId;
       payload.paymentAccountId = formData.paymentAccountId;
-    } else if (type === 'RECEIPT') {
+    } else if (voucherType === 'RECEIPT') {
       payload.receiptAccountId = formData.receiptAccountId;
       payload.depositAccountId = formData.depositAccountId;
-    } else if (type === 'CONTRA') {
+    } else if (voucherType === 'CONTRA') {
       payload.fromAccountId = formData.fromAccountId;
       payload.toAccountId = formData.toAccountId;
     }
@@ -89,7 +107,7 @@ export function VoucherDialog({ isOpen, onClose, accounts }: VoucherDialogProps)
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Create New Voucher</DialogTitle>
+          <DialogTitle>Create {voucherLabels[voucherType]}</DialogTitle>
         </DialogHeader>
 
         {error && (
@@ -101,16 +119,6 @@ export function VoucherDialog({ isOpen, onClose, accounts }: VoucherDialogProps)
 
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2 col-span-2">
-              <label className="text-sm font-medium text-slate-700">Voucher Type</label>
-              <Select value={type} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setType(e.target.value as VoucherType)}>
-                <option value="EXPENSE">Expense Voucher</option>
-                <option value="PAYMENT">Payment Voucher</option>
-                <option value="RECEIPT">Receipt Voucher</option>
-                <option value="CONTRA">Contra (Transfer)</option>
-              </Select>
-            </div>
-
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700">Entry Date</label>
               <Input
@@ -133,7 +141,7 @@ export function VoucherDialog({ isOpen, onClose, accounts }: VoucherDialogProps)
               />
             </div>
 
-            {type === 'EXPENSE' && (
+            {voucherType === 'EXPENSE' && (
               <>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-slate-700">Expense Account</label>
@@ -162,7 +170,7 @@ export function VoucherDialog({ isOpen, onClose, accounts }: VoucherDialogProps)
               </>
             )}
 
-            {type === 'PAYMENT' && (
+            {voucherType === 'PAYMENT' && (
               <>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-slate-700">Payee Account (Vendor/Liability)</label>
@@ -191,7 +199,7 @@ export function VoucherDialog({ isOpen, onClose, accounts }: VoucherDialogProps)
               </>
             )}
 
-            {type === 'RECEIPT' && (
+            {voucherType === 'RECEIPT' && (
               <>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-slate-700">Receipt Account (Income/Client)</label>
@@ -220,7 +228,7 @@ export function VoucherDialog({ isOpen, onClose, accounts }: VoucherDialogProps)
               </>
             )}
 
-            {type === 'CONTRA' && (
+            {voucherType === 'CONTRA' && (
               <>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-slate-700">From Account (Source)</label>
@@ -295,7 +303,7 @@ export function VoucherDialog({ isOpen, onClose, accounts }: VoucherDialogProps)
               className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-mod-accounting-accent)] px-6 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[var(--color-mod-accounting-text)] disabled:opacity-50"
             >
               {loading && <Loader2 size={16} className="animate-spin" />}
-              Post Transaction
+              Save Draft {voucherLabels[voucherType]}
             </button>
           </DialogFooter>
         </form>

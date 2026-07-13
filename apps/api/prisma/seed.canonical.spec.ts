@@ -3,6 +3,10 @@ import { join } from 'node:path';
 
 describe('canonical development seed', () => {
   const source = readFileSync(join(__dirname, 'seed.ts'), 'utf8');
+  const platformSource = readFileSync(
+    join(__dirname, 'platform-seed.ts'),
+    'utf8',
+  );
 
   it('keeps the Everest Academy Class 1-12 distribution deterministic', () => {
     const expectedCounts = [
@@ -68,5 +72,14 @@ describe('canonical development seed', () => {
     ]) {
       expect(source).not.toContain(legacyPassword);
     }
+  });
+
+  it('preserves changed demo credentials during routine reseeds', () => {
+    expect(source).toContain('SCHOOLOS_DEMO_RESET_CREDENTIALS_ON_SEED');
+    expect(source).toContain('resetDemoCredentialsOnSeed');
+    expect(source).toContain('...(resetDemoCredentialsOnSeed');
+    expect(platformSource).toContain('PLATFORM_SEED_RESET_CREDENTIALS_ON_SEED');
+    expect(platformSource).toContain('resetPlatformCredentialsOnSeed');
+    expect(platformSource).toContain('...(resetPlatformCredentialsOnSeed');
   });
 });

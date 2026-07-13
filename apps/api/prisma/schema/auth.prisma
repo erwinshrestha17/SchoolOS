@@ -70,6 +70,8 @@ model User {
   reviewedAttendanceCorrections  AttendanceCorrectionRequest[]    @relation("ReviewedAttendanceCorrections")
   createdAccountMappings         AccountingReportAccountMapping[] @relation("CreatedAccountMappings")
   updatedAccountMappings         AccountingReportAccountMapping[] @relation("UpdatedAccountMappings")
+  createdAccountingSourceMappings AccountingSourceMapping[]       @relation("CreatedAccountingSourceMappings")
+  updatedAccountingSourceMappings AccountingSourceMapping[]       @relation("UpdatedAccountingSourceMappings")
   reconciledBankStatements       BankStatement[]                  @relation("ReconciledBankStatements")
   verifiedStaffDocuments         StaffDocument[]                  @relation("VerifiedStaffDocuments")
   createdStaffLifecycleEvents    StaffLifecycleEvent[]            @relation("CreatedStaffLifecycleEvents")

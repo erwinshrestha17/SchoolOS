@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -201,53 +202,100 @@ export class PayrollService {
       throw new NotFoundException('Staff member not found in this tenant');
     }
 
-    const contract = await this.prisma.$transaction(async (tx) => {
-      // Deactivate current active contracts
-      await tx.staffContract.updateMany({
-        where: {
-          tenantId: actor.tenantId,
-          staffId: dto.staffId,
-          status: 'ACTIVE',
-        },
-        data: {
-          status: 'INACTIVE',
-          endDate: new Date(),
-        },
-      });
+    const startDate = new Date(dto.startDate);
+    const endDate = dto.endDate ? new Date(dto.endDate) : null;
+    assertStaffContractDateRange(startDate, endDate);
 
-      return tx.staffContract.create({
-        data: {
-          tenantId: actor.tenantId,
-          staffId: dto.staffId,
-          contractNumber: dto.contractNumber,
-          position: dto.position,
-          startDate: new Date(dto.startDate),
-          endDate: dto.endDate ? new Date(dto.endDate) : null,
-          baseSalary: new Prisma.Decimal(dto.baseSalary),
-          allowances: new Prisma.Decimal(dto.allowances ?? 0),
-          deductions: new Prisma.Decimal(dto.deductions ?? 0),
-          status: 'ACTIVE',
+    const result = await this.prisma.$transaction(
+      async (tx) => {
+        const overlappingContracts = await tx.staffContract.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            staffId: dto.staffId,
+            status: 'ACTIVE',
+            ...(endDate ? { startDate: { lte: endDate } } : {}),
+            OR: [{ endDate: null }, { endDate: { gte: startDate } }],
+          },
+          orderBy: [{ startDate: 'asc' }, { id: 'asc' }],
+        });
+
+        const previousContract =
+          overlappingContracts.length === 1 &&
+          overlappingContracts[0].startDate < startDate
+            ? overlappingContracts[0]
+            : null;
+
+        if (overlappingContracts.length > 0 && !previousContract) {
+          throw new ConflictException(
+            'The proposed contract overlaps another active or scheduled contract',
+          );
+        }
+
+        const closedPreviousContract = previousContract
+          ? await tx.staffContract.update({
+              where: { id: previousContract.id, tenantId: actor.tenantId },
+              data: { endDate: previousDayUtc(startDate) },
+            })
+          : null;
+
+        const contract = await tx.staffContract.create({
+          data: {
+            tenantId: actor.tenantId,
+            staffId: dto.staffId,
+            contractNumber: dto.contractNumber.trim(),
+            position: dto.position.trim(),
+            startDate,
+            endDate,
+            baseSalary: new Prisma.Decimal(dto.baseSalary),
+            allowances: new Prisma.Decimal(dto.allowances ?? 0),
+            deductions: new Prisma.Decimal(dto.deductions ?? 0),
+            status: 'ACTIVE',
+          },
+          include: {
+            staff: true,
+          },
+        });
+
+        return { contract, previousContract, closedPreviousContract };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+
+    if (result.previousContract && result.closedPreviousContract) {
+      await this.auditService.record({
+        action: 'supersede',
+        resource: 'staff_contract',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        resourceId: result.previousContract.id,
+        before: {
+          endDate: result.previousContract.endDate,
+          status: result.previousContract.status,
         },
-        include: {
-          staff: true,
+        after: {
+          endDate: result.closedPreviousContract.endDate,
+          status: result.closedPreviousContract.status,
+          supersededByContractId: result.contract.id,
         },
       });
-    });
+    }
 
     await this.auditService.record({
       action: 'create',
       resource: 'staff_contract',
       tenantId: actor.tenantId,
       userId: actor.userId,
-      resourceId: contract.id,
+      resourceId: result.contract.id,
       after: {
-        staffId: contract.staffId,
-        contractNumber: contract.contractNumber,
-        baseSalary: contract.baseSalary.toString(),
+        staffId: result.contract.staffId,
+        contractNumber: result.contract.contractNumber,
+        baseSalary: result.contract.baseSalary.toString(),
+        startDate: result.contract.startDate,
+        endDate: result.contract.endDate,
       },
     });
 
-    return contract;
+    return result.contract;
   }
 
   async createSalaryStructure(
@@ -1172,7 +1220,7 @@ export class PayrollService {
     }
 
     if (run.status === PayrollRunStatus.APPROVED) {
-      return run;
+      return serializePayrollRunSummary(run);
     }
 
     if (!actions.canApprove) {
@@ -1237,22 +1285,20 @@ export class PayrollService {
       },
     });
 
-    return updated;
+    return serializePayrollRunSummary(updated);
   }
 
-  async reviewPayrollRun(id: string, actor: AuthContext) {
+  async submitPayrollRunForReview(id: string, actor: AuthContext) {
     const run = await this.getPayrollRunOrThrow(id, actor);
     const actions = getPayrollRunActions(run.status);
 
-    if (run.status === PayrollRunStatus.POSTED) {
-      throw new ConflictException('Posted payroll cannot be reviewed');
+    if (!actions.canSubmitReview) {
+      throw new ConflictException(
+        `Payroll run in ${run.status} status cannot be submitted for review`,
+      );
     }
 
-    if (!actions.canReview) {
-      return run;
-    }
-
-    return this.prisma.payrollRun.update({
+    const updated = await this.prisma.payrollRun.update({
       where: { id: run.id },
       data: { status: PayrollRunStatus.UNDER_REVIEW },
       include: {
@@ -1263,6 +1309,53 @@ export class PayrollService {
         },
       },
     });
+
+    await this.auditService.record({
+      action: 'submit_review',
+      resource: 'payroll_run',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: updated.id,
+      before: { status: run.status },
+      after: { status: updated.status },
+    });
+
+    return serializePayrollRunSummary(updated);
+  }
+
+  async reviewPayrollRun(id: string, actor: AuthContext) {
+    const run = await this.getPayrollRunOrThrow(id, actor);
+    const actions = getPayrollRunActions(run.status);
+
+    if (!actions.canCompleteReview) {
+      throw new ConflictException(
+        `Payroll run in ${run.status} status cannot complete review`,
+      );
+    }
+
+    const updated = await this.prisma.payrollRun.update({
+      where: { id: run.id },
+      data: { status: PayrollRunStatus.REVIEWED },
+      include: {
+        lines: {
+          include: {
+            staff: true,
+          },
+        },
+      },
+    });
+
+    await this.auditService.record({
+      action: 'complete_review',
+      resource: 'payroll_run',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: updated.id,
+      before: { status: run.status },
+      after: { status: updated.status },
+    });
+
+    return serializePayrollRunSummary(updated);
   }
 
   async postPayrollRun(id: string, actor: AuthContext) {
@@ -1345,7 +1438,13 @@ export class PayrollService {
       },
     });
 
-    return posted;
+    return serializePayrollRunSummary({
+      ...posted,
+      _count: {
+        lines: posted.lines.length,
+        payslips: posted.payslips.length,
+      },
+    });
   }
 
   async reverseAndCorrectPayrollRun(
@@ -1433,22 +1532,24 @@ export class PayrollService {
     actor: AuthContext,
   ) {
     const run = await this.getPayrollRunOrThrow(id, actor);
+    const actions = getPayrollRunActions(run.status);
 
-    if (
-      run.status === PayrollRunStatus.APPROVED ||
-      run.status === PayrollRunStatus.POSTED ||
-      run.status === PayrollRunStatus.PAID
-    ) {
+    if (!actions.canReject) {
       throw new ConflictException(
-        'Approved, posted, or paid payroll cannot be rejected',
+        `Payroll run in ${run.status} status cannot be returned for correction`,
       );
+    }
+
+    const reason = dto.reason?.trim();
+    if (!reason) {
+      throw new BadRequestException('Correction reason is required');
     }
 
     const updated = await this.prisma.payrollRun.update({
       where: { id: run.id },
       data: {
-        status: PayrollRunStatus.CANCELLED,
-        notes: dto.reason ?? run.notes,
+        status: PayrollRunStatus.GENERATED,
+        notes: reason,
       },
       include: { lines: { include: { staff: true } } },
     });
@@ -1459,10 +1560,15 @@ export class PayrollService {
       tenantId: actor.tenantId,
       userId: actor.userId,
       resourceId: updated.id,
-      after: { status: updated.status, reason: dto.reason ?? null },
+      before: { status: run.status },
+      after: {
+        status: updated.status,
+        reason,
+        returnedForCorrection: true,
+      },
     });
 
-    return updated;
+    return serializePayrollRunSummary(updated);
   }
 
   async markPayrollRunPaid(
@@ -2814,18 +2920,19 @@ export function calculatePayrollTotals(
 }
 
 export function getPayrollRunActions(status: string) {
+  const canSubmitReview =
+    status === PayrollRunStatus.DRAFT ||
+    status === PayrollRunStatus.GENERATED;
+
   return {
-    canEdit:
-      status === PayrollRunStatus.DRAFT ||
-      status === PayrollRunStatus.GENERATED ||
-      status === PayrollRunStatus.UNDER_REVIEW,
-    canReview:
-      status === PayrollRunStatus.DRAFT ||
-      status === PayrollRunStatus.GENERATED,
-    canApprove:
+    canEdit: canSubmitReview,
+    canReview: canSubmitReview,
+    canSubmitReview,
+    canCompleteReview: status === PayrollRunStatus.UNDER_REVIEW,
+    canApprove: status === PayrollRunStatus.REVIEWED,
+    canReject:
       status === PayrollRunStatus.UNDER_REVIEW ||
-      status === PayrollRunStatus.REVIEWED ||
-      status === PayrollRunStatus.GENERATED,
+      status === PayrollRunStatus.REVIEWED,
     canPost: status === PayrollRunStatus.APPROVED,
     canPay: status === PayrollRunStatus.POSTED,
     canReverse:
@@ -2852,6 +2959,22 @@ function assertSalaryStructureDateRange(
 
   if (effectiveTo && effectiveTo < effectiveFrom) {
     throw new ConflictException('effectiveTo cannot be before effectiveFrom');
+  }
+}
+
+function assertStaffContractDateRange(startDate: Date, endDate: Date | null) {
+  if (Number.isNaN(startDate.getTime())) {
+    throw new BadRequestException('Contract start date must be valid');
+  }
+
+  if (endDate && Number.isNaN(endDate.getTime())) {
+    throw new BadRequestException('Contract end date must be valid');
+  }
+
+  if (endDate && endDate < startDate) {
+    throw new BadRequestException(
+      'Contract end date cannot be before the start date',
+    );
   }
 }
 
@@ -3039,6 +3162,7 @@ function serializePayrollRunSummary(run: {
   const { _count, ...rest } = run;
   return {
     ...rest,
+    allowedActions: getPayrollRunActions(run.status),
     grossAmount: moneyString(run.grossAmount),
     deductionAmount: moneyString(run.deductionAmount),
     netAmount: moneyString(run.netAmount),

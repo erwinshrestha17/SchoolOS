@@ -7,8 +7,8 @@ import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { AccountingM9Service } from './accounting-m9.service';
+import { AccountingSourceMappingService } from './accounting-source-mapping.service';
 import { NEPAL_SCHOOL_CHART_TEMPLATE } from './m9-accounting.utils';
-import { M9SourceService } from './m9-source.service';
 import { M9TemplateService } from './m9-template.service';
 
 @Controller('accounting/m9')
@@ -17,7 +17,7 @@ import { M9TemplateService } from './m9-template.service';
 export class AccountingM9Controller {
   constructor(
     private readonly m9: AccountingM9Service,
-    private readonly sources: M9SourceService,
+    private readonly sources: AccountingSourceMappingService,
     private readonly templates: M9TemplateService,
   ) {}
 
@@ -30,7 +30,7 @@ export class AccountingM9Controller {
   @Get('source-mappings')
   @Permissions('accounting:reports:read')
   listSourceMappings(@CurrentAuth() auth: AuthContext) {
-    return this.sources.listMappings(auth);
+    return this.sources.listMappings(auth, { page: 1, limit: 25 });
   }
 
   @Get('source-mappings/health')

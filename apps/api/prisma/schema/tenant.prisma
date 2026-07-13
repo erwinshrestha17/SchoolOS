@@ -156,6 +156,7 @@ model Tenant {
   studentDocumentHistory        StudentDocumentHistory[]
   attendanceCorrectionRequests  AttendanceCorrectionRequest[]
   accountingReportMappings      AccountingReportAccountMapping[]
+  accountingSourceMappings      AccountingSourceMapping[]
   bankStatements                BankStatement[]
   studentQrCredentials          StudentQrCredential[]
   admissionImportBatches        AdmissionImportBatch[]

@@ -81,6 +81,202 @@ export class AccountingService {
     );
   }
 
+  async getDashboardSummary(actor: AuthContext) {
+    const now = new Date();
+    const sourceJournalTypes = [
+      JournalSourceType.INVOICE,
+      JournalSourceType.FEE_PAYMENT,
+      JournalSourceType.PAYMENT_REFUND,
+      JournalSourceType.PAYROLL,
+      JournalSourceType.PAYROLL_RUN,
+      JournalSourceType.PAYROLL_DISBURSEMENT,
+      JournalSourceType.ADJUSTMENT,
+    ];
+
+    const [
+      activeFiscalYear,
+      journalsByStatusRows,
+      unreconciledBankItems,
+      activeSourceMappings,
+      postedSourceEntries,
+      postedSourceEntriesWithoutId,
+      exportJobsByStatusRows,
+      trialBalanceTotals,
+      recentJournalRows,
+    ] = await Promise.all([
+      this.prisma.fiscalYear.findFirst({
+        where: { tenantId: actor.tenantId, status: 'OPEN' },
+        orderBy: [{ startDate: 'desc' }, { id: 'asc' }],
+        select: {
+          id: true,
+          name: true,
+          startDate: true,
+          endDate: true,
+          status: true,
+          periods: {
+            where: { startDate: { lte: now }, endDate: { gte: now } },
+            orderBy: [{ startDate: 'desc' }, { id: 'asc' }],
+            take: 1,
+            select: {
+              id: true,
+              label: true,
+              periodNumber: true,
+              startDate: true,
+              endDate: true,
+              status: true,
+            },
+          },
+        },
+      }),
+      this.prisma.journalEntry.groupBy({
+        by: ['status'],
+        where: { tenantId: actor.tenantId },
+        _count: { _all: true },
+      }),
+      this.prisma.bankStatement.count({
+        where: { tenantId: actor.tenantId, isReconciled: false },
+      }),
+      this.prisma.accountingSourceMapping.count({
+        where: {
+          tenantId: actor.tenantId,
+          isActive: true,
+          effectiveFrom: { lte: now },
+          OR: [{ effectiveTo: null }, { effectiveTo: { gte: now } }],
+        },
+      }),
+      this.prisma.journalEntry.count({
+        where: {
+          tenantId: actor.tenantId,
+          status: JournalEntryStatus.POSTED,
+          sourceType: { in: sourceJournalTypes },
+        },
+      }),
+      this.prisma.journalEntry.count({
+        where: {
+          tenantId: actor.tenantId,
+          status: JournalEntryStatus.POSTED,
+          sourceType: { in: sourceJournalTypes },
+          sourceId: null,
+        },
+      }),
+      this.prisma.reportExport.groupBy({
+        by: ['status'],
+        where: {
+          tenantId: actor.tenantId,
+          reportKey: { startsWith: 'accounting.' },
+        },
+        _count: { _all: true },
+      }),
+      this.prisma.journalLine.aggregate({
+        where: {
+          tenantId: actor.tenantId,
+          journalEntry: { status: JournalEntryStatus.POSTED },
+        },
+        _sum: { debit: true, credit: true },
+      }),
+      this.prisma.journalEntry.findMany({
+        where: { tenantId: actor.tenantId },
+        orderBy: [{ entryDate: 'desc' }, { createdAt: 'desc' }],
+        take: 5,
+        select: {
+          id: true,
+          entryNumber: true,
+          entryDate: true,
+          narration: true,
+          status: true,
+          sourceModule: true,
+          sourceType: true,
+          sourceId: true,
+          reversalOfId: true,
+          correctionOfId: true,
+          lines: { select: { debit: true, credit: true } },
+        },
+      }),
+    ]);
+
+    const journalsByStatus = Object.fromEntries(
+      journalsByStatusRows.map((row) => [row.status, row._count._all]),
+    );
+    const exportJobsByStatus = Object.fromEntries(
+      exportJobsByStatusRows.map((row) => [row.status, row._count._all]),
+    );
+    const totalDebit = trialBalanceTotals._sum.debit ?? new Prisma.Decimal(0);
+    const totalCredit = trialBalanceTotals._sum.credit ?? new Prisma.Decimal(0);
+    const sourceMappingIssueCount =
+      postedSourceEntriesWithoutId +
+      (postedSourceEntries > 0 && activeSourceMappings === 0 ? 1 : 0);
+    const closingBlockerCount =
+      (journalsByStatus[JournalEntryStatus.DRAFT] ?? 0) +
+      (journalsByStatus[JournalEntryStatus.SUBMITTED] ?? 0) +
+      (journalsByStatus[JournalEntryStatus.APPROVED] ?? 0) +
+      unreconciledBankItems +
+      sourceMappingIssueCount;
+
+    return {
+      generatedAt: now.toISOString(),
+      staleAfterSeconds: 60,
+      activeFiscalYear: activeFiscalYear
+        ? {
+            id: activeFiscalYear.id,
+            name: activeFiscalYear.name,
+            startDate: activeFiscalYear.startDate.toISOString(),
+            endDate: activeFiscalYear.endDate.toISOString(),
+            status: activeFiscalYear.status,
+          }
+        : null,
+      activePeriod: activeFiscalYear?.periods[0]
+        ? {
+            ...activeFiscalYear.periods[0],
+            startDate: activeFiscalYear.periods[0].startDate.toISOString(),
+            endDate: activeFiscalYear.periods[0].endDate.toISOString(),
+          }
+        : null,
+      journalsByStatus,
+      pendingJournalSubmissions:
+        journalsByStatus[JournalEntryStatus.DRAFT] ?? 0,
+      pendingJournalApprovals:
+        journalsByStatus[JournalEntryStatus.SUBMITTED] ?? 0,
+      approvedButUnpostedJournals:
+        journalsByStatus[JournalEntryStatus.APPROVED] ?? 0,
+      unreconciledBankItems,
+      activeSourceMappings,
+      sourceMappingIssueCount,
+      postedSourceEntries,
+      postedSourceEntriesWithoutId,
+      exportJobsByStatus,
+      activeExportJobs:
+        (exportJobsByStatus.QUEUED ?? 0) + (exportJobsByStatus.RUNNING ?? 0),
+      failedExportJobs: exportJobsByStatus.FAILED ?? 0,
+      failedSourcePostings: null,
+      failedSourcePostingsAvailability: 'NEEDS_POSTING_FAILURE_CONTRACT',
+      trialBalance: {
+        totalDebit: totalDebit.toFixed(2),
+        totalCredit: totalCredit.toFixed(2),
+        balanced: totalDebit.equals(totalCredit),
+      },
+      closingBlockerCount,
+      recentJournals: recentJournalRows.map((entry) => {
+        const total = entry.lines.reduce(
+          (sum, line) => sum.add(line.debit),
+          new Prisma.Decimal(0),
+        );
+        return {
+          id: entry.id,
+          entryNumber: entry.entryNumber,
+          entryDate: entry.entryDate.toISOString(),
+          narration: entry.narration,
+          status: entry.status,
+          sourceModule: entry.sourceModule,
+          sourceType: entry.sourceType,
+          sourceId: entry.sourceId,
+          reversalOfId: entry.reversalOfId,
+          correctionOfId: entry.correctionOfId,
+          totalDebit: total.toFixed(2),
+        };
+      }),
+    };
+  }
+
   async listPeriods(actor: AuthContext) {
     return this.prisma.accountingPeriod.findMany({
       where: { tenantId: actor.tenantId },
