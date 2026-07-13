@@ -1090,6 +1090,81 @@ export type FiscalPeriodCloseReadiness = {
   readyToClose: boolean;
 };
 
+export type FiscalCloseIssueSeverity = 'BLOCKING' | 'WARNING' | 'INFO';
+
+export type FiscalYearCloseIssueCode =
+  | 'OPEN_PERIODS'
+  | 'DRAFT_JOURNALS'
+  | 'SUBMITTED_JOURNALS'
+  | 'APPROVED_UNPOSTED_JOURNALS'
+  | 'MISSING_SOURCE_MAPPINGS'
+  | 'UNRECONCILED_BANK_ITEMS'
+  | 'UNBALANCED_JOURNALS'
+  | 'TRIAL_BALANCE_NOT_READY'
+  | 'OPENING_BALANCE_INCOMPLETE'
+  | 'PAYROLL_POSTING_INCOMPLETE';
+
+export type FiscalYearCloseReadiness = {
+  checkedAt: string;
+  lastCalculatedAt: string;
+  stale: boolean;
+  fiscalYear: {
+    id: string;
+    name: string;
+    status: string;
+    startDate: string;
+    endDate: string;
+    bsStartDate: string;
+    bsEndDate: string;
+  };
+  periods: {
+    total: number;
+    open: number;
+    locked: number;
+    closed: number;
+  };
+  journals: {
+    draft: number;
+    submitted: number;
+    approvedUnposted: number;
+    posted: number;
+    postedSourceWithoutMapping: number;
+    unbalancedPosted: number;
+  };
+  unreconciledBankItems: number;
+  trialBalance: {
+    debit: string;
+    credit: string;
+    balanced: boolean;
+  };
+  openingBalance: {
+    exists: boolean;
+    status: string | null;
+  };
+  payroll: {
+    approvedUnposted: number;
+  };
+  issues: Array<{
+    code: FiscalYearCloseIssueCode;
+    severity: FiscalCloseIssueSeverity;
+    count: number;
+    safeMessage: string;
+    resolutionRoute: string;
+  }>;
+  blockingIssueCount: number;
+  warningCount: number;
+  readinessStatus: 'READY' | 'NEEDS_ACKNOWLEDGEMENT' | 'BLOCKED' | 'CLOSED';
+  allowedActions: Array<'CLOSE' | 'REOPEN'>;
+  unavailableChecks: Array<
+    | 'NEEDS_POSTING_FAILURE_CONTRACT'
+    | 'NEEDS_REPORT_SNAPSHOT_POLICY'
+    | 'NEEDS_EXPORT_JOB_SCOPE_CONFIRMATION'
+    | 'NEEDS_FEE_POSTING_RECONCILIATION_CONTRACT'
+    | 'NEEDS_WARNING_ACKNOWLEDGEMENT_CONTRACT'
+  >;
+  readyToClose: boolean;
+};
+
 export type AccountingReport = {
   trialBalance: Array<{
     accountId: string;

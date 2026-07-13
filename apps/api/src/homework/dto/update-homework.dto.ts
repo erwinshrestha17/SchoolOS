@@ -1,4 +1,7 @@
-import { HomeworkAssignmentStatus, HomeworkSubmissionMethod } from '@prisma/client';
+import {
+  HomeworkAssignmentStatus,
+  HomeworkSubmissionMethod,
+} from '@prisma/client';
 import {
   IsArray,
   IsBoolean,

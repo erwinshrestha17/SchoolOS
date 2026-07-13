@@ -579,6 +579,7 @@ export class AccountingPostingService {
       sourceId?: string | null;
       postingType?: string | null;
       lines: JournalPostingLineInput[];
+      allowClosedPeriod?: boolean;
     },
     actor: AuthContext,
     tx: Prisma.TransactionClient = this.prisma,
@@ -587,6 +588,8 @@ export class AccountingPostingService {
       tx,
       input.tenantId,
       input.entryDate,
+      false,
+      input.allowClosedPeriod ?? false,
     );
     const lines = input.lines.map((line, index) => {
       const debit = toDecimal(line.debit ?? 0);
@@ -1775,6 +1778,7 @@ export class AccountingPostingService {
     tenantId: string,
     entryDate: Date,
     allowLocked = false,
+    allowClosedPeriod = false,
   ) {
     const postingDate = toUtcDateOnly(entryDate);
     // 1. Check Fiscal Period (Primary)
@@ -1795,7 +1799,10 @@ export class AccountingPostingService {
       );
     }
 
-    if (fiscalPeriod.status === AccountingPeriodStatus.CLOSED) {
+    if (
+      fiscalPeriod.status === AccountingPeriodStatus.CLOSED &&
+      !allowClosedPeriod
+    ) {
       throw new ConflictException(
         `Cannot post to closed fiscal period "${fiscalPeriod.label}"`,
       );

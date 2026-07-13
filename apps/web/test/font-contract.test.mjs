@@ -85,6 +85,7 @@ describe('Typography Standardization Contract', () => {
       'components/hr/payroll-runs.tsx',
       'components/hr/payroll-preview.tsx',
       'components/accounting/opening-balance-dialog.tsx',
+      'components/accounting/accounting-source-mappings-workspace.tsx',
       'components/academics/tabs/promotion-tab.tsx',
       'components/academics/tabs/result-publishing-tab.tsx',
     ];

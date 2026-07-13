@@ -241,11 +241,7 @@ export class HomeworkController {
     @Body() dto: UpdateHomeworkSubmissionStatusDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.homeworkService.updateSubmissionStatus(
-      submissionId,
-      dto,
-      auth,
-    );
+    return this.homeworkService.updateSubmissionStatus(submissionId, dto, auth);
   }
 
   // --- Reminders ---

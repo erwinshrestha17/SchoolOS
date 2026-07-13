@@ -76,6 +76,9 @@ export const test = base.extend<object, WorkerFixtures>({
   ],
 
   storageState: async ({ schoolAdminState }, use) => {
+    // `use` here is Playwright's fixture-provider callback, not React's
+    // `use()` hook; the rule below false-positives on the naming convention.
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     await use(schoolAdminState);
   },
 });

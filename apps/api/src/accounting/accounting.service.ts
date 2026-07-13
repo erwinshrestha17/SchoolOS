@@ -13,8 +13,10 @@ import {
   JournalEntryStatus,
   JournalLineSide,
   JournalSourceType,
+  PayrollRunStatus,
   Prisma,
 } from '@prisma/client';
+import { formatBsDate } from '@schoolos/core';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
@@ -27,6 +29,7 @@ import { ReverseJournalEntryDto } from './dto/reverse-journal-entry.dto';
 import { LockFiscalPeriodDto } from './dto/lock-fiscal-period.dto';
 import { UnlockFiscalPeriodDto } from './dto/unlock-fiscal-period.dto';
 import { CloseFiscalPeriodDto } from './dto/close-fiscal-period.dto';
+import { CloseFiscalYearDto } from './dto/close-fiscal-year.dto';
 import { ReopenFiscalPeriodDto } from './dto/reopen-fiscal-period.dto';
 import { SubmitJournalDto } from './dto/submit-journal.dto';
 import { ApproveJournalDto } from './dto/approve-journal.dto';
@@ -1980,7 +1983,299 @@ export class AccountingService {
 
   // ─── Slice 4: Fiscal Year Close ────────────────────────────────────
 
-  async closeFiscalYear(fiscalYearId: string, actor: AuthContext) {
+  async getFiscalYearCloseReadiness(fiscalYearId: string, actor: AuthContext) {
+    const fiscalYear = await this.prisma.fiscalYear.findFirst({
+      where: { id: fiscalYearId, tenantId: actor.tenantId },
+      include: { periods: true },
+    });
+    if (!fiscalYear) {
+      throw new NotFoundException('Fiscal year not found');
+    }
+
+    const sourceTypes = [
+      JournalSourceType.INVOICE,
+      JournalSourceType.FEE_PAYMENT,
+      JournalSourceType.PAYMENT_REFUND,
+      JournalSourceType.PAYROLL,
+      JournalSourceType.PAYROLL_RUN,
+      JournalSourceType.PAYROLL_DISBURSEMENT,
+      JournalSourceType.ADJUSTMENT,
+    ];
+    const [
+      journalStatuses,
+      postedSourceWithoutMapping,
+      unreconciledBankItems,
+      trialBalance,
+      unbalancedRows,
+      approvedUnpostedPayrollRuns,
+      openingBalanceEntry,
+    ] = await Promise.all([
+      this.prisma.journalEntry.groupBy({
+        by: ['status'],
+        where: { tenantId: actor.tenantId, fiscalYearId: fiscalYear.id },
+        _count: { _all: true },
+      }),
+      this.prisma.journalEntry.count({
+        where: {
+          tenantId: actor.tenantId,
+          fiscalYearId: fiscalYear.id,
+          status: JournalEntryStatus.POSTED,
+          sourceType: { in: sourceTypes },
+          sourceMappingId: null,
+        },
+      }),
+      this.bankStatements.count({
+        where: {
+          tenantId: actor.tenantId,
+          isReconciled: false,
+          statementDate: { gte: fiscalYear.startDate, lte: fiscalYear.endDate },
+        },
+      }),
+      this.prisma.journalLine.aggregate({
+        where: {
+          tenantId: actor.tenantId,
+          journalEntry: {
+            tenantId: actor.tenantId,
+            fiscalYearId: fiscalYear.id,
+            status: JournalEntryStatus.POSTED,
+          },
+        },
+        _sum: { debit: true, credit: true },
+      }),
+      this.prisma.$queryRaw<Array<{ count: number }>>(Prisma.sql`
+        SELECT COUNT(*)::INTEGER AS "count"
+        FROM (
+          SELECT journal."id"
+          FROM "JournalEntry" AS journal
+          INNER JOIN "JournalLine" AS line
+            ON line."journalEntryId" = journal."id"
+            AND line."tenantId" = ${actor.tenantId}
+          WHERE journal."tenantId" = ${actor.tenantId}
+            AND journal."fiscalYearId" = ${fiscalYear.id}
+            AND journal."status" = ${JournalEntryStatus.POSTED}::"JournalEntryStatus"
+          GROUP BY journal."id"
+          HAVING COALESCE(SUM(line."debit"), 0) <> COALESCE(SUM(line."credit"), 0)
+        ) AS unbalanced
+      `),
+      this.prisma.payrollRun.count({
+        where: {
+          tenantId: actor.tenantId,
+          fiscalYearId: fiscalYear.id,
+          status: PayrollRunStatus.APPROVED,
+        },
+      }),
+      this.prisma.journalEntry.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          sourceType: 'OPENING_BALANCE',
+          sourceId: fiscalYear.id,
+        },
+        select: { status: true },
+      }),
+    ]);
+
+    const statusCount = (status: JournalEntryStatus) =>
+      journalStatuses.find((row) => row.status === status)?._count._all ?? 0;
+    const debit = new Prisma.Decimal(trialBalance._sum.debit ?? 0);
+    const credit = new Prisma.Decimal(trialBalance._sum.credit ?? 0);
+    const unbalancedPosted = unbalancedRows[0]?.count ?? 0;
+    const periodsByStatus = {
+      open: fiscalYear.periods.filter(
+        (p) => p.status === AccountingPeriodStatus.OPEN,
+      ).length,
+      locked: fiscalYear.periods.filter(
+        (p) => p.status === AccountingPeriodStatus.LOCKED,
+      ).length,
+      closed: fiscalYear.periods.filter(
+        (p) => p.status === AccountingPeriodStatus.CLOSED,
+      ).length,
+    };
+
+    type IssueSeverity = 'BLOCKING' | 'WARNING' | 'INFO';
+    type IssueCode =
+      | 'OPEN_PERIODS'
+      | 'DRAFT_JOURNALS'
+      | 'SUBMITTED_JOURNALS'
+      | 'APPROVED_UNPOSTED_JOURNALS'
+      | 'MISSING_SOURCE_MAPPINGS'
+      | 'UNRECONCILED_BANK_ITEMS'
+      | 'UNBALANCED_JOURNALS'
+      | 'TRIAL_BALANCE_NOT_READY'
+      | 'OPENING_BALANCE_INCOMPLETE'
+      | 'PAYROLL_POSTING_INCOMPLETE';
+    const issues: Array<{
+      code: IssueCode;
+      severity: IssueSeverity;
+      count: number;
+      safeMessage: string;
+      resolutionRoute: string;
+    }> = [];
+    const addIssue = (
+      code: IssueCode,
+      severity: IssueSeverity,
+      count: number,
+      safeMessage: string,
+      resolutionRoute: string,
+    ) => {
+      if (count > 0) {
+        issues.push({ code, severity, count, safeMessage, resolutionRoute });
+      }
+    };
+
+    addIssue(
+      'OPEN_PERIODS',
+      'BLOCKING',
+      periodsByStatus.open + periodsByStatus.locked,
+      'All fiscal periods must be closed before the fiscal year can be closed.',
+      '/dashboard/accounting/fiscal-periods',
+    );
+    addIssue(
+      'DRAFT_JOURNALS',
+      'BLOCKING',
+      statusCount(JournalEntryStatus.DRAFT),
+      'Draft journals must be completed or cancelled.',
+      '/dashboard/accounting/journals?status=DRAFT',
+    );
+    addIssue(
+      'SUBMITTED_JOURNALS',
+      'BLOCKING',
+      statusCount(JournalEntryStatus.SUBMITTED),
+      'Submitted journals are still awaiting a decision.',
+      '/dashboard/accounting/journals?status=SUBMITTED',
+    );
+    addIssue(
+      'APPROVED_UNPOSTED_JOURNALS',
+      'BLOCKING',
+      statusCount(JournalEntryStatus.APPROVED),
+      'Approved journals must be posted or returned through the approved workflow.',
+      '/dashboard/accounting/journals?status=APPROVED',
+    );
+    addIssue(
+      'MISSING_SOURCE_MAPPINGS',
+      'BLOCKING',
+      postedSourceWithoutMapping,
+      'Posted source journals without mapping evidence require review.',
+      '/dashboard/accounting/source-mappings',
+    );
+    addIssue(
+      'UNRECONCILED_BANK_ITEMS',
+      'BLOCKING',
+      unreconciledBankItems,
+      'Bank statement items in this fiscal year remain unreconciled.',
+      '/dashboard/accounting/reconciliation',
+    );
+    addIssue(
+      'UNBALANCED_JOURNALS',
+      'BLOCKING',
+      unbalancedPosted,
+      'One or more posted journals are unbalanced.',
+      '/dashboard/accounting/journals?status=POSTED',
+    );
+    addIssue(
+      'TRIAL_BALANCE_NOT_READY',
+      'BLOCKING',
+      debit.equals(credit) ? 0 : 1,
+      'The fiscal year trial balance is not balanced.',
+      '/dashboard/accounting/reports?report=trial-balance',
+    );
+    addIssue(
+      'PAYROLL_POSTING_INCOMPLETE',
+      'BLOCKING',
+      approvedUnpostedPayrollRuns,
+      'Approved payroll runs in this fiscal year have not been posted to the ledger.',
+      '/dashboard/payroll/runs',
+    );
+    addIssue(
+      'OPENING_BALANCE_INCOMPLETE',
+      'WARNING',
+      openingBalanceEntry?.status === JournalEntryStatus.POSTED ? 0 : 1,
+      openingBalanceEntry
+        ? 'The opening balance entry has not been posted.'
+        : 'No opening balance entry has been recorded for this fiscal year.',
+      '/dashboard/accounting/opening-balance',
+    );
+
+    const blockingCount = issues.filter(
+      (issue) => issue.severity === 'BLOCKING',
+    ).length;
+    const warningCount = issues.filter(
+      (issue) => issue.severity === 'WARNING',
+    ).length;
+    const readyToClose = blockingCount === 0;
+    const readinessStatus =
+      fiscalYear.status === 'CLOSED'
+        ? 'CLOSED'
+        : blockingCount > 0
+          ? 'BLOCKED'
+          : warningCount > 0
+            ? 'NEEDS_ACKNOWLEDGEMENT'
+            : 'READY';
+    const allowedActions: Array<'CLOSE' | 'REOPEN'> =
+      fiscalYear.status === 'CLOSED'
+        ? ['REOPEN']
+        : readyToClose
+          ? ['CLOSE']
+          : [];
+
+    return {
+      checkedAt: new Date().toISOString(),
+      lastCalculatedAt: new Date().toISOString(),
+      stale: false,
+      fiscalYear: {
+        id: fiscalYear.id,
+        name: fiscalYear.name,
+        status: fiscalYear.status,
+        startDate: fiscalYear.startDate,
+        endDate: fiscalYear.endDate,
+        bsStartDate: formatBsDate(fiscalYear.startDate),
+        bsEndDate: formatBsDate(fiscalYear.endDate),
+      },
+      periods: {
+        total: fiscalYear.periods.length,
+        ...periodsByStatus,
+      },
+      journals: {
+        draft: statusCount(JournalEntryStatus.DRAFT),
+        submitted: statusCount(JournalEntryStatus.SUBMITTED),
+        approvedUnposted: statusCount(JournalEntryStatus.APPROVED),
+        posted: statusCount(JournalEntryStatus.POSTED),
+        postedSourceWithoutMapping,
+        unbalancedPosted,
+      },
+      unreconciledBankItems,
+      trialBalance: {
+        debit: debit.toFixed(2),
+        credit: credit.toFixed(2),
+        balanced: debit.equals(credit),
+      },
+      openingBalance: {
+        exists: Boolean(openingBalanceEntry),
+        status: openingBalanceEntry?.status ?? null,
+      },
+      payroll: {
+        approvedUnposted: approvedUnpostedPayrollRuns,
+      },
+      issues,
+      blockingIssueCount: blockingCount,
+      warningCount,
+      readinessStatus,
+      allowedActions,
+      unavailableChecks: [
+        'NEEDS_POSTING_FAILURE_CONTRACT' as const,
+        'NEEDS_REPORT_SNAPSHOT_POLICY' as const,
+        'NEEDS_EXPORT_JOB_SCOPE_CONFIRMATION' as const,
+        'NEEDS_FEE_POSTING_RECONCILIATION_CONTRACT' as const,
+        'NEEDS_WARNING_ACKNOWLEDGEMENT_CONTRACT' as const,
+      ],
+      readyToClose,
+    };
+  }
+
+  async closeFiscalYear(
+    fiscalYearId: string,
+    dto: CloseFiscalYearDto,
+    actor: AuthContext,
+  ) {
     const fiscalYear = await this.prisma.fiscalYear.findFirst({
       where: { id: fiscalYearId, tenantId: actor.tenantId },
       include: { periods: true },
@@ -1994,13 +2289,16 @@ export class AccountingService {
       throw new ConflictException('Fiscal year is already closed');
     }
 
-    // All periods must be CLOSED
-    const openPeriods = fiscalYear.periods.filter(
-      (p) => p.status !== AccountingPeriodStatus.CLOSED,
+    const readiness = await this.getFiscalYearCloseReadiness(
+      fiscalYearId,
+      actor,
     );
-    if (openPeriods.length > 0) {
+    if (!readiness.readyToClose) {
       throw new ConflictException(
-        `All fiscal periods must be closed before closing the fiscal year. Open periods: ${openPeriods.map((p) => p.label).join(', ')}`,
+        `Fiscal year cannot be closed until these issues are resolved: ${readiness.issues
+          .filter((issue) => issue.severity === 'BLOCKING')
+          .map((issue) => issue.code)
+          .join(', ')}`,
       );
     }
 
@@ -2131,6 +2429,10 @@ export class AccountingService {
         sourceId: fiscalYearId,
         postingType: 'FISCAL_YEAR_CLOSE',
         lines: closingLines,
+        // All fiscal periods are required to be CLOSED before this point
+        // (enforced by readiness), so the closing entry itself must be
+        // allowed to post into an already-closed period.
+        allowClosedPeriod: true,
       },
       actor,
     );
@@ -2142,7 +2444,7 @@ export class AccountingService {
         status: 'CLOSED',
         closedAt: new Date(),
         closedById: actor.userId,
-        closeReason: `Fiscal year closed with closing entry ${closingEntry.entryNumber}`,
+        closeReason: dto.reason,
       },
     });
 
@@ -2153,6 +2455,7 @@ export class AccountingService {
       userId: actor.userId,
       resourceId: fiscalYearId,
       after: {
+        reason: dto.reason,
         closingEntryId: closingEntry.id,
         closingEntryNumber: closingEntry.entryNumber,
         netResult: netResult.toString(),

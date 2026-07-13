@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle, Info } from 'lucide-react';
+import { formatBsDate } from '@schoolos/core';
 import { api } from '@/lib/api';
 import type { HomeworkPublishNotifyChoice } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -119,9 +120,7 @@ export function HomeworkCreateForm() {
   const selectedClassName = classesQuery.data?.find((c) => c.id === formData.classId)?.name;
   const selectedSectionName = sectionsQuery.data?.find((s) => s.id === formData.sectionId)?.name;
   const workloadScopeLabel = [selectedClassName, selectedSectionName].filter(Boolean).join(' - ') || 'This class';
-  const workloadDateLabel = formData.dueDate
-    ? new Date(formData.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-    : '';
+  const workloadDateLabel = formData.dueDate ? formatBsDate(formData.dueDate) : '';
 
   const createMutation = useMutation({
     mutationFn: async ({ publish }: { publish: boolean }) => {

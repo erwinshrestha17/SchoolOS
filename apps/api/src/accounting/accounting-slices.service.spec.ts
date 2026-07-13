@@ -50,6 +50,10 @@ describe('AccountingService - Slices 2-5', () => {
         create: jest.fn(),
         update: jest.fn(),
         count: jest.fn().mockResolvedValue(0),
+        groupBy: jest.fn().mockResolvedValue([]),
+      },
+      payrollRun: {
+        count: jest.fn().mockResolvedValue(0),
       },
       journalLine: {
         findFirst: jest.fn(),
@@ -85,6 +89,7 @@ describe('AccountingService - Slices 2-5', () => {
         create: jest.fn(),
       },
       $transaction: jest.fn(),
+      $queryRaw: jest.fn().mockResolvedValue([{ count: 0 }]),
     };
     prisma.$transaction.mockImplementation(async (input: unknown) =>
       typeof input === 'function' ? input(prisma) : Promise.all(input as any),
@@ -397,12 +402,15 @@ describe('AccountingService - Slices 2-5', () => {
   // ─── Slice 4: Fiscal Year Close ────────────────────────────────────
 
   describe('closeFiscalYear', () => {
+    const closeDto = { reason: 'End of fiscal year close-out' };
+
     it('should reject closing when periods are still open', async () => {
       prisma.fiscalYear.findFirst.mockResolvedValue({
         id: 'fy-1',
         tenantId: 'tenant-1',
         name: 'FY 2026',
         status: 'OPEN',
+        startDate: new Date('2026-04-01'),
         endDate: new Date('2027-03-31'),
         periods: [
           { id: 'p-1', label: '2026-04', status: 'OPEN' },
@@ -410,9 +418,9 @@ describe('AccountingService - Slices 2-5', () => {
         ],
       });
 
-      await expect(service.closeFiscalYear('fy-1', actor)).rejects.toThrow(
-        'All fiscal periods must be closed',
-      );
+      await expect(
+        service.closeFiscalYear('fy-1', closeDto, actor),
+      ).rejects.toThrow('OPEN_PERIODS');
     });
 
     it('should reject closing an already closed fiscal year', async () => {
@@ -423,9 +431,9 @@ describe('AccountingService - Slices 2-5', () => {
         periods: [],
       });
 
-      await expect(service.closeFiscalYear('fy-1', actor)).rejects.toThrow(
-        'Fiscal year is already closed',
-      );
+      await expect(
+        service.closeFiscalYear('fy-1', closeDto, actor),
+      ).rejects.toThrow('Fiscal year is already closed');
     });
 
     it('should reject when no revenue/expense balances exist', async () => {
@@ -434,6 +442,7 @@ describe('AccountingService - Slices 2-5', () => {
         tenantId: 'tenant-1',
         name: 'FY 2026',
         status: 'OPEN',
+        startDate: new Date('2026-04-01'),
         endDate: new Date('2027-03-31'),
         periods: [{ id: 'p-1', status: 'CLOSED' }],
       });
@@ -445,9 +454,9 @@ describe('AccountingService - Slices 2-5', () => {
         accountId: 're-1',
       });
 
-      await expect(service.closeFiscalYear('fy-1', actor)).rejects.toThrow(
-        'No revenue or expense balances to close',
-      );
+      await expect(
+        service.closeFiscalYear('fy-1', closeDto, actor),
+      ).rejects.toThrow('No revenue or expense balances to close');
     });
 
     it('should throw when retained earnings account not found', async () => {
@@ -456,6 +465,7 @@ describe('AccountingService - Slices 2-5', () => {
         tenantId: 'tenant-1',
         name: 'FY 2026',
         status: 'OPEN',
+        startDate: new Date('2026-04-01'),
         endDate: new Date('2027-03-31'),
         periods: [{ id: 'p-1', status: 'CLOSED' }],
       });
@@ -469,9 +479,84 @@ describe('AccountingService - Slices 2-5', () => {
       prisma.accountingReportAccountMapping.findFirst.mockResolvedValue(null);
       prisma.chartAccount.findFirst.mockResolvedValue(null);
 
-      await expect(service.closeFiscalYear('fy-1', actor)).rejects.toThrow(
-        'Retained Earnings account not found',
+      await expect(
+        service.closeFiscalYear('fy-1', closeDto, actor),
+      ).rejects.toThrow('Retained Earnings account not found');
+    });
+  });
+
+  describe('getFiscalYearCloseReadiness', () => {
+    it('reports READY with no issues when periods are closed and books balance', async () => {
+      prisma.fiscalYear.findFirst.mockResolvedValue({
+        id: 'fy-1',
+        tenantId: 'tenant-1',
+        name: 'FY 2026',
+        status: 'OPEN',
+        startDate: new Date('2026-04-01'),
+        endDate: new Date('2027-03-31'),
+        periods: [{ id: 'p-1', status: 'CLOSED' }],
+      });
+
+      const readiness = await service.getFiscalYearCloseReadiness(
+        'fy-1',
+        actor,
       );
+
+      expect(readiness.readyToClose).toBe(true);
+      expect(readiness.blockingIssueCount).toBe(0);
+      expect(readiness.allowedActions).toEqual(['CLOSE']);
+      expect(readiness.readinessStatus).toBe('NEEDS_ACKNOWLEDGEMENT');
+      expect(
+        readiness.issues.find(
+          (issue) => issue.code === 'OPENING_BALANCE_INCOMPLETE',
+        ),
+      ).toBeDefined();
+    });
+
+    it('reports BLOCKED with OPEN_PERIODS when a period is still open', async () => {
+      prisma.fiscalYear.findFirst.mockResolvedValue({
+        id: 'fy-1',
+        tenantId: 'tenant-1',
+        name: 'FY 2026',
+        status: 'OPEN',
+        startDate: new Date('2026-04-01'),
+        endDate: new Date('2027-03-31'),
+        periods: [
+          { id: 'p-1', status: 'OPEN' },
+          { id: 'p-2', status: 'CLOSED' },
+        ],
+      });
+
+      const readiness = await service.getFiscalYearCloseReadiness(
+        'fy-1',
+        actor,
+      );
+
+      expect(readiness.readyToClose).toBe(false);
+      expect(readiness.readinessStatus).toBe('BLOCKED');
+      expect(readiness.allowedActions).toEqual([]);
+      expect(
+        readiness.issues.find((issue) => issue.code === 'OPEN_PERIODS'),
+      ).toMatchObject({ severity: 'BLOCKING', count: 1 });
+    });
+
+    it('returns REOPEN as the only allowed action for a closed fiscal year', async () => {
+      prisma.fiscalYear.findFirst.mockResolvedValue({
+        id: 'fy-1',
+        tenantId: 'tenant-1',
+        name: 'FY 2026',
+        status: 'CLOSED',
+        startDate: new Date('2026-04-01'),
+        endDate: new Date('2027-03-31'),
+        periods: [{ id: 'p-1', status: 'CLOSED' }],
+      });
+
+      const readiness = await service.getFiscalYearCloseReadiness(
+        'fy-1',
+        actor,
+      );
+
+      expect(readiness.allowedActions).toEqual(['REOPEN']);
     });
   });
 

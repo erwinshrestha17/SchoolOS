@@ -19,6 +19,7 @@ import type {
   ChartAccountSummary,
   FiscalPeriodSummary,
   FiscalPeriodCloseReadiness,
+  FiscalYearCloseReadiness,
   FiscalYearSummary,
   JournalEntryView,
   PaginatedResult,
@@ -211,9 +212,14 @@ export const accountingApi = {
       method: "POST",
       json: body,
     }),
-  closeFiscalYear: (id: string) =>
+  getFiscalYearCloseReadiness: (id: string) =>
+    request<FiscalYearCloseReadiness>(
+      `/accounting/fiscal-years/${encodeURIComponent(id)}/close-readiness`,
+    ),
+  closeFiscalYear: (id: string, body: JsonBody) =>
     request<any>(`/accounting/fiscal-years/${id}/close-year`, {
       method: "POST",
+      json: body,
     }),
   reopenFiscalYear: (id: string, body: JsonBody) =>
     request<any>(`/accounting/fiscal-years/${id}/reopen-year`, {

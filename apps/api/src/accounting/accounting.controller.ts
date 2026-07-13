@@ -32,6 +32,7 @@ import { ReverseJournalEntryDto } from './dto/reverse-journal-entry.dto';
 import { LockFiscalPeriodDto } from './dto/lock-fiscal-period.dto';
 import { UnlockFiscalPeriodDto } from './dto/unlock-fiscal-period.dto';
 import { CloseFiscalPeriodDto } from './dto/close-fiscal-period.dto';
+import { CloseFiscalYearDto } from './dto/close-fiscal-year.dto';
 import { ReopenFiscalPeriodDto } from './dto/reopen-fiscal-period.dto';
 import { SubmitJournalDto } from './dto/submit-journal.dto';
 import { ApproveJournalDto } from './dto/approve-journal.dto';
@@ -518,10 +519,23 @@ export class AccountingController {
 
   // ─── Slice 4: Fiscal Year Close ──────────────────────────────────
 
+  @Get('fiscal-years/:id/close-readiness')
+  @Permissions('accounting:reports:read')
+  getFiscalYearCloseReadiness(
+    @Param('id') id: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.getFiscalYearCloseReadiness(id, auth);
+  }
+
   @Post('fiscal-years/:id/close-year')
   @Permissions('accounting:fiscal:manage')
-  closeFiscalYear(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
-    return this.accountingService.closeFiscalYear(id, auth);
+  closeFiscalYear(
+    @Param('id') id: string,
+    @Body() dto: CloseFiscalYearDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.closeFiscalYear(id, dto, auth);
   }
 
   @Post('fiscal-years/:id/reopen-year')

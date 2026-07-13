@@ -536,14 +536,15 @@ export class PayrollReadinessService {
     }
 
     for (const line of lines) {
-      if (!line.contractId) {
+      if (!line.contractId && !line.salaryStructure) {
         candidates.push(
           candidate(year, month, runId, line.staffId, {
             code: PayrollExceptionCode.MISSING_ACTIVE_CONTRACT,
             severity: PayrollExceptionSeverity.BLOCKING,
-            title: 'Payroll line requires an active contract',
+            title:
+              'Payroll line requires an active contract or salary structure',
             safeMessage:
-              'This included payroll line is not linked to a contract covering the payroll period.',
+              'This included payroll line is not linked to a contract or an active salary structure covering the payroll period.',
             resolutionRoute: `/dashboard/hr/staff/${line.staffId}`,
             blockedActions: ['SUBMIT_REVIEW', 'APPROVE', 'POST'],
           }),

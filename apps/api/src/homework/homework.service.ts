@@ -447,16 +447,15 @@ export class HomeworkService {
     return mapHomeworkAssignmentDetail(assignment);
   }
 
-  async getHomeworkSummaryToday(
-    actor: AuthContext,
-    query: { date?: string },
-  ) {
+  async getHomeworkSummaryToday(actor: AuthContext, query: { date?: string }) {
     if (actor.roles.includes('student') || actor.roles.includes('parent')) {
       throw new ForbiddenException(
         'Homework summary is limited to authorized staff',
       );
     }
-    const date = query.date ? parseRequiredDate(query.date, 'date') : new Date();
+    const date = query.date
+      ? parseRequiredDate(query.date, 'date')
+      : new Date();
     const dayStart = startOfDay(date);
     const dayEnd = endOfDay(date);
 
@@ -568,7 +567,9 @@ export class HomeworkService {
     actor: AuthContext,
     query: { classId: string; sectionId?: string; date?: string },
   ) {
-    const date = query.date ? parseRequiredDate(query.date, 'date') : new Date();
+    const date = query.date
+      ? parseRequiredDate(query.date, 'date')
+      : new Date();
     const dayStart = startOfDay(date);
     const dayEnd = endOfDay(date);
 
@@ -654,12 +655,8 @@ export class HomeworkService {
     const where: Prisma.HomeworkSubmissionWhereInput = {
       tenantId: actor.tenantId,
       homeworkId: assignment.id,
-      ...(dto.studentIds?.length
-        ? { studentId: { in: dto.studentIds } }
-        : {}),
-      ...(excludeSet.size
-        ? { studentId: { notIn: [...excludeSet] } }
-        : {}),
+      ...(dto.studentIds?.length ? { studentId: { in: dto.studentIds } } : {}),
+      ...(excludeSet.size ? { studentId: { notIn: [...excludeSet] } } : {}),
     };
 
     const result = await this.prisma.homeworkSubmission.updateMany({
@@ -1009,7 +1006,11 @@ export class HomeworkService {
       },
       include: homeworkAssignmentInclude(),
     });
-    await this.notifyHomeworkAssigned(updated.id, actor, notify ?? 'NOTIFY_NOW');
+    await this.notifyHomeworkAssigned(
+      updated.id,
+      actor,
+      notify ?? 'NOTIFY_NOW',
+    );
 
     await this.auditService.record({
       action: 'assign',
@@ -1727,9 +1728,7 @@ export class HomeworkService {
       assignments.filter((a) => a.sectionId).map((a) => a.sectionId as string),
     );
     const classIdsNeedingExpansion = [
-      ...new Set(
-        assignments.filter((a) => !a.sectionId).map((a) => a.classId),
-      ),
+      ...new Set(assignments.filter((a) => !a.sectionId).map((a) => a.classId)),
     ];
 
     const expandedSections = classIdsNeedingExpansion.length
@@ -1744,7 +1743,10 @@ export class HomeworkService {
 
     const explicitSections = explicitSectionIds.size
       ? await this.prisma.section.findMany({
-          where: { tenantId: actor.tenantId, id: { in: [...explicitSectionIds] } },
+          where: {
+            tenantId: actor.tenantId,
+            id: { in: [...explicitSectionIds] },
+          },
           select: { id: true, classId: true },
         })
       : [];
@@ -1764,7 +1766,11 @@ export class HomeworkService {
     const staffId = await this.resolveActorStaffId(actor);
     if (!staffId) return false;
     const section = await this.prisma.section.findFirst({
-      where: { tenantId: actor.tenantId, id: sectionId, classTeacherId: staffId },
+      where: {
+        tenantId: actor.tenantId,
+        id: sectionId,
+        classTeacherId: staffId,
+      },
       select: { id: true },
     });
     return Boolean(section);
@@ -1820,7 +1826,11 @@ export class HomeworkService {
 
     const recentSubmissions = await this.prisma.homeworkSubmission.findMany({
       where: { tenantId: actor.tenantId, studentId: { in: uniqueStudentIds } },
-      select: { studentId: true, status: true, homework: { select: { dueDate: true } } },
+      select: {
+        studentId: true,
+        status: true,
+        homework: { select: { dueDate: true } },
+      },
       orderBy: [{ homework: { dueDate: 'desc' } }],
       take: uniqueStudentIds.length * 30,
     });
