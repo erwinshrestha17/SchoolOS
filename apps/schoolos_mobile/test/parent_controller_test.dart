@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:schoolos_mobile/core/storage/app_preferences_service.dart';
+import 'package:schoolos_mobile/core/errors/app_exception.dart';
 import 'package:schoolos_mobile/features/parent/application/parent_providers.dart';
 import 'package:schoolos_mobile/features/parent/data/parent_repository.dart';
 import 'package:schoolos_mobile/features/parent/domain/parent_models.dart';
@@ -114,6 +115,71 @@ void main() {
     expect(controller.state.selectedChildId, childA.id);
     expect(controller.state.dashboard?.child.id, childA.id);
     expect(controller.state.profile?.child.id, childA.id);
+  });
+
+  group('activity read acknowledgement', () {
+    test('submits SEEN once and keeps the successful state', () async {
+      when(
+        () => repository.markActivitySeen(
+          postId: 'post-1',
+          guardianId: 'guardian-1',
+        ),
+      ).thenAnswer((_) async {});
+      final controller = ParentActivitySeenController(repository, true);
+
+      await expectLater(
+        controller.markSeen(postId: 'post-1', guardianId: 'guardian-1'),
+        completion(isTrue),
+      );
+      await expectLater(
+        controller.markSeen(postId: 'post-1', guardianId: 'guardian-1'),
+        completion(isTrue),
+      );
+
+      expect(controller.state.status, ParentActivitySeenStatus.seen);
+      verify(
+        () => repository.markActivitySeen(
+          postId: 'post-1',
+          guardianId: 'guardian-1',
+        ),
+      ).called(1);
+    });
+
+    test('does not queue acknowledgement while offline', () async {
+      final controller = ParentActivitySeenController(repository, false);
+
+      await expectLater(
+        controller.markSeen(postId: 'post-1', guardianId: 'guardian-1'),
+        completion(isFalse),
+      );
+
+      expect(controller.state.status, ParentActivitySeenStatus.failed);
+      expect(controller.state.error, isA<NetworkException>());
+      verifyNever(
+        () => repository.markActivitySeen(
+          postId: any(named: 'postId'),
+          guardianId: any(named: 'guardianId'),
+        ),
+      );
+    });
+
+    test('keeps permission denial retryable and school-friendly', () async {
+      when(
+        () => repository.markActivitySeen(
+          postId: 'post-1',
+          guardianId: 'guardian-1',
+        ),
+      ).thenThrow(const PermissionException());
+      final controller = ParentActivitySeenController(repository, true);
+
+      await expectLater(
+        controller.markSeen(postId: 'post-1', guardianId: 'guardian-1'),
+        completion(isFalse),
+      );
+
+      expect(controller.state.status, ParentActivitySeenStatus.failed);
+      expect(controller.state.error, isA<PermissionException>());
+    });
   });
 }
 

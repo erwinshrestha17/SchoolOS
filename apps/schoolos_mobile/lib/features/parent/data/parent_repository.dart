@@ -328,14 +328,13 @@ class ParentRepository {
         .toList();
   }
 
-  Future<void> submitActivityReaction({
+  Future<void> markActivitySeen({
     required String postId,
     required String guardianId,
-    required String reaction,
   }) async {
     await _client.post<dynamic>(
       '/activity-feed/posts/${Uri.encodeComponent(postId)}/reactions',
-      data: {'reaction': reaction, 'guardianId': guardianId},
+      data: {'reaction': 'SEEN', 'guardianId': guardianId},
     );
   }
 
@@ -388,6 +387,25 @@ class ParentRepository {
     final bytes = response.data;
     if (bytes == null || bytes.isEmpty) {
       throw const NotFoundAppException('Activity media is unavailable.');
+    }
+    return Uint8List.fromList(bytes);
+  }
+
+  Future<Uint8List> getActivityThumbnail(String thumbnailPath) async {
+    if (!thumbnailPath.startsWith('/activity-feed/attachments/') ||
+        !thumbnailPath.endsWith('/thumbnail')) {
+      throw const ValidationException(
+        message: 'Activity thumbnail is unavailable.',
+      );
+    }
+
+    final response = await _client.dio.get<List<int>>(
+      thumbnailPath,
+      options: Options(responseType: ResponseType.bytes),
+    );
+    final bytes = response.data;
+    if (bytes == null || bytes.isEmpty) {
+      throw const NotFoundAppException('Activity thumbnail is unavailable.');
     }
     return Uint8List.fromList(bytes);
   }

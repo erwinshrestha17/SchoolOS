@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../core/errors/app_exception.dart';
 import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
@@ -106,30 +107,63 @@ class _ActivityContentState extends ConsumerState<_ActivityContent> {
           ref.invalidate(parentActivityFeedFilteredProvider(filter));
           await ref.read(parentActivityFeedFilteredProvider(filter).future);
         },
-        child: ListView(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          children: [
-            _FilterBar(
-              category: _category,
-              month: _month,
-              onCategoryChanged: (value) => setState(() => _category = value),
-              onMonthChanged: (value) => setState(() => _month = value),
+        child: CustomScrollView(
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.lg,
+                AppSpacing.lg,
+                0,
+              ),
+              sliver: SliverList.list(
+                children: [
+                  _FilterBar(
+                    category: _category,
+                    month: _month,
+                    onCategoryChanged: (value) =>
+                        setState(() => _category = value),
+                    onMonthChanged: (value) => setState(() => _month = value),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _MilestoneSummaryCard(milestonesAsync: milestones),
+                  const SizedBox(height: AppSpacing.md),
+                ],
+              ),
             ),
-            const SizedBox(height: AppSpacing.md),
-            _MilestoneSummaryCard(milestonesAsync: milestones),
-            const SizedBox(height: AppSpacing.md),
             if (items.isEmpty)
-              const AppEmptyState(
-                title: 'No activity yet',
-                message:
-                    'Class activities and milestones will appear here after approval.',
-                icon: Icons.auto_awesome_rounded,
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: Padding(
+                  padding: EdgeInsets.all(AppSpacing.lg),
+                  child: AppEmptyState(
+                    title: 'No activity yet',
+                    message:
+                        'Class activities and milestones will appear here after approval.',
+                    icon: Icons.auto_awesome_rounded,
+                  ),
+                ),
               )
             else
-              for (final item in items) ...[
-                _ActivityCard(item: item, guardianId: widget.guardianId),
-                const SizedBox(height: AppSpacing.md),
-              ],
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  0,
+                  AppSpacing.lg,
+                  AppSpacing.lg,
+                ),
+                sliver: SliverList.builder(
+                  itemCount: items.length,
+                  itemBuilder: (context, index) => Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                    child: _ActivityCard(
+                      item: items[index],
+                      guardianId: widget.guardianId,
+                      filter: filter,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -253,45 +287,27 @@ class _MilestoneSummaryCard extends StatelessWidget {
   }
 }
 
-class _ActivityCard extends ConsumerStatefulWidget {
-  const _ActivityCard({required this.item, required this.guardianId});
+class _ActivityCard extends ConsumerWidget {
+  const _ActivityCard({
+    required this.item,
+    required this.guardianId,
+    required this.filter,
+  });
 
   final ParentActivityItem item;
   final String? guardianId;
+  final ParentActivityFeedFilter filter;
 
   @override
-  ConsumerState<_ActivityCard> createState() => _ActivityCardState();
-}
-
-class _ActivityCardState extends ConsumerState<_ActivityCard> {
-  bool _reacting = false;
-
-  Future<void> _react(String reaction) async {
-    final guardianId = widget.guardianId;
-    if (guardianId == null || _reacting) return;
-    setState(() => _reacting = true);
-    try {
-      await ref
-          .read(parentRepositoryProvider)
-          .submitActivityReaction(
-            postId: widget.item.id,
-            guardianId: guardianId,
-            reaction: reaction,
-          );
-    } catch (_) {
-      // Reaction failures are non-critical; the UI simply stays unchanged.
-    } finally {
-      if (mounted) setState(() => _reacting = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final item = widget.item;
-    final previewable = item.attachments.where(
-      (attachment) => attachment.canPreview,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final seenState = ref.watch(parentActivitySeenProvider(item.id));
+    final isSeen =
+        item.isSeen || seenState.status == ParentActivitySeenStatus.seen;
+    final isPending = seenState.status == ParentActivitySeenStatus.pending;
+    final thumbnailReady = item.attachments.where(
+      (attachment) => attachment.canLoadThumbnail,
     );
-    final preview = previewable.isEmpty ? null : previewable.first;
+    final thumbnail = thumbnailReady.isEmpty ? null : thumbnailReady.first;
 
     return AppCard(
       child: Column(
@@ -334,12 +350,15 @@ class _ActivityCardState extends ConsumerState<_ActivityCard> {
             const SizedBox(height: AppSpacing.md),
             Text(item.caption),
           ],
-          if (preview != null) ...[
+          if (thumbnail != null) ...[
             const SizedBox(height: AppSpacing.md),
-            _ProtectedActivityPreview(
-              attachment: preview,
+            _ProtectedActivityThumbnail(
+              attachment: thumbnail,
               additionalCount: item.attachments.length - 1,
             ),
+          ] else if (item.attachments.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.md),
+            _ActivityMediaPlaceholder(attachment: item.attachments.first),
           ],
           const SizedBox(height: AppSpacing.md),
           Row(
@@ -352,35 +371,76 @@ class _ActivityCardState extends ConsumerState<_ActivityCard> {
                 ),
               ),
               const Spacer(),
-              if (widget.guardianId != null)
-                for (final reaction in const ['HEART', 'CLAP', 'STAR'])
-                  IconButton(
-                    tooltip: _labelize(reaction),
-                    onPressed: _reacting ? null : () => _react(reaction),
-                    icon: Icon(switch (reaction) {
-                      'HEART' => Icons.favorite_rounded,
-                      'CLAP' => Icons.front_hand_rounded,
-                      _ => Icons.star_rounded,
-                    }, size: 20),
+              if (guardianId != null)
+                if (isSeen)
+                  const Chip(
+                    avatar: Icon(Icons.check_circle_rounded, size: 18),
+                    label: Text('Seen'),
                   )
-              else
-                Text(
-                  '${item.reactionCount} reactions',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.slate500,
-                    fontWeight: FontWeight.w700,
+                else
+                  OutlinedButton.icon(
+                    onPressed: isPending
+                        ? null
+                        : () async {
+                            final marked = await ref
+                                .read(
+                                  parentActivitySeenProvider(item.id).notifier,
+                                )
+                                .markSeen(
+                                  postId: item.id,
+                                  guardianId: guardianId!,
+                                );
+                            if (marked) {
+                              ref.invalidate(
+                                parentActivityFeedFilteredProvider(filter),
+                              );
+                            }
+                          },
+                    icon: isPending
+                        ? const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.check_circle_outline_rounded),
+                    label: Text(isPending ? 'Marking…' : 'Mark as read'),
                   ),
-                ),
             ],
           ),
+          if (seenState.status == ParentActivitySeenStatus.failed &&
+              seenState.error != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              _activitySeenErrorMessage(seenState.error!),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppColors.danger,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 }
 
-class _ProtectedActivityPreview extends ConsumerWidget {
-  const _ProtectedActivityPreview({
+String _activitySeenErrorMessage(AppException error) {
+  return switch (error) {
+    NetworkException() =>
+      'Internet access is required to mark this activity as read.',
+    SessionExpiredException() =>
+      'Your session expired. Sign in again before marking this activity.',
+    PermissionException() =>
+      'This activity is no longer available for the selected child.',
+    NotFoundAppException() =>
+      'This activity was archived or is no longer available.',
+    ModuleLockedException() =>
+      'Activity Feed is not currently available for your school.',
+    _ => 'This activity could not be marked as read. Please try again.',
+  };
+}
+
+class _ProtectedActivityThumbnail extends ConsumerWidget {
+  const _ProtectedActivityThumbnail({
     required this.attachment,
     required this.additionalCount,
   });
@@ -390,15 +450,15 @@ class _ProtectedActivityPreview extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final preview = ref.watch(
-      parentActivityPreviewProvider(attachment.previewPath),
+    final thumbnail = ref.watch(
+      parentActivityThumbnailProvider(attachment.thumbnailPath),
     );
 
     return AspectRatio(
       aspectRatio: 16 / 10,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: preview.when(
+        child: thumbnail.when(
           loading: () => Container(
             color: AppColors.slate100,
             child: const Center(child: CircularProgressIndicator()),
@@ -418,50 +478,180 @@ class _ProtectedActivityPreview extends ConsumerWidget {
                 IconButton(
                   tooltip: 'Retry media',
                   onPressed: () => ref.invalidate(
-                    parentActivityPreviewProvider(attachment.previewPath),
+                    parentActivityThumbnailProvider(attachment.thumbnailPath),
                   ),
                   icon: const Icon(Icons.refresh_rounded),
                 ),
               ],
             ),
           ),
-          data: (bytes) => Stack(
-            fit: StackFit.expand,
-            children: [
-              Image.memory(
-                bytes,
-                fit: BoxFit.cover,
-                gaplessPlayback: true,
-                errorBuilder: (_, _, _) => Container(
-                  color: AppColors.slate100,
-                  alignment: Alignment.center,
-                  child: const Icon(Icons.broken_image_outlined),
+          data: (bytes) => InkWell(
+            onTap: attachment.canPreview
+                ? () => showDialog<void>(
+                    context: context,
+                    builder: (_) =>
+                        _ActivityMediaDialog(attachment: attachment),
+                  )
+                : null,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.memory(
+                  bytes,
+                  fit: BoxFit.cover,
+                  gaplessPlayback: true,
+                  errorBuilder: (_, _, _) => Container(
+                    color: AppColors.slate100,
+                    alignment: Alignment.center,
+                    child: const Icon(Icons.broken_image_outlined),
+                  ),
                 ),
-              ),
-              if (additionalCount > 0)
-                Positioned(
-                  right: AppSpacing.sm,
-                  bottom: AppSpacing.sm,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.sm,
-                      vertical: AppSpacing.xs,
+                if (attachment.canPreview)
+                  const Positioned(
+                    left: AppSpacing.sm,
+                    bottom: AppSpacing.sm,
+                    child: Chip(
+                      avatar: Icon(Icons.open_in_full_rounded, size: 16),
+                      label: Text('Open photo'),
                     ),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.72),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      '+$additionalCount',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
+                  ),
+                if (additionalCount > 0)
+                  Positioned(
+                    right: AppSpacing.sm,
+                    bottom: AppSpacing.sm,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm,
+                        vertical: AppSpacing.xs,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.72),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '+$additionalCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActivityMediaPlaceholder extends StatelessWidget {
+  const _ActivityMediaPlaceholder({required this.attachment});
+
+  final ParentActivityAttachment attachment;
+
+  @override
+  Widget build(BuildContext context) {
+    final failed = attachment.processingStatus.toUpperCase() == 'FAILED';
+    return InkWell(
+      onTap: attachment.canPreview
+          ? () => showDialog<void>(
+              context: context,
+              builder: (_) => _ActivityMediaDialog(attachment: attachment),
+            )
+          : null,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        width: double.infinity,
+        constraints: const BoxConstraints(minHeight: 120),
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        decoration: BoxDecoration(
+          color: AppColors.slate100,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              failed
+                  ? Icons.image_not_supported_outlined
+                  : Icons.hourglass_top_rounded,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              failed
+                  ? 'This activity photo is unavailable.'
+                  : 'This activity photo is being prepared.',
+              textAlign: TextAlign.center,
+            ),
+            if (attachment.canPreview) ...[
+              const SizedBox(height: AppSpacing.sm),
+              const Text(
+                'Tap to open the protected photo.',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ActivityMediaDialog extends ConsumerWidget {
+  const _ActivityMediaDialog({required this.attachment});
+
+  final ParentActivityAttachment attachment;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final preview = ref.watch(
+      parentActivityPreviewProvider(attachment.previewPath),
+    );
+    return Dialog(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 720, maxHeight: 720),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text(attachment.fileName),
+              trailing: IconButton(
+                tooltip: 'Close photo',
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close_rounded),
+              ),
+            ),
+            Flexible(
+              child: preview.when(
+                loading: () => const Padding(
+                  padding: EdgeInsets.all(AppSpacing.xl),
+                  child: CircularProgressIndicator(),
+                ),
+                error: (_, _) => Padding(
+                  padding: const EdgeInsets.all(AppSpacing.xl),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.image_not_supported_outlined),
+                      const SizedBox(height: AppSpacing.sm),
+                      const Text('Protected media is unavailable.'),
+                      TextButton(
+                        onPressed: () => ref.invalidate(
+                          parentActivityPreviewProvider(attachment.previewPath),
+                        ),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                ),
+                data: (bytes) => InteractiveViewer(
+                  child: Image.memory(bytes, fit: BoxFit.contain),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

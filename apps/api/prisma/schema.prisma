@@ -1667,14 +1667,17 @@ model ActivityAttachment {
   processingStatus   String?         @default("PENDING")
   optimizedObjectKey String?
   optimizedSizeBytes Int?
+  thumbnailFileAssetId String?
   createdAt          DateTime        @default(now())
 
   tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   activityPost ActivityPost @relation(fields: [activityPostId], references: [id], onDelete: Cascade)
   fileAsset    FileAsset?   @relation(fields: [fileAssetId], references: [id], onDelete: SetNull)
+  thumbnailFileAsset FileAsset? @relation("ActivityThumbnailFile", fields: [thumbnailFileAssetId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, activityPostId])
   @@index([fileAssetId])
+  @@index([thumbnailFileAssetId])
 }
 
 model ActivityPostStudent {
@@ -6340,6 +6343,7 @@ model FileAsset {
   tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   uploadedBy          User?                @relation(fields: [uploadedByUserId], references: [id], onDelete: SetNull)
   activityAttachments ActivityAttachment[]
+  activityThumbnailAttachments ActivityAttachment[] @relation("ActivityThumbnailFile")
   homeworkAttachments HomeworkAttachment[]
   studentPhoto        Student?             @relation("StudentPhoto")
   studentDocuments    StudentDocument[]    @relation("DocumentFile")

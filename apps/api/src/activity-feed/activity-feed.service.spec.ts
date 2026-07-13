@@ -1,6 +1,7 @@
 import {
   ActivityCategory,
   ActivityPostStatus,
+  ActivityReactionType,
   AudienceType,
   AuthMethod,
   ConsentType,
@@ -1106,6 +1107,92 @@ describe('ActivityFeedService', () => {
         }),
       }),
     );
+  });
+
+  it('returns the existing guardian SEEN acknowledgement on idempotent replay', async () => {
+    const parentActor: AuthContext = {
+      ...actor,
+      userId: 'guardian-user-1',
+      roles: ['parent'],
+      permissions: ['activity_feed:read'],
+    };
+    const existing = {
+      id: 'reaction-seen-1',
+      tenantId: actor.tenantId,
+      activityPostId: 'post-1',
+      guardianId: 'guardian-1',
+      studentId: null,
+      reaction: ActivityReactionType.SEEN,
+      createdAt: new Date('2026-07-01T06:30:00.000Z'),
+    };
+
+    prisma.activityPost.findFirst
+      .mockResolvedValueOnce({
+        id: 'post-1',
+        tenantId: actor.tenantId,
+        status: ActivityPostStatus.APPROVED,
+        softDeletedAt: null,
+      })
+      .mockResolvedValueOnce({ id: 'post-1' });
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      userId: parentActor.userId,
+      studentLinks: [{ studentId: 'student-1' }],
+    });
+    prisma.student.findMany.mockResolvedValue([
+      {
+        id: 'student-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+      },
+    ]);
+    prisma.activityReaction.findFirst.mockResolvedValue(existing);
+
+    await expect(
+      service.createReaction(
+        'post-1',
+        {
+          guardianId: 'guardian-1',
+          reaction: ActivityReactionType.SEEN,
+        },
+        parentActor,
+      ),
+    ).resolves.toBe(existing);
+
+    expect(prisma.activityReaction.create).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ActivityPostStatus.DRAFT,
+    ActivityPostStatus.PENDING_APPROVAL,
+    ActivityPostStatus.ARCHIVED,
+  ])('blocks parent SEEN acknowledgement for %s posts', async (status) => {
+    const parentActor: AuthContext = {
+      ...actor,
+      userId: 'guardian-user-1',
+      roles: ['parent'],
+      permissions: ['activity_feed:read'],
+    };
+    prisma.activityPost.findFirst.mockResolvedValue({
+      id: 'post-1',
+      tenantId: actor.tenantId,
+      status,
+      softDeletedAt: status === ActivityPostStatus.ARCHIVED ? new Date() : null,
+    });
+
+    await expect(
+      service.createReaction(
+        'post-1',
+        {
+          guardianId: 'guardian-1',
+          reaction: ActivityReactionType.SEEN,
+        },
+        parentActor,
+      ),
+    ).rejects.toThrow('Activity post is no longer available');
+
+    expect(prisma.activityReaction.create).not.toHaveBeenCalled();
   });
 
   it.each([

@@ -245,6 +245,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     hasModule,
     loading: entitlementsLoading,
   } = useEntitlements();
+  const isParentOnlySession = Boolean(
+    session?.user.roles.length &&
+      session.user.roles.every((role) => role === "parent"),
+  );
 
   useEffect(() => {
     if (status === "anonymous") {
@@ -255,13 +259,20 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }, [pathname, router, status]);
 
   useEffect(() => {
+    if (status === "authenticated" && isParentOnlySession) {
+      router.replace("/login?notice=parent-mobile-only");
+    }
+  }, [isParentOnlySession, router, status]);
+
+  useEffect(() => {
     if (
+      !isParentOnlySession &&
       session?.user.mustChangePassword &&
       pathname !== "/dashboard/account-security"
     ) {
       router.replace("/dashboard/account-security");
     }
-  }, [pathname, router, session?.user.mustChangePassword]);
+  }, [isParentOnlySession, pathname, router, session?.user.mustChangePassword]);
 
   useEffect(() => {
     if (status !== "loading") {
@@ -340,6 +351,21 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </h2>
           <p className="text-sm text-gray-500">
             Protected pages require an active SchoolOS session.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isParentOnlySession) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
+        <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 text-center shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Parent access is mobile only
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Parents and guardians use the SchoolOS mobile app for linked-child access.
           </p>
         </div>
       </div>

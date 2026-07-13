@@ -2,6 +2,7 @@ import { StorageProvider } from '@prisma/client';
 import { Job } from 'bullmq';
 import sharp from 'sharp';
 import { PrismaService } from '../../prisma/prisma.service';
+import { FileRegistryService } from '../../file-registry/file-registry.service';
 import { StorageService } from '../../storage/storage.service';
 import {
   ActivityMediaCompressionJob,
@@ -42,8 +43,10 @@ interface ActivityAttachmentRecord {
   contentType: string;
   fileAsset: {
     id: string;
+    tenantId: string;
     objectKey: string;
   };
+  thumbnailFileAsset: null;
 }
 
 describe('ActivityMediaProcessor', () => {
@@ -53,6 +56,10 @@ describe('ActivityMediaProcessor', () => {
 
   let prisma: PrismaMock;
   let storageService: StorageMock;
+  let fileRegistryService: {
+    listFilesByEntity: jest.Mock;
+    registerGeneratedFile: jest.Mock;
+  };
   let processor: ActivityMediaProcessor;
 
   beforeEach(() => {
@@ -73,6 +80,22 @@ describe('ActivityMediaProcessor', () => {
         [SaveBufferInput]
       >(),
     };
+    const generatedAssets: Array<Record<string, unknown>> = [];
+    fileRegistryService = {
+      listFilesByEntity: jest.fn(async () => generatedAssets),
+      registerGeneratedFile: jest.fn(async (input) => {
+        const asset = {
+          id: 'thumbnail-file-1',
+          tenantId,
+          module: input.module,
+          entityId: input.entityId,
+          status: 'UPLOADED',
+          metadata: input.metadata,
+        };
+        generatedAssets.push(asset);
+        return asset;
+      }),
+    };
 
     processor = new ActivityMediaProcessor(
       prisma as unknown as PrismaService,
@@ -80,6 +103,7 @@ describe('ActivityMediaProcessor', () => {
       {
         shouldProcessTenantJob: jest.fn().mockResolvedValue(true),
       } as never,
+      fileRegistryService as unknown as FileRegistryService,
     );
   });
 
@@ -102,6 +126,9 @@ describe('ActivityMediaProcessor', () => {
 
     const savedInput = storageService.saveBufferObject.mock.calls[0][0];
     const metadata = await sharp(savedInput.content).metadata();
+    const thumbnailInput =
+      fileRegistryService.registerGeneratedFile.mock.calls[0][0];
+    const thumbnailMetadata = await sharp(thumbnailInput.content).metadata();
 
     expect(savedInput).toEqual(
       expect.objectContaining({
@@ -117,6 +144,24 @@ describe('ActivityMediaProcessor', () => {
     expect(
       Math.max(metadata.width ?? 0, metadata.height ?? 0),
     ).toBeLessThanOrEqual(1280);
+    expect(thumbnailInput).toEqual(
+      expect.objectContaining({
+        tenantId,
+        generatedByUserId: 'teacher-1',
+        originalFilename: 'classroom-thumbnail-256.webp',
+        mimeType: 'image/webp',
+        module: 'activity',
+        entityId: attachmentId,
+        metadata: {
+          variant: 'thumbnail-256',
+          sourceFileAssetId: fileAssetId,
+          activityAttachmentId: attachmentId,
+        },
+      }),
+    );
+    expect(
+      Math.max(thumbnailMetadata.width ?? 0, thumbnailMetadata.height ?? 0),
+    ).toBeLessThanOrEqual(256);
     expect(prisma.activityAttachment.update).toHaveBeenCalledWith({
       where: { id: attachmentId },
       data: { processingStatus: 'PROCESSING' },
@@ -127,6 +172,7 @@ describe('ActivityMediaProcessor', () => {
         processingStatus: 'READY',
         optimizedObjectKey: `${tenantId}/activity-feed/optimized/optimized_classroom.jpg`,
         optimizedSizeBytes: savedInput.content.byteLength,
+        thumbnailFileAssetId: 'thumbnail-file-1',
       },
     });
     expect(result).toEqual(
@@ -135,12 +181,13 @@ describe('ActivityMediaProcessor', () => {
         fileAssetId,
         status: 'READY',
         optimizedKey: `${tenantId}/activity-feed/optimized/optimized_classroom.jpg`,
+        thumbnailFileAssetId: 'thumbnail-file-1',
       }),
     );
   });
 
   it('keeps HEIC bytes private when transcoding support is unavailable', async () => {
-    const heicBuffer = Buffer.from('heic-preview-bytes');
+    const heicBuffer = await createPatternJpeg(640, 480);
     prisma.activityAttachment.findFirst.mockResolvedValue(
       buildAttachment({
         contentType: 'image/heic',
@@ -171,7 +218,36 @@ describe('ActivityMediaProcessor', () => {
         processingStatus: 'READY',
         optimizedObjectKey: `${tenantId}/activity-feed/optimized/optimized_classroom.heic`,
         optimizedSizeBytes: heicBuffer.byteLength,
+        thumbnailFileAssetId: 'thumbnail-file-1',
       },
+    });
+  });
+
+  it('reuses the registered thumbnail variant on job retry', async () => {
+    const originalBuffer = await createPatternJpeg(800, 600);
+    prisma.activityAttachment.findFirst.mockResolvedValue(
+      buildAttachment({ contentType: 'image/jpeg', fileName: 'retry.jpg' }),
+    );
+    storageService.getObjectBuffer.mockResolvedValue(originalBuffer);
+    storageService.saveBufferObject.mockImplementation(({ content }) =>
+      Promise.resolve({
+        provider: StorageProvider.LOCAL,
+        objectKey: `${tenantId}/activity-feed/optimized/retry.jpg`,
+        publicUrl: null,
+        sizeBytes: content.byteLength,
+      }),
+    );
+
+    await processor.process(buildJob());
+    await processor.process(buildJob());
+
+    expect(fileRegistryService.registerGeneratedFile).toHaveBeenCalledTimes(1);
+    expect(prisma.activityAttachment.update).toHaveBeenLastCalledWith({
+      where: { id: attachmentId },
+      data: expect.objectContaining({
+        processingStatus: 'READY',
+        thumbnailFileAssetId: 'thumbnail-file-1',
+      }),
     });
   });
 
@@ -208,8 +284,10 @@ describe('ActivityMediaProcessor', () => {
       contentType,
       fileAsset: {
         id: fileAssetId,
+        tenantId,
         objectKey: `${tenantId}/activity-feed/original/${fileName}`,
       },
+      thumbnailFileAsset: null,
     };
   }
 

@@ -1,5 +1,5 @@
-import { ParentLearningSummaryView } from '../../../components/learning/learning-runtime';
+import { redirect } from 'next/navigation';
 
 export default function ParentLearningPage() {
-  return <ParentLearningSummaryView />;
+  redirect('/login?notice=parent-mobile-only');
 }

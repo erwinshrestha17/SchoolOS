@@ -2,6 +2,7 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import sharp from 'sharp';
+import { FileRegistryService } from '../../file-registry/file-registry.service';
 import { PlansService } from '../../plans/plans.service';
 import { skipSuspendedTenantJob } from '../../plans/processor-tenant.guard';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -17,6 +18,9 @@ export interface ActivityMediaCompressionJob {
 const ACTIVITY_PREVIEW_MAX_EDGE_PX = 1280;
 const ACTIVITY_PREVIEW_JPEG_QUALITY = 72;
 const ACTIVITY_PREVIEW_WEBP_QUALITY = 72;
+const ACTIVITY_THUMBNAIL_EDGE_PX = 256;
+const ACTIVITY_THUMBNAIL_WEBP_QUALITY = 68;
+const ACTIVITY_THUMBNAIL_VARIANT = 'thumbnail-256';
 
 @Processor('activity-media')
 export class ActivityMediaProcessor extends WorkerHost {
@@ -26,6 +30,7 @@ export class ActivityMediaProcessor extends WorkerHost {
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
     private readonly plansService: PlansService,
+    private readonly fileRegistryService: FileRegistryService,
   ) {
     super();
   }
@@ -46,12 +51,36 @@ export class ActivityMediaProcessor extends WorkerHost {
 
     const attachment = await this.prisma.activityAttachment.findFirst({
       where: { id: attachmentId, tenantId },
-      include: { fileAsset: true },
+      include: { fileAsset: true, thumbnailFileAsset: true },
     });
 
-    if (!attachment?.fileAsset) {
+    if (
+      !attachment?.fileAsset ||
+      attachment.fileAsset.tenantId !== tenantId ||
+      attachment.fileAsset.id !== fileAssetId
+    ) {
       this.logger.warn(`Attachment ${attachmentId} not found, skipping.`);
       return;
+    }
+
+    if (
+      this.isValidThumbnailVariant(
+        attachment.thumbnailFileAsset,
+        tenantId,
+        attachmentId,
+        fileAssetId,
+      )
+    ) {
+      await this.prisma.activityAttachment.update({
+        where: { id: attachmentId },
+        data: { processingStatus: 'READY' },
+      });
+      return {
+        attachmentId,
+        fileAssetId,
+        thumbnailFileAssetId: attachment.thumbnailFileAsset.id,
+        status: 'READY',
+      };
     }
 
     await this.prisma.activityAttachment.update({
@@ -80,12 +109,23 @@ export class ActivityMediaProcessor extends WorkerHost {
         content: optimizedBuffer,
       });
 
+      const thumbnailBuffer = await this.buildThumbnail(originalBuffer);
+      const thumbnailFileAsset = await this.findOrCreateThumbnailVariant({
+        tenantId,
+        attachmentId,
+        fileAssetId,
+        requestedById: job.data.requestedById,
+        originalFileName: attachment.fileName,
+        content: thumbnailBuffer,
+      });
+
       await this.prisma.activityAttachment.update({
         where: { id: attachmentId },
         data: {
           processingStatus: 'READY',
           optimizedObjectKey: optimizedResult.objectKey,
           optimizedSizeBytes: optimizedResult.sizeBytes,
+          thumbnailFileAssetId: thumbnailFileAsset.id,
         },
       });
 
@@ -94,6 +134,7 @@ export class ActivityMediaProcessor extends WorkerHost {
         fileAssetId,
         status: 'READY',
         optimizedKey: optimizedResult.objectKey,
+        thumbnailFileAssetId: thumbnailFileAsset.id,
       };
     } catch (error) {
       await this.prisma.activityAttachment.update({
@@ -109,6 +150,98 @@ export class ActivityMediaProcessor extends WorkerHost {
       );
       throw error;
     }
+  }
+
+  private buildThumbnail(originalBuffer: Buffer) {
+    return sharp(originalBuffer, { failOn: 'none' })
+      .rotate()
+      .resize({
+        width: ACTIVITY_THUMBNAIL_EDGE_PX,
+        height: ACTIVITY_THUMBNAIL_EDGE_PX,
+        fit: 'cover',
+        position: 'attention',
+        withoutEnlargement: true,
+      })
+      .webp({ quality: ACTIVITY_THUMBNAIL_WEBP_QUALITY, effort: 4 })
+      .toBuffer();
+  }
+
+  private async findOrCreateThumbnailVariant(input: {
+    tenantId: string;
+    attachmentId: string;
+    fileAssetId: string;
+    requestedById: string;
+    originalFileName: string;
+    content: Buffer;
+  }) {
+    const existing = (
+      await this.fileRegistryService.listFilesByEntity(
+        input.tenantId,
+        'activity',
+        input.attachmentId,
+      )
+    ).find((asset) =>
+      this.isValidThumbnailVariant(
+        asset,
+        input.tenantId,
+        input.attachmentId,
+        input.fileAssetId,
+      ),
+    );
+
+    if (existing) {
+      return existing;
+    }
+
+    const stem = input.originalFileName.replace(/\.[^.]+$/, '') || 'activity';
+    return this.fileRegistryService.registerGeneratedFile({
+      tenantId: input.tenantId,
+      generatedByUserId: input.requestedById,
+      originalFilename: `${stem}-${ACTIVITY_THUMBNAIL_VARIANT}.webp`,
+      content: input.content,
+      mimeType: 'image/webp',
+      module: 'activity',
+      entityId: input.attachmentId,
+      metadata: {
+        variant: ACTIVITY_THUMBNAIL_VARIANT,
+        sourceFileAssetId: input.fileAssetId,
+        activityAttachmentId: input.attachmentId,
+      },
+    });
+  }
+
+  private isValidThumbnailVariant(
+    asset: {
+      id: string;
+      tenantId: string;
+      module: string | null;
+      entityId: string | null;
+      status: string;
+      metadata: unknown;
+    } | null,
+    tenantId: string,
+    attachmentId: string,
+    sourceFileAssetId: string,
+  ): asset is NonNullable<typeof asset> {
+    if (
+      !asset ||
+      asset.tenantId !== tenantId ||
+      asset.module !== 'activity' ||
+      asset.entityId !== attachmentId ||
+      asset.status !== 'UPLOADED' ||
+      !asset.metadata ||
+      typeof asset.metadata !== 'object' ||
+      Array.isArray(asset.metadata)
+    ) {
+      return false;
+    }
+
+    const metadata = asset.metadata as Record<string, unknown>;
+    return (
+      metadata.variant === ACTIVITY_THUMBNAIL_VARIANT &&
+      metadata.sourceFileAssetId === sourceFileAssetId &&
+      metadata.activityAttachmentId === attachmentId
+    );
   }
 
   private async buildOptimizedPreview(

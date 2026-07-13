@@ -33,17 +33,13 @@ test.describe.serial('M5/M6 privacy workflow smoke', () => {
     await login(page, schoolCredentials);
   });
 
-  test('loads activity parent view, moderation detail, homework, and timetable without fatal pages', async ({
+  test('blocks the retired parent web view and loads staff M5/M6 workspaces without fatal pages', async ({
     page,
   }) => {
     const targets = [
       {
         route: '/dashboard/activity',
         visible: /Activity Feed|Feed Preview|Milestones/i,
-      },
-      {
-        route: '/dashboard/activity/parent',
-        visible: /Parent Activity Feed|No classroom activities shared yet/i,
       },
       {
         route: '/dashboard/homework',
@@ -70,20 +66,19 @@ test.describe.serial('M5/M6 privacy workflow smoke', () => {
       });
       await expectNoFatalPage(page, target.route);
     }
+
+    await page.goto('/dashboard/activity/parent');
+    await expect(page).toHaveURL(/\/login\?notice=parent-mobile-only$/);
+    await expect(page.locator('body')).toContainText(/Staff & Admin Portal/i);
+    await expectNoFatalPage(page, '/dashboard/activity/parent');
   });
 
-  test('keeps activity media privacy language visible in teacher and parent surfaces', async ({
+  test('keeps activity media privacy language visible in the teacher surface', async ({
     page,
   }) => {
     await page.goto('/dashboard/activity');
     await expect(page.locator('body')).toContainText(/private media|consent/i);
     await expectNoFatalPage(page, '/dashboard/activity');
-
-    await page.goto('/dashboard/activity/parent');
-    await expect(page.locator('body')).toContainText(
-      /Approved classroom activities|photo consent|No classroom activities/i,
-    );
-    await expectNoFatalPage(page, '/dashboard/activity/parent');
   });
 });
 

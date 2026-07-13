@@ -1000,12 +1000,26 @@ export class MobileService {
     month?: string,
   ) {
     const student = await this.getAccessibleStudent(studentId, actor);
+    const guardian = await this.prisma.guardian.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        studentLinks: { some: { studentId } },
+      },
+      select: { id: true },
+    });
+    if (!guardian) {
+      throw new ForbiddenException(
+        'This child is not linked to your guardian account',
+      );
+    }
     const monthRange = month ? parseMonthRange(month) : null;
     const items = await this.prisma.activityPost.findMany({
       where: {
         tenantId: actor.tenantId,
         status: 'APPROVED',
         softDeletedAt: null,
+        parentVisible: true,
         ...(category ? { category: category as ActivityCategory } : {}),
         ...(monthRange
           ? { publishedAt: { gte: monthRange.start, lt: monthRange.end } }
@@ -1030,7 +1044,17 @@ export class MobileService {
             contentType: true,
             sizeBytes: true,
             processingStatus: true,
+            thumbnailFileAssetId: true,
+            optimizedObjectKey: true,
           },
+        },
+        reactions: {
+          where: {
+            guardianId: guardian.id,
+            reaction: 'SEEN',
+          },
+          select: { createdAt: true },
+          take: 1,
         },
         _count: {
           select: {
@@ -1050,6 +1074,7 @@ export class MobileService {
         caption: item.caption,
         category: item.category,
         publishedAt: toIso(item.publishedAt ?? item.createdAt),
+        seenAt: toIso(item.reactions[0]?.createdAt ?? null),
         attachmentCount: item._count.attachments,
         reactionCount: item._count.reactions,
         attachments: item.attachments.map((attachment) => ({
@@ -1058,6 +1083,12 @@ export class MobileService {
           contentType: attachment.contentType,
           sizeBytes: attachment.sizeBytes,
           processingStatus: attachment.processingStatus,
+          thumbnailPath:
+            attachment.thumbnailFileAssetId || attachment.optimizedObjectKey
+              ? `/activity-feed/attachments/${encodeURIComponent(
+                  attachment.id,
+                )}/thumbnail`
+              : null,
           previewPath: `/activity-feed/attachments/${encodeURIComponent(
             attachment.id,
           )}/preview`,

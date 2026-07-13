@@ -14,6 +14,7 @@ import { LoadingState } from '../../../../components/ui/loading-state';
 import { ErrorState } from '../../../../components/ui/error-state';
 import { Select } from '../../../../components/ui/form-field';
 import { Badge } from '../../../../components/ui/badge';
+import { ActivityThumbnail } from '../../../../components/activity/activity-thumbnail';
 
 const activityCategories = [
   'CLASSROOM_LEARNING',
@@ -216,12 +217,11 @@ export default function ActivityGalleryPage() {
                 className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
               >
                 <div className="relative aspect-[4/3] bg-slate-100">
-                  {item.previewUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={item.previewUrl}
+                  {item.thumbnailUrl ? (
+                    <ActivityThumbnail
+                      attachmentId={item.id}
+                      version={item.thumbnailUrl}
                       alt={item.fileName}
-                      className="h-full w-full object-cover"
                     />
                   ) : (
                     <div className="flex h-full flex-col items-center justify-center p-4 text-center">
@@ -263,7 +263,7 @@ export default function ActivityGalleryPage() {
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      disabled={!item.previewUrl || isBusy}
+                      disabled={Boolean(item.accessBlockedReason) || isBusy}
                       onClick={() => void handlePreview(item.id)}
                       className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-[10px] font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                     >
@@ -272,7 +272,7 @@ export default function ActivityGalleryPage() {
                     </button>
                     <button
                       type="button"
-                      disabled={!item.previewUrl || isBusy}
+                      disabled={Boolean(item.accessBlockedReason) || isBusy}
                       onClick={() => void handleDownload(item.id, item.fileName)}
                       className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[var(--color-mod-activity-accent)] px-3 text-[10px] font-black uppercase tracking-widest text-white hover:bg-[var(--color-mod-activity-text)] disabled:opacity-50"
                     >

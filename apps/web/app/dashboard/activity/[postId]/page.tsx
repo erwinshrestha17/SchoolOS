@@ -20,6 +20,7 @@ import { EmptyState } from "../../../../components/ui/empty-state";
 import { LoadingState } from "../../../../components/ui/loading-state";
 import { PageHeader } from "../../../../components/ui/page-header";
 import { LifecyclePanel } from "../../../../components/activity/lifecycle-panel";
+import { ActivityThumbnail } from "../../../../components/activity/activity-thumbnail";
 
 type ActivityPostStatus = NonNullable<ActivityPost["status"]>;
 
@@ -310,12 +311,11 @@ function ActivityPostDetail({
               className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
             >
               <div className="aspect-[16/10] bg-slate-100">
-                {attachment.previewUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={attachment.previewUrl}
+                {attachment.thumbnailUrl ? (
+                  <ActivityThumbnail
+                    attachmentId={attachment.id}
+                    version={attachment.thumbnailUrl}
                     alt={attachment.fileName}
-                    className="h-full w-full object-cover"
                   />
                 ) : (
                   <div className="flex h-full flex-col items-center justify-center text-slate-400">

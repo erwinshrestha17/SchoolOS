@@ -983,7 +983,9 @@ export class ActivityFeedService {
           title: dto.title,
           caption: dto.caption,
           askAtHome: dto.askAtHome ?? null,
-          activityDate: dto.activityDate ? new Date(dto.activityDate) : new Date(),
+          activityDate: dto.activityDate
+            ? new Date(dto.activityDate)
+            : new Date(),
           parentVisible: dto.parentVisible ?? true,
           language: dto.language ?? ActivityPostLanguage.ENGLISH,
           category,
@@ -1030,6 +1032,7 @@ export class ActivityFeedService {
             requestedById: actor.userId,
           },
           {
+            jobId: `activity-media-${attachment.id}`,
             attempts: 3,
             backoff: { type: 'exponential', delay: 5000 },
             removeOnComplete: true,
@@ -1229,6 +1232,13 @@ export class ActivityFeedService {
 
     if (!post) {
       throw new NotFoundException('Activity post not found in this tenant');
+    }
+
+    if (
+      (isParentOnly(actor) || isStudentOnly(actor)) &&
+      (post.status !== ActivityPostStatus.APPROVED || post.softDeletedAt)
+    ) {
+      throw new ForbiddenException('Activity post is no longer available');
     }
 
     await this.ensurePostVisibleToActor(actor, post.id);
@@ -2010,6 +2020,11 @@ export class ActivityFeedService {
       sizeBytes: attachment.sizeBytes,
       sortOrder: attachment.sortOrder,
       processingStatus: attachment.processingStatus,
+      thumbnailUrl: isBlocked
+        ? null
+        : attachment.thumbnailFileAssetId || attachment.optimizedObjectKey
+          ? this.buildActivityAttachmentUrl(attachment.id, 'thumbnail')
+          : null,
       previewUrl: isBlocked
         ? null
         : attachment.fileAssetId
@@ -2021,7 +2036,7 @@ export class ActivityFeedService {
 
   private buildActivityAttachmentUrl(
     attachmentId: string,
-    action: 'preview' | 'download',
+    action: 'thumbnail' | 'preview' | 'download',
   ) {
     const configuredBaseUrl = process.env.API_PUBLIC_BASE_URL?.trim();
     const apiBaseUrl = configuredBaseUrl

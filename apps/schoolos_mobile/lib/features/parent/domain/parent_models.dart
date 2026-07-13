@@ -847,6 +847,7 @@ class ParentActivityItem {
     required this.caption,
     required this.category,
     this.publishedAt,
+    this.seenAt,
     required this.attachmentCount,
     required this.reactionCount,
     required this.attachments,
@@ -857,9 +858,12 @@ class ParentActivityItem {
   final String caption;
   final String category;
   final String? publishedAt;
+  final String? seenAt;
   final int attachmentCount;
   final int reactionCount;
   final List<ParentActivityAttachment> attachments;
+
+  bool get isSeen => seenAt != null && seenAt!.isNotEmpty;
 
   factory ParentActivityItem.fromJson(Map<String, dynamic> json) {
     return ParentActivityItem(
@@ -868,6 +872,7 @@ class ParentActivityItem {
       caption: json['caption'] as String? ?? '',
       category: json['category'] as String? ?? 'SCHOOL',
       publishedAt: json['publishedAt'] as String?,
+      seenAt: json['seenAt'] as String?,
       attachmentCount: _asInt(json['attachmentCount']),
       reactionCount: _asInt(json['reactionCount']),
       attachments: _asList(json['attachments'])
@@ -885,6 +890,7 @@ class ParentActivityAttachment {
     required this.contentType,
     required this.sizeBytes,
     required this.processingStatus,
+    required this.thumbnailPath,
     required this.previewPath,
   });
 
@@ -893,8 +899,11 @@ class ParentActivityAttachment {
   final String contentType;
   final int sizeBytes;
   final String processingStatus;
+  final String thumbnailPath;
   final String previewPath;
 
+  bool get canLoadThumbnail =>
+      thumbnailPath.startsWith('/activity-feed/attachments/');
   bool get canPreview => previewPath.startsWith('/activity-feed/attachments/');
 
   factory ParentActivityAttachment.fromJson(Map<String, dynamic> json) {
@@ -904,6 +913,7 @@ class ParentActivityAttachment {
       contentType: json['contentType'] as String? ?? 'image/jpeg',
       sizeBytes: _asInt(json['sizeBytes']),
       processingStatus: json['processingStatus'] as String? ?? 'PENDING',
+      thumbnailPath: json['thumbnailPath'] as String? ?? '',
       previewPath: json['previewPath'] as String? ?? '',
     );
   }

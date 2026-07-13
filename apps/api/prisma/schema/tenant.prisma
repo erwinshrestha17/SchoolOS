@@ -242,6 +242,7 @@ model FileAsset {
   tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   uploadedBy          User?                @relation(fields: [uploadedByUserId], references: [id], onDelete: SetNull)
   activityAttachments ActivityAttachment[]
+  activityThumbnailAttachments ActivityAttachment[] @relation("ActivityThumbnailFile")
   homeworkAttachments HomeworkAttachment[]
   studentPhoto        Student?             @relation("StudentPhoto")
   studentDocuments    StudentDocument[]    @relation("DocumentFile")

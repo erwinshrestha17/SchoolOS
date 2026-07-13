@@ -1913,7 +1913,6 @@ describe("SchoolOS web production contracts", () => {
       "api.listDevelopmentalMilestones",
       "api.listMilestoneTemplates",
       "api.listNotificationDeliveries",
-      "api.listParentActivityPosts",
       "api.previewActivityAudience",
       "api.getActivityPost",
       "api.createActivityPost",
@@ -1929,6 +1928,11 @@ describe("SchoolOS web production contracts", () => {
     for (const apiCall of requiredApis) {
       assert.match(activitySurfaces, new RegExp(apiCall.replace(".", "\\.")));
     }
+
+    const parentRoute = read("app/dashboard/activity/parent/page.tsx");
+    const retiredParentView = read("components/activity/parent-activity-view.tsx");
+    assert.match(parentRoute, /redirect\(["']\/login\?notice=parent-mobile-only["']\)/);
+    assert.doesNotMatch(retiredParentView, /api\.|useQuery|listParentActivityPosts/);
   });
 
   it("keeps canteen POS receipt preview and PDF reprint wired to real APIs", () => {

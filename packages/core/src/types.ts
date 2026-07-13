@@ -1091,6 +1091,7 @@ export type ActivityAttachment = {
   fileName: string;
   contentType: string;
   sizeBytes: number;
+  thumbnailUrl?: string | null;
   previewUrl?: string | null;
   accessBlockedReason?: string | null;
   processingStatus?: string | null;
@@ -1115,13 +1116,7 @@ export type ActivityPost = {
   language?: 'ENGLISH' | 'NEPALI' | 'BOTH';
   category: string;
   audienceType: string;
-  status?:
-    | 'DRAFT'
-    | 'PENDING_APPROVAL'
-    | 'APPROVED'
-    | 'REJECTED'
-    | 'NEEDS_CORRECTION'
-    | 'ARCHIVED';
+  status?: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'NEEDS_CORRECTION' | 'ARCHIVED';
   moderationReason?: string | null;
   moderatedAt?: string | null;
   editedAt?: string | null;

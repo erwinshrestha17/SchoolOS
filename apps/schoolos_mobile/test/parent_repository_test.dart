@@ -227,6 +227,35 @@ void main() {
       },
     );
 
+    test(
+      'downloads activity thumbnails only through the protected path',
+      () async {
+        when(
+          () => dio.get<List<int>>(
+            '/activity-feed/attachments/attachment-1/thumbnail',
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(path: 'activity-thumbnail'),
+            data: [0x52, 0x49, 0x46, 0x46],
+          ),
+        );
+
+        final bytes = await repository.getActivityThumbnail(
+          '/activity-feed/attachments/attachment-1/thumbnail',
+        );
+
+        expect(bytes, [0x52, 0x49, 0x46, 0x46]);
+        verify(
+          () => dio.get<List<int>>(
+            '/activity-feed/attachments/attachment-1/thumbnail',
+            options: any(named: 'options'),
+          ),
+        ).called(1);
+      },
+    );
+
     test('maps the linked-child published exam schedule', () async {
       when(
         () => apiClient.get<dynamic>('/mobile/students/child-1/exam-schedule'),
@@ -366,11 +395,11 @@ void main() {
       },
     );
 
-    test('submits a reaction as the authenticated guardian only', () async {
+    test('marks an activity seen as the authenticated guardian', () async {
       when(
         () => apiClient.post<dynamic>(
           '/activity-feed/posts/post-1/reactions',
-          data: {'reaction': 'HEART', 'guardianId': 'guardian-1'},
+          data: {'reaction': 'SEEN', 'guardianId': 'guardian-1'},
         ),
       ).thenAnswer(
         (_) async => Response(
@@ -381,16 +410,15 @@ void main() {
         ),
       );
 
-      await repository.submitActivityReaction(
+      await repository.markActivitySeen(
         postId: 'post-1',
         guardianId: 'guardian-1',
-        reaction: 'HEART',
       );
 
       verify(
         () => apiClient.post<dynamic>(
           '/activity-feed/posts/post-1/reactions',
-          data: {'reaction': 'HEART', 'guardianId': 'guardian-1'},
+          data: {'reaction': 'SEEN', 'guardianId': 'guardian-1'},
         ),
       ).called(1);
     });

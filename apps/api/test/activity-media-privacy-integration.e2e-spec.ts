@@ -11,6 +11,7 @@ import {
   StorageProvider,
 } from '@prisma/client';
 import { Job } from 'bullmq';
+import sharp from 'sharp';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AuditService } from '../src/audit/audit.service';
 import { AuthContext } from '../src/auth/auth.types';
@@ -118,6 +119,8 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
     markUploaded: jest.Mock;
     getSignedUrl: jest.Mock;
     auditAccess: jest.Mock;
+    listFilesByEntity: jest.Mock;
+    registerGeneratedFile: jest.Mock;
   };
   let activityFeedService: ActivityFeedService;
   let lifecycleService: ActivityPostLifecycleService;
@@ -160,6 +163,15 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
         .fn()
         .mockResolvedValue('signed://activity/file-asset-1'),
       auditAccess: jest.fn().mockResolvedValue(undefined),
+      listFilesByEntity: jest.fn().mockResolvedValue([]),
+      registerGeneratedFile: jest.fn(async (input) => ({
+        id: 'thumbnail-file-1',
+        tenantId,
+        module: input.module,
+        entityId: input.entityId,
+        status: 'UPLOADED',
+        metadata: input.metadata,
+      })),
     };
 
     activityFeedService = new ActivityFeedService(
@@ -183,6 +195,7 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
       {
         shouldProcessTenantJob: jest.fn().mockResolvedValue(true),
       } as never,
+      fileRegistryService as unknown as FileRegistryService,
     );
   });
 
@@ -498,6 +511,18 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
   it('processes activity media compression with tenant, attachment, and file asset scoping', async () => {
     const post = seedPost({ id: 'post-media', studentIds: ['student-1'] });
     const attachment = post.attachments[0];
+    storageService.getObjectBuffer.mockResolvedValue(
+      await sharp({
+        create: {
+          width: 640,
+          height: 480,
+          channels: 3,
+          background: '#4f46e5',
+        },
+      })
+        .jpeg()
+        .toBuffer(),
+    );
 
     const result = await mediaProcessor.process({
       data: {

@@ -134,6 +134,93 @@ final parentActivityPreviewProvider = FutureProvider.autoDispose
           .getActivityPreview(previewPath);
     });
 
+final parentActivityThumbnailProvider = FutureProvider.autoDispose
+    .family<Uint8List, String>((ref, thumbnailPath) {
+      return ref
+          .watch(parentRepositoryProvider)
+          .getActivityThumbnail(thumbnailPath);
+    });
+
+enum ParentActivitySeenStatus { idle, pending, seen, failed }
+
+class ParentActivitySeenState {
+  const ParentActivitySeenState({required this.status, this.error});
+
+  const ParentActivitySeenState.idle()
+    : status = ParentActivitySeenStatus.idle,
+      error = null;
+
+  final ParentActivitySeenStatus status;
+  final AppException? error;
+}
+
+class ParentActivitySeenController
+    extends StateNotifier<ParentActivitySeenState> {
+  ParentActivitySeenController(this._repository, this._isOnline)
+    : super(const ParentActivitySeenState.idle());
+
+  final ParentRepository _repository;
+  final bool _isOnline;
+
+  Future<bool> markSeen({
+    required String postId,
+    required String guardianId,
+  }) async {
+    if (state.status == ParentActivitySeenStatus.pending ||
+        state.status == ParentActivitySeenStatus.seen) {
+      return state.status == ParentActivitySeenStatus.seen;
+    }
+    if (!_isOnline) {
+      state = const ParentActivitySeenState(
+        status: ParentActivitySeenStatus.failed,
+        error: NetworkException(
+          'Internet access is required to mark an activity as read.',
+        ),
+      );
+      return false;
+    }
+
+    state = const ParentActivitySeenState(
+      status: ParentActivitySeenStatus.pending,
+    );
+    try {
+      await _repository.markActivitySeen(
+        postId: postId,
+        guardianId: guardianId,
+      );
+      state = const ParentActivitySeenState(
+        status: ParentActivitySeenStatus.seen,
+      );
+      return true;
+    } on AppException catch (error) {
+      state = ParentActivitySeenState(
+        status: ParentActivitySeenStatus.failed,
+        error: error,
+      );
+      return false;
+    } catch (_) {
+      state = const ParentActivitySeenState(
+        status: ParentActivitySeenStatus.failed,
+        error: UnknownException(
+          'This activity could not be marked as read. Please try again.',
+        ),
+      );
+      return false;
+    }
+  }
+}
+
+final parentActivitySeenProvider = StateNotifierProvider.autoDispose
+    .family<ParentActivitySeenController, ParentActivitySeenState, String>((
+      ref,
+      postId,
+    ) {
+      return ParentActivitySeenController(
+        ref.watch(parentRepositoryProvider),
+        ref.watch(connectivityProvider),
+      );
+    });
+
 class ParentMilestonesFilter {
   const ParentMilestonesFilter({required this.childId, this.month});
 

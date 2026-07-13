@@ -347,6 +347,31 @@ export class ActivityFeedController {
     return media.stream?.pipe(res);
   }
 
+  @Get('attachments/:id/thumbnail')
+  @Permissions('activity_feed:read')
+  async getAttachmentThumbnail(
+    @Param('id') attachmentId: string,
+    @CurrentAuth() auth: AuthContext,
+    @Res() res: Response,
+  ) {
+    const media = await this.activityMediaService.getAttachmentMedia(
+      auth,
+      attachmentId,
+      'thumbnail',
+    );
+
+    res.setHeader('Content-Type', media.contentType);
+    res.setHeader('Content-Length', String(media.sizeBytes));
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="${sanitizeFileName(media.fileName)}"`,
+    );
+
+    return media.stream?.pipe(res);
+  }
+
   @Get('attachments/:id/download')
   @Permissions('activity_feed:read')
   @Header('Cache-Control', 'private, max-age=60')

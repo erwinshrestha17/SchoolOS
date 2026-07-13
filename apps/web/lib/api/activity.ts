@@ -125,6 +125,25 @@ export const activityApi = {
     );
     await openImageBlob(response);
   },
+  getActivityThumbnailBlob: async (attachmentId: string) => {
+    const response = await fetch(
+      `${API_BASE_URL}/activity-feed/attachments/${encodeURIComponent(attachmentId)}/thumbnail`,
+      { credentials: 'include' },
+    );
+    if (!response.ok) {
+      throw new Error('Protected activity thumbnail is unavailable.');
+    }
+    const contentType =
+      response.headers.get('content-type')?.toLowerCase() ?? '';
+    if (!contentType.startsWith('image/')) {
+      throw new Error('Protected activity thumbnail is unavailable.');
+    }
+    const blob = await response.blob();
+    if (blob.size === 0) {
+      throw new Error('Protected activity thumbnail is unavailable.');
+    }
+    return blob;
+  },
   downloadActivityAttachment: async (
     attachmentId: string,
     fileName: string,

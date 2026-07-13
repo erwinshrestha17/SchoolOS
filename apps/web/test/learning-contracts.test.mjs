@@ -11,7 +11,7 @@ function read(relativePath) {
 }
 
 describe('M13 Learning frontend contracts', () => {
-  it('adds dashboard, board, student, and parent Learning routes', () => {
+  it('adds dashboard, board, and student Learning routes while blocking parent web access', () => {
     for (const route of [
       'app/dashboard/learning/page.tsx',
       'app/dashboard/learning/activities/page.tsx',
@@ -30,6 +30,19 @@ describe('M13 Learning frontend contracts', () => {
     ]) {
       assert.equal(existsSync(join(webRoot, route)), true, `Missing ${route}`);
     }
+
+    for (const parentRoute of [
+      'app/parent/learning/page.tsx',
+      'app/parent/learning/progress/page.tsx',
+    ]) {
+      const source = read(parentRoute);
+      assert.match(source, /redirect\(['"]\/login\?notice=parent-mobile-only['"]\)/);
+      assert.doesNotMatch(source, /ParentLearningSummaryView|learningApi\./);
+    }
+
+    const dashboardLayout = read('app/dashboard/layout.tsx');
+    assert.match(dashboardLayout, /roles\.every\(\(role\) => role === ["']parent["']\)/);
+    assert.match(dashboardLayout, /router\.replace\(["']\/login\?notice=parent-mobile-only["']\)/);
   });
 
   it('wires Learning through dashboard permissions and module entitlements', () => {

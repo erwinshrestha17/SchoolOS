@@ -1264,9 +1264,12 @@ describe('MobileService', () => {
             contentType: 'image/jpeg',
             sizeBytes: 2048,
             processingStatus: 'READY',
+            thumbnailFileAssetId: null,
+            optimizedObjectKey: 'must-not-leak-optimized-key',
             objectKey: 'must-not-leak',
           },
         ],
+        reactions: [{ createdAt: new Date('2026-07-01T06:30:00.000Z') }],
         _count: { attachments: 1, reactions: 2 },
       },
     ]);
@@ -1280,6 +1283,7 @@ describe('MobileService', () => {
     expect(result.items[0]).toEqual(
       expect.objectContaining({
         id: 'post-1',
+        seenAt: '2026-07-01T06:30:00.000Z',
         attachments: [
           {
             id: 'attachment-1',
@@ -1287,12 +1291,30 @@ describe('MobileService', () => {
             contentType: 'image/jpeg',
             sizeBytes: 2048,
             processingStatus: 'READY',
+            thumbnailPath: '/activity-feed/attachments/attachment-1/thumbnail',
             previewPath: '/activity-feed/attachments/attachment-1/preview',
           },
         ],
       }),
     );
     expect(JSON.stringify(result)).not.toContain('must-not-leak');
+    expect(prisma.activityPost.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: 'tenant-1',
+          status: 'APPROVED',
+          softDeletedAt: null,
+          parentVisible: true,
+        }),
+        include: expect.objectContaining({
+          reactions: {
+            where: { guardianId: 'guardian-1', reaction: 'SEEN' },
+            select: { createdAt: true },
+            take: 1,
+          },
+        }),
+      }),
+    );
   });
 
   it('returns homework scoped to the linked child class and section', async () => {

@@ -99,6 +99,19 @@ describe('Activity Hardening Verification', () => {
       getSignedUrl: jest.fn(),
       auditAccess: jest.fn(),
       updateFileEntity: jest.fn().mockResolvedValue({}),
+      listFilesByEntity: jest.fn().mockResolvedValue([]),
+      registerGeneratedFile: jest.fn().mockResolvedValue({
+        id: 'thumbnail-file-1',
+        tenantId,
+        module: 'activity',
+        entityId: 'attach-1',
+        status: 'UPLOADED',
+        metadata: {
+          variant: 'thumbnail-256',
+          sourceFileAssetId: 'file-1',
+          activityAttachmentId: 'attach-1',
+        },
+      }),
     };
 
     mediaQueue = {
@@ -122,9 +135,14 @@ describe('Activity Hardening Verification', () => {
       communicationsService,
     );
 
-    mediaProcessor = new ActivityMediaProcessor(prisma, storageService, {
-      shouldProcessTenantJob: jest.fn().mockResolvedValue(true),
-    } as never);
+    mediaProcessor = new ActivityMediaProcessor(
+      prisma,
+      storageService,
+      {
+        shouldProcessTenantJob: jest.fn().mockResolvedValue(true),
+      } as never,
+      fileRegistry,
+    );
   });
 
   describe('Post Lifecycle & Moderation', () => {

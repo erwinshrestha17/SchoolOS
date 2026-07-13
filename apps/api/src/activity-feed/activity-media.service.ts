@@ -54,7 +54,7 @@ export class ActivityMediaService {
   async getAttachmentMedia(
     actor: AuthContext,
     attachmentId: string,
-    action: 'preview' | 'download',
+    action: 'thumbnail' | 'preview' | 'download',
   ): Promise<ActivityMediaFile> {
     const attachment = await this.findVisibleAttachmentOrThrow(
       actor,
@@ -72,21 +72,42 @@ export class ActivityMediaService {
       throw new ForbiddenException('Activity media is outside this tenant');
     }
 
-    const objectKey =
-      action === 'preview' && attachment.optimizedObjectKey
-        ? attachment.optimizedObjectKey
-        : fileAsset.objectKey;
+    let objectKey: string;
+    let fileName = attachment.fileName;
+    let contentType = attachment.contentType;
+    let sizeBytes = attachment.sizeBytes;
+
+    if (action === 'thumbnail') {
+      if (attachment.thumbnailFileAsset) {
+        this.assertThumbnailVariantOwnership(attachment);
+        objectKey = attachment.thumbnailFileAsset.objectKey;
+        fileName = attachment.thumbnailFileAsset.originalFilename;
+        contentType = attachment.thumbnailFileAsset.mimeType;
+        sizeBytes = Number(attachment.thumbnailFileAsset.sizeBytes);
+      } else if (attachment.optimizedObjectKey) {
+        objectKey = attachment.optimizedObjectKey;
+        sizeBytes = attachment.optimizedSizeBytes ?? attachment.sizeBytes;
+      } else {
+        throw new NotFoundException('Activity thumbnail is not available');
+      }
+    } else {
+      objectKey =
+        action === 'preview' && attachment.optimizedObjectKey
+          ? attachment.optimizedObjectKey
+          : fileAsset.objectKey;
+      sizeBytes =
+        action === 'preview' && attachment.optimizedSizeBytes
+          ? attachment.optimizedSizeBytes
+          : attachment.sizeBytes;
+    }
 
     const content = await this.storageService.getObjectBuffer(objectKey);
 
     return {
       stream: Readable.from(content),
-      fileName: attachment.fileName,
-      contentType: attachment.contentType,
-      sizeBytes:
-        action === 'preview' && attachment.optimizedSizeBytes
-          ? attachment.optimizedSizeBytes
-          : attachment.sizeBytes,
+      fileName,
+      contentType,
+      sizeBytes,
     };
   }
 
@@ -137,6 +158,7 @@ export class ActivityMediaService {
           },
         },
         fileAsset: true,
+        thumbnailFileAsset: true,
       },
     });
 
@@ -155,6 +177,10 @@ export class ActivityMediaService {
 
     if (fileAsset.tenantId !== actor.tenantId) {
       throw new ForbiddenException('Activity media is outside this tenant');
+    }
+
+    if (action.startsWith('thumbnail') && attachment.thumbnailFileAsset) {
+      this.assertThumbnailVariantOwnership(attachment);
     }
 
     await this.auditService.record({
@@ -194,15 +220,51 @@ export class ActivityMediaService {
         studentTags: Array<{ studentId: string }>;
         status: ActivityPostStatus;
         softDeletedAt: Date | null;
+        parentVisible: boolean;
       };
     },
   ) {
+    if (
+      actor.roles.some((role) =>
+        ['teacher', 'subject_teacher'].includes(role),
+      ) &&
+      !actor.permissions.includes('activity_feed:moderate')
+    ) {
+      const staff = await this.prisma.staff.findFirst({
+        where: { tenantId: actor.tenantId, userId: actor.userId },
+        select: { id: true },
+      });
+      const assignment = staff
+        ? await this.prisma.subjectTeacherAssignment.findFirst({
+            where: {
+              tenantId: actor.tenantId,
+              staffId: staff.id,
+              classId: attachment.activityPost.classId,
+              ...(attachment.activityPost.sectionId
+                ? {
+                    OR: [
+                      { sectionId: attachment.activityPost.sectionId },
+                      { sectionId: null },
+                    ],
+                  }
+                : {}),
+            },
+            select: { id: true },
+          })
+        : null;
+      if (!assignment) {
+        throw new ForbiddenException('Activity media is outside your scope');
+      }
+      return;
+    }
+
     if (!isParentOnly(actor) && !isStudentOnly(actor)) {
       return;
     }
 
     if (
       attachment.activityPost.softDeletedAt ||
+      !attachment.activityPost.parentVisible ||
       attachment.activityPost.status !== ActivityPostStatus.APPROVED
     ) {
       throw new ForbiddenException('Activity post is no longer available');
@@ -244,6 +306,46 @@ export class ActivityMediaService {
 
     if (!visibleStudentInAudience) {
       throw new ForbiddenException('Activity media is outside your scope');
+    }
+  }
+
+  private assertThumbnailVariantOwnership(attachment: {
+    id: string;
+    tenantId: string;
+    fileAssetId: string | null;
+    thumbnailFileAsset: {
+      tenantId: string;
+      module: string | null;
+      entityId: string | null;
+      metadata: unknown;
+      status: string;
+      softDeletedAt: Date | null;
+      deletedAt: Date | null;
+    } | null;
+  }) {
+    const thumbnail = attachment.thumbnailFileAsset;
+    if (
+      !thumbnail ||
+      thumbnail.tenantId !== attachment.tenantId ||
+      thumbnail.module !== 'activity' ||
+      thumbnail.entityId !== attachment.id ||
+      thumbnail.status !== 'UPLOADED' ||
+      thumbnail.softDeletedAt ||
+      thumbnail.deletedAt ||
+      !thumbnail.metadata ||
+      typeof thumbnail.metadata !== 'object' ||
+      Array.isArray(thumbnail.metadata)
+    ) {
+      throw new ForbiddenException('Activity thumbnail is outside this scope');
+    }
+
+    const metadata = thumbnail.metadata as Record<string, unknown>;
+    if (
+      metadata.variant !== 'thumbnail-256' ||
+      metadata.sourceFileAssetId !== attachment.fileAssetId ||
+      metadata.activityAttachmentId !== attachment.id
+    ) {
+      throw new ForbiddenException('Activity thumbnail is outside this scope');
     }
   }
 
