@@ -640,6 +640,7 @@ export const NotificationChannel = {
   EMAIL: 'EMAIL',
   SMS: 'SMS',
   PUSH: 'PUSH',
+  IN_APP: 'IN_APP',
 } as const;
 
 export const NotificationStatus = {
@@ -678,6 +679,9 @@ export const ActivityReactionType = {
   HEART: 'HEART',
   CLAP: 'CLAP',
   STAR: 'STAR',
+  SEEN: 'SEEN',
+  THANK_YOU: 'THANK_YOU',
+  APPRECIATED: 'APPRECIATED',
 } as const;
 
 export const DevelopmentalMilestoneStatus = {

@@ -1065,7 +1065,7 @@ export class ActivityFeedService {
           studentIds: dto.studentIds,
           title: post.title,
           body: post.caption,
-          channels: [NotificationChannel.PUSH],
+          channels: resolveActivityNotificationChannels(category),
           requiredConsentTypes: [ConsentType.PHOTO_USAGE],
           activeStudentsOnly: true,
         });
@@ -2086,6 +2086,27 @@ function activityPostRequiresApproval(
   );
 }
 
+const CATEGORIES_ELIGIBLE_FOR_PUSH = new Set<ActivityCategory>([
+  ActivityCategory.EDUCATIONAL_TOUR,
+  ActivityCategory.COMPETITION,
+  ActivityCategory.ACHIEVEMENT,
+]);
+
+/**
+ * Routine classroom posts and individual milestones only need an in-app
+ * notification; tours, competitions, and achievements also get a push
+ * notification since parents are more likely to want to know right away.
+ * Emergency/urgent communication is out of scope here — that goes through
+ * the M12 notice workflow, not the activity feed.
+ */
+export function resolveActivityNotificationChannels(
+  category: ActivityCategory,
+): NotificationChannel[] {
+  return CATEGORIES_ELIGIBLE_FOR_PUSH.has(category)
+    ? [NotificationChannel.IN_APP, NotificationChannel.PUSH]
+    : [NotificationChannel.IN_APP];
+}
+
 type PhotoConsentStatus =
   | 'ALLOWED'
   | 'NOT_ALLOWED'
@@ -2194,6 +2215,56 @@ const MILESTONE_TEMPLATE_CATALOG = [
     suggestedStatus: 'EMERGING',
     observationPrompt:
       'Capture grip, control, and comfort during writing or drawing work.',
+  },
+  {
+    key: 'ecd-social-participates-group',
+    stage: 'ECD',
+    stageAliases: ['montessori', 'nursery', 'kg', 'pre-primary'],
+    domain: 'Social',
+    milestone: 'Participates in group activities',
+    suggestedStatus: 'EMERGING',
+    observationPrompt:
+      'Note involvement during circle time, group play, or shared classroom tasks.',
+  },
+  {
+    key: 'ecd-cognitive-recognizes-colours-shapes',
+    stage: 'ECD',
+    stageAliases: ['montessori', 'nursery', 'kg', 'pre-primary'],
+    domain: 'Cognitive',
+    milestone: 'Recognizes colours or shapes',
+    suggestedStatus: 'EMERGING',
+    observationPrompt:
+      'Record which colours or shapes the child identified and in what activity.',
+  },
+  {
+    key: 'ecd-language-communicates-needs',
+    stage: 'ECD',
+    stageAliases: ['montessori', 'nursery', 'kg', 'pre-primary'],
+    domain: 'Language',
+    milestone: 'Communicates needs more clearly',
+    suggestedStatus: 'PROGRESSING',
+    observationPrompt:
+      'Capture an example of the child expressing a need, request, or feeling in words.',
+  },
+  {
+    key: 'ecd-self-help-follows-routines',
+    stage: 'ECD',
+    stageAliases: ['montessori', 'nursery', 'kg', 'pre-primary'],
+    domain: 'Self-help',
+    milestone: 'Follows classroom routines',
+    suggestedStatus: 'ACHIEVED',
+    observationPrompt:
+      'Note whether the child follows daily routines (arrival, cleanup, lining up) with minimal reminders.',
+  },
+  {
+    key: 'ecd-self-help-demonstrates-independence',
+    stage: 'ECD',
+    stageAliases: ['montessori', 'nursery', 'kg', 'pre-primary'],
+    domain: 'Self-help',
+    milestone: 'Demonstrates independence',
+    suggestedStatus: 'PROGRESSING',
+    observationPrompt:
+      'Record a task the child completed on their own without adult help.',
   },
   {
     key: 'primary-self-help-organizes-bag',

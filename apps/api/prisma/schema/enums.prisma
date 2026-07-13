@@ -364,6 +364,7 @@ enum NotificationChannel {
   EMAIL
   SMS
   PUSH
+  IN_APP
 }
 
 enum NotificationStatus {
@@ -413,9 +414,15 @@ enum AttendanceCorrectionStatus {
 }
 
 enum ActivityReactionType {
+  // Legacy social-media-style values, kept for backward compatibility with
+  // existing reaction data. New guardian acknowledgements should use the
+  // plain values below (SEEN / THANK_YOU / APPRECIATED) instead.
   HEART
   CLAP
   STAR
+  SEEN
+  THANK_YOU
+  APPRECIATED
 }
 
 enum DevelopmentalMilestoneStatus {

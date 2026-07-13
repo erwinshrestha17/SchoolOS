@@ -126,6 +126,12 @@ describe('ActivityFeedService', () => {
         domain: 'Language',
         milestone: 'Follows two-step classroom instructions',
       }),
+      expect.objectContaining({
+        key: 'ecd-language-communicates-needs',
+        stage: 'ECD',
+        domain: 'Language',
+        milestone: 'Communicates needs more clearly',
+      }),
     ]);
     expect(templates[0]).not.toHaveProperty('stageAliases');
   });

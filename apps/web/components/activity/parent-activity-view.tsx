@@ -3,17 +3,77 @@
 import { formatBsDateTime, type ActivityPost } from "@schoolos/core";
 import { useQuery } from "@tanstack/react-query";
 import { Camera, Download, Eye, ShieldCheck } from "lucide-react";
+import { useState } from "react";
 import { api } from "../../lib/api";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { PageState } from "../ui/page-state";
+import { cn } from "../../lib/utils";
 
 export function ParentActivityView() {
+  const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
+
+  const childrenQuery = useQuery({
+    queryKey: ["parent-linked-children"],
+    queryFn: () => api.listMyLinkedStudents(),
+  });
+  const children = childrenQuery.data?.items ?? [];
+
   const postsQuery = useQuery({
-    queryKey: ["parent-activity-posts"],
-    queryFn: () => api.listParentActivityPosts(),
+    queryKey: ["parent-activity-posts", selectedChildId],
+    queryFn: () => api.listParentActivityPosts({ studentId: selectedChildId }),
   });
 
+  return (
+    <div className="space-y-4">
+      {children.length > 1 ? (
+        <div
+          className="flex flex-wrap gap-2"
+          data-testid="parent-activity-child-switcher"
+        >
+          <button
+            type="button"
+            onClick={() => setSelectedChildId(null)}
+            className={cn(
+              "inline-flex h-9 items-center rounded-full px-4 text-xs font-bold transition-colors",
+              selectedChildId === null
+                ? "bg-slate-900 text-white"
+                : "border border-slate-200 bg-white text-slate-600 hover:border-slate-300",
+            )}
+          >
+            All Children
+          </button>
+          {children.map((child) => (
+            <button
+              key={child.id}
+              type="button"
+              onClick={() => setSelectedChildId(child.id)}
+              className={cn(
+                "inline-flex h-9 items-center rounded-full px-4 text-xs font-bold transition-colors",
+                selectedChildId === child.id
+                  ? "bg-slate-900 text-white"
+                  : "border border-slate-200 bg-white text-slate-600 hover:border-slate-300",
+              )}
+            >
+              {child.name}
+              {child.classSection ? ` – ${child.classSection}` : ""}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      <ParentActivityPostList postsQuery={postsQuery} />
+    </div>
+  );
+}
+
+function ParentActivityPostList({
+  postsQuery,
+}: {
+  postsQuery: ReturnType<
+    typeof useQuery<ActivityPost[]>
+  >;
+}) {
   if (postsQuery.isLoading) {
     return (
       <div className="space-y-4" data-testid="parent-activity-loading">

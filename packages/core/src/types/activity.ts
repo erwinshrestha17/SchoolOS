@@ -59,7 +59,7 @@ export type ActivityReaction = {
   activityPostId: string;
   guardianId: string | null;
   studentId: string | null;
-  reaction: 'HEART' | 'CLAP' | 'STAR';
+  reaction: 'HEART' | 'CLAP' | 'STAR' | 'SEEN' | 'THANK_YOU' | 'APPRECIATED';
   createdAt: string;
 };
 

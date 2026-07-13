@@ -3,16 +3,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  ActivityPostStatus,
-  ConsentType,
-  NotificationChannel,
-} from '@prisma/client';
+import { ActivityPostStatus, ConsentType } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { resolveActivityNotificationChannels } from './activity-feed.service';
 import {
   DeleteActivityPostDto,
   ModerateActivityPostDto,
@@ -230,7 +227,7 @@ export class ActivityPostLifecycleService {
         studentIds: studentTags.map((tag) => tag.studentId),
         title: post.title,
         body: post.caption,
-        channels: [NotificationChannel.PUSH],
+        channels: resolveActivityNotificationChannels(post.category),
         requiredConsentTypes: [ConsentType.PHOTO_USAGE],
         activeStudentsOnly: true,
       });

@@ -197,6 +197,14 @@ function getChannelMode(channel: NotificationChannel) {
     };
   }
 
+  if (channel === NotificationChannel.IN_APP) {
+    return {
+      label: 'In-app notification',
+      enabledEnv: 'IN_APP_PROVIDER_ENABLED',
+      readyEnv: 'IN_APP_PROVIDER_READY',
+    };
+  }
+
   return {
     label: 'Push notification',
     enabledEnv: 'PUSH_PROVIDER_ENABLED',

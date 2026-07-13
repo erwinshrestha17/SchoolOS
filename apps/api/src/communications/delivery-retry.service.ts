@@ -390,6 +390,20 @@ export class DeliveryRetryService {
           message: delivery.body,
           metadata,
         });
+      } else if (delivery.channel === NotificationChannel.IN_APP) {
+        // No external provider to retry against — the delivery row itself
+        // is the notification, so retrying just means marking it sent
+        // immediately rather than waiting on an async job.
+        await this.prisma.notificationDelivery.update({
+          where: { id: delivery.id },
+          data: { status: NotificationStatus.SENT, sentAt: retriedAt },
+        });
+        return {
+          deliveryId: delivery.id,
+          status: NotificationStatus.SENT,
+          errorMessage: null,
+          retriedAt: retriedAt.toISOString(),
+        };
       } else {
         await this.notificationsService.sendPushNotification({
           title: delivery.title,

@@ -114,6 +114,19 @@ export const studentsApi = {
     }>(`/students/${encodeURIComponent(studentId)}/documents/${encodeURIComponent(kind)}.pdf`);
     await openProtectedFile(artifact.fileAssetId, { fileName: artifact.fileName });
   },
+  listMyLinkedStudents: () =>
+    request<{ items: MyLinkedStudent[] }>('/mobile/me/students'),
+};
+
+export type MyLinkedStudent = {
+  id: string;
+  name: string;
+  classSection: string | null;
+  classId: string | null;
+  sectionId: string | null;
+  rollNumber: string | null;
+  relationship: string;
+  guardianId: string;
 };
 
 export type StudentQrScanAudit = { id: string; action: string; scannedBy: string | null; scannedByEmail: string | null; performedBy: string | null; performedByEmail: string | null; purpose: string | null; success: boolean | null; failureCode: string | null; reason: string | null; timestamp: string };

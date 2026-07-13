@@ -579,37 +579,33 @@ export class OperationalSummaryService {
           ]
         : [
             this.def(
-              'pendingModeration',
+              'pendingReview',
               'activityPost',
               { tenantId, status: 'PENDING_APPROVAL' },
               'Review activity moderation',
               '/dashboard/activity/moderation',
             ),
-            this.def('publishedToday', 'activityPost', {
-              tenantId,
-              publishedAt: { gte: day.startUtc, lt: day.endExclusiveUtc },
-            }),
-            this.def('draftCount', 'activityPost', {
-              tenantId,
-              status: 'DRAFT',
-            }),
             this.def(
-              'failedMediaProcessing',
+              'consentIssues',
+              'guardianConsent',
+              {
+                tenantId,
+                consentType: 'PHOTO_USAGE',
+                OR: [
+                  { granted: false },
+                  { revokedAt: { not: null } },
+                  { metadata: { path: ['restricted'], equals: true } },
+                ],
+              },
+              'Review photo consent issues',
+              '/dashboard/activity',
+            ),
+            this.def(
+              'failedUploads',
               'activityAttachment',
               { tenantId, processingStatus: 'FAILED' },
               'Review failed activity media',
               '/dashboard/activity/gallery',
-            ),
-            this.def(
-              'failedDeliveries',
-              'notificationDelivery',
-              {
-                tenantId,
-                activityPostId: { not: null },
-                status: { in: ['FAILED', 'RETRY_PENDING'] },
-              },
-              'Review failed activity deliveries',
-              '/dashboard/activity/deliveries',
             ),
           ],
       m6_homework_timetable: teacherOnly

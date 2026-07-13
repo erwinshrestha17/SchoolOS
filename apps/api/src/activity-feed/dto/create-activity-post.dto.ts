@@ -88,7 +88,7 @@ export class CreateActivityPostDto {
 
   @IsArray()
   @ArrayMinSize(1)
-  @ArrayMaxSize(5)
+  @ArrayMaxSize(6)
   @ValidateNested({ each: true })
   @Type(() => ActivityAttachmentInputDto)
   attachments!: ActivityAttachmentInputDto[];

@@ -154,13 +154,13 @@ export default function ActivityComposerPage() {
 
   function addFiles(fileList: FileList | null) {
     const incoming = Array.from(fileList ?? []);
-    const combined = [...files, ...incoming].slice(0, 5);
+    const combined = [...files, ...incoming].slice(0, 6);
     setFiles(combined);
 
     const firstNonImage = combined.find((file) => !file.type.startsWith('image/'));
     const firstLargeImage = combined.find((file) => file.size > maxImageBytes);
-    if (combined.length > 5) {
-      setFileWarning('Please attach 1 to 5 images only.');
+    if (combined.length > 6) {
+      setFileWarning('Please attach 1 to 6 images only.');
     } else if (firstNonImage) {
       setFileWarning('Activity attachments must be image files.');
     } else if (firstLargeImage) {
@@ -197,7 +197,7 @@ export default function ActivityComposerPage() {
     post.title.trim().length >= 2 &&
     post.caption.trim().length >= 2 &&
     files.length > 0 &&
-    files.length <= 5 &&
+    files.length <= 6 &&
     !fileWarning;
 
   async function submit() {
@@ -612,11 +612,13 @@ function ContentStep({
           value={post.caption}
           onChange={(event) => setPost((current) => ({ ...current, caption: event.target.value }))}
           placeholder={
-            post.language === 'BOTH'
-              ? 'Today our students participated in ________.\nआज विद्यार्थीहरूले ________ गतिविधिमा सहभागिता जनाए।'
-              : post.language === 'NEPALI'
-                ? 'आज कक्षामा के भयो?'
-                : 'What happened in class today?'
+            post.category === 'PRESCHOOL_ACTIVITY'
+              ? 'Today we practised identifying red, blue and yellow objects.'
+              : post.language === 'BOTH'
+                ? 'Today our students participated in ________.\nआज विद्यार्थीहरूले ________ गतिविधिमा सहभागिता जनाए।'
+                : post.language === 'NEPALI'
+                  ? 'आज कक्षामा के भयो?'
+                  : 'What happened in class today?'
           }
         />
       </FormField>
@@ -628,7 +630,11 @@ function ContentStep({
           onChange={(event) =>
             setPost((current) => ({ ...current, askAtHome: event.target.value }))
           }
-          placeholder="e.g. Ask your child to name one object of each colour they found today."
+          placeholder={
+            post.category === 'PRESCHOOL_ACTIVITY'
+              ? 'e.g. You can ask your child to find one object of each colour at home.'
+              : 'e.g. Ask your child to name one object of each colour they found today.'
+          }
           maxLength={280}
         />
         <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
@@ -649,7 +655,7 @@ function ContentStep({
             className="file:mr-4 file:rounded-full file:border-0 file:bg-slate-100 file:px-4 file:text-[10px] file:font-black file:uppercase file:tracking-widest"
           />
           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-            Attach 1 to 5 images, 10MB or smaller each. Previews use signed access only.
+            Attach 1 to 6 images, 10MB or smaller each. Previews use signed access only.
           </p>
 
           {files.length > 0 ? (

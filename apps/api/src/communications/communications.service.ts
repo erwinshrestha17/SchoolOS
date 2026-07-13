@@ -1496,6 +1496,17 @@ export class CommunicationsService {
         return;
       }
 
+      if (delivery.channel === NotificationChannel.IN_APP) {
+        // In-app notifications are already visible via the notification
+        // center by virtue of this NotificationDelivery row existing — no
+        // external provider dispatch is needed, just mark it delivered.
+        await this.prisma.notificationDelivery.update({
+          where: { id: delivery.id },
+          data: { status: NotificationStatus.SENT, sentAt: new Date() },
+        });
+        return;
+      }
+
       await this.notificationsService.sendPushNotification({
         title: delivery.title,
         body: delivery.body,

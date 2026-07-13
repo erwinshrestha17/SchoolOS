@@ -11,7 +11,6 @@ import {
   Download,
   Eye,
   Heart,
-  Sparkles,
   Star,
   UsersRound,
 } from "lucide-react";
@@ -404,16 +403,19 @@ function BackLink() {
 function ReactionSummary({ post }: { post: ActivityPost }) {
   const reactions = post.reactions ?? [];
   const items = [
-    { key: "HEART", icon: Heart },
-    { key: "CLAP", icon: Sparkles },
-    { key: "STAR", icon: Star },
+    { key: "SEEN", label: "Seen", icon: Eye },
+    { key: "THANK_YOU", label: "Thank you", icon: Heart },
+    { key: "APPRECIATED", label: "Appreciated", icon: Star },
   ] as const;
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 className="text-base font-black text-slate-900">Reactions</h2>
+      <h2 className="text-base font-black text-slate-900">Acknowledgements</h2>
+      <p className="mt-1 text-xs text-slate-500">
+        Simple parent acknowledgements — not open comments or public reaction counts.
+      </p>
       <div className="mt-4 flex flex-wrap gap-3">
-        {items.map(({ key, icon: Icon }) => {
+        {items.map(({ key, label, icon: Icon }) => {
           const count = reactions.filter(
             (reaction) => reaction.reaction === key,
           ).length;
@@ -423,7 +425,7 @@ function ReactionSummary({ post }: { post: ActivityPost }) {
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold text-slate-700"
             >
               <Icon size={16} />
-              {formatEnumLabel(key)}: {count}
+              {label}: {count}
             </div>
           );
         })}

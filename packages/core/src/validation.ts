@@ -294,7 +294,7 @@ export const activityPostFormSchema = z.object({
     fileName: true,
     contentType: true,
     base64Content: true
-  })).min(1).max(5)
+  })).min(1).max(6)
 });
 
 export const moodLogFormSchema = z.object({
