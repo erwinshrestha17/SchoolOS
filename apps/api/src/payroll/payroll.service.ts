@@ -29,7 +29,7 @@ import type { Job, Queue } from 'bullmq';
 import { AccountingPostingService } from '../accounting/accounting-posting.service';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
-import { buildSalarySlipPdf, buildSimplePdf } from '../common/pdf/simple-pdf';
+import { buildSalarySlipPdf } from '../common/pdf/simple-pdf';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { CreateStaffContractDto } from '../hr/dto/create-staff-contract.dto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -46,6 +46,7 @@ import type {
   StaffContractListQueryDto,
 } from './dto/payroll-list-query.dto';
 import { PayrollPreviewQueryDto } from './dto/payroll-preview-query.dto';
+import { PayrollReadinessService } from './payroll-readiness.service';
 import { UpdateSalaryStructureDto } from './dto/update-salary-structure.dto';
 
 interface PayrollReportFilters {
@@ -113,6 +114,8 @@ export class PayrollService {
       PayslipGenerationJobData,
       PayslipGenerationJobResult
     >,
+    @Optional()
+    private readonly payrollReadinessService?: PayrollReadinessService,
   ) {}
 
   async listContracts(
@@ -765,6 +768,18 @@ export class PayrollService {
           _count: { _all: true },
         })
       : [];
+    const exceptionReadiness = this.payrollReadinessService
+      ? await this.payrollReadinessService.getReadiness(
+          {
+            year: periodYear,
+            month: periodMonth,
+            payrollRunId: selectedRun?.id,
+            page: 1,
+            limit: 1,
+          },
+          actor,
+        )
+      : null;
 
     const runStatusCounts = Object.values(PayrollRunStatus).reduce<
       Record<string, number>
@@ -827,7 +842,9 @@ export class PayrollService {
             tdsAmount: moneyString(selectedRun.tdsAmount),
             approvalReadiness: getPayrollRunActions(selectedRun.status),
             postingReadiness: {
-              canPost: getPayrollRunActions(selectedRun.status).canPost,
+              canPost:
+                getPayrollRunActions(selectedRun.status).canPost &&
+                exceptionReadiness?.readinessStatus !== 'BLOCKED',
               accountingJournalId: selectedRun.journalEntryId,
               disbursementJournalEntryId:
                 selectedRun.disbursementJournalEntryId,
@@ -847,14 +864,27 @@ export class PayrollService {
               expected: employeeCount,
               byStatus: payslipStatusCounts,
             },
-            validationExceptionCount: null,
-            validationExceptionSource: 'needs_exception_workflow_contract',
+            validationExceptionCount:
+              (exceptionReadiness?.blockingExceptionCount ?? 0) +
+              (exceptionReadiness?.warningCount ?? 0) +
+              (exceptionReadiness?.informationalCount ?? 0),
+            validationExceptionSource: 'payroll_exception_workflow',
+            validationExceptionsBySeverity: {
+              BLOCKING: exceptionReadiness?.blockingExceptionCount ?? 0,
+              WARNING: exceptionReadiness?.warningCount ?? 0,
+              INFO: exceptionReadiness?.informationalCount ?? 0,
+            },
           }
         : null,
     };
   }
 
   async createPayrollRun(dto: CreatePayrollRunDto, actor: AuthContext) {
+    await this.payrollReadinessService?.assertActionAllowed(
+      actor,
+      'CREATE_DRAFT',
+      { year: dto.periodYear, month: dto.periodMonth },
+    );
     const existing = await this.prisma.payrollRun.findUnique({
       where: {
         tenantId_periodMonth_periodYear: {
@@ -1213,6 +1243,11 @@ export class PayrollService {
 
   async approvePayrollRun(id: string, actor: AuthContext) {
     const run = await this.getPayrollRunOrThrow(id, actor);
+    await this.payrollReadinessService?.assertActionAllowed(actor, 'APPROVE', {
+      year: run.periodYear,
+      month: run.periodMonth,
+      payrollRunId: run.id,
+    });
     const actions = getPayrollRunActions(run.status);
 
     if (run.status === PayrollRunStatus.POSTED) {
@@ -1290,6 +1325,15 @@ export class PayrollService {
 
   async submitPayrollRunForReview(id: string, actor: AuthContext) {
     const run = await this.getPayrollRunOrThrow(id, actor);
+    await this.payrollReadinessService?.assertActionAllowed(
+      actor,
+      'SUBMIT_REVIEW',
+      {
+        year: run.periodYear,
+        month: run.periodMonth,
+        payrollRunId: run.id,
+      },
+    );
     const actions = getPayrollRunActions(run.status);
 
     if (!actions.canSubmitReview) {
@@ -1360,6 +1404,11 @@ export class PayrollService {
 
   async postPayrollRun(id: string, actor: AuthContext) {
     const run = await this.getPayrollRunOrThrow(id, actor);
+    await this.payrollReadinessService?.assertActionAllowed(actor, 'POST', {
+      year: run.periodYear,
+      month: run.periodMonth,
+      payrollRunId: run.id,
+    });
     const actions = getPayrollRunActions(run.status);
 
     if (run.journalEntryId) {
@@ -1577,6 +1626,15 @@ export class PayrollService {
     actor: AuthContext,
   ) {
     const run = await this.getPayrollRunOrThrow(id, actor);
+    await this.payrollReadinessService?.assertActionAllowed(
+      actor,
+      'MARK_PAID',
+      {
+        year: run.periodYear,
+        month: run.periodMonth,
+        payrollRunId: run.id,
+      },
+    );
 
     if (run.status === PayrollRunStatus.PAID) {
       throw new ConflictException('Payroll run is already marked as paid');
@@ -2921,8 +2979,7 @@ export function calculatePayrollTotals(
 
 export function getPayrollRunActions(status: string) {
   const canSubmitReview =
-    status === PayrollRunStatus.DRAFT ||
-    status === PayrollRunStatus.GENERATED;
+    status === PayrollRunStatus.DRAFT || status === PayrollRunStatus.GENERATED;
 
   return {
     canEdit: canSubmitReview,
@@ -3004,10 +3061,6 @@ function getPayrollPeriod(periodYear: number, periodMonth: number) {
   );
 
   return { startsOn, endsOn };
-}
-
-function roundMoney(value: number) {
-  return Math.round(value * 100) / 100;
 }
 
 function moneyDecimal(value: Prisma.Decimal) {

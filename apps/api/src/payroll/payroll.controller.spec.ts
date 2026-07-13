@@ -49,13 +49,20 @@ function createController() {
   const salarySlipService = {
     getApprovedSalarySlipPdf: jest.fn(),
   };
+  const payrollReadinessService = {
+    getReadiness: jest.fn(),
+    listExceptions: jest.fn(),
+    acknowledge: jest.fn(),
+  };
 
   return {
     controller: new PayrollController(
       payrollService as never,
+      payrollReadinessService as never,
       salarySlipService as never,
     ),
     payrollService,
+    payrollReadinessService,
     salarySlipService,
   };
 }

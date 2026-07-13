@@ -1,14 +1,25 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../lib/api';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
-import { Input } from '../ui/input';
-import { Select } from '../ui/select';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { useEffect, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "../../lib/api";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "../ui/dialog";
+import { Input } from "../ui/input";
+import { Select } from "../ui/select";
+import { Loader2, AlertCircle } from "lucide-react";
 
-export type VoucherType = 'EXPENSE' | 'PAYMENT' | 'RECEIPT' | 'CONTRA';
+export type VoucherType =
+  | "JOURNAL"
+  | "EXPENSE"
+  | "PAYMENT"
+  | "RECEIPT"
+  | "CONTRA";
 
 interface VoucherDialogProps {
   isOpen: boolean;
@@ -18,10 +29,11 @@ interface VoucherDialogProps {
 }
 
 const voucherLabels: Record<VoucherType, string> = {
-  EXPENSE: 'Expense Voucher',
-  PAYMENT: 'Payment Voucher',
-  RECEIPT: 'Receipt Voucher',
-  CONTRA: 'Contra Voucher',
+  JOURNAL: "Journal Voucher",
+  EXPENSE: "Expense Voucher",
+  PAYMENT: "Payment Voucher",
+  RECEIPT: "Receipt Voucher",
+  CONTRA: "Contra Voucher",
 };
 
 export function VoucherDialog({
@@ -35,35 +47,40 @@ export function VoucherDialog({
   const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    expenseAccountId: '',
-    paymentAccountId: '',
-    payeeAccountId: '',
-    receiptAccountId: '',
-    depositAccountId: '',
-    fromAccountId: '',
-    toAccountId: '',
+    debitAccountId: "",
+    creditAccountId: "",
+    expenseAccountId: "",
+    paymentAccountId: "",
+    payeeAccountId: "",
+    receiptAccountId: "",
+    depositAccountId: "",
+    fromAccountId: "",
+    toAccountId: "",
     amount: 0,
-    entryDate: new Date().toISOString().split('T')[0],
-    narration: '',
-    reference: '',
+    entryDate: new Date().toISOString().split("T")[0],
+    narration: "",
+    reference: "",
   });
 
   const mutation = useMutation({
     mutationFn: (data: any) => {
-      if (voucherType === 'EXPENSE') return api.createExpenseVoucher(data);
-      if (voucherType === 'PAYMENT') return api.createPaymentVoucher(data);
-      if (voucherType === 'RECEIPT') return api.createReceiptVoucher(data);
+      if (voucherType === "JOURNAL") return api.createManualJournal(data);
+      if (voucherType === "EXPENSE") return api.createExpenseVoucher(data);
+      if (voucherType === "PAYMENT") return api.createPaymentVoucher(data);
+      if (voucherType === "RECEIPT") return api.createReceiptVoucher(data);
       return api.createContraVoucher(data);
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['ledger-entries'] });
-      void queryClient.invalidateQueries({ queryKey: ['accounting-summary'] });
-      void queryClient.invalidateQueries({ queryKey: ['accounting-dashboard-summary'] });
-      void queryClient.invalidateQueries({ queryKey: ['accounting-report'] });
+      void queryClient.invalidateQueries({ queryKey: ["ledger-entries"] });
+      void queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["accounting-dashboard-summary"],
+      });
+      void queryClient.invalidateQueries({ queryKey: ["accounting-report"] });
       onClose();
     },
     onError: (err: any) => {
-      setError(err.message || 'Failed to create voucher');
+      setError(err.message || "Failed to create voucher");
     },
     onSettled: () => setLoading(false),
   });
@@ -78,24 +95,45 @@ export function VoucherDialog({
     e.preventDefault();
     setError(null);
     setLoading(true);
-    
+
     const payload: any = {
-      amount: Number(formData.amount),
       entryDate: formData.entryDate,
       narration: formData.narration,
-      reference: formData.reference,
     };
 
-    if (voucherType === 'EXPENSE') {
+    if (voucherType === "JOURNAL") {
+      payload.sourceId = formData.reference || undefined;
+      payload.lines = [
+        {
+          chartAccountId: formData.debitAccountId,
+          side: "DEBIT",
+          amount: Number(formData.amount),
+          description: formData.narration,
+        },
+        {
+          chartAccountId: formData.creditAccountId,
+          side: "CREDIT",
+          amount: Number(formData.amount),
+          description: formData.narration,
+        },
+      ];
+    } else {
+      payload.amount = Number(formData.amount);
+      if (voucherType !== "CONTRA") {
+        payload.reference = formData.reference || undefined;
+      }
+    }
+
+    if (voucherType === "EXPENSE") {
       payload.expenseAccountId = formData.expenseAccountId;
       payload.paymentAccountId = formData.paymentAccountId;
-    } else if (voucherType === 'PAYMENT') {
+    } else if (voucherType === "PAYMENT") {
       payload.payeeAccountId = formData.payeeAccountId;
       payload.paymentAccountId = formData.paymentAccountId;
-    } else if (voucherType === 'RECEIPT') {
+    } else if (voucherType === "RECEIPT") {
       payload.receiptAccountId = formData.receiptAccountId;
       payload.depositAccountId = formData.depositAccountId;
-    } else if (voucherType === 'CONTRA') {
+    } else if (voucherType === "CONTRA") {
       payload.fromAccountId = formData.fromAccountId;
       payload.toAccountId = formData.toAccountId;
     }
@@ -120,173 +158,343 @@ export function VoucherDialog({
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700">Entry Date</label>
+              <label
+                htmlFor={`${voucherType.toLowerCase()}-entry-date`}
+                className="text-sm font-medium text-slate-700"
+              >
+                Entry Date
+              </label>
               <Input
+                id={`${voucherType.toLowerCase()}-entry-date`}
                 type="date"
                 value={formData.entryDate}
-                onChange={(e) => setFormData({ ...formData, entryDate: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, entryDate: e.target.value })
+                }
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700">Amount</label>
+              <label
+                htmlFor={`${voucherType.toLowerCase()}-amount`}
+                className="text-sm font-medium text-slate-700"
+              >
+                Amount
+              </label>
               <Input
+                id={`${voucherType.toLowerCase()}-amount`}
                 type="number"
                 step="0.01"
                 min="0.01"
                 value={formData.amount}
-                onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
+                onChange={(e) =>
+                  setFormData({ ...formData, amount: Number(e.target.value) })
+                }
                 required
               />
             </div>
 
-            {voucherType === 'EXPENSE' && (
+            {voucherType === "JOURNAL" && (
               <>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">Expense Account</label>
-                  <Select 
-                    value={formData.expenseAccountId} 
-                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, expenseAccountId: e.target.value })}
+                  <label className="text-sm font-medium text-slate-700">
+                    Debit Account
+                  </label>
+                  <Select
+                    value={formData.debitAccountId}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                      setFormData({
+                        ...formData,
+                        debitAccountId: e.target.value,
+                      })
+                    }
+                    required
                   >
                     <option value="">Select account</option>
-                    {accounts.filter(a => a.type === 'EXPENSE').map(a => (
-                      <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
-                    ))}
+                    {accounts
+                      .filter((account) => account.isActive !== false)
+                      .map((account) => (
+                        <option key={account.id} value={account.id}>
+                          {account.code} - {account.name}
+                        </option>
+                      ))}
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">Payment Account (Bank/Cash)</label>
-                  <Select 
-                    value={formData.paymentAccountId} 
-                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, paymentAccountId: e.target.value })}
+                  <label className="text-sm font-medium text-slate-700">
+                    Credit Account
+                  </label>
+                  <Select
+                    value={formData.creditAccountId}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                      setFormData({
+                        ...formData,
+                        creditAccountId: e.target.value,
+                      })
+                    }
+                    required
                   >
                     <option value="">Select account</option>
-                    {accounts.filter(a => ['ASSET', 'LIABILITY'].includes(a.type)).map(a => (
-                      <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
-                    ))}
+                    {accounts
+                      .filter((account) => account.isActive !== false)
+                      .map((account) => (
+                        <option key={account.id} value={account.id}>
+                          {account.code} - {account.name}
+                        </option>
+                      ))}
                   </Select>
                 </div>
               </>
             )}
 
-            {voucherType === 'PAYMENT' && (
+            {voucherType === "EXPENSE" && (
               <>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">Payee Account (Vendor/Liability)</label>
-                  <Select 
-                    value={formData.payeeAccountId} 
-                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, payeeAccountId: e.target.value })}
+                  <label className="text-sm font-medium text-slate-700">
+                    Expense Account
+                  </label>
+                  <Select
+                    value={formData.expenseAccountId}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                      setFormData({
+                        ...formData,
+                        expenseAccountId: e.target.value,
+                      })
+                    }
                   >
                     <option value="">Select account</option>
-                    {accounts.map(a => (
-                      <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
-                    ))}
+                    {accounts
+                      .filter((a) => a.type === "EXPENSE")
+                      .map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.code} - {a.name}
+                        </option>
+                      ))}
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">Payment Account (Bank/Cash)</label>
-                  <Select 
-                    value={formData.paymentAccountId} 
-                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, paymentAccountId: e.target.value })}
+                  <label className="text-sm font-medium text-slate-700">
+                    Payment Account (Bank/Cash)
+                  </label>
+                  <Select
+                    value={formData.paymentAccountId}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                      setFormData({
+                        ...formData,
+                        paymentAccountId: e.target.value,
+                      })
+                    }
                   >
                     <option value="">Select account</option>
-                    {accounts.filter(a => ['ASSET', 'LIABILITY'].includes(a.type)).map(a => (
-                      <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
-                    ))}
+                    {accounts
+                      .filter((a) => ["ASSET", "LIABILITY"].includes(a.type))
+                      .map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.code} - {a.name}
+                        </option>
+                      ))}
                   </Select>
                 </div>
               </>
             )}
 
-            {voucherType === 'RECEIPT' && (
+            {voucherType === "PAYMENT" && (
               <>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">Receipt Account (Income/Client)</label>
-                  <Select 
-                    value={formData.receiptAccountId} 
-                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, receiptAccountId: e.target.value })}
+                  <label className="text-sm font-medium text-slate-700">
+                    Payee Account (Vendor/Liability)
+                  </label>
+                  <Select
+                    value={formData.payeeAccountId}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                      setFormData({
+                        ...formData,
+                        payeeAccountId: e.target.value,
+                      })
+                    }
                   >
                     <option value="">Select account</option>
-                    {accounts.map(a => (
-                      <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                    {accounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.code} - {a.name}
+                      </option>
                     ))}
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">Deposit Account (Bank/Cash)</label>
-                  <Select 
-                    value={formData.depositAccountId} 
-                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, depositAccountId: e.target.value })}
+                  <label className="text-sm font-medium text-slate-700">
+                    Payment Account (Bank/Cash)
+                  </label>
+                  <Select
+                    value={formData.paymentAccountId}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                      setFormData({
+                        ...formData,
+                        paymentAccountId: e.target.value,
+                      })
+                    }
                   >
                     <option value="">Select account</option>
-                    {accounts.filter(a => ['ASSET', 'LIABILITY'].includes(a.type)).map(a => (
-                      <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
-                    ))}
+                    {accounts
+                      .filter((a) => ["ASSET", "LIABILITY"].includes(a.type))
+                      .map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.code} - {a.name}
+                        </option>
+                      ))}
                   </Select>
                 </div>
               </>
             )}
 
-            {voucherType === 'CONTRA' && (
+            {voucherType === "RECEIPT" && (
               <>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">From Account (Source)</label>
-                  <Select 
-                    value={formData.fromAccountId} 
-                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, fromAccountId: e.target.value })}
+                  <label className="text-sm font-medium text-slate-700">
+                    Receipt Account (Income/Client)
+                  </label>
+                  <Select
+                    value={formData.receiptAccountId}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                      setFormData({
+                        ...formData,
+                        receiptAccountId: e.target.value,
+                      })
+                    }
                   >
                     <option value="">Select account</option>
-                    {accounts.filter(a => ['ASSET', 'LIABILITY'].includes(a.type)).map(a => (
-                      <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                    {accounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.code} - {a.name}
+                      </option>
                     ))}
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">To Account (Destination)</label>
-                  <Select 
-                    value={formData.toAccountId} 
-                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, toAccountId: e.target.value })}
+                  <label className="text-sm font-medium text-slate-700">
+                    Deposit Account (Bank/Cash)
+                  </label>
+                  <Select
+                    value={formData.depositAccountId}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                      setFormData({
+                        ...formData,
+                        depositAccountId: e.target.value,
+                      })
+                    }
                   >
                     <option value="">Select account</option>
-                    {accounts.filter(a => ['ASSET', 'LIABILITY'].includes(a.type)).map(a => (
-                      <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
-                    ))}
+                    {accounts
+                      .filter((a) => ["ASSET", "LIABILITY"].includes(a.type))
+                      .map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.code} - {a.name}
+                        </option>
+                      ))}
+                  </Select>
+                </div>
+              </>
+            )}
+
+            {voucherType === "CONTRA" && (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700">
+                    From Account (Source)
+                  </label>
+                  <Select
+                    value={formData.fromAccountId}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                      setFormData({
+                        ...formData,
+                        fromAccountId: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="">Select account</option>
+                    {accounts
+                      .filter((a) => ["ASSET", "LIABILITY"].includes(a.type))
+                      .map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.code} - {a.name}
+                        </option>
+                      ))}
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700">
+                    To Account (Destination)
+                  </label>
+                  <Select
+                    value={formData.toAccountId}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                      setFormData({ ...formData, toAccountId: e.target.value })
+                    }
+                  >
+                    <option value="">Select account</option>
+                    {accounts
+                      .filter((a) => ["ASSET", "LIABILITY"].includes(a.type))
+                      .map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.code} - {a.name}
+                        </option>
+                      ))}
                   </Select>
                 </div>
               </>
             )}
 
             <div className="space-y-2 col-span-2">
-              <label className="text-sm font-medium text-slate-700">Narration</label>
+              <label
+                htmlFor={`${voucherType.toLowerCase()}-narration`}
+                className="text-sm font-medium text-slate-700"
+              >
+                Narration
+              </label>
               <Input
+                id={`${voucherType.toLowerCase()}-narration`}
                 value={formData.narration}
-                onChange={(e) => setFormData({ ...formData, narration: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, narration: e.target.value })
+                }
                 placeholder="Description of the transaction"
                 required
               />
             </div>
 
             <div className="space-y-2 col-span-2">
-              <label className="text-sm font-medium text-slate-700">Reference (Optional)</label>
+              <label
+                htmlFor={`${voucherType.toLowerCase()}-reference`}
+                className="text-sm font-medium text-slate-700"
+              >
+                Reference (Optional)
+              </label>
               <Input
+                id={`${voucherType.toLowerCase()}-reference`}
                 value={formData.reference}
-                onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, reference: e.target.value })
+                }
                 placeholder="Cheque No, Invoice No, etc."
               />
             </div>
           </div>
 
           <div className="mt-4 rounded-2xl bg-amber-50 border border-amber-100 p-4">
-             <div className="flex gap-3">
-               <AlertCircle size={18} className="text-amber-600 shrink-0" />
-               <div>
-                 <p className="text-xs font-bold text-amber-900">Immutable Ledger Warning</p>
-                 <p className="text-[10px] mt-0.5 text-amber-700 font-medium leading-relaxed">
-                   Posted journals cannot be edited. If you make a mistake, you must use a reversal or correction workflow to maintain the audit trail.
-                 </p>
-               </div>
-             </div>
+            <div className="flex gap-3">
+              <AlertCircle size={18} className="text-amber-600 shrink-0" />
+              <div>
+                <p className="text-xs font-bold text-amber-900">
+                  Immutable Ledger Warning
+                </p>
+                <p className="text-[10px] mt-0.5 text-amber-700 font-medium leading-relaxed">
+                  Posted journals cannot be edited. If you make a mistake, you
+                  must use a reversal or correction workflow to maintain the
+                  audit trail.
+                </p>
+              </div>
+            </div>
           </div>
 
           <DialogFooter className="pt-4">

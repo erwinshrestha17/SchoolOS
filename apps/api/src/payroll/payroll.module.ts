@@ -7,6 +7,7 @@ import { FileRegistryModule } from '../file-registry/file-registry.module';
 import { HrContractsController } from '../hr/hr-contracts.controller';
 import { PayrollController } from './payroll.controller';
 import { PayrollProcessor } from './payroll.processor';
+import { PayrollReadinessService } from './payroll-readiness.service';
 import { PayrollSalarySlipService } from './payroll-salary-slip.service';
 import { PayrollService } from './payroll.service';
 
@@ -21,7 +22,12 @@ import { PayrollService } from './payroll.service';
     }),
   ],
   controllers: [HrContractsController, PayrollController],
-  providers: [PayrollService, PayrollSalarySlipService, PayrollProcessor],
-  exports: [PayrollService, PayrollSalarySlipService],
+  providers: [
+    PayrollService,
+    PayrollReadinessService,
+    PayrollSalarySlipService,
+    PayrollProcessor,
+  ],
+  exports: [PayrollService, PayrollReadinessService, PayrollSalarySlipService],
 })
 export class PayrollModule {}

@@ -81,9 +81,46 @@ model PayrollRun {
   reversedBy User?         @relation("ReversedPayrollRuns", fields: [reversedById], references: [id], onDelete: SetNull)
   lines      PayrollLine[]
   payslips   Payslip[]
+  exceptions PayrollException[]
 
   @@unique([tenantId, periodMonth, periodYear])
   @@index([tenantId, status])
+}
+
+model PayrollException {
+  id                   String                   @id @default(uuid())
+  tenantId             String
+  payrollRunId         String?
+  staffId              String?
+  periodYear           Int
+  periodMonth          Int
+  identityKey          String
+  code                 PayrollExceptionCode
+  severity             PayrollExceptionSeverity
+  status               PayrollExceptionStatus  @default(OPEN)
+  title                String
+  safeMessage          String
+  resolutionRoute      String?
+  blockedActions       String[]
+  detectedAt           DateTime                 @default(now())
+  lastDetectedAt       DateTime                 @default(now())
+  acknowledgedAt       DateTime?
+  acknowledgedById     String?
+  acknowledgementReason String?
+  resolvedAt           DateTime?
+  resolutionReason     String?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  payrollRun PayrollRun? @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  staff      Staff?      @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, identityKey])
+  @@index([tenantId, periodYear, periodMonth, status, severity])
+  @@index([tenantId, payrollRunId, status])
+  @@index([tenantId, staffId, status])
+  @@index([tenantId, code, status])
 }
 
 model PayrollLine {

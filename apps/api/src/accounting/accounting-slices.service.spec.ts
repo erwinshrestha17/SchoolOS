@@ -75,12 +75,20 @@ describe('AccountingService - Slices 2-5', () => {
         findMany: jest.fn().mockResolvedValue([]),
         count: jest.fn().mockResolvedValue(0),
         update: jest.fn(),
+        updateMany: jest.fn(),
         aggregate: jest
           .fn()
           .mockResolvedValue({ _sum: { debitAmount: 0, creditAmount: 0 } }),
       },
+      bankStatementImportBatch: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn(),
+      },
       $transaction: jest.fn(),
     };
+    prisma.$transaction.mockImplementation(async (input: unknown) =>
+      typeof input === 'function' ? input(prisma) : Promise.all(input as any),
+    );
 
     auditService = {
       record: jest.fn().mockResolvedValue(undefined),
@@ -520,7 +528,9 @@ describe('AccountingService - Slices 2-5', () => {
         { id: 'bs-1', description: 'Payment received' },
         { id: 'bs-2', description: 'Rent paid' },
       ];
-      prisma.$transaction.mockResolvedValue(createdStatements);
+      prisma.bankStatement.create
+        .mockResolvedValueOnce(createdStatements[0])
+        .mockResolvedValueOnce(createdStatements[1]);
 
       const result = await service.importBankStatement(
         'bank-acc',
@@ -540,11 +550,13 @@ describe('AccountingService - Slices 2-5', () => {
       );
 
       expect(result.count).toBe(2);
-      expect(result.importBatchId).toMatch(
-        /^IMPORT-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+      expect(result.idempotent).toBe(false);
+      expect(result.importBatchId).toMatch(/^IMPORT-[0-9a-f]{64}$/);
+      expect(prisma.bankStatementImportBatch.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ lineCount: 2 }),
+        }),
       );
-      const transactionCalls = prisma.$transaction.mock.calls[0][0];
-      expect(transactionCalls).toHaveLength(2);
       expect(auditService.record).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'import',
@@ -569,6 +581,55 @@ describe('AccountingService - Slices 2-5', () => {
           actor,
         ),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('returns an existing batch without duplicating statement rows', async () => {
+      prisma.chartAccount.findFirst.mockResolvedValue({
+        id: 'bank-acc',
+        code: '1010',
+        name: 'Bank Account',
+      });
+      prisma.bankStatementImportBatch.findFirst.mockResolvedValue({
+        id: 'existing-batch',
+      });
+      prisma.bankStatement.findMany.mockResolvedValue([
+        { id: 'bs-existing', accountId: 'bank-acc' },
+      ]);
+
+      const result = await service.importBankStatement(
+        'bank-acc',
+        [
+          {
+            statementDate: '2026-04-01',
+            description: 'Payment received',
+            debitAmount: 5000,
+          },
+        ],
+        actor,
+      );
+
+      expect(result.idempotent).toBe(true);
+      expect(result.count).toBe(1);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('rejects duplicate rows inside one import', async () => {
+      const duplicate = {
+        statementDate: '2026-04-01',
+        description: 'Same statement row',
+        debitAmount: 5000,
+      };
+
+      await expect(
+        service.importBankStatement(
+          'bank-acc',
+          [duplicate, { ...duplicate }],
+          actor,
+        ),
+      ).rejects.toThrow('duplicates another row in this import');
+
+      expect(prisma.chartAccount.findFirst).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
     it('should reject empty bank statement imports before persistence', async () => {
@@ -605,22 +666,31 @@ describe('AccountingService - Slices 2-5', () => {
 
   describe('reconcileStatement', () => {
     it('should match a bank statement line to a journal line', async () => {
-      prisma.bankStatement.findFirst.mockResolvedValue({
-        id: 'bs-1',
-        tenantId: 'tenant-1',
-        isReconciled: false,
-      });
+      prisma.bankStatement.findFirst
+        .mockResolvedValueOnce({
+          id: 'bs-1',
+          tenantId: 'tenant-1',
+          accountId: 'bank-acc',
+          debitAmount: 500,
+          creditAmount: 0,
+          isReconciled: false,
+        })
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          id: 'bs-1',
+          isReconciled: true,
+          journalLineId: 'jl-1',
+        });
 
       prisma.journalLine.findFirst.mockResolvedValue({
         id: 'jl-1',
         tenantId: 'tenant-1',
+        chartAccountId: 'bank-acc',
+        debit: 500,
+        credit: 0,
       });
 
-      prisma.bankStatement.update.mockResolvedValue({
-        id: 'bs-1',
-        isReconciled: true,
-        journalLineId: 'jl-1',
-      });
+      prisma.bankStatement.updateMany.mockResolvedValue({ count: 1 });
 
       const result = (await service.reconcileStatement(
         'bs-1',
@@ -648,6 +718,27 @@ describe('AccountingService - Slices 2-5', () => {
       await expect(
         service.reconcileStatement('bs-1', 'jl-1', actor),
       ).rejects.toThrow('Statement line is already reconciled');
+    });
+
+    it('rejects a journal line whose amount differs from the statement', async () => {
+      prisma.bankStatement.findFirst.mockResolvedValue({
+        id: 'bs-1',
+        tenantId: 'tenant-1',
+        accountId: 'bank-acc',
+        debitAmount: 500,
+        creditAmount: 0,
+        isReconciled: false,
+      });
+      prisma.journalLine.findFirst.mockResolvedValue({
+        id: 'jl-1',
+        debit: 499,
+        credit: 0,
+      });
+
+      await expect(
+        service.reconcileStatement('bs-1', 'jl-1', actor),
+      ).rejects.toThrow('amounts must match');
+      expect(prisma.bankStatement.updateMany).not.toHaveBeenCalled();
     });
   });
 
@@ -697,7 +788,8 @@ describe('AccountingService - Slices 2-5', () => {
           accountId: 'bank-acc',
           isReconciled: false,
         },
-        orderBy: { statementDate: 'asc' },
+        orderBy: [{ statementDate: 'asc' }, { id: 'asc' }],
+        take: 200,
       });
     });
   });

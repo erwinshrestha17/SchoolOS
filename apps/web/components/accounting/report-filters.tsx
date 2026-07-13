@@ -14,6 +14,7 @@ interface ReportFiltersProps {
     endDate?: string;
     fiscalYearId?: string;
     fiscalPeriodId?: string;
+    accountId?: string;
   }) => void;
 }
 
@@ -21,6 +22,10 @@ export function ReportFilters({ onFilterChange }: ReportFiltersProps) {
   const fiscalYearsQuery = useQuery({
     queryKey: ["fiscal-years"],
     queryFn: () => api.listFiscalYears(),
+  });
+  const accountsQuery = useQuery({
+    queryKey: ["chart-accounts", "report-filters"],
+    queryFn: () => api.listChartAccounts(),
   });
 
   const activeYear = (fiscalYearsQuery.data ?? []).find(
@@ -79,7 +84,7 @@ export function ReportFilters({ onFilterChange }: ReportFiltersProps) {
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="space-y-1.5">
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-tight ml-1">
             Fiscal Year
@@ -99,6 +104,28 @@ export function ReportFilters({ onFilterChange }: ReportFiltersProps) {
                 {year.name} {year.status === "OPEN" ? " (Active)" : ""}
               </option>
             ))}
+          </Select>
+        </div>
+
+        <div className="space-y-1.5">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-tight ml-1">
+            Ledger Account
+          </p>
+          <Select
+            defaultValue=""
+            onChange={(e) =>
+              onFilterChange({ accountId: e.target.value || undefined })
+            }
+            className="h-11 w-full rounded-xl border-slate-200 text-xs font-bold shadow-sm"
+          >
+            <option value="">All mapped accounts</option>
+            {(accountsQuery.data ?? [])
+              .filter((account) => account.isActive !== false)
+              .map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.code} - {account.name}
+                </option>
+              ))}
           </Select>
         </div>
 

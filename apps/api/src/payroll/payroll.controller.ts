@@ -33,12 +33,16 @@ import {
   PayrollRunListQueryDto,
   PayslipListQueryDto,
   SalaryStructureListQueryDto,
-  StaffContractListQueryDto,
 } from './dto/payroll-list-query.dto';
 import { PayrollPreviewQueryDto } from './dto/payroll-preview-query.dto';
 import { PayrollReportQueryDto } from './dto/payroll-report-query.dto';
 import { PayslipRegenerationJobSummaryDto } from './dto/payslip-regeneration-job.dto';
+import {
+  AcknowledgePayrollExceptionDto,
+  PayrollExceptionQueryDto,
+} from './dto/payroll-exception-query.dto';
 import { UpdateSalaryStructureDto } from './dto/update-salary-structure.dto';
+import { PayrollReadinessService } from './payroll-readiness.service';
 import { PayrollSalarySlipService } from './payroll-salary-slip.service';
 import { PayrollService } from './payroll.service';
 
@@ -51,8 +55,58 @@ import { PayrollService } from './payroll.service';
 export class PayrollController {
   constructor(
     private readonly payrollService: PayrollService,
+    private readonly payrollReadinessService: PayrollReadinessService,
     private readonly salarySlipService: PayrollSalarySlipService,
   ) {}
+
+  @Get('readiness')
+  @Permissions('payroll:run:read')
+  @ApiOperation({
+    summary: 'Get backend-owned payroll readiness for a bounded period',
+  })
+  getReadiness(
+    @Query() query: PayrollExceptionQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollReadinessService.getReadiness(query, auth);
+  }
+
+  @Get('exceptions')
+  @Permissions('payroll:run:read')
+  @ApiOperation({
+    summary: 'List tenant-scoped payroll exceptions with server pagination',
+  })
+  listExceptions(
+    @Query() query: PayrollExceptionQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollReadinessService.listExceptions(query, auth);
+  }
+
+  @Post('readiness/recheck')
+  @Permissions('payroll:run:review')
+  @ApiOperation({
+    summary: 'Recompute payroll readiness from canonical source data',
+  })
+  recheckReadiness(
+    @Query() query: PayrollExceptionQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollReadinessService.getReadiness(query, auth);
+  }
+
+  @Post('exceptions/:id/acknowledge')
+  @Permissions('payroll:run:review')
+  @ApiOperation({
+    summary: 'Acknowledge a payroll warning with an audited reason',
+  })
+  acknowledgeException(
+    @Param('id') id: string,
+    @Body() dto: AcknowledgePayrollExceptionDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollReadinessService.acknowledge(id, dto, auth);
+  }
 
   @Get('preview')
   @Permissions('payroll:run:read')

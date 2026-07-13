@@ -1,4 +1,4 @@
-import type { StaffSummary } from './staff.js';
+import type { StaffSummary } from "./staff.js";
 
 export type PayrollMoneyAmount = string | number;
 
@@ -140,10 +140,10 @@ export type PayslipSummary = {
 };
 
 export type PayslipRegenerationJobStatus =
-  | 'QUEUED'
-  | 'PROCESSING'
-  | 'SUCCEEDED'
-  | 'FAILED';
+  | "QUEUED"
+  | "PROCESSING"
+  | "SUCCEEDED"
+  | "FAILED";
 
 export type PayslipRegenerationJobSummary = {
   jobId: string;
@@ -165,7 +165,7 @@ export type PayrollDashboardSummary = {
     periodYear: number;
     payrollRunId: string | null;
     contractWindowDays: number;
-    timezone: 'Asia/Kathmandu';
+    timezone: "Asia/Kathmandu";
     windowStart: string;
     windowEndExclusive: string;
   };
@@ -177,12 +177,12 @@ export type PayrollDashboardSummary = {
   payrollRunsByStatus: Record<string, number>;
   latestPayrollRun: Pick<
     PayrollRunSummary,
-    | 'id'
-    | 'periodMonth'
-    | 'periodYear'
-    | 'status'
-    | 'journalEntryId'
-    | 'disbursementJournalEntryId'
+    | "id"
+    | "periodMonth"
+    | "periodYear"
+    | "status"
+    | "journalEntryId"
+    | "disbursementJournalEntryId"
   > | null;
   selectedPayrollRun: {
     id: string;
@@ -205,12 +205,82 @@ export type PayrollDashboardSummary = {
       salaryDisbursementProviderSupported: boolean;
     };
     payslipGeneration: {
-      status: 'UNAVAILABLE' | 'PENDING' | 'PARTIAL' | 'COMPLETE';
+      status: "UNAVAILABLE" | "PENDING" | "PARTIAL" | "COMPLETE";
       total: number;
       expected: number;
       byStatus: Record<string, number>;
     };
-    validationExceptionCount: null;
-    validationExceptionSource: 'needs_exception_workflow_contract';
+    validationExceptionCount: number;
+    validationExceptionSource: "payroll_exception_workflow";
+    validationExceptionsBySeverity: Record<PayrollExceptionSeverity, number>;
   } | null;
+};
+
+export type PayrollExceptionSeverity = "BLOCKING" | "WARNING" | "INFO";
+export type PayrollExceptionStatus =
+  | "OPEN"
+  | "ACKNOWLEDGED"
+  | "RESOLVED"
+  | "WAIVED";
+export type PayrollExceptionCode =
+  | "MISSING_SALARY_STRUCTURE"
+  | "NO_EFFECTIVE_SALARY_STRUCTURE"
+  | "MISSING_ACTIVE_CONTRACT"
+  | "EXPIRED_CONTRACT"
+  | "INACTIVE_STAFF_INCLUDED"
+  | "MISSING_ATTENDANCE"
+  | "ATTENDANCE_ANOMALY"
+  | "LEAVE_OVERLAP"
+  | "MISSING_PAN"
+  | "MISSING_BANK_ACCOUNT"
+  | "MISSING_STATUTORY_CONFIGURATION"
+  | "INVALID_WORKING_DAYS"
+  | "NEGATIVE_NET_PAY"
+  | "MISSING_ACCOUNT_MAPPING"
+  | "FISCAL_PERIOD_LOCKED"
+  | "ACCOUNTING_POSTING_FAILED"
+  | "PAYSLIP_GENERATION_FAILED";
+
+export type PayrollExceptionSummary = {
+  id: string;
+  payrollRunId: string | null;
+  staffId: string | null;
+  employeeId: string | null;
+  staffName: string | null;
+  department: string | null;
+  code: PayrollExceptionCode;
+  severity: PayrollExceptionSeverity;
+  status: PayrollExceptionStatus;
+  title: string;
+  safeMessage: string;
+  resolutionRoute: string | null;
+  blockedActions: string[];
+  detectedAt: string;
+  acknowledgedAt: string | null;
+  resolvedAt: string | null;
+  resolutionReason: string | null;
+};
+
+export type PayrollReadinessSummary = {
+  period: { year: number; month: number };
+  staffConsidered: number;
+  staffExcluded: number;
+  blockingExceptionCount: number;
+  warningCount: number;
+  informationalCount: number;
+  exceptionsByCategory: Partial<Record<PayrollExceptionCode, number>>;
+  readinessStatus: "BLOCKED" | "NEEDS_ACKNOWLEDGEMENT" | "READY";
+  allowedNextAction: string | null;
+  lastCalculatedAt: string;
+  stale: boolean;
+  selectedPayrollRun: Pick<PayrollRunSummary, "id" | "status"> | null;
+};
+
+export type PayrollExceptionPage = {
+  items: PayrollExceptionSummary[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  readiness: PayrollReadinessSummary;
 };

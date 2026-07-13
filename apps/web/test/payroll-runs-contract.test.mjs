@@ -18,7 +18,10 @@ describe('Payroll Runs UI contracts', () => {
   it('renders Payroll Runs from the HR workspace instead of the preview-only tab', () => {
     const workspace = read('components/hr/hr-workspace.tsx');
 
-    assert.equal(existsSync(join(webRoot, 'components/hr/payroll-runs.tsx')), true);
+    assert.equal(
+      existsSync(join(webRoot, 'components/hr/payroll-runs.tsx')),
+      true,
+    );
     assert.match(workspace, /import \{ PayrollRuns \} from '\.\/payroll-runs'/);
     assert.match(workspace, /label: 'Payroll Runs'/);
     assert.match(workspace, /<PayrollRuns \/>/);
@@ -27,10 +30,7 @@ describe('Payroll Runs UI contracts', () => {
   });
 
   it('uses only preview, create, approve, post, list, and approved salary-slip PDF helpers', () => {
-    const apiClient = readMany([
-      'lib/api/payroll.ts',
-      'lib/api/client.ts',
-    ]);
+    const apiClient = readMany(['lib/api/payroll.ts', 'lib/api/client.ts']);
     const payrollRuns = read('components/hr/payroll-runs.tsx');
     const payrollWorkflow = readMany([
       'components/hr/payroll-runs.tsx',
@@ -44,8 +44,16 @@ describe('Payroll Runs UI contracts', () => {
       'postPayrollRun',
       'getPayrollPreview',
     ]) {
-      assert.match(apiClient, new RegExp(`${helper}:`), `Missing API helper: ${helper}`);
-      assert.match(payrollWorkflow, new RegExp(`api\\.${helper}`), `Payroll Runs UI does not use ${helper}`);
+      assert.match(
+        apiClient,
+        new RegExp(`${helper}:`),
+        `Missing API helper: ${helper}`,
+      );
+      assert.match(
+        payrollWorkflow,
+        new RegExp(`api\\.${helper}`),
+        `Payroll Runs UI does not use ${helper}`,
+      );
     }
 
     assert.match(apiClient, /openApprovedSalarySlipPdf/);
@@ -62,20 +70,26 @@ describe('Payroll Runs UI contracts', () => {
     assert.doesNotMatch(payrollRuns, /getPayslipPdf/);
   });
 
-  it('keeps Payroll Runs UI inside the Phase 2 posting boundary without disbursement or reversals', () => {
-    const apiClient = readMany([
-      'lib/api/payroll.ts',
-      'lib/api/client.ts',
-    ]);
+  it('keeps Payroll Runs UI inside the posting boundary with reasoned reversal', () => {
+    const apiClient = readMany(['lib/api/payroll.ts', 'lib/api/client.ts']);
     const payrollRuns = read('components/hr/payroll-runs.tsx');
 
     assert.match(payrollRuns, /Approval locks payroll calculations/i);
-    assert.match(payrollRuns, /Posting is a separate APPROVED-to-POSTED action/i);
-    assert.match(payrollRuns, /creates the M11 payroll accrual journal/i);
-    assert.match(payrollRuns, /backend accounting posting boundary/i);
-    assert.match(payrollRuns, /does not disburse salaries/i);
-    assert.match(payrollRuns, /does not.*create reversal entries/i);
-    assert.match(payrollRuns, /allow editing posted runs|enable editing posted runs/i);
+    assert.match(
+      payrollRuns,
+      /Posting is a separate\s+APPROVED-to-POSTED action/i,
+    );
+    assert.match(payrollRuns, /creates the M11 payroll accrual\s+journal/i);
+    assert.match(payrollRuns, /backend accounting posting\s+boundary/i);
+    assert.match(payrollRuns, /does\s+not disburse salaries/i);
+    assert.match(
+      payrollRuns,
+      /reversal is a separate reasoned backend\s+workflow/i,
+    );
+    assert.match(
+      payrollRuns,
+      /posted runs remain\s+immutable|allow editing posted runs|enable editing posted runs/i,
+    );
     assert.match(payrollRuns, /selectedRun\.status === 'APPROVED'/);
     assert.match(payrollRuns, /selectedRun\.status === 'POSTED'/);
 
@@ -84,16 +98,23 @@ describe('Payroll Runs UI contracts', () => {
     assert.doesNotMatch(payrollRuns, /\/accounting\/journal-entries/);
     assert.doesNotMatch(payrollRuns, /\/accounting\/ledger/);
     assert.doesNotMatch(payrollRuns, /\/ledger\/entries/);
-    assert.doesNotMatch(payrollRuns, /disbursePayroll|paySalary|releasePayment|reversePayroll|voidPostedPayroll/i);
-    assert.doesNotMatch(payrollRuns, /payslipNumber|openPdfBlob|getPayslipPdf|listPayslips/);
-    assert.doesNotMatch(apiClient, /disbursePayroll|paySalary|releasePayment|reversePayroll|voidPostedPayroll/i);
+    assert.doesNotMatch(
+      payrollRuns,
+      /disbursePayroll|paySalary|releasePayment|voidPostedPayroll/i,
+    );
+    assert.doesNotMatch(
+      payrollRuns,
+      /payslipNumber|openPdfBlob|getPayslipPdf|listPayslips/,
+    );
+    assert.doesNotMatch(
+      apiClient,
+      /disbursePayroll|paySalary|releasePayment|voidPostedPayroll/i,
+    );
+    assert.match(apiClient, /reversePayrollRun/);
   });
 
   it('keeps Payroll Runs permission-aware and avoids internal tenant or journal identifier leakage', () => {
-    const apiClient = readMany([
-      'lib/api/payroll.ts',
-      'lib/api/client.ts',
-    ]);
+    const apiClient = readMany(['lib/api/payroll.ts', 'lib/api/client.ts']);
     const payrollRuns = read('components/hr/payroll-runs.tsx');
 
     assert.match(payrollRuns, /hasPermissions\(\['payroll:manage'\]\)/);
@@ -101,7 +122,10 @@ describe('Payroll Runs UI contracts', () => {
     assert.match(payrollRuns, /payroll:manage/);
     assert.doesNotMatch(payrollRuns, /tenantId/);
     assert.doesNotMatch(payrollRuns, /objectKey|storageObjectKey|database/i);
-    assert.doesNotMatch(payrollRuns, /\{selectedRun\.journalEntryId\}|Journal ID|journalEntryId:/);
+    assert.doesNotMatch(
+      payrollRuns,
+      /\{selectedRun\.journalEntryId\}|Journal ID|journalEntryId:/,
+    );
     assert.doesNotMatch(apiClient, /objectKey|storageObjectKey|database/i);
   });
 
@@ -111,32 +135,30 @@ describe('Payroll Runs UI contracts', () => {
     const adminPayslips = read('components/hr/payslip-list.tsx');
 
     assert.match(apiClient, /openMyPayslipPdf/);
-    assert.match(apiClient, /\/payroll\/me\/payslips\/\$\{encodeURIComponent\(payslipNumber\)\}\.pdf/);
+    assert.match(
+      apiClient,
+      /\/payroll\/me\/payslips\/\$\{encodeURIComponent\(payslipNumber\)\}\.pdf/,
+    );
     assert.match(myPayslips, /api\.openMyPayslipPdf/);
     assert.match(myPayslips, /api\.listMyPayslips/);
     assert.doesNotMatch(myPayslips, /api\.openPayslipPdf/);
     assert.match(adminPayslips, /api\.openPayslipPdf/);
   });
 
-  it('keeps exception totals unavailable and maps missing payslip files to regeneration guidance', () => {
+  it('uses backend exception totals and maps missing payslip files to regeneration guidance', () => {
     const client = read('lib/api/client.ts');
     const hrDashboard = read('app/dashboard/hr/page.tsx');
     const adminPayslips = read('components/hr/payslip-list.tsx');
     const myPayslips = read('components/staff/my-payslips.tsx');
 
     assert.match(hrDashboard, /title="Payroll Exceptions"/);
-    assert.match(hrDashboard, /value="Unavailable"/);
-    assert.match(
-      hrDashboard,
-      /Unavailable until a backend exception workflow contract exists/,
-    );
+    assert.match(hrDashboard, /selectedRun\?\.validationExceptionCount/);
+    assert.match(hrDashboard, /href="\/dashboard\/payroll\/readiness"/);
+    assert.match(hrDashboard, /Backend-owned readiness queue/);
     assert.match(client, /throw new ApiRequestError\(/);
     assert.match(adminPayslips, /error instanceof ApiRequestError/);
     assert.match(adminPayslips, /error\.statusCode === 409/);
-    assert.match(
-      adminPayslips,
-      /Regenerate payslips before downloading/,
-    );
+    assert.match(adminPayslips, /Regenerate payslips before downloading/);
     assert.match(myPayslips, /error instanceof ApiRequestError/);
     assert.match(myPayslips, /error\.statusCode === 409/);
     assert.match(myPayslips, /Ask your payroll administrator to regenerate it/);

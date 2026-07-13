@@ -42,6 +42,7 @@ import { CreateOpeningBalanceDto } from './dto/opening-balance.dto';
 import {
   ImportBankStatementDto,
   ReconcileBankStatementDto,
+  UnreconcileBankStatementDto,
 } from './dto/import-bank-statement.dto';
 import {
   ExpenseVoucherDto,
@@ -230,6 +231,15 @@ export class AccountingController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.accountingService.closeFiscalPeriod(id, dto, auth);
+  }
+
+  @Get('fiscal-periods/:id/close-readiness')
+  @Permissions('accounting:reports:read')
+  getFiscalPeriodCloseReadiness(
+    @Param('id') id: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.getFiscalPeriodCloseReadiness(id, auth);
   }
 
   @Post('fiscal-periods/:id/reopen')
@@ -526,6 +536,20 @@ export class AccountingController {
 
   // ─── Slice 5: Bank Reconciliation ────────────────────────────────
 
+  @Post('bank-reconciliation/:accountId/import-preview')
+  @Permissions('accounting:settings:update')
+  previewBankStatementImport(
+    @Param('accountId') accountId: string,
+    @Body() body: ImportBankStatementDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.previewBankStatementImport(
+      accountId,
+      body.lines,
+      auth,
+    );
+  }
+
   @Post('bank-reconciliation/:accountId/import')
   @Permissions('accounting:settings:update')
   importBankStatement(
@@ -537,6 +561,7 @@ export class AccountingController {
       accountId,
       body.lines,
       auth,
+      body.fingerprint,
     );
   }
 
@@ -570,6 +595,19 @@ export class AccountingController {
     return this.accountingService.reconcileStatement(
       body.statementId,
       body.journalLineId,
+      auth,
+    );
+  }
+
+  @Post('bank-reconciliation/unreconcile')
+  @Permissions('accounting:settings:update')
+  unreconcileStatement(
+    @Body() body: UnreconcileBankStatementDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.unreconcileStatement(
+      body.statementId,
+      body.reason,
       auth,
     );
   }

@@ -14,7 +14,8 @@ export type PayrollActionType =
   | 'COMPLETE_REVIEW'
   | 'APPROVE'
   | 'REJECT'
-  | 'POST';
+  | 'POST'
+  | 'REVERSE';
 
 interface PayrollActionDialogProps {
   isOpen: boolean;
@@ -50,6 +51,8 @@ export function PayrollActionDialog({
           return api.rejectPayrollRun(runId, { reason: trimmedReason });
         case 'POST':
           return api.postPayrollRun(runId);
+        case 'REVERSE':
+          return api.reversePayrollRun(runId, { reason: trimmedReason });
         default:
           throw new Error('Unsupported payroll action');
       }
@@ -121,6 +124,18 @@ export function PayrollActionDialog({
           requiresReason: false,
           confirmText: 'Post to M11',
           confirmVariant: 'default' as const,
+        };
+      case 'REVERSE':
+        return {
+          title: 'Reverse Payroll',
+          description:
+            'Reverse the posted payroll through linked opposite accounting entries.',
+          icon: <Ban size={20} className="text-red-500" />,
+          warning:
+            'The original payroll and journals remain immutable. The reason and linked reversals are audited.',
+          requiresReason: true,
+          confirmText: 'Reverse Payroll',
+          confirmVariant: 'destructive' as const,
         };
     }
   };

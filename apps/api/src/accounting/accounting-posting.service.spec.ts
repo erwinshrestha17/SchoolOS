@@ -11,6 +11,7 @@ import { AccountingPostingService } from './accounting-posting.service';
 function createPostingClient(overrides?: {
   existingJournal?: { entryNumber: string } | null;
   closedPeriod?: { name: string; status?: AccountingPeriodStatus } | null;
+  sourceMapping?: false;
 }) {
   const upsertedAccounts = new Map([
     ['5010', { id: 'salary-expense', type: ChartAccountType.EXPENSE }],
@@ -19,6 +20,7 @@ function createPostingClient(overrides?: {
   ]);
 
   return {
+    $queryRaw: jest.fn().mockResolvedValue([{ lastValue: 5 }]),
     accountingPeriod: {
       findFirst: jest.fn().mockResolvedValue(overrides?.closedPeriod ?? null),
     },
@@ -41,8 +43,26 @@ function createPostingClient(overrides?: {
           entryNumber: data.entryNumber,
           sourceType: data.sourceType,
           sourceId: data.sourceId,
+          sourceMappingId: data.sourceMappingId,
           lines: data.lines.create,
         }),
+      ),
+    },
+    accountingSourceMapping: {
+      findFirst: jest.fn().mockResolvedValue(
+        overrides?.sourceMapping === false
+          ? null
+          : {
+              id: 'payroll-mapping-1',
+              debitAccount: {
+                id: 'salary-expense',
+                type: ChartAccountType.EXPENSE,
+              },
+              creditAccount: {
+                id: 'salary-payable',
+                type: ChartAccountType.LIABILITY,
+              },
+            },
       ),
     },
     chartAccount: {
@@ -89,6 +109,7 @@ describe('AccountingPostingService payroll posting', () => {
         grossAmount: new Prisma.Decimal(75000),
         deductionAmount: new Prisma.Decimal(1750),
         netAmount: new Prisma.Decimal(73250),
+        entryDate: new Date('2026-05-31T23:59:59.999Z'),
       },
       { tenantId: 'tenant-1', userId: 'user-1' } as never,
       client as never,
@@ -97,13 +118,29 @@ describe('AccountingPostingService payroll posting', () => {
     expect(entry.entryNumber).toBe('JE-2026-000005');
     expect(entry.sourceType).toBe(JournalSourceType.PAYROLL_RUN);
     expect(entry.sourceId).toBe('run-1');
+    expect(entry.sourceMappingId).toBe('payroll-mapping-1');
     expect(entry.lines).toHaveLength(3);
 
     const debit = sumLines(entry.lines, JournalLineSide.DEBIT);
     const credit = sumLines(entry.lines, JournalLineSide.CREDIT);
 
     expect(debit.toString()).toBe(credit.toString());
-    expect(client.chartAccount.upsert).toHaveBeenCalledTimes(6);
+    expect(client.chartAccount.upsert).toHaveBeenCalledTimes(4);
+    expect(client.fiscalPeriod.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          startDate: { lte: new Date('2026-05-31T00:00:00.000Z') },
+          endDate: { gte: new Date('2026-05-31T00:00:00.000Z') },
+        }),
+      }),
+    );
+    expect(client.accountingSourceMapping.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          effectiveFrom: { lte: new Date('2026-05-31T00:00:00.000Z') },
+        }),
+      }),
+    );
   });
 
   it('returns existing payroll journal for duplicate source document posting', async () => {
@@ -162,5 +199,32 @@ describe('AccountingPostingService payroll posting', () => {
         client as never,
       ),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('blocks a first payroll posting when no effective source mapping exists', async () => {
+    const client = createPostingClient({ sourceMapping: false });
+    const service = new AccountingPostingService(
+      client as never,
+      {
+        record: jest.fn(),
+      } as never,
+    );
+
+    await expect(
+      service.postPayrollAccrual(
+        {
+          tenantId: 'tenant-1',
+          payrollRunId: 'run-1',
+          periodMonth: 5,
+          periodYear: 2026,
+          grossAmount: new Prisma.Decimal(75000),
+          deductionAmount: new Prisma.Decimal(1750),
+          netAmount: new Prisma.Decimal(73250),
+        },
+        { tenantId: 'tenant-1', userId: 'user-1' } as never,
+        client as never,
+      ),
+    ).rejects.toThrow(/no active source mapping/i);
+    expect(client.journalEntry.create).not.toHaveBeenCalled();
   });
 });

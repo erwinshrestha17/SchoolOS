@@ -9,8 +9,12 @@ import { useState } from "react";
 import { FiscalPeriodActions } from "./fiscal-period-actions";
 import { FiscalYearCloseDialog } from "./fiscal-year-close-dialog";
 import { formatBsDate } from "@schoolos/core";
+import { useSession } from "../session-provider";
 
 export function FiscalManagementView() {
+  const { hasPermissions } = useSession();
+  const canManageFiscalYear = hasPermissions(['accounting:fiscal:manage']);
+  const canReopenFiscalYear = hasPermissions(['accounting:fiscal:reopen']);
   const [fyCloseOpen, setFyCloseOpen] = useState(false);
   const [fyMode, setFyMode] = useState<"CLOSE" | "REOPEN">("CLOSE");
   const [selectedFy, setSelectedFy] = useState<any>(null);
@@ -30,6 +34,7 @@ export function FiscalManagementView() {
           {(fiscalYearsQuery.data ?? []).map((year) => (
             <div
               key={year.id}
+              data-testid={`fiscal-year-${year.id}`}
               className="rounded-2xl border border-slate-100 bg-slate-50/50 p-6"
             >
               <div className="flex items-center justify-between">
@@ -51,7 +56,7 @@ export function FiscalManagementView() {
                   >
                     {year.status}
                   </span>
-                  {year.status === "OPEN" ? (
+                  {year.status === "OPEN" && canManageFiscalYear ? (
                     <button
                       onClick={() => {
                         setSelectedFy(year);
@@ -63,7 +68,7 @@ export function FiscalManagementView() {
                       <Lock size={14} />
                       Close Year
                     </button>
-                  ) : (
+                  ) : year.status !== "OPEN" && canReopenFiscalYear ? (
                     <button
                       onClick={() => {
                         setSelectedFy(year);
@@ -75,13 +80,14 @@ export function FiscalManagementView() {
                       <Unlock size={14} />
                       Reopen
                     </button>
-                  )}
+                  ) : null}
                 </div>
               </div>
               <div className="mt-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
                 {(year.periods ?? []).map((period: any) => (
                   <div
                     key={period.id}
+                    data-testid={`fiscal-period-${period.id}`}
                     className="flex flex-col gap-1 rounded-2xl bg-white border border-slate-100 p-3 shadow-sm"
                   >
                     <div className="flex items-center justify-between">

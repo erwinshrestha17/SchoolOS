@@ -281,9 +281,7 @@ describe('PayrollService hardening boundaries', () => {
 
     await expect(
       service.approvePayrollRun('run-1', actor as never),
-    ).rejects.toThrow(
-      'Payroll run in GENERATED status cannot be approved',
-    );
+    ).rejects.toThrow('Payroll run in GENERATED status cannot be approved');
 
     expect(prisma.payrollLine.updateMany).not.toHaveBeenCalled();
     expect(prisma.payslip.createMany).not.toHaveBeenCalled();
@@ -562,8 +560,13 @@ describe('PayrollService hardening boundaries', () => {
           expected: 2,
           byStatus: expect.objectContaining({ ISSUED: 1 }),
         }),
-        validationExceptionCount: null,
-        validationExceptionSource: 'needs_exception_workflow_contract',
+        validationExceptionCount: 0,
+        validationExceptionSource: 'payroll_exception_workflow',
+        validationExceptionsBySeverity: {
+          BLOCKING: 0,
+          WARNING: 0,
+          INFO: 0,
+        },
       }),
     });
     expect(prisma.staff.count).toHaveBeenCalledWith(
@@ -1233,11 +1236,13 @@ function buildService(options: {
         .fn()
         .mockResolvedValue(options.payrollRunStatusGroups ?? []),
       create: jest.fn().mockResolvedValue(buildPayrollRun()),
-      update: jest.fn().mockImplementation(async () =>
-        updatedPayrollRunQueue.length > 0
-          ? updatedPayrollRunQueue.shift()
-          : buildPayrollRun(),
-      ),
+      update: jest
+        .fn()
+        .mockImplementation(async () =>
+          updatedPayrollRunQueue.length > 0
+            ? updatedPayrollRunQueue.shift()
+            : buildPayrollRun(),
+        ),
     },
     payrollLine: {
       count: jest.fn().mockResolvedValue(options.payrollLineCount ?? 0),

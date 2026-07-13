@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import {
   AlertCircle,
   ArrowRight,
@@ -12,39 +12,49 @@ import {
   FileText,
   History,
   Wallet,
-} from 'lucide-react';
-import { api } from '../../../lib/api';
-import { cn } from '../../../lib/utils';
-import { ModuleHeader } from '../../../components/ui/module-header';
-import { KpiCard, KpiGrid } from '../../../components/ui/kpi-card';
-import { ModuleTabs } from '../../../components/dashboard/module-tabs';
-import { LoadingState } from '../../../components/ui/loading-state';
-import { ErrorState } from '../../../components/ui/error-state';
-import { EmptyState } from '../../../components/ui/empty-state';
+  ShieldCheck,
+} from "lucide-react";
+import { api } from "../../../lib/api";
+import { cn } from "../../../lib/utils";
+import { ModuleHeader } from "../../../components/ui/module-header";
+import { KpiCard, KpiGrid } from "../../../components/ui/kpi-card";
+import { ModuleTabs } from "../../../components/dashboard/module-tabs";
+import { LoadingState } from "../../../components/ui/loading-state";
+import { ErrorState } from "../../../components/ui/error-state";
+import { EmptyState } from "../../../components/ui/empty-state";
 
-const moneyFormatter = new Intl.NumberFormat('en-NP', {
-  style: 'currency',
-  currency: 'NPR',
+const moneyFormatter = new Intl.NumberFormat("en-NP", {
+  style: "currency",
+  currency: "NPR",
   maximumFractionDigits: 0,
 });
 
 const moduleTabs = [
-  { href: '/dashboard/payroll/runs', label: 'Runs', icon: History },
-  { href: '/dashboard/payroll/salary-structures', label: 'Salary Structures', icon: Calculator },
-  { href: '/dashboard/payroll/payslips', label: 'Payslips', icon: FileText },
-  { href: '/dashboard/payroll/reports', label: 'Reports', icon: BarChart3 },
-  { href: '/dashboard/hr/staff', label: 'Staff', icon: Wallet },
+  { href: "/dashboard/payroll/runs", label: "Runs", icon: History },
+  {
+    href: "/dashboard/payroll/salary-structures",
+    label: "Salary Structures",
+    icon: Calculator,
+  },
+  {
+    href: "/dashboard/payroll/readiness",
+    label: "Readiness",
+    icon: ShieldCheck,
+  },
+  { href: "/dashboard/payroll/payslips", label: "Payslips", icon: FileText },
+  { href: "/dashboard/payroll/reports", label: "Reports", icon: BarChart3 },
+  { href: "/dashboard/hr/staff", label: "Staff", icon: Wallet },
 ];
 
 function formatMoney(value?: number | string | null) {
-  if (value === undefined || value === null) return 'Unavailable';
+  if (value === undefined || value === null) return "Unavailable";
   return moneyFormatter.format(Number(value));
 }
 
 export default function PayrollDashboardPage() {
   const router = useRouter();
   const summaryQuery = useQuery({
-    queryKey: ['payroll-dashboard-summary'],
+    queryKey: ["payroll-dashboard-summary"],
     queryFn: () => api.getPayrollDashboardSummary(),
   });
 
@@ -53,19 +63,19 @@ export default function PayrollDashboardPage() {
   const latestRun = summary?.latestPayrollRun ?? null;
   const workflowSteps = [
     {
-      label: 'Draft',
-      statuses: ['DRAFT', 'GENERATED', 'UNDER_REVIEW', 'REVIEWED'],
-      description: 'Generated or under review',
+      label: "Draft",
+      statuses: ["DRAFT", "GENERATED", "UNDER_REVIEW", "REVIEWED"],
+      description: "Generated or under review",
     },
     {
-      label: 'Approved',
-      statuses: ['APPROVED'],
-      description: 'Ready for posting',
+      label: "Approved",
+      statuses: ["APPROVED"],
+      description: "Ready for posting",
     },
     {
-      label: 'Posted',
-      statuses: ['POSTED'],
-      description: 'Accrued in accounting',
+      label: "Posted",
+      statuses: ["POSTED"],
+      description: "Accrued in accounting",
     },
   ].map((step) => ({
     ...step,
@@ -75,7 +85,7 @@ export default function PayrollDashboardPage() {
     ),
   }));
   const awaitingAction = workflowSteps
-    .filter((step) => step.label !== 'Posted')
+    .filter((step) => step.label !== "Posted")
     .reduce((total, step) => total + step.count, 0);
 
   return (
@@ -95,19 +105,19 @@ export default function PayrollDashboardPage() {
         }
         moreActionItems={[
           {
-            label: 'Salary Structures',
+            label: "Salary Structures",
             icon: <Calculator className="h-4 w-4" />,
-            onClick: () => router.push('/dashboard/payroll/salary-structures'),
+            onClick: () => router.push("/dashboard/payroll/salary-structures"),
           },
           {
-            label: 'Payslips',
+            label: "Payslips",
             icon: <FileText className="h-4 w-4" />,
-            onClick: () => router.push('/dashboard/payroll/payslips'),
+            onClick: () => router.push("/dashboard/payroll/payslips"),
           },
           {
-            label: 'Reports',
+            label: "Reports",
             icon: <BarChart3 className="h-4 w-4" />,
-            onClick: () => router.push('/dashboard/payroll/reports'),
+            onClick: () => router.push("/dashboard/payroll/reports"),
           },
         ]}
       >
@@ -141,20 +151,42 @@ export default function PayrollDashboardPage() {
         />
         <KpiCard
           title="Approval Queue"
-          value={summaryQuery.isError ? 'Unavailable' : awaitingAction}
+          value={summaryQuery.isError ? "Unavailable" : awaitingAction}
           icon={<AlertCircle className="h-5 w-5" />}
           loading={summaryQuery.isLoading}
-          tone={awaitingAction > 0 ? 'warning' : 'success'}
+          tone={awaitingAction > 0 ? "warning" : "success"}
           description="Runs awaiting review or posting"
+        />
+        <KpiCard
+          title="Readiness Exceptions"
+          value={
+            summaryQuery.isError
+              ? "Unavailable"
+              : (selectedRun?.validationExceptionCount ?? 0)
+          }
+          icon={<ShieldCheck className="h-5 w-5" />}
+          loading={summaryQuery.isLoading}
+          href="/dashboard/payroll/readiness"
+          tone={
+            (selectedRun?.validationExceptionsBySeverity.BLOCKING ?? 0) > 0
+              ? "danger"
+              : (selectedRun?.validationExceptionsBySeverity.WARNING ?? 0) > 0
+                ? "warning"
+                : "success"
+          }
+          description="Backend-owned exception workflow"
         />
       </KpiGrid>
 
       <section className="shell-card p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-lg font-black text-slate-950">Payroll Workflow</h2>
+            <h2 className="text-lg font-black text-slate-950">
+              Payroll Workflow
+            </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Current loaded run statuses for review, approval, and accounting posting.
+              Current loaded run statuses for review, approval, and accounting
+              posting.
             </p>
           </div>
           <Link
@@ -168,7 +200,10 @@ export default function PayrollDashboardPage() {
 
         <div className="mt-5">
           {summaryQuery.isLoading ? (
-            <LoadingState variant="spinner" label="Loading payroll workflow..." />
+            <LoadingState
+              variant="spinner"
+              label="Loading payroll workflow..."
+            />
           ) : summaryQuery.isError ? (
             <ErrorState
               title="Payroll workflow unavailable"
@@ -190,7 +225,9 @@ export default function PayrollDashboardPage() {
                       {step.count}
                     </span>
                   </div>
-                  <p className="mt-3 text-sm font-medium text-slate-700">{step.description}</p>
+                  <p className="mt-3 text-sm font-medium text-slate-700">
+                    {step.description}
+                  </p>
                 </div>
               ))}
             </div>
@@ -208,33 +245,48 @@ export default function PayrollDashboardPage() {
         <section className="shell-card p-6">
           <h2 className="text-lg font-black text-slate-950">Posting Status</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Posted runs are linked to accounting journals; salary disbursement remains outside this workspace.
+            Posted runs are linked to accounting journals; salary disbursement
+            remains outside this workspace.
           </p>
 
           <div className="mt-5 space-y-3">
             {[
               {
-                label: 'Latest Run',
-                status: latestRun?.status?.replaceAll('_', ' ') ?? 'No runs',
-                tone: latestRun ? 'text-[var(--primary-dark)]' : 'text-slate-500',
+                label: "Latest Run",
+                status: latestRun?.status?.replaceAll("_", " ") ?? "No runs",
+                tone: latestRun
+                  ? "text-[var(--primary-dark)]"
+                  : "text-slate-500",
               },
               {
-                label: 'Selected Run Journal',
-                status: selectedRun?.postingReadiness.accountingJournalId ? 'Linked' : 'Not posted',
-                tone: selectedRun?.postingReadiness.accountingJournalId ? 'text-success-700' : 'text-warning-700',
+                label: "Selected Run Journal",
+                status: selectedRun?.postingReadiness.accountingJournalId
+                  ? "Linked"
+                  : "Not posted",
+                tone: selectedRun?.postingReadiness.accountingJournalId
+                  ? "text-success-700"
+                  : "text-warning-700",
               },
               {
-                label: 'Runs Awaiting Review or Posting',
+                label: "Runs Awaiting Review or Posting",
                 status: String(awaitingAction),
-                tone: awaitingAction > 0 ? 'text-warning-700' : 'text-success-700',
+                tone:
+                  awaitingAction > 0 ? "text-warning-700" : "text-success-700",
               },
             ].map((item) => (
               <div
                 key={item.label}
                 className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4"
               >
-                <span className="text-sm font-medium text-slate-600">{item.label}</span>
-                <span className={cn('text-xs font-bold uppercase tracking-wide', item.tone)}>
+                <span className="text-sm font-medium text-slate-600">
+                  {item.label}
+                </span>
+                <span
+                  className={cn(
+                    "text-xs font-bold uppercase tracking-wide",
+                    item.tone,
+                  )}
+                >
                   {item.status}
                 </span>
               </div>
@@ -243,17 +295,35 @@ export default function PayrollDashboardPage() {
         </section>
 
         <section className="shell-card p-6">
-          <h2 className="text-lg font-black text-slate-950">Reports and Protected Files</h2>
+          <h2 className="text-lg font-black text-slate-950">
+            Reports and Protected Files
+          </h2>
           <p className="mt-1 text-sm text-slate-500">
             Payslip PDFs and exports stay behind authenticated payroll helpers.
           </p>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             {[
-              { label: 'Payslips', href: '/dashboard/payroll/payslips', icon: FileText },
-              { label: 'Payroll Reports', href: '/dashboard/payroll/reports', icon: BarChart3 },
-              { label: 'Salary Structures', href: '/dashboard/payroll/salary-structures', icon: Calculator },
-              { label: 'Staff Contracts', href: '/dashboard/hr/contracts', icon: Wallet },
+              {
+                label: "Payslips",
+                href: "/dashboard/payroll/payslips",
+                icon: FileText,
+              },
+              {
+                label: "Payroll Reports",
+                href: "/dashboard/payroll/reports",
+                icon: BarChart3,
+              },
+              {
+                label: "Salary Structures",
+                href: "/dashboard/payroll/salary-structures",
+                icon: Calculator,
+              },
+              {
+                label: "Staff Contracts",
+                href: "/dashboard/hr/contracts",
+                icon: Wallet,
+              },
             ].map((item) => (
               <Link
                 key={item.href}

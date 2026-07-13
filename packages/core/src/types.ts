@@ -1054,6 +1054,42 @@ export type FiscalPeriodSummary = {
   status: string;
 };
 
+export type FiscalPeriodCloseReadiness = {
+  checkedAt: string;
+  period: FiscalPeriodSummary & { fiscalYearName: string };
+  journals: {
+    draft: number;
+    submitted: number;
+    approvedUnposted: number;
+    posted: number;
+    postedSourceWithoutMapping: number;
+    unbalancedPosted: number;
+  };
+  unreconciledBankItems: number;
+  trialBalance: {
+    debit: string;
+    credit: string;
+    balanced: boolean;
+  };
+  blockers: Array<{
+    code:
+      | 'DRAFT_JOURNALS'
+      | 'SUBMITTED_JOURNALS'
+      | 'APPROVED_UNPOSTED_JOURNALS'
+      | 'POSTED_SOURCE_WITHOUT_MAPPING'
+      | 'UNRECONCILED_BANK_ITEMS'
+      | 'UNBALANCED_POSTED_JOURNALS'
+      | 'UNBALANCED_TRIAL_BALANCE';
+    count: number;
+    safeMessage: string;
+    resolutionRoute: string;
+  }>;
+  unavailableChecks: Array<
+    'NEEDS_POSTING_FAILURE_CONTRACT' | 'NEEDS_REPORT_SNAPSHOT_POLICY'
+  >;
+  readyToClose: boolean;
+};
+
 export type AccountingReport = {
   trialBalance: Array<{
     accountId: string;
@@ -1082,6 +1118,158 @@ export type AccountingReport = {
     netCashMovement: number;
   };
   balanced: boolean;
+};
+
+export type AccountingReportFilters = {
+  fiscalYearId: string;
+  fiscalPeriodId?: string;
+  fromDate?: string;
+  toDate?: string;
+  accountId?: string;
+};
+
+export type AccountingTrialBalanceResponse = {
+  fiscalYearId: string;
+  fiscalPeriodId?: string;
+  fromDate?: string;
+  toDate?: string;
+  totalOpeningDebit: string;
+  totalOpeningCredit: string;
+  totalPeriodDebit: string;
+  totalPeriodCredit: string;
+  totalClosingDebit: string;
+  totalClosingCredit: string;
+  isBalanced: boolean;
+  imbalanceAmount: string;
+  rows: Array<{
+    accountId: string;
+    accountCode: string;
+    accountName: string;
+    accountType: string;
+    parentId: string | null;
+    openingDebit: string;
+    openingCredit: string;
+    periodDebit: string;
+    periodCredit: string;
+    closingDebit: string;
+    closingCredit: string;
+    netBalance: string;
+    normalBalanceSide: 'DEBIT' | 'CREDIT';
+  }>;
+  generatedAt: string;
+};
+
+export type AccountingGeneralLedgerResponse = {
+  fiscalYearId: string;
+  fiscalPeriodId?: string;
+  fromDate?: string;
+  toDate?: string;
+  accountId: string;
+  accountCode: string;
+  openingBalance: string;
+  openingBalanceSide: 'DEBIT' | 'CREDIT';
+  closingBalance: string;
+  closingBalanceSide: 'DEBIT' | 'CREDIT';
+  totals: { debit: string; credit: string };
+  rows: Array<{
+    journalEntryId: string;
+    journalLineId: string;
+    entryDate: string;
+    postedAt: string | null;
+    entryNumber: string | null;
+    accountId: string;
+    accountCode: string;
+    accountName: string;
+    description: string | null;
+    sourceModule: string | null;
+    sourceType: string;
+    sourceId: string | null;
+    debit: string;
+    credit: string;
+    runningBalance: string;
+    runningBalanceSide: 'DEBIT' | 'CREDIT';
+  }>;
+  pagination: { page: number; limit: number; total: number; totalPages: number };
+  generatedAt: string;
+};
+
+export type AccountingCashBookResponse = {
+  fiscalYearId: string;
+  fiscalPeriodId?: string;
+  fromDate?: string;
+  toDate?: string;
+  account?: { id: string; code: string; name: string };
+  openingBalance: string;
+  openingBalanceSide: 'DEBIT' | 'CREDIT';
+  totalReceipts: string;
+  totalPayments: string;
+  closingBalance: string;
+  closingBalanceSide: 'DEBIT' | 'CREDIT';
+  rows: Array<{
+    journalEntryId: string;
+    journalLineId: string;
+    entryDate: string;
+    postedAt: string | null;
+    entryNumber: string | null;
+    accountId: string;
+    accountCode: string;
+    accountName: string;
+    narration: string | null;
+    sourceModule: string | null;
+    sourceType: string;
+    sourceId: string | null;
+    receiptAmount: string;
+    paymentAmount: string;
+    runningBalance: string;
+    runningBalanceSide: 'DEBIT' | 'CREDIT';
+  }>;
+  pagination: { page: number; limit: number; total: number; totalPages: number };
+  generatedAt: string;
+  setupWarnings?: string[];
+};
+
+export type AccountingIncomeStatementResponse = {
+  fiscalYearId: string;
+  fiscalPeriodId?: string;
+  fromDate?: string;
+  toDate?: string;
+  sections: Array<{
+    section: 'INCOME' | 'EXPENSE';
+    total: string;
+    accounts: Array<{
+      accountId: string;
+      accountCode: string;
+      accountName: string;
+      amount: string;
+    }>;
+  }>;
+  totalIncome: string;
+  totalExpense: string;
+  netSurplusOrDeficit: string;
+  resultType: 'SURPLUS' | 'DEFICIT' | 'BREAK_EVEN';
+  generatedAt: string;
+};
+
+export type AccountingBalanceSheetResponse = {
+  fiscalYearId: string;
+  asOfDate: string;
+  sections: Array<{
+    section: 'ASSETS' | 'LIABILITIES' | 'EQUITY';
+    total: string;
+    accounts: Array<{
+      accountId?: string;
+      accountCode: string;
+      accountName: string;
+      amount: string;
+    }>;
+  }>;
+  totalAssets: string;
+  totalLiabilities: string;
+  totalEquity: string;
+  totalLiabilitiesAndEquity: string;
+  isBalanced: boolean;
+  imbalanceAmount: string;
+  generatedAt: string;
 };
 
 export type AccountingDashboardSummary = {
@@ -1178,6 +1366,73 @@ export type AccountingSourceMappingHealth = {
     configuredMappingCount: number;
   }>;
   isClean: boolean;
+};
+
+export type BankStatementImportLine = {
+  statementDate: string;
+  description: string;
+  reference?: string | null;
+  debitAmount: string;
+  creditAmount: string;
+};
+
+export type BankStatementImportPreview = {
+  account: { id: string; code: string; name: string };
+  fingerprint: string;
+  lineCount: number;
+  rows: BankStatementImportLine[];
+  readyToCommit: boolean;
+};
+
+export type BankStatementImportResult = {
+  importBatchId: string;
+  count: number;
+  idempotent: boolean;
+  statements: BankStatementLineSummary[];
+};
+
+export type BankStatementLineSummary = {
+  id: string;
+  accountId: string;
+  statementDate: string;
+  description: string;
+  reference: string | null;
+  debitAmount: string;
+  creditAmount: string;
+  isReconciled: boolean;
+  reconciledAt: string | null;
+  journalLineId: string | null;
+  importBatchId: string | null;
+};
+
+export type BankReconciliationSuggestion = {
+  bankTransactionId: string;
+  amount: string;
+  statementDate: string;
+  reference: string | null;
+  description: string;
+  candidates: Array<{
+    candidateJournalId: string;
+    ledgerTransactionId: string;
+    bankTransactionId: string;
+    score: number;
+    confidence: 'EXACT' | 'HIGH' | 'MEDIUM' | 'LOW';
+    matchedFields: string[];
+    warningFlags: string[];
+    suggestedAction: 'REVIEW_AND_CONFIRM' | 'MANUAL_REVIEW';
+    reason: string;
+  }>;
+};
+
+export type BankReconciliationSummary = {
+  accountId: string;
+  accountCode: string;
+  accountName: string;
+  totalStatements: number;
+  reconciledStatements: number;
+  unreconciledStatements: number;
+  statementBalance: { debit: string; credit: string };
+  ledgerBalance: { debit: string; credit: string };
 };
 
 
@@ -2532,10 +2787,10 @@ export type PayslipSummary = {
 };
 
 export type PayslipRegenerationJobStatus =
-  | 'QUEUED'
-  | 'PROCESSING'
-  | 'SUCCEEDED'
-  | 'FAILED';
+  | "QUEUED"
+  | "PROCESSING"
+  | "SUCCEEDED"
+  | "FAILED";
 
 export type PayslipRegenerationJobSummary = {
   jobId: string;
@@ -2557,7 +2812,7 @@ export type PayrollDashboardSummary = {
     periodYear: number;
     payrollRunId: string | null;
     contractWindowDays: number;
-    timezone: 'Asia/Kathmandu';
+    timezone: "Asia/Kathmandu";
     windowStart: string;
     windowEndExclusive: string;
   };
@@ -2569,12 +2824,12 @@ export type PayrollDashboardSummary = {
   payrollRunsByStatus: Record<string, number>;
   latestPayrollRun: Pick<
     PayrollRunSummary,
-    | 'id'
-    | 'periodMonth'
-    | 'periodYear'
-    | 'status'
-    | 'journalEntryId'
-    | 'disbursementJournalEntryId'
+    | "id"
+    | "periodMonth"
+    | "periodYear"
+    | "status"
+    | "journalEntryId"
+    | "disbursementJournalEntryId"
   > | null;
   selectedPayrollRun: {
     id: string;
@@ -2597,14 +2852,84 @@ export type PayrollDashboardSummary = {
       salaryDisbursementProviderSupported: boolean;
     };
     payslipGeneration: {
-      status: 'UNAVAILABLE' | 'PENDING' | 'PARTIAL' | 'COMPLETE';
+      status: "UNAVAILABLE" | "PENDING" | "PARTIAL" | "COMPLETE";
       total: number;
       expected: number;
       byStatus: Record<string, number>;
     };
-    validationExceptionCount: null;
-    validationExceptionSource: 'needs_exception_workflow_contract';
+    validationExceptionCount: number;
+    validationExceptionSource: "payroll_exception_workflow";
+    validationExceptionsBySeverity: Record<PayrollExceptionSeverity, number>;
   } | null;
+};
+
+export type PayrollExceptionSeverity = "BLOCKING" | "WARNING" | "INFO";
+export type PayrollExceptionStatus =
+  | "OPEN"
+  | "ACKNOWLEDGED"
+  | "RESOLVED"
+  | "WAIVED";
+export type PayrollExceptionCode =
+  | "MISSING_SALARY_STRUCTURE"
+  | "NO_EFFECTIVE_SALARY_STRUCTURE"
+  | "MISSING_ACTIVE_CONTRACT"
+  | "EXPIRED_CONTRACT"
+  | "INACTIVE_STAFF_INCLUDED"
+  | "MISSING_ATTENDANCE"
+  | "ATTENDANCE_ANOMALY"
+  | "LEAVE_OVERLAP"
+  | "MISSING_PAN"
+  | "MISSING_BANK_ACCOUNT"
+  | "MISSING_STATUTORY_CONFIGURATION"
+  | "INVALID_WORKING_DAYS"
+  | "NEGATIVE_NET_PAY"
+  | "MISSING_ACCOUNT_MAPPING"
+  | "FISCAL_PERIOD_LOCKED"
+  | "ACCOUNTING_POSTING_FAILED"
+  | "PAYSLIP_GENERATION_FAILED";
+
+export type PayrollExceptionSummary = {
+  id: string;
+  payrollRunId: string | null;
+  staffId: string | null;
+  employeeId: string | null;
+  staffName: string | null;
+  department: string | null;
+  code: PayrollExceptionCode;
+  severity: PayrollExceptionSeverity;
+  status: PayrollExceptionStatus;
+  title: string;
+  safeMessage: string;
+  resolutionRoute: string | null;
+  blockedActions: string[];
+  detectedAt: string;
+  acknowledgedAt: string | null;
+  resolvedAt: string | null;
+  resolutionReason: string | null;
+};
+
+export type PayrollReadinessSummary = {
+  period: { year: number; month: number };
+  staffConsidered: number;
+  staffExcluded: number;
+  blockingExceptionCount: number;
+  warningCount: number;
+  informationalCount: number;
+  exceptionsByCategory: Partial<Record<PayrollExceptionCode, number>>;
+  readinessStatus: "BLOCKED" | "NEEDS_ACKNOWLEDGEMENT" | "READY";
+  allowedNextAction: string | null;
+  lastCalculatedAt: string;
+  stale: boolean;
+  selectedPayrollRun: Pick<PayrollRunSummary, "id" | "status"> | null;
+};
+
+export type PayrollExceptionPage = {
+  items: PayrollExceptionSummary[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  readiness: PayrollReadinessSummary;
 };
 
 

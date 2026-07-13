@@ -282,16 +282,30 @@ export class AccountingPostingService {
       return existing;
     }
 
-    const salaryExpense = await this.ensureAccount(tx, input.tenantId, {
-      code: '5010',
-      name: 'Salary Expense',
-      type: ChartAccountType.EXPENSE,
+    const effectiveDate = toUtcDateOnly(entryDate);
+    const sourceMapping = await tx.accountingSourceMapping.findFirst({
+      where: {
+        tenantId: input.tenantId,
+        sourceModule: 'PAYROLL',
+        sourceType: JournalSourceType.PAYROLL_RUN,
+        postingType: 'APPROVAL',
+        isActive: true,
+        effectiveFrom: { lte: effectiveDate },
+        OR: [{ effectiveTo: null }, { effectiveTo: { gte: effectiveDate } }],
+        debitAccount: { tenantId: input.tenantId, isActive: true },
+        creditAccount: { tenantId: input.tenantId, isActive: true },
+      },
+      include: { debitAccount: true, creditAccount: true },
+      orderBy: [{ effectiveFrom: 'desc' }, { id: 'asc' }],
     });
-    const salaryPayable = await this.ensureAccount(tx, input.tenantId, {
-      code: '2200',
-      name: 'Salary Payable',
-      type: ChartAccountType.LIABILITY,
-    });
+    if (!sourceMapping) {
+      throw new ConflictException(
+        'Payroll posting is unavailable because no active source mapping covers this payroll date',
+      );
+    }
+
+    const salaryExpense = sourceMapping.debitAccount;
+    const salaryPayable = sourceMapping.creditAccount;
     const pfPayable = await this.ensureAccount(tx, input.tenantId, {
       code: '2210',
       name: 'PF Payable',
@@ -417,6 +431,7 @@ export class AccountingPostingService {
         sourceModule: 'PAYROLL',
         sourceType: JournalSourceType.PAYROLL_RUN,
         sourceId: input.payrollRunId,
+        sourceMappingId: sourceMapping.id,
         postingType: 'APPROVAL',
         createdById: actor.userId,
         postedAt: new Date(),
@@ -1761,12 +1776,13 @@ export class AccountingPostingService {
     entryDate: Date,
     allowLocked = false,
   ) {
+    const postingDate = toUtcDateOnly(entryDate);
     // 1. Check Fiscal Period (Primary)
     const fiscalPeriod = await tx.fiscalPeriod.findFirst({
       where: {
         tenantId,
-        startDate: { lte: entryDate },
-        endDate: { gte: entryDate },
+        startDate: { lte: postingDate },
+        endDate: { gte: postingDate },
       },
       include: {
         fiscalYear: true,
@@ -1804,8 +1820,8 @@ export class AccountingPostingService {
         status: {
           in: [AccountingPeriodStatus.LOCKED, AccountingPeriodStatus.CLOSED],
         },
-        startsOn: { lte: entryDate },
-        endsOn: { gte: entryDate },
+        startsOn: { lte: postingDate },
+        endsOn: { gte: postingDate },
       },
     });
 
@@ -1865,14 +1881,31 @@ export class AccountingPostingService {
     entryDate: Date = new Date(),
   ) {
     const year = entryDate.getUTCFullYear();
-    const count = await tx.journalEntry.count({
-      where: {
-        tenantId,
-        fiscalYearId,
-      },
-    });
+    const scopeKey = fiscalYearId ?? `CALENDAR-${year}`;
+    const sequenceRows = await tx.$queryRaw<Array<{ lastValue: number }>>(
+      Prisma.sql`
+        INSERT INTO "JournalEntrySequence" (
+          "tenantId",
+          "scopeKey",
+          "lastValue",
+          "updatedAt"
+        )
+        VALUES (${tenantId}, ${scopeKey}, 1, CURRENT_TIMESTAMP)
+        ON CONFLICT ("tenantId", "scopeKey") DO UPDATE
+        SET
+          "lastValue" = "JournalEntrySequence"."lastValue" + 1,
+          "updatedAt" = CURRENT_TIMESTAMP
+        RETURNING "lastValue"
+      `,
+    );
+    const nextValue = sequenceRows[0]?.lastValue;
+    if (!Number.isInteger(nextValue) || nextValue < 1) {
+      throw new ConflictException(
+        'Journal entry number could not be allocated safely',
+      );
+    }
 
-    return `JE-${year}-${String(count + 1).padStart(6, '0')}`;
+    return `JE-${year}-${String(nextValue).padStart(6, '0')}`;
   }
 
   private async ensureAccount(
@@ -2001,6 +2034,12 @@ export class AccountingPostingService {
   ) {
     this.validateJournalLines(lines);
   }
+}
+
+function toUtcDateOnly(value: Date) {
+  return new Date(
+    Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()),
+  );
 }
 
 function toDecimal(

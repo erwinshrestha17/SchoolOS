@@ -540,6 +540,39 @@ enum PayslipStatus {
   ISSUED
 }
 
+enum PayrollExceptionSeverity {
+  BLOCKING
+  WARNING
+  INFO
+}
+
+enum PayrollExceptionStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+  WAIVED
+}
+
+enum PayrollExceptionCode {
+  MISSING_SALARY_STRUCTURE
+  NO_EFFECTIVE_SALARY_STRUCTURE
+  MISSING_ACTIVE_CONTRACT
+  EXPIRED_CONTRACT
+  INACTIVE_STAFF_INCLUDED
+  MISSING_ATTENDANCE
+  ATTENDANCE_ANOMALY
+  LEAVE_OVERLAP
+  MISSING_PAN
+  MISSING_BANK_ACCOUNT
+  MISSING_STATUTORY_CONFIGURATION
+  INVALID_WORKING_DAYS
+  NEGATIVE_NET_PAY
+  MISSING_ACCOUNT_MAPPING
+  FISCAL_PERIOD_LOCKED
+  ACCOUNTING_POSTING_FAILED
+  PAYSLIP_GENERATION_FAILED
+}
+
 enum AccountingPeriodStatus {
   OPEN
   LOCKED
@@ -1390,6 +1423,7 @@ model ChartAccount {
   journalLines             JournalLine[]
   accountingReportMappings AccountingReportAccountMapping[]
   bankStatements           BankStatement[]
+  bankStatementImportBatches BankStatementImportBatch[]
   sourceDebitMappings      AccountingSourceMapping[] @relation("AccountingSourceMappingDebitAccount")
   sourceCreditMappings     AccountingSourceMapping[] @relation("AccountingSourceMappingCreditAccount")
 
@@ -1420,9 +1454,10 @@ model AccountingSourceMapping {
   creditAccount ChartAccount @relation("AccountingSourceMappingCreditAccount", fields: [creditAccountId], references: [id], onDelete: Restrict)
   createdBy     User?        @relation("CreatedAccountingSourceMappings", fields: [createdById], references: [id], onDelete: SetNull)
   updatedBy     User?        @relation("UpdatedAccountingSourceMappings", fields: [updatedById], references: [id], onDelete: SetNull)
+  journalEntries JournalEntry[]
 
-  @@unique([tenantId, sourceModule, sourceType, postingType, effectiveFrom])
-  @@index([tenantId, sourceModule, sourceType, postingType, isActive])
+  @@unique([tenantId, sourceModule, sourceType, postingType, effectiveFrom], map: "AccountingSourceMapping_effective_key")
+  @@index([tenantId, sourceModule, sourceType, postingType, isActive], map: "AccountingSourceMapping_active_lookup_idx")
   @@index([tenantId, effectiveFrom, effectiveTo])
   @@index([tenantId, debitAccountId])
   @@index([tenantId, creditAccountId])
@@ -1440,6 +1475,7 @@ model JournalEntry {
   sourceModule   String?
   sourceType     JournalSourceType
   sourceId       String?
+  sourceMappingId String?
   postingType    String?
   reversalOfId   String?
   correctionOfId String?
@@ -1474,6 +1510,7 @@ model JournalEntry {
   fiscalYear   FiscalYear?    @relation(fields: [fiscalYearId], references: [id], onDelete: SetNull)
   fiscalPeriod FiscalPeriod?  @relation(fields: [fiscalPeriodId], references: [id], onDelete: SetNull)
   createdBy    User?          @relation("CreatedJournalEntries", fields: [createdById], references: [id])
+  sourceMapping AccountingSourceMapping? @relation(fields: [sourceMappingId], references: [id], onDelete: Restrict)
   reversalOf   JournalEntry?  @relation("JournalEntryReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
   reversals    JournalEntry[] @relation("JournalEntryReversal")
   correctionOf JournalEntry?  @relation("JournalEntryCorrection", fields: [correctionOfId], references: [id], onDelete: Restrict)
@@ -1490,6 +1527,18 @@ model JournalEntry {
   @@index([tenantId, fiscalYearId, fiscalPeriodId, status])
   @@index([tenantId, fiscalYearId])
   @@index([tenantId, fiscalPeriodId])
+  @@index([tenantId, sourceMappingId])
+}
+
+model JournalEntrySequence {
+  tenantId  String
+  scopeKey  String
+  lastValue Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, scopeKey])
 }
 
 model JournalLine {
@@ -1637,6 +1686,23 @@ model BankStatement {
   @@index([tenantId, accountId, isReconciled])
   @@index([tenantId, importBatchId])
   @@index([tenantId, accountId, statementDate])
+  @@unique([tenantId, journalLineId])
+}
+
+model BankStatementImportBatch {
+  id          String   @id
+  tenantId    String
+  accountId   String
+  fingerprint String
+  lineCount   Int
+  createdById String
+  createdAt   DateTime @default(now())
+
+  tenant  Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  account ChartAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, accountId, fingerprint])
+  @@index([tenantId, accountId, createdAt])
 }
 
 
@@ -5010,9 +5076,46 @@ model PayrollRun {
   reversedBy User?         @relation("ReversedPayrollRuns", fields: [reversedById], references: [id], onDelete: SetNull)
   lines      PayrollLine[]
   payslips   Payslip[]
+  exceptions PayrollException[]
 
   @@unique([tenantId, periodMonth, periodYear])
   @@index([tenantId, status])
+}
+
+model PayrollException {
+  id                   String                   @id @default(uuid())
+  tenantId             String
+  payrollRunId         String?
+  staffId              String?
+  periodYear           Int
+  periodMonth          Int
+  identityKey          String
+  code                 PayrollExceptionCode
+  severity             PayrollExceptionSeverity
+  status               PayrollExceptionStatus  @default(OPEN)
+  title                String
+  safeMessage          String
+  resolutionRoute      String?
+  blockedActions       String[]
+  detectedAt           DateTime                 @default(now())
+  lastDetectedAt       DateTime                 @default(now())
+  acknowledgedAt       DateTime?
+  acknowledgedById     String?
+  acknowledgementReason String?
+  resolvedAt           DateTime?
+  resolutionReason     String?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  payrollRun PayrollRun? @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  staff      Staff?      @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, identityKey])
+  @@index([tenantId, periodYear, periodMonth, status, severity])
+  @@index([tenantId, payrollRunId, status])
+  @@index([tenantId, staffId, status])
+  @@index([tenantId, code, status])
 }
 
 model PayrollLine {
@@ -5477,6 +5580,7 @@ model Staff {
   staffContracts             StaffContract[]
   salaryStructures           SalaryStructure[]
   payrollLines               PayrollLine[]
+  payrollExceptions          PayrollException[]
   payslips                   Payslip[]
   qualificationsRecords      StaffQualification[]
   experienceRecords          StaffExperienceRecord[]
@@ -6172,6 +6276,7 @@ model Tenant {
   receiptReprintHistory         ReceiptReprintHistory[]
   chartAccounts                 ChartAccount[]
   journalEntries                JournalEntry[]
+  journalEntrySequences         JournalEntrySequence[]
   journalLines                  JournalLine[]
   notices                       Notice[]
   events                        Event[]
@@ -6227,11 +6332,13 @@ model Tenant {
   staffQualifications           StaffQualification[]
   staffExperienceRecords        StaffExperienceRecord[]
   payrollRuns                   PayrollRun[]
+  payrollExceptions             PayrollException[]
   payrollLines                  PayrollLine[]
   payslips                      Payslip[]
   salaryStructures              SalaryStructure[]
   salaryComponents              SalaryComponent[]
   accountingPeriods             AccountingPeriod[]
+  bankStatementImportBatches    BankStatementImportBatch[]
   fiscalYears                   FiscalYear[]
   fiscalPeriods                 FiscalPeriod[]
   conversations                 Conversation[]

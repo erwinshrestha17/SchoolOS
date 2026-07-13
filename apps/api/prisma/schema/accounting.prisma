@@ -19,6 +19,7 @@ model ChartAccount {
   journalLines             JournalLine[]
   accountingReportMappings AccountingReportAccountMapping[]
   bankStatements           BankStatement[]
+  bankStatementImportBatches BankStatementImportBatch[]
   sourceDebitMappings      AccountingSourceMapping[] @relation("AccountingSourceMappingDebitAccount")
   sourceCreditMappings     AccountingSourceMapping[] @relation("AccountingSourceMappingCreditAccount")
 
@@ -49,9 +50,10 @@ model AccountingSourceMapping {
   creditAccount ChartAccount @relation("AccountingSourceMappingCreditAccount", fields: [creditAccountId], references: [id], onDelete: Restrict)
   createdBy     User?        @relation("CreatedAccountingSourceMappings", fields: [createdById], references: [id], onDelete: SetNull)
   updatedBy     User?        @relation("UpdatedAccountingSourceMappings", fields: [updatedById], references: [id], onDelete: SetNull)
+  journalEntries JournalEntry[]
 
-  @@unique([tenantId, sourceModule, sourceType, postingType, effectiveFrom])
-  @@index([tenantId, sourceModule, sourceType, postingType, isActive])
+  @@unique([tenantId, sourceModule, sourceType, postingType, effectiveFrom], map: "AccountingSourceMapping_effective_key")
+  @@index([tenantId, sourceModule, sourceType, postingType, isActive], map: "AccountingSourceMapping_active_lookup_idx")
   @@index([tenantId, effectiveFrom, effectiveTo])
   @@index([tenantId, debitAccountId])
   @@index([tenantId, creditAccountId])
@@ -69,6 +71,7 @@ model JournalEntry {
   sourceModule   String?
   sourceType     JournalSourceType
   sourceId       String?
+  sourceMappingId String?
   postingType    String?
   reversalOfId   String?
   correctionOfId String?
@@ -103,6 +106,7 @@ model JournalEntry {
   fiscalYear   FiscalYear?    @relation(fields: [fiscalYearId], references: [id], onDelete: SetNull)
   fiscalPeriod FiscalPeriod?  @relation(fields: [fiscalPeriodId], references: [id], onDelete: SetNull)
   createdBy    User?          @relation("CreatedJournalEntries", fields: [createdById], references: [id])
+  sourceMapping AccountingSourceMapping? @relation(fields: [sourceMappingId], references: [id], onDelete: Restrict)
   reversalOf   JournalEntry?  @relation("JournalEntryReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
   reversals    JournalEntry[] @relation("JournalEntryReversal")
   correctionOf JournalEntry?  @relation("JournalEntryCorrection", fields: [correctionOfId], references: [id], onDelete: Restrict)
@@ -119,6 +123,18 @@ model JournalEntry {
   @@index([tenantId, fiscalYearId, fiscalPeriodId, status])
   @@index([tenantId, fiscalYearId])
   @@index([tenantId, fiscalPeriodId])
+  @@index([tenantId, sourceMappingId])
+}
+
+model JournalEntrySequence {
+  tenantId  String
+  scopeKey  String
+  lastValue Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, scopeKey])
 }
 
 model JournalLine {
@@ -266,4 +282,21 @@ model BankStatement {
   @@index([tenantId, accountId, isReconciled])
   @@index([tenantId, importBatchId])
   @@index([tenantId, accountId, statementDate])
+  @@unique([tenantId, journalLineId])
+}
+
+model BankStatementImportBatch {
+  id          String   @id
+  tenantId    String
+  accountId   String
+  fingerprint String
+  lineCount   Int
+  createdById String
+  createdAt   DateTime @default(now())
+
+  tenant  Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  account ChartAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, accountId, fingerprint])
+  @@index([tenantId, accountId, createdAt])
 }

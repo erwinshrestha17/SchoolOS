@@ -1,46 +1,51 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Plus, Eye } from 'lucide-react';
-import { api } from '../../lib/api';
-import { SectionCard } from '../ui/section-card';
-import { PageState } from '../ui/page-state';
-import { ReportTable } from './report-table';
-import { VoucherDialog } from './voucher-dialog';
-import { JournalDetailDialog } from './journal-detail-dialog';
-import { JournalEntryView } from '@schoolos/core';
-import { cn } from '../../lib/utils';
-import { Toast } from '../ui/toast';
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Plus, Eye } from "lucide-react";
+import { api } from "../../lib/api";
+import { SectionCard } from "../ui/section-card";
+import { PageState } from "../ui/page-state";
+import { ReportTable } from "./report-table";
+import { VoucherDialog } from "./voucher-dialog";
+import { JournalDetailDialog } from "./journal-detail-dialog";
+import { JournalEntryView } from "@schoolos/core";
+import { cn } from "../../lib/utils";
+import { Toast } from "../ui/toast";
+import { useSession } from "../session-provider";
 
 export function JournalEntriesView() {
+  const { hasPermissions } = useSession();
+  const canCreateJournal = hasPermissions(["accounting:journals:create"]);
   const [voucherOpen, setVoucherOpen] = useState(false);
-  const [selectedEntry, setSelectedEntry] = useState<JournalEntryView | null>(null);
+  const [selectedEntry, setSelectedEntry] = useState<JournalEntryView | null>(
+    null,
+  );
   const [notice, setNotice] = useState<string | null>(null);
 
-  const accountsQuery = useQuery({ 
-    queryKey: ['chart-accounts'], 
-    queryFn: () => api.listChartAccounts() 
+  const accountsQuery = useQuery({
+    queryKey: ["chart-accounts"],
+    queryFn: () => api.listChartAccounts(),
   });
 
   const journalsQuery = useQuery({
-    queryKey: ['ledger-entries'],
+    queryKey: ["ledger-entries"],
     queryFn: () => api.listJournalEntries(),
   });
 
-  const fiscalYearsQuery = useQuery({ 
-    queryKey: ['fiscal-years'], 
-    queryFn: () => api.listFiscalYears() 
+  const fiscalYearsQuery = useQuery({
+    queryKey: ["fiscal-years"],
+    queryFn: () => api.listFiscalYears(),
   });
 
   const activePeriod = (fiscalYearsQuery.data ?? [])
-    .find(y => y.status === 'OPEN')
-    ?.periods?.find((p: any) => p.status === 'OPEN');
+    .find((y) => y.status === "OPEN")
+    ?.periods?.find((p: any) => p.status === "OPEN");
 
   const handleCreateVoucher = () => {
     if (!activePeriod) {
       setNotice(
-        'No active fiscal period found. Open a period in Accounting Management before creating a voucher.',
+        "No active fiscal period found. Open a period in Accounting Management before creating a voucher.",
       );
       return;
     }
@@ -59,11 +64,16 @@ export function JournalEntriesView() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'POSTED': return 'text-emerald-600 bg-emerald-50';
-      case 'DRAFT': return 'text-slate-600 bg-slate-50';
-      case 'SUBMITTED': return 'text-amber-600 bg-amber-50';
-      case 'REVERSED': return 'text-rose-600 bg-rose-50';
-      default: return 'text-slate-600 bg-slate-50';
+      case "POSTED":
+        return "text-emerald-600 bg-emerald-50";
+      case "DRAFT":
+        return "text-slate-600 bg-slate-50";
+      case "SUBMITTED":
+        return "text-amber-600 bg-amber-50";
+      case "REVERSED":
+        return "text-rose-600 bg-rose-50";
+      default:
+        return "text-slate-600 bg-slate-50";
     }
   };
 
@@ -79,18 +89,22 @@ export function JournalEntriesView() {
         />
       ) : null}
 
-      <div className="flex flex-wrap gap-3">
-        <button
-          onClick={handleCreateVoucher}
-          className={cn(
-            "inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 active:translate-y-0",
-            activePeriod ? "bg-[var(--color-mod-accounting-accent)] hover:bg-[var(--color-mod-accounting-text)]" : "bg-slate-400 cursor-not-allowed opacity-70"
-          )}
-        >
-          <Plus size={18} />
-          Create Expense Voucher
-        </button>
-      </div>
+      {canCreateJournal ? (
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={handleCreateVoucher}
+            className={cn(
+              "inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 active:translate-y-0",
+              activePeriod
+                ? "bg-[var(--color-mod-accounting-accent)] hover:bg-[var(--color-mod-accounting-text)]"
+                : "bg-slate-400 cursor-not-allowed opacity-70",
+            )}
+          >
+            <Plus size={18} />
+            Create Journal Voucher
+          </button>
+        </div>
+      ) : null}
 
       <SectionCard
         title="All Journal Entries"
@@ -100,26 +114,45 @@ export function JournalEntriesView() {
           <PageState
             tone="danger"
             title="Failed to load journal entries"
-            description={journalsQuery.error?.message ?? 'Journal entries could not be loaded.'}
+            description={
+              journalsQuery.error?.message ??
+              "Journal entries could not be loaded."
+            }
           />
         ) : (
           <ReportTable
-            headers={['Date', 'Number', 'Narration', 'Type', 'Status', 'Amount', 'Action']}
+            headers={[
+              "Date",
+              "Number",
+              "Narration",
+              "Type",
+              "Status",
+              "Amount",
+              "Action",
+            ]}
             rows={(journalsQuery.data ?? []).map((entry) => ({
               id: entry.id,
               cells: [
-                { value: entry.entryDate, type: 'date' },
+                { value: entry.entryDate, type: "date" },
                 { value: entry.entryNumber, bold: true },
                 { value: entry.narration },
                 { value: entry.sourceType },
-                { 
+                {
                   value: (
-                    <span className={cn("rounded-lg px-2 py-1 text-[10px] font-black uppercase tracking-tighter", getStatusColor(entry.status))}>
+                    <span
+                      className={cn(
+                        "rounded-lg px-2 py-1 text-[10px] font-black uppercase tracking-tighter",
+                        getStatusColor(entry.status),
+                      )}
+                    >
                       {entry.status}
                     </span>
-                  ) 
+                  ),
                 },
-                { value: entry.totalDebit || entry.totalCredit || 0, type: 'currency' },
+                {
+                  value: entry.totalDebit || entry.totalCredit || 0,
+                  type: "currency",
+                },
                 {
                   value: (
                     <button
@@ -129,19 +162,19 @@ export function JournalEntriesView() {
                     >
                       <Eye size={18} />
                     </button>
-                  )
-                }
+                  ),
+                },
               ],
             }))}
           />
         )}
       </SectionCard>
 
-      <VoucherDialog 
-        isOpen={voucherOpen} 
-        onClose={() => setVoucherOpen(false)} 
-        accounts={accountsQuery.data ?? []} 
-        voucherType="EXPENSE"
+      <VoucherDialog
+        isOpen={voucherOpen}
+        onClose={() => setVoucherOpen(false)}
+        accounts={accountsQuery.data ?? []}
+        voucherType="JOURNAL"
       />
 
       <JournalDetailDialog

@@ -22,7 +22,15 @@ import { ReportFilters } from "./report-filters";
 import { ReportTable } from "./report-table";
 
 import { PageHeader } from "../ui/page-header";
-import { formatBsDateTime } from "@schoolos/core";
+import {
+  formatBsDateTime,
+  type AccountingBalanceSheetResponse,
+  type AccountingCashBookResponse,
+  type AccountingGeneralLedgerResponse,
+  type AccountingIncomeStatementResponse,
+  type AccountingReportFilters,
+  type AccountingTrialBalanceResponse,
+} from "@schoolos/core";
 
 type ReportType =
   | "trial-balance"
@@ -49,6 +57,7 @@ export function AccountingReportsView({
     endDate?: string;
     fiscalYearId?: string;
     fiscalPeriodId?: string;
+    accountId?: string;
   }>({});
 
   useEffect(() => {
@@ -67,17 +76,31 @@ export function AccountingReportsView({
   const reportQuery = useQuery({
     queryKey: ["accounting-report", activeReport, filters],
     queryFn: () => {
+      if (!filters.fiscalYearId) {
+        throw new Error("Select a fiscal year to generate this report.");
+      }
+      const reportFilters: AccountingReportFilters = {
+        fiscalYearId: filters.fiscalYearId,
+        fiscalPeriodId: filters.fiscalPeriodId,
+        fromDate: filters.startDate,
+        toDate: filters.endDate,
+        accountId: filters.accountId,
+      };
       if (activeReport === "trial-balance")
-        return api.listTrialBalance(filters);
+        return api.listTrialBalance(reportFilters);
       if (activeReport === "income-statement")
-        return api.listIncomeStatement(filters);
+        return api.listIncomeStatement(reportFilters);
       if (activeReport === "balance-sheet")
-        return api.listBalanceSheet(filters);
+        return api.listBalanceSheet(reportFilters);
       if (activeReport === "general-ledger")
-        return api.listGeneralLedger(filters);
-      if (activeReport === "tax-summary") return api.listVatSummary();
-      return api.listCashBook(filters);
+        return api.listGeneralLedger(reportFilters);
+      if (activeReport === "tax-summary")
+        return api.listTaxSummary(reportFilters);
+      return api.listCashBook(reportFilters);
     },
+    enabled:
+      Boolean(filters.fiscalYearId) &&
+      (activeReport !== "general-ledger" || Boolean(filters.accountId)),
   });
 
   const snapshotsQuery = useQuery({
@@ -113,7 +136,38 @@ export function AccountingReportsView({
     ].includes(report);
   };
 
+  const snapshotItems = Array.isArray(
+    (snapshotsQuery.data as { items?: unknown })?.items,
+  )
+    ? ((snapshotsQuery.data as { items: Array<Record<string, unknown>> }).items ??
+      [])
+    : [];
+
   const renderReportContent = () => {
+    if (!filters.fiscalYearId) {
+      return (
+        <div className="py-10">
+          <PageState
+            tone="loading"
+            title="Loading fiscal year"
+            description="The report will load after the active fiscal year is confirmed."
+          />
+        </div>
+      );
+    }
+
+    if (activeReport === "general-ledger" && !filters.accountId) {
+      return (
+        <div className="py-10">
+          <PageState
+            tone="info"
+            title="Select a ledger account"
+            description="Choose a tenant-owned active account in Report Filters to generate the General Ledger."
+          />
+        </div>
+      );
+    }
+
     if (reportQuery.isLoading) {
       return (
         <div className="py-20">
@@ -156,19 +210,27 @@ export function AccountingReportsView({
     }
 
     if (activeReport === "trial-balance") {
+      const trialBalance = data as AccountingTrialBalanceResponse;
       return (
         <ReportTable
-          headers={["Code", "Account", "Type", "Debit", "Credit", "Balance"]}
-          rows={((data as any[]) ?? []).map((row) => ({
+          headers={[
+            "Code",
+            "Account",
+            "Type",
+            "Period Debit",
+            "Period Credit",
+            "Closing Balance",
+          ]}
+          rows={(trialBalance.rows ?? []).map((row) => ({
             id: row.accountId,
             cells: [
-              { value: row.code, bold: true },
-              { value: row.name },
-              { value: row.type },
-              { value: row.debit, type: "currency", align: "right" },
-              { value: row.credit, type: "currency", align: "right" },
+              { value: row.accountCode, bold: true },
+              { value: row.accountName },
+              { value: row.accountType },
+              { value: row.periodDebit, type: "currency", align: "right" },
+              { value: row.periodCredit, type: "currency", align: "right" },
               {
-                value: row.balance,
+                value: row.netBalance,
                 type: "currency",
                 bold: true,
                 align: "right",
@@ -180,8 +242,11 @@ export function AccountingReportsView({
     }
 
     if (activeReport === "income-statement") {
-      const pnl = data as any;
-      const groups = pnl?.groups ?? {};
+      const pnl = data as AccountingIncomeStatementResponse;
+      const income = pnl.sections.find((section) => section.section === "INCOME");
+      const expenses = pnl.sections.find(
+        (section) => section.section === "EXPENSE",
+      );
 
       const rows: any[] = [];
 
@@ -190,14 +255,14 @@ export function AccountingReportsView({
         isHeader: true,
         cells: [{ value: "REVENUE", bold: true }],
       });
-      (groups.revenue ?? []).forEach((r: any) => {
+      (income?.accounts ?? []).forEach((r) => {
         rows.push({
           id: r.accountId,
           cells: [
-            { value: r.name, indent: 1 },
+            { value: `${r.accountCode} - ${r.accountName}`, indent: 1 },
             { value: "" },
             { value: "" },
-            { value: r.balance * -1, type: "currency", align: "right" },
+            { value: r.amount, type: "currency", align: "right" },
           ],
         });
       });
@@ -208,7 +273,7 @@ export function AccountingReportsView({
           { value: "Total Revenue" },
           { value: "" },
           { value: "" },
-          { value: pnl?.income ?? 0, type: "currency", align: "right" },
+          { value: pnl.totalIncome, type: "currency", align: "right" },
         ],
       });
 
@@ -218,14 +283,14 @@ export function AccountingReportsView({
         className: "mt-4",
         cells: [{ value: "EXPENSES", bold: true }],
       });
-      (groups.expenses ?? []).forEach((e: any) => {
+      (expenses?.accounts ?? []).forEach((e) => {
         rows.push({
           id: e.accountId,
           cells: [
-            { value: e.name, indent: 1 },
+            { value: `${e.accountCode} - ${e.accountName}`, indent: 1 },
             { value: "" },
             { value: "" },
-            { value: e.balance, type: "currency", align: "right" },
+            { value: e.amount, type: "currency", align: "right" },
           ],
         });
       });
@@ -236,7 +301,7 @@ export function AccountingReportsView({
           { value: "Total Expenses" },
           { value: "" },
           { value: "" },
-          { value: pnl?.expenses ?? 0, type: "currency", align: "right" },
+          { value: pnl.totalExpense, type: "currency", align: "right" },
         ],
       });
 
@@ -249,7 +314,11 @@ export function AccountingReportsView({
           { value: "NET INCOME", bold: true },
           { value: "" },
           { value: "" },
-          { value: pnl?.netIncome ?? 0, type: "currency", align: "right" },
+          {
+            value: pnl.netSurplusOrDeficit,
+            type: "currency",
+            align: "right",
+          },
         ],
       });
 
@@ -262,7 +331,12 @@ export function AccountingReportsView({
     }
 
     if (activeReport === "balance-sheet") {
-      const bs = data as any;
+      const bs = data as AccountingBalanceSheetResponse;
+      const assets = bs.sections.find((section) => section.section === "ASSETS");
+      const liabilities = bs.sections.find(
+        (section) => section.section === "LIABILITIES",
+      );
+      const equity = bs.sections.find((section) => section.section === "EQUITY");
       const rows: any[] = [];
 
       rows.push({
@@ -270,12 +344,12 @@ export function AccountingReportsView({
         isHeader: true,
         cells: [{ value: "ASSETS", bold: true }],
       });
-      (bs.assets ?? []).forEach((a: any) => {
+      (assets?.accounts ?? []).forEach((a) => {
         rows.push({
           id: a.accountId,
           cells: [
-            { value: a.name, indent: 1 },
-            { value: a.balance, type: "currency", align: "right" },
+            { value: `${a.accountCode} - ${a.accountName}`, indent: 1 },
+            { value: a.amount, type: "currency", align: "right" },
           ],
         });
       });
@@ -284,7 +358,7 @@ export function AccountingReportsView({
         isFooter: true,
         cells: [
           { value: "Total Assets" },
-          { value: bs.totals?.assets ?? 0, type: "currency", align: "right" },
+          { value: bs.totalAssets, type: "currency", align: "right" },
         ],
       });
 
@@ -293,12 +367,12 @@ export function AccountingReportsView({
         isHeader: true,
         cells: [{ value: "LIABILITIES", bold: true }],
       });
-      (bs.liabilities ?? []).forEach((l: any) => {
+      (liabilities?.accounts ?? []).forEach((l) => {
         rows.push({
           id: l.accountId,
           cells: [
-            { value: l.name, indent: 1 },
-            { value: l.balance * -1, type: "currency", align: "right" },
+            { value: `${l.accountCode} - ${l.accountName}`, indent: 1 },
+            { value: l.amount, type: "currency", align: "right" },
           ],
         });
       });
@@ -308,7 +382,7 @@ export function AccountingReportsView({
         cells: [
           { value: "Total Liabilities" },
           {
-            value: bs.totals?.liabilities ?? 0,
+            value: bs.totalLiabilities,
             type: "currency",
             align: "right",
           },
@@ -320,12 +394,12 @@ export function AccountingReportsView({
         isHeader: true,
         cells: [{ value: "EQUITY", bold: true }],
       });
-      (bs.equity ?? []).forEach((e: any) => {
+      (equity?.accounts ?? []).forEach((e) => {
         rows.push({
           id: e.accountId,
           cells: [
-            { value: e.name, indent: 1 },
-            { value: e.balance * -1, type: "currency", align: "right" },
+            { value: `${e.accountCode} - ${e.accountName}`, indent: 1 },
+            { value: e.amount, type: "currency", align: "right" },
           ],
         });
       });
@@ -334,7 +408,7 @@ export function AccountingReportsView({
         isFooter: true,
         cells: [
           { value: "Total Equity" },
-          { value: bs.totals?.equity ?? 0, type: "currency", align: "right" },
+          { value: bs.totalEquity, type: "currency", align: "right" },
         ],
       });
 
@@ -342,14 +416,15 @@ export function AccountingReportsView({
     }
 
     if (activeReport === "general-ledger") {
+      const ledger = data as AccountingGeneralLedgerResponse;
       return (
         <ReportTable
           headers={["Date", "Journal", "Account", "Debit", "Credit", "Balance"]}
-          rows={((data as any[]) ?? []).map((row, index) => ({
-            id: `${row.journalNumber}-${index}`,
+          rows={(ledger.rows ?? []).map((row, index) => ({
+            id: `${row.journalEntryId}-${index}`,
             cells: [
-              { value: row.date, type: "date" },
-              { value: row.journalNumber, bold: true },
+              { value: row.entryDate, type: "date" },
+              { value: row.entryNumber ?? "Unnumbered", bold: true },
               { value: row.accountName },
               { value: row.debit, type: "currency", align: "right" },
               { value: row.credit, type: "currency", align: "right" },
@@ -366,7 +441,7 @@ export function AccountingReportsView({
     }
 
     if (activeReport === "cash-book") {
-      const cb = data as any;
+      const cb = data as AccountingCashBookResponse;
       return (
         <ReportTable
           headers={[
@@ -377,14 +452,14 @@ export function AccountingReportsView({
             "Payment",
             "Balance",
           ]}
-          rows={((cb.rows as any[]) ?? []).map((row, index) => ({
-            id: `${row.journalNumber}-${index}`,
+          rows={(cb.rows ?? []).map((row, index) => ({
+            id: `${row.journalEntryId}-${index}`,
             cells: [
-              { value: row.date, type: "date" },
-              { value: row.journalNumber },
+              { value: row.entryDate, type: "date" },
+              { value: row.entryNumber ?? "Unnumbered" },
               { value: row.narration },
-              { value: row.debit, type: "currency", align: "right" },
-              { value: row.credit, type: "currency", align: "right" },
+              { value: row.receiptAmount, type: "currency", align: "right" },
+              { value: row.paymentAmount, type: "currency", align: "right" },
               {
                 value: row.runningBalance,
                 type: "currency",
@@ -398,22 +473,30 @@ export function AccountingReportsView({
     }
 
     if (activeReport === "tax-summary") {
+      const tax = data as {
+        vat?: { outputVat: string; inputVat: string; netVat: string };
+        tds?: { deductedPayable: string; paid: string; netPayable: string };
+        pf?: {
+          employeeContribution: string;
+          employerContribution: string;
+          paid: string;
+          netPayable: string;
+        };
+      };
+      const rows = [
+        tax.vat && ["VAT", "Net payable/receivable", tax.vat.netVat],
+        tax.tds && ["TDS", "Net payable", tax.tds.netPayable],
+        tax.pf && ["PF", "Net payable", tax.pf.netPayable],
+      ].filter(Boolean) as string[][];
       return (
         <ReportTable
-          headers={["Type", "Reference", "Amount", "Tax Rate", "Tax Amount"]}
-          rows={((data as any[]) ?? []).map((row, index) => ({
+          headers={["Type", "Summary", "Amount"]}
+          rows={rows.map((row, index) => ({
             id: `tax-${index}`,
             cells: [
-              { value: row.type, bold: true },
-              { value: row.reference },
-              { value: row.baseAmount, type: "currency", align: "right" },
-              { value: `${row.taxRate}%` },
-              {
-                value: row.taxAmount,
-                type: "currency",
-                bold: true,
-                align: "right",
-              },
+              { value: row[0], bold: true },
+              { value: row[1] },
+              { value: row[2], type: "currency", bold: true, align: "right" },
             ],
           }))}
         />
@@ -573,7 +656,7 @@ export function AccountingReportsView({
               className="space-y-2"
               data-testid="accounting-report-snapshots"
             >
-              {((snapshotsQuery.data as any)?.items ?? [])
+              {snapshotItems
                 .filter((item: any) =>
                   String(item.reportKey ?? "").includes(activeReport),
                 )
@@ -593,7 +676,7 @@ export function AccountingReportsView({
                     </span>
                   </button>
                 ))}
-              {((snapshotsQuery.data as any)?.items ?? []).filter((item: any) =>
+              {snapshotItems.filter((item) =>
                 String(item.reportKey ?? "").includes(activeReport),
               ).length === 0 && (
                 <p className="text-sm text-slate-500">

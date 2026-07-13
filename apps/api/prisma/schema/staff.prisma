@@ -47,6 +47,7 @@ model Staff {
   staffContracts             StaffContract[]
   salaryStructures           SalaryStructure[]
   payrollLines               PayrollLine[]
+  payrollExceptions          PayrollException[]
   payslips                   Payslip[]
   qualificationsRecords      StaffQualification[]
   experienceRecords          StaffExperienceRecord[]

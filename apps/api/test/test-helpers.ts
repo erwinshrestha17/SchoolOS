@@ -500,6 +500,10 @@ export function createPrismaMock() {
     onModuleInit: jest.fn(() => Promise.resolve()),
     onModuleDestroy: jest.fn(() => Promise.resolve()),
   };
+  let journalSequence = 0;
+  prisma.$queryRaw = jest.fn(() =>
+    Promise.resolve([{ lastValue: ++journalSequence }]),
+  );
 
   prisma.$transaction = jest.fn((arg: any) => {
     if (typeof arg === 'function') {

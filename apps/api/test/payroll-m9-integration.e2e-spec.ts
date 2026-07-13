@@ -39,6 +39,8 @@ interface ChartAccountUpsertInput {
   update?: { code?: string };
 }
 interface TransactionMock {
+  $queryRaw: jest.Mock;
+  accountingSourceMapping: PayrollM9PrismaMock['accountingSourceMapping'];
   journalEntry: PayrollM9PrismaMock['journalEntry'];
   fiscalPeriod: PayrollM9PrismaMock['fiscalPeriod'];
   fiscalYear: PayrollM9PrismaMock['fiscalYear'];
@@ -93,6 +95,10 @@ interface PayrollM9PrismaMock {
     upsert: jest.Mock;
     create: jest.Mock;
   };
+  accountingSourceMapping: {
+    findFirst: jest.Mock;
+  };
+  $queryRaw: jest.Mock;
   $transaction: jest.Mock;
 }
 
@@ -129,7 +135,7 @@ describe('Payroll + M9 Accounting Integration (E2E)', () => {
 
   it('approves a payroll run without creating accounting journals', async () => {
     prisma.__currentRun = buildPayrollRun({
-      status: PayrollRunStatus.GENERATED,
+      status: PayrollRunStatus.REVIEWED,
     });
 
     const approved = await payrollService.approvePayrollRun('run-1', actor);
@@ -350,7 +356,9 @@ describe('Payroll + M9 Accounting Integration (E2E)', () => {
         { reason: 'Void paid payroll directly' },
         actor,
       ),
-    ).rejects.toThrow('Approved, posted, or paid payroll cannot be rejected');
+    ).rejects.toThrow(
+      'Payroll run in PAID status cannot be returned for correction',
+    );
     expect(prisma.payrollRun.update).not.toHaveBeenCalled();
     expect(prisma.journalEntry.create).not.toHaveBeenCalled();
   });
@@ -391,7 +399,7 @@ function buildPrismaMock(): PayrollM9PrismaMock {
       create: jest.fn((q: JournalCreateInput) => {
         mock.__journalSequence += 1;
         const entry = {
-          id: `journal-${mock.__journalSequence}`,
+          id: `journal-${String(mock.__journalSequence)}`,
           entryNumber: `JE-2026-${String(mock.__journalSequence).padStart(4, '0')}`,
           ...q.data,
           lines: q.data.lines.create,
@@ -438,6 +446,18 @@ function buildPrismaMock(): PayrollM9PrismaMock {
         Promise.resolve(chartAccountForCode(q.data?.code)),
       ),
     },
+    accountingSourceMapping: {
+      findFirst: jest.fn(() =>
+        Promise.resolve({
+          id: 'mapping-payroll-approval',
+          debitAccount: chartAccountForCode('5010'),
+          creditAccount: chartAccountForCode('2200'),
+        }),
+      ),
+    },
+    $queryRaw: jest.fn(() =>
+      Promise.resolve([{ lastValue: mock.__journalSequence + 1 }]),
+    ),
     $transaction: jest.fn(async (input: unknown) => {
       if (typeof input !== 'function') {
         return Promise.all(input as Promise<unknown>[]);
@@ -453,6 +473,8 @@ function buildPrismaMock(): PayrollM9PrismaMock {
 
 function buildTransactionMock(root: PayrollM9PrismaMock): TransactionMock {
   return {
+    $queryRaw: root.$queryRaw,
+    accountingSourceMapping: root.accountingSourceMapping,
     journalEntry: root.journalEntry,
     fiscalPeriod: root.fiscalPeriod,
     fiscalYear: root.fiscalYear,

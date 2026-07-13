@@ -1,5 +1,6 @@
 "use client";
 
+import { isValidElement } from "react";
 import { cn } from "../../lib/utils";
 import { MoneyDisplay } from "../ui/money-display";
 import { Calculator } from "lucide-react";
@@ -95,7 +96,11 @@ export function ReportTable({ headers, rows }: ReportTableProps) {
                         {formatBsDate(cell.value)}
                       </span>
                     ) : (
-                      String(cell.value ?? "")
+                      isValidElement(cell.value) ? (
+                        cell.value
+                      ) : (
+                        String(cell.value ?? "")
+                      )
                     )}
                   </td>
                 );

@@ -2717,8 +2717,8 @@ describe("SchoolOS web production contracts", () => {
     assert.match(hrPage, /api\.listContractExpiryReminders/);
     assert.match(hrPage, /\/dashboard\/payroll\/runs/);
     assert.match(hrPage, /\/dashboard\/payroll\/payslips/);
-    assert.match(hrPage, /value="Unavailable"/);
-    assert.match(hrPage, /Remaining Issues/);
+    assert.match(hrPage, /\? "Unavailable"|value="Unavailable"/);
+    assert.match(hrPage, /Remaining Issues|Known Boundary/);
     assert.doesNotMatch(hrPage, /api\.listStaff\(/);
     assert.doesNotMatch(hrPage, /api\.listLeaveRequests/);
     assert.match(payrollPage, /<ModuleHeader/);
@@ -2727,7 +2727,10 @@ describe("SchoolOS web production contracts", () => {
       read("app/dashboard/payroll/reports/page.tsx"),
       /api\.getPayrollReportSummary/,
     );
-    assert.match(payrollPage, /salary disbursement remains outside this workspace/i);
+    assert.match(
+      payrollPage,
+      /salary disbursement\s+remains outside this workspace/i,
+    );
     assert.doesNotMatch(payrollPage, /statuses: \['PAID'\]/);
     assert.doesNotMatch(payrollPage, /markPayrollRunPaid|Mark Paid|Disbursement Account Code/);
     assert.match(payrollApi, /listContractExpiryReminders/);
@@ -2793,7 +2796,7 @@ describe("SchoolOS web production contracts", () => {
     assert.match(payrollRuns, /Post to M11 Accounting/);
     assert.match(
       payrollRuns,
-      /Salary disbursement is handled outside this workspace/,
+      /does\s+not disburse salaries|Salary disbursement is handled outside this workspace/,
     );
     assert.doesNotMatch(payrollActionDialog, /MARK_PAID|markPayrollRunPaid/);
     assert.doesNotMatch(

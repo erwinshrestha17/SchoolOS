@@ -15,6 +15,7 @@ describe('Accounting Correctness Hardening', () => {
 
   beforeEach(() => {
     mockPrisma = {
+      $queryRaw: jest.fn().mockResolvedValue([{ lastValue: 1 }]),
       fiscalPeriod: {
         findFirst: jest.fn(),
       },

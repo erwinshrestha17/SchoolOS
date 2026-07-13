@@ -316,6 +316,7 @@ async function main() {
   await cleanupLegacyData(tenant.id);
 
   await seedChartAccounts(tenant.id);
+  await seedAccountingSourceMappings(tenant.id);
   await seedAccountingReportMappings(tenant.id);
   await seedFiscalYear(tenant.id);
   await seedFeeHeads(tenant.id);
@@ -333,6 +334,7 @@ async function main() {
   await seedTransportData(tenant.id);
   await seedCanteenData(tenant.id);
   await seedPlatformInfrastructure();
+  await seedM7M11E2eIdentities(tenant.id);
 
   console.log('');
   console.log('✅ SchoolOS seed completed successfully.');
@@ -596,6 +598,356 @@ async function seedRolePermissions(tenantId: string) {
   }
 }
 
+type E2eRoleSeed = {
+  name: string;
+  email: string;
+  description: string;
+  permissions: string[];
+};
+
+const m7M11E2eRoleSeeds: E2eRoleSeed[] = [
+  {
+    name: 'e2e_hr_officer',
+    email: 'e2e.hr-officer@schoolos.test',
+    description: 'Local E2E HR officer with staff and contract duties',
+    permissions: [
+      'staff:read',
+      'staff:create',
+      'staff:update',
+      'hr:read',
+      'hr:manage',
+      'hr:staff:read',
+      'hr:staff:create',
+      'hr:staff:update',
+      'payroll:salary:read',
+      'payroll:salary:write',
+    ],
+  },
+  {
+    name: 'e2e_payroll_officer',
+    email: 'e2e.payroll-officer@schoolos.test',
+    description: 'Local E2E payroll preparation officer',
+    permissions: [
+      'staff:read',
+      'hr:staff:read',
+      'payroll:read',
+      'payroll:salary:read',
+      'payroll:salary:write',
+      'payroll:run:create',
+      'payroll:run:read',
+      'payroll:payslip:read',
+      'payroll:payslip:generate',
+      'payroll:reports:read',
+      'payroll:exports:create',
+    ],
+  },
+  {
+    name: 'e2e_payroll_reviewer',
+    email: 'e2e.payroll-reviewer@schoolos.test',
+    description: 'Local E2E payroll reviewer',
+    permissions: [
+      'payroll:read',
+      'payroll:run:read',
+      'payroll:run:review',
+      'payroll:payslip:read',
+    ],
+  },
+  {
+    name: 'e2e_payroll_approver',
+    email: 'e2e.payroll-approver@schoolos.test',
+    description: 'Local E2E payroll approver',
+    permissions: [
+      'payroll:read',
+      'payroll:run:read',
+      'payroll:run:approve',
+      'payroll:payslip:read',
+    ],
+  },
+  {
+    name: 'e2e_payroll_poster',
+    email: 'e2e.payroll-poster@schoolos.test',
+    description: 'Local E2E payroll-to-accounting poster',
+    permissions: [
+      'payroll:read',
+      'payroll:run:read',
+      'payroll:run:post',
+      'accounting:journals:read',
+    ],
+  },
+  {
+    name: 'e2e_accountant',
+    email: 'e2e.accountant@schoolos.test',
+    description: 'Local E2E accounting preparer',
+    permissions: [
+      'accounting:read',
+      'accounting:accounts:read',
+      'accounting:accounts:write',
+      'accounting:journals:create',
+      'accounting:journals:read',
+      'accounting:journals:submit',
+      'accounting:reports:read',
+      'accounting:settings:read',
+      'accounting:settings:update',
+      'accounting:exports:create',
+    ],
+  },
+  {
+    name: 'e2e_accounting_reviewer',
+    email: 'e2e.accounting-reviewer@schoolos.test',
+    description: 'Local E2E accounting reviewer with reject authority',
+    permissions: [
+      'accounting:accounts:read',
+      'accounting:journals:read',
+      'accounting:journals:reject',
+      'accounting:reports:read',
+      'accounting:settings:read',
+    ],
+  },
+  {
+    name: 'e2e_accounting_approver',
+    email: 'e2e.accounting-approver@schoolos.test',
+    description: 'Local E2E accounting approver and poster',
+    permissions: [
+      'accounting:accounts:read',
+      'accounting:journals:read',
+      'accounting:journals:approve',
+      'accounting:journals:post',
+      'accounting:journals:reverse',
+      'accounting:reports:read',
+    ],
+  },
+  {
+    name: 'e2e_accounting_fiscal_controller',
+    email: 'e2e.accounting-fiscal-controller@schoolos.test',
+    description: 'Local E2E fiscal lock, close, and controlled reopen authority',
+    permissions: [
+      'accounting:accounts:read',
+      'accounting:journals:read',
+      'accounting:reports:read',
+      'accounting:fiscal:manage',
+      'accounting:fiscal:reopen',
+    ],
+  },
+  {
+    name: 'e2e_principal_read_only',
+    email: 'e2e.principal-read-only@schoolos.test',
+    description: 'Local E2E principal read-only financial oversight',
+    permissions: [
+      'staff:read',
+      'hr:read',
+      'hr:staff:read',
+      'payroll:read',
+      'payroll:run:read',
+      'payroll:reports:read',
+      'accounting:accounts:read',
+      'accounting:journals:read',
+      'accounting:reports:read',
+      'accounting:settings:read',
+    ],
+  },
+  {
+    name: 'e2e_auditor_read_only',
+    email: 'e2e.auditor-read-only@schoolos.test',
+    description: 'Local E2E auditor read-only financial evidence access',
+    permissions: [
+      'payroll:read',
+      'payroll:run:read',
+      'payroll:reports:read',
+      'accounting:accounts:read',
+      'accounting:journals:read',
+      'accounting:reports:read',
+      'accounting:settings:read',
+      'reports:read',
+      'reports:export',
+    ],
+  },
+  {
+    name: 'e2e_staff_self_service',
+    email: 'e2e.staff-self-service@schoolos.test',
+    description: 'Local E2E staff self-service identity',
+    permissions: ['staff:read'],
+  },
+  {
+    name: 'e2e_unauthorized_school_user',
+    email: 'e2e.unauthorized@schoolos.test',
+    description: 'Local E2E school identity without HR or finance access',
+    permissions: ['settings:read_public'],
+  },
+];
+
+async function seedM7M11E2eIdentities(primaryTenantId: string) {
+  const password = process.env.SCHOOLOS_E2E_ROLE_SEED_PASSWORD;
+  if (!password) {
+    console.log('Skipping opt-in M7/M11 E2E identities.');
+    return;
+  }
+
+  if (password.length < 12) {
+    throw new Error(
+      'SCHOOLOS_E2E_ROLE_SEED_PASSWORD must be at least 12 characters.',
+    );
+  }
+
+  console.log('Seeding opt-in M7/M11 E2E identities...');
+  for (const roleSeed of m7M11E2eRoleSeeds) {
+    await seedE2eRoleUser(primaryTenantId, roleSeed, password);
+  }
+
+  const staffSelfServiceUser = await prisma.user.findUnique({
+    where: {
+      tenantId_email: {
+        tenantId: primaryTenantId,
+        email: 'e2e.staff-self-service@schoolos.test',
+      },
+    },
+  });
+  if (!staffSelfServiceUser) {
+    throw new Error('Failed to create the E2E staff self-service identity.');
+  }
+  await upsertStaffProfile({
+    tenantId: primaryTenantId,
+    userId: staffSelfServiceUser.id,
+    employeeId: 'EA-E2E-SELF-001',
+    firstName: 'E2E',
+    lastName: 'Self Service',
+    gender: Gender.OTHER,
+    designation: 'E2E Staff',
+    department: 'Verification',
+  });
+
+  await seedE2eBoundaryTenant({
+    slug: 'e2e-other-school',
+    name: 'E2E Other School',
+    isActive: true,
+    email: 'e2e.other-tenant@schoolos.test',
+    password,
+  });
+  await seedE2eBoundaryTenant({
+    slug: 'e2e-suspended-school',
+    name: 'E2E Suspended School',
+    isActive: false,
+    email: 'e2e.suspended-tenant@schoolos.test',
+    password,
+  });
+}
+
+async function seedE2eRoleUser(
+  tenantId: string,
+  roleSeed: E2eRoleSeed,
+  password: string,
+) {
+  const role = await prisma.role.upsert({
+    where: { tenantId_name: { tenantId, name: roleSeed.name } },
+    update: { description: roleSeed.description, isSystem: false },
+    create: {
+      tenantId,
+      name: roleSeed.name,
+      description: roleSeed.description,
+      isSystem: false,
+    },
+  });
+
+  const permissions = await Promise.all(
+    Array.from(new Set(['roles:read', ...roleSeed.permissions])).map(
+      async (permissionKey) => {
+        const parts = permissionKey.split(':');
+        const action = parts.pop();
+        const resource = parts.join(':');
+        if (!resource || !action) {
+          throw new Error(`Invalid E2E permission key: ${permissionKey}`);
+        }
+        const permission = await prisma.permission.findUnique({
+          where: { resource_action: { resource, action } },
+        });
+        if (!permission) {
+          throw new Error(`Missing E2E permission: ${permissionKey}`);
+        }
+        return permission;
+      },
+    ),
+  );
+
+  await prisma.$transaction([
+    prisma.rolePermission.deleteMany({ where: { roleId: role.id } }),
+    ...permissions.map((permission) =>
+      prisma.rolePermission.create({
+        data: { roleId: role.id, permissionId: permission.id },
+      }),
+    ),
+  ]);
+
+  return ensureSeedUserWithRole({
+    tenantId,
+    email: roleSeed.email,
+    password,
+    roleId: role.id,
+  });
+}
+
+async function seedE2eBoundaryTenant(input: {
+  slug: string;
+  name: string;
+  isActive: boolean;
+  email: string;
+  password: string;
+}) {
+  const tenant = await prisma.tenant.upsert({
+    where: { slug: input.slug },
+    update: {
+      name: input.name,
+      mode: Mode.SINGLE,
+      plan: 'Enterprise',
+      isActive: input.isActive,
+    },
+    create: {
+      slug: input.slug,
+      name: input.name,
+      mode: Mode.SINGLE,
+      plan: 'Enterprise',
+      isActive: input.isActive,
+    },
+  });
+
+  const enterprisePlan = await prisma.platformPlan.findUnique({
+    where: { key: 'enterprise' },
+  });
+  if (!enterprisePlan) {
+    throw new Error('Enterprise plan must exist before E2E boundary tenants.');
+  }
+  await prisma.tenantSubscription.upsert({
+    where: { id: `sub-${input.slug}` },
+    update: {
+      planId: enterprisePlan.id,
+      status: TenantSubscriptionStatus.ACTIVE,
+      addOns: ['payroll'],
+    },
+    create: {
+      id: `sub-${input.slug}`,
+      tenantId: tenant.id,
+      planId: enterprisePlan.id,
+      status: TenantSubscriptionStatus.ACTIVE,
+      addOns: ['payroll'],
+    },
+  });
+  await seedDemoTenantFeatureOverrides(tenant.id);
+
+  await seedE2eRoleUser(
+    tenant.id,
+    {
+      name: 'e2e_boundary_reader',
+      email: input.email,
+      description: 'Local E2E tenant-boundary reader',
+      permissions: [
+        'payroll:read',
+        'payroll:run:read',
+        'accounting:journals:read',
+        'accounting:reports:read',
+      ],
+    },
+    input.password,
+  );
+}
+
 async function seedChartAccounts(tenantId: string) {
   console.log('Seeding default chart of accounts...');
 
@@ -622,6 +974,49 @@ async function seedChartAccounts(tenantId: string) {
       },
     });
   }
+}
+
+async function seedAccountingSourceMappings(tenantId: string) {
+  console.log('Seeding default accounting source mappings...');
+
+  const [salaryExpense, salaryPayable] = await Promise.all([
+    prisma.chartAccount.findUnique({
+      where: { tenantId_code: { tenantId, code: '5010' } },
+    }),
+    prisma.chartAccount.findUnique({
+      where: { tenantId_code: { tenantId, code: '2200' } },
+    }),
+  ]);
+
+  if (!salaryExpense?.isActive || !salaryPayable?.isActive) {
+    throw new Error(
+      'Default payroll source mapping requires active tenant-owned accounts 5010 and 2200.',
+    );
+  }
+
+  const effectiveFrom = date('2000-01-01');
+  await prisma.accountingSourceMapping.upsert({
+    where: {
+      tenantId_sourceModule_sourceType_postingType_effectiveFrom: {
+        tenantId,
+        sourceModule: 'PAYROLL',
+        sourceType: 'PAYROLL_RUN',
+        postingType: 'APPROVAL',
+        effectiveFrom,
+      },
+    },
+    update: {},
+    create: {
+      tenantId,
+      sourceModule: 'PAYROLL',
+      sourceType: 'PAYROLL_RUN',
+      postingType: 'APPROVAL',
+      debitAccountId: salaryExpense.id,
+      creditAccountId: salaryPayable.id,
+      description: 'Default payroll accrual mapping',
+      effectiveFrom,
+    },
+  });
 }
 
 async function seedAccountingReportMappings(tenantId: string) {

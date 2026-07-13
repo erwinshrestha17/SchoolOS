@@ -1,42 +1,17 @@
-import { expect, test, type Page } from '@playwright/test';
-
-const API_BASE_URL =
-  process.env.SCHOOLOS_E2E_API_BASE_URL ??
-  process.env.NEXT_PUBLIC_API_BASE_URL ??
-  'http://localhost:4000/api/v1';
-
-const schoolAdminCredentials = {
-  tenantSlug: process.env.SCHOOLOS_E2E_TENANT_SLUG ?? 'default-school',
-  email: process.env.SCHOOLOS_E2E_EMAIL ?? 'admin@schoolos.com',
-  password: process.env.SCHOOLOS_E2E_PASSWORD ?? 'admin123',
-};
+import { expect, test } from './fixtures/auth';
 
 test.describe.serial('SchoolOS Accounting Workflow Smoke Tests', () => {
-  test.beforeEach(async ({ context, page }) => {
-    // Check if API is available
-    try {
-      const response = await page.request.get(`${API_BASE_URL}/health`);
-      if (!response.ok()) {
-        test.skip(true, 'API is not healthy');
-      }
-    } catch {
-      test.skip(true, 'API is not reachable');
-    }
-
-    await context.clearCookies();
-    await login(page, schoolAdminCredentials);
-  });
-
   test('Accounting Dashboard: Navigation and shell integrity', async ({ page }) => {
     await page.goto('/dashboard/accounting');
     await expect(page).toHaveURL(/\/dashboard\/accounting/);
     
-    // Verify cards for core accounting summaries
+    // Verify the backend-owned operational summaries. Do not replace these with
+    // browser-derived revenue or balance totals.
     const accountingSummaries = [
-      'Total Revenue',
-      'Total Expenses',
-      'Net Balance',
-      'Fiscal Status',
+      'Open Fiscal Periods',
+      'Unposted Journals',
+      'Unreconciled Statements',
+      'Mapping Issues',
     ];
 
     for (const summary of accountingSummaries) {
@@ -63,14 +38,15 @@ test.describe.serial('SchoolOS Accounting Workflow Smoke Tests', () => {
     await page.goto('/dashboard/accounting/accounts');
     await expect(page.getByRole('heading', { name: /Chart of Accounts/i })).toBeVisible();
     
-    // Verify tree structure or list
-    await expect(page.getByText(/Assets/i)).toBeVisible();
-    await expect(page.getByText(/Liabilities/i)).toBeVisible();
+    // Verify canonical account types without matching account names such as
+    // "Library Assets".
+    await expect(page.getByText(/^ASSET$/).first()).toBeVisible();
+    await expect(page.getByText(/^LIABILITY$/).first()).toBeVisible();
   });
 
   test('Reports: Reports hub and filters', async ({ page }) => {
     await page.goto('/dashboard/accounting/reports');
-    await expect(page.getByRole('heading', { name: /Accounting Reports/i })).toBeVisible();
+    await expect(page.getByText('Accounting Reports', { exact: true }).first()).toBeVisible();
     
     // Verify report selection buttons
     const reports = [
@@ -87,16 +63,16 @@ test.describe.serial('SchoolOS Accounting Workflow Smoke Tests', () => {
 
     // Verify filter section
     await expect(page.getByText(/Report Filters/i)).toBeVisible();
-    await expect(page.getByText(/Fiscal Year/i)).toBeVisible();
-    await expect(page.getByText(/Custom Date Range/i)).toBeVisible();
+    await expect(page.getByText('Fiscal Year', { exact: true })).toBeVisible();
+    await expect(page.getByText('Custom Date Range', { exact: true })).toBeVisible();
     await expect(page.getByTestId('accounting-report-pdf-export')).toBeVisible();
     await expect(page.getByTestId('accounting-report-snapshots')).toBeVisible();
   });
 
   test('Reconciliation: Bank reconciliation workspace loads', async ({ page }) => {
     await page.goto('/dashboard/accounting/reconciliation');
-    await expect(page.getByRole('heading', { name: /Bank Reconciliation/i })).toBeVisible();
-    await expect(page.getByText(/Select account to reconcile/i)).toBeVisible();
+    await expect(page.getByText(/Select Bank\/Cash Account/i)).toBeVisible();
+    await expect(page.getByRole('combobox').first()).toBeVisible();
     const autoMatch = page.getByTestId('bank-reconciliation-auto-match');
     if ((await autoMatch.count()) > 0) {
       await expect(autoMatch).toBeVisible();
@@ -105,25 +81,7 @@ test.describe.serial('SchoolOS Accounting Workflow Smoke Tests', () => {
 
   test('Management: Fiscal management page loads', async ({ page }) => {
     await page.goto('/dashboard/accounting/management');
-    await expect(page.getByRole('heading', { name: /Fiscal Management/i })).toBeVisible();
-    await expect(page.getByRole('tab', { name: /Fiscal Periods/i })).toBeVisible();
-    await expect(page.getByRole('tab', { name: /Fiscal Years/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Fiscal Years & Periods/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Close Year|Reopen/i }).first()).toBeVisible();
   });
 });
-
-async function login(
-  page: Page,
-  credentials: { tenantSlug: string; email: string; password: string },
-) {
-  await page.goto('/login');
-  await expect(page.getByLabel(/School Code/i)).toBeVisible();
-
-  await page.getByLabel(/School Code/i).fill(credentials.tenantSlug);
-  await page.getByLabel(/Email/i).fill(credentials.email);
-  await page.getByLabel(/Password/i).fill(credentials.password);
-
-  await Promise.all([
-    page.waitForURL(/\/dashboard(?:$|[/?#])/, { timeout: 20_000 }),
-    page.getByRole('button', { name: /Sign in/i }).click(),
-  ]);
-}

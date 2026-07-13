@@ -26,6 +26,7 @@ import {
 } from "@schoolos/core";
 import { cn } from "../../lib/utils";
 import { Toast, type ToastTone } from "../ui/toast";
+import { useSession } from "../session-provider";
 
 interface JournalDetailDialogProps {
   isOpen: boolean;
@@ -39,6 +40,11 @@ export function JournalDetailDialog({
   entry,
 }: JournalDetailDialogProps) {
   const queryClient = useQueryClient();
+  const { hasPermissions } = useSession();
+  const canSubmit = hasPermissions(["accounting:journals:submit"]);
+  const canApprove = hasPermissions(["accounting:journals:approve"]);
+  const canPost = hasPermissions(["accounting:journals:post"]);
+  const canReverse = hasPermissions(["accounting:journals:reverse"]);
   const [isReversing, setIsReversing] = useState(false);
   const [isCorrecting, setIsCorrecting] = useState(false);
   const [reason, setReason] = useState("");
@@ -48,16 +54,27 @@ export function JournalDetailDialog({
     tone: ToastTone;
   } | null>(null);
 
-  const postMutation = useMutation({
-    mutationFn: (id: string) => api.postJournal(id),
+  const actionMutation = useMutation({
+    mutationFn: ({
+      id,
+      action,
+    }: {
+      id: string;
+      action: "submit" | "approve" | "post";
+    }) => {
+      if (action === "submit") return api.submitJournal(id, {});
+      if (action === "approve") return api.approveJournal(id, {});
+      return api.postJournal(id);
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["ledger-entries"] });
       onClose();
     },
     onError: (err: Error) => {
       setNotice({
-        title: "Posting failed",
-        description: err.message || "Failed to post journal entry",
+        title: "Journal action failed",
+        description:
+          err.message || "The journal action could not be completed.",
         tone: "danger",
       });
     },
@@ -416,22 +433,58 @@ export function JournalDetailDialog({
         <DialogFooter className="gap-2 sm:gap-0 p-4 border-t bg-slate-50/50">
           {!isReversing && !isCorrecting && (
             <>
-              {entry.status === "SUBMITTED" && (
+              {entry.status === "DRAFT" && canSubmit && (
                 <button
-                  onClick={() => postMutation.mutate(entry.id)}
-                  disabled={postMutation.isPending}
-                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-2 text-sm font-bold text-white shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all disabled:opacity-50"
+                  onClick={() =>
+                    actionMutation.mutate({ id: entry.id, action: "submit" })
+                  }
+                  disabled={actionMutation.isPending}
+                  className="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-6 py-2 text-sm font-bold text-white shadow-sm hover:bg-amber-700 transition-all disabled:opacity-50"
                 >
-                  {postMutation.isPending ? (
+                  {actionMutation.isPending ? (
                     <Loader2 size={16} className="animate-spin" />
                   ) : (
                     <CheckCircle2 size={16} />
                   )}
-                  Approve & Post
+                  Submit for Approval
                 </button>
               )}
 
-              {entry.status === "POSTED" && (
+              {entry.status === "SUBMITTED" && canApprove && (
+                <button
+                  onClick={() =>
+                    actionMutation.mutate({ id: entry.id, action: "approve" })
+                  }
+                  disabled={actionMutation.isPending}
+                  className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-mod-accounting-accent)] px-6 py-2 text-sm font-bold text-white shadow-sm hover:bg-[var(--color-mod-accounting-text)] transition-all disabled:opacity-50"
+                >
+                  {actionMutation.isPending ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <CheckCircle2 size={16} />
+                  )}
+                  Approve Journal
+                </button>
+              )}
+
+              {entry.status === "APPROVED" && canPost && (
+                <button
+                  onClick={() =>
+                    actionMutation.mutate({ id: entry.id, action: "post" })
+                  }
+                  disabled={actionMutation.isPending}
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-2 text-sm font-bold text-white shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all disabled:opacity-50"
+                >
+                  {actionMutation.isPending ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <CheckCircle2 size={16} />
+                  )}
+                  Post Journal
+                </button>
+              )}
+
+              {entry.status === "POSTED" && canReverse && (
                 <div className="flex gap-2 mr-auto">
                   <button
                     onClick={() => setIsReversing(true)}

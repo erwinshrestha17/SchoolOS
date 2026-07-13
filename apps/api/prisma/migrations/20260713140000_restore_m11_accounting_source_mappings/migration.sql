@@ -19,10 +19,10 @@ CREATE TABLE "AccountingSourceMapping" (
   CONSTRAINT "AccountingSourceMapping_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "AccountingSourceMapping_tenantId_sourceModule_sourceType_postingType_effectiveFrom_key"
+CREATE UNIQUE INDEX "AccountingSourceMapping_effective_key"
   ON "AccountingSourceMapping"("tenantId", "sourceModule", "sourceType", "postingType", "effectiveFrom");
 
-CREATE INDEX "AccountingSourceMapping_tenantId_sourceModule_sourceType_postingType_isActive_idx"
+CREATE INDEX "AccountingSourceMapping_active_lookup_idx"
   ON "AccountingSourceMapping"("tenantId", "sourceModule", "sourceType", "postingType", "isActive");
 
 CREATE INDEX "AccountingSourceMapping_tenantId_effectiveFrom_effectiveTo_idx"

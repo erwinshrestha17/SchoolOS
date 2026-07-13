@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import { createHash } from 'crypto';
 import { ReportsQueryDto } from './dto/reports-query.dto';
 
 import {
@@ -46,12 +46,14 @@ import { DEFAULT_CHART_ACCOUNTS } from '../finance/finance.defaults';
 
 export interface UnsafeBankStatement {
   id: string;
+  accountId: string;
   statementDate: Date;
   description: string;
   reference?: string | null;
   debitAmount?: Prisma.Decimal | number | string | null;
   creditAmount?: Prisma.Decimal | number | string | null;
   isReconciled: boolean;
+  journalLineId?: string | null;
   [key: string]: unknown;
 }
 
@@ -1269,6 +1271,13 @@ export class AccountingService {
       );
     }
 
+    const readiness = await this.getFiscalPeriodCloseReadiness(id, actor);
+    if (!readiness.readyToClose) {
+      throw new ConflictException(
+        `Fiscal period cannot be closed until these blockers are resolved: ${readiness.blockers.map((blocker) => blocker.code).join(', ')}`,
+      );
+    }
+
     // Optional: check if previous period is closed
     const previousPeriod = await this.prisma.fiscalPeriod.findFirst({
       where: {
@@ -1308,6 +1317,189 @@ export class AccountingService {
     });
 
     return updated;
+  }
+
+  async getFiscalPeriodCloseReadiness(id: string, actor: AuthContext) {
+    const period = await this.prisma.fiscalPeriod.findFirst({
+      where: { id, tenantId: actor.tenantId },
+      include: { fiscalYear: { select: { name: true } } },
+    });
+    if (!period) {
+      throw new NotFoundException('Fiscal period not found');
+    }
+
+    const sourceTypes = [
+      JournalSourceType.INVOICE,
+      JournalSourceType.FEE_PAYMENT,
+      JournalSourceType.PAYMENT_REFUND,
+      JournalSourceType.PAYROLL,
+      JournalSourceType.PAYROLL_RUN,
+      JournalSourceType.PAYROLL_DISBURSEMENT,
+      JournalSourceType.ADJUSTMENT,
+    ];
+    const [
+      journalStatuses,
+      postedSourceWithoutMapping,
+      unreconciledBankItems,
+      trialBalance,
+      unbalancedRows,
+    ] = await Promise.all([
+      this.prisma.journalEntry.groupBy({
+        by: ['status'],
+        where: {
+          tenantId: actor.tenantId,
+          fiscalPeriodId: period.id,
+        },
+        _count: { _all: true },
+      }),
+      this.prisma.journalEntry.count({
+        where: {
+          tenantId: actor.tenantId,
+          fiscalPeriodId: period.id,
+          status: JournalEntryStatus.POSTED,
+          sourceType: { in: sourceTypes },
+          sourceMappingId: null,
+        },
+      }),
+      this.bankStatements.count({
+        where: {
+          tenantId: actor.tenantId,
+          isReconciled: false,
+          statementDate: { gte: period.startDate, lte: period.endDate },
+        },
+      }),
+      this.prisma.journalLine.aggregate({
+        where: {
+          tenantId: actor.tenantId,
+          journalEntry: {
+            tenantId: actor.tenantId,
+            fiscalPeriodId: period.id,
+            status: JournalEntryStatus.POSTED,
+          },
+        },
+        _sum: { debit: true, credit: true },
+      }),
+      this.prisma.$queryRaw<Array<{ count: number }>>(Prisma.sql`
+        SELECT COUNT(*)::INTEGER AS "count"
+        FROM (
+          SELECT journal."id"
+          FROM "JournalEntry" AS journal
+          INNER JOIN "JournalLine" AS line
+            ON line."journalEntryId" = journal."id"
+            AND line."tenantId" = ${actor.tenantId}
+          WHERE journal."tenantId" = ${actor.tenantId}
+            AND journal."fiscalPeriodId" = ${period.id}
+            AND journal."status" = ${JournalEntryStatus.POSTED}::"JournalEntryStatus"
+          GROUP BY journal."id"
+          HAVING COALESCE(SUM(line."debit"), 0) <> COALESCE(SUM(line."credit"), 0)
+        ) AS unbalanced
+      `),
+    ]);
+
+    const statusCount = (status: JournalEntryStatus) =>
+      journalStatuses.find((row) => row.status === status)?._count._all ?? 0;
+    const debit = new Prisma.Decimal(trialBalance._sum.debit ?? 0);
+    const credit = new Prisma.Decimal(trialBalance._sum.credit ?? 0);
+    const unbalancedPosted = unbalancedRows[0]?.count ?? 0;
+    const blockers: Array<{
+      code:
+        | 'DRAFT_JOURNALS'
+        | 'SUBMITTED_JOURNALS'
+        | 'APPROVED_UNPOSTED_JOURNALS'
+        | 'POSTED_SOURCE_WITHOUT_MAPPING'
+        | 'UNRECONCILED_BANK_ITEMS'
+        | 'UNBALANCED_POSTED_JOURNALS'
+        | 'UNBALANCED_TRIAL_BALANCE';
+      count: number;
+      safeMessage: string;
+      resolutionRoute: string;
+    }> = [];
+    const addBlocker = (
+      code: (typeof blockers)[number]['code'],
+      count: number,
+      safeMessage: string,
+      resolutionRoute: string,
+    ) => {
+      if (count > 0) {
+        blockers.push({ code, count, safeMessage, resolutionRoute });
+      }
+    };
+    addBlocker(
+      'DRAFT_JOURNALS',
+      statusCount(JournalEntryStatus.DRAFT),
+      'Draft journals must be completed or cancelled.',
+      '/dashboard/accounting/journals?status=DRAFT',
+    );
+    addBlocker(
+      'SUBMITTED_JOURNALS',
+      statusCount(JournalEntryStatus.SUBMITTED),
+      'Submitted journals are still awaiting a decision.',
+      '/dashboard/accounting/journals?status=SUBMITTED',
+    );
+    addBlocker(
+      'APPROVED_UNPOSTED_JOURNALS',
+      statusCount(JournalEntryStatus.APPROVED),
+      'Approved journals must be posted or returned through the approved workflow.',
+      '/dashboard/accounting/journals?status=APPROVED',
+    );
+    addBlocker(
+      'POSTED_SOURCE_WITHOUT_MAPPING',
+      postedSourceWithoutMapping,
+      'Posted source journals without mapping evidence require review.',
+      '/dashboard/accounting/source-mappings',
+    );
+    addBlocker(
+      'UNRECONCILED_BANK_ITEMS',
+      unreconciledBankItems,
+      'Bank statement items in this period remain unreconciled.',
+      '/dashboard/accounting/reconciliation',
+    );
+    addBlocker(
+      'UNBALANCED_POSTED_JOURNALS',
+      unbalancedPosted,
+      'One or more posted journals are unbalanced.',
+      '/dashboard/accounting/journals?status=POSTED',
+    );
+    addBlocker(
+      'UNBALANCED_TRIAL_BALANCE',
+      debit.equals(credit) ? 0 : 1,
+      'The period trial balance is not balanced.',
+      '/dashboard/accounting/reports?report=trial-balance',
+    );
+
+    return {
+      checkedAt: new Date().toISOString(),
+      period: {
+        id: period.id,
+        fiscalYearId: period.fiscalYearId,
+        fiscalYearName: period.fiscalYear.name,
+        label: period.label,
+        periodNumber: period.periodNumber,
+        startDate: period.startDate,
+        endDate: period.endDate,
+        status: period.status,
+      },
+      journals: {
+        draft: statusCount(JournalEntryStatus.DRAFT),
+        submitted: statusCount(JournalEntryStatus.SUBMITTED),
+        approvedUnposted: statusCount(JournalEntryStatus.APPROVED),
+        posted: statusCount(JournalEntryStatus.POSTED),
+        postedSourceWithoutMapping,
+        unbalancedPosted,
+      },
+      unreconciledBankItems,
+      trialBalance: {
+        debit: debit.toFixed(2),
+        credit: credit.toFixed(2),
+        balanced: debit.equals(credit),
+      },
+      blockers,
+      unavailableChecks: [
+        'NEEDS_POSTING_FAILURE_CONTRACT' as const,
+        'NEEDS_REPORT_SNAPSHOT_POLICY' as const,
+      ],
+      readyToClose: blockers.length === 0,
+    };
   }
 
   async reopenFiscalPeriod(
@@ -2020,34 +2212,81 @@ export class AccountingService {
     accountId: string,
     lines: ImportBankStatementLineDto[],
     actor: AuthContext,
+    expectedFingerprint?: string,
   ) {
-    const sanitizedLines = this.validateBankStatementImportLines(lines);
-    const account = await this.prisma.chartAccount.findFirst({
-      where: { id: accountId, tenantId: actor.tenantId },
-    });
+    const preparation = await this.prepareBankStatementImport(
+      accountId,
+      lines,
+      actor,
+    );
+    if (
+      expectedFingerprint &&
+      expectedFingerprint !== preparation.fingerprint
+    ) {
+      throw new BadRequestException(
+        'Bank statement data changed after preview. Preview the file again before committing.',
+      );
+    }
+    const importBatchId = `IMPORT-${preparation.fingerprint}`;
 
-    if (!account) {
-      throw new NotFoundException('Account not found in this tenant');
+    const existingBatch = await this.prisma.bankStatementImportBatch.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        accountId,
+        fingerprint: preparation.fingerprint,
+      },
+    });
+    if (existingBatch) {
+      return this.readExistingBankStatementImport(
+        importBatchId,
+        accountId,
+        actor,
+      );
     }
 
-    const importBatchId = `IMPORT-${randomUUID()}`;
-
-    const statements = (await this.prisma.$transaction(
-      sanitizedLines.map((line) =>
-        this.bankStatements.create({
+    let statements: UnsafeBankStatement[];
+    try {
+      statements = await this.prisma.$transaction(async (tx) => {
+        await tx.bankStatementImportBatch.create({
           data: {
+            id: importBatchId,
             tenantId: actor.tenantId,
             accountId,
-            statementDate: new Date(line.statementDate),
-            description: line.description,
-            reference: line.reference ?? null,
-            debitAmount: line.debitAmount ?? 0,
-            creditAmount: line.creditAmount ?? 0,
-            importBatchId,
+            fingerprint: preparation.fingerprint,
+            lineCount: preparation.lines.length,
+            createdById: actor.userId,
           },
-        }),
-      ),
-    )) as UnsafeBankStatement[];
+        });
+        return Promise.all(
+          preparation.lines.map((line) =>
+            tx.bankStatement.create({
+              data: {
+                tenantId: actor.tenantId,
+                accountId,
+                statementDate: line.statementDate,
+                description: line.description,
+                reference: line.reference,
+                debitAmount: line.debitAmount,
+                creditAmount: line.creditAmount,
+                importBatchId,
+              },
+            }),
+          ),
+        ) as Promise<UnsafeBankStatement[]>;
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        return this.readExistingBankStatementImport(
+          importBatchId,
+          accountId,
+          actor,
+        );
+      }
+      throw error;
+    }
 
     await this.auditService.record({
       action: 'import',
@@ -2058,7 +2297,92 @@ export class AccountingService {
       after: { accountId, lineCount: statements.length },
     });
 
-    return { importBatchId, count: statements.length, statements };
+    return {
+      importBatchId,
+      count: statements.length,
+      idempotent: false,
+      statements,
+    };
+  }
+
+  async previewBankStatementImport(
+    accountId: string,
+    lines: ImportBankStatementLineDto[],
+    actor: AuthContext,
+  ) {
+    const preparation = await this.prepareBankStatementImport(
+      accountId,
+      lines,
+      actor,
+    );
+    return {
+      account: preparation.account,
+      fingerprint: preparation.fingerprint,
+      lineCount: preparation.lines.length,
+      rows: preparation.lines.map((line) => ({
+        statementDate: line.statementDate.toISOString().slice(0, 10),
+        description: line.description,
+        reference: line.reference,
+        debitAmount: line.debitAmount.toFixed(2),
+        creditAmount: line.creditAmount.toFixed(2),
+      })),
+      readyToCommit: true,
+    };
+  }
+
+  private async prepareBankStatementImport(
+    accountId: string,
+    lines: ImportBankStatementLineDto[],
+    actor: AuthContext,
+  ) {
+    const sanitizedLines = this.validateBankStatementImportLines(lines);
+    const account = await this.prisma.chartAccount.findFirst({
+      where: {
+        id: accountId,
+        tenantId: actor.tenantId,
+        type: ChartAccountType.ASSET,
+        isActive: true,
+      },
+      select: { id: true, code: true, name: true },
+    });
+    if (!account) {
+      throw new NotFoundException(
+        'Active bank or cash account not found in this tenant',
+      );
+    }
+
+    return {
+      account,
+      lines: sanitizedLines,
+      fingerprint: bankStatementImportFingerprint(accountId, sanitizedLines),
+    };
+  }
+
+  private async readExistingBankStatementImport(
+    importBatchId: string,
+    accountId: string,
+    actor: AuthContext,
+  ) {
+    const statements = (await this.bankStatements.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        accountId,
+        importBatchId,
+      },
+      orderBy: [{ statementDate: 'asc' }, { id: 'asc' }],
+      take: 500,
+    })) as UnsafeBankStatement[];
+    if (statements.length === 0) {
+      throw new ConflictException(
+        'A matching bank import exists but its statement lines are unavailable',
+      );
+    }
+    return {
+      importBatchId,
+      count: statements.length,
+      idempotent: true,
+      statements,
+    };
   }
 
   getUnreconciledStatements(accountId: string, actor: AuthContext) {
@@ -2068,7 +2392,8 @@ export class AccountingService {
         accountId,
         isReconciled: false,
       },
-      orderBy: { statementDate: 'asc' },
+      orderBy: [{ statementDate: 'asc' }, { id: 'asc' }],
+      take: 200,
     });
   }
 
@@ -2081,6 +2406,7 @@ export class AccountingService {
       );
     }
 
+    const seenRows = new Set<string>();
     return lines.map((line, index) => {
       const description = line.description?.trim();
       const statementDate = new Date(line.statementDate);
@@ -2117,12 +2443,21 @@ export class AccountingService {
         );
       }
 
-      return {
-        ...line,
+      const normalized = {
+        statementDate,
         description,
-        debitAmount,
-        creditAmount,
+        reference: line.reference?.trim() || null,
+        debitAmount: new Prisma.Decimal(debitAmount),
+        creditAmount: new Prisma.Decimal(creditAmount),
       };
+      const rowKey = bankStatementImportLineKey(normalized);
+      if (seenRows.has(rowKey)) {
+        throw new BadRequestException(
+          `Bank statement line ${index + 1} duplicates another row in this import`,
+        );
+      }
+      seenRows.add(rowKey);
+      return normalized;
     });
   }
 
@@ -2294,21 +2629,77 @@ export class AccountingService {
     }
 
     const journalLine = await this.prisma.journalLine.findFirst({
-      where: { id: journalLineId, tenantId: actor.tenantId },
+      where: {
+        id: journalLineId,
+        tenantId: actor.tenantId,
+        chartAccountId: statement.accountId,
+        journalEntry: { status: JournalEntryStatus.POSTED },
+      },
     });
 
     if (!journalLine) {
-      throw new NotFoundException('Journal line not found in this tenant');
+      throw new NotFoundException(
+        'Posted journal line for this bank account was not found',
+      );
     }
 
-    const updated = await this.bankStatements.update({
-      where: { id: statementId },
-      data: {
-        isReconciled: true,
-        reconciledAt: new Date(),
-        reconciledById: actor.userId,
+    const statementAmount = bankStatementSignedAmount(statement);
+    const journalAmount = new Prisma.Decimal(journalLine.debit).gt(0)
+      ? new Prisma.Decimal(journalLine.debit)
+      : new Prisma.Decimal(journalLine.credit).mul(-1);
+    if (!journalAmount.equals(statementAmount)) {
+      throw new ConflictException(
+        'Statement and journal amounts must match before reconciliation',
+      );
+    }
+
+    const existingJournalLineMatch = await this.bankStatements.findFirst({
+      where: {
+        tenantId: actor.tenantId,
         journalLineId,
+        isReconciled: true,
       },
+      select: { id: true },
+    });
+    if (existingJournalLineMatch) {
+      throw new ConflictException(
+        'Journal line is already matched to another bank statement line',
+      );
+    }
+
+    let updateResult: { count: number };
+    try {
+      updateResult = await this.bankStatements.updateMany({
+        where: {
+          id: statementId,
+          tenantId: actor.tenantId,
+          isReconciled: false,
+        },
+        data: {
+          isReconciled: true,
+          reconciledAt: new Date(),
+          reconciledById: actor.userId,
+          journalLineId,
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          'Journal line is already matched to another bank statement line',
+        );
+      }
+      throw error;
+    }
+    if (updateResult.count !== 1) {
+      throw new ConflictException(
+        'Statement line changed while reconciliation was being confirmed',
+      );
+    }
+    const updated = await this.bankStatements.findFirst({
+      where: { id: statementId, tenantId: actor.tenantId },
     });
 
     await this.auditService.record({
@@ -2321,6 +2712,57 @@ export class AccountingService {
     });
 
     return updated;
+  }
+
+  async unreconcileStatement(
+    statementId: string,
+    reason: string,
+    actor: AuthContext,
+  ) {
+    const statement = await this.bankStatements.findFirst({
+      where: {
+        id: statementId,
+        tenantId: actor.tenantId,
+        isReconciled: true,
+      },
+    });
+    if (!statement) {
+      throw new NotFoundException('Reconciled bank statement line not found');
+    }
+
+    const updateResult = await this.bankStatements.updateMany({
+      where: {
+        id: statementId,
+        tenantId: actor.tenantId,
+        isReconciled: true,
+        journalLineId: statement.journalLineId,
+      },
+      data: {
+        isReconciled: false,
+        reconciledAt: null,
+        reconciledById: null,
+        journalLineId: null,
+      },
+    });
+    if (updateResult.count !== 1) {
+      throw new ConflictException(
+        'Statement line changed while the correction was being applied',
+      );
+    }
+
+    await this.auditService.record({
+      action: 'unreconcile',
+      resource: 'bank_statement',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: statementId,
+      before: { journalLineId: statement.journalLineId },
+      after: { reason },
+    });
+
+    return this.bankStatements.findFirst({
+      where: { id: statementId, tenantId: actor.tenantId },
+    });
   }
 
   async getReconciliationSummary(accountId: string, actor: AuthContext) {
@@ -2488,6 +2930,38 @@ function bankStatementSignedAmount(statement: UnsafeBankStatement) {
   const debit = new Prisma.Decimal(statement.debitAmount ?? 0);
   const credit = new Prisma.Decimal(statement.creditAmount ?? 0);
   return debit.gt(0) ? debit : credit.mul(-1);
+}
+
+type NormalizedBankStatementImportLine = {
+  statementDate: Date;
+  description: string;
+  reference: string | null;
+  debitAmount: Prisma.Decimal;
+  creditAmount: Prisma.Decimal;
+};
+
+function bankStatementImportLineKey(line: NormalizedBankStatementImportLine) {
+  return JSON.stringify([
+    line.statementDate.toISOString().slice(0, 10),
+    line.description,
+    line.reference,
+    line.debitAmount.toFixed(2),
+    line.creditAmount.toFixed(2),
+  ]);
+}
+
+function bankStatementImportFingerprint(
+  accountId: string,
+  lines: NormalizedBankStatementImportLine[],
+) {
+  return createHash('sha256')
+    .update(
+      JSON.stringify({
+        accountId,
+        rows: lines.map(bankStatementImportLineKey).sort(),
+      }),
+    )
+    .digest('hex');
 }
 
 function daysBetween(a: Date, b: Date) {

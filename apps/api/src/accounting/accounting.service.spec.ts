@@ -247,6 +247,14 @@ describe('fiscal period lifecycle management', () => {
     // Mock findFirst to return the current period first, then null for the previous period check
     (prisma.fiscalPeriod.findFirst as jest.Mock)
       .mockResolvedValueOnce(period)
+      .mockResolvedValueOnce({
+        ...period,
+        fiscalYearId: 'fy-1',
+        periodNumber: 1,
+        startDate: new Date('2026-04-01'),
+        endDate: new Date('2026-04-30'),
+        fiscalYear: { name: 'FY 2026' },
+      })
       .mockResolvedValueOnce(null);
 
     await service.closeFiscalPeriod('p1', { reason: 'Audited' }, actor);
@@ -578,6 +586,7 @@ function buildService(options: {
         return Promise.resolve(null);
       }),
       count: jest.fn().mockResolvedValue(options.journalCount ?? 0),
+      groupBy: jest.fn().mockResolvedValue([]),
       create: jest.fn().mockResolvedValue(options.createdReversal),
       update: jest.fn().mockImplementation(({ where, data }) => {
         return Promise.resolve({ id: where.id, ...data });
@@ -590,6 +599,15 @@ function buildService(options: {
       findFirst: jest.fn().mockResolvedValue(options.fiscalPeriod),
       update: jest.fn().mockResolvedValue(options.fiscalPeriod),
     },
+    journalLine: {
+      aggregate: jest.fn().mockResolvedValue({
+        _sum: { debit: new Prisma.Decimal(0), credit: new Prisma.Decimal(0) },
+      }),
+    },
+    bankStatement: {
+      count: jest.fn().mockResolvedValue(0),
+    },
+    $queryRaw: jest.fn().mockResolvedValue([{ count: 0 }]),
   };
   const auditService = {
     record: jest.fn(),
