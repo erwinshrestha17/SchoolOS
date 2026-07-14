@@ -12,7 +12,7 @@ import { NotificationCenterService } from './notification-center.service';
 
 @Controller('notices')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
-@Entitlement('module.communications')
+@Entitlement('module.notices')
 export class NoticeDetailController {
   constructor(
     private readonly noticeDetailService: NoticeDetailService,
