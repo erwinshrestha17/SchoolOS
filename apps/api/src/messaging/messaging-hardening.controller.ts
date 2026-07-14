@@ -11,7 +11,7 @@ import { ParentTeacherChatService } from './parent-teacher-chat.service';
 
 @Controller('messaging')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
-@Entitlement('module.communications')
+@Entitlement('feature.chat.enabled')
 export class MessagingHardeningController {
   constructor(
     private readonly messagingHardeningService: MessagingHardeningService,
