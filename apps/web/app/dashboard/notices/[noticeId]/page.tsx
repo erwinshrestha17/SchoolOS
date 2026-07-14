@@ -574,10 +574,13 @@ function InfoCard({
 }
 
 function resolveNoticeState(notice: NoticeDetail) {
-  if (notice.publishedAt) {
-    return "Published";
+  if (notice.lifecycleStatus) {
+    return formatEnumLabel(notice.lifecycleStatus);
   }
 
+  // Compatibility fallback for an API instance that has not yet applied the
+  // lifecycle migration during a rolling deployment.
+  if (notice.publishedAt) return "Published";
   if (notice.scheduledFor) {
     return "Scheduled";
   }

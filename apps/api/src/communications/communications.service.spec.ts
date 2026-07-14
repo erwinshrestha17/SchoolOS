@@ -8,6 +8,7 @@ import {
   EventType,
   NotificationChannel,
   NotificationStatus,
+  NoticeLifecycleStatus,
   NoticePriority,
   ProviderType,
   StudentLifecycleStatus,
@@ -572,6 +573,7 @@ describe('CommunicationsService', () => {
         tenantId: 'tenant-1',
         attachmentUrl: null,
         idempotencyKey: '11111111-1111-4111-8111-111111111111',
+        lifecycleStatus: NoticeLifecycleStatus.DRAFT,
         publishedAt: null,
       }),
     });
@@ -629,6 +631,8 @@ describe('CommunicationsService', () => {
       audienceType: AudienceType.ALL,
       classId: null,
       sectionId: null,
+      lifecycleStatus: NoticeLifecycleStatus.DRAFT,
+      approvalRequestId: null,
       scheduledFor: null,
       publishedAt: null,
     });
@@ -642,6 +646,51 @@ describe('CommunicationsService', () => {
     expect(prisma.notice.update).toHaveBeenCalled();
     expect(notificationsService.sendPushNotification).not.toHaveBeenCalled();
     expect(notificationsService.sendSms).not.toHaveBeenCalled();
+  });
+
+  it('persists approval-pending and approved notice lifecycle projections', async () => {
+    prisma.notice.findFirst.mockResolvedValueOnce({
+      id: 'notice-1',
+      tenantId: 'tenant-1',
+      lifecycleStatus: NoticeLifecycleStatus.DRAFT,
+      approvalRequestId: null,
+    });
+    prisma.notice.update.mockResolvedValueOnce({
+      id: 'notice-1',
+      lifecycleStatus: NoticeLifecycleStatus.APPROVAL_PENDING,
+      approvalRequestId: 'approval-1',
+    });
+
+    await service.markNoticeApprovalPending('notice-1', 'approval-1', actor);
+
+    prisma.notice.findFirst.mockResolvedValueOnce({
+      id: 'notice-1',
+      tenantId: 'tenant-1',
+      lifecycleStatus: NoticeLifecycleStatus.APPROVAL_PENDING,
+      approvalRequestId: 'approval-1',
+    });
+    prisma.notice.update.mockResolvedValueOnce({
+      id: 'notice-1',
+      lifecycleStatus: NoticeLifecycleStatus.APPROVED,
+      approvalRequestId: 'approval-1',
+    });
+
+    await service.markNoticeApproved('notice-1', 'approval-1', actor);
+
+    expect(prisma.notice.update).toHaveBeenNthCalledWith(1, {
+      where: { id: 'notice-1' },
+      data: {
+        lifecycleStatus: NoticeLifecycleStatus.APPROVAL_PENDING,
+        approvalRequestId: 'approval-1',
+      },
+    });
+    expect(prisma.notice.update).toHaveBeenNthCalledWith(2, {
+      where: { id: 'notice-1' },
+      data: {
+        lifecycleStatus: NoticeLifecycleStatus.APPROVED,
+        approvalRequestId: 'approval-1',
+      },
+    });
   });
 
   it('converts fee payment domain events into guardian receipt notifications', async () => {

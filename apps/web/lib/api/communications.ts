@@ -6,6 +6,7 @@ import type {
   ConsentRecord,
   EventSummary,
   GuardianConsentStatus,
+  NoticeLifecycleStatus,
   NoticeSummary,
   NotificationDelivery,
   NotificationDeliveryFailureSummary,
@@ -32,8 +33,16 @@ export type NoticeDetail = {
     email: string | null;
   } | null;
   attachmentUrl: string | null;
+  lifecycleStatus: NoticeLifecycleStatus;
+  approvalRequestId: string | null;
   scheduledFor: string | null;
   publishedAt: string | null;
+  expiresAt: string | null;
+  cancelledAt: string | null;
+  cancellationReason: string | null;
+  archivedAt: string | null;
+  archiveReason: string | null;
+  archivedFromStatus: NoticeLifecycleStatus | null;
   createdAt: string;
   updatedAt: string;
   deliverySummary: {

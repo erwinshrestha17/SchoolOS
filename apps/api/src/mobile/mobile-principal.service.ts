@@ -13,6 +13,7 @@ import {
   ApprovalWorkflowType,
   AudienceType,
   ChatEscalationStatus,
+  NoticeLifecycleStatus,
   NoticePriority,
   NotificationStatus,
   Prisma,
@@ -130,12 +131,17 @@ export class MobilePrincipalService implements OnModuleInit {
     this.approvalWorkflowService.registerFinalAction(
       'communications.notice.publish_high_impact',
       {
-        apply: async ({ tenantId, targetId, payload, actor }) => {
+        apply: async ({ tenantId, requestId, targetId, payload, actor }) => {
           if (tenantId !== actor.tenantId) {
             throw new ForbiddenException(
               'Approval action is outside the active tenant.',
             );
           }
+          await this.communicationsService.markNoticeApproved(
+            targetId,
+            requestId,
+            actor,
+          );
           const finalActionPayload = asRecord(payload);
           return this.communicationsService.publishNotice(targetId, actor, {
             scheduledFor:
@@ -2228,6 +2234,11 @@ export class MobilePrincipalService implements OnModuleInit {
         actor,
       );
       approvalRequestId = approvalRequest.id;
+      await this.communicationsService.markNoticeApprovalPending(
+        notice.id,
+        approvalRequest.id,
+        actor,
+      );
     } else {
       await this.communicationsService.publishNotice(notice.id, actor, {
         scheduledFor,
@@ -2273,6 +2284,8 @@ export class MobilePrincipalService implements OnModuleInit {
         audienceType: true,
         classId: true,
         sectionId: true,
+        lifecycleStatus: true,
+        approvalRequestId: true,
         scheduledFor: true,
         publishedAt: true,
         createdAt: true,
@@ -2335,6 +2348,7 @@ export class MobilePrincipalService implements OnModuleInit {
     return {
       id: notice.id,
       state,
+      lifecycleStatus: notice.lifecycleStatus ?? NoticeLifecycleStatus.DRAFT,
       title: notice.title,
       body: notice.body,
       priority: notice.priority,

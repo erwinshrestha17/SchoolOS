@@ -56,6 +56,7 @@ describe('TimetableSubstitutionService', () => {
               findMany: jest.fn(),
               findFirst: jest.fn(),
               update: jest.fn(),
+              count: jest.fn(),
             },
             staff: {
               findFirst: jest.fn(),
@@ -89,6 +90,40 @@ describe('TimetableSubstitutionService', () => {
     );
     prisma = module.get<PrismaService>(PrismaService);
     attendanceService = module.get<AttendanceService>(AttendanceService);
+  });
+
+  describe('listSubstitutions', () => {
+    it('returns only bounded teacher identity fields for substitution rows', async () => {
+      jest
+        .spyOn(prisma.timetableSubstitution, 'findMany')
+        .mockResolvedValue([]);
+      jest.spyOn(prisma.timetableSubstitution, 'count').mockResolvedValue(0);
+
+      await service.listSubstitutions(mockActor as any, {});
+
+      expect(prisma.timetableSubstitution.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: expect.objectContaining({
+            absentTeacher: {
+              select: {
+                id: true,
+                employeeId: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+            substituteTeacher: {
+              select: {
+                id: true,
+                employeeId: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          }),
+        }),
+      );
+    });
   });
 
   describe('createSubstitution', () => {

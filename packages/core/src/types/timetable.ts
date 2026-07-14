@@ -114,6 +114,15 @@ export type TimetableSubstitutionSummary = {
   reason: string;
   status: 'DRAFT' | 'ASSIGNED' | 'CANCELLED' | 'COMPLETED';
   timetableSlot?: TimetableSlotSummary;
+  absentTeacher: TimetableTeacherIdentity;
+  substituteTeacher: TimetableTeacherIdentity | null;
+};
+
+export type TimetableTeacherIdentity = {
+  id: string;
+  employeeId: string;
+  firstName: string;
+  lastName: string;
 };
 
 export type TeacherWorkloadSummary = {

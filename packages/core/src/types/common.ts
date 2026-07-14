@@ -214,6 +214,19 @@ export type StudentDuplicateCandidatesResult = {
   reviewedStudentId: string | null;
 };
 
+export const NOTICE_LIFECYCLE_STATUSES = [
+  "DRAFT",
+  "APPROVAL_PENDING",
+  "APPROVED",
+  "SCHEDULED",
+  "PUBLISHED",
+  "CANCELLED",
+  "EXPIRED",
+  "ARCHIVED",
+] as const;
+
+export type NoticeLifecycleStatus = (typeof NOTICE_LIFECYCLE_STATUSES)[number];
+
 export type NoticeSummary = {
   id: string;
   title: string;
@@ -222,8 +235,18 @@ export type NoticeSummary = {
   audienceType: string;
   classId?: string | null;
   sectionId?: string | null;
+  lifecycleStatus: NoticeLifecycleStatus;
+  approvalRequestId?: string | null;
   scheduledFor?: string | null;
   publishedAt: string | null;
+  expiresAt?: string | null;
+  cancelledAt?: string | null;
+  cancelledById?: string | null;
+  cancellationReason?: string | null;
+  archivedAt?: string | null;
+  archivedById?: string | null;
+  archiveReason?: string | null;
+  archivedFromStatus?: NoticeLifecycleStatus | null;
   createdAt?: string;
 };
 

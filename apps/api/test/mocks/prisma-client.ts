@@ -590,6 +590,17 @@ export const NoticePriority = {
   EMERGENCY: 'EMERGENCY',
 } as const;
 
+export const NoticeLifecycleStatus = {
+  DRAFT: 'DRAFT',
+  APPROVAL_PENDING: 'APPROVAL_PENDING',
+  APPROVED: 'APPROVED',
+  SCHEDULED: 'SCHEDULED',
+  PUBLISHED: 'PUBLISHED',
+  CANCELLED: 'CANCELLED',
+  EXPIRED: 'EXPIRED',
+  ARCHIVED: 'ARCHIVED',
+} as const;
+
 export const AudienceType = {
   ALL: 'ALL',
   CLASS: 'CLASS',

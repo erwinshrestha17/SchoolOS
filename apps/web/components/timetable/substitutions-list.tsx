@@ -16,7 +16,12 @@ import {
   type PaginatedDataTableColumn,
 } from "@/components/schoolos/data/paginated-data-table";
 
-type TimetableSubstitutionRow = Awaited<ReturnType<typeof api.listSubstitutions>>["items"][number];
+type TimetableSubstitutionRow = Awaited<
+  ReturnType<typeof api.listSubstitutions>
+>["items"][number];
+type TimetableTeacherIdentity = NonNullable<
+  TimetableSubstitutionRow["absentTeacher"]
+>;
 
 const PAGE_SIZE = 20;
 
@@ -29,7 +34,9 @@ function formatSubstitutionDate(value: string | null | undefined) {
   }
 }
 
-function formatTeacherName(teacher: any) {
+function formatTeacherName(
+  teacher: TimetableTeacherIdentity | null | undefined,
+) {
   if (!teacher) return "Teacher not assigned";
   return (
     [teacher.firstName, teacher.lastName]
@@ -59,7 +66,8 @@ export function SubstitutionsList({ filters }: { filters: any }) {
 
   const substitutionsQuery = useQuery({
     queryKey: ["timetable-substitutions", filters, page],
-    queryFn: () => api.listSubstitutions({ ...filters, page, limit: PAGE_SIZE }),
+    queryFn: () =>
+      api.listSubstitutions({ ...filters, page, limit: PAGE_SIZE }),
   });
   const slotQuery = useQuery({
     queryKey: ["timetable-substitution-slots", filters.classId],
@@ -242,7 +250,13 @@ export function SubstitutionsList({ filters }: { filters: any }) {
         columns={columns}
         items={substitutionsQuery.data?.items ?? []}
         getRowId={(row) => row.id}
-        status={substitutionsQuery.isError ? "error" : substitutionsQuery.isLoading ? "loading" : "ready"}
+        status={
+          substitutionsQuery.isError
+            ? "error"
+            : substitutionsQuery.isLoading
+              ? "loading"
+              : "ready"
+        }
         page={page}
         pageSize={PAGE_SIZE}
         totalItems={substitutionsQuery.data?.meta.total ?? 0}

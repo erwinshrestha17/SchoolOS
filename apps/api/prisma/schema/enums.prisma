@@ -211,6 +211,17 @@ enum NoticePriority {
   EMERGENCY
 }
 
+enum NoticeLifecycleStatus {
+  DRAFT
+  APPROVAL_PENDING
+  APPROVED
+  SCHEDULED
+  PUBLISHED
+  CANCELLED
+  EXPIRED
+  ARCHIVED
+}
+
 enum AudienceType {
   ALL
   CLASS

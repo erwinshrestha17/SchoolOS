@@ -227,6 +227,17 @@ enum NoticePriority {
   EMERGENCY
 }
 
+enum NoticeLifecycleStatus {
+  DRAFT
+  APPROVAL_PENDING
+  APPROVED
+  SCHEDULED
+  PUBLISHED
+  CANCELLED
+  EXPIRED
+  ARCHIVED
+}
+
 enum AudienceType {
   ALL
   CLASS
@@ -3249,21 +3260,31 @@ model CanteenWastage {
 
 // ─── Compiled from schema/communication.prisma ───
 model Notice {
-  id            String         @id @default(uuid())
-  tenantId      String
-  classId       String?
-  sectionId     String?
-  createdById   String?
-  title         String
-  body          String
-  priority      NoticePriority @default(NORMAL)
-  audienceType  AudienceType   @default(ALL)
-  attachmentUrl String?
-  idempotencyKey String?
-  scheduledFor  DateTime?
-  publishedAt   DateTime?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  id                 String                @id @default(uuid())
+  tenantId           String
+  classId            String?
+  sectionId          String?
+  createdById        String?
+  title              String
+  body               String
+  priority           NoticePriority        @default(NORMAL)
+  audienceType       AudienceType          @default(ALL)
+  attachmentUrl      String?
+  idempotencyKey     String?
+  lifecycleStatus    NoticeLifecycleStatus @default(DRAFT)
+  approvalRequestId  String?
+  scheduledFor       DateTime?
+  publishedAt        DateTime?
+  expiresAt          DateTime?
+  cancelledAt        DateTime?
+  cancelledById      String?
+  cancellationReason String?
+  archivedAt         DateTime?
+  archivedById       String?
+  archiveReason      String?
+  archivedFromStatus NoticeLifecycleStatus?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
 
   tenant     Tenant                 @relation(fields: [tenantId], references: [id])
   class      Class?                 @relation(fields: [classId], references: [id])
@@ -3272,6 +3293,7 @@ model Notice {
   deliveries NotificationDelivery[]
 
   @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, lifecycleStatus, scheduledFor])
 }
 
 model Event {

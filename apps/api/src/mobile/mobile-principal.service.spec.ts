@@ -5,6 +5,7 @@ import {
   AudienceType,
   AuthMethod,
   ChatEscalationStatus,
+  NoticeLifecycleStatus,
   NoticePriority,
 } from '@prisma/client';
 import {
@@ -86,6 +87,8 @@ describe('MobilePrincipalService', () => {
     previewNoticeRecipients: jest.Mock;
     getCommunicationProviderDiagnostics: jest.Mock;
     createNoticeDraft: jest.Mock;
+    markNoticeApprovalPending: jest.Mock;
+    markNoticeApproved: jest.Mock;
     publishNotice: jest.Mock;
   };
   let fileRegistry: {
@@ -146,6 +149,8 @@ describe('MobilePrincipalService', () => {
       previewNoticeRecipients: jest.fn(),
       getCommunicationProviderDiagnostics: jest.fn(),
       createNoticeDraft: jest.fn(),
+      markNoticeApprovalPending: jest.fn(),
+      markNoticeApproved: jest.fn(),
       publishNotice: jest.fn(),
     };
     fileRegistry = {
@@ -488,6 +493,11 @@ describe('MobilePrincipalService', () => {
       actor,
       { scheduledFor: null },
     );
+    expect(communications.markNoticeApproved).toHaveBeenCalledWith(
+      'notice-1',
+      'approval-1',
+      actor,
+    );
   });
 
   it('locks resolved escalations against resolution-note edits', async () => {
@@ -678,6 +688,11 @@ describe('MobilePrincipalService', () => {
       actor,
     );
     expect(communications.publishNotice).not.toHaveBeenCalled();
+    expect(communications.markNoticeApprovalPending).toHaveBeenCalledWith(
+      'notice-1',
+      'approval-1',
+      actor,
+    );
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'principal_mobile_emergency_notice_submitted',
@@ -797,6 +812,8 @@ describe('MobilePrincipalService', () => {
       audienceType: AudienceType.ALL,
       classId: null,
       sectionId: null,
+      lifecycleStatus: NoticeLifecycleStatus.PUBLISHED,
+      approvalRequestId: null,
       scheduledFor: null,
       publishedAt: null,
       createdAt: new Date('2026-06-28T01:00:00.000Z'),

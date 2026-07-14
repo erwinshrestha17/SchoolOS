@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import type { NoticeLifecycleStatus } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -18,8 +19,16 @@ export interface NoticeDetail {
     email: string | null;
   } | null;
   attachmentUrl: string | null;
+  lifecycleStatus: NoticeLifecycleStatus;
+  approvalRequestId: string | null;
   scheduledFor: string | null;
   publishedAt: string | null;
+  expiresAt: string | null;
+  cancelledAt: string | null;
+  cancellationReason: string | null;
+  archivedAt: string | null;
+  archiveReason: string | null;
+  archivedFromStatus: NoticeLifecycleStatus | null;
   createdAt: string;
   updatedAt: string;
   deliverySummary: {
@@ -107,8 +116,16 @@ export class NoticeDetailService {
           }
         : null,
       attachmentUrl,
+      lifecycleStatus: notice.lifecycleStatus,
+      approvalRequestId: notice.approvalRequestId,
       scheduledFor: notice.scheduledFor?.toISOString() ?? null,
       publishedAt: notice.publishedAt?.toISOString() ?? null,
+      expiresAt: notice.expiresAt?.toISOString() ?? null,
+      cancelledAt: notice.cancelledAt?.toISOString() ?? null,
+      cancellationReason: notice.cancellationReason,
+      archivedAt: notice.archivedAt?.toISOString() ?? null,
+      archiveReason: notice.archiveReason,
+      archivedFromStatus: notice.archivedFromStatus,
       createdAt: notice.createdAt.toISOString(),
       updatedAt: notice.updatedAt.toISOString(),
       deliverySummary: {

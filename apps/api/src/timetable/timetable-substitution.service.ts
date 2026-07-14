@@ -874,7 +874,14 @@ function timetableSlotInclude() {
 function substitutionInclude() {
   return {
     timetableSlot: { include: timetableSlotInclude() },
-    absentTeacher: true,
-    substituteTeacher: true,
+    absentTeacher: { select: timetableTeacherIdentitySelect },
+    substituteTeacher: { select: timetableTeacherIdentitySelect },
   } satisfies Prisma.TimetableSubstitutionInclude;
 }
+
+const timetableTeacherIdentitySelect = {
+  id: true,
+  employeeId: true,
+  firstName: true,
+  lastName: true,
+} satisfies Prisma.StaffSelect;

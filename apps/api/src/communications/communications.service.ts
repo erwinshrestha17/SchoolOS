@@ -15,6 +15,7 @@ import {
   NotificationChannel,
   NotificationStatus,
   type Notice,
+  NoticeLifecycleStatus,
   NoticePriority,
   ParentTeacherThreadStatus,
   Prisma,
@@ -116,6 +117,9 @@ export class CommunicationsService {
     const attachmentUrl = await this.resolveNoticeAttachment(dto, actor);
 
     const publishedAt = dto.scheduledFor ? null : new Date();
+    const lifecycleStatus = dto.scheduledFor
+      ? NoticeLifecycleStatus.SCHEDULED
+      : NoticeLifecycleStatus.PUBLISHED;
     const notice = await this.prisma.notice.create({
       data: {
         tenantId: actor.tenantId,
@@ -127,6 +131,7 @@ export class CommunicationsService {
         classId: dto.classId ?? null,
         sectionId: dto.sectionId ?? null,
         attachmentUrl,
+        lifecycleStatus,
         scheduledFor: dto.scheduledFor ? new Date(dto.scheduledFor) : null,
         publishedAt,
       },
@@ -191,6 +196,7 @@ export class CommunicationsService {
           sectionId: input.sectionId ?? null,
           attachmentUrl: null,
           idempotencyKey: input.idempotencyKey,
+          lifecycleStatus: NoticeLifecycleStatus.DRAFT,
           scheduledFor: input.scheduledFor
             ? new Date(input.scheduledFor)
             : null,
@@ -259,6 +265,18 @@ export class CommunicationsService {
         'High-impact notice not found in this tenant',
       );
     }
+    if (
+      notice.lifecycleStatus === NoticeLifecycleStatus.CANCELLED ||
+      notice.lifecycleStatus === NoticeLifecycleStatus.EXPIRED ||
+      notice.lifecycleStatus === NoticeLifecycleStatus.ARCHIVED
+    ) {
+      throw new ConflictException(
+        `Notice cannot be published from ${notice.lifecycleStatus.toLowerCase()} state`,
+      );
+    }
+    if (notice.lifecycleStatus === NoticeLifecycleStatus.APPROVAL_PENDING) {
+      throw new ConflictException('Notice approval is still pending');
+    }
 
     const requestedSchedule = options.scheduledFor
       ? new Date(options.scheduledFor)
@@ -271,6 +289,7 @@ export class CommunicationsService {
       const scheduled = await this.prisma.notice.update({
         where: { id: notice.id },
         data: {
+          lifecycleStatus: NoticeLifecycleStatus.SCHEDULED,
           scheduledFor: requestedSchedule,
           publishedAt: null,
         },
@@ -307,6 +326,7 @@ export class CommunicationsService {
       await this.prisma.notice.update({
         where: { id: notice.id },
         data: {
+          lifecycleStatus: NoticeLifecycleStatus.PUBLISHED,
           publishedAt,
           scheduledFor: null,
         },
@@ -338,6 +358,83 @@ export class CommunicationsService {
           channel.dispatchAvailable,
       ),
     };
+  }
+
+  async markNoticeApprovalPending(
+    noticeId: string,
+    approvalRequestId: string,
+    actor: AuthContext,
+  ) {
+    const notice = await this.getTenantNotice(noticeId, actor);
+    if (notice.lifecycleStatus === NoticeLifecycleStatus.PUBLISHED) {
+      throw new ConflictException('Published notices cannot request approval');
+    }
+
+    const updated = await this.prisma.notice.update({
+      where: { id: notice.id },
+      data: {
+        lifecycleStatus: NoticeLifecycleStatus.APPROVAL_PENDING,
+        approvalRequestId,
+      },
+    });
+    await this.auditService.record({
+      action: 'request_approval',
+      resource: 'notice',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: notice.id,
+      before: { lifecycleStatus: notice.lifecycleStatus },
+      after: {
+        lifecycleStatus: updated.lifecycleStatus,
+        approvalRequestId,
+      },
+    });
+    return updated;
+  }
+
+  async markNoticeApproved(
+    noticeId: string,
+    approvalRequestId: string,
+    actor: AuthContext,
+  ) {
+    const notice = await this.getTenantNotice(noticeId, actor);
+    if (
+      notice.approvalRequestId &&
+      notice.approvalRequestId !== approvalRequestId
+    ) {
+      throw new ConflictException(
+        'Notice approval does not match the active approval request',
+      );
+    }
+    if (
+      notice.lifecycleStatus !== NoticeLifecycleStatus.APPROVAL_PENDING &&
+      notice.lifecycleStatus !== NoticeLifecycleStatus.APPROVED
+    ) {
+      throw new ConflictException(
+        `Notice cannot be approved from ${notice.lifecycleStatus.toLowerCase()} state`,
+      );
+    }
+
+    const updated = await this.prisma.notice.update({
+      where: { id: notice.id },
+      data: {
+        lifecycleStatus: NoticeLifecycleStatus.APPROVED,
+        approvalRequestId,
+      },
+    });
+    await this.auditService.record({
+      action: 'approve',
+      resource: 'notice',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: notice.id,
+      before: { lifecycleStatus: notice.lifecycleStatus },
+      after: {
+        lifecycleStatus: updated.lifecycleStatus,
+        approvalRequestId,
+      },
+    });
+    return updated;
   }
 
   async previewNoticeRecipients(dto: CreateNoticeDto, actor: AuthContext) {
@@ -973,6 +1070,7 @@ export class CommunicationsService {
     const dueNotices = await this.prisma.notice.findMany({
       where: {
         tenantId: actor.tenantId,
+        lifecycleStatus: NoticeLifecycleStatus.SCHEDULED,
         publishedAt: null,
         scheduledFor: { lte: now },
       },
@@ -982,7 +1080,11 @@ export class CommunicationsService {
     for (const notice of dueNotices) {
       await this.prisma.notice.update({
         where: { id: notice.id },
-        data: { publishedAt: now },
+        data: {
+          lifecycleStatus: NoticeLifecycleStatus.PUBLISHED,
+          publishedAt: now,
+          scheduledFor: null,
+        },
       });
 
       const delivery = await this.emitNoticePublished(notice, actor);
@@ -1007,6 +1109,16 @@ export class CommunicationsService {
       processed: results.length,
       results,
     };
+  }
+
+  private async getTenantNotice(noticeId: string, actor: AuthContext) {
+    const notice = await this.prisma.notice.findFirst({
+      where: { id: noticeId, tenantId: actor.tenantId },
+    });
+    if (!notice) {
+      throw new NotFoundException('Notice not found in this tenant');
+    }
+    return notice;
   }
 
   async listConsents(actor: AuthContext) {

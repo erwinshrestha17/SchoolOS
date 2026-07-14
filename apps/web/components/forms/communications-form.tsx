@@ -1893,6 +1893,20 @@ function validateAudienceFields(input: {
 }
 
 function resolveNoticeState(notice: NoticeSummary) {
+  if (notice.lifecycleStatus === "PUBLISHED" && notice.publishedAt) {
+    return `Published ${formatDateTime(notice.publishedAt)}`;
+  }
+
+  if (notice.lifecycleStatus === "SCHEDULED" && notice.scheduledFor) {
+    return `Scheduled ${formatDateTime(notice.scheduledFor)}`;
+  }
+
+  if (notice.lifecycleStatus) {
+    return formatEnumLabel(notice.lifecycleStatus);
+  }
+
+  // Compatibility fallback for an API instance that has not yet applied the
+  // lifecycle migration during a rolling deployment.
   if (notice.publishedAt) {
     return `Published ${formatDateTime(notice.publishedAt)}`;
   }
