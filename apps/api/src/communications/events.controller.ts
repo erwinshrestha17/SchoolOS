@@ -11,7 +11,7 @@ import { CreateEventDto } from './dto/create-event.dto';
 
 @Controller('events')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
-@Entitlement('module.communications')
+@Entitlement('module.notices')
 export class EventsController {
   constructor(private readonly communicationsService: CommunicationsService) {}
 
