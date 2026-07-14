@@ -44,6 +44,12 @@ const ADDON_ENTITLEMENTS: Record<
   },
 };
 
+const DEFERRED_CHAT_FEATURES = new Set([
+  FEATURE_KEYS.CHAT_ENABLED,
+  FEATURE_KEYS.MOBILE_PARENT_TEACHER_CHAT,
+  'feature.parent_teacher_chat',
+]);
+
 @Injectable()
 export class EntitlementsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -193,6 +199,20 @@ export class EntitlementsService {
       }
     }
 
+    // Backward compatibility: old plans used one catch-all communications module.
+    // Expose the precise M12/M15 boundaries without requiring a destructive plan
+    // migration or changing stable notice and notification routes immediately.
+    if (modulesSet.delete('communications')) {
+      modulesSet.add('notifications');
+      modulesSet.add('notices');
+    }
+
+    // Chat is intentionally deferred. Existing schema and history are retained,
+    // but neither plan definitions nor tenant overrides may make chat executable.
+    for (const key of DEFERRED_CHAT_FEATURES) {
+      featuresSet.delete(key);
+    }
+
     // Filter out M0 / platform-related features and modules
     const modules = Array.from(modulesSet).filter(
       (m) => !this.isM0OrPlatform(m) && !this.isM0OrPlatform(`module.${m}`),
@@ -214,6 +234,9 @@ export class EntitlementsService {
     featureKey: string,
   ): Promise<boolean> {
     if (this.isM0OrPlatform(featureKey)) {
+      return false;
+    }
+    if (DEFERRED_CHAT_FEATURES.has(featureKey)) {
       return false;
     }
     if (featureKey.startsWith('module.')) {
@@ -241,7 +264,9 @@ export class EntitlementsService {
       entitlements.modules.includes(cleaned) ||
       entitlements.features.includes(cleaned) ||
       (cleaned === 'timetable' && entitlements.modules.includes('homework')) ||
-      (cleaned === 'communications' && entitlements.modules.includes('notices'))
+      (cleaned === 'communications' &&
+        (entitlements.modules.includes('notifications') ||
+          entitlements.modules.includes('notices')))
     );
   }
 
