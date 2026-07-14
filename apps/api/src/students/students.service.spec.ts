@@ -10,6 +10,7 @@ import {
   Prisma,
   StudentLifecycleStatus,
 } from '@prisma/client';
+import sharp from 'sharp';
 import { StudentsService } from './students.service';
 
 const actor = {
@@ -956,6 +957,111 @@ describe('students lifecycle hardening', () => {
     });
   });
 
+  it('embeds the real uploaded student photo in the generated ID card', async () => {
+    const student = buildStudent({ guardianLinks: [] });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      generatedStudentDocumentFindFirstQueue: [null],
+    });
+    const { service, studentPhotoService, fileRegistryService } =
+      buildService(prisma);
+    const photoBytes = await createTestJpeg(240, 300);
+    studentPhotoService.getPhotoContent.mockResolvedValue({
+      studentId: student.id,
+      fileName: 'photo.jpg',
+      mimeType: 'image/jpeg',
+      content: photoBytes,
+    });
+
+    const pdf = await service.generateStudentDocumentPdf(
+      student.id,
+      'id-card',
+      actor,
+    );
+
+    expect(pdf.fileAvailable).toBe(true);
+    expect(studentPhotoService.getPhotoContent).toHaveBeenCalledWith(
+      student.id,
+      actor,
+    );
+    const generatedPdf = fileRegistryService.registerGeneratedFile.mock
+      .calls[0][0].content as Buffer;
+    // A real DCTDecode (JPEG) image XObject was embedded, not a fallback box.
+    expect(generatedPdf.toString('latin1')).toContain('/Filter /DCTDecode');
+  });
+
+  it('falls back to a clean placeholder when the student has no uploaded photo', async () => {
+    const student = buildStudent({ guardianLinks: [] });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      generatedStudentDocumentFindFirstQueue: [null],
+    });
+    const { service, studentPhotoService, fileRegistryService } =
+      buildService(prisma);
+    studentPhotoService.getPhotoContent.mockRejectedValue(
+      new NotFoundException('Student photo not found'),
+    );
+
+    const pdf = await service.generateStudentDocumentPdf(
+      student.id,
+      'id-card',
+      actor,
+    );
+
+    expect(pdf.fileAvailable).toBe(true);
+    const generatedPdf = fileRegistryService.registerGeneratedFile.mock
+      .calls[0][0].content as Buffer;
+    const pdfText = generatedPdf.toString('latin1');
+    expect(pdfText).not.toContain('/Filter /DCTDecode');
+    expect(pdfText).toContain('(PHOTO)');
+    expect(pdfText).toContain('(not available)');
+  });
+
+  it('still generates the ID card when the photo file exists but is archived or unreadable', async () => {
+    const student = buildStudent({ guardianLinks: [] });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      generatedStudentDocumentFindFirstQueue: [null],
+    });
+    const { service, studentPhotoService } = buildService(prisma);
+    studentPhotoService.getPhotoContent.mockRejectedValue(
+      new NotFoundException('Student photo is not available'),
+    );
+
+    await expect(
+      service.generateStudentDocumentPdf(student.id, 'id-card', actor),
+    ).resolves.toEqual({
+      fileAssetId: 'generated-file-asset',
+      fileName: `${student.studentSystemId}-id-card.pdf`,
+      mimeType: 'application/pdf',
+      fileAvailable: true,
+    });
+  });
+
+  it('does not leak the photo file asset id as text into the generated ID card', async () => {
+    const student = buildStudent({ guardianLinks: [] });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      generatedStudentDocumentFindFirstQueue: [null],
+    });
+    const { service, studentPhotoService, fileRegistryService } =
+      buildService(prisma);
+    const photoBytes = await createTestJpeg(120, 150);
+    const secretAssetId = 'photo-asset-9f2c1e0a-not-a-url';
+    studentPhotoService.getPhotoContent.mockResolvedValue({
+      studentId: student.id,
+      fileName: 'photo.jpg',
+      mimeType: 'image/jpeg',
+      content: photoBytes,
+    });
+
+    await service.generateStudentDocumentPdf(student.id, 'id-card', actor);
+
+    const generatedPdf = fileRegistryService.registerGeneratedFile.mock
+      .calls[0][0].content as Buffer;
+    expect(generatedPdf.toString('latin1')).not.toContain(secretAssetId);
+  });
+
   it('returns a clean validation error for unsupported student document kinds', async () => {
     const prisma = buildPrisma({});
     const { service } = buildService(prisma);
@@ -1760,6 +1866,19 @@ describe('Cross-Tenant Access Hardening', () => {
   });
 });
 
+async function createTestJpeg(width: number, height: number) {
+  return sharp({
+    create: {
+      width,
+      height,
+      channels: 3,
+      background: { r: 120, g: 140, b: 180 },
+    },
+  })
+    .jpeg({ quality: 90 })
+    .toBuffer();
+}
+
 function buildStudent(
   overrides: Partial<{
     id: string;
@@ -1907,6 +2026,11 @@ function buildService(prisma: ReturnType<typeof buildPrisma>) {
     verifyLimit: jest.fn(),
     checkLimit: jest.fn(),
   };
+  const studentPhotoService = {
+    getPhotoContent: jest
+      .fn()
+      .mockRejectedValue(new Error('No student photo in this test')),
+  };
 
   return {
     service: new StudentsService(
@@ -1918,12 +2042,14 @@ function buildService(prisma: ReturnType<typeof buildPrisma>) {
       storageService as never,
       fileRegistryService as never,
       usageService as never,
+      studentPhotoService as never,
     ),
     prisma,
     auditService,
     notificationsService,
     storageService,
     fileRegistryService,
+    studentPhotoService,
   };
 }
 

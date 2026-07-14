@@ -14,6 +14,7 @@ import {
   StudentLifecycleStatus,
   StudentQrStatus,
 } from '@prisma/client';
+import sharp from 'sharp';
 import {
   formatBsAcademicYear,
   StudentAttendanceHistory,
@@ -24,15 +25,19 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
+import { assertSchoolLogoFileAsset } from '../common/files/school-logo-file.policy';
 import {
   buildCertificatePdf,
   buildIdCardPdf,
   buildRosterPdf,
+  getJpegDimensions,
+  PdfImage,
 } from '../common/pdf/simple-pdf';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
+import { StudentPhotoService } from './student-photo.service';
 import { UsageService } from '../usage/usage.service';
 import { UsersService } from '../users/users.service';
 import { ArchiveStudentDto } from './dto/archive-student.dto';
@@ -73,6 +78,7 @@ export class StudentsService {
     private readonly storageService: StorageService,
     private readonly fileRegistryService: FileRegistryService,
     private readonly usageService: UsageService,
+    private readonly studentPhotoService: StudentPhotoService,
   ) {}
 
   async createStudent(dto: CreateStudentDto, actor: AuthContext) {
@@ -296,6 +302,7 @@ export class StudentsService {
         email: student.user?.email ?? null,
         hasLogin: Boolean(student.userId),
         lifecycleStatus: student.lifecycleStatus,
+        photoVersion: student.photoFileId ?? null,
         qrCredential: student.qrCredentials[0]
           ? {
               id: student.qrCredentials[0].id,
@@ -716,18 +723,7 @@ export class StudentsService {
         }
       : null;
 
-    let photoUrl = student.photoUrl;
-    if (photoUrl && !photoUrl.startsWith('http')) {
-      try {
-        const signed = await this.fileRegistryService.getSignedUrl(
-          actor.tenantId,
-          photoUrl,
-        );
-        photoUrl = signed;
-      } catch {
-        photoUrl = null;
-      }
-    }
+    const photoVersion = student.photoFileId ?? null;
 
     const guardians = (student.guardianLinks || []).map((link) => ({
       id: link.guardian.id,
@@ -764,7 +760,7 @@ export class StudentsService {
         motherTongue: student.motherTongue,
         disabilityFlag: student.disabilityFlag,
         nationalStudentId: student.nationalStudentId,
-        photoUrl,
+        photoVersion,
         className: student.class.name,
         sectionName: student.sectionRef?.name ?? student.section,
         class: {
@@ -3437,8 +3433,17 @@ export class StudentsService {
       orderBy: [{ version: 'desc' }, { generatedAt: 'desc' }],
     });
     const version = (latestVersion?.version ?? 0) + 1;
+    const [logo, photo] =
+      normalizedKind === 'id-card'
+        ? await Promise.all([
+            this.loadSchoolLogoForIdCard(actor),
+            this.loadStudentPhotoForIdCard(student.id, actor),
+          ])
+        : [null, null];
     const pdf = buildStudentDocumentPdf({
       student,
+      logo,
+      photo,
       kind: normalizedKind,
       actor,
       issuedAt: signedAt,
@@ -3537,6 +3542,86 @@ export class StudentsService {
       mimeType: 'application/pdf',
       fileAvailable: true as const,
     };
+  }
+
+  // Loads the student's uploaded photo through the same protected File
+  // Registry flow the profile/roster use, then normalizes it to a JPEG via
+  // sharp so any accepted upload format (jpeg/png/webp) can be embedded in
+  // the hand-rolled PDF engine, which only draws DCTDecode (JPEG) images.
+  // Fails safe to null on any error (missing/archived file, unreadable
+  // image, wrong tenant, etc.) so ID card generation never breaks.
+  private async loadStudentPhotoForIdCard(
+    studentId: string,
+    actor: AuthContext,
+  ): Promise<PdfImage | null> {
+    try {
+      const { content } = await this.studentPhotoService.getPhotoContent(
+        studentId,
+        actor,
+      );
+      const normalized = await sharp(content, { failOn: 'none' })
+        .rotate()
+        .resize({
+          width: 324,
+          height: 390,
+          fit: 'cover',
+          position: 'attention',
+        })
+        .jpeg({ quality: 85, mozjpeg: true })
+        .toBuffer();
+      const dimensions = getJpegDimensions(normalized);
+      return {
+        buffer: normalized,
+        width: dimensions.width,
+        height: dimensions.height,
+        format: 'jpeg',
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  // Mirrors report-card-pdf.service.ts's loadSchoolLogo: resolves the
+  // tenant's configured school logo (if any) for use on the ID card header.
+  private async loadSchoolLogoForIdCard(
+    actor: AuthContext,
+  ): Promise<PdfImage | null> {
+    const setting = await this.prisma.tenantSetting.findUnique({
+      where: { tenantId_key: { tenantId: actor.tenantId, key: 'school_logo' } },
+    });
+    const logoAssetId =
+      typeof setting?.value === 'string' ? setting.value : undefined;
+
+    if (
+      !logoAssetId ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        logoAssetId,
+      )
+    ) {
+      return null;
+    }
+
+    try {
+      const asset = await this.fileRegistryService.getFileMetadata(
+        actor.tenantId,
+        logoAssetId,
+      );
+      assertSchoolLogoFileAsset(asset, actor.tenantId);
+      const { content } = await this.fileRegistryService.getProtectedDownload(
+        actor.tenantId,
+        logoAssetId,
+        actor.userId,
+      );
+      const dimensions = getJpegDimensions(content);
+      return {
+        buffer: content,
+        width: dimensions.width,
+        height: dimensions.height,
+        format: 'jpeg',
+      };
+    } catch {
+      return null;
+    }
   }
 
   async revokeGeneratedStudentDocument(
@@ -4379,8 +4464,10 @@ function buildStudentDocumentPdf(input: {
   actor: AuthContext;
   issuedAt: Date;
   version: number;
+  logo?: PdfImage | null;
+  photo?: PdfImage | null;
 }) {
-  const { student, kind, actor, issuedAt, version } = input;
+  const { student, kind, actor, issuedAt, version, logo, photo } = input;
   const latestEnrollment = student.enrollments[0];
   const primaryGuardian =
     student.guardianLinks.find((link) => link.isPrimary)?.guardian ??
@@ -4422,6 +4509,9 @@ function buildStudentDocumentPdf(input: {
       guardianName: primaryGuardian?.fullName,
       guardianPhone: primaryGuardian?.primaryPhone,
       academicYear: latestEnrollment?.academicYear.name,
+      qrToken: student.studentSystemId,
+      logo,
+      photo,
     });
   }
 

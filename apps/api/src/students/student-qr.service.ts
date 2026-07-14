@@ -751,7 +751,7 @@ export class StudentQrService {
       classSection: `${student.class.name}${
         student.sectionRef ? ` - ${student.sectionRef.name}` : ''
       }`,
-      photoUrl: student.photoUrl ?? null,
+      photoVersion: student.photoFileId ?? null,
       lifecycleStatus: student.lifecycleStatus,
       purpose,
     };

@@ -64,7 +64,7 @@ export type StudentProfile = {
   doctorName?: string | null;
   doctorPhone?: string | null;
   lifecycleStatus?: string;
-  photoUrl?: string;
+  photoVersion?: string | null;
   activeIdentity?: {
     id: string;
     status: string;

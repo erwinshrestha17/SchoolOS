@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { ImageOff, Loader2 } from 'lucide-react';
 import { studentsApi } from '@/lib/api/students';
+import { useProtectedImage } from '@/lib/hooks/use-protected-image';
 
 type StudentPhotoPreviewProps = {
   studentId: string;
@@ -17,40 +17,19 @@ export function StudentPhotoPreview({
   alt,
   className = 'h-20 w-20',
 }: StudentPhotoPreviewProps) {
-  const [src, setSrc] = useState<string | null>(null);
-  const [state, setState] = useState<'loading' | 'ready' | 'missing' | 'error'>(
-    photoVersion ? 'loading' : 'missing',
-  );
-
-  useEffect(() => {
-    if (!photoVersion) {
-      setSrc(null);
-      setState('missing');
-      return;
-    }
-
-    let active = true;
-    let objectUrl: string | null = null;
-    setState('loading');
-    setSrc(null);
-
-    void studentsApi.getStudentPhotoBlob(studentId)
-      .then((blob) => {
-        if (!active) return;
-        objectUrl = URL.createObjectURL(blob);
-        setSrc(objectUrl);
-        setState('ready');
-      })
-      .catch(() => {
-        if (!active) return;
-        setState('error');
-      });
-
-    return () => {
-      active = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [photoVersion, studentId]);
+  const hasPhoto = Boolean(photoVersion);
+  const { src, state: fetchState } = useProtectedImage({
+    queryKey: ['student-photo-blob', studentId, photoVersion],
+    enabled: hasPhoto,
+    fetchBlob: (signal) => studentsApi.getStudentPhotoBlob(studentId, signal),
+  });
+  const state: 'loading' | 'ready' | 'missing' | 'error' = !hasPhoto
+    ? 'missing'
+    : fetchState === 'denied'
+      ? 'error'
+      : fetchState === 'idle'
+        ? 'loading'
+        : fetchState;
 
   if (state === 'ready' && src) {
     // Blob URLs are generated from an authenticated protected-file response.

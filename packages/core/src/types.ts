@@ -3737,7 +3737,7 @@ export type StudentProfile = {
   doctorName?: string | null;
   doctorPhone?: string | null;
   lifecycleStatus?: string;
-  photoUrl?: string;
+  photoVersion?: string | null;
   activeIdentity?: {
     id: string;
     status: string;
@@ -4330,18 +4330,6 @@ export type TimetableSubstitutionSummary = {
   reason: string;
   status: 'DRAFT' | 'ASSIGNED' | 'CANCELLED' | 'COMPLETED';
   timetableSlot?: TimetableSlotSummary;
-  absentTeacher?: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    employeeId: string;
-  };
-  substituteTeacher?: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    employeeId: string;
-  } | null;
 };
 
 export type TeacherWorkloadSummary = {

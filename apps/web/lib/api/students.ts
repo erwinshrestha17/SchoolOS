@@ -33,6 +33,7 @@ import type {
   UploadStudentDocumentPayload,
 } from '@schoolos/core';
 import {
+  ApiRequestError,
   API_BASE_URL,
   JsonBody,
   openProtectedFile,
@@ -75,13 +76,13 @@ export const studentsApi = {
   uploadStudentPhoto: async (studentId: string, file: File, note?: string) => request<{ studentId: string; photoFileId: string; fileName: string; mimeType: string; sizeBytes: number; previewUrl: string; downloadUrl: string }>(`/students/${encodeURIComponent(studentId)}/photo`, { method: 'POST', json: { fileName: file.name, mimeType: file.type, base64Content: await readFileAsBase64(file), ...(note ? { note } : {}) } }),
   removeStudentPhoto: (studentId: string) => request<{ success: true; deleted: boolean }>(`/students/${encodeURIComponent(studentId)}/photo`, { method: 'DELETE' }),
   getStudentPhotoPreview: (studentId: string) => request<{ studentId: string; photoFileId: string; fileName: string; mimeType: string; sizeBytes: number; url: string; expiresInSeconds: number }>(`/students/${encodeURIComponent(studentId)}/photo/preview`),
-  getStudentPhotoBlob: async (studentId: string) => {
-    const response = await fetch(`${API_BASE_URL}/students/${encodeURIComponent(studentId)}/photo/content`, { credentials: 'include' });
-    if (!response.ok) throw new Error(parseApiErrorMessage(await response.text()) || 'Student photo could not be loaded.');
+  getStudentPhotoBlob: async (studentId: string, signal?: AbortSignal) => {
+    const response = await fetch(`${API_BASE_URL}/students/${encodeURIComponent(studentId)}/photo/content`, { credentials: 'include', signal });
+    if (!response.ok) throw new ApiRequestError(parseApiErrorMessage(await response.text()) || 'Student photo could not be loaded.', response.status);
     const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
-    if (!contentType.startsWith('image/')) throw new Error('The server did not return an image preview.');
+    if (!contentType.startsWith('image/')) throw new ApiRequestError('The server did not return an image preview.', response.status);
     const blob = await response.blob();
-    if (blob.size === 0) throw new Error('The student photo is empty.');
+    if (blob.size === 0) throw new ApiRequestError('The student photo is empty.', response.status);
     return blob;
   },
   exportIemisStudents: () => request<IemisExportResult>('/students/iemis/export'),

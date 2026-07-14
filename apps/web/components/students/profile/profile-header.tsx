@@ -1,12 +1,10 @@
 'use client';
 
 import { StudentFeeClearance, StudentProfileDetail } from '@schoolos/core';
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { api } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
-import { Avatar } from '@/components/ui/avatar';
+import { StudentAvatar } from '@/components/students/student-avatar';
 import { SectionCard } from '@/components/ui/section-card';
 import { ActionMenu } from '@/components/ui/action-menu';
 import {
@@ -53,7 +51,6 @@ export function ProfileHeader({
   const primaryGuardian = profile.guardians.find((guardian) => guardian.isPrimary) ?? profile.guardians[0];
   const className = formatClassLabel(student.className ?? student.class?.name);
   const sectionName = student.sectionName ?? student.section ?? 'Section not assigned';
-  const [photoObjectUrl, setPhotoObjectUrl] = useState<string | null>(null);
   const supportNoteExists = Boolean(
     student.medicalConditions || student.severeAllergies || student.medications || student.specialNeeds,
   );
@@ -88,32 +85,6 @@ export function ProfileHeader({
             onClick: () => onSelectTab('Fees'),
           };
 
-  useEffect(() => {
-    let objectUrl: string | null = null;
-    let cancelled = false;
-
-    if (!student.photoUrl) {
-      setPhotoObjectUrl(null);
-      return undefined;
-    }
-
-    void api
-      .getStudentPhotoBlob(student.id)
-      .then((blob) => {
-        if (cancelled) return;
-        objectUrl = URL.createObjectURL(blob);
-        setPhotoObjectUrl(objectUrl);
-      })
-      .catch(() => {
-        if (!cancelled) setPhotoObjectUrl(null);
-      });
-
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [student.id, student.photoUrl]);
-
   return (
     <SectionCard className="overflow-hidden border-[var(--color-mod-admissions-border)] bg-white shadow-sm">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-5">
@@ -133,8 +104,9 @@ export function ProfileHeader({
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(18rem,0.9fr)_auto] xl:items-start">
         <div className="flex min-w-0 flex-col gap-5 sm:flex-row sm:items-center">
-          <Avatar
-            src={photoObjectUrl}
+          <StudentAvatar
+            studentId={student.id}
+            photoVersion={student.photoVersion}
             alt={`${studentName} profile photo`}
             initials={initials(studentName)}
             size="xl"

@@ -16,7 +16,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { SectionCard } from '../ui/section-card';
 import { Badge } from '../ui/badge';
-import { Avatar } from '../ui/avatar';
+import { StudentAvatar } from '../students/student-avatar';
 import { Drawer } from '../ui/drawer';
 import { LoadingState } from '../ui/loading-state';
 import { EmptyState } from '../ui/empty-state';
@@ -576,10 +576,12 @@ export function StudentDirectory({
                   className={`group flex flex-col gap-4 p-5 transition hover:bg-slate-50/50 lg:flex-row lg:items-center lg:justify-between ${selectedStudentId === student.id ? 'bg-[var(--color-mod-admissions-soft)] ring-1 ring-inset ring-[var(--color-mod-admissions-border)]' : ''}`}
                 >
                   <div className="flex items-center gap-4 min-w-0">
-                    <Avatar 
-                      src={student.photoUrl ?? undefined} 
-                      initials={initials(studentName)} 
-                      size="lg" 
+                    <StudentAvatar
+                      studentId={student.id}
+                      photoVersion={student.photoVersion}
+                      initials={initials(studentName)}
+                      alt={studentName}
+                      size="lg"
                       className="ring-2 ring-white shadow-sm transition group-hover:ring-[var(--color-mod-admissions-border)]"
                     />
                     <div className="min-w-0">
@@ -752,7 +754,7 @@ function StudentInspector({ student, admission, onOpenPdf }: { student: StudentP
       : 'Email not included in directory data';
   return (
     <div className="space-y-5 pt-5">
-      <div className="text-center"><Avatar src={student.photoUrl} initials={initials(name)} size="xl" className="mx-auto" /><div className="mt-3 flex items-center justify-center gap-2"><h3 className="text-lg font-black text-slate-950">{name}</h3><StatusChip status={student.lifecycleStatus ?? 'ACTIVE'} /></div><p className="mt-1 text-xs font-bold text-[var(--color-mod-admissions-text)]">{student.studentSystemId}</p><p className="mt-2 text-xs text-slate-500">{student.className ?? student.class?.name ?? admission?.className ?? 'No class'} / {student.sectionName ?? student.section ?? admission?.sectionName ?? 'No section'} · Roll {student.rollNumber ?? admission?.rollNumber ?? '—'}</p></div>
+      <div className="text-center"><StudentAvatar studentId={student.id} photoVersion={student.photoVersion} initials={initials(name)} alt={name} size="xl" className="mx-auto" /><div className="mt-3 flex items-center justify-center gap-2"><h3 className="text-lg font-black text-slate-950">{name}</h3><StatusChip status={student.lifecycleStatus ?? 'ACTIVE'} /></div><p className="mt-1 text-xs font-bold text-[var(--color-mod-admissions-text)]">{student.studentSystemId}</p><p className="mt-2 text-xs text-slate-500">{student.className ?? student.class?.name ?? admission?.className ?? 'No class'} / {student.sectionName ?? student.section ?? admission?.sectionName ?? 'No section'} · Roll {student.rollNumber ?? admission?.rollNumber ?? '—'}</p></div>
       <Link href={`/dashboard/students/${encodeURIComponent(student.id)}`} className="flex min-h-10 w-full items-center justify-center rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 text-sm font-bold text-white shadow-sm hover:bg-[var(--color-mod-admissions-text)]">View Full Profile</Link>
       <section className="border-t border-slate-100 pt-4"><h4 className="text-xs font-black uppercase tracking-wide text-slate-500">Guardian</h4>{primaryGuardian ? <div className="mt-3 space-y-1 text-sm"><p className="font-bold text-slate-900">{primaryGuardian.fullName} <span className="font-medium text-slate-500">({primaryGuardian.relation})</span></p><p className="text-xs text-slate-600">{primaryGuardian.primaryPhone}</p><p className="text-xs text-slate-600">{guardianEmail}</p></div> : <p className="mt-3 text-sm text-slate-500">No guardian linked.</p>}</section>
       <section className="border-t border-slate-100 pt-4"><div className="flex items-center justify-between"><h4 className="text-xs font-black uppercase tracking-wide text-slate-500">Document Checklist</h4><span className="text-xs font-bold text-slate-400">Open profile</span></div><p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">Document counts are not included in the paginated directory contract. Open the protected document workspace for the authoritative checklist.</p><Link href={`/dashboard/admissions/documents?student=${encodeURIComponent(student.id)}`} className="mt-3 inline-flex text-xs font-bold text-[var(--color-mod-admissions-text)]">Review documents</Link></section>

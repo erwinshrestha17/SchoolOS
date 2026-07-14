@@ -11,12 +11,17 @@ describe('Student profile edit controls', () => {
   it('loads student photos through the protected binary endpoint', () => {
     const api = read('lib/api/students.ts');
     const preview = read('components/students/profile/student-photo-preview.tsx');
+    const protectedImageHook = read('lib/hooks/use-protected-image.ts');
     const edit = read('components/students/profile/student-edit-card.tsx');
     assert.match(api, /photo\/content/);
     assert.match(preview, /getStudentPhotoBlob/);
-    assert.match(preview, /URL\.createObjectURL/);
+    // The blob -> object URL lifecycle is shared via useProtectedImage rather
+    // than duplicated per component.
+    assert.match(preview, /useProtectedImage/);
+    assert.match(protectedImageHook, /URL\.createObjectURL/);
     assert.match(edit, /StudentPhotoPreview/);
     assert.doesNotMatch(edit, /src=\{student\.photoUrl\}/);
+    assert.doesNotMatch(edit, /photoVersion=\{student\.photoUrl\}/);
   });
 
   it('uses clean accessible disability option controls instead of native radio inputs', () => {

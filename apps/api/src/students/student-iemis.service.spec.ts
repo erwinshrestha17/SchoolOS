@@ -8,6 +8,7 @@ import { CommunicationsService } from '../communications/communications.service'
 import { NotificationsService } from '../notifications/notifications.service';
 import { UsageService } from '../usage/usage.service';
 import { UsersService } from '../users/users.service';
+import { StudentPhotoService } from './student-photo.service';
 import { StudentLifecycleStatus, EnrollmentStatus } from '@prisma/client';
 import { AuthContext } from '../auth/auth.types';
 
@@ -74,6 +75,10 @@ describe('StudentsService (iEMIS Export)', () => {
             registerFile: jest.fn(),
             markUploaded: jest.fn(),
           },
+        },
+        {
+          provide: StudentPhotoService,
+          useValue: { getPhotoContent: jest.fn() },
         },
       ],
     }).compile();

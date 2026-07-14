@@ -231,7 +231,6 @@ export class TransportHardeningService {
             id: true,
             firstNameEn: true,
             lastNameEn: true,
-            photoUrl: true,
             rollNumber: true,
           },
         },

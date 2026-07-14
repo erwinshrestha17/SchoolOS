@@ -325,6 +325,19 @@ export function buildSalarySlipPdf(input: {
   );
 }
 
+const ID_CARD_COLORS = {
+  navy: [0.106, 0.227, 0.361] as RgbColor,
+  navyDark: [0.071, 0.157, 0.247] as RgbColor,
+  gold: [0.831, 0.627, 0.09] as RgbColor,
+  goldLight: [0.961, 0.902, 0.784] as RgbColor,
+  white: [1, 1, 1] as RgbColor,
+  panelBg: [0.929, 0.949, 0.969] as RgbColor,
+  mutedText: [0.392, 0.455, 0.545] as RgbColor,
+  darkText: [0.118, 0.161, 0.231] as RgbColor,
+  placeholderBg: [0.886, 0.91, 0.941] as RgbColor,
+  placeholderIcon: [0.58, 0.639, 0.722] as RgbColor,
+};
+
 export function buildIdCardPdf(input: {
   schoolName: string;
   studentName: string;
@@ -338,80 +351,297 @@ export function buildIdCardPdf(input: {
   academicYear?: string | null;
   qrToken?: string | null;
   logo?: PdfImage | null;
+  photo?: PdfImage | null;
 }) {
-  const left = 200;
-  const bottom = 432;
-  const width = 212;
-  const height = 337;
+  const c = ID_CARD_COLORS;
+  const cardX = 156;
+  const cardW = 300;
+  const cardTop = 726;
+  const cardH = 500;
+  const cardBottom = cardTop - cardH;
+  const cardRadius = 16;
+
+  const headerH = 96;
+  const headerBottom = cardTop - headerH;
+  const accentH = 6;
+  const accentBottom = headerBottom - accentH;
+
+  const badgeSize = 44;
+  const badgeX = cardX + 18;
+  const badgeY = headerBottom + (headerH - badgeSize) / 2;
+  const headerTextX = badgeX + badgeSize + 14;
+
+  const photoW = 108;
+  const photoH = 130;
+  const photoX = cardX + 18;
+  const photoY = accentBottom - 18 - photoH;
+
+  const textColX = photoX + photoW + 16;
+  const textColW = cardX + cardW - 14 - textColX;
+
+  const dividerY = photoY - 14;
+  const gridTop = dividerY - 22;
+  const gridRowH = 34;
+  const gridColA = cardX + 18;
+  const gridColB = cardX + cardW / 2 + 6;
+
+  const panelTop = gridTop - gridRowH * 2 - 8;
+  const panelH = 70;
+  const panelBottom = panelTop - panelH;
+  const panelX = cardX + 14;
+  const panelW = cardW - 28;
+
+  const qrSize = 48;
+  const qrX = cardX + 18;
+  const qrY = cardBottom + 20;
+
   const contentParts = [
-    '0.8 w',
-    `${left} ${bottom} ${width} ${height} re S`,
-    `${left + 8} ${bottom + 8} ${width - 16} ${height - 16} re S`,
+    // Card body: clip everything to a rounded rectangle so the sharp-cornered
+    // header band, panels, and photo frame all render with rounded corners.
+    'q',
+    roundedRectPath(cardX, cardBottom, cardW, cardH, cardRadius),
+    'W n',
+    fillColor(c.white),
+    filledRect(cardX, cardBottom, cardW, cardH),
+
+    // Header band
+    fillColor(c.navy),
+    filledRect(cardX, headerBottom, cardW, headerH),
+    fillColor(c.gold),
+    filledRect(cardX, accentBottom, cardW, accentH),
+
     input.logo
-      ? `q 40 0 0 40 ${left + 14} ${bottom + height - 54} cm /Img1 Do Q`
-      : '',
+      ? [
+          fillColor(c.white),
+          roundedRect(badgeX, badgeY, badgeSize, badgeSize, 8, 'f'),
+          drawImage(
+            'Logo',
+            badgeX + 3,
+            badgeY + 3,
+            badgeSize - 6,
+            badgeSize - 6,
+          ),
+        ].join('\n')
+      : [
+          fillColor(c.gold),
+          roundedRect(badgeX, badgeY, badgeSize, badgeSize, 8, 'f'),
+          text(
+            input.schoolName.trim().charAt(0).toUpperCase() || 'S',
+            badgeX + badgeSize / 2 - 7,
+            badgeY + badgeSize / 2 - 8,
+            20,
+            'F2',
+            c.navyDark,
+          ),
+        ].join('\n'),
+
+    ...(() => {
+      const nameUpper = input.schoolName.toUpperCase();
+      const long = nameUpper.length > 22;
+      const size = long ? 10 : 13;
+      const maxChars = long ? 40 : 22;
+      return [
+        text(
+          fitText(nameUpper, maxChars),
+          headerTextX,
+          headerBottom + headerH - 38,
+          size,
+          'F2',
+          c.white,
+        ),
+      ];
+    })(),
     text(
-      fitText(input.schoolName, 29),
-      left + (input.logo ? 58 : 14),
-      bottom + height - 28,
-      input.logo ? 9 : 11,
+      spaceOutLetters('STUDENT IDENTITY CARD'),
+      headerTextX,
+      headerBottom + headerH - 60,
+      7,
       'F2',
+      c.goldLight,
     ),
-    text('STUDENT ID CARD', left + 50, bottom + height - 48, 10, 'F2'),
-    `${left + 20} ${bottom + 176} 88 96 re S`,
-    text('PHOTO', left + 48, bottom + 220, 9, 'F1'),
-    text(fitText(input.studentName, 24), left + 20, bottom + 152, 13, 'F2'),
-    text(`ID: ${input.studentId}`, left + 20, bottom + 132, 9, 'F1'),
+
+    // Photo frame
+    'q',
+    roundedRectPath(photoX, photoY, photoW, photoH, 8),
+    'W n',
+    input.photo
+      ? drawImage('Photo', photoX, photoY, photoW, photoH)
+      : [
+          fillColor(c.placeholderBg),
+          filledRect(photoX, photoY, photoW, photoH),
+          text(
+            'PHOTO',
+            photoX + photoW / 2 - 15,
+            photoY + photoH / 2 + 4,
+            9,
+            'F2',
+            c.placeholderIcon,
+          ),
+          text(
+            'not available',
+            photoX + photoW / 2 - 24,
+            photoY + photoH / 2 - 10,
+            7,
+            'F1',
+            c.placeholderIcon,
+          ),
+        ].join('\n'),
+    'Q',
+    strokeColor(c.navy),
+    lineWidth(1.4),
+    roundedRect(photoX, photoY, photoW, photoH, 8, 'S'),
+
+    // Name + student ID beside the photo
+    ...wrapNameLines(
+      input.studentName,
+      textColX,
+      photoY + photoH - 18,
+      textColW,
+      13,
+      c.darkText,
+    ),
+    text('STUDENT ID', textColX, photoY + photoH - 52, 7, 'F2', c.mutedText),
+    text(input.studentId, textColX, photoY + photoH - 64, 10, 'F1', c.darkText),
+
+    // Divider
+    strokeColor(c.panelBg),
+    lineWidth(1),
+    `${cardX + 18} ${dividerY} m ${cardX + cardW - 18} ${dividerY} l S`,
+
+    // Info grid: Class / Section / Roll No / Blood Group
+    ...gridField('CLASS', input.className, gridColA, gridTop, c),
+    ...gridField('SECTION', input.sectionName ?? 'N/A', gridColB, gridTop, c),
+    ...gridField(
+      'ROLL NO',
+      input.rollNumber !== null && input.rollNumber !== undefined
+        ? String(input.rollNumber)
+        : 'N/A',
+      gridColA,
+      gridTop - gridRowH,
+      c,
+    ),
+    ...gridField(
+      'BLOOD GROUP',
+      input.bloodGroup ?? 'N/A',
+      gridColB,
+      gridTop - gridRowH,
+      c,
+    ),
+
+    // Emergency contact panel
+    fillColor(c.panelBg),
+    roundedRect(panelX, panelBottom, panelW, panelH, 10, 'f'),
     text(
-      `Class: ${input.className}${input.sectionName ? ' - ' + input.sectionName : ''}`,
-      left + 20,
-      bottom + 116,
+      spaceOutLetters('EMERGENCY CONTACT'),
+      panelX + 14,
+      panelTop - 18,
+      6.5,
+      'F2',
+      c.mutedText,
+    ),
+    text(
+      fitText(input.guardianName ?? 'Not recorded', 26),
+      panelX + 14,
+      panelTop - 34,
+      10,
+      'F2',
+      c.darkText,
+    ),
+    text(
+      input.guardianPhone ?? 'N/A',
+      panelX + 14,
+      panelTop - 50,
       9,
       'F1',
+      c.mutedText,
     ),
-    input.rollNumber
-      ? text(`Roll No: ${input.rollNumber}`, left + 20, bottom + 100, 9, 'F1')
-      : '',
-    input.bloodGroup
-      ? text(`Blood: ${input.bloodGroup}`, left + 124, bottom + 100, 9, 'F2')
-      : '',
-    `${left + 14} ${bottom + 76} m ${left + width - 14} ${bottom + 76} l S`,
-    sectionLabel('Emergency Contact', left + 20, bottom + 60),
+
+    // QR + validity footer inside the card
+    input.qrToken
+      ? [
+          fillColor(c.white),
+          roundedRect(qrX - 4, qrY - 4, qrSize + 8, qrSize + 8, 4, 'f'),
+          strokeColor(c.panelBg),
+          lineWidth(1),
+          roundedRect(qrX - 4, qrY - 4, qrSize + 8, qrSize + 8, 4, 'S'),
+          renderQrTokenAsPdfBlocks(input.qrToken, qrX, qrY, qrSize),
+          text(
+            spaceOutLetters('SCAN TO VERIFY'),
+            qrX + qrSize + 16,
+            qrY + qrSize - 10,
+            6.5,
+            'F2',
+            c.navy,
+          ),
+          input.academicYear
+            ? text(
+                `Valid for AY ${input.academicYear}`,
+                qrX + qrSize + 16,
+                qrY + qrSize - 26,
+                8,
+                'F1',
+                c.mutedText,
+              )
+            : '',
+        ].join('\n')
+      : input.academicYear
+        ? text(
+            `Valid for Academic Year ${input.academicYear}`,
+            qrX,
+            qrY + qrSize / 2,
+            9,
+            'F2',
+            c.mutedText,
+          )
+        : '',
+
+    'Q', // end card clip
+
+    // Crisp outer border, drawn after the clip is released
+    strokeColor(c.navy),
+    lineWidth(1.6),
+    roundedRect(cardX, cardBottom, cardW, cardH, cardRadius, 'S'),
+
+    // Footer note below the printable card
     text(
-      fitText(input.guardianName ?? 'N/A', 22),
-      left + 20,
-      bottom + 45,
+      'This is a system-generated SchoolOS student identity card.',
+      cardX,
+      cardBottom - 26,
       8,
       'F1',
+      c.mutedText,
     ),
-    text(input.guardianPhone ?? 'N/A', left + 122, bottom + 45, 8, 'F1'),
-    input.academicYear
-      ? text(
-          `Valid for: ${input.academicYear}`,
-          left + 20,
-          bottom + 26,
-          7,
-          'F1',
-        )
-      : '',
+    text(
+      `Reference: ${input.studentId}-id-card`,
+      cardX,
+      cardBottom - 40,
+      7,
+      'F1',
+      c.mutedText,
+    ),
   ];
 
-  if (input.qrToken) {
-    contentParts.push(
-      renderQrTokenAsPdfBlocks(
-        input.qrToken,
-        left + width - 72,
-        bottom + 96,
-        56,
-      ),
-      text('SCAN ID', left + width - 68, bottom + 86, 6, 'F2'),
-    );
-  }
+  const images: Array<{ key: string; image: PdfImage }> = [];
+  if (input.logo) images.push({ key: 'Logo', image: input.logo });
+  if (input.photo) images.push({ key: 'Photo', image: input.photo });
 
-  return buildPdfFromContent(
+  return buildPdfFromContentMulti(
     contentParts.filter(Boolean).join('\n'),
-    input.logo,
+    images,
   );
+}
+
+function gridField(
+  label: string,
+  value: string,
+  x: number,
+  y: number,
+  c: typeof ID_CARD_COLORS,
+) {
+  return [
+    text(label, x, y, 7, 'F2', c.mutedText),
+    text(fitText(value, 20), x, y - 15, 10, 'F2', c.darkText),
+  ];
 }
 
 export function buildReportCardPdf(input: {
@@ -671,22 +901,43 @@ function escapePdfText(input: string | number | null | undefined) {
 }
 
 function buildPdfFromContent(content: string, logo?: PdfImage | null) {
+  return buildPdfFromContentMulti(
+    content,
+    logo ? [{ key: 'Img1', image: logo }] : [],
+  );
+}
+
+// Generalized version of buildPdfFromContent that can embed more than one
+// image XObject (e.g. a school logo plus a student photo on the same page).
+function buildPdfFromContentMulti(
+  content: string,
+  images: Array<{ key: string; image: PdfImage }>,
+) {
+  const xobjectDict = images
+    .map(({ key }, index) => `/${key} ${7 + index} 0 R`)
+    .join(' ');
   const objects: Array<string | Buffer> = [
     '<< /Type /Catalog /Pages 2 0 R >>',
     '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
     `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> ${
-      logo ? '/XObject << /Img1 7 0 R >>' : ''
+      images.length ? `/XObject << ${xobjectDict} >>` : ''
     } >> /Contents 4 0 R >>`,
     `<< /Length ${Buffer.byteLength(content)} >>\nstream\n${content}\nendstream`,
     '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
     '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>',
   ];
 
-  if (logo) {
+  for (const { image } of images) {
+    // Must be a single PDF object (dict + stream keyword + bytes + endstream
+    // all inside one "N 0 obj ... endobj"), not three separate objects.
     objects.push(
-      `<< /Type /XObject /Subtype /Image /Width ${logo.width} /Height ${logo.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${logo.buffer.length} >>\nstream\n`,
-      logo.buffer,
-      '\nendstream',
+      Buffer.concat([
+        Buffer.from(
+          `<< /Type /XObject /Subtype /Image /Width ${image.width} /Height ${image.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${image.buffer.length} >>\nstream\n`,
+        ),
+        image.buffer,
+        Buffer.from('\nendstream'),
+      ]),
     );
   }
 
@@ -731,8 +982,10 @@ function text(
   y: number,
   size: number,
   font: 'F1' | 'F2',
+  color?: RgbColor,
 ) {
-  return `BT /${font} ${size} Tf ${x} ${y} Td (${escapePdfText(value)}) Tj ET`;
+  const body = `BT /${font} ${size} Tf ${x} ${y} Td (${escapePdfText(value)}) Tj ET`;
+  return color ? `q ${fillColor(color)}\n${body}\nQ` : body;
 }
 
 function pageFrame(
@@ -760,6 +1013,80 @@ function infoBox(x: number, y: number, width: number, height: number) {
 
 function pill(x: number, y: number, width: number, height: number) {
   return `${x} ${y} ${width} ${height} re S`;
+}
+
+type RgbColor = [number, number, number];
+
+function fillColor([r, g, b]: RgbColor) {
+  return `${r} ${g} ${b} rg`;
+}
+
+function strokeColor([r, g, b]: RgbColor) {
+  return `${r} ${g} ${b} RG`;
+}
+
+function filledRect(x: number, y: number, width: number, height: number) {
+  return `${x} ${y} ${width} ${height} re f`;
+}
+
+function lineWidth(width: number) {
+  return `${width} w`;
+}
+
+// Rounded-rectangle path built from four cubic-Bezier corner arcs. Caller
+// appends a paint operator (f = fill, S = stroke, B = fill+stroke, or
+// "W n" to use it as a clip region without painting).
+function roundedRectPath(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+) {
+  const r = Math.min(radius, width / 2, height / 2);
+  const k = r * 0.5522847498;
+
+  return [
+    `${x + r} ${y} m`,
+    `${x + width - r} ${y} l`,
+    `${x + width - r + k} ${y} ${x + width} ${y + r - k} ${x + width} ${y + r} c`,
+    `${x + width} ${y + height - r} l`,
+    `${x + width} ${y + height - r + k} ${x + width - r + k} ${y + height} ${x + width - r} ${y + height} c`,
+    `${x + r} ${y + height} l`,
+    `${x + r - k} ${y + height} ${x} ${y + height - r + k} ${x} ${y + height - r} c`,
+    `${x} ${y + r} l`,
+    `${x} ${y + r - k} ${x + r - k} ${y} ${x + r} ${y} c`,
+    'h',
+  ].join('\n');
+}
+
+function roundedRect(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+  mode: 'f' | 'S' | 'B',
+) {
+  return `${roundedRectPath(x, y, width, height, radius)}\n${mode}`;
+}
+
+// Draws an image XObject scaled/positioned into an arbitrary box using the
+// PDF "cm" coordinate-transform operator (unit image square -> target box).
+function drawImage(
+  key: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) {
+  return `q ${width} 0 0 ${height} ${x} ${y} cm /${key} Do Q`;
+}
+
+// Rough "tracked out" letter spacing for small all-caps labels, since the
+// hand-rolled text operator has no native character-spacing control here.
+function spaceOutLetters(value: string) {
+  return value.split('').join(' ');
 }
 
 function stamp(value: string, x: number, y: number) {
@@ -883,6 +1210,36 @@ function wrapPdfLine(
   }
 
   return lines.map((line, index) => text(line, x, y - index * 14, size, 'F1'));
+}
+
+// Bold, colored, max-2-line word wrap used for the ID card student name.
+function wrapNameLines(
+  value: string,
+  x: number,
+  y: number,
+  width: number,
+  size: number,
+  color: RgbColor,
+) {
+  const maxChars = Math.max(10, Math.floor(width / (size * 0.52)));
+  const words = value.split(/\s+/);
+  const lines: string[] = [];
+  let current = '';
+
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word;
+    if (next.length > maxChars && current) {
+      lines.push(current);
+      current = word;
+      continue;
+    }
+    current = next;
+  }
+  if (current) lines.push(current);
+
+  return lines
+    .slice(0, 2)
+    .map((line, index) => text(line, x, y - index * 16, size, 'F2', color));
 }
 
 interface QrCodeMatrix {

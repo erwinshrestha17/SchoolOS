@@ -198,6 +198,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
     mutationFn: (file: File) => api.uploadStudentPhoto(studentId, file),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['student-profile', studentId] });
+      void queryClient.invalidateQueries({ queryKey: ['students'] });
     },
   });
 
@@ -205,6 +206,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
     mutationFn: () => api.removeStudentPhoto(studentId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['student-profile', studentId] });
+      void queryClient.invalidateQueries({ queryKey: ['students'] });
     },
   });
 
