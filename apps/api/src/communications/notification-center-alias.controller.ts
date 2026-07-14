@@ -10,7 +10,7 @@ import { NotificationCenterService } from './notification-center.service';
 
 @Controller('notification-center')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
-@Entitlement('module.communications')
+@Entitlement('module.notifications')
 export class NotificationCenterAliasController {
   constructor(
     private readonly notificationCenterService: NotificationCenterService,
