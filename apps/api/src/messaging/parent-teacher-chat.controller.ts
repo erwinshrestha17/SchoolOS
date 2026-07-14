@@ -32,7 +32,7 @@ import { ParentTeacherChatService } from './parent-teacher-chat.service';
 
 @Controller('messaging/parent-teacher')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
-@Entitlement('module.communications')
+@Entitlement('feature.chat.enabled')
 export class ParentTeacherChatController {
   constructor(private readonly service: ParentTeacherChatService) {}
 
