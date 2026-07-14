@@ -11,7 +11,7 @@ import { CreateNoticeDto } from './dto/create-notice.dto';
 
 @Controller('notices')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
-@Entitlement('module.communications')
+@Entitlement('module.notices')
 export class NoticesController {
   constructor(private readonly communicationsService: CommunicationsService) {}
 
