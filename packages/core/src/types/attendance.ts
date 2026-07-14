@@ -1,5 +1,12 @@
-import type { AcademicYearSummary, ClassSummary, SectionSummary } from './academic.js';
-import type { AttendanceRosterStudent, AttendanceCorrectionStatus } from './common.js';
+import type {
+  AcademicYearSummary,
+  ClassSummary,
+  SectionSummary,
+} from "./academic.js";
+import type {
+  AttendanceRosterStudent,
+  AttendanceCorrectionStatus,
+} from "./common.js";
 
 export type AttendanceSummary = {
   sessionId: string;
@@ -50,7 +57,7 @@ export type AttendanceAnalytics = {
     submittedSessionCount: number;
     draftSessionCount: number;
     notMarkedSessionCount: number;
-    totals: AttendanceSummary['totals'];
+    totals: AttendanceSummary["totals"];
   };
   monthlyAttendance: {
     month: number;
@@ -163,7 +170,7 @@ export type AttendanceCalendarDayView = {
   isWorkingDay: boolean;
   label: string | null;
   holidayType: string | null;
-  source: 'explicit' | 'weekday_fallback';
+  source: "explicit" | "weekday_fallback";
 };
 
 export type SchoolCalendarDaySummary = {
@@ -175,7 +182,7 @@ export type SchoolCalendarDaySummary = {
 };
 
 export type AttendanceEscalationWarning = {
-  type: 'consecutive_absence' | 'below_threshold';
+  type: "consecutive_absence" | "below_threshold";
   sourceType: string;
   sourceId: string;
   studentId: string;
@@ -203,4 +210,95 @@ export type StaffAttendanceMonthlySummary = {
     approvedLeaveDays: number;
     unresolvedOverlapAnomalies: number;
   }>;
+};
+
+export type StudentAttendanceMonthState =
+  | "COMPLETED"
+  | "CURRENT"
+  | "UPCOMING"
+  | "NO_DATA"
+  | "PARTIAL";
+
+export type StudentAttendanceDataState = "COMPLETE" | "PARTIAL" | "EMPTY";
+
+export type StudentAttendanceAcademicYearOption = {
+  id: string;
+  name: string;
+  startsOnBs: string;
+  endsOnBs: string;
+  isCurrent: boolean;
+};
+
+export type StudentAttendanceMonthOption = {
+  key: string;
+  label: string;
+  bsMonth: number;
+  bsYear: number;
+  isCurrent: boolean;
+  isAvailable: boolean;
+};
+
+export type StudentAttendanceTotals = {
+  totalSchoolDays: number;
+  present: number;
+  absent: number;
+  late: number;
+  leave: number;
+  recordedDays: number;
+  attendancePercentage: number | null;
+};
+
+export type StudentAttendanceMonthSummary = StudentAttendanceTotals & {
+  key: string;
+  bsMonth: number;
+  bsYear: number;
+  label: string;
+  startsOnBs: string;
+  endsOnBs: string;
+  state: StudentAttendanceMonthState;
+  registerDays: number;
+};
+
+export type StudentAttendanceMonthlyRegisterDay = {
+  dateBs: string;
+  dateLabel: string;
+  dayLabel: string;
+  weekday: number;
+  dayType: "SCHOOL_DAY" | "HOLIDAY" | "WEEKEND" | "EXAM_DAY";
+  calendarLabel: string | null;
+  holidayName: string | null;
+  registerState: "SUBMITTED" | "DRAFT" | "NOT_CREATED";
+  attendanceStatus:
+    | "PRESENT"
+    | "ABSENT"
+    | "LATE"
+    | "LEAVE"
+    | "SICK_LEAVE"
+    | "EXCUSED_LEAVE"
+    | "UNEXCUSED_LEAVE"
+    | "ON_LEAVE"
+    | "HALF_DAY"
+    | "HOLIDAY"
+    | "NOT_MARKED"
+    | null;
+  isToday: boolean;
+  isFuture: boolean;
+  arrivalAt: string | null;
+  remark: string | null;
+};
+
+export type StudentAttendanceMonthlyRegister = {
+  studentId: string;
+  academicYears: StudentAttendanceAcademicYearOption[];
+  selectedAcademicYear: StudentAttendanceAcademicYearOption | null;
+  months: StudentAttendanceMonthOption[];
+  currentMonthKey: string | null;
+  previousMonthKey: string | null;
+  nextMonthKey: string | null;
+  calendarState: "AVAILABLE" | "UNAVAILABLE";
+  dataState: StudentAttendanceDataState;
+  month: StudentAttendanceMonthSummary | null;
+  leaveSupported: boolean;
+  lastUpdatedAt: string | null;
+  days: StudentAttendanceMonthlyRegisterDay[];
 };

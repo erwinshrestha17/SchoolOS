@@ -19,6 +19,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import sharp from 'sharp';
+import { toGregorianDateFromBs } from '@schoolos/core';
 import { AttendanceService } from './attendance.service';
 import { AttendanceConflictReviewDecision } from './dto/review-attendance-conflict.dto';
 
@@ -43,6 +44,10 @@ const teacherActor = {
 };
 
 describe('attendance production hardening', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it('loads roster from active tenant enrollment scope and defaults students present', async () => {
     const student = buildStudent({
       rollNumber: 3,
@@ -1874,7 +1879,221 @@ describe('attendance production hardening', () => {
     });
     expect(JSON.stringify(result)).not.toContain('objectKey');
   });
+
+  it('defaults to the current BS month and returns backend-owned bounded navigation', async () => {
+    jest.useFakeTimers().setSystemTime(bsTestDate(2083, 2, 15));
+    const academicYear = {
+      id: 'ay-1',
+      name: '2083/84',
+      startsOn: bsTestDate(2083, 1, 1),
+      endsOn: bsTestDate(2083, 3, 2),
+      isCurrent: true,
+    };
+    const enrollment = {
+      classId: 'class-1',
+      sectionId: 'section-1',
+      academicYear,
+    };
+    const currentSession = {
+      id: 'session-current',
+      attendanceDate: bsTestDate(2083, 2, 1),
+      submittedAt: bsTestDate(2083, 2, 1),
+      updatedAt: bsTestDate(2083, 2, 1),
+      records: [
+        { status: AttendanceStatus.PRESENT, remark: null, lateAt: null },
+      ],
+    };
+    const { service, prisma } = buildService({
+      enrollments: [enrollment],
+      studentFindFirst: {
+        id: 'student-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+      },
+      attendanceSessions: [currentSession],
+    });
+
+    const result = await service.getStudentMonthlyRegister(
+      'student-1',
+      {},
+      adminActor,
+    );
+
+    expect(result.months.map((month) => month.label)).toEqual([
+      'Baisakh 2083 BS',
+      'Jestha 2083 BS',
+      'Asar 2083 BS',
+    ]);
+    expect(result.month?.key).toBe('2083-02');
+    expect(result.previousMonthKey).toBe('2083-01');
+    expect(result.nextMonthKey).toBeNull();
+    expect(result.months[2]?.isAvailable).toBe(false);
+    expect(result.month).toEqual(
+      expect.objectContaining({
+        present: 1,
+        absent: 0,
+        attendancePercentage: 100,
+      }),
+    );
+    expect(prisma.attendanceSession.findMany).toHaveBeenCalledTimes(1);
+    jest.useRealTimers();
+  });
+
+  it('allows every month in a completed historical year and keeps zero days distinct from partial data', async () => {
+    jest.useFakeTimers().setSystemTime(bsTestDate(2083, 2, 15));
+    const academicYear = {
+      id: 'ay-1',
+      name: '2083/84',
+      startsOn: bsTestDate(2083, 1, 1),
+      endsOn: bsTestDate(2083, 1, 3),
+      isCurrent: false,
+    };
+    const enrollment = {
+      classId: 'class-1',
+      sectionId: 'section-1',
+      academicYear,
+    };
+    const nonWorkingDays = [1, 2, 3].map((day) => ({
+      calendarDate: bsTestDate(2083, 1, day),
+      isWorkingDay: false,
+      label: 'School closure',
+      holidayType: 'CLOSURE',
+    }));
+    const { service } = buildService({
+      enrollments: [enrollment],
+      studentFindFirst: {
+        id: 'student-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+      },
+      calendarDays: nonWorkingDays,
+    });
+
+    const completed = await service.getStudentMonthlyRegister(
+      'student-1',
+      {},
+      adminActor,
+    );
+
+    expect(completed.months.every((month) => month.isAvailable)).toBe(true);
+    expect(completed.month).toEqual(
+      expect.objectContaining({
+        state: 'COMPLETED',
+        totalSchoolDays: 0,
+        recordedDays: 0,
+        attendancePercentage: null,
+      }),
+    );
+
+    const partialService = buildService({
+      enrollments: [enrollment],
+      studentFindFirst: {
+        id: 'student-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+      },
+      attendanceSessions: [
+        {
+          id: 'draft-1',
+          attendanceDate: bsTestDate(2083, 1, 1),
+          submittedAt: null,
+          updatedAt: bsTestDate(2083, 1, 1),
+          records: [],
+        },
+      ],
+    }).service;
+    const partial = await partialService.getStudentMonthlyRegister(
+      'student-1',
+      {},
+      adminActor,
+    );
+    expect(partial.month?.state).toBe('PARTIAL');
+    expect(partial.dataState).toBe('PARTIAL');
+    jest.useRealTimers();
+  });
+
+  it('returns only the selected student month and preserves daily BS labels', async () => {
+    jest.useFakeTimers().setSystemTime(bsTestDate(2083, 2, 15));
+    const academicYear = {
+      id: 'ay-1',
+      name: '2083/84',
+      startsOn: bsTestDate(2083, 1, 1),
+      endsOn: bsTestDate(2083, 3, 2),
+      isCurrent: true,
+    };
+    const session = {
+      id: 'session-1',
+      attendanceDate: bsTestDate(2083, 2, 1),
+      submittedAt: bsTestDate(2083, 2, 1),
+      updatedAt: bsTestDate(2083, 2, 1),
+      records: [
+        {
+          status: AttendanceStatus.LATE,
+          remark: 'Bus delay',
+          lateAt: bsTestDate(2083, 2, 1),
+        },
+      ],
+    };
+    const { service, prisma } = buildService({
+      enrollments: [
+        { classId: 'class-1', sectionId: 'section-1', academicYear },
+      ],
+      studentFindFirst: {
+        id: 'student-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+      },
+      attendanceSessions: [session],
+      calendarDays: [
+        {
+          calendarDate: bsTestDate(2083, 2, 2),
+          isWorkingDay: false,
+          label: 'School holiday',
+          holidayType: 'PUBLIC_HOLIDAY',
+        },
+      ],
+    });
+
+    const result = await service.getStudentMonthlyRegister(
+      'student-1',
+      { academicYearId: 'ay-1', month: '2083-02' },
+      adminActor,
+    );
+
+    expect(result.month?.key).toBe('2083-02');
+    expect(result.days[0]).toEqual(
+      expect.objectContaining({
+        dateBs: '2083-02-01',
+        dateLabel: 'Jestha 1, 2083',
+        registerState: 'SUBMITTED',
+        attendanceStatus: AttendanceStatus.LATE,
+        remark: 'Bus delay',
+      }),
+    );
+    expect(result.days[1]).toEqual(
+      expect.objectContaining({
+        dayType: 'HOLIDAY',
+        attendanceStatus: null,
+        holidayName: 'School holiday',
+      }),
+    );
+    expect(result.days[2]).toEqual(
+      expect.objectContaining({
+        attendanceStatus: 'NOT_MARKED',
+      }),
+    );
+    expect(result.days.some((day) => day.dayType === 'WEEKEND')).toBe(true);
+    expect(prisma.attendanceSession.findMany).toHaveBeenCalledTimes(1);
+    jest.useRealTimers();
+  });
 });
+
+function bsTestDate(year: number, month: number, day: number) {
+  const gregorian = toGregorianDateFromBs({ year, month, day });
+  return new Date(
+    Date.UTC(gregorian.year, gregorian.month - 1, gregorian.day, 6),
+  );
+}
 
 function buildService(options: {
   academicYear?: unknown;
@@ -1915,6 +2134,9 @@ function buildService(options: {
   fileAssets?: unknown[];
   attendanceDraft?: unknown;
   fileRegistryService?: unknown;
+  enrollments?: unknown[];
+  enrollmentFindFirst?: unknown;
+  calendarDays?: unknown[];
 }) {
   const tx = {
     attendanceConflict: {
@@ -1965,7 +2187,10 @@ function buildService(options: {
       findFirst: jest.fn().mockResolvedValue(options.calendarDay ?? null),
       findMany: jest
         .fn()
-        .mockResolvedValue(options.calendarDay ? [options.calendarDay] : []),
+        .mockResolvedValue(
+          options.calendarDays ??
+            (options.calendarDay ? [options.calendarDay] : []),
+        ),
     },
     tenantSetting: {
       findUnique: jest.fn().mockResolvedValue(
@@ -1985,6 +2210,12 @@ function buildService(options: {
       findMany: jest.fn().mockResolvedValue(options.students ?? []),
       findFirst: jest.fn().mockResolvedValue(options.studentFindFirst ?? null),
       findUnique: jest.fn().mockResolvedValue(options.studentFindFirst ?? null),
+    },
+    enrollment: {
+      findMany: jest.fn().mockResolvedValue(options.enrollments ?? []),
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(options.enrollmentFindFirst ?? null),
     },
     attendanceSyncSubmission: {
       findUnique: jest

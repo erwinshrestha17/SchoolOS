@@ -59,10 +59,10 @@ describe('Student profile edit controls', () => {
     assert.match(documents, /api\.revokeGeneratedStudentDocument\(studentId, documentId, \{ reason \}\)/);
     assert.match(documents, /generatedDocumentRevokeReason\.trim\(\)\.length < 5/);
     assert.match(documents, /Revoke generated document/);
-    assert.match(documents, /Retention until/);
+    assert.match(documents, /Version history/);
     assert.match(documents, /revokedAt/);
     assert.match(documents, /queryKey: \['student-profile', studentId\]/);
-    assert.match(documents, /generated-document revoke history/);
+    assert.match(documents, /keep its audit history/);
     assert.doesNotMatch(documents, /window\.confirm|confirm\(/);
     assert.doesNotMatch(documents, /storageObjectKey|pdfUrl/);
     assert.doesNotMatch(documents, /delete history/);

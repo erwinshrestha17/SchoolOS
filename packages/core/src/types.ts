@@ -1739,7 +1739,7 @@ export type AttendanceAnalytics = {
     submittedSessionCount: number;
     draftSessionCount: number;
     notMarkedSessionCount: number;
-    totals: AttendanceSummary['totals'];
+    totals: AttendanceSummary["totals"];
   };
   monthlyAttendance: {
     month: number;
@@ -1852,7 +1852,7 @@ export type AttendanceCalendarDayView = {
   isWorkingDay: boolean;
   label: string | null;
   holidayType: string | null;
-  source: 'explicit' | 'weekday_fallback';
+  source: "explicit" | "weekday_fallback";
 };
 
 export type SchoolCalendarDaySummary = {
@@ -1864,7 +1864,7 @@ export type SchoolCalendarDaySummary = {
 };
 
 export type AttendanceEscalationWarning = {
-  type: 'consecutive_absence' | 'below_threshold';
+  type: "consecutive_absence" | "below_threshold";
   sourceType: string;
   sourceId: string;
   studentId: string;
@@ -1892,6 +1892,97 @@ export type StaffAttendanceMonthlySummary = {
     approvedLeaveDays: number;
     unresolvedOverlapAnomalies: number;
   }>;
+};
+
+export type StudentAttendanceMonthState =
+  | "COMPLETED"
+  | "CURRENT"
+  | "UPCOMING"
+  | "NO_DATA"
+  | "PARTIAL";
+
+export type StudentAttendanceDataState = "COMPLETE" | "PARTIAL" | "EMPTY";
+
+export type StudentAttendanceAcademicYearOption = {
+  id: string;
+  name: string;
+  startsOnBs: string;
+  endsOnBs: string;
+  isCurrent: boolean;
+};
+
+export type StudentAttendanceMonthOption = {
+  key: string;
+  label: string;
+  bsMonth: number;
+  bsYear: number;
+  isCurrent: boolean;
+  isAvailable: boolean;
+};
+
+export type StudentAttendanceTotals = {
+  totalSchoolDays: number;
+  present: number;
+  absent: number;
+  late: number;
+  leave: number;
+  recordedDays: number;
+  attendancePercentage: number | null;
+};
+
+export type StudentAttendanceMonthSummary = StudentAttendanceTotals & {
+  key: string;
+  bsMonth: number;
+  bsYear: number;
+  label: string;
+  startsOnBs: string;
+  endsOnBs: string;
+  state: StudentAttendanceMonthState;
+  registerDays: number;
+};
+
+export type StudentAttendanceMonthlyRegisterDay = {
+  dateBs: string;
+  dateLabel: string;
+  dayLabel: string;
+  weekday: number;
+  dayType: "SCHOOL_DAY" | "HOLIDAY" | "WEEKEND" | "EXAM_DAY";
+  calendarLabel: string | null;
+  holidayName: string | null;
+  registerState: "SUBMITTED" | "DRAFT" | "NOT_CREATED";
+  attendanceStatus:
+    | "PRESENT"
+    | "ABSENT"
+    | "LATE"
+    | "LEAVE"
+    | "SICK_LEAVE"
+    | "EXCUSED_LEAVE"
+    | "UNEXCUSED_LEAVE"
+    | "ON_LEAVE"
+    | "HALF_DAY"
+    | "HOLIDAY"
+    | "NOT_MARKED"
+    | null;
+  isToday: boolean;
+  isFuture: boolean;
+  arrivalAt: string | null;
+  remark: string | null;
+};
+
+export type StudentAttendanceMonthlyRegister = {
+  studentId: string;
+  academicYears: StudentAttendanceAcademicYearOption[];
+  selectedAcademicYear: StudentAttendanceAcademicYearOption | null;
+  months: StudentAttendanceMonthOption[];
+  currentMonthKey: string | null;
+  previousMonthKey: string | null;
+  nextMonthKey: string | null;
+  calendarState: "AVAILABLE" | "UNAVAILABLE";
+  dataState: StudentAttendanceDataState;
+  month: StudentAttendanceMonthSummary | null;
+  leaveSupported: boolean;
+  lastUpdatedAt: string | null;
+  days: StudentAttendanceMonthlyRegisterDay[];
 };
 
 
@@ -3709,9 +3800,12 @@ export type StudentProfile = {
   studentSystemId: string;
   firstNameEn?: string;
   lastNameEn?: string;
+  firstNameNp?: string | null;
+  lastNameNp?: string | null;
   fullNameEn?: string;
   fullNameNp?: string | null;
   gender?: string;
+  nationality?: string | null;
   dateOfBirth?: string;
   admissionNumber?: string | null;
   admissionDate?: string;
@@ -3786,17 +3880,17 @@ export type StudentModuleSummary = {
 };
 
 export enum StudentQrResolvePurpose {
-  GENERAL_STUDENT_LOOKUP = 'GENERAL_STUDENT_LOOKUP',
-  LIBRARY = 'LIBRARY',
-  CANTEEN = 'CANTEEN',
-  TRANSPORT = 'TRANSPORT',
-  ATTENDANCE = 'ATTENDANCE',
+  GENERAL_STUDENT_LOOKUP = "GENERAL_STUDENT_LOOKUP",
+  LIBRARY = "LIBRARY",
+  CANTEEN = "CANTEEN",
+  TRANSPORT = "TRANSPORT",
+  ATTENDANCE = "ATTENDANCE",
 }
 
 export type StudentQrCredentialSummary = {
   id: string;
   studentId: string;
-  status: 'ACTIVE' | 'ROTATED' | 'REVOKED';
+  status: "ACTIVE" | "ROTATED" | "REVOKED";
   createdById: string | null;
   updatedById: string | null;
   expiresAt: string | null;
@@ -3943,13 +4037,13 @@ export type RemoveStudentGuardianPayload = {
 };
 
 export type StudentLifecycleStatus =
-  | 'ACTIVE'
-  | 'TRANSFERRED'
-  | 'EXITED'
-  | 'ALUMNI'
-  | 'ARCHIVED'
-  | 'MERGED'
-  | 'DELETED';
+  | "ACTIVE"
+  | "TRANSFERRED"
+  | "EXITED"
+  | "ALUMNI"
+  | "ARCHIVED"
+  | "MERGED"
+  | "DELETED";
 
 export type StudentLifecycleTransition = {
   id: string;
@@ -4072,10 +4166,10 @@ export type GeneratedStudentDocumentMeta = {
 };
 
 export type GuardianIdentityVerificationStatus =
-  | 'PENDING'
-  | 'VERIFIED'
-  | 'REJECTED'
-  | 'REVOKED';
+  | "PENDING"
+  | "VERIFIED"
+  | "REJECTED"
+  | "REVOKED";
 
 export type GuardianIdentityVerification = {
   id: string;
@@ -4098,6 +4192,76 @@ export type IemisValidationIssue = {
   studentSystemId: string;
   field: string;
   message: string;
+};
+
+export type StudentIemisReadinessStatus =
+  | "READY"
+  | "READY_WITH_WARNINGS"
+  | "BLOCKED"
+  | "NOT_EVALUATED"
+  | "OUTDATED_VALIDATION";
+
+export type StudentIemisIssueSeverity =
+  | "BLOCKING"
+  | "WARNING"
+  | "INFORMATION"
+  | "NOT_REQUIRED";
+
+export type StudentIemisIssueCategory =
+  | "IDENTITY"
+  | "ENROLLMENT_PLACEMENT"
+  | "GUARDIAN_INFORMATION"
+  | "TRANSFER_INFORMATION"
+  | "DOCUMENTS"
+  | "ATTENDANCE"
+  | "ACADEMIC_STATUS_RESULTS";
+
+export type StudentIemisIssueFixTarget =
+  | "STUDENT_PROFILE"
+  | "ENROLLMENT"
+  | "GUARDIANS"
+  | "DOCUMENTS"
+  | "ATTENDANCE"
+  | "ACADEMICS"
+  | "NONE";
+
+export type StudentIemisReadinessIssue = {
+  code: string;
+  category: StudentIemisIssueCategory;
+  severity: StudentIemisIssueSeverity;
+  title: string;
+  message: string;
+  field: string;
+  blocking: boolean;
+  currentValueSafe: string | null;
+  requiredAction: string;
+  fixTarget: StudentIemisIssueFixTarget;
+  requiredPermission: PermissionKey | null;
+  responsibleRole: string | null;
+};
+
+export type StudentIemisReadiness = {
+  studentId: string;
+  studentSystemId: string;
+  fullNameEn: string;
+  nationalStudentId: string | null;
+  status: StudentIemisReadinessStatus;
+  passedRequiredChecks: number;
+  totalRequiredChecks: number;
+  blockingIssueCount: number;
+  warningCount: number;
+  exportEligible: boolean;
+  eligible: boolean;
+  evaluatedAt: string;
+  requirementVersion: string;
+  score: number;
+  academicYear: string | null;
+  className: string | null;
+  sectionName: string | null;
+  rollNumber: number | null;
+  enrollmentStatus: string | null;
+  admissionDate: string | null;
+  issues: StudentIemisReadinessIssue[];
 };
 
 export type StudentIemisReadinessSummary = {
@@ -4141,7 +4305,7 @@ export type IemisExportRow = {
 };
 
 export type IemisExportResult = {
-  formatVersion: 'SCHOLOS-IEMIS-1.0';
+  formatVersion: "SCHOLOS-IEMIS-1.0";
   exportedAt: string;
   exportId: string;
   fileAssetId: string;
@@ -4159,7 +4323,7 @@ export type StudentDuplicateCandidate = {
   sourceStudent: StudentDuplicateCandidateStudent;
   candidateStudent: StudentDuplicateCandidateStudent;
   score: number;
-  confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+  confidence: "LOW" | "MEDIUM" | "HIGH";
   reasons: string[];
   blockedReason: string | null;
 };

@@ -50,6 +50,9 @@ describe('StudentsService (iEMIS Export)', () => {
             tenantSetting: {
               findUnique: jest.fn(),
             },
+            subjectTeacherAssignment: {
+              findFirst: jest.fn(),
+            },
           },
         },
         { provide: AuditService, useValue: { record: jest.fn() } },
@@ -133,6 +136,7 @@ describe('StudentsService (iEMIS Export)', () => {
         enrollments: [
           {
             academicYear: { name: '2081' },
+            class: { name: 'Class 1' },
             section: { name: 'A' },
           },
         ],
@@ -234,6 +238,152 @@ describe('StudentsService (iEMIS Export)', () => {
     expect(result.issues.some((i) => i.field === 'guardianContact')).toBe(true);
   });
 
+  describe('getIemisReadiness', () => {
+    it('returns backend-owned required-check counts for a ready student', async () => {
+      (prisma.student.findFirst as jest.Mock).mockResolvedValue(
+        buildReadinessStudent(),
+      );
+
+      const result = await service.getIemisReadiness('student-ready', mockAuth);
+
+      expect(prisma.student.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'student-ready', tenantId: mockAuth.tenantId },
+        }),
+      );
+      expect(result.status).toBe('READY');
+      expect(result.passedRequiredChecks).toBe(result.totalRequiredChecks);
+      expect(result.blockingIssueCount).toBe(0);
+      expect(result.warningCount).toBe(0);
+      expect(result.exportEligible).toBe(true);
+      expect(result.eligible).toBe(true);
+      expect(result.academicYear).toBe('2082/83');
+      expect(result.className).toBe('Class 12');
+      expect(result.sectionName).toBe('A');
+      expect(result.requirementVersion).toBe('SCHOLOS-IEMIS-1.0');
+    });
+
+    it('returns exact blocking issues and safe fix metadata', async () => {
+      (prisma.student.findFirst as jest.Mock).mockResolvedValue(
+        buildReadinessStudent({
+          firstNameNp: null,
+          lastNameNp: null,
+          enrollments: [
+            {
+              id: 'enrollment-1',
+              status: EnrollmentStatus.ACTIVE,
+              academicYear: { name: '2082/83', startsOn: null },
+              class: { name: 'Class 12' },
+              section: null,
+              rollNumber: 20,
+              admissionDate: new Date('2025-04-14'),
+            },
+          ],
+        }),
+      );
+
+      const result = await service.getIemisReadiness(
+        'student-blocked',
+        mockAuth,
+      );
+
+      expect(result.status).toBe('BLOCKED');
+      expect(result.exportEligible).toBe(false);
+      expect(result.blockingIssueCount).toBe(2);
+      expect(result.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'NEPALI_NAME_REQUIRED',
+            severity: 'BLOCKING',
+            field: 'fullNameNp',
+            fixTarget: 'STUDENT_PROFILE',
+            requiredPermission: 'students:update',
+          }),
+          expect.objectContaining({
+            code: 'SECTION_PLACEMENT_REQUIRED',
+            severity: 'BLOCKING',
+            field: 'sectionId',
+            fixTarget: 'ENROLLMENT',
+            requiredPermission: 'students:update',
+          }),
+        ]),
+      );
+    });
+
+    it('keeps a warning-only student export-eligible', async () => {
+      (prisma.student.findFirst as jest.Mock).mockResolvedValue(
+        buildReadinessStudent({ nationalStudentId: null }),
+      );
+
+      const result = await service.getIemisReadiness(
+        'student-warning',
+        mockAuth,
+      );
+
+      expect(result.status).toBe('READY_WITH_WARNINGS');
+      expect(result.exportEligible).toBe(true);
+      expect(result.blockingIssueCount).toBe(0);
+      expect(result.warningCount).toBe(1);
+      expect(result.issues).toEqual([
+        expect.objectContaining({
+          code: 'NATIONAL_STUDENT_ID_MISSING',
+          severity: 'WARNING',
+          blocking: false,
+        }),
+      ]);
+    });
+
+    it('allows an assigned teacher to read readiness for an active-placement student', async () => {
+      const teacherAuth: AuthContext = {
+        ...mockAuth,
+        userId: 'teacher-user-1',
+        roles: ['teacher'],
+      };
+      (prisma.student.findFirst as jest.Mock).mockResolvedValue(
+        buildReadinessStudent(),
+      );
+      (
+        prisma.subjectTeacherAssignment.findFirst as jest.Mock
+      ).mockResolvedValue({ id: 'assignment-1' });
+
+      const result = await service.getIemisReadiness(
+        'student-assigned',
+        teacherAuth,
+      );
+
+      expect(prisma.subjectTeacherAssignment.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            tenantId: teacherAuth.tenantId,
+            staff: { userId: teacherAuth.userId },
+            classId: 'class-12',
+          }),
+        }),
+      );
+      expect(result.status).toBe('READY');
+    });
+
+    it('fails closed when a teacher is not assigned to the active placement', async () => {
+      const teacherAuth: AuthContext = {
+        ...mockAuth,
+        userId: 'teacher-user-2',
+        roles: ['subject_teacher'],
+      };
+      (prisma.student.findFirst as jest.Mock).mockResolvedValue(
+        buildReadinessStudent(),
+      );
+      (
+        prisma.subjectTeacherAssignment.findFirst as jest.Mock
+      ).mockResolvedValue(null);
+
+      await expect(
+        service.getIemisReadiness('student-unassigned', teacherAuth),
+      ).rejects.toThrow(
+        'Student reporting readiness is outside your teaching scope',
+      );
+    });
+  });
+
   describe('getIemisValidationList', () => {
     const mockStudents = [
       {
@@ -267,6 +417,7 @@ describe('StudentsService (iEMIS Export)', () => {
         enrollments: [
           {
             academicYear: { name: '2081' },
+            class: { name: 'Class 1' },
             section: { name: 'A' },
           },
         ],
@@ -328,3 +479,51 @@ describe('StudentsService (iEMIS Export)', () => {
     });
   });
 });
+
+function buildReadinessStudent(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'student-ready',
+    studentSystemId: 'EA-2083-12-B-020',
+    firstNameEn: 'Bikash',
+    lastNameEn: 'Adhikari',
+    firstNameNp: 'विकास',
+    lastNameNp: 'अधिकारी',
+    dateOfBirth: new Date('2008-01-01'),
+    gender: 'MALE',
+    nationality: 'Nepali',
+    nationalStudentId: 'IEMIS-001',
+    admissionDate: new Date('2025-04-14'),
+    admissionNumber: 'ADM-001',
+    lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+    classId: 'class-12',
+    class: { name: 'Class 12' },
+    sectionRef: { name: 'A' },
+    guardianLinks: [
+      {
+        isPrimary: true,
+        relation: 'Father',
+        guardian: {
+          fullName: 'Guardian Adhikari',
+          primaryPhone: '9800000000',
+          email: null,
+          wardNumber: '5',
+        },
+      },
+    ],
+    enrollments: [
+      {
+        id: 'enrollment-1',
+        status: EnrollmentStatus.ACTIVE,
+        classId: 'class-12',
+        sectionId: 'section-a',
+        academicYear: { name: '2082/83', startsOn: null },
+        class: { name: 'Class 12' },
+        section: { name: 'A' },
+        rollNumber: 20,
+        admissionDate: new Date('2025-04-14'),
+      },
+    ],
+    tenant: { name: 'Test School' },
+    ...overrides,
+  };
+}

@@ -1,5 +1,6 @@
 import { AuthMethod } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
+import { PERMISSIONS_KEY } from '../auth/decorators/permissions.decorator';
 import { StudentsController } from './students.controller';
 
 const actor: AuthContext = {
@@ -36,6 +37,7 @@ function createController() {
     generateStudentDocumentPdf: jest.fn(),
     revokeGeneratedStudentDocument: jest.fn(),
     getAttendanceHistory: jest.fn(),
+    getIemisReadiness: jest.fn(),
     getStudentIdentity: jest.fn(),
     generateStudentIdentity: jest.fn(),
     revokeStudentIdentity: jest.fn(),
@@ -97,6 +99,30 @@ describe('StudentsController M1 contracts', () => {
 
     expect(service.exportIemis).toHaveBeenCalledWith(actor);
     expect(result).toBe('csv');
+  });
+
+  it('keeps student readiness and correction routes permission protected', () => {
+    const readinessPermissions = Reflect.getMetadata(
+      PERMISSIONS_KEY,
+      StudentsController.prototype.getIemisReadiness,
+    );
+    const correctionPermissions = Reflect.getMetadata(
+      PERMISSIONS_KEY,
+      StudentsController.prototype.updateStudent,
+    );
+
+    expect(readinessPermissions).toEqual(['students:read']);
+    expect(correctionPermissions).toEqual(['students:update']);
+  });
+
+  it('delegates student readiness with tenant-scoped actor context', () => {
+    const { controller, service } = createController();
+    service.getIemisReadiness.mockReturnValue({ status: 'BLOCKED' });
+
+    const result = controller.getIemisReadiness('student-1', actor);
+
+    expect(service.getIemisReadiness).toHaveBeenCalledWith('student-1', actor);
+    expect(result).toEqual({ status: 'BLOCKED' });
   });
 
   it('passes roster export filters to service without dropping class or section scope', () => {

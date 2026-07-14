@@ -41,6 +41,7 @@ function createController() {
     approveCorrectionRequest: jest.fn(),
     getStudentHistory: jest.fn(),
     getParentSummary: jest.fn(),
+    getStudentMonthlyRegister: jest.fn(),
   };
 
   return {
@@ -134,6 +135,28 @@ describe('AttendanceController M2 contracts', () => {
       {},
     );
     expect(result).toEqual({ studentId: 'student-1' });
+  });
+
+  it('delegates only the selected BS month for the student register', () => {
+    const { controller, service } = createController();
+    const query = { academicYearId: 'year-1', month: '2083-01' };
+    service.getStudentMonthlyRegister.mockReturnValue({
+      studentId: 'student-1',
+      days: [],
+    });
+
+    const result = controller.getStudentMonthlyRegister(
+      'student-1',
+      query as never,
+      actor,
+    );
+
+    expect(service.getStudentMonthlyRegister).toHaveBeenCalledWith(
+      'student-1',
+      query,
+      actor,
+    );
+    expect(result).toEqual({ studentId: 'student-1', days: [] });
   });
 
   it('delegates monthly register export with filters and current actor', async () => {

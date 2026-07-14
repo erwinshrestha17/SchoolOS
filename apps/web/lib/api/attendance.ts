@@ -11,6 +11,7 @@ import type {
   StaffLeaveBalanceSummary,
   StaffLeaveRequestSummary,
   StaffLeaveReviewResult,
+  StudentAttendanceMonthlyRegister,
 } from "@schoolos/core";
 import {
   API_BASE_URL,
@@ -90,6 +91,19 @@ export const attendanceApi = {
       withQuery(
         `/attendance/students/${encodeURIComponent(studentId)}/history`,
         params ?? {},
+      ),
+    ),
+  getStudentAttendanceMonthlyRegister: (
+    studentId: string,
+    params?: { academicYearId?: string | null; month?: string | null },
+  ) =>
+    request<StudentAttendanceMonthlyRegister>(
+      withQuery(
+        `/attendance/students/${encodeURIComponent(studentId)}/monthly-register`,
+        {
+          academicYearId: params?.academicYearId,
+          month: params?.month,
+        },
       ),
     ),
   getAttendanceStudentSummary: (

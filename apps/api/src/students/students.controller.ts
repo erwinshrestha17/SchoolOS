@@ -34,6 +34,7 @@ import { UpdateStudentDto } from './dto/update-student.dto';
 import { UpdateStudentGuardianDto } from './dto/update-student-guardian.dto';
 import { AttendanceHistoryQueryDto } from './dto/attendance-history.dto';
 import { GeneratedStudentDocumentArtifactResponseDto } from './dto/generated-student-document-artifact.dto';
+import { StudentIemisReadinessResponseDto } from './dto/student-iemis-readiness.dto';
 import { sanitizeStudentProfileResponse } from './student-profile-sanitizer';
 import { StudentsService } from './students.service';
 
@@ -342,6 +343,10 @@ export class StudentsController {
 
   @Get(':id/iemis-readiness')
   @Permissions('students:read')
+  @ApiOperation({
+    summary: 'Get backend-owned iEMIS readiness for one tenant student',
+  })
+  @ApiOkResponse({ type: StudentIemisReadinessResponseDto })
   getIemisReadiness(
     @Param('id') studentId: string,
     @CurrentAuth() auth: AuthContext,

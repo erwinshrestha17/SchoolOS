@@ -5,6 +5,7 @@ import {
   formatBsDate,
   formatBsDateTime,
   type StudentDocument,
+  type StudentIemisReadiness,
   type StudentProfileDetail,
 } from '@schoolos/core';
 import Link from 'next/link';
@@ -42,15 +43,6 @@ type OverviewTabProps = {
   ) => void;
 };
 
-type IemisReadiness = {
-  studentId: string;
-  studentSystemId: string;
-  fullNameEn: string;
-  eligible: boolean;
-  score: number;
-  issues: Array<{ field: string; message: string }>;
-};
-
 type StudentLifecycleTimelineItem = {
   id: string;
   fromStatus: string | null;
@@ -67,9 +59,7 @@ export function OverviewTab({ profile, onSelectTab }: OverviewTabProps) {
   const currentEnrollment =
     profile.enrollments.find(
       (enrollment) => enrollment.status.toUpperCase() === 'ACTIVE',
-    ) ??
-    profile.enrollments[0] ??
-    null;
+    ) ?? null;
   const documentIssues = getDocumentAttention(profile.documents);
 
   const attendanceQuery = useQuery({
@@ -107,16 +97,6 @@ export function OverviewTab({ profile, onSelectTab }: OverviewTabProps) {
           onClick: () => onSelectTab('Fees'),
         }
       : null,
-    iemisQuery.data && iemisQuery.data.issues.length > 0
-      ? {
-          key: 'iemis',
-          tone: 'warning' as const,
-          title: 'iEMIS readiness has issues',
-          description: `${iemisQuery.data.issues.length} reporting field${iemisQuery.data.issues.length === 1 ? '' : 's'} need review.`,
-          action: 'Review iEMIS fields',
-          onClick: () => onSelectTab('Profile'),
-        }
-      : null,
     documentIssues.length > 0
       ? {
           key: 'documents',
@@ -136,20 +116,14 @@ export function OverviewTab({ profile, onSelectTab }: OverviewTabProps) {
           title="Attention needed"
           description="Information that should be completed or reviewed."
         >
-          {feeClearanceQuery.isLoading || iemisQuery.isLoading ? (
+          {feeClearanceQuery.isLoading ? (
             <LoadingState label="Checking profile attention items..." />
-          ) : feeClearanceQuery.isError || iemisQuery.isError ? (
+          ) : feeClearanceQuery.isError ? (
             <div className="grid gap-3">
               {feeClearanceQuery.isError ? (
                 <InlineError
                   title="Fee clearance could not be checked"
                   onRetry={() => void feeClearanceQuery.refetch()}
-                />
-              ) : null}
-              {iemisQuery.isError ? (
-                <InlineError
-                  title="iEMIS readiness could not be checked"
-                  onRetry={() => void iemisQuery.refetch()}
                 />
               ) : null}
             </div>
@@ -171,8 +145,8 @@ export function OverviewTab({ profile, onSelectTab }: OverviewTabProps) {
                   No profile issues need attention right now.
                 </p>
                 <p className="mt-1 text-xs font-medium leading-5">
-                  Fee clearance, iEMIS readiness, and uploaded document status
-                  do not currently show blockers.
+                  Fee clearance and uploaded document status do not currently
+                  show blockers.
                 </p>
               </div>
             </div>
@@ -249,10 +223,7 @@ export function OverviewTab({ profile, onSelectTab }: OverviewTabProps) {
           </div>
         </SectionCard>
 
-        <IemisReadinessCard
-          query={iemisQuery}
-          onReview={() => onSelectTab('Profile')}
-        />
+        <IemisReadinessCard query={iemisQuery} studentId={studentId} />
       </section>
 
       <SectionCard
@@ -362,18 +333,12 @@ function QuickSummaryCard({
           value={
             currentEnrollment
               ? `${formatClassLabel(currentEnrollment.className)}${currentEnrollment.sectionName ? ` / ${currentEnrollment.sectionName}` : ''}`
-              : formatClassLabel(
-                  profile.student.className ?? profile.student.class?.name,
-                )
+              : 'No active enrollment'
           }
         />
         <SummaryRow
           label="Roll"
-          value={
-            (
-              currentEnrollment?.rollNumber ?? profile.student.rollNumber
-            )?.toString() ?? 'Not assigned'
-          }
+          value={currentEnrollment?.rollNumber?.toString() ?? 'Not assigned'}
         />
         <SummaryRow
           label="Primary guardian"
@@ -386,11 +351,19 @@ function QuickSummaryCard({
 
 function IemisReadinessCard({
   query,
-  onReview,
+  studentId,
 }: {
-  query: UseQueryResult<IemisReadiness>;
-  onReview: () => void;
+  query: UseQueryResult<StudentIemisReadiness>;
+  studentId: string;
 }) {
+  const readiness = query.data;
+  const status = readiness
+    ? getIemisStatusPresentation(readiness.status)
+    : null;
+  const hasCompleteSummary = readiness
+    ? hasCompleteIemisSummary(readiness)
+    : false;
+
   return (
     <SectionCard title="iEMIS readiness">
       {query.isLoading ? (
@@ -404,53 +377,131 @@ function IemisReadinessCard({
           onRetry={() => void query.refetch()}
           className="min-h-0 p-5"
         />
-      ) : query.data ? (
+      ) : readiness && !hasCompleteSummary ? (
+        <ErrorState
+          title="Readiness details are incomplete"
+          message="Some reporting details could not be loaded. Check again before preparing an export."
+          onRetry={() => void query.refetch()}
+          className="min-h-0 p-5"
+        />
+      ) : readiness && status ? (
         <div className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <Badge variant={query.data.eligible ? 'success' : 'warning'}>
-              {query.data.eligible ? 'Ready' : 'Incomplete'}
-            </Badge>
-            <span className="text-2xl font-black text-slate-950">
-              {query.data.score}%
-            </span>
+          <div className="flex items-center gap-2">
+            <status.Icon
+              size={17}
+              className={status.iconClassName}
+              aria-hidden="true"
+            />
+            <Badge variant={status.badgeVariant}>{status.label}</Badge>
           </div>
-          {query.data.issues.length > 0 ? (
-            <>
-              <ul className="space-y-2">
-                {query.data.issues.slice(0, 3).map((issue) => (
-                  <li
-                    key={`${issue.field}-${issue.message}`}
-                    className="flex gap-2 text-xs font-medium leading-5 text-slate-600"
-                  >
-                    <AlertTriangle
-                      size={14}
-                      className="mt-0.5 shrink-0 text-warning-600"
-                      aria-hidden="true"
-                    />
-                    <span>{issue.message}</span>
-                  </li>
-                ))}
-              </ul>
-              <button
-                type="button"
-                onClick={onReview}
-                className="text-xs font-bold text-[var(--color-mod-admissions-text)] hover:underline"
-              >
-                Review iEMIS fields
-              </button>
-            </>
-          ) : (
-            <p className="text-xs font-semibold leading-5 text-slate-500">
-              No iEMIS issues need review.
+          <div>
+            <p className="text-sm font-black text-slate-950">
+              {readiness.status === 'NOT_EVALUATED'
+                ? 'Required checks have not been run.'
+                : `${readiness.passedRequiredChecks} of ${readiness.totalRequiredChecks} required checks passed`}
             </p>
-          )}
+            <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
+              {getIemisSummary(readiness)}
+            </p>
+          </div>
+          <div className="space-y-1 text-xs font-semibold text-slate-500">
+            <p>
+              {readiness.exportEligible
+                ? 'Export eligible'
+                : 'Not eligible for export'}
+            </p>
+            <p>Last checked: {formatBsDateTime(readiness.evaluatedAt)}</p>
+            {query.isFetching ? (
+              <p className="flex items-center gap-2 text-[var(--color-mod-admissions-text)]">
+                <Clock size={13} className="animate-pulse" aria-hidden="true" />
+                Checking readiness…
+              </p>
+            ) : null}
+          </div>
+          <Link
+            href={`/dashboard/students/${encodeURIComponent(studentId)}/iemis`}
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--color-mod-admissions-border)] bg-[var(--color-mod-admissions-bg)] px-4 py-2 text-xs font-bold text-[var(--color-mod-admissions-text)] transition hover:border-[var(--color-mod-admissions-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mod-admissions-accent)] focus-visible:ring-offset-2"
+          >
+            {readiness.blockingIssueCount > 0
+              ? 'Review missing details'
+              : 'Review government-reporting details'}
+            <ChevronRight size={15} aria-hidden="true" />
+          </Link>
         </div>
       ) : (
         <p className="text-sm font-semibold text-slate-500">
-          iEMIS readiness is unavailable.
+          iEMIS readiness has not been checked yet.
         </p>
       )}
     </SectionCard>
+  );
+}
+
+function getIemisStatusPresentation(status: StudentIemisReadiness['status']) {
+  switch (status) {
+    case 'READY':
+      return {
+        label: 'Ready',
+        badgeVariant: 'success' as const,
+        Icon: CheckCircle2,
+        iconClassName: 'text-success-600',
+      };
+    case 'READY_WITH_WARNINGS':
+      return {
+        label: 'Ready with warnings',
+        badgeVariant: 'warning' as const,
+        Icon: AlertTriangle,
+        iconClassName: 'text-warning-600',
+      };
+    case 'BLOCKED':
+      return {
+        label: 'Needs attention',
+        badgeVariant: 'warning' as const,
+        Icon: AlertTriangle,
+        iconClassName: 'text-danger-600',
+      };
+    case 'OUTDATED_VALIDATION':
+      return {
+        label: 'Check outdated',
+        badgeVariant: 'warning' as const,
+        Icon: Clock,
+        iconClassName: 'text-warning-600',
+      };
+    case 'NOT_EVALUATED':
+      return {
+        label: 'Not checked yet',
+        badgeVariant: 'neutral' as const,
+        Icon: Clock,
+        iconClassName: 'text-slate-500',
+      };
+  }
+}
+
+function getIemisSummary(readiness: StudentIemisReadiness) {
+  if (readiness.status === 'NOT_EVALUATED') {
+    return 'Run the SchoolOS readiness check before preparing this student for export.';
+  }
+  if (readiness.status === 'OUTDATED_VALIDATION') {
+    return 'The last validation is outdated. Check readiness again before preparing an export.';
+  }
+  if (readiness.blockingIssueCount > 0) {
+    return `${readiness.blockingIssueCount} required detail${readiness.blockingIssueCount === 1 ? ' is' : 's are'} missing.`;
+  }
+  if (readiness.warningCount > 0) {
+    return `${readiness.warningCount} warning${readiness.warningCount === 1 ? '' : 's'} should be reviewed before submission.`;
+  }
+  return 'All required student reporting checks currently pass.';
+}
+
+function hasCompleteIemisSummary(readiness: StudentIemisReadiness) {
+  return (
+    typeof readiness.passedRequiredChecks === 'number' &&
+    typeof readiness.totalRequiredChecks === 'number' &&
+    typeof readiness.blockingIssueCount === 'number' &&
+    typeof readiness.warningCount === 'number' &&
+    typeof readiness.exportEligible === 'boolean' &&
+    typeof readiness.evaluatedAt === 'string' &&
+    readiness.passedRequiredChecks <= readiness.totalRequiredChecks
   );
 }
 

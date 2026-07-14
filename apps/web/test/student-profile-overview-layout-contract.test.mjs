@@ -54,7 +54,7 @@ describe('Student profile overview layout contract', () => {
     assert.match(detail, /label: ["']Identity & QR["']/);
     assert.match(
       detail,
-      /router\.push\(`\/dashboard\/students\/\$\{encodeURIComponent\(studentId\)\}\/identity`\)/,
+      /router\.push\([\s\S]*`\/dashboard\/students\/\$\{encodeURIComponent\(studentId\)\}\/identity`/,
     );
     assert.match(identityPage, /<StudentQrCard/);
     assert.match(identityPage, /Back to student profile/);

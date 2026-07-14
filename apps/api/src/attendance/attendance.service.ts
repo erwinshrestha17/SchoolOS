@@ -8,9 +8,16 @@ import {
 } from '@nestjs/common';
 import {
   BS_MONTH_NAMES_EN,
+  BS_WEEKDAY_NAMES_EN,
   daysInBsMonth,
+  formatBsDateForInput,
+  formatBsDateOnly,
   getNepalSchoolDay,
+  toBsDateFromGregorian,
   toGregorianDateFromBs,
+  type StudentAttendanceMonthState,
+  type StudentAttendanceMonthSummary,
+  type StudentAttendanceMonthlyRegister,
 } from '@schoolos/core';
 import {
   AttendanceConflictDecision,
@@ -60,6 +67,7 @@ import { ReviewAttendanceCorrectionDto } from './dto/review-attendance-correctio
 import { ListAttendanceCorrectionRequestsDto } from './dto/list-attendance-correction-requests.dto';
 import { GetMonthlyRegisterDto } from './dto/get-monthly-register.dto';
 import { GetStudentHistoryDto } from './dto/get-student-history.dto';
+import { StudentAttendanceMonthQueryDto } from './dto/student-attendance-register.dto';
 import { UpsertAttendanceDraftDto } from './dto/upsert-attendance-draft.dto';
 import { buildRosterPdf } from '../common/pdf/simple-pdf';
 import { loadSchoolLogoForPdf } from '../common/pdf/school-logo-loader';
@@ -1472,6 +1480,245 @@ export class AttendanceService {
             : null,
       },
       matrix,
+    };
+  }
+
+  async getStudentMonthlyRegister(
+    studentId: string,
+    dto: StudentAttendanceMonthQueryDto,
+    actor: AuthContext,
+  ): Promise<StudentAttendanceMonthlyRegister> {
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: { tenantId: actor.tenantId, studentId },
+      select: {
+        classId: true,
+        sectionId: true,
+        academicYear: {
+          select: {
+            id: true,
+            name: true,
+            startsOn: true,
+            endsOn: true,
+            isCurrent: true,
+          },
+        },
+      },
+      orderBy: { academicYear: { startsOn: 'desc' } },
+      take: 100,
+    });
+
+    const enrollment = dto.academicYearId
+      ? enrollments.find((item) => item.academicYear.id === dto.academicYearId)
+      : (enrollments.find((item) => item.academicYear.isCurrent) ??
+        enrollments[0]);
+
+    if (dto.academicYearId && !enrollment) {
+      throw new NotFoundException(
+        'Student enrollment was not found for the selected academic year.',
+      );
+    }
+
+    await this.ensureStudentAttendanceAccess(
+      studentId,
+      actor,
+      enrollment
+        ? {
+            academicYearId: enrollment.academicYear.id,
+            classId: enrollment.classId,
+            sectionId: enrollment.sectionId,
+          }
+        : undefined,
+    );
+
+    const academicYears = enrollments.map((item) =>
+      mapStudentAttendanceAcademicYear(item.academicYear),
+    );
+
+    if (!enrollment) {
+      return {
+        studentId,
+        academicYears,
+        selectedAcademicYear: null,
+        months: [],
+        currentMonthKey: null,
+        previousMonthKey: null,
+        nextMonthKey: null,
+        calendarState: 'UNAVAILABLE',
+        dataState: 'EMPTY',
+        month: null,
+        leaveSupported: true,
+        lastUpdatedAt: null,
+        days: [],
+      };
+    }
+
+    const academicYearDates = enumerateAcademicYearDates(
+      enrollment.academicYear.startsOn,
+      enrollment.academicYear.endsOn,
+    );
+    const monthKeys = Array.from(
+      new Set(academicYearDates.map((date) => getBsMonthKeyForDate(date))),
+    );
+    const todayKey = getDateKey(new Date());
+    const presentMonthKey = getBsMonthKeyForDate(new Date());
+    const isCompletedYear =
+      getDateKey(enrollment.academicYear.endsOn) < todayKey;
+    const currentMonthKey = monthKeys.includes(presentMonthKey)
+      ? presentMonthKey
+      : null;
+    const availableMonthKeys = isCompletedYear
+      ? monthKeys
+      : monthKeys.filter((key) => key <= presentMonthKey);
+    const defaultMonthKey =
+      currentMonthKey ?? availableMonthKeys[availableMonthKeys.length - 1];
+    const monthKey = dto.month ?? defaultMonthKey;
+
+    if (!monthKey || !monthKeys.includes(monthKey)) {
+      throw new BadRequestException(
+        'The selected BS month is outside this academic year.',
+      );
+    }
+    if (!availableMonthKeys.includes(monthKey)) {
+      throw new BadRequestException(
+        'Future attendance months are not available for this academic year.',
+      );
+    }
+
+    const dates = academicYearDates.filter(
+      (date) => getBsMonthKeyForDate(date) === monthKey,
+    );
+
+    const [sessions, calendarByDate] = await Promise.all([
+      this.prisma.attendanceSession.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          academicYearId: enrollment.academicYear.id,
+          classId: enrollment.classId,
+          sectionId: enrollment.sectionId ?? null,
+          attendanceDate: getAcademicYearDateRange(dates),
+        },
+        select: {
+          id: true,
+          attendanceDate: true,
+          submittedAt: true,
+          updatedAt: true,
+          records: {
+            where: { tenantId: actor.tenantId, studentId },
+            select: {
+              status: true,
+              remark: true,
+              lateAt: true,
+            },
+          },
+        },
+        orderBy: { attendanceDate: 'asc' },
+        take: 35,
+      }),
+      this.loadCalendarDayMap(actor.tenantId, dates),
+    ]);
+    const sessionByDate = new Map(
+      sessions.map((session) => [getDateKey(session.attendanceDate), session]),
+    );
+    const month = buildStudentAttendanceMonths(
+      dates,
+      sessions,
+      calendarByDate,
+    )[0];
+
+    if (!month) {
+      throw new NotFoundException('Attendance month could not be resolved.');
+    }
+
+    const selectedMonthIndex = availableMonthKeys.indexOf(monthKey);
+    const days = dates.map((date) => {
+      const dateKey = getDateKey(date);
+      const bsDate = toBsDateFromGregorian(dateOnlyParts(dateKey));
+      const calendarDay = calendarByDate.get(dateKey);
+      const session = sessionByDate.get(dateKey);
+      const record = session?.submittedAt ? session.records[0] : undefined;
+      const weekday = getNepalWeekday(date);
+      const isFuture = dateKey > todayKey;
+      const dayType = getStudentAttendanceDayType(calendarDay);
+      const attendanceStatus = record?.status
+        ? record.status
+        : (dayType === 'SCHOOL_DAY' || dayType === 'EXAM_DAY') && !isFuture
+          ? ('NOT_MARKED' as const)
+          : null;
+
+      return {
+        dateBs: formatBsDateForInput(dateOnlyParts(dateKey)),
+        dateLabel: formatBsDateOnly(bsDate),
+        dayLabel: BS_WEEKDAY_NAMES_EN[weekday],
+        weekday,
+        dayType,
+        calendarLabel: calendarDay?.label ?? null,
+        holidayName:
+          dayType === 'HOLIDAY'
+            ? (calendarDay?.label ?? 'School holiday')
+            : null,
+        registerState: session?.submittedAt
+          ? ('SUBMITTED' as const)
+          : session
+            ? ('DRAFT' as const)
+            : ('NOT_CREATED' as const),
+        attendanceStatus,
+        isToday: dateKey === todayKey,
+        isFuture,
+        arrivalAt: record?.lateAt?.toISOString() ?? null,
+        remark: record?.remark ?? null,
+      };
+    });
+    const pastWorkingDays = days.filter(
+      (day) =>
+        (day.dayType === 'SCHOOL_DAY' || day.dayType === 'EXAM_DAY') &&
+        !day.isFuture,
+    );
+    const hasPartialData = pastWorkingDays.some(
+      (day) =>
+        day.registerState === 'DRAFT' || day.attendanceStatus === 'NOT_MARKED',
+    );
+    const hasRecordedAttendance = days.some(
+      (day) =>
+        day.attendanceStatus !== null && day.attendanceStatus !== 'NOT_MARKED',
+    );
+
+    return {
+      studentId,
+      academicYears,
+      selectedAcademicYear: mapStudentAttendanceAcademicYear(
+        enrollment.academicYear,
+      ),
+      months: monthKeys.map((key) => {
+        const [bsYear, bsMonth] = key.split('-').map(Number);
+        return {
+          key,
+          label: `${BS_MONTH_NAMES_EN[bsMonth - 1]} ${bsYear} BS`,
+          bsMonth,
+          bsYear,
+          isCurrent: key === currentMonthKey,
+          isAvailable: availableMonthKeys.includes(key),
+        };
+      }),
+      currentMonthKey,
+      previousMonthKey:
+        selectedMonthIndex > 0
+          ? (availableMonthKeys[selectedMonthIndex - 1] ?? null)
+          : null,
+      nextMonthKey:
+        selectedMonthIndex >= 0 &&
+        selectedMonthIndex < availableMonthKeys.length - 1
+          ? (availableMonthKeys[selectedMonthIndex + 1] ?? null)
+          : null,
+      calendarState: 'AVAILABLE',
+      dataState: hasPartialData
+        ? 'PARTIAL'
+        : hasRecordedAttendance
+          ? 'COMPLETE'
+          : 'EMPTY',
+      month,
+      leaveSupported: true,
+      lastUpdatedAt: getLatestAttendanceUpdate(sessions),
+      days,
     };
   }
 
@@ -4058,6 +4305,7 @@ export class AttendanceService {
     actor: AuthContext,
     classId: string,
     sectionId?: string | null,
+    academicYearId?: string,
   ) {
     // Admins and full-permission staff can access everything
     if (
@@ -4094,6 +4342,7 @@ export class AttendanceService {
         staffId: staff.id,
         classId,
         ...(sectionId ? { sectionId } : {}),
+        ...(academicYearId ? { academicYearId } : {}),
         tenantId: actor.tenantId,
       },
     });
@@ -4301,6 +4550,11 @@ export class AttendanceService {
   private async ensureStudentAttendanceAccess(
     studentId: string,
     actor: AuthContext,
+    scope?: {
+      academicYearId?: string;
+      classId: string;
+      sectionId?: string | null;
+    },
   ) {
     const student = await this.prisma.student.findFirst({
       where: {
@@ -4366,8 +4620,9 @@ export class AttendanceService {
     if (actor.roles.includes('teacher')) {
       await this.checkTeacherAssignment(
         actor,
-        student.classId,
-        student.sectionId,
+        scope?.classId ?? student.classId,
+        scope?.sectionId ?? student.sectionId,
+        scope?.academicYearId,
       );
       return;
     }
@@ -5013,6 +5268,237 @@ export class AttendanceService {
       ]),
     );
   }
+}
+
+type StudentAttendanceSessionRow = {
+  attendanceDate: Date;
+  submittedAt: Date | null;
+  updatedAt: Date;
+  records: Array<{
+    status: AttendanceStatus;
+    remark: string | null;
+    lateAt: Date | null;
+  }>;
+};
+
+type AttendanceCalendarDayMapValue = {
+  isWorkingDay: boolean;
+  label: string | null;
+  holidayType?: string | null;
+  source?: 'explicit' | 'weekday_fallback';
+};
+
+function getStudentAttendanceDayType(
+  calendarDay: AttendanceCalendarDayMapValue | undefined,
+): 'SCHOOL_DAY' | 'HOLIDAY' | 'WEEKEND' | 'EXAM_DAY' {
+  const normalizedHolidayType = calendarDay?.holidayType
+    ?.trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, '_');
+  if (normalizedHolidayType === 'EXAM_DAY') return 'EXAM_DAY';
+  if (calendarDay?.isWorkingDay) return 'SCHOOL_DAY';
+  return calendarDay?.source === 'explicit' ? 'HOLIDAY' : 'WEEKEND';
+}
+
+function mapStudentAttendanceAcademicYear(academicYear: {
+  id: string;
+  name: string;
+  startsOn: Date;
+  endsOn: Date;
+  isCurrent: boolean;
+}) {
+  return {
+    id: academicYear.id,
+    name: academicYear.name,
+    startsOnBs: formatBsDateForInput(academicYear.startsOn),
+    endsOnBs: formatBsDateForInput(academicYear.endsOn),
+    isCurrent: academicYear.isCurrent,
+  };
+}
+
+function enumerateAcademicYearDates(startsOn: Date, endsOn: Date) {
+  const start = dateOnlyParts(getNepalSchoolDay(startsOn).gregorianDate);
+  const end = dateOnlyParts(getNepalSchoolDay(endsOn).gregorianDate);
+  const cursor = Date.UTC(start.year, start.month - 1, start.day);
+  const last = Date.UTC(end.year, end.month - 1, end.day);
+
+  if (cursor > last) {
+    throw new BadRequestException(
+      'Academic year end date must not be before its start date.',
+    );
+  }
+
+  const dates: Date[] = [];
+  for (let day = cursor; day <= last; day += 86_400_000) {
+    dates.push(new Date(day));
+  }
+  return dates;
+}
+
+function getAcademicYearDateRange(dates: Date[]) {
+  const first = dates[0];
+  const last = dates[dates.length - 1];
+  if (!first || !last) {
+    throw new BadRequestException('Academic year has no calendar dates.');
+  }
+  return {
+    gte: getNepalBusinessDateRange(first).gte,
+    lt: getNepalBusinessDateRange(last).lt,
+  };
+}
+
+function buildStudentAttendanceMonths(
+  dates: Date[],
+  sessions: StudentAttendanceSessionRow[],
+  calendarByDate: Map<string, AttendanceCalendarDayMapValue>,
+): StudentAttendanceMonthSummary[] {
+  const datesByMonth = new Map<string, Date[]>();
+  for (const date of dates) {
+    const key = getBsMonthKeyForDate(date);
+    const monthDates = datesByMonth.get(key);
+    if (monthDates) monthDates.push(date);
+    else datesByMonth.set(key, [date]);
+  }
+
+  const sessionsByDate = new Map(
+    sessions.map((session) => [getDateKey(session.attendanceDate), session]),
+  );
+  const todayKey = getDateKey(new Date());
+
+  return Array.from(datesByMonth.entries()).map(([key, monthDates]) => {
+    const first = monthDates[0];
+    const last = monthDates[monthDates.length - 1];
+    const firstKey = getDateKey(first);
+    const lastKey = getDateKey(last);
+    const firstBs = toBsDateFromGregorian(dateOnlyParts(firstKey));
+    const officialDates = monthDates.filter(
+      (date) => calendarByDate.get(getDateKey(date))?.isWorkingDay ?? true,
+    );
+    const officialSessions = officialDates
+      .map((date) => sessionsByDate.get(getDateKey(date)))
+      .filter((session): session is StudentAttendanceSessionRow =>
+        Boolean(session?.submittedAt),
+      );
+    const records = officialSessions.flatMap((session) => session.records);
+    const totals = summarizeStudentAttendanceRecords(records);
+    const hasDraft = monthDates.some((date) => {
+      const session = sessionsByDate.get(getDateKey(date));
+      return Boolean(session && !session.submittedAt);
+    });
+    const state = getStudentAttendanceMonthState({
+      firstKey,
+      lastKey,
+      todayKey,
+      totalSchoolDays: officialDates.length,
+      registerDays: officialSessions.length,
+      recordedDays: records.length,
+      hasDraft,
+    });
+
+    return {
+      key,
+      bsMonth: firstBs.month,
+      bsYear: firstBs.year,
+      label: `${BS_MONTH_NAMES_EN[firstBs.month - 1]} ${firstBs.year} BS`,
+      startsOnBs: formatBsDateForInput(dateOnlyParts(firstKey)),
+      endsOnBs: formatBsDateForInput(dateOnlyParts(lastKey)),
+      state,
+      totalSchoolDays: officialDates.length,
+      present: totals.present,
+      absent: totals.absent,
+      late: totals.late,
+      leave: totals.leave,
+      recordedDays: records.length,
+      registerDays: officialSessions.length,
+      attendancePercentage:
+        state === 'UPCOMING' ? null : totals.attendancePercentage,
+    };
+  });
+}
+
+function summarizeStudentAttendanceRecords(
+  records: Array<{ status: AttendanceStatus }>,
+) {
+  const totals = records.reduce(
+    (result, record) => {
+      if (record.status === AttendanceStatus.PRESENT) result.present += 1;
+      else if (record.status === AttendanceStatus.ABSENT) result.absent += 1;
+      else if (record.status === AttendanceStatus.LATE) result.late += 1;
+      else if (record.status === AttendanceStatus.HALF_DAY) {
+        result.present += 0.5;
+        result.absent += 0.5;
+      } else if (isAttendanceLeaveStatus(record.status)) result.leave += 1;
+      return result;
+    },
+    { present: 0, absent: 0, late: 0, leave: 0 },
+  );
+  const denominator =
+    totals.present + totals.absent + totals.late + totals.leave;
+  return {
+    ...totals,
+    attendancePercentage:
+      denominator > 0
+        ? Math.round(((totals.present + totals.late) / denominator) * 10000) /
+          100
+        : null,
+  };
+}
+
+function isAttendanceLeaveStatus(status: AttendanceStatus) {
+  return (
+    status === AttendanceStatus.LEAVE ||
+    status === AttendanceStatus.SICK_LEAVE ||
+    status === AttendanceStatus.EXCUSED_LEAVE ||
+    status === AttendanceStatus.UNEXCUSED_LEAVE ||
+    status === AttendanceStatus.ON_LEAVE
+  );
+}
+
+function getStudentAttendanceMonthState(input: {
+  firstKey: string;
+  lastKey: string;
+  todayKey: string;
+  totalSchoolDays: number;
+  registerDays: number;
+  recordedDays: number;
+  hasDraft: boolean;
+}): StudentAttendanceMonthState {
+  if (input.firstKey > input.todayKey) return 'UPCOMING';
+  if (input.lastKey >= input.todayKey) return 'CURRENT';
+  if (input.totalSchoolDays === 0) return 'COMPLETED';
+  if (input.registerDays === 0 && !input.hasDraft) return 'NO_DATA';
+  if (
+    input.hasDraft ||
+    input.registerDays < input.totalSchoolDays ||
+    input.recordedDays < input.registerDays
+  ) {
+    return 'PARTIAL';
+  }
+  return 'COMPLETED';
+}
+
+function getLatestAttendanceUpdate(sessions: StudentAttendanceSessionRow[]) {
+  let latest: Date | null = null;
+  for (const session of sessions) {
+    if (!latest || session.updatedAt > latest) latest = session.updatedAt;
+  }
+  return latest?.toISOString() ?? null;
+}
+
+function getBsMonthKeyForDate(date: Date) {
+  const bsDate = toBsDateFromGregorian(
+    dateOnlyParts(getNepalSchoolDay(date).gregorianDate),
+  );
+  return getBsMonthKey(bsDate.year, bsDate.month);
+}
+
+function getBsMonthKey(year: number, month: number) {
+  return `${year}-${String(month).padStart(2, '0')}`;
+}
+
+function dateOnlyParts(value: string) {
+  const [year, month, day] = value.split('-').map(Number);
+  return { year, month, day };
 }
 
 function resolveMonthlyRegisterPeriod(dto: GetMonthlyRegisterDto) {

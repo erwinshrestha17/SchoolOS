@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -497,6 +498,7 @@ describe('students lifecycle hardening', () => {
         {
           academicYear: { name: '2083' },
           classId: 'class-1',
+          class: { name: 'Grade 1' },
           section: { name: 'A' },
           status: EnrollmentStatus.ACTIVE,
         },
@@ -1904,6 +1906,38 @@ describe('Cross-Tenant Access Hardening', () => {
     ).rejects.toThrow(NotFoundException);
   });
 
+  it('rejects getStudentProfile for an unassigned teacher', async () => {
+    const student = buildStudent({
+      enrollments: [
+        {
+          id: 'enrollment-1',
+          status: EnrollmentStatus.ACTIVE,
+          classId: 'class-1',
+          sectionId: 'section-1',
+          academicYear: { name: '2083' },
+          class: { name: 'Grade 1' },
+          section: { name: 'A' },
+          rollNumber: 7,
+          admissionDate: new Date('2026-04-01T00:00:00.000Z'),
+        },
+      ],
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      subjectTeacherAssignmentFindFirstResult: null,
+    });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.getStudentProfile(student.id, {
+        ...actor,
+        userId: 'teacher-user-1',
+        roles: ['teacher'],
+        permissions: ['students:read'],
+      }),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
   it('rejects updateStudent for a student outside the actor tenant', async () => {
     const prisma = buildPrisma({ studentFindFirstQueue: [null] });
     const { service } = buildService(prisma);
@@ -2176,6 +2210,7 @@ function buildPrisma(options: {
   attendanceRecordFindManyResult?: unknown[];
   studentDocumentExpiryTemplateFindManyResult?: unknown[];
   studentDocumentExpiryTemplateUpsertResult?: unknown;
+  subjectTeacherAssignmentFindFirstResult?: unknown;
 }) {
   const transaction = {
     enrollment: {
@@ -2305,6 +2340,13 @@ function buildPrisma(options: {
       count: jest
         .fn()
         .mockResolvedValue(options.studentQrCredentialCountResult ?? 0),
+    },
+    subjectTeacherAssignment: {
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(
+          options.subjectTeacherAssignmentFindFirstResult ?? null,
+        ),
     },
     class: {
       findFirst: jest

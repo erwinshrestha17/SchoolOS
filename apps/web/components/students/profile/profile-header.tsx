@@ -24,6 +24,7 @@ type StudentProfileTabShortcut = 'Overview' | 'Attendance' | 'Fees' | 'Documents
 
 type ProfileHeaderProps = {
   profile: StudentProfileDetail;
+  canEdit: boolean;
   onEdit: () => void;
   onOpenIdCard: () => void;
   onSelectTab: (tab: StudentProfileTabShortcut) => void;
@@ -36,6 +37,7 @@ type ProfileHeaderProps = {
 
 export function ProfileHeader({
   profile,
+  canEdit,
   onEdit,
   onOpenIdCard,
   onSelectTab,
@@ -160,14 +162,20 @@ export function ProfileHeader({
         </div>
 
         <div className="flex min-w-[12.5rem] flex-col gap-3">
-          <button
-            type="button"
-            onClick={onEdit}
-            className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[var(--color-mod-admissions-accent)] px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-admissions-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2"
-          >
-            <PencilLine size={18} aria-hidden="true" />
-            Edit profile
-          </button>
+          {canEdit ? (
+            <button
+              type="button"
+              onClick={onEdit}
+              className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[var(--color-mod-admissions-accent)] px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-admissions-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2"
+            >
+              <PencilLine size={18} aria-hidden="true" />
+              Edit profile
+            </button>
+          ) : (
+            <p className="max-w-60 rounded-xl bg-slate-50 px-4 py-3 text-xs font-semibold leading-5 text-slate-600">
+              Profile changes require authorized student records staff.
+            </p>
+          )}
           <ActionMenu
             align="right"
             label="Student profile actions"

@@ -8,6 +8,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ApiOkResponse, ApiOperation } from '@nestjs/swagger';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -33,6 +34,10 @@ import { GetMonthlyRegisterDto } from './dto/get-monthly-register.dto';
 import { GetStudentHistoryDto } from './dto/get-student-history.dto';
 import { UpsertAttendanceDraftDto } from './dto/upsert-attendance-draft.dto';
 import { GetParentSummaryDto } from './dto/get-parent-summary.dto';
+import {
+  StudentAttendanceMonthQueryDto,
+  StudentAttendanceMonthlyRegisterResponseDto,
+} from './dto/student-attendance-register.dto';
 
 @Controller('attendance')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
@@ -370,6 +375,25 @@ export class AttendanceController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.attendanceService.getStudentHistory(studentId, query, auth);
+  }
+
+  @Get('students/:studentId/monthly-register')
+  @Permissions('attendance:read')
+  @ApiOperation({
+    summary:
+      'Get one student monthly attendance calendar, summary, and register',
+  })
+  @ApiOkResponse({ type: StudentAttendanceMonthlyRegisterResponseDto })
+  getStudentMonthlyRegister(
+    @Param('studentId') studentId: string,
+    @Query() query: StudentAttendanceMonthQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.getStudentMonthlyRegister(
+      studentId,
+      query,
+      auth,
+    );
   }
 
   @Get('students/:id/summary')

@@ -1,5 +1,6 @@
-import type { ActivityPost } from './activity.js';
-import type { StudentDuplicateCandidateStudent } from './common.js';
+import type { ActivityPost } from "./activity.js";
+import type { StudentDuplicateCandidateStudent } from "./common.js";
+import type { PermissionKey } from "../permissions.js";
 
 export type GuardianProfile = {
   id: string;
@@ -36,9 +37,12 @@ export type StudentProfile = {
   studentSystemId: string;
   firstNameEn?: string;
   lastNameEn?: string;
+  firstNameNp?: string | null;
+  lastNameNp?: string | null;
   fullNameEn?: string;
   fullNameNp?: string | null;
   gender?: string;
+  nationality?: string | null;
   dateOfBirth?: string;
   admissionNumber?: string | null;
   admissionDate?: string;
@@ -113,17 +117,17 @@ export type StudentModuleSummary = {
 };
 
 export enum StudentQrResolvePurpose {
-  GENERAL_STUDENT_LOOKUP = 'GENERAL_STUDENT_LOOKUP',
-  LIBRARY = 'LIBRARY',
-  CANTEEN = 'CANTEEN',
-  TRANSPORT = 'TRANSPORT',
-  ATTENDANCE = 'ATTENDANCE',
+  GENERAL_STUDENT_LOOKUP = "GENERAL_STUDENT_LOOKUP",
+  LIBRARY = "LIBRARY",
+  CANTEEN = "CANTEEN",
+  TRANSPORT = "TRANSPORT",
+  ATTENDANCE = "ATTENDANCE",
 }
 
 export type StudentQrCredentialSummary = {
   id: string;
   studentId: string;
-  status: 'ACTIVE' | 'ROTATED' | 'REVOKED';
+  status: "ACTIVE" | "ROTATED" | "REVOKED";
   createdById: string | null;
   updatedById: string | null;
   expiresAt: string | null;
@@ -270,13 +274,13 @@ export type RemoveStudentGuardianPayload = {
 };
 
 export type StudentLifecycleStatus =
-  | 'ACTIVE'
-  | 'TRANSFERRED'
-  | 'EXITED'
-  | 'ALUMNI'
-  | 'ARCHIVED'
-  | 'MERGED'
-  | 'DELETED';
+  | "ACTIVE"
+  | "TRANSFERRED"
+  | "EXITED"
+  | "ALUMNI"
+  | "ARCHIVED"
+  | "MERGED"
+  | "DELETED";
 
 export type StudentLifecycleTransition = {
   id: string;
@@ -399,10 +403,10 @@ export type GeneratedStudentDocumentMeta = {
 };
 
 export type GuardianIdentityVerificationStatus =
-  | 'PENDING'
-  | 'VERIFIED'
-  | 'REJECTED'
-  | 'REVOKED';
+  | "PENDING"
+  | "VERIFIED"
+  | "REJECTED"
+  | "REVOKED";
 
 export type GuardianIdentityVerification = {
   id: string;
@@ -425,6 +429,76 @@ export type IemisValidationIssue = {
   studentSystemId: string;
   field: string;
   message: string;
+};
+
+export type StudentIemisReadinessStatus =
+  | "READY"
+  | "READY_WITH_WARNINGS"
+  | "BLOCKED"
+  | "NOT_EVALUATED"
+  | "OUTDATED_VALIDATION";
+
+export type StudentIemisIssueSeverity =
+  | "BLOCKING"
+  | "WARNING"
+  | "INFORMATION"
+  | "NOT_REQUIRED";
+
+export type StudentIemisIssueCategory =
+  | "IDENTITY"
+  | "ENROLLMENT_PLACEMENT"
+  | "GUARDIAN_INFORMATION"
+  | "TRANSFER_INFORMATION"
+  | "DOCUMENTS"
+  | "ATTENDANCE"
+  | "ACADEMIC_STATUS_RESULTS";
+
+export type StudentIemisIssueFixTarget =
+  | "STUDENT_PROFILE"
+  | "ENROLLMENT"
+  | "GUARDIANS"
+  | "DOCUMENTS"
+  | "ATTENDANCE"
+  | "ACADEMICS"
+  | "NONE";
+
+export type StudentIemisReadinessIssue = {
+  code: string;
+  category: StudentIemisIssueCategory;
+  severity: StudentIemisIssueSeverity;
+  title: string;
+  message: string;
+  field: string;
+  blocking: boolean;
+  currentValueSafe: string | null;
+  requiredAction: string;
+  fixTarget: StudentIemisIssueFixTarget;
+  requiredPermission: PermissionKey | null;
+  responsibleRole: string | null;
+};
+
+export type StudentIemisReadiness = {
+  studentId: string;
+  studentSystemId: string;
+  fullNameEn: string;
+  nationalStudentId: string | null;
+  status: StudentIemisReadinessStatus;
+  passedRequiredChecks: number;
+  totalRequiredChecks: number;
+  blockingIssueCount: number;
+  warningCount: number;
+  exportEligible: boolean;
+  eligible: boolean;
+  evaluatedAt: string;
+  requirementVersion: string;
+  score: number;
+  academicYear: string | null;
+  className: string | null;
+  sectionName: string | null;
+  rollNumber: number | null;
+  enrollmentStatus: string | null;
+  admissionDate: string | null;
+  issues: StudentIemisReadinessIssue[];
 };
 
 export type StudentIemisReadinessSummary = {
@@ -468,7 +542,7 @@ export type IemisExportRow = {
 };
 
 export type IemisExportResult = {
-  formatVersion: 'SCHOLOS-IEMIS-1.0';
+  formatVersion: "SCHOLOS-IEMIS-1.0";
   exportedAt: string;
   exportId: string;
   fileAssetId: string;
@@ -486,7 +560,7 @@ export type StudentDuplicateCandidate = {
   sourceStudent: StudentDuplicateCandidateStudent;
   candidateStudent: StudentDuplicateCandidateStudent;
   score: number;
-  confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+  confidence: "LOW" | "MEDIUM" | "HIGH";
   reasons: string[];
   blockedReason: string | null;
 };

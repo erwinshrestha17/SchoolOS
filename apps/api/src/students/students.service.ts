@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -17,6 +18,9 @@ import {
 import sharp from 'sharp';
 import {
   formatBsAcademicYear,
+  formatBsDate,
+  type StudentIemisReadiness,
+  type StudentIemisReadinessIssue,
   StudentAttendanceHistory,
   StudentAttendanceHistorySummary,
   StudentModuleSummary,
@@ -266,12 +270,15 @@ export class StudentsService {
         studentSystemId: student.studentSystemId,
         firstNameEn: student.firstNameEn,
         lastNameEn: student.lastNameEn,
+        firstNameNp: student.firstNameNp,
+        lastNameNp: student.lastNameNp,
         fullNameEn: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
         fullNameNp:
           student.firstNameNp || student.lastNameNp
             ? `${student.firstNameNp ?? ''} ${student.lastNameNp ?? ''}`.trim()
             : null,
         gender: student.gender,
+        nationality: student.nationality,
         dateOfBirth: student.dateOfBirth.toISOString().slice(0, 10),
         admissionNumber: student.admissionNumber,
         admissionDate: student.admissionDate.toISOString().slice(0, 10),
@@ -429,6 +436,7 @@ export class StudentsService {
           enrollments: {
             include: {
               academicYear: true,
+              class: true,
               section: true,
             },
             orderBy: [{ createdAt: 'desc' }],
@@ -442,7 +450,10 @@ export class StudentsService {
       statusGroups.map((group) => [group.lifecycleStatus, group._count._all]),
     );
     const iemisIssues = iemisStudents.reduce((sum, student) => {
-      return sum + (validateIemisStudent(student).length > 0 ? 1 : 0);
+      return (
+        sum +
+        (validateIemisStudent(student).some((issue) => issue.blocking) ? 1 : 0)
+      );
     }, 0);
 
     return {
@@ -663,6 +674,37 @@ export class StudentsService {
 
     if (!student) {
       throw new NotFoundException('Student not found in this tenant');
+    }
+
+    if (
+      actor.roles.some(
+        (role) => role === 'teacher' || role === 'subject_teacher',
+      ) &&
+      !actor.roles.some((role) => role === 'admin' || role === 'principal')
+    ) {
+      const activeEnrollment = student.enrollments.find(
+        (enrollment) => enrollment.status === EnrollmentStatus.ACTIVE,
+      );
+      const assignment = activeEnrollment
+        ? await this.prisma.subjectTeacherAssignment.findFirst({
+            where: {
+              tenantId: actor.tenantId,
+              staff: { userId: actor.userId },
+              classId: activeEnrollment.classId,
+              OR: [
+                { sectionId: activeEnrollment.sectionId },
+                { sectionId: null },
+              ],
+            },
+            select: { id: true },
+          })
+        : null;
+
+      if (!assignment) {
+        throw new ForbiddenException(
+          'Student profile is outside your teaching scope',
+        );
+      }
     }
 
     const activityPosts = await this.prisma.activityPost.findMany({
@@ -2674,11 +2716,14 @@ export class StudentsService {
           include: { guardian: true },
         },
         enrollments: {
+          where: { status: EnrollmentStatus.ACTIVE },
           include: {
             academicYear: true,
+            class: true,
             section: true,
           },
           orderBy: [{ createdAt: 'desc' }],
+          take: 1,
         },
       },
       orderBy: [{ studentSystemId: 'asc' }],
@@ -2711,7 +2756,7 @@ export class StudentsService {
 
     const headers = buildIemisHeaders();
     const rows = validationResults
-      .filter((result) => result.issues.length === 0)
+      .filter((result) => !result.issues.some((issue) => issue.blocking))
       .map(({ student }) => buildIemisRow(student, iemisSchoolCode));
 
     const csv = buildCsv(headers, rows);
@@ -2782,25 +2827,27 @@ export class StudentsService {
     });
 
     return {
-      formatVersion: 'SCHOLOS-IEMIS-1.0',
+      formatVersion: IEMIS_REQUIREMENT_VERSION,
       exportedAt: exportedAt.toISOString(),
       exportId: exportRecord.id,
       fileAssetId: fileAsset.id,
       fileName,
       totalRecords: students.length,
       validRecords: rows.length,
-      invalidRecords: validationResults.filter(
-        (result) => result.issues.length > 0,
+      invalidRecords: validationResults.filter((result) =>
+        result.issues.some((issue) => issue.blocking),
       ).length,
       issues: validationResults
-        .filter((result) => result.issues.length > 0)
+        .filter((result) => result.issues.some((issue) => issue.blocking))
         .flatMap((result) =>
-          result.issues.map((issue) => ({
-            studentId: result.student.id,
-            studentSystemId: result.student.studentSystemId,
-            field: issue.field,
-            message: issue.message,
-          })),
+          result.issues
+            .filter((issue) => issue.blocking)
+            .map((issue) => ({
+              studentId: result.student.id,
+              studentSystemId: result.student.studentSystemId,
+              field: issue.field,
+              message: issue.message,
+            })),
         ),
       headers,
       rows,
@@ -3287,8 +3334,10 @@ export class StudentsService {
           include: { guardian: true },
         },
         enrollments: {
+          where: { status: EnrollmentStatus.ACTIVE },
           include: {
             academicYear: true,
+            class: true,
             section: true,
           },
           orderBy: [{ createdAt: 'desc' }],
@@ -3301,20 +3350,36 @@ export class StudentsService {
       throw new NotFoundException('Student not found in this tenant');
     }
 
-    const issues = validateIemisStudent(student);
-    const score = Math.max(0, Math.round(((12 - issues.length) / 12) * 100));
+    if (
+      actor.roles.some(
+        (role) => role === 'teacher' || role === 'subject_teacher',
+      ) &&
+      !actor.roles.some((role) => role === 'admin' || role === 'principal')
+    ) {
+      const activeEnrollment = student.enrollments[0] ?? null;
+      const assignment = activeEnrollment
+        ? await this.prisma.subjectTeacherAssignment.findFirst({
+            where: {
+              tenantId: actor.tenantId,
+              staff: { userId: actor.userId },
+              classId: activeEnrollment.classId,
+              OR: [
+                { sectionId: activeEnrollment.sectionId },
+                { sectionId: null },
+              ],
+            },
+            select: { id: true },
+          })
+        : null;
 
-    return {
-      studentId: student.id,
-      studentSystemId: student.studentSystemId,
-      fullNameEn: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
-      eligible: issues.length === 0,
-      score,
-      issues: issues.map((issue) => ({
-        field: issue.field,
-        message: issue.message,
-      })),
-    };
+      if (!assignment) {
+        throw new ForbiddenException(
+          'Student reporting readiness is outside your teaching scope',
+        );
+      }
+    }
+
+    return buildStudentIemisReadiness(student, new Date());
   }
 
   async getIemisValidationList(
@@ -3339,11 +3404,14 @@ export class StudentsService {
           include: { guardian: true },
         },
         enrollments: {
+          where: { status: EnrollmentStatus.ACTIVE },
           include: {
             academicYear: true,
+            class: true,
             section: true,
           },
           orderBy: [{ createdAt: 'desc' }],
+          take: 1,
         },
       },
       orderBy: [{ studentSystemId: 'asc' }],
@@ -3351,21 +3419,33 @@ export class StudentsService {
 
     const list = students.map((student) => {
       const issues = validateIemisStudent(student);
-      const score = Math.max(0, Math.round(((12 - issues.length) / 12) * 100));
+      const blockingIssueCount = issues.filter(
+        (issue) => issue.blocking,
+      ).length;
+      const passedRequiredChecks = Math.max(
+        0,
+        IEMIS_REQUIRED_RULE_CODES.length - blockingIssueCount,
+      );
+      const score = Math.round(
+        (passedRequiredChecks / IEMIS_REQUIRED_RULE_CODES.length) * 100,
+      );
+      const activeEnrollment = student.enrollments[0] ?? null;
 
       return {
         studentId: student.id,
         studentSystemId: student.studentSystemId,
         fullNameEn: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
-        className: student.class.name,
-        sectionName: student.sectionRef?.name ?? student.section ?? null,
-        eligible: issues.length === 0,
+        className: activeEnrollment?.class?.name ?? student.class.name,
+        sectionName: activeEnrollment?.section?.name ?? null,
+        eligible: blockingIssueCount === 0,
         score,
-        issuesCount: issues.length,
-        issues: issues.map((issue) => ({
-          field: issue.field,
-          message: issue.message,
-        })),
+        issuesCount: blockingIssueCount,
+        issues: issues
+          .filter((issue) => issue.blocking)
+          .map((issue) => ({
+            field: issue.field,
+            message: issue.message,
+          })),
       };
     });
 
@@ -3404,6 +3484,7 @@ export class StudentsService {
         enrollments: {
           include: {
             academicYear: true,
+            class: true,
             section: true,
           },
           orderBy: [{ createdAt: 'desc' }],
@@ -4371,6 +4452,7 @@ type StudentDocumentPayload = Prisma.StudentGetPayload<{
     enrollments: {
       include: {
         academicYear: true;
+        class: true;
         section: true;
       };
     };
@@ -4653,17 +4735,15 @@ function buildIemisRow(
     motherTongue: student.motherTongue ?? '',
     ethnicity: student.ethnicity ?? '',
     disabilityFlag: student.disabilityFlag ?? '',
-    admissionDate: student.admissionDate.toISOString().slice(0, 10),
+    admissionDate: (latestEnrollment?.admissionDate ?? student.admissionDate)
+      .toISOString()
+      .slice(0, 10),
     admissionNumber: student.admissionNumber ?? '',
     lifecycleStatus: student.lifecycleStatus,
     academicYear: latestEnrollment?.academicYear.name ?? '',
-    className: student.class.name,
-    sectionName:
-      latestEnrollment?.section?.name ??
-      student.sectionRef?.name ??
-      student.section ??
-      '',
-    rollNumber: student.rollNumber ?? '',
+    className: latestEnrollment?.class?.name ?? '',
+    sectionName: latestEnrollment?.section?.name ?? '',
+    rollNumber: latestEnrollment?.rollNumber ?? '',
     primaryGuardianName: primaryGuardian?.fullName ?? '',
     primaryGuardianRelation: primaryGuardianLink?.relation ?? '',
     primaryGuardianPhone: primaryGuardian?.primaryPhone ?? '',
@@ -5055,100 +5135,322 @@ function resolveDocumentRetentionUntil(
   return new Date(generatedAt.getTime() + retentionDays * 86_400_000);
 }
 
-function validateIemisStudent(student: StudentDocumentPayload) {
-  const issues: Array<{ field: string; message: string }> = [];
-  const latestEnrollment = student.enrollments[0] ?? null;
+const IEMIS_REQUIREMENT_VERSION = 'SCHOLOS-IEMIS-1.0';
+
+const IEMIS_REQUIRED_RULE_CODES = [
+  'STUDENT_SYSTEM_ID_REQUIRED',
+  'ENGLISH_NAME_REQUIRED',
+  'NEPALI_NAME_REQUIRED',
+  'DATE_OF_BIRTH_REQUIRED',
+  'GENDER_REQUIRED',
+  'NATIONALITY_REQUIRED',
+  'ADMISSION_DATE_REQUIRED',
+  'ACTIVE_ACADEMIC_YEAR_REQUIRED',
+  'CLASS_PLACEMENT_REQUIRED',
+  'SECTION_PLACEMENT_REQUIRED',
+  'GUARDIAN_CONTACT_REQUIRED',
+  'ACTIVE_LIFECYCLE_REQUIRED',
+] as const;
+
+function buildStudentIemisReadiness(
+  student: StudentDocumentPayload,
+  evaluatedAt: Date,
+): StudentIemisReadiness {
+  const activeEnrollment = student.enrollments[0] ?? null;
+  const issues = validateIemisStudent(student, evaluatedAt);
+  const blockingIssueCount = issues.filter((issue) => issue.blocking).length;
+  const warningCount = issues.filter(
+    (issue) => issue.severity === 'WARNING',
+  ).length;
+  const totalRequiredChecks = IEMIS_REQUIRED_RULE_CODES.length;
+  const passedRequiredChecks = Math.max(
+    0,
+    totalRequiredChecks - blockingIssueCount,
+  );
+  const exportEligible = blockingIssueCount === 0;
+  const status =
+    blockingIssueCount > 0
+      ? 'BLOCKED'
+      : warningCount > 0
+        ? 'READY_WITH_WARNINGS'
+        : 'READY';
+  const academicYear = activeEnrollment?.academicYear.startsOn
+    ? formatBsAcademicYear(
+        toBsDateFromGregorian(activeEnrollment.academicYear.startsOn),
+      )
+    : (activeEnrollment?.academicYear.name ?? null);
+
+  return {
+    studentId: student.id,
+    studentSystemId: student.studentSystemId,
+    fullNameEn: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
+    nationalStudentId: student.nationalStudentId ?? null,
+    status,
+    passedRequiredChecks,
+    totalRequiredChecks,
+    blockingIssueCount,
+    warningCount,
+    exportEligible,
+    eligible: exportEligible,
+    evaluatedAt: evaluatedAt.toISOString(),
+    requirementVersion: IEMIS_REQUIREMENT_VERSION,
+    score: Math.round((passedRequiredChecks / totalRequiredChecks) * 100),
+    academicYear,
+    className: activeEnrollment?.class?.name ?? null,
+    sectionName: activeEnrollment?.section?.name ?? null,
+    rollNumber: activeEnrollment?.rollNumber ?? null,
+    enrollmentStatus: activeEnrollment?.status ?? null,
+    admissionDate:
+      activeEnrollment?.admissionDate.toISOString() ??
+      student.admissionDate?.toISOString() ??
+      null,
+    issues,
+  };
+}
+
+function validateIemisStudent(
+  student: StudentDocumentPayload,
+  evaluatedAt = new Date(),
+): StudentIemisReadinessIssue[] {
+  const issues: StudentIemisReadinessIssue[] = [];
+  const activeEnrollment = student.enrollments[0] ?? null;
   const hasGuardianContact = student.guardianLinks.some(
     (link) =>
       Boolean(link.guardian.primaryPhone) || Boolean(link.guardian.email),
   );
 
-  if (!student.studentSystemId) {
+  const blocking = (
+    issue: Omit<
+      StudentIemisReadinessIssue,
+      'severity' | 'blocking' | 'responsibleRole'
+    >,
+  ) => {
     issues.push({
+      ...issue,
+      severity: 'BLOCKING',
+      blocking: true,
+      responsibleRole: null,
+    });
+  };
+
+  if (!student.studentSystemId) {
+    blocking({
+      code: 'STUDENT_SYSTEM_ID_REQUIRED',
+      category: 'IDENTITY',
+      title: 'SchoolOS student ID is missing',
+      message:
+        'A stable school student ID is required to identify this record in the reporting export.',
       field: 'studentSystemId',
-      message: 'School student ID is required',
+      currentValueSafe: null,
+      requiredAction:
+        'Ask an authorized student records administrator to correct the student ID.',
+      fixTarget: 'NONE',
+      requiredPermission: 'students:update',
     });
   }
 
   if (!student.firstNameEn || !student.lastNameEn) {
-    issues.push({
+    blocking({
+      code: 'ENGLISH_NAME_REQUIRED',
+      category: 'IDENTITY',
+      title: 'English name is incomplete',
+      message:
+        "The student's English first and last name are required for government reporting.",
       field: 'fullNameEn',
-      message: 'English first and last name are required',
+      currentValueSafe:
+        [student.firstNameEn, student.lastNameEn].filter(Boolean).join(' ') ||
+        null,
+      requiredAction: 'Complete the English first and last name.',
+      fixTarget: 'STUDENT_PROFILE',
+      requiredPermission: 'students:update',
     });
   }
 
   if (!student.firstNameNp || !student.lastNameNp) {
-    issues.push({
+    blocking({
+      code: 'NEPALI_NAME_REQUIRED',
+      category: 'IDENTITY',
+      title: 'Nepali name is missing',
+      message:
+        "The student's Nepali first and last name are required by the active SchoolOS reporting rule set.",
       field: 'fullNameNp',
-      message: 'Nepali first and last name are required',
+      currentValueSafe:
+        [student.firstNameNp, student.lastNameNp].filter(Boolean).join(' ') ||
+        null,
+      requiredAction:
+        "Add the student's Nepali first and last name after authorized human review.",
+      fixTarget: 'STUDENT_PROFILE',
+      requiredPermission: 'students:update',
     });
   }
 
-  if (!student.dateOfBirth) {
-    issues.push({
+  if (!student.dateOfBirth || student.dateOfBirth > evaluatedAt) {
+    blocking({
+      code: 'DATE_OF_BIRTH_REQUIRED',
+      category: 'IDENTITY',
+      title: student.dateOfBirth
+        ? 'Date of birth needs correction'
+        : 'Date of birth is missing',
+      message: student.dateOfBirth
+        ? 'A future date of birth cannot be used for government reporting.'
+        : "The student's date of birth is required for government reporting.",
       field: 'dateOfBirth',
-      message: 'Date of birth is required',
-    });
-  } else if (student.dateOfBirth > new Date()) {
-    issues.push({
-      field: 'dateOfBirth',
-      message: 'Date of birth cannot be in the future',
+      currentValueSafe: student.dateOfBirth
+        ? formatBsDate(student.dateOfBirth)
+        : null,
+      requiredAction: 'Review and correct the date of birth.',
+      fixTarget: 'STUDENT_PROFILE',
+      requiredPermission: 'students:update',
     });
   }
 
   if (!student.gender) {
-    issues.push({
+    blocking({
+      code: 'GENDER_REQUIRED',
+      category: 'IDENTITY',
+      title: 'Gender is not recorded',
+      message:
+        'The active reporting rule requires an authorized gender value for this student.',
       field: 'gender',
-      message: 'Gender is required',
+      currentValueSafe: null,
+      requiredAction:
+        "Ask authorized staff to review the student's official record and select the recorded value.",
+      fixTarget: 'STUDENT_PROFILE',
+      requiredPermission: 'students:update',
     });
   }
 
   if (!student.nationality) {
-    issues.push({
+    blocking({
+      code: 'NATIONALITY_REQUIRED',
+      category: 'IDENTITY',
+      title: 'Nationality is not recorded',
+      message:
+        'Nationality is required by the active SchoolOS reporting rule set.',
       field: 'nationality',
-      message: 'Nationality is required',
+      currentValueSafe: null,
+      requiredAction: 'Review the official student record and add nationality.',
+      fixTarget: 'STUDENT_PROFILE',
+      requiredPermission: 'students:update',
     });
   }
 
-  if (!student.admissionDate) {
-    issues.push({
+  if (!activeEnrollment?.admissionDate && !student.admissionDate) {
+    blocking({
+      code: 'ADMISSION_DATE_REQUIRED',
+      category: 'ENROLLMENT_PLACEMENT',
+      title: 'Admission date is missing',
+      message:
+        "The student's admission date is required for the reporting record.",
       field: 'admissionDate',
-      message: 'Admission date is required',
+      currentValueSafe: null,
+      requiredAction:
+        'Ask an authorized admissions administrator to correct the admission date on the active enrollment.',
+      fixTarget: 'NONE',
+      requiredPermission: 'enrollments:create',
     });
   }
 
-  if (!student.classId) {
-    issues.push({
-      field: 'classId',
-      message: 'Class assignment is required',
-    });
-  }
-
-  if (!student.sectionRef?.name && !student.section) {
-    issues.push({
-      field: 'section',
-      message: 'Section assignment is required',
-    });
-  }
-
-  if (!latestEnrollment?.academicYear?.name) {
-    issues.push({
+  if (!activeEnrollment?.academicYear?.name) {
+    blocking({
+      code: 'ACTIVE_ACADEMIC_YEAR_REQUIRED',
+      category: 'ENROLLMENT_PLACEMENT',
+      title: activeEnrollment
+        ? 'Academic year is missing'
+        : 'Active enrollment is missing',
+      message: activeEnrollment
+        ? 'The active enrollment must identify the reporting academic year.'
+        : 'The student needs an active enrollment before the record can be included in an export.',
       field: 'academicYear',
-      message: 'Latest academic year enrollment is required',
+      currentValueSafe: null,
+      requiredAction: activeEnrollment
+        ? 'Correct the academic year on the active enrollment.'
+        : "Create or restore the student's active enrollment.",
+      fixTarget: activeEnrollment ? 'ENROLLMENT' : 'NONE',
+      requiredPermission: 'enrollments:create',
+    });
+  }
+
+  if (!activeEnrollment?.class?.name) {
+    blocking({
+      code: 'CLASS_PLACEMENT_REQUIRED',
+      category: 'ENROLLMENT_PLACEMENT',
+      title: 'Class is not assigned',
+      message:
+        "The active enrollment must include the student's class for the reporting period.",
+      field: 'classId',
+      currentValueSafe: null,
+      requiredAction: activeEnrollment
+        ? 'Assign the student to the correct class in the active enrollment.'
+        : "Create or restore the student's active enrollment before assigning a class.",
+      fixTarget: activeEnrollment ? 'ENROLLMENT' : 'NONE',
+      requiredPermission: 'students:update',
+    });
+  }
+
+  if (!activeEnrollment?.section?.name) {
+    blocking({
+      code: 'SECTION_PLACEMENT_REQUIRED',
+      category: 'ENROLLMENT_PLACEMENT',
+      title: 'Section is not assigned',
+      message:
+        'The active SchoolOS reporting rule requires a section for the selected academic year.',
+      field: 'sectionId',
+      currentValueSafe: activeEnrollment?.class?.name
+        ? `Class: ${activeEnrollment.class.name}; section: not assigned`
+        : null,
+      requiredAction: activeEnrollment
+        ? 'Assign the student to the correct section in the active enrollment.'
+        : "Create or restore the student's active enrollment before assigning a section.",
+      fixTarget: activeEnrollment ? 'ENROLLMENT' : 'NONE',
+      requiredPermission: 'students:update',
     });
   }
 
   if (!hasGuardianContact) {
-    issues.push({
+    blocking({
+      code: 'GUARDIAN_CONTACT_REQUIRED',
+      category: 'GUARDIAN_INFORMATION',
+      title: 'Guardian contact is missing',
+      message:
+        'At least one linked guardian phone number or email address is required by the active reporting rule.',
       field: 'guardianContact',
-      message: 'At least one guardian phone or email contact is required',
+      currentValueSafe: null,
+      requiredAction: "Add or correct a linked guardian's contact information.",
+      fixTarget: 'GUARDIANS',
+      requiredPermission: 'guardians:update',
     });
   }
 
   if (student.lifecycleStatus !== StudentLifecycleStatus.ACTIVE) {
-    issues.push({
-      field: 'lifecycleStatus',
+    blocking({
+      code: 'ACTIVE_LIFECYCLE_REQUIRED',
+      category: 'ENROLLMENT_PLACEMENT',
+      title: 'Student record is not active',
       message: 'Only active students are exportable to iEMIS',
+      field: 'lifecycleStatus',
+      currentValueSafe: student.lifecycleStatus,
+      requiredAction: 'Review the student lifecycle status before reporting.',
+      fixTarget: 'NONE',
+      requiredPermission: 'students:manage_lifecycle',
+    });
+  }
+
+  if (!student.nationalStudentId) {
+    issues.push({
+      code: 'NATIONAL_STUDENT_ID_MISSING',
+      category: 'IDENTITY',
+      severity: 'WARNING',
+      title: 'iEMIS identifier is not recorded',
+      message:
+        'The record remains exportable under the active SchoolOS rule set, but the identifier should be reviewed before submission.',
+      field: 'nationalStudentId',
+      blocking: false,
+      currentValueSafe: null,
+      requiredAction: 'Add the verified iEMIS identifier when it is available.',
+      fixTarget: 'STUDENT_PROFILE',
+      requiredPermission: 'students:update',
+      responsibleRole: null,
     });
   }
 
