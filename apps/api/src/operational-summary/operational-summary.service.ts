@@ -120,7 +120,7 @@ const MODULE_CONFIG: Record<
     entitlement: 'notices',
     permissions: ['notices:read', 'communications:read'],
     route: '/dashboard/notices',
-    label: 'Notices & Communication',
+    label: 'Notices & Announcements',
   },
   m12_learning: {
     entitlement: 'learning',

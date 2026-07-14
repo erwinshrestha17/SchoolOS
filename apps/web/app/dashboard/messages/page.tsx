@@ -1,5 +1,5 @@
-import { ParentTeacherMessagingWorkspace } from '@/components/messaging/parent-teacher-messaging-workspace';
+import { ChatDeferredState } from '@/components/messaging/chat-deferred-state';
 
 export default function MessagesPage() {
-  return <ParentTeacherMessagingWorkspace />;
+  return <ChatDeferredState />;
 }

@@ -539,10 +539,10 @@ Use this sequence unless the user explicitly changes priority:
 
 1. **MOB1 Core shell and auth hardening**: secure storage, session restore, role routing, error mapper, permission/module service, logout cache clearing.
 2. **MOB2 Parent MVP**: child switcher, home, attendance, homework, notices, profile.
-3. **MOB3 Teacher MVP**: today board, assigned classes, attendance, homework, timetable, notices/messages.
+3. **MOB3 Teacher MVP**: today board, assigned classes, attendance, homework, timetable, notifications, and notices.
 4. **MOB4 Staff and Driver MVP**: staff self-service, driver assigned trip, manifest, GPS status, emergency.
 5. **MOB5 Principal attention app**: attention dashboard, approvals, attendance risk, emergency notices, safe snapshots.
-6. **MOB6 Parent operations depth**: fees/receipts, report cards, transport, canteen, library, activity, chat, learning summary.
+6. **MOB6 Parent operations depth**: fees/receipts, report cards, transport, canteen, library, activity, notices, and learning summary. Chat/conversations remain deferred.
 7. **MOB7 Controlled student session polish**: session join/autosave/submit/result, school-only hardening.
 8. **MOB8 Device QA, offline/read cache, push notifications, accessibility, and low-bandwidth polish.**
 

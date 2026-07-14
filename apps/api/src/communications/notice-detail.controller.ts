@@ -12,7 +12,7 @@ import { NotificationCenterService } from './notification-center.service';
 
 @Controller('notices')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
-@Entitlement('module.communications')
+@Entitlement('module.notices')
 export class NoticeDetailController {
   constructor(
     private readonly noticeDetailService: NoticeDetailService,
@@ -39,7 +39,7 @@ export class NoticeDetailController {
   }
 
   @Get(':noticeId/unread-recipients')
-  @Permissions('notices:read', 'communications:read_deliveries')
+  @Permissions('notices:read', 'notices:read_reports')
   getUnreadRecipients(
     @Param('noticeId') noticeId: string,
     @CurrentAuth() auth: AuthContext,

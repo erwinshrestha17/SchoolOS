@@ -45,9 +45,10 @@ Use this numbering in web routes, labels, comments, tests, smoke names, and docs
 | M9 | Transport |
 | M10 | Canteen |
 | M11 | Accounting and Finance |
-| M12 | Notifications, Notices, Communication, Chat |
+| M12 | Notifications and Delivery |
 | M13 | Learning Layer |
 | M14 | Intelligence / AI |
+| M15 | Notices and Announcements |
 
 `M8A`, `M8B`, and `M8C` are obsolete. Library, Transport, and Canteen are standalone modules.
 
@@ -256,11 +257,12 @@ M4 Academics and Accounting are especially strict: never compute counts, readine
 | M9 Transport | Transport dashboard | Trips today, active/delayed/stale trips, students without assignment, expiring vehicle documents, boarding exceptions | Route editor, vehicle form, trip operation screen, driver assignment, parent transport page |
 | M10 Canteen | Canteen manager dashboard | POS sales today, meals served, low-stock items, low-wallet alerts, allergy alerts, pending vendor bills | POS sale, QR serving/scanning, wallet top-up, stock adjustment, vendor bill form |
 | M11 Accounting & Finance | Accounting overview, principal read-only finance snapshot | Period status, vouchers awaiting approval, reconciliation exceptions, receivables/payables, report snapshot status | Voucher editor, journal-entry detail, reconciliation workspace, account setup, fiscal-close workflow |
-| M12 Notifications/Notices/Chat | Communication operations dashboard | Notices scheduled, failed deliveries, unread high-priority notices, open escalations, provider/queue health | Notice composer, recipient preview, delivery-log detail, chat thread, moderation case detail |
+| M12 Notifications and Delivery | Personal inbox in the global topbar plus tenant-safe settings/diagnostics | Failed delivery, unread personal notifications, provider/queue state | Personal notification detail, delivery-log detail, tenant-safe preferences |
+| M15 Notices and Announcements | Notice operations workspace | Draft/scheduled/high-impact notices, acknowledgement follow-up | Notice composer, recipient preview, approval, scheduled detail, read/acknowledgement report |
 | M13 Learning Layer | Teacher/admin learning overview | Active sessions, activities awaiting launch/review, session issues, submissions needing review | Activity editor, live classroom session, student activity screen, parent learning summary |
 | M14 AI / Intelligence | None until explicitly approved | None | Do not create KPI or analytics UI yet |
 
-Implementation priority (core operational workspaces first, then academics/finance, then HR/extended ops): (1) Principal Home cross-module attention, (2) M1 Admissions, (3) M2 Attendance, (4) M3 Fees, (5) M4 Academics, (6) M6 Homework & Timetable, (7) M12 Communication. Then M7, M8, M9, M10, M11, M13 as those workspaces are polished.
+Implementation priority (core operational workspaces first, then academics/finance, then HR/extended ops): (1) Principal Home cross-module attention, (2) M1 Admissions, (3) M2 Attendance, (4) M3 Fees, (5) M4 Academics, (6) M6 Homework & Timetable, (7) M12 Notifications and M15 Notices. Then M7, M8, M9, M10, M11, M13 as those workspaces are polished.
 
 Replace KPIs with the record/workflow state itself on task pages, e.g.: forms (stepper, draft/saved state, validation errors), registers/grids (`Marked 28 of 30`, `Saving`, `Submitted`, `Locked`), financial workflows (payment status, balance due, idempotency/pending confirmation, audit status), queues (server total, active filters, pending/failed count), detail pages (lifecycle status, audit timeline, protected-file state). Mobile: one urgent task card, not a KPI wall.
 
@@ -346,14 +348,18 @@ Replace KPIs with the record/workflow state itself on task pages, e.g.: forms (s
 - Period close/reopen is high risk and requires reason.
 - Large exports use File Registry and job status.
 
-### M12 Notifications, Notices, Communication, and Chat
+### M12 Notifications and Delivery
 
 - Source modules emit events; M12 owns delivery lifecycle.
 - Quiet hours are visible and enforced by backend.
-- Parent-teacher scope only where allowed.
-- Attachments use File Registry.
-- Escalation/report actions are audited.
 - Provider-disabled, mock, failed, partial, and queued delivery states are explicit.
+- Personal notifications remain in the global notification center; delivery diagnostics do not become a generic school workspace.
+
+### M15 Notices and Announcements
+
+- Notice routes own drafting, recipient preview, approval, scheduling, protected attachments, read/acknowledgement follow-up, and publication audit.
+- Notice publication emits a normalized event to M12; the browser never calls providers or calculates official recipients.
+- Chat/conversation navigation and quick actions are hidden. Legacy routes render a bounded deferred state; new chat writes remain backend-disabled while historical data stays protected.
 
 ### M13 Learning Layer
 
@@ -395,7 +401,7 @@ Use this order unless the user explicitly changes priority:
    - M2 Attendance.
    - M3 Fees.
    - M4 Academics/Report Cards.
-   - M12 Notifications/Communication.
+   - M12 Notifications and M15 Notices.
 
 4. **W4 Operational modules**
    - M6 Homework/Timetable.

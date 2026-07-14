@@ -605,6 +605,31 @@ export const permissionCatalog = [
 
   // ─── Compiled from catalog/communications.ts ───
   {
+    resource: "notifications",
+    action: "view_own",
+    description: "View and update one's own notification inbox",
+  },
+  {
+    resource: "notifications",
+    action: "manage_templates",
+    description: "Manage notification delivery templates",
+  },
+  {
+    resource: "notifications",
+    action: "manage_preferences",
+    description: "Manage tenant-safe notification preferences and quiet hours",
+  },
+  {
+    resource: "notifications",
+    action: "view_delivery_diagnostics",
+    description: "View bounded notification delivery diagnostics",
+  },
+  {
+    resource: "notifications",
+    action: "retry_deliveries",
+    description: "Retry eligible failed notification deliveries",
+  },
+  {
     resource: "notices",
     action: "create",
     description: "Create and publish school notices",
@@ -613,6 +638,21 @@ export const permissionCatalog = [
     resource: "notices",
     action: "read",
     description: "Read school notices",
+  },
+  {
+    resource: "notices",
+    action: "approve",
+    description: "Approve high-impact notices",
+  },
+  {
+    resource: "notices",
+    action: "send_emergency",
+    description: "Create and publish emergency notices",
+  },
+  {
+    resource: "notices",
+    action: "read_reports",
+    description: "Read notice delivery and acknowledgement reports",
   },
   {
     resource: "events",
@@ -909,6 +949,8 @@ export const permissionCatalog = [
   },
 
   // ─── Compiled from catalog/messaging.ts ───
+  // Compatibility-only catalog. Chat and conversations are deferred and
+  // these write permissions are excluded from system role defaults.
   {
     resource: "messaging",
     action: "create",
@@ -1478,8 +1520,15 @@ const PLATFORM_PERMISSION_KEYS = [
   "tenants:manage",
 ];
 
+const DEFERRED_CHAT_WRITE_PERMISSION_KEYS = [
+  "messaging:create",
+  "messaging:manage",
+];
+
 const TENANT_PERMISSION_KEYS = ALL_PERMISSION_KEYS.filter(
-  (key) => !PLATFORM_PERMISSION_KEYS.includes(key),
+  (key) =>
+    !PLATFORM_PERMISSION_KEYS.includes(key) &&
+    !DEFERRED_CHAT_WRITE_PERMISSION_KEYS.includes(key),
 );
 
 export const systemRolePermissions: Record<string, string[]> = {
@@ -1511,7 +1560,6 @@ export const systemRolePermissions: Record<string, string[]> = {
     "learning:delete",
     "learning:launch",
     "learning:progress",
-    "messaging:create",
     "messaging:read",
     "activity_feed:create",
     "activity_feed:read",
@@ -1552,7 +1600,6 @@ export const systemRolePermissions: Record<string, string[]> = {
     "learning:delete",
     "learning:launch",
     "learning:progress",
-    "messaging:create",
     "messaging:read",
     "activity_feed:create",
     "activity_feed:read",
@@ -1597,7 +1644,6 @@ export const systemRolePermissions: Record<string, string[]> = {
     "homework:submit",
     "learning:read",
     "learning:progress",
-    "messaging:create",
     "messaging:read",
     "transport:tracking:parent",
     "canteen:parent:read",

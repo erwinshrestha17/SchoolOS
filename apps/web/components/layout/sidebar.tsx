@@ -58,7 +58,10 @@ export type NavGroup = {
   items: NavItem[];
 };
 
-const academicPermissions: PermissionKey[] = ['academics:read', 'academics:manage'];
+const academicPermissions: PermissionKey[] = [
+  'academics:read',
+  'academics:manage',
+];
 const homeworkAndTimetablePermissions: PermissionKey[] = [
   'homework:read',
   'timetable:read',
@@ -70,12 +73,7 @@ const learningPermissions: PermissionKey[] = [
   'learning:launch',
   'learning:progress',
 ];
-const communicationsPermissions: PermissionKey[] = [
-  'notices:read',
-  'notices:create',
-  'messaging:create',
-  'messaging:manage',
-];
+const noticesPermissions: PermissionKey[] = ['notices:read', 'notices:create'];
 const settingsPermissions: PermissionKey[] = [
   'settings:read',
   'roles:read',
@@ -279,26 +277,18 @@ export const dashboardNavGroups: NavGroup[] = [
     ],
   },
   {
-    label: 'Communication',
+    label: 'Notices',
     icon: MessageSquare,
     items: [
       {
         href: '/dashboard/notices',
-        label: 'Notices & Communication',
+        label: 'Notices & Announcements',
         icon: MessageSquare,
-        permissions: communicationsPermissions,
-        // '/dashboard/messages' is intentionally not claimed here: the
-        // Messages item below owns that route so exactly one entry lights
-        // up as active. '/dashboard/communications' redirects to
-        // '/dashboard/notices', the single canonical M12 overview.
+        permissions: noticesPermissions,
+        // Historical communication URLs remain compatibility redirects to
+        // the canonical M15 notices workspace. Chat routes are intentionally
+        // excluded from active navigation.
         activeWhen: ['/dashboard/communications', '/dashboard/notices'],
-      },
-      {
-        href: '/dashboard/messages',
-        label: 'Messages',
-        icon: MessageSquare,
-        permissions: ['messaging:create', 'messaging:manage'],
-        moduleKeys: ['notices'],
       },
     ],
   },
@@ -352,7 +342,9 @@ export function Sidebar({
     enabled: canReadNotifications,
     refetchInterval: 60_000,
   });
-  const unreadNoticesBadge = formatBadgeCount(notificationCenterQuery.data?.unreadCount ?? 0);
+  const unreadNoticesBadge = formatBadgeCount(
+    notificationCenterQuery.data?.unreadCount ?? 0,
+  );
 
   const visibleGroups = dashboardNavGroups
     .map((group) => ({
@@ -521,7 +513,9 @@ function SidebarContent({
               <School size={14} aria-hidden="true" />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-xs font-bold text-slate-900">{schoolName}</p>
+              <p className="truncate text-xs font-bold text-slate-900">
+                {schoolName}
+              </p>
               <p className="mt-0.5 text-[0.68rem] font-medium text-slate-500">
                 School workspace
               </p>
@@ -626,10 +620,15 @@ function SidebarContent({
           </div>
           {!collapsed && (
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-bold text-slate-800" title={userLabel}>
+              <p
+                className="truncate text-xs font-bold text-slate-800"
+                title={userLabel}
+              >
                 {userLabel}
               </p>
-              <p className="truncate text-[0.68rem] font-medium text-slate-500">{roleLabel}</p>
+              <p className="truncate text-[0.68rem] font-medium text-slate-500">
+                {roleLabel}
+              </p>
             </div>
           )}
 
@@ -645,9 +644,17 @@ function SidebarContent({
               title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
               {collapsed ? (
-                <ChevronRight size={18} className="shrink-0" aria-hidden="true" />
+                <ChevronRight
+                  size={18}
+                  className="shrink-0"
+                  aria-hidden="true"
+                />
               ) : (
-                <ChevronLeft size={18} className="shrink-0" aria-hidden="true" />
+                <ChevronLeft
+                  size={18}
+                  className="shrink-0"
+                  aria-hidden="true"
+                />
               )}
             </button>
           )}
@@ -716,7 +723,9 @@ function NavEntry({
         size={18}
         className={cn(
           'shrink-0 transition-colors',
-          active ? 'text-[var(--primary)]' : 'text-slate-500 group-hover:text-slate-800',
+          active
+            ? 'text-[var(--primary)]'
+            : 'text-slate-500 group-hover:text-slate-800',
         )}
         aria-hidden="true"
       />
@@ -761,16 +770,23 @@ export function canDisplayNavItem(
   session: ReturnType<typeof useSession>['session'],
   hasModule: (module: string) => boolean,
 ) {
-  if (item.permissions?.length && !hasAnyPermission(session, item.permissions)) {
+  if (
+    item.permissions?.length &&
+    !hasAnyPermission(session, item.permissions)
+  ) {
     return false;
   }
 
-  const moduleKeys = item.moduleKeys ?? (() => {
-    const requiredModule = getRequiredModuleForHref(item.href);
-    return requiredModule ? [requiredModule] : [];
-  })();
+  const moduleKeys =
+    item.moduleKeys ??
+    (() => {
+      const requiredModule = getRequiredModuleForHref(item.href);
+      return requiredModule ? [requiredModule] : [];
+    })();
 
-  return moduleKeys.length === 0 || moduleKeys.some((module) => hasModule(module));
+  return (
+    moduleKeys.length === 0 || moduleKeys.some((module) => hasModule(module))
+  );
 }
 
 /**
@@ -780,7 +796,10 @@ export function canDisplayNavItem(
  * when several items' routes overlap (e.g. a parent module route and one of
  * its more specific sub-routes).
  */
-function computeActiveHref(items: NavItem[], pathname: string | null): string | null {
+function computeActiveHref(
+  items: NavItem[],
+  pathname: string | null,
+): string | null {
   if (!pathname) return null;
 
   let bestHref: string | null = null;
@@ -792,7 +811,10 @@ function computeActiveHref(items: NavItem[], pathname: string | null): string | 
       let score = -1;
       if (pathname === candidate) {
         score = candidate.length + 10_000;
-      } else if (candidate !== '/dashboard' && pathname.startsWith(`${candidate}/`)) {
+      } else if (
+        candidate !== '/dashboard' &&
+        pathname.startsWith(`${candidate}/`)
+      ) {
         score = candidate.length;
       }
       if (score > bestScore) {

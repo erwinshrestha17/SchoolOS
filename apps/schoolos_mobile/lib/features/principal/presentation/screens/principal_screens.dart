@@ -764,20 +764,13 @@ class _MoreBody extends StatelessWidget {
           ],
         ),
         _MenuGroup(
-          title: '4. Communication',
+          title: '4. Notices and alerts',
           items: [
             _MenuItem(
               'Escalations',
               Icons.warning_rounded,
               AppColors.danger,
               AppRoutes.principalEscalations,
-            ),
-            _MenuItem(
-              'Chats',
-              Icons.chat_bubble_rounded,
-              AppColors.success,
-              AppRoutes.notices,
-              enabled: false,
             ),
             _MenuItem(
               'Notice Archive',

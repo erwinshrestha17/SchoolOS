@@ -159,7 +159,7 @@ describe('FileRegistryController upload safety', () => {
     );
   });
 
-  it('allows notice and chat attachment upload modules with matching permissions', async () => {
+  it('allows notice attachment uploads with matching permissions', async () => {
     const content = Buffer.from('safe-content').toString('base64');
     storageService.saveBase64Object.mockResolvedValue({
       objectKey: 'tenant-1/notices/notice.pdf',
@@ -207,6 +207,24 @@ describe('FileRegistryController upload safety', () => {
         entityId: 'notice-1',
       }),
     );
+  });
+
+  it('blocks new chat attachments while preserving historical download policy', async () => {
+    await expect(
+      controller.uploadFile(
+        { ...auth, permissions: ['messaging:create', 'messaging:read'] } as any,
+        {
+          fileName: 'historical-chat.pdf',
+          contentType: 'application/pdf',
+          base64Content: Buffer.from('safe-content').toString('base64'),
+          module: 'parent-teacher-chat',
+          entityId: 'thread-1',
+        },
+      ),
+    ).rejects.toThrow('New chat attachments are unavailable');
+
+    expect(storageService.saveBase64Object).not.toHaveBeenCalled();
+    expect(fileRegistryService.registerFile).not.toHaveBeenCalled();
   });
 
   it('rejects uploads for unsupported modules', async () => {

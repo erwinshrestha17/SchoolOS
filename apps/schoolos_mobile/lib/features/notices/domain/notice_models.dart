@@ -311,7 +311,7 @@ String _routeFromSource(
   final childId = json['childId'] as String?;
   return switch (type) {
     ParentNotificationType.notice => '/notices/$id',
-    ParentNotificationType.message => '/parent/chat?threadId=$sourceId',
+    ParentNotificationType.message => '/notifications',
     ParentNotificationType.homework => '/parent/homework/$sourceId',
     ParentNotificationType.event => '/parent/updates?eventId=$sourceId',
     ParentNotificationType.gallery => '/parent/activity?postId=$sourceId',

@@ -10,6 +10,8 @@ describe('NotificationsService', () => {
     process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE;
   const originalPushEnabled = process.env.PUSH_PROVIDER_ENABLED;
   const originalPushReady = process.env.PUSH_PROVIDER_READY;
+  const originalEmailEnabled = process.env.EMAIL_PROVIDER_ENABLED;
+  const originalEmailReady = process.env.EMAIL_PROVIDER_READY;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -32,6 +34,8 @@ describe('NotificationsService', () => {
     restoreEnv('SCHOOLOS_NOTIFICATION_PROVIDER_MODE', originalNotificationMode);
     restoreEnv('PUSH_PROVIDER_ENABLED', originalPushEnabled);
     restoreEnv('PUSH_PROVIDER_READY', originalPushReady);
+    restoreEnv('EMAIL_PROVIDER_ENABLED', originalEmailEnabled);
+    restoreEnv('EMAIL_PROVIDER_READY', originalEmailReady);
   });
 
   it('should be defined', () => {
@@ -65,6 +69,19 @@ describe('NotificationsService', () => {
       enabled: true,
       failureCode: null,
       failureReason: null,
+    });
+  });
+
+  it('fails closed when an external provider has not been explicitly enabled and verified', async () => {
+    delete process.env.EMAIL_PROVIDER_ENABLED;
+    delete process.env.EMAIL_PROVIDER_READY;
+
+    await expect(
+      service.getProviderReadiness(NotificationChannel.EMAIL),
+    ).resolves.toEqual({
+      enabled: false,
+      failureCode: 'PROVIDER_NOT_READY',
+      failureReason: 'Email provider readiness has not been confirmed.',
     });
   });
 });

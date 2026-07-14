@@ -78,6 +78,37 @@ describe('PlansService entitlement and usage enforcement', () => {
     ).resolves.toEqual(expect.objectContaining({ allowed: true }));
   });
 
+  it('maps legacy communication entitlement data to M12 and M15 without surfacing chat', async () => {
+    prisma.tenantSubscription.findFirst.mockResolvedValue({
+      status: 'ACTIVE',
+      plan: {
+        key: 'custom-plan',
+        features: [
+          { featureKey: 'module.communications', enabled: true },
+          { featureKey: 'module.messaging', enabled: true },
+          { featureKey: 'module.chat', enabled: true },
+          {
+            featureKey: 'feature.mobile.parent_teacher_chat',
+            enabled: true,
+          },
+        ],
+      },
+    });
+
+    await expect(
+      entitlementsService.getEntitlements('tenant-1'),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        modules: expect.arrayContaining(['notifications', 'notices']),
+        features: [],
+      }),
+    );
+    const entitlements = await entitlementsService.getEntitlements('tenant-1');
+    expect(entitlements.modules).not.toEqual(
+      expect.arrayContaining(['communications', 'messaging', 'chat']),
+    );
+  });
+
   it('blocks disabled or missing feature keys from active subscription plan features', async () => {
     prisma.tenant.findUnique.mockResolvedValue({ isActive: true });
     prisma.tenantFeatureOverride.findMany.mockResolvedValue([]);

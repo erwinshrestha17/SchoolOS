@@ -29,6 +29,7 @@ import {
   UpdateChatAvailabilityDto,
 } from './dto/parent-teacher-chat.dto';
 import { ParentTeacherChatService } from './parent-teacher-chat.service';
+import { ChatWriteDisabledGuard } from './chat-write-disabled.guard';
 
 @Controller('messaging/parent-teacher')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
@@ -55,6 +56,7 @@ export class ParentTeacherChatController {
   }
 
   @Post('threads')
+  @UseGuards(ChatWriteDisabledGuard)
   @Permissions('messaging:create')
   createThread(
     @Body() dto: CreateParentTeacherThreadDto,
@@ -94,6 +96,7 @@ export class ParentTeacherChatController {
   }
 
   @Post('threads/:threadId/messages')
+  @UseGuards(ChatWriteDisabledGuard)
   @Permissions('messaging:create')
   sendMessage(
     @Param('threadId') threadId: string,

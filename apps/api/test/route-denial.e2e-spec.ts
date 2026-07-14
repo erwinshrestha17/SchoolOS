@@ -497,7 +497,7 @@ describe('Route Denial (Entitlement Hardening) E2E', () => {
     },
     {
       label: 'communications-deliveries',
-      featureKey: 'module.communications',
+      featureKey: 'module.notifications',
       controller: DeliveriesController,
       handler: DeliveriesController.prototype.listDeliveries,
       permissions: ['communications:read_deliveries'],

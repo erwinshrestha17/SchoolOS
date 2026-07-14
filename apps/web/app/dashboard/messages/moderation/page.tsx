@@ -1,5 +1,5 @@
-import { ParentTeacherMessagingWorkspace } from '@/components/messaging/parent-teacher-messaging-workspace';
+import { ChatDeferredState } from '@/components/messaging/chat-deferred-state';
 
 export default function MessageModerationPage() {
-  return <ParentTeacherMessagingWorkspace initialStatusFilter="ESCALATED" />;
+  return <ChatDeferredState />;
 }

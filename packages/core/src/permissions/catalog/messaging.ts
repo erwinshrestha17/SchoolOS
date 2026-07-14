@@ -1,4 +1,6 @@
 export const messagingPermissions = [
+  // Compatibility-only catalog. Chat and conversations are deferred and
+  // these write permissions are excluded from system role defaults.
   {
     resource: "messaging",
     action: "create",

@@ -600,6 +600,31 @@ export const permissionCatalog = [
 
   // ─── Compiled from catalog/communications.ts ───
   {
+    resource: "notifications",
+    action: "view_own",
+    description: "View and update one's own notification inbox",
+  },
+  {
+    resource: "notifications",
+    action: "manage_templates",
+    description: "Manage notification delivery templates",
+  },
+  {
+    resource: "notifications",
+    action: "manage_preferences",
+    description: "Manage tenant-safe notification preferences and quiet hours",
+  },
+  {
+    resource: "notifications",
+    action: "view_delivery_diagnostics",
+    description: "View bounded notification delivery diagnostics",
+  },
+  {
+    resource: "notifications",
+    action: "retry_deliveries",
+    description: "Retry eligible failed notification deliveries",
+  },
+  {
     resource: "notices",
     action: "create",
     description: "Create and publish school notices",
@@ -608,6 +633,21 @@ export const permissionCatalog = [
     resource: "notices",
     action: "read",
     description: "Read school notices",
+  },
+  {
+    resource: "notices",
+    action: "approve",
+    description: "Approve high-impact notices",
+  },
+  {
+    resource: "notices",
+    action: "send_emergency",
+    description: "Create and publish emergency notices",
+  },
+  {
+    resource: "notices",
+    action: "read_reports",
+    description: "Read notice delivery and acknowledgement reports",
   },
   {
     resource: "events",
@@ -904,6 +944,8 @@ export const permissionCatalog = [
   },
 
   // ─── Compiled from catalog/messaging.ts ───
+  // Compatibility-only catalog. Chat and conversations are deferred and
+  // these write permissions are excluded from system role defaults.
   {
     resource: "messaging",
     action: "create",

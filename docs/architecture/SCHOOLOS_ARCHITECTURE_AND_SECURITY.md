@@ -13,7 +13,7 @@
 
 ## 1. Active Module Numbering
 
-The canonical M0-M14 taxonomy and module ownership live in [the Module Design Catalog](SCHOOLOS_MODULE_DESIGN_CATALOG.md). This architecture applies to that taxonomy; M14 Intelligence / AI remains deferred.
+The canonical M0-M15 taxonomy and module ownership live in [the Module Design Catalog](SCHOOLOS_MODULE_DESIGN_CATALOG.md). This architecture applies to that taxonomy; M14 Intelligence / AI and chat/conversations remain deferred.
 
 ---
 
@@ -148,7 +148,7 @@ Modules such as Students, Activity Feed, Notices, Homework, Payroll, Accounting,
 
 ```text
 SchoolOS modules
-Students / Activity / Notices / Homework / PDFs / Reports / Chat / Library / Canteen / Transport / Learning
+Students / Activity / M15 Notices / Homework / PDFs / Reports / historical Chat compatibility / Library / Canteen / Transport / Learning
         |
         v
 FileRegistryService
@@ -244,12 +244,17 @@ Rules:
 - Accounting report snapshots should be immutable/versioned.
 - Other modules must not directly write official ledgers from frontend code.
 
-### M12 Notifications, Notices, Communication, Chat
+### M12 Notifications and Delivery
 
-- Files: notice/chat attachments, notification delivery reports, provider failure exports.
-- Attachments must use File Registry access rules.
-- Chat attachment access must fail closed for unlinked actors.
+- Files: notification delivery reports and provider failure exports.
 - Provider secrets, callback payload secrets, raw object keys, and private URLs must never leak.
+
+### M15 Notices and Announcements
+
+- Files: protected notice attachments and notice acknowledgement/report exports.
+- Attachments must use File Registry access rules.
+- M15 emits a normalized publication event; only M12 routes provider delivery.
+- Historical chat attachments remain protected under compatibility authorization and retention policy. New chat attachment writes are disabled.
 
 ### M13 Learning Layer
 
@@ -384,7 +389,7 @@ The system must not pretend to send real messages in disabled, log/dev, or mock 
 
 ## 7. Real-Time and AI Cost Rules
 
-Use real-time only where immediate updates materially improve the workflow, such as live attendance session state, critical admin notifications, admin-only transport latest-location state after load testing, and parent-teacher chat after ownership and retention rules are approved.
+Use real-time only where immediate updates materially improve the workflow, such as live attendance session state, critical admin notifications, and admin-only transport latest-location state after load testing. Chat/conversation real-time scope is deferred and requires separate re-approval plus ownership and retention rules.
 
 Use polling, manual refresh, cached summaries, or scheduled refresh for fee dashboards, exam summaries, student lists, notice lists, report/export history, and static settings.
 

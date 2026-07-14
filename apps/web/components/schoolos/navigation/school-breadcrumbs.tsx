@@ -79,12 +79,12 @@ const SEGMENT_LABELS: Record<string, string> = {
   'smart-board': 'Smart Board',
   launch: 'Launch',
   progress: 'Progress',
-  notices: 'Notices & Communication',
+  notices: 'Notices & Announcements',
   new: 'New',
   deliveries: 'Delivery Logs',
-  communications: 'Communications',
-  messaging: 'Messaging',
-  messages: 'Messages',
+  communications: 'Legacy notification route',
+  messaging: 'Chat deferred',
+  messages: 'Chat deferred',
   moderation: 'Moderation',
   threads: 'Threads',
   recipients: 'Recipient Preview',
@@ -173,7 +173,10 @@ export function SchoolBreadcrumbs({
   const crumbs = segments.map((segment, index) => {
     const href = `${rootHref}/${segments.slice(0, index + 1).join('/')}`;
     const isLast = index === segments.length - 1;
-    const label = isLast && effectiveCurrentLabel ? effectiveCurrentLabel : labelFor(segment);
+    const label =
+      isLast && effectiveCurrentLabel
+        ? effectiveCurrentLabel
+        : labelFor(segment);
     return { href, label, isLast };
   });
 

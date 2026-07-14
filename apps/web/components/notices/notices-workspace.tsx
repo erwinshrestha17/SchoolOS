@@ -4,15 +4,7 @@ import type { PermissionKey } from '@schoolos/core';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import {
-  AlertTriangle,
-  Clock3,
-  Mail,
-  MessageSquare,
-  Send,
-  Settings,
-  ShieldAlert,
-} from 'lucide-react';
+import { AlertTriangle, Clock3, Mail, Send, Settings } from 'lucide-react';
 import { communicationsApi } from '../../lib/api/communications';
 import { DashboardPageShell } from '../dashboard/dashboard-page-shell';
 import { CommunicationsForm } from '../forms/communications-form';
@@ -40,8 +32,6 @@ export function NoticesWorkspace({
   const { session } = useSession();
   const granted = new Set<PermissionKey>(session?.user.permissions ?? []);
   const canCreateNotices = granted.has('notices:create');
-  const canUseChat = granted.has('messaging:create');
-  const canManageChat = granted.has('messaging:manage');
   const canReadDeliveries = granted.has('communications:read_deliveries');
   const canManageTemplates = granted.has('communications:manage_templates');
 
@@ -57,12 +47,14 @@ export function NoticesWorkspace({
   return (
     <DashboardPageShell>
       <ModuleHeader
-        eyebrow="M12 Notices / Communication / Chat"
-        title={variant === 'composer' ? 'New Notice' : 'Notices & Communication'}
+        eyebrow="M15 Notices and Announcements"
+        title={
+          variant === 'composer' ? 'New Notice' : 'Notices & Announcements'
+        }
         description={
           variant === 'composer'
             ? 'Compose and publish a notice, or schedule it for later. Recipient counts and delivery channels are confirmed before you send.'
-            : 'Publish official school communication, review delivery health, and manage controlled parent-teacher conversations. Delivery truth remains backend-owned.'
+            : 'Draft, preview, publish, and review official school notices. Recipient and delivery truth remains backend-owned.'
         }
         primaryAction={
           variant === 'overview' && canCreateNotices ? (
@@ -85,15 +77,6 @@ export function NoticesWorkspace({
                 },
               ]
             : []),
-          ...(canUseChat
-            ? [
-                {
-                  label: 'Parent-Teacher Chat',
-                  icon: <MessageSquare size={16} />,
-                  onClick: () => router.push('/dashboard/messages'),
-                },
-              ]
-            : []),
           ...(canCreateNotices
             ? [
                 {
@@ -104,24 +87,13 @@ export function NoticesWorkspace({
                 },
               ]
             : []),
-          ...(canManageChat
-            ? [
-                {
-                  label: 'Escalated Chats',
-                  icon: <ShieldAlert size={16} />,
-                  onClick: () => router.push('/dashboard/messages/moderation'),
-                },
-              ]
-            : []),
           ...(canReadDeliveries
             ? [
                 {
-                  label: 'Provider Diagnostics',
+                  label: 'Notification Settings',
                   icon: <Settings size={16} />,
                   onClick: () =>
-                    router.push(
-                      '/dashboard/communications/provider-diagnostics',
-                    ),
+                    router.push('/dashboard/settings/notifications'),
                 },
               ]
             : []),
@@ -158,7 +130,11 @@ export function NoticesWorkspace({
               loading={summaryQuery.isLoading}
               value={summaryValue(summary?.unreadHighImpactNotices)}
               icon={<Mail size={20} />}
-              tone={(summary?.unreadHighImpactNotices ?? 0) > 0 ? 'warning' : 'neutral'}
+              tone={
+                (summary?.unreadHighImpactNotices ?? 0) > 0
+                  ? 'warning'
+                  : 'neutral'
+              }
               description="Unread urgent or emergency delivery rows."
             />
           </KpiGrid>
@@ -171,25 +147,19 @@ export function NoticesWorkspace({
           ...(canCreateNotices
             ? [{ href: '/dashboard/notices/new', label: 'Compose' }]
             : []),
-          ...(canUseChat
-            ? [{ href: '/dashboard/messages', label: 'Chat' }]
-            : []),
           ...(canReadDeliveries
-            ? [{ href: '/dashboard/notices/deliveries', label: 'Delivery Logs' }]
+            ? [
+                {
+                  href: '/dashboard/notices/deliveries',
+                  label: 'Delivery Logs',
+                },
+              ]
             : []),
           ...(canManageTemplates
             ? [
                 {
-                  href: '/dashboard/communications/templates',
-                  label: 'Templates',
-                },
-              ]
-            : []),
-          ...(canManageChat
-            ? [
-                {
-                  href: '/dashboard/messages/moderation',
-                  label: 'Escalations',
+                  href: '/dashboard/settings/notifications',
+                  label: 'Delivery Settings',
                 },
               ]
             : []),

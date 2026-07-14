@@ -51,7 +51,7 @@ class PushDeepLinkResolver {
     String? childId,
     ChildScopeVerifier canAccessChild,
   ) async {
-    if (_isSafeNoticeRoute(route)) {
+    if (route == AppRoutes.notifications || _isSafeNoticeRoute(route)) {
       return route;
     }
 
@@ -88,6 +88,7 @@ class PushDeepLinkResolver {
 }
 
 const _teacherRoutes = {
+  AppRoutes.notifications,
   AppRoutes.teacherHome,
   AppRoutes.teacherAttendance,
   AppRoutes.teacherHomework,
@@ -95,6 +96,7 @@ const _teacherRoutes = {
 };
 
 const _principalRoutes = {
+  AppRoutes.notifications,
   AppRoutes.principalAttention,
   AppRoutes.principalApprovals,
   AppRoutes.principalNotices,
@@ -106,9 +108,14 @@ const _principalRoutes = {
 
 const _adminRoutes = {AppRoutes.adminHome, ..._principalRoutes};
 
-const _driverRoutes = {AppRoutes.driverHome, AppRoutes.driverRoute};
+const _driverRoutes = {
+  AppRoutes.notifications,
+  AppRoutes.driverHome,
+  AppRoutes.driverRoute,
+};
 
 const _staffRoutes = {
+  AppRoutes.notifications,
   AppRoutes.staffHome,
   AppRoutes.staffAttendance,
   AppRoutes.staffLeave,

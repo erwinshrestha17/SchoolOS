@@ -23,7 +23,7 @@ export function UpgradePrompt({ moduleName, currentTier }: UpgradePromptProps) {
     transport: 'Transport Management',
     canteen: 'Canteen Management',
     accounting: 'Accounting & Finance',
-    notices: 'Notices & Communication',
+    notices: 'Notices & Announcements',
   };
 
   const friendlyName = moduleFriendlyNames[moduleName] || moduleName;

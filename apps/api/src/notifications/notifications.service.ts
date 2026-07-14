@@ -132,6 +132,19 @@ function resolveProviderReadiness(
     };
   }
 
+  if (
+    channel !== NotificationChannel.IN_APP &&
+    channel !== NotificationChannel.PUSH &&
+    (!isEnabled(process.env[channelMode.enabledEnv]) ||
+      !isEnabled(process.env[channelMode.readyEnv]))
+  ) {
+    return {
+      enabled: false,
+      failureCode: 'PROVIDER_NOT_READY',
+      failureReason: `${channelMode.label} provider readiness has not been confirmed.`,
+    };
+  }
+
   if (channel === NotificationChannel.PUSH) {
     const providerMode = (
       process.env.PUSH_PROVIDER_MODE ??

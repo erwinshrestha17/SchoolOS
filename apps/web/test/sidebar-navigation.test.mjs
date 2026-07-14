@@ -24,11 +24,11 @@ describe('school operations sidebar', () => {
       'Daily Operations',
       'School Operations',
       'Staff & Finance',
-      'Communication',
+      'Notices',
       'Reports',
       'Settings',
       'Fees & Receipts',
-      'Notices & Communication',
+      'Notices & Announcements',
       'Homework & Timetable',
       'Exams & Results',
       'Reports & Exports',
@@ -46,9 +46,9 @@ describe('school operations sidebar', () => {
     assert.doesNotMatch(sidebar, /label: 'Report Cards'/);
   });
 
-  it('keeps deep communication and academic routes active through their consolidated entries', () => {
+  it('keeps notice compatibility and academic routes active through their consolidated entries', () => {
     assert.match(sidebar, /'\/dashboard\/notices'/);
-    assert.match(sidebar, /'\/dashboard\/messages'/);
+    assert.doesNotMatch(sidebar, /href: '\/dashboard\/messages'/);
     assert.match(sidebar, /'\/dashboard\/academics\/cas'/);
     assert.match(sidebar, /'\/dashboard\/academics\/report-cards'/);
     assert.match(sidebar, /'\/dashboard\/timetable'/);
@@ -56,10 +56,8 @@ describe('school operations sidebar', () => {
   });
 
   it('resolves exactly one active nav item when routes overlap', () => {
-    // Regression coverage: Messages and Notices & Communication both cover
-    // /dashboard/messages in the old implementation, and Academics'
-    // href-prefix used to also light up on /dashboard/academics/exams|cas
-    // |report-cards. Both must resolve to a single most-specific match now.
+    // Legacy communication URLs resolve through the M15 notice entry, while
+    // Academics' href-prefix remains single-match for its deeper routes.
     assert.match(sidebar, /function computeActiveHref/);
     assert.match(
       sidebar,

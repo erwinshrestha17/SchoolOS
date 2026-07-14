@@ -32,7 +32,7 @@ Not yet established: GA / Production release
 
 ## 1. Executive Summary
 
-SchoolOS is a Nepal-first, multi-tenant education operating SaaS designed to run the daily administrative, academic, financial, operational, communication, and controlled-learning workflows of an education institution from one tenant-isolated platform.
+SchoolOS is a Nepal-first, multi-tenant education operating SaaS designed to run the daily administrative, academic, financial, operational, notification, notice, and controlled-learning workflows of an education institution from one tenant-isolated platform.
 
 SchoolOS is not a generic CRUD dashboard. It is an operating system for real institutional work:
 
@@ -42,7 +42,7 @@ One tenant-aware source of truth
 + one attendance truth
 + one fee and receipt trail
 + one academic record
-+ one communication trail
++ one notification and notice trail
 + one protected file registry
 + one audit trail
 + role-scoped web and mobile experiences
@@ -136,7 +136,7 @@ These conditions create operational risk:
 
 1. Duplicate data entry and inconsistent records.
 2. Fee, receipt, cashier, and accounting mismatch risk.
-3. Slow or unprovable parent communication.
+3. Slow or unprovable parent notification and notice delivery.
 4. Unauthorized or accidental disclosure of student, staff, salary, or financial information.
 5. Weak traceability for approvals, corrections, reversals, and published results.
 6. High staff dependency on institutional memory and manual follow-up.
@@ -162,7 +162,7 @@ SchoolOS provides:
 - **Operational confidence:** exception-focused dashboards and real workflow drill-throughs instead of decorative metrics.
 - **Finance trust:** backend-owned totals, idempotent money writes, immutable confirmed records, reasoned reversals/corrections, receipts, cashier close, and accounting boundaries.
 - **Parent trust:** linked-child-only visibility, understandable records, consent-safe content, protected documents, and honest notification delivery states.
-- **Teacher usability:** assigned-scope attendance, homework, timetable, marks, communication, and controlled learning without admin-dashboard complexity.
+- **Teacher usability:** assigned-scope attendance, homework, timetable, marks, notices, and controlled learning without admin-dashboard complexity.
 - **Leadership oversight:** attention items, approvals, risks, readiness summaries, and audit trails without bypassing operational controls.
 - **Platform governance:** strict `tenantId` isolation, entitlement enforcement, provider readiness, queue operations, support override controls, and release gates.
 
@@ -176,7 +176,7 @@ Clear fee records
 + understandable receipts
 + reasoned reversals/corrections
 + attendance truth
-+ parent communication
++ parent notifications and notices
 + principal attention
 ```
 
@@ -190,7 +190,7 @@ External wording must avoid unsupported claims of legal compliance, regulator ap
 
 1. Prove one school can run agreed daily workflows without engineering intervention.
 2. Build a repeatable controlled-pilot onboarding, support, verification, backup, and rollback process.
-3. Establish a trusted operational record for student, attendance, fees, receipts, academics, communication, files, and audit.
+3. Establish a trusted operational record for student, attendance, fees, receipts, academics, notifications, notices, files, and audit.
 4. Support modular packaging without weakening tenant, role, entitlement, or data boundaries.
 5. Differentiate through Nepal-first usability, fee transparency, parent trust, protected records, and practical school operations.
 6. Create a scalable foundation for Preschool, School, +2, and controlled learning without parallel systems.
@@ -203,7 +203,7 @@ External wording must avoid unsupported claims of legal compliance, regulator ap
 3. Provide a persona-first Flutter companion app for immediate, safe, role-scoped tasks and visibility.
 4. Make parents able to understand linked-child attendance, dues, receipts, notices, homework, activity, report cards, and enabled services.
 5. Make teachers able to complete assigned daily work quickly without broad administrative access.
-6. Make principals able to identify and act on attention items, approvals, operational risks, finance snapshots, academic readiness, and communication failures.
+6. Make principals able to identify and act on attention items, approvals, operational risks, finance snapshots, academic readiness, and notification-delivery failures.
 7. Make financial records idempotent, auditable, explainable, and backend-owned.
 8. Make protected files accessible only through authenticated, scoped File Registry flows.
 9. Make notification delivery status honest across in-app, push, SMS, and email modes.
@@ -314,7 +314,7 @@ No hard-coded streams or parallel +2 platform may be introduced.
 | Accountant / finance officer | Manage invoices, receipts, reversals, reports, reconciliation, and accounting handoff | Backend-owned totals, idempotency, controlled corrections, audit, protected artifacts |
 | Cashier | Collect fees quickly and close the counter accurately | Fast student search, payment, receipt, reprint, method totals, and day-end close |
 | Academic coordinator / exam head | Configure academics, timetable, exams, marks, CAS, report cards, and promotion | Dense, task-first web workspaces with locks, readiness, corrections, and publishing controls |
-| Teacher | Run assigned daily classroom work | Assigned-scope attendance, homework, timetable, communication, marks, and learning sessions |
+| Teacher | Run assigned daily classroom work | Assigned-scope attendance, homework, timetable, notices, marks, and learning sessions |
 | HR / payroll officer | Manage staff, contracts, leave, attendance, payroll, and payslips | Protected staff records, controlled payroll lifecycle, reasoned corrections, and audit |
 | Librarian | Run circulation and catalogue workflows | Search, scan, issue/return, reservation, fine/lost/damaged handling, and reports |
 | Transport manager | Manage routes, vehicles, assignments, trips, and safety exceptions | Assignment conflict checks, stale-status labels, protected documents, and parent-safe status |
@@ -399,7 +399,7 @@ Suspended tenants, disabled modules, expired sessions, invalid relationships, re
 |---|---|---|
 | Platform control plane | `/platform/*` | SchoolOS tenant, plan, SaaS billing, provider, queue, support, audit, and platform operations |
 | Tenant configuration plane | `/dashboard/settings/*` | One institution's branding, academic setup, roles, fee heads, policies, notification preferences, and enabled configuration |
-| Institution operations plane | `/dashboard/*` | Daily admissions, students, attendance, fees, academics, homework, HR, library, transport, canteen, accounting, communication, learning, reports, and files |
+| Institution operations plane | `/dashboard/*` | Daily admissions, students, attendance, fees, academics, homework, HR, library, transport, canteen, accounting, notifications, notices, learning, reports, and files |
 
 These planes must not be mixed.
 
@@ -460,9 +460,10 @@ Mobile must provide:
 | M9 | Transport | Manage vehicles, drivers/conductors, routes/stops, assignments, trips, boarding/deboarding, status, safety, documents, and parent visibility |
 | M10 | Canteen | Manage menus, meal plans, POS, wallets, QR serving, allergy/medical safety, receipts, stock, vendors, and finance handoff |
 | M11 | Accounting and Finance | Maintain chart of accounts, vouchers, journals, fiscal periods, source mappings, reconciliation, financial statements, snapshots, and audit |
-| M12 | Notifications, Notices, Communication, Chat | Own notification event intake, targeting, templates, channels, delivery, retries, read state, notices, chat, moderation, emergency messaging, and diagnostics |
+| M12 | Notifications and Delivery | Own normalized event intake, recipient resolution, personal inbox/read state, templates, preferences, channels, provider delivery, retries, callbacks, diagnostics, and delivery audit |
 | M13 | Learning Layer | Support teacher-created, school-controlled activities, smart-board/lab sessions, practice, progress, and supportive parent summaries |
 | M14 | Intelligence / AI | Deferred teacher-reviewed analytics and safe AI after production data, privacy, audit, human review, safety, and cost controls are approved |
+| M15 | Notices and Announcements | Own school-authored notice drafts, audiences, preview, approval, scheduling, publication, protected attachments, acknowledgements, read follow-up, archive, and publication audit |
 
 `M8A`, `M8B`, and `M8C` are obsolete. Library, Transport, and Canteen are independent modules. Inventory & Asset Management is not active scope.
 
@@ -635,7 +636,7 @@ Required capabilities:
 
 Critical boundary: other modules and browsers do not directly write official ledger records; accounting entries use backend-owned integration boundaries.
 
-### 11.13 M12 Notifications, Notices, Communication, Chat
+### 11.13 M12 Notifications and Delivery
 
 Required capabilities:
 
@@ -646,8 +647,6 @@ Required capabilities:
 - Explicit disabled, log/dev, mock, sandbox, degraded, and configured provider modes.
 - Idempotent delivery jobs, retries, callbacks, delivery logs, and diagnostics.
 - Notification inbox, unread/read/archive state, safe deep links, and preferences/quiet hours.
-- Notice composition, targeting, recipient preview, scheduling, approval, dispatch, read receipts, and unread follow-up.
-- Assignment/permission-scoped parent-teacher/staff chat, moderation, report, block, escalation, and audit.
 
 Critical boundary: feature modules emit events and never call SMS/email/push providers directly.
 
@@ -679,6 +678,20 @@ No AI/ML/LLM runtime may be added until explicitly approved after:
 - Safety and bias review.
 - Model/provider cost and failure controls.
 - Clear prohibition on automated punishment or irreversible decisions.
+
+### 11.16 M15 Notices and Announcements
+
+Required capabilities:
+
+- Draft, category, English/Nepali/bilingual content, template, schedule, expiry, pin/highlight, archive, and restore.
+- Class, section, role, staff, linked-parent, and authorized selected-recipient audiences.
+- Backend recipient preview using the same resolver used again at final dispatch.
+- High-impact/emergency approval, confirmation, reason where required, audit, and cancellation before dispatch.
+- Protected attachments through File Registry.
+- Publish or schedule, then emit `NOTICE_PUBLISHED` or an equivalent normalized event to M12.
+- Aggregated M12 delivery state plus M15 read/acknowledgement reporting and safe unread follow-up.
+
+Critical boundary: M15 never calls provider SDKs or delivery adapters. Chat, messaging, and conversations are deferred; new writes and active navigation remain disabled while historical records and authorization are preserved pending an approved retention decision.
 
 ---
 
@@ -756,13 +769,15 @@ Academic/exam setup
 
 ```text
 Compose notice
--> choose channels and target
+-> define audience
 -> backend recipient preview
 -> approval where high impact
--> schedule/send
--> provider delivery jobs and callbacks
--> delivery/read state
--> retry/follow-up with audit
+-> publish or schedule
+-> M15 emits normalized notice publication event
+-> M12 re-resolves final recipients with the same rules
+-> M12 creates inbox rows and configured-channel jobs
+-> delivery/read state and callbacks
+-> M15 acknowledgement/read follow-up with audit
 ```
 
 ### 12.7 Driver trip
@@ -835,7 +850,7 @@ Feature module
 -> StorageAdapter
 ```
 
-Protected files include student documents/photos, receipts, report cards, activity media, homework/learning resources, staff documents/contracts/payslips, vehicle documents, notice/chat attachments, accounting evidence/reports, exports, labels, and generated certificates.
+Protected files include student documents/photos, receipts, report cards, activity media, homework/learning resources, staff documents/contracts/payslips, vehicle documents, notice attachments, preserved historical chat attachments, accounting evidence/reports, exports, labels, and generated certificates.
 
 The product must not expose raw object keys, permanent provider URLs, or unauthenticated private files.
 
@@ -981,7 +996,7 @@ Metrics must be measured from backend-owned data and interpreted within the curr
 
 - Real API-backed frontend standardization across M0-M13.
 - Complete loading/empty/error/permission/locked/queued/partial states.
-- Academic/report-card, HR/payroll, accounting, homework/timetable, and communication workflow depth.
+- Academic/report-card, HR/payroll, accounting, homework/timetable, notification-delivery, and notice workflow depth.
 - Parent, teacher, principal, driver, and staff companion polish.
 - Server-side pagination/filtering and performance/index review.
 
@@ -1078,7 +1093,7 @@ SchoolOS product delivery depends on:
 | Financial duplication or silent mutation | Loss of trust and accounting mismatch | Idempotency, transaction safety, immutable confirmed records, reasoned reversal, reconciliation |
 | Browser/mobile computes official truth | Inconsistent records | Backend-owned summaries/totals and contract tests |
 | Protected-file exposure | Student/staff/finance privacy breach | File Registry-only access, short-lived/authenticated download, denial tests |
-| Provider mode represented incorrectly | False communication/payment confidence | Explicit provider state, verified callbacks, honest delivery status |
+| Provider mode represented incorrectly | False notification/payment confidence | Explicit provider state, verified callbacks, honest delivery status |
 | Mobile becomes a mini admin dashboard | Scope leakage and poor usability | Persona-first navigation and purpose-limited APIs |
 | Premature inactive-scope or AI expansion | Distracts from pilot/GA blockers | Explicit non-scope labels and release-governed approval |
 | Documentation overstates readiness | Bad decisions and buyer mistrust | Evidence-based status language and release-policy precedence |
@@ -1099,7 +1114,7 @@ These require explicit owner/product decision and must not be guessed in impleme
 6. Formal/IRD-ready billing boundary and external claim wording after expert validation.
 7. Education-reporting export formats and institution/authority validation.
 8. Offline-write policy beyond currently approved attendance-style idempotent workflows.
-9. Whether parent-teacher chat is enabled for the controlled pilot and under which quiet-hour/moderation policy.
+9. Approved retention and migration policy for historical chat/conversation records; chat remains disabled until separately re-approved.
 10. Any M14 Intelligence / AI proposal.
 
 Unknown implementation items must be labeled precisely:

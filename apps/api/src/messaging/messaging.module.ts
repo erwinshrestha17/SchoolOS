@@ -9,6 +9,7 @@ import { MessagingService } from './messaging.service';
 import { ParentTeacherChatController } from './parent-teacher-chat.controller';
 import { ParentTeacherChatService } from './parent-teacher-chat.service';
 import { UsageModule } from '../usage/usage.module';
+import { ChatWriteDisabledGuard } from './chat-write-disabled.guard';
 
 @Module({
   imports: [AuthModule, CommunicationsModule, AuditModule, UsageModule],
@@ -18,6 +19,7 @@ import { UsageModule } from '../usage/usage.module';
     MessagingHardeningController,
   ],
   providers: [
+    ChatWriteDisabledGuard,
     MessagingService,
     ParentTeacherChatService,
     MessagingHardeningService,

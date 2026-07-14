@@ -83,6 +83,10 @@ const SAFE_MIME_TYPES = new Set([
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ]);
 const DANGEROUS_EXTENSIONS = /\.(exe|bat|cmd|com|scr|js|mjs|sh|ps1|php|jar)$/i;
+const DEFERRED_CHAT_UPLOAD_MODULES = new Set([
+  'messages',
+  'parent-teacher-chat',
+]);
 const MODULE_UPLOAD_PERMISSIONS: Record<string, string[]> = {
   activity: ['activity_feed:create'],
   admissions: ['student_documents:manage'],
@@ -294,6 +298,12 @@ export class FileRegistryController {
   }
 
   private validateModulePermission(moduleName: string, permissions: string[]) {
+    if (DEFERRED_CHAT_UPLOAD_MODULES.has(moduleName)) {
+      throw new ForbiddenException(
+        'New chat attachments are unavailable while chat is deferred',
+      );
+    }
+
     const requiredPermissions = MODULE_UPLOAD_PERMISSIONS[moduleName];
 
     if (!requiredPermissions) {

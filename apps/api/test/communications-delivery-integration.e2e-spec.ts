@@ -47,6 +47,7 @@ describe('Communications Delivery Reliability Integration (E2E)', () => {
     sendEmail: jest.Mock;
     sendSms: jest.Mock;
     sendPushNotification: jest.Mock;
+    getProviderReadiness: jest.Mock;
   };
   let communicationsService: CommunicationsService;
   let deliveryRetryService: DeliveryRetryService;
@@ -67,6 +68,11 @@ describe('Communications Delivery Reliability Integration (E2E)', () => {
       sendEmail: jest.fn().mockResolvedValue(undefined),
       sendSms: jest.fn().mockResolvedValue(undefined),
       sendPushNotification: jest.fn().mockResolvedValue(undefined),
+      getProviderReadiness: jest.fn().mockResolvedValue({
+        enabled: true,
+        failureCode: null,
+        failureReason: null,
+      }),
     };
 
     deliveryRetryService = new DeliveryRetryService(
@@ -133,6 +139,14 @@ describe('Communications Delivery Reliability Integration (E2E)', () => {
           noticeId: notice.id,
           guardianId: 'guardian-1',
           recipientUserId: 'guardian-user-1',
+          status: NotificationStatus.SENT,
+          channel: NotificationChannel.IN_APP,
+        }),
+        expect.objectContaining({
+          tenantId,
+          noticeId: notice.id,
+          guardianId: 'guardian-1',
+          recipientUserId: 'guardian-user-1',
           status: NotificationStatus.QUEUED,
           channel: NotificationChannel.PUSH,
         }),
@@ -168,7 +182,7 @@ describe('Communications Delivery Reliability Integration (E2E)', () => {
         after: expect.objectContaining({
           recipientCount: 1,
           skippedRecipientCount: 1,
-          channelCount: 1,
+          channelCount: 2,
         }),
       }),
     );

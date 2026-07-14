@@ -83,7 +83,7 @@ describe('CommunicationsService', () => {
       },
       guardianConsent: {
         create: jest.fn(),
-        findMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
       },
       communicationPreference: {
         findMany: jest.fn().mockResolvedValue([]),
@@ -94,6 +94,11 @@ describe('CommunicationsService', () => {
       sendPushNotification: jest.fn(),
       sendSms: jest.fn(),
       sendEmail: jest.fn(),
+      getProviderReadiness: jest.fn().mockResolvedValue({
+        enabled: true,
+        failureCode: null,
+        failureReason: null,
+      }),
     };
     auditService = {
       record: jest.fn(),
@@ -369,11 +374,15 @@ describe('CommunicationsService', () => {
     expect(preview).toEqual(
       expect.objectContaining({
         priority: NoticePriority.EMERGENCY,
-        channels: [NotificationChannel.PUSH, NotificationChannel.SMS],
+        channels: [
+          NotificationChannel.IN_APP,
+          NotificationChannel.PUSH,
+          NotificationChannel.SMS,
+        ],
         recipientCount: 2,
         allowedRecipientCount: 1,
         skippedRecipientCount: 1,
-        estimatedDeliveryRows: 2,
+        estimatedDeliveryRows: 3,
         sampleRecipients: [
           {
             studentId: 'student-1',
@@ -605,9 +614,12 @@ describe('CommunicationsService', () => {
     expect(prisma.notice.create).not.toHaveBeenCalled();
   });
 
-  it('does not publish a high-impact notice when delivery providers are disabled', async () => {
-    const previous = process.env.NOTIFICATIONS_DISABLED;
-    process.env.NOTIFICATIONS_DISABLED = 'disabled';
+  it('publishes high-impact notices to the in-app inbox while disabled external providers remain skipped', async () => {
+    notificationsService.getProviderReadiness.mockResolvedValue({
+      enabled: false,
+      failureCode: 'PROVIDER_DISABLED',
+      failureReason: 'Provider disabled for this environment',
+    });
     prisma.notice.findFirst.mockResolvedValue({
       id: 'notice-1',
       tenantId: 'tenant-1',
@@ -621,20 +633,15 @@ describe('CommunicationsService', () => {
       publishedAt: null,
     });
 
-    try {
-      await expect(service.publishNotice('notice-1', actor)).rejects.toThrow(
-        'No configured delivery channel is currently available',
-      );
-      expect(prisma.notice.update).not.toHaveBeenCalled();
-      expect(notificationsService.sendPushNotification).not.toHaveBeenCalled();
-      expect(notificationsService.sendSms).not.toHaveBeenCalled();
-    } finally {
-      if (previous === undefined) {
-        delete process.env.NOTIFICATIONS_DISABLED;
-      } else {
-        process.env.NOTIFICATIONS_DISABLED = previous;
-      }
-    }
+    prisma.notificationDelivery.findMany.mockResolvedValue([]);
+    prisma.student.findMany.mockResolvedValue([]);
+
+    await expect(service.publishNotice('notice-1', actor)).resolves.toEqual(
+      expect.objectContaining({ state: 'QUEUED' }),
+    );
+    expect(prisma.notice.update).toHaveBeenCalled();
+    expect(notificationsService.sendPushNotification).not.toHaveBeenCalled();
+    expect(notificationsService.sendSms).not.toHaveBeenCalled();
   });
 
   it('converts fee payment domain events into guardian receipt notifications', async () => {

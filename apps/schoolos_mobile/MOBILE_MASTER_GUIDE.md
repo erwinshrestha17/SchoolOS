@@ -73,6 +73,11 @@ Use the GA policy and attach current local, emulator/device, staging, and contro
 
 ## Push Notification Configuration
 
+Push and the personal inbox are M12 Notifications and Delivery. Authored school
+notices are M15 Notices and Announcements and delegate delivery to M12. Chat or
+conversation routes are not active mobile capability; historical message-type
+notifications open the personal inbox instead of a chat surface.
+
 The app registers FCM tokens only for authenticated parent, teacher, principal/admin, driver, and staff personas. Controlled student sessions do not register broad mobile push. Configure Firebase per build without committing provider secrets:
 
 ```text

@@ -72,8 +72,15 @@ const PLATFORM_PERMISSION_KEYS = [
   "tenants:manage",
 ];
 
+const DEFERRED_CHAT_WRITE_PERMISSION_KEYS = [
+  "messaging:create",
+  "messaging:manage",
+];
+
 const TENANT_PERMISSION_KEYS = ALL_PERMISSION_KEYS.filter(
-  (key) => !PLATFORM_PERMISSION_KEYS.includes(key),
+  (key) =>
+    !PLATFORM_PERMISSION_KEYS.includes(key) &&
+    !DEFERRED_CHAT_WRITE_PERMISSION_KEYS.includes(key),
 );
 
 export const systemRolePermissions: Record<string, string[]> = {
@@ -105,7 +112,6 @@ export const systemRolePermissions: Record<string, string[]> = {
     "learning:delete",
     "learning:launch",
     "learning:progress",
-    "messaging:create",
     "messaging:read",
     "activity_feed:create",
     "activity_feed:read",
@@ -146,7 +152,6 @@ export const systemRolePermissions: Record<string, string[]> = {
     "learning:delete",
     "learning:launch",
     "learning:progress",
-    "messaging:create",
     "messaging:read",
     "activity_feed:create",
     "activity_feed:read",
@@ -191,7 +196,6 @@ export const systemRolePermissions: Record<string, string[]> = {
     "homework:submit",
     "learning:read",
     "learning:progress",
-    "messaging:create",
     "messaging:read",
     "transport:tracking:parent",
     "canteen:parent:read",

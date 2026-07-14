@@ -199,10 +199,10 @@ class _ConsentStatusSection extends ConsumerWidget {
           const SizedBox(height: 12),
           _ReadOnlyPermissionCard(
             icon: Icons.forum_rounded,
-            title: 'Communication consent',
+            title: 'Notification consent',
             message:
                 _messageFor(items, 'MESSAGING') ??
-                'No communication consent record is available yet.',
+                'No notification consent record is available yet.',
             statusLabel: _statusFor(items, 'MESSAGING'),
             version: _find(items, 'MESSAGING')?.version,
             onDecision: (version, granted) =>
@@ -370,7 +370,7 @@ class _ReadOnlyPermissionCard extends StatelessWidget {
 String _labelFor(String type) {
   return switch (type) {
     'PHOTO_USAGE' => 'Media consent',
-    'MESSAGING' => 'Communication consent',
+    'MESSAGING' => 'Notification consent',
     'DATA_PROCESSING' => 'Data processing consent',
     _ => 'Consent',
   };

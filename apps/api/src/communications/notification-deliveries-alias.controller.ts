@@ -12,7 +12,7 @@ import { RetryDeliveryDto } from './dto/m10-hardening.dto';
 
 @Controller('notifications/deliveries')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
-@Entitlement('module.communications')
+@Entitlement('module.notifications')
 export class NotificationDeliveriesAliasController {
   constructor(
     private readonly communicationsService: CommunicationsService,
@@ -20,25 +20,25 @@ export class NotificationDeliveriesAliasController {
   ) {}
 
   @Get()
-  @Permissions('communications:read_deliveries')
+  @Permissions('notifications:view_delivery_diagnostics')
   listDeliveries(@CurrentAuth() auth: AuthContext) {
     return this.communicationsService.listDeliveries(auth);
   }
 
   @Get('analytics')
-  @Permissions('communications:read_deliveries')
+  @Permissions('notifications:view_delivery_diagnostics')
   analytics(@CurrentAuth() auth: AuthContext) {
     return this.communicationsService.getDeliveryAnalytics(auth);
   }
 
   @Get('failures')
-  @Permissions('communications:read_deliveries')
+  @Permissions('notifications:view_delivery_diagnostics')
   failures(@CurrentAuth() auth: AuthContext) {
     return this.deliveryRetryService.listFailureDashboard(auth);
   }
 
   @Post(':deliveryId/retry')
-  @Permissions('communications:retry_deliveries')
+  @Permissions('notifications:retry_deliveries')
   retryDelivery(
     @Param('deliveryId') deliveryId: string,
     @Body() dto: RetryDeliveryDto,
@@ -50,7 +50,7 @@ export class NotificationDeliveriesAliasController {
   }
 
   @Post('retry-failed')
-  @Permissions('communications:retry_deliveries')
+  @Permissions('notifications:retry_deliveries')
   retryFailedDeliveries(
     @Body() dto: RetryDeliveryDto,
     @CurrentAuth() auth: AuthContext,

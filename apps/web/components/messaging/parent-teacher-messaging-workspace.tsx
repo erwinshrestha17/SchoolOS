@@ -225,9 +225,9 @@ export function ParentTeacherMessagingWorkspace({
   return (
     <DashboardPageShell>
       <ModuleHeader
-        eyebrow="M12 Notices / Communication / Chat"
-        title="Parent-Teacher Chat"
-        description="Parent and class-teacher conversations with school moderation, reporting, escalation, and quiet-hours controls."
+        eyebrow="Deferred compatibility surface"
+        title="Historical Parent-Teacher Conversations"
+        description="New chat activity is unavailable. Authorized historical records remain protected while retention and migration policy is reviewed."
         moreActionItems={[
           {
             label: "Notices",

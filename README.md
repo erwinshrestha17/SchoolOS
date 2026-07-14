@@ -17,6 +17,10 @@ HIGHER_SECONDARY
 
 Bachelor and Master's institution-management features, a broad student mobile application, and M14 Intelligence / AI runtime are not active scope.
 
+The active delivery boundary separates **M12 Notifications and Delivery** from
+**M15 Notices and Announcements**. Chat/conversations are deferred: new chat
+writes and navigation are disabled while historical records remain protected.
+
 ## Current Pilot Focus
 
 SchoolOS is currently **Internal QA / controlled-pilot preparation**, not staging validated, controlled pilot validated, release candidate, or GA / Production release.

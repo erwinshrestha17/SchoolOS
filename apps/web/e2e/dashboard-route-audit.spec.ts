@@ -20,6 +20,7 @@ const schoolRoutes = [
   '/dashboard/fees',
   '/dashboard/finance',
   '/dashboard/notices',
+  '/dashboard/notices/new',
   '/dashboard/activity',
   '/dashboard/academics',
   '/dashboard/academics/exam-terms',
@@ -52,14 +53,16 @@ const platformRoutes = [
   '/platform/settings/plans',
 ] as const;
 
-const platformApiPathsByRoute: Record<(typeof platformRoutes)[number], RegExp> = {
-  '/platform/dashboard': /\/platform\/dashboard(?:$|[?#])?/,
-  '/platform/schools': /\/platform\/tenants(?:$|[/?#])?/,
-  '/platform/schools?workflow=subscriptions': /\/platform\/tenants(?:$|[/?#])?/,
-  '/platform/audit': /\/platform\/audit-logs(?:$|[/?#])?/,
-  '/platform/settings?tab=plans': /\/platform\/plans(?:$|[?#])?/,
-  '/platform/settings/plans': /\/platform\/plans(?:$|[?#])?/,
-};
+const platformApiPathsByRoute: Record<(typeof platformRoutes)[number], RegExp> =
+  {
+    '/platform/dashboard': /\/platform\/dashboard(?:$|[?#])?/,
+    '/platform/schools': /\/platform\/tenants(?:$|[/?#])?/,
+    '/platform/schools?workflow=subscriptions':
+      /\/platform\/tenants(?:$|[/?#])?/,
+    '/platform/audit': /\/platform\/audit-logs(?:$|[/?#])?/,
+    '/platform/settings?tab=plans': /\/platform\/plans(?:$|[?#])?/,
+    '/platform/settings/plans': /\/platform\/plans(?:$|[?#])?/,
+  };
 
 const tenantApiPathsByRoute = {
   '/dashboard': /\/auth\/me(?:$|[?#])?|\/academic-years(?:$|[/?#])?/,
@@ -105,6 +108,27 @@ test.describe('Dashboard route audit smoke', () => {
 
     expect(pageErrors, pageErrors.join('\n')).toEqual([]);
   });
+
+  test('keeps personal notifications available while chat routes stay deferred', async ({
+    page,
+  }) => {
+    await login(page, schoolCredentials);
+
+    const notificationButton = page.getByRole('button', {
+      name: /Notifications/i,
+    });
+    await expect(notificationButton).toBeVisible();
+    await notificationButton.click();
+    await expect(page.getByTestId('notification-panel')).toBeVisible();
+
+    await expect(page.getByRole('link', { name: /^Messages$/i })).toHaveCount(
+      0,
+    );
+    await page.goto('/dashboard/messages');
+    await expect(
+      page.getByRole('heading', { name: /Chat is deferred/i }),
+    ).toBeVisible();
+  });
 });
 
 test.describe('Platform route audit smoke', () => {
@@ -117,7 +141,9 @@ test.describe('Platform route audit smoke', () => {
     );
   });
 
-  test('loads implemented platform routes for platform users', async ({ page }) => {
+  test('loads implemented platform routes for platform users', async ({
+    page,
+  }) => {
     await login(page, platformCredentials);
 
     for (const route of platformRoutes) {
@@ -140,16 +166,22 @@ test.describe('Browser-level platform and school route denial', () => {
     );
   });
 
-  test('denies school users from platform control-plane routes', async ({ page }) => {
+  test('denies school users from platform control-plane routes', async ({
+    page,
+  }) => {
     await login(page, schoolCredentials);
 
     for (const route of platformRoutes) {
       await expectRouteDenied(page, route, platformApiPathsByRoute[route]);
-      await expect(page.getByRole('heading', { name: /Platform Dashboard/i })).toHaveCount(0);
+      await expect(
+        page.getByRole('heading', { name: /Platform Dashboard/i }),
+      ).toHaveCount(0);
     }
   });
 
-  test('denies platform users from tenant school operation routes', async ({ page }) => {
+  test('denies platform users from tenant school operation routes', async ({
+    page,
+  }) => {
     await login(page, platformCredentials);
 
     for (const [route, apiPattern] of Object.entries(tenantApiPathsByRoute)) {
@@ -199,7 +231,8 @@ async function expectRouteDenied(
   const deniedResponsePromise = page
     .waitForResponse(
       (response) =>
-        apiPattern.test(response.url()) && [401, 403].includes(response.status()),
+        apiPattern.test(response.url()) &&
+        [401, 403].includes(response.status()),
       { timeout: 5_000 },
     )
     .catch(() => null);

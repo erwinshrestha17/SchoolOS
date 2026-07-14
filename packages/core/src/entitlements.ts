@@ -25,7 +25,8 @@ export const CUSTOMER_MODULES = [
   'transport', // M9 Transport
   'canteen', // M10 Canteen
   'accounting', // M11 Accounting & Finance
-  'notices', // M12 Notifications, Notices, Communication & Chat
+  'notifications', // M12 Notifications & Delivery
+  'notices', // M15 Notices & Announcements (stable key retained)
   'learning', // M13 Learning Layer
 ];
 
@@ -84,7 +85,16 @@ export const FEATURE_KEYS = {
   ACCOUNTING_FULL: 'feature.accounting.full',
   ACCOUNTING_AUDIT: 'feature.accounting.audit',
 
-  // M12 Notifications, Notices, Communication & Chat
+  // M12 Notifications & Delivery
+  NOTIFICATIONS_IN_APP: 'feature.notifications.in_app',
+  NOTIFICATIONS_PUSH: 'feature.notifications.push',
+  NOTIFICATIONS_SMS: 'feature.notifications.sms',
+  NOTIFICATIONS_EMAIL: 'feature.notifications.email',
+  NOTIFICATIONS_PREFERENCES: 'feature.notifications.preferences',
+  NOTIFICATIONS_DELIVERY_DIAGNOSTICS:
+    'feature.notifications.delivery_diagnostics',
+
+  // M15 Notices & Announcements. Existing keys remain compatibility-stable.
   NOTICES_BASIC: 'feature.notices.basic',
   NOTICES_FULL: 'feature.notices.full',
   NOTICES_READ_TRACKING: 'feature.notices.read_tracking',
@@ -99,6 +109,7 @@ export const FEATURE_KEYS = {
   MOBILE_PARENT_BASIC: 'feature.mobile.parent_basic',
   MOBILE_TEACHER_PARENT: 'feature.mobile.teacher_parent',
   MOBILE_FULL_ROLE: 'feature.mobile.full_role',
+  /** @deprecated Chat is deferred; retained only to recognize legacy data. */
   MOBILE_PARENT_TEACHER_CHAT: 'feature.mobile.parent_teacher_chat',
 
   // Imports/Exports
@@ -120,6 +131,7 @@ export const ENTITLEMENT_MATRIX: Record<
       'exams',
       'activity',
       'homework',
+      'notifications',
       'notices',
     ],
     features: [
@@ -128,6 +140,7 @@ export const ENTITLEMENT_MATRIX: Record<
       FEATURE_KEYS.ACTIVITY_BASIC,
       FEATURE_KEYS.HOMEWORK_BASIC,
       FEATURE_KEYS.TIMETABLE_VIEW,
+      FEATURE_KEYS.NOTIFICATIONS_IN_APP,
       FEATURE_KEYS.NOTICES_BASIC,
       FEATURE_KEYS.REPORTS_BASIC,
       FEATURE_KEYS.MOBILE_PARENT_BASIC,
@@ -141,6 +154,7 @@ export const ENTITLEMENT_MATRIX: Record<
       'exams',
       'activity',
       'homework',
+      'notifications',
       'notices',
     ],
     features: [
@@ -155,6 +169,8 @@ export const ENTITLEMENT_MATRIX: Record<
       FEATURE_KEYS.TIMETABLE_VIEW,
       FEATURE_KEYS.TIMETABLE_BASIC,
       FEATURE_KEYS.HR_STAFF_RECORDS,
+      FEATURE_KEYS.NOTIFICATIONS_IN_APP,
+      FEATURE_KEYS.NOTIFICATIONS_PREFERENCES,
       FEATURE_KEYS.NOTICES_BASIC,
       FEATURE_KEYS.NOTICES_FULL,
       FEATURE_KEYS.ACCOUNTING_BASIC_FINANCE,
@@ -177,6 +193,7 @@ export const ENTITLEMENT_MATRIX: Record<
       'transport',
       'canteen',
       'accounting',
+      'notifications',
       'notices',
       'learning',
     ],
@@ -206,6 +223,10 @@ export const ENTITLEMENT_MATRIX: Record<
       FEATURE_KEYS.TRANSPORT_FULL,
       FEATURE_KEYS.CANTEEN_BASIC,
       FEATURE_KEYS.CANTEEN_FULL,
+      FEATURE_KEYS.NOTIFICATIONS_IN_APP,
+      FEATURE_KEYS.NOTIFICATIONS_PUSH,
+      FEATURE_KEYS.NOTIFICATIONS_PREFERENCES,
+      FEATURE_KEYS.NOTIFICATIONS_DELIVERY_DIAGNOSTICS,
       FEATURE_KEYS.NOTICES_BASIC,
       FEATURE_KEYS.NOTICES_FULL,
       FEATURE_KEYS.NOTICES_READ_TRACKING,
@@ -231,6 +252,7 @@ export const ENTITLEMENT_MATRIX: Record<
       'transport',
       'canteen',
       'accounting',
+      'notifications',
       'notices',
       'learning',
     ],
@@ -264,6 +286,12 @@ export const ENTITLEMENT_MATRIX: Record<
       FEATURE_KEYS.TRANSPORT_FULL,
       FEATURE_KEYS.CANTEEN_BASIC,
       FEATURE_KEYS.CANTEEN_FULL,
+      FEATURE_KEYS.NOTIFICATIONS_IN_APP,
+      FEATURE_KEYS.NOTIFICATIONS_PUSH,
+      FEATURE_KEYS.NOTIFICATIONS_SMS,
+      FEATURE_KEYS.NOTIFICATIONS_EMAIL,
+      FEATURE_KEYS.NOTIFICATIONS_PREFERENCES,
+      FEATURE_KEYS.NOTIFICATIONS_DELIVERY_DIAGNOSTICS,
       FEATURE_KEYS.NOTICES_BASIC,
       FEATURE_KEYS.NOTICES_FULL,
       FEATURE_KEYS.NOTICES_READ_TRACKING,
@@ -277,7 +305,6 @@ export const ENTITLEMENT_MATRIX: Record<
       FEATURE_KEYS.MOBILE_PARENT_BASIC,
       FEATURE_KEYS.MOBILE_TEACHER_PARENT,
       FEATURE_KEYS.MOBILE_FULL_ROLE,
-      FEATURE_KEYS.MOBILE_PARENT_TEACHER_CHAT,
       FEATURE_KEYS.IMPORTS_EXPORTS_ADVANCED,
       FEATURE_KEYS.GPS_LIVE_TRACKING,
       FEATURE_KEYS.CANTEEN_WALLET_CONTROLS,

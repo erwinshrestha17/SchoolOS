@@ -152,7 +152,9 @@ Current repository status: **PROPOSED / NEEDS_SCHEMA_DESIGN**. Do not invent end
 | Lists | Growing lists use pagination/filtering/sorting. Do not add unbounded `findMany` for tenant-owned operational data. |
 | Money | Use database/backend Decimal/numeric totals. Money writes are idempotent and audited; confirmed records use reversal/correction. |
 | Files | Use `Feature module -> FileRegistryService -> StorageService -> StorageAdapter`; clients use protected preview/download helpers. |
-| Notifications | Source modules emit normalized events; M12 owns recipient resolution, templates, channels, providers, retries, callbacks, read state, and audit. |
+| M12 Notifications and Delivery | Source modules emit normalized events; M12 owns recipient resolution, templates, channels, providers, retries, callbacks, personal inbox/read state, diagnostics, and audit. |
+| M15 Notices and Announcements | M15 owns notice drafts, audience preview, approval/scheduling/publication, protected attachments, acknowledgement reporting, and emits `NOTICE_PUBLISHED` or an equivalent normalized event to M12. Preview and final dispatch use the same backend recipient resolver. |
+| Deferred chat compatibility | New conversations/messages and active navigation are disabled. Historical chat records, migrations, moderation evidence, tenant scope, and read authorization are preserved pending a retention decision. |
 | Suspended tenants | Suspended tenants fail closed across API, web, mobile, jobs, exports, files, notifications, and learning. |
 
 ## 7. Web Requirements

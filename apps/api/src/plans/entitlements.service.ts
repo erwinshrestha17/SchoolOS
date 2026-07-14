@@ -141,13 +141,21 @@ export class EntitlementsService {
       for (const f of subscription.plan.features) {
         if (f.enabled) {
           if (f.featureKey.startsWith('module.')) {
-            modulesSet.add(f.featureKey.replace('module.', ''));
+            applyModuleCompatibility(
+              modulesSet,
+              f.featureKey.replace('module.', ''),
+              true,
+            );
           } else {
             featuresSet.add(f.featureKey);
           }
         } else {
           if (f.featureKey.startsWith('module.')) {
-            modulesSet.delete(f.featureKey.replace('module.', ''));
+            applyModuleCompatibility(
+              modulesSet,
+              f.featureKey.replace('module.', ''),
+              false,
+            );
           } else {
             featuresSet.delete(f.featureKey);
           }
@@ -180,17 +188,35 @@ export class EntitlementsService {
       const key = override.featureKey;
       if (override.enabled) {
         if (key.startsWith('module.')) {
-          modulesSet.add(key.replace('module.', ''));
+          applyModuleCompatibility(
+            modulesSet,
+            key.replace('module.', ''),
+            true,
+          );
         } else {
           featuresSet.add(key);
         }
       } else {
         if (key.startsWith('module.')) {
-          modulesSet.delete(key.replace('module.', ''));
+          applyModuleCompatibility(
+            modulesSet,
+            key.replace('module.', ''),
+            false,
+          );
         } else {
           featuresSet.delete(key);
         }
       }
+    }
+
+    // Chat is outside the active release boundary. Preserve legacy keys in
+    // storage, but never surface them as enabled product entitlements.
+    modulesSet.delete('communications');
+    modulesSet.delete('messaging');
+    modulesSet.delete('chat');
+    featuresSet.delete(FEATURE_KEYS.MOBILE_PARENT_TEACHER_CHAT);
+    for (const feature of Array.from(featuresSet)) {
+      if (feature.startsWith('feature.chat.')) featuresSet.delete(feature);
     }
 
     // Filter out M0 / platform-related features and modules
@@ -230,6 +256,9 @@ export class EntitlementsService {
     const cleaned = moduleName.startsWith('module.')
       ? moduleName.replace('module.', '')
       : moduleName;
+    if (cleaned === 'chat' || cleaned === 'messaging') {
+      return false;
+    }
     if (
       this.isM0OrPlatform(cleaned) ||
       this.isM0OrPlatform(`module.${cleaned}`)
@@ -237,11 +266,14 @@ export class EntitlementsService {
       return false;
     }
     const entitlements = await this.getEntitlements(tenantId);
+    const hasModule = (name: string) => entitlements.modules.includes(name);
     return (
       entitlements.modules.includes(cleaned) ||
       entitlements.features.includes(cleaned) ||
       (cleaned === 'timetable' && entitlements.modules.includes('homework')) ||
-      (cleaned === 'communications' && entitlements.modules.includes('notices'))
+      (cleaned === 'communications' &&
+        (hasModule('notifications') || hasModule('notices'))) ||
+      (cleaned === 'notifications' && hasModule('notices'))
     );
   }
 
@@ -286,5 +318,28 @@ export class EntitlementsService {
       );
     }
   }
+}
+
+function applyModuleCompatibility(
+  modules: Set<string>,
+  moduleName: string,
+  enabled: boolean,
+) {
+  if (moduleName === 'communications') {
+    for (const replacement of ['notifications', 'notices']) {
+      if (enabled) modules.add(replacement);
+      else modules.delete(replacement);
+    }
+    modules.delete('communications');
+    return;
+  }
+
+  if (moduleName === 'chat' || moduleName === 'messaging') {
+    modules.delete(moduleName);
+    return;
+  }
+
+  if (enabled) modules.add(moduleName);
+  else modules.delete(moduleName);
 }
 // Trigger build

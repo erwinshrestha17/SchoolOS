@@ -10,32 +10,32 @@ import { NotificationCenterService } from './notification-center.service';
 
 @Controller('communications/notifications')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
-@Entitlement('module.communications')
+@Entitlement('module.notifications')
 export class NotificationCenterController {
   constructor(
     private readonly notificationCenterService: NotificationCenterService,
   ) {}
 
   @Get()
-  @Permissions('notices:read')
+  @Permissions('notifications:view_own')
   getCenter(@CurrentAuth() auth: AuthContext) {
     return this.notificationCenterService.getCenter(auth);
   }
 
   @Get('unread-count')
-  @Permissions('notices:read')
+  @Permissions('notifications:view_own')
   getUnreadCount(@CurrentAuth() auth: AuthContext) {
     return this.notificationCenterService.getUnreadCount(auth);
   }
 
   @Post(':id/read')
-  @Permissions('notices:read')
+  @Permissions('notifications:view_own')
   markRead(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
     return this.notificationCenterService.markRead(id, auth);
   }
 
   @Post('mark-all-read')
-  @Permissions('notices:read')
+  @Permissions('notifications:view_own')
   markAllRead(@CurrentAuth() auth: AuthContext) {
     return this.notificationCenterService.markAllRead(auth);
   }

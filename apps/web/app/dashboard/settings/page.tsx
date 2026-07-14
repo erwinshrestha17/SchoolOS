@@ -482,10 +482,10 @@ const SETTINGS_SECTIONS: SettingSectionConfig[] = [
   },
   {
     id: "communication",
-    eyebrow: "Parent engagement",
-    title: "Communication Rules",
+    eyebrow: "Notification delivery",
+    title: "Notification Rules",
     description:
-      "Configure notification defaults, consent requirements, quiet hours, and teacher chat availability.",
+      "Configure notification defaults, consent requirements, quiet hours, and emergency delivery policy.",
     icon: MessageSquare,
     tone: "bg-cyan-50 text-cyan-700 border-cyan-100",
     fields: [
@@ -515,41 +515,6 @@ const SETTINGS_SECTIONS: SettingSectionConfig[] = [
       {
         key: "quiet_hours_enabled",
         label: "Enable Quiet Hours",
-        type: "checkbox",
-      },
-      {
-        key: "chat_availability_enabled",
-        label: "Allow Parent-Teacher Chat",
-        type: "checkbox",
-        defaultValue: true,
-      },
-      {
-        key: "chat_sunday_to_thursday_start",
-        label: "Sun–Thu Chat Start",
-        type: "time",
-        defaultValue: "16:00",
-      },
-      {
-        key: "chat_sunday_to_thursday_end",
-        label: "Sun–Thu Chat End",
-        type: "time",
-        defaultValue: "19:00",
-      },
-      {
-        key: "chat_friday_start",
-        label: "Friday Chat Start",
-        type: "time",
-        defaultValue: "14:00",
-      },
-      {
-        key: "chat_friday_end",
-        label: "Friday Chat End",
-        type: "time",
-        defaultValue: "17:00",
-      },
-      {
-        key: "chat_saturday_enabled",
-        label: "Enable Saturday Chat",
         type: "checkbox",
       },
       {
@@ -3458,7 +3423,7 @@ function UsersAccessPanel() {
     {
       title: "Parent Accounts",
       description:
-        "Parents and guardians with access to student records, notices, and messaging.",
+        "Parents and guardians with access to linked-child records, notices, and notifications.",
       icon: Users,
       accent: "bg-emerald-50 text-emerald-700 border-emerald-100",
       count: users.filter((user) => hasAnyRole(user, ["parent"])).length,
@@ -3951,11 +3916,11 @@ const PLATFORM_ROLE_NAMES = new Set([
 const ROLE_MODULE_MAP: Record<string, string[]> = {
   admin: ["Full tenant access"],
   principal: ["Full tenant access"],
-  teacher: ["Academics", "Attendance", "Homework", "Messaging", "HR leave"],
-  subject_teacher: ["Academics", "Homework", "Messaging", "Timetable"],
+  teacher: ["Academics", "Attendance", "Homework", "Notices", "HR leave"],
+  subject_teacher: ["Academics", "Homework", "Notices", "Timetable"],
   support_staff: ["Students (read)", "Staff (read)", "Notices"],
   student: ["Timetable", "Homework", "Notices", "Activity"],
-  parent: ["Students (read)", "Messaging", "Transport tracking"],
+  parent: ["Students (read)", "Notices", "Transport tracking"],
   accountant: ["Fees", "Payments", "Accounting", "Payroll", "Reports"],
   librarian: ["Library", "Fees (manage)", "Classes (read)"],
   driver: ["Transport", "Students (read)"],
@@ -4744,7 +4709,7 @@ function SubscriptionPanel() {
     transport: "M9 Transport Management",
     canteen: "M10 Canteen Management",
     accounting: "M11 Accounting & Finance",
-    notices: "M12 Notices & Communication",
+    notices: "M15 Notices & Announcements",
   };
 
   const activeModules = (entitlements.modules ?? []).filter(

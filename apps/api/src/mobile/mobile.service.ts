@@ -1932,7 +1932,7 @@ function parentNotificationRoute(item: {
     return `/notices/${item.id}`;
   }
   if (source.includes('message')) {
-    return `/parent/chat?threadId=${encodeURIComponent(item.sourceId)}`;
+    return '/notifications';
   }
   if (source.includes('homework')) {
     return `/parent/homework/${encodeURIComponent(item.sourceId)}`;

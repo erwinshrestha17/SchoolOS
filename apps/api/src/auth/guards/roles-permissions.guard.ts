@@ -12,6 +12,17 @@ import { ROLES_KEY } from '../decorators/roles.decorator';
 import { AuthenticatedRequest } from '../auth-request.interface';
 
 const permissionAliases: Record<string, string[]> = {
+  'notifications:view_own': ['notices:read'],
+  'notifications:manage_templates': ['communications:manage_templates'],
+  'notifications:manage_preferences': [
+    'communications:manage_consent',
+    'notices:read',
+  ],
+  'notifications:view_delivery_diagnostics': ['communications:read_deliveries'],
+  'notifications:retry_deliveries': ['communications:retry_deliveries'],
+  'notices:approve': ['notices:create'],
+  'notices:send_emergency': ['notices:create'],
+  'notices:read_reports': ['communications:read_deliveries'],
   'academics:create': ['academics:manage'],
   'academics:update': ['academics:manage'],
   'academics:delete': ['academics:manage'],

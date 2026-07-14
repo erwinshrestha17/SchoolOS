@@ -12,6 +12,7 @@ import { CreateConversationDto } from './dto/create-conversation.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { ReadMessageDto } from './dto/read-message.dto';
 import { MessagingService } from './messaging.service';
+import { ChatWriteDisabledGuard } from './chat-write-disabled.guard';
 
 interface MessageSentEvent {
   tenantId: string;
@@ -59,6 +60,7 @@ export class MessagingController {
   }
 
   @Post('conversations')
+  @UseGuards(ChatWriteDisabledGuard)
   @Permissions('messaging:create')
   createConversation(
     @Body() dto: CreateConversationDto,
@@ -74,6 +76,7 @@ export class MessagingController {
   }
 
   @Post('messages')
+  @UseGuards(ChatWriteDisabledGuard)
   @Permissions('messaging:create')
   createMessage(
     @Body() dto: CreateMessageDto,

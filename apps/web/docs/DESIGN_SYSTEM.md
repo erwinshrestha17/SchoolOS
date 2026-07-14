@@ -321,20 +321,19 @@ Rules:
 
 ---
 
-## 7. M12 Notices / Communication / Chat Design Rules
+## 7. M12 Notifications and M15 Notices Design Rules
 
-The PRD owns communication outcomes, the SRS owns web requirements, and the Module Design Catalog owns M12 boundaries. The canonical frontend guardrails in this design system still apply.
+The PRD owns notification and notice outcomes, the SRS owns web requirements, and the Module Design Catalog owns the M12 and M15 boundaries. The canonical frontend guardrails in this design system still apply. Chat and conversations are deferred and do not receive an active workspace pattern.
 
-### 7.1 M12 workspace patterns
+### 7.1 Notification and notice workspace patterns
 
 M12 uses four primary layout patterns:
 
 | Pattern | Used for |
 |---|---|
-| Dashboard grid | Communication overview, KPI strip, notice activity, unread queue, provider health, recent events. |
+| Compact inbox | Personal notifications, unread state, safe deep links, and archive actions. |
 | Form plus preview rail | Notice composer, targeting, channel preview, recipient summary. |
-| Table plus right detail panel | Approvals, delivery logs, callback monitor, moderation cases. |
-| Three-column conversation workspace | Communication inbox and parent-teacher chat. |
+| Table plus right detail panel | Notice approvals, delivery logs, and callback diagnostics. |
 | Library plus preview rail | Templates and scheduling. |
 
 Do not force a single generic table layout across all M12 screens. The selected pattern must match the primary job.

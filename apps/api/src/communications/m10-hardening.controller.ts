@@ -28,17 +28,19 @@ import { M10HardeningService } from './m10-hardening.service';
 
 @Controller()
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
-@Entitlement('module.communications')
+@Entitlement('module.notifications')
 export class M10HardeningController {
   constructor(private readonly m10HardeningService: M10HardeningService) {}
 
   @Get('communications/notices')
+  @Entitlement('module.notices')
   @Permissions('notices:read')
   listCommunicationNotices(@CurrentAuth() auth: AuthContext) {
     return this.m10HardeningService.listNoticesWithReadStatus(auth);
   }
 
   @Get('communications/notices/:noticeId')
+  @Entitlement('module.notices')
   @Permissions('notices:read')
   getCommunicationNotice(
     @Param('noticeId') noticeId: string,
@@ -51,6 +53,7 @@ export class M10HardeningController {
   }
 
   @Post('communications/notices/:noticeId/read')
+  @Entitlement('module.notices')
   @Permissions('notices:read')
   markNoticeRead(
     @Param('noticeId') noticeId: string,
@@ -60,7 +63,8 @@ export class M10HardeningController {
   }
 
   @Post('communications/notices/:noticeId/resend-failed')
-  @Permissions('communications:retry_deliveries')
+  @Entitlement('module.notices')
+  @Permissions('notifications:retry_deliveries')
   resendFailedNoticeDeliveries(
     @Param('noticeId') noticeId: string,
     @Body() dto: ResendNoticeDto,
@@ -70,13 +74,13 @@ export class M10HardeningController {
   }
 
   @Get('communications/retention-policy')
-  @Permissions('communications:read_deliveries')
+  @Permissions('notifications:view_delivery_diagnostics')
   getRetentionPolicyStatus(@CurrentAuth() auth: AuthContext) {
     return this.m10HardeningService.getRetentionPolicyStatus(auth);
   }
 
   @Get('communications/audit')
-  @Permissions('communications:read_deliveries')
+  @Permissions('notifications:view_delivery_diagnostics')
   listCommunicationAuditTrail(
     @Query() query: CommunicationAuditQueryDto,
     @CurrentAuth() auth: AuthContext,
@@ -85,7 +89,7 @@ export class M10HardeningController {
   }
 
   @Post('notifications/deliveries/:deliveryId/retry')
-  @Permissions('communications:retry_deliveries')
+  @Permissions('notifications:retry_deliveries')
   retryDelivery(
     @Param('deliveryId') deliveryId: string,
     @Body() dto: RetryDeliveryDto,
@@ -99,7 +103,7 @@ export class M10HardeningController {
   }
 
   @Patch('communications/deliveries/provider-status')
-  @Permissions('communications:retry_deliveries')
+  @Permissions('notifications:retry_deliveries')
   recordProviderDeliveryStatus(
     @Body() dto: ProviderDeliveryStatusDto,
     @CurrentAuth() auth: AuthContext,
@@ -108,7 +112,7 @@ export class M10HardeningController {
   }
 
   @Post('communications/consent/templates')
-  @Permissions('communications:manage_consent')
+  @Permissions('notifications:manage_preferences')
   createConsentTemplate(
     @Body() dto: CreateConsentTemplateDto,
     @CurrentAuth() auth: AuthContext,
@@ -117,19 +121,19 @@ export class M10HardeningController {
   }
 
   @Get('communications/consent/templates')
-  @Permissions('communications:manage_consent')
+  @Permissions('notifications:manage_preferences')
   listConsentTemplates(@CurrentAuth() auth: AuthContext) {
     return this.m10HardeningService.listConsentTemplates(auth, false);
   }
 
   @Get('communications/consent/templates/active')
-  @Permissions('notices:read')
+  @Permissions('notifications:manage_preferences')
   listActiveConsentTemplates(@CurrentAuth() auth: AuthContext) {
     return this.m10HardeningService.listConsentTemplates(auth, true);
   }
 
   @Patch('communications/consent/templates/:templateId')
-  @Permissions('communications:manage_consent')
+  @Permissions('notifications:manage_preferences')
   updateConsentTemplate(
     @Param('templateId') templateId: string,
     @Body() dto: UpdateConsentTemplateDto,
@@ -143,7 +147,7 @@ export class M10HardeningController {
   }
 
   @Post('communications/consent/templates/:templateId/publish')
-  @Permissions('communications:manage_consent')
+  @Permissions('notifications:manage_preferences')
   publishConsentTemplate(
     @Param('templateId') templateId: string,
     @CurrentAuth() auth: AuthContext,
@@ -152,7 +156,7 @@ export class M10HardeningController {
   }
 
   @Post('communications/consent/templates/:templateId/archive')
-  @Permissions('communications:manage_consent')
+  @Permissions('notifications:manage_preferences')
   archiveConsentTemplate(
     @Param('templateId') templateId: string,
     @CurrentAuth() auth: AuthContext,
@@ -161,13 +165,13 @@ export class M10HardeningController {
   }
 
   @Get('communications/preferences')
-  @Permissions('notices:read')
+  @Permissions('notifications:manage_preferences')
   getCommunicationPreference(@CurrentAuth() auth: AuthContext) {
     return this.m10HardeningService.getCommunicationPreference(auth);
   }
 
   @Patch('communications/preferences')
-  @Permissions('notices:read')
+  @Permissions('notifications:manage_preferences')
   updateCommunicationPreference(
     @Body() dto: CommunicationPreferenceDto,
     @CurrentAuth() auth: AuthContext,
@@ -178,7 +182,7 @@ export class M10HardeningController {
   }
 
   @Post('communications/marketing-opt-out')
-  @Permissions('notices:read')
+  @Permissions('notifications:manage_preferences')
   marketingOptOut(
     @Body() dto: CommunicationPreferenceDto,
     @CurrentAuth() auth: AuthContext,
@@ -187,7 +191,7 @@ export class M10HardeningController {
   }
 
   @Post('communications/marketing-opt-in')
-  @Permissions('notices:read')
+  @Permissions('notifications:manage_preferences')
   marketingOptIn(
     @Body() dto: CommunicationPreferenceDto,
     @CurrentAuth() auth: AuthContext,

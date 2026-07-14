@@ -187,7 +187,7 @@ describe('dashboard command center', () => {
       'Transport',
       'Canteen',
       'Accounting & Finance',
-      'Notices & Communication',
+      'Notices & Announcements',
       'Learning Layer',
     ]) {
       assert.ok(commandCenter.includes(label), `Missing visible product label: ${label}`);

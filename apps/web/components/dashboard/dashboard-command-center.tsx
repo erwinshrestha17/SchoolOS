@@ -153,8 +153,8 @@ const MODULE_DEFINITIONS: Record<
     accentClass: "text-cyan-800 bg-cyan-50 border-cyan-100",
   },
   m10_communications: {
-    label: "Notices & Communication",
-    shortLabel: "Communication",
+    label: "Notices & Announcements",
+    shortLabel: "Notices",
     group: "daily",
     icon: MessageSquare,
     accentClass: "text-rose-700 bg-rose-50 border-rose-100",

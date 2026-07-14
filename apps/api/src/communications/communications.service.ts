@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { getNepalSchoolDay } from '@schoolos/core';
-import { OnEvent } from '@nestjs/event-emitter';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import {
   AudienceType,
   AuthMethod,
@@ -100,6 +100,7 @@ export class CommunicationsService {
     private readonly usageService: UsageService,
     private readonly redisService: RedisService,
     private readonly fileRegistryService?: FileRegistryService,
+    private readonly eventEmitter?: EventEmitter2,
   ) {}
 
   async listNotices(actor: AuthContext) {
@@ -142,26 +143,7 @@ export class CommunicationsService {
     }
 
     if (publishedAt) {
-      await this.recordDeliveryRecords({
-        actor,
-        sourceType: 'notice',
-        sourceId: notice.id,
-        noticeId: notice.id,
-        audienceType: notice.audienceType,
-        classId: notice.classId,
-        sectionId: notice.sectionId,
-        title: notice.title,
-        body: notice.body,
-        channels:
-          notice.priority === NoticePriority.EMERGENCY
-            ? [NotificationChannel.PUSH, NotificationChannel.SMS]
-            : [NotificationChannel.PUSH],
-        requiredConsentTypes: [ConsentType.MESSAGING],
-        communicationCategory:
-          notice.priority === NoticePriority.EMERGENCY
-            ? 'ESSENTIAL'
-            : 'NON_ESSENTIAL',
-      });
+      await this.emitNoticePublished(notice, actor);
     }
 
     await this.auditService.record({
@@ -318,36 +300,7 @@ export class CommunicationsService {
       notice.priority === NoticePriority.EMERGENCY
         ? [NotificationChannel.PUSH, NotificationChannel.SMS]
         : [NotificationChannel.PUSH];
-    const hasAvailableChannel = providerDiagnostics.channels.some(
-      (channel) =>
-        requiredChannels.includes(channel.channel) && channel.dispatchAvailable,
-    );
-    if (!hasAvailableChannel) {
-      throw new ConflictException(
-        'No configured delivery channel is currently available',
-      );
-    }
-
-    const delivery = await this.recordDeliveryRecords({
-      actor,
-      sourceType: 'notice',
-      sourceId: notice.id,
-      noticeId: notice.id,
-      audienceType: notice.audienceType,
-      classId: notice.classId,
-      sectionId: notice.sectionId,
-      title: notice.title,
-      body: notice.body,
-      channels:
-        notice.priority === NoticePriority.EMERGENCY
-          ? [NotificationChannel.PUSH, NotificationChannel.SMS]
-          : [NotificationChannel.PUSH],
-      requiredConsentTypes: [ConsentType.MESSAGING],
-      communicationCategory:
-        notice.priority === NoticePriority.EMERGENCY
-          ? 'ESSENTIAL'
-          : 'NON_ESSENTIAL',
-    });
+    const delivery = await this.emitNoticePublished(notice, actor);
 
     const publishedAt = notice.publishedAt ?? new Date();
     if (!notice.publishedAt) {
@@ -378,6 +331,12 @@ export class CommunicationsService {
       state: 'QUEUED',
       publishedAt: publishedAt.toISOString(),
       delivery,
+      providerMode: providerDiagnostics.overallMode,
+      externalChannelAvailable: providerDiagnostics.channels.some(
+        (channel) =>
+          requiredChannels.includes(channel.channel) &&
+          channel.dispatchAvailable,
+      ),
     };
   }
 
@@ -385,10 +344,7 @@ export class CommunicationsService {
     await this.ensureAudienceRefs(actor, dto.classId, dto.sectionId);
 
     const priority = dto.priority ?? NoticePriority.NORMAL;
-    const channels =
-      priority === NoticePriority.EMERGENCY
-        ? [NotificationChannel.PUSH, NotificationChannel.SMS]
-        : [NotificationChannel.PUSH];
+    const channels = noticeChannels(priority);
     const input: DeliveryRecordInput = {
       actor,
       sourceType: 'notice_preview',
@@ -402,6 +358,7 @@ export class CommunicationsService {
       requiredConsentTypes: [ConsentType.MESSAGING],
       communicationCategory:
         priority === NoticePriority.EMERGENCY ? 'ESSENTIAL' : 'NON_ESSENTIAL',
+      activeStudentsOnly: true,
     };
     const recipients = await this.resolveAudienceRecipients(input);
     const { allowedRecipients, skippedRecipients } =
@@ -1028,26 +985,7 @@ export class CommunicationsService {
         data: { publishedAt: now },
       });
 
-      const delivery = await this.recordDeliveryRecords({
-        actor,
-        sourceType: 'notice',
-        sourceId: notice.id,
-        noticeId: notice.id,
-        audienceType: notice.audienceType,
-        classId: notice.classId,
-        sectionId: notice.sectionId,
-        title: notice.title,
-        body: notice.body,
-        channels:
-          notice.priority === NoticePriority.EMERGENCY
-            ? [NotificationChannel.PUSH, NotificationChannel.SMS]
-            : [NotificationChannel.PUSH],
-        requiredConsentTypes: [ConsentType.MESSAGING],
-        communicationCategory:
-          notice.priority === NoticePriority.EMERGENCY
-            ? 'ESSENTIAL'
-            : 'NON_ESSENTIAL',
-      });
+      const delivery = await this.emitNoticePublished(notice, actor);
 
       results.push({
         noticeId: notice.id,
@@ -1477,6 +1415,24 @@ export class CommunicationsService {
         sourceId: delivery.sourceId,
       };
 
+      if (delivery.channel !== NotificationChannel.IN_APP) {
+        const readiness = await this.notificationsService.getProviderReadiness(
+          delivery.channel,
+        );
+        if (!readiness.enabled) {
+          await this.prisma.notificationDelivery.update({
+            where: { id: delivery.id },
+            data: {
+              status: NotificationStatus.SKIPPED,
+              errorMessage: readiness.failureReason,
+              failureCode: readiness.failureCode,
+              failureReason: readiness.failureReason,
+            },
+          });
+          return;
+        }
+      }
+
       if (delivery.channel === NotificationChannel.EMAIL) {
         await this.notificationsService.sendEmail({
           to: delivery.destination,
@@ -1498,8 +1454,8 @@ export class CommunicationsService {
 
       if (delivery.channel === NotificationChannel.IN_APP) {
         // In-app notifications are already visible via the notification
-        // center by virtue of this NotificationDelivery row existing — no
-        // external provider dispatch is needed, just mark it delivered.
+        // center by virtue of this row existing. No external dispatch is
+        // needed; SENT means available to the inbox, not provider-delivered.
         await this.prisma.notificationDelivery.update({
           where: { id: delivery.id },
           data: { status: NotificationStatus.SENT, sentAt: new Date() },
@@ -1642,13 +1598,15 @@ export class CommunicationsService {
         },
         include: { user: true },
       });
-      return staff.map((s) => ({
-        studentId: '',
-        guardianId: null,
-        userId: s.userId,
-        email: s.user?.email ?? null,
-        phone: s.user?.phone ?? null,
-      }));
+      return deduplicateRecipients(
+        staff.map((s) => ({
+          studentId: '',
+          guardianId: null,
+          userId: s.userId,
+          email: s.user?.email ?? null,
+          phone: s.user?.phone ?? null,
+        })),
+      );
     }
 
     if (input.audienceType === AudienceType.ROLE) {
@@ -1668,13 +1626,15 @@ export class CommunicationsService {
         },
       });
 
-      return users.map((user) => ({
-        studentId: '',
-        guardianId: null,
-        userId: user.id,
-        email: user.email,
-        phone: user.phone,
-      }));
+      return deduplicateRecipients(
+        users.map((user) => ({
+          studentId: '',
+          guardianId: null,
+          userId: user.id,
+          email: user.email,
+          phone: user.phone,
+        })),
+      );
     }
 
     const students = await this.prisma.student.findMany({
@@ -1688,7 +1648,10 @@ export class CommunicationsService {
           : {}),
         ...(input.studentIds?.length ? { id: { in: input.studentIds } } : {}),
         ...(input.activeStudentsOnly
-          ? { lifecycleStatus: StudentLifecycleStatus.ACTIVE }
+          ? {
+              lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+              enrollments: { some: { status: 'ACTIVE' } },
+            }
           : {}),
         // If audience type is STUDENT but no IDs provided, we return NO ONE (safer)
         ...(input.audienceType === AudienceType.STUDENT &&
@@ -1743,7 +1706,53 @@ export class CommunicationsService {
       }
     }
 
-    return recipients;
+    return deduplicateRecipients(recipients);
+  }
+
+  private async emitNoticePublished(notice: Notice, actor: AuthContext) {
+    const event: NoticePublishedEvent = {
+      tenantId: actor.tenantId,
+      actor,
+      noticeId: notice.id,
+      audienceType: notice.audienceType,
+      classId: notice.classId,
+      sectionId: notice.sectionId,
+      title: notice.title,
+      body: notice.body,
+      priority: notice.priority,
+    };
+
+    if (!this.eventEmitter) {
+      return this.handleNoticePublished(event);
+    }
+
+    const results = await this.eventEmitter.emitAsync(
+      'notice.published',
+      event,
+    );
+    return results[0] ?? { count: 0 };
+  }
+
+  @OnEvent('notice.published')
+  handleNoticePublished(event: NoticePublishedEvent) {
+    return this.recordDeliveryRecords({
+      actor: toNotificationActor(event),
+      sourceType: 'notice',
+      sourceId: event.noticeId,
+      noticeId: event.noticeId,
+      audienceType: event.audienceType,
+      classId: event.classId,
+      sectionId: event.sectionId,
+      title: event.title,
+      body: event.body,
+      channels: noticeChannels(event.priority),
+      requiredConsentTypes: [ConsentType.MESSAGING],
+      communicationCategory:
+        event.priority === NoticePriority.EMERGENCY
+          ? 'ESSENTIAL'
+          : 'NON_ESSENTIAL',
+      activeStudentsOnly: true,
+    });
   }
 
   private async partitionRecipientsByCommunicationPolicy(
@@ -1904,6 +1913,16 @@ interface TenantDomainEvent {
   actor?: AuthContext;
 }
 
+type NoticePublishedEvent = TenantDomainEvent & {
+  noticeId: string;
+  audienceType: AudienceType;
+  classId: string | null;
+  sectionId: string | null;
+  title: string;
+  body: string;
+  priority: NoticePriority;
+};
+
 type StudentAdmittedEvent = TenantDomainEvent & {
   classId: string;
   sectionId?: string | null;
@@ -1946,6 +1965,30 @@ function resolveDestination(
   }
 
   return recipient.userId ?? recipient.phone ?? recipient.email;
+}
+
+function noticeChannels(priority: NoticePriority): NotificationChannel[] {
+  return priority === NoticePriority.EMERGENCY
+    ? [
+        NotificationChannel.IN_APP,
+        NotificationChannel.PUSH,
+        NotificationChannel.SMS,
+      ]
+    : [NotificationChannel.IN_APP, NotificationChannel.PUSH];
+}
+
+function deduplicateRecipients(recipients: DeliveryRecipient[]) {
+  const unique = new Map<string, DeliveryRecipient>();
+  for (const recipient of recipients) {
+    const key =
+      recipient.userId ??
+      recipient.email?.trim().toLowerCase() ??
+      recipient.phone?.trim() ??
+      recipient.guardianId ??
+      recipient.studentId;
+    if (key && !unique.has(key)) unique.set(key, recipient);
+  }
+  return Array.from(unique.values());
 }
 
 function toNotificationActor(event: TenantDomainEvent): AuthContext {

@@ -208,7 +208,7 @@ class _UpdateCard extends StatelessWidget {
               Text(
                 switch (item.category) {
                   ParentUpdateCategory.notice => 'Read',
-                  ParentUpdateCategory.message => 'Reply',
+                  ParentUpdateCategory.message => 'View',
                   ParentUpdateCategory.event => 'Open',
                   ParentUpdateCategory.gallery => 'View gallery',
                 },
@@ -232,7 +232,7 @@ class _UpdateCard extends StatelessWidget {
       ParentPortalColors.orange,
     ),
     ParentUpdateCategory.message => (
-      Icons.chat_bubble_outline_rounded,
+      Icons.notifications_none_rounded,
       ParentPortalColors.purpleSoft,
       ParentPortalColors.purple,
     ),

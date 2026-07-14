@@ -1,10 +1,5 @@
-import { ParentTeacherMessagingWorkspace } from '@/components/messaging/parent-teacher-messaging-workspace';
+import { ChatDeferredState } from '@/components/messaging/chat-deferred-state';
 
-export default async function MessageThreadPage({
-  params,
-}: {
-  params: Promise<{ threadId: string }>;
-}) {
-  const { threadId } = await params;
-  return <ParentTeacherMessagingWorkspace threadId={threadId} />;
+export default function MessageThreadPage() {
+  return <ChatDeferredState />;
 }

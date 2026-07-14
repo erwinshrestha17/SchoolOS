@@ -116,4 +116,18 @@ void main() {
 
     expect(route, isNull);
   });
+
+  test(
+    'historical chat notifications open the notification inbox only',
+    () async {
+      final route = await PushDeepLinkResolver.resolve(
+        payload: const {'tenantId': tenantId, 'route': '/notifications'},
+        role: 'PARENT',
+        tenantId: tenantId,
+        canAccessChild: (_) async => false,
+      );
+
+      expect(route, '/notifications');
+    },
+  );
 }

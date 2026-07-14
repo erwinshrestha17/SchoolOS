@@ -29,7 +29,7 @@ const moduleLabels: Record<OperationalSummaryRouteModule, string> = {
   transport: "Transport",
   canteen: "Canteen",
   accounting: "Accounting",
-  communications: "Notices & Communication",
+  communications: "Notices & Announcements",
   intelligence: "M11 Intelligence",
   learning: "Learning",
 };
@@ -356,7 +356,11 @@ export function RefreshSummaryButton({
       aria-label={isLoading ? "Refreshing dashboard" : "Refresh dashboard"}
       title={isLoading ? "Refreshing dashboard" : "Refresh dashboard"}
     >
-      <RefreshCw size={18} strokeWidth={2.25} className={isLoading ? "animate-spin" : undefined} />
+      <RefreshCw
+        size={18}
+        strokeWidth={2.25}
+        className={isLoading ? "animate-spin" : undefined}
+      />
     </button>
   );
 }

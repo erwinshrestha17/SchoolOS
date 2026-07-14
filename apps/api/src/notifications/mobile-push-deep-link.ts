@@ -80,7 +80,7 @@ function parentRoute(
 
   if (source.includes('message')) {
     return {
-      route: '/parent/chat',
+      route: '/notifications',
       childId: input.studentId,
     };
   }
@@ -176,9 +176,8 @@ function teacherRoute(source: string) {
   if (source.includes('timetable') || source.includes('substitution')) {
     return '/teacher/timetable';
   }
-  if (source.includes('message') || source.includes('chat')) {
-    return '/teacher/messages';
-  }
+  if (source.includes('message') || source.includes('chat'))
+    return '/notifications';
   if (source.includes('attendance')) return '/teacher/attendance';
   return '/teacher/home';
 }

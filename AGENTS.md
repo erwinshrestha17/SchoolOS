@@ -47,9 +47,10 @@ Use this numbering in new docs, UI copy, comments, tickets, and implementation n
 | M9 | Transport |
 | M10 | Canteen |
 | M11 | Accounting and Finance |
-| M12 | Notifications, Notices, Communication, Chat |
+| M12 | Notifications and Delivery |
 | M13 | Learning Layer |
 | M14 | Intelligence / AI |
+| M15 | Notices and Announcements |
 
 `M8A`, `M8B`, and `M8C` are obsolete. Library, Transport, and Canteen are independent modules.
 
@@ -81,8 +82,9 @@ Current priorities: security/RBAC/tenant-isolation evidence; staging deployment 
 - Do not rename `tenantId`.
 - Keep planes separate: `/platform/*` operator SaaS, `/dashboard/settings/*` school config, `/dashboard/*` school operations.
 - Do not mix SaaS billing with school fee collection/accounting.
-- Keep M13 Learning separate and reuse core students/staff/classes/subjects/timetable/files/RBAC/audit/communication.
-- Keep M12 Notification/Communication delivery separate from feature modules. Source modules emit events; the Notification module owns recipient resolution, templates, channel routing, delivery jobs, retries, read state, provider diagnostics, and audit.
+- Keep M13 Learning separate and reuse core students/staff/classes/subjects/timetable/files/RBAC/audit/notifications.
+- Keep M12 notification delivery separate from feature modules. Source modules emit events; M12 owns recipient resolution, templates, channel routing, delivery jobs, retries, read state, provider diagnostics, and audit.
+- Keep M15 notice authoring separate from M12 delivery. M15 previews and publishes notices, then emits a normalized event to M12. Chat/conversations are deferred; preserve historical data and authorization without active navigation or new writes.
 
 ## Naming and contract rules
 

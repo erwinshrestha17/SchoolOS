@@ -317,7 +317,7 @@ Train in this order:
 5. **Attendance:** class/section/date register, present-by-default support, absent/late/leave exceptions, draft/submit result, lock/conflict state.
 6. **Fee Collection:** invoice search, outstanding amount, overpayment block, partial/full payment, receipt PDF, ledger preview.
 7. **Activity Feed:** audience targeting, 1-5 image rule, private media object-key behavior, feed preview, delivery records.
-8. **Notices/Communications:** normal/urgent/emergency notice, event creation, delivery records, guardian consent capture/revoke.
+8. **M12 Notifications and M15 Notices:** normal/urgent/emergency notice, recipient preview, normalized publication event, in-app/delivery records, guardian consent capture/revoke, and chat-write denial.
 9. **Logout/session behavior:** avatar menu logout.
 
 ### Day-1 Pilot Script
@@ -341,7 +341,7 @@ Train in this order:
 - **Attendance:** Roster loads. All Present default. Exceptions cycle. Future dates blocked. Submit succeeds and queues notifications. Locked session displays correct state.
 - **Fees:** Invoice search works. Overpayment blocked. Partial payment succeeds. Receipt success panel appears. Receipt PDF opens. Ledger preview is labeled preview-only.
 - **Activity:** Target selection clear. Upload blocks >5 images. Feed preview shows new post. Delivery record is queued.
-- **Communications:** Normal notice publishes. Emergency warning appears for emergency priority. Event creation works. Delivery records list statuses. Guardian consent capture/revoke works.
+- **M12 Notifications and M15 Notices:** Normal notice publishes through the normalized event handoff. Emergency warning appears for emergency priority. Delivery records distinguish in-app success from skipped/failed external providers. Guardian consent capture/revoke and chat-write denial work.
 
 ### Controlled-Pilot Boundaries
 - The supported workflow slice must be recorded for each pilot; module presence in the repository does not prove that a workflow is pilot validated.

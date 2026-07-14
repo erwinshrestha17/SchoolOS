@@ -425,11 +425,7 @@ async function seedTenantSettings(tenantId: string) {
     { key: 'tds_enabled', value: true },
     { key: 'active_academic_year_label', value: '2081/82' },
     { key: 'active_fiscal_year_label', value: 'FY 2081/82' },
-    { key: 'chat_sunday_to_thursday_start', value: '16:00' },
-    { key: 'chat_sunday_to_thursday_end', value: '19:00' },
-    { key: 'chat_friday_start', value: '14:00' },
-    { key: 'chat_friday_end', value: '17:00' },
-    { key: 'chat_saturday_enabled', value: false },
+    { key: 'chat_enabled', value: false },
   ];
 
   for (const item of defaults) {
@@ -719,7 +715,8 @@ const m7M11E2eRoleSeeds: E2eRoleSeed[] = [
   {
     name: 'e2e_accounting_fiscal_controller',
     email: 'e2e.accounting-fiscal-controller@schoolos.test',
-    description: 'Local E2E fiscal lock, close, and controlled reopen authority',
+    description:
+      'Local E2E fiscal lock, close, and controlled reopen authority',
     permissions: [
       'accounting:accounts:read',
       'accounting:journals:read',
@@ -2674,6 +2671,7 @@ async function seedCanonicalNotices(
     classId: string | null;
     sectionId: string | null;
     priority: NoticePriority;
+    publication: 'PUBLISHED' | 'SCHEDULED' | 'DRAFT';
   }> = [
     {
       title: 'Welcome to Everest Academy 2083',
@@ -2682,6 +2680,7 @@ async function seedCanonicalNotices(
       classId: null,
       sectionId: null,
       priority: NoticePriority.NORMAL,
+      publication: 'PUBLISHED',
     },
     {
       title: 'Parent Teacher Meeting',
@@ -2690,6 +2689,25 @@ async function seedCanonicalNotices(
       classId: null,
       sectionId: null,
       priority: NoticePriority.URGENT,
+      publication: 'PUBLISHED',
+    },
+    {
+      title: 'Scheduled Parent Orientation Reminder',
+      body: 'Parent orientation reminder is scheduled for the next school week.',
+      audienceType: AudienceType.ALL,
+      classId: null,
+      sectionId: null,
+      priority: NoticePriority.NORMAL,
+      publication: 'SCHEDULED',
+    },
+    {
+      title: 'Emergency Closure Draft Awaiting Approval',
+      body: 'High-impact draft retained without dispatch until the approval workflow completes.',
+      audienceType: AudienceType.ALL,
+      classId: null,
+      sectionId: null,
+      priority: NoticePriority.EMERGENCY,
+      publication: 'DRAFT',
     },
   ];
   const class5 = classes.find((item) => item.name === 'Class 5');
@@ -2702,6 +2720,7 @@ async function seedCanonicalNotices(
       classId: class5.id,
       sectionId: section5a.id,
       priority: NoticePriority.NORMAL,
+      publication: 'PUBLISHED',
     });
   }
 
@@ -2719,7 +2738,12 @@ async function seedCanonicalNotices(
             sectionId: noticeData.sectionId,
             priority: noticeData.priority,
             createdById,
-            publishedAt: new Date(),
+            publishedAt:
+              noticeData.publication === 'PUBLISHED' ? new Date() : null,
+            scheduledFor:
+              noticeData.publication === 'SCHEDULED'
+                ? addDays(new Date(), 7)
+                : null,
           },
         })
       : await prisma.notice.create({
@@ -2732,13 +2756,19 @@ async function seedCanonicalNotices(
             sectionId: noticeData.sectionId,
             priority: noticeData.priority,
             createdById,
-            publishedAt: new Date(),
+            publishedAt:
+              noticeData.publication === 'PUBLISHED' ? new Date() : null,
+            scheduledFor:
+              noticeData.publication === 'SCHEDULED'
+                ? addDays(new Date(), 7)
+                : null,
           },
         });
 
     await prisma.notificationDelivery.deleteMany({
       where: { tenantId, sourceType: 'notice', sourceId: notice.id },
     });
+    if (noticeData.publication !== 'PUBLISHED') continue;
     const targets = students.filter((student) => {
       if (noticeData.audienceType === AudienceType.SECTION) {
         return student.className === 'Class 5' && student.sectionName === 'A';
@@ -2748,12 +2778,13 @@ async function seedCanonicalNotices(
     await prisma.notificationDelivery.createMany({
       data: targets.map((student) => ({
         tenantId,
-        channel: NotificationChannel.PUSH,
+        channel: NotificationChannel.IN_APP,
         status: NotificationStatus.SENT,
         sourceType: 'notice',
         sourceId: notice.id,
         audienceType: noticeData.audienceType,
         guardianId: student.guardianId,
+        recipientUserId: student.guardianUserId,
         studentId: student.id,
         noticeId: notice.id,
         destination: `guardian:${student.admissionNumber}`,
@@ -2762,6 +2793,59 @@ async function seedCanonicalNotices(
         sentAt: new Date(),
       })),
     });
+
+    const firstTarget = targets[0];
+    if (firstTarget) {
+      await prisma.notificationDelivery.create({
+        data: {
+          tenantId,
+          channel: NotificationChannel.PUSH,
+          status: NotificationStatus.FAILED,
+          sourceType: 'notice',
+          sourceId: notice.id,
+          audienceType: noticeData.audienceType,
+          guardianId: firstTarget.guardianId,
+          recipientUserId: firstTarget.guardianUserId,
+          studentId: firstTarget.id,
+          noticeId: notice.id,
+          destination: `guardian:${firstTarget.admissionNumber}`,
+          title: notice.title,
+          body: notice.body,
+          errorMessage:
+            'Seeded provider-disabled example; no external delivery occurred',
+          failureCode: 'PROVIDER_DISABLED',
+          failureReason: 'Push provider is disabled in the canonical seed',
+          failedAt: new Date(),
+        },
+      });
+
+      const firstInboxDelivery = await prisma.notificationDelivery.findFirst({
+        where: {
+          tenantId,
+          noticeId: notice.id,
+          channel: NotificationChannel.IN_APP,
+          recipientUserId: firstTarget.guardianUserId,
+        },
+        select: { id: true },
+      });
+      if (firstInboxDelivery) {
+        await prisma.notificationReadReceipt.upsert({
+          where: {
+            tenantId_notificationDeliveryId_userId: {
+              tenantId,
+              notificationDeliveryId: firstInboxDelivery.id,
+              userId: firstTarget.guardianUserId,
+            },
+          },
+          update: { readAt: new Date() },
+          create: {
+            tenantId,
+            notificationDeliveryId: firstInboxDelivery.id,
+            userId: firstTarget.guardianUserId,
+          },
+        });
+      }
+    }
   }
 }
 
@@ -4670,12 +4754,13 @@ async function seedDemoTenantFeatureOverrides(tenantId: string) {
     'module.transport',
     'module.canteen',
     'module.accounting',
+    'module.notifications',
     'module.notices',
     'module.learning',
     'feature.mobile.parent_basic',
     'feature.mobile.teacher_parent',
     'feature.mobile.full_role',
-    'feature.mobile.parent_teacher_chat',
+    'feature.notifications.in_app',
     'feature.transport.gps_live',
   ];
 
@@ -4699,6 +4784,27 @@ async function seedDemoTenantFeatureOverrides(tenantId: string) {
       },
     });
   }
+
+  await prisma.tenantFeatureOverride.upsert({
+    where: {
+      tenantId_featureKey: {
+        tenantId,
+        featureKey: 'feature.mobile.parent_teacher_chat',
+      },
+    },
+    update: {
+      enabled: false,
+      reason:
+        'Chat and conversations are deferred from the active release boundary',
+    },
+    create: {
+      tenantId,
+      featureKey: 'feature.mobile.parent_teacher_chat',
+      enabled: false,
+      reason:
+        'Chat and conversations are deferred from the active release boundary',
+    },
+  });
 }
 
 async function seedPlatformInfrastructure() {

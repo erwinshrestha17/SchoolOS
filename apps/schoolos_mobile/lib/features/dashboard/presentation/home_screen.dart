@@ -22,7 +22,7 @@ class HomeScreen extends StatelessWidget {
     ),
     _RoleTile(
       'Teacher',
-      'Classes, attendance, homework, timetable, and parent messages.',
+      'Classes, attendance, homework, timetable, and school notices.',
       Icons.co_present_rounded,
       AppRoutes.teacherHome,
     ),
@@ -40,7 +40,7 @@ class HomeScreen extends StatelessWidget {
     ),
     _RoleTile(
       'Admin',
-      'Approvals, alerts, summaries, and communication.',
+      'Approvals, alerts, summaries, and notices.',
       Icons.admin_panel_settings_rounded,
       AppRoutes.adminHome,
     ),

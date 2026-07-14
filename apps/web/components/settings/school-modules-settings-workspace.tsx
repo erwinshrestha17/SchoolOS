@@ -21,7 +21,7 @@ const modules = [
   { key: 'transport', label: 'Transport', href: '/dashboard/transport' },
   { key: 'canteen', label: 'Canteen', href: '/dashboard/canteen' },
   { key: 'accounting', label: 'Accounting', href: '/dashboard/accounting' },
-  { key: 'notices', label: 'Notices & Communication', href: '/dashboard/notices' },
+  { key: 'notices', label: 'Notices & Announcements', href: '/dashboard/notices' },
   { key: 'learning', label: 'Learning', href: '/dashboard/learning' },
 ] as const;
 

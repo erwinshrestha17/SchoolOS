@@ -99,13 +99,8 @@ const dashboardRouteGates: RouteGate[] = [
   },
   {
     prefix: "/dashboard/communications",
-    label: "Communications",
-    permissions: [
-      "notices:read",
-      "notices:create",
-      "messaging:create",
-      "messaging:manage",
-    ],
+    label: "Notices",
+    permissions: ["notices:read", "notices:create"],
   },
   {
     prefix: "/dashboard/notices",
@@ -114,13 +109,13 @@ const dashboardRouteGates: RouteGate[] = [
   },
   {
     prefix: "/dashboard/messages",
-    label: "Messages",
-    permissions: ["notices:read", "messaging:create"],
+    label: "Chat deferred",
+    permissions: ["notices:read"],
   },
   {
     prefix: "/dashboard/messaging",
-    label: "Messaging",
-    permissions: ["notices:read", "messaging:create"],
+    label: "Chat deferred",
+    permissions: ["notices:read"],
   },
   {
     prefix: "/dashboard/hr",
@@ -247,7 +242,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   } = useEntitlements();
   const isParentOnlySession = Boolean(
     session?.user.roles.length &&
-      session.user.roles.every((role) => role === "parent"),
+    session.user.roles.every((role) => role === "parent"),
   );
 
   useEffect(() => {
@@ -365,7 +360,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             Parent access is mobile only
           </h2>
           <p className="mt-1 text-sm text-gray-500">
-            Parents and guardians use the SchoolOS mobile app for linked-child access.
+            Parents and guardians use the SchoolOS mobile app for linked-child
+            access.
           </p>
         </div>
       </div>

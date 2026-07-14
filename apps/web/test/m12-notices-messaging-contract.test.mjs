@@ -5,8 +5,8 @@ import { describe, it } from "node:test";
 const webRoot = new URL("../", import.meta.url);
 const read = (path) => readFileSync(new URL(path, webRoot), "utf8");
 
-describe("M12 notices and messaging contract", () => {
-  it("keeps the overview focused and defers route-specific communication work", () => {
+describe("M12 notifications and M15 notices boundary", () => {
+  it("keeps the M15 overview focused and moves delivery settings out of it", () => {
     const workspace = read("components/notices/notices-workspace.tsx");
     const form = read("components/forms/communications-form.tsx");
     const shell = read("components/layout/dashboard-shell.tsx");
@@ -15,7 +15,9 @@ describe("M12 notices and messaging contract", () => {
     assert.doesNotMatch(workspace, /title="Escalated Chats"/);
     assert.doesNotMatch(workspace, /title="Provider Status"/);
     assert.match(workspace, /label: 'Recipient Preview'/);
-    assert.match(workspace, /label: 'Provider Diagnostics'/);
+    assert.match(workspace, /label: 'Notification Settings'/);
+    assert.match(workspace, /M15 Notices and Announcements/);
+    assert.doesNotMatch(workspace, /Parent-Teacher Chat/);
 
     assert.match(form, /mode === "composer"\s*\? \["Notices"\]/);
     assert.match(form, /mode === "delivery"\s*\? \["Delivery Records"\]/);
@@ -52,18 +54,14 @@ describe("M12 notices and messaging contract", () => {
     );
   });
 
-  it("requires confirmation before an irreversible parent-teacher thread close", () => {
-    const workspace = read(
-      "components/messaging/parent-teacher-messaging-workspace.tsx",
-    );
+  it("hides chat navigation and renders bounded compatibility routes", () => {
+    const sidebar = read("components/layout/sidebar.tsx");
+    const deferred = read("components/messaging/chat-deferred-state.tsx");
+    const messagesPage = read("app/dashboard/messages/page.tsx");
 
-    assert.match(workspace, /isConfirmingClose/);
-    assert.match(workspace, /Confirm thread close/);
-    // The Moderation panel's onSubmit must open the dialog, not call
-    // closeMutation.mutate() directly on click.
-    assert.doesNotMatch(
-      workspace,
-      /if \(moderationReason\.trim\(\)\.length >= 3\)\s*\n\s*closeMutation\.mutate\(\);/,
-    );
+    assert.doesNotMatch(sidebar, /label: 'Messages'/);
+    assert.doesNotMatch(sidebar, /messaging:create/);
+    assert.match(deferred, /Chat is deferred/);
+    assert.match(messagesPage, /ChatDeferredState/);
   });
 });

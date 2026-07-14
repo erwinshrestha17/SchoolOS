@@ -24,7 +24,7 @@ import {
 
 @Controller('communications')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
-@Entitlement('module.communications')
+@Entitlement('module.notifications')
 export class CommunicationsOperationsController {
   constructor(private readonly communicationsService: CommunicationsService) {}
 
@@ -35,13 +35,13 @@ export class CommunicationsOperationsController {
   }
 
   @Get('provider-diagnostics')
-  @Permissions('communications:read_deliveries')
+  @Permissions('notifications:view_delivery_diagnostics')
   getProviderDiagnostics(@CurrentAuth() auth: AuthContext) {
     return this.communicationsService.getCommunicationProviderDiagnostics(auth);
   }
 
   @Get('templates')
-  @Permissions('communications:manage_templates')
+  @Permissions('notifications:manage_templates')
   listTemplates(
     @Query() query: ListCommunicationTemplatesQueryDto,
     @CurrentAuth() auth: AuthContext,
@@ -50,7 +50,7 @@ export class CommunicationsOperationsController {
   }
 
   @Post('templates')
-  @Permissions('communications:manage_templates')
+  @Permissions('notifications:manage_templates')
   createTemplate(
     @Body() dto: CreateCommunicationTemplateDto,
     @CurrentAuth() auth: AuthContext,
@@ -59,7 +59,7 @@ export class CommunicationsOperationsController {
   }
 
   @Patch('templates/:templateId')
-  @Permissions('communications:manage_templates')
+  @Permissions('notifications:manage_templates')
   updateTemplate(
     @Param('templateId') templateId: string,
     @Body() dto: UpdateCommunicationTemplateDto,
@@ -73,7 +73,7 @@ export class CommunicationsOperationsController {
   }
 
   @Post('templates/:templateId/publish')
-  @Permissions('communications:manage_templates')
+  @Permissions('notifications:manage_templates')
   publishTemplate(
     @Param('templateId') templateId: string,
     @CurrentAuth() auth: AuthContext,
@@ -85,7 +85,7 @@ export class CommunicationsOperationsController {
   }
 
   @Post('templates/:templateId/archive')
-  @Permissions('communications:manage_templates')
+  @Permissions('notifications:manage_templates')
   archiveTemplate(
     @Param('templateId') templateId: string,
     @CurrentAuth() auth: AuthContext,

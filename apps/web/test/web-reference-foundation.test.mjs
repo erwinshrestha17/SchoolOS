@@ -15,11 +15,11 @@ describe('reference dashboard foundation', () => {
   it('keeps the active repository-grounded web design and readiness sources', () => {
     const designPath = join(
       repoRoot,
-      'docs/design/SCHOOLOS_WEB_FRONTEND_DESIGN_PLAN.md',
+      'docs/architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md',
     );
     const readinessPath = join(
       repoRoot,
-      'docs/project/SCHOOLOS_PRODUCTION_READINESS_AUDIT.md',
+      'docs/production/SCHOOLOS_GA_RELEASE_POLICY.md',
     );
     assert.equal(existsSync(designPath), true);
     assert.equal(existsSync(readinessPath), true);
@@ -37,12 +37,13 @@ describe('reference dashboard foundation', () => {
       'M9 Transport',
       'M10 Canteen',
       'M11 Accounting and Finance',
-      'M12 Notifications, Notices, Communication, Chat',
+      'M12 Notifications and Delivery',
+      'M15 Notices and Announcements',
     ]) {
       assert.match(design, new RegExp(marker.replace(/[&/]/g, '\\$&')));
     }
-    assert.match(design, /never fake production behavior/);
-    assert.match(readiness, /Internal QA-ready/);
+    assert.match(design, /Chat\/conversations are deferred/);
+    assert.match(readiness, /Internal QA/);
   });
 
   it('provides the requested shared dashboard composition primitives', () => {
@@ -91,24 +92,20 @@ describe('reference dashboard foundation', () => {
     assert.doesNotMatch(operations, /allergenTags|dietaryWarning/);
   });
 
-  it('adds a permission-scoped communications composition route', () => {
+  it('keeps the legacy communications route as an M15 compatibility redirect', () => {
     const communications = read('app/dashboard/communications/page.tsx');
     const noticesWorkspace = read('components/notices/notices-workspace.tsx');
     const layout = read('app/dashboard/layout.tsx');
     const sidebar = read('components/layout/sidebar.tsx');
 
-    // /dashboard/notices is the single canonical M12 overview; the older
-    // /dashboard/communications route now redirects there so there is only
-    // one KPI-fetching "home" experience for this module.
+    // /dashboard/notices is the canonical M15 workspace; the older route is
+    // retained only as a compatibility redirect.
     assert.match(layout, /prefix: ['"]\/dashboard\/communications['"]/);
     assert.match(sidebar, /href: '\/dashboard\/notices'/);
     assert.match(communications, /redirect\('\/dashboard\/notices'\)/);
     assert.match(noticesWorkspace, /communicationsApi\.getCommunicationsSummary/);
     assert.equal((noticesWorkspace.match(/<KpiCard/g) ?? []).length, 4);
-    assert.match(
-      noticesWorkspace,
-      /router\.push\(\s*'\/dashboard\/communications\/provider-diagnostics'/,
-    );
+    assert.doesNotMatch(noticesWorkspace, /provider-diagnostics/);
     assert.doesNotMatch(noticesWorkspace, /title="Provider Status"/);
     assert.doesNotMatch(noticesWorkspace, /setTimeout|setInterval/);
   });

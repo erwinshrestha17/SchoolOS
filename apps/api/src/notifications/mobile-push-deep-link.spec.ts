@@ -50,4 +50,16 @@ describe('resolveMobilePushDeepLink', () => {
       }),
     ).toBeNull();
   });
+
+  it('routes historical chat notifications to the personal inbox', () => {
+    expect(
+      resolveMobilePushDeepLink({
+        ...input,
+        sourceType: 'message_sent',
+      }),
+    ).toEqual({
+      route: '/notifications',
+      childId: 'student-1',
+    });
+  });
 });

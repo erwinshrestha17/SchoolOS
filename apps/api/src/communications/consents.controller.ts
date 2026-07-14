@@ -12,18 +12,18 @@ import { GuardianConsentActionDto } from './dto/guardian-consent-action.dto';
 
 @Controller('consents')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
-@Entitlement('module.communications')
+@Entitlement('module.notifications')
 export class ConsentsController {
   constructor(private readonly communicationsService: CommunicationsService) {}
 
   @Get()
-  @Permissions('consents:manage')
+  @Permissions('notifications:manage_preferences')
   listConsents(@CurrentAuth() auth: AuthContext) {
     return this.communicationsService.listConsents(auth);
   }
 
   @Post()
-  @Permissions('consents:manage')
+  @Permissions('notifications:manage_preferences')
   captureConsent(
     @Body() dto: CaptureConsentDto,
     @CurrentAuth() auth: AuthContext,
@@ -32,7 +32,7 @@ export class ConsentsController {
   }
 
   @Get('guardians/:guardianId/status')
-  @Permissions('consents:manage')
+  @Permissions('notifications:manage_preferences')
   getGuardianConsentStatus(
     @Param('guardianId') guardianId: string,
     @CurrentAuth() auth: AuthContext,
@@ -44,7 +44,7 @@ export class ConsentsController {
   }
 
   @Post('guardians/:guardianId/capture')
-  @Permissions('consents:manage')
+  @Permissions('notifications:manage_preferences')
   captureGuardianConsent(
     @Param('guardianId') guardianId: string,
     @Body() dto: GuardianConsentActionDto,
@@ -61,7 +61,7 @@ export class ConsentsController {
   }
 
   @Post('guardians/:guardianId/revoke')
-  @Permissions('consents:manage')
+  @Permissions('notifications:manage_preferences')
   revokeGuardianConsent(
     @Param('guardianId') guardianId: string,
     @Body() dto: GuardianConsentActionDto,

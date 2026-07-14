@@ -110,14 +110,13 @@ describe("SchoolOS Settings Page Contracts", () => {
     assert.doesNotMatch(page, /tenantId: ['"]all['"]/);
   });
 
-  it("uses normalized communication chat-hour setting keys", () => {
+  it("keeps notification policy active while removing deferred chat controls", () => {
     const page = read("app/dashboard/settings/page.tsx");
 
-    assert.match(page, /chat_sunday_to_thursday_start/);
-    assert.match(page, /chat_sunday_to_thursday_end/);
-    assert.match(page, /chat_friday_start/);
-    assert.match(page, /chat_friday_end/);
-    assert.doesNotMatch(page, /TODO: Backend schema normalization/);
+    assert.match(page, /title: "Notification Rules"/);
+    assert.match(page, /quiet_hours_enabled/);
+    assert.match(page, /emergency_override_requires_admin/);
+    assert.doesNotMatch(page, /chat_(availability|sunday|friday|saturday)/);
   });
 
   it("wires school logo branding to private File Registry APIs", () => {
