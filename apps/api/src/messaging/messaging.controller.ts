@@ -19,7 +19,7 @@ interface MessageSentEvent {
 
 @Controller('messaging')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
-@Entitlement('module.communications')
+@Entitlement('feature.chat.enabled')
 export class MessagingController {
   constructor(
     private readonly messagingService: MessagingService,
