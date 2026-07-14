@@ -8,6 +8,7 @@ import {
   SalaryComponentType,
   SalaryStructureStatus,
 } from '@prisma/client';
+import sharp from 'sharp';
 import { PayrollService } from './payroll.service';
 
 const actor = {
@@ -968,8 +969,13 @@ describe('PayrollService hardening boundaries', () => {
 
   it('regenerates the requested payslip even when a stale completed export exists', async () => {
     const generatedAsset = { id: 'file-regenerated' };
+    const logoBytes = await createTestLogoJpeg();
     const fileRegistryService = {
       registerGeneratedFile: jest.fn().mockResolvedValue(generatedAsset),
+      getFileMetadata: jest
+        .fn()
+        .mockResolvedValue(buildSchoolLogoAsset(logoBytes.length)),
+      getProtectedDownload: jest.fn().mockResolvedValue({ content: logoBytes }),
     };
     const payslip = buildPayslip({
       id: 'payslip-1',
@@ -991,6 +997,9 @@ describe('PayrollService hardening boundaries', () => {
         },
       ],
       fileRegistryService,
+    });
+    prisma.tenantSetting.findUnique.mockResolvedValue({
+      value: SCHOOL_LOGO_FILE_ASSET_ID,
     });
 
     await expect(
@@ -1017,6 +1026,9 @@ describe('PayrollService hardening boundaries', () => {
         entityId: 'payslip-1',
       }),
     );
+    const generatedPdf = fileRegistryService.registerGeneratedFile.mock
+      .calls[0][0].content as Buffer;
+    expect(generatedPdf.toString('latin1')).toContain('/Filter /DCTDecode');
     expect(prisma.reportExport.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         tenantId: actor.tenantId,
@@ -1034,6 +1046,47 @@ describe('PayrollService hardening boundaries', () => {
         userId: actor.userId,
       }),
     );
+  });
+
+  it('still generates payslips when the configured school logo is unavailable', async () => {
+    const fileRegistryService = {
+      registerGeneratedFile: jest.fn().mockResolvedValue({ id: 'file-plain' }),
+      getFileMetadata: jest
+        .fn()
+        .mockRejectedValue(new Error('School logo is archived')),
+      getProtectedDownload: jest.fn(),
+    };
+    const payslip = buildPayslip({
+      id: 'payslip-plain',
+      payrollRunId: 'run-plain',
+      staff: buildStaff(),
+      payrollLine: buildPayrollLine(),
+    });
+    const { service, prisma } = buildService({
+      payrollRun: buildPayrollRun({
+        id: 'run-plain',
+        status: PayrollRunStatus.POSTED,
+        tenant: { name: 'SchoolOS Academy' },
+        payslips: [payslip],
+      }),
+      fileRegistryService,
+    });
+    prisma.tenantSetting.findUnique.mockResolvedValue({
+      value: SCHOOL_LOGO_FILE_ASSET_ID,
+    });
+
+    await expect(
+      service.generatePayslipPdfBatch({
+        tenantId: actor.tenantId,
+        payrollRunId: 'run-plain',
+        payslipId: 'payslip-plain',
+        requestedByUserId: actor.userId,
+      }),
+    ).resolves.toEqual(expect.objectContaining({ generated: 1 }));
+
+    const generatedPdf = fileRegistryService.registerGeneratedFile.mock
+      .calls[0][0].content as Buffer;
+    expect(generatedPdf.toString('latin1')).not.toContain('/Filter /DCTDecode');
   });
 
   it('lists statutory deductions from tenant-scoped active salary structures only', async () => {
@@ -1261,6 +1314,9 @@ function buildService(options: {
       findMany: jest.fn().mockResolvedValue(options.reportExports ?? []),
       create: jest.fn(),
     },
+    tenantSetting: {
+      findUnique: jest.fn().mockResolvedValue(null),
+    },
     staffAttendance: {
       findMany: jest.fn().mockResolvedValue([]),
     },
@@ -1436,4 +1492,33 @@ function buildPayslip(overrides: Record<string, unknown> = {}) {
     },
     ...overrides,
   };
+}
+
+const SCHOOL_LOGO_FILE_ASSET_ID = '11111111-1111-1111-1111-111111111111';
+
+function buildSchoolLogoAsset(sizeBytes: number) {
+  return {
+    id: SCHOOL_LOGO_FILE_ASSET_ID,
+    tenantId: actor.tenantId,
+    module: 'settings',
+    entityId: actor.tenantId,
+    status: FileStatus.UPLOADED,
+    originalFilename: 'school-logo.jpg',
+    mimeType: 'image/jpeg',
+    sizeBytes: BigInt(sizeBytes),
+    metadata: { kind: 'SCHOOL_LOGO' },
+  };
+}
+
+function createTestLogoJpeg() {
+  return sharp({
+    create: {
+      width: 96,
+      height: 48,
+      channels: 3,
+      background: { r: 24, g: 84, b: 140 },
+    },
+  })
+    .jpeg({ quality: 90 })
+    .toBuffer();
 }

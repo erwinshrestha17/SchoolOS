@@ -5,6 +5,7 @@ import { createHash } from 'crypto';
 import { AccountingReportsService } from './accounting-reports.service';
 import { convertToCsv, formatCsvDecimal } from '../common/csv-utils';
 import { buildTableReportPdf } from '../common/pdf/simple-pdf';
+import { loadSchoolLogoForPdf } from '../common/pdf/school-logo-loader';
 import { PrismaService } from '../prisma/prisma.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { AuditService } from '../audit/audit.service';
@@ -1048,15 +1049,19 @@ export class AccountingReportExportsService {
       note?: string | null;
     }>;
   }) {
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: input.tenantId },
-    });
+    const [tenant, logo] = await Promise.all([
+      this.prisma.tenant.findUnique({
+        where: { id: input.tenantId },
+      }),
+      loadSchoolLogoForPdf(this.prisma, this.fileRegistryService, input.actor),
+    ]);
     const content = buildTableReportPdf({
       schoolName: tenant?.name ?? input.actor.tenantSlug,
       title: input.title,
       subtitle: input.subtitle,
       rows: input.rows,
       summaryCards: input.summaryCards,
+      logo,
     });
     const existingExport = await this.prisma.reportExport.findFirst({
       where: {
@@ -1319,15 +1324,19 @@ export class AccountingReportExportsService {
       note?: string | null;
     }>;
   }) {
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: input.tenantId },
-    });
+    const [tenant, logo] = await Promise.all([
+      this.prisma.tenant.findUnique({
+        where: { id: input.tenantId },
+      }),
+      loadSchoolLogoForPdf(this.prisma, this.fileRegistryService, input.actor),
+    ]);
     return buildTableReportPdf({
       schoolName: tenant?.name ?? input.actor.tenantSlug,
       title: input.title,
       subtitle: input.subtitle,
       rows: input.rows,
       summaryCards: input.summaryCards,
+      logo,
     });
   }
 

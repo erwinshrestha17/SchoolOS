@@ -3,6 +3,7 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import {
   AuthMethod,
   FeeFrequency,
+  FileStatus,
   InvoiceStatus,
   JournalLineSide,
   JournalSourceType,
@@ -10,6 +11,7 @@ import {
   PaymentMethod,
   Prisma,
 } from '@prisma/client';
+import sharp from 'sharp';
 import {
   FinanceService,
   resolveInvoiceStatusAfterAdjustment,
@@ -844,7 +846,7 @@ describe('finance production controls', () => {
     );
   });
 
-  it('returns a valid PDF payload for tenant-scoped receipts', async () => {
+  it('embeds the configured school logo in tenant-scoped receipt PDFs', async () => {
     const payment = buildPayment({
       paidAt: new Date('2026-04-27T10:00:00.000Z'),
       student: {
@@ -866,14 +868,22 @@ describe('finance production controls', () => {
       paymentId: payment.id,
       payment,
     };
+    const logoBytes = await createTestLogoJpeg();
     const fileRegistryService = {
       registerGeneratedFile: jest.fn().mockResolvedValue({ id: 'file-1' }),
+      getFileMetadata: jest
+        .fn()
+        .mockResolvedValue(buildSchoolLogoAsset(logoBytes.length)),
+      getProtectedDownload: jest.fn().mockResolvedValue({ content: logoBytes }),
     };
     const { service, prisma } = buildService({
       invoice: null,
       feeHead: null,
       receipt,
       fileRegistryService,
+    });
+    prisma.tenantSetting.findUnique.mockResolvedValue({
+      value: SCHOOL_LOGO_FILE_ASSET_ID,
     });
 
     const pdf = await service.getReceiptPdf(receipt.receiptNumber, actor);
@@ -911,6 +921,7 @@ describe('finance production controls', () => {
     expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
     expect(pdf.toString('latin1')).toContain('VERIFY RECEIPT');
     expect(pdf.toString('latin1')).toContain(receipt.receiptNumber);
+    expect(pdf.toString('latin1')).toContain('/Filter /DCTDecode');
     expect(fileRegistryService.registerGeneratedFile).toHaveBeenCalledWith(
       expect.objectContaining({
         tenantId: actor.tenantId,
@@ -960,6 +971,7 @@ describe('finance production controls', () => {
     );
 
     expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
+    expect(pdf.toString('latin1')).not.toContain('/Filter /DCTDecode');
     await expect(
       service.getReceiptPdfForStudent(
         receipt.receiptNumber,
@@ -1533,6 +1545,7 @@ describe('finance production controls', () => {
       collectorUser: null,
       closedBy: { id: actor.userId, email: actor.email },
     };
+    const logoBytes = await createTestLogoJpeg();
     const fileRegistryService = {
       registerGeneratedFile: jest.fn().mockResolvedValue({
         id: 'file-close-1',
@@ -1540,6 +1553,10 @@ describe('finance production controls', () => {
         mimeType: 'application/pdf',
         sizeBytes: BigInt(2048),
       }),
+      getFileMetadata: jest
+        .fn()
+        .mockResolvedValue(buildSchoolLogoAsset(logoBytes.length)),
+      getProtectedDownload: jest.fn().mockResolvedValue({ content: logoBytes }),
     };
     const { service, prisma } = buildService({
       invoice: null,
@@ -1549,6 +1566,9 @@ describe('finance production controls', () => {
       createdCashierClose: createdClose,
       cashierCloseCount: 0,
       fileRegistryService,
+    });
+    prisma.tenantSetting.findUnique.mockResolvedValue({
+      value: SCHOOL_LOGO_FILE_ASSET_ID,
     });
 
     const preview = await service.previewCashierClose(
@@ -1642,6 +1662,9 @@ describe('finance production controls', () => {
         }),
       }),
     );
+    const closePdf = fileRegistryService.registerGeneratedFile.mock.calls[0][0]
+      .content as Buffer;
+    expect(closePdf.toString('latin1')).toContain('/Filter /DCTDecode');
   });
 
   it('requires a variance reason when actual cash differs from expected cash', async () => {
@@ -2592,6 +2615,9 @@ function buildService(options: {
           options.tenant ?? { id: actor.tenantId, name: 'SchoolOS' },
         ),
     },
+    tenantSetting: {
+      findUnique: jest.fn().mockResolvedValue(null),
+    },
     chartAccount: {
       findUniqueOrThrow: jest
         .fn()
@@ -2675,4 +2701,33 @@ function buildService(options: {
     eventEmitter,
     accountingPostingService,
   };
+}
+
+const SCHOOL_LOGO_FILE_ASSET_ID = '11111111-1111-1111-1111-111111111111';
+
+function buildSchoolLogoAsset(sizeBytes: number) {
+  return {
+    id: SCHOOL_LOGO_FILE_ASSET_ID,
+    tenantId: actor.tenantId,
+    module: 'settings',
+    entityId: actor.tenantId,
+    status: FileStatus.UPLOADED,
+    originalFilename: 'school-logo.jpg',
+    mimeType: 'image/jpeg',
+    sizeBytes: BigInt(sizeBytes),
+    metadata: { kind: 'SCHOOL_LOGO' },
+  };
+}
+
+function createTestLogoJpeg() {
+  return sharp({
+    create: {
+      width: 96,
+      height: 48,
+      channels: 3,
+      background: { r: 24, g: 84, b: 140 },
+    },
+  })
+    .jpeg({ quality: 90 })
+    .toBuffer();
 }

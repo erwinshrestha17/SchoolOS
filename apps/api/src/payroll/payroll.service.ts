@@ -29,7 +29,8 @@ import type { Job, Queue } from 'bullmq';
 import { AccountingPostingService } from '../accounting/accounting-posting.service';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
-import { buildSalarySlipPdf } from '../common/pdf/simple-pdf';
+import { buildSalarySlipPdf, type PdfImage } from '../common/pdf/simple-pdf';
+import { loadSchoolLogoForPdf } from '../common/pdf/school-logo-loader';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { CreateStaffContractDto } from '../hr/dto/create-staff-contract.dto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -2211,6 +2212,14 @@ export class PayrollService {
         .map((exportRecord) => getJsonString(exportRecord.filters, 'payslipId'))
         .filter((payslipId): payslipId is string => Boolean(payslipId)),
     );
+    const logo = await loadSchoolLogoForPdf(
+      this.prisma,
+      this.fileRegistryService,
+      {
+        tenantId: input.tenantId,
+        userId: input.requestedByUserId,
+      },
+    );
 
     let generated = 0;
     let skipped = 0;
@@ -2226,6 +2235,7 @@ export class PayrollService {
         periodMonth: run.periodMonth,
         periodYear: run.periodYear,
         payslip,
+        logo,
       });
       const fileName = `${payslip.payslipNumber}.pdf`;
       const asset = await this.fileRegistryService.registerGeneratedFile({
@@ -2306,6 +2316,7 @@ export class PayrollService {
     payslip: Prisma.PayslipGetPayload<{
       include: { staff: true; payrollLine: true };
     }>;
+    logo?: PdfImage | null;
   }) {
     const monthLabels = [
       'January',
@@ -2355,6 +2366,7 @@ export class PayrollService {
         present: payslip.payrollLine.attendanceDays,
         working: payslip.payrollLine.workingDays,
       },
+      logo: input.logo,
     });
   }
 

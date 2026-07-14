@@ -2,23 +2,34 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
 import { AccountingReportExportsService } from './accounting-report-exports.service';
 import { AccountingReportsService } from './accounting-reports.service';
-import { ChartAccountType, JournalLineSide, Prisma } from '@prisma/client';
+import {
+  ChartAccountType,
+  FileStatus,
+  JournalLineSide,
+  Prisma,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { AuditService } from '../audit/audit.service';
+import sharp from 'sharp';
 
 describe('AccountingReportExportsService', () => {
   let service: AccountingReportExportsService;
   let reportsService: jest.Mocked<AccountingReportsService>;
   let prisma: {
     tenant: { findUnique: jest.Mock };
+    tenantSetting: { findUnique: jest.Mock };
     reportExport: {
       findFirst: jest.Mock;
       create: jest.Mock;
       update: jest.Mock;
     };
   };
-  let fileRegistryService: { registerGeneratedFile: jest.Mock };
+  let fileRegistryService: {
+    registerGeneratedFile: jest.Mock;
+    getFileMetadata: jest.Mock;
+    getProtectedDownload: jest.Mock;
+  };
   let auditService: { record: jest.Mock };
   let queue: { add: jest.Mock };
 
@@ -35,6 +46,9 @@ describe('AccountingReportExportsService', () => {
       tenant: {
         findUnique: jest.fn().mockResolvedValue({ name: 'Test School' }),
       },
+      tenantSetting: {
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
       reportExport: {
         findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn(),
@@ -43,6 +57,8 @@ describe('AccountingReportExportsService', () => {
     };
     fileRegistryService = {
       registerGeneratedFile: jest.fn().mockResolvedValue({ id: 'file-1' }),
+      getFileMetadata: jest.fn(),
+      getProtectedDownload: jest.fn(),
     };
     auditService = { record: jest.fn() };
     queue = { add: jest.fn().mockResolvedValue({ id: 'job-1' }) };
@@ -625,6 +641,24 @@ describe('AccountingReportExportsService', () => {
   });
 
   it('exports a valid Trial Balance PDF and records a protected snapshot', async () => {
+    const logoBytes = await createTestLogoJpeg();
+    prisma.tenantSetting.findUnique.mockResolvedValue({
+      value: SCHOOL_LOGO_FILE_ASSET_ID,
+    });
+    fileRegistryService.getFileMetadata.mockResolvedValue({
+      id: SCHOOL_LOGO_FILE_ASSET_ID,
+      tenantId: 'tenant-1',
+      module: 'settings',
+      entityId: 'tenant-1',
+      status: FileStatus.UPLOADED,
+      originalFilename: 'school-logo.jpg',
+      mimeType: 'image/jpeg',
+      sizeBytes: BigInt(logoBytes.length),
+      metadata: { kind: 'SCHOOL_LOGO' },
+    });
+    fileRegistryService.getProtectedDownload.mockResolvedValue({
+      content: logoBytes,
+    });
     reportsService.getTrialBalance.mockResolvedValue({
       rows: [],
       totalOpeningDebit: new Prisma.Decimal(0),
@@ -654,6 +688,7 @@ describe('AccountingReportExportsService', () => {
     expect(pdfText).toContain('CLOSING DEBIT');
     expect(pdfText).toContain('CLOSING CREDIT');
     expect(pdfText).toContain('BALANCED');
+    expect(pdfText).toContain('/Filter /DCTDecode');
   });
 
   it('reuses an existing PDF snapshot for identical accounting report export retries', async () => {
@@ -771,6 +806,7 @@ describe('AccountingReportExportsService', () => {
     expect(pdfText).toContain('TOTAL LIABILITIES');
     expect(pdfText).toContain('TOTAL EQUITY');
     expect(pdfText).toContain('BALANCED');
+    expect(pdfText).not.toContain('/Filter /DCTDecode');
   });
 
   it('returns empty CSV for reports with no data rows', async () => {
@@ -789,3 +825,18 @@ describe('AccountingReportExportsService', () => {
     expect(csv).toContain('"SUMMARY","","Net BREAK_EVEN","0.00"');
   });
 });
+
+const SCHOOL_LOGO_FILE_ASSET_ID = '11111111-1111-1111-1111-111111111111';
+
+function createTestLogoJpeg() {
+  return sharp({
+    create: {
+      width: 96,
+      height: 48,
+      channels: 3,
+      background: { r: 24, g: 84, b: 140 },
+    },
+  })
+    .jpeg({ quality: 90 })
+    .toBuffer();
+}

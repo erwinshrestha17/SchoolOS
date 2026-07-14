@@ -1,10 +1,12 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import {
   AuthMethod,
+  FileStatus,
   LibraryCopyStatus,
   LibraryIssueStatus,
   Prisma,
 } from '@prisma/client';
+import sharp from 'sharp';
 import { LibraryService } from './library.service';
 
 const actor = {
@@ -29,6 +31,39 @@ const actor = {
 };
 
 describe('LibraryService Phase 3A foundation', () => {
+  it('embeds configured branding in library report PDFs and falls back when absent', async () => {
+    const { service, prisma, fileRegistryService } = buildService();
+    const logoBytes = await createTestLogoJpeg();
+    prisma.tenantSetting.findUnique.mockResolvedValue({
+      value: SCHOOL_LOGO_FILE_ASSET_ID,
+    });
+    fileRegistryService.getFileMetadata.mockResolvedValue({
+      id: SCHOOL_LOGO_FILE_ASSET_ID,
+      tenantId: actor.tenantId,
+      module: 'settings',
+      entityId: actor.tenantId,
+      status: FileStatus.UPLOADED,
+      originalFilename: 'school-logo.jpg',
+      mimeType: 'image/jpeg',
+      sizeBytes: BigInt(logoBytes.length),
+      metadata: { kind: 'SCHOOL_LOGO' },
+    });
+    fileRegistryService.getProtectedDownload.mockResolvedValue({
+      content: logoBytes,
+    });
+
+    const popular = await service.exportPopularBooks(actor);
+    const overdue = await service.exportOverdueBooks(actor);
+    expect(popular.pdf.toString('latin1')).toContain('/Filter /DCTDecode');
+    expect(overdue.pdf.toString('latin1')).toContain('/Filter /DCTDecode');
+
+    prisma.tenantSetting.findUnique.mockResolvedValue(null);
+    const unbranded = await service.exportPopularBooks(actor);
+    expect(unbranded.pdf.toString('latin1')).not.toContain(
+      '/Filter /DCTDecode',
+    );
+  });
+
   it('creates a tenant-scoped library book', async () => {
     const { service, prisma, auditService } = buildService();
 
@@ -667,6 +702,12 @@ function buildService(
     staff: {
       findFirst: jest.fn().mockResolvedValue(options.staff ?? null),
     },
+    tenant: {
+      findUnique: jest.fn().mockResolvedValue({ name: 'SchoolOS Academy' }),
+    },
+    tenantSetting: {
+      findUnique: jest.fn().mockResolvedValue(null),
+    },
     $transaction: jest.fn().mockImplementation(async (input: unknown) => {
       if (Array.isArray(input)) {
         return Promise.all(input);
@@ -693,6 +734,10 @@ function buildService(
   const studentQrService = {
     resolveQr: jest.fn().mockResolvedValue({ studentId: 'student-1' }),
   };
+  const fileRegistryService = {
+    getFileMetadata: jest.fn(),
+    getProtectedDownload: jest.fn(),
+  };
 
   return {
     service: new LibraryService(
@@ -702,6 +747,7 @@ function buildService(
       configService as never,
       accountingPostingService as never,
       studentQrService as never,
+      fileRegistryService as never,
     ),
     prisma,
     tx,
@@ -709,6 +755,7 @@ function buildService(
     communicationsService,
     accountingPostingService,
     studentQrService,
+    fileRegistryService,
   };
 }
 
@@ -734,4 +781,19 @@ function buildLibraryFine() {
       borrowerStudent: { id: 'student-1' },
     },
   };
+}
+
+const SCHOOL_LOGO_FILE_ASSET_ID = '11111111-1111-1111-1111-111111111111';
+
+function createTestLogoJpeg() {
+  return sharp({
+    create: {
+      width: 96,
+      height: 48,
+      channels: 3,
+      background: { r: 24, g: 84, b: 140 },
+    },
+  })
+    .jpeg({ quality: 90 })
+    .toBuffer();
 }

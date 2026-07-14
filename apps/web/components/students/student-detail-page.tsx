@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useSearchParams } from 'next/navigation';
-import { MoreHorizontal, ShieldCheck } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { MoreHorizontal, QrCode, ShieldCheck } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useRecentlyViewed } from '@/lib/hooks/use-recently-viewed';
 import { LoadingState } from '@/components/ui/loading-state';
@@ -81,6 +81,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
   const [activeDetailTab, setActiveDetailTab] = useState<DetailTab>('Overview');
 
   const queryClient = useQueryClient();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { record: recordRecentlyViewed } = useRecentlyViewed();
 
@@ -317,14 +318,18 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
                 label: tab.label,
                 icon: tab.value === 'Health' ? <ShieldCheck size={16} /> : undefined,
                 onClick: () => setActiveDetailTab(tab.value),
-              }))}
+              })).concat({
+                label: 'Identity & QR',
+                icon: <QrCode size={16} />,
+                onClick: () => router.push(`/dashboard/students/${encodeURIComponent(studentId)}/identity`),
+              })}
             />
           </TabsList>
         </div>
 
         <div className="min-h-[400px]">
           <TabsContent value="Overview" className="mt-0">
-            <ProfileTabs.OverviewTab profile={profile} onOpenPdf={openStudentPdf} onSelectTab={(tab) => setActiveDetailTab(tab)} />
+            <ProfileTabs.OverviewTab profile={profile} onSelectTab={(tab) => setActiveDetailTab(tab)} />
           </TabsContent>
           <TabsContent value="Profile" className="mt-0">
             <ProfileTabs.ProfileTab profile={profile} />

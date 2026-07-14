@@ -10,6 +10,7 @@ import { getQueueToken } from '@nestjs/bullmq';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PlansService } from '../plans/plans.service';
 import { SUSPENDED_TENANT_MESSAGE } from '../plans/tenant-access.constants';
+import sharp from 'sharp';
 
 describe('ReportsService', () => {
   let service: ReportsService;
@@ -64,6 +65,7 @@ describe('ReportsService', () => {
             },
             tenantSetting: {
               findMany: jest.fn().mockResolvedValue([]),
+              findUnique: jest.fn().mockResolvedValue(null),
             },
             enrollment: {
               findMany: jest.fn().mockResolvedValue([
@@ -451,30 +453,52 @@ describe('ReportsService', () => {
     );
   });
 
-  it('does not load report logos from non-branding file references', async () => {
-    (prisma.tenantSetting.findMany as jest.Mock).mockResolvedValueOnce([
-      { value: '11111111-1111-1111-1111-111111111111' },
-    ]);
+  it('embeds the configured school logo in table report PDFs', async () => {
+    const logoBytes = await createTestLogoJpeg();
+    (prisma.tenantSetting.findUnique as jest.Mock).mockResolvedValueOnce({
+      value: SCHOOL_LOGO_FILE_ASSET_ID,
+    });
     (fileRegistry.getFileMetadata as jest.Mock).mockResolvedValueOnce({
-      id: '11111111-1111-1111-1111-111111111111',
+      id: SCHOOL_LOGO_FILE_ASSET_ID,
       tenantId: actor.tenantId,
-      module: 'students',
-      entityId: 'student-1',
+      module: 'settings',
+      entityId: actor.tenantId,
       status: FileStatus.UPLOADED,
-      originalFilename: 'student-photo.jpg',
+      originalFilename: 'school-logo.jpg',
       mimeType: 'image/jpeg',
-      sizeBytes: BigInt(32),
-      metadata: { kind: 'STUDENT_PHOTO' },
+      sizeBytes: BigInt(logoBytes.length),
+      metadata: { kind: 'SCHOOL_LOGO' },
+    });
+    (fileRegistry.getProtectedDownload as jest.Mock).mockResolvedValueOnce({
+      content: logoBytes,
     });
 
-    const logo = await (
-      service as unknown as {
-        loadReportLogo(actor: AuthContext): Promise<unknown>;
-      }
-    ).loadReportLogo(actor);
+    const result = await service.exportReport(
+      'academic-class-result-summary',
+      {
+        format: 'pdf',
+        filters: { academicYearId: 'ay1', examTermId: 'et1' },
+      },
+      actor,
+    );
 
-    expect(logo).toBeNull();
-    expect(fileRegistry.getProtectedDownload).not.toHaveBeenCalled();
+    const pdf = result.content as Buffer;
+    expect(pdf.toString('latin1')).toContain('/Filter /DCTDecode');
+  });
+
+  it('still generates table report PDFs when no school logo is configured', async () => {
+    const result = await service.exportReport(
+      'academic-class-result-summary',
+      {
+        format: 'pdf',
+        filters: { academicYearId: 'ay1', examTermId: 'et1' },
+      },
+      actor,
+    );
+
+    const pdf = result.content as Buffer;
+    expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
+    expect(pdf.toString('latin1')).not.toContain('/Filter /DCTDecode');
   });
 
   it('lists export history with tenant scope and safe pagination bounds', async () => {
@@ -578,4 +602,19 @@ describe('ReportsService', () => {
 function expectBufferText(content: unknown) {
   expect(Buffer.isBuffer(content)).toBe(true);
   return (content as Buffer).toString();
+}
+
+const SCHOOL_LOGO_FILE_ASSET_ID = '11111111-1111-1111-1111-111111111111';
+
+function createTestLogoJpeg() {
+  return sharp({
+    create: {
+      width: 96,
+      height: 48,
+      channels: 3,
+      background: { r: 24, g: 84, b: 140 },
+    },
+  })
+    .jpeg({ quality: 90 })
+    .toBuffer();
 }

@@ -1,8 +1,8 @@
 import { AuthMethod, FileStatus } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
-import { ReportCardPdfService } from './report-card-pdf.service';
+import { loadSchoolLogoForPdf } from '../common/pdf/school-logo-loader';
 
-describe('ReportCardPdfService logo loading', () => {
+describe('ReportCardPdfService logo loading boundary', () => {
   const actor: AuthContext = {
     tenantId: 'tenant-1',
     tenantSlug: 'green-valley',
@@ -14,23 +14,23 @@ describe('ReportCardPdfService logo loading', () => {
   };
 
   function buildService() {
+    const prisma = {
+      tenantSetting: {
+        findUnique: jest.fn().mockResolvedValue({
+          value: '11111111-1111-1111-1111-111111111111',
+        }),
+      },
+    };
     const fileRegistryService = {
       getFileMetadata: jest.fn(),
       getProtectedDownload: jest.fn(),
     };
 
-    const service = new ReportCardPdfService(
-      {} as never,
-      {} as never,
-      {} as never,
-      fileRegistryService as never,
-    );
-
-    return { service, fileRegistryService };
+    return { prisma, fileRegistryService };
   }
 
   it('does not load report card logos from non-branding file references', async () => {
-    const { service, fileRegistryService } = buildService();
+    const { prisma, fileRegistryService } = buildService();
     fileRegistryService.getFileMetadata.mockResolvedValue({
       id: '11111111-1111-1111-1111-111111111111',
       tenantId: actor.tenantId,
@@ -43,14 +43,11 @@ describe('ReportCardPdfService logo loading', () => {
       metadata: { kind: 'STUDENT_PHOTO' },
     });
 
-    const logo = await (
-      service as unknown as {
-        loadSchoolLogo(
-          logoSetting: string,
-          actor: AuthContext,
-        ): Promise<unknown>;
-      }
-    ).loadSchoolLogo('11111111-1111-1111-1111-111111111111', actor);
+    const logo = await loadSchoolLogoForPdf(
+      prisma as never,
+      fileRegistryService as never,
+      actor,
+    );
 
     expect(logo).toBeNull();
     expect(fileRegistryService.getProtectedDownload).not.toHaveBeenCalled();

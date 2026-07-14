@@ -7,6 +7,7 @@ import {
   AttendanceStatus,
   AuthMethod,
   EnrollmentStatus,
+  FileStatus,
   Prisma,
   StudentLifecycleStatus,
 } from '@prisma/client';
@@ -957,6 +958,75 @@ describe('students lifecycle hardening', () => {
     });
   });
 
+  it('embeds the configured school logo in generated student certificates', async () => {
+    const student = buildStudent({ guardianLinks: [] });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      generatedStudentDocumentFindFirstQueue: [null],
+    });
+    const { service, fileRegistryService } = buildService(prisma);
+    const logoBytes = await createTestJpeg(96, 48);
+    configureSchoolLogo(prisma, fileRegistryService, logoBytes);
+
+    await service.generateStudentDocumentPdf(
+      student.id,
+      'enrollment-confirmation',
+      actor,
+    );
+
+    const generatedPdf = fileRegistryService.registerGeneratedFile.mock
+      .calls[0][0].content as Buffer;
+    expect(generatedPdf.toString('latin1')).toContain('/Filter /DCTDecode');
+  });
+
+  it('still generates student certificates without an unavailable school logo', async () => {
+    const student = buildStudent({ guardianLinks: [] });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      generatedStudentDocumentFindFirstQueue: [null],
+    });
+    const { service, fileRegistryService } = buildService(prisma);
+    prisma.tenantSetting.findUnique.mockResolvedValue({
+      value: SCHOOL_LOGO_FILE_ASSET_ID,
+    });
+    fileRegistryService.getFileMetadata.mockRejectedValue(
+      new NotFoundException('School logo is unavailable'),
+    );
+
+    await expect(
+      service.generateStudentDocumentPdf(
+        student.id,
+        'enrollment-confirmation',
+        actor,
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        fileName: `${student.studentSystemId}-enrollment-confirmation.pdf`,
+        fileAvailable: true,
+      }),
+    );
+    const generatedPdf = fileRegistryService.registerGeneratedFile.mock
+      .calls[0][0].content as Buffer;
+    expect(generatedPdf.toString('latin1')).not.toContain('/Filter /DCTDecode');
+  });
+
+  it('embeds the configured school logo in roster PDFs and falls back when absent', async () => {
+    const student = buildStudent({ guardianLinks: [] });
+    const prisma = buildPrisma({ studentFindManyResult: [student] });
+    const { service, fileRegistryService } = buildService(prisma);
+    const logoBytes = await createTestJpeg(96, 48);
+    configureSchoolLogo(prisma, fileRegistryService, logoBytes);
+
+    const branded = await service.exportRoster({}, actor);
+    expect(branded.pdf.toString('latin1')).toContain('/Filter /DCTDecode');
+
+    prisma.tenantSetting.findUnique.mockResolvedValue(null);
+    const unbranded = await service.exportRoster({}, actor);
+    expect(unbranded.pdf.toString('latin1')).not.toContain(
+      '/Filter /DCTDecode',
+    );
+  });
+
   it('embeds the real uploaded student photo in the generated ID card', async () => {
     const student = buildStudent({ guardianLinks: [] });
     const prisma = buildPrisma({
@@ -1879,6 +1949,30 @@ async function createTestJpeg(width: number, height: number) {
     .toBuffer();
 }
 
+const SCHOOL_LOGO_FILE_ASSET_ID = '11111111-1111-1111-1111-111111111111';
+
+function configureSchoolLogo(
+  prisma: ReturnType<typeof buildPrisma>,
+  fileRegistryService: ReturnType<typeof buildService>['fileRegistryService'],
+  content: Buffer,
+) {
+  prisma.tenantSetting.findUnique.mockResolvedValue({
+    value: SCHOOL_LOGO_FILE_ASSET_ID,
+  });
+  fileRegistryService.getFileMetadata.mockResolvedValue({
+    id: SCHOOL_LOGO_FILE_ASSET_ID,
+    tenantId: actor.tenantId,
+    module: 'settings',
+    entityId: actor.tenantId,
+    status: FileStatus.UPLOADED,
+    originalFilename: 'school-logo.jpg',
+    mimeType: 'image/jpeg',
+    sizeBytes: BigInt(content.length),
+    metadata: { kind: 'SCHOOL_LOGO' },
+  });
+  fileRegistryService.getProtectedDownload.mockResolvedValue({ content });
+}
+
 function buildStudent(
   overrides: Partial<{
     id: string;
@@ -2021,6 +2115,8 @@ function buildService(prisma: ReturnType<typeof buildPrisma>) {
     }),
     getSignedUrl: jest.fn(),
     listFilesByEntity: jest.fn().mockResolvedValue([]),
+    getFileMetadata: jest.fn(),
+    getProtectedDownload: jest.fn(),
   };
   const usageService = {
     verifyLimit: jest.fn(),
@@ -2214,11 +2310,18 @@ function buildPrisma(options: {
       findFirst: jest
         .fn()
         .mockResolvedValue(options.classFindFirstResult ?? { id: 'class-1' }),
+      findUnique: jest
+        .fn()
+        .mockResolvedValue({ id: 'class-1', name: 'Grade 1' }),
     },
     section: {
       findFirst: jest
         .fn()
         .mockResolvedValue(options.sectionFindFirstResult ?? null),
+      findUnique: jest.fn().mockResolvedValue(null),
+    },
+    tenant: {
+      findUnique: jest.fn().mockResolvedValue({ name: 'Everest Academy' }),
     },
     enrollment: {
       findFirst: jest

@@ -19,8 +19,10 @@ import { AuditService } from '../audit/audit.service';
 import { AccountingPostingService } from '../accounting/accounting-posting.service';
 import type { AuthContext } from '../auth/auth.types';
 import { buildTableReportPdf } from '../common/pdf/simple-pdf';
+import { loadSchoolLogoForPdf } from '../common/pdf/school-logo-loader';
 import { CommunicationsService } from '../communications/communications.service';
 import { ConfigService } from '../config/config.service';
+import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateLibraryBookDto } from './dto/create-library-book.dto';
 import { CreateLibraryCopyDto } from './dto/create-library-copy.dto';
@@ -69,6 +71,7 @@ export class LibraryService {
     private readonly configService: ConfigService,
     private readonly accountingPostingService: AccountingPostingService,
     private readonly studentQrService: StudentQrService,
+    private readonly fileRegistryService: FileRegistryService,
   ) {}
 
   async listBooks(actor: AuthContext, options: ListBooksQuery = {}) {
@@ -1248,15 +1251,19 @@ export class LibraryService {
       'Issue Count': item.issueCount,
     }));
 
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: actor.tenantId },
-    });
+    const [tenant, logo] = await Promise.all([
+      this.prisma.tenant.findUnique({
+        where: { id: actor.tenantId },
+      }),
+      loadSchoolLogoForPdf(this.prisma, this.fileRegistryService, actor),
+    ]);
 
     return {
       pdf: buildTableReportPdf({
         schoolName: tenant?.name || 'SchoolOS',
         title: 'Popular Books Report',
         rows,
+        logo,
       }),
       fileName: 'Popular_Books_Report.pdf',
     };
@@ -1290,15 +1297,19 @@ export class LibraryService {
       ),
     }));
 
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: actor.tenantId },
-    });
+    const [tenant, logo] = await Promise.all([
+      this.prisma.tenant.findUnique({
+        where: { id: actor.tenantId },
+      }),
+      loadSchoolLogoForPdf(this.prisma, this.fileRegistryService, actor),
+    ]);
 
     return {
       pdf: buildTableReportPdf({
         schoolName: tenant?.name || 'SchoolOS',
         title: 'Overdue Books Report',
         rows,
+        logo,
       }),
       fileName: 'Overdue_Books_Report.pdf',
     };

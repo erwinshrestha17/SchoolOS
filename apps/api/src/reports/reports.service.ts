@@ -25,11 +25,8 @@ import {
 import { FinanceService } from '../finance/finance.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PlansService } from '../plans/plans.service';
-import { assertSchoolLogoFileAsset } from '../common/files/school-logo-file.policy';
-import {
-  buildTableReportPdf,
-  getJpegDimensions,
-} from '../common/pdf/simple-pdf';
+import { buildTableReportPdf } from '../common/pdf/simple-pdf';
+import { loadSchoolLogoForPdf } from '../common/pdf/school-logo-loader';
 
 export interface ReportExecutor {
   definition: ReportDefinition;
@@ -2226,7 +2223,11 @@ export class ReportsService {
     }
 
     if (input.format === 'pdf') {
-      const logo = await this.loadReportLogo(input.actor);
+      const logo = await loadSchoolLogoForPdf(
+        this.prisma,
+        this.fileRegistryService,
+        input.actor,
+      );
       return {
         content: buildTableReportPdf({
           schoolName: input.actor.tenantSlug,
@@ -2245,50 +2246,6 @@ export class ReportsService {
       contentType: 'text/csv',
       fileName,
     };
-  }
-
-  private async loadReportLogo(actor: AuthContext): Promise<{
-    buffer: Buffer;
-    width: number;
-    height: number;
-    format: 'jpeg';
-  } | null> {
-    const settings = await this.prisma.tenantSetting.findMany({
-      where: { tenantId: actor.tenantId, key: 'school_logo' },
-    });
-    const logoSetting = settings[0]?.value;
-    const logoFileAssetId =
-      typeof logoSetting === 'string' ? logoSetting : null;
-    if (
-      !logoFileAssetId ||
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        logoFileAssetId,
-      )
-    ) {
-      return null;
-    }
-
-    try {
-      const asset = await this.fileRegistryService.getFileMetadata(
-        actor.tenantId,
-        logoFileAssetId,
-      );
-      assertSchoolLogoFileAsset(asset, actor.tenantId);
-      const { content } = await this.fileRegistryService.getProtectedDownload(
-        actor.tenantId,
-        logoFileAssetId,
-        actor.userId,
-      );
-      const dimensions = getJpegDimensions(content);
-      return {
-        buffer: content,
-        width: dimensions.width,
-        height: dimensions.height,
-        format: 'jpeg',
-      };
-    } catch {
-      return null;
-    }
   }
 
   private async registerReportExportFile(input: {

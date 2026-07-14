@@ -62,6 +62,7 @@ import { GetMonthlyRegisterDto } from './dto/get-monthly-register.dto';
 import { GetStudentHistoryDto } from './dto/get-student-history.dto';
 import { UpsertAttendanceDraftDto } from './dto/upsert-attendance-draft.dto';
 import { buildRosterPdf } from '../common/pdf/simple-pdf';
+import { loadSchoolLogoForPdf } from '../common/pdf/school-logo-loader';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 
 const M2_ATTENDANCE_HARDENING_POLICY_KEY = 'attendance.m2.hardeningPolicy';
@@ -3499,6 +3500,11 @@ export class AttendanceService {
       ].join('\n');
     } else {
       // Basic PDF table generation using simple-pdf
+      const logo = await loadSchoolLogoForPdf(
+        this.prisma,
+        this.fileRegistryService,
+        actor,
+      );
       content = buildRosterPdf({
         schoolName: 'Attendance Register',
         className: data.className,
@@ -3521,6 +3527,7 @@ export class AttendanceService {
           PERCENTAGE:
             s.totals.percentage === null ? '' : `${s.totals.percentage}%`,
         })),
+        logo,
       });
     }
 

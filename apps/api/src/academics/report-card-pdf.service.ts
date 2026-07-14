@@ -12,11 +12,8 @@ import {
   GradeCalculatorService,
   type TenantGradingPolicy,
 } from './grade-calculator.service';
-import {
-  buildReportCardPdf,
-  getJpegDimensions,
-} from '../common/pdf/simple-pdf';
-import { assertSchoolLogoFileAsset } from '../common/files/school-logo-file.policy';
+import { buildReportCardPdf } from '../common/pdf/simple-pdf';
+import { loadSchoolLogoForPdf } from '../common/pdf/school-logo-loader';
 
 type ReportCardWithRelations = Prisma.ReportCardGetPayload<{
   include: {
@@ -112,7 +109,6 @@ export class ReportCardPdfService {
               'school_address',
               'school_phone',
               'school_email',
-              'school_logo',
               'principal_name',
               'report_card_footer_text',
             ],
@@ -173,20 +169,11 @@ export class ReportCardPdfService {
     const settingMap = new Map(settings.map((s) => [s.key, String(s.value)]));
     const primaryGuardian = reportCard.student.guardianLinks[0]?.guardian;
 
-    let logoBuffer: Buffer | null = null;
-    let logoDimensions: { width: number; height: number } | null = null;
-
-    const logo = await this.loadSchoolLogo(
-      settingMap.get('school_logo'),
+    const logo = await loadSchoolLogoForPdf(
+      this.prisma,
+      this.fileRegistryService,
       actor,
     );
-    if (logo) {
-      logoBuffer = logo.buffer;
-      logoDimensions = {
-        width: logo.width,
-        height: logo.height,
-      };
-    }
 
     const gradingPolicy = await this.gradeCalculator.getTenantGradingPolicy(
       actor.tenantId,
@@ -240,15 +227,7 @@ export class ReportCardPdfService {
         finalGpa: Number(reportCard.gpa),
         remarks: reportCard.remarks,
       },
-      logo:
-        logoBuffer && logoDimensions
-          ? {
-              buffer: logoBuffer,
-              width: logoDimensions.width,
-              height: logoDimensions.height,
-              format: 'jpeg',
-            }
-          : null,
+      logo,
     });
 
     if (!reportCard.fileId) {
@@ -300,45 +279,6 @@ export class ReportCardPdfService {
     });
 
     return pdf;
-  }
-
-  private async loadSchoolLogo(
-    logoSetting: string | undefined,
-    actor: AuthContext,
-  ): Promise<{
-    buffer: Buffer;
-    width: number;
-    height: number;
-  } | null> {
-    if (
-      !logoSetting ||
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        logoSetting,
-      )
-    ) {
-      return null;
-    }
-
-    try {
-      const asset = await this.fileRegistryService.getFileMetadata(
-        actor.tenantId,
-        logoSetting,
-      );
-      assertSchoolLogoFileAsset(asset, actor.tenantId);
-      const { content } = await this.fileRegistryService.getProtectedDownload(
-        actor.tenantId,
-        logoSetting,
-        actor.userId,
-      );
-      const dimensions = getJpegDimensions(content);
-      return {
-        buffer: content,
-        width: dimensions.width,
-        height: dimensions.height,
-      };
-    } catch {
-      return null;
-    }
   }
 
   private buildSubjectRows(

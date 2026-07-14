@@ -41,6 +41,7 @@ import {
   buildReceiptPdf,
   buildCashierClosePdf,
 } from '../common/pdf/simple-pdf';
+import { loadSchoolLogoForPdf } from '../common/pdf/school-logo-loader';
 import { CommunicationsService } from '../communications/communications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
@@ -547,6 +548,11 @@ export class FinanceService {
     const school = await this.prisma.tenant.findUnique({
       where: { id: actor.tenantId },
     });
+    const logo = await loadSchoolLogoForPdf(
+      this.prisma,
+      this.fileRegistryService,
+      actor,
+    );
 
     const student = receipt.payment.student;
     const invoice = receipt.payment.invoice;
@@ -576,6 +582,7 @@ export class FinanceService {
       balance: Number(invoice.totalAmount.sub(receipt.payment.amount)),
       isReprint: true,
       qrToken: receipt.receiptNumber,
+      logo,
     });
     const fileName = `Receipt_${receipt.receiptNumber}_Reprint.pdf`;
     let history: Prisma.ReceiptReprintHistoryGetPayload<object> | null =
@@ -5780,6 +5787,11 @@ export class FinanceService {
       where: { id: actor.tenantId },
     });
     const schoolName = school?.name || 'SchoolOS';
+    const logo = await loadSchoolLogoForPdf(
+      this.prisma,
+      this.fileRegistryService,
+      actor,
+    );
 
     const methodBreakdown = parseCashierCloseMethodBreakdown(
       close.methodBreakdown,
@@ -5808,6 +5820,7 @@ export class FinanceService {
       lastReceiptNumber: close.lastReceiptNumber,
       notes: close.notes,
       closedByName: close.closedBy?.email ?? 'System',
+      logo,
     });
 
     let fileAssetId: string | null = null;
@@ -7404,7 +7417,12 @@ export class FinanceService {
       pdf = download.content;
       fileAssetId = existingFile.id;
     } else {
-      pdf = buildReceiptPdf(pdfData);
+      const logo = await loadSchoolLogoForPdf(
+        this.prisma,
+        this.fileRegistryService,
+        actor,
+      );
+      pdf = buildReceiptPdf({ ...pdfData, logo });
 
       try {
         const asset = await this.fileRegistryService.registerGeneratedFile({

@@ -25,7 +25,7 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
-import { assertSchoolLogoFileAsset } from '../common/files/school-logo-file.policy';
+import { loadSchoolLogoForPdf } from '../common/pdf/school-logo-loader';
 import {
   buildCertificatePdf,
   buildIdCardPdf,
@@ -3203,6 +3203,11 @@ export class StudentsService {
           where: { id: filters.sectionId },
         })
       : null;
+    const logo = await loadSchoolLogoForPdf(
+      this.prisma,
+      this.fileRegistryService,
+      actor,
+    );
 
     return {
       headers,
@@ -3221,6 +3226,7 @@ export class StudentsService {
           'Status',
         ],
         rows,
+        logo,
       }),
     };
   }
@@ -3433,13 +3439,12 @@ export class StudentsService {
       orderBy: [{ version: 'desc' }, { generatedAt: 'desc' }],
     });
     const version = (latestVersion?.version ?? 0) + 1;
-    const [logo, photo] =
+    const [logo, photo] = await Promise.all([
+      loadSchoolLogoForPdf(this.prisma, this.fileRegistryService, actor),
       normalizedKind === 'id-card'
-        ? await Promise.all([
-            this.loadSchoolLogoForIdCard(actor),
-            this.loadStudentPhotoForIdCard(student.id, actor),
-          ])
-        : [null, null];
+        ? this.loadStudentPhotoForIdCard(student.id, actor)
+        : Promise.resolve(null),
+    ]);
     const pdf = buildStudentDocumentPdf({
       student,
       logo,
@@ -3572,49 +3577,6 @@ export class StudentsService {
       const dimensions = getJpegDimensions(normalized);
       return {
         buffer: normalized,
-        width: dimensions.width,
-        height: dimensions.height,
-        format: 'jpeg',
-      };
-    } catch {
-      return null;
-    }
-  }
-
-  // Mirrors report-card-pdf.service.ts's loadSchoolLogo: resolves the
-  // tenant's configured school logo (if any) for use on the ID card header.
-  private async loadSchoolLogoForIdCard(
-    actor: AuthContext,
-  ): Promise<PdfImage | null> {
-    const setting = await this.prisma.tenantSetting.findUnique({
-      where: { tenantId_key: { tenantId: actor.tenantId, key: 'school_logo' } },
-    });
-    const logoAssetId =
-      typeof setting?.value === 'string' ? setting.value : undefined;
-
-    if (
-      !logoAssetId ||
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        logoAssetId,
-      )
-    ) {
-      return null;
-    }
-
-    try {
-      const asset = await this.fileRegistryService.getFileMetadata(
-        actor.tenantId,
-        logoAssetId,
-      );
-      assertSchoolLogoFileAsset(asset, actor.tenantId);
-      const { content } = await this.fileRegistryService.getProtectedDownload(
-        actor.tenantId,
-        logoAssetId,
-        actor.userId,
-      );
-      const dimensions = getJpegDimensions(content);
-      return {
-        buffer: content,
         width: dimensions.width,
         height: dimensions.height,
         format: 'jpeg',
@@ -4532,6 +4494,7 @@ function buildStudentDocumentPdf(input: {
         'This certificate is internally signed by SchoolOS and retained under the school document retention policy.',
       ],
       signature: buildSignatureBlock(actor),
+      logo,
     });
   }
 
@@ -4551,6 +4514,7 @@ function buildStudentDocumentPdf(input: {
         'This certificate is internally signed by SchoolOS and retained under the school document retention policy.',
       ],
       signature: buildSignatureBlock(actor),
+      logo,
     });
   }
 
@@ -4571,6 +4535,7 @@ function buildStudentDocumentPdf(input: {
         'Enrollment validity depends on current lifecycle, fee, and attendance records in SchoolOS.',
       ],
       signature: buildSignatureBlock(actor),
+      logo,
     });
   }
 
@@ -4589,6 +4554,7 @@ function buildStudentDocumentPdf(input: {
       'This certificate is internally signed by SchoolOS and retained under the school document retention policy.',
     ],
     signature: buildSignatureBlock(actor),
+    logo,
   });
 }
 

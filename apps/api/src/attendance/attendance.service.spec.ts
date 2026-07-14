@@ -14,9 +14,11 @@ import {
   AuthMethod,
   ConsentType,
   EnrollmentStatus,
+  FileStatus,
   NotificationChannel,
   Prisma,
 } from '@prisma/client';
+import sharp from 'sharp';
 import { AttendanceService } from './attendance.service';
 import { AttendanceConflictReviewDecision } from './dto/review-attendance-conflict.dto';
 
@@ -183,6 +185,63 @@ describe('attendance production hardening', () => {
           },
         }),
       }),
+    );
+  });
+
+  it('embeds configured branding in attendance register PDFs and falls back when absent', async () => {
+    const logoBytes = await createTestLogoJpeg();
+    const fileRegistryService = {
+      registerGeneratedFile: jest.fn().mockResolvedValue({ id: 'file-1' }),
+      getFileMetadata: jest.fn().mockResolvedValue({
+        id: SCHOOL_LOGO_FILE_ASSET_ID,
+        tenantId: adminActor.tenantId,
+        module: 'settings',
+        entityId: adminActor.tenantId,
+        status: FileStatus.UPLOADED,
+        originalFilename: 'school-logo.jpg',
+        mimeType: 'image/jpeg',
+        sizeBytes: BigInt(logoBytes.length),
+        metadata: { kind: 'SCHOOL_LOGO' },
+      }),
+      getProtectedDownload: jest.fn().mockResolvedValue({ content: logoBytes }),
+    };
+    const { service, prisma } = buildService({
+      classroom: { id: 'class-1', name: 'Grade 1' },
+      students: [],
+      attendanceSessions: [],
+      fileRegistryService,
+    });
+    prisma.tenantSetting.findUnique.mockResolvedValue({
+      value: SCHOOL_LOGO_FILE_ASSET_ID,
+    });
+
+    const branded = await service.exportMonthlyRegister(
+      {
+        academicYearId: 'ay-1',
+        classId: 'class-1',
+        bsMonth: 1,
+        bsYear: 2081,
+      },
+      'pdf',
+      adminActor,
+    );
+    expect((branded as Buffer).toString('latin1')).toContain(
+      '/Filter /DCTDecode',
+    );
+
+    prisma.tenantSetting.findUnique.mockResolvedValue(null);
+    const unbranded = await service.exportMonthlyRegister(
+      {
+        academicYearId: 'ay-1',
+        classId: 'class-1',
+        bsMonth: 1,
+        bsYear: 2081,
+      },
+      'pdf',
+      adminActor,
+    );
+    expect((unbranded as Buffer).toString('latin1')).not.toContain(
+      '/Filter /DCTDecode',
     );
   });
 
@@ -1855,6 +1914,7 @@ function buildService(options: {
   reportExportCount?: number;
   fileAssets?: unknown[];
   attendanceDraft?: unknown;
+  fileRegistryService?: unknown;
 }) {
   const tx = {
     attendanceConflict: {
@@ -2049,6 +2109,7 @@ function buildService(options: {
       auditService as never,
       eventEmitter as never,
       settingsService as never,
+      options.fileRegistryService as never,
     ),
     prisma,
     tx,
@@ -2083,6 +2144,21 @@ function buildAttendanceSession(overrides: Record<string, unknown> = {}) {
     records: [],
     ...overrides,
   };
+}
+
+const SCHOOL_LOGO_FILE_ASSET_ID = '11111111-1111-1111-1111-111111111111';
+
+function createTestLogoJpeg() {
+  return sharp({
+    create: {
+      width: 96,
+      height: 48,
+      channels: 3,
+      background: { r: 24, g: 84, b: 140 },
+    },
+  })
+    .jpeg({ quality: 90 })
+    .toBuffer();
 }
 
 function buildSyncSubmission(overrides: Record<string, unknown> = {}) {
