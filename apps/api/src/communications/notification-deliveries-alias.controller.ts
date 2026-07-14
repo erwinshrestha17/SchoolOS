@@ -12,7 +12,7 @@ import { RetryDeliveryDto } from './dto/m10-hardening.dto';
 
 @Controller('notifications/deliveries')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
-@Entitlement('module.communications')
+@Entitlement('module.notifications')
 export class NotificationDeliveriesAliasController {
   constructor(
     private readonly communicationsService: CommunicationsService,
