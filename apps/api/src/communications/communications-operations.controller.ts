@@ -24,24 +24,26 @@ import {
 
 @Controller('communications')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
-@Entitlement('module.communications')
 export class CommunicationsOperationsController {
   constructor(private readonly communicationsService: CommunicationsService) {}
 
   @Get('summary')
   @Permissions('notices:read')
+  @Entitlement('module.notices')
   getSummary(@CurrentAuth() auth: AuthContext) {
     return this.communicationsService.getCommunicationsSummary(auth);
   }
 
   @Get('provider-diagnostics')
   @Permissions('communications:read_deliveries')
+  @Entitlement('module.notifications')
   getProviderDiagnostics(@CurrentAuth() auth: AuthContext) {
     return this.communicationsService.getCommunicationProviderDiagnostics(auth);
   }
 
   @Get('templates')
   @Permissions('communications:manage_templates')
+  @Entitlement('module.notices')
   listTemplates(
     @Query() query: ListCommunicationTemplatesQueryDto,
     @CurrentAuth() auth: AuthContext,
@@ -51,6 +53,7 @@ export class CommunicationsOperationsController {
 
   @Post('templates')
   @Permissions('communications:manage_templates')
+  @Entitlement('module.notices')
   createTemplate(
     @Body() dto: CreateCommunicationTemplateDto,
     @CurrentAuth() auth: AuthContext,
@@ -60,6 +63,7 @@ export class CommunicationsOperationsController {
 
   @Patch('templates/:templateId')
   @Permissions('communications:manage_templates')
+  @Entitlement('module.notices')
   updateTemplate(
     @Param('templateId') templateId: string,
     @Body() dto: UpdateCommunicationTemplateDto,
@@ -74,6 +78,7 @@ export class CommunicationsOperationsController {
 
   @Post('templates/:templateId/publish')
   @Permissions('communications:manage_templates')
+  @Entitlement('module.notices')
   publishTemplate(
     @Param('templateId') templateId: string,
     @CurrentAuth() auth: AuthContext,
@@ -86,6 +91,7 @@ export class CommunicationsOperationsController {
 
   @Post('templates/:templateId/archive')
   @Permissions('communications:manage_templates')
+  @Entitlement('module.notices')
   archiveTemplate(
     @Param('templateId') templateId: string,
     @CurrentAuth() auth: AuthContext,
