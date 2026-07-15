@@ -42,7 +42,7 @@ describe('reference dashboard foundation', () => {
     ]) {
       assert.match(design, new RegExp(marker.replace(/[&/]/g, '\\$&')));
     }
-    assert.match(design, /Chat\/conversations are deferred/);
+    assert.match(design, /Chat\/conversations are removed from the active product/);
     assert.match(readiness, /Internal QA/);
   });
 

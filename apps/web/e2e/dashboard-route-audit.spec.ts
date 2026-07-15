@@ -109,7 +109,7 @@ test.describe('Dashboard route audit smoke', () => {
     expect(pageErrors, pageErrors.join('\n')).toEqual([]);
   });
 
-  test('keeps personal notifications available while chat routes stay deferred', async ({
+  test('keeps personal notifications available while removed chat routes stay unavailable', async ({
     page,
   }) => {
     await login(page, schoolCredentials);
@@ -126,7 +126,7 @@ test.describe('Dashboard route audit smoke', () => {
     );
     await page.goto('/dashboard/messages');
     await expect(
-      page.getByRole('heading', { name: /Chat is deferred/i }),
+      page.getByRole('heading', { name: /Chat has been removed/i }),
     ).toBeVisible();
   });
 });

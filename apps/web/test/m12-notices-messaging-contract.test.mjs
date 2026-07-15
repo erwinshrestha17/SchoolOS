@@ -59,12 +59,12 @@ describe("M12 notifications and M15 notices boundary", () => {
 
   it("hides chat navigation and renders bounded compatibility routes", () => {
     const sidebar = read("components/layout/sidebar.tsx");
-    const deferred = read("components/messaging/chat-deferred-state.tsx");
+    const removed = read("components/messaging/chat-removed-state.tsx");
     const messagesPage = read("app/dashboard/messages/page.tsx");
 
     assert.doesNotMatch(sidebar, /label: 'Messages'/);
     assert.doesNotMatch(sidebar, /messaging:create/);
-    assert.match(deferred, /Chat is deferred/);
-    assert.match(messagesPage, /ChatDeferredState/);
+    assert.match(removed, /Chat has been removed/);
+    assert.match(messagesPage, /ChatRemovedState/);
   });
 });

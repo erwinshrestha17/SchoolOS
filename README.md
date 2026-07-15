@@ -18,8 +18,12 @@ HIGHER_SECONDARY
 Bachelor and Master's institution-management features, a broad student mobile application, and M14 Intelligence / AI runtime are not active scope.
 
 The active delivery boundary separates **M12 Notifications and Delivery** from
-**M15 Notices and Announcements**. Chat/conversations are deferred: new chat
-writes and navigation are disabled while historical records remain protected.
+**M15 Notices and Announcements**. Chat/conversations are removed from the active
+product: new writes and navigation are disabled while historical records remain
+protected for compatibility and retention.
+**M13 Learning Layer is deferred and frozen**: its implementation is preserved,
+disabled by default for pilot tenants, excluded from pilot acceptance and release
+claims, and limited to critical security or repository-compatibility fixes.
 
 ## Current Pilot Focus
 

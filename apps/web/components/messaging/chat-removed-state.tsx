@@ -2,13 +2,13 @@ import Link from 'next/link';
 import { DashboardPageShell } from '../dashboard/dashboard-page-shell';
 import { PageState } from '../ui/page-state';
 
-export function ChatDeferredState() {
+export function ChatRemovedState() {
   return (
     <DashboardPageShell>
       <PageState
         tone="warning"
-        title="Chat is deferred"
-        description="New conversations and messages are unavailable for this release. Historical records remain protected by backend authorization and retention policy."
+        title="Chat has been removed"
+        description="New conversations and messages are unavailable. Historical records remain protected by backend authorization and retention policy."
         secondaryAction={
           <Link
             href="/dashboard/notices"

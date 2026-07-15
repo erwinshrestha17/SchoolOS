@@ -109,6 +109,42 @@ describe('PlansService entitlement and usage enforcement', () => {
     );
   });
 
+  it('keeps deferred Learning disabled by default while preserving explicit enablement', async () => {
+    prisma.tenantSubscription.findFirst.mockResolvedValue({
+      status: 'ACTIVE',
+      plan: {
+        key: 'professional',
+        features: [],
+      },
+    });
+
+    await expect(
+      entitlementsService.getEntitlements('tenant-1'),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        modules: expect.not.arrayContaining(['learning']),
+        features: expect.not.arrayContaining([
+          'feature.learning.basic',
+          'feature.learning.full',
+        ]),
+      }),
+    );
+
+    prisma.tenantFeatureOverride.findMany.mockResolvedValue([
+      { featureKey: 'module.learning', enabled: true },
+      { featureKey: 'feature.learning.basic', enabled: true },
+    ]);
+
+    await expect(
+      entitlementsService.getEntitlements('tenant-1'),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        modules: expect.arrayContaining(['learning']),
+        features: expect.arrayContaining(['feature.learning.basic']),
+      }),
+    );
+  });
+
   it('blocks disabled or missing feature keys from active subscription plan features', async () => {
     prisma.tenant.findUnique.mockResolvedValue({ isActive: true });
     prisma.tenantFeatureOverride.findMany.mockResolvedValue([]);

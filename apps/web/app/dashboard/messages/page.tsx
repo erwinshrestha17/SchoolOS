@@ -1,5 +1,5 @@
-import { ChatDeferredState } from '@/components/messaging/chat-deferred-state';
+import { ChatRemovedState } from '@/components/messaging/chat-removed-state';
 
 export default function MessagesPage() {
-  return <ChatDeferredState />;
+  return <ChatRemovedState />;
 }

@@ -109,13 +109,16 @@ export const FEATURE_KEYS = {
   MOBILE_PARENT_BASIC: 'feature.mobile.parent_basic',
   MOBILE_TEACHER_PARENT: 'feature.mobile.teacher_parent',
   MOBILE_FULL_ROLE: 'feature.mobile.full_role',
-  /** @deprecated Chat is deferred; retained only to recognize legacy data. */
+  /** @deprecated Chat is removed; retained only to recognize legacy data. */
   MOBILE_PARENT_TEACHER_CHAT: 'feature.mobile.parent_teacher_chat',
 
   // Imports/Exports
   IMPORTS_EXPORTS_ADVANCED: 'feature.general.advanced_imports_exports',
 };
 
+// M13 Learning keys remain compatibility-stable above, but Learning is omitted
+// from every default tier while the module is deferred and frozen. A future
+// explicitly approved tenant can still use the existing plan/override path.
 export const ENTITLEMENT_MATRIX: Record<
   SubscriptionTier,
   {
@@ -195,7 +198,6 @@ export const ENTITLEMENT_MATRIX: Record<
       'accounting',
       'notifications',
       'notices',
-      'learning',
     ],
     features: [
       FEATURE_KEYS.FEES_BASIC,
@@ -210,8 +212,6 @@ export const ENTITLEMENT_MATRIX: Record<
       FEATURE_KEYS.ACTIVITY_MODERATION,
       FEATURE_KEYS.HOMEWORK_BASIC,
       FEATURE_KEYS.HOMEWORK_FULL,
-      FEATURE_KEYS.LEARNING_BASIC,
-      FEATURE_KEYS.LEARNING_FULL,
       FEATURE_KEYS.TIMETABLE_VIEW,
       FEATURE_KEYS.TIMETABLE_BASIC,
       FEATURE_KEYS.TIMETABLE_CONFLICTS,
@@ -254,7 +254,6 @@ export const ENTITLEMENT_MATRIX: Record<
       'accounting',
       'notifications',
       'notices',
-      'learning',
     ],
     features: [
       FEATURE_KEYS.FEES_BASIC,
@@ -271,8 +270,6 @@ export const ENTITLEMENT_MATRIX: Record<
       FEATURE_KEYS.ACTIVITY_CONSENT_MEDIA,
       FEATURE_KEYS.HOMEWORK_BASIC,
       FEATURE_KEYS.HOMEWORK_FULL,
-      FEATURE_KEYS.LEARNING_BASIC,
-      FEATURE_KEYS.LEARNING_FULL,
       FEATURE_KEYS.TIMETABLE_VIEW,
       FEATURE_KEYS.TIMETABLE_BASIC,
       FEATURE_KEYS.TIMETABLE_CONFLICTS,

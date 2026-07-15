@@ -259,10 +259,10 @@ M4 Academics and Accounting are especially strict: never compute counts, readine
 | M11 Accounting & Finance | Accounting overview, principal read-only finance snapshot | Period status, vouchers awaiting approval, reconciliation exceptions, receivables/payables, report snapshot status | Voucher editor, journal-entry detail, reconciliation workspace, account setup, fiscal-close workflow |
 | M12 Notifications and Delivery | Personal inbox in the global topbar plus tenant-safe settings/diagnostics | Failed delivery, unread personal notifications, provider/queue state | Personal notification detail, delivery-log detail, tenant-safe preferences |
 | M15 Notices and Announcements | Notice operations workspace | Draft/scheduled/high-impact notices, acknowledgement follow-up | Notice composer, recipient preview, approval, scheduled detail, read/acknowledgement report |
-| M13 Learning Layer | Teacher/admin learning overview | Active sessions, activities awaiting launch/review, session issues, submissions needing review | Activity editor, live classroom session, student activity screen, parent learning summary |
+| M13 Learning Layer | None while deferred/frozen | None; preserve existing backend-owned summaries only for compatibility | All Learning routes and screens; no feature or visual-fixture expansion while frozen |
 | M14 AI / Intelligence | None until explicitly approved | None | Do not create KPI or analytics UI yet |
 
-Implementation priority (core operational workspaces first, then academics/finance, then HR/extended ops): (1) Principal Home cross-module attention, (2) M1 Admissions, (3) M2 Attendance, (4) M3 Fees, (5) M4 Academics, (6) M6 Homework & Timetable, (7) M12 Notifications and M15 Notices. Then M7, M8, M9, M10, M11, M13 as those workspaces are polished.
+Implementation priority (core operational workspaces first, then academics/finance, then HR/extended ops): (1) Principal Home cross-module attention, (2) M1 Admissions, (3) M2 Attendance, (4) M3 Fees, (5) M4 Academics, (6) M6 Homework & Timetable, (7) M12 Notifications and M15 Notices. Then M7, M8, M9, M10, and M11. M13 is deferred/frozen and is not in the implementation queue.
 
 Replace KPIs with the record/workflow state itself on task pages, e.g.: forms (stepper, draft/saved state, validation errors), registers/grids (`Marked 28 of 30`, `Saving`, `Submitted`, `Locked`), financial workflows (payment status, balance due, idempotency/pending confirmation, audit status), queues (server total, active filters, pending/failed count), detail pages (lifecycle status, audit timeline, protected-file state). Mobile: one urgent task card, not a KPI wall.
 
@@ -359,17 +359,14 @@ Replace KPIs with the record/workflow state itself on task pages, e.g.: forms (s
 
 - Notice routes own drafting, recipient preview, approval, scheduling, protected attachments, read/acknowledgement follow-up, and publication audit.
 - Notice publication emits a normalized event to M12; the browser never calls providers or calculates official recipients.
-- Chat/conversation navigation and quick actions are hidden. Legacy routes render a bounded deferred state; new chat writes remain backend-disabled while historical data stays protected.
+- Chat/conversation navigation and quick actions are removed. Legacy routes render a bounded removed/unavailable compatibility state; new chat writes remain backend-disabled while historical data stays protected for retention.
 
 ### M13 Learning Layer
 
-- Teacher assigned-scope.
-- Resources protected.
-- Student runtime is active-session only.
-- Parent sees own child only.
-- Student sees own attempt/result only.
-- No public leaderboard.
-- No AI tutor/runtime unless approved.
+- Preserve existing routes, components, contracts, tests, assigned-scope behavior, protected resources, active-session-only student runtime, and linked-child/own-attempt boundaries.
+- Keep navigation hidden whenever the `learning` module entitlement is disabled; direct routes and API requests remain fail-closed.
+- Do not add or redesign Learning screens, questions, session modes, reports, analytics, mobile surfaces, seed fixtures, screenshots, public/home learning, AI, or adaptive behavior while frozen.
+- Only make a focused M13 web change for a critical security/tenancy fix or to restore build, typecheck, OpenAPI, or repository-wide tests.
 
 ### M14 Intelligence / AI
 
@@ -410,9 +407,8 @@ Use this order unless the user explicitly changes priority:
    - M9 Transport.
    - M10 Canteen.
 
-5. **W5 Accounting, Learning, Settings, Platform**
+5. **W5 Accounting, Settings, Platform**
    - M11 Accounting.
-   - M13 Learning.
    - School Settings.
    - Platform Control Plane.
 

@@ -1,6 +1,6 @@
-import { permissionCatalog } from './catalog.js';
-import type { PermissionKey } from './catalog.js';
-import { buildPermissionKey } from './utils.js';
+import { permissionCatalog } from "./catalog.js";
+import type { PermissionKey } from "./catalog.js";
+import { buildPermissionKey } from "./utils.js";
 
 export const systemRoleDefinitions = [
   {
@@ -38,7 +38,6 @@ export const systemRoleDefinitions = [
   { name: "driver", description: "System preset role for driver" },
 ] as const;
 
-
 const ALL_PERMISSION_KEYS = permissionCatalog.map(({ resource, action }) =>
   buildPermissionKey(resource, action),
 );
@@ -72,7 +71,7 @@ const PLATFORM_PERMISSION_KEYS = [
   "tenants:manage",
 ];
 
-const DEFERRED_CHAT_WRITE_PERMISSION_KEYS = [
+const REMOVED_CHAT_WRITE_PERMISSION_KEYS = [
   "messaging:create",
   "messaging:manage",
 ];
@@ -80,7 +79,7 @@ const DEFERRED_CHAT_WRITE_PERMISSION_KEYS = [
 const TENANT_PERMISSION_KEYS = ALL_PERMISSION_KEYS.filter(
   (key) =>
     !PLATFORM_PERMISSION_KEYS.includes(key) &&
-    !DEFERRED_CHAT_WRITE_PERMISSION_KEYS.includes(key),
+    !REMOVED_CHAT_WRITE_PERMISSION_KEYS.includes(key),
 );
 
 export const systemRolePermissions: Record<string, string[]> = {

@@ -13,7 +13,7 @@
 
 ## 1. Active Module Numbering
 
-The canonical M0-M15 taxonomy and module ownership live in [the Module Design Catalog](SCHOOLOS_MODULE_DESIGN_CATALOG.md). This architecture applies to that taxonomy; M14 Intelligence / AI and chat/conversations remain deferred.
+The canonical M0-M15 taxonomy and module ownership live in [the Module Design Catalog](SCHOOLOS_MODULE_DESIGN_CATALOG.md). This architecture applies to that taxonomy; M13 Learning is deferred/frozen, M14 Intelligence / AI is roadmap-only, and chat/conversations are removed from the active product with historical compatibility retained for protection and disposal policy.
 
 ---
 
@@ -258,6 +258,9 @@ Rules:
 
 ### M13 Learning Layer
 
+- Preserve the existing Learning domain, Prisma schema and migrations, records, contracts, clients, tests, permissions, files, and entitlements without destructive migration or feature expansion.
+- Keep Learning disabled by default for pilot tenants and hidden from navigation when its entitlement is disabled. Existing API and route guards remain authoritative and fail closed.
+- Exclude M13 from current pilot acceptance, mandatory release gates, and production-readiness claims. Only critical security, tenancy, suspended-tenant, protected-file, build, migration, OpenAPI, or repository-regression fixes are allowed while frozen.
 - Files: learning resources, activity attachments, printable worksheets, safe classroom media, and progress/report exports where supported.
 - Learning resources must be tenant-scoped and class/session/role scoped.
 - Parent summaries must not expose another child's resources or attempts.
@@ -389,7 +392,7 @@ The system must not pretend to send real messages in disabled, log/dev, or mock 
 
 ## 7. Real-Time and AI Cost Rules
 
-Use real-time only where immediate updates materially improve the workflow, such as live attendance session state, critical admin notifications, and admin-only transport latest-location state after load testing. Chat/conversation real-time scope is deferred and requires separate re-approval plus ownership and retention rules.
+Use real-time only where immediate updates materially improve the workflow, such as live attendance session state, critical admin notifications, and admin-only transport latest-location state after load testing. Chat/conversation real-time scope is removed and must not be reintroduced without explicit new-scope approval plus ownership and retention rules.
 
 Use polling, manual refresh, cached summaries, or scheduled refresh for fee dashboards, exam summaries, student lists, notice lists, report/export history, and static settings.
 

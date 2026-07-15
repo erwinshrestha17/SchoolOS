@@ -54,8 +54,9 @@ SchoolOS remains a Nepal-first, multi-tenant education operating SaaS for `PRESC
 - Keep SchoolOS SaaS billing separate from school fee collection and M11 school accounting.
 - Keep backend authorization, RBAC, tenant scope, and module entitlement as the source of truth.
 - Keep M12 Notifications and Delivery separate from M15 Notices and Announcements. Feature modules and M15 emit normalized events; only M12 owns provider routing, delivery state, retries, callbacks, inbox/read state, diagnostics, and delivery audit.
-- Keep chat/conversations deferred from the active release boundary. New writes and navigation remain disabled while historical records, migrations, authorization, moderation evidence, and retention obligations are preserved.
-- Keep M13 Learning as a separate domain that reuses core student, staff, class, subject, timetable, notification, file, RBAC, and audit systems.
+- Keep chat/conversations removed from the active product and release boundary. New writes and navigation remain disabled while historical records, migrations, authorization, moderation evidence, and retention obligations are preserved. Chat is not a deferred module and its former identifier must not be reused.
+- Keep M13 Learning preserved as a separate but deferred/frozen domain that reuses core student, staff, class, subject, timetable, notification, file, RBAC, and audit systems. Do not remove or rewrite its implementation, data, migrations, contracts, clients, tests, permissions, or entitlements.
+- Keep M13 disabled by default for pilot tenants and hidden from navigation when disabled. Exclude it from pilot acceptance criteria, supported release claims, and mandatory release gates. Only security, tenancy, suspended-tenant, protected-file, build, migration, OpenAPI, or repository-regression fixes may change M13 while frozen.
 - Keep M14 Intelligence / AI as roadmap-only until explicitly approved after the required data, review, safety, and cost controls exist.
 - Keep student access backend-authorized and limited to controlled learning/session use; do not add a broad Student App.
 - Do not introduce microservices, Angular migration, broad public student mobile, unsafe offline financial operations, or unverified live-map/provider scope as a shortcut to release.
@@ -135,9 +136,10 @@ pnpm test:e2e
 pnpm build
 pnpm verify:production
 pnpm smoke:pilot
-pnpm smoke:learning
 pnpm smoke:full
 ```
+
+`pnpm smoke:learning` remains an optional compatibility check for a permitted M13 fix or a repository-wide regression. It is not required for pilot acceptance, release-candidate, production, or GA evidence while M13 is deferred.
 
 For mobile changes:
 
@@ -199,6 +201,7 @@ Local verification is necessary but insufficient for GA. GA also requires the st
 
 ```text
 AI/ML/LLM runtime or open student AI chat
+New M13 Learning functionality, pilot acceptance, or production-readiness claims
 Angular migration
 Microservice migration
 Broad public student mobile application

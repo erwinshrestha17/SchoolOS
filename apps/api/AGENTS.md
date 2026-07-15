@@ -25,7 +25,7 @@ Formal requirements/design owners:
 - Platform support override requires reason and audit.
 - Money writes are idempotent/audited; confirmed records use reversal/correction.
 - Files go through FileRegistryService and StorageService only.
-- M13 Learning stays in the learning domain; M14 AI stays roadmap unless approved.
+- M13 Learning stays preserved in the learning domain but is deferred and frozen. Do not add functionality; only make focused security, tenancy, build, migration, OpenAPI, or repository-regression fixes. M14 AI stays roadmap-only and must not be implemented through M13.
 
 ## Naming and API contract rule
 
@@ -103,8 +103,9 @@ pnpm typecheck
 pnpm build
 pnpm verify:production
 pnpm smoke:pilot
-pnpm smoke:learning
 pnpm smoke:full
 ```
+
+`pnpm smoke:learning` is optional compatibility verification for a permitted M13 fix or related repository-wide regression. It is not a mandatory release gate while M13 is deferred.
 
 Docs-only changes need no runtime checks.

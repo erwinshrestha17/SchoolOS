@@ -2,11 +2,11 @@
 
 **Status:** Canonical MDD catalog
 **Owner/audience:** CTO, product manager, module leads, backend/web/mobile leads, QA, security, support/operations
-**Scope:** Active M0-M14 module ownership, stage applicability, module boundaries, cross-module rules, code-evidence gap matrix, and stage-aware implementation roadmap.
+**Scope:** M0-M15 module ownership, stage applicability, module boundaries, cross-module rules, code-evidence gap matrix, and stage-aware implementation roadmap, including deferred/frozen M13 and roadmap-only M14.
 **Precedence:** This document owns module taxonomy, ownership, cross-module boundaries, existing implementation evidence, and known contract, schema, and verification gaps. Product intent is owned by `../product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`; software requirements by `../requirements/SCHOOLOS_SRS.md`; architecture/security by `SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`; release gates by `../production/SCHOOLOS_GA_RELEASE_POLICY.md`.
 **Inputs/source documents:** The six canonical documents listed in `../README.md` and repository source inspected on 2026-06-20. Current work and blockers belong in GitHub Issues, Milestones, or Projects; current evidence belongs in CI runs, smoke outputs, staging records, and release artifacts.
 **Out-of-scope content:** Endpoint URL invention, Prisma migrations, code changes, current sprint sequencing, and GA readiness claims.
-**Last reviewed date:** 2026-07-01
+**Last reviewed date:** 2026-07-15
 
 ---
 
@@ -27,7 +27,7 @@
 | M10    | Canteen                                     | Menu, meal plans, wallet/POS, serving, allergy warnings, stock/vendor workflows.                                               |
 | M11    | Accounting and Finance                      | Chart of accounts, journals, vouchers, fiscal locks, reconciliation, accounting reports.                                       |
 | M12    | Notifications and Delivery                  | Event intake, recipient resolution, inbox/read state, templates, preferences, delivery, retries, callbacks, diagnostics.      |
-| M13    | Learning Layer                              | Teacher activities, smart-board, lab/session mode, attempts, progress, resources, parent summaries.                            |
+| M13    | Learning Layer                              | Deferred/frozen preserved implementation: activities, sessions, attempts, progress, resources, and parent summaries.          |
 | M14    | Intelligence / AI                           | Deferred roadmap only.                                                                                                         |
 | M15    | Notices and Announcements                   | Notice drafts, audiences, preview, approval, scheduling, publication, protected attachments, acknowledgement, archive.       |
 
@@ -50,7 +50,7 @@
 | M10 Canteen                                     | Optional, allergy-safe serving where enabled        | Where enabled                      | Where enabled                                               |
 | M11 Accounting and Finance                      | Optional/advanced                                   | Optional/advanced                  | Optional/advanced                                           |
 | M12 Notifications and Delivery                  | Required, parent trust and safety                   | Required                           | Required                                                    |
-| M13 Learning Layer                              | Teacher-led/screen-light only                       | Teacher-led/lab/session            | Lab/project support where approved                          |
+| M13 Learning Layer                              | Deferred; disabled by default for pilots            | Deferred; disabled by default      | Deferred; disabled by default                              |
 | M14 Intelligence / AI                           | Deferred                                            | Deferred                           | Deferred                                                    |
 | M15 Notices and Announcements                   | Required, parent trust and safety                   | Required                           | Required                                                    |
 
@@ -62,13 +62,13 @@
 4. Money modules use backend/database totals, idempotency, audit, and reversal/correction.
 5. M12 owns notification delivery; source modules emit normalized events only.
 6. M15 owns notice authoring and emits normalized publication events to M12; preview and final dispatch use the same backend recipient rules.
-7. Chat/conversations are deferred. New writes and active navigation are disabled; historical data, migrations, authorization, moderation evidence, and retention obligations remain.
-8. M13 remains separate and reuses core students, staff, classes, subjects, timetable, notifications, files, RBAC, and audit.
+7. Chat/conversations are removed from the active product and are not a deferred module. New writes and active navigation are disabled; historical data, migrations, authorization, moderation evidence, and retention obligations remain protected until approved disposal.
+8. M13 remains separate, deferred, and frozen. Preserve its implementation, data, migrations, contracts, clients, tests, permissions, and entitlements; keep it disabled by default for pilot tenants and do not expand it.
 9. M14 is roadmap-only and must not be implemented as incidental analytics or AI inside another module.
 
 ### 3.1 Advanced operations foundations
 
-Advanced operations deepen existing M0-M13 workflows without creating another module or introducing AI. Current repository foundations and their required ownership are:
+Advanced operations deepen active M0-M12 and M15 workflows without creating another module, expanding frozen M13, or introducing AI. Current repository foundations and their required ownership are:
 
 | Foundation                                 | Canonical ownership                                                                                              | Required behavior before release claims                                                                                             |
 | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
@@ -142,7 +142,7 @@ Required reviewer checklist:
 | M10 Canteen                                     | Menu, meal plans, enrollments, wallet, serving, POS, suppliers, inventory, stock movement exist.                              | Preschool can use allergy-safe serving where enabled, but mandatory meal/nap/toileting logs are not default scope.                                                                            | Mobile/POS device proof and wallet/payment staging proof pending.                                                                               |
 | M11 Accounting and Finance                      | Chart accounts, journals, periods, fiscal years, reports, bank statements, mappings exist.                                    | Shared accounting receives approved source events; it is not a stage-specific ledger.                                                                                                         | End-to-end live reconciliation and backup/restore proof missing.                                                                                |
 | M12 Notifications and Delivery                  | Notification queue/provider adapters, notification center, deliveries, retries, consents, push tokens, and diagnostics exist. | Feature modules and M15 emit normalized events; M12 alone owns final routing, providers, retries, read state, and diagnostics. | Provider sandbox/staging proof, callback robustness, quiet-hours depth, and device push proof pending. |
-| M13 Learning Layer                              | Learning activities, sessions, participants, attempts, progress, resources, parent summaries exist.                           | Preschool remains teacher-led/screen-light; School uses classroom/lab; +2 can support lab/project resources after approval.                                                                   | Device/browser/staging proof pending; no AI tutor/adaptive runtime.                                                                             |
+| M13 Learning Layer                              | Learning activities, sessions, participants, attempts, progress, resources, parent summaries, contracts, tests, and entitlement gates exist and are preserved. | Deferred/frozen for every stage; disabled by default for pilot tenants and hidden when not entitled. | Excluded from pilot/release claims; only critical security, tenancy, build, migration, OpenAPI, or repository-regression fixes are allowed. |
 | M14 Intelligence / AI                           | No active runtime should be added.                                                                                            | Deferred for all stages.                                                                                                                                                                      | Requires future privacy, safety, review, cost, data-quality, and audit design.                                                                  |
 | M15 Notices and Announcements                   | Notice create/preview/schedule/detail/read-report APIs, protected attachments, high-impact mobile draft/approval handoff, publication audit, and a persisted lifecycle projection exist. | Notice publication emits a normalized event to M12; M15 consumes aggregate M12 delivery state without provider ownership. | Category/bilingual/template fields, cancellation/archive/restore commands, expiry processing, and authenticated browser/device proof remain pending. |
 
@@ -189,4 +189,4 @@ This roadmap records architecture dependencies only. Current work, blockers, and
 | P2       | Stage-aware web dashboard composition over one shared shell.                                                                                | Backend context contract, web route state tests, no fake totals, authenticated browser proof.                    |
 | P2       | Stage-aware mobile context switch for parent/teacher/principal.                                                                             | Purpose-limited DTOs, device QA, offline/read-cache boundaries, child/assignment scope tests.                    |
 | P3       | Stage-aware reporting and operational analytics.                                                                                            | Server-owned summaries, pagination/index proof, queued reports, File Registry exports.                           |
-| Deferred | M14 Intelligence / AI.                                                                                                                      | Separate future approval after production-quality data, safety, privacy, human review, cost, and audit controls. |
+| Deferred | M13 Learning Layer feature work and M14 Intelligence / AI.                                                                                    | M13 requires explicit unfreeze/re-approval; M14 requires separate future approval after production-quality data, safety, privacy, human review, cost, and audit controls. |

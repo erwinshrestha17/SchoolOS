@@ -157,14 +157,14 @@ describe("SchoolOS workspace consistency contract", () => {
     assert.doesNotMatch(protectedSurfaces, /window\.open\([^)]*(?:file|attachment|payslip)/i);
   });
 
-  it("keeps M12 delivery, M15 notice authoring, and deferred chat boundaries distinct", () => {
+  it("keeps M12 delivery, M15 notice authoring, and removed chat boundaries distinct", () => {
     const notices = sourceFor("notices");
-    const deferredChat = read("components/messaging/chat-deferred-state.tsx");
+    const removedChat = read("components/messaging/chat-removed-state.tsx");
     const sidebar = read("components/layout/sidebar.tsx");
 
     assert.match(notices, /communicationsApi\.getCommunicationsSummary/);
     assert.match(notices, /recipient|Delivery/i);
-    assert.match(deferredChat, /unavailable for this release/i);
+    assert.match(removedChat, /New conversations and messages are unavailable/i);
     assert.doesNotMatch(sidebar, /href:\s*["']\/dashboard\/(?:messages|messaging)["']/);
   });
 

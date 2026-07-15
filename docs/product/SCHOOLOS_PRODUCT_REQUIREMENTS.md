@@ -32,7 +32,7 @@ Not yet established: GA / Production release
 
 ## 1. Executive Summary
 
-SchoolOS is a Nepal-first, multi-tenant education operating SaaS designed to run the daily administrative, academic, financial, operational, notification, notice, and controlled-learning workflows of an education institution from one tenant-isolated platform.
+SchoolOS is a Nepal-first, multi-tenant education operating SaaS designed to run the daily administrative, academic, financial, operational, notification, and notice workflows of an education institution from one tenant-isolated platform. The existing controlled-learning layer is preserved but deferred/frozen outside the current pilot and release boundary.
 
 SchoolOS is not a generic CRUD dashboard. It is an operating system for real institutional work:
 
@@ -162,7 +162,7 @@ SchoolOS provides:
 - **Operational confidence:** exception-focused dashboards and real workflow drill-throughs instead of decorative metrics.
 - **Finance trust:** backend-owned totals, idempotent money writes, immutable confirmed records, reasoned reversals/corrections, receipts, cashier close, and accounting boundaries.
 - **Parent trust:** linked-child-only visibility, understandable records, consent-safe content, protected documents, and honest notification delivery states.
-- **Teacher usability:** assigned-scope attendance, homework, timetable, marks, notices, and controlled learning without admin-dashboard complexity.
+- **Teacher usability:** assigned-scope attendance, homework, timetable, marks, and notices without admin-dashboard complexity. Preserved M13 Learning behavior is not part of the current pilot.
 - **Leadership oversight:** attention items, approvals, risks, readiness summaries, and audit trails without bypassing operational controls.
 - **Platform governance:** strict `tenantId` isolation, entitlement enforcement, provider readiness, queue operations, support override controls, and release gates.
 
@@ -193,7 +193,7 @@ External wording must avoid unsupported claims of legal compliance, regulator ap
 3. Establish a trusted operational record for student, attendance, fees, receipts, academics, notifications, notices, files, and audit.
 4. Support modular packaging without weakening tenant, role, entitlement, or data boundaries.
 5. Differentiate through Nepal-first usability, fee transparency, parent trust, protected records, and practical school operations.
-6. Create a scalable foundation for Preschool, School, +2, and controlled learning without parallel systems.
+6. Create a scalable foundation for Preschool, School, and +2 without parallel systems while preserving the frozen M13 Learning implementation for possible future re-approval.
 7. Move from the current Internal QA / controlled-pilot preparation posture through the defined release stages only with recorded evidence.
 
 ### 5.2 Product goals
@@ -207,7 +207,7 @@ External wording must avoid unsupported claims of legal compliance, regulator ap
 7. Make financial records idempotent, auditable, explainable, and backend-owned.
 8. Make protected files accessible only through authenticated, scoped File Registry flows.
 9. Make notification delivery status honest across in-app, push, SMS, and email modes.
-10. Keep M13 Learning teacher-led, school-controlled, session-scoped, and non-comparative.
+10. Keep M13 Learning deferred and frozen: preserve existing teacher-led, school-controlled, session-scoped, non-comparative implementation without new feature work or current release claims.
 11. Keep M14 Intelligence / AI deferred until explicitly approved with production data, privacy, human review, cost, and safety controls.
 
 ---
@@ -314,7 +314,7 @@ No hard-coded streams or parallel +2 platform may be introduced.
 | Accountant / finance officer | Manage invoices, receipts, reversals, reports, reconciliation, and accounting handoff | Backend-owned totals, idempotency, controlled corrections, audit, protected artifacts |
 | Cashier | Collect fees quickly and close the counter accurately | Fast student search, payment, receipt, reprint, method totals, and day-end close |
 | Academic coordinator / exam head | Configure academics, timetable, exams, marks, CAS, report cards, and promotion | Dense, task-first web workspaces with locks, readiness, corrections, and publishing controls |
-| Teacher | Run assigned daily classroom work | Assigned-scope attendance, homework, timetable, notices, marks, and learning sessions |
+| Teacher | Run assigned daily classroom work | Assigned-scope attendance, homework, timetable, notices, and marks; preserved Learning sessions remain outside the current pilot |
 | HR / payroll officer | Manage staff, contracts, leave, attendance, payroll, and payslips | Protected staff records, controlled payroll lifecycle, reasoned corrections, and audit |
 | Librarian | Run circulation and catalogue workflows | Search, scan, issue/return, reservation, fine/lost/damaged handling, and reports |
 | Transport manager | Manage routes, vehicles, assignments, trips, and safety exceptions | Assignment conflict checks, stale-status labels, protected documents, and parent-safe status |
@@ -322,7 +322,7 @@ No hard-coded streams or parallel +2 platform may be introduced.
 | Canteen manager / staff | Run menu, POS, QR serve, wallet, safety, and stock workflows | Fast, idempotent counter/serve flow with allergy/medical warnings and backend wallet truth |
 | Parent / guardian | Understand and act on matters for linked children | Child-scoped attendance, dues, receipts, homework, notices, activity, reports, transport, and enabled services |
 | Staff self-service user | Manage own attendance, leave, profile, payslips, and notices | Own-record-only mobile experience with protected files |
-| Student, Preschool through +2 | Participate in school-controlled learning only | Expiring session/QR access, own activity, autosave/submit, own result, no broad admin/student app |
+| Student, Preschool through +2 | No broad Student App; preserve controlled-session compatibility only | Existing expiring session/QR, own activity, autosave/submit, and own-result boundaries remain frozen and disabled by default for pilots |
 | SchoolOS platform operator/support | Manage tenants, plans, providers, queues, SaaS billing, and support access | Separate `/platform/*` control plane, masked secrets, reasoned support override, audit, and expiry |
 
 ---
@@ -377,7 +377,7 @@ Mobile is for:
 - Attention items and bounded approvals.
 - Parent and staff self-service.
 - Driver trip operation.
-- Controlled student learning sessions.
+- Preserved controlled student learning sessions only when explicitly re-approved and entitled; not in the current pilot boundary.
 
 Mobile must not copy the desktop dashboard or expose admin-shaped APIs.
 
@@ -461,7 +461,7 @@ Mobile must provide:
 | M10 | Canteen | Manage menus, meal plans, POS, wallets, QR serving, allergy/medical safety, receipts, stock, vendors, and finance handoff |
 | M11 | Accounting and Finance | Maintain chart of accounts, vouchers, journals, fiscal periods, source mappings, reconciliation, financial statements, snapshots, and audit |
 | M12 | Notifications and Delivery | Own normalized event intake, recipient resolution, personal inbox/read state, templates, preferences, channels, provider delivery, retries, callbacks, diagnostics, and delivery audit |
-| M13 | Learning Layer | Support teacher-created, school-controlled activities, smart-board/lab sessions, practice, progress, and supportive parent summaries |
+| M13 | Learning Layer | Deferred and frozen; preserve the existing teacher-created, school-controlled activity/session implementation without pilot availability, feature expansion, or current release claims |
 | M14 | Intelligence / AI | Deferred teacher-reviewed analytics and safe AI after production data, privacy, audit, human review, safety, and cost controls are approved |
 | M15 | Notices and Announcements | Own school-authored notice drafts, audiences, preview, approval, scheduling, publication, protected attachments, acknowledgements, read follow-up, archive, and publication audit |
 
@@ -652,7 +652,9 @@ Critical boundary: feature modules emit events and never call SMS/email/push pro
 
 ### 11.14 M13 Learning Layer
 
-Required capabilities:
+Status: deferred and frozen. The existing implementation is preserved as-is, disabled by default for pilot tenants, hidden when the module entitlement is disabled, and excluded from current pilot acceptance and production-readiness claims.
+
+Preserved implementation boundary:
 
 - Teacher-created activities for assigned class/section/subject.
 - Draft, publish, schedule/archive where supported.
@@ -664,6 +666,8 @@ Required capabilities:
 - Protected learning resources through File Registry.
 
 Critical boundary: no public leaderboard, unrestricted home learning, AI tutor, adaptive recommendation, open student chat, or broad student app without approval.
+
+No new activities, questions, session modes, reports, analytics, seed expansion, populated visual fixtures, mobile expansion, AI, adaptive behavior, or public/student-home learning may be added while M13 is frozen. A focused change is allowed only to fix tenant isolation, RBAC/ownership, suspended-tenant failure, protected-file security, build/typecheck failure, Prisma migration failure, OpenAPI verification failure, or a repository-wide test regression. Existing Learning records must not be deleted and destructive Learning migrations are prohibited.
 
 ### 11.15 M14 Intelligence / AI
 
@@ -691,7 +695,7 @@ Required capabilities:
 - Publish or schedule, then emit `NOTICE_PUBLISHED` or an equivalent normalized event to M12.
 - Aggregated M12 delivery state plus M15 read/acknowledgement reporting and safe unread follow-up.
 
-Critical boundary: M15 never calls provider SDKs or delivery adapters. Chat, messaging, and conversations are deferred; new writes and active navigation remain disabled while historical records and authorization are preserved pending an approved retention decision.
+Critical boundary: M15 never calls provider SDKs or delivery adapters. Chat, messaging, and conversations are removed from the active product; new writes and active navigation remain disabled while historical records and authorization are preserved for compatibility and approved retention/disposal handling.
 
 ---
 
@@ -793,7 +797,9 @@ Driver signs in
 -> parents see child-scoped status and timestamp
 ```
 
-### 12.8 Controlled learning session
+### 12.8 Preserved controlled learning session
+
+Deferred/frozen compatibility flow only. It is not a current pilot journey or acceptance criterion.
 
 ```text
 Teacher creates approved activity
@@ -994,7 +1000,7 @@ Metrics must be measured from backend-owned data and interpreted within the curr
 
 ### P1 — Complete operating workspaces
 
-- Real API-backed frontend standardization across M0-M13.
+- Real API-backed frontend standardization across M0-M12 and M15; preserve M13 without expansion.
 - Complete loading/empty/error/permission/locked/queued/partial states.
 - Academic/report-card, HR/payroll, accounting, homework/timetable, notification-delivery, and notice workflow depth.
 - Parent, teacher, principal, driver, and staff companion polish.
@@ -1005,12 +1011,12 @@ Metrics must be measured from backend-owned data and interpreted within the curr
 - Preschool safety workflow after schema/contract approval.
 - +2 streams, subject combinations, practicals, projects, and board-readiness depth.
 - Library/transport/canteen device and provider hardening.
-- Broader controlled learning adoption.
 - Multi-branch operational depth.
 
 ### Deferred
 
 - Broad Student App.
+- M13 Learning feature work, pilot acceptance, and production-readiness claims.
 - M14 Intelligence / AI.
 - Unverified live transport map/ETA/geofence expansion.
 - Biometric attendance.
@@ -1114,7 +1120,7 @@ These require explicit owner/product decision and must not be guessed in impleme
 6. Formal/IRD-ready billing boundary and external claim wording after expert validation.
 7. Education-reporting export formats and institution/authority validation.
 8. Offline-write policy beyond currently approved attendance-style idempotent workflows.
-9. Approved retention and migration policy for historical chat/conversation records; chat remains disabled until separately re-approved.
+9. Approved retention and disposal policy for historical chat/conversation records; Chat remains removed from the active product and cannot be reactivated without explicit new-scope approval.
 10. Any M14 Intelligence / AI proposal.
 
 Unknown implementation items must be labeled precisely:

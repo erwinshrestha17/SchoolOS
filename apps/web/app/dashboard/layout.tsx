@@ -109,12 +109,12 @@ const dashboardRouteGates: RouteGate[] = [
   },
   {
     prefix: "/dashboard/messages",
-    label: "Chat deferred",
+    label: "Chat removed",
     permissions: ["notices:read"],
   },
   {
     prefix: "/dashboard/messaging",
-    label: "Chat deferred",
+    label: "Chat removed",
     permissions: ["notices:read"],
   },
   {

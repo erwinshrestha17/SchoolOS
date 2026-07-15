@@ -209,7 +209,7 @@ export class EntitlementsService {
       }
     }
 
-    // Chat is outside the active release boundary. Preserve legacy keys in
+    // Chat is removed from the active product. Preserve legacy keys in
     // storage, but never surface them as enabled product entitlements.
     modulesSet.delete('communications');
     modulesSet.delete('messaging');

@@ -408,6 +408,8 @@ You do not have permission to view payslips.
 
 ## 9. Offline, Cache, and Sync Rules
 
+M13 Learning is deferred and frozen. The Learning entries below document preserved compatibility and security boundaries only; they do not authorize new mobile work, pilot enablement, seed/fixture expansion, or release acceptance.
+
 ### 9.1 Safe offline reads
 
 Safe to cache for offline read where backend policy allows:
@@ -542,9 +544,8 @@ Use this sequence unless the user explicitly changes priority:
 3. **MOB3 Teacher MVP**: today board, assigned classes, attendance, homework, timetable, notifications, and notices.
 4. **MOB4 Staff and Driver MVP**: staff self-service, driver assigned trip, manifest, GPS status, emergency.
 5. **MOB5 Principal attention app**: attention dashboard, approvals, attendance risk, emergency notices, safe snapshots.
-6. **MOB6 Parent operations depth**: fees/receipts, report cards, transport, canteen, library, activity, notices, and learning summary. Chat/conversations remain deferred.
-7. **MOB7 Controlled student session polish**: session join/autosave/submit/result, school-only hardening.
-8. **MOB8 Device QA, offline/read cache, push notifications, accessibility, and low-bandwidth polish.**
+6. **MOB6 Parent operations depth**: fees/receipts, report cards, transport, canteen, library, activity, and notices. M13 Learning is deferred/frozen with no mobile expansion; Chat/conversations are removed from the active product.
+7. **MOB7 Device QA, offline/read cache, push notifications, accessibility, and low-bandwidth polish.**
 
 ---
 

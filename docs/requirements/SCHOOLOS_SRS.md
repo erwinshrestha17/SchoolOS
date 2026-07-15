@@ -137,6 +137,7 @@ Current repository status: **PROPOSED / NEEDS_SCHEMA_DESIGN**. Do not invent end
 | SRS-NFR-13 | Formal invoice and adjustment-note identifiers are allocated transactionally by tenant, fiscal year and document type; issued identifiers are never reused. |
 | SRS-NFR-14 | Issued tax invoices and adjustment notes are immutable snapshots; cancellation, credit/debit, reprint and retry workflows are idempotent and audited. |
 | SRS-NFR-15 | External government/provider states distinguish disabled, export-only, sandbox, queued, accepted, rejected and transport failure; SchoolOS never infers certification or official submission. |
+| SRS-NFR-16 | M13 Learning remains preserved but deferred and frozen: disabled by default for pilot tenants, hidden when not entitled, excluded from pilot/release acceptance, and changed only for critical security, tenancy, build, migration, OpenAPI, or repository-regression fixes. |
 
 ## 6. Backend API Rules
 
@@ -154,7 +155,8 @@ Current repository status: **PROPOSED / NEEDS_SCHEMA_DESIGN**. Do not invent end
 | Files | Use `Feature module -> FileRegistryService -> StorageService -> StorageAdapter`; clients use protected preview/download helpers. |
 | M12 Notifications and Delivery | Source modules emit normalized events; M12 owns recipient resolution, templates, channels, providers, retries, callbacks, personal inbox/read state, diagnostics, and audit. |
 | M15 Notices and Announcements | M15 owns notice drafts, audience preview, approval/scheduling/publication, protected attachments, acknowledgement reporting, and emits `NOTICE_PUBLISHED` or an equivalent normalized event to M12. Preview and final dispatch use the same backend recipient resolver. |
-| Deferred chat compatibility | New conversations/messages and active navigation are disabled. Historical chat records, migrations, moderation evidence, tenant scope, and read authorization are preserved pending a retention decision. |
+| Removed chat compatibility | Chat is not an active or deferred module. New conversations/messages and active navigation are disabled; historical records, migrations, moderation evidence, tenant scope, and read authorization remain protected for retention/disposal handling. |
+| Deferred M13 compatibility | Preserve Learning APIs, contracts, schema, migrations, records, permissions, entitlements, clients, and tests. Do not add functionality or run destructive migrations. Existing routes remain fail-closed behind module entitlement and RBAC. |
 | Suspended tenants | Suspended tenants fail closed across API, web, mobile, jobs, exports, files, notifications, and learning. |
 
 ## 7. Web Requirements

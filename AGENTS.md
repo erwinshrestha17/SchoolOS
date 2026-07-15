@@ -75,6 +75,8 @@ Report readiness honestly. The current posture is Internal QA / controlled-pilot
 
 Current priorities: security/RBAC/tenant-isolation evidence; staging deployment and operational proof; browser E2E; real-API web workspaces; pilot workflows; mobile device QA; performance/backup/observability/release automation. M14 AI remains roadmap only unless explicitly approved.
 
+M13 Learning Layer is deferred and frozen. Preserve its backend, Prisma schema and migrations, OpenAPI/shared contracts, web and Flutter surfaces, tests, files, permissions, entitlements, and existing records. Keep it disabled by default for pilot tenants, hidden from navigation when disabled, and outside pilot acceptance criteria and production-readiness claims. Do not add M13 features, seed expansion, populated visual fixtures, mobile expansion, activity/question types, session modes, reports, analytics, AI, adaptive behavior, or public/student-home learning. Only make a focused M13 change to fix tenant isolation, RBAC/ownership, suspended-tenant failure, protected-file security, build/typecheck failure, Prisma migration failure, OpenAPI verification failure, or a repository-wide test regression. Do not delete Learning data or run destructive Learning migrations.
+
 ## Architecture: never break
 
 - Keep NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js App Router, Flutter companion app, `packages/core` where available.
@@ -82,9 +84,9 @@ Current priorities: security/RBAC/tenant-isolation evidence; staging deployment 
 - Do not rename `tenantId`.
 - Keep planes separate: `/platform/*` operator SaaS, `/dashboard/settings/*` school config, `/dashboard/*` school operations.
 - Do not mix SaaS billing with school fee collection/accounting.
-- Keep M13 Learning separate and reuse core students/staff/classes/subjects/timetable/files/RBAC/audit/notifications.
+- Keep the frozen M13 Learning domain separate and preserve its reuse of core students/staff/classes/subjects/timetable/files/RBAC/audit/notifications; do not extend it.
 - Keep M12 notification delivery separate from feature modules. Source modules emit events; M12 owns recipient resolution, templates, channel routing, delivery jobs, retries, read state, provider diagnostics, and audit.
-- Keep M15 notice authoring separate from M12 delivery. M15 previews and publishes notices, then emits a normalized event to M12. Chat/conversations are deferred; preserve historical data and authorization without active navigation or new writes.
+- Keep M15 notice authoring separate from M12 delivery. M15 previews and publishes notices, then emits a normalized event to M12. Chat/conversations are removed from the active product; preserve historical data and authorization for compatibility/retention without active navigation or new writes. Do not treat Chat as a deferred module or reuse its former identifier.
 
 ## Naming and contract rules
 
@@ -117,7 +119,7 @@ Web: one screen = one main job; real APIs only; no fake production data; server-
 
 Mobile: companion app only; persona-first; purpose-limited APIs only; no admin-shaped mobile payloads; safe offline reads only; visible sync states for approved idempotent writes. Students use controlled school learning/session access only; a broad Student App is not active scope.
 
-Learning: school-controlled, teacher-led, lab/session or controlled-device student access; expiring session codes/QR; parent summaries child-scoped and non-comparative; no leaderboard, open student chat, harsh labels, AI tutor, adaptive runtime, or broad home learning unless approved.
+Learning: frozen existing behavior remains school-controlled, teacher-led, lab/session or controlled-device student access; expiring session codes/QR and child-scoped, non-comparative parent summaries are preserved. Do not expand it or add leaderboard, open student chat, harsh labels, AI tutor, adaptive runtime, broad home learning, or M14 behavior.
 
 ## Missing API decision rule
 
@@ -163,12 +165,13 @@ pnpm test:e2e
 pnpm build
 pnpm verify:production
 pnpm smoke:pilot
-pnpm smoke:learning
 pnpm smoke:full
 pnpm --filter @schoolos/web typecheck
 pnpm test:web:e2e
 cd apps/schoolos_mobile && flutter pub get && dart format . && flutter analyze && flutter test
 ```
+
+`pnpm smoke:learning` remains available as an optional compatibility check when a permitted M13 fix or a repository-wide regression requires it. It is not a mandatory pilot, release-candidate, production, or GA gate while M13 is deferred.
 
 Docs-only changes need no runtime checks.
 

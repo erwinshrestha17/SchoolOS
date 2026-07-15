@@ -4756,7 +4756,6 @@ async function seedDemoTenantFeatureOverrides(tenantId: string) {
     'module.accounting',
     'module.notifications',
     'module.notices',
-    'module.learning',
     'feature.mobile.parent_basic',
     'feature.mobile.teacher_parent',
     'feature.mobile.full_role',
@@ -4789,20 +4788,37 @@ async function seedDemoTenantFeatureOverrides(tenantId: string) {
     where: {
       tenantId_featureKey: {
         tenantId,
+        featureKey: 'module.learning',
+      },
+    },
+    update: {
+      enabled: false,
+      reason: 'M13 Learning is deferred and disabled for pilot tenants',
+    },
+    create: {
+      tenantId,
+      featureKey: 'module.learning',
+      enabled: false,
+      reason: 'M13 Learning is deferred and disabled for pilot tenants',
+    },
+  });
+
+  await prisma.tenantFeatureOverride.upsert({
+    where: {
+      tenantId_featureKey: {
+        tenantId,
         featureKey: 'feature.mobile.parent_teacher_chat',
       },
     },
     update: {
       enabled: false,
-      reason:
-        'Chat and conversations are deferred from the active release boundary',
+      reason: 'Chat and conversations are removed from the active product',
     },
     create: {
       tenantId,
       featureKey: 'feature.mobile.parent_teacher_chat',
       enabled: false,
-      reason:
-        'Chat and conversations are deferred from the active release boundary',
+      reason: 'Chat and conversations are removed from the active product',
     },
   });
 }

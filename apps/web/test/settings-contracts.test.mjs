@@ -110,7 +110,7 @@ describe("SchoolOS Settings Page Contracts", () => {
     assert.doesNotMatch(page, /tenantId: ['"]all['"]/);
   });
 
-  it("keeps notification policy active while removing deferred chat controls", () => {
+  it("keeps notification policy active while excluding removed chat controls", () => {
     const page = read("app/dashboard/settings/page.tsx");
 
     assert.match(page, /title: "Notification Rules"/);

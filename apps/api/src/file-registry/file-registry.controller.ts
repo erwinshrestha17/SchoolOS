@@ -83,7 +83,7 @@ const SAFE_MIME_TYPES = new Set([
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ]);
 const DANGEROUS_EXTENSIONS = /\.(exe|bat|cmd|com|scr|js|mjs|sh|ps1|php|jar)$/i;
-const DEFERRED_CHAT_UPLOAD_MODULES = new Set([
+const REMOVED_CHAT_UPLOAD_MODULES = new Set([
   'messages',
   'parent-teacher-chat',
 ]);
@@ -298,9 +298,9 @@ export class FileRegistryController {
   }
 
   private validateModulePermission(moduleName: string, permissions: string[]) {
-    if (DEFERRED_CHAT_UPLOAD_MODULES.has(moduleName)) {
+    if (REMOVED_CHAT_UPLOAD_MODULES.has(moduleName)) {
       throw new ForbiddenException(
-        'New chat attachments are unavailable while chat is deferred',
+        'New chat attachments are unavailable because chat has been removed',
       );
     }
 

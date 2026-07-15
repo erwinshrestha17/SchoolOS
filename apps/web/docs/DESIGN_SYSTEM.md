@@ -323,7 +323,7 @@ Rules:
 
 ## 7. M12 Notifications and M15 Notices Design Rules
 
-The PRD owns notification and notice outcomes, the SRS owns web requirements, and the Module Design Catalog owns the M12 and M15 boundaries. The canonical frontend guardrails in this design system still apply. Chat and conversations are deferred and do not receive an active workspace pattern.
+The PRD owns notification and notice outcomes, the SRS owns web requirements, and the Module Design Catalog owns the M12 and M15 boundaries. The canonical frontend guardrails in this design system still apply. Chat and conversations are removed from the active product and do not receive a workspace pattern.
 
 ### 7.1 Notification and notice workspace patterns
 
@@ -597,11 +597,15 @@ reactivate chat writes or navigation.
 | M11 Accounting and Finance | Spreadsheet/grid + transaction | Vouchers, journals, fiscal locks, reconciliation and reports |
 | M12 Notifications and Delivery | Monitoring + queue/approval | Delivery state, retries, provider diagnostics and receipts |
 | M15 Notices and Announcements | Builder + queue/approval | Recipient preview, approval, publish/schedule and attachments |
-| M13 Learning Layer | Builder + monitoring | Teacher activities, controlled sessions, review and protected resources |
+| M13 Learning Layer | Preserved compatibility only | Deferred/frozen; no new or redesigned workspace work while disabled for pilots |
 
 Summary cards remain optional. M10 deliberately has no landing summary until a
 backend-owned contract can provide actionable values; loaded POS or wallet rows
 must never become browser-owned official totals.
+
+The existing M13 Learning screens and patterns remain preserved, but this design
+system does not authorize new Learning UI, populated fixtures, screenshots,
+analytics, or mobile expansion while the module is deferred and frozen.
 
 ### 8.8 Controlled state evidence
 
