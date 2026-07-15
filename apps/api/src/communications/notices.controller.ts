@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import { AudienceType, NoticePriority } from '@prisma/client';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -8,6 +17,12 @@ import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from './communications.service';
 import { CreateNoticeDto } from './dto/create-notice.dto';
+import {
+  CreateNoticeDraftDto,
+  NoticeLifecycleReasonDto,
+  NoticeScheduleDto,
+  UpdateNoticeDraftDto,
+} from './dto/notice-lifecycle.dto';
 
 @Controller('notices')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
@@ -25,6 +40,85 @@ export class NoticesController {
   @Permissions('notices:create')
   createNotice(@Body() dto: CreateNoticeDto, @CurrentAuth() auth: AuthContext) {
     return this.communicationsService.createNotice(dto, auth);
+  }
+
+  @Post('drafts')
+  @Permissions('notices:create')
+  createDraft(
+    @Body() dto: CreateNoticeDraftDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.communicationsService.createNoticeDraft(
+      {
+        ...dto,
+        priority: dto.priority ?? NoticePriority.NORMAL,
+        audienceType: dto.audienceType ?? AudienceType.ALL,
+      },
+      auth,
+    );
+  }
+
+  @Patch(':noticeId')
+  @Permissions('notices:edit')
+  updateDraft(
+    @Param('noticeId') noticeId: string,
+    @Body() dto: UpdateNoticeDraftDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.communicationsService.updateNoticeDraft(noticeId, dto, auth);
+  }
+
+  @Post(':noticeId/publish')
+  @Permissions('notices:publish')
+  publish(
+    @Param('noticeId') noticeId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.communicationsService.publishPreparedNotice(noticeId, auth);
+  }
+
+  @Post(':noticeId/schedule')
+  @Permissions('notices:schedule')
+  schedule(
+    @Param('noticeId') noticeId: string,
+    @Body() dto: NoticeScheduleDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.communicationsService.scheduleNotice(
+      noticeId,
+      dto.scheduledFor,
+      auth,
+    );
+  }
+
+  @Post(':noticeId/cancel')
+  @Permissions('notices:cancel')
+  cancel(
+    @Param('noticeId') noticeId: string,
+    @Body() dto: NoticeLifecycleReasonDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.communicationsService.cancelNotice(noticeId, dto.reason, auth);
+  }
+
+  @Post(':noticeId/archive')
+  @Permissions('notices:archive')
+  archive(
+    @Param('noticeId') noticeId: string,
+    @Body() dto: NoticeLifecycleReasonDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.communicationsService.archiveNotice(noticeId, dto.reason, auth);
+  }
+
+  @Post(':noticeId/restore')
+  @Permissions('notices:archive')
+  restore(
+    @Param('noticeId') noticeId: string,
+    @Body() dto: NoticeLifecycleReasonDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.communicationsService.restoreNotice(noticeId, dto.reason, auth);
   }
 
   @Post('recipient-preview')

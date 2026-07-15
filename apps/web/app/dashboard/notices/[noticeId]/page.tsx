@@ -1,7 +1,7 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { formatBsDateTime } from "@schoolos/core";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { formatBsDateTime, type PermissionKey } from "@schoolos/core";
 import {
   api,
   type NoticeDetail,
@@ -12,19 +12,31 @@ import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useRecentlyViewed } from "@/lib/hooks/use-recently-viewed";
 import { PageHeader } from "@/components/ui/page-header";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ProtectedFileButton } from "@/components/ui/protected-file";
+import { useSession } from "@/components/session-provider";
 import {
   ArrowLeft,
+  Archive,
   CalendarClock,
   Megaphone,
   Paperclip,
+  RotateCcw,
   Send,
   UsersRound,
+  XCircle,
 } from "lucide-react";
+
+type NoticeLifecycleAction = "cancel" | "archive" | "restore";
 
 export default function NoticeDetailPage() {
   const params = useParams<{ noticeId: string }>();
   const noticeId = params.noticeId;
+  const queryClient = useQueryClient();
+  const { session } = useSession();
+  const [pendingAction, setPendingAction] =
+    useState<NoticeLifecycleAction | null>(null);
+  const [actionReason, setActionReason] = useState("");
 
   const noticeQuery = useQuery({
     queryKey: ["notice-detail", noticeId],
@@ -36,6 +48,33 @@ export default function NoticeDetailPage() {
     queryKey: ["notice-unread-recipients", noticeId],
     queryFn: () => api.listNoticeUnreadRecipients(noticeId),
     enabled: Boolean(noticeId),
+  });
+
+  const lifecycleMutation = useMutation({
+    mutationFn: ({
+      action,
+      reason,
+    }: {
+      action: NoticeLifecycleAction;
+      reason: string;
+    }) => {
+      if (action === "cancel") return api.cancelNotice(noticeId, reason);
+      if (action === "archive") return api.archiveNotice(noticeId, reason);
+      return api.restoreNotice(noticeId, reason);
+    },
+    onSuccess: async () => {
+      setPendingAction(null);
+      setActionReason("");
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["notice-detail", noticeId],
+        }),
+        queryClient.invalidateQueries({ queryKey: ["notices"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["communications-summary"],
+        }),
+      ]);
+    },
   });
 
   const { record: recordRecentlyViewed } = useRecentlyViewed();
@@ -98,13 +137,56 @@ export default function NoticeDetailPage() {
   }
 
   const attachmentFileId = getProtectedFileId(notice.attachmentUrl);
+  const granted = new Set<PermissionKey>(session?.user.permissions ?? []);
+  const canCancel =
+    granted.has("notices:cancel") &&
+    ["DRAFT", "APPROVAL_PENDING", "APPROVED", "SCHEDULED"].includes(
+      notice.lifecycleStatus,
+    );
+  const canArchive =
+    granted.has("notices:archive") &&
+    notice.lifecycleStatus !== "ARCHIVED";
+  const canRestore =
+    granted.has("notices:archive") &&
+    notice.lifecycleStatus === "ARCHIVED";
 
   return (
     <NoticePageShell>
       <PageHeader
         title={notice.title}
         description={getAudienceSummary(notice)}
-        actions={<BackLink className="mt-0" />}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <BackLink className="mt-0" />
+            {canCancel ? (
+              <button
+                type="button"
+                onClick={() => setPendingAction("cancel")}
+                className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-danger-200 px-3 py-2 text-sm font-semibold text-danger-700 hover:bg-danger-50"
+              >
+                <XCircle size={16} /> Cancel
+              </button>
+            ) : null}
+            {canArchive ? (
+              <button
+                type="button"
+                onClick={() => setPendingAction("archive")}
+                className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                <Archive size={16} /> Archive
+              </button>
+            ) : null}
+            {canRestore ? (
+              <button
+                type="button"
+                onClick={() => setPendingAction("restore")}
+                className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                <RotateCcw size={16} /> Restore
+              </button>
+            ) : null}
+          </div>
+        }
       />
 
       <div className="flex flex-wrap items-center gap-2">
@@ -116,6 +198,13 @@ export default function NoticeDetailPage() {
           {resolveNoticeState(notice)}
         </span>
       </div>
+
+      {lifecycleMutation.isError ? (
+        <div className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700">
+          The notice action could not be completed. Refresh the notice and try
+          again.
+        </div>
+      ) : null}
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <article className="rounded-2xl border border-[var(--line)] bg-white p-6 shadow-sm sm:p-8">
@@ -211,8 +300,56 @@ export default function NoticeDetailPage() {
             : null
         }
       />
+
+      <ConfirmDialog
+        isOpen={pendingAction !== null}
+        title={`${pendingAction ? formatEnumLabel(pendingAction) : "Update"} notice?`}
+        description={noticeActionDescription(pendingAction)}
+        confirmLabel={
+          pendingAction ? formatEnumLabel(pendingAction) : "Confirm"
+        }
+        destructive={pendingAction === "cancel"}
+        isConfirming={lifecycleMutation.isPending}
+        confirmDisabled={!actionReason.trim()}
+        onClose={() => {
+          if (!lifecycleMutation.isPending) {
+            setPendingAction(null);
+            setActionReason("");
+          }
+        }}
+        onConfirm={() => {
+          if (pendingAction && actionReason.trim()) {
+            lifecycleMutation.mutate({
+              action: pendingAction,
+              reason: actionReason.trim(),
+            });
+          }
+        }}
+      >
+        <label className="grid gap-2 text-sm font-semibold text-gray-700">
+          Reason
+          <textarea
+            value={actionReason}
+            onChange={(event) => setActionReason(event.target.value)}
+            maxLength={500}
+            rows={3}
+            className="rounded-xl border border-gray-200 px-3 py-2 font-normal"
+            placeholder="Record why this notice is being changed"
+          />
+        </label>
+      </ConfirmDialog>
     </NoticePageShell>
   );
+}
+
+function noticeActionDescription(action: NoticeLifecycleAction | null) {
+  if (action === "cancel") {
+    return "This stops a draft or scheduled notice from being published. A reason is required for the audit trail.";
+  }
+  if (action === "archive") {
+    return "This removes the notice from active work while preserving its record and delivery evidence.";
+  }
+  return "This restores the notice to its previous lifecycle state without sending it again.";
 }
 
 function NoticePageShell({ children }: { children: React.ReactNode }) {

@@ -595,6 +595,33 @@ function buildPrismaMock() {
         state.notificationDeliveries.push(delivery);
         return delivery;
       }),
+      upsert: jest.fn(
+        async (q: {
+          where: {
+            tenantId_idempotencyKey: {
+              tenantId: string;
+              idempotencyKey: string;
+            };
+          };
+          create: Record<string, unknown>;
+        }) => {
+          const key = q.where.tenantId_idempotencyKey;
+          const existing = state.notificationDeliveries.find(
+            (delivery) =>
+              delivery.tenantId === key.tenantId &&
+              delivery.idempotencyKey === key.idempotencyKey,
+          );
+          if (existing) return existing;
+
+          const delivery = {
+            id: `delivery-${state.notificationDeliveries.length + 1}`,
+            createdAt: new Date(),
+            ...q.create,
+          };
+          state.notificationDeliveries.push(delivery);
+          return delivery;
+        },
+      ),
       findMany: jest.fn(
         async (q: { where?: Record<string, unknown>; take?: number }) => {
           const where = q.where ?? {};

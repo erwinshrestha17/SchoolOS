@@ -148,6 +148,38 @@ export const communicationsApi = {
     ),
   createNotice: (body: JsonBody) =>
     request<NoticeSummary>("/notices", { method: "POST", json: body }),
+  createNoticeDraft: (body: JsonBody) =>
+    request<NoticeSummary>("/notices/drafts", { method: "POST", json: body }),
+  updateNoticeDraft: (noticeId: string, body: JsonBody) =>
+    request<NoticeSummary>(`/notices/${encodeURIComponent(noticeId)}`, {
+      method: "PATCH",
+      json: body,
+    }),
+  publishNotice: (noticeId: string) =>
+    request<{ notice: NoticeSummary }>(
+      `/notices/${encodeURIComponent(noticeId)}/publish`,
+      { method: "POST" },
+    ),
+  scheduleNotice: (noticeId: string, scheduledFor: string) =>
+    request<NoticeSummary>(
+      `/notices/${encodeURIComponent(noticeId)}/schedule`,
+      { method: "POST", json: { scheduledFor } },
+    ),
+  cancelNotice: (noticeId: string, reason: string) =>
+    request<NoticeSummary>(
+      `/notices/${encodeURIComponent(noticeId)}/cancel`,
+      { method: "POST", json: { reason } },
+    ),
+  archiveNotice: (noticeId: string, reason: string) =>
+    request<NoticeSummary>(
+      `/notices/${encodeURIComponent(noticeId)}/archive`,
+      { method: "POST", json: { reason } },
+    ),
+  restoreNotice: (noticeId: string, reason: string) =>
+    request<NoticeSummary>(
+      `/notices/${encodeURIComponent(noticeId)}/restore`,
+      { method: "POST", json: { reason } },
+    ),
   previewNoticeRecipients: (body: JsonBody) =>
     request<NoticeRecipientPreview>("/notices/recipient-preview", {
       method: "POST",

@@ -3322,6 +3322,7 @@ model Event {
 model NotificationDelivery {
   id                String              @id @default(uuid())
   tenantId          String
+  idempotencyKey    String?
   channel           NotificationChannel
   status            NotificationStatus  @default(QUEUED)
   sourceType        String
@@ -3359,6 +3360,7 @@ model NotificationDelivery {
   readReceipts  NotificationReadReceipt[]
 
   @@index([tenantId, sourceType, sourceId])
+  @@unique([tenantId, idempotencyKey])
   @@index([tenantId, recipientUserId])
   @@index([tenantId, status, createdAt])
   @@index([tenantId, status, channel])

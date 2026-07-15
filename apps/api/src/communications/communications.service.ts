@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
@@ -29,6 +30,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { CreateNoticeDto } from './dto/create-notice.dto';
+import { UpdateNoticeDraftDto } from './dto/notice-lifecycle.dto';
 import {
   CreateCommunicationTemplateDto,
   ListCommunicationTemplatesQueryDto,
@@ -114,6 +116,15 @@ export class CommunicationsService {
 
   async createNotice(dto: CreateNoticeDto, actor: AuthContext) {
     await this.ensureAudienceRefs(actor, dto.classId, dto.sectionId);
+    const priority = dto.priority ?? NoticePriority.NORMAL;
+    if (priority !== NoticePriority.NORMAL) {
+      throw new ConflictException(
+        'Urgent and emergency notices must use the approval-backed draft workflow',
+      );
+    }
+    if (dto.scheduledFor && new Date(dto.scheduledFor) <= new Date()) {
+      throw new BadRequestException('Scheduled time must be in the future');
+    }
     const attachmentUrl = await this.resolveNoticeAttachment(dto, actor);
 
     const publishedAt = dto.scheduledFor ? null : new Date();
@@ -126,7 +137,7 @@ export class CommunicationsService {
         createdById: actor.userId,
         title: dto.title,
         body: dto.body,
-        priority: dto.priority ?? NoticePriority.NORMAL,
+        priority,
         audienceType: dto.audienceType ?? AudienceType.ALL,
         classId: dto.classId ?? null,
         sectionId: dto.sectionId ?? null,
@@ -244,6 +255,274 @@ export class CommunicationsService {
       },
     });
     return notice;
+  }
+
+  async updateNoticeDraft(
+    noticeId: string,
+    dto: UpdateNoticeDraftDto,
+    actor: AuthContext,
+  ) {
+    const notice = await this.getTenantNotice(noticeId, actor);
+    if (notice.lifecycleStatus !== NoticeLifecycleStatus.DRAFT) {
+      throw new ConflictException('Only draft notices can be edited');
+    }
+
+    const classId = dto.classId ?? notice.classId ?? undefined;
+    const sectionId = dto.sectionId ?? notice.sectionId ?? undefined;
+    await this.ensureAudienceRefs(actor, classId, sectionId);
+    await this.assertNoticeAttachmentFile(dto.attachmentFileId, actor);
+
+    const scheduledFor = dto.scheduledFor
+      ? new Date(dto.scheduledFor)
+      : notice.scheduledFor;
+    const expiresAt = dto.expiresAt
+      ? new Date(dto.expiresAt)
+      : notice.expiresAt;
+    this.assertNoticeDates(scheduledFor, expiresAt);
+
+    const updated = await this.prisma.notice.update({
+      where: { id: notice.id },
+      data: {
+        title: dto.title?.trim(),
+        body: dto.body?.trim(),
+        priority: dto.priority,
+        audienceType: dto.audienceType,
+        classId: dto.classId,
+        sectionId: dto.sectionId,
+        scheduledFor: dto.scheduledFor ? scheduledFor : undefined,
+        expiresAt: dto.expiresAt ? expiresAt : undefined,
+      },
+    });
+
+    if (dto.attachmentFileId && this.fileRegistryService) {
+      await this.fileRegistryService.linkToEntity(
+        actor.tenantId,
+        dto.attachmentFileId,
+        'notices',
+        notice.id,
+        actor.userId,
+      );
+    }
+
+    await this.auditService.record({
+      action: 'update_draft',
+      resource: 'notice',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: notice.id,
+      before: this.noticeLifecycleAudit(notice),
+      after: this.noticeLifecycleAudit(updated),
+    });
+    return updated;
+  }
+
+  async publishPreparedNotice(noticeId: string, actor: AuthContext) {
+    const notice = await this.getTenantNotice(noticeId, actor);
+    if (notice.lifecycleStatus === NoticeLifecycleStatus.PUBLISHED) {
+      return {
+        notice,
+        delivery: await this.getNoticeDeliverySummary(actor, notice.id),
+        replayed: true,
+      };
+    }
+    if (
+      notice.priority !== NoticePriority.NORMAL &&
+      notice.lifecycleStatus !== NoticeLifecycleStatus.APPROVED
+    ) {
+      throw new ConflictException(
+        'Urgent and emergency notices require approval before publication',
+      );
+    }
+    if (
+      notice.lifecycleStatus !== NoticeLifecycleStatus.DRAFT &&
+      notice.lifecycleStatus !== NoticeLifecycleStatus.APPROVED &&
+      notice.lifecycleStatus !== NoticeLifecycleStatus.SCHEDULED
+    ) {
+      throw new ConflictException(
+        `Notice cannot be published from ${notice.lifecycleStatus.toLowerCase()} state`,
+      );
+    }
+    if (notice.expiresAt && notice.expiresAt <= new Date()) {
+      throw new ConflictException('Expired notices cannot be published');
+    }
+
+    const delivery = await this.emitNoticePublished(notice, actor);
+    if (delivery.count < 1) {
+      throw new ConflictException(
+        'No eligible recipients are available for this notice',
+      );
+    }
+
+    const publishedAt = new Date();
+    const result = await this.prisma.notice.updateMany({
+      where: {
+        id: notice.id,
+        tenantId: actor.tenantId,
+        lifecycleStatus: notice.lifecycleStatus,
+        publishedAt: null,
+      },
+      data: {
+        lifecycleStatus: NoticeLifecycleStatus.PUBLISHED,
+        publishedAt,
+        scheduledFor: null,
+      },
+    });
+    const published = await this.getTenantNotice(notice.id, actor);
+
+    if (result.count > 0) {
+      await this.auditService.record({
+        action: 'publish',
+        resource: 'notice',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        resourceId: notice.id,
+        before: this.noticeLifecycleAudit(notice),
+        after: {
+          ...this.noticeLifecycleAudit(published),
+          deliveryCount: delivery.count,
+        },
+      });
+    }
+    return { notice: published, delivery, replayed: result.count === 0 };
+  }
+
+  async scheduleNotice(
+    noticeId: string,
+    scheduledForInput: string,
+    actor: AuthContext,
+  ) {
+    const notice = await this.getTenantNotice(noticeId, actor);
+    if (
+      notice.priority !== NoticePriority.NORMAL &&
+      notice.lifecycleStatus !== NoticeLifecycleStatus.APPROVED
+    ) {
+      throw new ConflictException(
+        'Urgent and emergency notices require approval before scheduling',
+      );
+    }
+    if (
+      notice.lifecycleStatus !== NoticeLifecycleStatus.DRAFT &&
+      notice.lifecycleStatus !== NoticeLifecycleStatus.APPROVED &&
+      notice.lifecycleStatus !== NoticeLifecycleStatus.SCHEDULED
+    ) {
+      throw new ConflictException(
+        `Notice cannot be scheduled from ${notice.lifecycleStatus.toLowerCase()} state`,
+      );
+    }
+
+    const scheduledFor = new Date(scheduledForInput);
+    this.assertNoticeDates(scheduledFor, notice.expiresAt);
+    if (scheduledFor <= new Date()) {
+      throw new BadRequestException('Scheduled time must be in the future');
+    }
+
+    const updated = await this.prisma.notice.update({
+      where: { id: notice.id },
+      data: {
+        lifecycleStatus: NoticeLifecycleStatus.SCHEDULED,
+        scheduledFor,
+        publishedAt: null,
+      },
+    });
+    await this.auditNoticeLifecycleChange('schedule', notice, updated, actor);
+    return updated;
+  }
+
+  async cancelNotice(noticeId: string, reason: string, actor: AuthContext) {
+    const notice = await this.getTenantNotice(noticeId, actor);
+    if (
+      notice.lifecycleStatus !== NoticeLifecycleStatus.DRAFT &&
+      notice.lifecycleStatus !== NoticeLifecycleStatus.APPROVAL_PENDING &&
+      notice.lifecycleStatus !== NoticeLifecycleStatus.APPROVED &&
+      notice.lifecycleStatus !== NoticeLifecycleStatus.SCHEDULED
+    ) {
+      throw new ConflictException(
+        `Notice cannot be cancelled from ${notice.lifecycleStatus.toLowerCase()} state`,
+      );
+    }
+
+    const cancelledAt = new Date();
+    const [updated] = await this.prisma.$transaction([
+      this.prisma.notice.update({
+        where: { id: notice.id },
+        data: {
+          lifecycleStatus: NoticeLifecycleStatus.CANCELLED,
+          cancelledAt,
+          cancelledById: actor.userId,
+          cancellationReason: reason.trim(),
+          scheduledFor: null,
+        },
+      }),
+      this.prisma.notificationDelivery.updateMany({
+        where: {
+          tenantId: actor.tenantId,
+          noticeId: notice.id,
+          status: {
+            in: [NotificationStatus.QUEUED, NotificationStatus.RETRY_PENDING],
+          },
+        },
+        data: {
+          status: NotificationStatus.CANCELLED,
+          errorMessage: 'Notice was cancelled before delivery completed',
+        },
+      }),
+    ]);
+    await this.auditNoticeLifecycleChange('cancel', notice, updated, actor, {
+      reason: reason.trim(),
+    });
+    return updated;
+  }
+
+  async archiveNotice(noticeId: string, reason: string, actor: AuthContext) {
+    const notice = await this.getTenantNotice(noticeId, actor);
+    if (notice.lifecycleStatus === NoticeLifecycleStatus.ARCHIVED) {
+      return notice;
+    }
+
+    const updated = await this.prisma.notice.update({
+      where: { id: notice.id },
+      data: {
+        archivedFromStatus: notice.lifecycleStatus,
+        lifecycleStatus: NoticeLifecycleStatus.ARCHIVED,
+        archivedAt: new Date(),
+        archivedById: actor.userId,
+        archiveReason: reason.trim(),
+      },
+    });
+    await this.auditNoticeLifecycleChange('archive', notice, updated, actor, {
+      reason: reason.trim(),
+    });
+    return updated;
+  }
+
+  async restoreNotice(noticeId: string, reason: string, actor: AuthContext) {
+    const notice = await this.getTenantNotice(noticeId, actor);
+    if (notice.lifecycleStatus !== NoticeLifecycleStatus.ARCHIVED) {
+      throw new ConflictException('Only archived notices can be restored');
+    }
+
+    let restoredStatus =
+      notice.archivedFromStatus ?? NoticeLifecycleStatus.DRAFT;
+    if (
+      restoredStatus === NoticeLifecycleStatus.SCHEDULED &&
+      (!notice.scheduledFor || notice.scheduledFor <= new Date())
+    ) {
+      restoredStatus = NoticeLifecycleStatus.DRAFT;
+    }
+    const updated = await this.prisma.notice.update({
+      where: { id: notice.id },
+      data: {
+        lifecycleStatus: restoredStatus,
+        archivedAt: null,
+        archivedById: null,
+        archiveReason: null,
+        archivedFromStatus: null,
+      },
+    });
+    await this.auditNoticeLifecycleChange('restore', notice, updated, actor, {
+      reason: reason.trim(),
+    });
+    return updated;
   }
 
   async publishNotice(
@@ -1078,20 +1357,10 @@ export class CommunicationsService {
     const results: Array<{ noticeId: string; deliveryCount: number }> = [];
 
     for (const notice of dueNotices) {
-      await this.prisma.notice.update({
-        where: { id: notice.id },
-        data: {
-          lifecycleStatus: NoticeLifecycleStatus.PUBLISHED,
-          publishedAt: now,
-          scheduledFor: null,
-        },
-      });
-
-      const delivery = await this.emitNoticePublished(notice, actor);
-
+      const result = await this.publishPreparedNotice(notice.id, actor);
       results.push({
         noticeId: notice.id,
-        deliveryCount: delivery.count,
+        deliveryCount: result.delivery.count,
       });
     }
 
@@ -1111,6 +1380,38 @@ export class CommunicationsService {
     };
   }
 
+  async processExpiredNotices(actor: AuthContext) {
+    const now = new Date();
+    const due = await this.prisma.notice.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        lifecycleStatus: NoticeLifecycleStatus.PUBLISHED,
+        expiresAt: { lte: now },
+      },
+      select: { id: true },
+    });
+    if (due.length === 0) return { processed: 0, noticeIds: [] as string[] };
+
+    const noticeIds = due.map(({ id }) => id);
+    const result = await this.prisma.notice.updateMany({
+      where: {
+        tenantId: actor.tenantId,
+        id: { in: noticeIds },
+        lifecycleStatus: NoticeLifecycleStatus.PUBLISHED,
+        expiresAt: { lte: now },
+      },
+      data: { lifecycleStatus: NoticeLifecycleStatus.EXPIRED },
+    });
+    await this.auditService.record({
+      action: 'expire',
+      resource: 'notice',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: { processed: result.count, noticeIds },
+    });
+    return { processed: result.count, noticeIds };
+  }
+
   private async getTenantNotice(noticeId: string, actor: AuthContext) {
     const notice = await this.prisma.notice.findFirst({
       where: { id: noticeId, tenantId: actor.tenantId },
@@ -1119,6 +1420,53 @@ export class CommunicationsService {
       throw new NotFoundException('Notice not found in this tenant');
     }
     return notice;
+  }
+
+  private assertNoticeDates(
+    scheduledFor: Date | null | undefined,
+    expiresAt: Date | null | undefined,
+  ) {
+    if (scheduledFor && Number.isNaN(scheduledFor.getTime())) {
+      throw new BadRequestException('Scheduled time is invalid');
+    }
+    if (expiresAt && Number.isNaN(expiresAt.getTime())) {
+      throw new BadRequestException('Expiry time is invalid');
+    }
+    if (scheduledFor && expiresAt && expiresAt <= scheduledFor) {
+      throw new BadRequestException('Expiry must be after the scheduled time');
+    }
+  }
+
+  private noticeLifecycleAudit(notice: Notice) {
+    return {
+      lifecycleStatus: notice.lifecycleStatus,
+      priority: notice.priority,
+      audienceType: notice.audienceType,
+      classId: notice.classId,
+      sectionId: notice.sectionId,
+      scheduledFor: notice.scheduledFor,
+      publishedAt: notice.publishedAt,
+      expiresAt: notice.expiresAt,
+      archivedFromStatus: notice.archivedFromStatus,
+    };
+  }
+
+  private async auditNoticeLifecycleChange(
+    action: string,
+    before: Notice,
+    after: Notice,
+    actor: AuthContext,
+    context: Record<string, unknown> = {},
+  ) {
+    await this.auditService.record({
+      action,
+      resource: 'notice',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: before.id,
+      before: this.noticeLifecycleAudit(before),
+      after: { ...this.noticeLifecycleAudit(after), ...context },
+    });
   }
 
   async listConsents(actor: AuthContext) {
@@ -1485,9 +1833,21 @@ export class CommunicationsService {
 
     for (const recipient of recipients) {
       for (const channel of input.channels) {
-        const delivery = await this.prisma.notificationDelivery.create({
-          data: {
+        const idempotencyKey = deliveryIdempotencyKey(
+          input,
+          recipient,
+          channel,
+        );
+        const delivery = await this.prisma.notificationDelivery.upsert({
+          where: {
+            tenantId_idempotencyKey: {
+              tenantId: input.actor.tenantId,
+              idempotencyKey,
+            },
+          },
+          create: {
             tenantId: input.actor.tenantId,
+            idempotencyKey,
             channel,
             status,
             sourceType: input.sourceType,
@@ -1505,6 +1865,7 @@ export class CommunicationsService {
             errorMessage: errorMessage ?? null,
             sentAt: null,
           },
+          update: {},
         });
 
         deliveries.push(delivery);
@@ -1523,6 +1884,7 @@ export class CommunicationsService {
       const metadata = {
         tenantId: delivery.tenantId,
         notificationDeliveryId: delivery.id,
+        deliveryAttempt: '0',
         sourceType: delivery.sourceType,
         sourceId: delivery.sourceId,
       };
@@ -2077,6 +2439,25 @@ function resolveDestination(
   }
 
   return recipient.userId ?? recipient.phone ?? recipient.email;
+}
+
+function deliveryIdempotencyKey(
+  input: DeliveryRecordInput,
+  recipient: DeliveryRecipient,
+  channel: NotificationChannel,
+) {
+  const recipientKey =
+    recipient.userId ??
+    recipient.guardianId ??
+    recipient.studentId ??
+    recipient.email?.trim().toLowerCase() ??
+    recipient.phone?.trim();
+  if (!recipientKey) {
+    throw new ConflictException(
+      'Notification recipient has no stable delivery identity',
+    );
+  }
+  return `${input.sourceType}:${input.sourceId}:${recipientKey}:${channel}`;
 }
 
 function noticeChannels(priority: NoticePriority): NotificationChannel[] {

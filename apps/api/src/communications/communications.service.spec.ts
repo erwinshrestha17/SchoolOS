@@ -43,6 +43,7 @@ describe('CommunicationsService', () => {
         findMany: jest.fn(),
         findFirst: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
         count: jest.fn().mockResolvedValue(0),
       },
       student: {
@@ -59,6 +60,16 @@ describe('CommunicationsService', () => {
           }),
         ),
         update: jest.fn(),
+        updateMany: jest.fn(),
+        upsert: jest.fn((args) =>
+          Promise.resolve({
+            id: `delivery-${prisma.notificationDelivery.upsert.mock.calls.length}`,
+            createdAt: new Date('2026-04-27T00:00:00.000Z'),
+            sentAt: null,
+            errorMessage: null,
+            ...args.create,
+          }),
+        ),
         findMany: jest.fn(),
         findFirst: jest.fn().mockResolvedValue(null),
         groupBy: jest.fn().mockResolvedValue([]),
@@ -90,6 +101,7 @@ describe('CommunicationsService', () => {
         findMany: jest.fn().mockResolvedValue([]),
       },
       $queryRaw: jest.fn().mockResolvedValue([]),
+      $transaction: jest.fn(async (operations) => Promise.all(operations)),
     };
     notificationsService = {
       sendPushNotification: jest.fn(),
@@ -238,20 +250,23 @@ describe('CommunicationsService', () => {
         }),
       }),
     );
-    expect(prisma.notificationDelivery.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        tenantId: 'tenant-1',
-        channel: NotificationChannel.PUSH,
-        status: NotificationStatus.QUEUED,
-        sourceType: 'event',
-        sourceId: 'event-1',
-        eventId: 'event-1',
-        audienceType: AudienceType.SECTION,
-        guardianId: 'guardian-1',
-        studentId: 'student-1',
-        destination: 'guardian-user-1',
+    expect(prisma.notificationDelivery.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          tenantId: 'tenant-1',
+          idempotencyKey: 'event:event-1:guardian-user-1:PUSH',
+          channel: NotificationChannel.PUSH,
+          status: NotificationStatus.QUEUED,
+          sourceType: 'event',
+          sourceId: 'event-1',
+          eventId: 'event-1',
+          audienceType: AudienceType.SECTION,
+          guardianId: 'guardian-1',
+          studentId: 'student-1',
+          destination: 'guardian-user-1',
+        }),
       }),
-    });
+    );
     expect(notificationsService.sendPushNotification).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'Parent meeting',
@@ -463,14 +478,16 @@ describe('CommunicationsService', () => {
         }),
       }),
     );
-    expect(prisma.notificationDelivery.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        activityPostId: 'post-1',
-        studentId: 'student-1',
-        guardianId: 'guardian-1',
-        status: NotificationStatus.QUEUED,
+    expect(prisma.notificationDelivery.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          activityPostId: 'post-1',
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          status: NotificationStatus.QUEUED,
+        }),
       }),
-    });
+    );
   });
 
   it('links notice attachments through File Registry and stores protected URLs only', async () => {
@@ -616,6 +633,142 @@ describe('CommunicationsService', () => {
     expect(prisma.notice.create).not.toHaveBeenCalled();
   });
 
+  it('fails closed when the compatibility create route tries to bypass high-impact approval', async () => {
+    await expect(
+      service.createNotice(
+        {
+          title: 'Emergency closure',
+          body: 'School is closed today.',
+          priority: NoticePriority.EMERGENCY,
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Urgent and emergency notices must use the approval-backed draft workflow',
+    );
+    expect(prisma.notice.create).not.toHaveBeenCalled();
+  });
+
+  it('schedules only a future approved high-impact notice and audits the transition', async () => {
+    const current = {
+      id: 'notice-1',
+      tenantId: 'tenant-1',
+      title: 'Urgent circular',
+      body: 'Please read.',
+      priority: NoticePriority.URGENT,
+      audienceType: AudienceType.ALL,
+      classId: null,
+      sectionId: null,
+      lifecycleStatus: NoticeLifecycleStatus.APPROVED,
+      scheduledFor: null,
+      publishedAt: null,
+      expiresAt: null,
+      archivedFromStatus: null,
+    };
+    prisma.notice.findFirst.mockResolvedValue(current);
+    prisma.notice.update.mockResolvedValue({
+      ...current,
+      lifecycleStatus: NoticeLifecycleStatus.SCHEDULED,
+      scheduledFor: new Date('2099-01-01T00:00:00.000Z'),
+    });
+
+    const result = await service.scheduleNotice(
+      'notice-1',
+      '2099-01-01T00:00:00.000Z',
+      actor,
+    );
+
+    expect(result.lifecycleStatus).toBe(NoticeLifecycleStatus.SCHEDULED);
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'schedule',
+        resource: 'notice',
+        tenantId: 'tenant-1',
+        resourceId: 'notice-1',
+      }),
+    );
+  });
+
+  it('cancels a scheduled notice and terminalizes still-queued delivery rows', async () => {
+    const current = {
+      id: 'notice-1',
+      tenantId: 'tenant-1',
+      title: 'Scheduled circular',
+      body: 'Please read.',
+      priority: NoticePriority.NORMAL,
+      audienceType: AudienceType.ALL,
+      classId: null,
+      sectionId: null,
+      lifecycleStatus: NoticeLifecycleStatus.SCHEDULED,
+      scheduledFor: new Date('2099-01-01T00:00:00.000Z'),
+      publishedAt: null,
+      expiresAt: null,
+      archivedFromStatus: null,
+    };
+    const cancelled = {
+      ...current,
+      lifecycleStatus: NoticeLifecycleStatus.CANCELLED,
+      scheduledFor: null,
+    };
+    prisma.notice.findFirst.mockResolvedValue(current);
+    prisma.notice.update.mockResolvedValue(cancelled);
+    prisma.notificationDelivery.updateMany.mockResolvedValue({ count: 1 });
+
+    await expect(
+      service.cancelNotice('notice-1', 'Calendar changed', actor),
+    ).resolves.toEqual(cancelled);
+    expect(prisma.notificationDelivery.updateMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: 'tenant-1',
+        noticeId: 'notice-1',
+        status: {
+          in: [NotificationStatus.QUEUED, NotificationStatus.RETRY_PENDING],
+        },
+      },
+      data: {
+        status: NotificationStatus.CANCELLED,
+        errorMessage: 'Notice was cancelled before delivery completed',
+      },
+    });
+  });
+
+  it('archives and restores without republishing or losing the prior lifecycle state', async () => {
+    const published = {
+      id: 'notice-1',
+      tenantId: 'tenant-1',
+      title: 'Published circular',
+      body: 'Please read.',
+      priority: NoticePriority.NORMAL,
+      audienceType: AudienceType.ALL,
+      classId: null,
+      sectionId: null,
+      lifecycleStatus: NoticeLifecycleStatus.PUBLISHED,
+      scheduledFor: null,
+      publishedAt: new Date('2026-07-15T00:00:00.000Z'),
+      expiresAt: null,
+      archivedFromStatus: null,
+    };
+    const archived = {
+      ...published,
+      lifecycleStatus: NoticeLifecycleStatus.ARCHIVED,
+      archivedFromStatus: NoticeLifecycleStatus.PUBLISHED,
+    };
+    prisma.notice.findFirst.mockResolvedValueOnce(published);
+    prisma.notice.update.mockResolvedValueOnce(archived);
+    await service.archiveNotice('notice-1', 'End of term', actor);
+
+    prisma.notice.findFirst.mockResolvedValueOnce(archived);
+    prisma.notice.update.mockResolvedValueOnce(published);
+    const restored = await service.restoreNotice(
+      'notice-1',
+      'Reference needed',
+      actor,
+    );
+
+    expect(restored.lifecycleStatus).toBe(NoticeLifecycleStatus.PUBLISHED);
+    expect(notificationsService.sendPushNotification).not.toHaveBeenCalled();
+  });
+
   it('publishes high-impact notices to the in-app inbox while disabled external providers remain skipped', async () => {
     notificationsService.getProviderReadiness.mockResolvedValue({
       enabled: false,
@@ -737,16 +890,18 @@ describe('CommunicationsService', () => {
       receiptNumber: 'REC-2025-2026-00001',
     });
 
-    expect(prisma.notificationDelivery.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        tenantId: actor.tenantId,
-        sourceType: 'fee_payment_confirmed',
-        sourceId: 'fee-payment:payment-1:confirmed',
-        studentId: 'student-1',
-        guardianId: 'guardian-1',
-        status: NotificationStatus.QUEUED,
+    expect(prisma.notificationDelivery.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          tenantId: actor.tenantId,
+          sourceType: 'fee_payment_confirmed',
+          sourceId: 'fee-payment:payment-1:confirmed',
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          status: NotificationStatus.QUEUED,
+        }),
       }),
-    });
+    );
     expect(notificationsService.sendEmail).toHaveBeenCalledWith(
       expect.objectContaining({
         to: 'guardian@school.test',
@@ -806,16 +961,18 @@ describe('CommunicationsService', () => {
         }),
       }),
     );
-    expect(prisma.notificationDelivery.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        tenantId: actor.tenantId,
-        sourceType: 'student_admitted',
-        sourceId: 'student:student-1:admitted',
-        guardianId: 'guardian-1',
-        studentId: 'student-1',
-        status: NotificationStatus.QUEUED,
+    expect(prisma.notificationDelivery.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          tenantId: actor.tenantId,
+          sourceType: 'student_admitted',
+          sourceId: 'student:student-1:admitted',
+          guardianId: 'guardian-1',
+          studentId: 'student-1',
+          status: NotificationStatus.QUEUED,
+        }),
       }),
-    });
+    );
     expect(notificationsService.sendSms).toHaveBeenCalledWith(
       expect.objectContaining({
         to: '+9779800000000',
@@ -873,11 +1030,13 @@ describe('CommunicationsService', () => {
     });
 
     expect(result.count).toBe(1);
-    expect(prisma.notificationDelivery.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        status: NotificationStatus.QUEUED,
+    expect(prisma.notificationDelivery.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          status: NotificationStatus.QUEUED,
+        }),
       }),
-    });
+    );
     expect(prisma.notificationDelivery.update).toHaveBeenCalledWith({
       where: { id: 'delivery-1' },
       data: {

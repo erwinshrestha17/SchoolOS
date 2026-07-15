@@ -78,6 +78,7 @@ export class NotificationsService {
 
   async sendEmail(input: SendEmailInput) {
     await this.notificationsQueue.add('sendEmail', input, {
+      ...notificationJobOptions(input.metadata),
       attempts: 3,
       backoff: { type: 'exponential', delay: 1000 },
     });
@@ -85,6 +86,7 @@ export class NotificationsService {
 
   async sendSms(input: SendSmsInput) {
     await this.notificationsQueue.add('sendSms', input, {
+      ...notificationJobOptions(input.metadata),
       attempts: 3,
       backoff: { type: 'exponential', delay: 1000 },
     });
@@ -92,6 +94,7 @@ export class NotificationsService {
 
   async sendPushNotification(input: SendPushNotificationInput) {
     await this.notificationsQueue.add('sendPushNotification', input, {
+      ...notificationJobOptions(input.metadata),
       attempts: 3,
       backoff: { type: 'exponential', delay: 1000 },
     });
@@ -102,6 +105,13 @@ export class NotificationsService {
   ): Promise<NotificationProviderReadiness> {
     return Promise.resolve(resolveProviderReadiness(channel));
   }
+}
+
+function notificationJobOptions(metadata?: Record<string, string>) {
+  const deliveryId = metadata?.notificationDeliveryId;
+  if (!deliveryId) return {};
+  const attempt = metadata.deliveryAttempt ?? '0';
+  return { jobId: `notification-${deliveryId}-${attempt}` };
 }
 
 function resolveProviderReadiness(

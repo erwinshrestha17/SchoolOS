@@ -27,7 +27,32 @@ export const communicationsPermissions = [
   {
     resource: "notices",
     action: "create",
-    description: "Create and publish school notices",
+    description: "Create school notice drafts",
+  },
+  {
+    resource: "notices",
+    action: "edit",
+    description: "Edit permitted school notice drafts",
+  },
+  {
+    resource: "notices",
+    action: "publish",
+    description: "Publish approved or normal school notices",
+  },
+  {
+    resource: "notices",
+    action: "schedule",
+    description: "Schedule approved or normal school notices",
+  },
+  {
+    resource: "notices",
+    action: "cancel",
+    description: "Cancel permitted notice drafts or schedules with a reason",
+  },
+  {
+    resource: "notices",
+    action: "archive",
+    description: "Archive and restore notices with a reason",
   },
   {
     resource: "notices",

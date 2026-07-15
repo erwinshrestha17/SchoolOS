@@ -67,4 +67,17 @@ describe("M12 notifications and M15 notices boundary", () => {
     assert.match(removed, /Chat has been removed/);
     assert.match(messagesPage, /ChatRemovedState/);
   });
+
+  it("uses reasoned backend lifecycle commands without provider ownership", () => {
+    const api = read("lib/api/communications.ts");
+    const detail = read("app/dashboard/notices/[noticeId]/page.tsx");
+
+    for (const action of ["cancel", "archive", "restore"]) {
+      assert.match(api, new RegExp(`/notices/.*\\$\\{.*noticeId.*\\}/${action}`));
+    }
+    assert.match(detail, /confirmDisabled=\{!actionReason\.trim\(\)\}/);
+    assert.match(detail, /A reason is required for the audit trail/);
+    assert.match(detail, /without sending it again/);
+    assert.doesNotMatch(detail, /SMS|FCM|webhook|provider secret/i);
+  });
 });

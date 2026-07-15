@@ -21,6 +21,7 @@ interface RetryableDelivery {
   body: string;
   errorMessage?: string | null;
   lastRetryAt?: Date | null;
+  retryCount: number;
 }
 
 export interface DeliveryRetryResult {
@@ -372,6 +373,7 @@ export class DeliveryRetryService {
       const metadata: Record<string, string> = {
         tenantId: delivery.tenantId,
         notificationDeliveryId: delivery.id,
+        deliveryAttempt: String(delivery.retryCount + 1),
         sourceType: delivery.sourceType,
         sourceId: delivery.sourceId,
         retry: 'true',

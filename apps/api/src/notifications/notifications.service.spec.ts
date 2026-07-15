@@ -5,6 +5,7 @@ import { getQueueToken } from '@nestjs/bullmq';
 
 describe('NotificationsService', () => {
   let service: NotificationsService;
+  let queueAdd: jest.Mock;
   const originalPushMode = process.env.PUSH_PROVIDER_MODE;
   const originalNotificationMode =
     process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE;
@@ -14,13 +15,14 @@ describe('NotificationsService', () => {
   const originalEmailReady = process.env.EMAIL_PROVIDER_READY;
 
   beforeEach(async () => {
+    queueAdd = jest.fn();
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         NotificationsService,
         {
           provide: getQueueToken('notifications'),
           useValue: {
-            add: jest.fn(),
+            add: queueAdd,
           },
         },
       ],
@@ -83,6 +85,28 @@ describe('NotificationsService', () => {
       failureCode: 'PROVIDER_NOT_READY',
       failureReason: 'Email provider readiness has not been confirmed.',
     });
+  });
+
+  it('uses a stable per-delivery attempt job id to suppress duplicate queue jobs', async () => {
+    await service.sendEmail({
+      to: 'guardian@school.test',
+      subject: 'Notice',
+      text: 'Please read.',
+      metadata: {
+        tenantId: 'tenant-1',
+        notificationDeliveryId: 'delivery-1',
+        deliveryAttempt: '0',
+      },
+    });
+
+    expect(queueAdd).toHaveBeenCalledWith(
+      'sendEmail',
+      expect.any(Object),
+      expect.objectContaining({
+        jobId: 'notification-delivery-1-0',
+        attempts: 3,
+      }),
+    );
   });
 });
 
