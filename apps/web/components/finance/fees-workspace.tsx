@@ -20,6 +20,7 @@ import { StudentLedgerWorkspace } from "@/components/finance/student-ledger-work
 import { useSession } from "@/components/session-provider";
 import { ErrorState } from "@/components/ui/error-state";
 import { PermissionDenied } from "@/components/ui/permission-denied";
+import { Button } from "@/components/ui/primitives/button";
 import { api } from "@/lib/api";
 import { useRecentlyViewed } from "@/lib/hooks/use-recently-viewed";
 
@@ -131,12 +132,11 @@ export function FeesWorkspace({ section }: { section: FeesSection }) {
         Back to overview
       </SecondaryLink>
     ) : section === "billing" && canBill ? (
-      <a
-        href="#new-billing-run"
-        className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[var(--color-mod-fees-accent)] px-4 text-sm font-semibold text-white hover:bg-[var(--color-mod-fees-text)]"
-      >
-        <Plus className="h-4 w-4" /> New billing run
-      </a>
+      <Button asChild>
+        <a href="#new-billing-run">
+          <Plus data-icon="inline-start" /> New billing run
+        </a>
+      </Button>
     ) : section === "reports" ? (
       <SecondaryLink
         href="/dashboard/fees/setup"
@@ -341,13 +341,12 @@ function PrimaryLink({
   children: React.ReactNode;
 }) {
   return (
-    <Link
-      href={href}
-      className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[var(--color-mod-fees-accent)] px-4 text-sm font-semibold text-white shadow-sm hover:bg-[var(--color-mod-fees-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mod-fees-accent)] focus-visible:ring-offset-2"
-    >
-      {icon}
-      {children}
-    </Link>
+    <Button asChild>
+      <Link href={href}>
+        {icon}
+        {children}
+      </Link>
+    </Button>
   );
 }
 

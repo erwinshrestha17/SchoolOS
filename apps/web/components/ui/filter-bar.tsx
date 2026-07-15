@@ -1,60 +1,71 @@
 'use client';
 
-import React from 'react';
+import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
-import { Filter } from 'lucide-react';
 
-interface FilterBarProps {
-  children: React.ReactNode;
+export interface FilterBarProps {
+  children?: ReactNode;
+  searchSlot?: ReactNode;
+  filterSlot?: ReactNode;
+  actionSlot?: ReactNode;
   className?: string;
   label?: string;
   description?: string;
-  actions?: React.ReactNode;
+  actions?: ReactNode;
   sticky?: boolean;
 }
 
 export function FilterBar({
   children,
+  searchSlot,
+  filterSlot,
+  actionSlot,
   className,
   label = 'Filters',
   description,
   actions,
   sticky,
 }: FilterBarProps) {
+  const mergedActions = actionSlot ?? actions;
+
   return (
     <div
       className={cn(
-        'rounded-2xl border border-slate-100 bg-slate-50/70 p-5 shadow-sm backdrop-blur-md',
-        sticky && 'sticky top-20 z-10',
+        'rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4',
+        sticky && 'sticky top-20 z-10 bg-card/95 backdrop-blur-md',
         className,
       )}
+      role="group"
+      aria-label={label}
+      data-schoolos-ui="filter-bar"
     >
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div className="flex min-w-0 flex-1 flex-col gap-4 lg:flex-row lg:items-end">
-          <div className="flex items-start gap-3 lg:w-52 lg:shrink-0">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 shadow-sm">
-              <Filter size={15} />
+      {description ? (
+        <p className="mb-3 text-xs leading-5 text-muted-foreground">
+          {description}
+        </p>
+      ) : null}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+        <div className="flex min-w-0 flex-1 flex-col gap-3 md:flex-row md:items-center">
+          {searchSlot ? (
+            <div className="w-full md:min-w-64 md:flex-[1.5]">{searchSlot}</div>
+          ) : null}
+          {filterSlot ? (
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+              {filterSlot}
             </div>
-            <div className="min-w-0">
-              <span className="text-xs font-black uppercase tracking-widest text-slate-500">
-                {label}
-              </span>
-              {description && (
-                <p className="mt-1 text-xs leading-5 text-slate-500">
-                  {description}
-                </p>
-              )}
+          ) : null}
+          {children ? (
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 [&_[data-slot=select-trigger]]:h-9 [&_input]:h-9">
+              {children}
             </div>
-          </div>
-
-          <div className="flex flex-1 flex-wrap items-end gap-3">{children}</div>
+          ) : null}
         </div>
 
-        {actions && (
+        {mergedActions ? (
           <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
-            {actions}
+            {mergedActions}
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

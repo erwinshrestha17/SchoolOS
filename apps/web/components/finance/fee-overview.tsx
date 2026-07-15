@@ -20,8 +20,9 @@ import {
 import { useSession } from "@/components/session-provider";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
-import { KpiCard } from "@/components/ui/kpi-card";
+import { SummaryCard, SummaryGrid } from "@/components/ui/summary-card";
 import { SectionCard } from "@/components/ui/section-card";
+import { WorkSurface } from "@/components/ui/work-surface";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { api } from "@/lib/api";
 
@@ -84,10 +85,10 @@ export function FeeOverview() {
   const summary = summaryQuery.data;
 
   return (
-    <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
-        <KpiCard
-          title="Collected today"
+    <div className="flex flex-col gap-6">
+      <SummaryGrid>
+        <SummaryCard
+          label="Collected today"
           value={
             summary
               ? formatCurrency(summary.collectedToday.netAmount)
@@ -100,10 +101,9 @@ export function FeeOverview() {
           tone="success"
           href={canCollect ? "/dashboard/fees/collect" : undefined}
           description="Net confirmed collection."
-          className="min-h-32 [&_h3]:text-xl [&_h3]:leading-7"
         />
-        <KpiCard
-          title="Total outstanding"
+        <SummaryCard
+          label="Total outstanding"
           value={
             summary
               ? formatCurrency(summary.outstanding.amount)
@@ -116,10 +116,9 @@ export function FeeOverview() {
           tone="neutral"
           href={canManage ? "/dashboard/fees/invoices?outstanding=true" : undefined}
           description="Backend-owned balance."
-          className="min-h-32 [&_h3]:text-xl [&_h3]:leading-7"
         />
-        <KpiCard
-          title="Overdue"
+        <SummaryCard
+          label="Overdue"
           value={
             !canManage
               ? "Restricted"
@@ -136,27 +135,9 @@ export function FeeOverview() {
           description={
             summary ? `${summary.overdue.studentCount} students.` : "Aging summary."
           }
-          className="min-h-32 [&_h3]:text-xl [&_h3]:leading-7"
         />
-        <KpiCard
-          title="Pending adjustments"
-          value={
-            canReviewAdjustments
-              ? (summary?.pendingApprovalCount ??
-                (summaryQuery.isError ? "Unavailable" : "Loading"))
-              : "Restricted"
-          }
-          loading={canReviewAdjustments && summaryQuery.isLoading}
-          icon={<ShieldAlert className="h-5 w-5" />}
-          tone={summary?.pendingApprovalCount ? "warning" : "neutral"}
-          href={
-            canReviewAdjustments ? "/dashboard/fees/adjustments?status=PENDING" : undefined
-          }
-          description="Refund and reversal review."
-          className="min-h-32 [&_h3]:text-xl [&_h3]:leading-7"
-        />
-        <KpiCard
-          title="Cashier close"
+        <SummaryCard
+          label="Cashier close"
           value={
             !canClose
               ? "Restricted"
@@ -172,9 +153,8 @@ export function FeeOverview() {
           tone={summary?.cashierClose.state === "OPEN" ? "warning" : "neutral"}
           href={canClose ? "/dashboard/fees/cashier-close" : undefined}
           description="School-day close state."
-          className="min-h-32 [&_h3]:text-xl [&_h3]:leading-7"
         />
-      </div>
+      </SummaryGrid>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-y border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
         <span>
@@ -207,10 +187,10 @@ export function FeeOverview() {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.75fr)]">
         <div className="space-y-6">
-          <SectionCard
+          <WorkSurface
             title="Today's collection activity"
             description="Confirmed backend totals for the current Nepal school day."
-            headerAction={
+            action={
               canCollect ? (
                 <Link
                   href="/dashboard/fees/collect"
@@ -220,7 +200,8 @@ export function FeeOverview() {
                 </Link>
               ) : undefined
             }
-            noPadding
+            variant="transaction"
+            flush
           >
             <div className="overflow-x-auto">
               <table className="w-full min-w-[560px] text-left text-sm">
@@ -251,7 +232,7 @@ export function FeeOverview() {
                 </tbody>
               </table>
             </div>
-          </SectionCard>
+          </WorkSurface>
 
           <SectionCard
             title="Overdue follow-up"

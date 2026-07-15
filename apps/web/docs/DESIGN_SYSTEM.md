@@ -441,3 +441,137 @@ Desktop references are dense operating-desk layouts. For narrower viewports:
 - Use table column priority instead of unreadably compressed tables.
 - Keep chat composer reachable without hiding student safety context entirely.
 - Preserve clear selected-row, selected-conversation, and selected-case states.
+
+---
+
+## 8. Canonical SchoolOS Workspace System
+
+SchoolOS standardizes the frame, primitives, and interaction rules while each
+module keeps a purpose-built operational workspace. A directory, cashier
+counter, marks grid, timetable builder, and notice composer must not be forced
+into the same content layout.
+
+Daily-operation landing pages compose in this order when each part is useful:
+
+```text
+DashboardPageShell
+├── ModuleHeader
+│   ├── Breadcrumb
+│   ├── Title and concise purpose
+│   ├── One primary action
+│   └── More Actions
+├── SummaryGrid (decision summaries only)
+├── WorkspaceTabs (stable sibling views only)
+├── FilterBar (directly above filtered work)
+└── WorkSurface
+    ├── Header, result metadata, contextual action
+    ├── Table, queue, form, builder, transaction, grid, or monitor
+    ├── Shared loading, empty, error, permission, or locked state
+    └── Pagination when the backend list grows
+```
+
+Summary cards and tabs are optional. A form or builder page starts with the
+work itself when a summary or sibling navigation would not help the user decide
+what to do next.
+
+### 8.1 Approved workspace patterns
+
+| Pattern | Primary uses | Main surface |
+|---|---|---|
+| Directory | Students, staff, books, vehicles, accounts | Filters, server-paginated table, detail sheet or route |
+| Queue and approval | Admissions, corrections, leave, reversals, moderation | Queue explanation, filters, cases, review sheet or route |
+| Transaction | Fee collection, canteen POS, issue/return | Current context, search/scan, form, validation, confirmation/receipt |
+| Builder | Timetable, homework, exam template, notice, learning activity | Context selectors, editor, validation/preview rail, safe actions |
+| Spreadsheet/grid | Marks, CAS, attendance, payroll, reconciliation | Fixed context, validation toolbar, dense grid, review rail |
+| Monitoring | Principal, attendance overview, transport trips, provider health | Limited summaries, attention list, operational status, drill-through |
+
+`WorkSurface` owns these controlled variants. Modules must not create a new
+surface theme to express a domain workflow.
+
+### 8.2 Shared component contract
+
+- `ModuleHeader`: one title scale, description width, action placement, and
+  ellipsis-menu treatment.
+- `SummaryGrid` / `SummaryCard`: neutral surface, subtle border, equal height,
+  compact padding, no more than four primary cards per desktop row.
+- `WorkspaceTabs`: neutral list with the global primary-blue selected state;
+  URL-backed or controlled state; no visible scrollbar.
+- `FilterBar`: one compact row on wide screens; search receives priority width;
+  secondary controls wrap or collapse on narrower screens.
+- `WorkSurface`: full Card header/content/footer composition with controlled
+  table, queue, form, builder, transaction, grid, and monitoring variants.
+- `ActionMenu`: one shared keyboard-accessible overflow action treatment.
+- Shared feedback: `LoadingState`, `EmptyState`, `ErrorState`,
+  `PermissionDenied`, `ModuleLockedState`, `QueuedJobState`, partial failure,
+  and protected-file unavailable states.
+
+`KpiCard`, `KpiGrid`, and `ModuleTabs` are compatibility names only while later
+modules migrate. New work uses the canonical names above.
+
+### 8.3 Colour policy
+
+```text
+Primary blue = routine main action, active navigation, link, focus, selected state
+Green        = success, completed, healthy
+Amber        = warning, attention
+Red          = error, blocked, overdue, destructive
+Blue         = information as well as the global primary/selected state
+```
+
+Module accents are location cues only. They may appear in a small icon
+container, section marker, illustration, or navigation icon. They must not
+change primary buttons, active tabs, card borders, typography, or focus rules.
+
+### 8.4 Spacing and density
+
+```text
+Page horizontal padding: 24px desktop, 16px compact
+Header to summary:       24px
+Summary to tabs:         20px
+Tabs to workspace:       16px
+Card content padding:    20px
+Shared control height:   36-40px according to approved component size
+Card radius:             global --radius token
+```
+
+Use the shared shell and component gaps. Do not introduce arbitrary large
+top margins, decorative minimum heights, or module-specific card heights.
+
+### 8.5 Motion
+
+`SchoolOSMotionProvider` owns the global tokens:
+
+```text
+fast:       140ms
+standard:   180ms
+deliberate: 220ms
+ease-out:   cubic-bezier(0.2, 0.8, 0.2, 1)
+```
+
+Approved motion is limited to tab indicators, content crossfades, filter-chip
+layout, contextual panels, and success/warning feedback. Respect reduced-motion
+preferences. Do not animate KPI values, every row, full-page entrances,
+financial totals, marks cells, or continuous operational status.
+
+### 8.6 Priority-route baseline (2026-07-15)
+
+| Route | Previous drift | Canonical baseline |
+|---|---|---|
+| `/dashboard/students` | M1-only summaries and local Radix tab markup | Shared summary, workspace tabs, compact directory work surface |
+| `/dashboard/admissions` | M1-only summaries and local queue tabs | Shared summary, workspace tabs, queue work surface |
+| `/dashboard/attendance` | Six summaries and green active navigation | Four decision summaries, primary-blue tabs, monitoring work surface |
+| `/dashboard/fees` | Orange actions/underline navigation and five-card row | Primary-blue actions/tabs, four decision summaries, transaction work surface |
+| `/dashboard/homework` | Module-blue action, five summaries, large filter area | Primary action, four summaries, shared tabs/filter/work surface |
+| `/dashboard/academics` | Purple actions/tabs and module-themed overview links | Primary action, shared summaries/tabs, canonical work surface |
+
+This baseline does not change backend contracts, authorization, entitlement,
+official totals, server filtering, pagination, or protected-file behavior.
+
+### 8.7 Consistency gate
+
+`test/workspace-consistency-contract.test.mjs` guards the priority routes and
+shared primitives. It verifies the common shell/header/summary/tab/work-surface
+composition, global primary navigation, four-column summary limit, hidden tab
+scrollbars, shared motion boundary, and preservation of URL-backed filtering
+and pagination. Visual review remains required at 1440px, 1280px, 1024px, and
+390px for populated and failure states before broad UI changes merge.

@@ -47,15 +47,16 @@ describe("M3 fees workspace contract", () => {
     assert.match(shell, /label: "Cashier Close"[\s\S]*"payments:close"/);
     assert.match(shell, /moreNavigation[\s\S]*label: "Billing runs"[\s\S]*"fees:bill"/);
     assert.match(shell, /moreNavigation[\s\S]*label: "Adjustments"/);
-    assert.match(shell, /More/);
+    assert.match(shell, /WorkspaceTabs/);
     assert.doesNotMatch(shell, /<DashboardShell|<Sidebar/);
   });
 
-  it("renders exactly five official overview KPIs from the bounded backend summary", () => {
+  it("renders four prioritized official overview summaries from the bounded backend contract", () => {
     const overview = read("components/finance/fee-overview.tsx");
     const financeApi = read("lib/api/finance.ts");
 
-    assert.equal((overview.match(/<KpiCard/g) ?? []).length, 5);
+    assert.equal((overview.match(/<SummaryCard/g) ?? []).length, 4);
+    assert.match(overview, /<SummaryGrid>/);
     assert.match(financeApi, /fees\/dashboard-summary/);
     assert.match(overview, /getFinanceDashboardSummary/);
     assert.match(overview, /date: schoolDay\.gregorianDate/);
@@ -63,7 +64,6 @@ describe("M3 fees workspace contract", () => {
     assert.match(overview, /summary\.collectedToday\.netAmount/);
     assert.match(overview, /summary\.outstanding\.amount/);
     assert.match(overview, /summary\.overdue\.amount/);
-    assert.match(overview, /summary\.pendingApprovalCount/);
     assert.match(overview, /summary\.cashierClose\.state/);
     assert.doesNotMatch(overview, /\.reduce\(/);
   });

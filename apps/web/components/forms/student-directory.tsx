@@ -19,8 +19,8 @@ import { LoadingState } from '../ui/loading-state';
 import { ErrorState } from '../ui/error-state';
 import { TablePagination } from '../ui/table-pagination';
 import { ActionMenu } from '../ui/action-menu';
-import { Tabs, TabsList, TabsTrigger } from '../ui/primitives/tabs';
-import { M1SummaryCard, M1SummaryGrid } from '../m1/m1-summary-card';
+import { SummaryCard, SummaryGrid } from '../ui/summary-card';
+import { WorkspaceTabs } from '../ui/module-tabs';
 import {
   BookOpenText,
   ContactRound,
@@ -40,13 +40,7 @@ import {
 import { StatusChip } from '../dashboard/status-chip';
 import { StatusBadge } from '../ui/status-badge';
 import { Button } from '../ui/primitives/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '../ui/primitives/card';
+import { WorkSurface } from '../ui/work-surface';
 import {
   Empty,
   EmptyContent,
@@ -204,75 +198,70 @@ export function StudentDirectory({
 
   return (
     <div className="flex flex-col gap-5">
-      <M1SummaryGrid>
-          <M1SummaryCard
-            title="Active Students"
+      <SummaryGrid>
+          <SummaryCard
+            label="Active Students"
             value={summaryUnavailable ? 'Unavailable' : (summary?.activeStudents ?? 'Unavailable')}
-            icon={Users}
+            icon={<Users aria-hidden />}
             loading={summaryLoading}
             href="/dashboard/students?status=ACTIVE"
             description="Currently active student records."
           />
-          <M1SummaryCard
-            title="Document Issues"
+          <SummaryCard
+            label="Document Issues"
             value={summaryUnavailable ? 'Unavailable' : (summary?.missingDocuments ?? 'Unavailable')}
-            icon={FolderOpen}
+            icon={<FolderOpen aria-hidden />}
             loading={summaryLoading}
             href="/dashboard/admissions/documents"
             description="Records with missing documents."
           />
-          <M1SummaryCard
-            title="Duplicate Candidates"
+          <SummaryCard
+            label="Duplicate Candidates"
             value={summaryUnavailable ? 'Unavailable' : (summary?.duplicateCandidates ?? 'Unavailable')}
-            icon={UserCheck}
+            icon={<UserCheck aria-hidden />}
             loading={summaryLoading}
             href="/dashboard/admissions/duplicates"
             description="Possible matching student records."
           />
-          <M1SummaryCard
-            title="iEMIS Issues"
+          <SummaryCard
+            label="iEMIS Issues"
             value={summaryUnavailable ? 'Unavailable' : (summary?.iemisIssues ?? 'Unavailable')}
-            icon={AlertTriangle}
+            icon={<AlertTriangle aria-hidden />}
             loading={summaryLoading}
             href="/dashboard/admissions/iemis"
             description="Student records with iEMIS issues."
           />
-      </M1SummaryGrid>
+      </SummaryGrid>
 
-      <Tabs
-        value={status || 'ALL'}
+      <WorkspaceTabs
+        activeValue={status || 'ALL'}
         onValueChange={(value) =>
           onFilterChange(
             { status: value === 'ALL' ? '' : value, page: 1 },
             { history: 'push' },
           )
         }
-      >
-        <TabsList
-          className="h-9 w-full max-w-full justify-start overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:grid lg:grid-cols-5 lg:overflow-visible"
-          aria-label="Student lifecycle views"
-        >
-          <TabsTrigger value="ALL">All Students</TabsTrigger>
-          <TabsTrigger value="ACTIVE">Active</TabsTrigger>
-          <TabsTrigger value="TRANSFERRED">Transferred</TabsTrigger>
-          <TabsTrigger value="EXITED">Withdrawn</TabsTrigger>
-          <TabsTrigger value="ALUMNI">Alumni</TabsTrigger>
-        </TabsList>
-      </Tabs>
+        label="Student lifecycle views"
+        items={[
+          { value: 'ALL', label: 'All Students' },
+          { value: 'ACTIVE', label: 'Active' },
+          { value: 'TRANSFERRED', label: 'Transferred' },
+          { value: 'EXITED', label: 'Withdrawn' },
+          { value: 'ALUMNI', label: 'Alumni' },
+        ]}
+      />
 
-      <Card
-        className="gap-0 overflow-hidden py-0 shadow-sm"
+      <WorkSurface
+        title="Student Roster"
+        description={
+          hasActiveFilters
+            ? `${totalStudents} students matching the selected filters`
+            : `${totalStudents} students`
+        }
+        variant="table"
+        flush
         data-testid="student-roster-workspace"
       >
-        <CardHeader className="gap-1 border-b border-border px-4 py-4">
-          <CardTitle className="text-base">Student Roster</CardTitle>
-          <CardDescription>
-            {hasActiveFilters
-              ? `${totalStudents} students matching the selected filters`
-              : `${totalStudents} students`}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
           <div
             className="grid gap-3 border-b border-border bg-muted/20 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[minmax(9rem,1fr)_minmax(8rem,0.8fr)_minmax(8rem,0.8fr)_minmax(8rem,0.8fr)_minmax(15rem,1.7fr)_auto]"
             aria-label="Directory filters"
@@ -630,8 +619,7 @@ export function StudentDirectory({
             ) : null}
           </Empty>
         )}
-        </CardContent>
-      </Card>
+      </WorkSurface>
 
       {pdfError && (
         <div className="animate-in fade-in slide-in-from-top-2 rounded-xl border border-danger-100 bg-danger-50 p-4 text-sm font-medium text-danger-600">

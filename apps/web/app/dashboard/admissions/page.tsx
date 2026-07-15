@@ -17,9 +17,9 @@ import { DashboardPageShell } from "../../../components/dashboard/dashboard-page
 import { AdmissionCaseQueues } from "../../../components/m1/admission-case-queues";
 import { M1PageHeader } from "../../../components/m1/m1-page-header";
 import {
-  M1SummaryCard,
-  M1SummaryGrid,
-} from "../../../components/m1/m1-summary-card";
+  SummaryCard,
+  SummaryGrid,
+} from "../../../components/ui/summary-card";
 import { useSession } from "../../../components/session-provider";
 import { Button } from "../../../components/ui/primitives/button";
 import {
@@ -126,40 +126,40 @@ export default function AdmissionsPage() {
         }
       />
 
-      <M1SummaryGrid>
-        <M1SummaryCard
-          title="Needs Information"
+      <SummaryGrid>
+        <SummaryCard
+          label="Needs Information"
           value={summaryQuery("NEEDS_INFORMATION")?.data?.total ?? "Unavailable"}
           loading={summaryQuery("NEEDS_INFORMATION")?.isLoading}
-          icon={FileWarning}
+          icon={<FileWarning aria-hidden />}
           href="/dashboard/admissions?queue=NEEDS_INFORMATION"
           description="Cases missing details or documents."
         />
-        <M1SummaryCard
-          title="Waiting for Review"
+        <SummaryCard
+          label="Waiting for Review"
           value={summaryQuery("WAITING_FOR_REVIEW")?.data?.total ?? "Unavailable"}
           loading={summaryQuery("WAITING_FOR_REVIEW")?.isLoading}
-          icon={ClipboardList}
+          icon={<ClipboardList aria-hidden />}
           href="/dashboard/admissions?queue=WAITING_FOR_REVIEW"
           description="Cases waiting for staff review."
         />
-        <M1SummaryCard
-          title="Ready to Admit"
+        <SummaryCard
+          label="Ready to Admit"
           value={summaryQuery("READY_TO_ADMIT")?.data?.total ?? "Unavailable"}
           loading={summaryQuery("READY_TO_ADMIT")?.isLoading}
-          icon={UserRoundCheck}
+          icon={<UserRoundCheck aria-hidden />}
           href="/dashboard/admissions?queue=READY_TO_ADMIT"
           description="Cases ready for final admission."
         />
-        <M1SummaryCard
-          title="Duplicate Warnings"
+        <SummaryCard
+          label="Duplicate Warnings"
           value={summaryQuery("DUPLICATE_WARNINGS")?.data?.total ?? "Unavailable"}
           loading={summaryQuery("DUPLICATE_WARNINGS")?.isLoading}
-          icon={ScanSearch}
+          icon={<ScanSearch aria-hidden />}
           href="/dashboard/admissions?queue=DUPLICATE_WARNINGS"
           description="Possible matches with existing students."
         />
-      </M1SummaryGrid>
+      </SummaryGrid>
       <AdmissionCaseQueues />
     </DashboardPageShell>
   );

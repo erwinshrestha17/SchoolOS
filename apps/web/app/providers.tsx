@@ -9,6 +9,7 @@ import { ApiRequestError } from '../lib/api';
 import { TooltipProvider } from '../components/ui/primitives/tooltip';
 import { Toaster } from '../components/ui/primitives/sonner';
 import { BreadcrumbLabelProvider } from '../components/schoolos/navigation/breadcrumb-label-context';
+import { SchoolOSMotionProvider } from '../components/schoolos/motion/schoolos-motion-provider';
 
 export function Providers({ children }: PropsWithChildren) {
   const [queryClient] = useState(
@@ -38,12 +39,14 @@ export function Providers({ children }: PropsWithChildren) {
         <SupportOverrideBanner />
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
-            <BreadcrumbLabelProvider>
-              {children}
-              {/* SchoolOS is light-only today; pin Sonner to light so it never
-                  follows an unconfigured OS dark-mode preference. */}
-              <Toaster theme="light" position="top-right" />
-            </BreadcrumbLabelProvider>
+            <SchoolOSMotionProvider>
+              <BreadcrumbLabelProvider>
+                {children}
+                {/* SchoolOS is light-only today; pin Sonner to light so it never
+                    follows an unconfigured OS dark-mode preference. */}
+                <Toaster theme="light" position="top-right" />
+              </BreadcrumbLabelProvider>
+            </SchoolOSMotionProvider>
           </TooltipProvider>
         </QueryClientProvider>
       </EntitlementsProvider>

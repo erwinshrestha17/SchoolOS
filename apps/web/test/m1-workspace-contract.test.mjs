@@ -347,12 +347,12 @@ test("M1 student roster uses a focused backend summary, safe filters, and pagina
   assert.match(directory, /summary\?\.missingDocuments/);
   assert.match(directory, /summary\?\.duplicateCandidates/);
   assert.match(directory, /summary\?\.iemisIssues/);
-  assert.equal((directory.match(/<M1SummaryCard/g) ?? []).length, 4);
+  assert.equal((directory.match(/<SummaryCard/g) ?? []).length, 4);
   assert.match(directory, /summaryUnavailable \? 'Unavailable'/);
   assert.doesNotMatch(directory, /title="Pending Applications"/);
   assert.doesNotMatch(directory, /title="QR Active"/);
-  assert.match(directory, /<TabsTrigger value="ACTIVE">Active<\/TabsTrigger>/);
-  assert.match(directory, /<TabsTrigger value="EXITED">Withdrawn<\/TabsTrigger>/);
+  assert.match(directory, /value: 'ACTIVE', label: 'Active'/);
+  assert.match(directory, /value: 'EXITED', label: 'Withdrawn'/);
   // Server pagination footer is the shared TablePagination component (not a
   // second hand-rolled Previous/Next implementation).
   assert.match(directory, /from '\.\.\/ui\/table-pagination'/);

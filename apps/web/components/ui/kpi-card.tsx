@@ -1,30 +1,25 @@
 'use client';
 
-import type { ReactNode } from 'react';
-import { cn } from '../../lib/utils';
-import { StatCard } from './stat-card';
+import {
+  SummaryCard,
+  SummaryGrid,
+  type SummaryCardProps,
+} from './summary-card';
 
-export type KpiCardProps = Parameters<typeof StatCard>[0];
+/** @deprecated Use SummaryCard. Kept as a compatibility bridge while later modules migrate. */
+export type KpiCardProps = Omit<SummaryCardProps, 'label'> & {
+  title: string;
+  trend?: {
+    value: number;
+    label: string;
+    isUp: boolean;
+  };
+};
 
-export function KpiCard(props: KpiCardProps) {
-  return <StatCard {...props} />;
+/** @deprecated Use SummaryCard. */
+export function KpiCard({ title, trend: _trend, ...props }: KpiCardProps) {
+  return <SummaryCard label={title} {...props} />;
 }
 
-export function KpiGrid({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        'grid gap-4 sm:grid-cols-2 xl:grid-cols-4',
-        className,
-      )}
-    >
-      {children}
-    </div>
-  );
-}
+/** @deprecated Use SummaryGrid. */
+export const KpiGrid = SummaryGrid;

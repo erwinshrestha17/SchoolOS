@@ -18,10 +18,11 @@ import {
 import { useSession } from '@/components/session-provider';
 import { academicsWorkspaceTabs } from '@/components/academics/academics-tabs';
 import { DashboardPageShell } from '@/components/dashboard/dashboard-page-shell';
-import { KpiCard, KpiGrid } from '@/components/ui/kpi-card';
+import { SummaryCard, SummaryGrid } from '@/components/ui/summary-card';
 import { ModuleHeader } from '@/components/ui/module-header';
-import { ModuleTabs } from '@/components/ui/module-tabs';
-import { SectionCard } from '@/components/ui/section-card';
+import { WorkspaceTabs } from '@/components/ui/module-tabs';
+import { WorkSurface } from '@/components/ui/work-surface';
+import { Button } from '@/components/ui/primitives/button';
 import { api } from '@/lib/api';
 
 const workflowSections = [
@@ -84,21 +85,19 @@ export default function AcademicsOverviewPage() {
         description={`Manage exam terms, marks, CAS, report cards, and result publishing${session?.tenant.name ? ` for ${session.tenant.name}` : ''}. Official readiness remains backend-owned.`}
         primaryAction={
           canManageAcademics ? (
-            <Link
-              href="/dashboard/academics/exam-terms"
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--color-mod-academics-accent)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-academics-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-academics-border)] focus:ring-offset-2"
-            >
-              <ClipboardList size={18} />
-              Create Exam Term
-            </Link>
+            <Button asChild>
+              <Link href="/dashboard/academics/exam-terms">
+                <ClipboardList data-icon="inline-start" />
+                Create Exam Term
+              </Link>
+            </Button>
           ) : canEnterMarks ? (
-            <Link
-              href="/dashboard/academics/marks"
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--color-mod-academics-accent)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-academics-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-academics-border)] focus:ring-offset-2"
-            >
-              <PencilLine size={18} />
-              Enter Marks
-            </Link>
+            <Button asChild>
+              <Link href="/dashboard/academics/marks">
+                <PencilLine data-icon="inline-start" />
+                Enter Marks
+              </Link>
+            </Button>
           ) : undefined
         }
         moreActionItems={[
@@ -137,9 +136,9 @@ export default function AcademicsOverviewPage() {
             : []),
         ]}
       >
-        <KpiGrid className="sm:grid-cols-2 lg:grid-cols-4">
-          <KpiCard
-            title="Marks Entry Open"
+        <SummaryGrid>
+          <SummaryCard
+            label="Marks Entry Open"
             loading={summaryQuery.isLoading}
             value={metricValue('marksOpen')}
             icon={<PencilLine size={20} />}
@@ -147,8 +146,8 @@ export default function AcademicsOverviewPage() {
             href="/dashboard/academics/marks"
             description="Unlocked mark entries across active terms."
           />
-          <KpiCard
-            title="Mark Lock Requests"
+          <SummaryCard
+            label="Mark Lock Requests"
             loading={summaryQuery.isLoading}
             value={metricValue('pendingMarkLocks')}
             icon={<Lock size={20} />}
@@ -156,8 +155,8 @@ export default function AcademicsOverviewPage() {
             href="/dashboard/academics/locks"
             description="Lock requests awaiting review."
           />
-          <KpiCard
-            title="Report Cards Unpublished"
+          <SummaryCard
+            label="Report Cards Unpublished"
             loading={summaryQuery.isLoading}
             value={metricValue('reportCardPublishBlockers')}
             icon={<AlertTriangle size={20} />}
@@ -167,8 +166,8 @@ export default function AcademicsOverviewPage() {
             href="/dashboard/academics/report-cards"
             description="Current-term report cards not yet published."
           />
-          <KpiCard
-            title="Promotion Ready"
+          <SummaryCard
+            label="Promotion Ready"
             loading={summaryQuery.isLoading}
             value={metricValue('promotionReady')}
             icon={<GraduationCap size={20} />}
@@ -176,16 +175,16 @@ export default function AcademicsOverviewPage() {
             href="/dashboard/academics/promotion"
             description="Students with a backend-calculated ready decision."
           />
-        </KpiGrid>
+        </SummaryGrid>
       </ModuleHeader>
 
-      <div className="space-y-6">
-        <ModuleTabs items={academicsWorkspaceTabs} accentColor="purple" variant="light" />
+      <div className="flex flex-col gap-6">
+        <WorkspaceTabs items={academicsWorkspaceTabs} />
 
-        <SectionCard
+        <WorkSurface
           title="Core academic workspaces"
           description="Open the next focused job. Marks, locks, grading, promotion, publishing, and protected PDF access remain backend-controlled across tenant-scoped and permissioned M4 workspaces."
-          noPadding
+          flush
         >
           <div className="divide-y divide-slate-100">
             {workflowSections.map((section) => {
@@ -210,7 +209,7 @@ export default function AcademicsOverviewPage() {
               );
             })}
           </div>
-        </SectionCard>
+        </WorkSurface>
 
       </div>
     </DashboardPageShell>

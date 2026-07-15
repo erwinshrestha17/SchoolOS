@@ -20,8 +20,8 @@ describe('M4 academics workspace contract', () => {
     const page = overviewAndTabs();
 
     assert.match(page, /<ModuleHeader/);
-    assert.match(page, /<KpiGrid/);
-    assert.match(page, /<ModuleTabs/);
+    assert.match(page, /<SummaryGrid/);
+    assert.match(page, /<WorkspaceTabs/);
     assert.match(page, />\s*Create Exam Term\s*</);
     assert.match(page, />\s*Enter Marks\s*</);
     assert.match(page, /moreActionItems/);
@@ -77,11 +77,11 @@ describe('M4 academics workspace contract', () => {
     assert.match(page, /href="\/dashboard\/academics\/marks"/);
     assert.match(
       page,
-      /title="Marks Entry Open"[\s\S]{0,300}href="\/dashboard\/academics\/marks"/,
+      /label="Marks Entry Open"[\s\S]{0,300}href="\/dashboard\/academics\/marks"/,
     );
     assert.match(
       page,
-      /title="Mark Lock Requests"[\s\S]{0,300}href="\/dashboard\/academics\/locks"/,
+      /label="Mark Lock Requests"[\s\S]{0,300}href="\/dashboard\/academics\/locks"/,
     );
     assert.match(page, /href="\/dashboard\/academics\/report-cards"/);
     assert.match(page, /href="\/dashboard\/academics\/promotion"/);

@@ -262,8 +262,8 @@ describe("SchoolOS web production contracts", () => {
     const workloadRoute = read("app/dashboard/timetable/workload/page.tsx");
 
     assert.match(page, /ModuleHeader/);
-    assert.match(page, /KpiGrid/);
-    assert.match(page, /ModuleTabs/);
+    assert.match(page, /SummaryGrid/);
+    assert.match(page, /WorkspaceTabs/);
     assert.match(page, /api\.getHomeworkSummaryToday/);
     assert.match(page, /api\.listHomeworkPage/);
     assert.match(page, /api\.listHomeworkTemplates/);
@@ -322,11 +322,11 @@ describe("SchoolOS web production contracts", () => {
 
     assert.match(moduleTabs, /usePathname/);
     assert.match(moduleTabs, /pathname === item\.href/);
-    assert.match(moduleTabs, /pathname\?\.startsWith\(item\.href\)/);
-    assert.match(moduleTabs, /item\.count !== undefined && item\.count > 0/);
+    assert.match(moduleTabs, /pathname\?\.startsWith\(`\$\{item\.href\}\/`\)/);
+    assert.match(moduleTabs, /typeof item\.count === 'number' && item\.count > 0/);
     assert.match(
       moduleTabs,
-      /bg-slate-700 text-white shadow-md border-slate-700/,
+      /bg-primary text-primary-foreground shadow-sm/,
     );
     assert.doesNotMatch(
       moduleTabs,

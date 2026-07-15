@@ -19,14 +19,7 @@ import { ErrorState } from "../ui/error-state";
 import { TablePagination } from "../ui/table-pagination";
 import { Badge } from "../ui/primitives/badge";
 import { Button } from "../ui/primitives/button";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../ui/primitives/card";
+import { WorkSurface } from "../ui/work-surface";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,7 +50,7 @@ import {
   TableHeader,
   TableRow,
 } from "../ui/primitives/table";
-import { Tabs, TabsList, TabsTrigger } from "../ui/primitives/tabs";
+import { WorkspaceTabs } from "../ui/module-tabs";
 import { useUrlFilters } from "../../lib/hooks/use-url-filters";
 
 const QUEUES: Array<{
@@ -200,8 +193,8 @@ export function AdmissionCaseQueues() {
   return (
     <section className="flex flex-col gap-3">
       <div className="flex min-w-0 items-center gap-2">
-        <Tabs
-          value={queue}
+        <WorkspaceTabs
+          activeValue={queue}
           onValueChange={(value) =>
             setFilters(
               { queue: value as AdmissionCaseQueue, page: 1 },
@@ -209,20 +202,11 @@ export function AdmissionCaseQueues() {
             )
           }
           className="min-w-0 flex-1"
-        >
-          <TabsList
-            className="h-9 w-full max-w-full justify-start overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:grid lg:grid-cols-5 lg:overflow-visible"
-            aria-label="Admission queue views"
-          >
-            {QUEUES.filter((item) => PRIMARY_QUEUE_IDS.has(item.id)).map(
-              (item) => (
-                <TabsTrigger key={item.id} value={item.id}>
-                  {item.label}
-                </TabsTrigger>
-              ),
-            )}
-          </TabsList>
-        </Tabs>
+          label="Admission queue views"
+          items={QUEUES.filter((item) => PRIMARY_QUEUE_IDS.has(item.id)).map(
+            (item) => ({ value: item.id, label: item.label }),
+          )}
+        />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -254,23 +238,20 @@ export function AdmissionCaseQueues() {
         </DropdownMenu>
       </div>
 
-      <Card
-        className="gap-0 overflow-hidden py-0 shadow-sm"
+      <WorkSurface
+        title={activeQueue.label}
+        description={activeQueue.description}
+        action={
+          query.data ? (
+            <Badge variant="secondary">
+              {query.data.total === 1 ? "1 case" : query.data.total + " cases"}
+            </Badge>
+          ) : undefined
+        }
+        variant="queue"
+        flush
         data-testid="admission-queue-workspace"
       >
-        <CardHeader className="gap-1 border-b border-border px-4 py-4">
-          <CardTitle className="text-base">{activeQueue.label}</CardTitle>
-          <CardDescription>{activeQueue.description}</CardDescription>
-          {query.data ? (
-            <CardAction>
-              <Badge variant="secondary">
-                {query.data.total === 1 ? "1 case" : query.data.total + " cases"}
-              </Badge>
-            </CardAction>
-          ) : null}
-        </CardHeader>
-
-        <CardContent className="p-0">
           <form
             className="flex flex-col gap-2 border-b border-border bg-muted/20 p-4 sm:flex-row sm:items-center"
             onSubmit={(event) => {
@@ -430,8 +411,7 @@ export function AdmissionCaseQueues() {
               onPageChange={(nextPage) => setFilters({ page: nextPage })}
             />
           ) : null}
-        </CardContent>
-      </Card>
+      </WorkSurface>
     </section>
   );
 }

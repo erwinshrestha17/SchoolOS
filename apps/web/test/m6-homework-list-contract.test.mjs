@@ -7,7 +7,7 @@ const read = (path) => readFileSync(new URL(path, webRoot), "utf8");
 
 // Rewritten for the M6 homework redesign (fuzzy-gliding-hopper.md): homework
 // is now a standalone, single-route, 4-tab workspace fully decoupled from
-// timetable, with 5 backend-driven KPI cards and no "Supporting homework
+// timetable, with 4 prioritized backend-driven summaries and no "Supporting homework
 // tools" disclosure — Templates and Completion are real tabs now.
 describe("M6 homework list contract", () => {
   it("uses the backend page contract with URL-backed filters and pagination", () => {
@@ -65,7 +65,7 @@ describe("M6 homework list contract", () => {
     assert.match(page, /canReviewHomework/);
   });
 
-  it("sources the 5 summary cards from the real per-role backend endpoint", () => {
+  it("sources four prioritized summary cards from the real per-role backend endpoint", () => {
     const page = read("app/dashboard/homework/page.tsx");
 
     // Regression guard for the recurring "loading-literal" KPI bug: value
@@ -73,7 +73,6 @@ describe("M6 homework list contract", () => {
     // `loading` prop drives the spinner state instead.
     assert.doesNotMatch(page, /value=\{isLoading \? ['"]Loading['"]/);
     assert.match(page, /api\.getHomeworkSummaryToday\(\)/);
-    assert.match(page, /summary\?\.givenToday/);
     assert.match(page, /summary\?\.dueToday/);
     assert.match(page, /summary\?\.notChecked/);
     assert.match(page, /summary\?\.incompleteStudents/);
@@ -81,7 +80,7 @@ describe("M6 homework list contract", () => {
     assert.doesNotMatch(page, /api\.getModuleSummary\("homework-timetable"\)/);
   });
 
-  it("keeps the header within the 4-tab / 5-KPI budget and fully decoupled from timetable", () => {
+  it("keeps the header within the 4-tab / 4-summary budget and fully decoupled from timetable", () => {
     const page = read("app/dashboard/homework/page.tsx");
 
     assert.equal(
@@ -89,7 +88,8 @@ describe("M6 homework list contract", () => {
         .length,
       4,
     );
-    assert.equal((page.match(/<KpiCard/g) ?? []).length, 5);
+    assert.equal((page.match(/<SummaryCard/g) ?? []).length, 4);
+    assert.match(page, /<SummaryGrid/);
     assert.doesNotMatch(page, /title="Homework Assigned"/);
     assert.doesNotMatch(page, /title="Pending Submissions"/);
     assert.doesNotMatch(page, /title="Timetable Conflicts"/);

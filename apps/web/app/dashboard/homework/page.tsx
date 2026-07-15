@@ -31,16 +31,17 @@ import { ActionMenu } from "../../../components/ui/action-menu";
 import { LoadingState } from "../../../components/ui/loading-state";
 import { EmptyState } from "../../../components/ui/empty-state";
 import { ErrorState } from "../../../components/ui/error-state";
-import { Button } from "../../../components/ui/button";
+import { Button } from "../../../components/ui/primitives/button";
 import { Input } from "../../../components/ui/input";
 import { Select } from "../../../components/ui/select";
 import { PermissionDenied } from "../../../components/ui/permission-denied";
 import { useSession } from "../../../components/session-provider";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ModuleHeader } from "../../../components/ui/module-header";
-import { KpiCard, KpiGrid } from "../../../components/ui/kpi-card";
-import { ModuleTabs } from "../../../components/dashboard/module-tabs";
+import { SummaryCard, SummaryGrid } from "../../../components/ui/summary-card";
+import { WorkspaceTabs } from "../../../components/dashboard/module-tabs";
 import { SectionCard } from "../../../components/ui/section-card";
+import { WorkSurface } from "../../../components/ui/work-surface";
 import { useUrlFilters } from "../../../lib/hooks/use-url-filters";
 import { TablePagination } from "../../../components/ui/table-pagination";
 import { Drawer } from "../../../components/ui/drawer";
@@ -440,12 +441,12 @@ function HomeworkWorkspace() {
   ];
 
   const primaryAction = canCreateHomework ? (
-    <Link href="/dashboard/homework/new">
-      <Button className="rounded-xl bg-[var(--color-mod-homework-accent)] text-white shadow-sm hover:bg-[var(--color-mod-homework-text)] focus-visible:ring-[var(--color-mod-homework-border)]">
-        <Plus className="mr-2 h-5 w-5" />
+    <Button asChild>
+      <Link href="/dashboard/homework/new">
+        <Plus data-icon="inline-start" />
         Give Homework
-      </Button>
-    </Link>
+      </Link>
+    </Button>
   ) : undefined;
 
   const isListTab = activeTab === "today" || activeTab === "all";
@@ -490,7 +491,7 @@ function HomeworkWorkspace() {
           },
         ]}
       >
-        <ModuleTabs
+        <WorkspaceTabs
           items={[
             { value: "today", label: "Today", icon: Calendar },
             { value: "all", label: "All Homework", icon: BookOpen },
@@ -499,52 +500,42 @@ function HomeworkWorkspace() {
           ]}
           activeValue={activeTab}
           onValueChange={(value) => setActiveTab(value as ActiveTab)}
-          accentColor="blue"
-          variant="light"
         />
 
-        <KpiGrid className="mt-5 sm:grid-cols-2 xl:grid-cols-5">
-          <KpiCard
-            title="Given Today"
-            value={summary?.givenToday ?? "Unavailable"}
-            loading={summaryQuery.isLoading}
-            icon={<BookOpen size={20} />}
-            tone="info"
-            description="Homework assigned with today's assigned date."
-          />
-          <KpiCard
-            title="Due Today"
+        <SummaryGrid className="mt-5">
+          <SummaryCard
+            label="Due Today"
             value={summary?.dueToday ?? "Unavailable"}
             loading={summaryQuery.isLoading}
             icon={<Calendar size={20} />}
             tone="neutral"
             description="Published homework due by end of today."
           />
-          <KpiCard
-            title="Not Checked"
+          <SummaryCard
+            label="Not Checked"
             value={summary?.notChecked ?? "Unavailable"}
             loading={summaryQuery.isLoading}
             icon={<ClipboardList size={20} />}
             tone={Number(summary?.notChecked) > 0 ? "warning" : "neutral"}
             description="Overdue homework with unchecked student rows."
           />
-          <KpiCard
-            title="Incomplete Students"
+          <SummaryCard
+            label="Incomplete Students"
             value={summary?.incompleteStudents ?? "Unavailable"}
             loading={summaryQuery.isLoading}
             icon={<AlertCircle size={20} />}
             tone={Number(summary?.incompleteStudents) > 0 ? "warning" : "neutral"}
             description="Students with incomplete or missing homework due."
           />
-          <KpiCard
-            title="Classes Without Homework"
+          <SummaryCard
+            label="Classes Without Homework"
             value={summary?.classesWithoutHomework ?? "Unavailable"}
             loading={summaryQuery.isLoading}
             icon={<Users size={20} />}
             tone={Number(summary?.classesWithoutHomework) > 0 ? "warning" : "neutral"}
             description="Sections with no homework assigned today."
           />
-        </KpiGrid>
+        </SummaryGrid>
       </ModuleHeader>
 
       {isListTab ? (
@@ -661,14 +652,14 @@ function HomeworkWorkspace() {
           </FilterBar>
 
           <div className="space-y-6">
-            <SectionCard
+            <WorkSurface
               title={activeTab === "today" ? "Today's homework" : "All homework"}
               description={
                 activeTab === "today"
                   ? "Homework assigned on the selected date."
                   : "The full homework history for the filtered scope."
               }
-              headerAction={
+              action={
                 <StatusBadge
                   status="INFO"
                   label={
@@ -762,7 +753,7 @@ function HomeworkWorkspace() {
                   ) : null}
                 </div>
               )}
-            </SectionCard>
+            </WorkSurface>
           </div>
         </>
       ) : null}

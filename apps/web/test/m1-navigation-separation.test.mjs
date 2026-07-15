@@ -14,7 +14,8 @@ describe("M1 Students and Admissions workspace navigation", () => {
   const pageHeader = read("components/m1/m1-page-header.tsx");
   const studentDirectory = read("components/forms/student-directory.tsx");
   const admissionQueues = read("components/m1/admission-case-queues.tsx");
-  const summaryCards = read("components/m1/m1-summary-card.tsx");
+  const summaryCards = read("components/ui/summary-card.tsx");
+  const workspaceTabs = read("components/dashboard/module-tabs.tsx");
 
   it("keeps Students and Admissions as separate sidebar workspaces", () => {
     assert.match(sidebar, /label: 'Students & Admissions'/);
@@ -45,9 +46,9 @@ describe("M1 Students and Admissions workspace navigation", () => {
   });
 
   it("uses URL-backed lifecycle and queue views without client totals", () => {
-    assert.match(studentDirectory, /aria-label="Student lifecycle views"/);
-    assert.match(studentDirectory, /value="EXITED">Withdrawn/);
-    assert.match(admissionQueues, /aria-label="Admission queue views"/);
+    assert.match(studentDirectory, /label="Student lifecycle views"/);
+    assert.match(studentDirectory, /value: 'EXITED', label: 'Withdrawn'/);
+    assert.match(admissionQueues, /label="Admission queue views"/);
     assert.match(admissionQueues, /useUrlFilters/);
     assert.match(admissionQueues, /history: "push"/);
     assert.match(studentDirectory, /history: 'push'/);
@@ -58,26 +59,26 @@ describe("M1 Students and Admissions workspace navigation", () => {
   });
 
   it("uses one compact shared summary-card composition on both workspaces", () => {
-    assert.match(studentDirectory, /M1SummaryGrid/);
-    assert.match(admissionsPage, /M1SummaryGrid/);
-    assert.match(summaryCards, /data-testid="m1-summary-grid"/);
-    assert.match(summaryCards, /grid gap-3 sm:grid-cols-2 xl:grid-cols-4/);
+    assert.match(studentDirectory, /SummaryGrid/);
+    assert.match(admissionsPage, /SummaryGrid/);
+    assert.match(summaryCards, /data-schoolos-ui="summary-grid"/);
+    assert.match(summaryCards, /grid gap-4 sm:grid-cols-2 xl:grid-cols-4/);
     assert.match(summaryCards, /<CardHeader/);
     assert.match(summaryCards, /<CardContent/);
     assert.match(summaryCards, /<CardDescription/);
-    assert.match(summaryCards, /gap-2 py-4/);
+    assert.match(summaryCards, /min-h-36 gap-3 py-4/);
     assert.doesNotMatch(summaryCards, /border-(?:slate|gray|black)-/);
-    assert.doesNotMatch(summaryCards, /min-h-|py-(?:8|10|12|16|20)/);
+    assert.doesNotMatch(summaryCards, /py-(?:8|10|12|16|20)/);
   });
 
   it("keeps local tabs compact without a visible desktop scrollbar", () => {
     for (const workspace of [studentDirectory, admissionQueues]) {
-      assert.match(workspace, /<TabsList/);
-      assert.match(workspace, /\[scrollbar-width:none\]/);
-      assert.match(workspace, /\[&::\-webkit-scrollbar\]:hidden/);
-      assert.match(workspace, /lg:grid lg:grid-cols-5 lg:overflow-visible/);
-      assert.doesNotMatch(workspace, /min-w-\[[^\]]+\]/);
+      assert.match(workspace, /<WorkspaceTabs/);
+      assert.doesNotMatch(workspace, /<TabsList/);
     }
+    assert.match(workspaceTabs, /\[scrollbar-width:none\]/);
+    assert.match(workspaceTabs, /\[&::\-webkit-scrollbar\]:hidden/);
+    assert.doesNotMatch(workspaceTabs, /min-w-\[[^\]]+\]/);
   });
 
   it("keeps the roster and admission queue as compact cohesive workspaces", () => {

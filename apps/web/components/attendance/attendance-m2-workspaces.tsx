@@ -47,12 +47,14 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { FilterBar } from "@/components/ui/filter-bar";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
+import { SummaryCard, SummaryGrid } from "@/components/ui/summary-card";
 import { LoadingState } from "@/components/ui/loading-state";
 import { LockedRecordBanner } from "@/components/ui/locked-record-banner";
 import { ModuleHeader } from "@/components/ui/module-header";
-import { ModuleTabs } from "@/components/ui/module-tabs";
+import { ModuleTabs, WorkspaceTabs } from "@/components/ui/module-tabs";
 import { ProtectedFileButton } from "@/components/ui/protected-file";
 import { SectionCard } from "@/components/ui/section-card";
+import { WorkSurface } from "@/components/ui/work-surface";
 import {
   Table,
   TableBody,
@@ -194,9 +196,9 @@ export function AttendanceOverviewWorkspace() {
           },
         ]}
       >
-        <KpiGrid className="sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-          <KpiCard
-            title="Classes marked"
+        <SummaryGrid>
+          <SummaryCard
+            label="Classes marked"
             loading={analyticsQuery.isLoading}
             value={
               analytics?.todaySummary.submittedSessionCount ?? "Unavailable"
@@ -206,8 +208,8 @@ export function AttendanceOverviewWorkspace() {
             href="/dashboard/attendance/mark"
             description="Submitted class sessions today."
           />
-          <KpiCard
-            title="Classes not marked"
+          <SummaryCard
+            label="Classes not marked"
             loading={analyticsQuery.isLoading}
             value={
               analytics?.todaySummary.notMarkedSessionCount ?? "Unavailable"
@@ -221,31 +223,16 @@ export function AttendanceOverviewWorkspace() {
             href="/dashboard/attendance/mark"
             description="Active class scopes awaiting submission today."
           />
-          <KpiCard
-            title="Present"
-            loading={analyticsQuery.isLoading}
-            value={totals?.present ?? "Unavailable"}
-            icon={<Users size={20} />}
-            tone="success"
-          />
-          <KpiCard
-            title="Absent"
+          <SummaryCard
+            label="Absent today"
             loading={analyticsQuery.isLoading}
             value={totals?.absent ?? "Unavailable"}
             icon={<XCircle size={20} />}
             tone="danger"
             href="/dashboard/attendance/reports"
           />
-          <KpiCard
-            title="Late"
-            loading={analyticsQuery.isLoading}
-            value={totals?.late ?? "Unavailable"}
-            icon={<FileClock size={20} />}
-            tone="warning"
-            href="/dashboard/attendance/reports"
-          />
-          <KpiCard
-            title="Pending corrections"
+          <SummaryCard
+            label="Pending corrections"
             loading={correctionsQuery.isLoading}
             value={correctionsQuery.data?.total ?? "Unavailable"}
             icon={<ClipboardCheck size={20} />}
@@ -254,19 +241,18 @@ export function AttendanceOverviewWorkspace() {
             }
             href="/dashboard/attendance/corrections"
           />
-        </KpiGrid>
+        </SummaryGrid>
       </ModuleHeader>
 
-      <ModuleTabs
+      <WorkspaceTabs
         items={attendanceTabs}
-        accentColor="emerald"
-        variant="light"
       />
 
       <div className="space-y-6">
-          <SectionCard
+          <WorkSurface
             title="Class Attendance Status"
             description="Latest class sessions from the attendance analytics API."
+            variant="monitoring"
           >
             {analyticsQuery.isLoading ? (
               <LoadingState label="Loading class attendance status..." />
@@ -318,7 +304,7 @@ export function AttendanceOverviewWorkspace() {
                 </TableBody>
               </Table>
             )}
-          </SectionCard>
+          </WorkSurface>
 
         <div>
           <AtRiskPanel

@@ -19,15 +19,8 @@ export function M1PageHeader({
     <ModuleHeader
       title={title}
       description={description}
-      className="mb-0 border-border pb-4"
-      primaryAction={
-        primaryAction || secondaryActions ? (
-          <>
-            {primaryAction}
-            {secondaryActions}
-          </>
-        ) : undefined
-      }
+      primaryAction={primaryAction}
+      secondaryActions={secondaryActions}
       moreActionItems={moreActionItems}
     />
   );
