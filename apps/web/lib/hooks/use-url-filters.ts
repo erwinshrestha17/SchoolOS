@@ -25,7 +25,10 @@ export function useUrlFilters<T extends FilterDefaults>(
   defaults: T,
 ): [
   FilterValues<T>,
-  (updates: Partial<FilterValues<T>>, options?: { resetPage?: boolean }) => void,
+  (
+    updates: Partial<FilterValues<T>>,
+    options?: { resetPage?: boolean; history?: "push" | "replace" },
+  ) => void,
 ] {
   const router = useRouter();
   const pathname = usePathname();
@@ -39,13 +42,13 @@ export function useUrlFilters<T extends FilterDefaults>(
   const setFilters = useCallback(
     (
       updates: Partial<FilterValues<T>>,
-      options?: { resetPage?: boolean },
+      options?: { resetPage?: boolean; history?: "push" | "replace" },
     ) => {
       const query = buildFilterQuery(
         defaultsRef.current,
         new URLSearchParams(currentQuery),
         updates,
-        options,
+        { resetPage: options?.resetPage },
       );
       const nextHref = buildFilterHref(pathname, currentQuery, query);
 
@@ -53,9 +56,11 @@ export function useUrlFilters<T extends FilterDefaults>(
         return;
       }
 
-      router.replace(nextHref, {
-        scroll: false,
-      });
+      if (options?.history === "push") {
+        router.push(nextHref, { scroll: false });
+      } else {
+        router.replace(nextHref, { scroll: false });
+      }
     },
     [currentQuery, pathname, router],
   );

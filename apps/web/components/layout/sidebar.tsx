@@ -124,7 +124,7 @@ export const dashboardNavGroups: NavGroup[] = [
     items: [{ href: '/dashboard', label: 'Home', icon: LayoutDashboard }],
   },
   {
-    label: 'Students',
+    label: 'Students & Admissions',
     icon: Users,
     items: [
       {

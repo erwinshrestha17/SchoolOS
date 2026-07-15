@@ -3,60 +3,146 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
-  ChevronLeft,
-  ChevronRight,
+  ChevronDown,
   ClipboardCheck,
-  FileWarning,
-  Loader2,
   Search,
-  UserRoundCheck,
 } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { formatBsDate } from "@schoolos/core";
 import {
   admissionCasesApi,
   type AdmissionCaseQueue,
 } from "../../lib/api/admission-cases";
-import { Button } from "../ui/button";
-import { ErrorState } from "../ui/error-state";
-import { formatBsDate } from "@schoolos/core";
 import { useSession } from "../session-provider";
+import { ErrorState } from "../ui/error-state";
+import { TablePagination } from "../ui/table-pagination";
+import { Badge } from "../ui/primitives/badge";
+import { Button } from "../ui/primitives/button";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../ui/primitives/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "../ui/primitives/dropdown-menu";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "../ui/primitives/empty";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "../ui/primitives/input-group";
+import { Skeleton } from "../ui/primitives/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../ui/primitives/table";
+import { Tabs, TabsList, TabsTrigger } from "../ui/primitives/tabs";
 import { useUrlFilters } from "../../lib/hooks/use-url-filters";
 
 const QUEUES: Array<{
   id: AdmissionCaseQueue;
   label: string;
-  icon: typeof ClipboardCheck;
+  description: string;
 }> = [
-  { id: "NEEDS_INFORMATION", label: "Needs Information", icon: FileWarning },
+  {
+    id: "NEEDS_INFORMATION",
+    label: "Needs Information",
+    description:
+      "These admission cases are missing required details or documents. Contact the applicant and complete the missing information.",
+  },
   {
     id: "WAITING_FOR_REVIEW",
     label: "Waiting for Review",
-    icon: ClipboardCheck,
+    description:
+      "These admission cases are ready for a staff review. Check the information, warnings, and school policy before deciding the next step.",
   },
-  { id: "READY_TO_ADMIT", label: "Ready to Admit", icon: UserRoundCheck },
-  { id: "WAITLISTED", label: "Waitlisted", icon: AlertTriangle },
-  { id: "APPROVED", label: "Approved", icon: UserRoundCheck },
-  { id: "NOT_ADMITTED", label: "Not Admitted", icon: AlertTriangle },
-  { id: "DOCUMENTS_PENDING", label: "Documents Pending", icon: FileWarning },
+  {
+    id: "READY_TO_ADMIT",
+    label: "Ready to Admit",
+    description:
+      "These admission cases passed the current checks. Review the final placement and admit the student when everything is correct.",
+  },
   {
     id: "DUPLICATE_WARNINGS",
     label: "Duplicate Warnings",
-    icon: AlertTriangle,
+    description:
+      "These admission cases may match an existing student. Review the possible match before creating another student record.",
+  },
+  {
+    id: "COMPLETED",
+    label: "Completed",
+    description:
+      "These admissions were finalized and have a linked student record. Open the student profile to continue school operations.",
+  },
+  {
+    id: "WAITLISTED",
+    label: "Waitlisted",
+    description:
+      "These admission cases are waiting for a place or a later school decision.",
+  },
+  {
+    id: "APPROVED",
+    label: "Approved",
+    description:
+      "These admission cases have approval but still need final admission completion.",
+  },
+  {
+    id: "NOT_ADMITTED",
+    label: "Not Admitted",
+    description:
+      "These admission cases have a recorded decision not to admit. Open a case to review its history.",
+  },
+  {
+    id: "DOCUMENTS_PENDING",
+    label: "Documents Pending",
+    description:
+      "These admitted students still have document follow-up work recorded on the original admission case.",
   },
 ];
+
 const PRIMARY_QUEUE_IDS = new Set<AdmissionCaseQueue>([
   "NEEDS_INFORMATION",
   "WAITING_FOR_REVIEW",
   "READY_TO_ADMIT",
   "DUPLICATE_WARNINGS",
+  "COMPLETED",
 ]);
+
+const STATUS_LABELS: Record<string, string> = {
+  DRAFT: "Draft",
+  NEEDS_INFORMATION: "Needs Information",
+  READY_TO_ADMIT: "Ready to Admit",
+  WAITING_FOR_REVIEW: "Waiting for Review",
+  WAITLISTED: "Waitlisted",
+  APPROVED: "Approved",
+  ADMITTED: "Completed",
+  NOT_ADMITTED: "Not Admitted",
+  CLOSED: "Closed",
+};
 
 export function AdmissionCaseQueues() {
   const { hasPermissions } = useSession();
-  // URL-backed so refreshing, using browser back/forward, or sharing a link
-  // to a specific queue/page/search preserves it — this is the daily
-  // admissions-staff working list, re-visited many times a day.
   const [filters, setFilters] = useUrlFilters<{
     queue: AdmissionCaseQueue;
     page: number;
@@ -66,7 +152,6 @@ export function AdmissionCaseQueues() {
     page: 1,
     search: "",
   });
-  // Guard against a stale/hand-edited URL naming a queue that no longer exists.
   const queue = QUEUES.some((item) => item.id === filters.queue)
     ? filters.queue
     : "NEEDS_INFORMATION";
@@ -79,6 +164,13 @@ export function AdmissionCaseQueues() {
     "guardians:create",
   ]);
 
+  useEffect(() => {
+    setSearch(submittedSearch);
+  }, [submittedSearch]);
+
+  // needs OpenAPI confirmation: the current queue DTO does not accept source,
+  // class, or date filters. Keep those out of the URL and request until the
+  // backend contract defines their exact semantics.
   const query = useQuery({
     queryKey: ["admission-case-queues", queue, page, submittedSearch],
     queryFn: () =>
@@ -106,224 +198,255 @@ export function AdmissionCaseQueues() {
   }
 
   return (
-    <section className="space-y-5">
-      <div className="flex flex-wrap items-center gap-2" aria-label="Admission queues">
-        {QUEUES.filter((item) => PRIMARY_QUEUE_IDS.has(item.id)).map((item) => {
-          const Icon = item.icon;
-          const selected = item.id === queue;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setFilters({ queue: item.id, page: 1 })}
-              className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-4 text-sm font-bold transition ${selected ? "border-[var(--color-mod-admissions-accent)] bg-blue-50 text-slate-950" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
-            >
-              <Icon className="h-4 w-4" />
-              {item.label}
-            </button>
-          );
-        })}
-        <label className="sr-only" htmlFor="admission-more-filters">
-          More admission filters
-        </label>
-        <select
-          id="admission-more-filters"
-          value={PRIMARY_QUEUE_IDS.has(queue) ? "" : queue}
-          onChange={(event) => {
-            if (!event.target.value) return;
-            setFilters({
-              queue: event.target.value as AdmissionCaseQueue,
-              page: 1,
-            });
-          }}
-          className="min-h-11 !w-44 shrink-0 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700"
+    <section className="flex flex-col gap-3">
+      <div className="flex min-w-0 items-center gap-2">
+        <Tabs
+          value={queue}
+          onValueChange={(value) =>
+            setFilters(
+              { queue: value as AdmissionCaseQueue, page: 1 },
+              { history: "push" },
+            )
+          }
+          className="min-w-0 flex-1"
         >
-          <option value="">More filters</option>
-          {QUEUES.filter((item) => !PRIMARY_QUEUE_IDS.has(item.id)).map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.label}
-            </option>
-          ))}
-        </select>
-      </div>
+          <TabsList
+            className="h-9 w-full max-w-full justify-start overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:grid lg:grid-cols-5 lg:overflow-visible"
+            aria-label="Admission queue views"
+          >
+            {QUEUES.filter((item) => PRIMARY_QUEUE_IDS.has(item.id)).map(
+              (item) => (
+                <TabsTrigger key={item.id} value={item.id}>
+                  {item.label}
+                </TabsTrigger>
+              ),
+            )}
+          </TabsList>
+        </Tabs>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div>
-          <h2 className="text-base font-black text-slate-950">
-            {activeQueue.label}
-          </h2>
-          <p className="mt-1 text-sm text-slate-600">
-            Use the next clear action. SchoolOS keeps technical stages in the
-            backend.
-          </p>
-        </div>
-        <form
-          className="flex min-w-[min(100%,20rem)] items-center gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            setFilters({ search, page: 1 });
-          }}
-        >
-          <label className="sr-only" htmlFor="admission-queue-search">
-            Search admissions
-          </label>
-          <input
-            id="admission-queue-search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Student or guardian phone"
-          />
-          <Button type="submit" variant="outline">
-            <Search className="h-4 w-4" />
-            Search
-          </Button>
-        </form>
-      </div>
-
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        {query.isLoading ? (
-          <div className="flex min-h-52 items-center justify-center gap-2 text-sm font-semibold text-slate-600">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            Loading admissions…
-          </div>
-        ) : query.data?.items.length ? (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-sm">
-              <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th className="px-5 py-3">Student</th>
-                  <th className="px-5 py-3">Guardian</th>
-                  <th className="px-5 py-3">Source</th>
-                  <th className="px-5 py-3">Status</th>
-                  <th className="px-5 py-3">Warnings</th>
-                  <th className="px-5 py-3 text-right">Next action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {query.data.items.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50">
-                    <td className="px-5 py-4">
-                      <p className="font-bold text-slate-950">
-                        {item.fullNameEn}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        Updated {formatBsDate(item.updatedAt)}
-                      </p>
-                    </td>
-                    <td className="px-5 py-4">
-                      <p className="font-semibold text-slate-800">
-                        {item.guardianFullName ?? "Not added"}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {item.guardianPhone ?? "No phone"}
-                      </p>
-                    </td>
-                    <td className="px-5 py-4 text-slate-600">
-                      {sourceLabel(item.source)}
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
-                        {statusLabel(item.displayStatus)}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4">
-                      {item.hasDuplicateWarning ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-warning-50 px-2.5 py-1 text-xs font-bold text-warning-800">
-                          <AlertTriangle className="h-3.5 w-3.5" />
-                          Duplicate
-                        </span>
-                      ) : item.hasDocumentsPending ? (
-                        <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-800">
-                          Documents pending
-                        </span>
-                      ) : (
-                        <span className="text-xs text-slate-500">None</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-4 text-right">
-                      <Link
-                        href={`/dashboard/admissions/cases/${item.id}`}
-                        className="inline-flex min-h-10 items-center rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 hover:bg-slate-50"
-                      >
-                        Open case
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="flex min-h-52 flex-col items-center justify-center px-6 text-center">
-            <h3 className="font-black text-slate-950">
-              No admissions in this queue
-            </h3>
-            <p className="mt-2 max-w-md text-sm text-slate-600">
-              Try another queue or change your search. New office admissions
-              appear here after the backend checks their requirements.
-            </p>
-            {submittedSearch ? (
-              <Button
-                type="button"
-                variant="outline"
-                className="mt-4"
-                onClick={() => {
-                  setSearch("");
-                  setFilters({ search: "", page: 1 });
-                }}
-              >
-                Clear search
-              </Button>
-            ) : canCreateAdmission ? (
-              <Link
-                href="/dashboard/admissions/new"
-                className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 text-sm font-bold text-white"
-              >
-                New admission
-              </Link>
-            ) : queue !== "NEEDS_INFORMATION" ? (
-              <Button
-                type="button"
-                variant="outline"
-                className="mt-4"
-                onClick={() => setFilters({ queue: "NEEDS_INFORMATION", page: 1 })}
-              >
-                View needs information
-              </Button>
-            ) : null}
-          </div>
-        )}
-      </div>
-
-      {query.data && (query.data.total > query.data.limit || page > 1) ? (
-        <div className="flex items-center justify-between gap-3 text-sm text-slate-600">
-          <span>
-            {query.data.total} admission{" "}
-            {query.data.total === 1 ? "case" : "cases"}
-          </span>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={page <= 1 || query.isFetching}
-              onClick={() => setFilters({ page: page - 1 })}
-            >
-              <ChevronLeft className="h-4 w-4" />
-              Previous
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm">
+              More queues
+              <ChevronDown data-icon="inline-end" />
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={!query.data.hasNextPage || query.isFetching}
-              onClick={() => setFilters({ page: page + 1 })}
-            >
-              Next
-              <ChevronRight className="h-4 w-4" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>More admission queues</DropdownMenuLabel>
+              {QUEUES.filter((item) => !PRIMARY_QUEUE_IDS.has(item.id)).map(
+                (item) => (
+                  <DropdownMenuItem
+                    key={item.id}
+                    onSelect={() =>
+                      setFilters(
+                        { queue: item.id, page: 1 },
+                        { history: "push" },
+                      )
+                    }
+                  >
+                    {item.label}
+                  </DropdownMenuItem>
+                ),
+              )}
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      <Card
+        className="gap-0 overflow-hidden py-0 shadow-sm"
+        data-testid="admission-queue-workspace"
+      >
+        <CardHeader className="gap-1 border-b border-border px-4 py-4">
+          <CardTitle className="text-base">{activeQueue.label}</CardTitle>
+          <CardDescription>{activeQueue.description}</CardDescription>
+          {query.data ? (
+            <CardAction>
+              <Badge variant="secondary">
+                {query.data.total === 1 ? "1 case" : query.data.total + " cases"}
+              </Badge>
+            </CardAction>
+          ) : null}
+        </CardHeader>
+
+        <CardContent className="p-0">
+          <form
+            className="flex flex-col gap-2 border-b border-border bg-muted/20 p-4 sm:flex-row sm:items-center"
+            onSubmit={(event) => {
+              event.preventDefault();
+              setFilters({ search, page: 1 }, { history: "push" });
+            }}
+          >
+            <label className="sr-only" htmlFor="admission-queue-search">
+              Search admissions
+            </label>
+            <InputGroup className="flex-1">
+              <InputGroupAddon>
+                <Search aria-hidden />
+              </InputGroupAddon>
+              <InputGroupInput
+                id="admission-queue-search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search student, guardian, phone, or application ID"
+              />
+            </InputGroup>
+            <Button type="submit" variant="outline" size="sm">
+              <Search data-icon="inline-start" />
+              Search
             </Button>
-          </div>
-        </div>
-      ) : null}
+          </form>
+
+          {query.isLoading ? (
+            <AdmissionQueueSkeleton />
+          ) : query.data?.items.length ? (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="px-4">Student</TableHead>
+                    <TableHead className="px-4">Guardian</TableHead>
+                    <TableHead className="hidden px-4 md:table-cell">Source</TableHead>
+                    <TableHead className="px-4">Status</TableHead>
+                    <TableHead className="hidden px-4 lg:table-cell">Warnings</TableHead>
+                    <TableHead className="px-4 text-right">Next action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {query.data.items.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell className="px-4 py-3 whitespace-normal">
+                        <p className="font-medium text-foreground">{item.fullNameEn}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Updated {formatBsDate(item.updatedAt)}
+                        </p>
+                      </TableCell>
+                      <TableCell className="px-4 py-3 whitespace-normal">
+                        <p className="font-medium text-foreground">
+                          {item.guardianFullName ?? "Not added"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.guardianPhone ?? "No phone"}
+                        </p>
+                      </TableCell>
+                      <TableCell className="hidden px-4 py-3 text-muted-foreground md:table-cell">
+                        {sourceLabel(item.source)}
+                      </TableCell>
+                      <TableCell className="px-4 py-3">
+                        <Badge variant="outline">{statusLabel(item.displayStatus)}</Badge>
+                      </TableCell>
+                      <TableCell className="hidden px-4 py-3 lg:table-cell">
+                        {item.hasDuplicateWarning ? (
+                          <Badge variant="destructive">
+                            <AlertTriangle aria-hidden />
+                            Possible duplicate
+                          </Badge>
+                        ) : item.hasDocumentsPending ? (
+                          <Badge variant="secondary">Documents pending</Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">None</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-right">
+                        {queue === "COMPLETED" && item.admittedStudentId ? (
+                          <Button asChild variant="outline" size="sm">
+                            <Link href={"/dashboard/students/" + item.admittedStudentId}>
+                              View student profile
+                            </Link>
+                          </Button>
+                        ) : (
+                          <Button asChild variant="outline" size="sm">
+                            <Link href={"/dashboard/admissions/cases/" + item.id}>
+                              Open case
+                            </Link>
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <Empty
+              className="gap-4 rounded-none border-0 p-8 md:p-10"
+              role="status"
+            >
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <ClipboardCheck aria-hidden />
+                </EmptyMedia>
+                <EmptyTitle>
+                  {submittedSearch
+                    ? "No admissions match this search"
+                    : "No admissions in " + activeQueue.label}
+                </EmptyTitle>
+                <EmptyDescription>
+                  {submittedSearch
+                    ? "Clear the search or try another student, guardian, phone, or application ID."
+                    : "There are no cases in this queue. Choose another queue or start a new admission."}
+                </EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent>
+                {submittedSearch ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setSearch("");
+                      setFilters({ search: "", page: 1 });
+                    }}
+                  >
+                    Clear search
+                  </Button>
+                ) : canCreateAdmission ? (
+                  <Button asChild>
+                    <Link href="/dashboard/admissions/new">New admission</Link>
+                  </Button>
+                ) : queue !== "NEEDS_INFORMATION" ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() =>
+                      setFilters(
+                        { queue: "NEEDS_INFORMATION", page: 1 },
+                        { history: "push" },
+                      )
+                    }
+                  >
+                    View needs information
+                  </Button>
+                ) : null}
+              </EmptyContent>
+            </Empty>
+          )}
+
+          {query.data && (query.data.total > query.data.limit || page > 1) ? (
+            <TablePagination
+              page={page}
+              pageSize={query.data.limit}
+              total={query.data.total}
+              onPageChange={(nextPage) => setFilters({ page: nextPage })}
+            />
+          ) : null}
+        </CardContent>
+      </Card>
     </section>
+  );
+}
+
+function AdmissionQueueSkeleton() {
+  return (
+    <div className="flex flex-col gap-3 p-5" aria-label="Loading admissions">
+      {Array.from({ length: 5 }, (_, index) => (
+        <div key={index} className="grid grid-cols-[2fr_2fr_1fr] gap-4 py-3">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -334,7 +457,5 @@ function sourceLabel(source: string) {
 }
 
 function statusLabel(status: string) {
-  return status
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return STATUS_LABELS[status] ?? "Status unavailable";
 }

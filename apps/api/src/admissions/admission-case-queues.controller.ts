@@ -19,6 +19,7 @@ const ADMISSION_QUEUE_NAMES = [
   'NOT_ADMITTED',
   'DOCUMENTS_PENDING',
   'DUPLICATE_WARNINGS',
+  'COMPLETED',
 ] as const;
 
 class ListAdmissionCaseQueuesDto {

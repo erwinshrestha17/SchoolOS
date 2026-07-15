@@ -3,23 +3,37 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../lib/api';
 import { StudentDirectory } from '../../../components/forms/student-directory';
-import { UserPlus } from 'lucide-react';
-import { useState } from 'react';
+import {
+  Download,
+  FileCheck2,
+  FolderOpen,
+  QrCode,
+  ScanSearch,
+  UserPlus,
+} from 'lucide-react';
+import { useDeferredValue, useState } from 'react';
 import { useSession } from '../../../components/session-provider';
 import { DashboardPageShell } from '../../../components/dashboard/dashboard-page-shell';
-import { ModuleHeader } from '../../../components/ui/module-header';
+import { M1PageHeader } from '../../../components/m1/m1-page-header';
 import Link from 'next/link';
-import { M1ModuleNav } from '../../../components/m1/m1-module-nav';
+import { useRouter } from 'next/navigation';
 import { useUrlFilters } from '../../../lib/hooks/use-url-filters';
+import { Button } from '../../../components/ui/primitives/button';
 
 const STUDENT_ROSTER_PAGE_SIZE = 25;
 
 export default function StudentsPage() {
+  const router = useRouter();
   const [pdfError, setPdfError] = useState('');
   const [isExportingIemis, setIsExportingIemis] = useState(false);
   const { hasPermissions } = useSession();
   const canManageStudentLifecycle = hasPermissions(['students:manage_lifecycle']);
   const canReadStudents = hasPermissions(['students:read']);
+  const canCreateAdmission = hasPermissions([
+    'enrollments:create',
+    'students:create',
+    'guardians:create',
+  ]);
 
   // URL-backed so refreshing, using browser back/forward, or sharing a link
   // to a filtered roster (e.g. "Grade 6, Section A, page 2") preserves it.
@@ -31,6 +45,15 @@ export default function StudentsPage() {
     search: '',
     page: 1,
   });
+  const deferredSearch = useDeferredValue(filters.search);
+  const serverFilters = { ...filters, search: deferredSearch };
+  const summaryFilters = {
+    academicYearId: filters.academicYearId,
+    classId: filters.classId,
+    sectionId: filters.sectionId,
+    status: filters.status,
+    search: deferredSearch,
+  };
 
   const admissionsQuery = useQuery({
     queryKey: ['admissions'],
@@ -48,38 +71,19 @@ export default function StudentsPage() {
     queryKey: ['sections'],
     queryFn: api.listSections,
   });
-  const studentsQuery = useQuery({ 
-    queryKey: ['students', filters], 
+  const studentsQuery = useQuery({
+    queryKey: ['students', serverFilters],
     queryFn: () => {
       return api.listStudents({
-        ...filters,
+        ...serverFilters,
         limit: STUDENT_ROSTER_PAGE_SIZE,
       });
-    } 
+    }
   });
   const studentSummaryQuery = useQuery({
-    queryKey: ['students', 'module-summary', filters],
-    queryFn: () => api.getStudentModuleSummary(filters),
+    queryKey: ['students', 'module-summary', summaryFilters],
+    queryFn: () => api.getStudentModuleSummary(summaryFilters),
   });
-  const duplicateCandidatesQuery = useQuery({
-    queryKey: ['student-duplicate-candidates'],
-    queryFn: () => api.listDuplicateStudentCandidates({ limit: 5 }),
-    enabled: canManageStudentLifecycle,
-  });
-  const iemisReadinessQuery = useQuery({
-    queryKey: [
-      'student-iemis-readiness-list',
-      filters.classId,
-      filters.sectionId,
-    ],
-    queryFn: () =>
-      api.listIemisReadiness({
-        classId: filters.classId,
-        sectionId: filters.sectionId,
-      }),
-    enabled: canReadStudents,
-  });
-
   async function openStudentPdf(studentId: string, kind: string) {
     setPdfError('');
     try {
@@ -128,43 +132,85 @@ export default function StudentsPage() {
   }
 
   return (
-    <DashboardPageShell>
-      <ModuleHeader
-        title="Admissions & Student Profiles"
-        description="Manage admissions, student records, guardians, documents, QR, and iEMIS readiness."
+    <DashboardPageShell className="gap-5">
+      <M1PageHeader
+        title="Students"
+        description="Manage enrolled students, guardians, documents, identity records, and enrollment history."
         primaryAction={
-          <Link
-            href="/dashboard/admissions/new"
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-admissions-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2"
-          >
-            <UserPlus size={18} />
-            New admission
-          </Link>
+          canCreateAdmission ? (
+            <Button asChild>
+              <Link href="/dashboard/admissions/new">
+                <UserPlus data-icon="inline-start" />
+                New admission
+              </Link>
+            </Button>
+          ) : undefined
         }
-      >
-        <M1ModuleNav />
-      </ModuleHeader>
+        moreActionItems={[
+          {
+            label: 'Document issues',
+            icon: <FolderOpen size={16} />,
+            onClick: () => router.push('/dashboard/admissions/documents'),
+          },
+          ...(canManageStudentLifecycle
+            ? [
+                {
+                  label: 'Duplicate review',
+                  icon: <ScanSearch size={16} />,
+                  onClick: () => router.push('/dashboard/admissions/duplicates'),
+                },
+              ]
+            : []),
+          {
+            label: 'iEMIS readiness',
+            icon: <FileCheck2 size={16} />,
+            onClick: () => router.push('/dashboard/admissions/iemis'),
+          },
+          {
+            label: 'QR / ID cards',
+            icon: <QrCode size={16} />,
+            onClick: () => router.push('/dashboard/admissions/qr'),
+          },
+          {
+            label: 'Export directory',
+            icon: <Download size={16} />,
+            onClick: () =>
+              void handleExportRoster('csv', {
+                academicYearId: filters.academicYearId,
+                classId: filters.classId,
+                sectionId: filters.sectionId,
+              }),
+          },
+          {
+            label: isExportingIemis ? 'Preparing iEMIS export' : 'Export iEMIS',
+            icon: <Download size={16} />,
+            disabled: !canReadStudents || isExportingIemis,
+            onClick: () => void handleExportIemis(),
+          },
+        ]}
+      />
 
       <StudentDirectory
         academicYears={academicYearsQuery.data ?? []}
         admissions={admissionsQuery.data?.items ?? []}
         summary={studentSummaryQuery.data}
+        summaryLoading={studentSummaryQuery.isLoading}
+        summaryUnavailable={studentSummaryQuery.isError}
+        canCreateAdmission={canCreateAdmission}
         classes={classesQuery.data ?? []}
         isError={
           academicYearsQuery.isError ||
           classesQuery.isError ||
           sectionsQuery.isError ||
           studentsQuery.isError ||
-          admissionsQuery.isError ||
-          studentSummaryQuery.isError
+          admissionsQuery.isError
         }
         isLoading={
           academicYearsQuery.isLoading ||
           classesQuery.isLoading ||
           sectionsQuery.isLoading ||
           studentsQuery.isLoading ||
-          admissionsQuery.isLoading ||
-          studentSummaryQuery.isLoading
+          admissionsQuery.isLoading
         }
         pdfError={pdfError}
         onRetry={() => {
@@ -174,33 +220,11 @@ export default function StudentsPage() {
           void studentsQuery.refetch();
           void admissionsQuery.refetch();
           void studentSummaryQuery.refetch();
-          void duplicateCandidatesQuery.refetch();
-          void iemisReadinessQuery.refetch();
         }}
         sections={sectionsQuery.data ?? []}
         studentsResponse={studentsQuery.data}
         onOpenPdf={(studentId, kind) => void openStudentPdf(studentId, kind)}
-        onExportRoster={(format, filters) =>
-          void handleExportRoster(format, filters)
-        }
-        onExportIemis={() => void handleExportIemis()}
-        canExportIemis={canReadStudents}
-        isExportingIemis={isExportingIemis}
-        iemisReadiness={iemisReadinessQuery.data ?? []}
-        isLoadingIemisReadiness={iemisReadinessQuery.isLoading}
-        iemisReadinessError={
-          iemisReadinessQuery.error instanceof Error
-            ? iemisReadinessQuery.error.message
-            : ''
-        }
-        canManageDuplicates={canManageStudentLifecycle}
-        duplicateCandidates={duplicateCandidatesQuery.data?.candidates ?? []}
-        isLoadingDuplicateCandidates={duplicateCandidatesQuery.isLoading}
-        duplicateCandidatesError={
-          duplicateCandidatesQuery.error instanceof Error
-            ? duplicateCandidatesQuery.error.message
-            : ''
-        }
+        filters={filters}
         onFilterChange={setFilters}
       />
     </DashboardPageShell>

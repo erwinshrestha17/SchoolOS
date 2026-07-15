@@ -162,7 +162,6 @@ test("M1 entry creates one unified admission case for direct and review workflow
   const queues = read("components/m1/admission-case-queues.tsx");
   const caseApi = read("lib/api/admission-cases.ts");
   const admissionsPage = read("app/dashboard/admissions/page.tsx");
-  const moduleNav = read("components/m1/m1-module-nav.tsx");
   const dashboardShell = read("components/layout/dashboard-shell.tsx");
   const policyList = read("components/settings/admission-policy-list.tsx");
   const policyWizard = read("components/settings/admission-policy-wizard.tsx");
@@ -210,7 +209,7 @@ test("M1 entry creates one unified admission case for direct and review workflow
   assert.match(directWizard, /Admit student/);
   assert.match(directWizard, /admissionCasesApi\.updateCase/);
   assert.match(directWizard, /api\.uploadFile\(file, 'admissions', caseId\)/);
-  assert.match(directWizard, /Add another student/);
+  assert.match(directWizard, /Admit another student/);
   assert.match(directWizard, /Open follow-up checklist/);
   assert.match(directWizard, /Select gender/);
   assert.match(directWizard, /Select relationship/);
@@ -229,7 +228,8 @@ test("M1 entry creates one unified admission case for direct and review workflow
   assert.match(reviewForm, /MARK_READY_FOR_REVIEW/);
   assert.match(queues, /listQueues/);
   assert.match(queues, /Ready to Admit/);
-  assert.match(queues, /More filters/);
+  assert.match(queues, /Completed/);
+  assert.match(queues, /More queues/);
   assert.match(queues, /query\.data\.total > query\.data\.limit/);
   assert.match(caseApi, /\/admissions\/cases/);
   assert.match(caseApi, /\/direct-admit/);
@@ -237,7 +237,6 @@ test("M1 entry creates one unified admission case for direct and review workflow
   assert.match(admissionsPage, /AdmissionCaseQueues/);
   assert.match(admissionsPage, /New admission/);
   assert.match(admissionsPage, /\/dashboard\/admissions\/applications/);
-  assert.match(moduleNav, /\/dashboard\/admissions\/applications/);
   assert.doesNotMatch(dashboardShell, /'\/dashboard\/admissions': 'students'/);
   assert.match(policyList, /Create Admission Policy/);
   assert.match(policyWizard, /Who Can Apply/);
@@ -343,14 +342,17 @@ test("M1 student roster uses a focused backend summary, safe filters, and pagina
   const page = read("app/dashboard/students/page.tsx");
   const directory = read("components/forms/student-directory.tsx");
 
-  assert.match(page, /api\.getStudentModuleSummary\(filters\)/);
+  assert.match(page, /api\.getStudentModuleSummary\(summaryFilters\)/);
   assert.match(page, /limit: STUDENT_ROSTER_PAGE_SIZE/);
   assert.match(directory, /summary\?\.missingDocuments/);
   assert.match(directory, /summary\?\.duplicateCandidates/);
   assert.match(directory, /summary\?\.iemisIssues/);
-  assert.equal((directory.match(/<KpiCard/g) ?? []).length, 4);
+  assert.equal((directory.match(/<M1SummaryCard/g) ?? []).length, 4);
+  assert.match(directory, /summaryUnavailable \? 'Unavailable'/);
   assert.doesNotMatch(directory, /title="Pending Applications"/);
   assert.doesNotMatch(directory, /title="QR Active"/);
+  assert.match(directory, /<TabsTrigger value="ACTIVE">Active<\/TabsTrigger>/);
+  assert.match(directory, /<TabsTrigger value="EXITED">Withdrawn<\/TabsTrigger>/);
   // Server pagination footer is the shared TablePagination component (not a
   // second hand-rolled Previous/Next implementation).
   assert.match(directory, /from '\.\.\/ui\/table-pagination'/);
@@ -374,35 +376,31 @@ test("M1 application queue keeps page-derived and decorative metrics out of the 
 
 test("M1 Admissions overview shows a real, actionable, honest KPI grid", () => {
   const page = read("app/dashboard/admissions/page.tsx");
-  const header = read("components/m1/m1-page-header.tsx");
 
-  // Uses the same bounded, permission-filtered operational-summary contract
-  // already computed backend-side, not a browser total or a fake placeholder.
-  assert.match(page, /api\.getModuleSummary\(["']students["']\)/);
-  assert.match(page, /admissionCasesApi\.listDocumentRequests/);
+  // Counts come from each backend-filtered queue total, not from loaded rows.
+  assert.match(page, /admissionCasesApi\.listQueues/);
+  assert.match(page, /ADMISSION_SUMMARY_QUEUES/);
   assert.match(page, /\/dashboard\/admissions\/assessments/);
-  assert.match(page, /applicationsNeedingReview/);
-  assert.match(page, /totalMissingDocuments/);
-  assert.match(page, /duplicateCandidates/);
-  assert.match(page, /iemisReadinessBlockers/);
+  assert.match(page, /Needs Information/);
+  assert.match(page, /Waiting for Review/);
+  assert.match(page, /Ready to Admit/);
+  assert.match(page, /Duplicate Warnings/);
 
-  // Honest states: real backend zero is fine, but loading/locked/unavailable
-  // must never render as a fabricated 0. Loading uses the shared KpiCard
-  // skeleton (loading prop), not the literal word "Loading" as a value.
-  assert.match(page, /loading=\{summaryQuery\.isLoading\}/);
-  assert.match(page, /return ["']Unavailable["']/);
-  assert.doesNotMatch(page, /isLoading\) return ["']Loading["']/);
+  // Honest states: real backend zero remains 0 while a missing/failed response
+  // stays unavailable and loading uses the shared shadcn Skeleton.
+  assert.match(page, /\?\.data\?\.total \?\? "Unavailable"/);
+  assert.match(page, /loading=\{summaryQuery/);
+  assert.doesNotMatch(page, /\.items\.length/);
 
-  // Every card opens a real, existing filtered queue.
-  assert.match(page, /href="\/dashboard\/admissions"/);
-  assert.match(page, /href="\/dashboard\/admissions\/documents"/);
-  assert.match(page, /href="\/dashboard\/admissions\/duplicates"/);
-  assert.match(page, /href="\/dashboard\/admissions\/iemis"/);
-
-  // The header component threads the KPI grid through without disturbing
-  // task pages (documents/duplicates/iemis/etc.) that reuse the same header
-  // but never pass a kpiGrid prop.
-  assert.match(header, /kpiGrid\?: ReactNode/);
+  // Every card opens its real server-filtered queue.
+  for (const queue of [
+    "NEEDS_INFORMATION",
+    "WAITING_FOR_REVIEW",
+    "READY_TO_ADMIT",
+    "DUPLICATE_WARNINGS",
+  ]) {
+    assert.match(page, new RegExp(`href="/dashboard/admissions\\?queue=${queue}"`));
+  }
 });
 
 test("student directory row actions use the shared keyboard-accessible ActionMenu, not a hover-only menu", () => {

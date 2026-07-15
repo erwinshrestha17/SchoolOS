@@ -24,7 +24,8 @@ export type AdmissionCaseQueue =
   | "APPROVED"
   | "NOT_ADMITTED"
   | "DOCUMENTS_PENDING"
-  | "DUPLICATE_WARNINGS";
+  | "DUPLICATE_WARNINGS"
+  | "COMPLETED";
 
 export type AdmissionCaseQueueItem = {
   id: string;

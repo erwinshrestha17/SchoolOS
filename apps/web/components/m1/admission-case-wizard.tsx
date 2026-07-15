@@ -251,7 +251,7 @@ export function AdmissionCaseWizard({ initialCaseId }: { initialCaseId?: string 
         <div className="flex flex-wrap gap-3">
           <Link href={admissionResult.redirectPath} className="inline-flex min-h-11 items-center rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 text-sm font-bold text-white">View student profile</Link>
           {caseData?.followUps.length ? <Link href={`${admissionResult.redirectPath}#admission-follow-ups`} className="inline-flex min-h-11 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50">Open follow-up checklist</Link> : null}
-          <Button type="button" variant="outline" onClick={() => { setStep(0); setForm({ ...EMPTY_FORM, admissionDate: new Date().toISOString().slice(0, 10) }); setDateOfBirthBs(''); setAdmissionDateBs(formatBsDateForInput(new Date())); setCaseId(null); setCaseData(null); setAdmissionResult(null); setLocalError(''); }}>Add another student</Button>
+          <Button type="button" variant="outline" onClick={() => { setStep(0); setForm({ ...EMPTY_FORM, admissionDate: new Date().toISOString().slice(0, 10) }); setDateOfBirthBs(''); setAdmissionDateBs(formatBsDateForInput(new Date())); setCaseId(null); setCaseData(null); setAdmissionResult(null); setLocalError(''); }}>Admit another student</Button>
         </div>
       </SectionCard>
     );

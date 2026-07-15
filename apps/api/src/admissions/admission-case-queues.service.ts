@@ -39,6 +39,10 @@ const QUEUE_STORAGE_STATUSES: Record<string, string[]> = {
   APPROVED: ['APPROVED', 'ACCEPTED'],
   NOT_ADMITTED: ['NOT_ADMITTED', 'REJECTED'],
   DOCUMENTS_PENDING: ['ADMITTED'],
+  // Queue-view alias only. AdmissionCase persists the confirmed ADMITTED
+  // lifecycle value; the school-facing workspace labels finalized cases as
+  // Completed without inventing a new stored status.
+  COMPLETED: ['ADMITTED', 'ENROLLED'],
   DUPLICATE_WARNINGS: [
     'DRAFT',
     'NEEDS_INFORMATION',

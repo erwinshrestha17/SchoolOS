@@ -15,57 +15,99 @@ test.describe('Students & Admissions Workflow Smoke', () => {
     await login(page);
   });
 
-  test('completes a full admission wizard flow', async ({ page }) => {
+  test('keeps Admissions selected and exposes server-backed queues', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/dashboard/admissions');
-    
-    // Step 0: Personal Info
-    await expect(page.getByText('Personal Information')).toBeVisible();
-    await page.getByLabel('First Name (EN)').fill('John');
-    await page.getByLabel('Last Name (EN)').fill('Doe');
-    await page.getByLabel('Date of Birth').fill('2015-05-15');
-    await page.getByLabel('Gender').selectOption('MALE');
-    await page.getByText('No known disability').click();
-    await page.getByRole('button', { name: /Next Step/i }).click();
 
-    // Step 1: Academic Placement
-    await expect(page.getByText('Academic Placement')).toBeVisible();
-    // Assuming academic years and classes are already seeded
-    await page.getByRole('button', { name: /Next Step/i }).click();
+    await expect(page.getByRole('heading', { name: 'Admissions', exact: true })).toBeVisible();
+    await expect(sidebarLink(page, 'Admissions')).toHaveAttribute('aria-current', 'page');
+    await expect(sidebarLink(page, 'Students')).not.toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('tab', { name: 'Needs Information' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Completed' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'New admission' }).first()).toBeVisible();
 
-    // Step 2: Guardian Contacts
-    await expect(page.getByText('Guardian Contacts')).toBeVisible();
-    await page.getByLabel('Full Name').first().fill('Robert Doe');
-    await page.getByLabel('Relation').first().fill('Father');
-    await page.getByLabel('Phone Number').first().fill('9800000001');
-    await page.getByRole('button', { name: /Next Step/i }).click();
+    await expectDesktopSummaryRow(page);
+    await expectNoHorizontalTabOverflow(page, 'Admission queue views');
 
-    // Step 3: Review & Documents
-    await expect(page.getByText('Review & Documents')).toBeVisible();
-    await expect(page.getByText('John Doe')).toBeVisible();
-    await expect(page.getByText('Robert Doe')).toBeVisible();
-    
-    // We won't actually submit to avoid cluttering DB unless it's a dedicated test DB
-    // but the UI check is done.
+    const queueWorkspace = page.getByTestId('admission-queue-workspace');
+    await expect(queueWorkspace).toBeVisible();
+    const workspaceBox = await queueWorkspace.boundingBox();
+    expect(workspaceBox?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(900);
+
+    const emptyState = queueWorkspace.locator('[data-slot="empty"]');
+    if (await emptyState.isVisible()) {
+      const emptyBox = await emptyState.boundingBox();
+      expect(emptyBox?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(420);
+    }
+
+    await expectResponsiveWorkspace(page, 'admission-queue-workspace', 'Admission queue views');
+
+    await page.getByRole('tab', { name: 'Waiting for Review' }).click();
+    await expect(page).toHaveURL(/queue=WAITING_FOR_REVIEW/);
+    await page.goBack();
+    await expect(page.getByRole('tab', { name: 'Needs Information' })).toHaveAttribute('data-state', 'active');
   });
 
-  test('verifies student directory filters and profile navigation', async ({ page }) => {
+  test('keeps Students selected, preserves lifecycle state, and opens the admission workflow', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/dashboard/students');
-    
-    await expect(page.getByText('Directory Filters')).toBeVisible();
-    await expect(page.getByRole('button', { name: /Enroll Student/i })).toBeVisible();
-    
-    // Search for a known student (if any) or just check empty state
-    await page
-      .getByLabel(/Search students by name, student code, guardian name, or phone/i)
-      .fill('UnknownStudentXYZ');
-    await expect(page.getByText(/No students found/i)).toBeVisible();
-    
-    await page.getByRole('button', { name: /Reset All/i }).click();
-    await expect(
-      page.getByLabel(/Search students by name, student code, guardian name, or phone/i),
-    ).toHaveValue('');
+
+    await expect(page.getByRole('heading', { name: 'Students', exact: true })).toBeVisible();
+    await expect(sidebarLink(page, 'Students')).toHaveAttribute('aria-current', 'page');
+    await expect(sidebarLink(page, 'Admissions')).not.toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('group', { name: 'Directory filters' })).toBeVisible();
+    await expect(page.getByTestId('student-roster-workspace')).toBeVisible();
+    await expectDesktopSummaryRow(page);
+    await expectNoHorizontalTabOverflow(page, 'Student lifecycle views');
+
+    const rosterBox = await page.getByTestId('student-roster-workspace').boundingBox();
+    expect(rosterBox?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(900);
+    await expectResponsiveWorkspace(page, 'student-roster-workspace', 'Student lifecycle views');
+    await page.getByRole('tab', { name: 'Transferred' }).click();
+    await expect(page).toHaveURL(/status=TRANSFERRED/);
+    await page.reload();
+    await expect(page.getByRole('tab', { name: 'Transferred' })).toHaveAttribute('data-state', 'active');
+
+    await page.getByRole('link', { name: 'New admission' }).click();
+    await expect(page).toHaveURL(/\/dashboard\/admissions\/new/);
+    await expect(sidebarLink(page, 'Admissions')).toHaveAttribute('aria-current', 'page');
   });
 });
+
+async function expectDesktopSummaryRow(page: Page) {
+  const cards = page.getByTestId('m1-summary-grid').locator(':scope > a');
+  await expect(cards).toHaveCount(4);
+  const first = await cards.nth(0).boundingBox();
+  const last = await cards.nth(3).boundingBox();
+  expect(Math.abs((first?.y ?? 0) - (last?.y ?? 0))).toBeLessThanOrEqual(2);
+}
+
+async function expectNoHorizontalTabOverflow(page: Page, name: string) {
+  const tabs = page.getByRole('tablist', { name });
+  const dimensions = await tabs.evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }));
+  expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
+}
+
+async function expectResponsiveWorkspace(page: Page, workspaceTestId: string, tabListName: string) {
+  for (const width of [1280, 1024]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(page.getByTestId(workspaceTestId)).toBeVisible();
+    await expectNoHorizontalTabOverflow(page, tabListName);
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByTestId(workspaceTestId)).toBeVisible();
+  await expect(page.getByRole('tablist', { name: tabListName })).toBeVisible();
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+}
+
+function sidebarLink(page: Page, name: string) {
+  return page.getByRole('complementary').getByRole('link', { name, exact: true });
+}
 
 async function login(page: Page) {
   await page.goto('/login');

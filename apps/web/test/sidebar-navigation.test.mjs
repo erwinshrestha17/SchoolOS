@@ -20,6 +20,7 @@ describe('school operations sidebar', () => {
   it('uses the consolidated school-operating information architecture', () => {
     for (const label of [
       'Home',
+      'Students & Admissions',
       'Academics',
       'Daily Operations',
       'School Operations',

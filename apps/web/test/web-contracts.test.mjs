@@ -1128,7 +1128,7 @@ describe("SchoolOS web production contracts", () => {
     assert.match(directory, /Class/);
     assert.match(directory, /Section/);
     assert.match(directory, /Quick Search/);
-    assert.match(directory, /Name or SCH-ID/);
+    assert.match(directory, /Name, student ID, guardian, or phone/);
   });
 
   it("keeps admissions workspace aligned to M1 UI tokens without fake labels", () => {
@@ -1156,11 +1156,10 @@ describe("SchoolOS web production contracts", () => {
     ]);
 
     assert.match(studentDirectory, /color-mod-admissions-accent/);
-    assert.match(studentDirectory, /listIemisReadiness/);
-    assert.match(studentDirectory, /\/students\/iemis\/validation/);
-    assert.match(studentDirectory, /Class iEMIS Readiness/);
-    assert.match(studentDirectory, /student-iemis-readiness-list/);
-    assert.match(studentDirectory, /Fix Profile/);
+    assert.match(studentDirectory, /\/students\/summary/);
+    assert.match(studentDirectory, /Student Roster/);
+    assert.match(studentDirectory, /Possible matching student records/);
+    assert.doesNotMatch(studentDirectory, /Readiness & duplicate attention panels/);
     assert.match(studentDirectory, /onOpenPdf\(student\.id, 'id-card'\)/);
     assert.match(studentDirectory, /\/dashboard\/fees\/collect\?studentId=/);
     assert.match(

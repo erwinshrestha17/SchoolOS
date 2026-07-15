@@ -6,29 +6,24 @@ import type {
   ClassSummary,
   SectionSummary,
   StudentProfile,
-  StudentDuplicateCandidate,
-  StudentIemisReadinessSummary,
   StudentModuleSummary,
   PaginatedResponse,
 } from '@schoolos/core';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useDeferredValue, useEffect, useMemo, useState } from 'react';
-import { SectionCard } from '../ui/section-card';
+import { useEffect, useMemo } from 'react';
 import { Badge } from '../ui/badge';
 import { StudentAvatar } from '../students/student-avatar';
 import { Drawer } from '../ui/drawer';
 import { LoadingState } from '../ui/loading-state';
-import { EmptyState } from '../ui/empty-state';
 import { ErrorState } from '../ui/error-state';
-import { FilterBar } from '../ui/filter-bar';
-import { KpiCard, KpiGrid } from '../ui/kpi-card';
 import { TablePagination } from '../ui/table-pagination';
 import { ActionMenu } from '../ui/action-menu';
+import { Tabs, TabsList, TabsTrigger } from '../ui/primitives/tabs';
+import { M1SummaryCard, M1SummaryGrid } from '../m1/m1-summary-card';
 import {
   BookOpenText,
   ContactRound,
-  Download,
   FileText,
   FolderOpen,
   MoreHorizontal,
@@ -40,17 +35,48 @@ import {
   Wallet,
   ChevronRight,
   AlertTriangle,
-  CheckCircle2,
-  ClipboardCheck,
   QrCode,
 } from 'lucide-react';
 import { StatusChip } from '../dashboard/status-chip';
 import { StatusBadge } from '../ui/status-badge';
+import { Button } from '../ui/primitives/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '../ui/primitives/card';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '../ui/primitives/empty';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from '../ui/primitives/input-group';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/primitives/select';
 
 type StudentDirectoryProps = {
   academicYears: AcademicYearSummary[];
   admissions: AdmissionSummary[];
   summary?: StudentModuleSummary;
+  summaryLoading: boolean;
+  summaryUnavailable: boolean;
+  canCreateAdmission: boolean;
   classes: ClassSummary[];
   isError: boolean;
   isLoading: boolean;
@@ -59,24 +85,14 @@ type StudentDirectoryProps = {
   pdfError: string;
   sections: SectionSummary[];
   studentsResponse?: PaginatedResponse<StudentProfile>;
-  onExportRoster: (
-    format: 'csv' | 'json',
-    filters: {
-      academicYearId?: string;
-      classId?: string;
-      sectionId?: string;
-    },
-  ) => void;
-  onExportIemis: () => void;
-  canExportIemis: boolean;
-  isExportingIemis: boolean;
-  iemisReadiness: StudentIemisReadinessSummary[];
-  isLoadingIemisReadiness: boolean;
-  iemisReadinessError: string;
-  canManageDuplicates: boolean;
-  duplicateCandidates: StudentDuplicateCandidate[];
-  isLoadingDuplicateCandidates: boolean;
-  duplicateCandidatesError: string;
+  filters: {
+    academicYearId: string;
+    classId: string;
+    sectionId: string;
+    status: string;
+    search: string;
+    page: number;
+  };
   onFilterChange: (filters: {
     academicYearId?: string;
     classId?: string;
@@ -84,13 +100,16 @@ type StudentDirectoryProps = {
     status?: string;
     search?: string;
     page?: number;
-  }) => void;
+  }, options?: { history?: 'push' | 'replace' }) => void;
 };
 
 export function StudentDirectory({
   academicYears,
   admissions,
   summary,
+  summaryLoading,
+  summaryUnavailable,
+  canCreateAdmission,
   classes,
   isError,
   isLoading,
@@ -99,17 +118,7 @@ export function StudentDirectory({
   pdfError,
   sections,
   studentsResponse,
-  onExportRoster,
-  onExportIemis,
-  canExportIemis,
-  isExportingIemis,
-  iemisReadiness,
-  isLoadingIemisReadiness,
-  iemisReadinessError,
-  canManageDuplicates,
-  duplicateCandidates,
-  isLoadingDuplicateCandidates,
-  duplicateCandidatesError,
+  filters,
   onFilterChange,
 }: StudentDirectoryProps) {
   const students = studentsResponse?.items ?? [];
@@ -120,53 +129,26 @@ export function StudentDirectory({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const selectedStudentId = searchParams.get('student');
-  // Read the filter UI's initial values from the URL (once, on mount) so the
-  // dropdowns/search box reflect a restored link/refresh instead of always
-  // starting blank while the underlying query results are already filtered.
-  const [academicYearId, setAcademicYearId] = useState(
-    () => searchParams.get('academicYearId') ?? '',
-  );
-  const [classId, setClassId] = useState(() => searchParams.get('classId') ?? '');
-  const [sectionId, setSectionId] = useState(
-    () => searchParams.get('sectionId') ?? '',
-  );
-  const [status, setStatus] = useState(() => searchParams.get('status') ?? '');
-  const [search, setSearch] = useState(() => searchParams.get('search') ?? '');
-  const deferredSearch = useDeferredValue(search);
+  const { academicYearId, classId, sectionId, status, search } = filters;
 
   const currentAcademicYear = academicYears.find((year) => year.isCurrent);
-  const selectedAcademicYear =
-    academicYears.find((year) => year.id === academicYearId) ?? currentAcademicYear;
   const availableSections = sections.filter((section) => {
     const sectionClassId = section.classId ?? section.class?.id;
     return !classId || sectionClassId === classId;
   });
-  const selectedSection = availableSections.find((section) => section.id === sectionId);
-  const iemisReadyCount = iemisReadiness.filter((item) => item.eligible).length;
-  const iemisIssueRows = iemisReadiness.filter((item) => !item.eligible);
-  const iemisAverageScore =
-    iemisReadiness.length > 0
-      ? Math.round(
-          iemisReadiness.reduce((sum, item) => sum + item.score, 0) /
-            iemisReadiness.length,
-        )
-      : 0;
-  const topIemisIssues = iemisIssueRows.slice(0, 5);
+  const hasActiveFilters = Boolean(
+    classId ||
+      sectionId ||
+      status ||
+      search ||
+      (academicYearId && academicYearId !== currentAcademicYear?.id),
+  );
 
   useEffect(() => {
     if (!academicYearId && currentAcademicYear) {
-      setAcademicYearId(currentAcademicYear.id);
+      onFilterChange({ academicYearId: currentAcademicYear.id });
     }
-  }, [academicYearId, currentAcademicYear]);
-
-  useEffect(() => {
-    if (!sectionId) return;
-    const existingSection = sections.find((section) => section.id === sectionId);
-    const existingSectionClassId = existingSection?.classId ?? existingSection?.class?.id;
-    if (existingSection && existingSectionClassId !== classId) {
-      setSectionId('');
-    }
-  }, [classId, sectionId, sections]);
+  }, [academicYearId, currentAcademicYear, onFilterChange]);
 
   const admissionBySystemId = useMemo(() => {
     const map = new Map<string, AdmissionSummary>();
@@ -175,17 +157,6 @@ export function StudentDirectory({
     }
     return map;
   }, [admissions]);
-
-  useEffect(() => {
-    onFilterChange({
-      academicYearId: academicYearId || undefined,
-      classId: classId || undefined,
-      sectionId: sectionId || undefined,
-      status: status || undefined,
-      search: deferredSearch || undefined,
-      page: 1,
-    });
-  }, [academicYearId, classId, sectionId, status, deferredSearch, onFilterChange]);
 
   const filteredStudents = students;
   const selectedStudent = students.find((student) => student.id === selectedStudentId) ?? null;
@@ -212,351 +183,285 @@ export function StudentDirectory({
 
   if (classes.length === 0) {
     return (
-      <EmptyState
-        title="No classes configured"
-        description="You need to set up academic years and classes before you can manage students."
-        action={
-          <Link href="/dashboard/settings" className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-mod-admissions-accent)] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-admissions-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2">
-            Configure School Settings
-          </Link>
-        }
-      />
+      <Empty className="border-border bg-card">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <BookOpenText aria-hidden />
+          </EmptyMedia>
+          <EmptyTitle>No classes configured</EmptyTitle>
+          <EmptyDescription>
+            Set up academic years and classes before managing students.
+          </EmptyDescription>
+        </EmptyHeader>
+        <EmptyContent>
+          <Button asChild variant="outline">
+            <Link href="/dashboard/settings">Configure School Settings</Link>
+          </Button>
+        </EmptyContent>
+      </Empty>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-3">
-        <KpiGrid className="sm:grid-cols-2 lg:grid-cols-4">
-          <KpiCard
+    <div className="flex flex-col gap-5">
+      <M1SummaryGrid>
+          <M1SummaryCard
             title="Active Students"
-            value={summary?.activeStudents ?? 0}
-            icon={<Users size={20} />}
-            tone="info"
-            description="Server total for active records."
+            value={summaryUnavailable ? 'Unavailable' : (summary?.activeStudents ?? 'Unavailable')}
+            icon={Users}
+            loading={summaryLoading}
+            href="/dashboard/students?status=ACTIVE"
+            description="Currently active student records."
           />
-          <KpiCard
-            title="Missing Documents"
-            value={summary?.missingDocuments ?? 0}
-            icon={<FolderOpen size={20} />}
-            tone={(summary?.missingDocuments ?? 0) > 0 ? 'warning' : 'success'}
-            description="Students with no active document."
+          <M1SummaryCard
+            title="Document Issues"
+            value={summaryUnavailable ? 'Unavailable' : (summary?.missingDocuments ?? 'Unavailable')}
+            icon={FolderOpen}
+            loading={summaryLoading}
+            href="/dashboard/admissions/documents"
+            description="Records with missing documents."
           />
-          <KpiCard
+          <M1SummaryCard
             title="Duplicate Candidates"
-            value={summary?.duplicateCandidates ?? 0}
-            icon={<UserCheck size={20} />}
-            tone={(summary?.duplicateCandidates ?? 0) > 0 ? 'warning' : 'success'}
-            description="Server-scored high-confidence pairs."
+            value={summaryUnavailable ? 'Unavailable' : (summary?.duplicateCandidates ?? 'Unavailable')}
+            icon={UserCheck}
+            loading={summaryLoading}
+            href="/dashboard/admissions/duplicates"
+            description="Possible matching student records."
           />
-          <KpiCard
+          <M1SummaryCard
             title="iEMIS Issues"
-            value={summary?.iemisIssues ?? 0}
-            icon={<AlertTriangle size={20} />}
-            tone={(summary?.iemisIssues ?? 0) > 0 ? 'warning' : 'success'}
-            description="From backend readiness validation."
+            value={summaryUnavailable ? 'Unavailable' : (summary?.iemisIssues ?? 'Unavailable')}
+            icon={AlertTriangle}
+            loading={summaryLoading}
+            href="/dashboard/admissions/iemis"
+            description="Student records with iEMIS issues."
           />
-        </KpiGrid>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <ActionMenu
-            label="Open student directory actions"
-            items={[
-              {
-                label: 'Export roster CSV',
-                icon: <Download size={16} />,
-                onClick: () =>
-                  onExportRoster('csv', { academicYearId, classId, sectionId }),
-              },
-              {
-                label: isExportingIemis
-                  ? 'Preparing iEMIS export'
-                  : 'Export iEMIS',
-                icon: <Download size={16} />,
-                disabled: !canExportIemis || isExportingIemis,
-                onClick: onExportIemis,
-              },
-            ]}
-            trigger={
-              <button
-                type="button"
-                className="flex min-h-11 shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2"
-              >
-                <MoreHorizontal size={18} />
-                More Actions
-              </button>
-            }
-          />
-        </div>
-      </div>
+      </M1SummaryGrid>
 
-      <FilterBar
-        label="Directory Filters"
-        description="Search and filter student records using server-backed directory filters."
-        actions={
-          (academicYearId || classId || sectionId || status || search) && (
-            <button 
-              onClick={() => {
-                setAcademicYearId(currentAcademicYear?.id ?? '');
-                setClassId('');
-                setSectionId('');
-                setStatus('');
-                setSearch('');
-              }}
-              className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-bold text-[var(--color-mod-admissions-text)] transition hover:bg-[var(--color-mod-admissions-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]"
-            >
-              <RotateCcw size={12} />
-              Reset All
-            </button>
+      <Tabs
+        value={status || 'ALL'}
+        onValueChange={(value) =>
+          onFilterChange(
+            { status: value === 'ALL' ? '' : value, page: 1 },
+            { history: 'push' },
           )
         }
       >
-        <div className="grid w-full gap-4 md:grid-cols-2 lg:grid-cols-5">
-          <div className="space-y-1.5">
-            <label className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-500 ml-1">Academic Year</label>
-            <select
-              className="premium-input text-sm focus:border-[var(--color-mod-admissions-accent)] focus:ring-[var(--color-mod-admissions-border)]"
-              value={academicYearId}
-              onChange={(e) => setAcademicYearId(e.target.value)}
-            >
-              <option value="">All Years</option>
-              {academicYears.map((year) => (
-                <option key={year.id} value={year.id}>{year.name} {year.isCurrent ? '(Current)' : ''}</option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-500 ml-1">Class</label>
-            <select
-              className="premium-input text-sm focus:border-[var(--color-mod-admissions-accent)] focus:ring-[var(--color-mod-admissions-border)]"
-              value={classId}
-              onChange={(e) => {
-                setClassId(e.target.value);
-                setSectionId('');
-              }}
-            >
-              <option value="">All Classes</option>
-              {classes.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-500 ml-1">Section</label>
-            <select
-              className="premium-input text-sm focus:border-[var(--color-mod-admissions-accent)] focus:ring-[var(--color-mod-admissions-border)]"
-              value={sectionId}
-              onChange={(e) => setSectionId(e.target.value)}
-              disabled={!classId}
-            >
-              <option value="">All Sections</option>
-              {availableSections.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-500 ml-1">Status</label>
-            <select
-              className="premium-input text-sm focus:border-[var(--color-mod-admissions-accent)] focus:ring-[var(--color-mod-admissions-border)]"
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-            >
-              <option value="">All Statuses</option>
-              <option value="ACTIVE">Active</option>
-              <option value="TRANSFERRED">Transferred</option>
-              <option value="EXITED">Exited</option>
-              <option value="ALUMNI">Alumni</option>
-              <option value="ARCHIVED">Archived</option>
-              <option value="MERGED">Merged</option>
-              <option value="DELETED">Deleted</option>
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-500 ml-1">Quick Search</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input
-                className="premium-input pl-9 text-sm focus:border-[var(--color-mod-admissions-accent)] focus:ring-[var(--color-mod-admissions-border)]"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Name or SCH-ID, guardian, or phone"
-                aria-label="Search students by name, student code, guardian name, or phone"
-              />
-            </div>
-          </div>
-        </div>
-      </FilterBar>
-
-      <details className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <summary className="cursor-pointer list-none px-5 py-4 text-sm font-black text-slate-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--color-mod-admissions-border)]">
-          Readiness & duplicate attention panels
-          <span className="ml-2 text-xs font-semibold text-slate-500">{iemisIssueRows.length} iEMIS issues · {duplicateCandidates.length} duplicate candidates</span>
-        </summary>
-        <div className="space-y-5 border-t border-slate-100 p-4">
-      <SectionCard
-        title="Class iEMIS Readiness"
-        description={
-          classId
-            ? `Reviewing ${classes.find((c) => c.id === classId)?.name ?? 'selected class'}${selectedSection ? ` / ${selectedSection.name}` : ''}`
-            : 'Reviewing all currently filtered student records for government export completeness'
-        }
-      >
-        {isLoadingIemisReadiness ? (
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="h-20 animate-pulse rounded-2xl bg-slate-50" />
-            <div className="h-20 animate-pulse rounded-2xl bg-slate-50" />
-            <div className="h-20 animate-pulse rounded-2xl bg-slate-50" />
-          </div>
-        ) : iemisReadinessError ? (
-          <div className="rounded-2xl border border-danger-100 bg-danger-50 p-4 text-sm font-semibold text-danger-700">
-            {iemisReadinessError}
-          </div>
-        ) : iemisReadiness.length > 0 ? (
-          <div className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                <div className="flex items-center gap-2 text-slate-500">
-                  <ClipboardCheck size={16} />
-                  <span className="text-[0.65rem] font-black uppercase tracking-wider">Average Score</span>
-                </div>
-                <p className="mt-2 text-2xl font-black text-slate-900">{iemisAverageScore}%</p>
-              </div>
-              <div className="rounded-2xl border border-success-100 bg-success-50 p-4">
-                <div className="flex items-center gap-2 text-success-700">
-                  <CheckCircle2 size={16} />
-                  <span className="text-[0.65rem] font-black uppercase tracking-wider">Ready Records</span>
-                </div>
-                <p className="mt-2 text-2xl font-black text-success-700">{iemisReadyCount}</p>
-              </div>
-              <div className="rounded-2xl border border-warning-100 bg-warning-50 p-4">
-                <div className="flex items-center gap-2 text-warning-700">
-                  <AlertTriangle size={16} />
-                  <span className="text-[0.65rem] font-black uppercase tracking-wider">Need Review</span>
-                </div>
-                <p className="mt-2 text-2xl font-black text-warning-700">{iemisIssueRows.length}</p>
-              </div>
-            </div>
-
-            {topIemisIssues.length > 0 ? (
-              <div className="space-y-2">
-                {topIemisIssues.map((item) => (
-                  <div
-                    key={item.studentId}
-                    className="flex flex-col gap-3 rounded-xl border border-warning-100 bg-white p-4 lg:flex-row lg:items-center lg:justify-between"
-                  >
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-black text-slate-900">{item.fullNameEn}</p>
-                        <Badge variant="warning" className="text-[0.65rem] font-extrabold uppercase">
-                          {item.score}% ready
-                        </Badge>
-                      </div>
-                      <p className="mt-1 text-xs font-semibold text-slate-500">
-                        {item.studentSystemId} / {item.className}
-                        {item.sectionName ? ` / ${item.sectionName}` : ''}
-                      </p>
-                      <p className="mt-2 text-xs font-medium text-slate-600">
-                        {item.issues.slice(0, 2).map((issue) => issue.message).join('; ')}
-                        {item.issuesCount > 2 ? `; ${item.issuesCount - 2} more` : ''}
-                      </p>
-                    </div>
-                    <Link
-                      href={`/dashboard/students/${encodeURIComponent(item.studentId)}`}
-                      className="inline-flex h-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 text-xs font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-admissions-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2"
-                    >
-                      Fix Profile
-                    </Link>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-success-100 bg-success-50 p-5 text-sm font-semibold text-success-700">
-                All records in this review set are ready for iEMIS export.
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="rounded-2xl border border-slate-100 bg-slate-50 p-5 text-sm font-semibold text-slate-600">
-            No student records match the current iEMIS readiness filters.
-          </div>
-        )}
-      </SectionCard>
-
-      {canManageDuplicates ? (
-        <SectionCard
-          title="Duplicate Review"
-          description="Admin-only candidate review based on name, guardian phone, DOB, admission number, and previous school."
+        <TabsList
+          className="h-9 w-full max-w-full justify-start overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:grid lg:grid-cols-5 lg:overflow-visible"
+          aria-label="Student lifecycle views"
         >
-          {isLoadingDuplicateCandidates ? (
-            <div className="grid gap-3">
-              <div className="h-16 animate-pulse rounded-2xl bg-slate-50" />
-              <div className="h-16 animate-pulse rounded-2xl bg-slate-50" />
-            </div>
-          ) : duplicateCandidatesError ? (
-            <div className="rounded-2xl border border-danger-100 bg-danger-50 p-4 text-sm font-semibold text-danger-700">
-              {duplicateCandidatesError}
-            </div>
-          ) : duplicateCandidates.length > 0 ? (
-            <div className="grid gap-3">
-              {duplicateCandidates.map((candidate) => (
-                <div
-                  key={`${candidate.sourceStudent.id}-${candidate.candidateStudent.id}`}
-                  className="rounded-xl border border-warning-100 bg-warning-50/40 p-4"
-                >
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-warning-600">
-                        <AlertTriangle size={18} />
-                      </div>
-                      <div>
-                        <p className="text-sm font-black text-slate-900">
-                          {candidate.sourceStudent.fullNameEn} may match {candidate.candidateStudent.fullNameEn}
-                        </p>
-                        <p className="mt-1 text-xs font-medium text-slate-600">
-                          {candidate.reasons.join(', ')}
-                        </p>
-                        {candidate.blockedReason ? (
-                          <p className="mt-2 text-xs font-bold text-warning-700">
-                            {candidate.blockedReason}
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        variant="phase2"
-                        className="border-warning-200 bg-white text-warning-700"
-                      >
-                        {candidate.confidence} / {candidate.score}
-                      </Badge>
-                      <Link
-                        href={`/dashboard/students/${encodeURIComponent(candidate.sourceStudent.id)}`}
-                        className="rounded-xl bg-white px-4 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]"
-                      >
-                        Review
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-5 text-sm font-semibold text-slate-600">
-              No duplicate candidates found in the current review window.
-            </div>
-          )}
-        </SectionCard>
-      ) : null}
-        </div>
-      </details>
+          <TabsTrigger value="ALL">All Students</TabsTrigger>
+          <TabsTrigger value="ACTIVE">Active</TabsTrigger>
+          <TabsTrigger value="TRANSFERRED">Transferred</TabsTrigger>
+          <TabsTrigger value="EXITED">Withdrawn</TabsTrigger>
+          <TabsTrigger value="ALUMNI">Alumni</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
-      <SectionCard
-        title="Student Roster"
-        description={classId ? `Showing students for ${classes.find(c => c.id === classId)?.name}` : 'Showing all student records'}
-        noPadding
+      <Card
+        className="gap-0 overflow-hidden py-0 shadow-sm"
+        data-testid="student-roster-workspace"
       >
-        {filteredStudents.length > 0 ? (
-          <div className="divide-y divide-slate-100" data-testid="student-directory-results">
+        <CardHeader className="gap-1 border-b border-border px-4 py-4">
+          <CardTitle className="text-base">Student Roster</CardTitle>
+          <CardDescription>
+            {hasActiveFilters
+              ? `${totalStudents} students matching the selected filters`
+              : `${totalStudents} students`}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div
+            className="grid gap-3 border-b border-border bg-muted/20 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[minmax(9rem,1fr)_minmax(8rem,0.8fr)_minmax(8rem,0.8fr)_minmax(8rem,0.8fr)_minmax(15rem,1.7fr)_auto]"
+            aria-label="Directory filters"
+            role="group"
+          >
+            <div className="flex flex-col gap-1.5">
+              <label
+                htmlFor="student-academic-year"
+                className="text-xs font-medium text-muted-foreground"
+              >
+                Academic Year
+              </label>
+              <Select
+                value={academicYearId || 'ALL'}
+                onValueChange={(value) =>
+                  onFilterChange({
+                    academicYearId: value === 'ALL' ? '' : value,
+                    page: 1,
+                  })
+                }
+              >
+                <SelectTrigger id="student-academic-year">
+                  <SelectValue placeholder="All years" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>Academic years</SelectLabel>
+                    <SelectItem value="ALL">All Years</SelectItem>
+                    {academicYears.map((year) => (
+                      <SelectItem key={year.id} value={year.id}>
+                        {year.name}{year.isCurrent ? ' (Current)' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label
+                htmlFor="student-class"
+                className="text-xs font-medium text-muted-foreground"
+              >
+                Class
+              </label>
+              <Select
+                value={classId || 'ALL'}
+                onValueChange={(value) =>
+                  onFilterChange({
+                    classId: value === 'ALL' ? '' : value,
+                    sectionId: '',
+                    page: 1,
+                  })
+                }
+              >
+                <SelectTrigger id="student-class">
+                  <SelectValue placeholder="All classes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>Classes</SelectLabel>
+                    <SelectItem value="ALL">All Classes</SelectItem>
+                    {classes.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label
+                htmlFor="student-section"
+                className="text-xs font-medium text-muted-foreground"
+              >
+                Section
+              </label>
+              <Select
+                value={sectionId || 'ALL'}
+                onValueChange={(value) =>
+                  onFilterChange({
+                    sectionId: value === 'ALL' ? '' : value,
+                    page: 1,
+                  })
+                }
+                disabled={!classId}
+              >
+                <SelectTrigger id="student-section">
+                  <SelectValue placeholder="All sections" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>Sections</SelectLabel>
+                    <SelectItem value="ALL">All Sections</SelectItem>
+                    {availableSections.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label
+                htmlFor="student-status"
+                className="text-xs font-medium text-muted-foreground"
+              >
+                Status
+              </label>
+              <Select
+                value={status || 'ALL'}
+                onValueChange={(value) =>
+                  onFilterChange({
+                    status: value === 'ALL' ? '' : value,
+                    page: 1,
+                  })
+                }
+              >
+                <SelectTrigger id="student-status">
+                  <SelectValue placeholder="All statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>Student status</SelectLabel>
+                    <SelectItem value="ALL">All Statuses</SelectItem>
+                    <SelectItem value="ACTIVE">Active</SelectItem>
+                    <SelectItem value="TRANSFERRED">Transferred</SelectItem>
+                    <SelectItem value="EXITED">Exited</SelectItem>
+                    <SelectItem value="ALUMNI">Alumni</SelectItem>
+                    <SelectItem value="ARCHIVED">Archived</SelectItem>
+                    <SelectItem value="MERGED">Merged</SelectItem>
+                    <SelectItem value="DELETED">Deleted</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-2 xl:col-span-1">
+              <label
+                htmlFor="student-search"
+                className="text-xs font-medium text-muted-foreground"
+              >
+                Quick Search
+              </label>
+              <InputGroup>
+                <InputGroupAddon>
+                  <Search aria-hidden />
+                </InputGroupAddon>
+                <InputGroupInput
+                  id="student-search"
+                  value={search}
+                  onChange={(event) =>
+                    onFilterChange({ search: event.target.value, page: 1 })
+                  }
+                  placeholder="Name, student ID, guardian, or phone"
+                  aria-label="Search students by name, student code, guardian name, or phone"
+                />
+              </InputGroup>
+            </div>
+
+            {hasActiveFilters ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="self-end"
+                onClick={() =>
+                  onFilterChange({
+                    academicYearId: currentAcademicYear?.id ?? '',
+                    classId: '',
+                    sectionId: '',
+                    status: '',
+                    search: '',
+                    page: 1,
+                  })
+                }
+              >
+                <RotateCcw data-icon="inline-start" />
+                Reset
+              </Button>
+            ) : null}
+          </div>
+
+          {filteredStudents.length > 0 ? (
+          <div className="divide-y divide-border" data-testid="student-directory-results">
             {filteredStudents.map((student) => {
               const admission = admissionBySystemId.get(student.studentSystemId);
               const studentName = getStudentName(student, admission);
@@ -568,12 +473,7 @@ export function StudentDirectory({
               return (
                 <div
                   key={student.id}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`Inspect ${studentName}`}
-                  onClick={() => updateSelectedStudent(student.id)}
-                  onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') updateSelectedStudent(student.id); }}
-                  className={`group flex flex-col gap-4 p-5 transition hover:bg-slate-50/50 lg:flex-row lg:items-center lg:justify-between ${selectedStudentId === student.id ? 'bg-[var(--color-mod-admissions-soft)] ring-1 ring-inset ring-[var(--color-mod-admissions-border)]' : ''}`}
+                  className={`group flex flex-col gap-3 p-4 transition hover:bg-muted/30 lg:flex-row lg:items-center lg:justify-between ${selectedStudentId === student.id ? 'bg-accent/50 ring-1 ring-inset ring-border' : ''}`}
                 >
                   <div className="flex items-center gap-4 min-w-0">
                     <StudentAvatar
@@ -582,53 +482,56 @@ export function StudentDirectory({
                       initials={initials(studentName)}
                       alt={studentName}
                       size="lg"
-                      className="ring-2 ring-white shadow-sm transition group-hover:ring-[var(--color-mod-admissions-border)]"
+                      className="ring-2 ring-background shadow-sm transition group-hover:ring-border"
                     />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <Link
-                          onClick={(event) => event.stopPropagation()}
                           href={`/dashboard/students/${encodeURIComponent(student.id)}`}
-                          className="font-bold text-slate-900 truncate hover:text-[var(--color-mod-admissions-text)] transition"
+                          className="truncate font-semibold text-foreground transition hover:text-primary"
                         >
                           {studentName}
                         </Link>
                         <StatusChip status={student.lifecycleStatus || 'ACTIVE'} />
                       </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-slate-500">
-                        <span className="text-[var(--color-mod-admissions-text)] font-bold tracking-tight">{student.studentSystemId}</span>
-                        <span className="h-1 w-1 rounded-full bg-slate-300" />
-                        <span className="text-slate-700">{className} {sectionName !== 'No section' ? `• ${sectionName}` : ''}</span>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                        <span className="font-medium text-primary">{student.studentSystemId}</span>
+                        <span className="size-1 rounded-full bg-border" />
+                        <span className="text-foreground">{className} {sectionName !== 'No section' ? `• ${sectionName}` : ''}</span>
                         {rollNumber && (
                           <>
-                            <span className="h-1 w-1 rounded-full bg-slate-300" />
+                            <span className="size-1 rounded-full bg-border" />
                             <span>Roll: {rollNumber}</span>
                           </>
                         )}
                       </div>
-                      <p className="mt-1 text-[0.7rem] text-slate-500">
-                         Guardian: <span className="text-slate-700 font-bold">{primaryGuardian?.fullName || 'Not recorded'}</span> • {primaryGuardian?.primaryPhone || 'No phone'}
+                      <p className="mt-1 text-xs text-muted-foreground">
+                         Guardian: <span className="font-medium text-foreground">{primaryGuardian?.fullName || 'Not recorded'}</span> • {primaryGuardian?.primaryPhone || 'No phone'}
                       </p>
                     </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    <Link
-                      onClick={(event) => event.stopPropagation()}
-                      href={`/dashboard/students/${encodeURIComponent(student.id)}`}
-                      className="inline-flex h-9 items-center gap-2 rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 text-[0.7rem] font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-admissions-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2"
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => updateSelectedStudent(student.id)}
                     >
-                      View Profile
-                      <ChevronRight size={14} />
-                    </Link>
-                    <Link
-                      onClick={(event) => event.stopPropagation()}
-                      href={`/dashboard/fees/collect?studentId=${encodeURIComponent(student.id)}`}
-                      className="inline-flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-[0.7rem] font-bold text-slate-700 transition hover:bg-slate-50"
-                    >
-                      <Wallet size={14} />
-                      Fees Ledger
-                    </Link>
+                      Quick view
+                    </Button>
+                    <Button asChild size="sm">
+                      <Link href={`/dashboard/students/${encodeURIComponent(student.id)}`}>
+                        View Profile
+                        <ChevronRight data-icon="inline-end" />
+                      </Link>
+                    </Button>
+                    <Button asChild variant="outline" size="sm">
+                      <Link href={`/dashboard/fees/collect?studentId=${encodeURIComponent(student.id)}`}>
+                        <Wallet data-icon="inline-start" />
+                        Fees Ledger
+                      </Link>
+                    </Button>
                     <ActionMenu
                       label={`Open actions for ${studentName}`}
                       items={[
@@ -671,12 +574,9 @@ export function StudentDirectory({
                         },
                       ]}
                       trigger={
-                        <button
-                          type="button"
-                          className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
-                        >
-                          <MoreHorizontal size={16} />
-                        </button>
+                        <Button type="button" variant="outline" size="icon-sm">
+                          <MoreHorizontal />
+                        </Button>
                       }
                     />
                   </div>
@@ -694,7 +594,7 @@ export function StudentDirectory({
                     classId,
                     sectionId,
                     status,
-                    search: deferredSearch,
+                    search,
                     page,
                   })
                 }
@@ -702,21 +602,36 @@ export function StudentDirectory({
             )}
           </div>
         ) : (
-          <EmptyState
-            title={search || status || classId || sectionId ? "No students found" : "No students in directory"}
-            description={search || status || classId || sectionId ? "Add a student or adjust filters to find the student record." : "Enroll your first student to get started with the SchoolOS directory."}
-            action={!(search || status || classId) && (
-               <Link
-                href="/dashboard/admissions"
-                className="flex items-center gap-2 rounded-xl bg-[var(--color-mod-admissions-accent)] px-6 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-admissions-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2"
-              >
-                <UserPlus size={18} />
-                Enroll First Student
-              </Link>
-            )}
-          />
+          <Empty className="gap-4 rounded-none border-0 p-8 md:p-10">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Users aria-hidden />
+              </EmptyMedia>
+              <EmptyTitle>
+                {hasActiveFilters
+                  ? 'No students match these filters'
+                  : 'No students in directory'}
+              </EmptyTitle>
+              <EmptyDescription>
+                {hasActiveFilters
+                  ? 'Adjust the filters or search to find a student record.'
+                  : 'Start a new admission to add the first enrolled student.'}
+              </EmptyDescription>
+            </EmptyHeader>
+            {!hasActiveFilters && canCreateAdmission ? (
+              <EmptyContent>
+                <Button asChild>
+                  <Link href="/dashboard/admissions/new">
+                    <UserPlus data-icon="inline-start" />
+                    New admission
+                  </Link>
+                </Button>
+              </EmptyContent>
+            ) : null}
+          </Empty>
         )}
-      </SectionCard>
+        </CardContent>
+      </Card>
 
       {pdfError && (
         <div className="animate-in fade-in slide-in-from-top-2 rounded-xl border border-danger-100 bg-danger-50 p-4 text-sm font-medium text-danger-600">
@@ -757,8 +672,8 @@ function StudentInspector({ student, admission, onOpenPdf }: { student: StudentP
       <div className="text-center"><StudentAvatar studentId={student.id} photoVersion={student.photoVersion} initials={initials(name)} alt={name} size="xl" className="mx-auto" /><div className="mt-3 flex items-center justify-center gap-2"><h3 className="text-lg font-black text-slate-950">{name}</h3><StatusChip status={student.lifecycleStatus ?? 'ACTIVE'} /></div><p className="mt-1 text-xs font-bold text-[var(--color-mod-admissions-text)]">{student.studentSystemId}</p><p className="mt-2 text-xs text-slate-500">{student.className ?? student.class?.name ?? admission?.className ?? 'No class'} / {student.sectionName ?? student.section ?? admission?.sectionName ?? 'No section'} · Roll {student.rollNumber ?? admission?.rollNumber ?? '—'}</p></div>
       <Link href={`/dashboard/students/${encodeURIComponent(student.id)}`} className="flex min-h-10 w-full items-center justify-center rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 text-sm font-bold text-white shadow-sm hover:bg-[var(--color-mod-admissions-text)]">View Full Profile</Link>
       <section className="border-t border-slate-100 pt-4"><h4 className="text-xs font-black uppercase tracking-wide text-slate-500">Guardian</h4>{primaryGuardian ? <div className="mt-3 space-y-1 text-sm"><p className="font-bold text-slate-900">{primaryGuardian.fullName} <span className="font-medium text-slate-500">({primaryGuardian.relation})</span></p><p className="text-xs text-slate-600">{primaryGuardian.primaryPhone}</p><p className="text-xs text-slate-600">{guardianEmail}</p></div> : <p className="mt-3 text-sm text-slate-500">No guardian linked.</p>}</section>
-      <section className="border-t border-slate-100 pt-4"><div className="flex items-center justify-between"><h4 className="text-xs font-black uppercase tracking-wide text-slate-500">Document Checklist</h4><span className="text-xs font-bold text-slate-400">Open profile</span></div><p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">Document counts are not included in the paginated directory contract. Open the protected document workspace for the authoritative checklist.</p><Link href={`/dashboard/admissions/documents?student=${encodeURIComponent(student.id)}`} className="mt-3 inline-flex text-xs font-bold text-[var(--color-mod-admissions-text)]">Review documents</Link></section>
-      <section className="border-t border-slate-100 pt-4"><div className="flex items-center justify-between"><h4 className="text-xs font-black uppercase tracking-wide text-slate-500">QR / ID Card</h4><StatusBadge status={student.qrCredential?.status ?? 'NOT_GENERATED'} tone={student.qrCredential?.status === 'ACTIVE' ? 'active' : 'inactive'} /></div><div className="mt-4 flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3"><QrCode className="h-12 w-12 text-slate-400" /><div><p className="text-xs font-bold text-slate-800">Secure QR credential</p><p className="mt-1 text-[0.68rem] text-slate-500">Raw QR values are never shown from directory data.</p></div></div><button type="button" onClick={() => onOpenPdf(student.id, 'id-card')} className="mt-3 flex min-h-10 w-full items-center justify-center rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50">View / Print ID Card</button></section>
+      <section className="border-t border-slate-100 pt-4"><div className="flex items-center justify-between"><h4 className="text-xs font-black uppercase tracking-wide text-slate-500">Document Checklist</h4><span className="text-xs font-bold text-slate-400">Open profile</span></div><p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">Open the protected document workspace for the current checklist.</p><Link href={`/dashboard/admissions/documents?student=${encodeURIComponent(student.id)}`} className="mt-3 inline-flex text-xs font-bold text-[var(--color-mod-admissions-text)]">Review documents</Link></section>
+      <section className="border-t border-slate-100 pt-4"><div className="flex items-center justify-between"><h4 className="text-xs font-black uppercase tracking-wide text-slate-500">QR / ID Card</h4><StatusBadge status={student.qrCredential?.status ?? 'NOT_GENERATED'} tone={student.qrCredential?.status === 'ACTIVE' ? 'active' : 'inactive'} /></div><div className="mt-4 flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3"><QrCode className="h-12 w-12 text-slate-400" /><div><p className="text-xs font-bold text-slate-800">Secure QR credential</p><p className="mt-1 text-[0.68rem] text-slate-500">QR security details stay protected.</p></div></div><button type="button" onClick={() => onOpenPdf(student.id, 'id-card')} className="mt-3 flex min-h-10 w-full items-center justify-center rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50">View / Print ID Card</button></section>
     </div>
   );
 }

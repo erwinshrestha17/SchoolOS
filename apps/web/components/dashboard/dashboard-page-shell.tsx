@@ -10,7 +10,7 @@ interface DashboardPageShellProps {
 
 export function DashboardPageShell({ children, className }: DashboardPageShellProps) {
   return (
-    <div className={cn("space-y-8 animate-in fade-in duration-300", className)}>
+    <div className={cn("flex flex-col gap-8 animate-in fade-in duration-300", className)}>
       {children}
     </div>
   );

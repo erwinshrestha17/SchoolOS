@@ -106,4 +106,23 @@ describe('AdmissionCaseQueuesService', () => {
       }),
     });
   });
+
+  it('maps the completed workspace queue to admitted storage statuses', async () => {
+    const prisma = {
+      admissionApplication: {
+        count: jest.fn().mockResolvedValue(0),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    } as any;
+    const service = new AdmissionCaseQueuesService(prisma);
+
+    await service.list(actor, { queue: 'COMPLETED' });
+
+    expect(prisma.admissionApplication.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        tenantId: 'tenant-a',
+        status: { in: ['ADMITTED', 'ENROLLED'] },
+      }),
+    });
+  });
 });
