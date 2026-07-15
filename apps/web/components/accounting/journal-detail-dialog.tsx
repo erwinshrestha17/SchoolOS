@@ -70,9 +70,14 @@ export function JournalDetailDialog({
       void queryClient.invalidateQueries({ queryKey: ["ledger-entries"] });
       onClose();
     },
-    onError: (err: Error) => {
+    onError: (err: Error, variables) => {
+      const actionFailureTitle = {
+        submit: "Submission failed",
+        approve: "Approval failed",
+        post: "Posting failed",
+      } as const;
       setNotice({
-        title: "Journal action failed",
+        title: actionFailureTitle[variables.action],
         description:
           err.message || "The journal action could not be completed.",
         tone: "danger",

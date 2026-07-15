@@ -1,8 +1,12 @@
+'use client';
+
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { QrCode, Utensils } from 'lucide-react';
 import { DashboardPageShell } from '../../../components/dashboard/dashboard-page-shell';
-import { ModuleTabs } from '../../../components/dashboard/module-tabs';
+import { WorkspaceTabs } from '../../../components/ui/module-tabs';
 import { CanteenWorkspace } from '../../../components/canteen/canteen-workspace';
-import { PageHeader } from '../../../components/ui/page-header';
+import { ModuleHeader } from '../../../components/ui/module-header';
 
 const canteenTabs = [
   { label: 'Overview', href: '/dashboard/canteen' },
@@ -19,33 +23,32 @@ const canteenTabs = [
 ];
 
 export default function CanteenPage() {
-  const headerActions = (
-    <div className="flex flex-wrap gap-2">
-      <Link
-        href="/dashboard/canteen/pos"
-        className="inline-flex h-10 items-center justify-center rounded-xl bg-lime-700 px-4 text-sm font-bold text-white hover:bg-lime-800"
-      >
-        POS
-      </Link>
-      <Link
-        href="/dashboard/canteen/serving"
-        className="inline-flex h-10 items-center justify-center rounded-xl border border-lime-100 bg-white px-4 text-sm font-bold text-lime-700 hover:bg-lime-50"
-      >
-        Serving
-      </Link>
-    </div>
-  );
+  const router = useRouter();
 
   return (
     <DashboardPageShell>
-      <PageHeader
+      <ModuleHeader
+        eyebrow="M10 Canteen"
         title="Canteen"
         description="Run scanner-first POS and serving workflows with wallet, allergy, spending limit, inventory, vendor, and receipt states visible."
-        actions={headerActions}
+        primaryAction={
+          <Link
+            href="/dashboard/canteen/pos"
+            className="inline-flex h-9 items-center gap-2 rounded-xl bg-[var(--primary)] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--primary-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2"
+          >
+            <QrCode className="h-4 w-4" />
+            Open POS
+          </Link>
+        }
+        moreActionItems={[
+          {
+            label: 'Open serving counter',
+            icon: <Utensils className="h-4 w-4" />,
+            onClick: () => router.push('/dashboard/canteen/serving'),
+          },
+        ]}
       />
-      <div className="mb-6">
-        <ModuleTabs items={canteenTabs} accentColor="lime" variant="light" />
-      </div>
+      <WorkspaceTabs items={canteenTabs} />
       <CanteenWorkspace initialTab="overview" />
     </DashboardPageShell>
   );

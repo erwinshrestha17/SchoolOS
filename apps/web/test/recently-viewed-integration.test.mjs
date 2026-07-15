@@ -38,7 +38,7 @@ describe("recently-viewed is actually recorded on the three real detail views", 
   it("records a student view once the profile loads", () => {
     const page = read("components/students/student-detail-page.tsx");
     assert.match(page, /useRecentlyViewed/);
-    assert.match(page, /kind: 'student'/);
+    assert.match(page, /kind: ["']student["']/);
   });
 
   it("records an invoice view once the invoice is resolved from real collection context data", () => {

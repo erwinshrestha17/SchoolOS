@@ -147,14 +147,14 @@ describe('Payroll Runs UI contracts', () => {
 
   it('uses backend exception totals and maps missing payslip files to regeneration guidance', () => {
     const client = read('lib/api/client.ts');
-    const hrDashboard = read('app/dashboard/hr/page.tsx');
+    const payrollDashboard = read('app/dashboard/payroll/page.tsx');
     const adminPayslips = read('components/hr/payslip-list.tsx');
     const myPayslips = read('components/staff/my-payslips.tsx');
 
-    assert.match(hrDashboard, /title="Payroll Exceptions"/);
-    assert.match(hrDashboard, /selectedRun\?\.validationExceptionCount/);
-    assert.match(hrDashboard, /href="\/dashboard\/payroll\/readiness"/);
-    assert.match(hrDashboard, /Backend-owned readiness queue/);
+    assert.match(payrollDashboard, /label: "Readiness Exceptions"/);
+    assert.match(payrollDashboard, /selectedRun\?\.validationExceptionCount/);
+    assert.match(payrollDashboard, /href: "\/dashboard\/payroll\/readiness"/);
+    assert.match(payrollDashboard, /<WorkSurface/);
     assert.match(client, /throw new ApiRequestError\(/);
     assert.match(adminPayslips, /error instanceof ApiRequestError/);
     assert.match(adminPayslips, /error\.statusCode === 409/);

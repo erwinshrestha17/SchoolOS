@@ -11,7 +11,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { DashboardPageShell } from '../../../components/dashboard/dashboard-page-shell';
-import { ModuleTabs } from '../../../components/dashboard/module-tabs';
+import { WorkspaceTabs } from '../../../components/ui/module-tabs';
 import { LibraryWorkspace } from '../../../components/library/library-workspace';
 import { ModuleHeader } from '../../../components/ui/module-header';
 
@@ -72,9 +72,8 @@ export default function LibraryPage() {
             onClick: () => router.push('/dashboard/library/reports'),
           },
         ]}
-      >
-        <ModuleTabs items={libraryTabs} accentColor="emerald" variant="light" />
-      </ModuleHeader>
+      />
+      <WorkspaceTabs items={libraryTabs} />
       <LibraryWorkspace initialTab="overview" />
     </DashboardPageShell>
   );

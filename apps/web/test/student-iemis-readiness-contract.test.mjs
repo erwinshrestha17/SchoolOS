@@ -78,7 +78,7 @@ describe('Student iEMIS readiness contract', () => {
     );
     assert.match(detail, /student-iemis-readiness-list/);
     assert.doesNotMatch(detail, /setQueryData\(\['student-iemis-readiness'/);
-    assert.match(detail, /hasPermissions\(\['students:update'\]\)/);
+    assert.match(detail, /hasPermissions\(\[["']students:update["']\]\)/);
     assert.match(header, /canEdit \? \(/);
     assert.match(
       header,

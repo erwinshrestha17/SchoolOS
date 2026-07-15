@@ -34,7 +34,7 @@ import {
 import { EmptyState } from "../ui/empty-state";
 import { LoadingState } from "../ui/loading-state";
 import { PageHeader } from "../ui/page-header";
-import { StatCard } from "../ui/stat-card";
+import { WorkSurface } from "../ui/work-surface";
 import { StatusBadge, type StatusTone } from "../ui/status-badge";
 import { cn } from "../../lib/utils";
 import { StudentSelector } from "../students/student-selector";
@@ -523,16 +523,6 @@ export function CanteenWorkspace({
     Boolean(serving.dietaryWarning),
   );
 
-  const stats = {
-    activeMenuItems: menuItems.filter((item) => item.status === "ACTIVE")
-      .length,
-    activeMealPlans: plans.filter((plan) => plan.status === "ACTIVE").length,
-    mealsServedToday: servings.filter((serving) => serving.status === "SERVED")
-      .length,
-    walletLow: lowBalanceWallets.length,
-    allergyWarnings: allergyWarnings.length,
-  };
-
   const selectedServingStudent = servingForm.studentId;
   const servingHasAllergyWarnings =
     (resolvedServingStudent?.allergyWarnings?.length ?? 0) > 0;
@@ -620,43 +610,11 @@ export function CanteenWorkspace({
 
       {activeTab === "overview" && (
         <div className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            <StatCard
-              title="Active Menu Items"
-              value={stats.activeMenuItems}
-              icon={<Utensils size={18} />}
-              loading={menuQuery.isLoading}
-            />
-            <StatCard
-              title="Active Meal Plans"
-              value={stats.activeMealPlans}
-              icon={<Soup size={18} />}
-              loading={plansQuery.isLoading}
-            />
-            <StatCard
-              title="Meals Served Today"
-              value={stats.mealsServedToday}
-              icon={<Soup size={18} />}
-              loading={servingsQuery.isLoading}
-            />
-            <StatCard
-              title="Wallet Low"
-              value={stats.walletLow}
-              icon={<Wallet size={18} />}
-              loading={lowBalanceQuery.isLoading}
-            />
-            <StatCard
-              title="Allergy Warnings"
-              value={stats.allergyWarnings}
-              icon={<AlertTriangle size={18} />}
-              loading={servingsQuery.isLoading}
-            />
-          </div>
           <div className="flex flex-wrap gap-2">
-            {stats.walletLow > 0 ? (
+            {lowBalanceWallets.length > 0 ? (
               <CanteenStatusBadge status="WALLET_LOW" />
             ) : null}
-            {stats.allergyWarnings > 0 ? (
+            {allergyWarnings.length > 0 ? (
               <CanteenStatusBadge status="ALLERGY_WARNING" />
             ) : null}
           </div>
@@ -668,10 +626,16 @@ export function CanteenWorkspace({
             ]}
           />
           <LowBalanceList wallets={lowBalanceWallets.slice(0, 5)} />
-          <SaleList
-            sales={sales.slice(0, 5)}
-            emptyTitle="No recent POS sales"
-          />
+          <WorkSurface
+            title="Recent POS sales"
+            description="Recent backend sale records; wallet balances and receipt totals remain backend-owned."
+            variant="transaction"
+          >
+            <SaleList
+              sales={sales.slice(0, 5)}
+              emptyTitle="No recent POS sales"
+            />
+          </WorkSurface>
         </div>
       )}
 
@@ -2355,11 +2319,9 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="text-lg font-bold text-slate-900">{title}</h2>
-      <p className="mt-1 text-sm text-slate-500">{description}</p>
-      <div className="mt-5">{children}</div>
-    </section>
+    <WorkSurface title={title} description={description} variant="transaction">
+      {children}
+    </WorkSurface>
   );
 }
 function Notice({

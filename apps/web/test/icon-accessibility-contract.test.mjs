@@ -63,7 +63,7 @@ describe("shared icon accessibility primitives", () => {
     const summary = read("components/ui/operational-summary.tsx");
 
     assert.match(summary, /export function RefreshSummaryButton/);
-    assert.match(summary, /<RefreshCw size=\{18\}/);
+    assert.match(summary, /<RefreshCw[\s\S]{0,80}size=\{18\}/);
     assert.match(summary, /aria-label=\{isLoading \? "Refreshing dashboard" : "Refresh dashboard"\}/);
     assert.match(summary, /title=\{isLoading \? "Refreshing dashboard" : "Refresh dashboard"\}/);
     assert.match(summary, /disabled=\{isLoading\}/);

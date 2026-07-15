@@ -104,7 +104,9 @@ describe('reference dashboard foundation', () => {
     assert.match(sidebar, /href: '\/dashboard\/notices'/);
     assert.match(communications, /redirect\('\/dashboard\/notices'\)/);
     assert.match(noticesWorkspace, /communicationsApi\.getCommunicationsSummary/);
-    assert.equal((noticesWorkspace.match(/<KpiCard/g) ?? []).length, 4);
+    assert.equal((noticesWorkspace.match(/<SummaryCard/g) ?? []).length, 4);
+    assert.match(noticesWorkspace, /<WorkspaceTabs/);
+    assert.match(noticesWorkspace, /<WorkSurface/);
     assert.doesNotMatch(noticesWorkspace, /provider-diagnostics/);
     assert.doesNotMatch(noticesWorkspace, /title="Provider Status"/);
     assert.doesNotMatch(noticesWorkspace, /setTimeout|setInterval/);

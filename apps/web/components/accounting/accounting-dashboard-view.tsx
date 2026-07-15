@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
 import {
   Calculator,
   Wallet,
@@ -20,10 +19,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { api } from "../../lib/api";
-import { SectionCard } from "../ui/section-card";
-import { KpiCard, KpiGrid } from "../ui/kpi-card";
-import { ModuleHeader } from "../ui/module-header";
-import { ModuleTabs } from "../ui/module-tabs";
+import { SummaryCard, SummaryGrid } from "../ui/summary-card";
+import { WorkSurface } from "../ui/work-surface";
 import { Badge } from "../ui/badge";
 import { cn } from "../../lib/utils";
 import { PageState } from "../ui/page-state";
@@ -47,7 +44,6 @@ function formatMoney(amount?: string | number | null) {
 }
 
 export function AccountingDashboardView() {
-  const router = useRouter();
   const { hasPermissions } = useSession();
   const canCreateJournal = hasPermissions(["accounting:journals:create"]);
   const summaryQuery = useQuery({
@@ -70,49 +66,10 @@ export function AccountingDashboardView() {
   const noFiscalYear = summaryQuery.isSuccess && !activeFiscalYear;
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500 pb-10">
-      <ModuleHeader
-        title="Accounting & Finance"
-        description="Manage journals, ledgers, reconciliation, fiscal controls, and financial reports."
-        primaryAction={
-          canCreateJournal ? (
-            <button
-              type="button"
-              onClick={() => router.push("/dashboard/accounting/journals")}
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--color-mod-accounting-accent)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-accounting-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-accounting-border)] focus:ring-offset-2"
-            >
-              <FileText className="h-4 w-4" />
-              New Journal Entry
-            </button>
-          ) : undefined
-        }
-        moreActionItems={[
-          {
-            label: "Chart of Accounts",
-            icon: <Calculator className="h-4 w-4" />,
-            onClick: () =>
-              router.push("/dashboard/accounting/chart-of-accounts"),
-          },
-          {
-            label: "Bank Reconciliation",
-            icon: <Landmark className="h-4 w-4" />,
-            onClick: () => router.push("/dashboard/accounting/reconciliation"),
-          },
-          {
-            label: "Financial Reports",
-            icon: <BarChart3 className="h-4 w-4" />,
-            onClick: () => router.push("/dashboard/accounting/reports"),
-          },
-          {
-            label: "Period Close",
-            icon: <Clock className="h-4 w-4" />,
-            onClick: () => router.push("/dashboard/accounting/fiscal-periods"),
-          },
-        ]}
-      >
-        <KpiGrid className="sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-          <KpiCard
-            title="Fiscal Year Status"
+    <div className="space-y-6 pb-10">
+        <SummaryGrid>
+          <SummaryCard
+            label="Fiscal Year Status"
             loading={summaryQuery.isLoading}
             value={activeFiscalYear?.status ?? "Unavailable"}
             icon={<Clock size={20} />}
@@ -122,8 +79,8 @@ export function AccountingDashboardView() {
             }
             href="/dashboard/accounting/fiscal-periods"
           />
-          <KpiCard
-            title="Pending Approvals"
+          <SummaryCard
+            label="Pending Approvals"
             loading={summaryQuery.isLoading}
             value={summaryQuery.data?.pendingJournalApprovals ?? "Unavailable"}
             icon={<FileText size={20} />}
@@ -135,8 +92,8 @@ export function AccountingDashboardView() {
             description="Submitted journals awaiting approval."
             href="/dashboard/accounting/journals?status=SUBMITTED"
           />
-          <KpiCard
-            title="Unreconciled Items"
+          <SummaryCard
+            label="Unreconciled Items"
             loading={summaryQuery.isLoading}
             value={summaryQuery.data?.unreconciledBankItems ?? "Unavailable"}
             icon={<Landmark size={20} />}
@@ -148,8 +105,8 @@ export function AccountingDashboardView() {
             description="Bank statement rows awaiting review."
             href="/dashboard/accounting/reconciliation"
           />
-          <KpiCard
-            title="Mapping Issues"
+          <SummaryCard
+            label="Mapping Issues"
             loading={summaryQuery.isLoading}
             value={summaryQuery.data?.sourceMappingIssueCount ?? "Unavailable"}
             icon={<AlertCircle size={20} />}
@@ -161,84 +118,7 @@ export function AccountingDashboardView() {
             description="Missing source references or active source mappings."
             href="/dashboard/accounting/source-mappings"
           />
-          <KpiCard
-            title="Active Export Jobs"
-            loading={summaryQuery.isLoading}
-            value={summaryQuery.data?.activeExportJobs ?? "Unavailable"}
-            icon={<History size={20} />}
-            tone={
-              (summaryQuery.data?.failedExportJobs ?? 0) > 0
-                ? "danger"
-                : "neutral"
-            }
-            description={
-              summaryQuery.data?.failedExportJobs
-                ? `${summaryQuery.data.failedExportJobs} failed export job(s).`
-                : "Queued and processing accounting exports."
-            }
-            href="/dashboard/accounting/reports"
-          />
-          <KpiCard
-            title="Trial Balance Readiness"
-            loading={summaryQuery.isLoading}
-            value={
-              summaryQuery.data
-                ? summaryQuery.data.trialBalance.balanced
-                  ? "Ready"
-                  : "Needs review"
-                : "Unavailable"
-            }
-            icon={<CheckCircle2 size={20} />}
-            tone={
-              summaryQuery.data?.trialBalance.balanced ? "success" : "warning"
-            }
-            description="Backend Decimal totals across posted journals."
-            href="/dashboard/accounting/reports?report=trial-balance"
-          />
-        </KpiGrid>
-      </ModuleHeader>
-
-      <ModuleTabs
-        items={[
-          {
-            href: "/dashboard/accounting",
-            label: "Dashboard",
-            icon: BarChart3,
-          },
-          {
-            href: "/dashboard/accounting/chart-of-accounts",
-            label: "Chart of Accounts",
-            icon: Calculator,
-          },
-          {
-            href: "/dashboard/accounting/journals",
-            label: "Journals",
-            icon: FileText,
-          },
-          {
-            href: "/dashboard/accounting/accounts",
-            label: "Ledger",
-            icon: History,
-          },
-          {
-            href: "/dashboard/accounting/reports",
-            label: "Reports",
-            icon: PieChart,
-          },
-          {
-            href: "/dashboard/accounting/reconciliation",
-            label: "Reconciliation",
-            icon: Landmark,
-          },
-          {
-            href: "/dashboard/accounting/fiscal-periods",
-            label: "Period Close",
-            icon: Clock,
-          },
-        ]}
-        accentColor="emerald"
-        variant="light"
-      />
+        </SummaryGrid>
 
       {summaryQuery.isError ? (
         <PageState
@@ -283,7 +163,7 @@ export function AccountingDashboardView() {
       <div className="grid gap-8 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-8">
           {canCreateJournal ? (
-            <SectionCard
+            <WorkSurface
               title="Operational Quick Actions"
               description="Execute standard financial transactions and vouchers."
             >
@@ -349,10 +229,10 @@ export function AccountingDashboardView() {
                   </button>
                 ))}
               </div>
-            </SectionCard>
+            </WorkSurface>
           ) : null}
 
-          <SectionCard
+          <WorkSurface
             title="Financial Reporting Hub"
             description="Access real-time verified accounting reports."
           >
@@ -433,12 +313,12 @@ export function AccountingDashboardView() {
                 ))}
               </div>
             </div>
-          </SectionCard>
+          </WorkSurface>
 
-          <SectionCard
+          <WorkSurface
             title="Recent Ledger Postings"
             description="Latest validated transactions across all journals."
-            headerAction={
+            action={
               <Link
                 href="/dashboard/accounting/journals"
                 className="text-sm font-bold text-emerald-600 hover:text-emerald-700"
@@ -478,11 +358,11 @@ export function AccountingDashboardView() {
                 )}
               />
             )}
-          </SectionCard>
+          </WorkSurface>
         </div>
 
         <div className="space-y-8">
-          <SectionCard title="Fiscal Status">
+          <WorkSurface title="Fiscal Status" variant="monitoring">
             <div className="space-y-6">
               <div className="rounded-2xl border border-[var(--color-mod-accounting-border)] bg-[var(--color-mod-accounting-bg)] p-5 text-[var(--color-mod-accounting-text)] shadow-sm">
                 <p className="text-[0.65rem] font-bold uppercase tracking-widest text-[var(--color-mod-accounting-text)]/70">
@@ -555,9 +435,9 @@ export function AccountingDashboardView() {
                 </Link>
               </div>
             </div>
-          </SectionCard>
+          </WorkSurface>
 
-          <SectionCard title="Double-Entry Guard">
+          <WorkSurface title="Double-Entry Guard" variant="monitoring">
             <div className="space-y-4">
               <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
                 <span className="text-xs font-bold text-slate-600">
@@ -595,7 +475,7 @@ export function AccountingDashboardView() {
                 </div>
               </div>
             </div>
-          </SectionCard>
+          </WorkSurface>
         </div>
       </div>
 

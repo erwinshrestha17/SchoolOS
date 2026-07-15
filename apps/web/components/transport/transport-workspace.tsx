@@ -7,8 +7,6 @@ import {
   AlertTriangle,
   Bus,
   Download,
-  FileWarning,
-  Gauge,
   MapPin,
   Navigation,
   Users,
@@ -36,7 +34,8 @@ import {
 } from "../../lib/transport-api";
 import { EmptyState } from "../ui/empty-state";
 import { LoadingState } from "../ui/loading-state";
-import { KpiCard, KpiGrid } from "../ui/kpi-card";
+import { SummaryCard, SummaryGrid } from "../ui/summary-card";
+import { WorkSurface } from "../ui/work-surface";
 import { StatusBadge, type StatusTone } from "../ui/status-badge";
 import { ConfirmDialog } from "../ui/confirm-dialog";
 import { cn } from "../../lib/utils";
@@ -480,9 +479,6 @@ export function TransportWorkspace({
     (trip) => trip.isDelayed,
   ).length;
   const staleGpsItems = staleGpsReportQuery.data?.items ?? [];
-  const staleGpsCount = staleGpsReportQuery.data
-    ? staleGpsItems.filter((item) => item.isStale).length
-    : undefined;
   const vehicleDocumentAlertCount = vehicleDocumentsReportQuery.data
     ? countVehicleDocumentIssues(vehicleDocumentsReportQuery.data.items)
     : undefined;
@@ -516,51 +512,24 @@ export function TransportWorkspace({
 
       {activeTab === "overview" && (
         <div className="space-y-6">
-          <KpiGrid className="sm:grid-cols-2 xl:grid-cols-5">
-            <KpiCard
-              title="Active Trips"
+          <SummaryGrid>
+            <SummaryCard
+              label="Active Trips"
               value={reportsQuery.data?.activeTrips ?? "Unavailable"}
               icon={<Navigation size={18} />}
               loading={reportsQuery.isLoading}
               tone="neutral"
               description="Official transport report total"
             />
-            <KpiCard
-              title="Assigned Students"
+            <SummaryCard
+              label="Assigned Students"
               value={reportsQuery.data?.activeAssignments ?? "Unavailable"}
               icon={<Users size={18} />}
               loading={reportsQuery.isLoading}
               tone="neutral"
               description="Official active transport assignments"
             />
-            <KpiCard
-              title="Stale GPS"
-              value={staleGpsCount ?? "Unavailable"}
-              icon={<Gauge size={18} />}
-              loading={staleGpsReportQuery.isLoading}
-              tone={staleGpsCount && staleGpsCount > 0 ? "warning" : "neutral"}
-              description="Backend stale/missing latest-location report"
-            />
-            <KpiCard
-              title="Delays"
-              value="Unavailable"
-              icon={<AlertTriangle size={18} />}
-              tone="neutral"
-              description="Needs a report-level delay summary endpoint"
-            />
-            <KpiCard
-              title="Vehicle Document Expiry"
-              value={vehicleDocumentAlertCount ?? "Unavailable"}
-              icon={<FileWarning size={18} />}
-              loading={vehicleDocumentsReportQuery.isLoading}
-              tone={
-                vehicleDocumentAlertCount && vehicleDocumentAlertCount > 0
-                  ? "warning"
-                  : "neutral"
-              }
-              description="Backend vehicle-document expiry report"
-            />
-          </KpiGrid>
+          </SummaryGrid>
 
           <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
             <div className="space-y-6">
@@ -622,8 +591,9 @@ export function TransportWorkspace({
               >
                 <ul className="space-y-2 text-sm text-slate-600">
                   <li>
-                    Report-level delay totals are unavailable; the Trip Monitor
-                    still shows per-trip delay status from backend trip rows.
+                    Report-level delay, stale-GPS, and document-expiry totals
+                    are unavailable: needs summary API. The workspace still
+                    shows the bounded backend report rows and timestamps.
                   </li>
                   <li>
                     Live map, route deviation, ETA, geofence, and overspeed
@@ -2298,11 +2268,9 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="text-lg font-bold text-slate-900">{title}</h2>
-      <p className="mt-1 text-sm text-slate-500">{description}</p>
-      <div className="mt-5">{children}</div>
-    </section>
+    <WorkSurface title={title} description={description} variant="monitoring">
+      {children}
+    </WorkSurface>
   );
 }
 

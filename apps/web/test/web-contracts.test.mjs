@@ -900,7 +900,8 @@ describe("SchoolOS web production contracts", () => {
     }
 
     assert.match(sidebar, /href: '\/dashboard\/activity'/);
-    assert.match(sidebar, /href: '\/dashboard\/messages'/);
+    assert.doesNotMatch(sidebar, /href: '\/dashboard\/messages'/);
+    assert.match(sidebar, /href: '\/dashboard\/notices'/);
     assert.match(sidebar, /href: '\/dashboard\/transport'/);
     assert.match(sidebar, /href: '\/dashboard\/canteen'/);
     assert.match(sidebar, /label: 'HR \/ Staff'/);
@@ -1683,7 +1684,7 @@ describe("SchoolOS web production contracts", () => {
 
     assert.match(
       attendanceForm,
-      /const statusCycle: AttendanceStatus\[\] = \[|STATUS_OPTIONS/,
+      /const (?:statusCycle|persistedAttendanceStatuses): AttendanceStatus\[\] = \[|STATUS_OPTIONS/,
     );
 
     for (const status of statuses) {
@@ -2231,7 +2232,7 @@ describe("SchoolOS web production contracts", () => {
       'eyebrow="M9 Transport"',
       "primaryAction",
       "moreActionItems",
-      "ModuleTabs",
+      "WorkspaceTabs",
       "Location Status",
       "/dashboard/transport/location",
       "Open Trips",
@@ -2239,7 +2240,12 @@ describe("SchoolOS web production contracts", () => {
       assert.ok(transportLayout.includes(marker), `Missing marker: ${marker}`);
     }
 
-    for (const marker of ["KpiGrid", "KpiCard", 'value="Unavailable"']) {
+    for (const marker of [
+      "SummaryGrid",
+      "SummaryCard",
+      "WorkSurface",
+      "needs summary API",
+    ]) {
       assert.ok(
         transportWorkspace.includes(marker),
         `Missing marker: ${marker}`,
@@ -2248,6 +2254,11 @@ describe("SchoolOS web production contracts", () => {
 
     assert.doesNotMatch(transportPage, /PageHeader|headerActions/);
     assert.doesNotMatch(transportLayout, /Live Status/);
+    assert.match(transportLayout, /bg-\[var\(--primary\)\]/);
+    assert.doesNotMatch(
+      transportLayout,
+      /bg-\[var\(--color-mod-transport-text\)\]/,
+    );
   });
 
   it("keeps M9 transport workspace aligned to transport UI tokens", () => {
@@ -2358,6 +2369,21 @@ describe("SchoolOS web production contracts", () => {
   it("keeps activity categories and upload limits explicit", () => {
     const composerPage = read("app/dashboard/activity/new/page.tsx");
     const categories = [
+      "CLASSROOM_LEARNING",
+      "MUSIC_AND_DANCE",
+      "SCIENCE_AND_PRACTICAL",
+      "PROJECT_WORK",
+      "EDUCATIONAL_TOUR",
+      "HEALTH_AND_HYGIENE",
+      "COMPETITION",
+      "ASSEMBLY",
+      "CLUB_ACTIVITY",
+      "COMMUNITY_SERVICE",
+      "FESTIVAL_AND_CULTURE",
+      "NATIONAL_PROGRAMME",
+      "ACHIEVEMENT",
+      "PRESCHOOL_ACTIVITY",
+      "OTHER",
       "LEARNING",
       "OUTDOOR_PLAY",
       "ART_AND_CRAFT",
@@ -2370,8 +2396,8 @@ describe("SchoolOS web production contracts", () => {
       assert.match(composerPage, new RegExp(category));
     }
 
-    assert.match(composerPage, /Attach 1 to 5 images/);
-    assert.match(composerPage, /combined\.length > 5/);
+    assert.match(composerPage, /Attach 1 to 6 images/);
+    assert.match(composerPage, /candidateFiles\.length > 6/);
     assert.match(composerPage, /maxImageBytes = 10 \* 1024 \* 1024/);
     assert.match(composerPage, /file\.type\.startsWith\(["']image\/["']\)/);
     assert.match(composerPage, /10MB/);
@@ -2484,7 +2510,6 @@ describe("SchoolOS web production contracts", () => {
     // Utility surfaces (moderation queue, deliveries table, reports stub,
     // parent views) use shared neutral components and carry no module theme.
     const themedSurfaces = [
-      "app/dashboard/activity/page.tsx",
       "app/dashboard/activity/new/page.tsx",
       "app/dashboard/activity/gallery/page.tsx",
       "app/dashboard/activity/observations/page.tsx",
@@ -2526,6 +2551,20 @@ describe("SchoolOS web production contracts", () => {
         `${surface} is missing activity module color tokens`,
       );
     }
+
+    const landing = read("app/dashboard/activity/page.tsx");
+    for (const sharedPrimitive of [
+      "OperationalSummaryGrid",
+      "WorkspaceTabs",
+      "FilterBar",
+      "WorkSurface",
+    ]) {
+      assert.match(landing, new RegExp(sharedPrimitive));
+    }
+    assert.doesNotMatch(
+      landing,
+      /bg-\[var\(--color-mod-activity-accent\)\]|accentColor=["']rose["']/,
+    );
   });
 
   it("keeps notices screen wired to real M12 APIs", () => {
@@ -2697,7 +2736,15 @@ describe("SchoolOS web production contracts", () => {
     for (const surface of surfaces) {
       const source = read(surface);
 
-      assert.match(source, /color-mod-notices/);
+      if (surface === "components/notices/notices-workspace.tsx") {
+        assert.match(source, /bg-\[var\(--primary\)\]/);
+        assert.doesNotMatch(
+          source,
+          /bg-\[var\(--color-mod-notices-accent\)\]/,
+        );
+      } else {
+        assert.match(source, /color-mod-notices/);
+      }
       for (const pattern of forbidden) {
         assert.doesNotMatch(source, pattern, `${surface} contains ${pattern}`);
       }
@@ -2725,9 +2772,10 @@ describe("SchoolOS web production contracts", () => {
 
     for (const marker of [
       "<ModuleHeader",
-      "<KpiGrid",
-      "<KpiCard",
-      "<ModuleTabs",
+      "<SummaryGrid",
+      "<SummaryCard",
+      "<WorkspaceTabs",
+      "<WorkSurface",
       "New Notice",
       "moreActionItems",
       "communicationsApi.getCommunicationsSummary",
@@ -2786,8 +2834,9 @@ describe("SchoolOS web production contracts", () => {
       /'Staff Directory'|'Contracts'|'Leave Requests'|'Attendance Summary'|'Leave Balances'/,
     );
     assert.match(hrPage, /<ModuleHeader/);
-    assert.match(hrPage, /<KpiGrid/);
-    assert.match(hrPage, /<ModuleTabs/);
+    assert.match(hrPage, /<SummaryGrid/);
+    assert.match(hrPage, /<WorkspaceTabs/);
+    assert.match(hrPage, /<WorkSurface/);
     assert.match(hrPage, /api\.getLeaveQueueDepth/);
     assert.match(hrPage, /api\.listContractExpiryReminders/);
     assert.match(hrPage, /\/dashboard\/payroll\/runs/);
@@ -2797,7 +2846,9 @@ describe("SchoolOS web production contracts", () => {
     assert.doesNotMatch(hrPage, /api\.listStaff\(/);
     assert.doesNotMatch(hrPage, /api\.listLeaveRequests/);
     assert.match(payrollPage, /<ModuleHeader/);
-    assert.match(payrollPage, /<KpiGrid/);
+    assert.match(payrollPage, /<SummaryGrid/);
+    assert.match(payrollPage, /<WorkspaceTabs/);
+    assert.match(payrollPage, /<WorkSurface/);
     assert.match(
       read("app/dashboard/payroll/reports/page.tsx"),
       /api\.getPayrollReportSummary/,

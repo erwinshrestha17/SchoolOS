@@ -108,12 +108,10 @@ describe('Phase 3B Library frontend contracts', () => {
     assert.doesNotMatch(page, /M8A/);
 
     for (const section of [
-      'Total books',
-      'Total copies',
-      'Available copies',
-      'Issued copies',
+      'Books on loan',
       'Overdue issues',
-      'Lost / damaged',
+      'Reservations waiting',
+      'Catalogue copies',
       'Book Catalogue',
       'Copy Management',
       'Issue / Return',
@@ -129,12 +127,13 @@ describe('Phase 3B Library frontend contracts', () => {
       assert.match(workspace, new RegExp(section.replace('/', '\\/')));
     }
 
-    assert.match(workspace, /<KpiGrid/);
-    assert.match(workspace, /value=\{stats\.availableCopies\}/);
-    assert.match(workspace, /availableCopies:\s*["']Unavailable["'] as const/);
-    assert.match(workspace, /issuedCopies:\s*["']Unavailable["'] as const/);
-    assert.match(workspace, /lostDamaged:\s*["']Unavailable["'] as const/);
-    assert.match(workspace, /Needs copy-status summary/);
+    assert.match(workspace, /<SummaryGrid/);
+    assert.match(workspace, /<SummaryCard/);
+    assert.match(workspace, /<WorkSurface/);
+    assert.match(workspace, /status: "ISSUED"/);
+    assert.match(workspace, /activeLoansQuery\.data\?\.meta\.total/);
+    assert.match(workspace, /reservationsQuery\.data\?\.meta\.total/);
+    assert.match(workspace, /needs summary API/);
     assert.match(workspace, /Remaining Issues/);
     assert.match(workspace, /listPageSize/);
     assert.match(workspace, /page: String\(bookPage\)/);
@@ -192,7 +191,8 @@ describe('Phase 3B Library frontend contracts', () => {
     assert.match(workspace, /LoadingState/);
     assert.match(workspace, /EmptyState/);
     assert.match(workspace, /ErrorNotice/);
-    assert.match(workspace, /color-mod-library-accent/);
+    assert.match(workspace, /var\(--primary\)/);
+    assert.doesNotMatch(workspace, /bg-\[var\(--color-mod-library-accent\)\]/);
     assert.doesNotMatch(
       workspace,
       /rounded-\[2rem\]|rounded-\[3rem\]|Unknown book|Unknown author|Unknown borrower|\bN\/A\b/,

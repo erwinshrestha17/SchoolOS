@@ -76,7 +76,7 @@ test.describe('Phase 2F.2 authenticated school admin browser smoke', () => {
   }) => {
     await page.goto('/dashboard/students');
     await expect(
-      page.locator('main').getByText('Directory Filters', { exact: true }),
+      page.getByRole('group', { name: /Directory filters/i }),
     ).toBeVisible();
 
     // Test search with real seeded data
@@ -92,9 +92,11 @@ test.describe('Phase 2F.2 authenticated school admin browser smoke', () => {
     await page
       .getByLabel(/Search students by name, student code, guardian name, or phone/i)
       .fill('NoSuchStudentForSmoke');
-    await expect(page.getByText(/No students found/i)).toBeVisible();
+    await expect(
+      page.getByText('No students match these filters', { exact: true }),
+    ).toBeVisible();
 
-    await page.getByRole('button', { name: /Reset All/i }).click();
+    await page.getByRole('button', { name: 'Reset', exact: true }).click();
 
     const firstStudent = page.locator('a[href^="/dashboard/students/"]').first();
     if (await firstStudent.isVisible()) {
@@ -116,9 +118,9 @@ test.describe('Phase 2F.2 authenticated school admin browser smoke', () => {
   });
 
   test('attendance and admissions validation controls render', async ({ page }) => {
-    await page.goto('/dashboard/attendance');
-    await expect(page.getByLabel(/Class/i)).toBeVisible();
-    await expect(page.getByLabel(/Date/i)).toBeVisible();
+    await page.goto('/dashboard/attendance/mark');
+    await expect(page.getByLabel(/^Class$/i)).toBeVisible();
+    await expect(page.getByLabel(/^Date$/i)).toBeVisible();
     await expect(page.locator('main')).toContainText(
       /Smart Attendance|Attendance Roster|Expected Students/i,
     );
@@ -127,14 +129,21 @@ test.describe('Phase 2F.2 authenticated school admin browser smoke', () => {
     await expect(
       page.locator('main').getByRole('heading', { name: /Admissions/i }),
     ).toBeVisible();
-    await page.getByRole('link', { name: /New admission/i }).click();
+    await page
+      .locator('[data-schoolos-ui="module-header"]')
+      .getByRole('link', { name: 'New admission', exact: true })
+      .click();
     await expect(
       page.locator('main').getByRole('heading', { name: /New admission/i }),
     ).toBeVisible();
-    await page.getByRole('button', { name: /Start direct admission/i }).click();
-    await expect(page.getByText(/Student and guardian/i)).toBeVisible();
-    await page.getByRole('button', { name: /Continue/i }).click();
-    await expect(page.getByText(/required|Invalid|Student and guardian/i).first()).toBeVisible();
+    await page
+      .getByRole('button', { name: 'Start school-office admission', exact: true })
+      .click();
+    await expect(
+      page.getByRole('heading', { name: 'Student and guardian', exact: true }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await expect(page.getByText('Enter valid student names.', { exact: true })).toBeVisible();
   });
 
   test('platform routes are denied or redirected for a school user', async ({ page }) => {

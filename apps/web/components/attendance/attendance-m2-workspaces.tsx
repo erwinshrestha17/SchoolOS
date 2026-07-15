@@ -37,6 +37,7 @@ import type {
   M2FollowUpQueue,
 } from "@/lib/api/attendance";
 import { AttendanceForm } from "@/components/forms/attendance-form";
+import { AttendanceConflictReview } from "./attendance-conflict-review";
 import { AttendanceCorrectionReview } from "./attendance-correction-review";
 import { useSession } from "@/components/session-provider";
 import { DashboardPageShell } from "@/components/dashboard/dashboard-page-shell";
@@ -154,6 +155,10 @@ export function AttendanceOverviewWorkspace() {
     queryFn: () =>
       api.listAttendanceCorrections({ status: "PENDING", limit: 10 }),
   });
+  const conflictsQuery = useQuery({
+    queryKey: ["attendance-conflicts"],
+    queryFn: api.listAttendanceConflicts,
+  });
   const followUpsQuery = useQuery({
     queryKey: ["attendance-m2-follow-ups", thirtyDaysAgo, today],
     queryFn: () =>
@@ -188,6 +193,16 @@ export function AttendanceOverviewWorkspace() {
             label: "Offline drafts",
             icon: <Save size={16} />,
             onClick: () => router.push("/dashboard/attendance/offline-drafts"),
+          },
+          {
+            label: "Attendance anomalies",
+            icon: <ShieldAlert size={16} />,
+            onClick: () => router.push("/dashboard/attendance/anomalies"),
+          },
+          {
+            label: "Follow-up queue",
+            icon: <MessageSquare size={16} />,
+            onClick: () => router.push("/dashboard/attendance/follow-ups"),
           },
           {
             label: "Settings",
@@ -312,6 +327,17 @@ export function AttendanceOverviewWorkspace() {
             isLoading={followUpsQuery.isLoading}
           />
         </div>
+
+        {conflictsQuery.isLoading ? (
+          <LoadingState label="Loading attendance conflict queue..." />
+        ) : conflictsQuery.isError ? (
+          <ErrorState
+            title="Conflict review queue unavailable"
+            onRetry={() => void conflictsQuery.refetch()}
+          />
+        ) : (
+          <AttendanceConflictReview conflicts={conflictsQuery.data ?? []} />
+        )}
       </div>
     </DashboardPageShell>
   );

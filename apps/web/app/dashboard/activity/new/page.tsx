@@ -33,6 +33,12 @@ const activityCategories = [
   'ACHIEVEMENT',
   'PRESCHOOL_ACTIVITY',
   'OTHER',
+  // Retained because these persisted/API values remain supported for existing
+  // schools and are still accepted by the shared activity contract.
+  'LEARNING',
+  'OUTDOOR_PLAY',
+  'CELEBRATION',
+  'GENERAL',
 ] as const;
 
 const audienceModes = ['whole', 'students'] as const;
@@ -154,12 +160,13 @@ export default function ActivityComposerPage() {
 
   function addFiles(fileList: FileList | null) {
     const incoming = Array.from(fileList ?? []);
-    const combined = [...files, ...incoming].slice(0, 6);
+    const candidateFiles = [...files, ...incoming];
+    const combined = candidateFiles.slice(0, 6);
     setFiles(combined);
 
     const firstNonImage = combined.find((file) => !file.type.startsWith('image/'));
     const firstLargeImage = combined.find((file) => file.size > maxImageBytes);
-    if (combined.length > 6) {
+    if (candidateFiles.length > 6) {
       setFileWarning('Please attach 1 to 6 images only.');
     } else if (firstNonImage) {
       setFileWarning('Activity attachments must be image files.');

@@ -8,8 +8,6 @@ import { useRouter } from "next/navigation";
 import {
   Archive,
   BookOpenCheck,
-  ClipboardCheck,
-  GraduationCap,
   MonitorPlay,
   Plus,
   Save,
@@ -30,9 +28,12 @@ import type {
 import { api } from "../../lib/api";
 import { cn } from "../../lib/utils";
 import { EmptyState } from "../ui/empty-state";
+import { FilterBar } from "../ui/filter-bar";
 import { LoadingState } from "../ui/loading-state";
-import { StatCard } from "../ui/stat-card";
+import { OperationalSummaryGrid } from "../ui/operational-summary-grid";
 import { StatusBadge } from "../ui/status-badge";
+import { TablePagination } from "../ui/table-pagination";
+import { WorkSurface } from "../ui/work-surface";
 import { LearningResourcesPanel } from "./learning-resources-panel";
 import { LearningSessionsPanel } from "./learning-sessions-panel";
 
@@ -115,6 +116,7 @@ export function LearningWorkspace({
     mode: "",
     status: "",
   });
+  const [page, setPage] = useState(1);
   const [form, setForm] = useState<LearningActivityPayload>({
     ...emptyActivityForm,
     questions: [{ ...emptyQuestion }],
@@ -138,17 +140,14 @@ export function LearningWorkspace({
         difficulty: (filters.difficulty || undefined) as LearningDifficulty,
         mode: (filters.mode || undefined) as LearningMode,
         status: (filters.status || undefined) as LearningActivityStatus,
-        limit: 50,
+        page,
+        limit: 20,
       }),
   });
   const activityDetailQuery = useQuery({
     queryKey: ["learning-activity", editingActivityId],
     queryFn: () => learningApi.getActivity(editingActivityId as string),
     enabled: Boolean(editingActivityId),
-  });
-  const liveSessionsQuery = useQuery({
-    queryKey: ["learning-sessions-live-count"],
-    queryFn: () => learningApi.listSessions({ status: "LIVE", limit: 1 }),
   });
   const classesQuery = useQuery({
     queryKey: ["classes"],
@@ -181,15 +180,13 @@ export function LearningWorkspace({
   const activities = activitiesQuery.data?.items ?? [];
   const students = studentsQuery.data?.items ?? [];
 
-  const readyCount = activities.filter(
-    (activity) => activity.status === "READY",
-  ).length;
-  const liveSessionCount = liveSessionsQuery.data?.total ?? 0;
-  const questionCount = activities.reduce(
-    (sum, activity) =>
-      sum + (activity._count?.questions ?? activity.questions?.length ?? 0),
-    0,
-  );
+  function updateFilter<Key extends keyof typeof filters>(
+    key: Key,
+    value: (typeof filters)[Key],
+  ) {
+    setFilters((current) => ({ ...current, [key]: value }));
+    setPage(1);
+  }
 
   const createActivityMutation = useMutation({
     mutationFn: learningApi.createActivity,
@@ -286,35 +283,21 @@ export function LearningWorkspace({
 
       {activeTab === "overview" && (
         <section className="space-y-5">
-          <div className="grid gap-4 md:grid-cols-4">
-            <StatCard
-              title="Activities"
-              value={activitiesQuery.data?.total ?? 0}
-              icon={<BookOpenCheck size={20} />}
-              loading={activitiesQuery.isLoading}
-            />
-            <StatCard
-              title="Ready"
-              value={readyCount}
-              icon={<ClipboardCheck size={20} />}
-              tone="success"
-              loading={activitiesQuery.isLoading}
-            />
-            <StatCard
-              title="Questions"
-              value={questionCount}
-              icon={<GraduationCap size={20} />}
-              tone="info"
-              loading={activitiesQuery.isLoading}
-            />
-            <StatCard
-              title="Tracked live"
-              value={liveSessionCount}
-              icon={<MonitorPlay size={20} />}
-              tone="warning"
-            />
-          </div>
+          <OperationalSummaryGrid
+            module="learning"
+            moduleName="Learning"
+            cards={[
+              { key: "myDraftActivities", label: "My draft activities", description: "Teacher activities still being prepared.", icon: <BookOpenCheck /> },
+              { key: "draftActivities", label: "Draft activities", description: "Activities still being prepared.", icon: <BookOpenCheck /> },
+              { key: "myLiveSessions", label: "My live sessions", description: "Teacher-led sessions active now.", icon: <MonitorPlay />, tone: "info" },
+              { key: "liveSessions", label: "Live sessions", description: "School learning sessions active now.", icon: <MonitorPlay />, tone: "info" },
+              { key: "mySessionRisks", label: "Session attention", description: "Paused or expired sessions needing review.", tone: "warning" },
+              { key: "sessionRisks", label: "Session attention", description: "Paused or expired sessions needing review.", tone: "warning" },
+              { key: "submittedAttemptsToday", label: "Submitted today", description: "Attempts submitted during the current school day.", tone: "success" },
+            ]}
+          />
           <ActivityList
+            title="Recent teacher activities"
             activities={activities.slice(0, 8)}
             isLoading={activitiesQuery.isLoading}
             onSelect={selectActivity}
@@ -326,13 +309,15 @@ export function LearningWorkspace({
 
       {activeTab === "activities" && (
         <section className="space-y-5">
-          <div className="shell-card p-5">
-            <div className="grid gap-3 md:grid-cols-6">
+          <FilterBar
+            label="Learning activity filters"
+            description="Filter the server-backed teacher activity directory."
+          >
               <SelectField
                 label="Class"
                 value={filters.classId}
                 onChange={(value) =>
-                  setFilters((current) => ({ ...current, classId: value }))
+                  updateFilter("classId", value)
                 }
                 options={(classesQuery.data ?? []).map((item) => ({
                   value: item.id,
@@ -343,7 +328,7 @@ export function LearningWorkspace({
                 label="Section"
                 value={filters.sectionId}
                 onChange={(value) =>
-                  setFilters((current) => ({ ...current, sectionId: value }))
+                  updateFilter("sectionId", value)
                 }
                 options={(sectionsQuery.data ?? []).map((item) => ({
                   value: item.id,
@@ -354,7 +339,7 @@ export function LearningWorkspace({
                 label="Subject"
                 value={filters.subjectId}
                 onChange={(value) =>
-                  setFilters((current) => ({ ...current, subjectId: value }))
+                  updateFilter("subjectId", value)
                 }
                 options={(subjectsQuery.data ?? []).map((item) => ({
                   value: item.id,
@@ -365,7 +350,7 @@ export function LearningWorkspace({
                 label="Difficulty"
                 value={filters.difficulty}
                 onChange={(value) =>
-                  setFilters((current) => ({ ...current, difficulty: value }))
+                  updateFilter("difficulty", value)
                 }
                 options={difficulties.map((value) => ({
                   value,
@@ -376,7 +361,7 @@ export function LearningWorkspace({
                 label="Mode"
                 value={filters.mode}
                 onChange={(value) =>
-                  setFilters((current) => ({ ...current, mode: value }))
+                  updateFilter("mode", value)
                 }
                 options={modes.map((value) => ({
                   value,
@@ -387,21 +372,25 @@ export function LearningWorkspace({
                 label="Status"
                 value={filters.status}
                 onChange={(value) =>
-                  setFilters((current) => ({ ...current, status: value }))
+                  updateFilter("status", value)
                 }
                 options={["", ...statuses].filter(Boolean).map((value) => ({
                   value,
                   label: labelize(value),
                 }))}
               />
-            </div>
-          </div>
+          </FilterBar>
           <ActivityList
+            title="Teacher activities"
             activities={activities}
             isLoading={activitiesQuery.isLoading}
             onSelect={selectActivity}
             onArchive={(id) => archiveActivityMutation.mutate(id)}
             onLaunch={() => router.push("/dashboard/learning/sessions")}
+            page={page}
+            pageSize={20}
+            total={activitiesQuery.data?.total ?? 0}
+            onPageChange={setPage}
           />
         </section>
       )}
@@ -632,7 +621,7 @@ export function LearningWorkspace({
                     createActivityMutation.isPending ||
                     updateActivityMutation.isPending
                   }
-                  className="inline-flex h-11 items-center gap-2 rounded-xl bg-emerald-700 px-5 text-sm font-black text-white shadow-sm hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex h-11 items-center gap-2 rounded-xl bg-[var(--primary)] px-5 text-sm font-black text-white shadow-sm hover:bg-[var(--primary-dark)] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Save size={17} />
                   {editingActivityId ? "Update activity" : "Create activity"}
@@ -641,7 +630,7 @@ export function LearningWorkspace({
                   <button
                     type="button"
                     onClick={() => router.push("/dashboard/learning/sessions")}
-                    className="inline-flex h-11 items-center gap-2 rounded-xl border border-emerald-100 bg-white px-5 text-sm font-black text-emerald-800 hover:bg-emerald-50"
+                    className="inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-white px-5 text-sm font-black text-[var(--primary)] hover:bg-muted"
                   >
                     <MonitorPlay size={17} />
                     Launch session
@@ -712,17 +701,27 @@ export function LearningWorkspace({
 }
 
 function ActivityList({
+  title,
   activities,
   isLoading,
   onSelect,
   onArchive,
   onLaunch,
+  page,
+  pageSize,
+  total,
+  onPageChange,
 }: {
+  title: string;
   activities: LearningActivity[];
   isLoading: boolean;
   onSelect: (activity: LearningActivity) => void;
   onArchive: (activityId: string) => void;
   onLaunch: (activityId: string) => void;
+  page?: number;
+  pageSize?: number;
+  total?: number;
+  onPageChange?: (page: number) => void;
 }) {
   if (isLoading) {
     return (
@@ -741,7 +740,16 @@ function ActivityList({
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <WorkSurface
+      title={title}
+      description={total === undefined ? "Open an activity to edit, archive, or launch it." : `${total} activities match the current server filters.`}
+      variant="table"
+      flush
+      footer={page && pageSize && total !== undefined && onPageChange ? (
+        <TablePagination page={page} pageSize={pageSize} total={total} onPageChange={onPageChange} />
+      ) : undefined}
+    >
+      <div className="overflow-x-auto">
       <div className="grid grid-cols-12 border-b border-slate-100 bg-slate-50 px-4 py-3 text-xs font-black uppercase tracking-wide text-slate-500">
         <div className="col-span-4">Activity</div>
         <div className="col-span-2">Class</div>
@@ -796,14 +804,14 @@ function ActivityList({
           </div>
         </div>
       ))}
-    </div>
+      </div>
+    </WorkSurface>
   );
 }
 
 function BoardLaunchPanel() {
   return (
-    <div className="shell-card p-5">
-      <h2 className="text-lg font-black text-slate-950">Smart Board Runtime</h2>
+    <WorkSurface title="Smart Board Runtime" variant="monitoring">
       <p className="mt-1 text-sm text-slate-500">
         Open a monitored session from the Sessions tab to launch the classroom
         board. The board route reads safe session data and never exposes answer
@@ -811,19 +819,18 @@ function BoardLaunchPanel() {
       </p>
       <Link
         href="/dashboard/learning/sessions"
-        className="mt-5 inline-flex h-11 items-center gap-2 rounded-xl bg-slate-950 px-5 text-sm font-black text-white hover:bg-slate-800"
+        className="mt-5 inline-flex h-11 items-center gap-2 rounded-xl bg-[var(--primary)] px-5 text-sm font-black text-white hover:bg-[var(--primary-dark)]"
       >
         <MonitorPlay size={17} />
         Open sessions
       </Link>
-    </div>
+    </WorkSurface>
   );
 }
 
 function LabPanel() {
   return (
-    <div className="shell-card p-5">
-      <h2 className="text-lg font-black text-slate-950">Computer Lab Access</h2>
+    <WorkSurface title="Computer Lab Access" variant="monitoring">
       <p className="mt-1 text-sm text-slate-500">
         Students join with the session code or QR token, then start an
         individual attempt.
@@ -831,13 +838,13 @@ function LabPanel() {
       <div className="mt-5 flex flex-wrap gap-3">
         <Link
           href="/student/learning/join"
-          className="inline-flex h-11 items-center gap-2 rounded-xl bg-emerald-700 px-5 text-sm font-black text-white hover:bg-emerald-800"
+          className="inline-flex h-11 items-center gap-2 rounded-xl bg-[var(--primary)] px-5 text-sm font-black text-white hover:bg-[var(--primary-dark)]"
         >
           <Users size={17} />
           Open student join
         </Link>
       </div>
-    </div>
+    </WorkSurface>
   );
 }
 

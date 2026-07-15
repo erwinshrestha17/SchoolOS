@@ -1,48 +1,43 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
+  AlertTriangle,
   BarChart3,
   CheckCircle2,
+  FileWarning,
   Images,
   MessageSquare,
   Plus,
+  RotateCcw,
+  ShieldAlert,
   Smile,
   Target,
   Truck,
 } from 'lucide-react';
-import { formatBsDateTime } from '@schoolos/core';
+import { activityCategoryValues, formatBsDateTime } from '@schoolos/core';
 import { api } from '../../../lib/api';
 import { DashboardPageShell } from '../../../components/dashboard/dashboard-page-shell';
 import { ModuleHeader } from '../../../components/ui/module-header';
-import { ModuleTabs } from '../../../components/ui/module-tabs';
-import { ModuleOperationalSummary } from '../../../components/ui/module-operational-summary';
+import { WorkspaceTabs } from '../../../components/ui/module-tabs';
 import { FilterBar } from '../../../components/ui/filter-bar';
 import { DataTable } from '../../../components/ui/data-table';
 import { StatusBadge } from '../../../components/ui/status-badge';
 import { Select } from '../../../components/ui/form-field';
+import { Button } from '../../../components/ui/button';
+import { EmptyState } from '../../../components/ui/empty-state';
+import { ErrorState } from '../../../components/ui/error-state';
+import { LoadingState } from '../../../components/ui/loading-state';
+import { OperationalSummaryGrid } from '../../../components/ui/operational-summary-grid';
+import { OffsetPagination } from '../../../components/ui/table-pagination';
+import { WorkSurface } from '../../../components/ui/work-surface';
+import { NoResultsState } from '../../../components/ui/workspace-states';
 
-const activityCategories = [
-  'CLASSROOM_LEARNING',
-  'ART_AND_CRAFT',
-  'MUSIC_AND_DANCE',
-  'SPORTS',
-  'SCIENCE_AND_PRACTICAL',
-  'PROJECT_WORK',
-  'EDUCATIONAL_TOUR',
-  'HEALTH_AND_HYGIENE',
-  'COMPETITION',
-  'ASSEMBLY',
-  'CLUB_ACTIVITY',
-  'COMMUNITY_SERVICE',
-  'FESTIVAL_AND_CULTURE',
-  'NATIONAL_PROGRAMME',
-  'ACHIEVEMENT',
-  'PRESCHOOL_ACTIVITY',
-  'OTHER',
-] as const;
+const activityCategories = activityCategoryValues;
+const pageSize = 20;
 
 const activityStatuses = [
   'DRAFT',
@@ -54,6 +49,8 @@ const activityStatuses = [
 ] as const;
 
 export default function ActivityPage() {
+  const router = useRouter();
+  const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({
     classId: '',
     sectionId: '',
@@ -65,7 +62,7 @@ export default function ActivityPage() {
   const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
   const sectionsQuery = useQuery({ queryKey: ['sections'], queryFn: api.listSections });
   const postsQuery = useQuery({
-    queryKey: ['activity-posts', filters],
+    queryKey: ['activity-posts', filters, page],
     queryFn: () =>
       api.listActivityPosts({
         classId: filters.classId || null,
@@ -73,7 +70,8 @@ export default function ActivityPage() {
         category: filters.category || null,
         status: filters.status || null,
         month: filters.month || null,
-        limit: 50,
+        limit: pageSize + 1,
+        offset: (page - 1) * pageSize,
       }),
   });
 
@@ -99,7 +97,23 @@ export default function ActivityPage() {
     [sections],
   );
 
-  const posts = postsQuery.data ?? [];
+  const hasActiveFilters = Object.values(filters).some(Boolean);
+  const posts = (postsQuery.data ?? []).slice(0, pageSize);
+  const hasNextPage = (postsQuery.data?.length ?? 0) > pageSize;
+
+  function updateFilter(key: keyof typeof filters, value: string) {
+    setPage(1);
+    setFilters((current) => ({
+      ...current,
+      [key]: value,
+      ...(key === 'classId' ? { sectionId: '' } : {}),
+    }));
+  }
+
+  function resetFilters() {
+    setPage(1);
+    setFilters({ classId: '', sectionId: '', category: '', status: '', month: '' });
+  }
 
   return (
     <DashboardPageShell>
@@ -109,17 +123,87 @@ export default function ActivityPage() {
         primaryAction={
           <Link
             href="/dashboard/activity/new"
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--color-mod-activity-accent)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-activity-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-activity-border)] focus:ring-offset-2"
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--primary)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[var(--primary-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-offset-2"
           >
             <Plus className="h-4 w-4" />
             Create Activity
           </Link>
         }
+        moreActionItems={[
+          {
+            label: 'Review moderation queue',
+            icon: <ShieldAlert size={16} />,
+            onClick: () => router.push('/dashboard/activity/moderation'),
+          },
+          {
+            label: 'Open protected gallery',
+            icon: <Images size={16} />,
+            onClick: () => router.push('/dashboard/activity/gallery'),
+          },
+          {
+            label: 'Review milestones',
+            icon: <Target size={16} />,
+            onClick: () => router.push('/dashboard/activity/milestones'),
+          },
+        ]}
       >
-        <ModuleOperationalSummary module="activity" compact={false} />
+        <OperationalSummaryGrid
+          module="activity"
+          moduleName="Activity Feed"
+          cards={[
+            {
+              key: 'pendingReview',
+              label: 'Pending review',
+              description: 'Activity posts waiting in the moderation queue.',
+              href: '/dashboard/activity/moderation',
+              icon: <ShieldAlert />,
+              tone: 'warning',
+            },
+            {
+              key: 'consentIssues',
+              label: 'Consent attention',
+              description: 'Photo-consent records needing staff attention.',
+              href: '/dashboard/activity',
+              icon: <AlertTriangle />,
+              tone: 'warning',
+            },
+            {
+              key: 'failedUploads',
+              label: 'Media processing failed',
+              description: 'Protected activity media that did not finish processing.',
+              href: '/dashboard/activity/gallery',
+              icon: <FileWarning />,
+              tone: 'danger',
+            },
+            {
+              key: 'myPostsAwaitingModeration',
+              label: 'My posts awaiting review',
+              description: 'Your activity posts waiting for moderation.',
+              href: '/dashboard/activity/moderation',
+              icon: <ShieldAlert />,
+              tone: 'warning',
+            },
+            {
+              key: 'myPublishedPostsToday',
+              label: 'My posts published today',
+              description: 'Your posts published during the current school day.',
+              href: '/dashboard/activity',
+              icon: <CheckCircle2 />,
+              tone: 'success',
+            },
+            {
+              key: 'myDraftPosts',
+              label: 'My draft posts',
+              description: 'Your activity posts that are not yet published.',
+              href: '/dashboard/activity',
+              icon: <MessageSquare />,
+              tone: 'neutral',
+            },
+          ]}
+        />
       </ModuleHeader>
 
-      <ModuleTabs
+      <WorkspaceTabs
         items={[
           { href: '/dashboard/activity', label: 'Feed', icon: MessageSquare },
           { href: '/dashboard/activity/moderation', label: 'Moderation', icon: CheckCircle2 },
@@ -129,23 +213,27 @@ export default function ActivityPage() {
           { href: '/dashboard/activity/deliveries', label: 'Deliveries', icon: Truck },
           { href: '/dashboard/activity/reports', label: 'Reports', icon: BarChart3 },
         ]}
-        accentColor="rose"
-        variant="light"
       />
 
       <FilterBar
         label="Feed filters"
         description="Server-filtered activity list, most recent first."
+        actionSlot={
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={!hasActiveFilters}
+            onClick={resetFilters}
+          >
+            <RotateCcw className="h-4 w-4" />
+            Reset
+          </Button>
+        }
       >
         <Select
           value={filters.classId}
-          onChange={(event) =>
-            setFilters((current) => ({
-              ...current,
-              classId: event.target.value,
-              sectionId: '',
-            }))
-          }
+          onChange={(event) => updateFilter('classId', event.target.value)}
         >
           <option value="">All classes</option>
           {classes.map((classroom) => (
@@ -156,9 +244,7 @@ export default function ActivityPage() {
         </Select>
         <Select
           value={filters.sectionId}
-          onChange={(event) =>
-            setFilters((current) => ({ ...current, sectionId: event.target.value }))
-          }
+          onChange={(event) => updateFilter('sectionId', event.target.value)}
         >
           <option value="">All sections</option>
           {filteredSections.map((section) => (
@@ -169,9 +255,7 @@ export default function ActivityPage() {
         </Select>
         <Select
           value={filters.category}
-          onChange={(event) =>
-            setFilters((current) => ({ ...current, category: event.target.value }))
-          }
+          onChange={(event) => updateFilter('category', event.target.value)}
         >
           <option value="">All categories</option>
           {activityCategories.map((category) => (
@@ -182,9 +266,7 @@ export default function ActivityPage() {
         </Select>
         <Select
           value={filters.status}
-          onChange={(event) =>
-            setFilters((current) => ({ ...current, status: event.target.value }))
-          }
+          onChange={(event) => updateFilter('status', event.target.value)}
         >
           <option value="">All statuses</option>
           {activityStatuses.map((status) => (
@@ -196,71 +278,101 @@ export default function ActivityPage() {
         <input
           type="month"
           value={filters.month}
-          onChange={(event) =>
-            setFilters((current) => ({ ...current, month: event.target.value }))
-          }
-          className="h-10 rounded-xl border border-slate-200 px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)]"
+          onChange={(event) => updateFilter('month', event.target.value)}
+          className="h-9 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)]"
         />
       </FilterBar>
 
-      <DataTable
-        columns={[
-          {
-            header: 'Title',
-            cell: (post) => (
-              <Link
-                href={`/dashboard/activity/${post.id}`}
-                className="font-bold text-slate-900 hover:text-[var(--color-mod-activity-text)]"
-              >
-                {post.title}
-              </Link>
-            ),
-          },
-          {
-            header: 'Class / Section',
-            cell: (post) =>
-              `${classNameById.get(post.classId ?? '') ?? 'Class not recorded'}${
-                post.sectionId ? ` / ${sectionNameById.get(post.sectionId) ?? 'Section'}` : ''
-              }`,
-          },
-          {
-            header: 'Category',
-            cell: (post) => formatEnumLabel(post.category),
-          },
-          {
-            header: 'Status',
-            cell: (post) => <StatusBadge status={post.status ?? 'DRAFT'} />,
-          },
-          {
-            header: 'Visibility',
-            cell: (post) =>
-              post.parentVisible === false ? (
-                <StatusBadge status="STAFF_ONLY" label="Staff only" tone="inactive" />
-              ) : (
-                <StatusBadge status="PARENTS" label="Parents" tone="active" />
-              ),
-          },
-          {
-            header: 'Published',
-            cell: (post) =>
-              post.publishedAt ? formatBsDateTime(post.publishedAt) : 'Draft',
-          },
-        ]}
-        data={posts}
-        isLoading={postsQuery.isLoading}
-        error={postsQuery.isError ? postsQuery.error : null}
-        emptyTitle={
-          filters.classId || filters.sectionId || filters.category || filters.status || filters.month
-            ? 'No results'
-            : 'No activity posts yet'
+      <WorkSurface
+        title="Activity monitoring"
+        description="Consent-aware activity records returned by the server, most recent first."
+        variant="table"
+        flush
+        footer={
+          posts.length > 0 ? (
+            <OffsetPagination
+              page={page}
+              hasNextPage={hasNextPage}
+              itemLabel="activity posts"
+              onPageChange={setPage}
+            />
+          ) : undefined
         }
-        emptyMessage={
-          filters.classId || filters.sectionId || filters.category || filters.status || filters.month
-            ? 'No activity posts match the selected filters.'
-            : 'Create the first classroom activity to get started.'
-        }
-        getRowKey={(post) => post.id}
-      />
+      >
+        {postsQuery.isLoading ? (
+          <LoadingState label="Loading activity posts..." className="min-h-64" />
+        ) : postsQuery.isError ? (
+          <ErrorState
+            title="Activity feed unavailable"
+            message="The activity list could not be loaded. No post or media state was changed."
+            onRetry={() => void postsQuery.refetch()}
+          />
+        ) : posts.length === 0 && hasActiveFilters ? (
+          <NoResultsState
+            description="No activity posts match the selected server filters."
+            onReset={resetFilters}
+          />
+        ) : posts.length === 0 ? (
+          <EmptyState
+            title="No activity posts yet"
+            description="Create the first classroom activity with consent-aware media to begin the feed."
+          />
+        ) : (
+          <DataTable
+            className="rounded-none border-0"
+            columns={[
+              {
+                header: 'Title',
+                cell: (post) => (
+                  <Link
+                    href={`/dashboard/activity/${post.id}`}
+                    className="font-bold text-slate-900 hover:text-[var(--primary)]"
+                  >
+                    {post.title}
+                  </Link>
+                ),
+              },
+              {
+                header: 'Class / Section',
+                cell: (post) =>
+                  `${classNameById.get(post.classId ?? '') ?? 'Class not recorded'}${
+                    post.sectionId
+                      ? ` / ${sectionNameById.get(post.sectionId) ?? 'Section'}`
+                      : ''
+                  }`,
+              },
+              {
+                header: 'Category',
+                cell: (post) => formatEnumLabel(post.category),
+              },
+              {
+                header: 'Status',
+                cell: (post) => <StatusBadge status={post.status ?? 'DRAFT'} />,
+              },
+              {
+                header: 'Visibility',
+                cell: (post) =>
+                  post.parentVisible === false ? (
+                    <StatusBadge
+                      status="STAFF_ONLY"
+                      label="Staff only"
+                      tone="inactive"
+                    />
+                  ) : (
+                    <StatusBadge status="PARENTS" label="Parents" tone="active" />
+                  ),
+              },
+              {
+                header: 'Published',
+                cell: (post) =>
+                  post.publishedAt ? formatBsDateTime(post.publishedAt) : 'Draft',
+              },
+            ]}
+            data={posts}
+            getRowKey={(post) => post.id}
+          />
+        )}
+      </WorkSurface>
     </DashboardPageShell>
   );
 }

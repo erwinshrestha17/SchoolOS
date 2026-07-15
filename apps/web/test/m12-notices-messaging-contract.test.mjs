@@ -11,7 +11,10 @@ describe("M12 notifications and M15 notices boundary", () => {
     const form = read("components/forms/communications-form.tsx");
     const shell = read("components/layout/dashboard-shell.tsx");
 
-    assert.equal((workspace.match(/<KpiCard/g) ?? []).length, 4);
+    assert.equal((workspace.match(/<SummaryCard/g) ?? []).length, 4);
+    assert.match(workspace, /<SummaryGrid/);
+    assert.match(workspace, /<WorkspaceTabs/);
+    assert.match(workspace, /<WorkSurface/);
     assert.doesNotMatch(workspace, /title="Escalated Chats"/);
     assert.doesNotMatch(workspace, /title="Provider Status"/);
     assert.match(workspace, /label: 'Recipient Preview'/);

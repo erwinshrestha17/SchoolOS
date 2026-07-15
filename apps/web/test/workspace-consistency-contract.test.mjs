@@ -28,7 +28,48 @@ const routeSources = {
   ],
   homework: ["app/dashboard/homework/page.tsx"],
   academics: ["app/dashboard/academics/page.tsx"],
+  activity: [
+    "app/dashboard/activity/page.tsx",
+    "components/ui/operational-summary-grid.tsx",
+  ],
+  hr: ["app/dashboard/hr/page.tsx"],
+  payroll: ["app/dashboard/payroll/page.tsx"],
+  library: [
+    "app/dashboard/library/page.tsx",
+    "components/library/library-workspace.tsx",
+  ],
+  transport: [
+    "app/dashboard/transport/layout.tsx",
+    "components/transport/transport-workspace.tsx",
+  ],
+  canteen: [
+    "app/dashboard/canteen/page.tsx",
+    "components/canteen/canteen-workspace.tsx",
+  ],
+  accounting: [
+    "app/dashboard/accounting/layout.tsx",
+    "components/accounting/accounting-dashboard-view.tsx",
+  ],
+  notices: ["components/notices/notices-workspace.tsx"],
+  learning: [
+    "app/dashboard/learning/page.tsx",
+    "components/learning/learning-workspace.tsx",
+    "components/ui/operational-summary-grid.tsx",
+  ],
 };
+
+const optionalSummaryRoutes = new Set(["canteen"]);
+const remainingMigrationRoutes = [
+  "activity",
+  "hr",
+  "payroll",
+  "library",
+  "transport",
+  "canteen",
+  "accounting",
+  "notices",
+  "learning",
+];
 
 const sourceFor = (route) => routeSources[route].map(read).join("\n");
 
@@ -44,12 +85,87 @@ describe("SchoolOS workspace consistency contract", () => {
   it("uses shared summaries, tabs, and work surfaces without route-local copies", () => {
     for (const route of Object.keys(routeSources)) {
       const source = sourceFor(route);
-      assert.match(source, /SummaryGrid/, `${route} must use SummaryGrid`);
-      assert.match(source, /SummaryCard/, `${route} must use SummaryCard`);
+      if (!optionalSummaryRoutes.has(route)) {
+        assert.match(source, /SummaryGrid/, `${route} must use SummaryGrid`);
+        assert.match(source, /SummaryCard/, `${route} must use SummaryCard`);
+      }
       assert.match(source, /WorkspaceTabs/, `${route} must use WorkspaceTabs`);
       assert.match(source, /WorkSurface/, `${route} must use WorkSurface`);
       assert.doesNotMatch(source, /function\s+SummaryCard|const\s+SummaryCard\s*=/);
     }
+  });
+
+  it("keeps remaining modules on shared primitives with no duplicate KPI or tab implementations", () => {
+    for (const route of remainingMigrationRoutes) {
+      const source = sourceFor(route);
+      assert.doesNotMatch(source, /\b(?:KpiCard|KpiGrid|StatCard|ModuleTabs)\b/);
+      assert.doesNotMatch(source, /function\s+SummaryCard|const\s+SummaryCard\s*=/);
+
+      const summaryCardCount = (source.match(/<SummaryCard\b/g) ?? []).length;
+      assert.ok(
+        summaryCardCount <= 4,
+        `${route} must render no more than four primary summary cards`,
+      );
+    }
+
+    const canteen = sourceFor("canteen");
+    assert.doesNotMatch(canteen, /<SummaryGrid|<SummaryCard/);
+    assert.match(canteen, /Open POS|Serving counter|Recent POS transactions/);
+  });
+
+  it("retains task-specific operational workspaces", () => {
+    const markers = {
+      activity: /consent|moderation|protected gallery/i,
+      hr: /leave queue|staff directory|payroll/i,
+      payroll: /Posting Status|Payroll Runs/i,
+      library: /Issue \/ Return|overdue attention/i,
+      transport: /Location Status|stale GPS|assigned trips/i,
+      canteen: /Open POS|serving|allergy/i,
+      accounting: /Double-Entry Guard|reconciliation/i,
+      notices: /Recipient Preview|Delivery Logs/i,
+      learning: /teacher-led|LearningSessionsPanel|protected resources/i,
+    };
+
+    for (const [route, marker] of Object.entries(markers)) {
+      assert.match(sourceFor(route), marker, `${route} lost its operational purpose`);
+    }
+  });
+
+  it("keeps shared states and protected-file helpers in the migrated system", () => {
+    const fixture = read("components/test-fixtures/workspace-state-fixture.tsx");
+    for (const state of [
+      "LoadingState",
+      "EmptyState",
+      "NoResultsState",
+      "ErrorState",
+      "PermissionDenied",
+      "ModuleLockedState",
+      "PartialFailureState",
+      "QueuedJobState",
+      "FileUnavailableState",
+    ]) {
+      assert.match(fixture, new RegExp(state));
+    }
+
+    const protectedSurfaces = [
+      read("components/hr/staff-documents-panel.tsx"),
+      read("components/hr/payslip-list.tsx"),
+      read("components/learning/learning-resources-panel.tsx"),
+      read("app/dashboard/notices/[noticeId]/page.tsx"),
+    ].join("\n");
+    assert.match(protectedSurfaces, /ProtectedFileButton/);
+    assert.doesNotMatch(protectedSurfaces, /window\.open\([^)]*(?:file|attachment|payslip)/i);
+  });
+
+  it("keeps M12 delivery, M15 notice authoring, and deferred chat boundaries distinct", () => {
+    const notices = sourceFor("notices");
+    const deferredChat = read("components/messaging/chat-deferred-state.tsx");
+    const sidebar = read("components/layout/sidebar.tsx");
+
+    assert.match(notices, /communicationsApi\.getCommunicationsSummary/);
+    assert.match(notices, /recipient|Delivery/i);
+    assert.match(deferredChat, /unavailable for this release/i);
+    assert.doesNotMatch(sidebar, /href:\s*["']\/dashboard\/(?:messages|messaging)["']/);
   });
 
   it("keeps module colour out of primary actions and workspace navigation", () => {
@@ -69,10 +185,19 @@ describe("SchoolOS workspace consistency contract", () => {
       read("components/finance/fee-overview.tsx"),
       read("app/dashboard/homework/page.tsx"),
       read("app/dashboard/academics/page.tsx"),
+      read("app/dashboard/activity/page.tsx"),
+      read("app/dashboard/hr/page.tsx"),
+      read("app/dashboard/payroll/page.tsx"),
+      read("app/dashboard/library/page.tsx"),
+      read("app/dashboard/transport/layout.tsx"),
+      read("app/dashboard/canteen/page.tsx"),
+      read("app/dashboard/accounting/layout.tsx"),
+      read("components/notices/notices-workspace.tsx"),
+      read("app/dashboard/learning/page.tsx"),
     ].join("\n");
     assert.doesNotMatch(
       targetSource,
-      /bg-\[var\(--color-mod-(?:admissions|attendance|fees|homework|academics)-accent\)\]/,
+      /bg-\[var\(--color-mod-(?:admissions|attendance|fees|homework|academics|activity)-accent\)\]/,
     );
 
     const tabs = read("components/dashboard/module-tabs.tsx");
@@ -107,6 +232,7 @@ describe("SchoolOS workspace consistency contract", () => {
     assert.match(provider, /standard: 0\.18/);
     assert.match(provider, /deliberate: 0\.22/);
     assert.match(provider, /0\.2, 0\.8, 0\.2, 1/);
+    assert.match(provider, /reducedMotion="user"/);
     assert.match(providers, /SchoolOSMotionProvider/);
     assert.doesNotMatch(shell, /animate-in|duration-300|slide-in|zoom-in/);
   });
@@ -116,6 +242,7 @@ describe("SchoolOS workspace consistency contract", () => {
     const admissions = sourceFor("admissions");
     const homework = sourceFor("homework");
     const fees = sourceFor("fees");
+    const activity = sourceFor("activity");
 
     assert.match(students, /useUrlFilters/);
     assert.match(students, /TablePagination/);
@@ -125,5 +252,8 @@ describe("SchoolOS workspace consistency contract", () => {
     assert.match(homework, /listHomeworkPage/);
     assert.match(fees, /searchParams/);
     assert.match(fees, /searchCollectionStudents/);
+    assert.match(activity, /limit: pageSize \+ 1/);
+    assert.match(activity, /offset: \(page - 1\) \* pageSize/);
+    assert.match(activity, /OffsetPagination/);
   });
 });

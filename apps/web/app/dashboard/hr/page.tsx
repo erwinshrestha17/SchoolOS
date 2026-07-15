@@ -19,8 +19,10 @@ import Link from "next/link";
 import { api } from "../../../lib/api";
 import { cn } from "../../../lib/utils";
 import { ModuleHeader } from "../../../components/ui/module-header";
-import { KpiCard, KpiGrid } from "../../../components/ui/kpi-card";
-import { ModuleTabs } from "../../../components/dashboard/module-tabs";
+import { DashboardPageShell } from "../../../components/dashboard/dashboard-page-shell";
+import { SummaryCard, SummaryGrid } from "../../../components/ui/summary-card";
+import { WorkspaceTabs } from "../../../components/ui/module-tabs";
+import { WorkSurface } from "../../../components/ui/work-surface";
 import { StatusBadge } from "../../../components/ui/status-badge";
 import { LoadingState } from "../../../components/ui/loading-state";
 import { EmptyState } from "../../../components/ui/empty-state";
@@ -90,7 +92,7 @@ export default function HRDashboardPage() {
   ];
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <DashboardPageShell>
       <ModuleHeader
         title="HR & Payroll"
         description="Manage staff records, leave, attendance, payroll runs, and payslips."
@@ -125,13 +127,11 @@ export default function HRDashboardPage() {
             onClick: () => router.push("/dashboard/payroll/reports"),
           },
         ]}
-      >
-        <ModuleTabs items={moduleTabs} accentColor="purple" variant="light" />
-      </ModuleHeader>
+      />
 
-      <KpiGrid className="sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-        <KpiCard
-          title="Active Staff"
+      <SummaryGrid>
+        <SummaryCard
+          label="Active Staff"
           value={
             payrollSummaryQuery.isError
               ? "Unavailable"
@@ -142,8 +142,8 @@ export default function HRDashboardPage() {
           tone="neutral"
           description="Backend-owned staff count"
         />
-        <KpiCard
-          title="On Leave Today"
+        <SummaryCard
+          label="On Leave Today"
           value={
             payrollSummaryQuery.isError
               ? "Unavailable"
@@ -154,8 +154,8 @@ export default function HRDashboardPage() {
           tone="neutral"
           description="Approved leave scoped to today"
         />
-        <KpiCard
-          title="Pending Leave"
+        <SummaryCard
+          label="Pending Leave"
           value={unavailable(leaveQueueQuery.isError, leaveQueue?.pending)}
           icon={<AlertCircle className="h-5 w-5" />}
           loading={leaveQueueQuery.isLoading}
@@ -163,8 +163,8 @@ export default function HRDashboardPage() {
           tone={(leaveQueue?.pending ?? 0) > 0 ? "warning" : "success"}
           description={`${leaveQueue?.stalePending ?? 0} stale beyond ${leaveQueue?.staleDays ?? 7} days`}
         />
-        <KpiCard
-          title="Contract Expiring"
+        <SummaryCard
+          label="Contract Expiring"
           value={unavailable(contractRemindersQuery.isError, reminders?.total)}
           icon={<Briefcase className="h-5 w-5" />}
           loading={contractRemindersQuery.isLoading}
@@ -172,52 +172,16 @@ export default function HRDashboardPage() {
           tone={(reminders?.total ?? 0) > 0 ? "warning" : "success"}
           description={`Next ${reminders?.windowDays ?? 30} days`}
         />
-        <KpiCard
-          title="Payroll Exceptions"
-          value={
-            payrollSummaryQuery.isError
-              ? "Unavailable"
-              : (selectedRun?.validationExceptionCount ?? 0)
-          }
-          icon={<BadgeCheck className="h-5 w-5" />}
-          loading={payrollSummaryQuery.isLoading}
-          href="/dashboard/payroll/readiness"
-          tone={
-            (selectedRun?.validationExceptionsBySeverity.BLOCKING ?? 0) > 0
-              ? "danger"
-              : (selectedRun?.validationExceptionsBySeverity.WARNING ?? 0) > 0
-                ? "warning"
-                : "success"
-          }
-          description="Backend-owned readiness queue"
-        />
-        <KpiCard
-          title="Payslips Generated"
-          value={
-            payrollSummaryQuery.isError
-              ? "Unavailable"
-              : selectedRun
-                ? `${selectedRun.payslipGeneration.total}/${selectedRun.payslipGeneration.expected}`
-                : "Unavailable"
-          }
-          icon={<FileText className="h-5 w-5" />}
-          loading={payrollSummaryQuery.isLoading}
-          tone="neutral"
-          description="Selected payroll run"
-        />
-      </KpiGrid>
+      </SummaryGrid>
+
+      <WorkspaceTabs items={moduleTabs} />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
-        <section className="shell-card p-6">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h2 className="text-lg font-black text-slate-950">
-                Leave Approval Queue
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Pending leave requests from the approval queue endpoint.
-              </p>
-            </div>
+        <WorkSurface
+          title="Leave Approval Queue"
+          description="Pending leave requests from the approval queue endpoint."
+          variant="queue"
+          action={
             <Link
               href="/dashboard/hr/leave"
               className="inline-flex items-center gap-1.5 text-sm font-bold text-[var(--primary-dark)] hover:text-slate-950"
@@ -225,9 +189,9 @@ export default function HRDashboardPage() {
               Review Leave
               <ArrowRight className="h-4 w-4" />
             </Link>
-          </div>
-
-          <div className="mt-5">
+          }
+        >
+          <div>
             {leaveQueueQuery.isLoading ? (
               <LoadingState variant="spinner" label="Loading leave queue..." />
             ) : leaveQueueQuery.isError ? (
@@ -284,18 +248,13 @@ export default function HRDashboardPage() {
               />
             )}
           </div>
-        </section>
+        </WorkSurface>
 
-        <section className="shell-card p-6">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h2 className="text-lg font-black text-slate-950">
-                Contract Reminders
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Active contract and probation reminders for the next 30 days.
-              </p>
-            </div>
+        <WorkSurface
+          title="Contract Reminders"
+          description="Active contract and probation reminders for the next 30 days."
+          variant="monitoring"
+          action={
             <Link
               href="/dashboard/hr/contracts"
               className="inline-flex items-center gap-1.5 text-sm font-bold text-[var(--primary-dark)] hover:text-slate-950"
@@ -303,9 +262,9 @@ export default function HRDashboardPage() {
               Manage Contracts
               <ArrowRight className="h-4 w-4" />
             </Link>
-          </div>
-
-          <div className="mt-5">
+          }
+        >
+          <div>
             {contractRemindersQuery.isLoading ? (
               <LoadingState
                 variant="spinner"
@@ -374,21 +333,15 @@ export default function HRDashboardPage() {
               />
             )}
           </div>
-        </section>
+        </WorkSurface>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(360px,1.05fr)]">
-        <section className="shell-card p-6">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h2 className="text-lg font-black text-slate-950">
-                Payroll Posting Boundary
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Review, approve, and post payroll runs to accounting.
-                Disbursement is not exposed here.
-              </p>
-            </div>
+        <WorkSurface
+          title="Payroll Posting Boundary"
+          description="Review, approve, and post payroll runs to accounting. Disbursement is not exposed here."
+          variant="monitoring"
+          action={
             <Link
               href="/dashboard/payroll/runs"
               className="inline-flex items-center gap-1.5 text-sm font-bold text-[var(--primary-dark)] hover:text-slate-950"
@@ -396,9 +349,9 @@ export default function HRDashboardPage() {
               Open Runs
               <ArrowRight className="h-4 w-4" />
             </Link>
-          </div>
-
-          <div className="mt-5 space-y-3">
+          }
+        >
+          <div className="space-y-3">
             {payrollSummaryQuery.isLoading ? (
               <LoadingState variant="spinner" label="Loading payroll runs..." />
             ) : payrollSummaryQuery.isError ? (
@@ -465,15 +418,14 @@ export default function HRDashboardPage() {
               </>
             )}
           </div>
-        </section>
+        </WorkSurface>
 
-        <section className="shell-card p-6">
-          <h2 className="text-lg font-black text-slate-950">Known Boundary</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Payroll settlement remains separate from the verified
-            accrual-posting workflow.
-          </p>
-          <div className="mt-5 space-y-3">
+        <WorkSurface
+          title="Known Boundary"
+          description="Payroll settlement remains separate from the verified accrual-posting workflow."
+          variant="monitoring"
+        >
+          <div className="space-y-3">
             {remainingIssues.map((issue) => (
               <div
                 key={issue}
@@ -484,8 +436,8 @@ export default function HRDashboardPage() {
               </div>
             ))}
           </div>
-        </section>
+        </WorkSurface>
       </div>
-    </div>
+    </DashboardPageShell>
   );
 }

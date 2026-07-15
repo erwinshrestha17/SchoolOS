@@ -27,10 +27,10 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { FilterBar } from "@/components/ui/filter-bar";
 import { LoadingState } from "@/components/ui/loading-state";
 import { ModuleHeader } from "@/components/ui/module-header";
-import { ModuleTabs } from "@/components/ui/module-tabs";
+import { WorkspaceTabs } from "@/components/ui/module-tabs";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { DashboardPageShell } from "@/components/dashboard/dashboard-page-shell";
-import { SectionCard } from "@/components/ui/section-card";
+import { WorkSurface } from "@/components/ui/work-surface";
 import {
   Dialog,
   DialogContent,
@@ -247,7 +247,7 @@ export function ParentTeacherMessagingWorkspace({
         ]}
       />
 
-      <ModuleTabs
+      <WorkspaceTabs
         items={[
           { href: "/dashboard/notices", label: "Notices" },
           { href: "/dashboard/notices/new", label: "Compose" },
@@ -255,11 +255,9 @@ export function ParentTeacherMessagingWorkspace({
           { href: "/dashboard/messages", label: "Chat" },
           { href: "/dashboard/messages/moderation", label: "Escalations" },
         ]}
-        accentColor="rose"
-        variant="light"
       />
 
-      <div className="mt-6 space-y-6">
+      <div className="space-y-6">
         <AvailabilityBanner
           isLoading={availabilityQuery.isLoading}
           isError={availabilityQuery.isError}
@@ -269,7 +267,7 @@ export function ParentTeacherMessagingWorkspace({
         />
 
         <div className="grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
-          <SectionCard
+          <WorkSurface
             title="Inbox"
             description="Student-linked parent-teacher threads"
           >
@@ -361,16 +359,16 @@ export function ParentTeacherMessagingWorkspace({
                 </div>
               )}
             </div>
-          </SectionCard>
+          </WorkSurface>
 
-          <SectionCard
+          <WorkSurface
             title={activeThread ? getThreadTitle(activeThread) : "Thread"}
             description={
               activeThread
                 ? getThreadSubtitle(activeThread)
                 : "Select a conversation"
             }
-            headerAction={
+            action={
               activeThread ? <StatusBadge value={activeThread.status} /> : null
             }
           >
@@ -538,7 +536,7 @@ export function ParentTeacherMessagingWorkspace({
                 </div>
               </div>
             ) : null}
-          </SectionCard>
+          </WorkSurface>
         </div>
       </div>
 

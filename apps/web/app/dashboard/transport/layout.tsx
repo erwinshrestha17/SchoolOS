@@ -5,7 +5,7 @@ import { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { BarChart3, Bus, MapPin, Navigation, Route, Users } from 'lucide-react';
 import { DashboardPageShell } from '../../../components/dashboard/dashboard-page-shell';
-import { ModuleTabs } from '../../../components/dashboard/module-tabs';
+import { WorkspaceTabs } from '../../../components/ui/module-tabs';
 import { ModuleHeader } from '../../../components/ui/module-header';
 
 const transportTabs = [
@@ -30,7 +30,7 @@ export default function TransportLayout({ children }: { children: ReactNode }) {
         primaryAction={
           <Link
             href="/dashboard/transport/trips"
-            className="inline-flex h-9 items-center gap-2 rounded-xl bg-[var(--color-mod-transport-text)] px-4 text-sm font-bold text-white shadow-sm transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:ring-offset-2 active:scale-[0.98]"
+            className="inline-flex h-9 items-center gap-2 rounded-xl bg-[var(--primary)] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--primary-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2 active:scale-[0.98]"
           >
             <Navigation className="h-4 w-4" />
             Open Trips
@@ -63,9 +63,8 @@ export default function TransportLayout({ children }: { children: ReactNode }) {
             onClick: () => router.push('/dashboard/transport/reports'),
           },
         ]}
-      >
-        <ModuleTabs items={transportTabs} accentColor="orange" variant="light" />
-      </ModuleHeader>
+      />
+      <WorkspaceTabs items={transportTabs} />
       <main>{children}</main>
     </DashboardPageShell>
   );

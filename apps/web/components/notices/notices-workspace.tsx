@@ -10,9 +10,10 @@ import { DashboardPageShell } from '../dashboard/dashboard-page-shell';
 import { CommunicationsForm } from '../forms/communications-form';
 import { DeliveryRetryPanel } from '../forms/delivery-retry-panel';
 import { NoticeDetailLinksPanel } from '../forms/notice-detail-links-panel';
-import { KpiCard, KpiGrid } from '../ui/kpi-card';
+import { SummaryCard, SummaryGrid } from '../ui/summary-card';
+import { WorkSurface } from '../ui/work-surface';
 import { ModuleHeader } from '../ui/module-header';
-import { ModuleTabs } from '../ui/module-tabs';
+import { WorkspaceTabs } from '../ui/module-tabs';
 import { useSession } from '../session-provider';
 
 type NoticeWorkspaceSection = 'Notices' | 'Delivery Records';
@@ -60,7 +61,7 @@ export function NoticesWorkspace({
           variant === 'overview' && canCreateNotices ? (
             <Link
               href="/dashboard/notices/new"
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--color-mod-notices-accent)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-notices-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-notices-border)] focus:ring-offset-2"
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--primary)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--primary-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2"
             >
               <Send size={18} />
               New Notice
@@ -98,35 +99,36 @@ export function NoticesWorkspace({
               ]
             : []),
         ]}
-      >
-        {variant === 'overview' ? (
-          <KpiGrid className="sm:grid-cols-2 xl:grid-cols-4">
-            <KpiCard
-              title="Sent Today"
+      />
+
+      {variant === 'overview' ? (
+          <SummaryGrid>
+            <SummaryCard
+              label="Sent Today"
               loading={summaryQuery.isLoading}
               value={summaryValue(summary?.sentToday)}
               icon={<Send size={20} />}
               tone="neutral"
               description="Notices sent in the current Nepal school day."
             />
-            <KpiCard
-              title="Scheduled"
+            <SummaryCard
+              label="Scheduled"
               loading={summaryQuery.isLoading}
               value={summaryValue(summary?.scheduledNotices)}
               icon={<Clock3 size={20} />}
               tone={(summary?.scheduledNotices ?? 0) > 0 ? 'info' : 'neutral'}
               description="Notices waiting for their scheduled send time."
             />
-            <KpiCard
-              title="Failed Deliveries"
+            <SummaryCard
+              label="Failed Deliveries"
               loading={summaryQuery.isLoading}
               value={summaryValue(summary?.failedDeliveries)}
               icon={<AlertTriangle size={20} />}
               tone={(summary?.failedDeliveries ?? 0) > 0 ? 'danger' : 'neutral'}
               description="Failed or retry-pending delivery records."
             />
-            <KpiCard
-              title="Unread High-Impact"
+            <SummaryCard
+              label="Unread High-Impact"
               loading={summaryQuery.isLoading}
               value={summaryValue(summary?.unreadHighImpactNotices)}
               icon={<Mail size={20} />}
@@ -137,11 +139,10 @@ export function NoticesWorkspace({
               }
               description="Unread urgent or emergency delivery rows."
             />
-          </KpiGrid>
-        ) : null}
-      </ModuleHeader>
+          </SummaryGrid>
+      ) : null}
 
-      <ModuleTabs
+      <WorkspaceTabs
         items={[
           { href: '/dashboard/notices', label: 'Notices' },
           ...(canCreateNotices
@@ -164,21 +165,30 @@ export function NoticesWorkspace({
               ]
             : []),
         ]}
-        accentColor="rose"
-        variant="light"
       />
 
-      <div className="mt-6 space-y-6">
-        <CommunicationsForm
-          initialSection={initialSection}
-          mode={
+      <div className="space-y-6">
+        <WorkSurface
+          title={variant === 'composer' ? 'Notice composer' : initialSection}
+          description={
             variant === 'composer'
-              ? 'composer'
-              : initialSection === 'Delivery Records'
-                ? 'delivery'
-                : 'overview'
+              ? 'Build the audience, preview backend recipient resolution, and publish or schedule safely.'
+              : 'Operate official notice and delivery records from backend-owned state.'
           }
-        />
+          variant={variant === 'composer' ? 'builder' : 'queue'}
+          flush
+        >
+          <CommunicationsForm
+            initialSection={initialSection}
+            mode={
+              variant === 'composer'
+                ? 'composer'
+                : initialSection === 'Delivery Records'
+                  ? 'delivery'
+                  : 'overview'
+            }
+          />
+        </WorkSurface>
         {variant === 'overview' ? (
           <>
             <NoticeDetailLinksPanel />

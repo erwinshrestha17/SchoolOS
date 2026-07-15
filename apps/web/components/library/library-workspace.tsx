@@ -8,13 +8,13 @@ import {
   ArrowUpRight,
   BellRing,
   BookOpen,
+  BookmarkCheck,
   CheckCircle2,
   ClipboardList,
   Copy,
   Download,
   FileText,
   Library,
-  PackageCheck,
   RotateCcw,
   Search,
 } from "lucide-react";
@@ -38,7 +38,8 @@ import {
   type ReturnLibraryIssuePayload,
 } from "../../lib/library-api";
 import { api } from "../../lib/api";
-import { KpiCard, KpiGrid } from "../ui/kpi-card";
+import { SummaryCard, SummaryGrid } from "../ui/summary-card";
+import { WorkSurface } from "../ui/work-surface";
 import { EmptyState } from "../ui/empty-state";
 import { ErrorState } from "../ui/error-state";
 import { LoadingState } from "../ui/loading-state";
@@ -206,6 +207,12 @@ export function LibraryWorkspace({
         page: String(issuePage),
         limit: listPageSize,
       }),
+  });
+  const activeLoansQuery = useQuery({
+    queryKey: ["library-issues", "ISSUED", "overview"],
+    queryFn: () =>
+      libraryApi.listIssues({ status: "ISSUED", page: "1", limit: "1" }),
+    enabled: activeTab === "overview",
   });
   const overdueQuery = useQuery({
     queryKey: ["library-overdue", overduePage],
@@ -487,32 +494,41 @@ export function LibraryWorkspace({
   const reservations = reservationsQuery.data?.items ?? emptyReservations;
 
   const stats = useMemo(() => {
-    const totalBooks = booksQuery.data?.meta.total ?? books.length;
-    const totalCopies = copiesQuery.data?.meta.total ?? copies.length;
-
     return {
-      totalBooks,
-      totalCopies,
-      availableCopies: "Unavailable" as const,
-      issuedCopies: "Unavailable" as const,
-      overdueIssues: overdueQuery.data?.meta.total ?? overdueIssues.length,
-      lostDamaged: "Unavailable" as const,
+      activeLoans: activeLoansQuery.isError
+        ? ("Unavailable" as const)
+        : (activeLoansQuery.data?.meta.total ?? 0),
+      overdueIssues: overdueQuery.isError
+        ? ("Unavailable" as const)
+        : (overdueQuery.data?.meta.total ?? 0),
+      reservationsWaiting: reservationsQuery.isError
+        ? ("Unavailable" as const)
+        : (reservationsQuery.data?.meta.total ?? 0),
+      totalCopies: copiesQuery.isError
+        ? ("Unavailable" as const)
+        : (copiesQuery.data?.meta.total ?? 0),
     };
   }, [
-    books.length,
-    booksQuery.data?.meta.total,
-    copies.length,
+    activeLoansQuery.data?.meta.total,
+    activeLoansQuery.isError,
     copiesQuery.data?.meta.total,
-    overdueIssues.length,
+    copiesQuery.isError,
     overdueQuery.data?.meta.total,
+    overdueQuery.isError,
+    reservationsQuery.data?.meta.total,
+    reservationsQuery.isError,
   ]);
 
   const isLoading =
-    booksQuery.isLoading || copiesQuery.isLoading || issuesQuery.isLoading;
+    activeLoansQuery.isLoading ||
+    copiesQuery.isLoading ||
+    overdueQuery.isLoading ||
+    reservationsQuery.isLoading;
   const error =
     booksQuery.error ||
     copiesQuery.error ||
     issuesQuery.error ||
+    activeLoansQuery.error ||
     overdueQuery.error;
 
   function handleBookSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -882,83 +898,77 @@ function OverviewPanel({
   overdueIssues,
 }: {
   stats: {
-    totalBooks: number;
-    totalCopies: number;
-    availableCopies: number | "Unavailable";
-    issuedCopies: number | "Unavailable";
-    overdueIssues: number;
-    lostDamaged: number | "Unavailable";
+    activeLoans: number | "Unavailable";
+    overdueIssues: number | "Unavailable";
+    reservationsWaiting: number | "Unavailable";
+    totalCopies: number | "Unavailable";
   };
   isLoading: boolean;
   overdueIssues: LibraryIssue[];
 }) {
   return (
     <div className="space-y-6">
-      <KpiGrid className="xl:grid-cols-3">
-        <KpiCard
-          title="Total books"
-          value={stats.totalBooks}
-          icon={<BookOpen size={18} />}
-          loading={isLoading}
-          description="Backend catalog metadata"
-        />
-        <KpiCard
-          title="Total copies"
-          value={stats.totalCopies}
-          icon={<Copy size={18} />}
-          loading={isLoading}
-          description="Backend copy metadata"
-        />
-        <KpiCard
-          title="Available copies"
-          value={stats.availableCopies}
-          icon={<PackageCheck size={18} />}
-          tone="neutral"
-          description="Needs copy-status summary"
-        />
-        <KpiCard
-          title="Issued copies"
-          value={stats.issuedCopies}
+      <SummaryGrid>
+        <SummaryCard
+          label="Books on loan"
+          value={stats.activeLoans}
           icon={<ClipboardList size={18} />}
-          tone="neutral"
-          description="Needs circulation summary"
+          loading={isLoading}
+          href="/dashboard/library/issues"
+          description="Backend circulation metadata"
         />
-        <KpiCard
-          title="Overdue issues"
+        <SummaryCard
+          label="Overdue issues"
           value={stats.overdueIssues}
           icon={<AlertCircle size={18} />}
           loading={isLoading}
+          href="/dashboard/library/overdue"
           description="Backend overdue metadata"
-          tone={stats.overdueIssues > 0 ? "warning" : "success"}
+          tone={
+            typeof stats.overdueIssues === "number" && stats.overdueIssues > 0
+              ? "warning"
+              : "success"
+          }
         />
-        <KpiCard
-          title="Lost / damaged"
-          value={stats.lostDamaged}
-          icon={<Library size={18} />}
+        <SummaryCard
+          label="Reservations waiting"
+          value={stats.reservationsWaiting}
+          icon={<BookmarkCheck size={18} />}
+          loading={isLoading}
+          href="/dashboard/library/reservations"
+          tone={
+            typeof stats.reservationsWaiting === "number" &&
+            stats.reservationsWaiting > 0
+              ? "info"
+              : "success"
+          }
+          description="Active reservation metadata"
+        />
+        <SummaryCard
+          label="Catalogue copies"
+          value={stats.totalCopies}
+          icon={<Copy size={18} />}
+          loading={isLoading}
+          href="/dashboard/library/copies"
           tone="neutral"
-          description="Needs inventory-health summary"
+          description="Backend copy metadata"
         />
-      </KpiGrid>
+      </SummaryGrid>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">
-              Operational attention
-            </h2>
-            <p className="text-sm text-slate-500">
-              Overdue copies that may need reminders or follow-up.
-            </p>
-          </div>
+      <WorkSurface
+        title="Operational attention"
+        description="Overdue copies that may need reminders or follow-up."
+        variant="queue"
+        action={
           <Link
             href="/dashboard/library/overdue"
-            className="rounded-xl bg-[var(--color-mod-library-accent)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-mod-library-text)]"
+            className="text-sm font-semibold text-[var(--primary)] hover:text-[var(--primary-dark)]"
           >
             Open overdue
           </Link>
-        </div>
-
-        <div className="mt-5 space-y-3">
+        }
+      >
+        <div className="space-y-3">
           {overdueIssues.slice(0, 5).map((issue) => (
             <IssueRow key={issue.id} issue={issue} compact />
           ))}
@@ -969,26 +979,26 @@ function OverviewPanel({
             />
           )}
         </div>
-      </section>
+      </WorkSurface>
 
       <section className="rounded-2xl border border-warning-100 bg-warning-50 p-5">
         <h2 className="text-sm font-black uppercase tracking-wide text-warning-800">
           Remaining Issues
         </h2>
         <p className="mt-2 text-sm leading-6 text-warning-800">
-          Available, issued, and lost/damaged official totals need a
-          module-owned Library summary endpoint. Until then, this overview only
-          shows totals from backend list metadata and marks missing summaries
-          unavailable.
+          Available-copy, lost/damaged, and fine-review totals need a
+          module-owned Library summary endpoint. This landing page uses bounded
+          backend pagination metadata for circulation and marks unsupported
+          official totals as needs summary API.
         </p>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <PanelHeader
-          title="Library operations"
-          description="Access detailed borrower history, fine records, and health reports."
-        />
-        <div className="mt-5 grid gap-4 lg:grid-cols-3">
+      <WorkSurface
+        title="Library operations"
+        description="Access detailed borrower history, fine records, and health reports."
+        variant="grid"
+      >
+        <div className="grid gap-4 lg:grid-cols-3">
           <Link
             href="/dashboard/library/reports"
             className="group rounded-2xl border border-slate-100 bg-slate-50/50 p-5 transition hover:border-[var(--color-mod-library-border)] hover:bg-[var(--color-mod-library-bg)]"
@@ -1023,7 +1033,7 @@ function OverviewPanel({
             </p>
           </Link>
         </div>
-      </section>
+      </WorkSurface>
     </div>
   );
 }

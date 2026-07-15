@@ -17,8 +17,10 @@ import {
 import { api } from "../../../lib/api";
 import { cn } from "../../../lib/utils";
 import { ModuleHeader } from "../../../components/ui/module-header";
-import { KpiCard, KpiGrid } from "../../../components/ui/kpi-card";
-import { ModuleTabs } from "../../../components/dashboard/module-tabs";
+import { DashboardPageShell } from "../../../components/dashboard/dashboard-page-shell";
+import { SummaryCard, SummaryGrid } from "../../../components/ui/summary-card";
+import { WorkspaceTabs } from "../../../components/ui/module-tabs";
+import { WorkSurface } from "../../../components/ui/work-surface";
 import { LoadingState } from "../../../components/ui/loading-state";
 import { ErrorState } from "../../../components/ui/error-state";
 import { EmptyState } from "../../../components/ui/empty-state";
@@ -89,7 +91,7 @@ export default function PayrollDashboardPage() {
     .reduce((total, step) => total + step.count, 0);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <DashboardPageShell>
       <ModuleHeader
         eyebrow="M7 Payroll"
         title="Payroll"
@@ -120,75 +122,50 @@ export default function PayrollDashboardPage() {
             onClick: () => router.push("/dashboard/payroll/reports"),
           },
         ]}
-      >
-        <ModuleTabs items={moduleTabs} accentColor="purple" variant="light" />
-      </ModuleHeader>
+      />
 
-      <KpiGrid>
-        <KpiCard
-          title="Gross Pay"
+      <SummaryGrid>
+        <SummaryCard
+          label="Gross Pay"
           value={formatMoney(selectedRun?.totalGross)}
           icon={<Wallet className="h-5 w-5" />}
           loading={summaryQuery.isLoading}
           tone="neutral"
           description="Selected run backend total"
         />
-        <KpiCard
-          title="Deductions"
+        <SummaryCard
+          label="Deductions"
           value={formatMoney(selectedRun?.totalDeductions)}
           icon={<Calculator className="h-5 w-5" />}
           loading={summaryQuery.isLoading}
           tone="info"
           description="PF, TDS, and other deductions"
         />
-        <KpiCard
-          title="Net Payable"
+        <SummaryCard
+          label="Net Payable"
           value={formatMoney(selectedRun?.totalNet)}
           icon={<BadgeCheck className="h-5 w-5" />}
           loading={summaryQuery.isLoading}
           tone="success"
           description="Backend-calculated run total"
         />
-        <KpiCard
-          title="Approval Queue"
+        <SummaryCard
+          label="Approval Queue"
           value={summaryQuery.isError ? "Unavailable" : awaitingAction}
           icon={<AlertCircle className="h-5 w-5" />}
           loading={summaryQuery.isLoading}
           tone={awaitingAction > 0 ? "warning" : "success"}
           description="Runs awaiting review or posting"
         />
-        <KpiCard
-          title="Readiness Exceptions"
-          value={
-            summaryQuery.isError
-              ? "Unavailable"
-              : (selectedRun?.validationExceptionCount ?? 0)
-          }
-          icon={<ShieldCheck className="h-5 w-5" />}
-          loading={summaryQuery.isLoading}
-          href="/dashboard/payroll/readiness"
-          tone={
-            (selectedRun?.validationExceptionsBySeverity.BLOCKING ?? 0) > 0
-              ? "danger"
-              : (selectedRun?.validationExceptionsBySeverity.WARNING ?? 0) > 0
-                ? "warning"
-                : "success"
-          }
-          description="Backend-owned exception workflow"
-        />
-      </KpiGrid>
+      </SummaryGrid>
 
-      <section className="shell-card p-6">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h2 className="text-lg font-black text-slate-950">
-              Payroll Workflow
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Current loaded run statuses for review, approval, and accounting
-              posting.
-            </p>
-          </div>
+      <WorkspaceTabs items={moduleTabs} />
+
+      <WorkSurface
+        title="Payroll Workflow"
+        description="Current loaded run statuses for review, approval, and accounting posting."
+        variant="queue"
+        action={
           <Link
             href="/dashboard/payroll/runs"
             className="inline-flex items-center gap-1.5 text-sm font-bold text-[var(--primary-dark)] hover:text-slate-950"
@@ -196,9 +173,9 @@ export default function PayrollDashboardPage() {
             Open Payroll Runs
             <ArrowRight className="h-4 w-4" />
           </Link>
-        </div>
-
-        <div className="mt-5">
+        }
+      >
+        <div>
           {summaryQuery.isLoading ? (
             <LoadingState
               variant="spinner"
@@ -239,17 +216,15 @@ export default function PayrollDashboardPage() {
             />
           )}
         </div>
-      </section>
+      </WorkSurface>
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <section className="shell-card p-6">
-          <h2 className="text-lg font-black text-slate-950">Posting Status</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Posted runs are linked to accounting journals; salary disbursement
-            remains outside this workspace.
-          </p>
-
-          <div className="mt-5 space-y-3">
+        <WorkSurface
+          title="Posting Status"
+          description="Posted runs are linked to accounting journals; salary disbursement remains outside this workspace."
+          variant="monitoring"
+        >
+          <div className="space-y-3">
             {[
               {
                 label: "Latest Run",
@@ -273,6 +248,18 @@ export default function PayrollDashboardPage() {
                 tone:
                   awaitingAction > 0 ? "text-warning-700" : "text-success-700",
               },
+              {
+                label: "Readiness Exceptions",
+                status: summaryQuery.isError
+                  ? "Unavailable"
+                  : String(selectedRun?.validationExceptionCount ?? 0),
+                tone:
+                  (selectedRun?.validationExceptionsBySeverity.BLOCKING ?? 0) > 0
+                    ? "text-danger-700"
+                    : (selectedRun?.validationExceptionsBySeverity.WARNING ?? 0) > 0
+                      ? "text-warning-700"
+                      : "text-success-700",
+              },
             ].map((item) => (
               <div
                 key={item.label}
@@ -292,17 +279,14 @@ export default function PayrollDashboardPage() {
               </div>
             ))}
           </div>
-        </section>
+        </WorkSurface>
 
-        <section className="shell-card p-6">
-          <h2 className="text-lg font-black text-slate-950">
-            Reports and Protected Files
-          </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Payslip PDFs and exports stay behind authenticated payroll helpers.
-          </p>
-
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <WorkSurface
+          title="Reports and Protected Files"
+          description="Payslip PDFs and exports stay behind authenticated payroll helpers."
+          variant="grid"
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
             {[
               {
                 label: "Payslips",
@@ -340,7 +324,7 @@ export default function PayrollDashboardPage() {
               </Link>
             ))}
           </div>
-        </section>
+        </WorkSurface>
       </div>
 
       {summaryQuery.isError ? (
@@ -350,6 +334,6 @@ export default function PayrollDashboardPage() {
           onRetry={() => void summaryQuery.refetch()}
         />
       ) : null}
-    </div>
+    </DashboardPageShell>
   );
 }

@@ -563,15 +563,62 @@ financial totals, marks cells, or continuous operational status.
 | `/dashboard/fees` | Orange actions/underline navigation and five-card row | Primary-blue actions/tabs, four decision summaries, transaction work surface |
 | `/dashboard/homework` | Module-blue action, five summaries, large filter area | Primary action, four summaries, shared tabs/filter/work surface |
 | `/dashboard/academics` | Purple actions/tabs and module-themed overview links | Primary action, shared summaries/tabs, canonical work surface |
+| `/dashboard/activity` | Activity-specific header, cards, and filter surface | Monitoring/creation workspace, backend summary, protected-media workflow |
+| `/dashboard/hr` and `/dashboard/payroll` | Separate HR/payroll card and navigation treatments | Shared directory/approval frame, privacy-safe backend summaries, protected staff documents and payslips |
+| `/dashboard/library` | Circulation controls mixed with local dashboard cards | Circulation-first workspace, four decision summaries, catalogue/copy separation |
+| `/dashboard/transport` | Transport-themed summaries and local panels | Monitoring workspace, backend totals only, explicit stale-location and document states |
+| `/dashboard/canteen` | Five browser-derived dashboard statistics | Transaction-first POS/serving workspace with no summary until a safe summary contract exists |
+| `/dashboard/accounting` | Duplicate local header/navigation and themed sections | Shared accounting shell, four backend summaries, task-specific journal/reconciliation surfaces |
+| `/dashboard/notices` | Communications-specific navigation and summary styling | Shared notice/queue frame, four delivery summaries, recipient-preview and delivery ownership preserved |
+| `/dashboard/learning` | Emerald primary actions, local KPI cards, local table/filter surfaces | Teacher-led monitoring/builder frame, backend operational summary, protected resources and session controls |
 
 This baseline does not change backend contracts, authorization, entitlement,
 official totals, server filtering, pagination, or protected-file behavior.
 
-### 8.7 Consistency gate
+M12 owns notification delivery and M15 owns notice authoring. Chat remains a
+hidden, read-disabled compatibility surface until its retention and workflow
+policy is explicitly approved; the shared workspace migration does not
+reactivate chat writes or navigation.
+
+### 8.7 Module-to-pattern mapping
+
+| Module | Approved landing pattern | Purpose-specific workspace retained |
+|---|---|---|
+| M1 Admissions and Student Profiles | Directory + queue/approval | Student directory, admission case review |
+| M2 Smart Attendance | Monitoring + spreadsheet/grid | Session status, roster marking, corrections |
+| M3 Fees and Receipts | Transaction | Cashier collection, invoices, receipts, close |
+| M4 Academics | Spreadsheet/grid + builder | Marks, CAS, results, report-card workflows |
+| M5 Activity Feed and Milestones | Monitoring + queue/approval | Consent-aware feed creation, moderation, protected media |
+| M6 Homework and Timetable | Directory + builder | Assignment review/composer and weekly timetable builder |
+| M7 HR and Payroll | Directory + queue/approval + spreadsheet/grid | Staff privacy, leave approval, payroll posting/correction |
+| M8 Library | Transaction + directory | Circulation counter, catalogue/copies, overdue attention |
+| M9 Transport | Monitoring | Routes, assignments, trip status, stale GPS and documents |
+| M10 Canteen | Transaction | Scanner-first POS/serving, wallet and safety checks |
+| M11 Accounting and Finance | Spreadsheet/grid + transaction | Vouchers, journals, fiscal locks, reconciliation and reports |
+| M12 Notifications and Delivery | Monitoring + queue/approval | Delivery state, retries, provider diagnostics and receipts |
+| M15 Notices and Announcements | Builder + queue/approval | Recipient preview, approval, publish/schedule and attachments |
+| M13 Learning Layer | Builder + monitoring | Teacher activities, controlled sessions, review and protected resources |
+
+Summary cards remain optional. M10 deliberately has no landing summary until a
+backend-owned contract can provide actionable values; loaded POS or wallet rows
+must never become browser-owned official totals.
+
+### 8.8 Controlled state evidence
+
+The authenticated test-only route
+`/dashboard/visual-fixtures/workspace-states` renders deterministic loading,
+empty, no-results, error, permission-denied, module-locked, partial-failure,
+queued, and protected-file-unavailable states only when
+`SCHOOLOS_VISUAL_FIXTURES=1`. It does not change tenant entitlements, weaken
+authorization, or provide production data.
+
+### 8.9 Consistency gate
 
 `test/workspace-consistency-contract.test.mjs` guards the priority routes and
-shared primitives. It verifies the common shell/header/summary/tab/work-surface
-composition, global primary navigation, four-column summary limit, hidden tab
-scrollbars, shared motion boundary, and preservation of URL-backed filtering
-and pagination. Visual review remains required at 1440px, 1280px, 1024px, and
-390px for populated and failure states before broad UI changes merge.
+shared primitives. It verifies the common shell/header/tab/work-surface
+composition, optional backend-owned summaries, task-specific workspace markers,
+protected-file helpers, required shared states, global primary navigation,
+four-card summary limit, hidden tab scrollbars, shared motion boundary, and
+preservation of server filtering and pagination. Visual review remains required
+at 1440px, 1280px, 1024px, and 390px for populated and failure states before
+broad UI changes merge.

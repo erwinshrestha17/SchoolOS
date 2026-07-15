@@ -10,6 +10,13 @@ type TablePaginationProps = {
   onPageChange: (page: number) => void;
 };
 
+type OffsetPaginationProps = {
+  page: number;
+  hasNextPage: boolean;
+  onPageChange: (page: number) => void;
+  itemLabel?: string;
+};
+
 export function TablePagination({
   page,
   pageSize,
@@ -46,6 +53,48 @@ export function TablePagination({
           variant="outline"
           size="sm"
           disabled={page >= pageCount}
+          onClick={() => onPageChange(page + 1)}
+        >
+          Next
+          <ChevronRight size={16} />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Shared pagination for real offset APIs that do not return an official total.
+ * It deliberately never derives or displays a browser-owned total.
+ */
+export function OffsetPagination({
+  page,
+  hasNextPage,
+  onPageChange,
+  itemLabel = 'records',
+}: OffsetPaginationProps) {
+  return (
+    <div className="flex flex-col gap-3 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+      <p className="font-medium text-slate-500">
+        Server-backed {itemLabel} · Page{' '}
+        <span className="font-bold text-slate-800">{page}</span>
+      </p>
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={page <= 1}
+          onClick={() => onPageChange(page - 1)}
+        >
+          <ChevronLeft size={16} />
+          Previous
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={!hasNextPage}
           onClick={() => onPageChange(page + 1)}
         >
           Next
