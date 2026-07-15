@@ -28,6 +28,27 @@ export const NOTIFICATION_EVENT_PRIORITIES = [
   "MANDATORY",
 ] as const;
 
+export const NOTIFICATION_CHANNELS = [
+  "IN_APP",
+  "PUSH",
+  "EMAIL",
+  "SMS",
+] as const;
+
+export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
+
+export const NOTIFICATION_PREFERENCE_CATEGORIES = [
+  "GENERAL",
+  "ATTENDANCE",
+  "FEES",
+  "NOTICE",
+  "SECURITY",
+  "EMERGENCY",
+] as const;
+
+export type NotificationPreferenceCategory =
+  (typeof NOTIFICATION_PREFERENCE_CATEGORIES)[number];
+
 export type NotificationEventPriority =
   (typeof NOTIFICATION_EVENT_PRIORITIES)[number];
 

@@ -53,9 +53,12 @@ describe('NoticeAcknowledgementService', () => {
     eventService = {
       accept: jest.fn().mockResolvedValue({ id: 'event-1' }),
       markDispatched: jest.fn().mockResolvedValue(undefined),
+      markFailed: jest.fn().mockResolvedValue(undefined),
     };
     communicationsService = {
-      recordDeliveryRecords: jest.fn().mockResolvedValue({ count: 2 }),
+      recordDeliveryRecords: jest
+        .fn()
+        .mockResolvedValue({ count: 2, queuedCount: 1, skippedCount: 1 }),
     };
     service = new NoticeAcknowledgementService(
       prisma,
@@ -168,7 +171,13 @@ describe('NoticeAcknowledgementService', () => {
         },
         actor,
       ),
-    ).resolves.toMatchObject({ eventId: 'event-1', recipientCount: 1 });
+    ).resolves.toMatchObject({
+      eventId: 'event-1',
+      recipientCount: 1,
+      requested: 1,
+      queued: 1,
+      skipped: 1,
+    });
     expect(eventService.accept).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'NOTICE_ACKNOWLEDGEMENT_FOLLOW_UP',
@@ -180,6 +189,33 @@ describe('NoticeAcknowledgementService', () => {
         notificationEventId: 'event-1',
         recipientUserIds: [recipientUserId],
       }),
+    );
+  });
+
+  it('marks the persisted event failed when delivery intake fails', async () => {
+    const recipientUserId = '22222222-2222-4222-8222-222222222222';
+    prisma.notificationDelivery.findMany.mockResolvedValueOnce([
+      { recipientUserId },
+    ]);
+    communicationsService.recordDeliveryRecords.mockRejectedValueOnce(
+      new Error('delivery intake failed'),
+    );
+
+    await expect(
+      service.requestFollowUp(
+        'notice-1',
+        {
+          recipientUserIds: [recipientUserId],
+          reason: 'Pilot follow-up requested',
+          idempotencyKey: 'follow-up-002',
+        },
+        actor,
+      ),
+    ).rejects.toThrow('delivery intake failed');
+    expect(eventService.markFailed).toHaveBeenCalledWith(
+      actor.tenantId,
+      'event-1',
+      'DELIVERY_INTAKE_FAILED',
     );
   });
 });

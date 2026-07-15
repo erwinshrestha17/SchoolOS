@@ -14,7 +14,9 @@ import {
   NotificationStatus,
   NoticeLifecycleStatus,
   NoticePriority,
+  NotificationPreferenceCategory,
 } from '@prisma/client';
+import { IsIn } from 'class-validator';
 
 export class CommunicationPageQueryDto {
   @IsOptional()
@@ -68,4 +70,14 @@ export class ListNotificationDeliveriesQueryDto extends CommunicationPageQueryDt
   @IsOptional()
   @IsEnum(NotificationChannel)
   channel?: NotificationChannel;
+}
+
+export class NotificationCenterQueryDto extends CommunicationPageQueryDto {
+  @IsOptional()
+  @IsIn(['ALL', 'READ', 'UNREAD'])
+  readStatus?: 'ALL' | 'READ' | 'UNREAD' = 'ALL';
+
+  @IsOptional()
+  @IsEnum(NotificationPreferenceCategory)
+  category?: NotificationPreferenceCategory;
 }

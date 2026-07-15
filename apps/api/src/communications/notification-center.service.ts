@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
-import type { CommunicationPageQueryDto } from './dto/communication-list-query.dto';
+import type { NotificationCenterQueryDto } from './dto/communication-list-query.dto';
 
 interface NotificationCenterRow {
   id: string;
@@ -24,6 +24,7 @@ interface NotificationCenterRow {
   sentAt: Date | null;
   createdAt: Date;
   readAt: Date | null;
+  eventType: string | null;
 }
 
 export interface NotificationCenterItem {
@@ -39,6 +40,7 @@ export interface NotificationCenterItem {
   readAt: string | null;
   isRead: boolean;
   linkHref: string;
+  category: string;
 }
 
 export interface NotificationCenterSummary {
@@ -56,14 +58,14 @@ export class NotificationCenterService {
 
   async getCenter(
     actor: AuthContext,
-    query: CommunicationPageQueryDto = { page: 1, limit: 25 },
+    query: NotificationCenterQueryDto = { page: 1, limit: 25 },
   ): Promise<NotificationCenterSummary> {
     const page = Math.max(1, query.page ?? 1);
     const limit = Math.min(100, Math.max(1, query.limit ?? 25));
     const [items, unreadCount, total] = await Promise.all([
-      this.getRecentItems(actor, page, limit),
+      this.getRecentItems(actor, page, limit, query),
       this.getUnreadCount(actor),
-      this.getTotalCount(actor),
+      this.getTotalCount(actor, query),
     ]);
 
     return {
@@ -80,6 +82,7 @@ export class NotificationCenterService {
     actor: AuthContext,
     page = 1,
     limit = 25,
+    query: NotificationCenterQueryDto = {},
   ): Promise<NotificationCenterItem[]> {
     const rows = await this.prisma.$queryRaw<
       NotificationCenterRow[]
@@ -103,14 +106,19 @@ export class NotificationCenterService {
         d."errorMessage",
         d."sentAt",
         d."createdAt",
-        r."readAt"
+        r."readAt",
+        ne."type"::text AS "eventType"
       FROM "NotificationDelivery" d
       LEFT JOIN "NotificationReadReceipt" r
         ON r."tenantId" = d."tenantId"
        AND r."notificationDeliveryId" = d."id"
        AND r."userId" = ${actor.userId}
+      LEFT JOIN "NotificationEvent" ne
+        ON ne."id" = d."notificationEventId"
+       AND ne."tenantId" = d."tenantId"
       WHERE d."tenantId" = ${actor.tenantId}
         ${this.visibilitySql(actor)}
+        ${notificationCenterFilterSql(query)}
       ORDER BY d."createdAt" DESC
       LIMIT ${limit} OFFSET ${(page - 1) * limit}
     `);
@@ -136,13 +144,24 @@ export class NotificationCenterService {
     return Number(rows[0]?.count ?? 0);
   }
 
-  private async getTotalCount(actor: AuthContext) {
+  private async getTotalCount(
+    actor: AuthContext,
+    query: NotificationCenterQueryDto,
+  ) {
     const rows = await this.prisma.$queryRaw<Array<{ count: bigint }>>(
       Prisma.sql`
         SELECT COUNT(*)::bigint AS count
         FROM "NotificationDelivery" d
+        LEFT JOIN "NotificationReadReceipt" r
+          ON r."tenantId" = d."tenantId"
+         AND r."notificationDeliveryId" = d."id"
+         AND r."userId" = ${actor.userId}
+        LEFT JOIN "NotificationEvent" ne
+          ON ne."id" = d."notificationEventId"
+         AND ne."tenantId" = d."tenantId"
         WHERE d."tenantId" = ${actor.tenantId}
           ${this.visibilitySql(actor)}
+          ${notificationCenterFilterSql(query)}
       `,
     );
     return Number(rows[0]?.count ?? 0);
@@ -265,12 +284,13 @@ function toCenterItem(row: NotificationCenterRow): NotificationCenterItem {
     readAt: row.readAt?.toISOString() ?? null,
     isRead: Boolean(row.readAt),
     linkHref: resolveNotificationHref(row),
+    category: notificationCategory(row.eventType, row.sourceType),
   };
 }
 
 function resolveNotificationHref(row: NotificationCenterRow) {
   if (row.noticeId) {
-    return '/dashboard/notices';
+    return `/dashboard/notices/${encodeURIComponent(row.noticeId)}`;
   }
 
   if (row.eventId) {
@@ -290,4 +310,46 @@ function resolveNotificationHref(row: NotificationCenterRow) {
   }
 
   return '/dashboard/notices';
+}
+
+function notificationCenterFilterSql(query: NotificationCenterQueryDto) {
+  const readFilter =
+    query.readStatus === 'READ'
+      ? Prisma.sql`AND r."notificationDeliveryId" IS NOT NULL`
+      : query.readStatus === 'UNREAD'
+        ? Prisma.sql`AND r."notificationDeliveryId" IS NULL`
+        : Prisma.empty;
+  const categoryFilter = query.category
+    ? Prisma.sql`AND ${notificationCategorySql()} = ${query.category}`
+    : Prisma.empty;
+  return Prisma.sql`${readFilter} ${categoryFilter}`;
+}
+
+function notificationCategorySql() {
+  return Prisma.sql`(
+    CASE
+      WHEN COALESCE(ne."type"::text, '') LIKE 'ATTENDANCE_%' OR d."sourceType" LIKE 'attendance%' THEN 'ATTENDANCE'
+      WHEN ne."type"::text = 'FEE_PAYMENT_CONFIRMED' OR d."sourceType" LIKE '%fee%' THEN 'FEES'
+      WHEN COALESCE(ne."type"::text, '') LIKE 'NOTICE_%' OR d."sourceType" = 'notice' THEN 'NOTICE'
+      WHEN d."sourceType" LIKE '%security%' OR d."sourceType" LIKE '%auth%' THEN 'SECURITY'
+      WHEN d."sourceType" LIKE '%emergency%' THEN 'EMERGENCY'
+      ELSE 'GENERAL'
+    END
+  )`;
+}
+
+function notificationCategory(eventType: string | null, sourceType: string) {
+  if (
+    eventType?.startsWith('ATTENDANCE_') ||
+    sourceType.startsWith('attendance')
+  )
+    return 'ATTENDANCE';
+  if (eventType === 'FEE_PAYMENT_CONFIRMED' || sourceType.includes('fee'))
+    return 'FEES';
+  if (eventType?.startsWith('NOTICE_') || sourceType === 'notice')
+    return 'NOTICE';
+  if (sourceType.includes('security') || sourceType.includes('auth'))
+    return 'SECURITY';
+  if (sourceType.includes('emergency')) return 'EMERGENCY';
+  return 'GENERAL';
 }

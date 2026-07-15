@@ -26,6 +26,8 @@ interface AcknowledgementRecipientRow {
   firstDeliveredAt: Date;
   acknowledgementId: string | null;
   firstAcknowledgedAt: Date | null;
+  recipientLabel: string | null;
+  recipientType: string;
 }
 
 @Injectable()
@@ -145,12 +147,31 @@ export class NoticeAcknowledgementService {
         SELECT
           r.*,
           a."id" AS "acknowledgementId",
-          a."firstAcknowledgedAt"
+          a."firstAcknowledgedAt",
+          CASE
+            WHEN g."id" IS NOT NULL THEN g."fullName"
+            WHEN s."id" IS NOT NULL THEN CONCAT_WS(' ', s."firstNameEn", s."lastNameEn")
+            ELSE u."email"
+          END AS "recipientLabel",
+          CASE
+            WHEN r."guardianId" IS NOT NULL THEN 'GUARDIAN'
+            WHEN r."studentId" IS NOT NULL THEN 'STUDENT'
+            ELSE 'USER'
+          END AS "recipientType"
         FROM recipients r
         LEFT JOIN "NoticeAcknowledgement" a
           ON a."tenantId" = ${actor.tenantId}
          AND a."noticeId" = ${noticeId}
          AND a."recipientUserId" = r."recipientUserId"
+        LEFT JOIN "User" u
+          ON u."tenantId" = ${actor.tenantId}
+         AND u."id" = r."recipientUserId"
+        LEFT JOIN "Guardian" g
+          ON g."tenantId" = ${actor.tenantId}
+         AND g."id" = r."guardianId"
+        LEFT JOIN "Student" s
+          ON s."tenantId" = ${actor.tenantId}
+         AND s."id" = r."studentId"
         WHERE ${statusClause}
         ORDER BY COALESCE(a."firstAcknowledgedAt", r."firstDeliveredAt") DESC
         LIMIT ${limit} OFFSET ${offset}
@@ -175,6 +196,10 @@ export class NoticeAcknowledgementService {
         firstDeliveredAt: row.firstDeliveredAt.toISOString(),
         acknowledgementId: row.acknowledgementId,
         firstAcknowledgedAt: row.firstAcknowledgedAt?.toISOString() ?? null,
+        recipientLabel: row.recipientLabel ?? 'Recipient unavailable',
+        recipientType:
+          row.recipientType ??
+          (row.guardianId ? 'GUARDIAN' : row.studentId ? 'STUDENT' : 'USER'),
       })),
       total,
       page,
@@ -231,23 +256,33 @@ export class NoticeAcknowledgementService {
       idempotencyKey: sourceId,
       metadata: { recipientCount: recipientUserIds.length },
     });
-    const result = await this.communicationsService.recordDeliveryRecords({
-      actor,
-      sourceType: 'notice_acknowledgement_follow_up',
-      sourceId,
-      noticeId,
-      notificationEventId: event.id,
-      audienceType: AudienceType.ALL,
-      recipientUserIds,
-      title: 'Notice acknowledgement requested',
-      body: 'Please review and acknowledge the school notice.',
-      channels: [NotificationChannel.IN_APP, NotificationChannel.PUSH],
-      communicationCategory: 'ESSENTIAL',
-    });
-    await this.notificationEventService.markDispatched(
-      actor.tenantId,
-      event.id,
-    );
+    let result;
+    try {
+      result = await this.communicationsService.recordDeliveryRecords({
+        actor,
+        sourceType: 'notice_acknowledgement_follow_up',
+        sourceId,
+        noticeId,
+        notificationEventId: event.id,
+        audienceType: AudienceType.ALL,
+        recipientUserIds,
+        title: 'Notice acknowledgement requested',
+        body: 'Please review and acknowledge the school notice.',
+        channels: [NotificationChannel.IN_APP, NotificationChannel.PUSH],
+        communicationCategory: 'ESSENTIAL',
+      });
+      await this.notificationEventService.markDispatched(
+        actor.tenantId,
+        event.id,
+      );
+    } catch (error) {
+      await this.notificationEventService.markFailed(
+        actor.tenantId,
+        event.id,
+        'DELIVERY_INTAKE_FAILED',
+      );
+      throw error;
+    }
     await this.auditService.record({
       action: 'request_follow_up',
       resource: 'notice_acknowledgement',
@@ -262,8 +297,11 @@ export class NoticeAcknowledgementService {
     });
     return {
       eventId: event.id,
+      noticeId,
       recipientCount: recipientUserIds.length,
-      ...result,
+      requested: recipientUserIds.length,
+      queued: result.queuedCount ?? 0,
+      skipped: result.skippedCount ?? 0,
     };
   }
 

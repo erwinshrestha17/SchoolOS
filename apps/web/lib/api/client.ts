@@ -698,6 +698,7 @@ export type NotificationCenterItem = {
   readAt: string | null;
   isRead: boolean;
   linkHref: string;
+  category: string;
 };
 
 export type NotificationCenterSummary = {

@@ -9,6 +9,7 @@ import type {
   NoticeLifecycleStatus,
   NoticeSummary,
   NotificationDelivery,
+  NotificationDeliveryOperationSummary,
   NotificationDeliveryFailureSummary,
   PaginatedResponse,
 } from "@schoolos/core";
@@ -34,6 +35,7 @@ export type NoticeDetail = {
     email: string | null;
   } | null;
   attachmentUrl: string | null;
+  attachmentFileId: string | null;
   lifecycleStatus: NoticeLifecycleStatus;
   approvalRequestId: string | null;
   scheduledFor: string | null;
@@ -53,6 +55,18 @@ export type NoticeDetail = {
     failed: number;
     skipped: number;
   };
+  approvalHistory: Array<{
+    decision: string;
+    reason: string | null;
+    actorEmail: string | null;
+    createdAt: string;
+  }>;
+  auditHistory: Array<{
+    id: string;
+    action: string;
+    actorEmail: string | null;
+    createdAt: string;
+  }>;
 };
 
 export type NoticeUnreadRecipient = {
@@ -103,6 +117,62 @@ export type NoticeRecipientPreview = {
   skippedRecipientCount: number;
   estimatedDeliveryRows: number;
 };
+
+export type NoticeAcknowledgementRecipient = {
+  recipientUserId: string;
+  guardianId: string | null;
+  studentId: string | null;
+  firstDeliveredAt: string;
+  acknowledgementId: string | null;
+  firstAcknowledgedAt: string | null;
+  recipientLabel: string;
+  recipientType: "GUARDIAN" | "STUDENT" | "USER";
+};
+
+export type NoticeAcknowledgementPage =
+  PaginatedResponse<NoticeAcknowledgementRecipient>;
+
+export type NoticeAcknowledgementFollowUpResult = {
+  noticeId: string;
+  requested: number;
+  queued: number;
+  skipped: number;
+  eventId: string;
+};
+
+export type NotificationPreferenceCategory =
+  import("@schoolos/core").NotificationPreferenceCategory;
+
+export type NotificationPreferenceChannel =
+  import("@schoolos/core").NotificationChannel;
+
+export type NotificationPreferenceOverride = {
+  id: string;
+  category: NotificationPreferenceCategory;
+  channel: NotificationPreferenceChannel;
+  enabled: boolean;
+  quietHoursEnabled: boolean | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type NotificationPreferenceSummary = {
+  tenantDefaults: {
+    timezone: "Asia/Kathmandu";
+    quietHoursEnabled: boolean;
+    quietHoursStart: string;
+    quietHoursEnd: string;
+  };
+  overrides: NotificationPreferenceOverride[];
+};
+
+export type NotificationDeliveryPage = PaginatedResponse<NotificationDelivery>;
+
+export type NotificationDeliveryOperationPage =
+  PaginatedResponse<NotificationDeliveryOperationSummary>;
+
+export type NotificationDeliveryFailurePage =
+  PaginatedResponse<NotificationDeliveryFailureSummary>;
 
 export type NotificationDeliveryAnalytics = {
   byStatus: Array<{ status: string; count: number }>;
@@ -161,9 +231,49 @@ export const communicationsApi = {
     ).then((page) => page.items),
   getNoticeDetail: (noticeId: string) =>
     request<NoticeDetail>(`/notices/${encodeURIComponent(noticeId)}`),
-  listNoticeUnreadRecipients: (noticeId: string) =>
+  listNoticeUnreadRecipients: (
+    noticeId: string,
+    params?: { page?: number; limit?: number },
+  ) =>
     request<NoticeUnreadRecipientsResult>(
-      `/notices/${encodeURIComponent(noticeId)}/unread-recipients`,
+      withQuery(
+        `/notices/${encodeURIComponent(noticeId)}/unread-recipients`,
+        params ?? {},
+      ),
+    ),
+  acknowledgeNotice: (noticeId: string) =>
+    request<{
+      id: string;
+      noticeId: string;
+      firstAcknowledgedAt: string;
+    }>(`/notices/${encodeURIComponent(noticeId)}/acknowledge`, {
+      method: "POST",
+    }),
+  listNoticeAcknowledgements: (
+    noticeId: string,
+    params?: {
+      page?: number;
+      limit?: number;
+      status?: "PENDING" | "ACKNOWLEDGED";
+    },
+  ) =>
+    request<NoticeAcknowledgementPage>(
+      withQuery(
+        `/notices/${encodeURIComponent(noticeId)}/acknowledgements`,
+        params ?? {},
+      ),
+    ),
+  requestNoticeAcknowledgementFollowUp: (
+    noticeId: string,
+    body: {
+      recipientUserIds: string[];
+      reason: string;
+      idempotencyKey: string;
+    },
+  ) =>
+    request<NoticeAcknowledgementFollowUpResult>(
+      `/notices/${encodeURIComponent(noticeId)}/acknowledgements/follow-up`,
+      { method: "POST", json: body },
     ),
   createNotice: (body: JsonBody) =>
     request<NoticeSummary>("/notices", { method: "POST", json: body }),
@@ -207,17 +317,36 @@ export const communicationsApi = {
   listEvents: () => request<EventSummary[]>("/events"),
   createEvent: (body: JsonBody) =>
     request<EventSummary>("/events", { method: "POST", json: body }),
+  listNotificationDeliveryPage: (params?: {
+    page?: number;
+    limit?: number;
+    sourceType?: string | null;
+    activityPostId?: string | null;
+    status?: string | null;
+    channel?: string | null;
+  }) =>
+    request<NotificationDeliveryPage>(
+      withQuery("/communications/deliveries", {
+        ...(params ?? {}),
+      }),
+    ),
+  listNotificationDeliveryOperationPage: (params?: {
+    page?: number;
+    limit?: number;
+    sourceType?: string | null;
+    status?: string | null;
+    channel?: string | null;
+  }) =>
+    request<NotificationDeliveryOperationPage>(
+      withQuery("/communications/deliveries/operations", params ?? {}),
+    ),
   listNotificationDeliveries: (params?: {
     sourceType?: string | null;
     activityPostId?: string | null;
   }) =>
-    request<PaginatedResponse<NotificationDelivery>>(
-      withQuery("/communications/deliveries", {
-        page: 1,
-        limit: 100,
-        ...(params ?? {}),
-      }),
-    ).then((page) => page.items),
+    communicationsApi
+      .listNotificationDeliveryPage({ page: 1, limit: 100, ...(params ?? {}) })
+      .then((page) => page.items),
   getNotificationDeliveryAnalytics: () =>
     request<NotificationDeliveryAnalytics>(
       "/communications/deliveries/analytics",
@@ -237,8 +366,17 @@ export const communicationsApi = {
       `/consents/guardians/${encodeURIComponent(guardianId)}/revoke`,
       { method: "POST", json: body },
     ),
+  getNotificationCenterPage: (params?: {
+    page?: number;
+    limit?: number;
+    readStatus?: "ALL" | "READ" | "UNREAD";
+    category?: NotificationPreferenceCategory;
+  }) =>
+    request<NotificationCenterSummary>(
+      withQuery("/communications/notifications", params ?? {}),
+    ),
   getNotificationCenter: () =>
-    request<NotificationCenterSummary>("/communications/notifications"),
+    communicationsApi.getNotificationCenterPage({ page: 1, limit: 25 }),
   markNotificationRead: (id: string) =>
     request<{ success: true }>(
       `/communications/notifications/${encodeURIComponent(id)}/read`,
@@ -259,19 +397,47 @@ export const communicationsApi = {
         json: body ?? {},
       },
     ),
+  listNotificationDeliveryFailurePage: (params?: {
+    page?: number;
+    limit?: number;
+    sourceType?: string | null;
+    status?: string | null;
+    channel?: string | null;
+  }) =>
+    request<NotificationDeliveryFailurePage>(
+      withQuery("/communications/deliveries/failures", params ?? {}),
+    ),
   listNotificationDeliveryFailures: () =>
-    request<{
-      total: number;
-      items: NotificationDeliveryFailureSummary[];
-      page: number;
-      limit: number;
-      hasNextPage: boolean;
-    }>("/communications/deliveries/failures"),
+    communicationsApi.listNotificationDeliveryFailurePage({
+      page: 1,
+      limit: 25,
+    }),
   retryFailedNotificationDeliveries: (body?: { reason?: string }) =>
     request<any>("/communications/deliveries/retry-failed", {
       method: "POST",
       json: body ?? {},
     }),
+
+  getOwnNotificationPreferences: () =>
+    request<NotificationPreferenceSummary>("/notifications/preferences/me"),
+  updateOwnNotificationPreference: (body: {
+    category: NotificationPreferenceCategory;
+    channel: NotificationPreferenceChannel;
+    enabled: boolean;
+    quietHoursEnabled?: boolean;
+  }) =>
+    request<NotificationPreferenceOverride>("/notifications/preferences/me", {
+      method: "PATCH",
+      json: body,
+    }),
+  resetOwnNotificationPreference: (
+    category: NotificationPreferenceCategory,
+    channel: NotificationPreferenceChannel,
+  ) =>
+    request<{ success: true }>(
+      `/notifications/preferences/me/${encodeURIComponent(category)}/${encodeURIComponent(channel)}`,
+      { method: "DELETE" },
+    ),
 
   // Payroll - PDFs
 };

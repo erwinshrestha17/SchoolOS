@@ -15,6 +15,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ProtectedFileButton } from "@/components/ui/protected-file";
 import { useSession } from "@/components/session-provider";
+import { NoticeAcknowledgementPanel } from "@/components/notices/notice-acknowledgement-panel";
+import { TablePagination } from "@/components/ui/table-pagination";
 import {
   ArrowLeft,
   Archive,
@@ -25,9 +27,15 @@ import {
   Send,
   UsersRound,
   XCircle,
+  Pencil,
 } from "lucide-react";
 
-type NoticeLifecycleAction = "cancel" | "archive" | "restore";
+type NoticeLifecycleAction =
+  | "publish"
+  | "schedule"
+  | "cancel"
+  | "archive"
+  | "restore";
 
 export default function NoticeDetailPage() {
   const params = useParams<{ noticeId: string }>();
@@ -37,6 +45,8 @@ export default function NoticeDetailPage() {
   const [pendingAction, setPendingAction] =
     useState<NoticeLifecycleAction | null>(null);
   const [actionReason, setActionReason] = useState("");
+  const [scheduledFor, setScheduledFor] = useState("");
+  const [unreadPage, setUnreadPage] = useState(1);
 
   const noticeQuery = useQuery({
     queryKey: ["notice-detail", noticeId],
@@ -45,9 +55,37 @@ export default function NoticeDetailPage() {
   });
 
   const unreadRecipientsQuery = useQuery({
-    queryKey: ["notice-unread-recipients", noticeId],
-    queryFn: () => api.listNoticeUnreadRecipients(noticeId),
-    enabled: Boolean(noticeId),
+    queryKey: ["notice-unread-recipients", noticeId, unreadPage],
+    queryFn: () =>
+      api.listNoticeUnreadRecipients(noticeId, { page: unreadPage, limit: 25 }),
+    enabled: Boolean(
+      noticeId && session?.user.permissions.includes("notices:read_reports"),
+    ),
+  });
+
+  const previewQuery = useQuery({
+    queryKey: [
+      "notice-recipient-preview",
+      noticeId,
+      noticeQuery.data?.updatedAt,
+    ],
+    queryFn: () =>
+      api.previewNoticeRecipients({
+        title: noticeQuery.data!.title,
+        body: noticeQuery.data!.body,
+        priority: noticeQuery.data!.priority,
+        audienceType: noticeQuery.data!.audienceType,
+        classId: noticeQuery.data!.classId,
+        sectionId: noticeQuery.data!.sectionId,
+      }),
+    enabled: Boolean(
+      noticeQuery.data &&
+      ["DRAFT", "APPROVED", "SCHEDULED"].includes(
+        noticeQuery.data.lifecycleStatus,
+      ) &&
+      (session?.user.permissions.includes("notices:publish") ||
+        session?.user.permissions.includes("notices:schedule")),
+    ),
   });
 
   const lifecycleMutation = useMutation({
@@ -58,6 +96,14 @@ export default function NoticeDetailPage() {
       action: NoticeLifecycleAction;
       reason: string;
     }) => {
+      if (action === "publish")
+        return api.publishNotice(noticeId).then((result) => result.notice);
+      if (action === "schedule") {
+        return api.scheduleNotice(
+          noticeId,
+          new Date(scheduledFor).toISOString(),
+        );
+      }
       if (action === "cancel") return api.cancelNotice(noticeId, reason);
       if (action === "archive") return api.archiveNotice(noticeId, reason);
       return api.restoreNotice(noticeId, reason);
@@ -65,6 +111,7 @@ export default function NoticeDetailPage() {
     onSuccess: async () => {
       setPendingAction(null);
       setActionReason("");
+      setScheduledFor("");
       await Promise.all([
         queryClient.invalidateQueries({
           queryKey: ["notice-detail", noticeId],
@@ -136,7 +183,8 @@ export default function NoticeDetailPage() {
     );
   }
 
-  const attachmentFileId = getProtectedFileId(notice.attachmentUrl);
+  const attachmentFileId =
+    notice.attachmentFileId ?? getProtectedFileId(notice.attachmentUrl);
   const granted = new Set<PermissionKey>(session?.user.permissions ?? []);
   const canCancel =
     granted.has("notices:cancel") &&
@@ -144,11 +192,17 @@ export default function NoticeDetailPage() {
       notice.lifecycleStatus,
     );
   const canArchive =
-    granted.has("notices:archive") &&
-    notice.lifecycleStatus !== "ARCHIVED";
+    granted.has("notices:archive") && notice.lifecycleStatus !== "ARCHIVED";
   const canRestore =
-    granted.has("notices:archive") &&
-    notice.lifecycleStatus === "ARCHIVED";
+    granted.has("notices:archive") && notice.lifecycleStatus === "ARCHIVED";
+  const canEdit =
+    granted.has("notices:edit") && notice.lifecycleStatus === "DRAFT";
+  const canPublish =
+    granted.has("notices:publish") &&
+    ["DRAFT", "APPROVED", "SCHEDULED"].includes(notice.lifecycleStatus);
+  const canSchedule =
+    granted.has("notices:schedule") &&
+    ["DRAFT", "APPROVED", "SCHEDULED"].includes(notice.lifecycleStatus);
 
   return (
     <NoticePageShell>
@@ -158,6 +212,34 @@ export default function NoticeDetailPage() {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <BackLink className="mt-0" />
+            {canEdit ? (
+              <Link
+                href={`/dashboard/notices/${noticeId}/edit`}
+                className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                <Pencil size={16} /> Edit draft
+              </Link>
+            ) : null}
+            {canPublish ? (
+              <button
+                type="button"
+                disabled={lifecycleMutation.isPending}
+                onClick={() => setPendingAction("publish")}
+                className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                <Send size={16} /> Publish
+              </button>
+            ) : null}
+            {canSchedule ? (
+              <button
+                type="button"
+                disabled={lifecycleMutation.isPending}
+                onClick={() => setPendingAction("schedule")}
+                className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+              >
+                <CalendarClock size={16} /> Schedule
+              </button>
+            ) : null}
             {canCancel ? (
               <button
                 type="button"
@@ -299,7 +381,38 @@ export default function NoticeDetailPage() {
             ? "Unread recipient details could not be loaded right now."
             : null
         }
+        onPageChange={setUnreadPage}
       />
+
+      <NoticeAcknowledgementPanel
+        noticeId={noticeId}
+        lifecycleStatus={notice.lifecycleStatus}
+      />
+
+      <section className="grid gap-6 lg:grid-cols-2">
+        <HistoryCard
+          title="Approval history"
+          empty="No approval decisions are recorded for this notice."
+          items={notice.approvalHistory.map((item) => ({
+            id: `${item.decision}-${item.createdAt}`,
+            label: formatEnumLabel(item.decision),
+            detail: item.reason ?? "No reason recorded",
+            actor: item.actorEmail,
+            createdAt: item.createdAt,
+          }))}
+        />
+        <HistoryCard
+          title="Audit history"
+          empty="No lifecycle audit entries are available."
+          items={notice.auditHistory.map((item) => ({
+            id: item.id,
+            label: formatEnumLabel(item.action),
+            detail: "Tenant-scoped lifecycle audit entry",
+            actor: item.actorEmail,
+            createdAt: item.createdAt,
+          }))}
+        />
+      </section>
 
       <ConfirmDialog
         isOpen={pendingAction !== null}
@@ -310,15 +423,34 @@ export default function NoticeDetailPage() {
         }
         destructive={pendingAction === "cancel"}
         isConfirming={lifecycleMutation.isPending}
-        confirmDisabled={!actionReason.trim()}
+        confirmDisabled={
+          pendingAction === "schedule"
+            ? !scheduledFor
+            : pendingAction === "publish"
+              ? previewQuery.isLoading ||
+                previewQuery.isError ||
+                (previewQuery.data?.allowedRecipientCount ?? 0) < 1 ||
+                (notice.priority !== "NORMAL" &&
+                  notice.lifecycleStatus !== "APPROVED")
+              : pendingAction === "cancel" ||
+                  pendingAction === "archive" ||
+                  pendingAction === "restore"
+                ? !actionReason.trim()
+                : false
+        }
         onClose={() => {
           if (!lifecycleMutation.isPending) {
             setPendingAction(null);
             setActionReason("");
+            setScheduledFor("");
           }
         }}
         onConfirm={() => {
-          if (pendingAction && actionReason.trim()) {
+          const needsReason =
+            pendingAction === "cancel" ||
+            pendingAction === "archive" ||
+            pendingAction === "restore";
+          if (pendingAction && (!needsReason || actionReason.trim())) {
             lifecycleMutation.mutate({
               action: pendingAction,
               reason: actionReason.trim(),
@@ -326,23 +458,59 @@ export default function NoticeDetailPage() {
           }
         }}
       >
-        <label className="grid gap-2 text-sm font-semibold text-gray-700">
-          Reason
-          <textarea
-            value={actionReason}
-            onChange={(event) => setActionReason(event.target.value)}
-            maxLength={500}
-            rows={3}
-            className="rounded-xl border border-gray-200 px-3 py-2 font-normal"
-            placeholder="Record why this notice is being changed"
-          />
-        </label>
+        {pendingAction === "schedule" ? (
+          <label className="grid gap-2 text-sm font-semibold text-gray-700">
+            Nepal-local scheduled time
+            <input
+              type="datetime-local"
+              value={scheduledFor}
+              onChange={(event) => setScheduledFor(event.target.value)}
+              className="min-h-11 rounded-xl border border-gray-200 px-3 py-2 font-normal"
+            />
+            <span className="text-xs font-normal text-gray-500">
+              Times are shown in Asia/Kathmandu for school operations.
+            </span>
+          </label>
+        ) : pendingAction === "publish" ? (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+            {previewQuery.isLoading
+              ? "Checking the current recipient preview…"
+              : previewQuery.isError
+                ? "Recipient preview is unavailable. Close this dialog and retry before publishing."
+                : `${previewQuery.data?.allowedRecipientCount ?? 0} eligible recipients across ${(previewQuery.data?.channels ?? []).map(formatEnumLabel).join(", ") || "no available channels"}.`}
+            {notice.priority !== "NORMAL" &&
+            notice.lifecycleStatus !== "APPROVED" ? (
+              <p className="mt-2 font-semibold text-amber-800">
+                Urgent and emergency notices require backend approval before
+                publication.
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <label className="grid gap-2 text-sm font-semibold text-gray-700">
+            Reason
+            <textarea
+              value={actionReason}
+              onChange={(event) => setActionReason(event.target.value)}
+              maxLength={500}
+              rows={3}
+              className="rounded-xl border border-gray-200 px-3 py-2 font-normal"
+              placeholder="Record why this notice is being changed"
+            />
+          </label>
+        )}
       </ConfirmDialog>
     </NoticePageShell>
   );
 }
 
 function noticeActionDescription(action: NoticeLifecycleAction | null) {
+  if (action === "publish") {
+    return "Review the current backend-resolved audience before queueing delivery. Duplicate submission is disabled while this action runs.";
+  }
+  if (action === "schedule") {
+    return "Choose a future Nepal-local time. The scheduled processor will use the persisted lifecycle state rather than assuming delivery from the clock.";
+  }
   if (action === "cancel") {
     return "This stops a draft or scheduled notice from being published. A reason is required for the audit trail.";
   }
@@ -399,10 +567,12 @@ function UnreadRecipientsPanel({
   result,
   isLoading,
   error,
+  onPageChange,
 }: {
   result: NoticeUnreadRecipientsResult | undefined;
   isLoading: boolean;
   error: string | null;
+  onPageChange: (page: number) => void;
 }) {
   const [search, setSearch] = useState("");
   const [channelFilter, setChannelFilter] = useState("");
@@ -649,6 +819,14 @@ function UnreadRecipientsPanel({
           </div>
         )}
       </div>
+      {result ? (
+        <TablePagination
+          page={result.page}
+          pageSize={result.limit}
+          total={result.total}
+          onPageChange={onPageChange}
+        />
+      ) : null}
     </section>
   );
 }
@@ -707,6 +885,47 @@ function InfoCard({
         ))}
       </dl>
     </div>
+  );
+}
+
+function HistoryCard({
+  title,
+  empty,
+  items,
+}: {
+  title: string;
+  empty: string;
+  items: Array<{
+    id: string;
+    label: string;
+    detail: string;
+    actor: string | null;
+    createdAt: string;
+  }>;
+}) {
+  return (
+    <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+      <h2 className="font-bold text-gray-950">{title}</h2>
+      {items.length === 0 ? (
+        <p className="mt-4 text-sm text-gray-500">{empty}</p>
+      ) : (
+        <ol className="mt-4 space-y-4 border-l border-gray-200 pl-5">
+          {items.map((item) => (
+            <li key={item.id} className="relative">
+              <span className="absolute -left-[1.53rem] top-1.5 h-2 w-2 rounded-full bg-rose-600" />
+              <p className="text-sm font-semibold text-gray-950">
+                {item.label}
+              </p>
+              <p className="mt-1 text-sm text-gray-600">{item.detail}</p>
+              <p className="mt-1 text-xs text-gray-500">
+                {item.actor ?? "Actor unavailable"} ·{" "}
+                {formatDateTime(item.createdAt)}
+              </p>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
   );
 }
 

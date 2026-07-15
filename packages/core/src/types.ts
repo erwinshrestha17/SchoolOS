@@ -243,6 +243,15 @@ export type NoticeSummary = {
   archiveReason?: string | null;
   archivedFromStatus?: NoticeLifecycleStatus | null;
   createdAt?: string;
+  updatedAt?: string;
+  createdBy?: {
+    id: string;
+    email: string | null;
+  } | null;
+  className?: string | null;
+  sectionName?: string | null;
+  deliveryCount?: number;
+  acknowledgementCount?: number;
 };
 
 export type EventSummary = {
@@ -387,6 +396,21 @@ export type NotificationDelivery = {
   body: string;
   sentAt: string | null;
   createdAt: string;
+};
+
+export type NotificationDeliveryOperationSummary = {
+  id: string;
+  channel: string;
+  status: string;
+  sourceType: string;
+  sourceId: string;
+  recipientType: "user" | "guardian" | "student" | "audience";
+  recipientLabel: string;
+  queuedAt: string;
+  attemptedAt: string | null;
+  deliveredAt: string | null;
+  failedAt: string | null;
+  retryCount: number;
 };
 
 export type NotificationDeliveryFailureSummary = {
@@ -2892,6 +2916,27 @@ export const NOTIFICATION_EVENT_PRIORITIES = [
   "CRITICAL",
   "MANDATORY",
 ] as const;
+
+export const NOTIFICATION_CHANNELS = [
+  "IN_APP",
+  "PUSH",
+  "EMAIL",
+  "SMS",
+] as const;
+
+export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
+
+export const NOTIFICATION_PREFERENCE_CATEGORIES = [
+  "GENERAL",
+  "ATTENDANCE",
+  "FEES",
+  "NOTICE",
+  "SECURITY",
+  "EMERGENCY",
+] as const;
+
+export type NotificationPreferenceCategory =
+  (typeof NOTIFICATION_PREFERENCE_CATEGORIES)[number];
 
 export type NotificationEventPriority =
   (typeof NOTIFICATION_EVENT_PRIORITIES)[number];

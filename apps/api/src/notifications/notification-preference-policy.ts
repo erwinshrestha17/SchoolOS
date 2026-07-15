@@ -65,6 +65,21 @@ export class NotificationPreferencePolicy {
     });
   }
 
+  async resetOwnPreference(
+    actor: AuthContext,
+    input: Pick<UpdateOwnNotificationPreferenceInput, 'category' | 'channel'>,
+  ) {
+    await this.prisma.notificationPreference.deleteMany({
+      where: {
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        category: input.category,
+        channel: input.channel,
+      },
+    });
+    return { success: true as const };
+  }
+
   async evaluateDelivery(
     tenantId: string,
     deliveryId: string,

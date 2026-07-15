@@ -1,15 +1,14 @@
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { describe, it } from "node:test";
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { describe, it } from 'node:test';
 
-const webRoot = new URL("../", import.meta.url);
-const read = (path) => readFileSync(new URL(path, webRoot), "utf8");
+const webRoot = new URL('../', import.meta.url);
+const read = (path) => readFileSync(new URL(path, webRoot), 'utf8');
 
-describe("M12 notifications and M15 notices boundary", () => {
-  it("keeps the M15 overview focused and moves delivery settings out of it", () => {
-    const workspace = read("components/notices/notices-workspace.tsx");
-    const form = read("components/forms/communications-form.tsx");
-    const shell = read("components/layout/dashboard-shell.tsx");
+describe('M12 notifications and M15 notices boundary', () => {
+  it('keeps the M15 overview focused and moves delivery settings out of it', () => {
+    const workspace = read('components/notices/notices-workspace.tsx');
+    const shell = read('components/layout/dashboard-shell.tsx');
 
     assert.equal((workspace.match(/<SummaryCard/g) ?? []).length, 4);
     assert.match(workspace, /<SummaryGrid/);
@@ -22,25 +21,16 @@ describe("M12 notifications and M15 notices boundary", () => {
     assert.match(workspace, /M15 Notices and Announcements/);
     assert.doesNotMatch(workspace, /Parent-Teacher Chat/);
 
-    assert.match(form, /mode === "composer"\s*\? \["Notices"\]/);
-    assert.match(form, /mode === "delivery"\s*\? \["Delivery Records"\]/);
-    assert.match(form, /\["Notices", "Events", "Consent Management"\]/);
-    assert.match(form, /<TabsList/);
-    assert.match(form, /<TabsTrigger/);
-    assert.doesNotMatch(form, /<ModuleTabs/);
-    assert.match(
-      form,
-      /enabled: mode === "overview" && activeSection === "Notices"/,
-    );
-    assert.match(form, /enabled: activeSection === "Delivery Records"/);
-    assert.match(workspace, /mode=\{/);
+    assert.match(workspace, /<NoticeListWorkspace/);
+    assert.match(workspace, /<NoticeComposerWorkspace/);
+    assert.doesNotMatch(workspace, /<DeliveryRetryPanel/);
 
     assert.doesNotMatch(shell, /'\/dashboard\/notices':/);
     assert.doesNotMatch(shell, /'\/dashboard\/messages':/);
   });
 
-  it("requires a recipient-preview confirmation for whole-school notices, not just emergencies", () => {
-    const form = read("components/forms/communications-form.tsx");
+  it('requires a recipient-preview confirmation for whole-school notices, not just emergencies', () => {
+    const form = read('components/forms/communications-form.tsx');
 
     // The high-impact gate must cover audienceType "ALL" in addition to
     // EMERGENCY priority — a school-wide NORMAL/URGENT notice is just as
@@ -57,10 +47,10 @@ describe("M12 notifications and M15 notices boundary", () => {
     );
   });
 
-  it("hides chat navigation and renders bounded compatibility routes", () => {
-    const sidebar = read("components/layout/sidebar.tsx");
-    const removed = read("components/messaging/chat-removed-state.tsx");
-    const messagesPage = read("app/dashboard/messages/page.tsx");
+  it('hides chat navigation and renders bounded compatibility routes', () => {
+    const sidebar = read('components/layout/sidebar.tsx');
+    const removed = read('components/messaging/chat-removed-state.tsx');
+    const messagesPage = read('app/dashboard/messages/page.tsx');
 
     assert.doesNotMatch(sidebar, /label: 'Messages'/);
     assert.doesNotMatch(sidebar, /messaging:create/);
@@ -68,14 +58,18 @@ describe("M12 notifications and M15 notices boundary", () => {
     assert.match(messagesPage, /ChatRemovedState/);
   });
 
-  it("uses reasoned backend lifecycle commands without provider ownership", () => {
-    const api = read("lib/api/communications.ts");
-    const detail = read("app/dashboard/notices/[noticeId]/page.tsx");
+  it('uses reasoned backend lifecycle commands without provider ownership', () => {
+    const api = read('lib/api/communications.ts');
+    const detail = read('app/dashboard/notices/[noticeId]/page.tsx');
 
-    for (const action of ["cancel", "archive", "restore"]) {
-      assert.match(api, new RegExp(`/notices/.*\\$\\{.*noticeId.*\\}/${action}`));
+    for (const action of ['cancel', 'archive', 'restore']) {
+      assert.match(
+        api,
+        new RegExp(`/notices/.*\\$\\{.*noticeId.*\\}/${action}`),
+      );
     }
-    assert.match(detail, /confirmDisabled=\{!actionReason\.trim\(\)\}/);
+    assert.match(detail, /pendingAction === "cancel"/);
+    assert.match(detail, /!actionReason\.trim\(\)/);
     assert.match(detail, /A reason is required for the audit trail/);
     assert.match(detail, /without sending it again/);
     assert.doesNotMatch(detail, /SMS|FCM|webhook|provider secret/i);

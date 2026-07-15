@@ -18,3 +18,11 @@ export class UpdateNotificationPreferenceDto {
   @IsBoolean()
   quietHoursEnabled?: boolean;
 }
+
+export class ResetNotificationPreferenceDto {
+  @IsEnum(NotificationPreferenceCategory)
+  category!: NotificationPreferenceCategory;
+
+  @IsEnum(NotificationChannel)
+  channel!: NotificationChannel;
+}

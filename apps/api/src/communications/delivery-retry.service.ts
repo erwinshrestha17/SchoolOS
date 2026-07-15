@@ -287,11 +287,12 @@ export class DeliveryRetryService {
         sourceType: delivery.sourceType,
         sourceId: delivery.sourceId,
         title: delivery.title,
-        lastFailureReason:
+        lastFailureReason: sanitizeFailureReason(
           delivery.failureReason ??
-          delivery.errorMessage ??
-          delivery.failureCode ??
-          null,
+            delivery.errorMessage ??
+            delivery.failureCode ??
+            null,
+        ),
         retryCount: delivery.retryCount,
         retryStatus:
           delivery.status === NotificationStatus.RETRY_PENDING
@@ -307,7 +308,11 @@ export class DeliveryRetryService {
           recipientUserId: delivery.recipientUserId,
           guardianId: delivery.guardianId,
           studentId: delivery.studentId,
-          destinationMasked: maskDestination(delivery.destination),
+          destinationMasked:
+            delivery.destination &&
+            delivery.destination === delivery.recipientUserId
+              ? 'User recipient'
+              : maskDestination(delivery.destination),
         },
       })),
     };

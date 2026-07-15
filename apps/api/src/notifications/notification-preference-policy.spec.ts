@@ -19,6 +19,7 @@ describe('NotificationPreferencePolicy', () => {
         findUnique: jest.fn().mockResolvedValue(null),
         findMany: jest.fn().mockResolvedValue([]),
         upsert: jest.fn(),
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       tenantSetting: {
         findMany: jest.fn().mockResolvedValue([
@@ -74,6 +75,30 @@ describe('NotificationPreferencePolicy', () => {
         new Date('2026-07-15T10:00:00.000Z'),
       ),
     ).resolves.toMatchObject({ action: 'SKIP' });
+  });
+
+  it('resets only the current user tenant category and channel override', async () => {
+    await expect(
+      policy.resetOwnPreference(
+        {
+          tenantId: 'tenant-1',
+          userId: 'user-1',
+        } as never,
+        {
+          category: NotificationPreferenceCategory.NOTICE,
+          channel: NotificationChannel.PUSH,
+        },
+      ),
+    ).resolves.toEqual({ success: true });
+
+    expect(prisma.notificationPreference.deleteMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: 'tenant-1',
+        userId: 'user-1',
+        category: NotificationPreferenceCategory.NOTICE,
+        channel: NotificationChannel.PUSH,
+      },
+    });
   });
 
   it('honors a user quiet-hours override over the tenant default', async () => {

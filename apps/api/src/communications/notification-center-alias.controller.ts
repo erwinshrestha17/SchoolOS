@@ -7,7 +7,7 @@ import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import type { AuthContext } from '../auth/auth.types';
 import { NotificationCenterService } from './notification-center.service';
-import { CommunicationPageQueryDto } from './dto/communication-list-query.dto';
+import { NotificationCenterQueryDto } from './dto/communication-list-query.dto';
 
 @Controller('notification-center')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
@@ -20,7 +20,7 @@ export class NotificationCenterAliasController {
   @Get()
   @Permissions('notifications:view_own')
   getCenter(
-    @Query() query: CommunicationPageQueryDto,
+    @Query() query: NotificationCenterQueryDto,
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.notificationCenterService.getCenter(auth, query);

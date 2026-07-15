@@ -9,7 +9,7 @@ describe('NoticeDetailService', () => {
     email: 'admin@school.test',
     authMethod: AuthMethod.PASSWORD,
     roles: ['admin'],
-    permissions: ['notices:read'],
+    permissions: ['notices:read', 'notices:read_reports'],
     tenantSlug: 'green-valley',
   };
 
@@ -20,6 +20,13 @@ describe('NoticeDetailService', () => {
       },
       notificationDelivery: {
         groupBy: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn().mockResolvedValue({ id: 'delivery-1' }),
+      },
+      auditLog: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      approvalRequest: {
+        findFirst: jest.fn().mockResolvedValue(null),
       },
     };
     const fileRegistry = {
@@ -67,6 +74,9 @@ describe('NoticeDetailService', () => {
     expect(detail.attachmentUrl).toBe(
       'http://localhost:4000/api/v1/files/file-1/preview',
     );
+    expect(detail.attachmentFileId).toBe('file-1');
+    expect(detail.auditHistory).toEqual([]);
+    expect(detail.approvalHistory).toEqual([]);
   });
 
   it('falls back to legacy attachmentUrl when no linked File Registry asset exists', async () => {
@@ -123,6 +133,45 @@ describe('NoticeDetailService', () => {
     );
 
     expect(fileRegistry.listFilesByEntity).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when a read-only user is outside the resolved audience', async () => {
+    const { service, prisma, fileRegistry } = buildService();
+    prisma.notice.findFirst.mockResolvedValue(noticeRecord());
+    prisma.notificationDelivery.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.getNoticeDetail('notice-1', {
+        ...actor,
+        permissions: ['notices:read'],
+      }),
+    ).rejects.toThrow('Notice not found');
+
+    expect(prisma.notificationDelivery.findFirst).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        noticeId: 'notice-1',
+        recipientUserId: actor.userId,
+      },
+      select: { id: true },
+    });
+    expect(fileRegistry.listFilesByEntity).not.toHaveBeenCalled();
+  });
+
+  it('hides staff identity and audit history from recipient-only detail', async () => {
+    const { service, prisma } = buildService();
+    prisma.notice.findFirst.mockResolvedValue(noticeRecord());
+
+    const detail = await service.getNoticeDetail('notice-1', {
+      ...actor,
+      permissions: ['notices:read'],
+    });
+
+    expect(detail.createdBy).toBeNull();
+    expect(detail.auditHistory).toEqual([]);
+    expect(detail.approvalHistory).toEqual([]);
+    expect(prisma.auditLog.findMany).not.toHaveBeenCalled();
+    expect(prisma.approvalRequest.findFirst).not.toHaveBeenCalled();
   });
 });
 

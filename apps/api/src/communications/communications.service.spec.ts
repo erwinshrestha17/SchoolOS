@@ -49,6 +49,9 @@ describe('CommunicationsService', () => {
       student: {
         findMany: jest.fn(),
       },
+      user: {
+        findMany: jest.fn(),
+      },
       notificationDelivery: {
         create: jest.fn((args) =>
           Promise.resolve({
@@ -769,6 +772,84 @@ describe('CommunicationsService', () => {
     expect(notificationsService.sendPushNotification).not.toHaveBeenCalled();
   });
 
+  it('claims the published lifecycle before emitting the canonical notification event', async () => {
+    const draft = {
+      id: 'notice-1',
+      tenantId: 'tenant-1',
+      title: 'Normal circular',
+      body: 'Please read.',
+      priority: NoticePriority.NORMAL,
+      audienceType: AudienceType.ALL,
+      classId: null,
+      sectionId: null,
+      lifecycleStatus: NoticeLifecycleStatus.DRAFT,
+      scheduledFor: null,
+      publishedAt: null,
+      expiresAt: null,
+      archivedFromStatus: null,
+    };
+    const published = {
+      ...draft,
+      lifecycleStatus: NoticeLifecycleStatus.PUBLISHED,
+      publishedAt: new Date('2026-07-15T00:00:00.000Z'),
+    };
+    prisma.notice.findFirst
+      .mockResolvedValueOnce(draft)
+      .mockResolvedValueOnce(published);
+    prisma.notice.updateMany.mockResolvedValue({ count: 1 });
+    jest.spyOn(service, 'previewNoticeRecipients').mockResolvedValue({
+      allowedRecipientCount: 1,
+    } as never);
+    const emit = jest
+      .spyOn(service as any, 'emitNoticePublished')
+      .mockImplementation(async (...args: unknown[]) => {
+        const sourceNotice = args[0] as { lifecycleStatus: string };
+        expect(sourceNotice.lifecycleStatus).toBe(
+          NoticeLifecycleStatus.PUBLISHED,
+        );
+        expect(prisma.notice.updateMany).toHaveBeenCalled();
+        return { count: 2 };
+      });
+
+    await expect(
+      service.publishPreparedNotice('notice-1', actor),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        notice: published,
+        replayed: false,
+      }),
+    );
+    expect(emit).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not change lifecycle or emit when recipient preview has no eligible recipient', async () => {
+    prisma.notice.findFirst.mockResolvedValue({
+      id: 'notice-1',
+      tenantId: 'tenant-1',
+      title: 'Normal circular',
+      body: 'Please read.',
+      priority: NoticePriority.NORMAL,
+      audienceType: AudienceType.ALL,
+      classId: null,
+      sectionId: null,
+      lifecycleStatus: NoticeLifecycleStatus.DRAFT,
+      scheduledFor: null,
+      publishedAt: null,
+      expiresAt: null,
+      archivedFromStatus: null,
+    });
+    jest.spyOn(service, 'previewNoticeRecipients').mockResolvedValue({
+      allowedRecipientCount: 0,
+    } as never);
+    const emit = jest.spyOn(service as any, 'emitNoticePublished');
+
+    await expect(
+      service.publishPreparedNotice('notice-1', actor),
+    ).rejects.toThrow('No eligible recipients are available for this notice');
+    expect(prisma.notice.updateMany).not.toHaveBeenCalled();
+    expect(emit).not.toHaveBeenCalled();
+  });
+
   it('publishes high-impact notices to the in-app inbox while disabled external providers remain skipped', async () => {
     notificationsService.getProviderReadiness.mockResolvedValue({
       enabled: false,
@@ -1460,7 +1541,15 @@ describe('CommunicationsService', () => {
         priority: NoticePriority.URGENT,
       }),
     ).resolves.toEqual({
-      items: [{ id: 'notice-1' }],
+      items: [
+        {
+          id: 'notice-1',
+          className: null,
+          sectionName: null,
+          deliveryCount: 0,
+          acknowledgementCount: 0,
+        },
+      ],
       total: 26,
       page: 1,
       limit: 25,
@@ -1487,6 +1576,89 @@ describe('CommunicationsService', () => {
     expect(prisma.notificationDelivery.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { tenantId: 'tenant-1' },
+      }),
+    );
+  });
+
+  it('returns purpose-limited delivery operations without message bodies or raw destinations', async () => {
+    prisma.notificationDelivery.findMany.mockResolvedValue([
+      {
+        id: 'delivery-1',
+        channel: NotificationChannel.EMAIL,
+        status: NotificationStatus.FAILED,
+        sourceType: 'notice',
+        sourceId: 'notice-1',
+        audienceType: AudienceType.ALL,
+        recipientUserId: 'user-1',
+        guardianId: null,
+        studentId: null,
+        destination: 'guardian@example.test',
+        createdAt: new Date('2026-07-15T00:00:00.000Z'),
+        sentAt: new Date('2026-07-15T00:01:00.000Z'),
+        deliveredAt: null,
+        failedAt: new Date('2026-07-15T00:02:00.000Z'),
+        retryCount: 2,
+      },
+    ]);
+    prisma.notificationDelivery.count.mockResolvedValue(1);
+
+    const result = await service.listDeliveryOperations(actor, {
+      page: 1,
+      limit: 25,
+      status: NotificationStatus.FAILED,
+    });
+
+    expect(result.items).toEqual([
+      expect.objectContaining({
+        id: 'delivery-1',
+        recipientType: 'user',
+        recipientLabel: 'gu***@example.test',
+        retryCount: 2,
+      }),
+    ]);
+    expect(result.items[0]).not.toHaveProperty('body');
+    expect(result.items[0]).not.toHaveProperty('destination');
+    expect(prisma.notificationDelivery.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: actor.tenantId,
+          status: NotificationStatus.FAILED,
+        }),
+        select: expect.not.objectContaining({ body: true, title: true }),
+      }),
+    );
+  });
+
+  it('normalizes absent student references for direct user follow-up deliveries', async () => {
+    prisma.notificationDelivery.findMany.mockResolvedValue([]);
+    prisma.user.findMany.mockResolvedValue([
+      {
+        id: 'recipient-1',
+        email: 'recipient@school.test',
+        phone: null,
+      },
+    ]);
+
+    await service.recordDeliveryRecords({
+      actor,
+      sourceType: 'notice_acknowledgement_follow_up',
+      sourceId: 'notice:notice-1:ack-follow-up:key-1',
+      noticeId: 'notice-1',
+      audienceType: AudienceType.ALL,
+      recipientUserIds: ['recipient-1'],
+      title: 'Please acknowledge',
+      body: 'Please review the notice.',
+      channels: [NotificationChannel.IN_APP],
+      communicationCategory: 'ESSENTIAL',
+    });
+
+    expect(prisma.notificationDelivery.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          recipientUserId: 'recipient-1',
+          guardianId: null,
+          studentId: null,
+        }),
       }),
     );
   });

@@ -2597,8 +2597,9 @@ describe("SchoolOS web production contracts", () => {
     assert.match(noticeDetailPage, /api\.getNoticeDetail\(noticeId\)/);
     assert.match(
       noticeDetailPage,
-      /api\.listNoticeUnreadRecipients\(noticeId\)/,
+      /api\.listNoticeUnreadRecipients\(noticeId, \{/,
     );
+    assert.match(noticeDetailPage, /page: unreadPage/);
     assert.match(noticeDetailPage, /Open attachment/);
     assert.match(noticeDetailPage, /ProtectedFileButton/);
     assert.match(noticeDetailPage, /getProtectedFileId/);

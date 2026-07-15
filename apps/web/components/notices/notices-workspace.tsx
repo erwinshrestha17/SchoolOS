@@ -8,13 +8,14 @@ import { AlertTriangle, Clock3, Mail, Send, Settings } from 'lucide-react';
 import { communicationsApi } from '../../lib/api/communications';
 import { DashboardPageShell } from '../dashboard/dashboard-page-shell';
 import { CommunicationsForm } from '../forms/communications-form';
-import { DeliveryRetryPanel } from '../forms/delivery-retry-panel';
 import { NoticeDetailLinksPanel } from '../forms/notice-detail-links-panel';
 import { SummaryCard, SummaryGrid } from '../ui/summary-card';
 import { WorkSurface } from '../ui/work-surface';
 import { ModuleHeader } from '../ui/module-header';
 import { WorkspaceTabs } from '../ui/module-tabs';
 import { useSession } from '../session-provider';
+import { NoticeListWorkspace } from './notice-list-workspace';
+import { NoticeComposerWorkspace } from './notice-composer-workspace';
 
 type NoticeWorkspaceSection = 'Notices' | 'Delivery Records';
 
@@ -33,8 +34,10 @@ export function NoticesWorkspace({
   const { session } = useSession();
   const granted = new Set<PermissionKey>(session?.user.permissions ?? []);
   const canCreateNotices = granted.has('notices:create');
-  const canReadDeliveries = granted.has('communications:read_deliveries');
-  const canManageTemplates = granted.has('communications:manage_templates');
+  const canReadDeliveries = granted.has(
+    'notifications:view_delivery_diagnostics',
+  );
+  const canManageTemplates = granted.has('notifications:manage_templates');
 
   const summaryQuery = useQuery({
     queryKey: ['communications-summary'],
@@ -54,7 +57,7 @@ export function NoticesWorkspace({
         }
         description={
           variant === 'composer'
-            ? 'Compose and publish a notice, or schedule it for later. Recipient counts and delivery channels are confirmed before you send.'
+            ? 'Create or update a draft and preview its backend-resolved recipients. Publication and scheduling happen after review on the notice detail.'
             : 'Draft, preview, publish, and review official school notices. Recipient and delivery truth remains backend-owned.'
         }
         primaryAction={
@@ -102,44 +105,44 @@ export function NoticesWorkspace({
       />
 
       {variant === 'overview' ? (
-          <SummaryGrid>
-            <SummaryCard
-              label="Sent Today"
-              loading={summaryQuery.isLoading}
-              value={summaryValue(summary?.sentToday)}
-              icon={<Send size={20} />}
-              tone="neutral"
-              description="Notices sent in the current Nepal school day."
-            />
-            <SummaryCard
-              label="Scheduled"
-              loading={summaryQuery.isLoading}
-              value={summaryValue(summary?.scheduledNotices)}
-              icon={<Clock3 size={20} />}
-              tone={(summary?.scheduledNotices ?? 0) > 0 ? 'info' : 'neutral'}
-              description="Notices waiting for their scheduled send time."
-            />
-            <SummaryCard
-              label="Failed Deliveries"
-              loading={summaryQuery.isLoading}
-              value={summaryValue(summary?.failedDeliveries)}
-              icon={<AlertTriangle size={20} />}
-              tone={(summary?.failedDeliveries ?? 0) > 0 ? 'danger' : 'neutral'}
-              description="Failed or retry-pending delivery records."
-            />
-            <SummaryCard
-              label="Unread High-Impact"
-              loading={summaryQuery.isLoading}
-              value={summaryValue(summary?.unreadHighImpactNotices)}
-              icon={<Mail size={20} />}
-              tone={
-                (summary?.unreadHighImpactNotices ?? 0) > 0
-                  ? 'warning'
-                  : 'neutral'
-              }
-              description="Unread urgent or emergency delivery rows."
-            />
-          </SummaryGrid>
+        <SummaryGrid>
+          <SummaryCard
+            label="Sent Today"
+            loading={summaryQuery.isLoading}
+            value={summaryValue(summary?.sentToday)}
+            icon={<Send size={20} />}
+            tone="neutral"
+            description="Notices sent in the current Nepal school day."
+          />
+          <SummaryCard
+            label="Scheduled"
+            loading={summaryQuery.isLoading}
+            value={summaryValue(summary?.scheduledNotices)}
+            icon={<Clock3 size={20} />}
+            tone={(summary?.scheduledNotices ?? 0) > 0 ? 'info' : 'neutral'}
+            description="Notices waiting for their scheduled send time."
+          />
+          <SummaryCard
+            label="Failed Deliveries"
+            loading={summaryQuery.isLoading}
+            value={summaryValue(summary?.failedDeliveries)}
+            icon={<AlertTriangle size={20} />}
+            tone={(summary?.failedDeliveries ?? 0) > 0 ? 'danger' : 'neutral'}
+            description="Failed or retry-pending delivery records."
+          />
+          <SummaryCard
+            label="Unread High-Impact"
+            loading={summaryQuery.isLoading}
+            value={summaryValue(summary?.unreadHighImpactNotices)}
+            icon={<Mail size={20} />}
+            tone={
+              (summary?.unreadHighImpactNotices ?? 0) > 0
+                ? 'warning'
+                : 'neutral'
+            }
+            description="Unread urgent or emergency delivery rows."
+          />
+        </SummaryGrid>
       ) : null}
 
       <WorkspaceTabs
@@ -172,27 +175,26 @@ export function NoticesWorkspace({
           title={variant === 'composer' ? 'Notice composer' : initialSection}
           description={
             variant === 'composer'
-              ? 'Build the audience, preview backend recipient resolution, and publish or schedule safely.'
+              ? 'Build the audience, preview backend recipient resolution, and save the reviewed draft.'
               : 'Operate official notice and delivery records from backend-owned state.'
           }
           variant={variant === 'composer' ? 'builder' : 'queue'}
           flush
         >
-          <CommunicationsForm
-            initialSection={initialSection}
-            mode={
-              variant === 'composer'
-                ? 'composer'
-                : initialSection === 'Delivery Records'
-                  ? 'delivery'
-                  : 'overview'
-            }
-          />
+          {variant === 'composer' ? (
+            <NoticeComposerWorkspace />
+          ) : initialSection === 'Delivery Records' ? (
+            <CommunicationsForm
+              initialSection="Delivery Records"
+              mode="delivery"
+            />
+          ) : (
+            <NoticeListWorkspace />
+          )}
         </WorkSurface>
         {variant === 'overview' ? (
           <>
             <NoticeDetailLinksPanel />
-            <DeliveryRetryPanel />
           </>
         ) : null}
       </div>

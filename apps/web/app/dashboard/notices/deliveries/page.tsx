@@ -1,5 +1,5 @@
-import { NoticesWorkspace } from '../../../../components/notices/notices-workspace';
+import { DeliveryOperationsWorkspace } from '@/components/notifications/delivery-operations-workspace';
 
 export default function NoticeDeliveriesPage() {
-  return <NoticesWorkspace initialSection="Delivery Records" />;
+  return <DeliveryOperationsWorkspace initialView="logs" />;
 }

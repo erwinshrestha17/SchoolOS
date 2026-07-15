@@ -248,6 +248,15 @@ export type NoticeSummary = {
   archiveReason?: string | null;
   archivedFromStatus?: NoticeLifecycleStatus | null;
   createdAt?: string;
+  updatedAt?: string;
+  createdBy?: {
+    id: string;
+    email: string | null;
+  } | null;
+  className?: string | null;
+  sectionName?: string | null;
+  deliveryCount?: number;
+  acknowledgementCount?: number;
 };
 
 export type EventSummary = {
@@ -392,6 +401,21 @@ export type NotificationDelivery = {
   body: string;
   sentAt: string | null;
   createdAt: string;
+};
+
+export type NotificationDeliveryOperationSummary = {
+  id: string;
+  channel: string;
+  status: string;
+  sourceType: string;
+  sourceId: string;
+  recipientType: "user" | "guardian" | "student" | "audience";
+  recipientLabel: string;
+  queuedAt: string;
+  attemptedAt: string | null;
+  deliveredAt: string | null;
+  failedAt: string | null;
+  retryCount: number;
 };
 
 export type NotificationDeliveryFailureSummary = {

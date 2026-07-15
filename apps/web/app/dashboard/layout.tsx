@@ -103,9 +103,27 @@ const dashboardRouteGates: RouteGate[] = [
     permissions: ["notices:read", "notices:create"],
   },
   {
+    prefix: "/dashboard/notices/deliveries",
+    label: "Delivery logs",
+    permissions: ["notifications:view_delivery_diagnostics"],
+  },
+  {
+    prefix: "/dashboard/notices/failures",
+    label: "Failure and retry center",
+    permissions: [
+      "notifications:view_delivery_diagnostics",
+      "notifications:retry_deliveries",
+    ],
+  },
+  {
     prefix: "/dashboard/notices",
     label: "Notices",
     permissions: ["notices:read", "notices:create"],
+  },
+  {
+    prefix: "/dashboard/notifications",
+    label: "Notifications",
+    permissions: ["notifications:view_own"],
   },
   {
     prefix: "/dashboard/messages",
@@ -189,6 +207,9 @@ const dashboardRouteGates: RouteGate[] = [
 
 function getRequiredModuleForHref(href: string): string | null {
   if (href.startsWith("/dashboard/communications")) return "notices";
+  if (href.startsWith("/dashboard/notices/deliveries")) return "notifications";
+  if (href.startsWith("/dashboard/notices/failures")) return "notifications";
+  if (href.startsWith("/dashboard/notifications")) return "notifications";
   if (href.startsWith("/dashboard/operations")) return null;
   if (href.startsWith("/dashboard/students")) return "students";
   if (href.startsWith("/dashboard/admissions")) return "students";

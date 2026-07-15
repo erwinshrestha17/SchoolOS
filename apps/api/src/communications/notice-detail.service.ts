@@ -19,6 +19,7 @@ export interface NoticeDetail {
     email: string | null;
   } | null;
   attachmentUrl: string | null;
+  attachmentFileId: string | null;
   lifecycleStatus: NoticeLifecycleStatus;
   approvalRequestId: string | null;
   scheduledFor: string | null;
@@ -38,6 +39,18 @@ export interface NoticeDetail {
     failed: number;
     skipped: number;
   };
+  approvalHistory: Array<{
+    decision: string;
+    reason: string | null;
+    actorEmail: string | null;
+    createdAt: string;
+  }>;
+  auditHistory: Array<{
+    id: string;
+    action: string;
+    actorEmail: string | null;
+    createdAt: string;
+  }>;
 }
 
 @Injectable()
@@ -51,6 +64,10 @@ export class NoticeDetailService {
     noticeId: string,
     actor: AuthContext,
   ): Promise<NoticeDetail> {
+    const canAdministerNotice = actor.permissions.some((permission) =>
+      NOTICE_ADMINISTRATION_PERMISSIONS.has(permission),
+    );
+    const canViewReports = actor.permissions.includes('notices:read_reports');
     const notice = await this.prisma.notice.findFirst({
       where: {
         id: noticeId,
@@ -82,22 +99,77 @@ export class NoticeDetailService {
       throw new NotFoundException('Notice not found');
     }
 
-    const deliveryGroups = await this.prisma.notificationDelivery.groupBy({
-      by: ['status'],
-      where: {
-        tenantId: actor.tenantId,
-        noticeId: notice.id,
-      },
-      _count: {
-        status: true,
-      },
-    });
+    if (!canAdministerNotice) {
+      const recipientDelivery =
+        await this.prisma.notificationDelivery.findFirst({
+          where: {
+            tenantId: actor.tenantId,
+            noticeId: notice.id,
+            recipientUserId: actor.userId,
+          },
+          select: { id: true },
+        });
+
+      if (!recipientDelivery) {
+        throw new NotFoundException('Notice not found');
+      }
+    }
+
+    const [deliveryGroups, auditRows, approvalRequest] = await Promise.all([
+      this.prisma.notificationDelivery.groupBy({
+        by: ['status'],
+        where: {
+          tenantId: actor.tenantId,
+          noticeId: notice.id,
+        },
+        _count: {
+          status: true,
+        },
+      }),
+      canViewReports
+        ? this.prisma.auditLog.findMany({
+            where: {
+              tenantId: actor.tenantId,
+              resource: 'notice',
+              resourceId: notice.id,
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 50,
+            select: {
+              id: true,
+              action: true,
+              createdAt: true,
+              user: { select: { email: true } },
+            },
+          })
+        : Promise.resolve([]),
+      canViewReports && notice.approvalRequestId
+        ? this.prisma.approvalRequest.findFirst({
+            where: {
+              id: notice.approvalRequestId,
+              tenantId: actor.tenantId,
+              targetId: notice.id,
+            },
+            select: {
+              decisions: {
+                orderBy: { createdAt: 'asc' },
+                select: {
+                  decision: true,
+                  reason: true,
+                  createdAt: true,
+                  decidedBy: { select: { email: true } },
+                },
+              },
+            },
+          })
+        : Promise.resolve(null),
+    ]);
 
     const deliveryCounts = new Map(
       deliveryGroups.map((group) => [group.status, group._count.status]),
     );
 
-    const attachmentUrl = await this.resolveAttachmentUrl(notice, actor);
+    const attachment = await this.resolveAttachment(notice, actor);
 
     return {
       id: notice.id,
@@ -109,13 +181,15 @@ export class NoticeDetailService {
       className: notice.class?.name ?? null,
       sectionId: notice.sectionId,
       sectionName: notice.section?.name ?? null,
-      createdBy: notice.createdBy
-        ? {
-            id: notice.createdBy.id,
-            email: notice.createdBy.email,
-          }
-        : null,
-      attachmentUrl,
+      createdBy:
+        canAdministerNotice && notice.createdBy
+          ? {
+              id: notice.createdBy.id,
+              email: notice.createdBy.email,
+            }
+          : null,
+      attachmentUrl: attachment.url,
+      attachmentFileId: attachment.fileId,
       lifecycleStatus: notice.lifecycleStatus,
       approvalRequestId: notice.approvalRequestId,
       scheduledFor: notice.scheduledFor?.toISOString() ?? null,
@@ -138,10 +212,23 @@ export class NoticeDetailService {
         failed: deliveryCounts.get('FAILED') ?? 0,
         skipped: deliveryCounts.get('SKIPPED') ?? 0,
       },
+      approvalHistory:
+        approvalRequest?.decisions.map((decision) => ({
+          decision: decision.decision,
+          reason: decision.reason,
+          actorEmail: decision.decidedBy.email,
+          createdAt: decision.createdAt.toISOString(),
+        })) ?? [],
+      auditHistory: auditRows.map((row) => ({
+        id: row.id,
+        action: row.action,
+        actorEmail: row.user?.email ?? null,
+        createdAt: row.createdAt.toISOString(),
+      })),
     };
   }
 
-  private async resolveAttachmentUrl(
+  private async resolveAttachment(
     notice: { id: string; attachmentUrl: string | null },
     actor: AuthContext,
   ) {
@@ -152,12 +239,21 @@ export class NoticeDetailService {
     );
 
     if (!linkedFile) {
-      return this.isSafeLegacyAttachmentUrl(notice.attachmentUrl)
-        ? notice.attachmentUrl
-        : null;
+      return {
+        fileId: null,
+        url: this.isSafeLegacyAttachmentUrl(notice.attachmentUrl)
+          ? notice.attachmentUrl
+          : null,
+      };
     }
 
-    return this.fileRegistryService.getSignedUrl(actor.tenantId, linkedFile.id);
+    return {
+      fileId: linkedFile.id,
+      url: await this.fileRegistryService.getSignedUrl(
+        actor.tenantId,
+        linkedFile.id,
+      ),
+    };
   }
 
   private isSafeLegacyAttachmentUrl(url: string | null) {
@@ -177,3 +273,14 @@ export class NoticeDetailService {
     }
   }
 }
+
+const NOTICE_ADMINISTRATION_PERMISSIONS = new Set([
+  'notices:create',
+  'notices:edit',
+  'notices:publish',
+  'notices:schedule',
+  'notices:cancel',
+  'notices:archive',
+  'notices:approve',
+  'notices:read_reports',
+]);

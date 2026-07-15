@@ -73,6 +73,15 @@ const TEMPLATE_SELECT = {
   updatedAt: true,
 } satisfies Prisma.CommunicationTemplateSelect;
 
+function maskDeliveryDestination(destination: string) {
+  if (destination.includes('@')) {
+    const [name, domain] = destination.split('@');
+    return `${name.slice(0, 2)}***@${domain}`;
+  }
+  if (destination.length <= 4) return 'Recipient';
+  return `${destination.slice(0, 3)}***${destination.slice(-2)}`;
+}
+
 const PROVIDER_CHANNELS = [
   {
     channel: NotificationChannel.EMAIL,
@@ -150,13 +159,31 @@ export class CommunicationsService {
     const [items, total] = await Promise.all([
       this.prisma.notice.findMany({
         where,
+        include: {
+          createdBy: { select: { id: true, email: true } },
+          class: { select: { name: true } },
+          section: { select: { name: true } },
+          _count: { select: { deliveries: true, acknowledgements: true } },
+        },
         orderBy: [{ createdAt: 'desc' }],
         skip: (page - 1) * limit,
         take: limit,
       }),
       this.prisma.notice.count({ where }),
     ]);
-    return { items, total, page, limit, hasNextPage: page * limit < total };
+    return {
+      items: items.map(({ class: classRef, section, _count, ...notice }) => ({
+        ...notice,
+        className: classRef?.name ?? null,
+        sectionName: section?.name ?? null,
+        deliveryCount: _count?.deliveries ?? 0,
+        acknowledgementCount: _count?.acknowledgements ?? 0,
+      })),
+      total,
+      page,
+      limit,
+      hasNextPage: page * limit < total,
+    };
   }
 
   async createNotice(dto: CreateNoticeDto, actor: AuthContext) {
@@ -391,8 +418,18 @@ export class CommunicationsService {
       throw new ConflictException('Expired notices cannot be published');
     }
 
-    const delivery = await this.emitNoticePublished(notice, actor);
-    if (delivery.count < 1) {
+    const preview = await this.previewNoticeRecipients(
+      {
+        title: notice.title,
+        body: notice.body,
+        priority: notice.priority,
+        audienceType: notice.audienceType,
+        classId: notice.classId ?? undefined,
+        sectionId: notice.sectionId ?? undefined,
+      },
+      actor,
+    );
+    if (preview.allowedRecipientCount < 1) {
       throw new ConflictException(
         'No eligible recipients are available for this notice',
       );
@@ -414,21 +451,33 @@ export class CommunicationsService {
     });
     const published = await this.getTenantNotice(notice.id, actor);
 
-    if (result.count > 0) {
-      await this.auditService.record({
-        action: 'publish',
-        resource: 'notice',
-        tenantId: actor.tenantId,
-        userId: actor.userId,
-        resourceId: notice.id,
-        before: this.noticeLifecycleAudit(notice),
-        after: {
-          ...this.noticeLifecycleAudit(published),
-          deliveryCount: delivery.count,
-        },
-      });
+    if (result.count === 0) {
+      return {
+        notice: published,
+        delivery: await this.getNoticeDeliverySummary(actor, notice.id),
+        replayed: true,
+      };
     }
-    return { notice: published, delivery, replayed: result.count === 0 };
+
+    // Persist the source lifecycle before accepting the canonical M12 event.
+    // NotificationEventService deliberately rejects events whose source is not
+    // currently published, and the updateMany claim above keeps this emission
+    // exactly once across concurrent publish attempts.
+    const delivery = await this.emitNoticePublished(published, actor);
+
+    await this.auditService.record({
+      action: 'publish',
+      resource: 'notice',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: notice.id,
+      before: this.noticeLifecycleAudit(notice),
+      after: {
+        ...this.noticeLifecycleAudit(published),
+        deliveryCount: delivery.count,
+      },
+    });
+    return { notice: published, delivery, replayed: false };
   }
 
   async scheduleNotice(
@@ -899,6 +948,82 @@ export class CommunicationsService {
       this.prisma.notificationDelivery.count({ where }),
     ]);
     return { items, total, page, limit, hasNextPage: page * limit < total };
+  }
+
+  async listDeliveryOperations(
+    actor: AuthContext,
+    filters: ListNotificationDeliveriesQueryDto = { page: 1, limit: 25 },
+  ) {
+    const page = Math.max(1, filters.page ?? 1);
+    const limit = Math.min(100, Math.max(1, filters.limit ?? 25));
+    const where: Prisma.NotificationDeliveryWhereInput = {
+      tenantId: actor.tenantId,
+      ...(filters.sourceType ? { sourceType: filters.sourceType } : {}),
+      ...(filters.activityPostId
+        ? { activityPostId: filters.activityPostId }
+        : {}),
+      ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.channel ? { channel: filters.channel } : {}),
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.notificationDelivery.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          channel: true,
+          status: true,
+          sourceType: true,
+          sourceId: true,
+          audienceType: true,
+          recipientUserId: true,
+          guardianId: true,
+          studentId: true,
+          destination: true,
+          createdAt: true,
+          sentAt: true,
+          deliveredAt: true,
+          failedAt: true,
+          retryCount: true,
+        },
+      }),
+      this.prisma.notificationDelivery.count({ where }),
+    ]);
+
+    return {
+      items: items.map((delivery) => ({
+        id: delivery.id,
+        channel: delivery.channel,
+        status: delivery.status,
+        sourceType: delivery.sourceType,
+        sourceId: delivery.sourceId,
+        recipientType: delivery.recipientUserId
+          ? 'user'
+          : delivery.guardianId
+            ? 'guardian'
+            : delivery.studentId
+              ? 'student'
+              : 'audience',
+        recipientLabel:
+          delivery.channel === NotificationChannel.IN_APP ||
+          delivery.destination === delivery.recipientUserId
+            ? 'User recipient'
+            : delivery.destination
+              ? maskDeliveryDestination(delivery.destination)
+              : `${delivery.audienceType.toLowerCase().replaceAll('_', ' ')} audience`,
+        queuedAt: delivery.createdAt.toISOString(),
+        attemptedAt: delivery.sentAt?.toISOString() ?? null,
+        deliveredAt: delivery.deliveredAt?.toISOString() ?? null,
+        failedAt: delivery.failedAt?.toISOString() ?? null,
+        retryCount: delivery.retryCount,
+      })),
+      total,
+      page,
+      limit,
+      hasNextPage: page * limit < total,
+    };
   }
 
   async getDeliveryAnalytics(actor: AuthContext) {
@@ -1953,7 +2078,7 @@ export class CommunicationsService {
             audienceType: input.audienceType,
             recipientUserId: recipient.userId,
             guardianId: recipient.guardianId,
-            studentId: recipient.studentId,
+            studentId: recipient.studentId || null,
             noticeId: input.noticeId ?? null,
             eventId: input.eventId ?? null,
             activityPostId: input.activityPostId ?? null,

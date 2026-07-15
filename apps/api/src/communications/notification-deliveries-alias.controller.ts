@@ -43,6 +43,15 @@ export class NotificationDeliveriesAliasController {
     return this.communicationsService.getDeliveryAnalytics(auth);
   }
 
+  @Get('operations')
+  @Permissions('notifications:view_delivery_diagnostics')
+  operations(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: ListNotificationDeliveriesQueryDto,
+  ) {
+    return this.communicationsService.listDeliveryOperations(auth, query);
+  }
+
   @Get('failures')
   @Permissions('notifications:view_delivery_diagnostics')
   failures(
