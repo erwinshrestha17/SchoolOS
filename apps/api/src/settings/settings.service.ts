@@ -100,6 +100,8 @@ export class SettingsService {
     'parent_notification_enabled',
     'consent_required_for_media',
     'quiet_hours_enabled',
+    'notification_quiet_hours_start',
+    'notification_quiet_hours_end',
     'chat_availability_enabled',
     'chat_sunday_to_thursday_start',
     'chat_sunday_to_thursday_end',
@@ -592,6 +594,17 @@ export class SettingsService {
         if (typeof value !== 'string') {
           throw new BadRequestException(
             `Invalid value for ${key}. Expected string.`,
+          );
+        }
+        break;
+      case 'notification_quiet_hours_start':
+      case 'notification_quiet_hours_end':
+        if (
+          typeof value !== 'string' ||
+          !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)
+        ) {
+          throw new BadRequestException(
+            `Invalid value for ${key}. Expected 24-hour HH:mm time.`,
           );
         }
         break;

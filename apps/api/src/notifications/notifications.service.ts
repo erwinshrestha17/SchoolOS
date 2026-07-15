@@ -22,6 +22,10 @@ interface SendPushNotificationInput {
   metadata?: Record<string, string>;
 }
 
+interface ReleaseInAppNotificationInput {
+  metadata: Record<string, string>;
+}
+
 interface SendAuthCodeEmailInput {
   to: string;
   tenantName: string;
@@ -94,6 +98,14 @@ export class NotificationsService {
 
   async sendPushNotification(input: SendPushNotificationInput) {
     await this.notificationsQueue.add('sendPushNotification', input, {
+      ...notificationJobOptions(input.metadata),
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 1000 },
+    });
+  }
+
+  async releaseInAppNotification(input: ReleaseInAppNotificationInput) {
+    await this.notificationsQueue.add('releaseInAppNotification', input, {
       ...notificationJobOptions(input.metadata),
       attempts: 3,
       backoff: { type: 'exponential', delay: 1000 },

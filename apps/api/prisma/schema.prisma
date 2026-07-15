@@ -404,6 +404,47 @@ enum NotificationStatus {
   SKIPPED
 }
 
+enum NotificationEventType {
+  STUDENT_ADMITTED
+  ATTENDANCE_STUDENT_ABSENT
+  ATTENDANCE_STUDENT_LATE
+  ATTENDANCE_STUDENT_LEAVE
+  ATTENDANCE_STUDENT_CONSECUTIVE_ABSENCE
+  FEE_PAYMENT_CONFIRMED
+  NOTICE_PUBLISHED
+  NOTICE_ACKNOWLEDGEMENT_FOLLOW_UP
+}
+
+enum NotificationEventSourceModule {
+  M1_ADMISSIONS
+  M2_ATTENDANCE
+  M3_FEES
+  M15_NOTICES
+}
+
+enum NotificationEventPriority {
+  NORMAL
+  IMPORTANT
+  CRITICAL
+  MANDATORY
+}
+
+enum NotificationEventStatus {
+  ACCEPTED
+  DISPATCHED
+  FAILED
+  CANCELLED
+}
+
+enum NotificationPreferenceCategory {
+  GENERAL
+  ATTENDANCE
+  FEES
+  NOTICE
+  SECURITY
+  EMERGENCY
+}
+
 enum ConsentType {
   PRIVACY
   DATA_PROCESSING
@@ -2724,6 +2765,10 @@ model User {
   editedActivityPosts            ActivityPost[]               @relation("EditedActivityPosts")
   deletedActivityPosts           ActivityPost[]               @relation("DeletedActivityPosts")
   notificationDeliveries      NotificationDelivery[]       @relation("NotificationActor")
+  notificationEvents          NotificationEvent[]          @relation("NotificationEventActor")
+  notificationPreferences     NotificationPreference[]
+  noticeAcknowledgements      NoticeAcknowledgement[]       @relation("NoticeAcknowledgementRecipient")
+  noticeAcknowledgementActions NoticeAcknowledgement[]      @relation("NoticeAcknowledgementActor")
   mobilePushTokens            MobilePushToken[]
   enteredMarks                MarkEntry[]                  @relation("EnteredMarks")
   reviewedStaffLeaveRequests  StaffLeaveRequest[]          @relation("ReviewedStaffLeaveRequests")
@@ -3291,9 +3336,31 @@ model Notice {
   section    Section?               @relation(fields: [sectionId], references: [id])
   createdBy  User?                  @relation("CreatedNotices", fields: [createdById], references: [id])
   deliveries NotificationDelivery[]
+  acknowledgements NoticeAcknowledgement[]
 
   @@unique([tenantId, idempotencyKey])
   @@index([tenantId, lifecycleStatus, scheduledFor])
+}
+
+model NoticeAcknowledgement {
+  id                   String   @id @default(uuid())
+  tenantId             String
+  noticeId             String
+  recipientUserId      String
+  actorId               String
+  guardianId            String?
+  studentId             String?
+  firstAcknowledgedAt   DateTime @default(now())
+  createdAt             DateTime @default(now())
+
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  notice        Notice   @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+  recipientUser User     @relation("NoticeAcknowledgementRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
+  actor         User     @relation("NoticeAcknowledgementActor", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, noticeId, recipientUserId])
+  @@index([tenantId, noticeId, firstAcknowledgedAt])
+  @@index([tenantId, recipientUserId, firstAcknowledgedAt])
 }
 
 model Event {
@@ -3334,6 +3401,7 @@ model NotificationDelivery {
   noticeId          String?
   eventId           String?
   activityPostId    String?
+  notificationEventId String?
   destination       String?
   title             String
   body              String
@@ -3357,6 +3425,7 @@ model NotificationDelivery {
   notice        Notice?                   @relation(fields: [noticeId], references: [id], onDelete: Cascade)
   event         Event?                    @relation(fields: [eventId], references: [id], onDelete: Cascade)
   activityPost  ActivityPost?             @relation(fields: [activityPostId], references: [id], onDelete: Cascade)
+  notificationEvent NotificationEvent?     @relation(fields: [notificationEventId], references: [id], onDelete: SetNull)
   readReceipts  NotificationReadReceipt[]
 
   @@index([tenantId, sourceType, sourceId])
@@ -3367,6 +3436,54 @@ model NotificationDelivery {
   @@index([tenantId, noticeId, status, createdAt])
   @@index([tenantId, recipientUserId, status, createdAt])
   @@index([tenantId, activityPostId], map: "notification_delivery_activity_post_idx")
+  @@index([tenantId, notificationEventId])
+}
+
+model NotificationEvent {
+  id               String                        @id @default(uuid())
+  tenantId         String
+  type             NotificationEventType
+  sourceModule     NotificationEventSourceModule
+  sourceEntityType String
+  sourceEntityId   String
+  actorId          String?
+  priority         NotificationEventPriority     @default(NORMAL)
+  metadata         Json?
+  idempotencyKey   String
+  status           NotificationEventStatus       @default(ACCEPTED)
+  acceptedAt       DateTime                      @default(now())
+  dispatchedAt     DateTime?
+  failedAt         DateTime?
+  failureCode      String?
+  createdAt        DateTime                      @default(now())
+  updatedAt        DateTime                      @updatedAt
+
+  tenant     Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  actor      User?                  @relation("NotificationEventActor", fields: [actorId], references: [id], onDelete: SetNull)
+  deliveries NotificationDelivery[]
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, type, createdAt])
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, sourceModule, sourceEntityType, sourceEntityId])
+}
+
+model NotificationPreference {
+  id                String                         @id @default(uuid())
+  tenantId          String
+  userId            String
+  category          NotificationPreferenceCategory
+  channel           NotificationChannel
+  enabled           Boolean                        @default(true)
+  quietHoursEnabled Boolean?
+  createdAt         DateTime                       @default(now())
+  updatedAt         DateTime                       @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, category, channel])
+  @@index([tenantId, userId, updatedAt])
 }
 
 model NotificationReadReceipt {
@@ -6346,6 +6463,9 @@ model Tenant {
   developmentalMilestones       DevelopmentalMilestone[]
   moodLogs                      MoodLog[]
   notificationDeliveries        NotificationDelivery[]
+  notificationEvents            NotificationEvent[]
+  notificationPreferences       NotificationPreference[]
+  noticeAcknowledgements        NoticeAcknowledgement[]
   notificationReadReceipts      NotificationReadReceipt[]
   mobilePushTokens              MobilePushToken[]
   guardianConsents              GuardianConsent[]

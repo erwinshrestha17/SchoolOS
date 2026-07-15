@@ -77,7 +77,10 @@ describe('HrAttendanceController leave decision routes', () => {
 
   it('keeps the generic review endpoint requiring an explicit status', () => {
     const { controller, service } = createController();
-    const dto = { status: 'REJECTED' as const, reviewNote: 'Duplicate request' };
+    const dto = {
+      status: 'REJECTED' as const,
+      reviewNote: 'Duplicate request',
+    };
     service.reviewLeaveRequest.mockReturnValue({ status: 'REJECTED' });
 
     const result = controller.reviewLeaveRequest('leave-1', dto, actor);

@@ -8,6 +8,7 @@ import { NotificationCenterAliasController } from '../communications/notificatio
 import { NotificationCenterController } from '../communications/notification-center.controller';
 import { NotificationDeliveriesAliasController } from '../communications/notification-deliveries-alias.controller';
 import { NotificationDeliveryModule } from './notification-delivery.module';
+import { NotificationPreferencesController } from './notification-preferences.controller';
 
 @Module({
   imports: [NotificationDeliveryModule, CommunicationsModule],
@@ -19,6 +20,7 @@ import { NotificationDeliveryModule } from './notification-delivery.module';
     CommunicationsOperationsController,
     ConsentsController,
     M10HardeningController,
+    NotificationPreferencesController,
   ],
   exports: [NotificationDeliveryModule, CommunicationsModule],
 })

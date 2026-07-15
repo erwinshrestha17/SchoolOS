@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { DevicePushTokensService } from './device-push-tokens.service';
 import { NotificationsProcessor } from './notifications.processor';
 import { NotificationsService } from './notifications.service';
+import { NotificationPreferencePolicy } from './notification-preference-policy';
 
 /**
  * Internal M12 transport boundary. Queue and job names remain stable for
@@ -19,7 +20,12 @@ import { NotificationsService } from './notifications.service';
     NotificationsService,
     DevicePushTokensService,
     NotificationsProcessor,
+    NotificationPreferencePolicy,
   ],
-  exports: [NotificationsService, DevicePushTokensService],
+  exports: [
+    NotificationsService,
+    DevicePushTokensService,
+    NotificationPreferencePolicy,
+  ],
 })
 export class NotificationDeliveryModule {}

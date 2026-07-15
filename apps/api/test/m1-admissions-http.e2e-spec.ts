@@ -51,6 +51,10 @@ describe('M1 Admissions HTTP ownership hardening (E2E)', () => {
       .overrideProvider(RedisService)
       .useValue({
         ping: jest.fn(() => Promise.resolve('PONG')),
+        getClient: jest.fn().mockReturnValue({
+          set: jest.fn().mockResolvedValue('OK'),
+          del: jest.fn().mockResolvedValue(1),
+        }),
         onModuleDestroy: jest.fn(() => Promise.resolve(undefined)),
       })
       .overrideProvider(StorageService)
@@ -414,6 +418,15 @@ describe('M1 Admissions HTTP ownership hardening (E2E)', () => {
         studentSystemId: 'SCH-2083-0001',
       }),
     );
+    expect(prisma.__state.notificationEvents).toContainEqual(
+      expect.objectContaining({
+        tenantId: tenantAId,
+        type: 'STUDENT_ADMITTED',
+        sourceModule: 'M1_ADMISSIONS',
+        sourceEntityId: conversion.body.admission.student.id,
+        actorId: actorA.userId,
+      }),
+    );
 
     await request(app.getHttpServer())
       .post('/admissions/applications/application-a/enroll')
@@ -583,6 +596,13 @@ function buildAdmissionConversionPayload() {
 
 function seedTenant(prisma: PrismaMock, tenantId: string) {
   ensureTenantDefaultsWithState(prisma.__state, tenantId);
+  prisma.__state.users.push({
+    id: tenantId === tenantAId ? actorA.userId : actorB.userId,
+    tenantId,
+    email: `${tenantId === tenantAId ? 'registrar-a' : 'registrar-b'}@school.test`,
+    status: 'ACTIVE',
+    authMethod: AuthMethod.PASSWORD,
+  });
   const planId = `plan-${tenantId}`;
   prisma.__state.platformPlans.push({
     id: planId,

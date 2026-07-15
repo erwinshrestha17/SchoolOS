@@ -1,7 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger, Optional } from '@nestjs/common';
 import { NotificationStatus } from '@prisma/client';
-import { Job } from 'bullmq';
+import { DelayedError, Job } from 'bullmq';
 import { decryptSensitiveField } from '../common/security/field-encryption';
 import { ConfigService } from '../config/config.service';
 import { PlansService } from '../plans/plans.service';
@@ -9,6 +9,7 @@ import { skipSuspendedTenantJob } from '../plans/processor-tenant.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { DevicePushTokensService } from './device-push-tokens.service';
 import { resolveMobilePushDeepLink } from './mobile-push-deep-link';
+import { NotificationPreferencePolicy } from './notification-preference-policy';
 
 interface EmailJobData {
   to: string;
@@ -31,7 +32,15 @@ interface PushJobData {
   metadata?: Record<string, unknown>;
 }
 
-type NotificationJobData = EmailJobData | SmsJobData | PushJobData;
+interface InAppJobData {
+  metadata: Record<string, unknown>;
+}
+
+type NotificationJobData =
+  | EmailJobData
+  | SmsJobData
+  | PushJobData
+  | InAppJobData;
 type NotificationProviderMode = 'dev-log' | 'disabled' | 'configured-provider';
 
 interface ProviderResolution {
@@ -59,6 +68,8 @@ export class NotificationsProcessor extends WorkerHost {
     private readonly configService?: ConfigService,
     @Optional()
     private readonly devicePushTokensService?: DevicePushTokensService,
+    @Optional()
+    private readonly notificationPreferencePolicy?: NotificationPreferencePolicy,
   ) {
     super();
   }
@@ -76,6 +87,35 @@ export class NotificationsProcessor extends WorkerHost {
       return;
     }
 
+    const deliveryId = job.data.metadata?.notificationDeliveryId;
+    if (
+      this.notificationPreferencePolicy &&
+      typeof tenantId === 'string' &&
+      typeof deliveryId === 'string'
+    ) {
+      const decision = await this.notificationPreferencePolicy.evaluateDelivery(
+        tenantId,
+        deliveryId,
+      );
+      if (decision.action === 'SKIP') {
+        await this.markDelivery(
+          job.data,
+          NotificationStatus.SKIPPED,
+          decision.reason,
+        );
+        return;
+      }
+      if (decision.action === 'DELAY') {
+        await this.markDelivery(
+          job.data,
+          NotificationStatus.RETRY_PENDING,
+          decision.reason,
+        );
+        await job.moveToDelayed(decision.resumeAt.getTime(), job.token);
+        throw new DelayedError();
+      }
+    }
+
     try {
       let result: ProviderResult | undefined;
       switch (job.name) {
@@ -87,6 +127,9 @@ export class NotificationsProcessor extends WorkerHost {
           break;
         case 'sendPushNotification':
           result = await this.handleSendPush(job.data as PushJobData);
+          break;
+        case 'releaseInAppNotification':
+          result = { status: NotificationStatus.SENT };
           break;
         default:
           this.logger.warn(`Unknown job name: ${job.name}`);

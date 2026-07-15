@@ -703,6 +703,10 @@ export type NotificationCenterItem = {
 export type NotificationCenterSummary = {
   unreadCount: number;
   items: NotificationCenterItem[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
 };
 
 export type MarkLockFilters = {

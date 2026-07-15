@@ -13,6 +13,7 @@ import { ConfigService } from '../config/config.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CommunicationsService } from './communications.service';
 import { DeliveryRetryService } from './delivery-retry.service';
+import type { CommunicationPageQueryDto } from './dto/communication-list-query.dto';
 import {
   CommunicationAuditQueryDto,
   CommunicationPreferenceDto,
@@ -67,8 +68,14 @@ export class M10HardeningService {
     private readonly configService: ConfigService,
   ) {}
 
-  async listNoticesWithReadStatus(actor: AuthContext) {
-    const rows = await this.prisma.$queryRaw<NoticeRow[]>(Prisma.sql`
+  async listNoticesWithReadStatus(
+    actor: AuthContext,
+    query: CommunicationPageQueryDto = { page: 1, limit: 25 },
+  ) {
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.min(100, Math.max(1, query.limit ?? 25));
+    const [rows, totals] = await Promise.all([
+      this.prisma.$queryRaw<NoticeRow[]>(Prisma.sql`
       SELECT
         n."id",
         n."title",
@@ -87,16 +94,29 @@ export class M10HardeningService {
        AND r."userId" = ${actor.userId}
       WHERE n."tenantId" = ${actor.tenantId}
       ORDER BY n."createdAt" DESC
-      LIMIT 100
-    `);
+      LIMIT ${limit} OFFSET ${(page - 1) * limit}
+    `),
+      this.prisma.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`
+        SELECT COUNT(*)::bigint AS "total"
+        FROM "Notice" n
+        WHERE n."tenantId" = ${actor.tenantId}
+      `),
+    ]);
 
-    return rows.map((row) => ({
-      ...row,
-      publishedAt: row.publishedAt?.toISOString() ?? null,
-      createdAt: row.createdAt.toISOString(),
-      readAt: row.readAt?.toISOString() ?? null,
-      isRead: Boolean(row.readAt),
-    }));
+    const total = Number(totals[0]?.total ?? 0);
+    return {
+      items: rows.map((row) => ({
+        ...row,
+        publishedAt: row.publishedAt?.toISOString() ?? null,
+        createdAt: row.createdAt.toISOString(),
+        readAt: row.readAt?.toISOString() ?? null,
+        isRead: Boolean(row.readAt),
+      })),
+      total,
+      page,
+      limit,
+      hasNextPage: page * limit < total,
+    };
   }
 
   async getNoticeDetailWithReadStatus(noticeId: string, actor: AuthContext) {

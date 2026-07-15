@@ -60,6 +60,7 @@ describe('M10HardeningController contracts', () => {
     });
     expect(m10HardeningService.listNoticesWithReadStatus).toHaveBeenCalledWith(
       actor,
+      {},
     );
     expect(
       m10HardeningService.getNoticeDetailWithReadStatus,

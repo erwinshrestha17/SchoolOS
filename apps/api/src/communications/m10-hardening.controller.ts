@@ -25,6 +25,7 @@ import {
   UpdateConsentTemplateDto,
 } from './dto/m10-hardening.dto';
 import { M10HardeningService } from './m10-hardening.service';
+import { CommunicationPageQueryDto } from './dto/communication-list-query.dto';
 
 @Controller()
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
@@ -35,8 +36,11 @@ export class M10HardeningController {
   @Get('communications/notices')
   @Entitlement('module.notices')
   @Permissions('notices:read')
-  listCommunicationNotices(@CurrentAuth() auth: AuthContext) {
-    return this.m10HardeningService.listNoticesWithReadStatus(auth);
+  listCommunicationNotices(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: CommunicationPageQueryDto = {},
+  ) {
+    return this.m10HardeningService.listNoticesWithReadStatus(auth, query);
   }
 
   @Get('communications/notices/:noticeId')

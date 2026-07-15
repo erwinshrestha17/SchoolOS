@@ -70,6 +70,8 @@ export type TenantSettingKey =
   | 'parent_notification_enabled'
   | 'consent_required_for_media'
   | 'quiet_hours_enabled'
+  | 'notification_quiet_hours_start'
+  | 'notification_quiet_hours_end'
   | 'chat_availability_enabled'
   | 'chat_sunday_to_thursday_start'
   | 'chat_sunday_to_thursday_end'

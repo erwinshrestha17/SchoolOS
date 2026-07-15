@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { AudienceType, NoticePriority } from '@prisma/client';
@@ -23,6 +24,7 @@ import {
   NoticeScheduleDto,
   UpdateNoticeDraftDto,
 } from './dto/notice-lifecycle.dto';
+import { ListNoticesQueryDto } from './dto/communication-list-query.dto';
 
 @Controller('notices')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
@@ -32,8 +34,11 @@ export class NoticesController {
 
   @Get()
   @Permissions('notices:read')
-  listNotices(@CurrentAuth() auth: AuthContext) {
-    return this.communicationsService.listNotices(auth);
+  listNotices(
+    @Query() query: ListNoticesQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.communicationsService.listNotices(auth, query);
   }
 
   @Post()

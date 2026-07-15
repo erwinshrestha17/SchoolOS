@@ -37,6 +37,98 @@ describe('NotificationsProcessor', () => {
     global.fetch = originalFetch;
   });
 
+  it('re-evaluates preferences at execution and skips an inactive recipient', async () => {
+    const prisma = {
+      notificationDelivery: { update: jest.fn() },
+    };
+    const policy = {
+      evaluateDelivery: jest.fn().mockResolvedValue({
+        action: 'SKIP',
+        reason: 'Recipient is no longer active',
+        mandatory: false,
+      }),
+    };
+    const processor = new NotificationsProcessor(
+      prisma as never,
+      { shouldProcessTenantJob: jest.fn().mockResolvedValue(true) } as never,
+      undefined,
+      undefined,
+      policy as never,
+    );
+
+    await processor.process({
+      name: 'sendEmail',
+      data: {
+        to: 'recipient@school.test',
+        subject: 'Notice',
+        text: 'Open SchoolOS.',
+        metadata: {
+          tenantId: 'tenant-1',
+          notificationDeliveryId: 'delivery-1',
+        },
+      },
+    } as never);
+
+    expect(policy.evaluateDelivery).toHaveBeenCalledWith(
+      'tenant-1',
+      'delivery-1',
+    );
+    expect(prisma.notificationDelivery.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: NotificationStatus.SKIPPED }),
+      }),
+    );
+  });
+
+  it('moves a quiet-hours job to the policy resume time', async () => {
+    const prisma = {
+      notificationDelivery: { update: jest.fn() },
+    };
+    const resumeAt = new Date('2026-07-16T00:15:00.000Z');
+    const policy = {
+      evaluateDelivery: jest.fn().mockResolvedValue({
+        action: 'DELAY',
+        reason: 'Recipient is currently in quiet hours',
+        resumeAt,
+        mandatory: false,
+      }),
+    };
+    const processor = new NotificationsProcessor(
+      prisma as never,
+      { shouldProcessTenantJob: jest.fn().mockResolvedValue(true) } as never,
+      undefined,
+      undefined,
+      policy as never,
+    );
+    const job = {
+      name: 'sendEmail',
+      token: 'worker-token',
+      moveToDelayed: jest.fn().mockResolvedValue(undefined),
+      data: {
+        to: 'recipient@school.test',
+        subject: 'Notice',
+        text: 'Open SchoolOS.',
+        metadata: {
+          tenantId: 'tenant-1',
+          notificationDeliveryId: 'delivery-1',
+        },
+      },
+    };
+
+    await expect(processor.process(job as never)).rejects.toThrow();
+    expect(job.moveToDelayed).toHaveBeenCalledWith(
+      resumeAt.getTime(),
+      'worker-token',
+    );
+    expect(prisma.notificationDelivery.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: NotificationStatus.RETRY_PENDING,
+        }),
+      }),
+    );
+  });
+
   it('sends a generic push payload to registered device tokens through the configured provider', async () => {
     process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE = 'configured-provider';
     process.env.PUSH_PROVIDER_READY = 'true';

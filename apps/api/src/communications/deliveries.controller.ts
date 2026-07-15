@@ -17,6 +17,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from './communications.service';
 import { DeliveryRetryService } from './delivery-retry.service';
 import { RetryDeliveryDto } from './dto/m10-hardening.dto';
+import { ListNotificationDeliveriesQueryDto } from './dto/communication-list-query.dto';
 
 @Controller('communications/deliveries')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
@@ -31,13 +32,9 @@ export class DeliveriesController {
   @Permissions('notifications:view_delivery_diagnostics')
   listDeliveries(
     @CurrentAuth() auth: AuthContext,
-    @Query('sourceType') sourceType?: string,
-    @Query('activityPostId') activityPostId?: string,
+    @Query() query: ListNotificationDeliveriesQueryDto,
   ) {
-    return this.communicationsService.listDeliveries(auth, {
-      sourceType,
-      activityPostId,
-    });
+    return this.communicationsService.listDeliveries(auth, query);
   }
 
   @Get('analytics')
@@ -48,8 +45,11 @@ export class DeliveriesController {
 
   @Get('failures')
   @Permissions('notifications:view_delivery_diagnostics')
-  failures(@CurrentAuth() auth: AuthContext) {
-    return this.deliveryRetryService.listFailureDashboard(auth);
+  failures(
+    @Query() query: ListNotificationDeliveriesQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.deliveryRetryService.listFailureDashboard(auth, query);
   }
 
   @Post(':deliveryId/retry')

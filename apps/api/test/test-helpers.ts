@@ -350,6 +350,11 @@ export function createPrismaMock() {
     learningAnswers: [] as Record<string, unknown>[],
     learningProgress: [] as Record<string, unknown>[],
     learningResources: [] as Record<string, unknown>[],
+    notificationDeliveries: [] as Record<string, unknown>[],
+    notificationEvents: [] as Record<string, unknown>[],
+    notificationPreferences: [] as Record<string, unknown>[],
+    communicationPreferences: [] as Record<string, unknown>[],
+    noticeAcknowledgements: [] as Record<string, unknown>[],
   };
 
   const nextId = (prefix: string) =>
@@ -2328,6 +2333,10 @@ export function createPrismaMock() {
 
   const dummyModels = [
     'notificationDelivery',
+    'notificationEvent',
+    'notificationPreference',
+    'communicationPreference',
+    'noticeAcknowledgement',
     'developmentalMilestone',
     'moodLog',
     'libraryIssue',

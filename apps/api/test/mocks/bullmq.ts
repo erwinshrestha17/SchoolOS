@@ -16,3 +16,5 @@ export const Worker = jest.fn().mockImplementation(() => ({
 }));
 
 export const Job = jest.fn();
+
+export class DelayedError extends Error {}

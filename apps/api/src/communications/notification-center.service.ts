@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
+import type { CommunicationPageQueryDto } from './dto/communication-list-query.dto';
 
 interface NotificationCenterRow {
   id: string;
@@ -43,22 +44,43 @@ export interface NotificationCenterItem {
 export interface NotificationCenterSummary {
   unreadCount: number;
   items: NotificationCenterItem[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
 }
 
 @Injectable()
 export class NotificationCenterService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getCenter(actor: AuthContext): Promise<NotificationCenterSummary> {
-    const [items, unreadCount] = await Promise.all([
-      this.getRecentItems(actor),
+  async getCenter(
+    actor: AuthContext,
+    query: CommunicationPageQueryDto = { page: 1, limit: 25 },
+  ): Promise<NotificationCenterSummary> {
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.min(100, Math.max(1, query.limit ?? 25));
+    const [items, unreadCount, total] = await Promise.all([
+      this.getRecentItems(actor, page, limit),
       this.getUnreadCount(actor),
+      this.getTotalCount(actor),
     ]);
 
-    return { unreadCount, items };
+    return {
+      unreadCount,
+      items,
+      total,
+      page,
+      limit,
+      hasNextPage: page * limit < total,
+    };
   }
 
-  async getRecentItems(actor: AuthContext): Promise<NotificationCenterItem[]> {
+  async getRecentItems(
+    actor: AuthContext,
+    page = 1,
+    limit = 25,
+  ): Promise<NotificationCenterItem[]> {
     const rows = await this.prisma.$queryRaw<
       NotificationCenterRow[]
     >(Prisma.sql`
@@ -90,7 +112,7 @@ export class NotificationCenterService {
       WHERE d."tenantId" = ${actor.tenantId}
         ${this.visibilitySql(actor)}
       ORDER BY d."createdAt" DESC
-      LIMIT 20
+      LIMIT ${limit} OFFSET ${(page - 1) * limit}
     `);
 
     return rows.map((row) => toCenterItem(row));
@@ -111,6 +133,18 @@ export class NotificationCenterService {
         ${this.visibilitySql(actor)}
     `);
 
+    return Number(rows[0]?.count ?? 0);
+  }
+
+  private async getTotalCount(actor: AuthContext) {
+    const rows = await this.prisma.$queryRaw<Array<{ count: bigint }>>(
+      Prisma.sql`
+        SELECT COUNT(*)::bigint AS count
+        FROM "NotificationDelivery" d
+        WHERE d."tenantId" = ${actor.tenantId}
+          ${this.visibilitySql(actor)}
+      `,
+    );
     return Number(rows[0]?.count ?? 0);
   }
 

@@ -4,8 +4,13 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
-import { getNepalSchoolDay } from '@schoolos/core';
+import {
+  getNepalSchoolDay,
+  type NotificationEventPriority as ContractNotificationEventPriority,
+  type NotificationEventType as ContractNotificationEventType,
+} from '@schoolos/core';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import {
   AudienceType,
@@ -27,6 +32,7 @@ import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationPreferencePolicy } from '../notifications/notification-preference-policy';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { CreateNoticeDto } from './dto/create-notice.dto';
@@ -37,8 +43,16 @@ import {
   UpdateCommunicationTemplateDto,
 } from './dto/communication-template.dto';
 import { CaptureConsentDto } from './dto/capture-consent.dto';
+import type {
+  ListNotificationDeliveriesQueryDto,
+  ListNoticesQueryDto,
+} from './dto/communication-list-query.dto';
 import { UsageService } from '../usage/usage.service';
 import { RedisService } from '../redis/redis.service';
+import {
+  type AcceptNotificationEventInput,
+  NotificationEventService,
+} from './notification-event.service';
 
 const TEMPLATE_SELECT = {
   id: true,
@@ -104,14 +118,45 @@ export class CommunicationsService {
     private readonly redisService: RedisService,
     private readonly fileRegistryService?: FileRegistryService,
     private readonly eventEmitter?: EventEmitter2,
+    @Optional()
+    private readonly notificationEventService?: NotificationEventService,
+    @Optional()
+    private readonly notificationPreferencePolicy?: NotificationPreferencePolicy,
   ) {}
 
-  async listNotices(actor: AuthContext) {
-    return this.prisma.notice.findMany({
-      where: { tenantId: actor.tenantId },
-      orderBy: [{ createdAt: 'desc' }],
-      take: 100,
-    });
+  async listNotices(
+    actor: AuthContext,
+    query: ListNoticesQueryDto = { page: 1, limit: 25 },
+  ) {
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.min(100, Math.max(1, query.limit ?? 25));
+    const search = query.search?.trim();
+    const where: Prisma.NoticeWhereInput = {
+      tenantId: actor.tenantId,
+      ...(query.lifecycleStatus
+        ? { lifecycleStatus: query.lifecycleStatus }
+        : {}),
+      ...(query.priority ? { priority: query.priority } : {}),
+      ...(query.audienceType ? { audienceType: query.audienceType } : {}),
+      ...(search
+        ? {
+            OR: [
+              { title: { contains: search, mode: 'insensitive' } },
+              { body: { contains: search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.notice.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.notice.count({ where }),
+    ]);
+    return { items, total, page, limit, hasNextPage: page * limit < total };
   }
 
   async createNotice(dto: CreateNoticeDto, actor: AuthContext) {
@@ -830,23 +875,30 @@ export class CommunicationsService {
 
   async listDeliveries(
     actor: AuthContext,
-    filters?: { sourceType?: string; activityPostId?: string },
+    filters: ListNotificationDeliveriesQueryDto = { page: 1, limit: 25 },
   ) {
-    return this.prisma.notificationDelivery.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        ...(filters?.sourceType ? { sourceType: filters.sourceType } : {}),
-        ...(filters?.activityPostId
-          ? { activityPostId: filters.activityPostId }
-          : {}),
-      },
-      include: {
-        guardian: true,
-        student: true,
-      },
-      orderBy: [{ createdAt: 'desc' }],
-      take: 100,
-    });
+    const page = Math.max(1, filters.page ?? 1);
+    const limit = Math.min(100, Math.max(1, filters.limit ?? 25));
+    const where: Prisma.NotificationDeliveryWhereInput = {
+      tenantId: actor.tenantId,
+      ...(filters.sourceType ? { sourceType: filters.sourceType } : {}),
+      ...(filters.activityPostId
+        ? { activityPostId: filters.activityPostId }
+        : {}),
+      ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.channel ? { channel: filters.channel } : {}),
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.notificationDelivery.findMany({
+        where,
+        include: { guardian: true, student: true },
+        orderBy: [{ createdAt: 'desc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.notificationDelivery.count({ where }),
+    ]);
+    return { items, total, page, limit, hasNextPage: page * limit < total };
   }
 
   async getDeliveryAnalytics(actor: AuthContext) {
@@ -1583,6 +1635,17 @@ export class CommunicationsService {
           },
         });
         if (deliveries.length > 0) {
+          if (input.notificationEventId) {
+            await this.prisma.notificationDelivery.updateMany({
+              where: {
+                tenantId: input.actor.tenantId,
+                sourceType: input.sourceType,
+                sourceId: input.sourceId,
+                notificationEventId: null,
+              },
+              data: { notificationEventId: input.notificationEventId },
+            });
+          }
           return summarizeExistingDeliveries(deliveries);
         }
       }
@@ -1606,6 +1669,17 @@ export class CommunicationsService {
         });
 
       if (existingDeliveries.length > 0) {
+        if (input.notificationEventId) {
+          await this.prisma.notificationDelivery.updateMany({
+            where: {
+              tenantId: input.actor.tenantId,
+              sourceType: input.sourceType,
+              sourceId: input.sourceId,
+              notificationEventId: null,
+            },
+            data: { notificationEventId: input.notificationEventId },
+          });
+        }
         return summarizeExistingDeliveries(existingDeliveries);
       }
 
@@ -1812,9 +1886,33 @@ export class CommunicationsService {
     event: TenantDomainEvent,
     input: DeliveryRecordInput,
   ) {
+    let notificationEventId: string | undefined;
     try {
-      await this.recordDeliveryRecords(input);
+      if (this.notificationEventService) {
+        const notificationEvent = await this.notificationEventService.accept(
+          notificationEventInput(eventName, event, input),
+        );
+        notificationEventId = notificationEvent.id;
+      }
+      const result = await this.recordDeliveryRecords({
+        ...input,
+        notificationEventId,
+      });
+      if (notificationEventId && this.notificationEventService) {
+        await this.notificationEventService.markDispatched(
+          event.tenantId,
+          notificationEventId,
+        );
+      }
+      return result;
     } catch (error) {
+      if (notificationEventId && this.notificationEventService) {
+        await this.notificationEventService.markFailed(
+          event.tenantId,
+          notificationEventId,
+          'DELIVERY_INTAKE_FAILED',
+        );
+      }
       this.logger.error(
         `Notification event ${eventName} failed for tenant ${event.tenantId}: ${
           error instanceof Error ? error.message : String(error)
@@ -1859,6 +1957,7 @@ export class CommunicationsService {
             noticeId: input.noticeId ?? null,
             eventId: input.eventId ?? null,
             activityPostId: input.activityPostId ?? null,
+            notificationEventId: input.notificationEventId ?? null,
             destination: resolveDestination(recipient, channel),
             title: input.title,
             body: input.body,
@@ -1888,6 +1987,24 @@ export class CommunicationsService {
         sourceType: delivery.sourceType,
         sourceId: delivery.sourceId,
       };
+
+      if (this.notificationPreferencePolicy) {
+        const decision =
+          await this.notificationPreferencePolicy.evaluateDelivery(
+            delivery.tenantId,
+            delivery.id,
+          );
+        if (decision.action === 'SKIP') {
+          await this.prisma.notificationDelivery.update({
+            where: { id: delivery.id },
+            data: {
+              status: NotificationStatus.SKIPPED,
+              errorMessage: decision.reason,
+            },
+          });
+          return;
+        }
+      }
 
       if (delivery.channel !== NotificationChannel.IN_APP) {
         const readiness = await this.notificationsService.getProviderReadiness(
@@ -1927,9 +2044,12 @@ export class CommunicationsService {
       }
 
       if (delivery.channel === NotificationChannel.IN_APP) {
-        // In-app notifications are already visible via the notification
-        // center by virtue of this row existing. No external dispatch is
-        // needed; SENT means available to the inbox, not provider-delivered.
+        if (this.notificationPreferencePolicy) {
+          await this.notificationsService.releaseInAppNotification({
+            metadata,
+          });
+          return;
+        }
         await this.prisma.notificationDelivery.update({
           where: { id: delivery.id },
           data: { status: NotificationStatus.SENT, sentAt: new Date() },
@@ -2064,6 +2184,25 @@ export class CommunicationsService {
   private async resolveAudienceRecipients(
     input: DeliveryRecordInput,
   ): Promise<DeliveryRecipient[]> {
+    if (input.recipientUserIds?.length) {
+      const users = await this.prisma.user.findMany({
+        where: {
+          tenantId: input.actor.tenantId,
+          id: { in: input.recipientUserIds },
+          status: 'ACTIVE',
+        },
+      });
+      return deduplicateRecipients(
+        users.map((user) => ({
+          studentId: '',
+          guardianId: null,
+          userId: user.id,
+          email: user.email,
+          phone: user.phone,
+        })),
+      );
+    }
+
     if (input.staffIds?.length) {
       const staff = await this.prisma.staff.findMany({
         where: {
@@ -2208,25 +2347,64 @@ export class CommunicationsService {
   }
 
   @OnEvent('notice.published')
-  handleNoticePublished(event: NoticePublishedEvent) {
-    return this.recordDeliveryRecords({
-      actor: toNotificationActor(event),
-      sourceType: 'notice',
-      sourceId: event.noticeId,
-      noticeId: event.noticeId,
-      audienceType: event.audienceType,
-      classId: event.classId,
-      sectionId: event.sectionId,
-      title: event.title,
-      body: event.body,
-      channels: noticeChannels(event.priority),
-      requiredConsentTypes: [ConsentType.MESSAGING],
-      communicationCategory:
-        event.priority === NoticePriority.EMERGENCY
-          ? 'ESSENTIAL'
-          : 'NON_ESSENTIAL',
-      activeStudentsOnly: true,
-    });
+  async handleNoticePublished(event: NoticePublishedEvent) {
+    const priority: ContractNotificationEventPriority =
+      event.priority === NoticePriority.EMERGENCY
+        ? 'MANDATORY'
+        : event.priority === NoticePriority.URGENT
+          ? 'CRITICAL'
+          : 'NORMAL';
+    const notificationEvent = this.notificationEventService
+      ? await this.notificationEventService.accept({
+          tenantId: event.tenantId,
+          type: 'NOTICE_PUBLISHED',
+          sourceEntityId: event.noticeId,
+          actorId: event.actor?.userId,
+          priority,
+          idempotencyKey: `notice:${event.noticeId}:published`,
+          metadata: {
+            audienceType: event.audienceType,
+            priority: event.priority,
+          },
+        })
+      : null;
+    try {
+      const result = await this.recordDeliveryRecords({
+        actor: toNotificationActor(event),
+        sourceType: 'notice',
+        sourceId: event.noticeId,
+        noticeId: event.noticeId,
+        audienceType: event.audienceType,
+        classId: event.classId,
+        sectionId: event.sectionId,
+        title: event.title,
+        body: event.body,
+        channels: noticeChannels(event.priority),
+        requiredConsentTypes: [ConsentType.MESSAGING],
+        communicationCategory:
+          event.priority === NoticePriority.EMERGENCY
+            ? 'ESSENTIAL'
+            : 'NON_ESSENTIAL',
+        activeStudentsOnly: true,
+        notificationEventId: notificationEvent?.id,
+      });
+      if (notificationEvent && this.notificationEventService) {
+        await this.notificationEventService.markDispatched(
+          event.tenantId,
+          notificationEvent.id,
+        );
+      }
+      return result;
+    } catch (error) {
+      if (notificationEvent && this.notificationEventService) {
+        await this.notificationEventService.markFailed(
+          event.tenantId,
+          notificationEvent.id,
+          'DELIVERY_INTAKE_FAILED',
+        );
+      }
+      throw error;
+    }
   }
 
   private async partitionRecipientsByCommunicationPolicy(
@@ -2337,6 +2515,7 @@ interface DeliveryRecordInput {
   noticeId?: string | null;
   eventId?: string | null;
   activityPostId?: string | null;
+  notificationEventId?: string | null;
   audienceType: AudienceType;
   classId?: string | null;
   sectionId?: string | null;
@@ -2344,6 +2523,7 @@ interface DeliveryRecordInput {
   guardianIds?: string[];
   staffIds?: string[];
   roleNames?: string[];
+  recipientUserIds?: string[];
   title: string;
   body: string;
   channels: NotificationChannel[];
@@ -2425,6 +2605,76 @@ type FeePaymentConfirmedEvent = TenantDomainEvent & {
   method: string;
   receiptNumber?: string | null;
 };
+
+const DOMAIN_NOTIFICATION_EVENT_TYPES = {
+  'student.admitted': 'STUDENT_ADMITTED',
+  'attendance.student.absent': 'ATTENDANCE_STUDENT_ABSENT',
+  'attendance.student.late': 'ATTENDANCE_STUDENT_LATE',
+  'attendance.student.leave': 'ATTENDANCE_STUDENT_LEAVE',
+  'attendance.student.consecutive_absence':
+    'ATTENDANCE_STUDENT_CONSECUTIVE_ABSENCE',
+  'fees.payment.confirmed': 'FEE_PAYMENT_CONFIRMED',
+} as const satisfies Record<string, ContractNotificationEventType>;
+
+function notificationEventInput(
+  eventName: string,
+  event: TenantDomainEvent,
+  input: DeliveryRecordInput,
+): AcceptNotificationEventInput {
+  const type =
+    DOMAIN_NOTIFICATION_EVENT_TYPES[
+      eventName as keyof typeof DOMAIN_NOTIFICATION_EVENT_TYPES
+    ];
+  if (!type) {
+    throw new BadRequestException(
+      `Unknown notification event type: ${eventName}`,
+    );
+  }
+
+  if (type === 'STUDENT_ADMITTED') {
+    const admitted = event as StudentAdmittedEvent;
+    return {
+      tenantId: event.tenantId,
+      type,
+      sourceEntityId: admitted.studentId,
+      actorId: event.actor?.userId,
+      idempotencyKey: input.sourceId,
+      metadata: {
+        classId: admitted.classId,
+        sectionId: admitted.sectionId ?? null,
+      },
+    };
+  }
+
+  if (type === 'FEE_PAYMENT_CONFIRMED') {
+    const payment = event as FeePaymentConfirmedEvent;
+    return {
+      tenantId: event.tenantId,
+      type,
+      sourceEntityId: payment.paymentId,
+      actorId: event.actor?.userId,
+      idempotencyKey: input.sourceId,
+      metadata: {
+        invoiceId: payment.invoiceId,
+        studentId: payment.studentId,
+      },
+    };
+  }
+
+  const attendance = event as AttendanceNotificationEvent;
+  return {
+    tenantId: event.tenantId,
+    type,
+    sourceEntityId: input.sourceId,
+    actorId: event.actor?.userId,
+    idempotencyKey: input.sourceId,
+    metadata: {
+      attendanceSessionId: attendance.attendanceSessionId,
+      studentId: attendance.studentId,
+      status: attendance.status,
+    },
+  };
+}
 
 function resolveDestination(
   recipient: DeliveryRecipient,

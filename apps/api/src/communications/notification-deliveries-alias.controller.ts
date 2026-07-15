@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
@@ -9,6 +17,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from './communications.service';
 import { DeliveryRetryService } from './delivery-retry.service';
 import { RetryDeliveryDto } from './dto/m10-hardening.dto';
+import { ListNotificationDeliveriesQueryDto } from './dto/communication-list-query.dto';
 
 @Controller('notifications/deliveries')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
@@ -21,8 +30,11 @@ export class NotificationDeliveriesAliasController {
 
   @Get()
   @Permissions('notifications:view_delivery_diagnostics')
-  listDeliveries(@CurrentAuth() auth: AuthContext) {
-    return this.communicationsService.listDeliveries(auth);
+  listDeliveries(
+    @Query() query: ListNotificationDeliveriesQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.communicationsService.listDeliveries(auth, query);
   }
 
   @Get('analytics')
@@ -33,8 +45,11 @@ export class NotificationDeliveriesAliasController {
 
   @Get('failures')
   @Permissions('notifications:view_delivery_diagnostics')
-  failures(@CurrentAuth() auth: AuthContext) {
-    return this.deliveryRetryService.listFailureDashboard(auth);
+  failures(
+    @Query() query: ListNotificationDeliveriesQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.deliveryRetryService.listFailureDashboard(auth, query);
   }
 
   @Post(':deliveryId/retry')

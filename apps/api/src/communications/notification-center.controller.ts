@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
@@ -7,6 +7,7 @@ import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import type { AuthContext } from '../auth/auth.types';
 import { NotificationCenterService } from './notification-center.service';
+import { CommunicationPageQueryDto } from './dto/communication-list-query.dto';
 
 @Controller('communications/notifications')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
@@ -18,8 +19,11 @@ export class NotificationCenterController {
 
   @Get()
   @Permissions('notifications:view_own')
-  getCenter(@CurrentAuth() auth: AuthContext) {
-    return this.notificationCenterService.getCenter(auth);
+  getCenter(
+    @Query() query: CommunicationPageQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.notificationCenterService.getCenter(auth, query);
   }
 
   @Get('unread-count')

@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
+import type { CommunicationPageQueryDto } from './dto/communication-list-query.dto';
 
 interface UnreadRecipientRow {
   deliveryId: string;
@@ -56,6 +57,10 @@ export interface NoticeUnreadRecipientsResult {
   readCount: number;
   unreadCount: number;
   recipients: UnreadNoticeRecipient[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
 }
 
 @Injectable()
@@ -65,7 +70,10 @@ export class NoticeUnreadRecipientsService {
   async getUnreadRecipients(
     noticeId: string,
     actor: AuthContext,
+    query: CommunicationPageQueryDto = { page: 1, limit: 25 },
   ): Promise<NoticeUnreadRecipientsResult> {
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.min(100, Math.max(1, query.limit ?? 25));
     const notice = await this.prisma.notice.findFirst({
       where: {
         id: noticeId,
@@ -143,18 +151,23 @@ export class NoticeUnreadRecipientsService {
           AND d."noticeId" = ${noticeId}
           AND r."notificationDeliveryId" IS NULL
         ORDER BY d."createdAt" DESC
-        LIMIT 200
+        LIMIT ${limit} OFFSET ${(page - 1) * limit}
       `),
     ]);
 
     const summary = summaryRows[0];
 
+    const total = Number(summary?.unreadCount ?? 0);
     return {
       noticeId,
       totalDeliveries: Number(summary?.totalDeliveries ?? 0),
       readCount: Number(summary?.readCount ?? 0),
       unreadCount: Number(summary?.unreadCount ?? 0),
       recipients: recipientRows.map(toUnreadRecipient),
+      total,
+      page,
+      limit,
+      hasNextPage: page * limit < total,
     };
   }
 }

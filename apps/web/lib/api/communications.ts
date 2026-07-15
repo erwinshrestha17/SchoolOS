@@ -10,6 +10,7 @@ import type {
   NoticeSummary,
   NotificationDelivery,
   NotificationDeliveryFailureSummary,
+  PaginatedResponse,
 } from "@schoolos/core";
 import {
   JsonBody,
@@ -85,6 +86,10 @@ export type NoticeUnreadRecipientsResult = {
   readCount: number;
   unreadCount: number;
   recipients: NoticeUnreadRecipient[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
 };
 
 export type NoticeRecipientPreview = {
@@ -139,7 +144,21 @@ export const communicationsApi = {
       `/communications/templates/${encodeURIComponent(templateId)}/archive`,
       { method: "POST" },
     ),
-  listNotices: () => request<NoticeSummary[]>("/notices"),
+  listNoticePage: (params?: {
+    page?: number;
+    limit?: number;
+    lifecycleStatus?: NoticeLifecycleStatus;
+    priority?: string;
+    audienceType?: string;
+    search?: string;
+  }) =>
+    request<PaginatedResponse<NoticeSummary>>(
+      withQuery("/notices", params ?? {}),
+    ),
+  listNotices: () =>
+    request<PaginatedResponse<NoticeSummary>>(
+      withQuery("/notices", { page: 1, limit: 100 }),
+    ).then((page) => page.items),
   getNoticeDetail: (noticeId: string) =>
     request<NoticeDetail>(`/notices/${encodeURIComponent(noticeId)}`),
   listNoticeUnreadRecipients: (noticeId: string) =>
@@ -166,20 +185,20 @@ export const communicationsApi = {
       { method: "POST", json: { scheduledFor } },
     ),
   cancelNotice: (noticeId: string, reason: string) =>
-    request<NoticeSummary>(
-      `/notices/${encodeURIComponent(noticeId)}/cancel`,
-      { method: "POST", json: { reason } },
-    ),
+    request<NoticeSummary>(`/notices/${encodeURIComponent(noticeId)}/cancel`, {
+      method: "POST",
+      json: { reason },
+    }),
   archiveNotice: (noticeId: string, reason: string) =>
-    request<NoticeSummary>(
-      `/notices/${encodeURIComponent(noticeId)}/archive`,
-      { method: "POST", json: { reason } },
-    ),
+    request<NoticeSummary>(`/notices/${encodeURIComponent(noticeId)}/archive`, {
+      method: "POST",
+      json: { reason },
+    }),
   restoreNotice: (noticeId: string, reason: string) =>
-    request<NoticeSummary>(
-      `/notices/${encodeURIComponent(noticeId)}/restore`,
-      { method: "POST", json: { reason } },
-    ),
+    request<NoticeSummary>(`/notices/${encodeURIComponent(noticeId)}/restore`, {
+      method: "POST",
+      json: { reason },
+    }),
   previewNoticeRecipients: (body: JsonBody) =>
     request<NoticeRecipientPreview>("/notices/recipient-preview", {
       method: "POST",
@@ -192,9 +211,13 @@ export const communicationsApi = {
     sourceType?: string | null;
     activityPostId?: string | null;
   }) =>
-    request<NotificationDelivery[]>(
-      withQuery("/communications/deliveries", params ?? {}),
-    ),
+    request<PaginatedResponse<NotificationDelivery>>(
+      withQuery("/communications/deliveries", {
+        page: 1,
+        limit: 100,
+        ...(params ?? {}),
+      }),
+    ).then((page) => page.items),
   getNotificationDeliveryAnalytics: () =>
     request<NotificationDeliveryAnalytics>(
       "/communications/deliveries/analytics",
@@ -240,6 +263,9 @@ export const communicationsApi = {
     request<{
       total: number;
       items: NotificationDeliveryFailureSummary[];
+      page: number;
+      limit: number;
+      hasNextPage: boolean;
     }>("/communications/deliveries/failures"),
   retryFailedNotificationDeliveries: (body?: { reason?: string }) =>
     request<any>("/communications/deliveries/retry-failed", {

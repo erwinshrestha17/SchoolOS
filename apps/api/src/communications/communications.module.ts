@@ -10,6 +10,8 @@ import { NoticeDetailService } from './notice-detail.service';
 import { NoticeUnreadRecipientsService } from './notice-unread-recipients.service';
 import { NotificationCenterService } from './notification-center.service';
 import { NoticeLifecycleCron } from './notice-lifecycle.cron';
+import { NotificationEventService } from './notification-event.service';
+import { NoticeAcknowledgementService } from './notice-acknowledgement.service';
 
 import { RedisModule } from '../redis/redis.module';
 
@@ -31,6 +33,8 @@ import { RedisModule } from '../redis/redis.module';
     DeliveryRetryService,
     M10HardeningService,
     NoticeLifecycleCron,
+    NotificationEventService,
+    NoticeAcknowledgementService,
   ],
   exports: [
     CommunicationsService,
@@ -39,6 +43,8 @@ import { RedisModule } from '../redis/redis.module';
     NoticeUnreadRecipientsService,
     DeliveryRetryService,
     M10HardeningService,
+    NotificationEventService,
+    NoticeAcknowledgementService,
   ],
 })
 export class CommunicationsModule {}

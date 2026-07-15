@@ -42,6 +42,7 @@ describe('DeliveryRetryService failure dashboard', () => {
             destination: 'guardian@example.edu',
           },
         ]),
+        count: jest.fn().mockResolvedValue(1),
       },
     };
     const service = new DeliveryRetryService(
@@ -52,6 +53,9 @@ describe('DeliveryRetryService failure dashboard', () => {
 
     await expect(service.listFailureDashboard(actor)).resolves.toEqual({
       total: 1,
+      page: 1,
+      limit: 25,
+      hasNextPage: false,
       items: [
         expect.objectContaining({
           id: 'delivery-1',
@@ -68,7 +72,8 @@ describe('DeliveryRetryService failure dashboard', () => {
     expect(prisma.notificationDelivery.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({ tenantId: 'tenant-1' }),
-        take: 100,
+        skip: 0,
+        take: 25,
       }),
     );
   });

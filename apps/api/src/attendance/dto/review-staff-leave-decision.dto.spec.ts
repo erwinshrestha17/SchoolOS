@@ -38,9 +38,7 @@ describe('ReviewStaffLeaveDecisionDto', () => {
     await expect(
       validate(dto, { whitelist: true, forbidNonWhitelisted: true }),
     ).resolves.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ property: 'status' }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ property: 'status' })]),
     );
   });
 });
@@ -52,9 +50,7 @@ describe('ReviewStaffLeaveRequestDto (generic review route)', () => {
     });
 
     await expect(validate(dto)).resolves.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ property: 'status' }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ property: 'status' })]),
     );
   });
 
@@ -64,9 +60,7 @@ describe('ReviewStaffLeaveRequestDto (generic review route)', () => {
     });
 
     await expect(validate(dto)).resolves.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ property: 'status' }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ property: 'status' })]),
     );
   });
 

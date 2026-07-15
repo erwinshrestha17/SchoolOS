@@ -8,6 +8,7 @@ import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import type { ListNotificationDeliveriesQueryDto } from './dto/communication-list-query.dto';
 
 interface RetryableDelivery {
   id: string;
@@ -218,47 +219,67 @@ export class DeliveryRetryService {
     };
   }
 
-  async listFailureDashboard(actor: AuthContext): Promise<{
+  async listFailureDashboard(
+    actor: AuthContext,
+    query: ListNotificationDeliveriesQueryDto = { page: 1, limit: 25 },
+  ): Promise<{
     items: DeliveryFailureDashboardItem[];
     total: number;
+    page: number;
+    limit: number;
+    hasNextPage: boolean;
   }> {
-    const deliveries = await this.prisma.notificationDelivery.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        status: {
-          in: [
-            NotificationStatus.FAILED,
-            NotificationStatus.RETRY_PENDING,
-            NotificationStatus.SKIPPED,
-          ],
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.min(100, Math.max(1, query.limit ?? 25));
+    const failureStatuses: NotificationStatus[] = [
+      NotificationStatus.FAILED,
+      NotificationStatus.RETRY_PENDING,
+      NotificationStatus.SKIPPED,
+    ];
+    if (query.status && !failureStatuses.includes(query.status)) {
+      throw new BadRequestException('Unsupported failure dashboard status');
+    }
+    const where = {
+      tenantId: actor.tenantId,
+      status: query.status ?? { in: failureStatuses },
+      ...(query.channel ? { channel: query.channel } : {}),
+      ...(query.sourceType ? { sourceType: query.sourceType } : {}),
+    };
+    const [deliveries, total] = await Promise.all([
+      this.prisma.notificationDelivery.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          status: true,
+          channel: true,
+          sourceType: true,
+          sourceId: true,
+          title: true,
+          errorMessage: true,
+          failureReason: true,
+          failureCode: true,
+          retryCount: true,
+          lastRetryAt: true,
+          failedAt: true,
+          createdAt: true,
+          audienceType: true,
+          recipientUserId: true,
+          guardianId: true,
+          studentId: true,
+          destination: true,
         },
-      },
-      orderBy: [{ createdAt: 'desc' }],
-      take: 100,
-      select: {
-        id: true,
-        status: true,
-        channel: true,
-        sourceType: true,
-        sourceId: true,
-        title: true,
-        errorMessage: true,
-        failureReason: true,
-        failureCode: true,
-        retryCount: true,
-        lastRetryAt: true,
-        failedAt: true,
-        createdAt: true,
-        audienceType: true,
-        recipientUserId: true,
-        guardianId: true,
-        studentId: true,
-        destination: true,
-      },
-    });
+      }),
+      this.prisma.notificationDelivery.count({ where }),
+    ]);
 
     return {
-      total: deliveries.length,
+      total,
+      page,
+      limit,
+      hasNextPage: page * limit < total,
       items: deliveries.map((delivery) => ({
         id: delivery.id,
         status: delivery.status,

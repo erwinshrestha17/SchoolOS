@@ -1448,6 +1448,37 @@ describe('CommunicationsService', () => {
     );
   });
 
+  it('paginates and filters scheduled and approval notice queues on the server', async () => {
+    prisma.notice.findMany.mockResolvedValue([{ id: 'notice-1' }]);
+    prisma.notice.count.mockResolvedValue(26);
+
+    await expect(
+      service.listNotices(actor, {
+        page: 1,
+        limit: 25,
+        lifecycleStatus: NoticeLifecycleStatus.SCHEDULED,
+        priority: NoticePriority.URGENT,
+      }),
+    ).resolves.toEqual({
+      items: [{ id: 'notice-1' }],
+      total: 26,
+      page: 1,
+      limit: 25,
+      hasNextPage: true,
+    });
+    expect(prisma.notice.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: 'tenant-1',
+          lifecycleStatus: NoticeLifecycleStatus.SCHEDULED,
+          priority: NoticePriority.URGENT,
+        }),
+        skip: 0,
+        take: 25,
+      }),
+    );
+  });
+
   it('omits sourceType and activityPostId filters when not provided, preserving prior behavior', async () => {
     prisma.notificationDelivery.findMany.mockResolvedValue([]);
 
