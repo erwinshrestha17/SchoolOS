@@ -128,6 +128,7 @@ export function FeesModuleShell({
   return (
     <DashboardPageShell>
       <ModuleHeader
+        eyebrow="Daily Operations"
         title={title}
         description={`${description}${session?.tenant.name ? ` · ${session.tenant.name}` : ""}`}
         primaryAction={primaryAction}

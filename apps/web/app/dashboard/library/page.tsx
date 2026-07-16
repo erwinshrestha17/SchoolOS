@@ -33,7 +33,7 @@ export default function LibraryPage() {
   return (
     <DashboardPageShell>
       <ModuleHeader
-        eyebrow="M8 Library"
+        eyebrow="School Operations"
         title="Library"
         description="Manage book catalogues, barcode copies, scanner-first issue-return workflows, overdue tracking, and fine posting status."
         primaryAction={

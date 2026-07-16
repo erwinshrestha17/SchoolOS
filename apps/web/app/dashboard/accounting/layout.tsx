@@ -28,7 +28,7 @@ export default function AccountingLayout({ children }: { children: ReactNode }) 
   return (
     <DashboardPageShell>
       <ModuleHeader
-        eyebrow="M11 Accounting and Finance"
+        eyebrow="Staff & Finance"
         title="Accounting & Finance"
         description={`Manage fiscal periods, chart of accounts, immutable journal postings, reconciliation, audit trail, and financial statements for ${session?.tenant.name || 'your school'}.`}
         primaryAction={canCreateJournal ? (

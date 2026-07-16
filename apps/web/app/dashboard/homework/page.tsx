@@ -464,6 +464,7 @@ function HomeworkWorkspace() {
       ) : null}
 
       <ModuleHeader
+        eyebrow="Homework & Timetable"
         title="Homework"
         description={`Give homework, track completion, and follow up on incomplete students${session?.tenant.name ? ` for ${session.tenant.name}` : ""}.`}
         primaryAction={primaryAction}
@@ -508,7 +509,7 @@ function HomeworkWorkspace() {
             value={summary?.dueToday ?? "Unavailable"}
             loading={summaryQuery.isLoading}
             icon={<Calendar size={20} />}
-            tone="neutral"
+            tone="module"
             description="Published homework due by end of today."
           />
           <SummaryCard
@@ -516,7 +517,7 @@ function HomeworkWorkspace() {
             value={summary?.notChecked ?? "Unavailable"}
             loading={summaryQuery.isLoading}
             icon={<ClipboardList size={20} />}
-            tone={Number(summary?.notChecked) > 0 ? "warning" : "neutral"}
+            tone={Number(summary?.notChecked) > 0 ? "warning" : "module"}
             description="Overdue homework with unchecked student rows."
           />
           <SummaryCard
@@ -524,7 +525,7 @@ function HomeworkWorkspace() {
             value={summary?.incompleteStudents ?? "Unavailable"}
             loading={summaryQuery.isLoading}
             icon={<AlertCircle size={20} />}
-            tone={Number(summary?.incompleteStudents) > 0 ? "warning" : "neutral"}
+            tone={Number(summary?.incompleteStudents) > 0 ? "warning" : "module"}
             description="Students with incomplete or missing homework due."
           />
           <SummaryCard
@@ -532,7 +533,7 @@ function HomeworkWorkspace() {
             value={summary?.classesWithoutHomework ?? "Unavailable"}
             loading={summaryQuery.isLoading}
             icon={<Users size={20} />}
-            tone={Number(summary?.classesWithoutHomework) > 0 ? "warning" : "neutral"}
+            tone={Number(summary?.classesWithoutHomework) > 0 ? "warning" : "module"}
             description="Sections with no homework assigned today."
           />
         </SummaryGrid>
@@ -1210,6 +1211,7 @@ function StudentHomeworkView() {
       ) : null}
 
       <ModuleHeader
+        eyebrow="Homework & Timetable"
         title="Homework"
         description={`Homework assigned to ${isParent ? "your child" : "you"}${session?.tenant.name ? ` at ${session.tenant.name}` : ""}.`}
       />

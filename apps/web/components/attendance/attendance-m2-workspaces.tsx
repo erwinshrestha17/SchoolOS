@@ -175,6 +175,7 @@ export function AttendanceOverviewWorkspace() {
   return (
     <DashboardPageShell>
       <ModuleHeader
+        eyebrow="Daily Operations"
         title="Smart Attendance"
         description="Track daily attendance, late arrivals, corrections, and alerts across the school."
         primaryAction={
@@ -238,7 +239,7 @@ export function AttendanceOverviewWorkspace() {
             tone={
               (analytics?.todaySummary.notMarkedSessionCount ?? 0) > 0
                 ? "warning"
-                : "neutral"
+                : "module"
             }
             href="/dashboard/attendance/mark"
             description="Active class scopes awaiting submission today."
@@ -257,7 +258,7 @@ export function AttendanceOverviewWorkspace() {
             value={correctionsQuery.data?.total ?? "Unavailable"}
             icon={<ClipboardCheck size={20} />}
             tone={
-              (correctionsQuery.data?.total ?? 0) > 0 ? "warning" : "neutral"
+              (correctionsQuery.data?.total ?? 0) > 0 ? "warning" : "module"
             }
             href="/dashboard/attendance/corrections"
           />
@@ -346,6 +347,7 @@ export function AttendanceMarkWorkspace() {
   return (
     <DashboardPageShell>
       <ModuleHeader
+        eyebrow="Smart Attendance"
         title="Daily Attendance Marking"
         description="Mark attendance for today by class, section, and supported daily session."
         primaryAction={
@@ -376,6 +378,7 @@ export function AttendanceSessionUnavailableWorkspace({
   return (
     <DashboardPageShell>
       <ModuleHeader
+        eyebrow="Smart Attendance"
         title="Class Session Attendance"
         description="Period/session attendance is not enabled until a tenant-safe timetable-period attendance contract exists."
       />
@@ -551,6 +554,7 @@ export function AttendanceRegisterWorkspace({
   return (
     <DashboardPageShell>
       <ModuleHeader
+        eyebrow="Smart Attendance"
         title={
           monthly ? "Monthly Attendance Register" : "Class Attendance Register"
         }
@@ -727,6 +731,7 @@ export function AttendanceCorrectionsQueueWorkspace() {
   return (
     <DashboardPageShell>
       <ModuleHeader
+        eyebrow="Smart Attendance"
         title="Attendance Corrections"
         description="Review and manage requests to correct attendance records."
         primaryAction={

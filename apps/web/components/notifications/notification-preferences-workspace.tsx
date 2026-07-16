@@ -83,7 +83,7 @@ export function NotificationPreferencesWorkspace() {
   return (
     <DashboardPageShell>
       <ModuleHeader
-        eyebrow="M12 Notifications and Delivery"
+        eyebrow="Notifications"
         title="My notification preferences"
         description="Choose allowed personal channels while keeping mandatory school safety and security messages enabled."
       />

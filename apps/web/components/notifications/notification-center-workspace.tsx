@@ -122,7 +122,7 @@ export function NotificationCenterWorkspace() {
   return (
     <DashboardPageShell>
       <ModuleHeader
-        eyebrow="M12 Notifications and Delivery"
+        eyebrow="Notifications"
         title="Notification center"
         description="Review your school notifications. Opening a source record always checks your current access again."
         metadata={

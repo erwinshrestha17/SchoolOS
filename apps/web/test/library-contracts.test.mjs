@@ -104,7 +104,7 @@ describe('Phase 3B Library frontend contracts', () => {
     assert.match(page, /\/dashboard\/library\/catalog/);
     assert.match(page, /\/dashboard\/library\/copies/);
     assert.match(page, /\/dashboard\/library\/reservations/);
-    assert.match(page, /eyebrow="M8 Library"/);
+    assert.match(page, /eyebrow="School Operations"/);
     assert.doesNotMatch(page, /M8A/);
 
     for (const section of [

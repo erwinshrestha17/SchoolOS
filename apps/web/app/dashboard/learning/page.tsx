@@ -15,7 +15,7 @@ export default function LearningPage() {
   return (
     <DashboardPageShell>
       <ModuleHeader
-        eyebrow="M13 Learning Layer"
+        eyebrow="Academics"
         title="Learning"
         description="Create teacher-led activities, launch school-only smart-board and computer-lab sessions, and review supportive progress."
         primaryAction={

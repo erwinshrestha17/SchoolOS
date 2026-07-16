@@ -118,6 +118,7 @@ export default function ActivityPage() {
   return (
     <DashboardPageShell>
       <ModuleHeader
+        eyebrow="Daily Operations"
         title="Activity Feed & Milestones"
         description="Publish consent-aware classroom activities, moderate content, and track milestones and deliveries."
         primaryAction={
@@ -197,7 +198,7 @@ export default function ActivityPage() {
               description: 'Your activity posts that are not yet published.',
               href: '/dashboard/activity',
               icon: <MessageSquare />,
-              tone: 'neutral',
+              tone: 'module',
             },
           ]}
         />

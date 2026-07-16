@@ -518,7 +518,7 @@ export function TransportWorkspace({
               value={reportsQuery.data?.activeTrips ?? "Unavailable"}
               icon={<Navigation size={18} />}
               loading={reportsQuery.isLoading}
-              tone="neutral"
+              tone="module"
               description="Official transport report total"
             />
             <SummaryCard
@@ -526,7 +526,7 @@ export function TransportWorkspace({
               value={reportsQuery.data?.activeAssignments ?? "Unavailable"}
               icon={<Users size={18} />}
               loading={reportsQuery.isLoading}
-              tone="neutral"
+              tone="module"
               description="Official active transport assignments"
             />
           </SummaryGrid>

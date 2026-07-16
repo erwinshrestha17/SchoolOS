@@ -51,7 +51,7 @@ export function NoticesWorkspace({
   return (
     <DashboardPageShell>
       <ModuleHeader
-        eyebrow="M15 Notices and Announcements"
+        eyebrow="Notices"
         title={
           variant === 'composer' ? 'New notice' : 'Notices & Announcements'
         }
@@ -101,7 +101,7 @@ export function NoticesWorkspace({
             loading={summaryQuery.isLoading}
             value={summaryValue(summary?.sentToday)}
             icon={<Send size={20} />}
-            tone="neutral"
+            tone="module"
             description="Notices sent in the current Nepal school day."
           />
           <SummaryCard
@@ -109,7 +109,7 @@ export function NoticesWorkspace({
             loading={summaryQuery.isLoading}
             value={summaryValue(summary?.scheduledNotices)}
             icon={<Clock3 size={20} />}
-            tone={(summary?.scheduledNotices ?? 0) > 0 ? 'info' : 'neutral'}
+            tone={(summary?.scheduledNotices ?? 0) > 0 ? 'info' : 'module'}
             description="Notices waiting for their scheduled send time."
           />
           <SummaryCard
@@ -117,7 +117,7 @@ export function NoticesWorkspace({
             loading={summaryQuery.isLoading}
             value={summaryValue(summary?.failedDeliveries)}
             icon={<AlertTriangle size={20} />}
-            tone={(summary?.failedDeliveries ?? 0) > 0 ? 'danger' : 'neutral'}
+            tone={(summary?.failedDeliveries ?? 0) > 0 ? 'danger' : 'module'}
             description="Failed or retry-pending delivery records."
           />
           <SummaryCard
@@ -128,7 +128,7 @@ export function NoticesWorkspace({
             tone={
               (summary?.unreadHighImpactNotices ?? 0) > 0
                 ? 'warning'
-                : 'neutral'
+                : 'module'
             }
             description="Unread urgent or emergency delivery rows."
           />

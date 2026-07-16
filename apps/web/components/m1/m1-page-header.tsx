@@ -17,6 +17,7 @@ export function M1PageHeader({
 }) {
   return (
     <ModuleHeader
+      eyebrow="Students & Admissions"
       title={title}
       description={description}
       primaryAction={primaryAction}

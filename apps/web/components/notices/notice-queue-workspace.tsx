@@ -21,7 +21,7 @@ export function NoticeQueueWorkspace({
   return (
     <DashboardPageShell>
       <ModuleHeader
-        eyebrow="M15 Notices and Announcements"
+        eyebrow="Notices & Announcements"
         title={title}
         description={description}
         primaryAction={

@@ -81,6 +81,7 @@ export default function AcademicsOverviewPage() {
   return (
     <DashboardPageShell>
       <ModuleHeader
+        eyebrow="Academics & Exams"
         title="Academics"
         description={`Manage exam terms, marks, CAS, report cards, and result publishing${session?.tenant.name ? ` for ${session.tenant.name}` : ''}. Official readiness remains backend-owned.`}
         primaryAction={
@@ -142,7 +143,7 @@ export default function AcademicsOverviewPage() {
             loading={summaryQuery.isLoading}
             value={metricValue('marksOpen')}
             icon={<PencilLine size={20} />}
-            tone={isPositive('marksOpen') ? 'warning' : 'neutral'}
+            tone={isPositive('marksOpen') ? 'warning' : 'module'}
             href="/dashboard/academics/marks"
             description="Unlocked mark entries across active terms."
           />
@@ -151,7 +152,7 @@ export default function AcademicsOverviewPage() {
             loading={summaryQuery.isLoading}
             value={metricValue('pendingMarkLocks')}
             icon={<Lock size={20} />}
-            tone={isPositive('pendingMarkLocks') ? 'warning' : 'neutral'}
+            tone={isPositive('pendingMarkLocks') ? 'warning' : 'module'}
             href="/dashboard/academics/locks"
             description="Lock requests awaiting review."
           />
@@ -161,7 +162,7 @@ export default function AcademicsOverviewPage() {
             value={metricValue('reportCardPublishBlockers')}
             icon={<AlertTriangle size={20} />}
             tone={
-              isPositive('reportCardPublishBlockers') ? 'warning' : 'neutral'
+              isPositive('reportCardPublishBlockers') ? 'warning' : 'module'
             }
             href="/dashboard/academics/report-cards"
             description="Current-term report cards not yet published."
@@ -171,7 +172,7 @@ export default function AcademicsOverviewPage() {
             loading={summaryQuery.isLoading}
             value={metricValue('promotionReady')}
             icon={<GraduationCap size={20} />}
-            tone={isPositive('promotionReady') ? 'info' : 'neutral'}
+            tone={isPositive('promotionReady') ? 'info' : 'module'}
             href="/dashboard/academics/promotion"
             description="Students with a backend-calculated ready decision."
           />

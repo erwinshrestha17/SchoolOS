@@ -113,7 +113,7 @@ export function FeeOverview() {
           }
           loading={summaryQuery.isLoading}
           icon={<Wallet className="h-5 w-5" />}
-          tone="neutral"
+          tone="module"
           href={canManage ? "/dashboard/fees/invoices?outstanding=true" : undefined}
           description="Backend-owned balance."
         />
@@ -130,7 +130,7 @@ export function FeeOverview() {
           }
           loading={canManage && summaryQuery.isLoading}
           icon={<AlertTriangle className="h-5 w-5" />}
-          tone={summary?.overdue.studentCount ? "warning" : "neutral"}
+          tone={summary?.overdue.studentCount ? "warning" : "module"}
           href={canManage ? "/dashboard/fees/reports?agingBucket=all" : undefined}
           description={
             summary ? `${summary.overdue.studentCount} students.` : "Aging summary."
@@ -150,7 +150,7 @@ export function FeeOverview() {
           }
           loading={canClose && summaryQuery.isLoading}
           icon={<History className="h-5 w-5" />}
-          tone={summary?.cashierClose.state === "OPEN" ? "warning" : "neutral"}
+          tone={summary?.cashierClose.state === "OPEN" ? "warning" : "module"}
           href={canClose ? "/dashboard/fees/cashier-close" : undefined}
           description="School-day close state."
         />

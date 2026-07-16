@@ -94,6 +94,7 @@ export default function HRDashboardPage() {
   return (
     <DashboardPageShell>
       <ModuleHeader
+        eyebrow="Staff & Finance"
         title="HR & Payroll"
         description="Manage staff records, leave, attendance, payroll runs, and payslips."
         primaryAction={
@@ -139,7 +140,7 @@ export default function HRDashboardPage() {
           }
           icon={<Users className="h-5 w-5" />}
           loading={payrollSummaryQuery.isLoading}
-          tone="neutral"
+          tone="module"
           description="Backend-owned staff count"
         />
         <SummaryCard
@@ -151,7 +152,7 @@ export default function HRDashboardPage() {
           }
           icon={<ClipboardCheck className="h-5 w-5" />}
           loading={payrollSummaryQuery.isLoading}
-          tone="neutral"
+          tone="module"
           description="Approved leave scoped to today"
         />
         <SummaryCard

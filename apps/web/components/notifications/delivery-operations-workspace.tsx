@@ -110,7 +110,7 @@ export function DeliveryOperationsWorkspace({
   return (
     <DashboardPageShell>
       <ModuleHeader
-        eyebrow="M12 Notifications and Delivery"
+        eyebrow="Notifications"
         title={view === "logs" ? "Delivery logs" : "Failure and retry center"}
         description="Investigate bounded delivery metadata without exposing message bodies, destinations, provider payloads, credentials, tokens, or stack traces."
         secondaryActions={

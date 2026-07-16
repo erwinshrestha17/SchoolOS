@@ -28,7 +28,7 @@ export default function CanteenPage() {
   return (
     <DashboardPageShell>
       <ModuleHeader
-        eyebrow="M10 Canteen"
+        eyebrow="School Operations"
         title="Canteen"
         description="Run scanner-first POS and serving workflows with wallet, allergy, spending limit, inventory, vendor, and receipt states visible."
         primaryAction={

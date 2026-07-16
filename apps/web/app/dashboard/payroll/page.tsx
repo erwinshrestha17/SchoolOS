@@ -93,7 +93,7 @@ export default function PayrollDashboardPage() {
   return (
     <DashboardPageShell>
       <ModuleHeader
-        eyebrow="M7 Payroll"
+        eyebrow="Staff & Finance"
         title="Payroll"
         description="Review payroll runs, approve them, post approved runs to accounting, and open protected payslips and statutory reports from backend-owned payroll data."
         primaryAction={
@@ -130,7 +130,7 @@ export default function PayrollDashboardPage() {
           value={formatMoney(selectedRun?.totalGross)}
           icon={<Wallet className="h-5 w-5" />}
           loading={summaryQuery.isLoading}
-          tone="neutral"
+          tone="module"
           description="Selected run backend total"
         />
         <SummaryCard

@@ -2232,7 +2232,7 @@ describe("SchoolOS web production contracts", () => {
 
     for (const marker of [
       "ModuleHeader",
-      'eyebrow="M9 Transport"',
+      'eyebrow="School Operations"',
       "primaryAction",
       "moreActionItems",
       "WorkspaceTabs",
