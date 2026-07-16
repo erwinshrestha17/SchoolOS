@@ -775,7 +775,7 @@ describe("SchoolOS web production contracts", () => {
   it("stores only metadata in browser session state", () => {
     const sessionModule = read("lib/session.ts");
 
-    assert.match(sessionModule, /Omit<AuthSession, 'accessToken'>/);
+    assert.match(sessionModule, /Omit<AuthSession, ["']accessToken["']>/);
     assert.match(sessionModule, /toBrowserSession/);
     assert.doesNotMatch(
       sessionModule,
@@ -1749,7 +1749,10 @@ describe("SchoolOS web production contracts", () => {
     // Submit is disabled once locked, and roster edits are disabled too
     // (also disabled once the day is submitted, not just admin-locked).
     assert.match(attendanceForm, /futureDateBlocked \|\|\s*\n?\s*isLocked/);
-    assert.match(attendanceForm, /disabled=\{isLocked(?: \|\| isSubmitted)?\}/);
+    assert.match(
+      attendanceForm,
+      /disabled=\{isLocked \|\| isSubmitted \|\| awaitingServerReceipt\}/,
+    );
     assert.match(attendanceForm, /disabled\?: boolean/);
 
     // Locked state points the user at the corrections workflow instead of a

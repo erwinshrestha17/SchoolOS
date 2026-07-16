@@ -33,6 +33,7 @@ void main() {
     registerFallbackValue(DateTime(2026));
     registerFallbackValue(assignedClass);
     registerFallbackValue(<AttendanceStudentEntry>[]);
+    registerFallbackValue(AttendanceDraftReceiptState.local);
   });
 
   setUp(() {
@@ -143,7 +144,7 @@ void main() {
       ).called(1);
       submitCompleter.complete(
         const TeacherAttendanceSubmitResult(
-          status: AttendanceSyncStatus.synced,
+          serverStatus: AttendanceServerSyncStatus.accepted,
           replayed: false,
         ),
       );
@@ -187,6 +188,35 @@ void main() {
     expect(controller.state.entries.single.status, AttendanceStatus.present);
   });
 
+  test('attendance changes autosave to a stable device draft', () async {
+    when(
+      () => repository.saveDraftAttendanceLocally(any(), any(), any()),
+    ).thenAnswer(
+      (_) async => TeacherAttendanceDraft(
+        clientSubmissionId: 'mobile-autosave-1',
+        savedAt: DateTime(2026, 6, 18, 8),
+        entries: entries,
+      ),
+    );
+    final controller = TeacherAttendanceController(
+      repository: repository,
+      isOnline: false,
+      draftSaveDelay: Duration.zero,
+    );
+    await _waitForLoad(controller);
+
+    controller.markStudent('student-1', AttendanceStatus.absent);
+    await _waitForDraft(controller);
+
+    verify(
+      () => repository.saveDraftAttendanceLocally(any(), any(), any()),
+    ).called(1);
+    expect(controller.state.hasUnsavedChanges, isTrue);
+    expect(controller.state.syncStatus, AttendanceSyncStatus.queued);
+    expect(controller.state.draftClientSubmissionId, 'mobile-autosave-1');
+    expect(controller.state.message, contains('Reconnect'));
+  });
+
   test('online sync failure keeps the saved draft retryable', () async {
     when(
       () => repository.saveDraftAttendanceLocally(any(), any(), any()),
@@ -200,6 +230,22 @@ void main() {
     when(
       () => repository.submitAttendance(any(), any(), any(), any(), any()),
     ).thenThrow(const NetworkException());
+    when(
+      () => repository.markDraftReceiptState(
+        any(),
+        any(),
+        any(),
+        clientSubmissionId: any(named: 'clientSubmissionId'),
+        receiptState: any(named: 'receiptState'),
+      ),
+    ).thenAnswer(
+      (_) async => TeacherAttendanceDraft(
+        clientSubmissionId: 'mobile-retry-1',
+        savedAt: DateTime(2026, 6, 18, 8),
+        entries: entries,
+        receiptState: AttendanceDraftReceiptState.transportAmbiguous,
+      ),
+    );
 
     final controller = TeacherAttendanceController(
       repository: repository,
@@ -210,11 +256,272 @@ void main() {
 
     await controller.submit();
 
-    expect(controller.state.syncStatus, AttendanceSyncStatus.failed);
+    expect(controller.state.syncStatus, AttendanceSyncStatus.serverChecking);
     expect(controller.state.hasUnsavedChanges, isTrue);
     expect(controller.state.draftClientSubmissionId, 'mobile-retry-1');
-    expect(controller.state.message, contains('draft remains'));
+    expect(
+      controller.state.draftReceiptState,
+      AttendanceDraftReceiptState.transportAmbiguous,
+    );
+    expect(controller.state.isEditingLocked, isTrue);
+    expect(controller.state.message, contains('could not confirm'));
+
+    controller.markStudent('student-1', AttendanceStatus.late);
+    await controller.discardDraft();
+    expect(controller.state.entries.single.status, AttendanceStatus.absent);
+    verifyNever(() => repository.discardDraftAttendance(any(), any()));
   });
+
+  test(
+    'PROCESSING receipt exposes a server-check state and keeps draft',
+    () async {
+      when(
+        () => repository.saveDraftAttendanceLocally(any(), any(), any()),
+      ).thenAnswer(
+        (_) async => TeacherAttendanceDraft(
+          clientSubmissionId: 'mobile-processing-1',
+          savedAt: DateTime(2026, 6, 18, 8),
+          entries: entries,
+        ),
+      );
+      when(
+        () => repository.submitAttendance(any(), any(), any(), any(), any()),
+      ).thenAnswer(
+        (_) async => const TeacherAttendanceSubmitResult(
+          serverStatus: AttendanceServerSyncStatus.processing,
+          replayed: true,
+        ),
+      );
+      final controller = TeacherAttendanceController(
+        repository: repository,
+        isOnline: true,
+      );
+      await _waitForLoad(controller);
+      controller.markStudent('student-1', AttendanceStatus.absent);
+
+      await controller.submit();
+
+      expect(controller.state.syncStatus, AttendanceSyncStatus.serverChecking);
+      expect(controller.state.hasUnsavedChanges, isTrue);
+      expect(controller.state.draftClientSubmissionId, 'mobile-processing-1');
+      expect(
+        controller.state.draftReceiptState,
+        AttendanceDraftReceiptState.processing,
+      );
+      expect(controller.state.isEditingLocked, isTrue);
+      expect(controller.state.attendance.isSubmitted, isFalse);
+      expect(controller.state.message, contains('still checking'));
+      expect(controller.state.message, contains('draft remains'));
+
+      controller.markStudent('student-1', AttendanceStatus.late);
+      await controller.discardDraft();
+      expect(controller.state.entries.single.status, AttendanceStatus.absent);
+      verifyNever(() => repository.discardDraftAttendance(any(), any()));
+    },
+  );
+
+  test(
+    'REJECTED receipt keeps the draft in a reviewable failed state',
+    () async {
+      when(
+        () => repository.saveDraftAttendanceLocally(any(), any(), any()),
+      ).thenAnswer(
+        (_) async => TeacherAttendanceDraft(
+          clientSubmissionId: 'mobile-rejected-1',
+          savedAt: DateTime(2026, 6, 18, 8),
+          entries: entries,
+        ),
+      );
+      when(
+        () => repository.submitAttendance(any(), any(), any(), any(), any()),
+      ).thenAnswer(
+        (_) async => const TeacherAttendanceSubmitResult(
+          serverStatus: AttendanceServerSyncStatus.rejected,
+          replayed: true,
+        ),
+      );
+      final controller = TeacherAttendanceController(
+        repository: repository,
+        isOnline: true,
+      );
+      await _waitForLoad(controller);
+      controller.markStudent('student-1', AttendanceStatus.absent);
+
+      await controller.submit();
+
+      expect(controller.state.syncStatus, AttendanceSyncStatus.failed);
+      expect(controller.state.hasUnsavedChanges, isTrue);
+      expect(controller.state.draftClientSubmissionId, 'mobile-rejected-1');
+      expect(
+        controller.state.draftReceiptState,
+        AttendanceDraftReceiptState.rejected,
+      );
+      expect(controller.state.isEditingLocked, isFalse);
+      expect(controller.state.attendance.isSubmitted, isFalse);
+      expect(controller.state.message, contains('did not accept'));
+      expect(controller.state.message, contains('draft remains'));
+
+      controller.markStudent('student-1', AttendanceStatus.late);
+      expect(controller.state.entries.single.status, AttendanceStatus.late);
+      when(
+        () => repository.saveDraftAttendanceLocally(any(), any(), any()),
+      ).thenAnswer(
+        (_) async => TeacherAttendanceDraft(
+          clientSubmissionId: 'mobile-rejected-2',
+          savedAt: DateTime(2026, 6, 18, 9),
+          entries: const [
+            AttendanceStudentEntry(
+              studentId: 'student-1',
+              studentName: 'Asha Sharma',
+              rollNumber: '7',
+              status: AttendanceStatus.late,
+            ),
+          ],
+        ),
+      );
+      when(
+        () => repository.submitAttendance(any(), any(), any(), any(), any()),
+      ).thenAnswer(
+        (_) async => const TeacherAttendanceSubmitResult(
+          serverStatus: AttendanceServerSyncStatus.accepted,
+          replayed: false,
+        ),
+      );
+
+      await controller.submit();
+
+      final submittedIds = verify(
+        () => repository.submitAttendance(
+          any(),
+          any(),
+          any(),
+          captureAny(),
+          any(),
+        ),
+      ).captured.cast<String>();
+      expect(submittedIds, ['mobile-rejected-1', 'mobile-rejected-2']);
+      expect(controller.state.attendance.isSubmitted, isTrue);
+      expect(controller.state.draftClientSubmissionId, isNull);
+    },
+  );
+
+  test(
+    'receipt persistence failure remains locked despite a REJECTED response',
+    () async {
+      when(
+        () => repository.saveDraftAttendanceLocally(any(), any(), any()),
+      ).thenAnswer(
+        (_) async => TeacherAttendanceDraft(
+          clientSubmissionId: 'mobile-receipt-storage-1',
+          savedAt: DateTime(2026, 6, 18, 8),
+          entries: entries,
+        ),
+      );
+      when(
+        () => repository.submitAttendance(any(), any(), any(), any(), any()),
+      ).thenAnswer(
+        (_) async => const TeacherAttendanceSubmitResult(
+          serverStatus: AttendanceServerSyncStatus.rejected,
+          replayed: true,
+          deviceReceiptPersisted: false,
+        ),
+      );
+      final controller = TeacherAttendanceController(
+        repository: repository,
+        isOnline: true,
+      );
+      await _waitForLoad(controller);
+      controller.markStudent('student-1', AttendanceStatus.absent);
+
+      await controller.submit();
+
+      expect(controller.state.syncStatus, AttendanceSyncStatus.serverChecking);
+      expect(
+        controller.state.draftReceiptState,
+        AttendanceDraftReceiptState.transportAmbiguous,
+      );
+      expect(controller.state.isEditingLocked, isTrue);
+      expect(controller.state.message, contains('could not save it safely'));
+      controller.markStudent('student-1', AttendanceStatus.late);
+      await controller.discardDraft();
+      expect(controller.state.entries.single.status, AttendanceStatus.absent);
+      verifyNever(() => repository.discardDraftAttendance(any(), any()));
+    },
+  );
+
+  test(
+    'reloaded PROCESSING receipt stays locked and retries the same ID',
+    () async {
+      when(() => repository.loadDraftAttendance(any(), any())).thenAnswer(
+        (_) async => TeacherAttendanceDraft(
+          clientSubmissionId: 'mobile-processing-reload-1',
+          savedAt: DateTime(2026, 6, 18, 8),
+          entries: const [
+            AttendanceStudentEntry(
+              studentId: 'student-1',
+              studentName: 'Asha Sharma',
+              rollNumber: '7',
+              status: AttendanceStatus.absent,
+            ),
+          ],
+          receiptState: AttendanceDraftReceiptState.processing,
+        ),
+      );
+      when(
+        () => repository.saveDraftAttendanceLocally(any(), any(), any()),
+      ).thenAnswer(
+        (_) async => TeacherAttendanceDraft(
+          clientSubmissionId: 'mobile-processing-reload-1',
+          savedAt: DateTime(2026, 6, 18, 8),
+          entries: const [
+            AttendanceStudentEntry(
+              studentId: 'student-1',
+              studentName: 'Asha Sharma',
+              rollNumber: '7',
+              status: AttendanceStatus.absent,
+            ),
+          ],
+          receiptState: AttendanceDraftReceiptState.processing,
+        ),
+      );
+      when(
+        () => repository.submitAttendance(any(), any(), any(), any(), any()),
+      ).thenAnswer(
+        (_) async => const TeacherAttendanceSubmitResult(
+          serverStatus: AttendanceServerSyncStatus.accepted,
+          replayed: true,
+        ),
+      );
+      final controller = TeacherAttendanceController(
+        repository: repository,
+        isOnline: true,
+      );
+      await _waitForLoad(controller);
+
+      expect(controller.state.syncStatus, AttendanceSyncStatus.serverChecking);
+      expect(controller.state.isEditingLocked, isTrue);
+      controller.markStudent('student-1', AttendanceStatus.leave);
+      await controller.discardDraft();
+      expect(controller.state.entries.single.status, AttendanceStatus.absent);
+      verifyNever(() => repository.discardDraftAttendance(any(), any()));
+
+      await controller.submit();
+
+      final submissionId =
+          verify(
+                () => repository.submitAttendance(
+                  any(),
+                  any(),
+                  any(),
+                  captureAny(),
+                  any(),
+                ),
+              ).captured.single
+              as String;
+      expect(submissionId, 'mobile-processing-reload-1');
+      expect(controller.state.attendance.isSubmitted, isTrue);
+    },
+  );
 
   test(
     'module lock and expired session errors remain typed for safe UI states',
@@ -244,6 +551,16 @@ void main() {
 
 Future<void> _waitForLoad(TeacherAttendanceController controller) async {
   for (var attempt = 0; attempt < 20 && controller.state.isLoading; attempt++) {
+    await Future<void>.delayed(Duration.zero);
+  }
+}
+
+Future<void> _waitForDraft(TeacherAttendanceController controller) async {
+  for (
+    var attempt = 0;
+    attempt < 20 && controller.state.draftClientSubmissionId == null;
+    attempt++
+  ) {
     await Future<void>.delayed(Duration.zero);
   }
 }

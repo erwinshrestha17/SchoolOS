@@ -9,6 +9,7 @@ import { useEntitlements } from "../../components/entitlements-provider";
 import { DashboardShell } from "../../components/layout/dashboard-shell";
 import { UpgradePrompt } from "../../components/layout/upgrade-prompt";
 import { PermissionDenied } from "../../components/ui/permission-denied";
+import { OfflineLockedState } from "../../components/ui/offline-locked-state";
 
 type RouteGate = {
   prefix: string;
@@ -302,6 +303,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
     return () => window.clearTimeout(timeoutId);
   }, [status]);
+
+  if (status === "offline_locked" || status === "verification_failed") {
+    return (
+      <OfflineLockedState
+        reason={status === "verification_failed" ? "server" : "network"}
+      />
+    );
+  }
 
   if (status === "loading") {
     return (

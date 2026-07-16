@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { PlatformShell } from "../../components/layout/platform-shell";
 import { PermissionDenied } from "../../components/platform/PermissionDenied";
+import { OfflineLockedState } from "../../components/ui/offline-locked-state";
 
 const PLATFORM_ROLES = [
   "platform_super_admin",
@@ -37,6 +38,14 @@ export default function PlatformLayout({
       }
     }
   }, [status, session, router]);
+
+  if (status === "offline_locked" || status === "verification_failed") {
+    return (
+      <OfflineLockedState
+        reason={status === "verification_failed" ? "server" : "network"}
+      />
+    );
+  }
 
   if (status === "loading" || !session) {
     return (

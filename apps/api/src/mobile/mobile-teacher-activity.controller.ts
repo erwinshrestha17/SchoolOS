@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiCreatedResponse } from '@nestjs/swagger';
 import { ActivityFeedService } from '../activity-feed/activity-feed.service';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
@@ -14,6 +15,7 @@ import {
   MobileTeacherActivityPostsQueryDto,
   MobileTeacherActivityStudentsQueryDto,
 } from './dto/mobile-teacher-activity.dto';
+import { MobileTeacherMilestoneReceiptDto } from './dto/mobile-teacher-milestone-receipt.dto';
 
 @Controller('mobile/teacher/activity')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
@@ -57,10 +59,18 @@ export class MobileTeacherActivityController {
 
   @Post('milestones')
   @Permissions('activity_feed:create')
-  createMilestone(
+  @ApiCreatedResponse({ type: MobileTeacherMilestoneReceiptDto })
+  async createMilestone(
     @Body() dto: CreateMobileTeacherMilestoneDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.activityFeedService.createMilestone(dto, auth);
+    const milestone = await this.activityFeedService.createMilestone(dto, auth);
+    return {
+      resourceId: milestone.id,
+      clientSubmissionId:
+        milestone.clientSubmissionId ?? dto.clientSubmissionId,
+      replayed: milestone.replayed,
+      serverReceivedAt: milestone.serverReceivedAt,
+    } satisfies MobileTeacherMilestoneReceiptDto;
   }
 }

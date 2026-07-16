@@ -1,10 +1,13 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:schoolos_mobile/core/auth/mobile_role.dart';
+import 'package:schoolos_mobile/core/errors/app_exception.dart';
 import 'package:schoolos_mobile/core/network/api_client.dart';
+import 'package:schoolos_mobile/core/storage/secure_storage_service.dart';
+import 'package:schoolos_mobile/core/storage/teacher_attendance_draft_store.dart';
 import 'package:schoolos_mobile/features/attendance/data/attendance_repository.dart';
 import 'package:schoolos_mobile/features/attendance/domain/attendance_models.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class MockApiClient extends Mock implements ApiClient {}
 
@@ -12,11 +15,22 @@ void main() {
   group('AttendanceRepository', () {
     late MockApiClient apiClient;
     late AttendanceRepository repository;
+    late _MemorySecureStore secureStore;
 
     setUp(() {
-      SharedPreferences.setMockInitialValues({});
       apiClient = MockApiClient();
-      repository = AttendanceRepository(apiClient);
+      secureStore = _MemorySecureStore();
+      repository = AttendanceRepository(
+        apiClient,
+        draftStore: TeacherAttendanceDraftStore(
+          secureStore,
+          scope: TeacherAttendanceDraftScope(
+            tenantId: 'tenant-1',
+            userId: 'teacher-1',
+            role: MobileRole.teacher,
+          ),
+        ),
+      );
     });
 
     test('uses the parent-safe mobile attendance endpoint', () async {
@@ -207,7 +221,11 @@ void main() {
           requestOptions: RequestOptions(
             path: '/mobile/teacher/attendance/sync',
           ),
-          data: {'sessionId': 'session-1'},
+          data: {
+            'attendanceSessionId': 'session-1',
+            'syncStatus': 'ACCEPTED',
+            'replayed': false,
+          },
         ),
       );
 
@@ -215,12 +233,17 @@ void main() {
         classSection,
         DateTime(2026, 6, 2),
       );
+      final draft = await repository.saveDraftAttendanceLocally(
+        classSection.id,
+        DateTime(2026, 6, 2),
+        roster.entries,
+      );
       final submitResult = await repository.submitAttendance(
         classSection,
         DateTime(2026, 6, 2),
         roster.entries,
-        'mobile-submit-1',
-        DateTime.utc(2026, 6, 2, 8),
+        draft.clientSubmissionId,
+        draft.savedAt,
       );
 
       expect(roster.entries, hasLength(2));
@@ -239,8 +262,11 @@ void main() {
       expect(payload['classId'], 'class-1');
       expect(payload['sectionId'], 'section-1');
       expect(payload['attendanceDate'], '2026-06-02');
-      expect(payload['clientSubmissionId'], 'mobile-submit-1');
-      expect(payload['deviceTimestamp'], '2026-06-02T08:00:00.000Z');
+      expect(payload['clientSubmissionId'], draft.clientSubmissionId);
+      expect(
+        payload['deviceTimestamp'],
+        draft.savedAt.toUtc().toIso8601String(),
+      );
       expect(payload['exceptions'], [
         {'studentId': 'student-2', 'status': 'ABSENT'},
       ]);
@@ -352,7 +378,11 @@ void main() {
             requestOptions: RequestOptions(
               path: '/mobile/teacher/attendance/sync',
             ),
-            data: {'sessionId': 'session-1'},
+            data: {
+              'attendanceSessionId': 'session-1',
+              'syncStatus': 'ACCEPTED',
+              'replayed': false,
+            },
           ),
         );
 
@@ -371,6 +401,13 @@ void main() {
         expect(loadedDraft.entries.last.studentId, 'student-2');
         expect(loadedDraft.entries.last.status, AttendanceStatus.late);
 
+        final updatedDraft = await repository.saveDraftAttendanceLocally(
+          classSection.id,
+          date,
+          loadedDraft.entries,
+        );
+        expect(updatedDraft.clientSubmissionId, loadedDraft.clientSubmissionId);
+
         await repository.submitAttendance(
           classSection,
           date,
@@ -386,5 +423,535 @@ void main() {
         expect(clearedDraft, isNull);
       },
     );
+
+    test('keeps the secure draft when a 2xx receipt is REJECTED', () async {
+      const classSection = TeacherClassSection(
+        id: 'year-1:class-1:section-1',
+        academicYearId: 'year-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        name: 'Grade 3 - A',
+        subject: 'Mathematics',
+      );
+      final date = DateTime(2026, 6, 2);
+      const draftEntries = [
+        AttendanceStudentEntry(
+          studentId: 'student-1',
+          studentName: 'Asha Sharma',
+          rollNumber: '7',
+          status: AttendanceStatus.absent,
+        ),
+      ];
+      when(
+        () => apiClient.post<dynamic>(
+          '/mobile/teacher/attendance/sync',
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(
+            path: '/mobile/teacher/attendance/sync',
+          ),
+          data: {'syncStatus': 'REJECTED', 'replayed': true},
+        ),
+      );
+      final draft = await repository.saveDraftAttendanceLocally(
+        classSection.id,
+        date,
+        draftEntries,
+      );
+
+      final result = await repository.submitAttendance(
+        classSection,
+        date,
+        draftEntries,
+        draft.clientSubmissionId,
+        draft.savedAt,
+      );
+
+      expect(result.serverStatus, AttendanceServerSyncStatus.rejected);
+      expect(result.status, AttendanceSyncStatus.failed);
+      expect(result.canClearDeviceDraft, isFalse);
+      final rejectedDraft = await repository.loadDraftAttendance(
+        classSection.id,
+        date,
+      );
+      expect(rejectedDraft, isNotNull);
+      expect(rejectedDraft?.receiptState, AttendanceDraftReceiptState.rejected);
+
+      const changedEntries = [
+        AttendanceStudentEntry(
+          studentId: 'student-1',
+          studentName: 'Asha Sharma',
+          rollNumber: '7',
+          status: AttendanceStatus.late,
+        ),
+      ];
+      final rotatedDraft = await repository.saveDraftAttendanceLocally(
+        classSection.id,
+        date,
+        changedEntries,
+      );
+      expect(
+        rotatedDraft.clientSubmissionId,
+        isNot(rejectedDraft?.clientSubmissionId),
+      );
+      expect(rotatedDraft.receiptState, AttendanceDraftReceiptState.local);
+      expect(rotatedDraft.entries.single.status, AttendanceStatus.late);
+    });
+
+    test('keeps the secure draft while a 2xx receipt is PROCESSING', () async {
+      const classSection = TeacherClassSection(
+        id: 'year-1:class-1:section-1',
+        academicYearId: 'year-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        name: 'Grade 3 - A',
+        subject: 'Mathematics',
+      );
+      final date = DateTime(2026, 6, 2);
+      const draftEntries = [
+        AttendanceStudentEntry(
+          studentId: 'student-1',
+          studentName: 'Asha Sharma',
+          rollNumber: '7',
+          status: AttendanceStatus.absent,
+        ),
+      ];
+      when(
+        () => apiClient.post<dynamic>(
+          '/mobile/teacher/attendance/sync',
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(
+            path: '/mobile/teacher/attendance/sync',
+          ),
+          data: {'syncStatus': 'PROCESSING', 'replayed': true},
+        ),
+      );
+      final draft = await repository.saveDraftAttendanceLocally(
+        classSection.id,
+        date,
+        draftEntries,
+      );
+
+      final result = await repository.submitAttendance(
+        classSection,
+        date,
+        draftEntries,
+        draft.clientSubmissionId,
+        draft.savedAt,
+      );
+
+      expect(result.serverStatus, AttendanceServerSyncStatus.processing);
+      expect(result.status, AttendanceSyncStatus.serverChecking);
+      expect(result.canClearDeviceDraft, isFalse);
+      final processingDraft = await repository.loadDraftAttendance(
+        classSection.id,
+        date,
+      );
+      expect(processingDraft, isNotNull);
+      expect(
+        processingDraft?.receiptState,
+        AttendanceDraftReceiptState.processing,
+      );
+
+      final sameContent = await repository.saveDraftAttendanceLocally(
+        classSection.id,
+        date,
+        draftEntries,
+      );
+      expect(sameContent.clientSubmissionId, draft.clientSubmissionId);
+      expect(sameContent.receiptState, AttendanceDraftReceiptState.processing);
+      expect(
+        () =>
+            repository.saveDraftAttendanceLocally(classSection.id, date, const [
+              AttendanceStudentEntry(
+                studentId: 'student-1',
+                studentName: 'Asha Sharma',
+                rollNumber: '7',
+                status: AttendanceStatus.late,
+              ),
+            ]),
+        throwsA(isA<ConflictAppException>()),
+      );
+    });
+
+    test('keeps the secure draft for an unknown 2xx sync status', () async {
+      const classSection = TeacherClassSection(
+        id: 'year-1:class-1:section-1',
+        academicYearId: 'year-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        name: 'Grade 3 - A',
+        subject: 'Mathematics',
+      );
+      final date = DateTime(2026, 6, 2);
+      const draftEntries = [
+        AttendanceStudentEntry(
+          studentId: 'student-1',
+          studentName: 'Asha Sharma',
+          rollNumber: '7',
+          status: AttendanceStatus.absent,
+        ),
+      ];
+      when(
+        () => apiClient.post<dynamic>(
+          '/mobile/teacher/attendance/sync',
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(
+            path: '/mobile/teacher/attendance/sync',
+          ),
+          data: {'syncStatus': 'UNEXPECTED_STATUS'},
+        ),
+      );
+      final draft = await repository.saveDraftAttendanceLocally(
+        classSection.id,
+        date,
+        draftEntries,
+      );
+
+      final result = await repository.submitAttendance(
+        classSection,
+        date,
+        draftEntries,
+        draft.clientSubmissionId,
+        draft.savedAt,
+      );
+
+      expect(result.serverStatus, AttendanceServerSyncStatus.unknown);
+      expect(result.status, AttendanceSyncStatus.serverChecking);
+      expect(result.canClearDeviceDraft, isFalse);
+      final unknownDraft = await repository.loadDraftAttendance(
+        classSection.id,
+        date,
+      );
+      expect(unknownDraft, isNotNull);
+      expect(unknownDraft?.receiptState, AttendanceDraftReceiptState.unknown);
+    });
+
+    test(
+      'post-response storage failure keeps a durable ambiguous receipt lock',
+      () async {
+        const classSection = TeacherClassSection(
+          id: 'year-1:class-1:section-1',
+          academicYearId: 'year-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          name: 'Grade 3 - A',
+          subject: 'Mathematics',
+        );
+        final date = DateTime(2026, 6, 2);
+        const draftEntries = [
+          AttendanceStudentEntry(
+            studentId: 'student-1',
+            studentName: 'Asha Sharma',
+            rollNumber: '7',
+            status: AttendanceStatus.absent,
+          ),
+        ];
+        when(
+          () => apiClient.post<dynamic>(
+            '/mobile/teacher/attendance/sync',
+            data: any(named: 'data'),
+          ),
+        ).thenAnswer((_) async {
+          secureStore.failNextWrites = 1;
+          return Response(
+            requestOptions: RequestOptions(
+              path: '/mobile/teacher/attendance/sync',
+            ),
+            data: {'syncStatus': 'REJECTED', 'replayed': true},
+          );
+        });
+        final draft = await repository.saveDraftAttendanceLocally(
+          classSection.id,
+          date,
+          draftEntries,
+        );
+
+        final result = await repository.submitAttendance(
+          classSection,
+          date,
+          draftEntries,
+          draft.clientSubmissionId,
+          draft.savedAt,
+        );
+
+        expect(result.serverStatus, AttendanceServerSyncStatus.rejected);
+        expect(result.deviceReceiptPersisted, isFalse);
+        final reloaded = await repository.loadDraftAttendance(
+          classSection.id,
+          date,
+        );
+        expect(
+          reloaded?.receiptState,
+          AttendanceDraftReceiptState.transportAmbiguous,
+        );
+        expect(reloaded?.clientSubmissionId, draft.clientSubmissionId);
+        expect(
+          () => repository
+              .saveDraftAttendanceLocally(classSection.id, date, const [
+                AttendanceStudentEntry(
+                  studentId: 'student-1',
+                  studentName: 'Asha Sharma',
+                  rollNumber: '7',
+                  status: AttendanceStatus.late,
+                ),
+              ]),
+          throwsA(isA<ConflictAppException>()),
+        );
+      },
+    );
+
+    test('network ambiguity is locked before the attendance request', () async {
+      const classSection = TeacherClassSection(
+        id: 'year-1:class-1:section-1',
+        academicYearId: 'year-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        name: 'Grade 3 - A',
+        subject: 'Mathematics',
+      );
+      final date = DateTime(2026, 6, 2);
+      const draftEntries = [
+        AttendanceStudentEntry(
+          studentId: 'student-1',
+          studentName: 'Asha Sharma',
+          rollNumber: '7',
+          status: AttendanceStatus.absent,
+        ),
+      ];
+      when(
+        () => apiClient.post<dynamic>(
+          '/mobile/teacher/attendance/sync',
+          data: any(named: 'data'),
+        ),
+      ).thenThrow(const NetworkException());
+      final draft = await repository.saveDraftAttendanceLocally(
+        classSection.id,
+        date,
+        draftEntries,
+      );
+
+      await expectLater(
+        repository.submitAttendance(
+          classSection,
+          date,
+          draftEntries,
+          draft.clientSubmissionId,
+          draft.savedAt,
+        ),
+        throwsA(isA<NetworkException>()),
+      );
+
+      final reloaded = await repository.loadDraftAttendance(
+        classSection.id,
+        date,
+      );
+      expect(
+        reloaded?.receiptState,
+        AttendanceDraftReceiptState.transportAmbiguous,
+      );
+      expect(reloaded?.clientSubmissionId, draft.clientSubmissionId);
+    });
+
+    test(
+      'deterministic request rejection restores the prior local state',
+      () async {
+        const classSection = TeacherClassSection(
+          id: 'year-1:class-1:section-1',
+          academicYearId: 'year-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          name: 'Grade 3 - A',
+          subject: 'Mathematics',
+        );
+        final date = DateTime(2026, 6, 2);
+        const draftEntries = [
+          AttendanceStudentEntry(
+            studentId: 'student-1',
+            studentName: 'Asha Sharma',
+            rollNumber: '7',
+            status: AttendanceStatus.absent,
+          ),
+        ];
+        when(
+          () => apiClient.post<dynamic>(
+            '/mobile/teacher/attendance/sync',
+            data: any(named: 'data'),
+          ),
+        ).thenThrow(
+          const ValidationException(message: 'Attendance was invalid.'),
+        );
+        final draft = await repository.saveDraftAttendanceLocally(
+          classSection.id,
+          date,
+          draftEntries,
+        );
+
+        await expectLater(
+          repository.submitAttendance(
+            classSection,
+            date,
+            draftEntries,
+            draft.clientSubmissionId,
+            draft.savedAt,
+          ),
+          throwsA(isA<ValidationException>()),
+        );
+
+        final reloaded = await repository.loadDraftAttendance(
+          classSection.id,
+          date,
+        );
+        expect(reloaded?.receiptState, AttendanceDraftReceiptState.local);
+        expect(reloaded?.clientSubmissionId, draft.clientSubmissionId);
+      },
+    );
+
+    test(
+      'transport-ambiguous receipt survives reload and rejects changed content',
+      () async {
+        final date = DateTime(2026, 6, 2);
+        const draftEntries = [
+          AttendanceStudentEntry(
+            studentId: 'student-1',
+            studentName: 'Asha Sharma',
+            rollNumber: '7',
+            status: AttendanceStatus.absent,
+          ),
+        ];
+        final localDraft = await repository.saveDraftAttendanceLocally(
+          'year-1:class-1:section-1',
+          date,
+          draftEntries,
+        );
+
+        await repository.markDraftReceiptState(
+          'year-1:class-1:section-1',
+          date,
+          draftEntries,
+          clientSubmissionId: localDraft.clientSubmissionId,
+          receiptState: AttendanceDraftReceiptState.transportAmbiguous,
+        );
+
+        final reloaded = await repository.loadDraftAttendance(
+          'year-1:class-1:section-1',
+          date,
+        );
+        expect(
+          reloaded?.receiptState,
+          AttendanceDraftReceiptState.transportAmbiguous,
+        );
+        expect(reloaded?.clientSubmissionId, localDraft.clientSubmissionId);
+        expect(
+          () => repository.saveDraftAttendanceLocally(
+            'year-1:class-1:section-1',
+            date,
+            const [
+              AttendanceStudentEntry(
+                studentId: 'student-1',
+                studentName: 'Asha Sharma',
+                rollNumber: '7',
+                status: AttendanceStatus.leave,
+              ),
+            ],
+          ),
+          throwsA(isA<ConflictAppException>()),
+        );
+      },
+    );
+
+    test(
+      'receipt transition fails closed on an ID or content mismatch',
+      () async {
+        final date = DateTime(2026, 6, 2);
+        const draftEntries = [
+          AttendanceStudentEntry(
+            studentId: 'student-1',
+            studentName: 'Asha Sharma',
+            rollNumber: '7',
+            status: AttendanceStatus.absent,
+          ),
+        ];
+        final draft = await repository.saveDraftAttendanceLocally(
+          'year-1:class-1:section-1',
+          date,
+          draftEntries,
+        );
+
+        expect(
+          () => repository.markDraftReceiptState(
+            'year-1:class-1:section-1',
+            date,
+            draftEntries,
+            clientSubmissionId: '${draft.clientSubmissionId}-different',
+            receiptState: AttendanceDraftReceiptState.processing,
+          ),
+          throwsA(isA<ConflictAppException>()),
+        );
+        expect(
+          () => repository.markDraftReceiptState(
+            'year-1:class-1:section-1',
+            date,
+            const [
+              AttendanceStudentEntry(
+                studentId: 'student-1',
+                studentName: 'Asha Sharma',
+                rollNumber: '7',
+                status: AttendanceStatus.present,
+              ),
+            ],
+            clientSubmissionId: draft.clientSubmissionId,
+            receiptState: AttendanceDraftReceiptState.processing,
+          ),
+          throwsA(isA<ConflictAppException>()),
+        );
+      },
+    );
   });
+}
+
+class _MemorySecureStore implements SecureKeyValueStore {
+  final Map<String, String> values = {};
+  int failNextWrites = 0;
+
+  @override
+  Future<void> write(String key, String value) async {
+    if (failNextWrites > 0) {
+      failNextWrites -= 1;
+      throw StateError('Simulated secure-storage write failure.');
+    }
+    values[key] = value;
+  }
+
+  @override
+  Future<String?> read(String key) async => values[key];
+
+  @override
+  Future<Map<String, String>> readAll() async => Map.of(values);
+
+  @override
+  Future<void> delete(String key) async {
+    values.remove(key);
+  }
+
+  @override
+  Future<void> clearAll() async {
+    values.clear();
+  }
+
+  @override
+  Future<bool> containsKey(String key) async => values.containsKey(key);
+
+  @override
+  Future<void> deleteByPrefix(String prefix) async {
+    values.removeWhere((key, _) => key.startsWith(prefix));
+  }
 }

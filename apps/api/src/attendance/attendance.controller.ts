@@ -8,7 +8,11 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiOkResponse, ApiOperation } from '@nestjs/swagger';
+import {
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+} from '@nestjs/swagger';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -38,6 +42,7 @@ import {
   StudentAttendanceMonthQueryDto,
   StudentAttendanceMonthlyRegisterResponseDto,
 } from './dto/student-attendance-register.dto';
+import { AttendanceSyncResultDto } from './dto/attendance-sync-result.dto';
 
 @Controller('attendance')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
@@ -248,6 +253,7 @@ export class AttendanceController {
 
   @Post('sync')
   @Permissions('attendance:mark')
+  @ApiCreatedResponse({ type: AttendanceSyncResultDto })
   syncAttendance(
     @Body() dto: SyncAttendanceDto,
     @CurrentAuth() auth: AuthContext,

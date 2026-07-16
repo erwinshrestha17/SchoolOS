@@ -1,12 +1,9 @@
-import '../../../core/errors/app_exception.dart';
 import '../../../core/network/api_client.dart';
-import '../../../core/storage/private_read_cache.dart';
 
 class PrincipalRepository {
-  const PrincipalRepository(this._client, {this.cache});
+  const PrincipalRepository(this._client);
 
   final ApiClient _client;
-  final PrivateReadCache? cache;
 
   Future<Map<String, dynamic>> getDashboard() =>
       _getCached('principal_dashboard', '/mobile/principal/dashboard');
@@ -212,27 +209,23 @@ class PrincipalRepository {
     String path, {
     Map<String, dynamic>? queryParameters,
   }) async {
-    try {
-      final response = await _client.get<dynamic>(
-        path,
-        queryParameters: queryParameters,
-      );
-      final data = response.data is Map<String, dynamic>
-          ? response.data as Map<String, dynamic>
-          : <String, dynamic>{};
-      final withMeta = {
-        ...data,
-        '_mobileLastUpdated': DateTime.now().toIso8601String(),
-        '_mobileFromCache': false,
-      };
-      await cache?.write(cacheKey, withMeta);
-      return withMeta;
-    } on AppException catch (error) {
-      if (error is! NetworkException && error is! TimeoutException) rethrow;
-      final cached = cache?.read(cacheKey);
-      if (cached == null) rethrow;
-      return cached.withMetadata();
+    // Principal records are deliberately network-only. The resource label is
+    // retained to keep each purpose-limited caller explicit.
+    if (cacheKey.isEmpty) {
+      throw ArgumentError.value(cacheKey, 'resourceLabel');
     }
+    final response = await _client.get<dynamic>(
+      path,
+      queryParameters: queryParameters,
+    );
+    final data = response.data is Map<String, dynamic>
+        ? response.data as Map<String, dynamic>
+        : <String, dynamic>{};
+    return {
+      ...data,
+      '_mobileLastUpdated': DateTime.now().toIso8601String(),
+      '_mobileFromCache': false,
+    };
   }
 
   Future<Map<String, dynamic>> _postJson(

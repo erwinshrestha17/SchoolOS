@@ -10,6 +10,7 @@ import { TooltipProvider } from '../components/ui/primitives/tooltip';
 import { Toaster } from '../components/ui/primitives/sonner';
 import { BreadcrumbLabelProvider } from '../components/schoolos/navigation/breadcrumb-label-context';
 import { SchoolOSMotionProvider } from '../components/schoolos/motion/schoolos-motion-provider';
+import { ServiceWorkerRegistration } from '../components/pwa/service-worker-registration';
 
 export function Providers({ children }: PropsWithChildren) {
   const [queryClient] = useState(
@@ -29,15 +30,23 @@ export function Providers({ children }: PropsWithChildren) {
               return failureCount < 1;
             },
           },
+          mutations: {
+            // Run mutation functions while offline so the central API policy
+            // rejects immediately instead of TanStack pausing and replaying
+            // an unsafe school operation after reconnection.
+            networkMode: 'always',
+            retry: false,
+          },
         },
       }),
   );
 
   return (
-    <SessionProvider>
-      <EntitlementsProvider>
-        <SupportOverrideBanner />
-        <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={queryClient}>
+      <SessionProvider>
+        <EntitlementsProvider>
+          <SupportOverrideBanner />
+          <ServiceWorkerRegistration />
           <TooltipProvider>
             <SchoolOSMotionProvider>
               <BreadcrumbLabelProvider>
@@ -48,8 +57,8 @@ export function Providers({ children }: PropsWithChildren) {
               </BreadcrumbLabelProvider>
             </SchoolOSMotionProvider>
           </TooltipProvider>
-        </QueryClientProvider>
-      </EntitlementsProvider>
-    </SessionProvider>
+        </EntitlementsProvider>
+      </SessionProvider>
+    </QueryClientProvider>
   );
 }

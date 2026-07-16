@@ -103,6 +103,7 @@ describe('MobileTeacherActivityController', () => {
       ],
     };
     const milestone = {
+      clientSubmissionId: '79c6e6d9-696a-44c7-9eef-9de40799e744',
       classId: '5a21e235-b33f-46be-b6de-cad39bf4aa10',
       studentId: '1c74dbe5-206d-49c3-b007-7903c560c068',
       domain: 'Social',
@@ -115,6 +116,9 @@ describe('MobileTeacherActivityController', () => {
     } as never);
     activityFeedService.createMilestone.mockResolvedValue({
       id: 'milestone-1',
+      clientSubmissionId: milestone.clientSubmissionId,
+      replayed: false,
+      serverReceivedAt: '2026-06-29T00:00:01.000Z',
     } as never);
 
     await expect(controller.createPost(post as never, actor)).resolves.toEqual({
@@ -122,7 +126,12 @@ describe('MobileTeacherActivityController', () => {
     });
     await expect(
       controller.createMilestone(milestone as never, actor),
-    ).resolves.toEqual({ id: 'milestone-1' });
+    ).resolves.toEqual({
+      resourceId: 'milestone-1',
+      clientSubmissionId: milestone.clientSubmissionId,
+      replayed: false,
+      serverReceivedAt: '2026-06-29T00:00:01.000Z',
+    });
 
     expect(activityFeedService.createPost).toHaveBeenCalledWith(post, actor);
     expect(activityFeedService.createMilestone).toHaveBeenCalledWith(

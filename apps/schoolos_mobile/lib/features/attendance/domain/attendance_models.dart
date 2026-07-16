@@ -1,6 +1,47 @@
 enum AttendanceStatus { present, absent, late, leave, festival, holiday }
 
-enum AttendanceSyncStatus { draft, queued, syncing, synced, failed, conflict }
+enum AttendanceSyncStatus {
+  draft,
+  queued,
+  syncing,
+  serverChecking,
+  synced,
+  failed,
+  conflict,
+}
+
+enum AttendanceServerSyncStatus {
+  accepted,
+  synced,
+  conflicted,
+  rejected,
+  processing,
+  unknown,
+}
+
+enum AttendanceDraftReceiptState {
+  local,
+  processing,
+  unknown,
+  transportAmbiguous,
+  rejected,
+}
+
+extension AttendanceDraftReceiptStatePolicy on AttendanceDraftReceiptState {
+  bool get locksContent =>
+      this == AttendanceDraftReceiptState.processing ||
+      this == AttendanceDraftReceiptState.unknown ||
+      this == AttendanceDraftReceiptState.transportAmbiguous;
+
+  AttendanceSyncStatus get syncStatus => switch (this) {
+    AttendanceDraftReceiptState.local => AttendanceSyncStatus.queued,
+    AttendanceDraftReceiptState.processing ||
+    AttendanceDraftReceiptState.unknown ||
+    AttendanceDraftReceiptState.transportAmbiguous =>
+      AttendanceSyncStatus.serverChecking,
+    AttendanceDraftReceiptState.rejected => AttendanceSyncStatus.failed,
+  };
+}
 
 class AttendanceSummary {
   const AttendanceSummary({
@@ -153,21 +194,49 @@ class TeacherAttendanceDraft {
     required this.clientSubmissionId,
     required this.savedAt,
     required this.entries,
+    this.receiptState = AttendanceDraftReceiptState.local,
   });
 
   final String clientSubmissionId;
   final DateTime savedAt;
   final List<AttendanceStudentEntry> entries;
+  final AttendanceDraftReceiptState receiptState;
 }
 
 class TeacherAttendanceSubmitResult {
   const TeacherAttendanceSubmitResult({
-    required this.status,
+    required this.serverStatus,
     required this.replayed,
+    this.deviceReceiptPersisted = true,
   });
 
-  final AttendanceSyncStatus status;
+  final AttendanceServerSyncStatus serverStatus;
   final bool replayed;
+  final bool deviceReceiptPersisted;
+
+  AttendanceSyncStatus get status => switch (serverStatus) {
+    AttendanceServerSyncStatus.accepted ||
+    AttendanceServerSyncStatus.synced => AttendanceSyncStatus.synced,
+    AttendanceServerSyncStatus.conflicted => AttendanceSyncStatus.conflict,
+    AttendanceServerSyncStatus.rejected => AttendanceSyncStatus.failed,
+    AttendanceServerSyncStatus.processing ||
+    AttendanceServerSyncStatus.unknown => AttendanceSyncStatus.serverChecking,
+  };
+
+  bool get canClearDeviceDraft =>
+      serverStatus == AttendanceServerSyncStatus.accepted ||
+      serverStatus == AttendanceServerSyncStatus.synced ||
+      serverStatus == AttendanceServerSyncStatus.conflicted;
+
+  AttendanceDraftReceiptState get draftReceiptState => switch (serverStatus) {
+    AttendanceServerSyncStatus.rejected => AttendanceDraftReceiptState.rejected,
+    AttendanceServerSyncStatus.processing =>
+      AttendanceDraftReceiptState.processing,
+    AttendanceServerSyncStatus.unknown => AttendanceDraftReceiptState.unknown,
+    AttendanceServerSyncStatus.accepted ||
+    AttendanceServerSyncStatus.synced ||
+    AttendanceServerSyncStatus.conflicted => AttendanceDraftReceiptState.local,
+  };
 }
 
 class TeacherTodayPeriod {

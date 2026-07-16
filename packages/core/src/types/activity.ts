@@ -83,6 +83,13 @@ export type DevelopmentalMilestone = {
   createdAt: string;
 };
 
+export type MobileTeacherMilestoneReceipt = {
+  resourceId: string;
+  clientSubmissionId: string;
+  replayed: boolean;
+  serverReceivedAt: string;
+};
+
 export type MoodLog = {
   id: string;
   classId?: string;

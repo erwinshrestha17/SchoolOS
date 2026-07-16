@@ -140,6 +140,7 @@ import {
   setSupportOverride,
   clearSupportOverride,
 } from "../session";
+import { assertOnlineForMutation } from "../offline-policy";
 
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api/v1";
@@ -262,6 +263,9 @@ function getCookie(name: string): string | undefined {
 }
 
 export async function request<T>(path: string, init?: RequestOptions) {
+  const method = init?.method?.toUpperCase() ?? "GET";
+  assertOnlineForMutation(method);
+
   const requestId = createRequestId();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -269,7 +273,6 @@ export async function request<T>(path: string, init?: RequestOptions) {
     ...((init?.headers as Record<string, string>) ?? {}),
   };
 
-  const method = init?.method?.toUpperCase() ?? "GET";
   const unsafeMethods = ["POST", "PUT", "PATCH", "DELETE"];
   if (unsafeMethods.includes(method)) {
     const csrfToken =
@@ -531,6 +534,8 @@ export async function downloadReport(
   reportKey: string,
   payload: ReportExportRequest,
 ) {
+  assertOnlineForMutation("POST");
+
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../../app/theme/app_colors.dart';
 
 class UserAvatar extends StatelessWidget {
@@ -35,32 +34,28 @@ class UserAvatar extends StatelessWidget {
     Widget avatarChild;
 
     if (imageUrl != null && imageUrl!.isNotEmpty) {
-      avatarChild = CachedNetworkImage(
-        imageUrl: imageUrl!,
-        imageBuilder: (context, imageProvider) => Container(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            image: DecorationImage(image: imageProvider, fit: BoxFit.cover),
-          ),
-        ),
-        placeholder: (context, url) => Container(
-          decoration: const BoxDecoration(
-            color: AppColors.slate200,
-            shape: BoxShape.circle,
-          ),
-          child: const Center(
-            child: SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation(AppColors.primary),
+      avatarChild = ClipOval(
+        child: Image.network(
+          imageUrl!,
+          fit: BoxFit.cover,
+          loadingBuilder: (context, child, progress) {
+            if (progress == null) return child;
+            return Container(
+              color: AppColors.slate200,
+              alignment: Alignment.center,
+              child: const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation(AppColors.primary),
+                ),
               ),
-            ),
-          ),
+            );
+          },
+          errorBuilder: (context, error, stackTrace) =>
+              _buildInitialsFallback(isDark, initials),
         ),
-        errorWidget: (context, url, error) =>
-            _buildInitialsFallback(isDark, initials),
       );
     } else {
       avatarChild = _buildInitialsFallback(isDark, initials);

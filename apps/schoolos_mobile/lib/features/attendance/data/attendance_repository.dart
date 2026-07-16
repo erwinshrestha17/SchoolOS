@@ -1,18 +1,20 @@
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dio/dio.dart';
 
 import '../../../core/errors/app_exception.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/storage/private_read_cache.dart';
+import '../../../core/storage/teacher_attendance_draft_store.dart';
 import '../domain/attendance_models.dart';
 
 class AttendanceRepository {
-  const AttendanceRepository(this._client, {this.cache});
+  const AttendanceRepository(this._client, {this.cache, this.draftStore});
 
   final ApiClient _client;
   final PrivateReadCache? cache;
+  final TeacherAttendanceDraftStore? draftStore;
 
   Future<AttendanceSnapshot> getParentAttendanceSnapshot(
     String studentId,
@@ -30,7 +32,7 @@ class AttendanceRepository {
       await cache?.write(cacheKey, data);
     } on AppException catch (error) {
       if (error is! NetworkException && error is! TimeoutException) rethrow;
-      final cached = cache?.read(cacheKey);
+      final cached = await cache?.read(cacheKey);
       if (cached == null) rethrow;
       data = cached.withMetadata();
     }
@@ -108,7 +110,7 @@ class AttendanceRepository {
       await cache?.write(cacheKey, data);
     } on AppException catch (error) {
       if (error is! NetworkException && error is! TimeoutException) rethrow;
-      final cached = cache?.read(cacheKey);
+      final cached = await cache?.read(cacheKey);
       if (cached == null) rethrow;
       data = cached.withMetadata();
     }
@@ -138,7 +140,7 @@ class AttendanceRepository {
       await cache?.write(cacheKey, data);
     } on AppException catch (error) {
       if (error is! NetworkException && error is! TimeoutException) rethrow;
-      final cached = cache?.read(cacheKey);
+      final cached = await cache?.read(cacheKey);
       if (cached == null) rethrow;
       data = cached.withMetadata();
     }
@@ -182,7 +184,7 @@ class AttendanceRepository {
       await cache?.write(cacheKey, data);
     } on AppException catch (error) {
       if (error is! NetworkException && error is! TimeoutException) rethrow;
-      final cached = cache?.read(cacheKey);
+      final cached = await cache?.read(cacheKey);
       if (cached == null) rethrow;
       data = cached.withMetadata();
     }
@@ -237,38 +239,95 @@ class AttendanceRepository {
     String clientSubmissionId,
     DateTime deviceTimestamp,
   ) async {
-    final response = await _client.post(
-      '/mobile/teacher/attendance/sync',
-      data: {
-        'academicYearId': classSection.academicYearId,
-        'classId': classSection.classId,
-        if (classSection.sectionId != null) 'sectionId': classSection.sectionId,
-        'attendanceDate': _dateOnly(date),
-        'exceptions': [
-          for (final entry in entries)
-            if (entry.status != AttendanceStatus.present)
-              {
-                'studentId': entry.studentId,
-                'status': _statusToApi(entry.status),
-              },
-        ],
-        'clientSubmissionId': clientSubmissionId,
-        'deviceTimestamp': deviceTimestamp.toUtc().toIso8601String(),
-      },
-    );
-    await _removeDraft(classSection.id, date);
+    final existing = await loadDraftAttendance(classSection.id, date);
+    if (existing == null ||
+        existing.clientSubmissionId != clientSubmissionId ||
+        !_sameAttendanceContent(existing.entries, entries)) {
+      throw const ConflictAppException();
+    }
+
+    final priorReceiptState = existing.receiptState;
+    if (!priorReceiptState.locksContent) {
+      await markDraftReceiptState(
+        classSection.id,
+        date,
+        entries,
+        clientSubmissionId: clientSubmissionId,
+        receiptState: AttendanceDraftReceiptState.transportAmbiguous,
+      );
+    }
+
+    late final Response<dynamic> response;
+    try {
+      response = await _client.post(
+        '/mobile/teacher/attendance/sync',
+        data: {
+          'academicYearId': classSection.academicYearId,
+          'classId': classSection.classId,
+          if (classSection.sectionId != null)
+            'sectionId': classSection.sectionId,
+          'attendanceDate': _dateOnly(date),
+          'exceptions': [
+            for (final entry in entries)
+              if (entry.status != AttendanceStatus.present)
+                {
+                  'studentId': entry.studentId,
+                  'status': _statusToApi(entry.status),
+                },
+          ],
+          'clientSubmissionId': clientSubmissionId,
+          'deviceTimestamp': deviceTimestamp.toUtc().toIso8601String(),
+        },
+      );
+    } on AppException catch (error) {
+      if (!priorReceiptState.locksContent && !_isAmbiguousSubmission(error)) {
+        try {
+          await markDraftReceiptState(
+            classSection.id,
+            date,
+            entries,
+            clientSubmissionId: clientSubmissionId,
+            receiptState: priorReceiptState,
+          );
+        } catch (_) {
+          throw const UnknownException(
+            'SchoolOS could not safely restore the local attendance receipt.',
+          );
+        }
+      }
+      rethrow;
+    } catch (_) {
+      throw const UnknownException(
+        'SchoolOS could not confirm the attendance receipt.',
+      );
+    }
     final data = response.data is Map<String, dynamic>
         ? response.data as Map<String, dynamic>
         : const <String, dynamic>{};
-    final syncStatus = data['syncStatus'] as String? ?? 'ACCEPTED';
-    return TeacherAttendanceSubmitResult(
-      status: syncStatus == 'CONFLICTED'
-          ? AttendanceSyncStatus.conflict
-          : syncStatus == 'REJECTED'
-          ? AttendanceSyncStatus.failed
-          : AttendanceSyncStatus.synced,
+    var result = TeacherAttendanceSubmitResult(
+      serverStatus: _parseAttendanceServerSyncStatus(data['syncStatus']),
       replayed: data['replayed'] as bool? ?? false,
     );
+    if (result.canClearDeviceDraft) {
+      await _removeDraft(classSection.id, date);
+    } else {
+      try {
+        await markDraftReceiptState(
+          classSection.id,
+          date,
+          entries,
+          clientSubmissionId: clientSubmissionId,
+          receiptState: result.draftReceiptState,
+        );
+      } catch (_) {
+        result = TeacherAttendanceSubmitResult(
+          serverStatus: result.serverStatus,
+          replayed: result.replayed,
+          deviceReceiptPersisted: false,
+        );
+      }
+    }
+    return result;
   }
 
   Future<TeacherAttendanceDraft> saveDraftAttendanceLocally(
@@ -276,59 +335,120 @@ class AttendanceRepository {
     DateTime date,
     List<AttendanceStudentEntry> entries,
   ) async {
-    final prefs = await SharedPreferences.getInstance();
     final existing = await loadDraftAttendance(classSectionId, date);
+    final contentChanged =
+        existing != null && !_sameAttendanceContent(existing.entries, entries);
+    if (contentChanged && existing.receiptState.locksContent) {
+      throw const ConflictAppException();
+    }
+
+    final rotateRejectedSubmission =
+        contentChanged &&
+        existing.receiptState == AttendanceDraftReceiptState.rejected;
     final draft = TeacherAttendanceDraft(
-      clientSubmissionId:
-          existing?.clientSubmissionId ?? _newClientSubmissionId(),
-      savedAt: DateTime.now(),
+      clientSubmissionId: rotateRejectedSubmission
+          ? _newClientSubmissionId()
+          : existing?.clientSubmissionId ?? _newClientSubmissionId(),
+      savedAt: rotateRejectedSubmission
+          ? DateTime.now()
+          : existing?.savedAt ?? DateTime.now(),
       entries: entries,
+      receiptState: rotateRejectedSubmission
+          ? AttendanceDraftReceiptState.local
+          : existing?.receiptState ?? AttendanceDraftReceiptState.local,
     );
-    await prefs.setString(
-      _draftKey(classSectionId, date),
-      jsonEncode({
-        'clientSubmissionId': draft.clientSubmissionId,
-        'savedAt': draft.savedAt.toIso8601String(),
-        'entries': [for (final entry in entries) entry.toJson()],
-      }),
-    );
+    await _writeDraft(classSectionId, date, draft);
     return draft;
+  }
+
+  Future<TeacherAttendanceDraft> markDraftReceiptState(
+    String classSectionId,
+    DateTime date,
+    List<AttendanceStudentEntry> entries, {
+    required String clientSubmissionId,
+    required AttendanceDraftReceiptState receiptState,
+  }) async {
+    final existing = await loadDraftAttendance(classSectionId, date);
+    if (existing == null ||
+        existing.clientSubmissionId != clientSubmissionId ||
+        !_sameAttendanceContent(existing.entries, entries)) {
+      throw const ConflictAppException();
+    }
+
+    final draft = TeacherAttendanceDraft(
+      clientSubmissionId: existing.clientSubmissionId,
+      savedAt: existing.savedAt,
+      entries: existing.entries,
+      receiptState: receiptState,
+    );
+    await _writeDraft(classSectionId, date, draft);
+    return draft;
+  }
+
+  Future<void> _writeDraft(
+    String classSectionId,
+    DateTime date,
+    TeacherAttendanceDraft draft,
+  ) async {
+    final stored =
+        await draftStore?.write(
+          classSectionId: classSectionId,
+          date: _dateOnly(date),
+          payload: {
+            'clientSubmissionId': draft.clientSubmissionId,
+            'savedAt': draft.savedAt.toIso8601String(),
+            'entries': [for (final entry in draft.entries) entry.toJson()],
+            'receiptState': draft.receiptState.name,
+          },
+        ) ??
+        false;
+    if (!stored) {
+      throw const CacheException(
+        'Attendance draft could not be stored securely for this teacher session.',
+      );
+    }
   }
 
   Future<TeacherAttendanceDraft?> loadDraftAttendance(
     String classSectionId,
     DateTime date,
   ) async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_draftKey(classSectionId, date));
-    if (raw == null || raw.isEmpty) {
-      return null;
-    }
+    final data = await draftStore?.read(
+      classSectionId: classSectionId,
+      date: _dateOnly(date),
+    );
+    if (data == null) return null;
     try {
-      final decoded = jsonDecode(raw);
-      final data = decoded is Map<String, dynamic> ? decoded : const {};
       final entries = _asList(data['entries'])
           .whereType<Map<String, dynamic>>()
           .map(AttendanceStudentEntry.fromJson)
           .toList();
-      if (entries.isEmpty) return null;
+      final clientSubmissionId = data['clientSubmissionId'] as String?;
+      final savedAt = DateTime.tryParse(data['savedAt'] as String? ?? '');
+      if (entries.isEmpty ||
+          clientSubmissionId == null ||
+          clientSubmissionId.trim().isEmpty ||
+          savedAt == null) {
+        await _removeDraft(classSectionId, date);
+        return null;
+      }
       return TeacherAttendanceDraft(
-        clientSubmissionId:
-            data['clientSubmissionId'] as String? ?? _newClientSubmissionId(),
-        savedAt:
-            DateTime.tryParse(data['savedAt'] as String? ?? '') ??
-            DateTime.now(),
+        clientSubmissionId: clientSubmissionId,
+        savedAt: savedAt,
         entries: entries,
+        receiptState: _parseDraftReceiptState(data['receiptState']),
       );
     } catch (_) {
-      await prefs.remove(_draftKey(classSectionId, date));
+      await _removeDraft(classSectionId, date);
       return null;
     }
   }
 
   Future<void> _removeDraft(String classSectionId, DateTime date) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_draftKey(classSectionId, date));
+    await draftStore?.delete(
+      classSectionId: classSectionId,
+      date: _dateOnly(date),
+    );
   }
 
   Future<void> discardDraftAttendance(String classSectionId, DateTime date) =>
@@ -342,14 +462,50 @@ String _newClientSubmissionId() {
   return 'mobile-attendance-${DateTime.now().microsecondsSinceEpoch}-$token';
 }
 
+AttendanceDraftReceiptState _parseDraftReceiptState(Object? value) {
+  if (value == null) return AttendanceDraftReceiptState.local;
+  if (value is! String) return AttendanceDraftReceiptState.unknown;
+
+  return switch (value.trim()) {
+    'local' => AttendanceDraftReceiptState.local,
+    'processing' => AttendanceDraftReceiptState.processing,
+    'unknown' => AttendanceDraftReceiptState.unknown,
+    'transportAmbiguous' => AttendanceDraftReceiptState.transportAmbiguous,
+    'rejected' => AttendanceDraftReceiptState.rejected,
+    _ => AttendanceDraftReceiptState.unknown,
+  };
+}
+
+bool _sameAttendanceContent(
+  List<AttendanceStudentEntry> left,
+  List<AttendanceStudentEntry> right,
+) {
+  if (left.length != right.length) return false;
+  final leftByStudent = <String, AttendanceStatus>{};
+  final rightByStudent = <String, AttendanceStatus>{};
+  for (final entry in left) {
+    if (entry.studentId.isEmpty || leftByStudent.containsKey(entry.studentId)) {
+      return false;
+    }
+    leftByStudent[entry.studentId] = entry.status;
+  }
+  for (final entry in right) {
+    if (entry.studentId.isEmpty ||
+        rightByStudent.containsKey(entry.studentId)) {
+      return false;
+    }
+    rightByStudent[entry.studentId] = entry.status;
+  }
+  if (leftByStudent.length != rightByStudent.length) return false;
+  return leftByStudent.entries.every(
+    (entry) => rightByStudent[entry.key] == entry.value,
+  );
+}
+
 String _dateOnly(DateTime value) {
   final month = value.month.toString().padLeft(2, '0');
   final day = value.day.toString().padLeft(2, '0');
   return '${value.year}-$month-$day';
-}
-
-String _draftKey(String classSectionId, DateTime date) {
-  return 'schoolos.teacher_attendance_draft.$classSectionId.${_dateOnly(date)}';
 }
 
 String _statusToApi(AttendanceStatus status) {
@@ -367,6 +523,25 @@ String _statusToApi(AttendanceStatus status) {
       return 'PRESENT';
   }
 }
+
+AttendanceServerSyncStatus _parseAttendanceServerSyncStatus(Object? value) {
+  if (value is! String) return AttendanceServerSyncStatus.unknown;
+
+  return switch (value.trim().toUpperCase()) {
+    'ACCEPTED' => AttendanceServerSyncStatus.accepted,
+    'SYNCED' => AttendanceServerSyncStatus.synced,
+    'CONFLICTED' => AttendanceServerSyncStatus.conflicted,
+    'REJECTED' => AttendanceServerSyncStatus.rejected,
+    'PROCESSING' => AttendanceServerSyncStatus.processing,
+    _ => AttendanceServerSyncStatus.unknown,
+  };
+}
+
+bool _isAmbiguousSubmission(AppException error) =>
+    error is NetworkException ||
+    error is TimeoutException ||
+    error is ServerException ||
+    error is UnknownException;
 
 class DateTimeRangeValue {
   const DateTimeRangeValue({required this.start, required this.end});

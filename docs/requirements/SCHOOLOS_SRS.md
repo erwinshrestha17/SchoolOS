@@ -129,7 +129,7 @@ Current repository status: **PROPOSED / NEEDS_SCHEMA_DESIGN**. Do not invent end
 | SRS-NFR-05 | High-risk actions require permission, confirmation, reason where policy requires it, audit, pending/success/error feedback, and safe retry behavior. |
 | SRS-NFR-06 | Sensitive errors must use bounded envelopes and never expose Prisma internals, stack traces, provider secrets, raw object keys, private URLs, token hashes, salary/bank data, or private payloads. |
 | SRS-NFR-07 | Reports, PDFs, media processing, imports, exports, provider delivery, retries, and large computations use queues/background jobs where practical. |
-| SRS-NFR-08 | Mobile supports offline safe reads only by default; offline writes require explicit idempotency, replay/reconciliation design, and visible queued/synced/failed state. |
+| SRS-NFR-08 | Web and mobile support offline safe reads only by default; offline writes require explicit idempotency, replay/reconciliation design, and visible queued/synced/failed/server-check state. |
 | SRS-NFR-09 | No offline payments, wallet debits, refunds, payroll, accounting, report-card publishing, tenant settings, platform controls, or high-risk writes. |
 | SRS-NFR-10 | M14 Intelligence / AI remains roadmap-only and must not introduce AI runtime, AI tutor, AI chat, adaptive learning, or inference workflows until approved. |
 | SRS-NFR-11 | Education-reporting validation, summaries, report states and export generation are backend-owned, tenant-scoped, permission-filtered and auditable. |
@@ -188,8 +188,8 @@ SchoolOS mobile remains one Flutter companion app.
 |---|---|
 | Persona-first | Parent, teacher, principal, staff, driver, and student-session flows are task-specific. |
 | Purpose-limited API | No broad admin dashboard copied to mobile and no admin-shaped payloads for parents/drivers/staff self-service. |
-| Secure storage | Credentials and tokens use secure storage. Private read cache is safe-read only and must clear on logout/session expiry where implemented. |
-| Offline | Offline reads may show cached private data with visible freshness; writes require explicit idempotency/reconciliation. |
+| Secure storage | Credentials and tokens use secure storage. Private read cache is safe-read only, encrypted at rest, schema-versioned, tenant/user/role scoped, TTL- and quota-bounded, and cleared on logout/session expiry. |
+| Offline | Offline reads may show allowlisted cached private data with visible freshness. Expired, differently scoped, or disallowed local entries fail closed. Restoring an offline session requires an unexpired stored access token and matching secure identity; an already-open offline session remains bounded by each resource's cache TTL. Server-side revocation or suspension takes effect on the next successful session revalidation. Writes require explicit idempotency/reconciliation. |
 | Context switching | Parent switches child and active stage; teacher switches assigned class/context; principal filters combined alerts by Preschool, School, and +2. |
 | Student access | Broad Student App routes must be hidden and backend-denied; controlled learning/session access must be tenant-scoped, self/session-scoped, expiring where applicable, and backend-authorized. |
 

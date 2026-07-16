@@ -36,7 +36,7 @@ export function LoginForm() {
 
   const mutation = useMutation({
     mutationFn: api.login,
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       if (isAuthSession(result)) {
         const isPlatformUser = result.user.roles.some((role) =>
           PLATFORM_ROLES.includes(role),
@@ -58,7 +58,7 @@ export function LoginForm() {
             );
 
         setChallengeMessage(null);
-        setAuthenticatedSession(result);
+        await setAuthenticatedSession(result);
         router.push(safeRedirect);
         return;
       }

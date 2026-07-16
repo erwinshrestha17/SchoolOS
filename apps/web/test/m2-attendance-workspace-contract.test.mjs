@@ -83,7 +83,10 @@ describe("M2 attendance workspace contract", () => {
   it("keeps submitted attendance read-only and exposes all weak-network states", () => {
     const form = read("components/forms/attendance-form.tsx");
 
-    assert.match(form, /disabled=\{isLocked \|\| isSubmitted\}/);
+    assert.match(
+      form,
+      /disabled=\{isLocked \|\| isSubmitted \|\| awaitingServerReceipt\}/,
+    );
     assert.match(form, /Attendance Submitted/);
     assert.match(form, /Request a correction/);
     assert.match(form, /Not synced\. Draft saved locally/);
@@ -91,6 +94,8 @@ describe("M2 attendance workspace contract", () => {
     assert.match(form, /Draft synced with SchoolOS/);
     assert.match(form, /Sync failed\. Draft is still saved locally/);
     assert.match(form, /Conflict found\. Review before syncing/);
+    assert.match(form, /SchoolOS did not accept this attendance/);
+    assert.match(form, /SchoolOS has not confirmed this attendance/);
   });
 
   it("prints backend-owned monthly register totals and never opens protected exports directly", () => {

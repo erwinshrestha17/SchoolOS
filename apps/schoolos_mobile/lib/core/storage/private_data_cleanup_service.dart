@@ -3,14 +3,30 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 
 import 'app_preferences_service.dart';
+import 'private_storage_keys.dart';
+import 'secure_storage_service.dart';
 
 class PrivateDataCleanupService {
-  const PrivateDataCleanupService(this._preferences);
+  const PrivateDataCleanupService(this._preferences, [this._secureStorage]);
 
   final AppPreferencesService _preferences;
+  final SecureKeyValueStore? _secureStorage;
 
   Future<void> clearPrivateData() async {
     await _preferences.clearPrivateData();
+    try {
+      await _secureStorage?.deleteByPrefix(privateReadCacheStoragePrefix);
+      await _secureStorage?.deleteByPrefix(teacherAttendanceDraftStoragePrefix);
+    } catch (_) {
+      try {
+        // If selective deletion fails, remove every secure record rather than
+        // leave private cache behind. Session and installation keys are safe to
+        // regenerate after logout.
+        await _secureStorage?.clearAll();
+      } catch (_) {
+        // Secure-storage failure must not block logout or session expiry.
+      }
+    }
     await Future.wait([
       _deleteSchoolOsDirectory(getTemporaryDirectory),
       _deleteSchoolOsDirectory(getApplicationDocumentsDirectory),

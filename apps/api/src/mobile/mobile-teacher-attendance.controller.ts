@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiCreatedResponse } from '@nestjs/swagger';
 import { AttendanceService } from '../attendance/attendance.service';
 import { SubmitAttendanceDto } from '../attendance/dto/submit-attendance.dto';
 import { SyncAttendanceDto } from '../attendance/dto/sync-attendance.dto';
@@ -14,6 +15,7 @@ import {
   MobileTeacherAttendanceRosterQueryDto,
   MobileTeacherTodayQueryDto,
 } from './dto/mobile-teacher-attendance-query.dto';
+import { MobileTeacherAttendanceSyncReceiptDto } from './dto/mobile-teacher-attendance-sync-receipt.dto';
 
 @Controller('mobile/teacher/attendance')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
@@ -79,6 +81,7 @@ export class MobileTeacherAttendanceController {
 
   @Post('sync')
   @Permissions('attendance:mark')
+  @ApiCreatedResponse({ type: MobileTeacherAttendanceSyncReceiptDto })
   async sync(@Body() dto: SyncAttendanceDto, @CurrentAuth() auth: AuthContext) {
     const result = await this.attendanceService.syncAttendance(dto, auth);
     return {

@@ -71,52 +71,57 @@ import {
   type PaginatedDataTableColumn,
 } from "@/components/schoolos/data/paginated-data-table";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
+import {
+  listAttendanceDraftsForCurrentBrowser,
+  type StoredAttendanceDraft,
+} from "@/lib/session";
 
-const correctionColumns: PaginatedDataTableColumn<AttendanceCorrectionRequest>[] = [
-  {
-    id: "id",
-    header: "Request",
-    cell: (item) => (
-      <span className="font-bold text-blue-700">{item.id.slice(0, 8)}</span>
-    ),
-  },
-  {
-    id: "student",
-    header: "Student",
-    cell: (item) => correctionStudentName(item),
-  },
-  {
-    id: "previousStatus",
-    header: "Original",
-    cell: (item) => item.previousStatus ?? "No record",
-  },
-  {
-    id: "requestedStatus",
-    header: "Requested",
-    cell: (item) => item.requestedStatus,
-  },
-  {
-    id: "status",
-    header: "Status",
-    cell: (item) => (
-      <Badge variant={item.status === "PENDING" ? "warning" : "success"}>
-        {item.status}
-      </Badge>
-    ),
-  },
-  {
-    id: "review",
-    header: "Review",
-    cell: (item) => (
-      <Link
-        className="text-sm font-bold text-blue-700"
-        href={`/dashboard/attendance/corrections/${item.id}`}
-      >
-        Open review
-      </Link>
-    ),
-  },
-];
+const correctionColumns: PaginatedDataTableColumn<AttendanceCorrectionRequest>[] =
+  [
+    {
+      id: "id",
+      header: "Request",
+      cell: (item) => (
+        <span className="font-bold text-blue-700">{item.id.slice(0, 8)}</span>
+      ),
+    },
+    {
+      id: "student",
+      header: "Student",
+      cell: (item) => correctionStudentName(item),
+    },
+    {
+      id: "previousStatus",
+      header: "Original",
+      cell: (item) => item.previousStatus ?? "No record",
+    },
+    {
+      id: "requestedStatus",
+      header: "Requested",
+      cell: (item) => item.requestedStatus,
+    },
+    {
+      id: "status",
+      header: "Status",
+      cell: (item) => (
+        <Badge variant={item.status === "PENDING" ? "warning" : "success"}>
+          {item.status}
+        </Badge>
+      ),
+    },
+    {
+      id: "review",
+      header: "Review",
+      cell: (item) => (
+        <Link
+          className="text-sm font-bold text-blue-700"
+          href={`/dashboard/attendance/corrections/${item.id}`}
+        >
+          Open review
+        </Link>
+      ),
+    },
+  ];
 
 const nepalNow = getNepalNow();
 const today = `${nepalNow.year}-${String(nepalNow.month).padStart(2, "0")}-${String(nepalNow.day).padStart(2, "0")}`;
@@ -259,67 +264,61 @@ export function AttendanceOverviewWorkspace() {
         </SummaryGrid>
       </ModuleHeader>
 
-      <WorkspaceTabs
-        items={attendanceTabs}
-      />
+      <WorkspaceTabs items={attendanceTabs} />
 
       <div className="space-y-6">
-          <WorkSurface
-            title="Class Attendance Status"
-            description="Latest class sessions from the attendance analytics API."
-            variant="monitoring"
-          >
-            {analyticsQuery.isLoading ? (
-              <LoadingState label="Loading class attendance status..." />
-            ) : analyticsQuery.isError ? (
-              <ErrorState
-                title="Attendance overview unavailable"
-                onRetry={() => void analyticsQuery.refetch()}
-              />
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Class / Section</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Present</TableHead>
-                    <TableHead>Absent</TableHead>
-                    <TableHead>Late</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(analytics?.latestSessions ?? [])
-                    .slice(0, 8)
-                    .map((session) => (
-                      <TableRow key={session.sessionId}>
-                        <TableCell className="font-bold text-slate-900">
-                          {session.className}
-                          {session.sectionName
-                            ? ` / ${session.sectionName}`
-                            : ""}
-                        </TableCell>
-                        <TableCell>
-                          {formatDate(session.attendanceDate)}
-                        </TableCell>
-                        <TableCell>{session.totals.present}</TableCell>
-                        <TableCell>{session.totals.absent}</TableCell>
-                        <TableCell>{session.totals.late}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={
-                              session.submittedAt ? "success" : "warning"
-                            }
-                          >
-                            {session.submittedAt ? "Submitted" : "Draft"}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
-            )}
-          </WorkSurface>
+        <WorkSurface
+          title="Class Attendance Status"
+          description="Latest class sessions from the attendance analytics API."
+          variant="monitoring"
+        >
+          {analyticsQuery.isLoading ? (
+            <LoadingState label="Loading class attendance status..." />
+          ) : analyticsQuery.isError ? (
+            <ErrorState
+              title="Attendance overview unavailable"
+              onRetry={() => void analyticsQuery.refetch()}
+            />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Class / Section</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Present</TableHead>
+                  <TableHead>Absent</TableHead>
+                  <TableHead>Late</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(analytics?.latestSessions ?? [])
+                  .slice(0, 8)
+                  .map((session) => (
+                    <TableRow key={session.sessionId}>
+                      <TableCell className="font-bold text-slate-900">
+                        {session.className}
+                        {session.sectionName ? ` / ${session.sectionName}` : ""}
+                      </TableCell>
+                      <TableCell>
+                        {formatDate(session.attendanceDate)}
+                      </TableCell>
+                      <TableCell>{session.totals.present}</TableCell>
+                      <TableCell>{session.totals.absent}</TableCell>
+                      <TableCell>{session.totals.late}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={session.submittedAt ? "success" : "warning"}
+                        >
+                          {session.submittedAt ? "Submitted" : "Draft"}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
+          )}
+        </WorkSurface>
 
         <div>
           <AtRiskPanel
@@ -430,7 +429,7 @@ export function AttendanceRegisterWorkspace({
   });
   const isTeacherPersona = Boolean(
     session?.user.roles.includes("teacher") &&
-      !session.user.roles.some((role) => ["admin", "principal"].includes(role)),
+    !session.user.roles.some((role) => ["admin", "principal"].includes(role)),
   );
   const assignedSections = useMemo(
     () =>
@@ -642,10 +641,7 @@ export function AttendanceRegisterWorkspace({
               setClassId(value);
               setSectionId("");
             }}
-            options={availableClasses.map((item) => [
-              item.id,
-              item.name,
-            ])}
+            options={availableClasses.map((item) => [item.id, item.name])}
           />
           <SelectLike
             label="Section"
@@ -762,9 +758,7 @@ export function AttendanceCorrectionsQueueWorkspace() {
           title="Correction Audit Log"
           description="Reviewed correction requests from the backend audit trail for the last 30 days."
           headerAction={
-            <Badge variant="info">
-              {auditQuery.data?.total ?? 0} rows
-            </Badge>
+            <Badge variant="info">{auditQuery.data?.total ?? 0} rows</Badge>
           }
         >
           {auditQuery.isLoading ? (
@@ -844,7 +838,8 @@ export function AttendanceCorrectionsQueueWorkspace() {
             total={correctionsQuery.data?.total ?? 0}
             detailHref={(id) => `/dashboard/attendance/corrections/${id}`}
           />
-          {!correctionsQuery.isLoading && (correctionsQuery.data?.total ?? 0) > 0 ? (
+          {!correctionsQuery.isLoading &&
+          (correctionsQuery.data?.total ?? 0) > 0 ? (
             <div className="rounded-2xl border border-slate-100 bg-white">
               <TablePagination
                 page={page}
@@ -857,7 +852,11 @@ export function AttendanceCorrectionsQueueWorkspace() {
         </div>
       ) : (
         <SectionCard
-          title={status === "APPROVED" ? "Reviewed Corrections" : "Escalated Corrections"}
+          title={
+            status === "APPROVED"
+              ? "Reviewed Corrections"
+              : "Escalated Corrections"
+          }
           description="Server-paginated correction requests scoped by tenant and backend permissions."
           headerAction={
             <Badge variant="neutral">
@@ -1038,6 +1037,10 @@ export function AttendanceCorrectionDetailWorkspace({ id }: { id: string }) {
 }
 
 export function AttendanceOfflineDraftsWorkspace() {
+  const { session } = useSession();
+  const [localDrafts, setLocalDrafts] = useState<StoredAttendanceDraft[]>([]);
+  const [localDraftsLoading, setLocalDraftsLoading] = useState(true);
+  const [localDraftsError, setLocalDraftsError] = useState<Error | null>(null);
   const draftsQuery = useQuery({
     queryKey: ["attendance-drafts"],
     queryFn: api.listAttendanceDrafts,
@@ -1052,6 +1055,54 @@ export function AttendanceOfflineDraftsWorkspace() {
       }),
   });
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadLocalDrafts() {
+      const tenantId = session?.tenant.id;
+      const userId = session?.user.id;
+
+      if (!tenantId || !userId) {
+        if (!cancelled) {
+          setLocalDrafts([]);
+          setLocalDraftsError(null);
+          setLocalDraftsLoading(false);
+        }
+        return;
+      }
+
+      try {
+        const drafts = await listAttendanceDraftsForCurrentBrowser({
+          tenantId,
+          userId,
+        });
+        if (!cancelled) {
+          setLocalDrafts(
+            drafts.toSorted(
+              (left, right) =>
+                new Date(right.savedAt).getTime() -
+                new Date(left.savedAt).getTime(),
+            ),
+          );
+          setLocalDraftsError(null);
+        }
+      } catch {
+        if (!cancelled) {
+          setLocalDraftsError(
+            new Error("Saved drafts are unavailable on this browser."),
+          );
+        }
+      } finally {
+        if (!cancelled) setLocalDraftsLoading(false);
+      }
+    }
+
+    void loadLocalDrafts();
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.tenant.id, session?.user.id]);
+
   return (
     <DashboardPageShell>
       <ModuleHeader
@@ -1064,14 +1115,71 @@ export function AttendanceOfflineDraftsWorkspace() {
         variant="light"
       />
       <Notice tone="info">
-        Attendance drafts are stored in IndexedDB on this browser and server
-        drafts are tenant/user scoped. Session clear removes browser-visible
-        auth metadata; drafts are reconciled through backend sync IDs.
+        Browser drafts are account-scoped, size-limited, expire after 48 hours,
+        and are cleared on logout or confirmed session expiry. Rejected or
+        still-checking submissions stay on the browser for safe review while the
+        session remains active.
       </Notice>
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid gap-6 xl:grid-cols-3">
+        <SectionCard title="This Browser">
+          {localDraftsLoading ? (
+            <LoadingState label="Loading browser drafts..." />
+          ) : localDraftsError ? (
+            <ErrorState
+              title="Browser drafts are unavailable"
+              error={localDraftsError}
+            />
+          ) : localDrafts.length === 0 ? (
+            <EmptyState
+              title="No attendance drafts on this browser"
+              description="Open Mark Attendance and make a change to save an offline-safe draft here."
+            />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Class</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {localDrafts.map((draft) => (
+                  <TableRow key={draft.key}>
+                    <TableCell>
+                      <div className="font-semibold text-slate-900">
+                        {draft.classLabel ?? "Selected class"}
+                      </div>
+                      {draft.sectionLabel ? (
+                        <div className="text-xs text-slate-500">
+                          {draft.sectionLabel}
+                        </div>
+                      ) : null}
+                    </TableCell>
+                    <TableCell>
+                      <div>{formatDate(draft.attendanceDate)}</div>
+                      <div className="text-xs text-slate-500">
+                        Saved {formatDateTime(draft.savedAt)}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="warning">Queued on browser</Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </SectionCard>
         <SectionCard title="Server Drafts">
           {draftsQuery.isLoading ? (
             <LoadingState label="Loading drafts..." />
+          ) : draftsQuery.isError ? (
+            <ErrorState
+              title="Server drafts could not load"
+              error={draftsQuery.error}
+              onRetry={() => void draftsQuery.refetch()}
+            />
           ) : (
             <Table>
               <TableHeader>
@@ -1101,6 +1209,12 @@ export function AttendanceOfflineDraftsWorkspace() {
         <SectionCard title="Sync Queue and Conflicts">
           {conflictsQuery.isLoading ? (
             <LoadingState label="Loading sync audit..." />
+          ) : conflictsQuery.isError ? (
+            <ErrorState
+              title="Sync audit could not load"
+              error={conflictsQuery.error}
+              onRetry={() => void conflictsQuery.refetch()}
+            />
           ) : (
             <Table>
               <TableHeader>
@@ -1116,17 +1230,16 @@ export function AttendanceOfflineDraftsWorkspace() {
                     <TableCell>{item.clientSubmissionId}</TableCell>
                     <TableCell>
                       <Badge
-                        variant={
-                          item.syncStatus === "REJECTED"
-                            ? "destructive"
-                            : "warning"
-                        }
+                        variant={getAttendanceSyncStatusTone(item.syncStatus)}
                       >
-                        {item.syncStatus}
+                        {getAttendanceSyncStatusLabel(item.syncStatus)}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {item.rejectionReason ?? "Review conflict metadata"}
+                      {getAttendanceSyncNextStep(
+                        item.syncStatus,
+                        item.rejectionReason,
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -1137,6 +1250,61 @@ export function AttendanceOfflineDraftsWorkspace() {
       </div>
     </DashboardPageShell>
   );
+}
+
+function getAttendanceSyncStatusLabel(status: string) {
+  switch (status) {
+    case "ACCEPTED":
+    case "SYNCED":
+      return "Received";
+    case "CONFLICTED":
+      return "Needs office review";
+    case "REJECTED":
+      return "Not accepted";
+    case "PROCESSING":
+      return "Checking server receipt";
+    case "DUPLICATE":
+      return "Already received";
+    default:
+      return "Needs review";
+  }
+}
+
+function getAttendanceSyncStatusTone(
+  status: string,
+): "destructive" | "success" | "warning" | "neutral" {
+  if (status === "REJECTED") return "destructive";
+  if (["ACCEPTED", "SYNCED", "DUPLICATE"].includes(status)) return "success";
+  if (["PROCESSING", "CONFLICTED"].includes(status)) return "warning";
+  return "neutral";
+}
+
+function getAttendanceSyncNextStep(
+  status: string,
+  rejectionReason: string | null,
+) {
+  if (status === "PROCESSING") {
+    return "Keep the device draft and check the official roster before retrying.";
+  }
+  if (status === "CONFLICTED") {
+    return "The office must compare this submission with the official roster.";
+  }
+  if (status !== "REJECTED") {
+    return "No action is required unless the roster looks different.";
+  }
+
+  switch (rejectionReason) {
+    case "LOCKED_SESSION":
+      return "The attendance day is locked. Request a correction if needed.";
+    case "ROSTER_MISMATCH":
+      return "The roster changed. Review the saved draft against the current roster.";
+    case "REFERENCE_NOT_FOUND":
+      return "The class, section, year, or student scope is no longer available.";
+    case "VALIDATION_ERROR":
+      return "Review the school day and attendance entries before creating a revised draft.";
+    default:
+      return "Keep the device draft and ask the office to check the official roster.";
+  }
 }
 
 export function AttendanceAnomaliesWorkspace() {
@@ -1324,7 +1492,9 @@ export function AttendanceStudentProfileWorkspace({
           title="Overall attendance"
           loading={summaryQuery.isLoading}
           value={
-            summary ? `${Math.round(summary.percentage * 10) / 10}%` : "Unavailable"
+            summary
+              ? `${Math.round(summary.percentage * 10) / 10}%`
+              : "Unavailable"
           }
           icon={<BarChart3 size={20} />}
           tone="success"
@@ -1543,7 +1713,8 @@ export function AttendanceReportsWorkspace() {
                               Download protected file
                             </ProtectedFileButton>
                             <span className="text-xs font-semibold text-slate-500">
-                              {item.file.fileName} · {formatFileSize(item.file.sizeBytes)}
+                              {item.file.fileName} ·{" "}
+                              {formatFileSize(item.file.sizeBytes)}
                             </span>
                           </div>
                         ) : (
@@ -1690,7 +1861,8 @@ export function AttendanceSettingsWorkspace() {
                 ],
                 [
                   "Channels",
-                  policy?.parentNotificationChannels.join(", ") ?? "Unavailable",
+                  policy?.parentNotificationChannels.join(", ") ??
+                    "Unavailable",
                 ],
                 [
                   "Provider state",
@@ -1713,7 +1885,10 @@ export function AttendanceSettingsWorkspace() {
         <SectionCard title="Policy Summary">
           <SummaryRows
             rows={[
-              ["Rule highlights", statesQuery.data?.supportPolicy ?? "Unavailable"],
+              [
+                "Rule highlights",
+                statesQuery.data?.supportPolicy ?? "Unavailable",
+              ],
               [
                 "Audit history",
                 "Policy updates recorded by backend audit service",
@@ -2190,9 +2365,7 @@ function ExportStatusBadge({
   }
   if (status === "QUEUED" || status === "RUNNING") {
     return (
-      <Badge variant="info">
-        {status === "QUEUED" ? "Queued" : "Running"}
-      </Badge>
+      <Badge variant="info">{status === "QUEUED" ? "Queued" : "Running"}</Badge>
     );
   }
   if (status === "FAILED" || status === "CANCELLED") {
@@ -2239,7 +2412,8 @@ function statusShort(status: string) {
 }
 
 function printAttendanceRegister() {
-  const cleanup = () => document.body.classList.remove("attendance-register-printing");
+  const cleanup = () =>
+    document.body.classList.remove("attendance-register-printing");
   document.body.classList.add("attendance-register-printing");
   window.addEventListener("afterprint", cleanup, { once: true });
   window.print();

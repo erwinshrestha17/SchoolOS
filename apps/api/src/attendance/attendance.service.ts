@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
   Optional,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import {
   BS_MONTH_NAMES_EN,
@@ -23,6 +24,7 @@ import {
   AttendanceConflictDecision,
   AttendanceConflictStatus,
   AttendanceSyncRejectionReason,
+  type AttendanceSyncSubmission,
   AttendanceSyncStatus,
   AttendanceStatus,
   AudienceType,
@@ -30,6 +32,8 @@ import {
   EnrollmentStatus,
   NotificationChannel,
   Prisma,
+  StaffStatus,
+  StudentLifecycleStatus,
   TimetableVersionStatus,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
@@ -74,6 +78,8 @@ import { loadSchoolLogoForPdf } from '../common/pdf/school-logo-loader';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 
 const M2_ATTENDANCE_HARDENING_POLICY_KEY = 'attendance.m2.hardeningPolicy';
+const ATTENDANCE_SYNC_PROCESSING_LEASE_MS = 2 * 60 * 1000;
+const ATTENDANCE_SYNC_ABANDONED_RETRY_MS = 15 * 60 * 1000;
 const DEFAULT_M2_ATTENDANCE_POLICY = {
   lockOverrideMinReasonLength: 8,
   correctionReviewMinReasonLength: 8,
@@ -369,6 +375,7 @@ export class AttendanceService {
       where: {
         id: scope.studentId,
         tenantId: actor.tenantId,
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
         classId: scope.classId,
         ...(scope.sectionId ? { sectionId: scope.sectionId } : {}),
         enrollments: {
@@ -575,6 +582,7 @@ export class AttendanceService {
     const students = await this.prisma.student.findMany({
       where: {
         tenantId: actor.tenantId,
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
         classId: dto.classId,
         ...(dto.sectionId ? { sectionId: dto.sectionId } : {}),
         enrollments: {
@@ -647,6 +655,8 @@ export class AttendanceService {
                   ? {
                       academicYearId: dto.academicYearId,
                       submittedById: actor.userId,
+                      sourceClientSubmissionId:
+                        submissionContext?.clientSubmissionId ?? null,
                       submittedAt: new Date(),
                       lockAt: await this.getAttendanceLockAt(
                         actor.tenantId,
@@ -667,6 +677,8 @@ export class AttendanceService {
                 sectionId: dto.sectionId ?? null,
                 attendanceDate,
                 submittedById: actor.userId,
+                sourceClientSubmissionId:
+                  submissionContext?.clientSubmissionId ?? null,
                 submittedAt: new Date(),
                 lockAt: await this.getAttendanceLockAt(
                   actor.tenantId,
@@ -871,16 +883,7 @@ export class AttendanceService {
     });
 
     if (existingSync) {
-      const replay = await this.prisma.attendanceSyncSubmission.update({
-        where: { id: existingSync.id },
-        data: {
-          syncAttemptCount: {
-            increment: 1,
-          },
-        },
-      });
-
-      return mapAttendanceSyncResult(replay, true);
+      return this.replayAttendanceSyncSubmission(existingSync, dto, actor);
     }
 
     const attendanceDate = stripTime(new Date(dto.attendanceDate));
@@ -891,6 +894,65 @@ export class AttendanceService {
       attendanceDate,
     );
 
+    let reservation: AttendanceSyncSubmission;
+    try {
+      reservation = await this.prisma.attendanceSyncSubmission.create({
+        data: {
+          tenantId: actor.tenantId,
+          clientSubmissionId: dto.clientSubmissionId,
+          academicYearId: dto.academicYearId,
+          classId: dto.classId,
+          sectionId: dto.sectionId ?? null,
+          attendanceDate,
+          deviceId: dto.deviceId ?? null,
+          deviceLabel: dto.deviceLabel ?? null,
+          deviceTimestamp: new Date(dto.deviceTimestamp),
+          sessionFingerprint: dto.sessionFingerprint ?? null,
+          syncStatus: AttendanceSyncStatus.PROCESSING,
+          syncAttemptCount: 1,
+          serverReceivedAt,
+          processingLeaseAt: serverReceivedAt,
+          rejectionReason: null,
+          submittedById: actor.userId,
+          payload: {
+            dto,
+            processing: true,
+            trustMetadata,
+          } as unknown as Prisma.InputJsonValue,
+        },
+      });
+    } catch (error) {
+      const databaseError = error as { code?: string };
+      if (databaseError.code === 'P2002') {
+        const winner = await this.prisma.attendanceSyncSubmission.findUnique({
+          where: {
+            tenantId_clientSubmissionId: {
+              tenantId: actor.tenantId,
+              clientSubmissionId: dto.clientSubmissionId,
+            },
+          },
+        });
+        if (winner) {
+          return this.replayAttendanceSyncSubmission(winner, dto, actor);
+        }
+      }
+      throw error;
+    }
+
+    return this.processAttendanceSyncReservation(
+      reservation,
+      dto,
+      actor,
+      trustMetadata,
+    );
+  }
+
+  private async processAttendanceSyncReservation(
+    reservation: AttendanceSyncSubmission,
+    dto: SyncAttendanceDto,
+    actor: AuthContext,
+    trustMetadata: Record<string, unknown>,
+  ) {
     try {
       const result = await this.submitAttendance(dto, actor, {
         source: 'sync_submission',
@@ -911,81 +973,325 @@ export class AttendanceService {
             })
           : null;
 
-      const created = await this.prisma.attendanceSyncSubmission.create({
+      const finalSyncStatus = conflict
+        ? AttendanceSyncStatus.CONFLICTED
+        : AttendanceSyncStatus.ACCEPTED;
+      const completedPayload = JSON.parse(
+        JSON.stringify({
+          dto,
+          result,
+          trustMetadata,
+        }),
+      ) as Prisma.InputJsonValue;
+      const completion = await this.prisma.attendanceSyncSubmission.updateMany({
+        where: {
+          id: reservation.id,
+          syncStatus: AttendanceSyncStatus.PROCESSING,
+          processingLeaseAt: reservation.processingLeaseAt,
+        },
         data: {
-          tenantId: actor.tenantId,
-          clientSubmissionId: dto.clientSubmissionId,
           attendanceSessionId: result.sessionId,
           conflictId: conflict?.id ?? null,
-          academicYearId: dto.academicYearId,
-          classId: dto.classId,
-          sectionId: dto.sectionId ?? null,
-          attendanceDate,
-          deviceId: dto.deviceId ?? null,
-          deviceLabel: dto.deviceLabel ?? null,
-          deviceTimestamp: new Date(dto.deviceTimestamp),
-          sessionFingerprint: dto.sessionFingerprint ?? null,
-          syncStatus: conflict
-            ? AttendanceSyncStatus.CONFLICTED
-            : AttendanceSyncStatus.ACCEPTED,
-          syncAttemptCount: 1,
-          serverReceivedAt,
+          syncStatus: finalSyncStatus,
+          processingLeaseAt: null,
           rejectionReason: null,
-          submittedById: actor.userId,
-          payload: JSON.parse(
-            JSON.stringify({
-              dto,
-              result,
-              trustMetadata,
-            }),
-          ) as Prisma.InputJsonValue,
+          payload: completedPayload,
         },
       });
+      if (completion.count !== 1) {
+        throw new ServiceUnavailableException(
+          'Attendance was received but its sync receipt needs reconciliation. Keep the server roster and do not resend this draft.',
+        );
+      }
 
-      return mapAttendanceSyncResult(created, false);
+      return mapAttendanceSyncResult(
+        {
+          ...reservation,
+          attendanceSessionId: result.sessionId,
+          conflictId: conflict?.id ?? null,
+          syncStatus: finalSyncStatus,
+          rejectionReason: null,
+        },
+        false,
+      );
     } catch (error) {
-      const created = await this.prisma.attendanceSyncSubmission.create({
-        data: {
-          tenantId: actor.tenantId,
-          clientSubmissionId: dto.clientSubmissionId,
-          academicYearId: dto.academicYearId,
-          classId: dto.classId,
-          sectionId: dto.sectionId ?? null,
-          attendanceDate,
-          deviceId: dto.deviceId ?? null,
-          deviceLabel: dto.deviceLabel ?? null,
-          deviceTimestamp: new Date(dto.deviceTimestamp),
-          sessionFingerprint: dto.sessionFingerprint ?? null,
+      if (isDeterministicAttendanceSyncRejection(error)) {
+        const rejectionReason = classifyAttendanceSyncRejection(error);
+        const rejectedPayload = {
+          dto,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          trustMetadata,
+        } as unknown as Prisma.InputJsonValue;
+        const rejection = await this.prisma.attendanceSyncSubmission.updateMany(
+          {
+            where: {
+              id: reservation.id,
+              syncStatus: AttendanceSyncStatus.PROCESSING,
+              processingLeaseAt: reservation.processingLeaseAt,
+            },
+            data: {
+              syncStatus: AttendanceSyncStatus.REJECTED,
+              processingLeaseAt: null,
+              rejectionReason,
+              payload: rejectedPayload,
+            },
+          },
+        );
+        if (rejection.count !== 1) {
+          throw new ServiceUnavailableException(
+            'Attendance sync state changed while the rejection was recorded. Keep this draft and check the server roster.',
+          );
+        }
+
+        const rejected = {
+          ...reservation,
           syncStatus: AttendanceSyncStatus.REJECTED,
-          syncAttemptCount: 1,
-          serverReceivedAt,
-          rejectionReason: classifyAttendanceSyncRejection(error),
-          submittedById: actor.userId,
+          rejectionReason,
+          payload: rejectedPayload,
+        };
+
+        await this.auditService.record({
+          action: 'reject',
+          resource: 'attendance_sync_submission',
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          resourceId: rejected.id,
+          after: {
+            clientSubmissionId: dto.clientSubmissionId,
+            rejectionReason: rejected.rejectionReason,
+          },
+        });
+
+        return mapAttendanceSyncResult(rejected, false);
+      }
+
+      await this.prisma.attendanceSyncSubmission.updateMany({
+        where: {
+          id: reservation.id,
+          syncStatus: AttendanceSyncStatus.PROCESSING,
+          processingLeaseAt: reservation.processingLeaseAt,
+        },
+        data: {
+          syncStatus: AttendanceSyncStatus.PROCESSING,
           payload: {
             dto,
-            error: error instanceof Error ? error.message : 'Unknown error',
+            processing: true,
+            reconciliationRequired: true,
             trustMetadata,
           } as unknown as Prisma.InputJsonValue,
         },
       });
 
+      throw new ServiceUnavailableException(
+        'Attendance sync could not be confirmed. Keep this draft and retry after the school roster is checked.',
+      );
+    }
+  }
+
+  private async replayAttendanceSyncSubmission(
+    existingSync: AttendanceSyncSubmission,
+    dto: SyncAttendanceDto,
+    actor: AuthContext,
+  ) {
+    if (
+      existingSync.submittedById !== actor.userId ||
+      !isMatchingAttendanceSyncReplay(existingSync, dto)
+    ) {
+      throw new ConflictException(
+        'Attendance sync ID was already used by another draft. Create a new offline draft and try again.',
+      );
+    }
+
+    if (isAttendanceSyncReservation(existingSync)) {
+      const leaseAt =
+        existingSync.processingLeaseAt ?? existingSync.serverReceivedAt;
+      if (
+        Date.now() - leaseAt.getTime() >=
+        ATTENDANCE_SYNC_PROCESSING_LEASE_MS
+      ) {
+        return this.reconcileAttendanceSyncReservation(
+          existingSync,
+          dto,
+          actor,
+        );
+      }
+      return mapAttendanceSyncResult(existingSync, true);
+    }
+
+    const replay = await this.prisma.attendanceSyncSubmission.update({
+      where: { id: existingSync.id },
+      data: {
+        syncAttemptCount: {
+          increment: 1,
+        },
+      },
+    });
+
+    return mapAttendanceSyncResult(replay, true);
+  }
+
+  private async reconcileAttendanceSyncReservation(
+    existingSync: AttendanceSyncSubmission,
+    dto: SyncAttendanceDto,
+    actor: AuthContext,
+  ) {
+    const officialSession = await this.prisma.attendanceSession.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        academicYearId: dto.academicYearId,
+        classId: dto.classId,
+        sectionId: dto.sectionId ?? null,
+        attendanceDate: getNepalBusinessDateRange(
+          stripTime(new Date(dto.attendanceDate)),
+        ),
+      },
+      include: {
+        records: {
+          select: {
+            studentId: true,
+            status: true,
+            remark: true,
+            lateAt: true,
+          },
+        },
+      },
+    });
+
+    const existingPayload = asJsonRecord(existingSync.payload) ?? {};
+    if (
+      officialSession &&
+      officialSession.submittedById === actor.userId &&
+      officialSession.sourceClientSubmissionId === dto.clientSubmissionId &&
+      isMatchingOfficialAttendanceSession(officialSession.records, dto)
+    ) {
+      const resolvedPayload = {
+        ...existingPayload,
+        processing: false,
+        reconciliationRequired: false,
+        reconciledFromOfficialSession: true,
+      } as Prisma.InputJsonValue;
+      const resolution = await this.prisma.attendanceSyncSubmission.updateMany({
+        where: {
+          id: existingSync.id,
+          syncStatus: AttendanceSyncStatus.PROCESSING,
+          processingLeaseAt: existingSync.processingLeaseAt,
+        },
+        data: {
+          attendanceSessionId: officialSession.id,
+          syncStatus: AttendanceSyncStatus.ACCEPTED,
+          processingLeaseAt: null,
+          rejectionReason: null,
+          syncAttemptCount: { increment: 1 },
+          payload: resolvedPayload,
+        },
+      });
+      if (resolution.count !== 1) {
+        throw new ConflictException(
+          'Attendance sync state changed while the official roster was checked. Keep this draft and retry shortly.',
+        );
+      }
+
       await this.auditService.record({
-        action: 'reject',
+        action: 'reconcile',
         resource: 'attendance_sync_submission',
         tenantId: actor.tenantId,
         userId: actor.userId,
-        resourceId: created.id,
+        resourceId: existingSync.id,
         after: {
           clientSubmissionId: dto.clientSubmissionId,
-          rejectionReason: created.rejectionReason,
+          attendanceSessionId: officialSession.id,
+          syncStatus: AttendanceSyncStatus.ACCEPTED,
         },
       });
 
-      throw error instanceof ForbiddenException ||
-        error instanceof NotFoundException
-        ? error
-        : new ForbiddenException('Attendance sync was rejected');
+      return mapAttendanceSyncResult(
+        {
+          ...existingSync,
+          attendanceSessionId: officialSession.id,
+          syncStatus: AttendanceSyncStatus.ACCEPTED,
+          syncAttemptCount: existingSync.syncAttemptCount + 1,
+          rejectionReason: null,
+        },
+        true,
+      );
     }
+
+    const reservationAgeMs =
+      Date.now() - existingSync.serverReceivedAt.getTime();
+    if (
+      !officialSession &&
+      reservationAgeMs < ATTENDANCE_SYNC_ABANDONED_RETRY_MS
+    ) {
+      const staleMarker = await this.prisma.attendanceSyncSubmission.updateMany(
+        {
+          where: {
+            id: existingSync.id,
+            syncStatus: AttendanceSyncStatus.PROCESSING,
+            processingLeaseAt: existingSync.processingLeaseAt,
+          },
+          data: {
+            payload: {
+              ...existingPayload,
+              processing: true,
+              reconciliationRequired: true,
+            },
+          },
+        },
+      );
+      if (staleMarker.count !== 1) {
+        throw new ConflictException(
+          'Attendance sync state changed while it was checked. Keep this draft and retry shortly.',
+        );
+      }
+      throw new ServiceUnavailableException(
+        'The earlier attendance sync is awaiting server confirmation. Keep this draft and check the official roster before retrying.',
+      );
+    }
+
+    const renewedLeaseAt = new Date();
+    const renewedPayload = {
+      ...existingPayload,
+      processing: true,
+      reconciliationRequired: true,
+      reconciliationRetryStartedAt: renewedLeaseAt.toISOString(),
+    } as Prisma.InputJsonValue;
+    const renewal = await this.prisma.attendanceSyncSubmission.updateMany({
+      where: {
+        id: existingSync.id,
+        syncStatus: AttendanceSyncStatus.PROCESSING,
+        processingLeaseAt: existingSync.processingLeaseAt,
+      },
+      data: {
+        processingLeaseAt: renewedLeaseAt,
+        syncAttemptCount: { increment: 1 },
+        payload: renewedPayload,
+      },
+    });
+    if (renewal.count !== 1) {
+      throw new ConflictException(
+        'Attendance sync state changed while reconciliation started. Keep this draft and retry shortly.',
+      );
+    }
+
+    const trustMetadata =
+      asJsonRecord(existingPayload.trustMetadata) ??
+      (await this.buildSyncTrustMetadata(
+        dto,
+        actor,
+        stripTime(new Date(dto.attendanceDate)),
+      ));
+    const renewedReservation: AttendanceSyncSubmission = {
+      ...existingSync,
+      processingLeaseAt: renewedLeaseAt,
+      syncAttemptCount: existingSync.syncAttemptCount + 1,
+      payload: renewedPayload as unknown as Prisma.JsonValue,
+    };
+    return this.processAttendanceSyncReservation(
+      renewedReservation,
+      dto,
+      actor,
+      trustMetadata,
+    );
   }
 
   async listConflicts(actor: AuthContext) {
@@ -1265,7 +1571,12 @@ export class AttendanceService {
   }
 
   async getMonthlyRegister(dto: GetMonthlyRegisterDto, actor: AuthContext) {
-    await this.checkTeacherAssignment(actor, dto.classId, dto.sectionId);
+    await this.checkTeacherAssignment(
+      actor,
+      dto.classId,
+      dto.sectionId,
+      dto.academicYearId,
+    );
 
     const period = resolveMonthlyRegisterPeriod(dto);
     const { startDate, endDate } = period;
@@ -1280,6 +1591,7 @@ export class AttendanceService {
         this.prisma.student.findMany({
           where: {
             tenantId: actor.tenantId,
+            lifecycleStatus: StudentLifecycleStatus.ACTIVE,
             classId: dto.classId,
             ...(dto.sectionId ? { sectionId: dto.sectionId } : {}),
             enrollments: {
@@ -3305,6 +3617,7 @@ export class AttendanceService {
       this.prisma.student.findMany({
         where: {
           tenantId: actor.tenantId,
+          lifecycleStatus: StudentLifecycleStatus.ACTIVE,
           classId,
           ...(sectionId ? { sectionId } : {}),
           enrollments: {
@@ -3317,12 +3630,15 @@ export class AttendanceService {
             },
           },
         },
-        include: {
-          guardianLinks: {
-            include: {
-              guardian: true,
-            },
-          },
+        select: {
+          id: true,
+          studentSystemId: true,
+          firstNameEn: true,
+          lastNameEn: true,
+          rollNumber: true,
+          severeAllergies: true,
+          medicalConditions: true,
+          specialNeeds: true,
         },
         orderBy: [{ rollNumber: 'asc' }, { firstNameEn: 'asc' }],
       }),
@@ -3381,10 +3697,6 @@ export class AttendanceService {
             student.medicalConditions ||
             student.specialNeeds,
           ),
-          primaryGuardian:
-            student.guardianLinks.find((link) => link.isPrimary)?.guardian ??
-            student.guardianLinks[0]?.guardian ??
-            null,
           status: record?.status ?? AttendanceStatus.PRESENT,
           remark: record?.remark ?? null,
         };
@@ -4296,7 +4608,12 @@ export class AttendanceService {
     }
 
     // Teacher Assignment check
-    await this.checkTeacherAssignment(actor, scope.classId, scope.sectionId);
+    await this.checkTeacherAssignment(
+      actor,
+      scope.classId,
+      scope.sectionId,
+      scope.academicYearId,
+    );
 
     return { academicYear, classroom, section };
   }
@@ -4317,7 +4634,11 @@ export class AttendanceService {
     }
 
     const staff = await this.prisma.staff.findFirst({
-      where: { userId: actor.userId, tenantId: actor.tenantId },
+      where: {
+        userId: actor.userId,
+        tenantId: actor.tenantId,
+        status: StaffStatus.ACTIVE,
+      },
     });
 
     if (!staff) {
@@ -4341,7 +4662,11 @@ export class AttendanceService {
       where: {
         staffId: staff.id,
         classId,
-        ...(sectionId ? { sectionId } : {}),
+        ...(sectionId
+          ? {
+              OR: [{ sectionId }, { sectionId: null }],
+            }
+          : { sectionId: null }),
         ...(academicYearId ? { academicYearId } : {}),
         tenantId: actor.tenantId,
       },
@@ -4367,6 +4692,7 @@ export class AttendanceService {
       where: {
         id: studentId,
         tenantId: actor.tenantId,
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
         classId: scope.classId,
         ...(scope.sectionId ? { sectionId: scope.sectionId } : {}),
         enrollments: {
@@ -5778,6 +6104,152 @@ function buildAttendanceIncomingPayload(
     exceptions: dto.exceptions ?? [],
     submissionContext: submissionContext ?? null,
   };
+}
+
+function isMatchingAttendanceSyncReplay(
+  existing: {
+    academicYearId: string;
+    classId: string;
+    sectionId: string | null;
+    attendanceDate: Date;
+    payload: Prisma.JsonValue;
+  },
+  dto: SyncAttendanceDto,
+) {
+  if (
+    existing.academicYearId !== dto.academicYearId ||
+    existing.classId !== dto.classId ||
+    existing.sectionId !== (dto.sectionId ?? null) ||
+    getDateKey(existing.attendanceDate) !==
+      getDateKey(new Date(dto.attendanceDate))
+  ) {
+    return false;
+  }
+
+  const payload = asJsonRecord(existing.payload);
+  const storedDto = payload ? asJsonRecord(payload.dto) : null;
+  if (!storedDto) {
+    return false;
+  }
+
+  const storedExceptions = normalizeAttendanceReplayExceptions(
+    storedDto.exceptions ?? [],
+  );
+  const incomingExceptions = normalizeAttendanceReplayExceptions(
+    dto.exceptions ?? [],
+  );
+
+  return (
+    storedDto.academicYearId === dto.academicYearId &&
+    storedDto.classId === dto.classId &&
+    (storedDto.sectionId ?? null) === (dto.sectionId ?? null) &&
+    storedExceptions !== null &&
+    incomingExceptions !== null &&
+    JSON.stringify(storedExceptions) === JSON.stringify(incomingExceptions)
+  );
+}
+
+function isAttendanceSyncReservation(submission: AttendanceSyncSubmission) {
+  const payload = asJsonRecord(submission.payload);
+  return (
+    submission.syncStatus === AttendanceSyncStatus.PROCESSING &&
+    submission.attendanceSessionId === null &&
+    submission.rejectionReason === null &&
+    payload?.processing === true
+  );
+}
+
+function isMatchingOfficialAttendanceSession(
+  records: Array<{
+    studentId: string;
+    status: AttendanceStatus;
+    remark: string | null;
+    lateAt: Date | null;
+  }>,
+  dto: SyncAttendanceDto,
+) {
+  const incomingExceptions = normalizeAttendanceReplayExceptions(
+    dto.exceptions ?? [],
+  );
+  if (!incomingExceptions) {
+    return false;
+  }
+
+  const incomingByStudent = new Map(
+    incomingExceptions.map((exception) => [exception.studentId, exception]),
+  );
+  const officialStudentIds = new Set(records.map((record) => record.studentId));
+
+  if (
+    incomingExceptions.some(
+      (exception) => !officialStudentIds.has(exception.studentId),
+    )
+  ) {
+    return false;
+  }
+
+  return records.every((record) => {
+    const incoming = incomingByStudent.get(record.studentId);
+
+    return (
+      record.status === (incoming?.status ?? AttendanceStatus.PRESENT) &&
+      record.remark === (incoming?.remark ?? null) &&
+      (record.lateAt?.toISOString() ?? null) === (incoming?.lateAt ?? null)
+    );
+  });
+}
+
+function isDeterministicAttendanceSyncRejection(error: unknown) {
+  return (
+    error instanceof BadRequestException ||
+    error instanceof ConflictException ||
+    error instanceof ForbiddenException ||
+    error instanceof NotFoundException
+  );
+}
+
+function asJsonRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function normalizeAttendanceReplayExceptions(value: unknown) {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const normalized = value.map((item) => {
+    const record = asJsonRecord(item);
+    if (
+      !record ||
+      typeof record.studentId !== 'string' ||
+      typeof record.status !== 'string'
+    ) {
+      return null;
+    }
+
+    const rawLateAt = typeof record.lateAt === 'string' ? record.lateAt : null;
+    const parsedLateAt = rawLateAt ? new Date(rawLateAt) : null;
+    if (parsedLateAt && Number.isNaN(parsedLateAt.getTime())) {
+      return null;
+    }
+
+    return {
+      studentId: record.studentId,
+      status: record.status,
+      remark: typeof record.remark === 'string' ? record.remark : null,
+      lateAt: parsedLateAt?.toISOString() ?? null,
+    };
+  });
+
+  if (normalized.some((item) => item === null)) {
+    return null;
+  }
+
+  return normalized
+    .filter((item): item is NonNullable<typeof item> => item !== null)
+    .sort((left, right) => left.studentId.localeCompare(right.studentId));
 }
 
 function countConsecutiveAbsences(

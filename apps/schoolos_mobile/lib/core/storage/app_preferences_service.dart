@@ -84,6 +84,23 @@ class AppPreferencesService {
     return _prefs.getString('$_privateCachePrefix$key');
   }
 
+  Future<void> purgeLegacyPrivateReadCache() async {
+    for (final key in _prefs.getKeys()) {
+      if (key.startsWith(_privateCachePrefix)) {
+        await _prefs.remove(key);
+      }
+    }
+  }
+
+  Future<void> purgeLegacyTeacherAttendanceDrafts() async {
+    const legacyDraftPrefix = 'schoolos.teacher_attendance_draft.';
+    for (final key in _prefs.getKeys()) {
+      if (key.startsWith(legacyDraftPrefix)) {
+        await _prefs.remove(key);
+      }
+    }
+  }
+
   Future<void> clearPrivateData() async {
     const privateKeys = {_selectedChildIdKey, _cachedUserKey};
     const privatePrefixes = {

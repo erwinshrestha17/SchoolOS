@@ -17,6 +17,8 @@ import {
   FileStatus,
   NotificationChannel,
   Prisma,
+  StaffStatus,
+  StudentLifecycleStatus,
 } from '@prisma/client';
 import sharp from 'sharp';
 import { toGregorianDateFromBs } from '@schoolos/core';
@@ -74,6 +76,7 @@ describe('attendance production hardening', () => {
     expect(prisma.student.findMany).toHaveBeenCalledWith({
       where: {
         tenantId: adminActor.tenantId,
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
         classId: 'class-1',
         sectionId: 'section-1',
         enrollments: {
@@ -86,12 +89,15 @@ describe('attendance production hardening', () => {
           },
         },
       },
-      include: {
-        guardianLinks: {
-          include: {
-            guardian: true,
-          },
-        },
+      select: {
+        id: true,
+        studentSystemId: true,
+        firstNameEn: true,
+        lastNameEn: true,
+        rollNumber: true,
+        severeAllergies: true,
+        medicalConditions: true,
+        specialNeeds: true,
       },
       orderBy: [{ rollNumber: 'asc' }, { firstNameEn: 'asc' }],
     });
@@ -101,6 +107,7 @@ describe('attendance production hardening', () => {
         status: AttendanceStatus.PRESENT,
       }),
     );
+    expect(roster.students[0]).not.toHaveProperty('primaryGuardian');
   });
 
   it('resolves the tenant current academic year when none is provided', async () => {
@@ -561,6 +568,109 @@ describe('attendance production hardening', () => {
     ).rejects.toThrow(
       'You are not assigned as Class Teacher or Subject Teacher for this section',
     );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('requires an active staff record before teacher attendance access', async () => {
+    const { service, prisma } = buildService({
+      academicYear: { id: 'ay-1' },
+      classroom: { id: 'class-1', name: 'Grade 1' },
+      staffFindFirst: null,
+    });
+
+    await expect(
+      service.getRoster(
+        teacherActor,
+        'ay-1',
+        'class-1',
+        undefined,
+        '2026-04-28',
+      ),
+    ).rejects.toThrow('Staff record not found in this tenant');
+
+    expect(prisma.staff.findFirst).toHaveBeenCalledWith({
+      where: {
+        userId: teacherActor.userId,
+        tenantId: teacherActor.tenantId,
+        status: StaffStatus.ACTIVE,
+      },
+    });
+    expect(prisma.subjectTeacherAssignment.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('does not widen an unsectioned attendance scope to section assignments', async () => {
+    const { service, prisma } = buildService({
+      academicYear: { id: 'ay-1' },
+      classroom: { id: 'class-1', name: 'Grade 1' },
+      staffFindFirst: { id: 'staff-1' },
+    });
+    prisma.subjectTeacherAssignment.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.getRoster(
+        teacherActor,
+        'ay-1',
+        'class-1',
+        undefined,
+        '2026-04-28',
+      ),
+    ).rejects.toThrow(
+      'You are not assigned as Class Teacher or Subject Teacher for this section',
+    );
+
+    expect(prisma.subjectTeacherAssignment.findFirst).toHaveBeenCalledWith({
+      where: {
+        staffId: 'staff-1',
+        classId: 'class-1',
+        sectionId: null,
+        academicYearId: 'ay-1',
+        tenantId: teacherActor.tenantId,
+      },
+    });
+  });
+
+  it('requires the requested academic year for section attendance assignments', async () => {
+    const scopeSection = { id: 'section-1', name: 'A', classId: 'class-1' };
+    const { service, prisma } = buildService({
+      academicYear: { id: 'ay-requested' },
+      classroom: { id: 'class-1', name: 'Grade 1' },
+      section: scopeSection,
+      staffFindFirst: { id: 'staff-1' },
+    });
+    prisma.section.findFirst
+      .mockResolvedValueOnce(scopeSection)
+      .mockResolvedValueOnce(null);
+    prisma.subjectTeacherAssignment.findFirst.mockImplementation(
+      ({ where }: { where: { academicYearId?: string } }) =>
+        where.academicYearId === 'ay-requested'
+          ? null
+          : { id: 'stale-year-assignment' },
+    );
+
+    await expect(
+      service.submitAttendance(
+        {
+          academicYearId: 'ay-requested',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          attendanceDate: '2026-04-28',
+          exceptions: [],
+        },
+        teacherActor,
+      ),
+    ).rejects.toThrow(
+      'You are not assigned as Class Teacher or Subject Teacher for this section',
+    );
+
+    expect(prisma.subjectTeacherAssignment.findFirst).toHaveBeenCalledWith({
+      where: {
+        staffId: 'staff-1',
+        classId: 'class-1',
+        OR: [{ sectionId: 'section-1' }, { sectionId: null }],
+        academicYearId: 'ay-requested',
+        tenantId: teacherActor.tenantId,
+      },
+    });
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
@@ -1059,6 +1169,7 @@ describe('attendance production hardening', () => {
       where: {
         id: 'student-1',
         tenantId: adminActor.tenantId,
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
         classId: 'class-1',
         sectionId: 'section-1',
         enrollments: {
@@ -1130,6 +1241,475 @@ describe('attendance production hardening', () => {
     );
   });
 
+  it('treats omitted and empty attendance exception arrays as the same replay payload', async () => {
+    const existingSync = buildSyncSubmission({
+      payload: {
+        dto: {
+          academicYearId: 'ay-1',
+          classId: 'class-1',
+          attendanceDate: '2026-04-28',
+        },
+      },
+    });
+    const updatedSync = buildSyncSubmission({ syncAttemptCount: 2 });
+    const { service } = buildService({
+      attendanceSyncFindUnique: existingSync,
+      attendanceSyncUpdated: updatedSync,
+    });
+
+    await expect(
+      service.syncAttendance(
+        {
+          academicYearId: 'ay-1',
+          classId: 'class-1',
+          attendanceDate: '2026-04-28',
+          clientSubmissionId: 'sync-1',
+          deviceTimestamp: '2026-04-28T08:05:00.000Z',
+        },
+        adminActor,
+      ),
+    ).resolves.toEqual(expect.objectContaining({ replayed: true }));
+  });
+
+  it('rejects replay keys created by another user in the same tenant', async () => {
+    const existingSync = buildSyncSubmission({
+      submittedById: 'another-user',
+    });
+    const { service, prisma } = buildService({
+      attendanceSyncFindUnique: existingSync,
+    });
+
+    await expect(
+      service.syncAttendance(
+        {
+          academicYearId: 'ay-1',
+          classId: 'class-1',
+          attendanceDate: '2026-04-28',
+          exceptions: [],
+          clientSubmissionId: 'sync-owned-by-another-user',
+          deviceTimestamp: '2026-04-28T08:00:00.000Z',
+        },
+        adminActor,
+      ),
+    ).rejects.toThrow(ConflictException);
+
+    expect(prisma.attendanceSyncSubmission.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects a replay key reused by the same user with different attendance content', async () => {
+    const existingSync = buildSyncSubmission();
+    const { service, prisma } = buildService({
+      attendanceSyncFindUnique: existingSync,
+    });
+
+    await expect(
+      service.syncAttendance(
+        {
+          academicYearId: 'ay-1',
+          classId: 'class-1',
+          attendanceDate: '2026-04-28',
+          exceptions: [
+            {
+              studentId: 'student-1',
+              status: AttendanceStatus.ABSENT,
+            },
+          ],
+          clientSubmissionId: 'sync-1',
+          deviceTimestamp: '2026-04-28T08:05:00.000Z',
+        },
+        adminActor,
+      ),
+    ).rejects.toThrow(ConflictException);
+
+    expect(prisma.attendanceSyncSubmission.update).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when a legacy attendance replay has no recorded owner', async () => {
+    const existingSync = buildSyncSubmission({ submittedById: null });
+    const { service, prisma } = buildService({
+      attendanceSyncFindUnique: existingSync,
+    });
+
+    await expect(
+      service.syncAttendance(
+        {
+          academicYearId: 'ay-1',
+          classId: 'class-1',
+          attendanceDate: '2026-04-28',
+          exceptions: [],
+          clientSubmissionId: 'sync-1',
+          deviceTimestamp: '2026-04-28T08:05:00.000Z',
+        },
+        adminActor,
+      ),
+    ).rejects.toThrow(ConflictException);
+
+    expect(prisma.attendanceSyncSubmission.update).not.toHaveBeenCalled();
+  });
+
+  it('reserves a replay key before attendance side effects and returns the concurrent in-flight receipt', async () => {
+    const inFlightWinner = buildSyncSubmission({
+      attendanceSessionId: null,
+      syncStatus: AttendanceSyncStatus.PROCESSING,
+      serverReceivedAt: new Date(),
+      payload: {
+        dto: {
+          academicYearId: 'ay-1',
+          classId: 'class-1',
+          attendanceDate: '2026-04-28',
+          exceptions: [],
+        },
+        processing: true,
+      },
+    });
+    const { service, prisma } = buildService({});
+    prisma.attendanceSyncSubmission.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(inFlightWinner);
+    prisma.attendanceSyncSubmission.create.mockRejectedValueOnce({
+      code: 'P2002',
+    });
+
+    await expect(
+      service.syncAttendance(
+        {
+          academicYearId: 'ay-1',
+          classId: 'class-1',
+          attendanceDate: '2026-04-28',
+          exceptions: [],
+          clientSubmissionId: 'sync-1',
+          deviceTimestamp: '2026-04-28T08:05:00.000Z',
+        },
+        adminActor,
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        clientSubmissionId: 'sync-1',
+        syncStatus: AttendanceSyncStatus.PROCESSING,
+        replayed: true,
+      }),
+    );
+
+    expect(prisma.attendanceSyncSubmission.update).not.toHaveBeenCalled();
+    expect(prisma.attendanceSession.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('marks a stale processing reservation for reconciliation without invalidating the original lease', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-04-28T08:05:00.000Z'));
+    const staleReservation = buildSyncSubmission({
+      attendanceSessionId: null,
+      syncStatus: AttendanceSyncStatus.PROCESSING,
+      serverReceivedAt: new Date('2026-04-28T08:00:01.000Z'),
+      processingLeaseAt: new Date('2026-04-28T08:00:01.000Z'),
+      payload: {
+        dto: {
+          academicYearId: 'ay-1',
+          classId: 'class-1',
+          attendanceDate: '2026-04-28',
+          exceptions: [],
+        },
+        processing: true,
+      },
+    });
+    const { service, prisma } = buildService({
+      attendanceSyncFindUnique: staleReservation,
+    });
+
+    await expect(
+      service.syncAttendance(
+        {
+          academicYearId: 'ay-1',
+          classId: 'class-1',
+          attendanceDate: '2026-04-28',
+          exceptions: [],
+          clientSubmissionId: 'sync-1',
+          deviceTimestamp: '2026-04-28T08:05:00.000Z',
+        },
+        adminActor,
+      ),
+    ).rejects.toThrow('awaiting server confirmation');
+
+    expect(prisma.attendanceSyncSubmission.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: staleReservation.id,
+          syncStatus: AttendanceSyncStatus.PROCESSING,
+        }),
+        data: expect.objectContaining({
+          payload: expect.objectContaining({
+            processing: true,
+            reconciliationRequired: true,
+          }),
+        }),
+      }),
+    );
+    expect(
+      prisma.attendanceSyncSubmission.updateMany.mock.calls[0]?.[0]?.data,
+    ).not.toHaveProperty('syncStatus');
+    jest.useRealTimers();
+  });
+
+  it('reconciles a stale processing receipt from the matching official roster', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-04-28T08:05:00.000Z'));
+    const processingLeaseAt = new Date('2026-04-28T08:00:01.000Z');
+    const staleReservation = buildSyncSubmission({
+      attendanceSessionId: null,
+      syncStatus: AttendanceSyncStatus.PROCESSING,
+      processingLeaseAt,
+      payload: {
+        dto: {
+          academicYearId: 'ay-1',
+          classId: 'class-1',
+          attendanceDate: '2026-04-28',
+          exceptions: [],
+        },
+        processing: true,
+      },
+    });
+    const officialSession = buildAttendanceSession({
+      sectionId: null,
+      sourceClientSubmissionId: 'sync-1',
+      records: [
+        {
+          studentId: 'student-1',
+          status: AttendanceStatus.PRESENT,
+          remark: null,
+          lateAt: null,
+        },
+      ],
+    });
+    const { service, prisma } = buildService({
+      attendanceSyncFindUnique: staleReservation,
+      attendanceSession: officialSession,
+    });
+    const submitSpy = jest.spyOn(service, 'submitAttendance');
+
+    const result = await service.syncAttendance(
+      {
+        academicYearId: 'ay-1',
+        classId: 'class-1',
+        attendanceDate: '2026-04-28',
+        exceptions: [],
+        clientSubmissionId: 'sync-1',
+        deviceTimestamp: '2026-04-28T08:05:00.000Z',
+      },
+      adminActor,
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        attendanceSessionId: officialSession.id,
+        syncStatus: AttendanceSyncStatus.ACCEPTED,
+        replayed: true,
+      }),
+    );
+    expect(submitSpy).not.toHaveBeenCalled();
+    expect(prisma.attendanceSyncSubmission.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ processingLeaseAt }),
+        data: expect.objectContaining({
+          attendanceSessionId: officialSession.id,
+          syncStatus: AttendanceSyncStatus.ACCEPTED,
+          processingLeaseAt: null,
+        }),
+      }),
+    );
+    jest.useRealTimers();
+  });
+
+  it('reconciles an explicit present exception against its official record', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-04-28T08:05:00.000Z'));
+    const processingLeaseAt = new Date('2026-04-28T08:00:01.000Z');
+    const explicitPresent = {
+      studentId: 'student-1',
+      status: AttendanceStatus.PRESENT,
+      remark: 'Arrived with the class',
+    };
+    const staleReservation = buildSyncSubmission({
+      attendanceSessionId: null,
+      syncStatus: AttendanceSyncStatus.PROCESSING,
+      processingLeaseAt,
+      payload: {
+        dto: {
+          academicYearId: 'ay-1',
+          classId: 'class-1',
+          attendanceDate: '2026-04-28',
+          exceptions: [explicitPresent],
+        },
+        processing: true,
+      },
+    });
+    const officialSession = buildAttendanceSession({
+      sectionId: null,
+      sourceClientSubmissionId: 'sync-1',
+      records: [
+        {
+          ...explicitPresent,
+          lateAt: null,
+        },
+      ],
+    });
+    const { service } = buildService({
+      attendanceSyncFindUnique: staleReservation,
+      attendanceSession: officialSession,
+    });
+    const submitSpy = jest.spyOn(service, 'submitAttendance');
+
+    await expect(
+      service.syncAttendance(
+        {
+          academicYearId: 'ay-1',
+          classId: 'class-1',
+          attendanceDate: '2026-04-28',
+          exceptions: [explicitPresent],
+          clientSubmissionId: 'sync-1',
+          deviceTimestamp: '2026-04-28T08:05:00.000Z',
+        },
+        adminActor,
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        attendanceSessionId: officialSession.id,
+        syncStatus: AttendanceSyncStatus.ACCEPTED,
+        replayed: true,
+      }),
+    );
+    expect(submitSpy).not.toHaveBeenCalled();
+    jest.useRealTimers();
+  });
+
+  it('renews and safely retries an abandoned processing reservation', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-04-28T08:20:00.000Z'));
+    const processingLeaseAt = new Date('2026-04-28T08:00:01.000Z');
+    const staleReservation = buildSyncSubmission({
+      attendanceSessionId: null,
+      syncStatus: AttendanceSyncStatus.PROCESSING,
+      processingLeaseAt,
+      payload: {
+        dto: {
+          academicYearId: 'ay-1',
+          classId: 'class-1',
+          attendanceDate: '2026-04-28',
+          exceptions: [],
+        },
+        processing: true,
+        trustMetadata: { firstSeen: true, flagged: false },
+      },
+    });
+    const { service, prisma } = buildService({
+      attendanceSyncFindUnique: staleReservation,
+    });
+    jest.spyOn(service, 'submitAttendance').mockResolvedValue({
+      sessionId: 'session-1',
+      attendanceDate: new Date('2026-04-28T00:00:00.000Z'),
+      className: 'Grade 1',
+      sectionName: null,
+      submittedAt: new Date('2026-04-28T08:20:00.000Z'),
+      lockAt: new Date('2026-04-28T14:00:00.000Z'),
+      conflictStatus: AttendanceConflictStatus.NONE,
+      calendarDay: null,
+      totals: {
+        totalStudents: 1,
+        present: 1,
+        absent: 0,
+        late: 0,
+        leave: 0,
+      },
+    } as never);
+
+    const result = await service.syncAttendance(
+      {
+        academicYearId: 'ay-1',
+        classId: 'class-1',
+        attendanceDate: '2026-04-28',
+        exceptions: [],
+        clientSubmissionId: 'sync-1',
+        deviceTimestamp: '2026-04-28T08:05:00.000Z',
+      },
+      adminActor,
+    );
+
+    expect(result.syncStatus).toBe(AttendanceSyncStatus.ACCEPTED);
+    expect(prisma.attendanceSyncSubmission.updateMany).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        where: expect.objectContaining({ processingLeaseAt }),
+        data: expect.objectContaining({
+          processingLeaseAt: new Date('2026-04-28T08:20:00.000Z'),
+          syncAttemptCount: { increment: 1 },
+        }),
+      }),
+    );
+    jest.useRealTimers();
+  });
+
+  it('does not overwrite a sync receipt after its processing lease changes', async () => {
+    const reservation = buildSyncSubmission({
+      attendanceSessionId: null,
+      syncStatus: AttendanceSyncStatus.PROCESSING,
+      payload: {
+        dto: {
+          academicYearId: 'ay-1',
+          classId: 'class-1',
+          attendanceDate: '2026-04-28',
+          exceptions: [],
+        },
+        processing: true,
+      },
+    });
+    const { service, prisma } = buildService({
+      attendanceSyncCreated: reservation,
+      updatedSyncCount: 0,
+    });
+    jest.spyOn(service, 'submitAttendance').mockResolvedValue({
+      sessionId: 'session-1',
+      attendanceDate: new Date('2026-04-28T00:00:00.000Z'),
+      className: 'Grade 1',
+      sectionName: null,
+      submittedAt: new Date('2026-04-28T08:00:00.000Z'),
+      lockAt: new Date('2026-04-28T14:00:00.000Z'),
+      conflictStatus: AttendanceConflictStatus.NONE,
+      calendarDay: null,
+      totals: {
+        totalStudents: 1,
+        present: 1,
+        absent: 0,
+        late: 0,
+        leave: 0,
+      },
+    } as never);
+
+    await expect(
+      service.syncAttendance(
+        {
+          academicYearId: 'ay-1',
+          classId: 'class-1',
+          attendanceDate: '2026-04-28',
+          exceptions: [],
+          clientSubmissionId: 'sync-1',
+          deviceTimestamp: '2026-04-28T08:05:00.000Z',
+        },
+        adminActor,
+      ),
+    ).rejects.toThrow('could not be confirmed');
+
+    expect(prisma.attendanceSyncSubmission.updateMany).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        where: {
+          id: reservation.id,
+          syncStatus: AttendanceSyncStatus.PROCESSING,
+          processingLeaseAt: reservation.processingLeaseAt,
+        },
+        data: expect.objectContaining({
+          attendanceSessionId: 'session-1',
+          syncStatus: AttendanceSyncStatus.ACCEPTED,
+        }),
+      }),
+    );
+    expect(prisma.attendanceSyncSubmission.update).not.toHaveBeenCalled();
+  });
+
   it('classifies non-working day sync rejections as validation errors', async () => {
     const { service, prisma } = buildService({
       academicYear: { id: 'ay-1' },
@@ -1141,6 +1721,8 @@ describe('attendance production hardening', () => {
         holidayType: 'PUBLIC',
       },
       attendanceSyncCreated: buildSyncSubmission({
+        clientSubmissionId: 'sync-2',
+        attendanceDate: new Date('2026-04-26T00:00:00.000Z'),
         syncStatus: AttendanceSyncStatus.REJECTED,
         rejectionReason: AttendanceSyncRejectionReason.VALIDATION_ERROR,
       }),
@@ -1158,9 +1740,24 @@ describe('attendance production hardening', () => {
         },
         adminActor,
       ),
-    ).rejects.toThrow(ForbiddenException);
+    ).resolves.toEqual(
+      expect.objectContaining({
+        clientSubmissionId: 'sync-2',
+        syncStatus: AttendanceSyncStatus.REJECTED,
+        replayed: false,
+        rejectionReason: AttendanceSyncRejectionReason.VALIDATION_ERROR,
+      }),
+    );
 
     expect(prisma.attendanceSyncSubmission.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          syncStatus: AttendanceSyncStatus.PROCESSING,
+          payload: expect.objectContaining({ processing: true }),
+        }),
+      }),
+    );
+    expect(prisma.attendanceSyncSubmission.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           syncStatus: AttendanceSyncStatus.REJECTED,
@@ -1194,7 +1791,7 @@ describe('attendance production hardening', () => {
         },
       ],
     });
-    const { service, prisma, tx } = buildService({
+    const { service, tx } = buildService({
       academicYear: { id: 'ay-1' },
       classroom: { id: 'class-1', name: 'Grade 1' },
       students: [buildStudent()],
@@ -2226,13 +2823,17 @@ function buildService(options: {
         .mockResolvedValue(options.priorSyncSubmission ?? null),
       update: jest
         .fn()
-        .mockResolvedValue(options.attendanceSyncUpdated ?? null),
+        .mockResolvedValue(
+          options.attendanceSyncUpdated ??
+            options.attendanceSyncCreated ??
+            null,
+        ),
       create: jest
         .fn()
         .mockResolvedValue(options.attendanceSyncCreated ?? null),
       updateMany: jest
         .fn()
-        .mockResolvedValue({ count: options.updatedSyncCount ?? 0 }),
+        .mockResolvedValue({ count: options.updatedSyncCount ?? 1 }),
     },
     attendanceConflict: {
       findFirst: jest
@@ -2364,6 +2965,9 @@ function buildStudent(overrides: Record<string, unknown> = {}) {
 function buildAttendanceSession(overrides: Record<string, unknown> = {}) {
   return {
     id: 'session-1',
+    academicYearId: 'ay-1',
+    submittedById: adminActor.userId,
+    sourceClientSubmissionId: null,
     attendanceDate: new Date('2026-04-28T00:00:00.000Z'),
     class: { name: 'Grade 1' },
     section: { name: 'A' },
@@ -2398,6 +3002,9 @@ function buildSyncSubmission(overrides: Record<string, unknown> = {}) {
     clientSubmissionId: 'sync-1',
     attendanceSessionId: 'session-1',
     conflictId: null,
+    academicYearId: 'ay-1',
+    classId: 'class-1',
+    sectionId: null,
     syncStatus: AttendanceSyncStatus.ACCEPTED,
     attendanceDate: new Date('2026-04-28T00:00:00.000Z'),
     deviceId: null,
@@ -2406,7 +3013,17 @@ function buildSyncSubmission(overrides: Record<string, unknown> = {}) {
     sessionFingerprint: null,
     syncAttemptCount: 1,
     serverReceivedAt: new Date('2026-04-28T08:00:01.000Z'),
+    processingLeaseAt: null,
     rejectionReason: null,
+    submittedById: adminActor.userId,
+    payload: {
+      dto: {
+        academicYearId: 'ay-1',
+        classId: 'class-1',
+        attendanceDate: '2026-04-28',
+        exceptions: [],
+      },
+    },
     createdAt: new Date('2026-04-28T08:00:01.000Z'),
     ...overrides,
   };

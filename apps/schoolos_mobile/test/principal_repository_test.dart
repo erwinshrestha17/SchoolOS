@@ -3,10 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:schoolos_mobile/core/errors/app_exception.dart';
 import 'package:schoolos_mobile/core/network/api_client.dart';
-import 'package:schoolos_mobile/core/storage/app_preferences_service.dart';
-import 'package:schoolos_mobile/core/storage/private_read_cache.dart';
 import 'package:schoolos_mobile/features/principal/data/principal_repository.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class MockApiClient extends Mock implements ApiClient {}
 
@@ -47,24 +44,17 @@ void main() {
       },
     );
 
-    test('uses cached read-only principal dashboard when offline', () async {
-      SharedPreferences.setMockInitialValues({});
-      final cache = PrivateReadCache(
-        AppPreferencesService(await SharedPreferences.getInstance()),
-      );
-      await cache.write('principal_dashboard', {
-        'attentionCount': 1,
-        'modules': {'attendance': true},
-      });
+    test('keeps principal dashboard network-only when offline', () async {
       when(
         () => apiClient.get<dynamic>('/mobile/principal/dashboard'),
       ).thenThrow(const NetworkException());
 
-      final repository = PrincipalRepository(apiClient, cache: cache);
-      final dashboard = await repository.getDashboard();
+      final repository = PrincipalRepository(apiClient);
 
-      expect(dashboard['attentionCount'], 1);
-      expect(dashboard['_mobileFromCache'], isTrue);
+      await expectLater(
+        repository.getDashboard(),
+        throwsA(isA<NetworkException>()),
+      );
     });
 
     test('loads the purpose-limited admissions snapshot', () async {

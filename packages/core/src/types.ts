@@ -1672,6 +1672,13 @@ export type DevelopmentalMilestone = {
   createdAt: string;
 };
 
+export type MobileTeacherMilestoneReceipt = {
+  resourceId: string;
+  clientSubmissionId: string;
+  replayed: boolean;
+  serverReceivedAt: string;
+};
+
 export type MoodLog = {
   id: string;
   classId?: string;
@@ -1840,12 +1847,20 @@ export type AttendanceConflict = {
   sectionName?: string | null;
 };
 
+export type AttendanceSyncStatus =
+  | 'PROCESSING'
+  | 'SYNCED'
+  | 'CONFLICTED'
+  | 'REJECTED'
+  | 'DUPLICATE'
+  | 'ACCEPTED';
+
 export type AttendanceSyncResult = {
   id: string;
   clientSubmissionId: string;
   attendanceSessionId: string | null;
   conflictId: string | null;
-  syncStatus: string;
+  syncStatus: AttendanceSyncStatus;
   attendanceDate: string;
   deviceId: string | null;
   deviceLabel: string | null;

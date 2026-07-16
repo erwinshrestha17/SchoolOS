@@ -6,10 +6,12 @@ import {
   AuthMethod,
   ConsentType,
   DevelopmentalMilestoneStatus,
+  EnrollmentStatus,
+  StaffStatus,
   StudentLifecycleStatus,
   StorageProvider,
 } from '@prisma/client';
-import { ForbiddenException } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { StorageService } from '../storage/storage.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { AuthContext } from '../auth/auth.types.js';
@@ -779,7 +781,11 @@ describe('ActivityFeedService', () => {
     });
     prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
     prisma.developmentalMilestone.create.mockImplementation(
-      async ({ data }: any) => ({ id: 'milestone-1', ...data }),
+      async ({ data }: any) => ({
+        id: 'milestone-1',
+        ...data,
+        createdAt: new Date('2026-04-28T00:00:01.000Z'),
+      }),
     );
 
     const result = await service.createMilestone(
@@ -799,6 +805,33 @@ describe('ActivityFeedService', () => {
 
     expect(result.photoObjectKey).toBe('/storage/public/photo.jpg');
     expect(result.photoUrl).toBeNull();
+    expect(result.replayed).toBe(false);
+    expect(result.serverReceivedAt).toBe('2026-04-28T00:00:01.000Z');
+    expect(prisma.student.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+          enrollments: {
+            some: expect.objectContaining({
+              status: EnrollmentStatus.ACTIVE,
+              academicYear: { isCurrent: true },
+            }),
+          },
+        }),
+      }),
+    );
+    expect(prisma.staff.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: StaffStatus.ACTIVE,
+          teacherAssignments: {
+            some: expect.objectContaining({
+              academicYear: { isCurrent: true },
+            }),
+          },
+        }),
+      }),
+    );
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'create',
@@ -822,6 +855,16 @@ describe('ActivityFeedService', () => {
     prisma.developmentalMilestone.findFirst.mockResolvedValue({
       id: 'milestone-existing',
       clientSubmissionId: '6731ea4f-5c37-4b16-bb72-955abbadc31b',
+      classId: 'class-1',
+      sectionId: 'section-1',
+      studentId: 'student-1',
+      domain: 'Motor skills',
+      milestone: 'Uses classroom materials independently',
+      status: DevelopmentalMilestoneStatus.PROGRESSING,
+      observationNote: null,
+      photoObjectKey: null,
+      observedAt: new Date('2026-04-28T00:00:00.000Z'),
+      createdAt: new Date('2026-04-28T00:00:01.000Z'),
     });
 
     const result = await service.createMilestone(
@@ -839,10 +882,51 @@ describe('ActivityFeedService', () => {
     );
 
     expect(result).toEqual(
-      expect.objectContaining({ id: 'milestone-existing' }),
+      expect.objectContaining({ id: 'milestone-existing', replayed: true }),
     );
     expect(prisma.developmentalMilestone.create).not.toHaveBeenCalled();
     expect(auditService.record).not.toHaveBeenCalled();
+  });
+
+  it('rejects a milestone replay key reused with different content', async () => {
+    prisma.class.findFirst.mockResolvedValue({ id: 'class-1' });
+    prisma.section.findFirst.mockResolvedValue({
+      id: 'section-1',
+      classId: 'class-1',
+    });
+    prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+    prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
+    prisma.developmentalMilestone.findFirst.mockResolvedValue({
+      id: 'milestone-existing',
+      clientSubmissionId: '6731ea4f-5c37-4b16-bb72-955abbadc31b',
+      classId: 'class-1',
+      sectionId: 'section-1',
+      studentId: 'student-1',
+      domain: 'Motor skills',
+      milestone: 'Uses classroom materials independently',
+      status: DevelopmentalMilestoneStatus.PROGRESSING,
+      observationNote: null,
+      photoObjectKey: null,
+      observedAt: new Date('2026-04-28T00:00:00.000Z'),
+      createdAt: new Date('2026-04-28T00:00:01.000Z'),
+    });
+
+    await expect(
+      service.createMilestone(
+        {
+          clientSubmissionId: '6731ea4f-5c37-4b16-bb72-955abbadc31b',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          studentId: 'student-1',
+          domain: 'Motor skills',
+          milestone: 'Changed milestone content',
+          status: DevelopmentalMilestoneStatus.PROGRESSING,
+          observedAt: '2026-04-28T00:00:00.000Z',
+        },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.developmentalMilestone.create).not.toHaveBeenCalled();
   });
 
   it('resolves a concurrent idempotent milestone create race to the existing record', async () => {
@@ -859,7 +943,20 @@ describe('ActivityFeedService', () => {
     prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
     prisma.developmentalMilestone.findFirst
       .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ id: 'milestone-existing' });
+      .mockResolvedValueOnce({
+        id: 'milestone-existing',
+        clientSubmissionId: '6731ea4f-5c37-4b16-bb72-955abbadc31b',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        studentId: 'student-1',
+        domain: 'Motor skills',
+        milestone: 'Uses classroom materials independently',
+        status: DevelopmentalMilestoneStatus.PROGRESSING,
+        observationNote: null,
+        photoObjectKey: null,
+        observedAt: new Date('2026-04-28T00:00:00.000Z'),
+        createdAt: new Date('2026-04-28T00:00:01.000Z'),
+      });
     prisma.developmentalMilestone.create.mockRejectedValue({ code: 'P2002' });
 
     await expect(

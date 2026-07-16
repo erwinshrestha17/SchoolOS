@@ -51,7 +51,10 @@ describe("global command palette (Ctrl/Cmd+K)", () => {
 
   it("is wired into the dashboard shell so it's available on every page", () => {
     const shell = read("components/layout/dashboard-shell.tsx");
-    assert.match(shell, /import \{ CommandPalette \} from '\.\/command-palette'/);
+    assert.match(
+      shell,
+      /import \{ CommandPalette \} from ["']\.\/command-palette["']/,
+    );
     assert.match(shell, /<CommandPalette \/>/);
   });
 });

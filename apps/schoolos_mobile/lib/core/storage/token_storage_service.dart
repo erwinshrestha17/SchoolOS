@@ -16,6 +16,7 @@ class TokenStorageService {
   static const String _accessTokenKey = 'school_os_access_token';
   static const String _refreshTokenKey = 'school_os_refresh_token';
   static const String _userRoleKey = 'school_os_user_role';
+  static const String _cachedUserKey = 'school_os_cached_user';
 
   Future<void> saveAccessToken(String token) async {
     await _storage.write(_accessTokenKey, token);
@@ -53,10 +54,23 @@ class TokenStorageService {
     await _storage.delete(_userRoleKey);
   }
 
+  Future<void> saveCachedUser(String userJson) async {
+    await _storage.write(_cachedUserKey, userJson);
+  }
+
+  Future<String?> getCachedUser() async {
+    return _storage.read(_cachedUserKey);
+  }
+
+  Future<void> deleteCachedUser() async {
+    await _storage.delete(_cachedUserKey);
+  }
+
   Future<void> clearTokens() async {
     await deleteAccessToken();
     await deleteRefreshToken();
     await deleteUserRole();
+    await deleteCachedUser();
   }
 
   Future<bool> hasValidSession() async {

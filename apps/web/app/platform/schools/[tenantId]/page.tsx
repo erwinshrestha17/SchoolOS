@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../../../../lib/api';
 import { PlatformTenantDetail, PlatformAuditLog, PlatformSaaSInvoiceSummary, PlatformApiKeyCreated, PlatformApiKeySummary } from '@schoolos/core';
 import { 
@@ -57,6 +58,7 @@ type InvoiceDialogMode = 'view' | 'payment' | 'cancel';
 export default function PlatformSchoolDetail() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [tenant, setTenant] = useState<PlatformTenantDetail | null>(null);
   const [invoices, setInvoices] = useState<PlatformSaaSInvoiceSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -220,6 +222,7 @@ export default function PlatformSchoolDetail() {
         reason: supportReason.trim(),
         durationMinutes: Number(supportDuration) || 30,
       });
+      queryClient.clear();
       setMessage('Support override is active. Redirecting to the school workspace.');
       setSupportDialogOpen(false);
       router.push(`/dashboard?tenantOverride=${encodeURIComponent(tenant.id)}`);

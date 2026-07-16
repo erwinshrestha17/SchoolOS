@@ -6,17 +6,22 @@ import {
   getNepalNow,
   toBsDateFromGregorian,
 } from "@schoolos/core";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { ApiRequestError } from "@/lib/api/client";
 import {
   clearAttendanceDraft,
+  createAttendanceDraftSubmissionId,
   readAttendanceDraft,
   storeAttendanceDraft,
   type AttendanceDraftStorageValue,
 } from "@/lib/session";
 import { useSession } from "@/components/session-provider";
+import {
+  canRestoreEditableAttendanceDraftAfterSyncError,
+  shouldClearLocalAttendanceDraft,
+} from "@/lib/offline-policy";
 import { SectionCard } from "@/components/ui/section-card";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { AttendanceHeader } from "@/components/attendance/attendance-header";
@@ -59,6 +64,9 @@ type DraftSyncState =
   | "retrying"
   | "synced"
   | "conflict"
+  | "recorded_conflict"
+  | "rejected"
+  | "server_check"
   | "failed";
 
 type AttendanceStatusFilter = "ALL" | "PRESENT" | "ABSENT" | "LATE" | "LEAVE";
@@ -88,9 +96,18 @@ export function AttendanceForm() {
   const [submitMessage, setSubmitMessage] = useState("");
   const [draftSyncState, setDraftSyncState] = useState<DraftSyncState>("idle");
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
+  const [draftClientSubmissionId, setDraftClientSubmissionId] = useState<
+    string | null
+  >(null);
   const [conflictMessage, setConflictMessage] = useState("");
+  const [syncResultMessage, setSyncResultMessage] = useState("");
+  const [lastServerSyncStatus, setLastServerSyncStatus] = useState<
+    string | null
+  >(null);
   const [hasDraftChanges, setHasDraftChanges] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isReceiptSyncPending, setIsReceiptSyncPending] = useState(false);
+  const receiptSyncInFlightRef = useRef(false);
 
   const academicYearsQuery = useQuery({
     queryKey: ["academic-years"],
@@ -111,7 +128,7 @@ export function AttendanceForm() {
     session?.user.roles.some((role) =>
       ["teacher", "subject_teacher"].includes(role),
     ) &&
-      !session?.user.roles.some((role) => ["admin", "principal"].includes(role)),
+    !session?.user.roles.some((role) => ["admin", "principal"].includes(role)),
   );
   const assignedSections = useMemo(
     () =>
@@ -133,7 +150,9 @@ export function AttendanceForm() {
   const availableClasses = useMemo(
     () =>
       isTeacherPersona
-        ? (classesQuery.data ?? []).filter((item) => assignedClassIds.has(item.id))
+        ? (classesQuery.data ?? []).filter((item) =>
+            assignedClassIds.has(item.id),
+          )
         : (classesQuery.data ?? []),
     [assignedClassIds, classesQuery.data, isTeacherPersona],
   );
@@ -155,8 +174,8 @@ export function AttendanceForm() {
       }),
     enabled: Boolean(
       (academicYearId || yearListUnavailable) &&
-        classId &&
-        !isFutureDate(attendanceDate),
+      classId &&
+      !isFutureDate(attendanceDate),
     ),
   });
 
@@ -180,11 +199,19 @@ export function AttendanceForm() {
       attendanceDate,
     ].join(":");
   }, [academicYearId, attendanceDate, classId, sectionId, session]);
+  const hasPendingLocalDraft = Boolean(
+    draftKey && draftClientSubmissionId && draftSavedAt,
+  );
 
-  const availableSections = (isTeacherPersona
-    ? assignedSections
-    : (sectionsQuery.data ?? [])
-  ).filter((s) => !classId || (s.classId ?? s.class?.id) === classId);
+  const availableSections = useMemo(
+    () =>
+      (isTeacherPersona ? assignedSections : (sectionsQuery.data ?? [])).filter(
+        (section) =>
+          !classId ||
+          (section.classId ?? section.class?.id) === classId,
+      ),
+    [assignedSections, classId, isTeacherPersona, sectionsQuery.data],
+  );
   const roster = useMemo(
     () => rosterQuery.data?.students ?? [],
     [rosterQuery.data?.students],
@@ -235,7 +262,10 @@ export function AttendanceForm() {
       }
     }
 
-    if ((sectionsQuery.isSuccess || sectionsQuery.isError) && availableClasses[0]) {
+    if (
+      (sectionsQuery.isSuccess || sectionsQuery.isError) &&
+      availableClasses[0]
+    ) {
       setClassId(availableClasses[0].id);
     }
   }, [
@@ -255,16 +285,43 @@ export function AttendanceForm() {
       if (cancelled) return;
 
       if (localDraft) {
+        setDraftClientSubmissionId(localDraft.clientSubmissionId);
         setExceptions(
           localDraft.exceptions as Record<string, AttendanceStatus>,
         );
         setRemarks(localDraft.remarks);
         setDraftSavedAt(localDraft.savedAt);
-        setDraftSyncState("saved_local");
+        const storedSyncStatus = String(
+          localDraft.lastSyncStatus ?? "",
+        ).toUpperCase();
+        setLastServerSyncStatus(storedSyncStatus || null);
+        if (storedSyncStatus === "REJECTED") {
+          setDraftSyncState("rejected");
+          setSyncResultMessage(
+            "SchoolOS did not accept this attendance. Review and change the local draft before sending a revised submission.",
+          );
+        } else if (
+          storedSyncStatus &&
+          !shouldClearLocalAttendanceDraft(storedSyncStatus)
+        ) {
+          setDraftSyncState("server_check");
+          setSyncResultMessage(
+            "SchoolOS has not confirmed this attendance yet. Keep the draft and check the official roster before trying again.",
+          );
+        } else {
+          setDraftSyncState("saved_local");
+          setSyncResultMessage("");
+        }
         setHasDraftChanges(true);
         setSubmitMessage("Recovered a locally saved attendance draft.");
         return;
       }
+
+      setDraftClientSubmissionId(createAttendanceDraftSubmissionId());
+      setDraftSavedAt(null);
+      setDraftSyncState("idle");
+      setSyncResultMessage("");
+      setLastServerSyncStatus(null);
 
       const nextExceptions: Record<string, AttendanceStatus> = {};
       const nextRemarks: Record<string, string> = {};
@@ -292,6 +349,7 @@ export function AttendanceForm() {
       !draftKey ||
       !academicYearId ||
       !classId ||
+      !draftClientSubmissionId ||
       roster.length === 0 ||
       !hasDraftChanges ||
       rosterQuery.data?.existingSession?.submittedAt
@@ -301,36 +359,79 @@ export function AttendanceForm() {
 
     const savedAt = new Date().toISOString();
     const draft: AttendanceDraftStorageValue = {
+      clientSubmissionId: draftClientSubmissionId,
       academicYearId,
+      academicYearLabel:
+        academicYearsQuery.data?.find((year) => year.id === academicYearId)
+          ?.name ?? rosterQuery.data?.academicYear?.name,
       classId,
+      classLabel:
+        availableClasses.find((item) => item.id === classId)?.name ??
+        rosterQuery.data?.class?.name,
       sectionId,
+      sectionLabel:
+        availableSections.find((item) => item.id === sectionId)?.name ??
+        rosterQuery.data?.section?.name ??
+        undefined,
       attendanceDate,
       exceptions,
       remarks,
       savedAt,
       serverSessionId: rosterQuery.data?.existingSession?.id ?? null,
       serverSubmittedAt: rosterQuery.data?.existingSession?.submittedAt ?? null,
+      lastSyncStatus: lastServerSyncStatus ?? undefined,
     };
 
-    void storeAttendanceDraft(draftKey, draft);
-    setDraftSavedAt(savedAt);
-    if (
-      !["conflict", "failed", "syncing", "retrying"].includes(draftSyncState)
-    ) {
-      setDraftSyncState("saved_local");
-    }
+    let cancelled = false;
+    void storeAttendanceDraft(draftKey, draft)
+      .then(() => {
+        if (cancelled) return;
+        setDraftSavedAt(savedAt);
+        if (
+          ![
+            "conflict",
+            "recorded_conflict",
+            "rejected",
+            "server_check",
+            "failed",
+            "syncing",
+            "retrying",
+          ].includes(draftSyncState)
+        ) {
+          setDraftSyncState("saved_local");
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setDraftSyncState("failed");
+        setSyncResultMessage(
+          "This attendance draft could not be saved safely on this browser.",
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [
     academicYearId,
+    academicYearsQuery.data,
     attendanceDate,
+    availableClasses,
+    availableSections,
     classId,
     draftKey,
+    draftClientSubmissionId,
     draftSyncState,
     exceptions,
     hasDraftChanges,
+    lastServerSyncStatus,
     remarks,
     roster.length,
+    rosterQuery.data?.academicYear?.name,
+    rosterQuery.data?.class?.name,
     rosterQuery.data?.existingSession?.id,
     rosterQuery.data?.existingSession?.submittedAt,
+    rosterQuery.data?.section?.name,
     sectionId,
   ]);
 
@@ -341,20 +442,6 @@ export function AttendanceForm() {
 
     window.addEventListener("online", handleOnline);
     return () => window.removeEventListener("online", handleOnline);
-  });
-
-  const mutation = useMutation({
-    mutationFn: api.submitAttendance,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["attendance-roster"] });
-      void clearAttendanceDraft(draftKey);
-      setDraftSyncState("synced");
-      setHasDraftChanges(false);
-      setSubmitMessage(
-        `Attendance submitted successfully at ${formatNepalTime(new Date())}.`,
-      );
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    },
   });
 
   const saveDraftMutation = useMutation({
@@ -371,22 +458,56 @@ export function AttendanceForm() {
 
   const syncMutation = useMutation({
     mutationFn: api.syncAttendance,
-    onSuccess: () => {
+    onSuccess: (result) => {
       void queryClient.invalidateQueries({
         queryKey: ["attendance-analytics"],
       });
       void queryClient.invalidateQueries({
         queryKey: ["attendance-conflicts"],
       });
-      void clearAttendanceDraft(draftKey);
-      setDraftSyncState("synced");
-      setHasDraftChanges(false);
-      setSubmitMessage(
-        `Offline draft synchronized successfully at ${formatNepalTime(new Date())}.`,
+      void queryClient.invalidateQueries({ queryKey: ["attendance-roster"] });
+
+      const syncStatus = String(result?.syncStatus ?? "").toUpperCase();
+      if (shouldClearLocalAttendanceDraft(syncStatus)) {
+        void clearAttendanceDraft(draftKey);
+        setDraftClientSubmissionId(null);
+        setDraftSavedAt(null);
+        setHasDraftChanges(false);
+        setSyncResultMessage("");
+        setLastServerSyncStatus(null);
+
+        if (syncStatus === "CONFLICTED") {
+          setDraftSyncState("recorded_conflict");
+          setSubmitMessage("");
+          setSyncResultMessage(
+            "SchoolOS received this attendance and recorded a conflict for office review.",
+          );
+          return;
+        }
+
+        setDraftSyncState("synced");
+        setSubmitMessage(
+          `Attendance submitted and confirmed at ${formatNepalTime(new Date())}.`,
+        );
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+
+      setHasDraftChanges(true);
+      setSubmitMessage("");
+      setLastServerSyncStatus(syncStatus || "UNKNOWN");
+      if (syncStatus === "REJECTED") {
+        setDraftSyncState("rejected");
+        setSyncResultMessage(
+          "SchoolOS did not accept this attendance. Review and change the local draft before sending a revised submission.",
+        );
+        return;
+      }
+
+      setDraftSyncState("server_check");
+      setSyncResultMessage(
+        "SchoolOS has not confirmed this attendance yet. Keep the draft and check the official roster before trying again.",
       );
-    },
-    onError: () => {
-      setDraftSyncState("failed");
     },
   });
 
@@ -414,7 +535,7 @@ export function AttendanceForm() {
   const isSubmitted = attendanceState?.isSubmitted ?? false;
   const hasConflict = Boolean(
     attendanceState?.conflictStatus &&
-      attendanceState.conflictStatus !== "NONE",
+    attendanceState.conflictStatus !== "NONE",
   );
   const submissionStatus = hasConflict
     ? "NEEDS_CORRECTION"
@@ -432,15 +553,27 @@ export function AttendanceForm() {
         ? "inactive"
         : undefined;
 
+  const awaitingServerReceipt = draftSyncState === "server_check";
+
+  const beginDraftEdit = () => {
+    if (draftSyncState === "rejected") {
+      setDraftClientSubmissionId(createAttendanceDraftSubmissionId());
+      setDraftSyncState("saved_local");
+      setSyncResultMessage("");
+      setLastServerSyncStatus(null);
+    }
+    setHasDraftChanges(true);
+  };
+
   const markAllPresent = () => {
     setExceptions({});
-    setHasDraftChanges(true);
+    beginDraftEdit();
   };
 
   const clearAll = () => {
     setExceptions({});
     setRemarks({});
-    setHasDraftChanges(true);
+    beginDraftEdit();
   };
 
   const buildDraftPayload = () => ({
@@ -460,7 +593,14 @@ export function AttendanceForm() {
   });
 
   const saveDraftToServer = async () => {
-    if (!academicYearId || !classId || roster.length === 0) return;
+    if (
+      !academicYearId ||
+      !classId ||
+      !draftClientSubmissionId ||
+      !draftSavedAt ||
+      roster.length === 0
+    )
+      return;
     if (hasReconnectConflict(rosterQuery.data?.existingSession, draftSavedAt)) {
       setDraftSyncState("conflict");
       setConflictMessage(
@@ -474,7 +614,15 @@ export function AttendanceForm() {
   };
 
   const syncDraftSubmission = async () => {
-    if (!academicYearId || !classId || roster.length === 0) return;
+    if (
+      receiptSyncInFlightRef.current ||
+      !draftKey ||
+      !academicYearId ||
+      !classId ||
+      !draftClientSubmissionId ||
+      roster.length === 0
+    )
+      return;
     if (hasReconnectConflict(rosterQuery.data?.existingSession, draftSavedAt)) {
       setDraftSyncState("conflict");
       setConflictMessage(
@@ -483,24 +631,138 @@ export function AttendanceForm() {
       return;
     }
 
-    setDraftSyncState(draftSyncState === "failed" ? "retrying" : "syncing");
-    await syncMutation.mutateAsync({
-      clientSubmissionId: `web-draft-${draftKey ?? createDraftFallbackId()}`,
-      deviceTimestamp: new Date().toISOString(),
+    receiptSyncInFlightRef.current = true;
+    setIsReceiptSyncPending(true);
+
+    const previousDraftSyncState = draftSyncState;
+    const previousLastServerSyncStatus = lastServerSyncStatus;
+    const receiptSavedAt = draftSavedAt ?? new Date().toISOString();
+    const receiptProtectedDraft: AttendanceDraftStorageValue = {
+      clientSubmissionId: draftClientSubmissionId,
       academicYearId,
+      academicYearLabel:
+        academicYearsQuery.data?.find((year) => year.id === academicYearId)
+          ?.name ?? rosterQuery.data?.academicYear?.name,
       classId,
-      sectionId: sectionId || null,
-      attendanceDate: new Date(attendanceDate).toISOString(),
-      exceptions: Object.entries(exceptions).map(([studentId, status]) => ({
-        studentId,
-        status,
-        remark: remarks[studentId]?.trim() || null,
-      })),
-    });
+      classLabel:
+        availableClasses.find((item) => item.id === classId)?.name ??
+        rosterQuery.data?.class?.name,
+      sectionId,
+      sectionLabel:
+        availableSections.find((item) => item.id === sectionId)?.name ??
+        rosterQuery.data?.section?.name ??
+        undefined,
+      attendanceDate,
+      exceptions,
+      remarks,
+      savedAt: receiptSavedAt,
+      serverSessionId: rosterQuery.data?.existingSession?.id ?? null,
+      serverSubmittedAt:
+        rosterQuery.data?.existingSession?.submittedAt ?? null,
+      lastSyncStatus: "PROCESSING",
+    };
+
+    try {
+      // The receipt marker must commit before the POST. If browser storage is
+      // unavailable, nothing is sent and the roster remains editable.
+      await storeAttendanceDraft(draftKey, receiptProtectedDraft);
+    } catch {
+      setDraftSyncState("failed");
+      setSyncResultMessage(
+        "This attendance could not be protected on this browser, so nothing was sent. Free browser storage and try again.",
+      );
+      receiptSyncInFlightRef.current = false;
+      setIsReceiptSyncPending(false);
+      return;
+    }
+
+    setDraftSavedAt(receiptSavedAt);
+    setHasDraftChanges(true);
+    setLastServerSyncStatus("PROCESSING");
+    setDraftSyncState("server_check");
+    setSubmitMessage("");
+    setSyncResultMessage(
+      "SchoolOS is checking this attendance under its saved submission ID.",
+    );
+
+    try {
+      await syncMutation.mutateAsync({
+        clientSubmissionId: draftClientSubmissionId,
+        deviceTimestamp: new Date().toISOString(),
+        academicYearId,
+        classId,
+        sectionId: sectionId || null,
+        attendanceDate: new Date(attendanceDate).toISOString(),
+        exceptions: Object.entries(exceptions).map(([studentId, status]) => ({
+          studentId,
+          status,
+          remark: remarks[studentId]?.trim() || null,
+        })),
+      });
+    } catch (error) {
+      // A final 401 triggers the SessionProvider's real teardown. Do not race
+      // that cleanup by recreating this account-scoped draft here.
+      if (error instanceof ApiRequestError && error.statusCode === 401) {
+        return;
+      }
+
+      if (canRestoreEditableAttendanceDraftAfterSyncError(error)) {
+        const restoredDraft = {
+          ...receiptProtectedDraft,
+          lastSyncStatus: previousLastServerSyncStatus ?? undefined,
+        };
+
+        try {
+          await storeAttendanceDraft(draftKey, restoredDraft);
+        } catch {
+          setLastServerSyncStatus("PROCESSING");
+          setDraftSyncState("server_check");
+          setSyncResultMessage(
+            "SchoolOS did not receive this check, but the browser could not safely restore the earlier draft marker. Keep the same submission and check again.",
+          );
+          return;
+        }
+
+        setLastServerSyncStatus(previousLastServerSyncStatus);
+        setDraftSyncState(
+          previousDraftSyncState === "idle"
+            ? "saved_local"
+            : previousDraftSyncState,
+        );
+        setSyncResultMessage(
+          "SchoolOS did not receive this submission. The local draft is still editable and nothing was queued.",
+        );
+        return;
+      }
+
+      const ambiguousDraft = {
+        ...receiptProtectedDraft,
+        lastSyncStatus: "TRANSPORT_AMBIGUOUS",
+      };
+
+      try {
+        await storeAttendanceDraft(draftKey, ambiguousDraft);
+        setLastServerSyncStatus("TRANSPORT_AMBIGUOUS");
+      } catch {
+        // The already committed PROCESSING marker remains the durable fallback.
+        setLastServerSyncStatus("PROCESSING");
+      }
+
+      setDraftSyncState("server_check");
+      setSyncResultMessage(
+        "SchoolOS may have received this attendance, but the receipt did not return. Keep the same submission ID and check the server again before editing.",
+      );
+    } finally {
+      receiptSyncInFlightRef.current = false;
+      setIsReceiptSyncPending(false);
+    }
   };
 
   const keepServerVersion = () => {
     void clearAttendanceDraft(draftKey);
+    setDraftClientSubmissionId(null);
+    setDraftSavedAt(null);
+    setLastServerSyncStatus(null);
     setDraftSyncState("synced");
     setConflictMessage("");
     void queryClient.invalidateQueries({ queryKey: ["attendance-roster"] });
@@ -521,9 +783,11 @@ export function AttendanceForm() {
         <div
           className={cn(
             "flex items-center justify-between gap-4 rounded-xl border px-5 py-4 text-sm font-bold",
-            draftSyncState === "conflict"
+            ["conflict", "recorded_conflict", "server_check"].includes(
+              draftSyncState,
+            )
               ? "border-warning-200 bg-warning-50 text-warning-900"
-              : draftSyncState === "failed"
+              : ["failed", "rejected"].includes(draftSyncState)
                 ? "border-danger-100 bg-danger-50 text-danger-800"
                 : "border-info-100 bg-info-50 text-info-800",
           )}
@@ -531,7 +795,12 @@ export function AttendanceForm() {
           <div className="flex items-center gap-3">
             <WifiOff size={18} />
             <span>
-              {getDraftSyncLabel(draftSyncState, draftSavedAt, conflictMessage)}
+              {getDraftSyncLabel(
+                draftSyncState,
+                draftSavedAt,
+                conflictMessage,
+                syncResultMessage,
+              )}
             </span>
           </div>
           {draftSyncState === "conflict" ? (
@@ -555,15 +824,22 @@ export function AttendanceForm() {
                 Review local draft
               </button>
             </div>
-          ) : (
+          ) : draftSyncState === "rejected" ? (
+            <span className="max-w-xs text-right text-xs font-semibold">
+              Change the draft below to prepare a new submission.
+            </span>
+          ) : hasPendingLocalDraft ? (
             <button
               type="button"
               onClick={() => void syncDraftSubmission()}
+              disabled={syncMutation.isPending}
               className="rounded-xl border border-info-100 bg-white px-3 py-2 text-xs"
             >
-              Sync now
+              {draftSyncState === "server_check"
+                ? "Check server again"
+                : "Sync now"}
             </button>
-          )}
+          ) : null}
         </div>
       )}
 
@@ -708,7 +984,7 @@ export function AttendanceForm() {
                 className="h-6"
               />
             </div>
-            {roster.length > 0 && (
+            {roster.length > 0 && !awaitingServerReceipt && (
               <ActionMenu
                 label="Open attendance roster actions"
                 items={[
@@ -821,10 +1097,8 @@ export function AttendanceForm() {
               <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-bold text-slate-700">
                 <AlertCircle size={20} className="shrink-0 text-slate-500" />
                 <span>
-                  {isLocked
-                    ? "This day is locked"
-                    : "Attendance is submitted"} and can no longer be edited
-                  or resubmitted here.{" "}
+                  {isLocked ? "This day is locked" : "Attendance is submitted"}{" "}
+                  and can no longer be edited or resubmitted here.{" "}
                   <Link
                     href="/dashboard/attendance/corrections"
                     className="underline hover:no-underline"
@@ -848,9 +1122,9 @@ export function AttendanceForm() {
                   student={student}
                   status={exceptions[student.id] ?? "PRESENT"}
                   remark={remarks[student.id] ?? ""}
-                  disabled={isLocked || isSubmitted}
+                  disabled={isLocked || isSubmitted || awaitingServerReceipt}
                   onStatusChange={(status) => {
-                    setHasDraftChanges(true);
+                    beginDraftEdit();
                     setExceptions((current) => {
                       const next = { ...current };
                       if (status === "PRESENT") {
@@ -862,7 +1136,7 @@ export function AttendanceForm() {
                     });
                   }}
                   onRemarkChange={(remark) => {
-                    setHasDraftChanges(true);
+                    beginDraftEdit();
                     setRemarks((current) => ({
                       ...current,
                       [student.id]: remark,
@@ -916,7 +1190,9 @@ export function AttendanceForm() {
               roster.length === 0 ||
               futureDateBlocked ||
               isLocked ||
-              isSubmitted
+              isSubmitted ||
+              awaitingServerReceipt ||
+              draftSyncState === "rejected"
             }
             className="flex items-center gap-3 rounded-xl bg-[var(--color-mod-attendance-accent)] px-10 py-4 text-sm font-black text-white shadow-lg shadow-[var(--color-mod-attendance-border)]/40 transition-all hover:scale-105 hover:bg-[var(--color-mod-attendance-text)] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
           >
@@ -963,7 +1239,13 @@ export function AttendanceForm() {
           <button
             type="button"
             onClick={() => void saveDraftToServer()}
-            disabled={saveDraftMutation.isPending || roster.length === 0}
+            disabled={
+              saveDraftMutation.isPending ||
+              roster.length === 0 ||
+              !hasPendingLocalDraft ||
+              awaitingServerReceipt ||
+              draftSyncState === "rejected"
+            }
             className="flex items-center gap-2 rounded-xl border border-[var(--color-mod-attendance-border)] bg-white px-4 py-2 text-xs font-bold text-[var(--color-mod-attendance-text)] transition-colors hover:bg-[var(--color-mod-attendance-soft)] disabled:opacity-50"
           >
             <Save size={14} />
@@ -972,11 +1254,16 @@ export function AttendanceForm() {
           <button
             type="button"
             onClick={() => void syncDraftSubmission()}
-            disabled={syncMutation.isPending || roster.length === 0}
+            disabled={
+              syncMutation.isPending ||
+              roster.length === 0 ||
+              !hasPendingLocalDraft ||
+              draftSyncState === "rejected"
+            }
             className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50"
           >
             <CheckCircle2 size={14} />
-            Sync Draft
+            {awaitingServerReceipt ? "Check Server" : "Sync Draft"}
           </button>
         </div>
       </div>
@@ -1106,10 +1393,6 @@ function isFutureDate(value: string) {
   return value > today;
 }
 
-function createDraftFallbackId() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
 function hasReconnectConflict(
   existingSession: { submittedAt: string | null } | null | undefined,
   localSavedAt: string | null,
@@ -1125,13 +1408,30 @@ function getDraftSyncLabel(
   state: DraftSyncState,
   savedAt: string | null,
   conflictMessage: string,
+  syncResultMessage: string,
 ) {
   if (state === "syncing") return "Syncing attendance draft...";
   if (state === "retrying") return "Retrying attendance sync...";
   if (state === "synced") return "Draft synced with SchoolOS.";
+  if (state === "recorded_conflict")
+    return (
+      syncResultMessage ||
+      "SchoolOS recorded this attendance for office conflict review."
+    );
+  if (state === "rejected")
+    return (
+      syncResultMessage ||
+      "SchoolOS did not accept this attendance. Review the local draft."
+    );
+  if (state === "server_check")
+    return (
+      syncResultMessage ||
+      "SchoolOS has not confirmed this attendance. Keep the local draft."
+    );
   if (state === "conflict")
     return conflictMessage || "Conflict found. Review before syncing.";
-  if (state === "failed") return "Sync failed. Draft is still saved locally.";
+  if (state === "failed")
+    return syncResultMessage || "Sync failed. Draft is still saved locally.";
   if (!savedAt) return "Not synced. Draft saved locally.";
 
   return `Not synced. Draft saved locally at ${formatNepalTime(savedAt)}.`;

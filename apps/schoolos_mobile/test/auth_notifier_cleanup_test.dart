@@ -11,6 +11,7 @@ class _MemoryTokenStorage implements TokenStorageService {
   String? accessToken = 'access-token';
   String? refreshToken = 'refresh-token';
   String? role = 'STUDENT';
+  String? cachedUser;
 
   @override
   Future<void> saveAccessToken(String token) async {
@@ -52,10 +53,24 @@ class _MemoryTokenStorage implements TokenStorageService {
   }
 
   @override
+  Future<void> saveCachedUser(String userJson) async {
+    cachedUser = userJson;
+  }
+
+  @override
+  Future<String?> getCachedUser() async => cachedUser;
+
+  @override
+  Future<void> deleteCachedUser() async {
+    cachedUser = null;
+  }
+
+  @override
   Future<void> clearTokens() async {
     accessToken = null;
     refreshToken = null;
     role = null;
+    cachedUser = null;
   }
 
   @override

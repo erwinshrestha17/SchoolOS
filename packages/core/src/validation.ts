@@ -343,11 +343,11 @@ export const attendanceSubmissionSchema = z.object({
 });
 
 export const attendanceSyncSchema = attendanceSubmissionSchema.extend({
-  clientSubmissionId: z.string().min(1),
+  clientSubmissionId: z.string().min(1).max(128),
   deviceTimestamp: z.string().min(1),
-  deviceId: z.string().optional().nullable(),
-  deviceLabel: z.string().optional().nullable(),
-  sessionFingerprint: z.string().optional().nullable()
+  deviceId: z.string().max(128).optional().nullable(),
+  deviceLabel: z.string().max(120).optional().nullable(),
+  sessionFingerprint: z.string().max(128).optional().nullable()
 });
 
 export const attendanceConflictReviewSchema = z.object({

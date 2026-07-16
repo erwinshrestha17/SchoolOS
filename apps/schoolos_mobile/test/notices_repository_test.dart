@@ -4,7 +4,11 @@ import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:schoolos_mobile/core/auth/mobile_role.dart';
+import 'package:schoolos_mobile/core/errors/app_exception.dart';
 import 'package:schoolos_mobile/core/network/api_client.dart';
+import 'package:schoolos_mobile/core/storage/private_read_cache.dart';
+import 'package:schoolos_mobile/core/storage/secure_storage_service.dart';
 import 'package:schoolos_mobile/features/notices/data/notices_repository.dart';
 import 'package:schoolos_mobile/features/notices/domain/notice_models.dart';
 
@@ -220,6 +224,81 @@ void main() {
     });
 
     test(
+      'offline notice feed caches metadata only and keeps detail network-only',
+      () async {
+        final storage = _MemorySecureStore();
+        final cachedRepository = NoticesRepository(
+          apiClient,
+          cache: PrivateReadCache(
+            storage,
+            scope: PrivateReadCacheScope(
+              tenantId: 'tenant-1',
+              userId: 'parent-1',
+              role: MobileRole.parent,
+            ),
+          ),
+        );
+        when(
+          () => apiClient.get<dynamic>('/mobile/me/notifications'),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(path: '/mobile/me/notifications'),
+            data: {
+              'unreadCount': 1,
+              'items': [
+                {
+                  'id': 'delivery-private-1',
+                  'title': 'Private update',
+                  'message': 'A private unread message body.',
+                  'sourceType': 'NOTICE',
+                  'sourceId': 'notice-1',
+                  'createdAt': '2026-06-01T10:00:00.000Z',
+                  'isRead': false,
+                  'attachment': {
+                    'id': 'file-private-1',
+                    'fileName': 'private.pdf',
+                    'downloadPath': '/private/download/path',
+                  },
+                  'providerPayload': {'secret': 'provider-secret'},
+                },
+              ],
+            },
+          ),
+        );
+
+        final online = await cachedRepository.getNoticeFeed();
+
+        expect(online.fromCache, isFalse);
+        expect(online.items.single.body, 'A private unread message body.');
+        final rawCache = storage.values.values.single;
+        expect(rawCache, isNot(contains('A private unread message body.')));
+        expect(rawCache, isNot(contains('private.pdf')));
+        expect(rawCache, isNot(contains('/private/download/path')));
+        expect(rawCache, isNot(contains('provider-secret')));
+        expect(rawCache, isNot(contains('"message"')));
+        expect(rawCache, isNot(contains('"body"')));
+        expect(rawCache, isNot(contains('"attachment"')));
+
+        when(
+          () => apiClient.get<dynamic>('/mobile/me/notifications'),
+        ).thenThrow(const NetworkException());
+
+        final offline = await cachedRepository.getNoticeFeed();
+
+        expect(offline.fromCache, isTrue);
+        expect(offline.items.single.title, 'Private update');
+        expect(offline.items.single.preview, 'Reconnect to read this notice.');
+        expect(offline.items.single.body, isEmpty);
+        expect(offline.items.single.hasAttachment, isFalse);
+        verifyNever(
+          () => apiClient.get<dynamic>(
+            '/mobile/me/notifications/delivery-private-1',
+          ),
+        );
+      },
+    );
+
+    test(
       'downloads notice attachment through protected mobile endpoint',
       () async {
         const attachment = NoticeAttachment(
@@ -281,4 +360,37 @@ void main() {
       );
     });
   });
+}
+
+class _MemorySecureStore implements SecureKeyValueStore {
+  final Map<String, String> values = {};
+
+  @override
+  Future<void> write(String key, String value) async {
+    values[key] = value;
+  }
+
+  @override
+  Future<String?> read(String key) async => values[key];
+
+  @override
+  Future<Map<String, String>> readAll() async => Map.of(values);
+
+  @override
+  Future<void> delete(String key) async {
+    values.remove(key);
+  }
+
+  @override
+  Future<void> clearAll() async {
+    values.clear();
+  }
+
+  @override
+  Future<bool> containsKey(String key) async => values.containsKey(key);
+
+  @override
+  Future<void> deleteByPrefix(String prefix) async {
+    values.removeWhere((key, _) => key.startsWith(prefix));
+  }
 }

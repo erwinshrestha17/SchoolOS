@@ -6,6 +6,7 @@ model AttendanceSession {
   sectionId      String?
   attendanceDate DateTime
   submittedById  String?
+  sourceClientSubmissionId String?
   submittedAt    DateTime?
   lockAt         DateTime
   conflictStatus AttendanceConflictStatus @default(NONE)
@@ -22,6 +23,7 @@ model AttendanceSession {
   correctionRequests AttendanceCorrectionRequest[]
 
   @@unique([tenantId, attendanceDate, classId, sectionId])
+  @@unique([tenantId, sourceClientSubmissionId], map: "attendance_session_source_submission_key")
 }
 
 model AttendanceRecord {
@@ -198,6 +200,7 @@ model AttendanceSyncSubmission {
   syncStatus          AttendanceSyncStatus           @default(ACCEPTED)
   syncAttemptCount    Int                            @default(1)
   serverReceivedAt    DateTime                       @default(now())
+  processingLeaseAt   DateTime?
   rejectionReason     AttendanceSyncRejectionReason?
   submittedById       String?
   payload             Json

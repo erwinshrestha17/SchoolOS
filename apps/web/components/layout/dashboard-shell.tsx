@@ -1,18 +1,19 @@
-'use client';
+"use client";
 
-import type { ReactNode } from 'react';
-import { useRef, useState } from 'react';
-import { usePathname } from 'next/navigation';
-import type { OperationalSummaryRouteModule } from '@schoolos/core';
-import { CommandPalette } from './command-palette';
-import { GlobalAside } from './global-aside';
-import { TopBar } from './top-bar';
-import { useSession } from '../session-provider';
-import { LoadingState } from '../ui/loading-state';
-import { ErrorBoundary } from '../ui/error-boundary';
-import { ModuleOperationalSummary } from '../ui/module-operational-summary';
-import { SupportOverrideBanner } from '../platform/SupportOverrideBanner';
-import { SchoolBreadcrumbs } from '../schoolos/navigation/school-breadcrumbs';
+import type { ReactNode } from "react";
+import { useRef, useState } from "react";
+import { usePathname } from "next/navigation";
+import type { OperationalSummaryRouteModule } from "@schoolos/core";
+import { CommandPalette } from "./command-palette";
+import { GlobalAside } from "./global-aside";
+import { TopBar } from "./top-bar";
+import { useSession } from "../session-provider";
+import { LoadingState } from "../ui/loading-state";
+import { ErrorBoundary } from "../ui/error-boundary";
+import { ModuleOperationalSummary } from "../ui/module-operational-summary";
+import { SupportOverrideBanner } from "../platform/SupportOverrideBanner";
+import { SchoolBreadcrumbs } from "../schoolos/navigation/school-breadcrumbs";
+import { NetworkStatusBanner } from "../ui/network-status-banner";
 
 // Students, attendance, fees, academics, homework, timetable, notices, and
 // messages already
@@ -26,15 +27,16 @@ import { SchoolBreadcrumbs } from '../schoolos/navigation/school-breadcrumbs';
 // its overview page (see app/dashboard/activity/page.tsx), matching the
 // students/attendance/fees pattern described above — do not also list it
 // here or the summary will render twice.
-const MODULE_LANDING_SUMMARIES: Record<string, OperationalSummaryRouteModule> = {
-  '/dashboard/hr': 'hr-payroll',
-  '/dashboard/payroll': 'hr-payroll',
-  '/dashboard/library': 'library',
-  '/dashboard/transport': 'transport',
-  '/dashboard/canteen': 'canteen',
-  '/dashboard/accounting': 'accounting',
-  '/dashboard/learning': 'learning',
-};
+const MODULE_LANDING_SUMMARIES: Record<string, OperationalSummaryRouteModule> =
+  {
+    "/dashboard/hr": "hr-payroll",
+    "/dashboard/payroll": "hr-payroll",
+    "/dashboard/library": "library",
+    "/dashboard/transport": "transport",
+    "/dashboard/canteen": "canteen",
+    "/dashboard/accounting": "accounting",
+    "/dashboard/learning": "learning",
+  };
 
 export function DashboardShell({ children }: { children: ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -51,7 +53,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
     mobileMenuButtonRef.current?.focus();
   }
 
-  if (status === 'loading') {
+  if (status === "loading") {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-[var(--background)]">
         <LoadingState variant="page" label="Syncing workspace..." />
@@ -85,6 +87,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           onMobileMenuToggle={() => setMobileOpen(!mobileOpen)}
           mobileMenuButtonRef={mobileMenuButtonRef}
         />
+        <NetworkStatusBanner />
 
         <main
           id="dashboard-main"
@@ -95,7 +98,9 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             <div className="animate-fade-in transition-all duration-300">
               <ErrorBoundary>
                 <SchoolBreadcrumbs className="mb-4" />
-                {summaryModule ? <ModuleOperationalSummary module={summaryModule} /> : null}
+                {summaryModule ? (
+                  <ModuleOperationalSummary module={summaryModule} />
+                ) : null}
                 {children}
               </ErrorBoundary>
             </div>

@@ -45,10 +45,7 @@ class ParentRepository {
   }
 
   Future<ChildProfile> getChildProfileForChild(GuardianChild child) async {
-    final data = await _getMap(
-      '/mobile/students/${child.id}/profile',
-      cacheKey: 'parent_profile_${child.id}',
-    );
+    final data = await _getMap('/mobile/students/${child.id}/profile');
     final profile = data['profile'] as Map<String, dynamic>? ?? const {};
     final emergencyContact =
         profile['emergencyContact'] as Map<String, dynamic>?;
@@ -127,7 +124,6 @@ class ParentRepository {
     final data = await _getMap(
       '/mobile/me/dashboard',
       queryParameters: {'studentId': child.id},
-      cacheKey: 'parent_dashboard_${child.id}',
     );
 
     return ParentDashboardSummary.fromMobileDashboard(data, child);
@@ -237,10 +233,7 @@ class ParentRepository {
   }
 
   Future<List<ParentReportCard>> getReportCardsForChild(String childId) async {
-    final data = await _getMap(
-      '/mobile/students/$childId/report-cards',
-      cacheKey: 'parent_report_cards_$childId',
-    );
+    final data = await _getMap('/mobile/students/$childId/report-cards');
     final items = data['items'] as List<dynamic>? ?? const [];
 
     return items
@@ -309,8 +302,6 @@ class ParentRepository {
     String? category,
     String? month,
   }) async {
-    final cacheKey =
-        'parent_activity_${childId}_${take}_${category ?? ''}_${month ?? ''}';
     final data = await _getMap(
       '/mobile/students/$childId/activity-feed',
       queryParameters: {
@@ -318,7 +309,6 @@ class ParentRepository {
         if (category != null && category.isNotEmpty) 'category': category,
         if (month != null && month.isNotEmpty) 'month': month,
       },
-      cacheKey: cacheKey,
     );
     final items = data['items'] as List<dynamic>? ?? const [];
 
@@ -342,35 +332,20 @@ class ParentRepository {
     String childId, {
     String? month,
   }) async {
-    const cacheKeyPrefix = 'parent_milestones_';
-    final cacheKey = '$cacheKeyPrefix${childId}_${month ?? ''}';
-    try {
-      final response = await _client.get<dynamic>(
-        '/activity-feed/milestones',
-        queryParameters: {
-          'studentId': childId,
-          if (month != null && month.isNotEmpty) 'month': month,
-        },
-      );
-      final items = response.data is List
-          ? response.data as List<dynamic>
-          : const <dynamic>[];
-      await cache?.write(cacheKey, {'items': items});
-      return items
-          .whereType<Map<String, dynamic>>()
-          .map(ParentMilestone.fromJson)
-          .toList();
-    } on AppException catch (error) {
-      if (error is! NetworkException && error is! TimeoutException) rethrow;
-      final cached = cache?.read(cacheKey);
-      if (cached == null) rethrow;
-      final items =
-          cached.withMetadata()['items'] as List<dynamic>? ?? const [];
-      return items
-          .whereType<Map<String, dynamic>>()
-          .map(ParentMilestone.fromJson)
-          .toList();
-    }
+    final response = await _client.get<dynamic>(
+      '/activity-feed/milestones',
+      queryParameters: {
+        'studentId': childId,
+        if (month != null && month.isNotEmpty) 'month': month,
+      },
+    );
+    final items = response.data is List
+        ? response.data as List<dynamic>
+        : const <dynamic>[];
+    return items
+        .whereType<Map<String, dynamic>>()
+        .map(ParentMilestone.fromJson)
+        .toList();
   }
 
   Future<Uint8List> getActivityPreview(String previewPath) async {
@@ -411,26 +386,17 @@ class ParentRepository {
   }
 
   Future<ParentTransportInfo> getTransportForChild(String childId) async {
-    final data = await _getMap(
-      '/mobile/students/$childId/transport',
-      cacheKey: 'parent_transport_$childId',
-    );
+    final data = await _getMap('/mobile/students/$childId/transport');
     return ParentTransportInfo.fromJson(data);
   }
 
   Future<ParentCanteenInfo> getCanteenForChild(String childId) async {
-    final data = await _getMap(
-      '/mobile/students/$childId/canteen',
-      cacheKey: 'parent_canteen_$childId',
-    );
+    final data = await _getMap('/mobile/students/$childId/canteen');
     return ParentCanteenInfo.fromJson(data);
   }
 
   Future<ParentLibraryInfo> getLibraryForChild(String childId) async {
-    final data = await _getMap(
-      '/mobile/students/$childId/library',
-      cacheKey: 'parent_library_$childId',
-    );
+    final data = await _getMap('/mobile/students/$childId/library');
     return ParentLibraryInfo.fromJson(data);
   }
 
@@ -541,7 +507,7 @@ class ParentRepository {
 
   Future<Map<String, dynamic>> _getMap(
     String path, {
-    required String cacheKey,
+    String? cacheKey,
     Map<String, dynamic>? queryParameters,
   }) async {
     try {
@@ -553,11 +519,14 @@ class ParentRepository {
         response.data as Map<String, dynamic>,
       );
       data['_mobileLastUpdated'] = DateTime.now().toIso8601String();
-      await cache?.write(cacheKey, data);
+      if (cacheKey != null) {
+        await cache?.write(cacheKey, data);
+      }
       return data;
     } on AppException catch (error) {
       if (error is! NetworkException && error is! TimeoutException) rethrow;
-      final cached = cache?.read(cacheKey);
+      if (cacheKey == null) rethrow;
+      final cached = await cache?.read(cacheKey);
       if (cached == null) rethrow;
       return cached.withMetadata();
     }

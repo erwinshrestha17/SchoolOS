@@ -12,10 +12,13 @@ import {
   ActivityPostLanguage,
   AudienceType,
   ConsentType,
+  type DevelopmentalMilestone,
   NotificationChannel,
   Prisma,
   ActivityAttachment,
   ActivityPostStatus,
+  EnrollmentStatus,
+  StaffStatus,
   StudentLifecycleStatus,
   StorageProvider,
 } from '@prisma/client';
@@ -1625,16 +1628,49 @@ export class ActivityFeedService {
       where: {
         id: dto.studentId,
         tenantId: actor.tenantId,
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
         classId: dto.classId,
         ...(dto.sectionId ? { sectionId: dto.sectionId } : {}),
+        enrollments: {
+          some: {
+            tenantId: actor.tenantId,
+            classId: dto.classId,
+            ...(dto.sectionId ? { sectionId: dto.sectionId } : {}),
+            status: EnrollmentStatus.ACTIVE,
+            academicYear: { isCurrent: true },
+          },
+        },
+      },
+      select: {
+        id: true,
+        enrollments: {
+          where: {
+            tenantId: actor.tenantId,
+            classId: dto.classId,
+            ...(dto.sectionId ? { sectionId: dto.sectionId } : {}),
+            status: EnrollmentStatus.ACTIVE,
+            academicYear: { isCurrent: true },
+          },
+          select: { sectionId: true },
+          take: 1,
+        },
       },
     });
 
     if (!student) {
       throw new NotFoundException(
-        'Student not found in this class/section tenant scope',
+        'Student not found in this assigned class/section',
       );
     }
+
+    const resolvedSectionId =
+      dto.sectionId ?? student.enrollments[0]?.sectionId ?? null;
+
+    await this.ensureClassSectionAndWriteAccess(actor, {
+      classId: dto.classId,
+      sectionId: resolvedSectionId,
+      requireWritable: true,
+    });
 
     if (dto.clientSubmissionId) {
       const existing = await this.prisma.developmentalMilestone.findFirst({
@@ -1645,17 +1681,18 @@ export class ActivityFeedService {
         },
       });
       if (existing) {
-        return existing;
+        this.assertMatchingMilestoneReplay(existing, dto, resolvedSectionId);
+        return mapMilestoneSubmission(existing, true);
       }
     }
 
-    let milestone;
+    let milestone: DevelopmentalMilestone;
     try {
       milestone = await this.prisma.developmentalMilestone.create({
         data: {
           tenantId: actor.tenantId,
           classId: dto.classId,
-          sectionId: dto.sectionId ?? null,
+          sectionId: resolvedSectionId,
           studentId: dto.studentId,
           domain: dto.domain,
           milestone: dto.milestone,
@@ -1678,7 +1715,8 @@ export class ActivityFeedService {
           },
         });
         if (existing) {
-          return existing;
+          this.assertMatchingMilestoneReplay(existing, dto, resolvedSectionId);
+          return mapMilestoneSubmission(existing, true);
         }
         throw new ConflictException(
           'This milestone submission is already being processed',
@@ -1700,7 +1738,41 @@ export class ActivityFeedService {
       },
     });
 
-    return milestone;
+    return mapMilestoneSubmission(milestone, false);
+  }
+
+  private assertMatchingMilestoneReplay(
+    existing: {
+      classId: string;
+      sectionId: string | null;
+      studentId: string;
+      domain: string;
+      milestone: string;
+      status: string;
+      observationNote: string | null;
+      photoObjectKey: string | null;
+      observedAt: Date;
+    },
+    dto: CreateDevelopmentalMilestoneDto,
+    resolvedSectionId: string | null,
+  ) {
+    const matches =
+      existing.classId === dto.classId &&
+      existing.sectionId === resolvedSectionId &&
+      existing.studentId === dto.studentId &&
+      existing.domain === dto.domain &&
+      existing.milestone === dto.milestone &&
+      existing.status === dto.status &&
+      existing.observationNote === (dto.observationNote ?? null) &&
+      existing.photoObjectKey ===
+        (dto.photoObjectKey ?? dto.photoUrl ?? null) &&
+      existing.observedAt.getTime() === new Date(dto.observedAt).getTime();
+
+    if (!matches) {
+      throw new ConflictException(
+        'This milestone submission ID was already used for different content. Create a new offline draft and try again.',
+      );
+    }
   }
 
   private async ensureClassSectionAndWriteAccess(
@@ -1742,10 +1814,16 @@ export class ActivityFeedService {
       where: {
         tenantId: actor.tenantId,
         userId: actor.userId,
+        status: StaffStatus.ACTIVE,
         teacherAssignments: {
           some: {
             classId: input.classId,
-            ...(input.sectionId ? { sectionId: input.sectionId } : {}),
+            ...(input.sectionId
+              ? {
+                  OR: [{ sectionId: input.sectionId }, { sectionId: null }],
+                }
+              : { sectionId: null }),
+            academicYear: { isCurrent: true },
           },
         },
       },
@@ -2183,6 +2261,19 @@ function derivePhotoConsentStatus(
 
 function isPhotoConsentAllowed(status: PhotoConsentStatus) {
   return status === 'ALLOWED';
+}
+
+function mapMilestoneSubmission<
+  T extends {
+    clientSubmissionId: string | null;
+    createdAt: Date;
+  },
+>(milestone: T, replayed: boolean) {
+  return {
+    ...milestone,
+    replayed,
+    serverReceivedAt: milestone.createdAt.toISOString(),
+  };
 }
 
 function isDatabaseErrorCode(error: unknown, code: string) {

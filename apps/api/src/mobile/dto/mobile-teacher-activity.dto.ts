@@ -1,8 +1,9 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsDateString,
   IsEnum,
   IsInt,
+  IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
@@ -33,10 +34,18 @@ export class CreateMobileTeacherMilestoneDto {
   studentId!: string;
 
   @IsString()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @IsNotEmpty()
   @MaxLength(80)
   domain!: string;
 
   @IsString()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @IsNotEmpty()
   @MaxLength(240)
   milestone!: string;
 

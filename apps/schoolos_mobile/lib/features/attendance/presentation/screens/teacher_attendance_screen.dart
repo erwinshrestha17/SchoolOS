@@ -169,7 +169,7 @@ class _TeacherAttendanceScreenState
                   for (final entry in filteredEntries) ...[
                     _AttendanceStudentRow(
                       entry: entry,
-                      isReadOnly: state.isReadOnly || state.isSubmitting,
+                      isReadOnly: state.isEditingLocked || state.isSubmitting,
                       onChanged: (status) =>
                           controller.markStudent(entry.studentId, status),
                     ),
@@ -189,6 +189,8 @@ class _TeacherAttendanceScreenState
                     ? 'Retry sync'
                     : state.syncStatus == AttendanceSyncStatus.queued
                     ? 'Retry sync'
+                    : state.syncStatus == AttendanceSyncStatus.serverChecking
+                    ? 'Check sync again'
                     : 'Submit attendance',
                 icon: _submitActionIcon(state),
                 onPressed: state.isSubmitting
@@ -205,7 +207,7 @@ class _TeacherAttendanceScreenState
     TeacherAttendanceController controller,
     TeacherAttendanceState state,
   ) async {
-    if (state.isOffline) {
+    if (state.isOffline || state.isReceiptPending) {
       await controller.submit();
       return;
     }
@@ -316,6 +318,7 @@ IconData _submitActionIcon(TeacherAttendanceState state) {
     AttendanceSyncStatus.failed => Icons.sync_problem_rounded,
     AttendanceSyncStatus.queued => Icons.cloud_sync_rounded,
     AttendanceSyncStatus.syncing => Icons.cloud_sync_rounded,
+    AttendanceSyncStatus.serverChecking => Icons.manage_search_rounded,
     _ => Icons.cloud_done_rounded,
   };
 }
@@ -410,7 +413,7 @@ class _TeacherAttendanceHeader extends StatelessWidget {
               SizedBox(
                 width: 148,
                 child: OutlinedButton.icon(
-                  onPressed: state.isReadOnly
+                  onPressed: state.isEditingLocked
                       ? null
                       : controller.bulkMarkPresent,
                   icon: const Icon(Icons.done_all_rounded),
@@ -438,7 +441,8 @@ class _SyncBanner extends StatelessWidget {
       AttendanceSyncStatus.failed ||
       AttendanceSyncStatus.conflict => AppColors.dangerLight,
       AttendanceSyncStatus.queued ||
-      AttendanceSyncStatus.syncing => AppColors.warningLight,
+      AttendanceSyncStatus.syncing ||
+      AttendanceSyncStatus.serverChecking => AppColors.warningLight,
       AttendanceSyncStatus.synced => AppColors.successLight,
       AttendanceSyncStatus.draft => AppColors.slate100,
     };
@@ -447,7 +451,8 @@ class _SyncBanner extends StatelessWidget {
         !state.isSubmitting &&
         !state.isOffline &&
         (state.syncStatus == AttendanceSyncStatus.failed ||
-            state.syncStatus == AttendanceSyncStatus.queued);
+            state.syncStatus == AttendanceSyncStatus.queued ||
+            state.syncStatus == AttendanceSyncStatus.serverChecking);
 
     return AppCard(
       color: color.withValues(alpha: 0.58),
@@ -515,7 +520,8 @@ class _SyncBanner extends StatelessWidget {
                     label: const Text('Retry sync'),
                   ),
                 if (state.draftClientSubmissionId != null &&
-                    !state.isSubmitting)
+                    !state.isSubmitting &&
+                    !state.isReceiptPending)
                   TextButton.icon(
                     onPressed: controller.discardDraft,
                     icon: const Icon(Icons.delete_outline_rounded),
@@ -535,6 +541,7 @@ AppStatusType _statusType(AttendanceSyncStatus status) {
     AttendanceSyncStatus.draft => AppStatusType.draft,
     AttendanceSyncStatus.queued => AppStatusType.queued,
     AttendanceSyncStatus.syncing => AppStatusType.syncing,
+    AttendanceSyncStatus.serverChecking => AppStatusType.syncing,
     AttendanceSyncStatus.synced => AppStatusType.synced,
     AttendanceSyncStatus.failed => AppStatusType.failed,
     AttendanceSyncStatus.conflict => AppStatusType.failed,
@@ -546,6 +553,7 @@ IconData _statusIcon(AttendanceSyncStatus status) {
     AttendanceSyncStatus.draft => Icons.edit_note_rounded,
     AttendanceSyncStatus.queued => Icons.cloud_queue_rounded,
     AttendanceSyncStatus.syncing => Icons.cloud_sync_rounded,
+    AttendanceSyncStatus.serverChecking => Icons.manage_search_rounded,
     AttendanceSyncStatus.synced => Icons.verified_rounded,
     AttendanceSyncStatus.failed => Icons.sync_problem_rounded,
     AttendanceSyncStatus.conflict => Icons.report_problem_outlined,
@@ -560,10 +568,14 @@ String _statusTitle(TeacherAttendanceState state) {
   if (!state.isWorkingDay) return 'Not a working day';
   if (state.attendance.isLocked) return 'Attendance locked';
   if (state.attendance.isSubmitted) return 'Attendance submitted';
+  if (state.draftReceiptState == AttendanceDraftReceiptState.rejected) {
+    return 'Attendance not accepted';
+  }
   return switch (state.syncStatus) {
     AttendanceSyncStatus.draft => 'Draft not submitted',
     AttendanceSyncStatus.queued => 'Saved on this phone',
     AttendanceSyncStatus.syncing => 'Syncing with SchoolOS',
+    AttendanceSyncStatus.serverChecking => 'Checking server receipt',
     AttendanceSyncStatus.synced => 'Synced with SchoolOS',
     AttendanceSyncStatus.failed => 'Sync failed',
     AttendanceSyncStatus.conflict => 'Needs office review',
@@ -584,6 +596,9 @@ String _statusNextStep(TeacherAttendanceState state) {
   if (state.attendance.isSubmitted) {
     return 'No further mobile action is needed for this class and date.';
   }
+  if (state.draftReceiptState == AttendanceDraftReceiptState.rejected) {
+    return 'Review and change the draft to create a new submission, or discard it if no longer needed.';
+  }
   if (state.isOffline) {
     return 'Reconnect before official sync. Do not mark the same class on another device.';
   }
@@ -594,6 +609,8 @@ String _statusNextStep(TeacherAttendanceState state) {
       'Internet is available. Retry sync to send the saved draft.',
     AttendanceSyncStatus.syncing =>
       'Keep this screen open until SchoolOS confirms the result.',
+    AttendanceSyncStatus.serverChecking =>
+      'Keep this draft. Check the server roster before trying the sync again.',
     AttendanceSyncStatus.synced =>
       'SchoolOS has the latest attendance state for this screen.',
     AttendanceSyncStatus.failed =>

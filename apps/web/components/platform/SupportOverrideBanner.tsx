@@ -5,12 +5,14 @@ import { Button } from '../ui/button';
 import { ShieldAlert, LogOut, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { api } from '../../lib/api';
+import { useQueryClient } from '@tanstack/react-query';
 
 export function SupportOverrideBanner() {
-  const { session, refreshSession } = useSession();
+  const { session, status, refreshSession } = useSession();
+  const queryClient = useQueryClient();
   const [exiting, setExiting] = useState(false);
 
-  if (!session?.user.isSupportOverride) {
+  if (status !== 'authenticated' || !session?.user.isSupportOverride) {
     return null;
   }
 
@@ -18,6 +20,7 @@ export function SupportOverrideBanner() {
     setExiting(true);
     try {
       await api.exitPlatformSupportOverride();
+      queryClient.clear();
       await refreshSession();
       window.location.href = '/platform/schools';
     } catch (err) {

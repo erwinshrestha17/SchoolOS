@@ -11,13 +11,14 @@ void main() async {
   EnvConfig.validate();
 
   final sharedPrefs = await SharedPreferences.getInstance();
+  final appPreferences = AppPreferencesService(sharedPrefs);
+  await appPreferences.purgeLegacyPrivateReadCache();
+  await appPreferences.purgeLegacyTeacherAttendanceDrafts();
 
   runApp(
     ProviderScope(
       overrides: [
-        appPreferencesServiceProvider.overrideWithValue(
-          AppPreferencesService(sharedPrefs),
-        ),
+        appPreferencesServiceProvider.overrideWithValue(appPreferences),
       ],
       child: const SchoolOSApp(),
     ),

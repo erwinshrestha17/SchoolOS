@@ -111,12 +111,20 @@ export type AttendanceConflict = {
   sectionName?: string | null;
 };
 
+export type AttendanceSyncStatus =
+  | 'PROCESSING'
+  | 'SYNCED'
+  | 'CONFLICTED'
+  | 'REJECTED'
+  | 'DUPLICATE'
+  | 'ACCEPTED';
+
 export type AttendanceSyncResult = {
   id: string;
   clientSubmissionId: string;
   attendanceSessionId: string | null;
   conflictId: string | null;
-  syncStatus: string;
+  syncStatus: AttendanceSyncStatus;
   attendanceDate: string;
   deviceId: string | null;
   deviceLabel: string | null;

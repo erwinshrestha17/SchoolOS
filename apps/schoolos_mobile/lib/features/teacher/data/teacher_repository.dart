@@ -61,7 +61,7 @@ class TeacherRepository {
       await cache?.write(cacheKey, data);
     } on AppException catch (error) {
       if (error is! NetworkException && error is! TimeoutException) rethrow;
-      final cached = cache?.read(cacheKey);
+      final cached = await cache?.read(cacheKey);
       if (cached == null) rethrow;
       data = cached.withMetadata();
     }
@@ -216,28 +216,19 @@ class TeacherRepository {
   }
 
   Future<TeacherActivitySnapshot> getActivity() async {
-    const cacheKey = 'teacher_activity';
-    late Map<String, dynamic> data;
-    try {
-      final responses = await Future.wait([
-        _client.get('/mobile/teacher/activity/scopes'),
-        _client.get(
-          '/mobile/teacher/activity/posts',
-          queryParameters: {'page': 1, 'limit': 20},
-        ),
-      ]);
-      data = {
-        'scopes': responses[0].data,
-        'posts': responses[1].data,
-        '_mobileLastUpdated': DateTime.now().toIso8601String(),
-      };
-      await cache?.write(cacheKey, data);
-    } on AppException catch (error) {
-      if (error is! NetworkException && error is! TimeoutException) rethrow;
-      final cached = cache?.read(cacheKey);
-      if (cached == null) rethrow;
-      data = cached.withMetadata();
-    }
+    final responses = await Future.wait([
+      _client.get('/mobile/teacher/activity/scopes'),
+      _client.get(
+        '/mobile/teacher/activity/posts',
+        queryParameters: {'page': 1, 'limit': 20},
+      ),
+    ]);
+    final data = <String, dynamic>{
+      'scopes': responses[0].data,
+      'posts': responses[1].data,
+      '_mobileLastUpdated': DateTime.now().toIso8601String(),
+      '_mobileFromCache': false,
+    };
 
     final scopes = data['scopes'] is Map<String, dynamic>
         ? data['scopes'] as Map<String, dynamic>
@@ -387,7 +378,7 @@ class TeacherRepository {
       await cache?.write(cacheKey, data);
     } on AppException catch (error) {
       if (error is! NetworkException && error is! TimeoutException) rethrow;
-      final cached = cache?.read(cacheKey);
+      final cached = await cache?.read(cacheKey);
       if (cached == null) rethrow;
       data = cached.withMetadata();
     }

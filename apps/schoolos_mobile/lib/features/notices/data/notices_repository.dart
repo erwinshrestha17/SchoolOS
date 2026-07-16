@@ -16,22 +16,32 @@ class NoticesRepository {
 
   Future<List<Notice>> getNotices() async {
     final center = await _getCenter();
-    return center.items.map(_noticeFromNotification).toList();
+    return center.items
+        .map(
+          (item) =>
+              _noticeFromNotification(item, metadataOnly: center.fromCache),
+        )
+        .toList();
   }
 
   Future<NoticeFeed> getNoticeFeed() async {
     final center = await _getCenter();
     return NoticeFeed(
-      items: center.items.map(_noticeFromNotification).toList(),
+      items: center.items
+          .map(
+            (item) =>
+                _noticeFromNotification(item, metadataOnly: center.fromCache),
+          )
+          .toList(),
       lastUpdated: center.lastUpdated,
       fromCache: center.fromCache,
     );
   }
 
   Future<Notice> getNoticeDetail(String noticeId) async {
-    final data = await _getMap(
-      '/mobile/me/notifications/$noticeId',
-      cacheKey: 'notice_detail_$noticeId',
+    final response = await _client.get('/mobile/me/notifications/$noticeId');
+    final data = Map<String, dynamic>.from(
+      response.data as Map<String, dynamic>,
     );
     return _noticeFromNotification(ParentNotification.fromJson(data));
   }
@@ -145,22 +155,26 @@ class NoticesRepository {
         response.data as Map<String, dynamic>,
       );
       data['_mobileLastUpdated'] = DateTime.now().toIso8601String();
-      await cache?.write(cacheKey, data);
+      await cache?.write(cacheKey, _safeNoticeFeedData(data));
       return data;
     } on AppException catch (error) {
       if (error is! NetworkException && error is! TimeoutException) rethrow;
-      final cached = cache?.read(cacheKey);
+      final cached = await cache?.read(cacheKey);
       if (cached == null) rethrow;
       return cached.withMetadata();
     }
   }
 
-  Notice _noticeFromNotification(ParentNotification item) {
+  Notice _noticeFromNotification(
+    ParentNotification item, {
+    bool metadataOnly = false,
+  }) {
+    final body = metadataOnly ? '' : item.message;
     return Notice(
       id: item.id,
       title: item.title,
-      preview: item.message,
-      body: item.message,
+      preview: metadataOnly ? 'Reconnect to read this notice.' : body,
+      body: body,
       publishedBy: 'SchoolOS',
       publishedAt: item.createdAt,
       audience: item.audience.label,
@@ -170,6 +184,38 @@ class NoticesRepository {
       attachment: item.attachment,
     );
   }
+}
+
+Map<String, dynamic> _safeNoticeFeedData(Map<String, dynamic> data) {
+  return <String, dynamic>{
+    'unreadCount': data['unreadCount'] as int? ?? 0,
+    'nextCursor': data['nextCursor'] as String?,
+    'items': (data['items'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(_safeNoticeFeedItem)
+        .toList(),
+  };
+}
+
+Map<String, dynamic> _safeNoticeFeedItem(Map<String, dynamic> item) {
+  const metadataKeys = <String>{
+    'id',
+    'title',
+    'sourceType',
+    'sourceId',
+    'childId',
+    'noticeId',
+    'eventId',
+    'activityPostId',
+    'route',
+    'createdAt',
+    'readAt',
+    'isRead',
+  };
+  return <String, dynamic>{
+    for (final entry in item.entries)
+      if (metadataKeys.contains(entry.key)) entry.key: entry.value,
+  };
 }
 
 String _safeFileName(String value) {
