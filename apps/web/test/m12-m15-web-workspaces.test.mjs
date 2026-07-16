@@ -14,6 +14,7 @@ describe('M12 and M15 rendered web workspaces', () => {
       'app/dashboard/notices/new/page.tsx',
       'app/dashboard/notices/[noticeId]/page.tsx',
       'app/dashboard/notices/[noticeId]/edit/page.tsx',
+      'app/dashboard/notices/[noticeId]/review/page.tsx',
       'app/dashboard/notices/scheduled/page.tsx',
       'app/dashboard/notices/approvals/page.tsx',
       'app/dashboard/notices/deliveries/page.tsx',

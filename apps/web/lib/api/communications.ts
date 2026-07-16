@@ -294,6 +294,18 @@ export const communicationsApi = {
       `/notices/${encodeURIComponent(noticeId)}/schedule`,
       { method: "POST", json: { scheduledFor } },
     ),
+  requestNoticeApproval: (
+    noticeId: string,
+    body: { reason: string; scheduledFor?: string },
+  ) =>
+    request<{
+      notice: NoticeSummary;
+      approvalRequestId: string;
+      replayed: boolean;
+    }>(`/notices/${encodeURIComponent(noticeId)}/approval`, {
+      method: "POST",
+      json: body,
+    }),
   cancelNotice: (noticeId: string, reason: string) =>
     request<NoticeSummary>(`/notices/${encodeURIComponent(noticeId)}/cancel`, {
       method: "POST",

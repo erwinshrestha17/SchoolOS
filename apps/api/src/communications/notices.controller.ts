@@ -20,17 +20,22 @@ import { CommunicationsService } from './communications.service';
 import { CreateNoticeDto } from './dto/create-notice.dto';
 import {
   CreateNoticeDraftDto,
+  NoticeApprovalRequestDto,
   NoticeLifecycleReasonDto,
   NoticeScheduleDto,
   UpdateNoticeDraftDto,
 } from './dto/notice-lifecycle.dto';
 import { ListNoticesQueryDto } from './dto/communication-list-query.dto';
+import { NoticeApprovalService } from './notice-approval.service';
 
 @Controller('notices')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
 @Entitlement('module.notices')
 export class NoticesController {
-  constructor(private readonly communicationsService: CommunicationsService) {}
+  constructor(
+    private readonly communicationsService: CommunicationsService,
+    private readonly noticeApprovalService: NoticeApprovalService,
+  ) {}
 
   @Get()
   @Permissions('notices:read')
@@ -94,6 +99,16 @@ export class NoticesController {
       dto.scheduledFor,
       auth,
     );
+  }
+
+  @Post(':noticeId/approval')
+  @Permissions('notices:create')
+  requestApproval(
+    @Param('noticeId') noticeId: string,
+    @Body() dto: NoticeApprovalRequestDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.noticeApprovalService.requestApproval(noticeId, dto, auth);
   }
 
   @Post(':noticeId/cancel')

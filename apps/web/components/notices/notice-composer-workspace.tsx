@@ -66,7 +66,7 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
   const sectionsQuery = useQuery({
     queryKey: ["sections"],
     queryFn: () => api.listSections(),
-    enabled: canCreate || canEdit,
+    enabled: (canCreate || canEdit) && form.audienceType === "SECTION",
   });
 
   useEffect(() => {
@@ -255,13 +255,13 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
             <select
               value={form.audienceType}
               onChange={(event) => {
+                const audienceType = event.target
+                  .value as NoticeDraftForm["audienceType"];
                 setForm((current) => ({
                   ...current,
-                  audienceType: event.target
-                    .value as NoticeDraftForm["audienceType"],
-                  classId: event.target.value === "ALL" ? "" : current.classId,
-                  sectionId:
-                    event.target.value === "SECTION" ? current.sectionId : "",
+                  audienceType,
+                  classId: "",
+                  sectionId: "",
                 }));
                 setDirty(true);
               }}
@@ -272,28 +272,29 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
               <option value="SECTION">Section</option>
             </select>
           </Field>
-          <Field label="Class">
-            <select
-              value={form.classId}
-              disabled={form.audienceType === "ALL"}
-              onChange={(event) => {
-                setForm((current) => ({
-                  ...current,
-                  classId: event.target.value,
-                  sectionId: "",
-                }));
-                setDirty(true);
-              }}
-              className="min-h-11"
-            >
-              <option value="">Select class</option>
-              {(classesQuery.data ?? []).map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-          </Field>
+          {form.audienceType !== "ALL" ? (
+            <Field label="Class">
+              <select
+                value={form.classId}
+                onChange={(event) => {
+                  setForm((current) => ({
+                    ...current,
+                    classId: event.target.value,
+                    sectionId: "",
+                  }));
+                  setDirty(true);
+                }}
+                className="min-h-11"
+              >
+                <option value="">Select class</option>
+                {(classesQuery.data ?? []).map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ) : null}
         </div>
 
         {form.audienceType === "SECTION" ? (

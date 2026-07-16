@@ -32,10 +32,12 @@ test.describe.serial('M12 and M15 authenticated notice workflows', () => {
       .fill('Edited before publication through the real draft endpoint.');
     await page.getByRole('button', { name: 'Save draft' }).click();
 
-    await page.getByRole('button', { name: 'Publish' }).click();
+    await page.getByRole('link', { name: 'Preview & publish' }).click();
+    await expect(page.getByText('Backend recipient preview')).toBeVisible();
+    await page.getByRole('button', { name: 'Publish now' }).click();
     const publishDialog = page.getByRole('dialog');
     await expect(publishDialog).toContainText('eligible recipients');
-    await publishDialog.getByRole('button', { name: 'Publish' }).click();
+    await publishDialog.getByRole('button', { name: 'Publish now' }).click();
     await expect(page.getByText('Published', { exact: true })).toBeVisible();
 
     await page.getByRole('button', { name: 'Archive' }).click();
@@ -70,14 +72,15 @@ test.describe.serial('M12 and M15 authenticated notice workflows', () => {
       .fill('Scheduled lifecycle evidence.');
     await page.getByRole('button', { name: 'Save draft' }).click();
 
-    await page.getByRole('button', { name: 'Schedule' }).click();
+    await page.getByRole('link', { name: 'Preview & publish' }).click();
     const future = new Date(Date.now() + 24 * 60 * 60 * 1000);
     const localValue = new Date(
       future.getTime() - future.getTimezoneOffset() * 60_000,
     )
       .toISOString()
       .slice(0, 16);
-    await page.getByLabel('Nepal-local scheduled time').fill(localValue);
+    await page.getByLabel('Optional Nepal-local schedule').fill(localValue);
+    await page.getByRole('button', { name: 'Schedule' }).click();
     await page
       .getByRole('dialog')
       .getByRole('button', { name: 'Schedule' })
@@ -97,7 +100,7 @@ test.describe.serial('M12 and M15 authenticated notice workflows', () => {
     await expect(page.getByText('Cancelled', { exact: true })).toBeVisible();
   });
 
-  test('urgent draft cannot bypass approval and pagination remains server driven', async ({
+  test('urgent draft requires approval and pagination remains server driven', async ({
     page,
   }) => {
     const title = `E2E urgent notice ${Date.now()}`;
@@ -110,10 +113,13 @@ test.describe.serial('M12 and M15 authenticated notice workflows', () => {
     await expect(page.getByText(/cannot bypass approval/i)).toBeVisible();
     await page.getByRole('button', { name: 'Save draft' }).click();
 
-    await page.getByRole('button', { name: 'Publish' }).click();
+    await page.getByRole('link', { name: 'Preview & publish' }).click();
     await expect(
-      page.getByRole('dialog').getByRole('button', { name: 'Publish' }),
-    ).toBeDisabled();
+      page.getByRole('button', { name: 'Submit for approval' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Publish now' }),
+    ).toHaveCount(0);
 
     const request = page.waitForRequest(
       (candidate) =>

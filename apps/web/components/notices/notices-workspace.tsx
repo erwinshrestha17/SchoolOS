@@ -25,7 +25,7 @@ export function NoticesWorkspace({
 }: {
   initialSection?: NoticeWorkspaceSection;
   /**
-   * 'composer' is the dedicated "New Notice" route. Per the M12 KPI design
+   * 'composer' is the dedicated "New notice" route. Per the M12 KPI design
    * rule, KPIs never appear on the notice composer — only the overview does.
    */
   variant?: 'overview' | 'composer';
@@ -53,7 +53,7 @@ export function NoticesWorkspace({
       <ModuleHeader
         eyebrow="M15 Notices and Announcements"
         title={
-          variant === 'composer' ? 'New Notice' : 'Notices & Announcements'
+          variant === 'composer' ? 'New notice' : 'Notices & Announcements'
         }
         description={
           variant === 'composer'
@@ -67,7 +67,7 @@ export function NoticesWorkspace({
               className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--primary)] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--primary-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2"
             >
               <Send size={18} />
-              New Notice
+              New notice
             </Link>
           ) : undefined
         }
@@ -78,16 +78,6 @@ export function NoticesWorkspace({
                   label: 'Delivery Logs',
                   icon: <Clock3 size={16} />,
                   onClick: () => router.push('/dashboard/notices/deliveries'),
-                },
-              ]
-            : []),
-          ...(canCreateNotices
-            ? [
-                {
-                  label: 'Recipient Preview',
-                  icon: <Mail size={16} />,
-                  onClick: () =>
-                    router.push('/dashboard/communications/recipients'),
                 },
               ]
             : []),
@@ -147,10 +137,7 @@ export function NoticesWorkspace({
 
       <WorkspaceTabs
         items={[
-          { href: '/dashboard/notices', label: 'Notices' },
-          ...(canCreateNotices
-            ? [{ href: '/dashboard/notices/new', label: 'Compose' }]
-            : []),
+          { href: '/dashboard/notices', label: 'All notices' },
           ...(canReadDeliveries
             ? [
                 {

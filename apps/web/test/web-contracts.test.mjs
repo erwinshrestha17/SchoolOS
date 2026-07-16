@@ -2764,7 +2764,7 @@ describe("SchoolOS web production contracts", () => {
     }
   });
 
-  it("uses the shared M12 workspace shell without browser-derived official totals", () => {
+  it("uses the shared M15 workspace shell without browser-derived official totals", () => {
     const workspace = read("components/notices/notices-workspace.tsx");
     const communicationsForm = read("components/forms/communications-form.tsx");
     const messaging = read(
@@ -2777,7 +2777,7 @@ describe("SchoolOS web production contracts", () => {
       "<SummaryCard",
       "<WorkspaceTabs",
       "<WorkSurface",
-      "New Notice",
+      "New notice",
       "moreActionItems",
       "communicationsApi.getCommunicationsSummary",
     ]) {

@@ -30,12 +30,7 @@ import {
   Pencil,
 } from "lucide-react";
 
-type NoticeLifecycleAction =
-  | "publish"
-  | "schedule"
-  | "cancel"
-  | "archive"
-  | "restore";
+type NoticeLifecycleAction = "cancel" | "archive" | "restore";
 
 export default function NoticeDetailPage() {
   const params = useParams<{ noticeId: string }>();
@@ -45,7 +40,6 @@ export default function NoticeDetailPage() {
   const [pendingAction, setPendingAction] =
     useState<NoticeLifecycleAction | null>(null);
   const [actionReason, setActionReason] = useState("");
-  const [scheduledFor, setScheduledFor] = useState("");
   const [unreadPage, setUnreadPage] = useState(1);
 
   const noticeQuery = useQuery({
@@ -59,32 +53,9 @@ export default function NoticeDetailPage() {
     queryFn: () =>
       api.listNoticeUnreadRecipients(noticeId, { page: unreadPage, limit: 25 }),
     enabled: Boolean(
-      noticeId && session?.user.permissions.includes("notices:read_reports"),
-    ),
-  });
-
-  const previewQuery = useQuery({
-    queryKey: [
-      "notice-recipient-preview",
-      noticeId,
-      noticeQuery.data?.updatedAt,
-    ],
-    queryFn: () =>
-      api.previewNoticeRecipients({
-        title: noticeQuery.data!.title,
-        body: noticeQuery.data!.body,
-        priority: noticeQuery.data!.priority,
-        audienceType: noticeQuery.data!.audienceType,
-        classId: noticeQuery.data!.classId,
-        sectionId: noticeQuery.data!.sectionId,
-      }),
-    enabled: Boolean(
-      noticeQuery.data &&
-      ["DRAFT", "APPROVED", "SCHEDULED"].includes(
-        noticeQuery.data.lifecycleStatus,
-      ) &&
-      (session?.user.permissions.includes("notices:publish") ||
-        session?.user.permissions.includes("notices:schedule")),
+      noticeId &&
+      session?.user.permissions.includes("notices:read_reports") &&
+      hasPublicationReporting(noticeQuery.data),
     ),
   });
 
@@ -96,14 +67,6 @@ export default function NoticeDetailPage() {
       action: NoticeLifecycleAction;
       reason: string;
     }) => {
-      if (action === "publish")
-        return api.publishNotice(noticeId).then((result) => result.notice);
-      if (action === "schedule") {
-        return api.scheduleNotice(
-          noticeId,
-          new Date(scheduledFor).toISOString(),
-        );
-      }
       if (action === "cancel") return api.cancelNotice(noticeId, reason);
       if (action === "archive") return api.archiveNotice(noticeId, reason);
       return api.restoreNotice(noticeId, reason);
@@ -111,7 +74,6 @@ export default function NoticeDetailPage() {
     onSuccess: async () => {
       setPendingAction(null);
       setActionReason("");
-      setScheduledFor("");
       await Promise.all([
         queryClient.invalidateQueries({
           queryKey: ["notice-detail", noticeId],
@@ -203,6 +165,12 @@ export default function NoticeDetailPage() {
   const canSchedule =
     granted.has("notices:schedule") &&
     ["DRAFT", "APPROVED", "SCHEDULED"].includes(notice.lifecycleStatus);
+  const isDraft = notice.lifecycleStatus === "DRAFT";
+  const showPublicationReporting = hasPublicationReporting(notice);
+  const canReview =
+    granted.has("notices:create") &&
+    ["DRAFT", "APPROVED", "SCHEDULED"].includes(notice.lifecycleStatus) &&
+    ((notice.priority !== "NORMAL" && isDraft) || canPublish || canSchedule);
 
   return (
     <NoticePageShell>
@@ -220,25 +188,14 @@ export default function NoticeDetailPage() {
                 <Pencil size={16} /> Edit draft
               </Link>
             ) : null}
-            {canPublish ? (
-              <button
-                type="button"
-                disabled={lifecycleMutation.isPending}
-                onClick={() => setPendingAction("publish")}
+            {canReview ? (
+              <Link
+                href={`/dashboard/notices/${noticeId}/review`}
                 className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
               >
-                <Send size={16} /> Publish
-              </button>
-            ) : null}
-            {canSchedule ? (
-              <button
-                type="button"
-                disabled={lifecycleMutation.isPending}
-                onClick={() => setPendingAction("schedule")}
-                className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
-              >
-                <CalendarClock size={16} /> Schedule
-              </button>
+                <Send size={16} />
+                {isDraft ? "Preview & publish" : "Review & publish"}
+              </Link>
             ) : null}
             {canCancel ? (
               <button
@@ -297,7 +254,11 @@ export default function NoticeDetailPage() {
             <div>
               <p className="text-sm font-semibold text-gray-950">Notice body</p>
               <p className="text-xs text-gray-500">
-                Published communication content
+                {isDraft
+                  ? "Draft notice content"
+                  : showPublicationReporting
+                    ? "Published notice content"
+                    : "Notice content awaiting publication"}
               </p>
             </div>
           </div>
@@ -327,67 +288,55 @@ export default function NoticeDetailPage() {
           <InfoCard
             icon={<CalendarClock size={18} />}
             title="Timeline"
-            items={[
-              ["Created", formatDateTime(notice.createdAt)],
-              [
-                "Published",
-                notice.publishedAt
-                  ? formatDateTime(notice.publishedAt)
-                  : "Not published",
-              ],
-              [
-                "Scheduled",
-                notice.scheduledFor
-                  ? formatDateTime(notice.scheduledFor)
-                  : "Not scheduled",
-              ],
-              ["Updated", formatDateTime(notice.updatedAt)],
-            ]}
+            items={getTimelineItems(notice)}
           />
 
-          <InfoCard
-            icon={<Send size={18} />}
-            title="Delivery summary"
-            items={[
-              ["Total", String(notice.deliverySummary.total)],
-              ["Queued", String(notice.deliverySummary.queued)],
-              ["Sent", String(notice.deliverySummary.sent)],
-              ["Failed", String(notice.deliverySummary.failed)],
-              ["Skipped", String(notice.deliverySummary.skipped)],
-            ]}
-          />
+          {showPublicationReporting ? (
+            <InfoCard
+              icon={<Send size={18} />}
+              title="Delivery summary"
+              items={[
+                ["Total", String(notice.deliverySummary.total)],
+                ["Queued", String(notice.deliverySummary.queued)],
+                ["Sent", String(notice.deliverySummary.sent)],
+                ["Failed", String(notice.deliverySummary.failed)],
+                ["Skipped", String(notice.deliverySummary.skipped)],
+              ]}
+            />
+          ) : (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm leading-6 text-slate-700">
+              Delivery and acknowledgement information will be available after
+              this notice is published.
+            </div>
+          )}
 
           <InfoCard
             icon={<Megaphone size={18} />}
             title="Audience"
-            items={[
-              ["Scope", formatEnumLabel(notice.audienceType)],
-              ["Class", notice.className ?? "All classes"],
-              ["Section", notice.sectionName ?? "All sections"],
-              [
-                "Created by",
-                notice.createdBy?.email ?? "System/user unavailable",
-              ],
-            ]}
+            items={getAudienceItems(notice)}
           />
         </aside>
       </section>
 
-      <UnreadRecipientsPanel
-        result={unreadRecipientsQuery.data}
-        isLoading={unreadRecipientsQuery.isLoading}
-        error={
-          unreadRecipientsQuery.isError
-            ? "Unread recipient details could not be loaded right now."
-            : null
-        }
-        onPageChange={setUnreadPage}
-      />
+      {showPublicationReporting ? (
+        <>
+          <UnreadRecipientsPanel
+            result={unreadRecipientsQuery.data}
+            isLoading={unreadRecipientsQuery.isLoading}
+            error={
+              unreadRecipientsQuery.isError
+                ? "Unread recipient details could not be loaded right now."
+                : null
+            }
+            onPageChange={setUnreadPage}
+          />
 
-      <NoticeAcknowledgementPanel
-        noticeId={noticeId}
-        lifecycleStatus={notice.lifecycleStatus}
-      />
+          <NoticeAcknowledgementPanel
+            noticeId={noticeId}
+            lifecycleStatus={notice.lifecycleStatus}
+          />
+        </>
+      ) : null}
 
       <section className="grid gap-6 lg:grid-cols-2">
         <HistoryCard
@@ -423,34 +372,15 @@ export default function NoticeDetailPage() {
         }
         destructive={pendingAction === "cancel"}
         isConfirming={lifecycleMutation.isPending}
-        confirmDisabled={
-          pendingAction === "schedule"
-            ? !scheduledFor
-            : pendingAction === "publish"
-              ? previewQuery.isLoading ||
-                previewQuery.isError ||
-                (previewQuery.data?.allowedRecipientCount ?? 0) < 1 ||
-                (notice.priority !== "NORMAL" &&
-                  notice.lifecycleStatus !== "APPROVED")
-              : pendingAction === "cancel" ||
-                  pendingAction === "archive" ||
-                  pendingAction === "restore"
-                ? !actionReason.trim()
-                : false
-        }
+        confirmDisabled={!actionReason.trim()}
         onClose={() => {
           if (!lifecycleMutation.isPending) {
             setPendingAction(null);
             setActionReason("");
-            setScheduledFor("");
           }
         }}
         onConfirm={() => {
-          const needsReason =
-            pendingAction === "cancel" ||
-            pendingAction === "archive" ||
-            pendingAction === "restore";
-          if (pendingAction && (!needsReason || actionReason.trim())) {
+          if (pendingAction && actionReason.trim()) {
             lifecycleMutation.mutate({
               action: pendingAction,
               reason: actionReason.trim(),
@@ -458,59 +388,23 @@ export default function NoticeDetailPage() {
           }
         }}
       >
-        {pendingAction === "schedule" ? (
-          <label className="grid gap-2 text-sm font-semibold text-gray-700">
-            Nepal-local scheduled time
-            <input
-              type="datetime-local"
-              value={scheduledFor}
-              onChange={(event) => setScheduledFor(event.target.value)}
-              className="min-h-11 rounded-xl border border-gray-200 px-3 py-2 font-normal"
-            />
-            <span className="text-xs font-normal text-gray-500">
-              Times are shown in Asia/Kathmandu for school operations.
-            </span>
-          </label>
-        ) : pendingAction === "publish" ? (
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-            {previewQuery.isLoading
-              ? "Checking the current recipient preview…"
-              : previewQuery.isError
-                ? "Recipient preview is unavailable. Close this dialog and retry before publishing."
-                : `${previewQuery.data?.allowedRecipientCount ?? 0} eligible recipients across ${(previewQuery.data?.channels ?? []).map(formatEnumLabel).join(", ") || "no available channels"}.`}
-            {notice.priority !== "NORMAL" &&
-            notice.lifecycleStatus !== "APPROVED" ? (
-              <p className="mt-2 font-semibold text-amber-800">
-                Urgent and emergency notices require backend approval before
-                publication.
-              </p>
-            ) : null}
-          </div>
-        ) : (
-          <label className="grid gap-2 text-sm font-semibold text-gray-700">
-            Reason
-            <textarea
-              value={actionReason}
-              onChange={(event) => setActionReason(event.target.value)}
-              maxLength={500}
-              rows={3}
-              className="rounded-xl border border-gray-200 px-3 py-2 font-normal"
-              placeholder="Record why this notice is being changed"
-            />
-          </label>
-        )}
+        <label className="grid gap-2 text-sm font-semibold text-gray-700">
+          Reason
+          <textarea
+            value={actionReason}
+            onChange={(event) => setActionReason(event.target.value)}
+            maxLength={500}
+            rows={3}
+            className="rounded-xl border border-gray-200 px-3 py-2 font-normal"
+            placeholder="Record why this notice is being changed"
+          />
+        </label>
       </ConfirmDialog>
     </NoticePageShell>
   );
 }
 
 function noticeActionDescription(action: NoticeLifecycleAction | null) {
-  if (action === "publish") {
-    return "Review the current backend-resolved audience before queueing delivery. Duplicate submission is disabled while this action runs.";
-  }
-  if (action === "schedule") {
-    return "Choose a future Nepal-local time. The scheduled processor will use the persisted lifecycle state rather than assuming delivery from the clock.";
-  }
   if (action === "cancel") {
     return "This stops a draft or scheduled notice from being published. A reason is required for the audit trail.";
   }
@@ -942,6 +836,53 @@ function resolveNoticeState(notice: NoticeDetail) {
   }
 
   return "Draft";
+}
+
+function hasPublicationReporting(notice: NoticeDetail | undefined) {
+  if (!notice) return false;
+  return Boolean(
+    notice.publishedAt ||
+    ["PUBLISHED", "EXPIRED"].includes(notice.lifecycleStatus) ||
+    (notice.lifecycleStatus === "ARCHIVED" &&
+      notice.archivedFromStatus &&
+      ["PUBLISHED", "EXPIRED"].includes(notice.archivedFromStatus)),
+  );
+}
+
+function getTimelineItems(notice: NoticeDetail): Array<[string, string]> {
+  const items: Array<[string, string]> = [
+    ["Created", formatDateTime(notice.createdAt)],
+  ];
+  if (notice.scheduledFor) {
+    items.push(["Scheduled", formatDateTime(notice.scheduledFor)]);
+  }
+  if (hasPublicationReporting(notice) && notice.publishedAt) {
+    items.push(["Published", formatDateTime(notice.publishedAt)]);
+  }
+  items.push(["Updated", formatDateTime(notice.updatedAt)]);
+  return items;
+}
+
+function getAudienceItems(notice: NoticeDetail): Array<[string, string]> {
+  const items: Array<[string, string]> = [
+    [
+      "Scope",
+      notice.audienceType === "ALL"
+        ? "Whole school"
+        : formatEnumLabel(notice.audienceType),
+    ],
+  ];
+  if (notice.audienceType !== "ALL") {
+    items.push(["Class", notice.className ?? "Class unavailable"]);
+  }
+  if (notice.audienceType === "SECTION") {
+    items.push(["Section", notice.sectionName ?? "Section unavailable"]);
+  }
+  items.push([
+    "Created by",
+    notice.createdBy?.email ?? "System/user unavailable",
+  ]);
+  return items;
 }
 
 function getAudienceSummary(notice: NoticeDetail) {

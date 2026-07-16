@@ -5,6 +5,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Length,
   MaxLength,
 } from 'class-validator';
 
@@ -94,6 +95,16 @@ export class UpdateNoticeDraftDto {
 export class NoticeScheduleDto {
   @IsDateString()
   scheduledFor!: string;
+}
+
+export class NoticeApprovalRequestDto {
+  @IsString()
+  @Length(3, 500)
+  reason!: string;
+
+  @IsOptional()
+  @IsDateString()
+  scheduledFor?: string;
 }
 
 export class NoticeLifecycleReasonDto {

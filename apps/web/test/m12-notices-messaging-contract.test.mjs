@@ -16,7 +16,8 @@ describe('M12 notifications and M15 notices boundary', () => {
     assert.match(workspace, /<WorkSurface/);
     assert.doesNotMatch(workspace, /title="Escalated Chats"/);
     assert.doesNotMatch(workspace, /title="Provider Status"/);
-    assert.match(workspace, /label: 'Recipient Preview'/);
+    assert.doesNotMatch(workspace, /label: 'Recipient Preview'/);
+    assert.doesNotMatch(workspace, /label: 'Compose'/);
     assert.match(workspace, /label: 'Notification Settings'/);
     assert.match(workspace, /M15 Notices and Announcements/);
     assert.doesNotMatch(workspace, /Parent-Teacher Chat/);
