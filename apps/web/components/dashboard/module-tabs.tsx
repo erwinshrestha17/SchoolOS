@@ -20,7 +20,7 @@ export interface WorkspaceTabsProps {
   onValueChange?: (value: string) => void;
   className?: string;
   label?: string;
-  /** @deprecated Module colour no longer controls workspace navigation. */
+  /** @deprecated Module colour is scope-driven via data-module; this prop is ignored. */
   accentColor?:
     | 'blue'
     | 'emerald'
@@ -80,7 +80,11 @@ export function WorkspaceTabs({
             {typeof item.count === 'number' && item.count > 0 ? (
               <Badge
                 variant={active ? 'default' : 'secondary'}
-                className="ml-1 min-w-5 justify-center px-1.5"
+                className={cn(
+                  'ml-1 min-w-5 justify-center px-1.5',
+                  active &&
+                    'bg-[var(--mod-accent,var(--primary))] text-white',
+                )}
               >
                 {item.count}
               </Badge>
@@ -89,7 +93,11 @@ export function WorkspaceTabs({
         );
         const itemClassName = cn(
           'inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md px-3 text-sm font-medium whitespace-nowrap text-muted-foreground outline-none transition-colors duration-(--schoolos-motion-fast) ease-(--schoolos-motion-ease-out) hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 [&_svg]:size-4',
-          active && 'bg-primary text-primary-foreground shadow-sm hover:text-primary-foreground',
+          // The active tab shares the module tint (soft background + dark
+          // accent text) so tab, selected row, and active filter read as one
+          // location signal; brand blue remains the unscoped fallback.
+          active &&
+            'bg-[var(--mod-soft,var(--primary-soft))] text-[color:var(--mod-text,var(--primary-dark))] shadow-sm hover:text-[color:var(--mod-text,var(--primary-dark))]',
         );
 
         if (item.href) {

@@ -37,7 +37,7 @@ export function ModuleHeader({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           {eyebrow ? (
-            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-[color:var(--mod-text,var(--muted))]">
               {eyebrow}
             </p>
           ) : null}

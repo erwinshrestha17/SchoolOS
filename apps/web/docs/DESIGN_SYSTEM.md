@@ -268,6 +268,16 @@ Charts use a controlled sequence — module accent, brand blue, teal, slate,
 marigold (`--chart-1` … `--chart-5`) — and switch to semantic warning/danger
 for negative or alert data. No rainbow charts; prefer about three series.
 
+**How module accents reach pages:** the authenticated shells stamp
+`data-module="<slug>"` on the workspace container (route mapping in
+`lib/module-theme.ts`); `globals.css` maps that attribute onto the generic
+`--mod-accent` / `--mod-soft` / `--mod-border` / `--mod-text` slots, which
+fall back to the brand tint when unscoped. Shared primitives consume the
+slots — active `WorkspaceTabs` tab and its count badge, selected table rows,
+the `ModuleHeader` eyebrow, and the opt-in `tone="module"` icon chip on
+`SummaryCard`. New module-coloured treatments should consume `--mod-*`
+rather than hardcoding a specific module's tokens.
+
 ### 5.4 Typography
 
 - **Inter** for English, numbers, tables, and general interface text;

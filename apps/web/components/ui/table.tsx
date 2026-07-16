@@ -19,7 +19,7 @@ export const TableFooter = ({ className, ...props }: React.HTMLAttributes<HTMLTa
 )
 
 export const TableRow = ({ className, ...props }: React.HTMLAttributes<HTMLTableRowElement>) => (
-  <tr className={`border-b transition-colors hover:bg-gray-100/50 data-[state=selected]:bg-gray-100 ${className}`} {...props} />
+  <tr className={`border-b transition-colors hover:bg-[var(--hover-subtle)] data-[state=selected]:bg-[var(--mod-soft,var(--primary-soft))] ${className}`} {...props} />
 )
 
 export const TableHead = ({ className, ...props }: React.HTMLAttributes<HTMLTableCellElement>) => (

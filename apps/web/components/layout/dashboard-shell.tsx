@@ -14,6 +14,7 @@ import { ModuleOperationalSummary } from "../ui/module-operational-summary";
 import { SupportOverrideBanner } from "../platform/SupportOverrideBanner";
 import { SchoolBreadcrumbs } from "../schoolos/navigation/school-breadcrumbs";
 import { NetworkStatusBanner } from "../ui/network-status-banner";
+import { moduleSlugForPath } from "../../lib/module-theme";
 
 // Students, attendance, fees, academics, homework, timetable, notices, and
 // messages already
@@ -91,6 +92,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
 
         <main
           id="dashboard-main"
+          data-module={moduleSlugForPath(pathname)}
           className="flex-1 overflow-y-auto scroll-smooth bg-[var(--background)] focus:outline-none"
           tabIndex={-1}
         >

@@ -18,7 +18,8 @@ export type SummaryTone =
   | 'info'
   | 'success'
   | 'warning'
-  | 'danger';
+  | 'danger'
+  | 'module';
 
 export type SummaryCardProps = {
   label: string;
@@ -38,12 +39,16 @@ const iconTone: Record<SummaryTone, string> = {
   success: 'border-success-100 bg-success-50 text-success-700',
   warning: 'border-warning-100 bg-warning-50 text-warning-700',
   danger: 'border-danger-100 bg-danger-50 text-danger-700',
+  module:
+    'border-[color:var(--mod-border,var(--color-primary-100))] bg-[var(--mod-soft,var(--primary-soft))] text-[color:var(--mod-text,var(--primary-dark))]',
 };
 
 /**
  * Canonical SchoolOS decision summary. Tone is restricted to the small icon
  * treatment; the card surface, border, typography, and interaction remain
- * global so module colour never becomes a second design system.
+ * global so module colour never becomes a second design system. The
+ * `module` tone resolves through the data-module scope for location-only
+ * icon chips; semantic tones keep owning risk and status meaning.
  */
 export function SummaryCard({
   label,

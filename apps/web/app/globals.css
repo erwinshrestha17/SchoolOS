@@ -334,6 +334,141 @@
   --color-ring: var(--ring);
 }
 
+/*
+ * ─── Module theming scope ───
+ * The workspace shell stamps data-module (see lib/module-theme.ts) so shared
+ * primitives can consume one generic slot set. Every slot has a brand-blue
+ * fallback at :root, so unscoped surfaces (auth, dialogs rendered in
+ * portals outside the scope) keep the core SchoolOS identity. Module colour
+ * marks location only; semantic states and the blue primary action never
+ * change per module.
+ */
+:root {
+  --mod-accent: var(--primary);
+  --mod-soft: var(--primary-soft);
+  --mod-border: var(--color-primary-100);
+  --mod-text: var(--primary-dark);
+}
+
+[data-module='platform'] {
+  --mod-accent: var(--color-mod-platform-accent);
+  --mod-soft: var(--color-mod-platform-soft);
+  --mod-border: var(--color-mod-platform-border);
+  --mod-text: var(--color-mod-platform-text);
+}
+
+[data-module='admissions'] {
+  --mod-accent: var(--color-mod-admissions-accent);
+  --mod-soft: var(--color-mod-admissions-soft);
+  --mod-border: var(--color-mod-admissions-border);
+  --mod-text: var(--color-mod-admissions-text);
+}
+
+[data-module='attendance'] {
+  --mod-accent: var(--color-mod-attendance-accent);
+  --mod-soft: var(--color-mod-attendance-soft);
+  --mod-border: var(--color-mod-attendance-border);
+  --mod-text: var(--color-mod-attendance-text);
+}
+
+[data-module='fees'] {
+  --mod-accent: var(--color-mod-fees-accent);
+  --mod-soft: var(--color-mod-fees-soft);
+  --mod-border: var(--color-mod-fees-border);
+  --mod-text: var(--color-mod-fees-text);
+}
+
+[data-module='academics'] {
+  --mod-accent: var(--color-mod-academics-accent);
+  --mod-soft: var(--color-mod-academics-soft);
+  --mod-border: var(--color-mod-academics-border);
+  --mod-text: var(--color-mod-academics-text);
+}
+
+[data-module='activity'] {
+  --mod-accent: var(--color-mod-activity-accent);
+  --mod-soft: var(--color-mod-activity-soft);
+  --mod-border: var(--color-mod-activity-border);
+  --mod-text: var(--color-mod-activity-text);
+}
+
+[data-module='homework'] {
+  --mod-accent: var(--color-mod-homework-accent);
+  --mod-soft: var(--color-mod-homework-soft);
+  --mod-border: var(--color-mod-homework-border);
+  --mod-text: var(--color-mod-homework-text);
+}
+
+[data-module='hr'] {
+  --mod-accent: var(--color-mod-hr-accent);
+  --mod-soft: var(--color-mod-hr-soft);
+  --mod-border: var(--color-mod-hr-border);
+  --mod-text: var(--color-mod-hr-text);
+}
+
+[data-module='library'] {
+  --mod-accent: var(--color-mod-library-accent);
+  --mod-soft: var(--color-mod-library-soft);
+  --mod-border: var(--color-mod-library-border);
+  --mod-text: var(--color-mod-library-text);
+}
+
+[data-module='transport'] {
+  --mod-accent: var(--color-mod-transport-accent);
+  --mod-soft: var(--color-mod-transport-soft);
+  --mod-border: var(--color-mod-transport-border);
+  --mod-text: var(--color-mod-transport-text);
+}
+
+[data-module='canteen'] {
+  --mod-accent: var(--color-mod-canteen-accent);
+  --mod-soft: var(--color-mod-canteen-soft);
+  --mod-border: var(--color-mod-canteen-border);
+  --mod-text: var(--color-mod-canteen-text);
+}
+
+[data-module='accounting'] {
+  --mod-accent: var(--color-mod-accounting-accent);
+  --mod-soft: var(--color-mod-accounting-soft);
+  --mod-border: var(--color-mod-accounting-border);
+  --mod-text: var(--color-mod-accounting-text);
+}
+
+[data-module='notices'] {
+  --mod-accent: var(--color-mod-notices-accent);
+  --mod-soft: var(--color-mod-notices-soft);
+  --mod-border: var(--color-mod-notices-border);
+  --mod-text: var(--color-mod-notices-text);
+}
+
+[data-module='learning'] {
+  --mod-accent: var(--color-mod-learning-accent);
+  --mod-soft: var(--color-mod-learning-soft);
+  --mod-border: var(--color-mod-learning-border);
+  --mod-text: var(--color-mod-learning-text);
+}
+
+[data-module='intelligence'] {
+  --mod-accent: var(--color-mod-intelligence-accent);
+  --mod-soft: var(--color-mod-intelligence-soft);
+  --mod-border: var(--color-mod-intelligence-border);
+  --mod-text: var(--color-mod-intelligence-text);
+}
+
+[data-module='reports'] {
+  --mod-accent: var(--color-mod-reports-accent);
+  --mod-soft: var(--color-mod-reports-soft);
+  --mod-border: var(--color-mod-reports-border);
+  --mod-text: var(--color-mod-reports-text);
+}
+
+[data-module='settings'] {
+  --mod-accent: var(--color-mod-settings-accent);
+  --mod-soft: var(--color-mod-settings-soft);
+  --mod-border: var(--color-mod-settings-border);
+  --mod-text: var(--color-mod-settings-text);
+}
+
 /* ─── Base resets ─── */
 * {
   box-sizing: border-box;
@@ -358,9 +493,16 @@ table {
   font-variant-numeric: tabular-nums;
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
+/*
+ * Layered so Tailwind text/decoration utilities can restyle links; an
+ * unlayered rule here would silently defeat every text-* utility placed on
+ * an anchor (layered utilities lose to unlayered author CSS).
+ */
+@layer base {
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
 }
 
 /* ─── Scrollbar styling ─── */

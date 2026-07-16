@@ -332,6 +332,7 @@ export function PlatformShell({ children }: { children: ReactNode }) {
 
         <main
           id="platform-main"
+          data-module="platform"
           className="flex-1 overflow-y-auto focus:outline-none"
           tabIndex={-1}
         >

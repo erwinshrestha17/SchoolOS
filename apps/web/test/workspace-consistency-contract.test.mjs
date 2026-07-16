@@ -201,7 +201,12 @@ describe("SchoolOS workspace consistency contract", () => {
     );
 
     const tabs = read("components/dashboard/module-tabs.tsx");
-    assert.match(tabs, /bg-primary text-primary-foreground/);
+    // One shared active-tab treatment: the module tint via the data-module
+    // scope with a brand-tint fallback — never per-tab accent style props.
+    assert.match(
+      tabs,
+      /bg-\[var\(--mod-soft,var\(--primary-soft\)\)\] text-\[color:var\(--mod-text,var\(--primary-dark\)\)\]/,
+    );
     assert.doesNotMatch(tabs, /activeDark|activeLight|tabAccentStyles/);
   });
 

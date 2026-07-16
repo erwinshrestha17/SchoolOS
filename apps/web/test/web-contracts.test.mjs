@@ -326,7 +326,7 @@ describe("SchoolOS web production contracts", () => {
     assert.match(moduleTabs, /typeof item\.count === 'number' && item\.count > 0/);
     assert.match(
       moduleTabs,
-      /bg-primary text-primary-foreground shadow-sm/,
+      /bg-\[var\(--mod-soft,var\(--primary-soft\)\)\] text-\[color:var\(--mod-text,var\(--primary-dark\)\)\] shadow-sm/,
     );
     assert.doesNotMatch(
       moduleTabs,
