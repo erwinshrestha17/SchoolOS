@@ -188,7 +188,7 @@ Prefer school terms:
 - Calm light app background.
 - White cards, tables, panels, and drawers.
 - Soft blue-grey page background.
-- Deep blue/indigo primary identity.
+- Himalayan blue identity: brand blue for actions, deep navy for authority.
 - Rounded cards and panels, generally 16-24px radius.
 - Subtle borders and shadows only where hierarchy requires it.
 - Clear typographic hierarchy.
@@ -198,47 +198,92 @@ Prefer school terms:
 
 ### 5.2 Base tokens
 
+One unified SchoolOS visual system with restrained module accents. The shell,
+buttons, tables, forms, typography, and semantic states stay consistent
+everywhere; module colours say **where you are**, never what a status means.
+
 | Token | Value | Usage |
 |---|---:|---|
-| `brand.primary` | `#155EEF` | Primary actions, active links. |
-| `brand.primaryDark` | `#0B3A88` | Sidebar active state, strong headers. |
-| `brand.primarySoft` | `#EAF1FF` | Soft active/selected backgrounds. |
-| `brand.secondary` | `#7C3AED` | Secondary accent. |
-| `surface.app` | `#F3F7FB` | Main background. |
-| `surface.card` | `#FFFFFF` | Cards, panels, tables. |
-| `surface.subtle` | `#F8FAFC` | Subtle table headers / grouped blocks. |
-| `border.default` | `#E2E8F0` | Card/table borders. |
-| `text.primary` | `#0F172A` | Primary text. |
-| `text.secondary` | `#475569` | Secondary text. |
-| `text.muted` | `#64748B` | Helper labels. |
-| `success` | `#16A34A` | Success state. |
-| `warning` | `#D97706` | Warning state. |
-| `danger` | `#DC2626` | Error/destructive state. |
-| `info` | `#0284C7` | Informational state. |
+| `brand.navy` | `#17324D` | Logo, important headings, authority accents. |
+| `brand.primary` | `#2563EB` | Primary actions, links, active controls. |
+| `brand.primaryDark` | `#1D4ED8` | Hover and pressed states, active nav label. |
+| `brand.primarySoft` | `#EAF2FF` | Brand tint: selected navigation and filters. |
+| `brand.teal` | `#168C8C` | Dashboard Home accent, chart series 3. |
+| `brand.marigold` | `#E2A126` | Restrained attention indicator, chart series 5. |
+| `surface.app` | `#F4F7FB` | Main page background. |
+| `surface.card` | `#FFFFFF` | Cards, forms, tables, drawers. |
+| `surface.sidebar` | `#F8FAFC` | Light navigation shell. |
+| `surface.hover` | `#F7F9FC` | Neutral row hover. |
+| `border.default` | `#DDE4EC` | Cards, fields, separators. |
+| `text.primary` | `#172033` | Headings and important data. |
+| `text.secondary` | `#667085` | Descriptions and metadata. |
+| `text.muted` | `#98A2B3` | Timestamps and placeholders. |
+
+Semantic colours indicate system meaning and never change by module
+(each has main / pale background / dark text):
+
+| Meaning | Main | Pale | Dark text |
+|---|---:|---:|---:|
+| Success | `#27875A` | `#EAF7F0` | `#17633E` |
+| Warning | `#D99016` | `#FFF6DF` | `#82580B` |
+| Danger | `#D14343` | `#FDECEC` | `#9D2929` |
+| Information | `#2878C8` | `#EAF3FC` | `#1F5E9B` |
+| Neutral | `#667085` | `#F2F4F7` | `#475467` |
+
+A module accent must never replace semantic meaning: green does not mean
+Canteen, orange does not mean Transport delay, gold does not mean payment
+succeeded. High-risk workflows (reversals, corrections, approvals) use
+semantic colours and visually override module identity.
 
 ### 5.3 Module accents
 
-Module accents identify location. They must not replace semantic status colors.
+Module accents identify location. Each has an accent, a pale tint
+(`--color-mod-*-soft`), a tinted border, and dark accent text; the accent
+should occupy no more than roughly 5-8% of a page. Primary actions remain
+brand blue everywhere. The selected row, active tab, and active filter share
+the same module tint.
 
-| Area | Accent |
-|---|---:|
-| Dashboard | `#155EEF` |
-| Platform Control | `#4F46E5` |
-| Admissions / Students | `#2563EB` |
-| Attendance | `#059669` |
-| Fees / Receipts | `#D97706` |
-| Academics | `#7C3AED` |
-| Activity Feed | `#DB2777` |
-| Homework / Timetable | `#0284C7` |
-| HR / Payroll | `#9333EA` |
-| Library | `#0D9488` |
-| Transport | `#EA580C` |
-| Canteen | `#65A30D` |
-| Accounting | `#0F766E` |
-| Notices / Chat | `#E11D48` |
-| Learning | `#7C3AED` |
-| Reports | `#0891B2` |
-| Settings | `#475569` |
+| Area | Accent | Pale tint | Dark text |
+|---|---:|---:|---:|
+| Dashboard Home (core identity) | `#2563EB` | `#EAF2FF` | `#1D4ED8` |
+| M0 Platform Core | `#465577` | `#EEF1F7` | `#2D3852` |
+| M1 Admissions / Students | `#2F80ED` | `#EBF4FF` | `#1E5FAE` |
+| M2 Attendance | `#0F8B8D` | `#E8F7F6` | `#0B6567` |
+| M3 Fees / Receipts | `#C88716` | `#FFF6DF` | `#805509` |
+| M4 Academics | `#5B5BD6` | `#EFEEFF` | `#3F3FA5` |
+| M5 Activity Feed | `#D56B5D` | `#FFF0ED` | `#9E4C42` |
+| M6 Homework / Timetable | `#7357C8` | `#F3EFFF` | `#513D91` |
+| M7 HR / Payroll | `#4B6B88` | `#EEF3F7` | `#365067` |
+| M8 Library | `#3F7C68` | `#EDF6F2` | `#2B5A4B` |
+| M9 Transport | `#D46A1F` | `#FFF1E7` | `#994915` |
+| M10 Canteen | `#6E8B3D` | `#F3F7E9` | `#4E642A` |
+| M11 Accounting | `#234B70` | `#EAF1F7` | `#183752` |
+| M12/M15 Notices / Communication | `#B24C7A` | `#FBEFF5` | `#803656` |
+| M13 Learning | `#2C91B7` | `#E9F7FC` | `#1F6986` |
+| M14 Intelligence (roadmap labels only) | `#6B5AB5` | `#F2EFFE` | `#493D80` |
+| Reports | `#168C8C` | `#E7F4F4` | `#0F6666` |
+| Settings | `#667085` | `#F2F4F7` | `#475467` |
+
+Charts use a controlled sequence — module accent, brand blue, teal, slate,
+marigold (`--chart-1` … `--chart-5`) — and switch to semantic warning/danger
+for negative or alert data. No rainbow charts; prefer about three series.
+
+### 5.4 Typography
+
+- **Inter** for English, numbers, tables, and general interface text;
+  **Noto Sans Devanagari** for Nepali text; system sans-serif as the final
+  fallback. Both load via `next/font` in the root layout only.
+- Web scale (named utilities exist in `globals.css`): page title 28/36 700
+  (`text-page-title`), section heading 20/28 600 (`text-section`), card
+  heading 16/24 600 (`text-card-title`), body 14/22 400 (`text-body`), form
+  label 13/18 600 (`text-form-label`), helper 12/18 400 (`text-helper`),
+  large KPI value 28-32/36 700 (`text-kpi`).
+- Do not reduce important operational text below 12px; dense tables may use
+  13px but names, amounts, statuses, and row actions stay readable.
+- Money, marks, counts, and receipt numbers use tabular numerals (applied to
+  tables globally); money and numeric totals right-align in tables.
+- Sentence case for labels and headings; official abbreviations (NPR, PAN,
+  CAS, QR, SMS, PDF, iEMIS, GPA) stay uppercase.
 
 ---
 

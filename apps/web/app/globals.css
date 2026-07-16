@@ -4,35 +4,65 @@
 
 /* ─── Global design tokens used by components ─── */
 :root {
-  --ink: #0F172A;
-  --muted: #475569;
-  --line: #E2E8F0;
+  --ink: #172033;
+  --muted: #667085;
+  --faint: #98A2B3;
+  --line: #DDE4EC;
 
-  --primary: #155EEF;
-  --primary-dark: #0B3A88;
-  --primary-soft: #EAF1FF;
-  --secondary: #7C3AED;
-  --secondary-soft: #F3E8FF;
-  --background: #F3F7FB;
+  --brand-navy: #17324D;
+  --brand-teal: #168C8C;
+  --brand-marigold: #E2A126;
+
+  --primary: #2563EB;
+  --primary-dark: #1D4ED8;
+  --primary-soft: #EAF2FF;
+  --secondary: #667085;
+  --secondary-soft: #F2F4F7;
+  --background: #F4F7FB;
   --surface: #FFFFFF;
-  --success: #16A34A;
-  --success-soft: #DCFCE7;
-  --warning: #D97706;
-  --warning-soft: #FEF3C7;
-  --danger: #DC2626;
-  --danger-soft: #FEE2E2;
-  --info: #0284C7;
-  --info-soft: #E0F2FE;
+  --hover-subtle: #F7F9FC;
+  --success: #27875A;
+  --success-soft: #EAF7F0;
+  --success-text: #17633E;
+  --warning: #D99016;
+  --warning-soft: #FFF6DF;
+  --warning-text: #82580B;
+  --danger: #D14343;
+  --danger-soft: #FDECEC;
+  --danger-text: #9D2929;
+  --info: #2878C8;
+  --info-soft: #EAF3FC;
+  --info-text: #1F5E9B;
+  --neutral: #667085;
+  --neutral-soft: #F2F4F7;
+  --neutral-text: #475467;
+
+  /* Light navigation shell (sidebar stays calm; module accents live in icons only) */
+  --sidebar-bg: #F8FAFC;
+  --sidebar-icon: #667085;
+  --sidebar-label: #475467;
+  --sidebar-hover: #F2F4F7;
+  --sidebar-active-bg: #EAF2FF;
+  --sidebar-active-label: #1D4ED8;
+  --sidebar-active-indicator: #2563EB;
+  --sidebar-heading: #98A2B3;
+
+  /* Report chart sequence: module accent first, then brand blue, teal, slate, marigold */
+  --chart-1: var(--primary);
+  --chart-2: #2563EB;
+  --chart-3: #168C8C;
+  --chart-4: #667085;
+  --chart-5: #E2A126;
 
   /* Focus ring derived from brand primary */
-  --focus-ring: rgba(21, 94, 239, 0.18);
+  --focus-ring: rgba(37, 99, 235, 0.18);
 
   /*
    * ─── Shadcn semantic token bridge ───
    * These aliases feed the Shadcn/Radix primitive layer (components/ui/primitives)
    * without renaming or reinterpreting the SchoolOS tokens above. Where a Shadcn
    * slot would collide with an existing token that means something else
-   * (--secondary is the purple brand accent, not a neutral button treatment;
+   * (--secondary is the neutral slate accent, not a neutral button treatment;
    * --muted is a text color, not a surface), a distinct raw variable is
    * introduced instead of overloading the existing one.
    */
@@ -56,154 +86,219 @@
   --radius: 0.75rem;
 }
 
-/* ─── Tailwind v4 theme configuration ─── */
-@theme {
-  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+/*
+ * ─── Tailwind v4 theme configuration ───
+ * `static` forces every token to be emitted even before a utility consumes
+ * it, so module tokens (e.g. M13/M14) stay resolvable from inline var() usage.
+ */
+@theme static {
+  --font-sans: 'Inter', 'Noto Sans Devanagari', ui-sans-serif, system-ui, -apple-system, sans-serif;
 
-  --color-primary-50: #EAF1FF;
-  --color-primary-100: #D0E1FF;
-  --color-primary-200: #A9C9FF;
-  --color-primary-300: #73A7FF;
-  --color-primary-400: #3D81FF;
-  --color-primary-500: #155EEF;
-  --color-primary-600: #0B3A88;
-  --color-primary-700: #082E6E;
-  --color-primary-800: #062354;
-  --color-primary-900: #04183A;
+  /*
+   * SchoolOS typography scale (web). Named text utilities for incremental
+   * adoption: text-page-title, text-section, text-card-title, text-body,
+   * text-form-label, text-helper, text-kpi.
+   */
+  --text-page-title: 1.75rem;
+  --text-page-title--line-height: 2.25rem;
+  --text-page-title--font-weight: 700;
+  --text-section: 1.25rem;
+  --text-section--line-height: 1.75rem;
+  --text-section--font-weight: 600;
+  --text-card-title: 1rem;
+  --text-card-title--line-height: 1.5rem;
+  --text-card-title--font-weight: 600;
+  --text-body: 0.875rem;
+  --text-body--line-height: 1.375rem;
+  --text-form-label: 0.8125rem;
+  --text-form-label--line-height: 1.125rem;
+  --text-form-label--font-weight: 600;
+  --text-helper: 0.75rem;
+  --text-helper--line-height: 1.125rem;
+  --text-kpi: 1.875rem;
+  --text-kpi--line-height: 2.25rem;
+  --text-kpi--font-weight: 700;
 
-  --color-secondary-50: #F3E8FF;
-  --color-secondary-500: #7C3AED;
-  --color-secondary-600: #6D28D9;
+  --color-primary-50: #EAF2FF;
+  --color-primary-100: #DBEAFE;
+  --color-primary-200: #BFDBFE;
+  --color-primary-300: #93C5FD;
+  --color-primary-400: #60A5FA;
+  --color-primary-500: #2563EB;
+  --color-primary-600: #1D4ED8;
+  --color-primary-700: #1E40AF;
+  --color-primary-800: #1E3A8A;
+  --color-primary-900: #17324D;
 
-  --color-sidebar-900: #0F172A;
-  --color-sidebar-800: #1E293B;
-  --color-sidebar-700: #334155;
+  --color-secondary-50: #F2F4F7;
+  --color-secondary-500: #667085;
+  --color-secondary-600: #475467;
 
-  --color-success-50: #DCFCE7;
-  --color-success-100: #BBF7D0;
-  --color-success-500: #16A34A;
-  --color-success-600: #15803D;
-  --color-success-700: #15803D;
-  --color-success-900: #14532D;
+  --color-sidebar-900: #17324D;
+  --color-sidebar-800: #1F3F60;
+  --color-sidebar-700: #2A5074;
 
-  --color-warning-50: #FEF3C7;
-  --color-warning-100: #FDE68A;
-  --color-warning-200: #FCD34D;
-  --color-warning-500: #D97706;
-  --color-warning-600: #D97706;
-  --color-warning-700: #B45309;
-  --color-warning-900: #78350F;
+  --color-success-50: #EAF7F0;
+  --color-success-100: #D2EDDE;
+  --color-success-500: #27875A;
+  --color-success-600: #1F754C;
+  --color-success-700: #17633E;
+  --color-success-900: #0E402B;
 
-  --color-danger-50: #FEE2E2;
-  --color-danger-100: #FECACA;
-  --color-danger-200: #FCA5A5;
-  --color-danger-500: #DC2626;
-  --color-danger-600: #DC2626;
-  --color-danger-700: #B91C1C;
-  --color-danger-900: #7F1D1D;
+  --color-warning-50: #FFF6DF;
+  --color-warning-100: #FAE9BD;
+  --color-warning-200: #F3D68C;
+  --color-warning-500: #D99016;
+  --color-warning-600: #C07E11;
+  --color-warning-700: #82580B;
+  --color-warning-900: #573B07;
 
-  --color-info-50: #E0F2FE;
-  --color-info-100: #BAE6FD;
-  --color-info-500: #0284C7;
-  --color-info-600: #0369A1;
-  --color-info-700: #0369A1;
+  --color-danger-50: #FDECEC;
+  --color-danger-100: #F8D6D6;
+  --color-danger-200: #F0B2B2;
+  --color-danger-500: #D14343;
+  --color-danger-600: #C03636;
+  --color-danger-700: #9D2929;
+  --color-danger-900: #6B1C1C;
 
-  /* Module colors from SchoolOS UI/UX Guide Section 8 */
-  --color-mod-dashboard-accent: #155EEF;
-  --color-mod-dashboard-soft: #EAF1FF;
+  --color-info-50: #EAF3FC;
+  --color-info-100: #D4E7F8;
+  --color-info-500: #2878C8;
+  --color-info-600: #2369B1;
+  --color-info-700: #1F5E9B;
+
+  /*
+   * Module accents (SchoolOS Colour Direction, M0-M14).
+   * Accent = location identity, soft = pale tint for selected rows/tabs/chips,
+   * border = tinted outline, text = dark accent text readable on the soft tint.
+   * Accents never replace semantic status colors.
+   */
+
+  /* Dashboard Home: core SchoolOS identity, not a module accent */
+  --color-mod-dashboard-accent: #2563EB;
+  --color-mod-dashboard-soft: #EAF2FF;
   --color-mod-dashboard-bg: var(--color-mod-dashboard-soft);
-  --color-mod-dashboard-border: #A9C9FF;
-  --color-mod-dashboard-text: #0B3A88;
+  --color-mod-dashboard-border: #C9D8FA;
+  --color-mod-dashboard-text: #1D4ED8;
 
-  --color-mod-platform-accent: #4F46E5;
-  --color-mod-platform-soft: #EEF2FF;
+  /* M0 Platform Core: graphite indigo */
+  --color-mod-platform-accent: #465577;
+  --color-mod-platform-soft: #EEF1F7;
   --color-mod-platform-bg: var(--color-mod-platform-soft);
-  --color-mod-platform-border: #C7D2FE;
-  --color-mod-platform-text: #3730A3;
+  --color-mod-platform-border: #D1D5DD;
+  --color-mod-platform-text: #2D3852;
 
-  --color-mod-admissions-accent: #2563EB;
-  --color-mod-admissions-soft: #EFF6FF;
+  /* M1 Admissions and Student Profiles: welcoming blue */
+  --color-mod-admissions-accent: #2F80ED;
+  --color-mod-admissions-soft: #EBF4FF;
   --color-mod-admissions-bg: var(--color-mod-admissions-soft);
-  --color-mod-admissions-border: #BFDBFE;
-  --color-mod-admissions-text: #1D4ED8;
+  --color-mod-admissions-border: #CBDFFB;
+  --color-mod-admissions-text: #1E5FAE;
 
-  --color-mod-attendance-accent: #059669;
-  --color-mod-attendance-soft: #ECFDF5;
+  /* M2 Smart Attendance: operational teal */
+  --color-mod-attendance-accent: #0F8B8D;
+  --color-mod-attendance-soft: #E8F7F6;
   --color-mod-attendance-bg: var(--color-mod-attendance-soft);
-  --color-mod-attendance-border: #A7F3D0;
-  --color-mod-attendance-text: #047857;
+  --color-mod-attendance-border: #C3E2E3;
+  --color-mod-attendance-text: #0B6567;
 
-  --color-mod-fees-accent: #D97706;
-  --color-mod-fees-soft: #FFFBEB;
+  /* M3 Fees and Receipts: careful gold (green stays reserved for paid states) */
+  --color-mod-fees-accent: #C88716;
+  --color-mod-fees-soft: #FFF6DF;
   --color-mod-fees-bg: var(--color-mod-fees-soft);
-  --color-mod-fees-border: #FCD34D;
-  --color-mod-fees-text: #92400E;
+  --color-mod-fees-border: #F1E1C5;
+  --color-mod-fees-text: #805509;
 
-  --color-mod-academics-accent: #7C3AED;
-  --color-mod-academics-soft: #F5F3FF;
+  /* M4 Academics, Exams, CAS, Report Cards: structured indigo */
+  --color-mod-academics-accent: #5B5BD6;
+  --color-mod-academics-soft: #EFEEFF;
   --color-mod-academics-bg: var(--color-mod-academics-soft);
-  --color-mod-academics-border: #DDD6FE;
-  --color-mod-academics-text: #6D28D9;
+  --color-mod-academics-border: #D6D6F5;
+  --color-mod-academics-text: #3F3FA5;
 
-  --color-mod-activity-accent: #DB2777;
-  --color-mod-activity-soft: #FDF2F8;
+  /* M5 Activity Feed and Milestones: warm coral */
+  --color-mod-activity-accent: #D56B5D;
+  --color-mod-activity-soft: #FFF0ED;
   --color-mod-activity-bg: var(--color-mod-activity-soft);
-  --color-mod-activity-border: #FBCFE8;
-  --color-mod-activity-text: #BE185D;
+  --color-mod-activity-border: #F5DAD7;
+  --color-mod-activity-text: #9E4C42;
 
-  --color-mod-homework-accent: #0284C7;
-  --color-mod-homework-soft: #E0F2FE;
+  /* M6 Homework and Timetable: organised violet */
+  --color-mod-homework-accent: #7357C8;
+  --color-mod-homework-soft: #F3EFFF;
   --color-mod-homework-bg: var(--color-mod-homework-soft);
-  --color-mod-homework-border: #7DD3FC;
-  --color-mod-homework-text: #0369A1;
+  --color-mod-homework-border: #DCD5F1;
+  --color-mod-homework-text: #513D91;
 
-  --color-mod-hr-accent: #9333EA;
-  --color-mod-hr-soft: #FAF5FF;
+  /* M7 HR and Payroll: confidential steel blue */
+  --color-mod-hr-accent: #4B6B88;
+  --color-mod-hr-soft: #EEF3F7;
   --color-mod-hr-bg: var(--color-mod-hr-soft);
-  --color-mod-hr-border: #E9D5FF;
-  --color-mod-hr-text: #7E22CE;
+  --color-mod-hr-border: #D2DAE1;
+  --color-mod-hr-text: #365067;
 
-  --color-mod-library-accent: #0D9488;
-  --color-mod-library-soft: #F0FDFA;
+  /* M8 Library: calm forest teal */
+  --color-mod-library-accent: #3F7C68;
+  --color-mod-library-soft: #EDF6F2;
   --color-mod-library-bg: var(--color-mod-library-soft);
-  --color-mod-library-border: #99F6E4;
-  --color-mod-library-text: #0F766E;
+  --color-mod-library-border: #CFDED9;
+  --color-mod-library-text: #2B5A4B;
 
-  --color-mod-transport-accent: #EA580C;
-  --color-mod-transport-soft: #FFF7ED;
+  /* M9 Transport: visible safety orange (identity only, not delay/danger) */
+  --color-mod-transport-accent: #D46A1F;
+  --color-mod-transport-soft: #FFF1E7;
   --color-mod-transport-bg: var(--color-mod-transport-soft);
-  --color-mod-transport-border: #FDBA74;
-  --color-mod-transport-text: #C2410C;
+  --color-mod-transport-border: #F4DAC7;
+  --color-mod-transport-text: #994915;
 
-  --color-mod-canteen-accent: #65A30D;
-  --color-mod-canteen-soft: #F7FEE7;
+  /* M10 Canteen: fresh olive (allergy warnings stay semantic danger) */
+  --color-mod-canteen-accent: #6E8B3D;
+  --color-mod-canteen-soft: #F3F7E9;
   --color-mod-canteen-bg: var(--color-mod-canteen-soft);
-  --color-mod-canteen-border: #BEF264;
-  --color-mod-canteen-text: #4D7C0F;
+  --color-mod-canteen-border: #DBE2CF;
+  --color-mod-canteen-text: #4E642A;
 
-  --color-mod-accounting-accent: #0F766E;
-  --color-mod-accounting-soft: #F0FDFA;
+  /* M11 Accounting and Finance: audit-ready deep navy */
+  --color-mod-accounting-accent: #234B70;
+  --color-mod-accounting-soft: #EAF1F7;
   --color-mod-accounting-bg: var(--color-mod-accounting-soft);
-  --color-mod-accounting-border: #99F6E4;
-  --color-mod-accounting-text: #115E59;
+  --color-mod-accounting-border: #C8D2DB;
+  --color-mod-accounting-text: #183752;
 
-  --color-mod-notices-accent: #E11D48;
-  --color-mod-notices-soft: #FFF1F2;
+  /* M12/M15 Notices, Notifications, Communication: institutional plum */
+  --color-mod-notices-accent: #B24C7A;
+  --color-mod-notices-soft: #FBEFF5;
   --color-mod-notices-bg: var(--color-mod-notices-soft);
-  --color-mod-notices-border: #FDA4AF;
-  --color-mod-notices-text: #BE123C;
+  --color-mod-notices-border: #ECD2DE;
+  --color-mod-notices-text: #803656;
 
-  --color-mod-reports-accent: #0891B2;
-  --color-mod-reports-soft: #ECFEFF;
+  /* M13 Learning Layer: engaging cyan blue */
+  --color-mod-learning-accent: #2C91B7;
+  --color-mod-learning-soft: #E9F7FC;
+  --color-mod-learning-bg: var(--color-mod-learning-soft);
+  --color-mod-learning-border: #CAE4ED;
+  --color-mod-learning-text: #1F6986;
+
+  /* M14 Intelligence / AI: restrained violet (roadmap labels and locked states only) */
+  --color-mod-intelligence-accent: #6B5AB5;
+  --color-mod-intelligence-soft: #F2EFFE;
+  --color-mod-intelligence-bg: var(--color-mod-intelligence-soft);
+  --color-mod-intelligence-border: #DAD6ED;
+  --color-mod-intelligence-text: #493D80;
+
+  /* Reports and analytics surfaces: brand teal from the chart sequence */
+  --color-mod-reports-accent: #168C8C;
+  --color-mod-reports-soft: #E7F4F4;
   --color-mod-reports-bg: var(--color-mod-reports-soft);
-  --color-mod-reports-border: #67E8F9;
-  --color-mod-reports-text: #0E7490;
+  --color-mod-reports-border: #C5E2E2;
+  --color-mod-reports-text: #0F6666;
 
-  --color-mod-settings-accent: #475569;
-  --color-mod-settings-soft: #F8FAFC;
+  /* Settings: neutral slate; settings pages stay nearly identical across modules */
+  --color-mod-settings-accent: #667085;
+  --color-mod-settings-soft: #F2F4F7;
   --color-mod-settings-bg: var(--color-mod-settings-soft);
-  --color-mod-settings-border: #CBD5E1;
-  --color-mod-settings-text: #334155;
+  --color-mod-settings-border: #D9DBE1;
+  --color-mod-settings-text: #475467;
 
   --radius-xl: 0.75rem;
   --radius-2xl: 1rem;
@@ -255,7 +350,12 @@ html {
 body {
   min-height: 100vh;
   margin: 0;
-  font-family: var(--font-sans);
+  font-family: var(--font-sans), var(--font-devanagari, 'Noto Sans Devanagari'), sans-serif;
+}
+
+/* Money, marks, counts, and receipt numbers stay column-aligned in tables. */
+table {
+  font-variant-numeric: tabular-nums;
 }
 
 a {
@@ -274,12 +374,12 @@ a {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #C7D0DC;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #98A2B3;
 }
 
 /* ─── Form elements ─── */
@@ -327,7 +427,7 @@ button:disabled {
 /* Hover feedback only for interactive cards (links/buttons); static cards stay calm. */
 a.shell-card:hover,
 button.shell-card:hover {
-  border-color: #cbd5e1;
+  border-color: #C7D0DC;
   box-shadow: 0 12px 20px -12px rgba(15, 23, 42, 0.18);
 }
 
@@ -373,12 +473,12 @@ button.shell-card:hover {
 .btn-secondary {
   border: 1px solid var(--line);
   background: #ffffff;
-  color: #475569;
+  color: var(--neutral-text);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  border-color: #cbd5e1;
-  color: #0f172a;
+  border-color: #C7D0DC;
+  color: var(--ink);
   transform: translateY(-1px);
 }
 
@@ -478,14 +578,14 @@ button.shell-card:hover {
   gap: 8px;
   padding: 8px 12px;
   font-size: 0.875rem;
-  color: #374151;
+  color: var(--neutral-text);
   border-radius: 8px;
   cursor: pointer;
   transition: background 0.1s ease;
 }
 
 .dropdown-item:hover {
-  background: #f3f4f6;
+  background: var(--neutral-soft);
 }
 
 .dropdown-item-danger {
@@ -565,7 +665,7 @@ button.shell-card:hover {
   border-radius: 9999px;
   padding: 0.5rem 1rem 0.5rem 2.5rem;
   font-size: 0.875rem;
-  color: #374151;
+  color: var(--neutral-text);
   width: 100%;
   max-width: 400px;
   transition: all 0.2s ease;
@@ -579,7 +679,7 @@ button.shell-card:hover {
 }
 
 .search-input::placeholder {
-  color: #9ca3af;
+  color: var(--faint);
 }
 
 /* ─── Breadcrumb ─── */
@@ -591,13 +691,13 @@ button.shell-card:hover {
 
 /* ─── Premium utility classes ─── */
 .premium-input {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--line);
   border-radius: var(--radius-xl);
   background: #ffffff;
   padding: 0.75rem 1rem;
   font-size: 0.8125rem;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--ink);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
   outline: none;
@@ -609,13 +709,13 @@ button.shell-card:hover {
 }
 
 .premium-input::placeholder {
-  color: #94a3b8;
+  color: var(--faint);
   font-weight: 500;
 }
 
 .premium-input:disabled {
   background: #f8fafc;
-  color: #94a3b8;
+  color: var(--faint);
   cursor: not-allowed;
   box-shadow: none;
 }

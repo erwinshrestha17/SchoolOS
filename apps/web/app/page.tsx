@@ -333,7 +333,7 @@ export default function RedesignedLandingPage() {
             {/* Desktop Window Shell */}
             <div className="relative bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
               {/* BorderBeam overlay */}
-              <BorderBeam colorFrom="#155EEF" colorTo="#7C3AED" duration={6} borderWidth={2} />
+              <BorderBeam colorFrom="#2563EB" colorTo="#168C8C" duration={6} borderWidth={2} />
               
               {/* Window Controls */}
               <div className="bg-slate-950/80 border-b border-slate-800 px-6 py-3.5 flex items-center justify-between">
@@ -403,14 +403,14 @@ export default function RedesignedLandingPage() {
                         <svg className="w-full h-full" viewBox="0 0 160 80">
                           <defs>
                             <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#155EEF" stopOpacity="0.4"/>
-                              <stop offset="100%" stopColor="#155EEF" stopOpacity="0"/>
+                              <stop offset="0%" stopColor="#2563EB" stopOpacity="0.4"/>
+                              <stop offset="100%" stopColor="#2563EB" stopOpacity="0"/>
                             </linearGradient>
                           </defs>
                           <path
                             d="M 10,70 L 35,55 L 60,60 L 85,35 L 110,40 L 135,15 L 150,10"
                             fill="none"
-                            stroke="#155EEF"
+                            stroke="#2563EB"
                             strokeWidth="2.5"
                             strokeLinecap="round"
                           />
@@ -418,8 +418,8 @@ export default function RedesignedLandingPage() {
                             d="M 10,70 L 35,55 L 60,60 L 85,35 L 110,40 L 135,15 L 150,10 L 150,80 L 10,80 Z"
                             fill="url(#chartGrad)"
                           />
-                          <circle cx="135" cy="15" r="3.5" fill="#155EEF" stroke="#0F172A" strokeWidth="1.5" />
-                          <circle cx="150" cy="10" r="3.5" fill="#10B981" stroke="#0F172A" strokeWidth="1.5" />
+                          <circle cx="135" cy="15" r="3.5" fill="#2563EB" stroke="#17324D" strokeWidth="1.5" />
+                          <circle cx="150" cy="10" r="3.5" fill="#27875A" stroke="#17324D" strokeWidth="1.5" />
                         </svg>
                       </div>
                       <div className="flex justify-between text-[8px] text-slate-500 font-bold px-1">

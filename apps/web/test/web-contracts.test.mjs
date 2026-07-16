@@ -1067,7 +1067,7 @@ describe("SchoolOS web production contracts", () => {
       /\.shell-card\s*\{[\s\S]*?border-radius: var\(--radius-2xl\);/,
     );
     // Focus rings derive from the brand primary, not an off-brand indigo.
-    assert.match(globals, /--focus-ring: rgba\(21, 94, 239/);
+    assert.match(globals, /--focus-ring: rgba\(37, 99, 235/);
     assert.doesNotMatch(globals, /rgba\(99, 102, 241/);
   });
 

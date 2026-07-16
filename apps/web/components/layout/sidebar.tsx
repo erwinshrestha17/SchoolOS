@@ -483,7 +483,7 @@ function SidebarContent({
   return (
     <div
       className={cn(
-        'sidebar-transition flex h-full flex-col border-r border-slate-200 bg-white text-slate-700',
+        'sidebar-transition flex h-full flex-col border-r border-slate-200 bg-[var(--sidebar-bg)] text-slate-700',
         collapsed ? 'w-[72px]' : 'w-[264px]',
       )}
     >
