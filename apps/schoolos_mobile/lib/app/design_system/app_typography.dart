@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 
 /// SchoolOS mobile type scale (Typography and Wording Standard §5).
 /// Inter carries English, numbers, and general interface text; Noto Sans
-/// Devanagari carries Nepali. Neither family is bundled as an asset yet, so
-/// the system font renders until the fonts are added — declaring the stack
-/// now keeps web and mobile on one type identity.
+/// Devanagari carries Nepali. Both families are bundled in assets/fonts
+/// (400/500/600/700), keeping web and mobile on one type identity.
 class AppTypography {
   const AppTypography._();
 

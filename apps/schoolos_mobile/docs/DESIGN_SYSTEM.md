@@ -258,8 +258,8 @@ Typography should create clear hierarchy without visual noise.
 Font: **Inter** for English, numbers, and interface text, with **Noto Sans
 Devanagari** for Nepali and the system sans-serif as final fallback — the
 same type personality as SchoolOS web. The stack is declared in
-`lib/app/design_system/app_typography.dart`; font assets are not bundled
-yet, so the system font renders until they are added.
+`lib/app/design_system/app_typography.dart` and both families are bundled
+in `assets/fonts` at weights 400/500/600/700.
 
 Scale (from the SchoolOS Typography Standard, mobile table): screen title
 24/32 700 (`headlineLarge`), section heading 18/24 600 (`titleLarge`), card
