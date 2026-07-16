@@ -31,14 +31,30 @@ export default function DashboardPage() {
     .map((action) => ({ action, href: resolveOperationalSummaryAction(action) }))
     .filter((item): item is { action: OperationalNextAction; href: string } => Boolean(item.href));
 
-  // The backend already orders nextActions by priority for the current
-  // session, so its first authorized entry is this user's single
-  // highest-value workflow today — promote that one to the page's primary
-  // action instead of a generic refresh button, per the "one primary action"
-  // header rule. Everything else stays reachable from More Actions.
-  const [primaryNextAction, ...remainingNextActions] = safeNextActions;
+  // Context-aware primary action from real permitted dashboard data: when
+  // anything needs review, the header's one primary action is the attention
+  // queue itself ("Review N attention items"); otherwise the backend's
+  // highest-priority authorized next action. Never a hard-coded workflow.
+  const attentionCount = (dashboardQuery.data?.attentionItems ?? []).filter(
+    (item) => item.count > 0,
+  ).length;
+  const [firstNextAction, ...remainingNextActions] = safeNextActions;
+  const primaryAction =
+    attentionCount > 0
+      ? {
+          label: `Review ${attentionCount} attention item${attentionCount === 1 ? '' : 's'}`,
+          href: '#needs-attention',
+        }
+      : firstNextAction
+        ? { label: firstNextAction.action.label, href: firstNextAction.href }
+        : null;
 
-  const quickActions: ActionMenuItem[] = remainingNextActions
+  // Everything else stays reachable from More Actions. When the primary
+  // action is the attention queue, the backend's first next action still
+  // belongs in the menu rather than disappearing.
+  const menuNextActions =
+    attentionCount > 0 ? safeNextActions : remainingNextActions;
+  const quickActions: ActionMenuItem[] = menuNextActions
     .slice(0, 5)
     .map(({ action, href }) => ({
       label: action.label,
@@ -69,12 +85,12 @@ export default function DashboardPage() {
           ) : undefined
         }
         primaryAction={
-          primaryNextAction ? (
+          primaryAction ? (
             <Link
-              href={primaryNextAction.href}
+              href={primaryAction.href}
               className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-[var(--primary)] px-6 text-sm font-bold text-white shadow-sm transition-all hover:bg-[var(--primary-dark)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
             >
-              {primaryNextAction.action.label}
+              {primaryAction.label}
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
           ) : undefined

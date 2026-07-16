@@ -988,6 +988,12 @@ describe("SchoolOS web production contracts", () => {
     const dashboard = readMany([
       "app/dashboard/page.tsx",
       "components/dashboard/dashboard-command-center.tsx",
+      "components/dashboard/dashboard-module-meta.tsx",
+      "components/dashboard/dashboard-summary-strip.tsx",
+      "components/dashboard/dashboard-attention-panel.tsx",
+      "components/dashboard/dashboard-operations-panel.tsx",
+      "components/dashboard/dashboard-readiness-section.tsx",
+      "components/dashboard/dashboard-activity-panel.tsx",
       "components/ui/operational-summary.tsx",
       "lib/api/operational-summary.ts",
     ]);
@@ -1000,7 +1006,7 @@ describe("SchoolOS web production contracts", () => {
     assert.match(dashboard, /DashboardCommandCenter/);
     assert.match(dashboard, /dashboard\.modules/);
     assert.match(dashboard, /dashboard\.attentionItems/);
-    assert.match(dashboard, /dashboard\.nextActions/);
+    assert.match(dashboard, /dashboardQuery\.data\?\.nextActions/);
     assert.match(dashboard, /dashboard\.recentItems/);
     assert.match(dashboard, /resolveOperationalSummaryAction/);
 
@@ -1014,6 +1020,12 @@ describe("SchoolOS web production contracts", () => {
     const dashboard = readMany([
       "app/dashboard/page.tsx",
       "components/dashboard/dashboard-command-center.tsx",
+      "components/dashboard/dashboard-module-meta.tsx",
+      "components/dashboard/dashboard-summary-strip.tsx",
+      "components/dashboard/dashboard-attention-panel.tsx",
+      "components/dashboard/dashboard-operations-panel.tsx",
+      "components/dashboard/dashboard-readiness-section.tsx",
+      "components/dashboard/dashboard-activity-panel.tsx",
       "components/ui/operational-summary.tsx",
     ]);
     const shell = read("components/layout/dashboard-shell.tsx");
@@ -1045,8 +1057,8 @@ describe("SchoolOS web production contracts", () => {
     );
     assert.match(dashboard, /DashboardCommandCenter/);
     assert.match(dashboard, /severityPresentation/);
-    assert.match(dashboard, /Pending Approvals & Alerts/);
-    assert.match(dashboard, /Today at a glance/);
+    assert.match(dashboard, /Needs your attention/);
+    assert.match(dashboard, /Today’s operations/);
     assert.match(dashboard, /["']\/dashboard\/fees["']/);
     assert.doesNotMatch(dashboard, /["']\/dashboard\/finance["']/);
     assert.doesNotMatch(
@@ -1093,12 +1105,16 @@ describe("SchoolOS web production contracts", () => {
 
   it("handles dashboard setup and empty-data states explicitly", () => {
     const dashboard = readMany([
-      "app/dashboard/page.tsx",
-      "components/dashboard/dashboard-command-center.tsx",
+      "app/dashboard/page.tsx", // keeps the `?? []` guard on summary fields
+      "components/dashboard/dashboard-operations-panel.tsx",
+      "components/dashboard/dashboard-activity-panel.tsx",
     ]);
 
-    assert.match(dashboard, /No daily-operation summaries are available/);
-    assert.match(dashboard, /No recent operational activity is available/);
+    assert.match(
+      dashboard,
+      /No operations summaries are available for your current access/,
+    );
+    assert.match(dashboard, /No recent school activity is available yet/);
     assert.match(dashboard, /\?\? \[\]/);
   });
 

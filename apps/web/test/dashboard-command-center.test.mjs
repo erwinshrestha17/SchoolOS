@@ -10,7 +10,21 @@ function read(relativePath) {
   return readFileSync(join(webRoot, relativePath), 'utf8');
 }
 
-describe('dashboard command center', () => {
+const DASHBOARD_COMPONENT_FILES = [
+  'components/dashboard/dashboard-command-center.tsx',
+  'components/dashboard/dashboard-module-meta.tsx',
+  'components/dashboard/dashboard-summary-strip.tsx',
+  'components/dashboard/dashboard-attention-panel.tsx',
+  'components/dashboard/dashboard-operations-panel.tsx',
+  'components/dashboard/dashboard-readiness-section.tsx',
+  'components/dashboard/dashboard-activity-panel.tsx',
+];
+
+function readDashboardBundle() {
+  return DASHBOARD_COMPONENT_FILES.map(read).join('\n');
+}
+
+describe('principal dashboard command center', () => {
   it('keeps the dashboard backed by the existing operational summary contract', () => {
     const page = read('app/dashboard/page.tsx');
 
@@ -22,165 +36,175 @@ describe('dashboard command center', () => {
     assert.match(page, /SummaryStatusBadge/);
   });
 
-  it('keeps dashboard drill-through actions on the shared safe-route allowlist', () => {
-    const commandCenter = read('components/dashboard/dashboard-command-center.tsx');
+  it('keeps every drill-through on the shared safe-route allowlist', () => {
+    const meta = read('components/dashboard/dashboard-module-meta.tsx');
+    const bundle = readDashboardBundle();
 
-    assert.match(commandCenter, /resolveOperationalSummaryAction/);
-    assert.match(commandCenter, /function safeRoute/);
-    assert.match(commandCenter, /function firstSafeAction/);
-    assert.doesNotMatch(commandCenter, /window\.open|signedUrl|objectKey|bucket/);
+    assert.match(meta, /resolveOperationalSummaryAction/);
+    assert.match(meta, /export function safeRoute/);
+    assert.match(meta, /export function firstSafeAction/);
+    // Module rows use fixed workspace routes, but even those resolve
+    // through the same allowlist so it stays the single authority.
+    assert.match(meta, /export function moduleWorkspaceRoute/);
+    assert.match(meta, /return safeRoute\(\{ key: `open_\$\{module\}`/);
+    assert.doesNotMatch(bundle, /window\.open|signedUrl|objectKey|bucket/);
   });
 
-  it('uses a priority-first operations layout instead of generic repeated summaries', () => {
+  it('composes the focused one-viewport structure without the old card walls', () => {
     const commandCenter = read('components/dashboard/dashboard-command-center.tsx');
 
-    for (const marker of [
-      'Pending Approvals & Alerts',
-      'Today at a glance',
-      'Run today’s school workflows',
-      'Academic snapshot',
-      'Department queues',
-      'Recent activity',
-      'Recent notices',
-      'DashboardUnavailableState',
-    ]) {
-      assert.ok(commandCenter.includes(marker), `Missing dashboard section: ${marker}`);
-    }
+    assert.match(commandCenter, /DashboardSummaryStrip/);
+    assert.match(commandCenter, /DashboardAttentionPanel/);
+    assert.match(commandCenter, /TodayOperationsPanel/);
+    assert.match(commandCenter, /SchoolReadinessSection/);
+    assert.match(commandCenter, /LatestSchoolActivityPanel/);
 
-    assert.doesNotMatch(commandCenter, /title="Operational summary"/);
+    const bundle = readDashboardBundle();
+    // Removed sections: the six-card pulse strip, module card walls, the
+    // quick-action tile wall, the full timetable list, and the separate
+    // notices panel must not come back.
+    assert.doesNotMatch(bundle, /Today at a glance/);
+    assert.doesNotMatch(bundle, /Department queues/);
+    assert.doesNotMatch(bundle, /QuickActionsSection/);
+    assert.doesNotMatch(bundle, /Jump into a workflow/);
+    assert.doesNotMatch(bundle, /TodaysTimetablePanel/);
+    assert.doesNotMatch(bundle, /RecentNoticesPanel/);
+    assert.doesNotMatch(bundle, /api\.listTimetable/);
+    assert.doesNotMatch(bundle, /api\.listNotices/);
   });
 
-  it('moves Pending Approvals into the context rail as a compact real-data panel, not a full-width banner', () => {
-    const commandCenter = read('components/dashboard/dashboard-command-center.tsx');
+  it('caps the summary strip at four compact cards built only from backend fields', () => {
+    const strip = read('components/dashboard/dashboard-summary-strip.tsx');
 
-    assert.match(commandCenter, /function PendingApprovalsPanel/);
-    assert.match(commandCenter, /function PendingApprovalRow/);
-    assert.doesNotMatch(commandCenter, /function AttentionCenter/);
-    assert.doesNotMatch(commandCenter, /function AttentionCard/);
-    // Every row must resolve through the same safe-route allowlist as
-    // everything else — no arbitrary href from backend attention payloads.
-    assert.match(
-      commandCenter,
-      /const directHref = safeRoute\(\{\s*\n\s*key: item\.key,/,
+    assert.match(strip, /\.slice\(0, 4\)/);
+    assert.match(strip, /attendanceProgress/);
+    assert.match(strip, /collectedTodayAmount/);
+    assert.match(strip, /paymentCountToday/);
+    assert.match(strip, /staffPresentToday/);
+    assert.match(strip, /staffOnApprovedLeaveToday/);
+
+    // Unavailable and permission-missing are never rendered as numbers.
+    assert.match(strip, /Information is not available yet\./);
+    assert.match(strip, /"Unavailable"/);
+    assert.match(strip, /permissionDenied/);
+  });
+
+  it('never presents unstarted attendance as student absence', () => {
+    const meta = read('components/dashboard/dashboard-module-meta.tsx');
+    const strip = read('components/dashboard/dashboard-summary-strip.tsx');
+    const operations = read('components/dashboard/dashboard-operations-panel.tsx');
+
+    // Progress comes from register/session counts (including the
+    // teacher-scoped keys), with an explicit notStarted state.
+    assert.match(meta, /attendanceSessionsToday/);
+    assert.match(meta, /unsubmittedRegisters/);
+    assert.match(meta, /assignedRegistersToday/);
+    assert.match(meta, /pendingRegistersToday/);
+    assert.match(meta, /notStarted/);
+
+    assert.match(strip, /"Not started"/);
+    assert.match(operations, /Attendance has not started/);
+    // The strip and rows must not read absence counts at all.
+    assert.doesNotMatch(strip, /absentToday|presentToday\b/);
+    assert.doesNotMatch(operations, /absentToday/);
+  });
+
+  it('keeps approvals, warnings, and follow-ups distinct instead of one merged pending number', () => {
+    const meta = read('components/dashboard/dashboard-module-meta.tsx');
+    const strip = read('components/dashboard/dashboard-summary-strip.tsx');
+
+    assert.match(meta, /APPROVAL_ATTENTION_KEYS/);
+    assert.match(meta, /export function attentionKind/);
+    assert.match(strip, /attentionKind\(item\) === "approval"/);
+    // The old misleading total — summing every attention count into one
+    // "Pending Approvals" figure — must not return.
+    assert.doesNotMatch(
+      readDashboardBundle(),
+      /reduce\(\s*\n?\s*\(sum, item\) => sum \+ item\.count/,
     );
   });
 
-  it('renders Recent Notices from the real M12 notices list, permission-gated, never a hardcoded count', () => {
-    const commandCenter = read('components/dashboard/dashboard-command-center.tsx');
+  it('bounds the attention list at five with an in-place view-all of the bounded payload', () => {
+    const panel = read('components/dashboard/dashboard-attention-panel.tsx');
 
-    assert.match(commandCenter, /function RecentNoticesPanel/);
-    assert.match(commandCenter, /queryFn: api\.listNotices/);
-    assert.match(commandCenter, /hasPermissions\(\["notices:read"\]\)/);
-    assert.match(commandCenter, /if \(!canReadNotices\) return null;/);
-    assert.match(commandCenter, /import \{ PriorityBadge \} from "\.\.\/forms\/communications-form"/);
-    assert.doesNotMatch(commandCenter, /notice\.body/);
+    assert.match(panel, /const DEFAULT_VISIBLE_ITEMS = 5/);
+    assert.match(panel, /openItems\.slice\(0, DEFAULT_VISIBLE_ITEMS\)/);
+    assert.match(panel, /View all \$\{formatNumber\(openItems\.length\)\} attention items/);
+    assert.match(panel, /id="needs-attention"/);
+    // Rows resolve through the safe-route allowlist, never raw item.action.
+    assert.match(panel, /const href = safeRoute\(\{/);
+    // Genuine zero is a distinct, honest state.
+    assert.match(panel, /No approvals, warnings, or follow-ups are open/);
   });
 
-  it('builds the six-card KPI strip only from real backend fields, full-width above both columns', () => {
-    const commandCenter = read('components/dashboard/dashboard-command-center.tsx');
+  it('renders today’s operations as compact permitted rows, never cards for locked modules', () => {
+    const operations = read('components/dashboard/dashboard-operations-panel.tsx');
 
-    for (const label of [
-      'Active Students',
-      'Present Today',
-      'Collected Today',
-      'Pending Approvals',
-      'Staff Present',
-      'Overdue Fees',
-    ]) {
-      assert.ok(commandCenter.includes(`label: "${label}"`), `Missing KPI card: ${label}`);
-    }
-
-    // Staff Present and Overdue Fees needed two new real backend metrics
-    // (staffPresentToday, overdueFeesAmount) added 2026-07-10 specifically so
-    // these cards would be honest instead of omitted or faked.
-    assert.match(commandCenter, /metric\(hr, "staffPresentToday"\)/);
-    assert.match(commandCenter, /metric\(fees, "overdueFeesAmount"\)/);
-
-    // Pending Approvals sums real attentionItems already on the payload —
-    // no second query — and has no href since it has no single destination.
-    assert.match(
-      commandCenter,
-      /attentionItems\.reduce\(\s*\n\s*\(sum, item\) => sum \+ item\.count,/,
-    );
-
-    assert.match(commandCenter, /cards\.slice\(0, 6\)/);
-    assert.match(commandCenter, /sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6/);
-
-    // The KPI strip must render outside/above the two-column
-    // main-content/aside grid so it spans the full page width, not just the
-    // narrower left column.
-    const returnIndex = commandCenter.indexOf('return (');
-    const pulseIndex = commandCenter.indexOf('School pulse');
-    const twoColumnGridIndex = commandCenter.indexOf(
-      "xl:grid-cols-[minmax(0,1fr)_24rem]",
-    );
-    assert.ok(returnIndex < pulseIndex && pulseIndex < twoColumnGridIndex);
+    assert.match(operations, /summary\.status !== "locked"/);
+    assert.match(operations, /prioritizeByAttention/);
+    assert.match(operations, /Today’s operations/);
+    // One meaningful state per module row with honest unavailable/zero split.
+    assert.match(operations, /registers submitted/);
+    assert.match(operations, /collected/);
+    assert.match(operations, /No open transport issue/);
+    assert.match(operations, /Information is not available yet\./);
+    assert.match(operations, /Some information is temporarily unavailable\./);
+    assert.match(operations, /No operations summaries are available for your current access\./);
   });
 
-  it('adds real backend fields for staff present and overdue fee amount instead of omitting the KPIs', () => {
-    const service = read('../api/src/operational-summary/operational-summary.service.ts');
+  it('keeps the readiness section bounded with honest permission and zero states', () => {
+    const readiness = read('components/dashboard/dashboard-readiness-section.tsx');
 
-    assert.match(service, /this\.def\('staffPresentToday', 'staffAttendance'/);
-    assert.match(service, /function overdueFeesAmountMetric|private async overdueFeesAmountMetric/);
-    assert.match(service, /Math\.max\(0, invoiceTotal - paidTotal \+ refundTotal\)/);
+    assert.match(readiness, /const MAX_ROWS_PER_PANEL = 4/);
+    assert.match(readiness, /Academic readiness/);
+    assert.match(readiness, /Finance readiness/);
+    assert.match(readiness, /People & operations/);
+    assert.match(readiness, /You do not have permission to view this summary\./);
+    assert.match(readiness, /No academic blockers reported\./);
+    assert.match(readiness, /count === null \|\| count <= 0/);
+    // Timetable is readiness/exceptions plus a drill-through, not a list.
+    assert.match(readiness, /unassignedSubstitutionsToday/);
+    assert.match(readiness, /View full timetable/);
+    assert.match(readiness, /href="\/dashboard\/timetable"/);
   });
 
-  it('shows Today\'s Timetable using the real ISO weekday convention, not JS getDay()', () => {
-    const commandCenter = read('components/dashboard/dashboard-command-center.tsx');
+  it('combines recent activity and notices into one bounded feed from the summary payload', () => {
+    const activity = read('components/dashboard/dashboard-activity-panel.tsx');
 
-    assert.match(commandCenter, /function TodaysTimetablePanel/);
-    assert.match(commandCenter, /function currentNepalIsoWeekday/);
-    // Confirmed from the timetable builder's own DAYS array: 1=Monday, not
-    // JS's Date.getDay() 0=Sunday convention (a mismatch a sibling teacher
-    // dashboard component actually has — do not copy that bug here). Built
-    // from getNepalNow() calendar fields, not Intl.DateTimeFormat, per the
-    // no-browser-local-date-rendering contract in date-utils-contract.test.mjs.
-    assert.match(commandCenter, /const now = getNepalNow\(\);/);
-    assert.match(commandCenter, /jsWeekday === 0 \? 7 : jsWeekday/);
-    assert.doesNotMatch(commandCenter, /new Intl\.DateTimeFormat/);
-    assert.match(commandCenter, /queryFn: \(\) => api\.listTimetable\(\{ dayOfWeek, limit: 50 \}\)/);
-    assert.match(commandCenter, /hasPermissions\(\["timetable:read"\]\)/);
-    assert.match(commandCenter, /if \(!canReadTimetable\) return null;/);
-    assert.match(commandCenter, /No classes are scheduled for today\./);
+    assert.match(activity, /const MAX_ACTIVITY_ITEMS = 5/);
+    assert.match(activity, /items\.slice\(0, MAX_ACTIVITY_ITEMS\)/);
+    assert.match(activity, /Latest school activity/);
+    assert.match(activity, /formatBsDateTime/);
+    // No message bodies, no extra list fetches, no invented view-all route.
+    assert.doesNotMatch(activity, /notice\.body|\.body\b/);
+    assert.doesNotMatch(activity, /useQuery/);
+    assert.match(activity, /ACTIVITY_EVENT_LABELS/);
   });
 
-  it('shows a radial gauge only for the one metric with a genuine real ratio (attendance)', () => {
-    const commandCenter = read('components/dashboard/dashboard-command-center.tsx');
+  it('derives the header primary action from real dashboard data, attention first', () => {
+    const page = read('app/dashboard/page.tsx');
 
-    assert.match(commandCenter, /function RadialGauge/);
-    assert.match(commandCenter, /function computeAttendanceRate/);
-    assert.match(
-      commandCenter,
-      /ringPercent=\{\s*\n\s*summary\.module === "m2_attendance" \? attendanceRate : null/,
-    );
+    assert.match(page, /title="School Overview"/);
+    assert.match(page, /Daily operating snapshot for your school/);
+    assert.match(page, /Review \$\{attentionCount\} attention item/);
+    assert.match(page, /href: '#needs-attention'/);
+    assert.match(page, /firstNextAction/);
+    assert.doesNotMatch(page, /primaryAction=\{\s*<RefreshSummaryButton/);
+    // Secondary actions stay in the shared More Actions menu.
+    assert.match(page, /moreActionItems=\{quickActions/);
   });
 
-  it('derives the attendance rate only from two real backend numbers, never invented', () => {
-    const commandCenter = read('components/dashboard/dashboard-command-center.tsx');
+  it('avoids technical wording and the old repeated status filler', () => {
+    const bundle = readDashboardBundle();
 
-    assert.match(
-      commandCenter,
-      /typeof presentToday === "number" &&\s*\n\s*typeof expectedStudents === "number" &&\s*\n\s*expectedStudents > 0/,
-    );
-    assert.match(commandCenter, /Math\.round\(\(presentToday \/ expectedStudents\) \* 100\)/);
-  });
-
-  it('renders a real, bounded quick-action icon grid instead of a generic action list', () => {
-    const commandCenter = read('components/dashboard/dashboard-command-center.tsx');
-
-    assert.match(commandCenter, /function QuickActionsSection/);
-    assert.match(commandCenter, /Jump into a workflow/);
-    // Every tile must come from the real, permission-filtered nextActions
-    // list and resolve through the same safe-route allowlist as the rest of
-    // the dashboard — never an invented action or an arbitrary href.
-    assert.match(commandCenter, /dashboard\.nextActions/);
-    assert.match(commandCenter, /\.slice\(0, 6\)/);
-    assert.match(commandCenter, /function quickActionPresentation/);
-    assert.doesNotMatch(commandCenter, /function NextActionsPanel/);
+    assert.doesNotMatch(bundle, /Current information available/);
+    assert.doesNotMatch(bundle, /No open work reported/);
+    assert.doesNotMatch(bundle, /Failed to fetch|Error 40|provider payload/i);
+    assert.doesNotMatch(bundle, /\bAPI\b|endpoint/);
   });
 
   it('uses current product labels for visible module names', () => {
-    const commandCenter = read('components/dashboard/dashboard-command-center.tsx');
+    const meta = read('components/dashboard/dashboard-module-meta.tsx');
 
     for (const label of [
       'Library',
@@ -190,26 +214,7 @@ describe('dashboard command center', () => {
       'Notices & Announcements',
       'Learning Layer',
     ]) {
-      assert.ok(commandCenter.includes(label), `Missing visible product label: ${label}`);
+      assert.ok(meta.includes(label), `Missing visible product label: ${label}`);
     }
-  });
-
-  it('uses the School Overview header copy with a single role-aware primary action', () => {
-    const page = read('app/dashboard/page.tsx');
-
-    assert.match(page, /title="School Overview"/);
-    assert.match(page, /Daily operating snapshot for your school/);
-
-    // The backend already orders nextActions by priority for the session,
-    // so the header's one primary action must be the first authorized entry
-    // from that real list, not a generic control like refresh — refresh
-    // moves next to the "Updated ..." timestamp where it belongs.
-    assert.match(page, /const \[primaryNextAction, \.\.\.remainingNextActions\] = safeNextActions/);
-    assert.match(page, /primaryNextAction\.action\.label/);
-    assert.match(page, /primaryNextAction\.href/);
-    assert.doesNotMatch(
-      page,
-      /primaryAction=\{\s*<RefreshSummaryButton/,
-    );
   });
 });
