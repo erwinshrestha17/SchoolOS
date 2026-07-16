@@ -444,6 +444,24 @@ export function AttendanceForm() {
     return () => window.removeEventListener("online", handleOnline);
   });
 
+  const mutation = useMutation({
+    mutationFn: api.submitAttendance,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["attendance-roster"] });
+      void clearAttendanceDraft(draftKey);
+      setDraftClientSubmissionId(null);
+      setDraftSavedAt(null);
+      setHasDraftChanges(false);
+      setSyncResultMessage("");
+      setLastServerSyncStatus(null);
+      setDraftSyncState("synced");
+      setSubmitMessage(
+        `Attendance submitted successfully at ${formatNepalTime(new Date())}.`,
+      );
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    },
+  });
+
   const saveDraftMutation = useMutation({
     mutationFn: api.saveAttendanceDraft,
     onSuccess: () => {
