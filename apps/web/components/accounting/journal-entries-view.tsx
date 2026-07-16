@@ -57,7 +57,7 @@ export function JournalEntriesView() {
       <PageState
         tone="loading"
         title="Loading journal entries"
-        description="Fetching posted and draft journal records from the backend."
+        description="Loading posted and draft journal records."
       />
     );
   }

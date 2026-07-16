@@ -12,7 +12,7 @@ interface PermissionDeniedProps {
 }
 
 export function PermissionDenied({
-  title = 'Access Restricted',
+  title = 'Access restricted',
   description = "You don't have the necessary permissions to access this platform control plane. Please contact your system administrator if you believe this is an error.",
   showBack = true,
   showHome = true,

@@ -42,7 +42,7 @@ export function JournalEntryDialog({
             <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 mt-2 ml-[3.25rem]">
               {entry
                 ? `Recorded on ${formatBsDate(entry.entryDate)}`
-                : "Fetching ledger details"}
+                : "Loading ledger details"}
             </p>
           </div>
           <button

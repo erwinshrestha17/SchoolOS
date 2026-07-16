@@ -45,9 +45,9 @@ export class ErrorBoundary extends Component<Props, State> {
           <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-danger-100 text-danger-600">
             <AlertTriangle size={32} />
           </div>
-          <h3 className="text-xl font-bold text-slate-900">Something went wrong</h3>
+          <h3 className="text-xl font-bold text-slate-900">This section could not be displayed</h3>
           <p className="mt-2 max-w-sm text-sm text-slate-500 leading-relaxed">
-            An unexpected error occurred while rendering this section.
+            The page ran into a problem while loading this section. Try again.
           </p>
           {requestId && (
             <p className="mt-3 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-500">

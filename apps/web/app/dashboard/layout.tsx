@@ -455,7 +455,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     return (
       <DashboardShell>
         <PermissionDenied
-          title="Access Restricted"
+          title="Access restricted"
           description="Platform administrator accounts cannot access school operations directly. Please use the Support Override console to access a school workspace."
           resource="School Operations"
           action="support_override"
@@ -472,7 +472,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     return (
       <DashboardShell>
         <PermissionDenied
-          title={`${routeGate.label} Access Restricted`}
+          title={`${routeGate.label} access is restricted`}
           description="Your current role cannot open this workspace. Ask a school administrator to add the required permission, or switch to an account with the correct access."
           resource={routeGate.label}
           action={routeGate.permissions.join(" or ")}

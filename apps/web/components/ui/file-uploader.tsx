@@ -85,7 +85,7 @@ export function FileUploader({
           <>
             <Loader2 className="h-10 w-10 mb-4 text-[var(--primary)] animate-spin" />
             <p className="text-sm font-bold text-slate-900">Uploading...</p>
-            <p className="text-xs text-slate-500 mt-1">Please wait while we process your files.</p>
+            <p className="text-xs text-slate-500 mt-1">Your files are being prepared.</p>
           </>
         ) : (
           <>

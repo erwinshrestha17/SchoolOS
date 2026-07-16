@@ -540,7 +540,7 @@ function MutationMessage({
   if (mutation.isError) {
     return (
       <p className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-medium text-rose-700">
-        {mutation.error?.message ?? 'Something went wrong.'}
+        {mutation.error?.message ?? 'Changes could not be saved. Try again.'}
       </p>
     );
   }

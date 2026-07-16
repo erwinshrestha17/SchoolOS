@@ -22,8 +22,8 @@ interface PermissionDeniedProps {
 }
 
 export function PermissionDenied({
-  title = 'Access Restricted',
-  description = "You don't have the necessary permissions to access this resource or perform this action.",
+  title = 'Access restricted',
+  description = "You do not have permission to open this page or perform this action. Contact your school administrator if you need access.",
   resource,
   action,
   className,

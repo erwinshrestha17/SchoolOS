@@ -57,7 +57,7 @@ export function ChartOfAccountsView() {
       <PageState
         tone="loading"
         title="Loading Chart of Accounts"
-        description="Fetching your school's financial account structure."
+        description="Loading your school's financial account structure."
       />
     );
   }

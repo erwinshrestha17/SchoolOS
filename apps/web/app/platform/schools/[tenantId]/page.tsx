@@ -1834,5 +1834,5 @@ function formatBytes(value: number) {
 }
 
 function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : 'Something went wrong';
+  return error instanceof Error ? error.message : 'This action could not be completed. Try again.';
 }

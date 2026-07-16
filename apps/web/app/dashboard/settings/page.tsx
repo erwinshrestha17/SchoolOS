@@ -1046,7 +1046,7 @@ function TenantSettingsContent() {
       {/* ── Compact Page Header ─────────────────────────────── */}
       <PageHeader
         title="Settings"
-        description="Manage school profile, rules, permissions, documents, and tenant configuration."
+        description="Manage school profile, rules, permissions, documents, and school configuration."
         actions={
           <>
             <span className="inline-flex items-center rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-500">
@@ -3472,7 +3472,7 @@ function UsersAccessPanel() {
     if (createDraft.roleIds.length === 0) {
       setActionNotice({
         type: "error",
-        text: "Select at least one tenant role before creating the account.",
+        text: "Select at least one school role before creating the account.",
       });
       return;
     }
@@ -3582,7 +3582,7 @@ function UsersAccessPanel() {
               Create Tenant User
             </p>
             <p className="mt-0.5 text-xs text-slate-500">
-              Assign one or more existing tenant roles at creation time.
+              Assign one or more existing school roles at creation time.
             </p>
           </div>
           <button
