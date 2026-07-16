@@ -80,98 +80,98 @@ const MODULE_DEFINITIONS: Record<
     shortLabel: "Students & Admissions",
     group: "queue",
     icon: Users,
-    accentClass: "text-blue-700 bg-blue-50 border-blue-100",
+    accentClass: "text-[color:var(--color-mod-admissions-text)] bg-[var(--color-mod-admissions-soft)] border-[color:var(--color-mod-admissions-border)]",
   },
   m2_attendance: {
     label: "Smart Attendance",
     shortLabel: "Attendance",
     group: "daily",
     icon: CalendarClock,
-    accentClass: "text-emerald-700 bg-emerald-50 border-emerald-100",
+    accentClass: "text-[color:var(--color-mod-attendance-text)] bg-[var(--color-mod-attendance-soft)] border-[color:var(--color-mod-attendance-border)]",
   },
   m3_fees: {
     label: "Fees & Receipts",
     shortLabel: "Fees",
     group: "daily",
     icon: Wallet,
-    accentClass: "text-amber-700 bg-amber-50 border-amber-100",
+    accentClass: "text-[color:var(--color-mod-fees-text)] bg-[var(--color-mod-fees-soft)] border-[color:var(--color-mod-fees-border)]",
   },
   m4_academics: {
     label: "Academics, Exams & Report Cards",
     shortLabel: "Academics",
     group: "academic",
     icon: GraduationCap,
-    accentClass: "text-violet-700 bg-violet-50 border-violet-100",
+    accentClass: "text-[color:var(--color-mod-academics-text)] bg-[var(--color-mod-academics-soft)] border-[color:var(--color-mod-academics-border)]",
   },
   m5_activity: {
     label: "Activity Feed & Milestones",
     shortLabel: "Activity Feed",
     group: "queue",
     icon: MessageSquare,
-    accentClass: "text-pink-700 bg-pink-50 border-pink-100",
+    accentClass: "text-[color:var(--color-mod-activity-text)] bg-[var(--color-mod-activity-soft)] border-[color:var(--color-mod-activity-border)]",
   },
   m6_homework_timetable: {
     label: "Homework & Timetable",
     shortLabel: "Homework & Timetable",
     group: "academic",
     icon: BookOpen,
-    accentClass: "text-sky-700 bg-sky-50 border-sky-100",
+    accentClass: "text-[color:var(--color-mod-homework-text)] bg-[var(--color-mod-homework-soft)] border-[color:var(--color-mod-homework-border)]",
   },
   m7_hr_payroll: {
     label: "HR & Payroll",
     shortLabel: "HR & Payroll",
     group: "queue",
     icon: Users,
-    accentClass: "text-purple-700 bg-purple-50 border-purple-100",
+    accentClass: "text-[color:var(--color-mod-hr-text)] bg-[var(--color-mod-hr-soft)] border-[color:var(--color-mod-hr-border)]",
   },
   m8a_library: {
     label: "Library",
     shortLabel: "Library",
     group: "queue",
     icon: Library,
-    accentClass: "text-teal-700 bg-teal-50 border-teal-100",
+    accentClass: "text-[color:var(--color-mod-library-text)] bg-[var(--color-mod-library-soft)] border-[color:var(--color-mod-library-border)]",
   },
   m8b_transport: {
     label: "Transport",
     shortLabel: "Transport",
     group: "daily",
     icon: Bus,
-    accentClass: "text-orange-700 bg-orange-50 border-orange-100",
+    accentClass: "text-[color:var(--color-mod-transport-text)] bg-[var(--color-mod-transport-soft)] border-[color:var(--color-mod-transport-border)]",
   },
   m8c_canteen: {
     label: "Canteen",
     shortLabel: "Canteen",
     group: "daily",
     icon: Utensils,
-    accentClass: "text-lime-700 bg-lime-50 border-lime-100",
+    accentClass: "text-[color:var(--color-mod-canteen-text)] bg-[var(--color-mod-canteen-soft)] border-[color:var(--color-mod-canteen-border)]",
   },
   m9_accounting: {
     label: "Accounting & Finance",
     shortLabel: "Accounting",
     group: "queue",
     icon: Landmark,
-    accentClass: "text-cyan-800 bg-cyan-50 border-cyan-100",
+    accentClass: "text-[color:var(--color-mod-accounting-text)] bg-[var(--color-mod-accounting-soft)] border-[color:var(--color-mod-accounting-border)]",
   },
   m10_communications: {
     label: "Notices & Announcements",
     shortLabel: "Notices",
     group: "daily",
     icon: MessageSquare,
-    accentClass: "text-rose-700 bg-rose-50 border-rose-100",
+    accentClass: "text-[color:var(--color-mod-notices-text)] bg-[var(--color-mod-notices-soft)] border-[color:var(--color-mod-notices-border)]",
   },
   m11_intelligence: {
     label: "Intelligence / AI",
     shortLabel: "Intelligence",
     group: "queue",
     icon: CircleAlert,
-    accentClass: "text-slate-600 bg-slate-50 border-slate-200",
+    accentClass: "text-[color:var(--color-mod-intelligence-text)] bg-[var(--color-mod-intelligence-soft)] border-[color:var(--color-mod-intelligence-border)]",
   },
   m12_learning: {
     label: "Learning Layer",
     shortLabel: "Learning",
     group: "academic",
     icon: School,
-    accentClass: "text-indigo-700 bg-indigo-50 border-indigo-100",
+    accentClass: "text-[color:var(--color-mod-learning-text)] bg-[var(--color-mod-learning-soft)] border-[color:var(--color-mod-learning-border)]",
   },
 };
 
@@ -242,18 +242,18 @@ const severityPresentation: Record<
 > = {
   critical: {
     label: "Urgent",
-    className: "border-rose-200 bg-rose-50/70",
-    iconClassName: "text-rose-600",
+    className: "border-danger-100 bg-danger-50",
+    iconClassName: "text-danger-700",
   },
   warning: {
     label: "Warning",
-    className: "border-amber-200 bg-amber-50/70",
-    iconClassName: "text-amber-600",
+    className: "border-warning-100 bg-warning-50",
+    iconClassName: "text-warning-700",
   },
   info: {
     label: "Review",
-    className: "border-blue-200 bg-blue-50/70",
-    iconClassName: "text-blue-600",
+    className: "border-info-100 bg-info-50",
+    iconClassName: "text-info-700",
   },
 };
 
@@ -415,7 +415,7 @@ function quickActionPresentation(href: string): {
     const definition = MODULE_DEFINITIONS[match[1]];
     return { icon: definition.icon, accentClass: definition.accentClass };
   }
-  return { icon: Settings, accentClass: "text-slate-600 bg-slate-50 border-slate-200" };
+  return { icon: Settings, accentClass: "text-[color:var(--color-mod-settings-text)] bg-[var(--color-mod-settings-soft)] border-[color:var(--color-mod-settings-border)]" };
 }
 
 function QuickActionsSection({
@@ -511,9 +511,9 @@ function PendingApprovalsPanel({
           ))}
         </div>
       ) : (
-        <div className="flex items-start gap-3 rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
+        <div className="flex items-start gap-3 rounded-xl border border-success-100 bg-success-50 p-4">
           <CheckCircle2
-            className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600"
+            className="mt-0.5 h-5 w-5 shrink-0 text-success-600"
             aria-hidden="true"
           />
           <p className="text-sm leading-5 text-slate-700">
@@ -548,34 +548,44 @@ function PendingApprovalRow({
       <span
         className={cn(
           "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border",
-          presentation.className,
+          definition.accentClass,
         )}
       >
-        <Icon
-          className={cn("h-4 w-4", presentation.iconClassName)}
-          aria-hidden="true"
-        />
+        <Icon className="h-4 w-4" aria-hidden="true" />
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-bold text-slate-900">
           {item.label}
         </p>
-        <p className="mt-0.5 truncate text-xs font-medium text-slate-500">
+        <p className="mt-0.5 truncate text-xs font-medium text-slate-600">
           {formatNumber(item.count)} {item.count === 1 ? "item" : "items"}{" "}
           pending in {definition.shortLabel}
         </p>
       </div>
+      <span
+        className={cn(
+          "shrink-0 rounded-full bg-white/80 px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide",
+          presentation.iconClassName,
+        )}
+      >
+        {presentation.label}
+      </span>
       {href ? (
         <ArrowRight
-          className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-[var(--primary)]"
+          className="h-4 w-4 shrink-0 text-slate-500 transition group-hover:translate-x-0.5 group-hover:text-[var(--primary)]"
           aria-hidden="true"
         />
       ) : null}
     </>
   );
 
-  const className =
-    "group flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 transition hover:border-slate-300 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2";
+  // The severity tier owns the row surface (pale red / amber / blue) and
+  // stays legible as text; the module icon keeps the module accent, per the
+  // colour direction's attention-queue treatment.
+  const className = cn(
+    "group flex items-center gap-3 rounded-xl border p-3 transition hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2",
+    presentation.className,
+  );
 
   return href ? (
     <Link href={href} className={className}>
@@ -1189,7 +1199,7 @@ function buildPulseCards(
           ? `${attendanceRate}% present today.`
           : "Active students in the current school record.",
       icon: Users,
-      accentClass: "text-blue-700 bg-blue-50 border-blue-100",
+      accentClass: "text-[color:var(--color-mod-dashboard-text)] bg-[var(--color-mod-dashboard-soft)] border-[color:var(--color-mod-dashboard-border)]",
       href: attendance ? (firstSafeAction(attendance)?.href ?? null) : null,
       actionLabel: "Open attendance",
     });
