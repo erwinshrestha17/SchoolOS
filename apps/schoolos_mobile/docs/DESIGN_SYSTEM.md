@@ -165,13 +165,41 @@ SchoolOS mobile should feel:
 
 - Clean card-based layout.
 - Simple white/soft cards on calm background.
-- Deep blue/indigo primary identity.
+- Himalayan blue identity: brand blue `#2563EB` for actions, deep navy
+  `#17324D` for authority. Same identity as SchoolOS web.
 - Clear role-specific home header.
 - Large tap targets.
 - Minimal charts.
 - No dense tables.
 - No desktop dashboard density.
 - Friendly school language.
+
+Palette lives in `lib/app/theme/app_colors.dart` and mirrors the web tokens
+(`apps/web/docs/DESIGN_SYSTEM.md` §5.2):
+
+| Token | Value | Usage |
+|---|---:|---|
+| `primary` | `#2563EB` | Primary actions, links, active controls. |
+| `primaryDark` | `#1D4ED8` | Pressed states. |
+| `primaryLight` | `#EAF2FF` | Brand tint: selected chips and rows. |
+| `brandNavy` | `#17324D` | Headings, authority accents. |
+| `secondary` | `#168C8C` | Brand teal accent. |
+| `backgroundLight` | `#F4F7FB` | Scaffold canvas. |
+| `slate200` | `#DDE4EC` | Borders and separators. |
+| `slate500` | `#667085` | Secondary text. |
+| `slate400` | `#98A2B3` | Timestamps and placeholders. |
+| `slate900` | `#172033` | Primary text. |
+
+Semantic colours never change meaning by screen or persona
+(main / pale / dark text): success `#27875A`/`#EAF7F0`/`#17633E`, warning
+`#D99016`/`#FFF6DF`/`#82580B`, danger `#D14343`/`#FDECEC`/`#9D2929`, info
+`#2878C8`/`#EAF3FC`/`#1F5E9B`.
+
+Persona home accents are anchored to the module each persona lives in:
+parent coral `#D56B5D` (Activity), student cyan `#2C91B7` (Learning),
+teacher indigo `#5B5BD6` (Academics), driver orange `#D46A1F` (Transport),
+staff steel `#4B6B88` (HR), admin navy `#17324D`. Accents identify the
+persona's home — they never replace semantic status colours.
 
 ### 5.2 Avoid
 
@@ -226,6 +254,19 @@ Use:
 ## 7. Typography
 
 Typography should create clear hierarchy without visual noise.
+
+Font: **Inter** for English, numbers, and interface text, with **Noto Sans
+Devanagari** for Nepali and the system sans-serif as final fallback — the
+same type personality as SchoolOS web. The stack is declared in
+`lib/app/design_system/app_typography.dart`; font assets are not bundled
+yet, so the system font renders until they are added.
+
+Scale (from the SchoolOS Typography Standard, mobile table): screen title
+24/32 700 (`headlineLarge`), section heading 18/24 600 (`titleLarge`), card
+heading 16/22 600 (`titleMedium`), main body 14/21 400 (`bodyMedium`),
+important value 20/28 700 (`headlineMedium`), helper 12/17 400
+(`bodySmall`), button 14/20 600 (`labelLarge`), bottom navigation 11/16 500
+(`labelSmall`). Do not reduce important operational text below 12.
 
 | Role | Guidance |
 |---|---|
