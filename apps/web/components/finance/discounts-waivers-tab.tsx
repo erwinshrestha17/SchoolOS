@@ -227,7 +227,7 @@ export function DiscountsWaiversTab({
             {discountSuccess && (
               <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-2.5 text-xs font-bold text-emerald-700">
                 <Check size={14} />
-                Discount rule created successfully!
+                Discount rule created.
               </div>
             )}
             {discountMutation.isError && (
@@ -455,7 +455,7 @@ export function DiscountsWaiversTab({
             {waiverSuccess && (
               <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-2.5 text-xs font-bold text-emerald-700">
                 <Check size={14} />
-                Waiver applied successfully!
+                Waiver applied.
               </div>
             )}
             {waiverMutation.isError && (

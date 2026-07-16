@@ -9,10 +9,10 @@ import { Button } from '@/components/ui/button';
 import { useEffect } from 'react';
 
 const examSchema = z.object({
-  academicYearId: z.string().min(1, 'Academic year is required'),
-  name: z.string().min(1, 'Exam name is required').max(50),
-  startsOn: z.string().min(1, 'Start date is required'),
-  endsOn: z.string().min(1, 'End date is required'),
+  academicYearId: z.string().min(1, 'Select an academic year'),
+  name: z.string().min(1, 'Enter an exam name').max(50),
+  startsOn: z.string().min(1, 'Select a start date'),
+  endsOn: z.string().min(1, 'Select an end date'),
   weightPercent: z.number().min(0).max(100),
   status: z.enum(['DRAFT', 'ACTIVE', 'ARCHIVED']),
 });

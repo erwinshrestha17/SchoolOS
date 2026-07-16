@@ -165,7 +165,7 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
       void queryClient.invalidateQueries({ queryKey: ['staff'] });
       setToastMsg({
         title: 'Profile Updated',
-        desc: 'Staff member information has been updated successfully.',
+        desc: 'Staff member information updated.',
         tone: 'success',
       });
     },

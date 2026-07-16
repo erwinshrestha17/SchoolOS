@@ -42,7 +42,7 @@ export type QueuedJobStateProps = {
 const statusCopy: Record<BackgroundJobStatus, string> = {
   QUEUED: 'Waiting in the queue. This will start shortly.',
   PROCESSING: 'This is running now. You can keep working — it will finish in the background.',
-  SUCCEEDED: 'Completed successfully.',
+  SUCCEEDED: 'Completed.',
   PARTIALLY_SUCCEEDED: 'Finished, but some items need attention.',
   FAILED: 'This did not complete. You can try again.',
   CANCELLED: 'This was cancelled before it finished.',

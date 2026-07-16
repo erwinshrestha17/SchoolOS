@@ -177,7 +177,7 @@ export function CasRecordsTab({ academicYears, classes, allSections, subjects }:
     mutationFn: api.createCasRecord,
     onSuccess: () => {
       invalidate();
-      setSuccessMessage('Observation recorded successfully.');
+      setSuccessMessage('Observation recorded.');
       setCas((current) => ({ ...current, studentId: '', score: 0, note: '' }));
       window.setTimeout(() => setSuccessMessage(''), 5000);
     },
@@ -189,7 +189,7 @@ export function CasRecordsTab({ academicYears, classes, allSections, subjects }:
     onSuccess: () => {
       invalidate();
       setEditingId(null);
-      setSuccessMessage('Observation updated successfully.');
+      setSuccessMessage('Observation updated.');
       window.setTimeout(() => setSuccessMessage(''), 5000);
     },
   });
@@ -199,7 +199,7 @@ export function CasRecordsTab({ academicYears, classes, allSections, subjects }:
     onSuccess: () => {
       invalidate();
       setDeleteTarget(null);
-      setSuccessMessage('Observation deleted successfully.');
+      setSuccessMessage('Observation deleted.');
       window.setTimeout(() => setSuccessMessage(''), 5000);
     },
   });
@@ -210,7 +210,7 @@ export function CasRecordsTab({ academicYears, classes, allSections, subjects }:
       invalidate();
       setBatchDraft({});
       setBatchNotes({});
-      setSuccessMessage(`Saved ${data.count} observations successfully.`);
+      setSuccessMessage(`Saved ${data.count} observations.`);
       window.setTimeout(() => setSuccessMessage(''), 5000);
     },
   });

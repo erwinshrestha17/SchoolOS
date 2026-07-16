@@ -239,7 +239,7 @@ export function AdmissionCaseWizard({ initialCaseId }: { initialCaseId?: string 
     ].filter(Boolean).join(' / ');
     return (
       <SectionCard
-        title="Admission completed successfully"
+        title="Admission completed"
         description={`${admissionResult.student.fullNameEn} now has an active student profile. Fee collection remains a separate workflow.`}
       >
         <dl className="mb-5 grid gap-3 sm:grid-cols-2">

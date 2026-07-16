@@ -168,7 +168,7 @@ export function CollectionSection({
             </div>
             <div>
               <p className="text-sm font-black tracking-tight text-success-900">
-                Payment collected successfully
+                Payment collected
               </p>
               <p className="mt-0.5 text-sm font-semibold text-success-800 tabular-nums">
                 {lastReceipt.disposition === "REPLAYED"

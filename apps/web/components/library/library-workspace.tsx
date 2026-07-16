@@ -300,7 +300,7 @@ export function LibraryWorkspace({
     mutationFn: ({ id, body }: { id: string; body: any }) =>
       libraryApi.updateFine(id, body),
     onSuccess: () => {
-      setNotice("Fine updated successfully.");
+      setNotice("Fine updated.");
       void queryClient.invalidateQueries({ queryKey: ["library-fines"] });
     },
   });
@@ -331,7 +331,7 @@ export function LibraryWorkspace({
     mutationFn: libraryApi.createBook,
     onSuccess: () => {
       setBookForm(emptyBookForm);
-      setNotice("Book saved successfully.");
+      setNotice("Book saved.");
       invalidateLibrary();
     },
   });
@@ -347,7 +347,7 @@ export function LibraryWorkspace({
     onSuccess: () => {
       setBookForm(emptyBookForm);
       setEditingBookId(null);
-      setNotice("Book updated successfully.");
+      setNotice("Book updated.");
       invalidateLibrary();
     },
   });
@@ -356,7 +356,7 @@ export function LibraryWorkspace({
     mutationFn: libraryApi.createCopy,
     onSuccess: () => {
       setCopyForm(emptyCopyForm);
-      setNotice("Book copy saved successfully.");
+      setNotice("Book copy saved.");
       invalidateLibrary();
     },
   });
@@ -372,7 +372,7 @@ export function LibraryWorkspace({
     onSuccess: () => {
       setCopyForm(emptyCopyForm);
       setEditingCopyId(null);
-      setNotice("Copy updated successfully.");
+      setNotice("Copy updated.");
       invalidateLibrary();
     },
   });
@@ -406,7 +406,7 @@ export function LibraryWorkspace({
     mutationFn: libraryApi.issueCopy,
     onSuccess: () => {
       setIssueForm(emptyIssueForm);
-      setNotice("Copy issued successfully.");
+      setNotice("Book issued.");
       invalidateLibrary();
     },
   });
@@ -420,7 +420,7 @@ export function LibraryWorkspace({
       body: ReturnLibraryIssuePayload;
     }) => libraryApi.returnIssue(id, body),
     onSuccess: () => {
-      setNotice("Issue closed successfully.");
+      setNotice("Book returned.");
       invalidateLibrary();
     },
   });
@@ -429,7 +429,7 @@ export function LibraryWorkspace({
     mutationFn: libraryApi.createReservation,
     onSuccess: () => {
       setReservationForm(emptyReservationForm);
-      setNotice("Reservation queued successfully.");
+      setNotice("Reservation added to the queue.");
       void queryClient.invalidateQueries({
         queryKey: ["library-reservations"],
       });

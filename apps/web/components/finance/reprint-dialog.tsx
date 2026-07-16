@@ -48,7 +48,7 @@ export function ReprintDialog({
 
   const handleReprint = async () => {
     if (!reason.trim()) {
-      setError("Reprint reason is required");
+      setError("Enter a reason for the reprint");
       return;
     }
 

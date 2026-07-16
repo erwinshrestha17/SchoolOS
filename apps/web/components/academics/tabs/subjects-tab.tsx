@@ -57,7 +57,7 @@ export function SubjectsTab({ academicYears, classes, allSections, staff, subjec
     onSuccess: () => {
       invalidate();
       setSubject({ classId: '', code: '', name: '', type: 'CORE', theoryMarks: 100, passMarks: 35 });
-      showSuccess('Subject created successfully.');
+      showSuccess('Subject created.');
     },
   });
 
@@ -65,7 +65,7 @@ export function SubjectsTab({ academicYears, classes, allSections, staff, subjec
     mutationFn: api.createTeacherAssignment,
     onSuccess: () => {
       invalidate();
-      showSuccess('Teacher assigned successfully.');
+      showSuccess('Teacher assigned.');
       setAssign((c) => ({ ...c, staffId: '' }));
     },
   });

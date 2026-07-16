@@ -162,7 +162,7 @@ export function BillingRunsTab() {
             {successMsg && (
               <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-2.5 text-xs font-bold text-emerald-700">
                 <Check size={14} />
-                Billing run started successfully! Invoices are generating.
+                Billing run started. Invoices are generating.
               </div>
             )}
             {billingRunMutation.isError && (

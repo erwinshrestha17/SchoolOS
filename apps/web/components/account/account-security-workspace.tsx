@@ -61,7 +61,7 @@ export function AccountSecurityWorkspace({
         kind: "success",
         text:
           result.message ||
-          "Password changed successfully. For your security, other sessions have been signed out.",
+          "Password changed. For your security, other sessions have been signed out.",
       });
     },
     onError: (error) => {

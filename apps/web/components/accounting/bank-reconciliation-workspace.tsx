@@ -135,7 +135,7 @@ export function BankReconciliationWorkspace() {
       setMessage(
         result.idempotent
           ? 'This statement import was already committed. No rows were duplicated.'
-          : 'Bank statement imported successfully',
+          : 'Bank statement imported',
       );
       setError(null);
       setImportPreview(null);

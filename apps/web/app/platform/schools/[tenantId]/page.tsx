@@ -175,7 +175,7 @@ export default function PlatformSchoolDetail() {
         status: 'CANCELLED',
         notes: 'Cancelled from platform dashboard by operator',
       });
-      setMessage('Subscription cancelled successfully.');
+      setMessage('Subscription cancelled.');
       setCancelSubscriptionDialogOpen(false);
       await loadTenantData();
     } catch (error: any) {
@@ -199,7 +199,7 @@ export default function PlatformSchoolDetail() {
     try {
       await api.updatePlatformTenantStatus(tenant.id, !tenant.isActive, statusReason);
       const actionText = !tenant.isActive ? 'activated' : 'suspended';
-      setMessage(`Tenant has been successfully ${actionText}.`);
+      setMessage(`Tenant ${actionText}.`);
       await loadTenantData();
       setStatusDialogOpen(false);
       setStatusReason('');

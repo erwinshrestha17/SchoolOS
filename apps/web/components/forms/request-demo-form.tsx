@@ -91,22 +91,22 @@ export function RequestDemoForm() {
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
-    if (!formData.schoolName.trim()) newErrors.schoolName = 'School Name is required';
-    if (!formData.schoolType) newErrors.schoolType = 'School Type is required';
-    if (!formData.location.trim()) newErrors.location = 'School Location is required';
-    if (!formData.studentsCount) newErrors.studentsCount = 'Number of Students is required';
+    if (!formData.schoolName.trim()) newErrors.schoolName = 'Enter your school name';
+    if (!formData.schoolType) newErrors.schoolType = 'Select a school type';
+    if (!formData.location.trim()) newErrors.location = 'Enter the school location';
+    if (!formData.studentsCount) newErrors.studentsCount = 'Select the number of students';
     
     if (!isValidPersonName(formData.contactName)) newErrors.contactName = 'Enter a valid contact name';
-    if (!formData.role.trim()) newErrors.role = 'Role / Designation is required';
+    if (!formData.role.trim()) newErrors.role = 'Enter your role or designation';
     if (!tryNormalizeNepalPhone(formData.phone)) newErrors.phone = 'Enter a valid NTC or Ncell mobile number';
     
     if (!formData.email.trim()) {
-      newErrors.email = 'Email Address is required';
+      newErrors.email = 'Enter your email address';
     } else if (!isValidEmail(formData.email)) {
       newErrors.email = 'Enter a valid email address';
     }
     
-    if (!formData.expectedTimeline) newErrors.expectedTimeline = 'Expected Timeline is required';
+    if (!formData.expectedTimeline) newErrors.expectedTimeline = 'Select an expected timeline';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;

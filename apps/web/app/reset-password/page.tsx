@@ -121,7 +121,7 @@ function ResetPasswordShell({
         {success ? (
           <p className="mt-4 flex gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
             <CheckCircle2 className="h-4 w-4 shrink-0" />
-            <span>Password changed successfully. You can sign in now.</span>
+            <span>Password changed. You can sign in now.</span>
           </p>
         ) : null}
         {mutation.isError ? (

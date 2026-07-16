@@ -317,7 +317,7 @@ export function CommunicationsForm({
       void queryClient.invalidateQueries({ queryKey: ["notices"] });
       setNoticeSuccess(
         notice.scheduleMode === "LATER"
-          ? "Notice scheduled successfully."
+          ? "Notice scheduled."
           : "Notice published. Delivery records have been queued.",
       );
       setNoticeError(null);

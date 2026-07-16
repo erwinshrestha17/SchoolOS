@@ -192,12 +192,12 @@ export function HomeworkCreateForm() {
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
-    if (!formData.academicYearId) newErrors.academicYearId = 'Academic year is required';
-    if (!formData.classId) newErrors.classId = 'Class is required';
-    if (!formData.subjectId) newErrors.subjectId = 'Subject is required';
-    if (!formData.title.trim()) newErrors.title = 'Title is required';
+    if (!formData.academicYearId) newErrors.academicYearId = 'Select an academic year';
+    if (!formData.classId) newErrors.classId = 'Select a class';
+    if (!formData.subjectId) newErrors.subjectId = 'Select a subject';
+    if (!formData.title.trim()) newErrors.title = 'Enter a homework title';
     if (!formData.instructions.trim()) newErrors.instructions = 'Homework instructions are required';
-    if (!formData.dueDate) newErrors.dueDate = 'Due date is required';
+    if (!formData.dueDate) newErrors.dueDate = 'Select a due date';
     if (formData.dueDate) {
       const startOfToday = new Date();
       startOfToday.setHours(0, 0, 0, 0);

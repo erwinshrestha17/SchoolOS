@@ -109,7 +109,7 @@ export function MarksLockTab({ exams }: Props) {
       invalidate();
       setUnlockForm((current) => ({ ...current, reason: '' }));
       setShowUnlockConfirm(false);
-      showSuccess('Exam term unlocked successfully.');
+      showSuccess('Exam term unlocked. Teachers can edit these marks again.');
     },
   });
 

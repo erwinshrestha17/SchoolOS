@@ -20,8 +20,8 @@ type ComponentNotice = {
 };
 
 const componentSchema = z.object({
-  subjectId: z.string().min(1, 'Subject is required'),
-  name: z.string().min(1, 'Component name is required').max(50),
+  subjectId: z.string().min(1, 'Select a subject'),
+  name: z.string().min(1, 'Enter a component name').max(50),
   type: z.enum(['TERMINAL', 'CAS', 'PRACTICAL', 'VIVA', 'PROJECT']),
   maxMarks: z.number().min(0),
   passMarks: z.number().min(0),
