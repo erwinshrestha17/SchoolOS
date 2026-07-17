@@ -276,8 +276,8 @@ export type AttendanceProgress =
 
 /**
  * Attendance day progress from the backend's own register counts. Reads the
- * school-wide keys first, then the teacher-scoped keys the same summary
- * endpoint returns for teaching-only sessions, so the card degrades to "your
+ * school-wide keys first, then the teacher-scoped keys the same backend
+ * summary returns for teaching-only sessions, so the card degrades to "your
  * assigned registers" without guessing anyone's role. "submitted = total -
  * pending" is presentation arithmetic on two backend counts, mirroring the
  * previous attendance-rate precedent — never an official attendance total.
