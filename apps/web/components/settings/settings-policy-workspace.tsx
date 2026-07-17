@@ -3,13 +3,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, CheckCircle2, CircleAlert, RotateCcw, Save } from 'lucide-react';
-import type { TenantSettingKey, TenantSettingSummary } from '@schoolos/core';
+import { ArrowLeft, CheckCircle2, CircleAlert, FileClock, RotateCcw, Save, ShieldCheck } from 'lucide-react';
+import { formatBsDateTime } from '@schoolos/core';
+import type { TenantSettingSummary } from '@schoolos/core';
 import { Button } from '../ui/button';
 import { ErrorState } from '../ui/error-state';
 import { PageHeader } from '../ui/page-header';
+import { PermissionDenied } from '../ui/permission-denied';
 import { api } from '../../lib/api';
 import { schoolSettingsApi } from '../../lib/api/school-settings';
+import { SCHOOL_SETTINGS_ACCESS_LABELS, canEditSchoolSettings } from './school-settings-catalog';
 import { getSchoolSettingsPolicy, type SchoolSettingsPolicyField } from './settings-policy-catalog';
 
 export function SettingsPolicyWorkspace({ policyId }: { policyId: string }) {
@@ -24,8 +27,17 @@ export function SettingsPolicyWorkspace({ policyId }: { policyId: string }) {
   const initialForm = useMemo(() => policy ? buildPolicyForm(policy.fields, settingsQuery.data ?? []) : {}, [policy, settingsQuery.data]);
   useEffect(() => setForm(initialForm), [initialForm]);
 
-  const canManage = (navigationQuery.data?.groups.flatMap((group) => group.items) ?? []).some((item) => item.access === 'manage');
+  const navigationItem = (navigationQuery.data?.groups.flatMap((group) => group.items) ?? []).find((item) => item.id === policy?.navigationItemId);
+  const canManage = canEditSchoolSettings(navigationItem?.access);
   const changedFields = policy?.fields.filter((field) => !sameValue(form[field.key], initialForm[field.key])) ?? [];
+  const lastUpdatedAt = useMemo(() => {
+    if (!policy || !settingsQuery.data) return null;
+    const stamps = settingsQuery.data
+      .filter((setting) => policy.fields.some((field) => field.key === setting.key))
+      .map((setting) => setting.updatedAt)
+      .sort();
+    return stamps.length ? stamps[stamps.length - 1] : null;
+  }, [policy, settingsQuery.data]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -35,11 +47,16 @@ export function SettingsPolicyWorkspace({ policyId }: { policyId: string }) {
       }
     },
     onSuccess: async () => {
-      setNotice({ kind: 'success', text: `${policy?.title ?? 'School policy'} saved.` });
+      setNotice({ kind: 'success', text: `${policy?.title ?? 'School policy'} saved for this school.` });
       await client.invalidateQueries({ queryKey: ['school-settings', 'all'] });
       await client.invalidateQueries({ queryKey: ['school-settings', 'overview'] });
     },
-    onError: () => setNotice({ kind: 'error', text: 'Save failed. Please review the policy values and try again.' }),
+    onError: (error) => setNotice({
+      kind: 'error',
+      text: isForbidden(error)
+        ? 'Save blocked: your role cannot change this school policy.'
+        : 'Save failed. Please review the policy values and try again.',
+    }),
   });
 
   if (!policy) {
@@ -48,6 +65,10 @@ export function SettingsPolicyWorkspace({ policyId }: { policyId: string }) {
 
   if (settingsQuery.isLoading || navigationQuery.isLoading) {
     return <div className="space-y-5 p-6"><div className="h-28 animate-pulse rounded-2xl bg-slate-100" /><div className="h-96 animate-pulse rounded-2xl bg-slate-100" /></div>;
+  }
+
+  if (isForbidden(settingsQuery.error)) {
+    return <div className="p-6"><PermissionDenied title="School Settings access needed" description="Your role cannot view this school policy. Ask a School Configuration Owner if you need access." /></div>;
   }
 
   if (settingsQuery.isError || navigationQuery.isError) {
@@ -66,15 +87,31 @@ export function SettingsPolicyWorkspace({ policyId }: { policyId: string }) {
       actions={<Link href="/dashboard/settings" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"><ArrowLeft className="h-4 w-4" />All settings</Link>}
     />
 
-    {!canManage ? <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><CircleAlert className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-bold">View-only access</p><p className="mt-1 leading-6">You can review this policy, but your role cannot change school-wide settings.</p></div></div> : null}
+    <div className="flex flex-wrap items-center gap-2 text-xs">
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 font-bold text-blue-800"><ShieldCheck className="h-3.5 w-3.5" />Applies only to this school</span>
+      <span className={`inline-flex items-center rounded-full px-3 py-1 font-bold ring-1 ${canManage ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-slate-100 text-slate-600 ring-slate-200'}`}>Your access: {navigationItem ? SCHOOL_SETTINGS_ACCESS_LABELS[navigationItem.access] : 'View only'}</span>
+      {lastUpdatedAt ? <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-600">Last updated {formatBsDateTime(lastUpdatedAt)}</span> : <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-600">Not configured yet</span>}
+      <Link href="/dashboard/settings/audit-export" className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 font-bold text-slate-700 transition hover:bg-slate-50"><FileClock className="h-3.5 w-3.5" />Change history</Link>
+    </div>
+
+    {!canManage ? <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><CircleAlert className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-bold">View-only access</p><p className="mt-1 leading-6">You can review this policy, but your role cannot change it. The backend enforces this on every save.</p></div></div> : null}
     {notice ? <div className={`flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold ${notice.kind === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}>{notice.kind === 'success' ? <CheckCircle2 className="h-4 w-4" /> : <CircleAlert className="h-4 w-4" />}{notice.text}</div> : null}
 
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-col gap-4 border-b border-slate-100 p-5 lg:flex-row lg:items-start lg:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">{policy.eyebrow}</p><h2 className="mt-1 text-lg font-bold text-slate-950">Configure policy</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">Changes apply only to this school and are recorded through the tenant settings API.</p></div>{policy.operationalLink ? <Link href={policy.operationalLink.href} className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">{policy.operationalLink.label}</Link> : null}</div>
+      <div className="flex flex-col gap-4 border-b border-slate-100 p-5 lg:flex-row lg:items-start lg:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">{policy.eyebrow}</p><h2 className="mt-1 text-lg font-bold text-slate-950">Configure policy</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">{policy.operationalImpact}</p></div>{policy.operationalLink ? <Link href={policy.operationalLink.href} className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">{policy.operationalLink.label}</Link> : null}</div>
       <div className="grid gap-x-8 gap-y-6 p-5 lg:grid-cols-2">{policy.fields.map((field) => <PolicyField key={field.key} field={field} value={form[field.key]} disabled={!canManage || saveMutation.isPending} onChange={(value) => setForm((current) => ({ ...current, [field.key]: value }))} />)}</div>
-      <div className="sticky bottom-0 flex flex-col-reverse gap-3 border-t border-slate-200 bg-white/95 p-4 backdrop-blur sm:flex-row sm:items-center sm:justify-between"><p className="text-sm text-slate-600">{changedFields.length ? `${changedFields.length} unsaved ${changedFields.length === 1 ? 'change' : 'changes'}` : 'No unsaved changes'}</p><div className="flex gap-2"><Button type="button" variant="outline" onClick={reset} disabled={!changedFields.length || saveMutation.isPending}><RotateCcw className="h-4 w-4" />Reset</Button><Button type="button" onClick={() => saveMutation.mutate()} disabled={!canManage || !changedFields.length || saveMutation.isPending}><Save className="h-4 w-4" />{saveMutation.isPending ? 'Saving…' : 'Save policy'}</Button></div></div>
+      <div className="sticky bottom-0 flex flex-col-reverse gap-3 border-t border-slate-200 bg-white/95 p-4 backdrop-blur sm:flex-row sm:items-center sm:justify-between"><p className="text-sm text-slate-600">{changedFields.length ? `${changedFields.length} unsaved ${changedFields.length === 1 ? 'change' : 'changes'}` : 'No unsaved changes'}</p><div className="flex gap-2"><Button type="button" variant="outline" onClick={reset} disabled={!changedFields.length || saveMutation.isPending}><RotateCcw className="h-4 w-4" />Discard</Button><Button type="button" onClick={() => saveMutation.mutate()} disabled={!canManage || !changedFields.length || saveMutation.isPending}><Save className="h-4 w-4" />{saveMutation.isPending ? 'Saving…' : 'Save policy'}</Button></div></div>
     </section>
   </div>;
+}
+
+function isForbidden(error: unknown): boolean {
+  return Boolean(
+    error &&
+    typeof error === 'object' &&
+    'statusCode' in error &&
+    (error as { statusCode?: number }).statusCode === 403,
+  );
 }
 
 function PolicyField({ field, value, onChange, disabled }: { field: SchoolSettingsPolicyField; value: unknown; onChange: (value: unknown) => void; disabled: boolean }) {

@@ -78,9 +78,7 @@ export class NoticeApprovalService implements OnModuleInit {
       );
     }
 
-    const scheduledFor = dto.scheduledFor
-      ? new Date(dto.scheduledFor)
-      : null;
+    const scheduledFor = dto.scheduledFor ? new Date(dto.scheduledFor) : null;
     if (scheduledFor && scheduledFor <= new Date()) {
       throw new BadRequestException('Scheduled time must be in the future');
     }

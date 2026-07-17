@@ -87,7 +87,7 @@ export function NoticesWorkspace({
                   label: 'Notification Settings',
                   icon: <Settings size={16} />,
                   onClick: () =>
-                    router.push('/dashboard/settings/notifications'),
+                    router.push('/dashboard/settings/communication'),
                 },
               ]
             : []),
@@ -149,7 +149,7 @@ export function NoticesWorkspace({
           ...(canManageTemplates
             ? [
                 {
-                  href: '/dashboard/settings/notifications',
+                  href: '/dashboard/settings/communication',
                   label: 'Delivery Settings',
                 },
               ]

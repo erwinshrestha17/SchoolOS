@@ -111,6 +111,8 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
     const authA = createAuthContextMock({
       tenantId: tenantAId,
       userId: adminA.id,
+      roles: ['admin'],
+      permissions: SYSTEM_ROLE_PERMISSIONS.admin as string[],
     });
 
     // 4. Admin A updates a setting

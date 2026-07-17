@@ -39,7 +39,7 @@ export function SchoolProfileWorkspace() {
   };
 
   return <div className="space-y-6 p-6 pb-28">
-    <PageHeader title="School Profile" description="Official information used in school records, receipts, certificates, and reports." actions={<Link href="/dashboard/settings/overview" className="inline-flex items-center gap-1 text-sm font-semibold text-slate-600 hover:text-slate-950"><ChevronLeft className="h-4 w-4" /> Settings overview</Link>} />
+    <PageHeader title="School Profile" description="Official information used in school records, receipts, certificates, and reports." actions={<Link href="/dashboard/settings" className="inline-flex items-center gap-1 text-sm font-semibold text-slate-600 hover:text-slate-950"><ChevronLeft className="h-4 w-4" /> Settings overview</Link>} />
     <section className="rounded-2xl border border-sky-100 bg-sky-50 p-5 text-sm text-sky-900"><p className="font-bold">SchoolOS Nepal operating standard</p><p className="mt-1">School time uses Asia/Kathmandu, operational dates use Bikram Sambat, and school currency is NPR. These standards are enforced and are not changed here.</p></section>
     {notice ? <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800"><CheckCircle2 className="h-4 w-4" />{notice}</div> : null}
     {validationError ? <div className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm font-semibold text-danger-800">{validationError}</div> : null}

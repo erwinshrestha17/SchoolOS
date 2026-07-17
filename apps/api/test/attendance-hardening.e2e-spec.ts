@@ -13,7 +13,11 @@ import { MobileController } from '../src/mobile/mobile.controller';
 import { ReportsService } from '../src/reports/reports.service';
 import { getQueueToken } from '@nestjs/bullmq';
 import { PrismaMock, createPrismaMock, createQueueMock } from './test-helpers';
-import { AttendanceStatus, EnrollmentStatus } from '@prisma/client';
+import {
+  AttendanceStatus,
+  EnrollmentStatus,
+  StaffStatus,
+} from '@prisma/client';
 
 describe('Attendance Hardening (E2E)', () => {
   let moduleRef: TestingModule;
@@ -214,6 +218,7 @@ describe('Attendance Hardening (E2E)', () => {
         employeeId: 'EMP-1',
         firstName: 'Tara',
         lastName: 'Teacher',
+        status: StaffStatus.ACTIVE,
       },
     ];
 
@@ -327,6 +332,7 @@ describe('Attendance Hardening (E2E)', () => {
           id: 'assign-1',
           tenantId,
           staffId: 'staff-1',
+          academicYearId: 'year-2081',
           classId: 'class-1',
           sectionId: 'section-1',
           subjectId: 'sub-1',

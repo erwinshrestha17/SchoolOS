@@ -59,7 +59,7 @@ test.describe('Phase 2F.2 authenticated school admin browser smoke', () => {
       { route: '/dashboard/canteen/pos', visible: /POS|Create POS sale/i },
       { route: '/dashboard/canteen/serving', visible: /Student ID \/ QR Serving|Serve meal now/i },
       { route: '/dashboard/transport/trips', visible: /Trip Monitor|Start trip/i },
-      { route: '/dashboard/settings', visible: /Setup readiness|School Profile/i },
+      { route: '/dashboard/settings', visible: /Applies only to this school|Needs attention|Recent configuration changes/i },
     ] as const;
 
     for (const target of targets) {

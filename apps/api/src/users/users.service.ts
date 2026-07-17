@@ -1,9 +1,11 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { SCHOOL_CONFIG_OWNER_ROLE } from '@schoolos/core';
 import { AuthMethod, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { AuditService } from '../audit/audit.service';
@@ -125,6 +127,32 @@ export class UsersService {
       throw new NotFoundException('User not found in this tenant');
     }
 
+    const deactivatingConfigOwner =
+      dto.status !== UserStatus.ACTIVE &&
+      user.status === UserStatus.ACTIVE &&
+      user.userRoles.some(({ role }) => role.name === SCHOOL_CONFIG_OWNER_ROLE);
+
+    if (deactivatingConfigOwner) {
+      if (!dto.reason?.trim()) {
+        throw new BadRequestException(
+          'A reason is required when deactivating a School Configuration Owner.',
+        );
+      }
+      const otherActiveOwners = await this.prisma.userRole.count({
+        where: {
+          tenantId: actor.tenantId,
+          userId: { not: user.id },
+          role: { tenantId: actor.tenantId, name: SCHOOL_CONFIG_OWNER_ROLE },
+          user: { status: UserStatus.ACTIVE },
+        },
+      });
+      if (otherActiveOwners === 0) {
+        throw new ForbiddenException(
+          'At least one active School Configuration Owner must remain. Assign the role to another active user first.',
+        );
+      }
+    }
+
     const updatedUser = await this.prisma.user.update({
       where: { id: user.id },
       data: {
@@ -144,7 +172,12 @@ export class UsersService {
       userId: actor.userId,
       resourceId: user.id,
       before: { status: user.status },
-      after: { status: dto.status },
+      after: {
+        status: dto.status,
+        ...(deactivatingConfigOwner
+          ? { configOwnerDeactivated: true, reason: dto.reason?.trim() }
+          : {}),
+      },
     });
 
     return this.toUserSummary(updatedUser);

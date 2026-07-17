@@ -1,8 +1,11 @@
 import {
+  BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { SCHOOL_CONFIG_OWNER_ROLE } from '@schoolos/core';
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
@@ -177,6 +180,23 @@ export class RolesService {
       );
     }
 
+    const removesOwnerRole = await this.wouldRemoveConfigOwnerRole(
+      actor.tenantId,
+      dto.userId,
+      dto.roleIds,
+    );
+    if (removesOwnerRole) {
+      if (!dto.reason?.trim()) {
+        throw new BadRequestException(
+          'A reason is required when removing the School Configuration Owner role.',
+        );
+      }
+      await this.assertAnotherActiveConfigOwnerExists(
+        actor.tenantId,
+        dto.userId,
+      );
+    }
+
     await this.prisma.userRole.deleteMany({
       where: {
         userId: dto.userId,
@@ -199,7 +219,15 @@ export class RolesService {
       tenantId: actor.tenantId,
       userId: actor.userId,
       resourceId: dto.userId,
-      after: { roleIds: dto.roleIds },
+      after: {
+        roleIds: dto.roleIds,
+        ...(removesOwnerRole
+          ? {
+              configOwnerRoleRemoved: true,
+              reason: dto.reason?.trim(),
+            }
+          : {}),
+      },
     });
 
     return this.prisma.userRole.findMany({
@@ -209,5 +237,43 @@ export class RolesService {
       },
       include: { role: true },
     });
+  }
+
+  private async wouldRemoveConfigOwnerRole(
+    tenantId: string,
+    userId: string,
+    nextRoleIds: string[],
+  ): Promise<boolean> {
+    const currentOwnerAssignment = await this.prisma.userRole.findFirst({
+      where: {
+        tenantId,
+        userId,
+        role: { tenantId, name: SCHOOL_CONFIG_OWNER_ROLE },
+      },
+      select: { roleId: true },
+    });
+    if (!currentOwnerAssignment) {
+      return false;
+    }
+    return !nextRoleIds.includes(currentOwnerAssignment.roleId);
+  }
+
+  private async assertAnotherActiveConfigOwnerExists(
+    tenantId: string,
+    excludedUserId: string,
+  ): Promise<void> {
+    const otherActiveOwners = await this.prisma.userRole.count({
+      where: {
+        tenantId,
+        userId: { not: excludedUserId },
+        role: { tenantId, name: SCHOOL_CONFIG_OWNER_ROLE },
+        user: { status: 'ACTIVE' },
+      },
+    });
+    if (otherActiveOwners === 0) {
+      throw new ForbiddenException(
+        'At least one active School Configuration Owner must remain. Assign the role to another active user first.',
+      );
+    }
   }
 }

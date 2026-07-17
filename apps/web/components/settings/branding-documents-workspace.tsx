@@ -121,7 +121,7 @@ export function BrandingDocumentsWorkspace() {
     <PageHeader
       title="Branding & Official Documents"
       description="Manage the protected school logo and the official wording used on school documents."
-      actions={<Link href="/dashboard/settings/overview" className="inline-flex items-center gap-1 text-sm font-semibold text-slate-600 hover:text-slate-950"><ChevronLeft className="h-4 w-4" /> Settings overview</Link>}
+      actions={<Link href="/dashboard/settings" className="inline-flex items-center gap-1 text-sm font-semibold text-slate-600 hover:text-slate-950"><ChevronLeft className="h-4 w-4" /> Settings overview</Link>}
     />
     <section className="rounded-2xl border border-sky-100 bg-sky-50 p-5 text-sm text-sky-900"><div className="flex gap-3"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-bold">Protected official files</p><p className="mt-1">School logos are stored through File Registry. Open or download them only through authenticated protected-file actions.</p></div></div></section>
     {notice ? <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800"><CheckCircle2 className="h-4 w-4" />{notice}</div> : null}

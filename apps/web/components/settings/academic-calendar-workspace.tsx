@@ -62,7 +62,7 @@ export function AcademicCalendarWorkspace() {
   };
 
   return <div className="space-y-6 p-6 pb-20">
-    <PageHeader title="Calendar, Academic Year & Holidays" description="Academic years and school days use Bikram Sambat. All date-only records are saved using Nepal school-day boundaries." actions={<Link href="/dashboard/settings/overview" className="inline-flex items-center gap-1 text-sm font-semibold text-slate-600 hover:text-slate-950"><ChevronLeft className="h-4 w-4" /> Settings overview</Link>} />
+    <PageHeader title="Calendar, Academic Year & Holidays" description="Academic years and school days use Bikram Sambat. All date-only records are saved using Nepal school-day boundaries." actions={<Link href="/dashboard/settings" className="inline-flex items-center gap-1 text-sm font-semibold text-slate-600 hover:text-slate-950"><ChevronLeft className="h-4 w-4" /> Settings overview</Link>} />
     <section className="rounded-2xl border border-sky-100 bg-sky-50 p-5 text-sm text-sky-900"><div className="flex gap-3"><CalendarDays className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-bold">Nepal school calendar standard</p><p className="mt-1">Timezone: {calendar.timeZone}. Enter BS dates as YYYY-MM-DD with English numerals, for example 2083-01-01. The backend converts them to safe Nepal-midnight UTC storage.</p></div></div></section>
     {notice ? <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800"><CheckCircle2 className="h-4 w-4" />{notice}</div> : null}
 

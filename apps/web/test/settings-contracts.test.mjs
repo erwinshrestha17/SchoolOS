@@ -11,78 +11,44 @@ function read(relativePath) {
 }
 
 describe("SchoolOS Settings Page Contracts", () => {
-  it("renders a school management settings console with all operational sections", () => {
+  it("keeps the settings index thin and defers to the role-aware control centre", () => {
     const page = read("app/dashboard/settings/page.tsx");
+    const frame = read("components/settings/settings-route-frame.tsx");
 
-    const requiredSections = [
-      "profile",
-      "branding",
-      "academic",
-      "fees",
-      "attendance",
-      "payroll",
-      "accounting",
-      "communication",
-      "security",
-      "data",
-    ];
-
-    for (const section of requiredSections) {
-      assert.ok(page.includes(section), `Missing section key: ${section}`);
-    }
-
-    const requiredLabels = [
-      "School Name",
-      "School Address",
-      "Contact Phone",
-      "Contact Email",
-      "PAN / Registration Number",
-      "Principal Name",
-      "Municipality",
-      "Ward Number",
-      "District",
-      "Province",
-      "School Type",
-      "iEMIS School Code",
-      "Active Fee Plan",
-      "Attendance Lock",
-      "Payroll Approval",
-      "Fiscal Year",
-      "Sensitive Staff Fields",
-      "Import / Export",
-    ];
-
-    for (const label of requiredLabels) {
-      assert.match(
-        page,
-        new RegExp(label),
-        `Missing field/section label: ${label}`,
-      );
-    }
+    assert.ok(page.length < 600, "settings index must stay a thin page");
+    assert.match(frame, /SettingsControlCenter/);
+    assert.match(frame, /getSchoolSettingsNavigation/);
+    assert.doesNotMatch(page, /SETTINGS_SECTIONS|SettingsSidebar|UnsavedBar/);
   });
 
-  it("ensures each settings section has a visible console structure", () => {
-    const page = read("app/dashboard/settings/page.tsx");
+  it("drives grouped navigation from the backend contract, not a static catalog", () => {
+    const frame = read("components/settings/settings-route-frame.tsx");
 
-    assert.match(page, /SettingsSidebar/);
-    assert.match(page, /SectionHeader/);
-    assert.match(page, /UnsavedBar/);
-    assert.match(page, /EditableSettingsSection/);
+    assert.match(frame, /schoolSettingsApi\.getSchoolSettingsNavigation/);
+    assert.match(frame, /Applies only to this school/);
+    assert.match(frame, /View only/);
+    assert.match(frame, /Your role has no School Settings access/);
+    assert.doesNotMatch(frame, /SCHOOL_SETTINGS_CATEGORIES/);
   });
 
-  it("keeps school settings controls aligned to settings UI tokens", () => {
-    const page = read("app/dashboard/settings/page.tsx");
+  it("renders a compact overview with attention, access, recent changes, and one primary action", () => {
+    const hub = read("components/settings/settings-control-center.tsx");
 
-    assert.match(page, /color-mod-settings-accent/);
-    assert.match(page, /color-mod-settings-text/);
-    assert.doesNotMatch(
-      page,
-      /bg-slate-900|bg-slate-950|hover:bg-slate-800|focus-visible:ring-slate-900|border-slate-900|primary-(50|100|200|500|600|700|800|900)|shadow-2xl|shadow-xl/,
-    );
+    assert.match(hub, /overview\.primaryAction/);
+    assert.match(hub, /overview\.attention/);
+    assert.match(hub, /overview\.recentChanges/);
+    assert.match(hub, /overview\.schoolName/);
+    assert.match(hub, /Applies only to this school/);
+    assert.match(hub, /Your access/);
+    assert.match(hub, /SCHOOL_SETTINGS_ACCESS_LABELS/);
+    assert.match(hub, /Managed by SchoolOS Platform/i);
+    assert.doesNotMatch(hub, /min-h-44/, "no large card wall on the overview");
+    assert.doesNotMatch(hub, /Upgrade Plan/);
   });
 
   it("strictly separates school settings from platform settings", () => {
-    const page = read("app/dashboard/settings/page.tsx");
+    const hub = read("components/settings/settings-control-center.tsx");
+    const frame = read("components/settings/settings-route-frame.tsx");
 
     const forbidden = [
       "SaaS billing",
@@ -93,109 +59,106 @@ describe("SchoolOS Settings Page Contracts", () => {
       "Infrastructure health",
     ];
 
-    for (const item of forbidden) {
-      assert.doesNotMatch(
-        page,
-        new RegExp(item, "i"),
-        `Found platform-only term: ${item}`,
-      );
+    for (const source of [hub, frame]) {
+      for (const item of forbidden) {
+        assert.doesNotMatch(
+          source,
+          new RegExp(item, "i"),
+          `Found platform-only term: ${item}`,
+        );
+      }
+      assert.doesNotMatch(source, /href=["']\/platform/);
     }
   });
 
+  it("resolves policy access per settings domain from the backend navigation", () => {
+    const policy = read("components/settings/settings-policy-workspace.tsx");
+    const catalog = read("components/settings/settings-policy-catalog.ts");
+
+    assert.match(policy, /navigationItemId/);
+    assert.match(policy, /canEditSchoolSettings/);
+    assert.match(policy, /PermissionDenied/);
+    assert.match(policy, /View-only access/);
+    assert.match(policy, /Applies only to this school/);
+    assert.match(policy, /Last updated|Not configured yet/);
+    assert.match(policy, /Change history/);
+    assert.match(policy, /operationalImpact/);
+    assert.match(catalog, /navigationItemId:/);
+    assert.match(catalog, /operationalImpact:/);
+  });
+
   it("maintains tenant scoping for all settings updates", () => {
-    const page = read("app/dashboard/settings/page.tsx");
+    const policy = read("components/settings/settings-policy-workspace.tsx");
 
-    assert.match(page, /api\.updateTenantSetting\(field\.key, nextValue\)/);
-    assert.doesNotMatch(page, /api\.updateGlobalSetting/);
-    assert.doesNotMatch(page, /tenantId: ['"]all['"]/);
+    assert.match(policy, /api\.updateTenantSetting\(field\.key, form\[field\.key\]\)/);
+    assert.doesNotMatch(policy, /api\.updateGlobalSetting/);
+    assert.doesNotMatch(policy, /tenantId: ['"]all['"]/);
   });
 
-  it("keeps notification policy active while excluding removed chat controls", () => {
-    const page = read("app/dashboard/settings/page.tsx");
-
-    assert.match(page, /title: "Notification Rules"/);
-    assert.match(page, /quiet_hours_enabled/);
-    assert.match(page, /emergency_override_requires_admin/);
-    assert.doesNotMatch(page, /chat_(availability|sunday|friday|saturday)/);
-  });
-
-  it("wires school logo branding to private File Registry APIs", () => {
-    const page = read("app/dashboard/settings/page.tsx");
-    const apiClient = read("lib/api/platform.ts");
-
-    assert.match(page, /data-testid="school-logo-upload-panel"/);
-    assert.match(page, /TENANT_LOGO_MAX_BYTES = 1024 \* 1024/);
-    assert.match(page, /TENANT_LOGO_MIME_TYPES/);
-    assert.match(page, /api\.uploadSchoolLogo\(file\)/);
-    assert.match(page, /api\.getSchoolLogoPreview\(\)/);
-    assert.match(page, /api\.getSchoolLogoDownload\(\)/);
-    assert.match(page, /api\.removeSchoolLogo\(\)/);
-    assert.match(page, /ConfirmDialog/);
-    assert.match(page, /Private File Registry/);
-    assert.doesNotMatch(
-      page,
-      /Logo and Stamp uploads are managed via the File Registry \(Coming Soon\)/,
-    );
-    assert.match(apiClient, /uploadSchoolLogo:/);
-    assert.match(apiClient, /getSchoolLogoPreview:/);
-    assert.match(apiClient, /getSchoolLogoDownload:/);
-    assert.match(apiClient, /removeSchoolLogo:/);
-  });
-
-  it("connects Users & Access settings to live tenant user APIs", () => {
-    const page = read("app/dashboard/settings/page.tsx");
+  it("collects a reason for owner-sensitive user suspension", () => {
+    const users = read("components/settings/users-access-workspace.tsx");
     const usersApi = read("lib/api/users.ts");
-    const apiBarrel = read("lib/api.ts");
 
-    assert.match(page, /api\.listUsers/);
-    assert.match(page, /api\.listRoleCatalog/);
-    assert.match(page, /api\.listPermissionCatalog/);
-    assert.match(page, /api\.createUser/);
-    assert.match(page, /api\.updateUserStatus/);
-    assert.match(page, /api\.resetUserPassword/);
-    assert.match(page, /api\.forceLogoutUser/);
-    assert.match(page, /Tenant-scoped user management is active/);
-    assert.match(page, /Role access inspection/);
-    assert.match(page, /What this role can access/);
-    assert.match(page, /Live tenant RBAC/);
-    assert.match(page, /Seeded fallback/);
-    assert.doesNotMatch(page, /User management backend pending/);
-    assert.doesNotMatch(page, /Backend route pending/);
-    assert.doesNotMatch(page, /API pending/);
-    assert.match(usersApi, /request<SchoolUserSummary\[\]>\(["']\/users["']\)/);
-    assert.match(usersApi, /request<TenantRoleSummary\[\]>\(["']\/roles["']\)/);
-    assert.match(
-      usersApi,
-      /request<PermissionCatalogItem\[\]>\(["']\/roles\/permissions["']\)/,
-    );
-    assert.match(
-      usersApi,
-      /\/users\/\$\{encodeURIComponent\(userId\)\}\/status/,
-    );
-    assert.match(
-      usersApi,
-      /\/users\/\$\{encodeURIComponent\(userId\)\}\/password-reset/,
-    );
-    assert.match(
-      usersApi,
-      /\/users\/\$\{encodeURIComponent\(userId\)\}\/force-logout/,
-    );
-    assert.match(apiBarrel, /usersApi/);
+    assert.match(users, /statusReason/);
+    assert.match(users, /School Configuration Owner/);
+    assert.match(usersApi, /reason\?: string/);
   });
 
-  it("connects the Settings audit panel to tenant-scoped audit logs", () => {
-    const page = read("app/dashboard/settings/page.tsx");
-    const apiClient = read("lib/api/platform.ts");
+  it("connects the settings audit workspace to safe tenant-scoped audit logs", () => {
+    const workspace = read("components/settings/audit-log-workspace.tsx");
+    const api = read("lib/api/settings-governance.ts");
 
-    assert.match(page, /api\.listTenantAuditLogs/);
-    assert.match(page, /settings-audit-logs/);
-    assert.match(page, /tenant-scoped audit API/);
-    assert.match(page, /Loading audit logs/);
-    assert.match(page, /No audit logs found/);
-    assert.match(apiClient, /listTenantAuditLogs:/);
-    assert.match(apiClient, /\/settings\/audit-logs/);
-    assert.doesNotMatch(page, /Log Filters \(Coming Soon\)/);
-    assert.doesNotMatch(page, /Request Audit Archive/);
-    assert.doesNotMatch(page, /Audit export will be available/);
+    assert.match(workspace, /settingsGovernanceApi\.listTenantAuditLogs/);
+    assert.match(api, /\/settings\/audit-logs/);
+    assert.doesNotMatch(workspace, /log\.before|log\.after|ipAddress|userAgent/);
+  });
+
+  it("redirects every legacy or duplicate settings route to its canonical owner", () => {
+    const redirects = [
+      ["app/dashboard/settings/overview/page.tsx", "/dashboard/settings"],
+      ["app/dashboard/settings/profile/page.tsx", "/dashboard/settings/school-profile"],
+      ["app/dashboard/settings/academic/page.tsx", "/dashboard/settings/academic-calendar"],
+      ["app/dashboard/settings/classes-sections/page.tsx", "/dashboard/settings/academic-structure"],
+      ["app/dashboard/settings/users-roles/page.tsx", "/dashboard/settings/users-access"],
+      ["app/dashboard/settings/notifications/page.tsx", "/dashboard/settings/communication"],
+      ["app/dashboard/settings/audit-log/page.tsx", "/dashboard/settings/audit-export"],
+      ["app/dashboard/settings/security-audit/page.tsx", "/dashboard/settings/audit-export"],
+      ["app/dashboard/settings/billing/page.tsx", "/dashboard/settings/modules"],
+      ["app/dashboard/settings/plans/page.tsx", "/dashboard/settings/modules"],
+    ];
+
+    for (const [file, destination] of redirects) {
+      const source = read(file);
+      assert.match(source, /redirect\(/, `${file} must redirect`);
+      assert.ok(source.includes(destination), `${file} must target ${destination}`);
+    }
+  });
+
+  it("provides canonical routes for every settings IA group", () => {
+    const routes = [
+      "school-profile",
+      "branding-documents",
+      "academic-calendar",
+      "academic-structure",
+      "modules",
+      "admissions",
+      "attendance",
+      "exams-report-cards",
+      "homework-timetable-learning",
+      "activity-consent",
+      "fees",
+      "accounting",
+      "hr-payroll",
+      "communication",
+      "documents-templates",
+      "integrations",
+      "users-access",
+      "roles-permissions",
+      "security",
+      "audit-export",
+    ];
+    for (const route of routes) {
+      read(`app/dashboard/settings/${route}/page.tsx`);
+    }
   });
 });

@@ -1,5 +1,5 @@
-import { AuditLogWorkspace } from '../../../../components/settings/audit-log-workspace';
+import { redirect } from 'next/navigation';
 
-export default function AuditLogPage() {
-  return <AuditLogWorkspace />;
+export default function AuditLogLegacyRedirect() {
+  redirect('/dashboard/settings/audit-export');
 }

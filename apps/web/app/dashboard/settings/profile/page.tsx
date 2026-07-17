@@ -1,3 +1,5 @@
-import { SchoolProfileWorkspace } from '@/components/settings/school-profile-workspace';
+import { redirect } from 'next/navigation';
 
-export default function SchoolProfileSettingsPage() { return <SchoolProfileWorkspace />; }
+export default function SchoolProfileLegacyRedirect() {
+  redirect('/dashboard/settings/school-profile');
+}

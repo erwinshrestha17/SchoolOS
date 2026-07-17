@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
 
 export default function PlansRedirect() {
-  redirect('/dashboard/settings?tab=subscription');
+  redirect('/dashboard/settings/modules');
 }

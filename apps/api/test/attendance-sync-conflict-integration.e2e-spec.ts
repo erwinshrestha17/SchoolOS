@@ -99,19 +99,24 @@ describe('Attendance Sync + Conflict Integration (E2E)', () => {
       exceptions: [],
     };
 
-    await expect(service.syncAttendance(dto, actor)).rejects.toThrow(
-      ForbiddenException,
-    );
+    const rejectedReceipt = await service.syncAttendance(dto, actor);
 
+    expect(rejectedReceipt).toEqual(
+      expect.objectContaining({
+        clientSubmissionId: 'client-sync-rejected',
+        syncStatus: AttendanceSyncStatus.REJECTED,
+        rejectionReason: AttendanceSyncRejectionReason.LOCKED_SESSION,
+        replayed: false,
+        syncAttemptCount: 1,
+      }),
+    );
     expect(prisma.attendanceSyncSubmission.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         tenantId: 'tenant-attendance-sync',
         clientSubmissionId: 'client-sync-rejected',
-        syncStatus: AttendanceSyncStatus.REJECTED,
-        rejectionReason: AttendanceSyncRejectionReason.LOCKED_SESSION,
+        syncStatus: AttendanceSyncStatus.PROCESSING,
         payload: expect.objectContaining({
-          error:
-            'Attendance for this date is locked. Please request a correction.',
+          processing: true,
           trustMetadata: expect.objectContaining({
             firstSeen: true,
             flagged: false,
@@ -119,6 +124,25 @@ describe('Attendance Sync + Conflict Integration (E2E)', () => {
         }),
       }),
     });
+    expect(prisma.attendanceSyncSubmission.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          syncStatus: AttendanceSyncStatus.PROCESSING,
+        }),
+        data: expect.objectContaining({
+          syncStatus: AttendanceSyncStatus.REJECTED,
+          rejectionReason: AttendanceSyncRejectionReason.LOCKED_SESSION,
+          payload: expect.objectContaining({
+            error:
+              'Attendance for this date is locked. Please request a correction.',
+            trustMetadata: expect.objectContaining({
+              firstSeen: true,
+              flagged: false,
+            }),
+          }),
+        }),
+      }),
+    );
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'reject',
@@ -233,7 +257,18 @@ function makeSyncPrisma() {
         createdAt: new Date('2026-05-10T08:01:00.000Z'),
         rejectionReason: null,
         submittedById: 'teacher-user',
-        payload: {},
+        payload: {
+          dto: {
+            clientSubmissionId: 'client-sync-1',
+            academicYearId: 'year-2081',
+            classId: 'class-1',
+            sectionId: 'section-1',
+            attendanceDate: '2026-05-10',
+            deviceTimestamp: '2026-05-10T08:00:00.000Z',
+            deviceId: 'teacher-phone-1',
+            exceptions: [],
+          },
+        },
       },
     ],
   };
@@ -283,6 +318,7 @@ function makeRejectedSyncPrisma() {
       syncStatus: AttendanceSyncStatus;
       syncAttemptCount: number;
       serverReceivedAt: Date;
+      processingLeaseAt: Date | null;
       createdAt: Date;
       rejectionReason: AttendanceSyncRejectionReason | null;
       submittedById: string;
@@ -326,6 +362,21 @@ function makeRejectedSyncPrisma() {
         }
         found.syncAttemptCount += 1;
         return found;
+      }),
+      updateMany: jest.fn(async ({ where, data }) => {
+        const matches = state.syncSubmissions.filter(
+          (item) =>
+            (where.id === undefined || item.id === where.id) &&
+            (where.syncStatus === undefined ||
+              item.syncStatus === where.syncStatus) &&
+            (where.processingLeaseAt === undefined ||
+              (item.processingLeaseAt?.getTime() ?? null) ===
+                ((where.processingLeaseAt as Date | null)?.getTime() ?? null)),
+        );
+        for (const item of matches) {
+          Object.assign(item, data);
+        }
+        return { count: matches.length };
       }),
     },
   };

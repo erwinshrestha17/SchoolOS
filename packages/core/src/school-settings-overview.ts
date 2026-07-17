@@ -45,8 +45,31 @@ export type SchoolSettingsReadinessItem = {
   status: 'ready' | 'needs_attention';
 };
 
+/**
+ * Safe summary of one recent school configuration change. Never carries
+ * raw before/after payloads, IP addresses, user agents, or secrets.
+ */
+export type SchoolSettingsRecentChange = {
+  id: string;
+  action: string;
+  settingKey: string | null;
+  actorLabel: string;
+  changedAt: string;
+};
+
+export type SchoolSettingsPrimaryAction = {
+  label: string;
+  href: string;
+};
+
 export type SchoolSettingsOverview = {
   generatedAt: string;
+  schoolName: string | null;
   navigation: SchoolSettingsNavigation;
   readiness: SchoolSettingsReadinessItem[];
+  /** Up to five backend-confirmed setup items that still need attention. */
+  attention: SchoolSettingsReadinessItem[];
+  /** Up to five recent safe configuration changes for this school only. */
+  recentChanges: SchoolSettingsRecentChange[];
+  primaryAction: SchoolSettingsPrimaryAction;
 };

@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Mode, Prisma } from '@prisma/client';
+import { SCHOOL_CONFIG_OWNER_ROLE } from '@schoolos/core';
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
 import {
@@ -61,11 +62,28 @@ export class TenantsService {
       throw new NotFoundException('Default admin role was not provisioned');
     }
 
+    const configOwnerRole = await this.prisma.role.findUnique({
+      where: {
+        tenantId_name: {
+          tenantId: tenant.id,
+          name: SCHOOL_CONFIG_OWNER_ROLE,
+        },
+      },
+    });
+
+    if (!configOwnerRole) {
+      throw new NotFoundException(
+        'School Configuration Owner role was not provisioned',
+      );
+    }
+
+    // The first tenant user is the school's first authorized Configuration
+    // Owner. Owner-role safeguards keep at least one active owner from then on.
     const adminUser = await this.usersService.createManagedUser({
       tenantId: tenant.id,
       email: dto.adminEmail,
       password: dto.adminPassword,
-      roleIds: [adminRole.id],
+      roleIds: [adminRole.id, configOwnerRole.id],
       assignedById: null,
     });
 

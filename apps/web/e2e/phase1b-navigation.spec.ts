@@ -51,7 +51,7 @@ test.describe('Phase 1B navigation smoke', () => {
 
     // Settings
     await page.goto('/dashboard/settings');
-    await expect(page.getByRole('heading', { name: /School Settings/i })).toBeVisible();
+    await expect(page.getByText(/Applies only to this school/i).first()).toBeVisible();
     
     // Header components: Notifications, Global Search, and User Profile
     await expect(page.getByPlaceholder(/Search students/i)).toBeVisible();

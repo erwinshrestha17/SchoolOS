@@ -1231,6 +1231,64 @@ export const permissionCatalog = [
     description: "Manage tenant branding, localization, and operational settings",
   },
   {
+    resource: "settings",
+    action: "delegate",
+    description:
+      "Delegate school settings access to other tenant roles within permitted scopes",
+  },
+  {
+    resource: "settings:audit",
+    action: "read",
+    description: "Read the tenant-scoped school configuration audit history",
+  },
+  {
+    resource: "settings:identity",
+    action: "manage",
+    description:
+      "Manage school identity, branding, and document template settings for this school",
+  },
+  {
+    resource: "settings:academic",
+    action: "manage",
+    description:
+      "Manage academic year, calendar, grading, exam, and report-card policy settings for this school",
+  },
+  {
+    resource: "settings:attendance",
+    action: "manage",
+    description: "Manage attendance policy settings for this school",
+  },
+  {
+    resource: "settings:finance",
+    action: "manage",
+    description:
+      "Manage fee, receipt, and payment policy settings for this school",
+  },
+  {
+    resource: "settings:hr",
+    action: "manage",
+    description:
+      "Manage HR, leave, and payroll policy settings for this school",
+  },
+  {
+    resource: "settings:accounting",
+    action: "manage",
+    description:
+      "Manage accounting and fiscal default settings for this school",
+  },
+  {
+    resource: "settings:communication",
+    action: "manage",
+    description:
+      "Manage communication, consent, and quiet-hour policy settings for this school",
+  },
+  {
+    resource: "settings:security",
+    action: "manage",
+    description:
+      "Manage session, masking, and export security policy settings for this school",
+  },
+  {
     resource: "reports",
     action: "read",
     description: "List available reports",
@@ -1490,6 +1548,11 @@ export const systemRoleDefinitions = [
     description: "Global platform role for managing SaaS billing and plans",
   },
   { name: "admin", description: "System preset role for admin" },
+  {
+    name: "school_config_owner",
+    description:
+      "School Configuration Owner with full authority over this school's settings, delegation, and configuration audit",
+  },
   { name: "teacher", description: "System preset role for teacher" },
   { name: "principal", description: "System preset role for school principal" },
   {
@@ -1555,9 +1618,67 @@ const TENANT_PERMISSION_KEYS = ALL_PERMISSION_KEYS.filter(
     !REMOVED_CHAT_WRITE_PERMISSION_KEYS.includes(key),
 );
 
+/**
+ * Canonical name of the tenant-scoped School Configuration Owner role.
+ * At least one active user per tenant must keep this role; role assignment
+ * and user status services enforce that safeguard.
+ */
+export const SCHOOL_CONFIG_OWNER_ROLE = "school_config_owner";
+
+const SETTINGS_DOMAIN_MANAGE_KEYS = [
+  "settings:identity:manage",
+  "settings:academic:manage",
+  "settings:attendance:manage",
+  "settings:finance:manage",
+  "settings:hr:manage",
+  "settings:accounting:manage",
+  "settings:communication:manage",
+  "settings:security:manage",
+];
+
+/**
+ * Settings-management authority is not granted to the principal preset by
+ * default. Principals see school policies read-only unless a Configuration
+ * Owner explicitly grants broader access.
+ */
+const PRINCIPAL_EXCLUDED_SETTINGS_KEYS = [
+  "settings:manage",
+  "settings:delegate",
+  ...SETTINGS_DOMAIN_MANAGE_KEYS,
+];
+
+const SCHOOL_CONFIG_OWNER_PERMISSION_KEYS = [
+  "settings:read_public",
+  "settings:read",
+  "settings:manage",
+  "settings:delegate",
+  "settings:audit:read",
+  ...SETTINGS_DOMAIN_MANAGE_KEYS,
+  "admission_policy:read",
+  "admission_policy:manage",
+  "accounting:settings:read",
+  "accounting:settings:update",
+  "users:create",
+  "users:read",
+  "users:update_status",
+  "users:reset_password",
+  "roles:read",
+  "roles:create",
+  "roles:assign",
+  "roles:manage_permissions",
+  "classes:read",
+  "sections:read",
+  "academic_years:read",
+  "academic_years:create",
+  "reports:read",
+];
+
 export const systemRolePermissions: Record<string, string[]> = {
   admin: [...TENANT_PERMISSION_KEYS],
-  principal: [...TENANT_PERMISSION_KEYS],
+  school_config_owner: [...SCHOOL_CONFIG_OWNER_PERMISSION_KEYS],
+  principal: TENANT_PERMISSION_KEYS.filter(
+    (key) => !PRINCIPAL_EXCLUDED_SETTINGS_KEYS.includes(key),
+  ),
   teacher: [
     "roles:read",
     "classes:read",
@@ -1730,6 +1851,8 @@ export const systemRolePermissions: Record<string, string[]> = {
     "accounting:settings:read",
     "accounting:settings:update",
     "accounting:exports:create",
+    "settings:finance:manage",
+    "settings:accounting:manage",
   ],
   hr_manager: [
     "roles:read",
@@ -1766,6 +1889,7 @@ export const systemRolePermissions: Record<string, string[]> = {
     "events:read",
     "settings:read_public",
     "settings:read",
+    "settings:hr:manage",
     "reports:read",
   ],
   librarian: [

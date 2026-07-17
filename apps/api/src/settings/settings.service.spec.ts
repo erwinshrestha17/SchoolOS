@@ -69,19 +69,13 @@ describe('SettingsService school logo uploads', () => {
     auditService.record.mockResolvedValue({});
 
     await service.updateSetting(
-      actor.tenantId,
+      actor,
       'chat_sunday_to_thursday_start',
       '16:00',
-      actor.userId,
     );
 
     await expect(
-      service.updateSetting(
-        actor.tenantId,
-        'chat_friday_end',
-        '5:00 PM',
-        actor.userId,
-      ),
+      service.updateSetting(actor, 'chat_friday_end', '5:00 PM'),
     ).rejects.toBeInstanceOf(BadRequestException);
 
     const upsertMock = prisma.tenantSetting.upsert as jest.MockedFunction<
@@ -100,10 +94,9 @@ describe('SettingsService school logo uploads', () => {
 
     await expect(
       service.updateSetting(
-        actor.tenantId,
+        actor,
         'school_logo',
         '11111111-1111-1111-1111-111111111111',
-        actor.userId,
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
 

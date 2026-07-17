@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { TenantActiveGuard } from '../auth/guards/tenant-active.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import type { AuthContext } from '../auth/auth.types';
 import { AssignPermissionsDto } from './dto/assign-permissions.dto';
@@ -10,7 +11,7 @@ import { CreateRoleDto } from './dto/create-role.dto';
 import { RolesService } from './roles.service';
 
 @Controller('roles')
-@UseGuards(JwtAuthGuard, RolesPermissionsGuard)
+@UseGuards(JwtAuthGuard, TenantActiveGuard, RolesPermissionsGuard)
 export class RolesController {
   constructor(private readonly rolesService: RolesService) {}
 

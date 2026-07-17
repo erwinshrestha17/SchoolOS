@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation';
+import { SettingsPolicyWorkspace } from '@/components/settings/settings-policy-workspace';
 
 export default function CommunicationSettingsPage() {
-  redirect('/dashboard/settings/notifications');
+  return <SettingsPolicyWorkspace policyId="communication" />;
 }

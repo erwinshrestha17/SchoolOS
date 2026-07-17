@@ -1226,6 +1226,64 @@ export const permissionCatalog = [
     description: "Manage tenant branding, localization, and operational settings",
   },
   {
+    resource: "settings",
+    action: "delegate",
+    description:
+      "Delegate school settings access to other tenant roles within permitted scopes",
+  },
+  {
+    resource: "settings:audit",
+    action: "read",
+    description: "Read the tenant-scoped school configuration audit history",
+  },
+  {
+    resource: "settings:identity",
+    action: "manage",
+    description:
+      "Manage school identity, branding, and document template settings for this school",
+  },
+  {
+    resource: "settings:academic",
+    action: "manage",
+    description:
+      "Manage academic year, calendar, grading, exam, and report-card policy settings for this school",
+  },
+  {
+    resource: "settings:attendance",
+    action: "manage",
+    description: "Manage attendance policy settings for this school",
+  },
+  {
+    resource: "settings:finance",
+    action: "manage",
+    description:
+      "Manage fee, receipt, and payment policy settings for this school",
+  },
+  {
+    resource: "settings:hr",
+    action: "manage",
+    description:
+      "Manage HR, leave, and payroll policy settings for this school",
+  },
+  {
+    resource: "settings:accounting",
+    action: "manage",
+    description:
+      "Manage accounting and fiscal default settings for this school",
+  },
+  {
+    resource: "settings:communication",
+    action: "manage",
+    description:
+      "Manage communication, consent, and quiet-hour policy settings for this school",
+  },
+  {
+    resource: "settings:security",
+    action: "manage",
+    description:
+      "Manage session, masking, and export security policy settings for this school",
+  },
+  {
     resource: "reports",
     action: "read",
     description: "List available reports",

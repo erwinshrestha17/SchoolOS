@@ -1,5 +1,5 @@
-import { SettingsOverviewWorkspace } from '../../../../components/settings/settings-overview-workspace';
+import { redirect } from 'next/navigation';
 
-export default function SettingsOverviewPage() {
-  return <SettingsOverviewWorkspace />;
+export default function SettingsOverviewRedirect() {
+  redirect('/dashboard/settings');
 }

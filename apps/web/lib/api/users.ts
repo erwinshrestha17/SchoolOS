@@ -41,7 +41,10 @@ export const usersApi = {
     request<PermissionCatalogItem[]>("/roles/permissions"),
   createUser: (body: JsonBody) =>
     request<SchoolUserSummary>("/users", { method: "POST", json: body }),
-  updateUserStatus: (userId: string, body: { status: SchoolUserStatus }) =>
+  updateUserStatus: (
+    userId: string,
+    body: { status: SchoolUserStatus; reason?: string },
+  ) =>
     request<SchoolUserSummary>(`/users/${encodeURIComponent(userId)}/status`, {
       method: "PATCH",
       json: body,

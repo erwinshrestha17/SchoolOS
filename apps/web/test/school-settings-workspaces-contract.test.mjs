@@ -46,12 +46,12 @@ describe('School Settings workspaces', () => {
     assert.doesNotMatch(workspace, /providerId|apiToken|secretKey|bucket|queue|callback URL|webhook URL/i);
   });
 
-  it('renders overview, profile, branding, and calendar through dedicated workspaces', () => {
+  it('renders profile, branding, and calendar through dedicated workspaces', () => {
     const overview = read('app/dashboard/settings/overview/page.tsx');
     const profile = read('app/dashboard/settings/school-profile/page.tsx');
     const branding = read('app/dashboard/settings/branding-documents/page.tsx');
     const calendar = read('app/dashboard/settings/academic-calendar/page.tsx');
-    assert.match(overview, /SettingsOverviewWorkspace/);
+    assert.match(overview, /redirect\('\/dashboard\/settings'\)/);
     assert.match(profile, /SchoolProfileWorkspace/);
     assert.match(branding, /BrandingDocumentsWorkspace/);
     assert.match(calendar, /AcademicCalendarWorkspace/);

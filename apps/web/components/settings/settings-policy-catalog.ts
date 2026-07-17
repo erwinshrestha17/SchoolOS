@@ -5,6 +5,7 @@ export type SchoolSettingsPolicyId =
   | 'attendance'
   | 'fees'
   | 'communication'
+  | 'activity-consent'
   | 'payroll'
   | 'accounting'
   | 'security';
@@ -24,6 +25,10 @@ export type SchoolSettingsPolicy = {
   eyebrow: string;
   title: string;
   description: string;
+  /** Backend navigation item id used to resolve this page's access level. */
+  navigationItemId: string;
+  /** What changing this policy affects in daily school operations. */
+  operationalImpact: string;
   operationalLink?: { href: string; label: string };
   fields: SchoolSettingsPolicyField[];
 };
@@ -33,7 +38,7 @@ const paymentMethods = ['Cash', 'Bank Transfer', 'eSewa', 'Khalti', 'Cheque'].ma
 
 export const SCHOOL_SETTINGS_POLICIES: SchoolSettingsPolicy[] = [
   {
-    id: 'academic', eyebrow: 'Academic operations', title: 'Academic & grading rules', description: 'Set school-wide academic defaults. Academic years, classes, sections, and holidays are managed separately in the school calendar workspace.', operationalLink: { href: '/dashboard/academics', label: 'Open Academics' }, fields: [
+    id: 'academic', eyebrow: 'Academic operations', title: 'Academic & grading rules', description: 'Set school-wide academic defaults. Academic years, classes, sections, and holidays are managed separately in the school calendar workspace.', navigationItemId: 'exams-report-cards', operationalImpact: 'These defaults shape grading, promotion, and result workflows in Academics (M4). Settings define the policy; Academics publishes results.', operationalLink: { href: '/dashboard/academics', label: 'Open Academics' }, fields: [
       { key: 'active_academic_year_label', label: 'Active academic year label', type: 'text', placeholder: '2083/84' },
       { key: 'default_calendar', label: 'Default calendar', type: 'select', defaultValue: 'BS', options: [{ label: 'Bikram Sambat (BS)', value: 'BS' }, { label: 'Anno Domini (AD)', value: 'AD' }] },
       { key: 'grading_scheme_label', label: 'Grading scheme label', type: 'text', placeholder: 'Letter Grade 2078' },
@@ -42,7 +47,7 @@ export const SCHOOL_SETTINGS_POLICIES: SchoolSettingsPolicy[] = [
     ],
   },
   {
-    id: 'attendance', eyebrow: 'Daily operations', title: 'Attendance rules', description: 'Set safe attendance lock, correction, and visibility policies for this school.', operationalLink: { href: '/dashboard/attendance', label: 'Open Attendance' }, fields: [
+    id: 'attendance', eyebrow: 'Daily operations', title: 'Attendance rules', description: 'Set safe attendance lock, correction, and visibility policies for this school.', navigationItemId: 'attendance', operationalImpact: 'These rules control when teachers can mark or correct attendance in Smart Attendance (M2). Correction approvals stay in the Attendance workspace.', operationalLink: { href: '/dashboard/attendance', label: 'Open Attendance' }, fields: [
       { key: 'attendance_lock_hours', label: 'Attendance lock window', description: 'Hours after the school-day record before normal changes are blocked.', type: 'number', defaultValue: 24 },
       { key: 'late_threshold_minutes', label: 'Late threshold', type: 'number', defaultValue: 15 },
       { key: 'half_day_threshold_minutes', label: 'Half-day threshold', type: 'number', defaultValue: 180 },
@@ -52,7 +57,7 @@ export const SCHOOL_SETTINGS_POLICIES: SchoolSettingsPolicy[] = [
     ],
   },
   {
-    id: 'fees', eyebrow: 'Fee operations', title: 'Fee & payment rules', description: 'Set policy defaults for receipts, approvals, cash closing, late fees and supported collection methods.', operationalLink: { href: '/dashboard/fees', label: 'Open Fees' }, fields: [
+    id: 'fees', eyebrow: 'Fee operations', title: 'Fee & payment rules', description: 'Set policy defaults for receipts, approvals, cash closing, late fees and supported collection methods.', navigationItemId: 'fees', operationalImpact: 'These rules govern how Fees & Receipts (M3) issues receipts and collects payments. Payment collection and reversals stay in the Fees workspace.', operationalLink: { href: '/dashboard/fees', label: 'Open Fees' }, fields: [
       { key: 'receipt_number_prefix', label: 'Receipt number prefix', type: 'text', placeholder: 'REC-' },
       { key: 'late_fee_grace_days', label: 'Late-fee grace days', type: 'number', defaultValue: 0 },
       { key: 'active_fee_plan_required', label: 'Require an active fee plan', type: 'checkbox', defaultValue: true },
@@ -64,10 +69,9 @@ export const SCHOOL_SETTINGS_POLICIES: SchoolSettingsPolicy[] = [
     ],
   },
   {
-    id: 'communication', eyebrow: 'School communication', title: 'Communication rules', description: 'Configure controlled notice delivery, media consent, quiet hours, and parent-teacher chat boundaries.', operationalLink: { href: '/dashboard/notices', label: 'Open Notices' }, fields: [
+    id: 'communication', eyebrow: 'School communication', title: 'Communication rules', description: 'Configure controlled notice delivery, quiet hours, and parent-teacher chat boundaries.', navigationItemId: 'communication', operationalImpact: 'These rules control how Notices (M15) and Delivery (M12) reach families. Sending and tracking messages stays in the Notices workspace.', operationalLink: { href: '/dashboard/notices', label: 'Open Notices' }, fields: [
       { key: 'default_notice_channel', label: 'Default notice channel', type: 'select', defaultValue: 'EMAIL', options: [{ label: 'Email', value: 'EMAIL' }, { label: 'SMS', value: 'SMS' }, { label: 'Mobile app push', value: 'APP' }] },
       { key: 'parent_notification_enabled', label: 'Enable parent notifications', type: 'checkbox', defaultValue: true },
-      { key: 'consent_required_for_media', label: 'Require media consent', type: 'checkbox', defaultValue: true },
       { key: 'quiet_hours_enabled', label: 'Enable quiet hours', type: 'checkbox' },
       { key: 'chat_availability_enabled', label: 'Allow parent-teacher chat', type: 'checkbox', defaultValue: true },
       { key: 'chat_sunday_to_thursday_start', label: 'Sunday–Thursday chat start', type: 'time', defaultValue: '16:00' },
@@ -79,7 +83,12 @@ export const SCHOOL_SETTINGS_POLICIES: SchoolSettingsPolicy[] = [
     ],
   },
   {
-    id: 'payroll', eyebrow: 'Staff and payroll', title: 'HR & payroll rules', description: 'Set staff leave and payroll policy defaults. Payroll results, salary structures, and payslips remain in HR & Payroll.', operationalLink: { href: '/dashboard/hr', label: 'Open HR' }, fields: [
+    id: 'activity-consent', eyebrow: 'Student activity', title: 'Activity, media & consent', description: 'Control whether student media requires recorded consent before it can be published to families.', navigationItemId: 'activity-consent', operationalImpact: 'When consent is required, Activity Feed (M5) blocks publishing student media without recorded consent. Post moderation stays in the Activity workspace. More granular activity and media policies need backend verification before they can be edited here.', operationalLink: { href: '/dashboard/activity', label: 'Open Activity' }, fields: [
+      { key: 'consent_required_for_media', label: 'Require media consent', description: 'Block publishing student photos and videos without recorded consent.', type: 'checkbox', defaultValue: true },
+    ],
+  },
+  {
+    id: 'payroll', eyebrow: 'Staff and payroll', title: 'HR & payroll rules', description: 'Set staff leave and payroll policy defaults. Payroll results, salary structures, and payslips remain in HR & Payroll.', navigationItemId: 'hr-payroll', operationalImpact: 'These defaults shape leave approval and payroll runs in HR & Payroll (M7). Salary records and payslips stay permission-gated in the HR workspace.', operationalLink: { href: '/dashboard/hr', label: 'Open HR' }, fields: [
       { key: 'payroll_month_day', label: 'Payroll day of month', type: 'number', defaultValue: 28 },
       { key: 'default_working_days_per_month', label: 'Default working days per month', type: 'number', defaultValue: 26 },
       { key: 'pf_enabled', label: 'Enable PF', type: 'checkbox' },
@@ -91,7 +100,7 @@ export const SCHOOL_SETTINGS_POLICIES: SchoolSettingsPolicy[] = [
     ],
   },
   {
-    id: 'accounting', eyebrow: 'School finance', title: 'Accounting defaults', description: 'Set school accounting policy defaults. Journals, fiscal close, and reports remain inside Accounting.', operationalLink: { href: '/dashboard/accounting', label: 'Open Accounting' }, fields: [
+    id: 'accounting', eyebrow: 'School finance', title: 'Accounting defaults', description: 'Set school accounting policy defaults. Journals, fiscal close, and reports remain inside Accounting.', navigationItemId: 'accounting', operationalImpact: 'These defaults guide posting and numbering in Accounting (M11). Journal posting, approval, and fiscal close stay in the Accounting workspace.', operationalLink: { href: '/dashboard/accounting', label: 'Open Accounting' }, fields: [
       { key: 'active_fiscal_year_label', label: 'Active fiscal year label', type: 'text', placeholder: '2083/84' },
       { key: 'fiscal_period_lock_policy', label: 'Fiscal period lock policy', type: 'select', defaultValue: 'MANUAL', options: [{ label: 'Manual close', value: 'MANUAL' }, { label: 'Monthly close', value: 'MONTHLY' }, { label: 'Quarterly close', value: 'QUARTERLY' }] },
       { key: 'default_cash_account_label', label: 'Default cash account', type: 'text' },
@@ -105,7 +114,7 @@ export const SCHOOL_SETTINGS_POLICIES: SchoolSettingsPolicy[] = [
     ],
   },
   {
-    id: 'security', eyebrow: 'School governance', title: 'Security & privacy', description: 'Set session, privacy, data masking, and controlled-export defaults for this school.', fields: [
+    id: 'security', eyebrow: 'School governance', title: 'Security & privacy', description: 'Set session, privacy, data masking, and controlled-export defaults for this school.', navigationItemId: 'security', operationalImpact: 'These defaults control sensitive-field masking, session length, and export permission checks across every school workspace.', fields: [
       { key: 'audit_log_retention_days', label: 'Audit log retention days', type: 'number', defaultValue: 365 },
       { key: 'session_timeout_minutes', label: 'Session timeout minutes', type: 'number', defaultValue: 60 },
       { key: 'sensitive_staff_fields_masked', label: 'Mask sensitive staff fields', type: 'checkbox', defaultValue: true },

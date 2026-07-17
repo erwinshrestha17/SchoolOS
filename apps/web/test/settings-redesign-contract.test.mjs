@@ -8,36 +8,36 @@ const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (path) => readFileSync(join(webRoot, path), 'utf8');
 
 describe('School Settings redesign', () => {
-  it('replaces the default settings entry with the control centre without changing the global sidebar', () => {
+  it('renders the control centre at the settings entry without changing the global sidebar', () => {
     const layout = read('app/dashboard/settings/layout.tsx');
     const frame = read('components/settings/settings-route-frame.tsx');
     const hub = read('components/settings/settings-control-center.tsx');
     assert.match(layout, /SettingsRouteFrame/);
     assert.match(frame, /SettingsControlCenter/);
-    assert.match(hub, /SCHOOL_SETTINGS_CATEGORIES/);
-    assert.match(hub, /School only/);
-    assert.match(hub, /Configuration status is intentionally conservative/);
+    assert.match(hub, /Applies only to this school/);
     assert.doesNotMatch(hub, /Upgrade Plan/);
   });
 
-  it('routes legacy settings links into the canonical school-settings information architecture', () => {
+  it('routes legacy ?section= and ?tab= links into the canonical information architecture', () => {
     const frame = read('components/settings/settings-route-frame.tsx');
-    assert.match(frame, /settings\/profile/);
-    assert.match(frame, /settings\/academic/);
-    assert.match(frame, /settings\/users-roles/);
-    assert.match(frame, /settings\/attendance/);
-    assert.match(frame, /settings\/audit-export/);
-    assert.match(frame, /SCHOOL_SETTINGS_CATEGORIES/);
+    for (const destination of [
+      'settings/school-profile',
+      'settings/academic-calendar',
+      'settings/users-access',
+      'settings/attendance',
+      'settings/audit-export',
+      'settings/communication',
+      'settings/hr-payroll',
+      'settings/accounting',
+    ]) assert.match(frame, new RegExp(destination));
+    assert.match(frame, /migratedLegacySections/);
   });
 
-  it('provides all fourteen stable school settings routes', () => {
-    const catalog = read('components/settings/school-settings-catalog.ts');
-    for (const route of [
-      'profile', 'academic', 'users-roles', 'modules', 'admissions', 'attendance',
-      'fees', 'exams-report-cards', 'homework-timetable-learning', 'communication',
-      'documents-templates', 'security', 'integrations', 'audit-export',
-    ]) assert.match(catalog, new RegExp(`/dashboard/settings/${route}`));
-    assert.doesNotMatch(catalog, /platform\//);
+  it('hides unauthorized items instead of hardcoding the full catalog', () => {
+    const frame = read('components/settings/settings-route-frame.tsx');
+    assert.match(frame, /navigationQuery/);
+    assert.match(frame, /groups\.map/);
+    assert.doesNotMatch(frame, /SCHOOL_SETTINGS_CATEGORIES/);
   });
 
   it('uses real settings APIs for policy configuration rather than browser-only state', () => {
@@ -45,5 +45,13 @@ describe('School Settings redesign', () => {
     assert.match(policy, /api\.getTenantSettings/);
     assert.match(policy, /api\.updateTenantSetting/);
     assert.match(policy, /schoolSettingsApi\.getSchoolSettingsNavigation/);
+  });
+
+  it('keeps access labels aligned with the six-level settings access contract', () => {
+    const catalog = read('components/settings/school-settings-catalog.ts');
+    for (const label of ['View only', 'Edit', 'Approve', 'Manage', 'Delegate']) {
+      assert.match(catalog, new RegExp(label));
+    }
+    assert.match(catalog, /canEditSchoolSettings/);
   });
 });

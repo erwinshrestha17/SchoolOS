@@ -15,6 +15,7 @@ import { SettingsService } from './settings.service';
 import { PlatformService } from '../platform/platform.service';
 import type { Prisma } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { TenantActiveGuard } from '../auth/guards/tenant-active.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthenticatedRequest } from '../auth/auth-request.interface';
@@ -27,7 +28,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { UploadTenantLogoDto } from './dto/upload-tenant-logo.dto';
 
 @Controller('settings')
-@UseGuards(JwtAuthGuard, RolesPermissionsGuard)
+@UseGuards(JwtAuthGuard, TenantActiveGuard, RolesPermissionsGuard)
 export class SettingsController {
   constructor(
     private readonly settingsService: SettingsService,
@@ -66,7 +67,7 @@ export class SettingsController {
   }
 
   @Get('audit-logs')
-  @Permissions('settings:manage')
+  @Permissions('settings:audit:read')
   async listTenantAuditLogs(
     @Req() req: AuthenticatedRequest,
     @Query('page') page?: string,
@@ -95,7 +96,7 @@ export class SettingsController {
   }
 
   @Post('branding/logo')
-  @Permissions('settings:manage')
+  @Permissions('settings:identity:manage')
   uploadSchoolLogo(
     @Body() dto: UploadTenantLogoDto,
     @CurrentAuth() auth: AuthContext,
@@ -116,13 +117,12 @@ export class SettingsController {
   }
 
   @Delete('branding/logo')
-  @Permissions('settings:manage')
+  @Permissions('settings:identity:manage')
   removeSchoolLogo(@CurrentAuth() auth: AuthContext) {
     return this.settingsService.removeSchoolLogo(auth);
   }
 
   @Patch(':key')
-  @Permissions('settings:manage')
   async updateSetting(
     @Param('key') key: string,
     @Body() payload: UpdateTenantSettingPayload,
@@ -132,10 +132,9 @@ export class SettingsController {
       throw new UnauthorizedException('Authentication context required');
     }
     await this.settingsService.updateSetting(
-      req.auth.tenantId,
+      req.auth,
       key,
       payload.value as Prisma.InputJsonValue,
-      req.auth.userId,
     );
     return { success: true };
   }

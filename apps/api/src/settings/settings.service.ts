@@ -1,11 +1,17 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { Prisma } from '@prisma/client';
 import {
   TenantSettingKey,
+  canWriteSchoolSettingKey,
   type PaginatedResponse,
   type PlatformAuditLog,
+  type SchoolSettingsRecentChange,
   type TenantSettingSummary,
 } from '@schoolos/core';
 import type { AuthContext } from '../auth/auth.types';
@@ -214,11 +220,6 @@ export class SettingsService {
           resourceId: true,
           tenantId: true,
           userId: true,
-          before: true,
-          after: true,
-          ipAddress: true,
-          userAgent: true,
-          requestId: true,
           createdAt: true,
           user: {
             select: {
@@ -232,6 +233,8 @@ export class SettingsService {
       this.prisma.auditLog.count({ where }),
     ]);
 
+    // Tenant-facing audit history is a safe summary only: raw before/after
+    // payloads, IP addresses, user agents, and request ids stay server-side.
     return {
       items: logs.map((log) => ({
         id: log.id,
@@ -240,11 +243,6 @@ export class SettingsService {
         resourceId: log.resourceId,
         tenantId: log.tenantId,
         userId: log.userId,
-        before: log.before,
-        after: log.after,
-        ipAddress: log.ipAddress,
-        userAgent: log.userAgent,
-        requestId: log.requestId,
         createdAt: log.createdAt.toISOString(),
         user: log.user,
       })),
@@ -253,6 +251,40 @@ export class SettingsService {
       limit,
       hasNextPage: page * limit < total,
     };
+  }
+
+  async getTenantName(tenantId: string): Promise<string | null> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { name: true },
+    });
+    return tenant?.name ?? null;
+  }
+
+  async listRecentSettingChanges(
+    tenantId: string,
+    limit: number,
+  ): Promise<SchoolSettingsRecentChange[]> {
+    const logs = await this.prisma.auditLog.findMany({
+      where: { tenantId, resource: 'settings' },
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(Math.max(limit, 1), 5),
+      select: {
+        id: true,
+        action: true,
+        resourceId: true,
+        createdAt: true,
+        user: { select: { email: true, phone: true } },
+      },
+    });
+
+    return logs.map((log) => ({
+      id: log.id,
+      action: log.action,
+      settingKey: log.resourceId,
+      actorLabel: log.user?.email ?? log.user?.phone ?? 'System',
+      changedAt: log.createdAt.toISOString(),
+    }));
   }
 
   async getSetting(
@@ -267,11 +299,13 @@ export class SettingsService {
   }
 
   async updateSetting(
-    tenantId: string,
+    actor: AuthContext,
     key: string,
     value: Prisma.InputJsonValue,
-    userId: string,
   ): Promise<void> {
+    const tenantId = actor.tenantId;
+    const userId = actor.userId;
+
     if (!this.allowedKeys.includes(key as TenantSettingKey)) {
       throw new BadRequestException(`Invalid setting key: ${key}`);
     }
@@ -279,6 +313,12 @@ export class SettingsService {
     if (key === 'school_logo') {
       throw new BadRequestException(
         'School logo must be updated through the protected branding logo upload endpoint.',
+      );
+    }
+
+    if (!canWriteSchoolSettingKey(actor.permissions, key as TenantSettingKey)) {
+      throw new ForbiddenException(
+        'Your role cannot change this school setting.',
       );
     }
 
