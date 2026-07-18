@@ -48,17 +48,14 @@ One tenant-aware source of truth
 + role-scoped web and mobile experiences
 ```
 
-The active education direction is:
+The active education direction is Grade 1-12 only, per Nepal education standards. Preschool (Montessori, Nursery, LKG, UKG, ECD) is permanently out of product scope by owner decision (2026-07-18):
 
 ```text
-PRESCHOOL
-  Montessori, Nursery, LKG, UKG
-
 SCHOOL
-  Grade 1-10
+  Grade 1-10 (Basic and Secondary)
 
 HIGHER_SECONDARY
-  Grade 11-12 / +2
+  Grade 11-12 / +2 (NEB)
 ```
 
 A broad Student App is not active scope.
@@ -97,7 +94,7 @@ One SchoolOS platform
 + configurable education experiences
 ```
 
-SchoolOS must not create separate databases, separate student tables, separate guardian systems, separate fee ledgers, separate authentication systems, or separate mobile binaries for Preschool, School, or +2.
+SchoolOS must not create separate databases, separate student tables, separate guardian systems, separate fee ledgers, separate authentication systems, or separate mobile binaries for School (Grade 1-10) or +2 (Grade 11-12).
 
 ### 2.2 Production/GA target, evidence-based readiness
 
@@ -193,7 +190,7 @@ External wording must avoid unsupported claims of legal compliance, regulator ap
 3. Establish a trusted operational record for student, attendance, fees, receipts, academics, notifications, notices, files, and audit.
 4. Support modular packaging without weakening tenant, role, entitlement, or data boundaries.
 5. Differentiate through Nepal-first usability, fee transparency, parent trust, protected records, and practical school operations.
-6. Create a scalable foundation for Preschool, School, and +2 without parallel systems while preserving the frozen M13 Learning implementation for possible future re-approval.
+6. Create a scalable foundation for School (Grade 1-10) and +2 (Grade 11-12) without parallel systems while preserving the frozen M13 Learning implementation for possible future re-approval.
 7. Move from the current Internal QA / controlled-pilot preparation posture through the defined release stages only with recorded evidence.
 
 ### 5.2 Product goals
@@ -225,7 +222,7 @@ SchoolOS must not, in the current release boundary:
 - Expose raw object keys, permanent private URLs, provider credentials, token hashes, stack traces, Prisma errors, or private payloads.
 - Allow parents to see unlinked children, teachers to see unassigned classes, drivers to see unassigned trips, staff to see other staff self-service data, or students to see other students.
 - Provide offline payment, refund, wallet debit, payroll, accounting, report-card publishing, or platform-setting writes.
-- Build a broad Preschool-through-Grade-12 student mobile app. These students receive controlled school learning/session access only.
+- Build a broad Grade 1-12 student mobile app. These students receive controlled school learning/session access only.
 - Build a public leaderboard, open student chat, harsh child labels, AI tutor, adaptive recommendations, automated punishment/risk decisions, or heavy simulations without approval.
 - Add Bachelor or Master's institution-management features, a broad Student App, or M14 runtime without explicit product approval.
 - Claim staging, pilot, release-candidate, production, or GA readiness from documentation or local tests alone.
@@ -238,7 +235,6 @@ SchoolOS must not, in the current release boundary:
 
 | Segment | Primary needs | SchoolOS direction |
 |---|---|---|
-| Preschool / Montessori / Nursery / LKG / UKG | Child safety, attendance, authorized pickup, parent trust, activities, milestones, notices, fees, simple teacher workflows | Preschool experience over shared students, guardians, attendance, activity, fees, files, communication, and mobile companion |
 | School Grade 1-10 | Admissions, attendance, fees, homework, timetable, exams, CAS, report cards, library, transport, canteen, HR, notices, parent communication | Core School experience and initial controlled-pilot beachhead |
 | Higher Secondary / +2 | Programs/streams, subject combinations, theory/practical timetables, labs, projects, internal assessment, mock exams, board readiness | Configurable +2 extension over shared academics, staff, fees, files, communication, and reports |
 | Multi-branch or growing groups | Common controls, role separation, tenant isolation, module packaging, operator support, reporting | Multi-tenant SaaS control plane plus tenant configuration and school operations planes |
@@ -263,21 +259,7 @@ Web and mobile must never infer authorization from class names, hidden buttons, 
 
 ### 7.3 Experience-specific defaults
 
-#### Preschool
-
-Default emphasis:
-
-- Safe arrival and handover.
-- Authorized pickup and temporary pickup changes where implemented.
-- Attendance and pickup exceptions.
-- Activity updates and consent-safe media.
-- Supportive milestones and observations.
-- Parent notices and simple fees/receipts.
-- Teacher simplicity and child-safety alerts.
-
-Not default:
-
-- Heavy marks grids, complex CAS, ranking, broad child-owned mobile app, open chat, or mandatory detailed care logs for every school.
+Preschool is out of product scope. There is no preschool experience, no authorized-pickup/handover workflow, and no preschool care-log or developmental-diary UX anywhere in SchoolOS.
 
 #### School Grade 1-10
 
@@ -322,7 +304,7 @@ No hard-coded streams or parallel +2 platform may be introduced.
 | Canteen manager / staff | Run menu, POS, QR serve, wallet, safety, and stock workflows | Fast, idempotent counter/serve flow with allergy/medical warnings and backend wallet truth |
 | Parent / guardian | Understand and act on matters for linked children | Child-scoped attendance, dues, receipts, homework, notices, activity, reports, transport, and enabled services |
 | Staff self-service user | Manage own attendance, leave, profile, payslips, and notices | Own-record-only mobile experience with protected files |
-| Student, Preschool through +2 | No broad Student App; preserve controlled-session compatibility only | Existing expiring session/QR, own activity, autosave/submit, and own-result boundaries remain frozen and disabled by default for pilots |
+| Student, Grade 1 through +2 | No broad Student App; preserve controlled-session compatibility only | Existing expiring session/QR, own activity, autosave/submit, and own-result boundaries remain frozen and disabled by default for pilots |
 | SchoolOS platform operator/support | Manage tenants, plans, providers, queues, SaaS billing, and support access | Separate `/platform/*` control plane, masked secrets, reasoned support override, audit, and expiry |
 
 ---
@@ -1008,7 +990,6 @@ Metrics must be measured from backend-owned data and interpreted within the curr
 
 ### P2 — Expanded experience depth
 
-- Preschool safety workflow after schema/contract approval.
 - +2 streams, subject combinations, practicals, projects, and board-readiness depth.
 - Library/transport/canteen device and provider hardening.
 - Multi-branch operational depth.
@@ -1104,7 +1085,7 @@ SchoolOS product delivery depends on:
 | Premature inactive-scope or AI expansion | Distracts from pilot/GA blockers | Explicit non-scope labels and release-governed approval |
 | Documentation overstates readiness | Bad decisions and buyer mistrust | Evidence-based status language and release-policy precedence |
 | Weak school ownership during pilot | Operational dependency on engineering | Pilot screening, named champions, shadow mode, support/runbook readiness |
-| Hard-coded education assumptions | Poor Preschool/School/+2 fit | Configurable experience context, contracts, and staged schema design |
+| Hard-coded education assumptions | Poor School/+2 fit | Configurable experience context, contracts, and staged schema design |
 
 ---
 
@@ -1113,8 +1094,8 @@ SchoolOS product delivery depends on:
 These require explicit owner/product decision and must not be guessed in implementation:
 
 1. Final paid-pilot institution profile, pricing cadence, and packaging.
-2. Exact Preschool authorized-pickup and care-alert schema/workflow.
-3. Exact +2 program, stream, combination, practical, project, and board-readiness model.
+2. Resolved 2026-07-18 by owner decision: Preschool is permanently out of scope. The authorized-pickup and care-alert workflow must never be built; SchoolOS covers Grade 1-12 only.
+3. Exact +2 program, stream, combination, practical, project, and board-readiness model. Owner direction (2026-07-18): follow Nepal Education Board (NEB) standards for Grade 11-12; the detailed configurable model still needs product sign-off.
 4. Supported payment, SMS, email, push, and object-storage providers for pilot and GA.
 5. Nepali localization depth and template ownership.
 6. Formal/IRD-ready billing boundary and external claim wording after expert validation.

@@ -19,7 +19,7 @@ The canonical M0-M15 taxonomy and module ownership live in [the Module Design Ca
 
 ## 1A. Stage-Aware Shared-Core Architecture
 
-SchoolOS supports `PRESCHOOL`, `SCHOOL` (Grade 1-10), and `HIGHER_SECONDARY` (Grade 11-12 / +2) over one shared core, not as separate products or data systems. A broad Student App is not active scope.
+SchoolOS supports `SCHOOL` (Grade 1-10) and `HIGHER_SECONDARY` (Grade 11-12 / +2) over one shared core, not as separate products or data systems. Preschool is permanently out of product scope. A broad Student App is not active scope.
 
 The shared record model remains:
 
@@ -55,9 +55,9 @@ The SRS owns the conceptual system diagram, non-functional requirements, data li
 
 Required architecture guardrails for proposed stage-aware work:
 
-1. Do not add `PreschoolStudent`, `SchoolStudent`, `PlusTwoStudent`, or a separate app/database.
+1. Do not add `SchoolStudent`, `PlusTwoStudent`, or a separate app/database.
 2. Extend the shared tenant/student/enrollment/academic model only through reviewed schema design, migration replay, OpenAPI/shared DTO updates, web/mobile contract updates, and tests.
-3. Preschool pickup/drop, authorized pickup, temporary pickup changes, and care alerts must be narrow, auditable, and permission-scoped.
+3. Student care and emergency data must stay narrow, auditable, and permission-scoped.
 4. Higher Secondary streams, subject combinations, practicals, projects, and lab timetables must be school-configurable, not hard-coded.
 5. Backend authorization must enforce the active experience independently of UI composition.
 6. Students remain limited to backend-authorized, self/session-scoped controlled learning/session access; a broad Student App is not active scope.

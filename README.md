@@ -2,12 +2,9 @@
 
 SchoolOS is a Nepal-first, multi-tenant education operating SaaS in Internal QA / controlled-pilot preparation.
 
-Active product scope:
+Active product scope (Grade 1-12, per Nepal education standards):
 
 ```text
-PRESCHOOL
-  Montessori, Nursery, LKG, UKG
-
 SCHOOL
   Grade 1-10
 
@@ -15,7 +12,7 @@ HIGHER_SECONDARY
   Grade 11-12 / +2
 ```
 
-Bachelor and Master's institution-management features, a broad student mobile application, and M14 Intelligence / AI runtime are not active scope.
+Preschool (Montessori, Nursery, LKG, UKG, ECD), Bachelor and Master's institution-management features, a broad student mobile application, and M14 Intelligence / AI runtime are not active scope.
 
 The active delivery boundary separates **M12 Notifications and Delivery** from
 **M15 Notices and Announcements**. Chat/conversations are removed from the active

@@ -30,7 +30,7 @@ Plus: confirm truly plan-gated modules (Transport, Canteen, Library, HR/Staff, A
 
 ## 1. Product context & non-negotiables
 
-SchoolOS is a **Nepal-first, multi-tenant school-management SaaS** in Internal QA / controlled-pilot preparation—the daily operating desk for Preschool, School (Grade 1-10), and Higher Secondary (Grade 11-12 / +2). Guiding principle, every screen: **one screen = one main job.** Every screen answers *Where am I? What needs attention? What can I safely do next?*
+SchoolOS is a **Nepal-first, multi-tenant school-management SaaS** in Internal QA / controlled-pilot preparation—the daily operating desk for School (Grade 1-10) and Higher Secondary (Grade 11-12 / +2). Guiding principle, every screen: **one screen = one main job.** Every screen answers *Where am I? What needs attention? What can I safely do next?*
 
 **Voice / content rules — apply to every string you write:**
 - School terms, not system terms: *Student* (not "entity"), *Guardian* (not "relation"), *Receipt*, *Class/Section*, *Staff*, *School Settings*, *Not enabled* (not "unauthorized module").

@@ -6,7 +6,7 @@
 
 This runbook defines deployment, recovery, and controlled-pilot operating procedures. It is not proof that any procedure has been executed or that SchoolOS has passed a release gate. The current posture is **Internal QA / controlled-pilot preparation**. Current work and blockers belong in GitHub Issues, Milestones, or Projects; current evidence belongs in CI runs, smoke outputs, staging records, and release artifacts.
 
-The active education scope is Preschool, School (Grade 1-10), and Higher Secondary (Grade 11-12 / +2) over one tenant-aware core. A broad Student App and M14 Intelligence / AI runtime are not active scope.
+The active education scope is School (Grade 1-10) and Higher Secondary (Grade 11-12 / +2) over one tenant-aware core; Preschool is out of scope. A broad Student App and M14 Intelligence / AI runtime are not active scope.
 
 ---
 

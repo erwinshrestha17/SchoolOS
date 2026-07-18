@@ -16,12 +16,13 @@ SchoolOS must remain one multi-tenant education operating platform:
 
 ```text
 Shared tenant-aware core
-+ PRESCHOOL experience pack
-+ SCHOOL experience pack
-+ HIGHER_SECONDARY experience pack
++ SCHOOL experience pack (Grade 1-10)
++ HIGHER_SECONDARY experience pack (Grade 11-12)
 + shared Next.js Web application
 + shared Flutter companion app
 ```
+
+Preschool is permanently out of product scope (owner decision, 2026-07-18). SchoolOS covers Grade 1-12 only, per Nepal education standards.
 
 A broad Student App is not active scope. Product scope is defined by the PRD.
 
@@ -38,7 +39,7 @@ Student
 + enabled module/capability
 ```
 
-Do not create separate `PreschoolStudent`, `SchoolStudent`, or `PlusTwoStudent` systems.
+Do not create separate `SchoolStudent` or `PlusTwoStudent` systems.
 
 ## 2. Verified Repository Baseline
 
@@ -54,8 +55,7 @@ This section records code evidence inspected during this documentation pass. It 
 | File Registry | IMPLEMENTED_UNVERIFIED | `FileRegistryService` and `StorageService` exist with signed upload/read paths and tests referenced in prior audit. External object storage was not verified here. |
 | Next.js Web | IMPLEMENTED_UNVERIFIED | `apps/web/app/dashboard/**`, `apps/web/app/platform/**`, and domain API clients exist; web client uses cookie credentials, CSRF token header, support override headers, and shared core types. |
 | Flutter companion app | IMPLEMENTED_UNVERIFIED | One GoRouter app has parent, teacher, principal, staff, driver, admin, and limited student routes; secure token storage and private read cache exist. Device QA was not run here. |
-| Program/stage resolver | NEEDS_SCHEMA_DESIGN | No canonical tenant program-offering, class stage profile, stream/combination, or `ExperienceContext` implementation was found. Current evidence is demo preschool class names and activity milestone stage filters only. |
-| Preschool pickup/handover workflow | NEEDS_SCHEMA_DESIGN | No dedicated authorized-pickup, temporary pickup change, arrival/checkout, or pickup exception model was verified. |
+| Program/stage resolver | NEEDS_SCHEMA_DESIGN | No canonical tenant program-offering, class stage profile, stream/combination, or `ExperienceContext` implementation was found. Current evidence is activity milestone stage filters only. |
 | Higher Secondary streams/subject combinations/practicals/projects | NEEDS_SCHEMA_DESIGN | Subjects have practical marks and assessments; no configurable stream/subject-combination/practical/project lifecycle model was verified. |
 
 ## 3. System Architecture Requirement
@@ -169,14 +169,13 @@ SchoolOS Web is the daily school operating desk.
 | Real APIs only | No mock production data, browser-owned official totals, or UI-invented lifecycle states. |
 | Shared states | Loading, empty, error, permission-denied, module-locked, validation, queued-job, partial-failure, protected-file unavailable, and success states must be distinct. |
 | Protected files | No raw private-file `window.open`; use authenticated helper flows and validate content where relevant. |
-| Stage-aware composition | One shared shell composes Preschool, School, or Higher Secondary dashboards based on backend experience context; it is not a separate web codebase. |
+| Stage-aware composition | One shared shell composes School or Higher Secondary dashboards based on backend experience context; it is not a separate web codebase. |
 | High-risk actions | Confirmation, reason where required, audit support, and clear pending/success/error feedback. |
 
 Stage-aware dashboard requirements:
 
 | Experience | Dashboard emphasis |
 |---|---|
-| `PRESCHOOL` | Child safety, attendance, pickup/drop, parent concerns, fees, admissions, class coverage. |
 | `SCHOOL` | Attendance gaps, homework, timetable, exams, marks, report cards, dues, operations. |
 | `HIGHER_SECONDARY` | Stream enrollment, practicals, projects, labs, internal assessment, mock exams, workload, dues. |
 
@@ -190,7 +189,7 @@ SchoolOS mobile remains one Flutter companion app.
 | Purpose-limited API | No broad admin dashboard copied to mobile and no admin-shaped payloads for parents/drivers/staff self-service. |
 | Secure storage | Credentials and tokens use secure storage. Private read cache is safe-read only, encrypted at rest, schema-versioned, tenant/user/role scoped, TTL- and quota-bounded, and cleared on logout/session expiry. |
 | Offline | Offline reads may show allowlisted cached private data with visible freshness. Expired, differently scoped, or disallowed local entries fail closed. Restoring an offline session requires an unexpired stored access token and matching secure identity; an already-open offline session remains bounded by each resource's cache TTL. Server-side revocation or suspension takes effect on the next successful session revalidation. Writes require explicit idempotency/reconciliation. |
-| Context switching | Parent switches child and active stage; teacher switches assigned class/context; principal filters combined alerts by Preschool, School, and +2. |
+| Context switching | Parent switches child and active stage; teacher switches assigned class/context; principal filters combined alerts by School and +2. |
 | Student access | Broad Student App routes must be hidden and backend-denied; controlled learning/session access must be tenant-scoped, self/session-scoped, expiring where applicable, and backend-authorized. |
 
 Mobile workflow priority:
@@ -198,7 +197,7 @@ Mobile workflow priority:
 | Workflow | Priority |
 |---|---|
 | Parent Today, attendance, fees/receipts, notices, activity, milestones, report cards, transport where enabled | P0/P1 depending on stage and module entitlement |
-| Teacher Today, attendance, assigned classes, homework, timetable, messages, preschool observations where approved | P0/P1 |
+| Teacher Today, attendance, assigned classes, homework, timetable, messages, classroom observations where approved | P0/P1 |
 | Principal attention, approvals, admissions snapshot, attendance/fees/academics/transport alerts | P0/P1 |
 | Staff own attendance, leave, payslips | P1 |
 | Driver assigned trip | P1 |
@@ -212,7 +211,7 @@ Mobile workflow priority:
 | Student core | `Student`, `Guardian`, `StudentGuardian`, and `Enrollment` exist. | Program/stage must extend the shared student/enrollment/class model, not create separate student tables. |
 | Academic structure | `AcademicYear`, `Class`, `Section`, `Subject`, `SubjectTeacherAssignment`, and timetable/exam models exist. | Need a formal program/stage/profile design for class/section and +2 streams/subject combinations. |
 | Enrollment lifecycle | `Enrollment` and lifecycle fields/history exist. | Stage/program transitions require explicit lifecycle/audit design before schema changes. |
-| Preschool safety | Emergency/care fields exist on `Student`; activity/milestone models exist. | Authorized pickup, temporary pickup, arrival/checkout, and pickup exception workflows need schema design. |
+| Student care fields | Emergency/care fields exist on `Student`; activity/milestone models exist. | Keep narrow, permission-scoped visibility for Grade 1-12 care and emergency data. |
 | Higher Secondary | `Subject.hasPractical`, theory/practical marks, assessments, exams, report cards, and promotion exist. | Stream/subject-combination/practical/project tracking needs ownership, indexes, API, UI, and tests. |
 | Money correctness | Fees, payments, receipts, cashier close, accounting, payroll, and canteen wallet/POS models exist. | Continue Decimal/database totals, idempotency, reversal/correction, and transaction-boundary tests. |
 | Institution compliance profile | Tenant/settings data exists, but no standalone compliance module is approved. | Extend M0-owned legal/location/affiliation/accreditation settings only through reviewed schema/contracts and field-level permission/audit rules. |
@@ -234,7 +233,7 @@ Mobile workflow priority:
 | Fee ledger | M3/M11 | planned/invoiced/paid/reversed/refunded/closed | Backend Decimal truth, idempotency, audit. |
 | Attendance | M2 | draft/submitted/locked/corrected/exported | Teacher/guardian scope enforced by backend. |
 | Files | M0 File Registry + feature owner | pending/uploaded/linked/previewed/downloaded/expired/deleted | No raw object keys or permanent private URLs in clients. |
-| Media consent | M5/M12 | captured/revoked/applied/audited | Consent-safe preschool and parent media visibility. |
+| Media consent | M5/M12 | captured/revoked/applied/audited | Consent-safe student and parent media visibility. |
 | Exam/result | M4 | draft/submitted/locked/generated/published/corrected/unpublished | Parent/student see published own-scope records only. |
 | Practical/project | Proposed M4 | assigned/in-progress/submitted/assessed/published | Needs +2 schema, DTO, authorization, and reporting design. |
 | Audit event | M0/Audit | recorded/retained/exported | Immutable enough for support/security investigation; no private payload leakage. |
@@ -249,7 +248,7 @@ Mobile workflow priority:
 | Accountant/cashier | Own tenant | Finance/cashier scope | Fees, receipts, cashier close, accounting where permitted | Client-calculated official totals, unrelated child care/media data |
 | Teacher | Own tenant | Assigned class/section/subject unless permitted | Attendance, homework, marks, class activity, parent-teacher threads | Unassigned students/classes, finance internals, broad admin settings |
 | Parent/guardian | Own tenant through linked children | Linked children only | Child attendance, fees, receipts, notices, activity, milestones, published results | Other children, staff finance, raw object keys, private messages outside linked scope |
-| Student session Preschool-+2 | Own tenant | Own/session-scoped | Approved controlled learning/session only | Broad student app, other students, open chat, admin data |
+| Student session Grade 1-12 | Own tenant | Own/session-scoped | Approved controlled learning/session only | Broad student app, other students, open chat, admin data |
 | Driver/conductor | Own tenant | Assigned trip only | Trip roster/status, route tasks, delay updates | Other routes/students, finance, staff data |
 | Staff self-service | Own tenant | Own staff record | Own attendance, leave, payslips where enabled | Other staff salary/bank/payroll records |
 
@@ -274,9 +273,8 @@ Mobile workflow priority:
 | Capability | Current status | Required next evidence |
 |---|---|---|
 | Shared student/guardian/enrollment core | IMPLEMENTED_UNVERIFIED | Fresh local/staging verification against seeded tenant and role scopes. |
-| Preschool class names and milestone templates | IMPLEMENTED_UNVERIFIED | Confirm stage filters, UI behavior, parent visibility, and consent-safe media in browser/mobile. |
-| Preschool pickup/drop and authorized pickup contacts | NEEDS_SCHEMA_DESIGN | Define module ownership, schema, DTO, RBAC, audit, mobile/web flows, and tests. |
-| Preschool care/allergy alerts | IMPLEMENTED_UNVERIFIED / NEEDS_AUTHORIZATION_RULE | Student care fields exist; narrow staff visibility and preschool UI workflows need verification/design. |
+| School-age milestone templates (Grade 1-8) | IMPLEMENTED_UNVERIFIED | Confirm stage filters, UI behavior, parent visibility, and consent-safe media in browser/mobile. |
+| Student care/allergy alerts | IMPLEMENTED_UNVERIFIED / NEEDS_AUTHORIZATION_RULE | Student care fields exist; narrow staff visibility rules need verification/design. |
 | School Grade 1-10 core workflows | IMPLEMENTED_UNVERIFIED | Authenticated browser E2E, pilot seed, mobile device QA, staging proof. |
 | Higher Secondary subject practical marks | IMPLEMENTED_UNVERIFIED | Confirm contracts, UI, report-card handling, and +2 policy fit. |
 | Higher Secondary streams/subject combinations | NEEDS_SCHEMA_DESIGN | Design configurable stream/program/combination model and migration plan. |

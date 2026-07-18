@@ -46,7 +46,7 @@ When evidence is missing, state the exact missing gate rather than using an opti
 
 ## 3. Product and architecture boundaries remain unchanged
 
-SchoolOS remains a Nepal-first, multi-tenant education operating SaaS for `PRESCHOOL`, `SCHOOL` (Grade 1-10), and `HIGHER_SECONDARY` (Grade 11-12 / +2). A broad Student App is not active scope. The GA target must preserve these boundaries:
+SchoolOS remains a Nepal-first, multi-tenant education operating SaaS for `SCHOOL` (Grade 1-10) and `HIGHER_SECONDARY` (Grade 11-12 / +2). Preschool is permanently out of product scope. A broad Student App is not active scope. The GA target must preserve these boundaries:
 
 - Keep the NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js App Router, Flutter companion app, and shared contracts where available.
 - Keep `tenantId` as the strict tenant boundary.
