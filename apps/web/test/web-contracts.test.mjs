@@ -2407,7 +2407,6 @@ describe('SchoolOS web production contracts', () => {
       'FESTIVAL_AND_CULTURE',
       'NATIONAL_PROGRAMME',
       'ACHIEVEMENT',
-      'PRESCHOOL_ACTIVITY',
       'OTHER',
       'LEARNING',
       'OUTDOOR_PLAY',

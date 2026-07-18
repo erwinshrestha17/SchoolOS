@@ -92,7 +92,7 @@ export default function ActivityObservationsPage() {
     <DashboardPageShell>
       <PageHeader
         title="Observations"
-        description="Record whole-class mood with optional student-specific exceptions. Preschool/ECE classes use this for daily emotional context."
+        description="Record whole-class mood with optional student-specific exceptions. Lower-grade classes use this for daily emotional context."
       />
 
       <div className="grid gap-8 xl:grid-cols-2">

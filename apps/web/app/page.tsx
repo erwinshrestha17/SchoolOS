@@ -295,7 +295,7 @@ export default function RedesignedLandingPage() {
           {/* Left Column: Headline and CTAs */}
           <div className="space-y-6">
             <div className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/60 px-4 py-1.5 text-xs font-semibold tracking-wider text-primary-300 uppercase">
-              🇳🇵 Built for Nepal schools · Montessori to Class 10
+              🇳🇵 Built for Nepal schools · Grade 1 to Grade 12
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.1] text-white">

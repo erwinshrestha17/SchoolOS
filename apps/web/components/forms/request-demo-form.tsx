@@ -298,7 +298,6 @@ export function RequestDemoForm() {
                     aria-required="true"
                   >
                     <option value="" disabled>Select Type</option>
-                    <option value="Montessori / Pre-primary">Montessori / Pre-primary</option>
                     <option value="Basic School">Basic School</option>
                     <option value="Secondary School">Secondary School</option>
                     <option value="Higher Secondary">Higher Secondary</option>

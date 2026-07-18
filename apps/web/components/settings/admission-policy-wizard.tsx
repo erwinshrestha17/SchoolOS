@@ -55,22 +55,6 @@ type PolicyTemplateDefaults = {
 // Scope (Step 2) and document set (Step 4) still need a human to confirm them.
 const POLICY_TEMPLATES: PolicyTemplateDefaults[] = [
   {
-    id: 'preschool',
-    label: 'Preschool / Montessori Admission',
-    description: 'Direct admission with a parent-child interaction and light document review.',
-    gradeBand: 'MONTESSORI',
-    applicantType: 'NEW',
-    requiredFields: ['emergencyName', 'emergencyPhone'],
-    admissionMode: 'DIRECT_ALLOWED',
-    requireDocumentReview: false,
-    requireInterview: true,
-    requirePrincipalApproval: false,
-    requireTransferCertificate: false,
-    requirePriorMarksheet: false,
-    requireStreamOrMarksReview: false,
-    documents: ['Birth certificate', 'Student passport photo', 'Parent/guardian citizenship'],
-  },
-  {
     id: 'grade-1-10-new',
     label: 'Grade 1-10 New Admission',
     description: 'Normal office admission for new students joining Grades 1 through 10.',
@@ -453,7 +437,7 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
             </SectionCard>
           ) : null}
 
-          <SectionCard title="Policy name" description="Give staff a plain-language name for this policy, e.g. Nursery Admission 2083.">
+          <SectionCard title="Policy name" description="Give staff a plain-language name for this policy, e.g. Grade 1 Admission 2083.">
             <label className="block space-y-2 text-sm font-bold text-slate-700">
               <span>Policy name</span>
               <input
@@ -492,7 +476,6 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
               <span>Grade band</span>
               <select className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" value={gradeBand} onChange={(event) => setGradeBand(event.target.value)}>
                 <option value="">Any grade band</option>
-                <option value="MONTESSORI">Montessori / ECD</option>
                 <option value="PRIMARY">Primary (Grades 1-5)</option>
                 <option value="BASIC_SECONDARY">Grades 6-10</option>
                 <option value="GRADE_11_12">Grades 11-12</option>

@@ -196,8 +196,8 @@ export function AcademicStructureWorkspace() {
                 <div>
                   <h2 className="font-bold text-slate-950">Add class</h2>
                   <p className="mt-1 text-sm leading-5 text-slate-600">
-                    Use the school’s preferred class label such as Nursery,
-                    Grade 1, or Class 10.
+                    Use the school’s preferred class label such as Grade 1,
+                    Class 8, or Class 12.
                   </p>
                 </div>
               </div>

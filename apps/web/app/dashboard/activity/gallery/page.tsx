@@ -32,7 +32,6 @@ const activityCategories = [
   'FESTIVAL_AND_CULTURE',
   'NATIONAL_PROGRAMME',
   'ACHIEVEMENT',
-  'PRESCHOOL_ACTIVITY',
   'OTHER',
 ] as const;
 

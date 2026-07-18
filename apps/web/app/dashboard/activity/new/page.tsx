@@ -31,7 +31,6 @@ const activityCategories = [
   'FESTIVAL_AND_CULTURE',
   'NATIONAL_PROGRAMME',
   'ACHIEVEMENT',
-  'PRESCHOOL_ACTIVITY',
   'OTHER',
   // Retained because these persisted/API values remain supported for existing
   // schools and are still accepted by the shared activity contract.
@@ -619,13 +618,11 @@ function ContentStep({
           value={post.caption}
           onChange={(event) => setPost((current) => ({ ...current, caption: event.target.value }))}
           placeholder={
-            post.category === 'PRESCHOOL_ACTIVITY'
-              ? 'Today we practised identifying red, blue and yellow objects.'
-              : post.language === 'BOTH'
-                ? 'Today our students participated in ________.\nआज विद्यार्थीहरूले ________ गतिविधिमा सहभागिता जनाए।'
-                : post.language === 'NEPALI'
-                  ? 'आज कक्षामा के भयो?'
-                  : 'What happened in class today?'
+            post.language === 'BOTH'
+              ? 'Today our students participated in ________.\nआज विद्यार्थीहरूले ________ गतिविधिमा सहभागिता जनाए।'
+              : post.language === 'NEPALI'
+                ? 'आज कक्षामा के भयो?'
+                : 'What happened in class today?'
           }
         />
       </FormField>
@@ -637,11 +634,7 @@ function ContentStep({
           onChange={(event) =>
             setPost((current) => ({ ...current, askAtHome: event.target.value }))
           }
-          placeholder={
-            post.category === 'PRESCHOOL_ACTIVITY'
-              ? 'e.g. You can ask your child to find one object of each colour at home.'
-              : 'e.g. Ask your child to name one object of each colour they found today.'
-          }
+          placeholder="e.g. Ask your child to explain one thing they learned in class today."
           maxLength={280}
         />
         <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
