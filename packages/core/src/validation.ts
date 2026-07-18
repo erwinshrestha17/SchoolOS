@@ -269,7 +269,6 @@ export const activityCategoryValues = [
   'FESTIVAL_AND_CULTURE',
   'NATIONAL_PROGRAMME',
   'ACHIEVEMENT',
-  'PRESCHOOL_ACTIVITY',
   'OTHER',
   // Legacy values kept for backward compatibility with existing posts.
   'LEARNING',
