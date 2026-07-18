@@ -2293,84 +2293,54 @@ function canManageAllActivity(actor: AuthContext) {
 
 const MILESTONE_TEMPLATE_CATALOG = [
   {
-    key: 'ecd-social-shares-materials',
-    stage: 'ECD',
-    stageAliases: ['montessori', 'nursery', 'kg', 'pre-primary'],
+    key: 'primary-social-works-in-groups',
+    stage: 'Primary',
+    stageAliases: ['grade-1', 'grade-2', 'grade-3', 'grade-4', 'grade-5'],
     domain: 'Social',
-    milestone: 'Shares classroom materials with peers',
+    milestone: 'Works cooperatively in pairs or small groups',
+    suggestedStatus: 'PROGRESSING',
+    observationPrompt:
+      'Observed during pair work, group tasks, or shared classroom responsibilities.',
+  },
+  {
+    key: 'primary-language-reads-grade-level-text',
+    stage: 'Primary',
+    stageAliases: ['grade-1', 'grade-2', 'grade-3', 'grade-4', 'grade-5'],
+    domain: 'Language',
+    milestone: 'Reads grade-level text aloud with confidence',
     suggestedStatus: 'EMERGING',
     observationPrompt:
-      'Observed during group play, material sharing, or pair activity.',
+      'Record the passage read and whether the student needed support with fluency.',
   },
   {
-    key: 'ecd-language-follows-two-step',
-    stage: 'ECD',
-    stageAliases: ['montessori', 'nursery', 'kg', 'pre-primary'],
+    key: 'primary-language-expresses-ideas',
+    stage: 'Primary',
+    stageAliases: ['grade-1', 'grade-2', 'grade-3', 'grade-4', 'grade-5'],
     domain: 'Language',
-    milestone: 'Follows two-step classroom instructions',
-    suggestedStatus: 'ACHIEVED',
+    milestone: 'Expresses ideas clearly in class discussion',
+    suggestedStatus: 'PROGRESSING',
     observationPrompt:
-      'Record the instruction and whether the child completed both steps independently.',
+      'Capture an example of the student explaining an idea, answer, or question in their own words.',
   },
   {
-    key: 'ecd-motor-pencil-grip',
-    stage: 'ECD',
-    stageAliases: ['montessori', 'nursery', 'kg', 'pre-primary'],
+    key: 'primary-motor-writes-legibly',
+    stage: 'Primary',
+    stageAliases: ['grade-1', 'grade-2', 'grade-3', 'grade-4', 'grade-5'],
     domain: 'Motor',
-    milestone: 'Uses age-appropriate pencil grip',
+    milestone: 'Writes legibly at a grade-appropriate pace',
     suggestedStatus: 'EMERGING',
     observationPrompt:
-      'Capture grip, control, and comfort during writing or drawing work.',
+      'Note handwriting control and pace during copywork or dictation.',
   },
   {
-    key: 'ecd-social-participates-group',
-    stage: 'ECD',
-    stageAliases: ['montessori', 'nursery', 'kg', 'pre-primary'],
-    domain: 'Social',
-    milestone: 'Participates in group activities',
-    suggestedStatus: 'EMERGING',
-    observationPrompt:
-      'Note involvement during circle time, group play, or shared classroom tasks.',
-  },
-  {
-    key: 'ecd-cognitive-recognizes-colours-shapes',
-    stage: 'ECD',
-    stageAliases: ['montessori', 'nursery', 'kg', 'pre-primary'],
+    key: 'primary-cognitive-applies-number-skills',
+    stage: 'Primary',
+    stageAliases: ['grade-1', 'grade-2', 'grade-3', 'grade-4', 'grade-5'],
     domain: 'Cognitive',
-    milestone: 'Recognizes colours or shapes',
+    milestone: 'Applies number skills to classroom problems',
     suggestedStatus: 'EMERGING',
     observationPrompt:
-      'Record which colours or shapes the child identified and in what activity.',
-  },
-  {
-    key: 'ecd-language-communicates-needs',
-    stage: 'ECD',
-    stageAliases: ['montessori', 'nursery', 'kg', 'pre-primary'],
-    domain: 'Language',
-    milestone: 'Communicates needs more clearly',
-    suggestedStatus: 'PROGRESSING',
-    observationPrompt:
-      'Capture an example of the child expressing a need, request, or feeling in words.',
-  },
-  {
-    key: 'ecd-self-help-follows-routines',
-    stage: 'ECD',
-    stageAliases: ['montessori', 'nursery', 'kg', 'pre-primary'],
-    domain: 'Self-help',
-    milestone: 'Follows classroom routines',
-    suggestedStatus: 'ACHIEVED',
-    observationPrompt:
-      'Note whether the child follows daily routines (arrival, cleanup, lining up) with minimal reminders.',
-  },
-  {
-    key: 'ecd-self-help-demonstrates-independence',
-    stage: 'ECD',
-    stageAliases: ['montessori', 'nursery', 'kg', 'pre-primary'],
-    domain: 'Self-help',
-    milestone: 'Demonstrates independence',
-    suggestedStatus: 'PROGRESSING',
-    observationPrompt:
-      'Record a task the child completed on their own without adult help.',
+      'Record the task and whether the student solved it independently or with support.',
   },
   {
     key: 'primary-self-help-organizes-bag',
@@ -2381,6 +2351,26 @@ const MILESTONE_TEMPLATE_CATALOG = [
     suggestedStatus: 'ACHIEVED',
     observationPrompt:
       'Note whether the student prepares books, copies, and stationery independently.',
+  },
+  {
+    key: 'lower-secondary-study-plans-revision',
+    stage: 'Lower Secondary',
+    stageAliases: ['grade-6', 'grade-7', 'grade-8'],
+    domain: 'Self-help',
+    milestone: 'Plans and revises for unit tests independently',
+    suggestedStatus: 'EMERGING',
+    observationPrompt:
+      'Record how the student prepared — notes, practice questions, or a revision plan.',
+  },
+  {
+    key: 'lower-secondary-social-takes-responsibility',
+    stage: 'Lower Secondary',
+    stageAliases: ['grade-6', 'grade-7', 'grade-8'],
+    domain: 'Social',
+    milestone: 'Takes responsibility in group projects',
+    suggestedStatus: 'PROGRESSING',
+    observationPrompt:
+      'Note the role the student took and how they handled their share of the work.',
   },
 ] as const;
 

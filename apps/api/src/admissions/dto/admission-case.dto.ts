@@ -47,7 +47,6 @@ export const ADMISSION_SOURCES = [
 export const ADMISSION_MODES = ['DIRECT_ALLOWED', 'REVIEW_REQUIRED'] as const;
 
 export const ADMISSION_GRADE_BANDS = [
-  'MONTESSORI',
   'PRIMARY',
   'BASIC_SECONDARY',
   'GRADE_11_12',

@@ -26,7 +26,7 @@ describe('payroll salary slip PDFs', () => {
 
   it('builds approved salary slip lines with payroll and staff details', () => {
     const lines = buildApprovedSalarySlipLines({
-      schoolName: 'Sunrise Montessori',
+      schoolName: 'Sunrise Academy',
       staffName: 'Sita Sharma',
       employeeId: 'EMP-001',
       periodMonth: 5,
@@ -41,7 +41,7 @@ describe('payroll salary slip PDFs', () => {
       status: 'Payroll Approved',
     });
 
-    expect(lines).toContain('Sunrise Montessori');
+    expect(lines).toContain('Sunrise Academy');
     expect(lines).toContain('Salary Slip');
     expect(lines).toContain('Status: Payroll Approved');
     expect(lines).toContain('Employee: Sita Sharma');
@@ -57,7 +57,7 @@ describe('payroll salary slip PDFs', () => {
 
   it('returns a valid PDF buffer without creating M9 accounting entries', () => {
     const pdf = buildApprovedSalarySlipPdf({
-      schoolName: 'Sunrise Montessori',
+      schoolName: 'Sunrise Academy',
       staffName: 'Sita Sharma',
       employeeId: 'EMP-001',
       periodMonth: 5,

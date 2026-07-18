@@ -3421,8 +3421,8 @@ export class AdmissionCasesService implements OnModuleInit {
   }
 
   private gradeBand(level: number | null) {
-    if (level === null) return null;
-    if (level <= 0) return 'MONTESSORI';
+    // SchoolOS covers Grade 1-12 only; levels below Grade 1 have no band.
+    if (level === null || level <= 0) return null;
     if (level <= 5) return 'PRIMARY';
     if (level <= 10) return 'BASIC_SECONDARY';
     return 'GRADE_11_12';

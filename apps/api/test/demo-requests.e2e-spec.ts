@@ -144,7 +144,7 @@ describe('Demo Requests (E2E)', () => {
 
     const created = await publicController.create({
       schoolName: 'Himalaya School',
-      schoolType: 'Montessori',
+      schoolType: 'Secondary School',
       location: 'Pokhara',
       studentsCount: '100-250',
       contactName: 'Coordinator',

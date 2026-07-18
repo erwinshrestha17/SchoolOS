@@ -195,16 +195,18 @@ describe('ActivityFeedController M5 contracts', () => {
   it('delegates milestone template listing with filters', () => {
     const { controller, activityFeedService } = createController();
     activityFeedService.listMilestoneTemplates.mockReturnValue([
-      { key: 'ecd-language-follows-two-step' },
+      { key: 'primary-language-reads-grade-level-text' },
     ]);
 
-    const result = controller.listMilestoneTemplates('montessori', 'Language');
+    const result = controller.listMilestoneTemplates('primary', 'Language');
 
     expect(activityFeedService.listMilestoneTemplates).toHaveBeenCalledWith({
-      stage: 'montessori',
+      stage: 'primary',
       domain: 'Language',
     });
-    expect(result).toEqual([{ key: 'ecd-language-follows-two-step' }]);
+    expect(result).toEqual([
+      { key: 'primary-language-reads-grade-level-text' },
+    ]);
   });
 
   it('serves protected activity previews with same-site embed headers', async () => {

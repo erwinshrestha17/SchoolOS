@@ -182,9 +182,9 @@ async function seedStudentsAndGuardians(
   const parentUser = users.get('guardian@schoolos.com');
   const studentUser = users.get('student@schoolos.com');
   const rows = [
-    ['SCH-2026-0001', 'Aarav', 'Shrestha', Gender.MALE, 'Nursery', 'A', 1, 'Demo Guardian A', 'demo-phone-001', true, false],
-    ['SCH-2026-0002', 'Aarohi', 'Shrestha', Gender.FEMALE, 'LKG', 'A', 2, 'Demo Guardian A', 'demo-phone-001', true, false],
-    ['SCH-2026-0003', 'Niva', 'Khadka', Gender.FEMALE, 'UKG', 'A', 3, 'Demo Guardian B', 'demo-phone-003', false, false],
+    ['SCH-2026-0001', 'Aarav', 'Shrestha', Gender.MALE, 'Class 2', 'A', 1, 'Demo Guardian A', 'demo-phone-001', true, false],
+    ['SCH-2026-0002', 'Aarohi', 'Shrestha', Gender.FEMALE, 'Class 3', 'A', 2, 'Demo Guardian A', 'demo-phone-001', true, false],
+    ['SCH-2026-0003', 'Niva', 'Khadka', Gender.FEMALE, 'Class 4', 'A', 3, 'Demo Guardian B', 'demo-phone-003', false, false],
     ['SCH-2026-0004', 'Samir', 'Gurung', Gender.MALE, 'Class 1', 'A', 4, 'Demo Guardian C', 'demo-phone-004', false, false],
     ['SCH-2026-0005', 'Prisha', 'Adhikari', Gender.FEMALE, 'Class 1', 'A', 5, 'Demo Guardian D', 'demo-phone-005', false, false],
     ['SCH-2026-0006', 'Kiran', 'Thapa', Gender.MALE, 'Class 5', 'A', 6, 'Demo Guardian E', 'demo-phone-006', false, false],
@@ -457,11 +457,11 @@ async function seedActivityPosts(
   const teacher = users.get('classteacher@schoolos.com');
   if (!teacher) return [];
 
-  const nursery = await findClass(prisma, tenantId, 'Nursery');
-  const nurseryA = await findSection(prisma, tenantId, nursery.id, 'A');
+  const classOne = await findClass(prisma, tenantId, 'Class 1');
+  const classOneA = await findSection(prisma, tenantId, classOne.id, 'A');
   const tagged = students[0];
   const posts = [
-    ['Montessori Activity', 'Children explored colors and shapes.', ActivityCategory.LEARNING, nursery.id, nurseryA.id, [] as string[]],
+    ['Art and Craft Session', 'Students explored colors and shapes in art class.', ActivityCategory.LEARNING, classOne.id, classOneA.id, [] as string[]],
     ['Class Reading Circle', 'Students practiced group reading.', ActivityCategory.LEARNING, tagged.student.classId, tagged.student.sectionId, [] as string[]],
     ['Student Milestone', 'A tagged student completed a puzzle independently.', ActivityCategory.GENERAL, tagged.student.classId, tagged.student.sectionId, [tagged.student.id]],
   ] as const;

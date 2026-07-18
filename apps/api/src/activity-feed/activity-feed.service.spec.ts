@@ -118,22 +118,22 @@ describe('ActivityFeedService', () => {
 
   it('returns milestone templates filtered by stage aliases and domain', () => {
     const templates = service.listMilestoneTemplates({
-      stage: 'montessori',
+      stage: 'grade-2',
       domain: 'Language',
     });
 
     expect(templates).toEqual([
       expect.objectContaining({
-        key: 'ecd-language-follows-two-step',
-        stage: 'ECD',
+        key: 'primary-language-reads-grade-level-text',
+        stage: 'Primary',
         domain: 'Language',
-        milestone: 'Follows two-step classroom instructions',
+        milestone: 'Reads grade-level text aloud with confidence',
       }),
       expect.objectContaining({
-        key: 'ecd-language-communicates-needs',
-        stage: 'ECD',
+        key: 'primary-language-expresses-ideas',
+        stage: 'Primary',
         domain: 'Language',
-        milestone: 'Communicates needs more clearly',
+        milestone: 'Expresses ideas clearly in class discussion',
       }),
     ]);
     expect(templates[0]).not.toHaveProperty('stageAliases');
