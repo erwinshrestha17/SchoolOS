@@ -23,7 +23,6 @@ import { ErrorState } from "@/components/ui/error-state";
 import { SummaryCard, SummaryGrid } from "@/components/ui/summary-card";
 import { SectionCard } from "@/components/ui/section-card";
 import { WorkSurface } from "@/components/ui/work-surface";
-import { StatusBadge } from "@/components/ui/status-badge";
 import { api } from "@/lib/api";
 
 const formatCurrency = (amount: number | string) =>
@@ -58,17 +57,6 @@ export function FeeOverview() {
         date: schoolDay.gregorianDate,
         timeZone: NEPAL_TIME_ZONE,
       }),
-  });
-  const receiptsQuery = useQuery({
-    queryKey: ["receipts", "overview"],
-    queryFn: () =>
-      api.listReceiptsPage({
-        page: 1,
-        limit: 5,
-        issuedFrom: schoolDay.startUtc.toISOString(),
-        issuedTo: schoolDay.endExclusiveUtc.toISOString(),
-      }),
-    enabled: canReadReceipts,
   });
   const overdueQuery = useQuery({
     queryKey: ["defaulters", "overview"],
@@ -305,68 +293,19 @@ export function FeeOverview() {
 
           <SectionCard
             title="Recent receipts"
-            description="Confirmed receipts for the current school day."
-            headerAction={
-              canReadReceipts ? (
-                <Link
-                  href="/dashboard/fees/receipts"
-                  className="text-sm font-semibold text-[var(--color-mod-fees-text)] hover:underline"
-                >
-                  View receipts
-                </Link>
-              ) : undefined
-            }
-            noPadding
+            description="Confirmed receipts stay in the protected Receipt center, already filtered to today."
           >
-            {!canReadReceipts ? (
-              <p className="p-6 text-sm text-slate-600">Receipt details are restricted for this role.</p>
-            ) : receiptsQuery.isError ? (
-              <ErrorState
-                title="Recent receipts are unavailable"
-                message="No receipt has been replaced with a placeholder. Retry to load the protected receipt list."
-                onRetry={() => void receiptsQuery.refetch()}
-                className="m-5 min-h-44"
-              />
-            ) : receiptsQuery.isLoading ? (
-              <p className="p-6 text-sm font-semibold text-slate-500">Loading protected receipts…</p>
-            ) : receiptsQuery.data?.items.length ? (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px] text-left text-sm">
-                  <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
-                    <tr>
-                      <th className="px-5 py-3">Receipt</th>
-                      <th className="px-5 py-3">Student</th>
-                      <th className="px-5 py-3">Invoice</th>
-                      <th className="px-5 py-3 text-right">Amount</th>
-                      <th className="px-5 py-3">Method</th>
-                      <th className="px-5 py-3">Issued</th>
-                      <th className="px-5 py-3">File</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 tabular-nums">
-                    {receiptsQuery.data.items.map((item) => (
-                      <tr key={item.id} className="hover:bg-slate-50">
-                        <td className="px-5 py-3.5 font-semibold text-slate-900">{item.receiptNumber}</td>
-                        <td className="px-5 py-3.5 text-slate-700">{item.student?.name ?? "Student unavailable"}</td>
-                        <td className="px-5 py-3.5 text-slate-600">{item.invoiceNumber ?? "Unavailable"}</td>
-                        <td className="px-5 py-3.5 text-right font-semibold text-slate-900">
-                          {typeof item.amount === "number" ? formatCurrency(item.amount) : "Unavailable"}
-                        </td>
-                        <td className="px-5 py-3.5 text-slate-600">{item.method ?? "Unavailable"}</td>
-                        <td className="px-5 py-3.5 text-slate-600">{formatBsDateTime(item.issuedAt)}</td>
-                        <td className="px-5 py-3.5"><StatusBadge status={item.fileStatus} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            {canReadReceipts ? (
+              <Link
+                href="/dashboard/fees/receipts"
+                className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-[var(--color-mod-fees-text)] hover:bg-[var(--color-mod-fees-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mod-fees-accent)] focus-visible:ring-offset-2"
+              >
+                <Receipt className="h-4 w-4" aria-hidden />
+                Open the Receipt center
+                <ArrowRight className="h-4 w-4" aria-hidden />
+              </Link>
             ) : (
-              <EmptyState
-                title="No receipts issued today"
-                description="Confirmed receipts will appear here after a payment succeeds."
-                icon={<Receipt className="h-7 w-7" />}
-                className="m-5 min-h-48"
-              />
+              <p className="text-sm text-slate-600">Receipt details are restricted for this role.</p>
             )}
           </SectionCard>
         </div>

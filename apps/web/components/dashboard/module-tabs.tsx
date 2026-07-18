@@ -1,9 +1,16 @@
 'use client';
 
 import type { LucideIcon } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Badge } from '@/components/ui/primitives/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/primitives/dropdown-menu';
 import { cn } from '@/lib/utils';
 
 export interface TabItem {
@@ -16,6 +23,13 @@ export interface TabItem {
 
 export interface WorkspaceTabsProps {
   items: TabItem[];
+  /**
+   * Low-frequency destinations kept behind a "More" affordance so the visible
+   * tab row stays within the ≤7 budget. Active-route detection still covers
+   * these, so a workspace opened from the menu highlights the trigger.
+   */
+  overflowItems?: TabItem[];
+  overflowLabel?: string;
   activeValue?: string;
   onValueChange?: (value: string) => void;
   className?: string;
@@ -37,28 +51,66 @@ export interface WorkspaceTabsProps {
 
 export type ModuleTabsProps = WorkspaceTabsProps;
 
+const activeTabClassName =
+  'bg-[var(--mod-soft,var(--primary-soft))] text-[color:var(--mod-text,var(--primary-dark))] shadow-sm hover:text-[color:var(--mod-text,var(--primary-dark))]';
+
+/**
+ * Resolve which href owns the current route: an exact match wins, otherwise
+ * the longest prefix match, so nested detail routes highlight their own
+ * section instead of every ancestor tab at once.
+ */
+function resolveActiveHref(
+  pathname: string | null,
+  items: TabItem[],
+): string | undefined {
+  for (const item of items) {
+    if (pathname === item.href) return item.href;
+  }
+  let bestHref: string | undefined;
+  for (const item of items) {
+    if (!item.href || item.href === '/dashboard') continue;
+    if (pathname?.startsWith(`${item.href}/`)) {
+      if (!bestHref || item.href.length > bestHref.length) {
+        bestHref = item.href;
+      }
+    }
+  }
+  return bestHref;
+}
+
 export function WorkspaceTabs({
   items,
+  overflowItems,
+  overflowLabel = 'More',
   activeValue,
   onValueChange,
   className,
   label = 'Workspace views',
 }: WorkspaceTabsProps) {
   const pathname = usePathname();
-  const hasExactHref = items.some((item) => item.href === pathname);
+  const allItems = overflowItems?.length ? [...items, ...overflowItems] : items;
+  const activeHref = resolveActiveHref(pathname, allItems);
 
   const isItemActive = (item: TabItem) => {
     if (onValueChange && item.value !== undefined) {
       return activeValue === item.value;
     }
     if (!item.href) return false;
-    return (
-      pathname === item.href ||
-      (!hasExactHref &&
-        item.href !== '/dashboard' &&
-        pathname?.startsWith(`${item.href}/`))
-    );
+    return item.href === activeHref;
   };
+
+  const overflowActive = Boolean(
+    overflowItems?.some((item) => item.href && item.href === activeHref),
+  );
+
+  const itemClassNameFor = (active: boolean) =>
+    cn(
+      'inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md px-3 text-sm font-medium whitespace-nowrap text-muted-foreground outline-none transition-colors duration-(--schoolos-motion-fast) ease-(--schoolos-motion-ease-out) hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 [&_svg]:size-4',
+      // The active tab shares the module tint (soft background + dark
+      // accent text) so tab, selected row, and active filter read as one
+      // location signal; brand blue remains the unscoped fallback.
+      active && activeTabClassName,
+    );
 
   return (
     <div
@@ -91,14 +143,7 @@ export function WorkspaceTabs({
             ) : null}
           </>
         );
-        const itemClassName = cn(
-          'inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md px-3 text-sm font-medium whitespace-nowrap text-muted-foreground outline-none transition-colors duration-(--schoolos-motion-fast) ease-(--schoolos-motion-ease-out) hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 [&_svg]:size-4',
-          // The active tab shares the module tint (soft background + dark
-          // accent text) so tab, selected row, and active filter read as one
-          // location signal; brand blue remains the unscoped fallback.
-          active &&
-            'bg-[var(--mod-soft,var(--primary-soft))] text-[color:var(--mod-text,var(--primary-dark))] shadow-sm hover:text-[color:var(--mod-text,var(--primary-dark))]',
-        );
+        const itemClassName = itemClassNameFor(active);
 
         if (item.href) {
           return (
@@ -130,6 +175,55 @@ export function WorkspaceTabs({
           </button>
         );
       })}
+
+      {overflowItems?.length ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            className={itemClassNameFor(overflowActive)}
+            aria-label={`${overflowLabel} workspace views`}
+            data-schoolos-ui="workspace-tabs-overflow"
+          >
+            <span>{overflowLabel}</span>
+            <ChevronDown aria-hidden />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {overflowItems.map((item) => {
+              const active = isItemActive(item);
+              const Icon = item.icon;
+              const inner = (
+                <>
+                  {Icon ? <Icon aria-hidden /> : null}
+                  <span>{item.label}</span>
+                </>
+              );
+              return (
+                <DropdownMenuItem
+                  key={item.href ?? item.value ?? item.label}
+                  asChild={Boolean(item.href)}
+                  className={cn(
+                    active &&
+                      'bg-[var(--mod-soft,var(--primary-soft))] text-[color:var(--mod-text,var(--primary-dark))]',
+                  )}
+                  onClick={
+                    item.href
+                      ? undefined
+                      : () =>
+                          item.value !== undefined && onValueChange?.(item.value)
+                  }
+                >
+                  {item.href ? (
+                    <Link href={item.href} aria-current={active ? 'page' : undefined}>
+                      {inner}
+                    </Link>
+                  ) : (
+                    inner
+                  )}
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : null}
     </div>
   );
 }

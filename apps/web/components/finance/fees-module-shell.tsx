@@ -121,9 +121,13 @@ export function FeesModuleShell({
   const visibleMoreNavigation = moreNavigation.filter((item) =>
     hasAnyPermission(item.permissions),
   );
-  const workspaceTabs = [...visiblePrimaryNavigation, ...visibleMoreNavigation].map(
-    (item) => ({ href: item.href, label: item.label, icon: item.icon }),
-  );
+  const toTabItem = (item: FeesNavigationItem) => ({
+    href: item.href,
+    label: item.label,
+    icon: item.icon,
+  });
+  const workspaceTabs = visiblePrimaryNavigation.map(toTabItem);
+  const overflowTabs = visibleMoreNavigation.map(toTabItem);
 
   return (
     <DashboardPageShell>
@@ -135,7 +139,11 @@ export function FeesModuleShell({
         metadata={metadata}
       />
 
-      <WorkspaceTabs items={workspaceTabs} label="Fees and receipts navigation" />
+      <WorkspaceTabs
+        items={workspaceTabs}
+        overflowItems={overflowTabs}
+        label="Fees and receipts navigation"
+      />
 
       <section aria-label={`${title} workspace`}>{children}</section>
     </DashboardPageShell>

@@ -21,6 +21,7 @@ import { useSession } from "@/components/session-provider";
 import { ErrorState } from "@/components/ui/error-state";
 import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Button } from "@/components/ui/primitives/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/api";
 import { useRecentlyViewed } from "@/lib/hooks/use-recently-viewed";
 
@@ -184,24 +185,81 @@ function FeesSectionContent({ section }: { section: FeesSection }) {
     case "receipts":
       return <LedgerSection mode="receipts" />;
     case "adjustments":
-      return (
-        <div className="space-y-6">
-          <FinanceApprovalQueue />
-          <DiscountsWaiversTab mode="waivers" />
-        </div>
-      );
+      return <AdjustmentsWorkspace />;
     case "cashier-close":
       return <CashierCloseSection />;
     case "reports":
       return <FinanceReportWorkspace />;
     case "setup":
-      return (
-        <div className="space-y-6">
-          <FeeSetupTab />
-          <DiscountsWaiversTab mode="discounts" />
-        </div>
-      );
+      return <SetupWorkspace />;
   }
+}
+
+/**
+ * URL-backed view switch so each route keeps one visible workspace at a time
+ * while deep links (e.g. ?view=waivers) still open the right surface.
+ */
+function useSectionView(defaultView: string, allowedViews: string[]) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const requested = searchParams.get("view");
+  const view =
+    requested && allowedViews.includes(requested) ? requested : defaultView;
+  const setView = useCallback(
+    (next: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (next === defaultView) params.delete("view");
+      else params.set("view", next);
+      const query = params.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, {
+        scroll: false,
+      });
+    },
+    [defaultView, pathname, router, searchParams],
+  );
+  return { view, setView };
+}
+
+function AdjustmentsWorkspace() {
+  const { view, setView } = useSectionView("refunds", ["refunds", "waivers"]);
+  return (
+    <div className="space-y-6">
+      <Tabs value={view} onValueChange={setView}>
+        <TabsList aria-label="Adjustments view">
+          <TabsTrigger value="refunds">Refunds & reversals</TabsTrigger>
+          <TabsTrigger value="waivers">Waivers</TabsTrigger>
+        </TabsList>
+      </Tabs>
+      {view === "waivers" ? (
+        <DiscountsWaiversTab mode="waivers" />
+      ) : (
+        <FinanceApprovalQueue />
+      )}
+    </div>
+  );
+}
+
+function SetupWorkspace() {
+  const { view, setView } = useSectionView("structure", [
+    "structure",
+    "discounts",
+  ]);
+  return (
+    <div className="space-y-6">
+      <Tabs value={view} onValueChange={setView}>
+        <TabsList aria-label="Fees setup view">
+          <TabsTrigger value="structure">Fee heads & plans</TabsTrigger>
+          <TabsTrigger value="discounts">Discount rules</TabsTrigger>
+        </TabsList>
+      </Tabs>
+      {view === "discounts" ? (
+        <DiscountsWaiversTab mode="discounts" />
+      ) : (
+        <FeeSetupTab />
+      )}
+    </div>
+  );
 }
 
 function CollectionRouteWorkspace() {
