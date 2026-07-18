@@ -27,8 +27,8 @@ This file stays in the Flutter app so mobile contributors can find app-local gua
 6. Principal flows are attention/approval/snapshot first, not full admin.
 7. Driver flows are assigned-trip only.
 8. Staff flows are own-staff self-service only.
-9. Preschool, Grade 1-10, and Grade 11-12 / +2 students do not get a broad Student App.
-10. Student learning access for Preschool through +2 is lab-only or controlled school-device only.
+9. Grade 1-10 and Grade 11-12 / +2 students do not get a broad Student App.
+10. Student learning access for Grade 1 through +2 is lab-only or controlled school-device only.
 11. A broad Student App is not active scope.
 12. Do not use admin-shaped endpoints for parent, teacher, principal, driver, staff, or lab/student-session screens.
 13. Every screen needs loading, empty, error, permission-denied, module-locked, offline, and success/pending states where applicable.

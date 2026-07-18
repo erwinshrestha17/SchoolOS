@@ -310,7 +310,7 @@ void main() {
                 ParentPortalChild(
                   id: 'aarav',
                   name: 'Aarav Shrestha',
-                  classSection: 'Nursery-A',
+                  classSection: 'Class 1-A',
                   teacher: 'Class teacher details in timetable',
                   attendance: 'Present today',
                   attendanceTime: 'Updated 6:19 PM',
@@ -321,7 +321,7 @@ void main() {
                 ParentPortalChild(
                   id: 'aarohi',
                   name: 'Aarohi Shrestha',
-                  classSection: 'LKG-A',
+                  classSection: 'Class 2-A',
                   teacher: 'Class teacher details in timetable',
                   attendance: 'Present today',
                   attendanceTime: 'Updated 6:19 PM',
@@ -338,7 +338,7 @@ void main() {
                   id: 'phonics',
                   childId: 'aarohi',
                   childName: 'Aarohi Shrestha',
-                  classSection: 'LKG-A',
+                  classSection: 'Class 2-A',
                   subject: 'English',
                   title: 'Read the phonics worksheet',
                   dueLabel: 'Due tomorrow',
