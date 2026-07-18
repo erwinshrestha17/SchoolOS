@@ -159,6 +159,7 @@ model Tenant {
   reportExports                 ReportExport[]
   onboardingOverrides           TenantOnboardingChecklistOverride[]
   studentMergeHistory           StudentMergeHistory[]
+  studentDuplicateReviews       StudentDuplicateReview[]
   studentIdentities             StudentIdentity[]
   studentDocumentHistory        StudentDocumentHistory[]
   attendanceCorrectionRequests  AttendanceCorrectionRequest[]

@@ -12,6 +12,7 @@ import {
   EnrollmentStatus,
   NotificationChannel,
   Prisma,
+  StudentDuplicateReviewStatus,
   StudentLifecycleStatus,
   StudentQrStatus,
 } from '@prisma/client';
@@ -50,7 +51,6 @@ import { CreateStudentDto } from './dto/create-student.dto';
 import { ListStudentsDto } from './dto/list-students.dto';
 import { DeleteStudentDto } from './dto/delete-student.dto';
 import { InviteGuardianDto } from './dto/invite-guardian.dto';
-import { ListDuplicateStudentCandidatesDto } from './dto/list-duplicate-student-candidates.dto';
 import { MergeDuplicateStudentDto } from './dto/merge-duplicate-student.dto';
 import { MergeDuplicateStudentPreviewDto } from './dto/merge-duplicate-student-preview.dto';
 import { CreateGuardianIdentityVerificationDto } from './dto/create-guardian-identity-verification.dto';
@@ -1939,126 +1939,6 @@ export class StudentsService {
     };
   }
 
-  async listDuplicateStudentCandidates(
-    query: ListDuplicateStudentCandidatesDto,
-    actor: AuthContext,
-  ) {
-    const limit = query.limit ?? 20;
-    const students = await this.prisma.student.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        lifecycleStatus: {
-          in: [StudentLifecycleStatus.ACTIVE, StudentLifecycleStatus.ARCHIVED],
-        },
-        ...(query.studentId ? { id: query.studentId } : {}),
-      },
-      select: {
-        id: true,
-        studentSystemId: true,
-        firstNameEn: true,
-        lastNameEn: true,
-        firstNameNp: true,
-        lastNameNp: true,
-        dateOfBirth: true,
-        admissionNumber: true,
-        previousSchool: true,
-        lifecycleStatus: true,
-        class: { select: { name: true } },
-        sectionRef: { select: { name: true } },
-        guardianLinks: {
-          select: {
-            guardian: {
-              select: {
-                fullName: true,
-                primaryPhone: true,
-                secondaryPhone: true,
-                email: true,
-              },
-            },
-          },
-        },
-        siblingMemberships: {
-          select: {
-            siblingGroupId: true,
-          },
-        },
-      },
-      orderBy: [{ studentSystemId: 'asc' }],
-      take: query.studentId ? 1 : 100,
-    });
-
-    if (query.studentId && students.length === 0) {
-      throw new NotFoundException('Student not found in this tenant');
-    }
-
-    const comparisonPool = query.studentId
-      ? await this.prisma.student.findMany({
-          where: {
-            tenantId: actor.tenantId,
-            id: { not: query.studentId },
-            lifecycleStatus: {
-              in: [
-                StudentLifecycleStatus.ACTIVE,
-                StudentLifecycleStatus.ARCHIVED,
-              ],
-            },
-          },
-          select: {
-            id: true,
-            studentSystemId: true,
-            firstNameEn: true,
-            lastNameEn: true,
-            firstNameNp: true,
-            lastNameNp: true,
-            dateOfBirth: true,
-            admissionNumber: true,
-            previousSchool: true,
-            lifecycleStatus: true,
-            class: { select: { name: true } },
-            sectionRef: { select: { name: true } },
-            guardianLinks: {
-              select: {
-                guardian: {
-                  select: {
-                    fullName: true,
-                    primaryPhone: true,
-                    secondaryPhone: true,
-                    email: true,
-                  },
-                },
-              },
-            },
-            siblingMemberships: {
-              select: {
-                siblingGroupId: true,
-              },
-            },
-          },
-          orderBy: [{ studentSystemId: 'asc' }],
-          take: 100,
-        })
-      : students;
-
-    const pairs = buildDuplicateCandidatePairs(students, comparisonPool, limit);
-
-    await this.auditService.record({
-      action: 'duplicate_candidates_reviewed',
-      resource: 'student',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      after: {
-        studentId: query.studentId ?? null,
-        candidateCount: pairs.length,
-      },
-    });
-
-    return {
-      candidates: pairs,
-      limit,
-      reviewedStudentId: query.studentId ?? null,
-    };
-  }
-
   async previewMergeDuplicateStudent(
     dto: MergeDuplicateStudentPreviewDto,
     actor: AuthContext,
@@ -2166,348 +2046,401 @@ export class StudentsService {
       );
     }
 
-    const [sourceStudent, targetStudent] = await Promise.all([
-      this.findTenantStudentForDuplicateMerge(dto.sourceStudentId, actor),
-      this.findTenantStudentForDuplicateMerge(dto.targetStudentId, actor),
-    ]);
-
-    if (
-      sourceStudent.lifecycleStatus !== StudentLifecycleStatus.ACTIVE &&
-      sourceStudent.lifecycleStatus !== StudentLifecycleStatus.ARCHIVED
-    ) {
-      throw new ConflictException(
-        'Only active or archived duplicate source records can be merged safely',
-      );
-    }
-
-    if (targetStudent.lifecycleStatus !== StudentLifecycleStatus.ACTIVE) {
-      throw new ConflictException(
-        'Duplicate records can only be merged into an active canonical student',
-      );
-    }
-
-    if (!isProbableDuplicateStudent(sourceStudent, targetStudent)) {
-      throw new BadRequestException(
-        'Students do not look like probable duplicate records',
-      );
-    }
-
-    ensureAllowedLifecycleTransition(
-      sourceStudent.lifecycleStatus,
-      StudentLifecycleStatus.MERGED,
-    );
-
-    const mergedAt = new Date();
-    const missingGuardianLinks = sourceStudent.guardianLinks
-      .filter(
-        (sourceLink) =>
-          !targetStudent.guardianLinks.some(
-            (targetLink) => targetLink.guardianId === sourceLink.guardianId,
+    return this.prisma.$transaction(
+      async (tx) => {
+        const [sourceStudent, targetStudent] = await Promise.all([
+          this.findTenantStudentForDuplicateMerge(
+            dto.sourceStudentId,
+            actor,
+            tx,
           ),
-      )
-      .map((sourceLink) => ({
-        tenantId: actor.tenantId,
-        studentId: targetStudent.id,
-        guardianId: sourceLink.guardianId,
-        relation: sourceLink.relation,
-        isPrimary:
-          !targetStudent.guardianLinks.some((link) => link.isPrimary) &&
-          sourceLink.isPrimary,
-        appLoginLinked: sourceLink.appLoginLinked,
-      }));
+          this.findTenantStudentForDuplicateMerge(
+            dto.targetStudentId,
+            actor,
+            tx,
+          ),
+        ]);
+        const [firstStudentId, secondStudentId] = [
+          sourceStudent.id,
+          targetStudent.id,
+        ].sort();
 
-    const mergeCounts = await this.prisma.$transaction(async (tx) => {
-      const sourceDocs = await tx.studentDocument.findMany({
-        where: { tenantId: actor.tenantId, studentId: sourceStudent.id },
-      });
+        if (
+          sourceStudent.lifecycleStatus !== StudentLifecycleStatus.ACTIVE &&
+          sourceStudent.lifecycleStatus !== StudentLifecycleStatus.ARCHIVED
+        ) {
+          throw new ConflictException(
+            'Only active or archived duplicate source records can be merged safely',
+          );
+        }
 
-      const [
-        guardianLinks,
-        documents,
-        generatedDocuments,
-        invoices,
-        payments,
-        feeWaivers,
-        notificationDeliveries,
-        developmentalMilestones,
-        moodLogs,
-        libraryIssues,
-        transportEnrollments,
-        transportLogs,
-        conversations,
-        conversationParticipants,
-        attendanceRecords,
-        attendanceCorrectionRequests,
-        canteenEnrollments,
-        canteenMealServings,
-        canteenWalletTransactions,
-      ] = await Promise.all([
-        missingGuardianLinks.length > 0
-          ? tx.studentGuardian.createMany({
-              data: missingGuardianLinks,
-              skipDuplicates: true,
-            })
-          : Promise.resolve({ count: 0 }),
-        tx.studentDocument.updateMany({
-          where: {
-            tenantId: actor.tenantId,
-            studentId: sourceStudent.id,
-          },
-          data: { studentId: targetStudent.id },
-        }),
-        tx.generatedStudentDocument.updateMany({
-          where: {
-            tenantId: actor.tenantId,
-            studentId: sourceStudent.id,
-          },
-          data: { studentId: targetStudent.id },
-        }),
-        tx.invoice.updateMany({
-          where: {
-            tenantId: actor.tenantId,
-            studentId: sourceStudent.id,
-          },
-          data: { studentId: targetStudent.id },
-        }),
-        tx.payment.updateMany({
-          where: {
-            tenantId: actor.tenantId,
-            studentId: sourceStudent.id,
-          },
-          data: { studentId: targetStudent.id },
-        }),
-        tx.feeWaiver.updateMany({
-          where: {
-            tenantId: actor.tenantId,
-            studentId: sourceStudent.id,
-          },
-          data: { studentId: targetStudent.id },
-        }),
-        tx.notificationDelivery.updateMany({
-          where: {
-            tenantId: actor.tenantId,
-            studentId: sourceStudent.id,
-          },
-          data: { studentId: targetStudent.id },
-        }),
-        tx.developmentalMilestone.updateMany({
-          where: {
-            tenantId: actor.tenantId,
-            studentId: sourceStudent.id,
-          },
-          data: { studentId: targetStudent.id },
-        }),
-        tx.moodLog.updateMany({
-          where: {
-            tenantId: actor.tenantId,
-            studentId: sourceStudent.id,
-          },
-          data: { studentId: targetStudent.id },
-        }),
-        tx.libraryIssue.updateMany({
-          where: {
-            tenantId: actor.tenantId,
-            borrowerStudentId: sourceStudent.id,
-          },
-          data: { borrowerStudentId: targetStudent.id },
-        }),
-        tx.transportEnrollment.updateMany({
-          where: {
-            tenantId: actor.tenantId,
-            studentId: sourceStudent.id,
-          },
-          data: { studentId: targetStudent.id },
-        }),
-        tx.transportLog.updateMany({
-          where: {
-            tenantId: actor.tenantId,
-            studentId: sourceStudent.id,
-          },
-          data: { studentId: targetStudent.id },
-        }),
-        tx.conversation.updateMany({
-          where: {
-            tenantId: actor.tenantId,
-            studentId: sourceStudent.id,
-          },
-          data: { studentId: targetStudent.id },
-        }),
-        tx.conversationParticipant.updateMany({
-          where: {
-            tenantId: actor.tenantId,
-            studentId: sourceStudent.id,
-          },
-          data: { studentId: targetStudent.id },
-        }),
-        tx.attendanceRecord.updateMany({
-          where: {
-            tenantId: actor.tenantId,
-            studentId: sourceStudent.id,
-          },
-          data: { studentId: targetStudent.id },
-        }),
-        tx.attendanceCorrectionRequest.updateMany({
-          where: {
-            tenantId: actor.tenantId,
-            studentId: sourceStudent.id,
-          },
-          data: { studentId: targetStudent.id },
-        }),
-        tx.canteenStudentEnrollment.updateMany({
-          where: {
-            tenantId: actor.tenantId,
-            studentId: sourceStudent.id,
-          },
-          data: { studentId: targetStudent.id },
-        }),
-        tx.canteenMealServing.updateMany({
-          where: {
-            tenantId: actor.tenantId,
-            studentId: sourceStudent.id,
-          },
-          data: { studentId: targetStudent.id },
-        }),
-        tx.canteenWalletTransaction.updateMany({
-          where: {
-            tenantId: actor.tenantId,
-            studentId: sourceStudent.id,
-          },
-          data: { studentId: targetStudent.id },
-        }),
-      ]);
+        if (targetStudent.lifecycleStatus !== StudentLifecycleStatus.ACTIVE) {
+          throw new ConflictException(
+            'Duplicate records can only be merged into an active canonical student',
+          );
+        }
 
-      if (sourceDocs.length > 0) {
-        await tx.studentDocumentHistory.createMany({
-          data: sourceDocs.map((doc) => ({
+        if (!isProbableDuplicateStudent(sourceStudent, targetStudent)) {
+          throw new BadRequestException(
+            'Students do not look like probable duplicate records',
+          );
+        }
+
+        ensureAllowedLifecycleTransition(
+          sourceStudent.lifecycleStatus,
+          StudentLifecycleStatus.MERGED,
+        );
+
+        const mergedAt = new Date();
+        const missingGuardianLinks = sourceStudent.guardianLinks
+          .filter(
+            (sourceLink) =>
+              !targetStudent.guardianLinks.some(
+                (targetLink) => targetLink.guardianId === sourceLink.guardianId,
+              ),
+          )
+          .map((sourceLink) => ({
             tenantId: actor.tenantId,
-            documentId: doc.id,
-            action: 'MOVE_MERGE',
-            documentTitle: doc.title,
-            documentKind: doc.kind,
-            performedBy: actor.userId,
-            reason: `Merged from student ${sourceStudent.studentSystemId}`,
-            metadata: {
-              sourceStudentId: sourceStudent.id,
-              targetStudentId: targetStudent.id,
+            studentId: targetStudent.id,
+            guardianId: sourceLink.guardianId,
+            relation: sourceLink.relation,
+            isPrimary:
+              !targetStudent.guardianLinks.some((link) => link.isPrimary) &&
+              sourceLink.isPrimary,
+            appLoginLinked: sourceLink.appLoginLinked,
+          }));
+
+        const duplicateReview = await tx.studentDuplicateReview.findUnique({
+          where: {
+            tenantId_firstStudentId_secondStudentId: {
+              tenantId: actor.tenantId,
+              firstStudentId,
+              secondStudentId,
             },
-          })),
+          },
         });
-      }
 
-      await tx.enrollment.updateMany({
-        where: {
-          tenantId: actor.tenantId,
-          studentId: sourceStudent.id,
-          status: EnrollmentStatus.ACTIVE,
-        },
-        data: {
-          status: EnrollmentStatus.EXITED,
-        },
-      });
+        if (
+          duplicateReview?.status === StudentDuplicateReviewStatus.NOT_DUPLICATE
+        ) {
+          throw new ConflictException(
+            'These records were marked as not duplicates. Reopen the review before merging.',
+          );
+        }
 
-      await tx.student.update({
-        where: { id: sourceStudent.id },
-        data: {
-          lifecycleStatus: StudentLifecycleStatus.MERGED,
-          exitReason: `Merged into ${targetStudent.studentSystemId}: ${dto.reason}`,
-          exitedAt: mergedAt,
-        },
-      });
+        const sourceDocs = await tx.studentDocument.findMany({
+          where: { tenantId: actor.tenantId, studentId: sourceStudent.id },
+        });
 
-      await tx.studentMergeHistory.create({
-        data: {
-          tenantId: actor.tenantId,
-          sourceStudentId: sourceStudent.id,
-          targetStudentId: targetStudent.id,
-          mergedById: actor.userId,
-          reason: dto.reason,
-          metadata: {
-            sourceStudentSystemId: sourceStudent.studentSystemId,
-            targetStudentSystemId: targetStudent.studentSystemId,
-            counts: {
-              guardianLinks: guardianLinks.count,
-              documents: documents.count,
-              invoices: invoices.count,
-              payments: payments.count,
-              attendanceRecords: attendanceRecords.count,
+        const [
+          guardianLinks,
+          documents,
+          generatedDocuments,
+          invoices,
+          payments,
+          feeWaivers,
+          notificationDeliveries,
+          developmentalMilestones,
+          moodLogs,
+          libraryIssues,
+          transportEnrollments,
+          transportLogs,
+          conversations,
+          conversationParticipants,
+          attendanceRecords,
+          attendanceCorrectionRequests,
+          canteenEnrollments,
+          canteenMealServings,
+          canteenWalletTransactions,
+        ] = await Promise.all([
+          missingGuardianLinks.length > 0
+            ? tx.studentGuardian.createMany({
+                data: missingGuardianLinks,
+                skipDuplicates: true,
+              })
+            : Promise.resolve({ count: 0 }),
+          tx.studentDocument.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: sourceStudent.id,
+            },
+            data: { studentId: targetStudent.id },
+          }),
+          tx.generatedStudentDocument.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: sourceStudent.id,
+            },
+            data: { studentId: targetStudent.id },
+          }),
+          tx.invoice.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: sourceStudent.id,
+            },
+            data: { studentId: targetStudent.id },
+          }),
+          tx.payment.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: sourceStudent.id,
+            },
+            data: { studentId: targetStudent.id },
+          }),
+          tx.feeWaiver.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: sourceStudent.id,
+            },
+            data: { studentId: targetStudent.id },
+          }),
+          tx.notificationDelivery.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: sourceStudent.id,
+            },
+            data: { studentId: targetStudent.id },
+          }),
+          tx.developmentalMilestone.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: sourceStudent.id,
+            },
+            data: { studentId: targetStudent.id },
+          }),
+          tx.moodLog.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: sourceStudent.id,
+            },
+            data: { studentId: targetStudent.id },
+          }),
+          tx.libraryIssue.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              borrowerStudentId: sourceStudent.id,
+            },
+            data: { borrowerStudentId: targetStudent.id },
+          }),
+          tx.transportEnrollment.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: sourceStudent.id,
+            },
+            data: { studentId: targetStudent.id },
+          }),
+          tx.transportLog.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: sourceStudent.id,
+            },
+            data: { studentId: targetStudent.id },
+          }),
+          tx.conversation.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: sourceStudent.id,
+            },
+            data: { studentId: targetStudent.id },
+          }),
+          tx.conversationParticipant.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: sourceStudent.id,
+            },
+            data: { studentId: targetStudent.id },
+          }),
+          tx.attendanceRecord.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: sourceStudent.id,
+            },
+            data: { studentId: targetStudent.id },
+          }),
+          tx.attendanceCorrectionRequest.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: sourceStudent.id,
+            },
+            data: { studentId: targetStudent.id },
+          }),
+          tx.canteenStudentEnrollment.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: sourceStudent.id,
+            },
+            data: { studentId: targetStudent.id },
+          }),
+          tx.canteenMealServing.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: sourceStudent.id,
+            },
+            data: { studentId: targetStudent.id },
+          }),
+          tx.canteenWalletTransaction.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: sourceStudent.id,
+            },
+            data: { studentId: targetStudent.id },
+          }),
+        ]);
+
+        if (sourceDocs.length > 0) {
+          await tx.studentDocumentHistory.createMany({
+            data: sourceDocs.map((doc) => ({
+              tenantId: actor.tenantId,
+              documentId: doc.id,
+              action: 'MOVE_MERGE',
+              documentTitle: doc.title,
+              documentKind: doc.kind,
+              performedBy: actor.userId,
+              reason: `Merged from student ${sourceStudent.studentSystemId}`,
+              metadata: {
+                sourceStudentId: sourceStudent.id,
+                targetStudentId: targetStudent.id,
+              },
+            })),
+          });
+        }
+
+        await tx.enrollment.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            studentId: sourceStudent.id,
+            status: EnrollmentStatus.ACTIVE,
+          },
+          data: {
+            status: EnrollmentStatus.EXITED,
+          },
+        });
+
+        const sourceLifecycleUpdate = await tx.student.updateMany({
+          where: {
+            id: sourceStudent.id,
+            tenantId: actor.tenantId,
+            lifecycleStatus: {
+              in: [
+                StudentLifecycleStatus.ACTIVE,
+                StudentLifecycleStatus.ARCHIVED,
+              ],
             },
           },
-        },
-      });
-
-      await tx.studentLifecycleTransition.create({
-        data: {
-          tenantId: actor.tenantId,
-          studentId: sourceStudent.id,
-          fromStatus: sourceStudent.lifecycleStatus,
-          toStatus: StudentLifecycleStatus.MERGED,
-          reason: dto.reason,
-          changedById: actor.userId,
-          feeClearanceWaived: true,
-          metadata: {
-            mergeType: 'duplicate_student_merge',
-            mergedIntoStudentId: targetStudent.id,
-            mergedIntoStudentSystemId: targetStudent.studentSystemId,
-            mergedAt: mergedAt.toISOString(),
+          data: {
+            lifecycleStatus: StudentLifecycleStatus.MERGED,
+            exitReason: `Merged into ${targetStudent.studentSystemId}: ${dto.reason}`,
+            exitedAt: mergedAt,
           },
-        },
-      });
+        });
 
-      return {
-        guardianLinks: guardianLinks.count,
-        documents: documents.count,
-        generatedDocuments: generatedDocuments.count,
-        invoices: invoices.count,
-        payments: payments.count,
-        feeWaivers: feeWaivers.count,
-        notificationDeliveries: notificationDeliveries.count,
-        developmentalMilestones: developmentalMilestones.count,
-        moodLogs: moodLogs.count,
-        libraryIssues: libraryIssues.count,
-        transportEnrollments: transportEnrollments.count,
-        transportLogs: transportLogs.count,
-        conversations: conversations.count,
-        conversationParticipants: conversationParticipants.count,
-        attendanceRecords: attendanceRecords.count,
-        attendanceCorrectionRequests: attendanceCorrectionRequests.count,
-        canteenEnrollments: canteenEnrollments.count,
-        canteenMealServings: canteenMealServings.count,
-        canteenWalletTransactions: canteenWalletTransactions.count,
-      };
-    });
+        if (sourceLifecycleUpdate.count !== 1) {
+          throw new ConflictException(
+            'The duplicate source record changed before the merge could be completed. Refresh and try again.',
+          );
+        }
 
-    await this.auditService.record({
-      action: 'merge_duplicate',
-      resource: 'student',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: sourceStudent.id,
-      before: {
-        sourceStudentId: sourceStudent.id,
-        sourceStudentSystemId: sourceStudent.studentSystemId,
-        targetStudentId: targetStudent.id,
-        targetStudentSystemId: targetStudent.studentSystemId,
-      },
-      after: {
-        lifecycleStatus: StudentLifecycleStatus.MERGED,
-        mergeCounts,
-      },
-    });
+        await tx.studentMergeHistory.create({
+          data: {
+            tenantId: actor.tenantId,
+            sourceStudentId: sourceStudent.id,
+            targetStudentId: targetStudent.id,
+            mergedById: actor.userId,
+            reason: dto.reason,
+            metadata: {
+              sourceStudentSystemId: sourceStudent.studentSystemId,
+              targetStudentSystemId: targetStudent.studentSystemId,
+              counts: {
+                guardianLinks: guardianLinks.count,
+                documents: documents.count,
+                invoices: invoices.count,
+                payments: payments.count,
+                attendanceRecords: attendanceRecords.count,
+              },
+            },
+          },
+        });
 
-    return {
-      sourceStudent: {
-        id: sourceStudent.id,
-        studentSystemId: sourceStudent.studentSystemId,
-        lifecycleStatus: StudentLifecycleStatus.MERGED,
+        await tx.studentLifecycleTransition.create({
+          data: {
+            tenantId: actor.tenantId,
+            studentId: sourceStudent.id,
+            fromStatus: sourceStudent.lifecycleStatus,
+            toStatus: StudentLifecycleStatus.MERGED,
+            reason: dto.reason,
+            changedById: actor.userId,
+            feeClearanceWaived: true,
+            metadata: {
+              mergeType: 'duplicate_student_merge',
+              mergedIntoStudentId: targetStudent.id,
+              mergedIntoStudentSystemId: targetStudent.studentSystemId,
+              mergedAt: mergedAt.toISOString(),
+            },
+          },
+        });
+
+        const mergeCounts = {
+          guardianLinks: guardianLinks.count,
+          documents: documents.count,
+          generatedDocuments: generatedDocuments.count,
+          invoices: invoices.count,
+          payments: payments.count,
+          feeWaivers: feeWaivers.count,
+          notificationDeliveries: notificationDeliveries.count,
+          developmentalMilestones: developmentalMilestones.count,
+          moodLogs: moodLogs.count,
+          libraryIssues: libraryIssues.count,
+          transportEnrollments: transportEnrollments.count,
+          transportLogs: transportLogs.count,
+          conversations: conversations.count,
+          conversationParticipants: conversationParticipants.count,
+          attendanceRecords: attendanceRecords.count,
+          attendanceCorrectionRequests: attendanceCorrectionRequests.count,
+          canteenEnrollments: canteenEnrollments.count,
+          canteenMealServings: canteenMealServings.count,
+          canteenWalletTransactions: canteenWalletTransactions.count,
+        };
+
+        await this.auditService.record(
+          {
+            action: 'merge_duplicate',
+            resource: 'student',
+            tenantId: actor.tenantId,
+            userId: actor.userId,
+            resourceId: sourceStudent.id,
+            before: {
+              sourceStudentId: sourceStudent.id,
+              sourceStudentSystemId: sourceStudent.studentSystemId,
+              targetStudentId: targetStudent.id,
+              targetStudentSystemId: targetStudent.studentSystemId,
+            },
+            after: {
+              lifecycleStatus: StudentLifecycleStatus.MERGED,
+              mergeCounts,
+            },
+          },
+          tx,
+        );
+
+        return {
+          sourceStudent: {
+            id: sourceStudent.id,
+            studentSystemId: sourceStudent.studentSystemId,
+            lifecycleStatus: StudentLifecycleStatus.MERGED,
+          },
+          targetStudent: {
+            id: targetStudent.id,
+            studentSystemId: targetStudent.studentSystemId,
+            lifecycleStatus: targetStudent.lifecycleStatus,
+          },
+          mergedAt: mergedAt.toISOString(),
+          mergeCounts,
+        };
       },
-      targetStudent: {
-        id: targetStudent.id,
-        studentSystemId: targetStudent.studentSystemId,
-        lifecycleStatus: targetStudent.lifecycleStatus,
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
       },
-      mergedAt: mergedAt.toISOString(),
-      mergeCounts,
-    };
+    );
   }
 
   async inviteGuardians(
@@ -4241,8 +4174,10 @@ export class StudentsService {
   private async findTenantStudentForDuplicateMerge(
     studentId: string,
     actor: AuthContext,
+    client: Pick<PrismaService, 'student'> | Prisma.TransactionClient = this
+      .prisma,
   ) {
-    const student = await this.prisma.student.findFirst({
+    const student = await client.student.findFirst({
       where: {
         id: studentId,
         tenantId: actor.tenantId,

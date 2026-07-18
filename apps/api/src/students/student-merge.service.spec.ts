@@ -9,7 +9,11 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { UsageService } from '../usage/usage.service';
 import { UsersService } from '../users/users.service';
 import { StudentPhotoService } from './student-photo.service';
-import { StudentLifecycleStatus, EnrollmentStatus } from '@prisma/client';
+import {
+  EnrollmentStatus,
+  StudentDuplicateReviewStatus,
+  StudentLifecycleStatus,
+} from '@prisma/client';
 import { AuthContext } from '../auth/auth.types';
 import {
   BadRequestException,
@@ -20,6 +24,7 @@ import {
 describe('StudentsService (Duplicate Merge)', () => {
   let service: StudentsService;
   let prisma: PrismaService;
+  let auditService: AuditService;
 
   const mockAuth: AuthContext = {
     userId: 'user-1',
@@ -42,7 +47,7 @@ describe('StudentsService (Duplicate Merge)', () => {
               findFirst: jest.fn(),
               findUnique: jest.fn(),
               findMany: jest.fn(),
-              update: jest.fn(),
+              updateMany: jest.fn(),
             },
             studentGuardian: {
               createMany: jest.fn(),
@@ -72,6 +77,9 @@ describe('StudentsService (Duplicate Merge)', () => {
             },
             studentMergeHistory: {
               create: jest.fn(),
+            },
+            studentDuplicateReview: {
+              findUnique: jest.fn(),
             },
             studentLifecycleTransition: {
               create: jest.fn(),
@@ -116,6 +124,7 @@ describe('StudentsService (Duplicate Merge)', () => {
 
     service = module.get<StudentsService>(StudentsService);
     prisma = module.get<PrismaService>(PrismaService);
+    auditService = module.get<AuditService>(AuditService);
     const delegates = [
       prisma.studentGuardian,
       prisma.studentDocument,
@@ -144,6 +153,8 @@ describe('StudentsService (Duplicate Merge)', () => {
       delegate.createMany?.mockResolvedValue({ count: 0 });
     }
     (prisma.studentDocument.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.student.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+    (auditService.record as jest.Mock).mockResolvedValue(undefined);
   });
 
   const sourceStudent = {
@@ -204,66 +215,6 @@ describe('StudentsService (Duplicate Merge)', () => {
     expect(result.isProbableDuplicate).toBe(true);
   });
 
-  it('lists duplicate candidates using tenant-scoped matching signals', async () => {
-    (prisma.student.findMany as jest.Mock).mockResolvedValue([
-      {
-        ...sourceStudent,
-        admissionNumber: 'ADM-001',
-        previousSchool: 'Sunrise Montessori',
-        class: { name: 'Class 1' },
-        sectionRef: { name: 'A' },
-        guardianLinks: [
-          {
-            guardian: {
-              fullName: 'James Doe',
-              primaryPhone: '9800000000',
-              secondaryPhone: null,
-            },
-          },
-        ],
-      },
-      {
-        ...targetStudent,
-        admissionNumber: 'ADM-001',
-        previousSchool: 'Sunrise Montessori',
-        class: { name: 'Class 1' },
-        sectionRef: { name: 'A' },
-        guardianLinks: [
-          {
-            guardian: {
-              fullName: 'James Doe',
-              primaryPhone: '9800000000',
-              secondaryPhone: null,
-            },
-          },
-        ],
-      },
-    ]);
-
-    const result = await service.listDuplicateStudentCandidates(
-      { limit: 10 },
-      mockAuth,
-    );
-
-    expect(prisma.student.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ tenantId: mockAuth.tenantId }),
-        take: 100,
-      }),
-    );
-    expect(result.candidates).toHaveLength(1);
-    expect(result.candidates[0].confidence).toBe('HIGH');
-    expect(result.candidates[0].reasons).toEqual(
-      expect.arrayContaining([
-        'Similar student name',
-        'Same date of birth',
-        'Admission number conflict',
-        'Shared guardian phone',
-        'Same previous school',
-      ]),
-    );
-  });
-
   it('should execute merge transactionally', async () => {
     (prisma.student.findFirst as jest.Mock)
       .mockResolvedValueOnce(sourceStudent)
@@ -283,15 +234,107 @@ describe('StudentsService (Duplicate Merge)', () => {
     );
 
     expect(result.mergeCounts.invoices).toBe(2);
-    expect(prisma.student.update).toHaveBeenCalledWith(
+    expect(prisma.student.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: sourceStudent.id },
+        where: expect.objectContaining({
+          id: sourceStudent.id,
+          tenantId: mockAuth.tenantId,
+          lifecycleStatus: {
+            in: [
+              StudentLifecycleStatus.ACTIVE,
+              StudentLifecycleStatus.ARCHIVED,
+            ],
+          },
+        }),
         data: expect.objectContaining({
           lifecycleStatus: StudentLifecycleStatus.MERGED,
         }),
       }),
     );
     expect(prisma.studentMergeHistory.create).toHaveBeenCalled();
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'merge_duplicate',
+        tenantId: mockAuth.tenantId,
+        resourceId: sourceStudent.id,
+      }),
+      prisma,
+    );
+    expect(
+      (prisma.studentMergeHistory.create as jest.Mock).mock
+        .invocationCallOrder[0],
+    ).toBeLessThan(
+      (auditService.record as jest.Mock).mock.invocationCallOrder[0],
+    );
+  });
+
+  it('rejects when the source lifecycle changes before the conditional merge update', async () => {
+    (prisma.student.findFirst as jest.Mock)
+      .mockResolvedValueOnce(sourceStudent)
+      .mockResolvedValueOnce(targetStudent);
+    (prisma.student.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
+
+    await expect(
+      service.mergeDuplicateStudent(
+        {
+          sourceStudentId: sourceStudent.id,
+          targetStudentId: targetStudent.id,
+          reason: 'Duplicate entry',
+        },
+        mockAuth,
+      ),
+    ).rejects.toThrow(ConflictException);
+
+    expect(prisma.studentMergeHistory.create).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
+  it('keeps merge audit failure inside the transaction boundary', async () => {
+    (prisma.student.findFirst as jest.Mock)
+      .mockResolvedValueOnce(sourceStudent)
+      .mockResolvedValueOnce(targetStudent);
+    (auditService.record as jest.Mock).mockRejectedValue(
+      new Error('audit unavailable'),
+    );
+
+    await expect(
+      service.mergeDuplicateStudent(
+        {
+          sourceStudentId: sourceStudent.id,
+          targetStudentId: targetStudent.id,
+          reason: 'Duplicate entry',
+        },
+        mockAuth,
+      ),
+    ).rejects.toThrow('audit unavailable');
+
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.any(Object),
+      prisma,
+    );
+  });
+
+  it('requires a not-duplicate disposition to be reopened before merge', async () => {
+    (prisma.student.findFirst as jest.Mock)
+      .mockResolvedValueOnce(sourceStudent)
+      .mockResolvedValueOnce(targetStudent);
+    (prisma.studentDuplicateReview.findUnique as jest.Mock).mockResolvedValue({
+      status: StudentDuplicateReviewStatus.NOT_DUPLICATE,
+    });
+
+    await expect(
+      service.mergeDuplicateStudent(
+        {
+          sourceStudentId: 'source-1',
+          targetStudentId: 'target-1',
+          reason: 'Duplicate entry',
+        },
+        mockAuth,
+      ),
+    ).rejects.toThrow(ConflictException);
+
+    expect(prisma.student.updateMany).not.toHaveBeenCalled();
+    expect(prisma.studentMergeHistory.create).not.toHaveBeenCalled();
   });
 
   it('should fail if students are not probable duplicates', async () => {

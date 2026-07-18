@@ -10,9 +10,17 @@ export default function DuplicateCandidatesPage() {
       <M1PageHeader
         title="Duplicate Candidates"
         description="Review probable duplicate student records and execute audited, atomic server-side merges."
-        primaryAction={<Link href="#duplicate-review" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary-500 px-4 text-sm font-bold text-white shadow-sm hover:bg-primary-600"><GitMerge className="h-4 w-4" /> Review Candidates</Link>}
+        primaryAction={
+          <Link
+            href="#duplicate-review"
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary-500 px-4 text-sm font-bold text-white shadow-sm hover:bg-primary-600"
+          >
+            <GitMerge className="h-4 w-4" />
+            Start review
+          </Link>
+        }
       />
-      <div id="duplicate-review"><DuplicateCandidatesWorkspace /></div>
+      <DuplicateCandidatesWorkspace />
     </DashboardPageShell>
   );
 }

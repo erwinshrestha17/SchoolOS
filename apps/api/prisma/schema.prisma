@@ -406,6 +406,7 @@ enum NotificationStatus {
 
 enum NotificationEventType {
   STUDENT_ADMITTED
+  ADMISSION_DOCUMENTS_REQUESTED
   ATTENDANCE_STUDENT_ABSENT
   ATTENDANCE_STUDENT_LATE
   ATTENDANCE_STUDENT_LEAVE
@@ -645,6 +646,11 @@ enum StudentLifecycleStatus {
   ARCHIVED
   MERGED
   DELETED
+}
+
+enum StudentDuplicateReviewStatus {
+  NOT_DUPLICATE
+  REOPENED
 }
 
 enum StudentDocumentStatus {
@@ -2801,6 +2807,8 @@ model User {
   reprintedReceipts           ReceiptReprintHistory[]      @relation("ReceiptReprinter")
   reversedPayments            Payment[]                    @relation("ReversedPayments")
   mergedStudents              StudentMergeHistory[]        @relation("MergedBy")
+  reviewedStudentDuplicates   StudentDuplicateReview[]     @relation("StudentDuplicateReviewReviewedBy")
+  reopenedStudentDuplicates   StudentDuplicateReview[]     @relation("StudentDuplicateReviewReopenedBy")
 
   requestedAttendanceCorrections AttendanceCorrectionRequest[]    @relation("RequestedAttendanceCorrections")
   reviewedAttendanceCorrections  AttendanceCorrectionRequest[]    @relation("ReviewedAttendanceCorrections")
@@ -5946,6 +5954,8 @@ model Student {
   lifecycleTransitions         StudentLifecycleTransition[]
   mergeHistorySource           StudentMergeHistory[]         @relation("SourceStudentMerge")
   mergeHistoryTarget           StudentMergeHistory[]         @relation("TargetStudentMerge")
+  duplicateReviewsAsFirst      StudentDuplicateReview[]       @relation("StudentDuplicateReviewFirst")
+  duplicateReviewsAsSecond     StudentDuplicateReview[]       @relation("StudentDuplicateReviewSecond")
   identities                   StudentIdentity[]
   photoFile                    FileAsset?                    @relation("StudentPhoto", fields: [photoFileId], references: [id])
   siblingMemberships           SiblingGroupMember[]
@@ -5985,6 +5995,8 @@ model Student {
   @@index([tenantId, classId, sectionId])
   @@index([tenantId, admissionNumber])
   @@index([tenantId, lifecycleStatus])
+  @@index([tenantId, lifecycleStatus, dateOfBirth])
+  @@index([tenantId, lifecycleStatus, firstNameEn, lastNameEn])
 }
 
 model Guardian {
@@ -6058,6 +6070,7 @@ model StudentGuardian {
   guardian Guardian @relation(fields: [guardianId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, guardianId])
+  @@index([tenantId, guardianId, studentId])
 }
 
 model Enrollment {
@@ -6135,6 +6148,34 @@ model StudentMergeHistory {
 
   @@index([tenantId, sourceStudentId])
   @@index([tenantId, targetStudentId])
+}
+
+model StudentDuplicateReview {
+  id                  String                       @id @default(uuid())
+  tenantId            String
+  firstStudentId      String
+  secondStudentId     String
+  status              StudentDuplicateReviewStatus @default(NOT_DUPLICATE)
+  reason              String
+  identityFingerprint String
+  reviewedById        String?
+  reviewedAt          DateTime                     @default(now())
+  reopenedById        String?
+  reopenedAt          DateTime?
+  reopenReason        String?
+  createdAt           DateTime                     @default(now())
+  updatedAt           DateTime                     @updatedAt
+
+  tenant        Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  firstStudent  Student @relation("StudentDuplicateReviewFirst", fields: [firstStudentId], references: [id], onDelete: Restrict)
+  secondStudent Student @relation("StudentDuplicateReviewSecond", fields: [secondStudentId], references: [id], onDelete: Restrict)
+  reviewedBy    User?   @relation("StudentDuplicateReviewReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reopenedBy    User?   @relation("StudentDuplicateReviewReopenedBy", fields: [reopenedById], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, firstStudentId, secondStudentId])
+  @@index([tenantId, status, reviewedAt])
+  @@index([tenantId, firstStudentId])
+  @@index([tenantId, secondStudentId])
 }
 
 model StudentIdentity {
@@ -6571,6 +6612,7 @@ model Tenant {
   reportExports                 ReportExport[]
   onboardingOverrides           TenantOnboardingChecklistOverride[]
   studentMergeHistory           StudentMergeHistory[]
+  studentDuplicateReviews       StudentDuplicateReview[]
   studentIdentities             StudentIdentity[]
   studentDocumentHistory        StudentDocumentHistory[]
   attendanceCorrectionRequests  AttendanceCorrectionRequest[]

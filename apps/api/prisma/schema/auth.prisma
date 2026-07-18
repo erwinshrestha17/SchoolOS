@@ -69,6 +69,8 @@ model User {
   reprintedReceipts           ReceiptReprintHistory[]      @relation("ReceiptReprinter")
   reversedPayments            Payment[]                    @relation("ReversedPayments")
   mergedStudents              StudentMergeHistory[]        @relation("MergedBy")
+  reviewedStudentDuplicates   StudentDuplicateReview[]     @relation("StudentDuplicateReviewReviewedBy")
+  reopenedStudentDuplicates   StudentDuplicateReview[]     @relation("StudentDuplicateReviewReopenedBy")
 
   requestedAttendanceCorrections AttendanceCorrectionRequest[]    @relation("RequestedAttendanceCorrections")
   reviewedAttendanceCorrections  AttendanceCorrectionRequest[]    @relation("ReviewedAttendanceCorrections")

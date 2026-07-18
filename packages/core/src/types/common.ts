@@ -208,10 +208,86 @@ export type StudentDuplicateCandidateStudent = {
   guardianPhones: string[];
 };
 
+export const STUDENT_DUPLICATE_CONFIDENCE_LEVELS = [
+  "LOW",
+  "MEDIUM",
+  "HIGH",
+] as const;
+
+export type StudentDuplicateConfidence =
+  (typeof STUDENT_DUPLICATE_CONFIDENCE_LEVELS)[number];
+
+export const STUDENT_DUPLICATE_CONFIDENCE_FILTERS = [
+  "ALL",
+  ...STUDENT_DUPLICATE_CONFIDENCE_LEVELS,
+] as const;
+
+export type StudentDuplicateConfidenceFilter =
+  (typeof STUDENT_DUPLICATE_CONFIDENCE_FILTERS)[number];
+
+export const STUDENT_DUPLICATE_QUEUE_STATUSES = [
+  "PENDING",
+  "NOT_DUPLICATE",
+] as const;
+
+export type StudentDuplicateQueueStatus =
+  (typeof STUDENT_DUPLICATE_QUEUE_STATUSES)[number];
+
+export const STUDENT_DUPLICATE_REVIEW_STATUSES = [
+  "NOT_DUPLICATE",
+  "REOPENED",
+] as const;
+
+export type StudentDuplicateReviewStatus =
+  (typeof STUDENT_DUPLICATE_REVIEW_STATUSES)[number];
+
+export type StudentDuplicateReviewMetadata = {
+  id: string;
+  status: StudentDuplicateReviewStatus;
+  reason: string;
+  identityChanged: boolean;
+  reviewedById: string | null;
+  reviewedAt: string;
+  reopenedById: string | null;
+  reopenedAt: string | null;
+  reopenReason: string | null;
+};
+
+export type StudentDuplicateCandidatesSummary = {
+  pending: number;
+  highConfidence: number;
+  resolvedNotDuplicate: number;
+  mergedToday: number;
+  asOf: string;
+};
+
+export type StudentDuplicateCandidatesFilters = {
+  studentId: string | null;
+  search: string | null;
+  confidence: StudentDuplicateConfidenceFilter;
+  status: StudentDuplicateQueueStatus;
+};
+
 export type StudentDuplicateCandidatesResult = {
   candidates: StudentDuplicateCandidate[];
   limit: number;
   reviewedStudentId: string | null;
+  page: number;
+  total: number;
+  totalPages: number;
+  status: StudentDuplicateQueueStatus;
+  filters: StudentDuplicateCandidatesFilters;
+  summary: StudentDuplicateCandidatesSummary;
+};
+
+export type MarkDuplicateStudentPairNotDuplicatePayload = {
+  studentOneId: string;
+  studentTwoId: string;
+  reason: string;
+};
+
+export type ReopenDuplicateStudentReviewPayload = {
+  reason: string;
 };
 
 export const NOTICE_LIFECYCLE_STATUSES = [

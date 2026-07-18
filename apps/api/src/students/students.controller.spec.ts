@@ -1,6 +1,14 @@
 import { AuthMethod } from '@prisma/client';
+import { DECORATORS } from '@nestjs/swagger/dist/constants';
 import type { AuthContext } from '../auth/auth.types';
 import { PERMISSIONS_KEY } from '../auth/decorators/permissions.decorator';
+import {
+  DuplicateStudentReviewMutationResponseDto,
+  ListDuplicateStudentCandidatesResponseDto,
+} from './dto/duplicate-student-review-response.dto';
+import { ListDuplicateStudentCandidatesDto } from './dto/list-duplicate-student-candidates.dto';
+import { MarkDuplicateStudentPairNotDuplicateDto } from './dto/mark-duplicate-student-pair-not-duplicate.dto';
+import { ReopenDuplicateStudentReviewDto } from './dto/reopen-duplicate-student-review.dto';
 import { StudentsController } from './students.controller';
 
 const actor: AuthContext = {
@@ -23,7 +31,6 @@ function createController() {
     updateStudentGuardian: jest.fn(),
     exportIemis: jest.fn(),
     exportRoster: jest.fn(),
-    listDuplicateStudentCandidates: jest.fn(),
     mergeDuplicateStudent: jest.fn(),
     getFeeClearance: jest.fn(),
     requestTransfer: jest.fn(),
@@ -42,10 +49,19 @@ function createController() {
     generateStudentIdentity: jest.fn(),
     revokeStudentIdentity: jest.fn(),
   };
+  const duplicateReviewService = {
+    listCandidates: jest.fn(),
+    markNotDuplicate: jest.fn(),
+    reopenReview: jest.fn(),
+  };
 
   return {
-    controller: new StudentsController(service as never),
+    controller: new StudentsController(
+      service as never,
+      duplicateReviewService as never,
+    ),
     service,
+    duplicateReviewService,
   };
 }
 
@@ -163,20 +179,119 @@ describe('StudentsController M1 contracts', () => {
   });
 
   it('delegates duplicate candidate review through lifecycle permission route', () => {
-    const { controller, service } = createController();
+    const { controller, duplicateReviewService } = createController();
     const query = { studentId: 'student-1', limit: 10 };
-    service.listDuplicateStudentCandidates.mockReturnValue({ candidates: [] });
+    duplicateReviewService.listCandidates.mockReturnValue({ candidates: [] });
 
     const result = controller.listDuplicateStudentCandidates(
       query as never,
       actor,
     );
 
-    expect(service.listDuplicateStudentCandidates).toHaveBeenCalledWith(
+    expect(duplicateReviewService.listCandidates).toHaveBeenCalledWith(
       query,
       actor,
     );
     expect(result).toEqual({ candidates: [] });
+  });
+
+  it('delegates not-duplicate review with tenant-scoped actor context', () => {
+    const { controller, duplicateReviewService } = createController();
+    const dto = {
+      studentOneId: 'student-1',
+      studentTwoId: 'student-2',
+      reason: 'Confirmed siblings with separate admission records',
+    };
+    duplicateReviewService.markNotDuplicate.mockReturnValue({
+      reviewState: 'NOT_DUPLICATE',
+    });
+
+    const result = controller.markDuplicateStudentPairNotDuplicate(
+      dto as never,
+      actor,
+    );
+
+    expect(duplicateReviewService.markNotDuplicate).toHaveBeenCalledWith(
+      dto,
+      actor,
+    );
+    expect(result).toEqual({ reviewState: 'NOT_DUPLICATE' });
+  });
+
+  it('delegates reopening a duplicate review through lifecycle permission', () => {
+    const { controller, duplicateReviewService } = createController();
+    const dto = { reason: 'New guardian contact now matches both records' };
+    duplicateReviewService.reopenReview.mockReturnValue({
+      reviewState: 'PENDING',
+    });
+
+    const result = controller.reopenDuplicateStudentReview(
+      'review-1',
+      dto as never,
+      actor,
+    );
+
+    expect(duplicateReviewService.reopenReview).toHaveBeenCalledWith(
+      'review-1',
+      dto,
+      actor,
+    );
+    expect(result).toEqual({ reviewState: 'PENDING' });
+  });
+
+  it('publishes duplicate-review query, request, and response OpenAPI metadata', () => {
+    expect(
+      Reflect.getMetadata(
+        DECORATORS.API_MODEL_PROPERTIES_ARRAY,
+        ListDuplicateStudentCandidatesDto.prototype,
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        ':studentId',
+        ':page',
+        ':limit',
+        ':search',
+        ':confidence',
+        ':status',
+      ]),
+    );
+    expect(
+      Reflect.getMetadata(
+        DECORATORS.API_MODEL_PROPERTIES_ARRAY,
+        MarkDuplicateStudentPairNotDuplicateDto.prototype,
+      ),
+    ).toEqual(
+      expect.arrayContaining([':studentOneId', ':studentTwoId', ':reason']),
+    );
+    expect(
+      Reflect.getMetadata(
+        DECORATORS.API_MODEL_PROPERTIES_ARRAY,
+        ReopenDuplicateStudentReviewDto.prototype,
+      ),
+    ).toEqual(expect.arrayContaining([':reason']));
+
+    const listResponses = Reflect.getMetadata(
+      DECORATORS.API_RESPONSE,
+      StudentsController.prototype.listDuplicateStudentCandidates,
+    );
+    const markResponses = Reflect.getMetadata(
+      DECORATORS.API_RESPONSE,
+      StudentsController.prototype.markDuplicateStudentPairNotDuplicate,
+    );
+    const reopenResponses = Reflect.getMetadata(
+      DECORATORS.API_RESPONSE,
+      StudentsController.prototype.reopenDuplicateStudentReview,
+    );
+
+    expect(listResponses['200'].type).toBe(
+      ListDuplicateStudentCandidatesResponseDto,
+    );
+    expect(markResponses['201'].type).toBe(
+      DuplicateStudentReviewMutationResponseDto,
+    );
+    expect(reopenResponses['201'].type).toBe(
+      DuplicateStudentReviewMutationResponseDto,
+    );
   });
 
   it('delegates transfer lifecycle action with reason-bearing payload', () => {

@@ -2351,6 +2351,7 @@ export function createPrismaMock() {
     'healthRecord',
     'incidentReport',
     'studentMergeHistory',
+    'studentDuplicateReview',
     'platformPlan',
     'platformPlanFeature',
     'tenantSubscription',

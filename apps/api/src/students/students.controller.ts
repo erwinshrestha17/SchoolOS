@@ -3,12 +3,17 @@ import {
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiOkResponse, ApiOperation } from '@nestjs/swagger';
+import {
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+} from '@nestjs/swagger';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -23,8 +28,14 @@ import { ListStudentsDto } from './dto/list-students.dto';
 import { DeleteStudentDto } from './dto/delete-student.dto';
 import { InviteGuardianDto } from './dto/invite-guardian.dto';
 import { ListDuplicateStudentCandidatesDto } from './dto/list-duplicate-student-candidates.dto';
+import { MarkDuplicateStudentPairNotDuplicateDto } from './dto/mark-duplicate-student-pair-not-duplicate.dto';
 import { MergeDuplicateStudentDto } from './dto/merge-duplicate-student.dto';
 import { MergeDuplicateStudentPreviewDto } from './dto/merge-duplicate-student-preview.dto';
+import { ReopenDuplicateStudentReviewDto } from './dto/reopen-duplicate-student-review.dto';
+import {
+  DuplicateStudentReviewMutationResponseDto,
+  ListDuplicateStudentCandidatesResponseDto,
+} from './dto/duplicate-student-review-response.dto';
 import { CreateGuardianIdentityVerificationDto } from './dto/create-guardian-identity-verification.dto';
 import { UpsertDocumentExpiryTemplateDto } from './dto/document-expiry-template.dto';
 import { RequestStudentTransferDto } from './dto/request-student-transfer.dto';
@@ -36,13 +47,17 @@ import { AttendanceHistoryQueryDto } from './dto/attendance-history.dto';
 import { GeneratedStudentDocumentArtifactResponseDto } from './dto/generated-student-document-artifact.dto';
 import { StudentIemisReadinessResponseDto } from './dto/student-iemis-readiness.dto';
 import { sanitizeStudentProfileResponse } from './student-profile-sanitizer';
+import { StudentDuplicateReviewService } from './student-duplicate-review.service';
 import { StudentsService } from './students.service';
 
 @Controller('students')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
 @Entitlement('module.students')
 export class StudentsController {
-  constructor(private readonly studentsService: StudentsService) {}
+  constructor(
+    private readonly studentsService: StudentsService,
+    private readonly duplicateReviewService: StudentDuplicateReviewService,
+  ) {}
 
   @Get()
   @Permissions('students:read')
@@ -64,11 +79,33 @@ export class StudentsController {
 
   @Get('duplicates/candidates')
   @Permissions('students:manage_lifecycle')
+  @ApiOkResponse({ type: ListDuplicateStudentCandidatesResponseDto })
   listDuplicateStudentCandidates(
     @Query() query: ListDuplicateStudentCandidatesDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.studentsService.listDuplicateStudentCandidates(query, auth);
+    return this.duplicateReviewService.listCandidates(query, auth);
+  }
+
+  @Post('duplicates/reviews')
+  @Permissions('students:manage_lifecycle')
+  @ApiCreatedResponse({ type: DuplicateStudentReviewMutationResponseDto })
+  markDuplicateStudentPairNotDuplicate(
+    @Body() dto: MarkDuplicateStudentPairNotDuplicateDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.duplicateReviewService.markNotDuplicate(dto, auth);
+  }
+
+  @Post('duplicates/reviews/:reviewId/reopen')
+  @Permissions('students:manage_lifecycle')
+  @ApiCreatedResponse({ type: DuplicateStudentReviewMutationResponseDto })
+  reopenDuplicateStudentReview(
+    @Param('reviewId', new ParseUUIDPipe()) reviewId: string,
+    @Body() dto: ReopenDuplicateStudentReviewDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.duplicateReviewService.reopenReview(reviewId, dto, auth);
   }
 
   @Get(':id')

@@ -1,5 +1,6 @@
 export const NOTIFICATION_EVENT_TYPES = [
   "STUDENT_ADMITTED",
+  "ADMISSION_DOCUMENTS_REQUESTED",
   "ATTENDANCE_STUDENT_ABSENT",
   "ATTENDANCE_STUDENT_LATE",
   "ATTENDANCE_STUDENT_LEAVE",
@@ -65,6 +66,11 @@ export const NOTIFICATION_EVENT_CATALOGUE: Readonly<
   STUDENT_ADMITTED: {
     sourceModule: "M1_ADMISSIONS",
     sourceEntityType: "student",
+    defaultPriority: "IMPORTANT",
+  },
+  ADMISSION_DOCUMENTS_REQUESTED: {
+    sourceModule: "M1_ADMISSIONS",
+    sourceEntityType: "admission_application",
     defaultPriority: "IMPORTANT",
   },
   ATTENDANCE_STUDENT_ABSENT: {

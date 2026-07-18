@@ -407,9 +407,18 @@ describe('students lifecycle hardening', () => {
       },
       data: { studentId: targetStudent.id },
     });
-    expect(prisma.transaction.student.update).toHaveBeenCalledWith(
+    expect(prisma.transaction.student.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: sourceStudent.id },
+        where: expect.objectContaining({
+          id: sourceStudent.id,
+          tenantId: actor.tenantId,
+          lifecycleStatus: {
+            in: [
+              StudentLifecycleStatus.ACTIVE,
+              StudentLifecycleStatus.ARCHIVED,
+            ],
+          },
+        }),
         data: expect.objectContaining({
           lifecycleStatus: StudentLifecycleStatus.MERGED,
           exitReason: `Merged into ${targetStudent.studentSystemId}: Duplicate record confirmed by registrar`,
@@ -438,6 +447,7 @@ describe('students lifecycle hardening', () => {
         resource: 'student',
         resourceId: sourceStudent.id,
       }),
+      prisma.transaction,
     );
     expect(result.sourceStudent.lifecycleStatus).toBe(
       StudentLifecycleStatus.MERGED,
@@ -472,7 +482,8 @@ describe('students lifecycle hardening', () => {
       ),
     ).rejects.toThrow(BadRequestException);
 
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.transaction.student.updateMany).not.toHaveBeenCalled();
   });
 
   it('returns validation-first iEMIS export results', async () => {
@@ -2218,9 +2229,23 @@ function buildPrisma(options: {
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     student: {
+      findFirst: jest.fn().mockImplementation(async () => {
+        const queue = options.studentFindFirstQueue ?? [];
+
+        if (queue.length === 0) {
+          return null;
+        }
+
+        if (queue.length === 1) {
+          return queue[0];
+        }
+
+        return queue.shift();
+      }),
       update: jest
         .fn()
         .mockResolvedValue(options.transactionStudentUpdateResult ?? null),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     studentGuardian: {
       createMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -2279,6 +2304,9 @@ function buildPrisma(options: {
     },
     studentMergeHistory: {
       create: jest.fn().mockResolvedValue({ id: 'merge-history-1' }),
+    },
+    studentDuplicateReview: {
+      findUnique: jest.fn().mockResolvedValue(null),
     },
     guardianIdentityVerification: {
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),

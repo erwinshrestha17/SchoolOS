@@ -390,6 +390,7 @@ enum NotificationStatus {
 
 enum NotificationEventType {
   STUDENT_ADMITTED
+  ADMISSION_DOCUMENTS_REQUESTED
   ATTENDANCE_STUDENT_ABSENT
   ATTENDANCE_STUDENT_LATE
   ATTENDANCE_STUDENT_LEAVE
@@ -629,6 +630,11 @@ enum StudentLifecycleStatus {
   ARCHIVED
   MERGED
   DELETED
+}
+
+enum StudentDuplicateReviewStatus {
+  NOT_DUPLICATE
+  REOPENED
 }
 
 enum StudentDocumentStatus {

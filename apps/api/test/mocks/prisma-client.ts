@@ -118,6 +118,7 @@ export const TransactionIsolationLevel = {
 export const Prisma = {
   Decimal,
   TransactionIsolationLevel,
+  empty: { strings: [''], values: [] },
   sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({
     strings,
     values,
@@ -487,6 +488,11 @@ export const StudentLifecycleStatus = {
   ARCHIVED: 'ARCHIVED',
   MERGED: 'MERGED',
   DELETED: 'DELETED',
+} as const;
+
+export const StudentDuplicateReviewStatus = {
+  NOT_DUPLICATE: 'NOT_DUPLICATE',
+  REOPENED: 'REOPENED',
 } as const;
 
 export const JournalSourceType = {

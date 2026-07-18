@@ -1,5 +1,10 @@
 import type { ActivityPost } from "./activity.js";
-import type { StudentDuplicateCandidateStudent } from "./common.js";
+import type {
+  StudentDuplicateCandidateStudent,
+  StudentDuplicateConfidence,
+  StudentDuplicateQueueStatus,
+  StudentDuplicateReviewMetadata,
+} from "./common.js";
 import type { PermissionKey } from "../permissions.js";
 
 export type GuardianProfile = {
@@ -560,9 +565,11 @@ export type StudentDuplicateCandidate = {
   sourceStudent: StudentDuplicateCandidateStudent;
   candidateStudent: StudentDuplicateCandidateStudent;
   score: number;
-  confidence: "LOW" | "MEDIUM" | "HIGH";
+  confidence: StudentDuplicateConfidence;
   reasons: string[];
   blockedReason: string | null;
+  reviewState: StudentDuplicateQueueStatus;
+  review?: StudentDuplicateReviewMetadata | null;
 };
 
 export type StudentDocument = {

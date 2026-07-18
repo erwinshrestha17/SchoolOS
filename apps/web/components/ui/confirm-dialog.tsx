@@ -19,6 +19,7 @@ type ConfirmDialogProps = {
   cancelLabel?: string;
   destructive?: boolean;
   isConfirming?: boolean;
+  preventCloseWhileConfirming?: boolean;
   confirmDisabled?: boolean;
   variant?: 'default' | 'warning' | 'destructive';
   onConfirm: () => void;
@@ -35,34 +36,63 @@ export function ConfirmDialog({
   destructive,
   variant,
   isConfirming,
+  preventCloseWhileConfirming = false,
   confirmDisabled,
   onConfirm,
   onClose,
   children,
 }: ConfirmDialogProps) {
+  const closeLocked = Boolean(isConfirming && preventCloseWhileConfirming);
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="rounded-2xl">
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open: boolean) => {
+        if (!open && !closeLocked) onClose();
+      }}
+    >
+      <DialogContent
+        className="rounded-2xl"
+        showCloseButton={!closeLocked}
+        aria-busy={isConfirming || undefined}
+        onEscapeKeyDown={(event: { preventDefault: () => void }) => {
+          if (closeLocked) event.preventDefault();
+        }}
+        onPointerDownOutside={(event: { preventDefault: () => void }) => {
+          if (closeLocked) event.preventDefault();
+        }}
+      >
         <DialogHeader className="flex flex-row items-start gap-4">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-warning-50 text-warning-600">
-            <AlertTriangle size={22} />
+            <AlertTriangle size={22} aria-hidden />
           </div>
           <div>
             <DialogTitle>{title}</DialogTitle>
-            <DialogDescription className="mt-1">{description}</DialogDescription>
+            <DialogDescription className="mt-1">
+              {description}
+            </DialogDescription>
           </div>
         </DialogHeader>
 
         {children}
 
         <DialogFooter className="gap-3">
-          <Button type="button" variant="outline" onClick={() => onClose()}>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={closeLocked}
+            onClick={() => onClose()}
+          >
             {cancelLabel}
           </Button>
           <Button
             type="button"
             disabled={isConfirming || confirmDisabled}
-            variant={variant === 'destructive' || destructive ? 'destructive' : 'default'}
+            variant={
+              variant === 'destructive' || destructive
+                ? 'destructive'
+                : 'default'
+            }
             onClick={onConfirm}
           >
             {isConfirming ? 'Working...' : confirmLabel}

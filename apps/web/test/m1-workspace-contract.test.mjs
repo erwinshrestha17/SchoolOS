@@ -1,42 +1,42 @@
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import test from "node:test";
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import test from 'node:test';
 
-const webRoot = new URL("..", import.meta.url).pathname;
-const read = (path) => readFileSync(join(webRoot, path), "utf8");
+const webRoot = new URL('..', import.meta.url).pathname;
+const read = (path) => readFileSync(join(webRoot, path), 'utf8');
 
-test("M1 workspaces expose real route-backed operations", () => {
-  const api = read("lib/api/students.ts");
-  const caseApi = read("lib/api/admission-cases.ts");
+test('M1 workspaces expose real route-backed operations', () => {
+  const api = read('lib/api/students.ts');
+  const caseApi = read('lib/api/admission-cases.ts');
   const documentRequestCenter = read(
-    "components/m1/document-request-center.tsx",
+    'components/m1/document-request-center.tsx',
   );
   const assessmentWorkspace = read(
-    "components/m1/assessment-interview-workspace.tsx",
+    'components/m1/assessment-interview-workspace.tsx',
   );
   const documentsWorkspace = read(
-    "components/m1/student-documents-workspace.tsx",
+    'components/m1/student-documents-workspace.tsx',
   );
   const applicationReview = read(
-    "components/m1/application-review-workspace.tsx",
+    'components/m1/application-review-workspace.tsx',
   );
   const applicationReviewPage = read(
-    "app/dashboard/admissions/applications/[applicationId]/page.tsx",
+    'app/dashboard/admissions/applications/[applicationId]/page.tsx',
   );
   const documentsErrorBoundary = read(
-    "app/dashboard/admissions/documents/error.tsx",
+    'app/dashboard/admissions/documents/error.tsx',
   );
   const routes = [
-    "app/dashboard/admissions/documents/page.tsx",
-    "app/dashboard/admissions/assessments/page.tsx",
-    "app/dashboard/admissions/duplicates/page.tsx",
-    "app/dashboard/admissions/iemis/page.tsx",
-    "app/dashboard/admissions/qr/page.tsx",
-    "app/dashboard/admissions/review/page.tsx",
+    'app/dashboard/admissions/documents/page.tsx',
+    'app/dashboard/admissions/assessments/page.tsx',
+    'app/dashboard/admissions/duplicates/page.tsx',
+    'app/dashboard/admissions/iemis/page.tsx',
+    'app/dashboard/admissions/qr/page.tsx',
+    'app/dashboard/admissions/review/page.tsx',
   ]
     .map(read)
-    .join("\n");
+    .join('\n');
 
   assert.match(routes, /StudentDocumentsWorkspace/);
   assert.match(routes, /DocumentRequestCenter/);
@@ -75,6 +75,15 @@ test("M1 workspaces expose real route-backed operations", () => {
   assert.match(assessmentWorkspace, /AWAITING_RESULTS/);
   assert.doesNotMatch(assessmentWorkspace, /datetime-local/);
   assert.match(api, /\/students\/duplicates\/merge/);
+  assert.match(api, /listDuplicateStudentCandidates/);
+  assert.match(api, /page\?: number/);
+  assert.match(api, /search\?: string/);
+  assert.match(api, /confidence\?: StudentDuplicateConfidenceFilter/);
+  assert.match(api, /status\?: StudentDuplicateQueueStatus/);
+  assert.match(api, /markDuplicateStudentPairNotDuplicate/);
+  assert.match(api, /\/students\/duplicates\/reviews/);
+  assert.match(api, /reopenDuplicateStudentReview/);
+  assert.match(api, /encodeURIComponent\(reviewId\).*\/reopen/);
   assert.match(api, /\/admissions\/applications/);
   assert.match(api, /updateAdmissionApplicationStatus/);
   assert.match(api, /enrollAdmissionApplication/);
@@ -147,25 +156,25 @@ test("M1 workspaces expose real route-backed operations", () => {
   );
 });
 
-test("M1 entry creates one unified admission case for direct and review workflows", () => {
-  const legacyPipeline = read("components/admissions/admissions-pipeline.tsx");
+test('M1 entry creates one unified admission case for direct and review workflows', () => {
+  const legacyPipeline = read('components/admissions/admissions-pipeline.tsx');
   const applicationPipelinePage = read(
-    "app/dashboard/admissions/applications/page.tsx",
+    'app/dashboard/admissions/applications/page.tsx',
   );
   const legacyApplicationForm = read(
-    "components/m1/admission-application-form.tsx",
+    'components/m1/admission-application-form.tsx',
   );
-  const entryPage = read("app/dashboard/admissions/new/page.tsx");
-  const entry = read("components/m1/admission-entry.tsx");
-  const directWizard = read("components/m1/admission-case-wizard.tsx");
-  const reviewForm = read("components/m1/admission-review-case-form.tsx");
-  const queues = read("components/m1/admission-case-queues.tsx");
-  const caseApi = read("lib/api/admission-cases.ts");
-  const admissionsPage = read("app/dashboard/admissions/page.tsx");
-  const dashboardShell = read("components/layout/dashboard-shell.tsx");
-  const policyList = read("components/settings/admission-policy-list.tsx");
-  const policyWizard = read("components/settings/admission-policy-wizard.tsx");
-  const mobileRouter = read("../schoolos_mobile/lib/app/router.dart");
+  const entryPage = read('app/dashboard/admissions/new/page.tsx');
+  const entry = read('components/m1/admission-entry.tsx');
+  const directWizard = read('components/m1/admission-case-wizard.tsx');
+  const reviewForm = read('components/m1/admission-review-case-form.tsx');
+  const queues = read('components/m1/admission-case-queues.tsx');
+  const caseApi = read('lib/api/admission-cases.ts');
+  const admissionsPage = read('app/dashboard/admissions/page.tsx');
+  const dashboardShell = read('components/layout/dashboard-shell.tsx');
+  const policyList = read('components/settings/admission-policy-list.tsx');
+  const policyWizard = read('components/settings/admission-policy-wizard.tsx');
+  const mobileRouter = read('../schoolos_mobile/lib/app/router.dart');
 
   assert.match(legacyPipeline, /listAdmissionApplications/);
   assert.match(legacyPipeline, /isAdmissionCaseDisplayStatus/);
@@ -248,16 +257,36 @@ test("M1 entry creates one unified admission case for direct and review workflow
   );
 });
 
-test("M1 high-risk workflows remain server controlled and protected", () => {
-  const duplicates = read("components/m1/duplicate-candidates-workspace.tsx");
-  const documents = read("components/m1/student-documents-workspace.tsx");
-  const qr = read("components/m1/qr-id-workspace.tsx");
-  const iemis = read("components/m1/iemis-readiness-workspace.tsx");
-  const admissionCase = read("components/m1/admission-case-detail.tsx");
+test('M1 high-risk workflows remain server controlled and protected', () => {
+  const duplicates = read('components/m1/duplicate-candidates-workspace.tsx');
+  const confirmDialog = read('components/ui/confirm-dialog.tsx');
+  const documents = read('components/m1/student-documents-workspace.tsx');
+  const qr = read('components/m1/qr-id-workspace.tsx');
+  const iemis = read('components/m1/iemis-readiness-workspace.tsx');
+  const admissionCase = read('components/m1/admission-case-detail.tsx');
 
   assert.match(duplicates, /previewDuplicateStudentMerge/);
   assert.match(duplicates, /mergeDuplicateStudent/);
-  assert.match(duplicates, /Mark Not Duplicate — unavailable/);
+  assert.match(duplicates, /markDuplicateStudentPairNotDuplicate/);
+  assert.match(duplicates, /reopenDuplicateStudentReview/);
+  assert.match(duplicates, /Mark as separate students/);
+  assert.match(duplicates, /Required · 5–500 characters/);
+  assert.match(duplicates, /currentQueueData\?\.totalPages/);
+  assert.match(duplicates, /pageNeedsCorrection/);
+  assert.match(duplicates, /history: 'replace'/);
+  assert.match(duplicates, /candidatesQuery\.isPlaceholderData/);
+  assert.match(duplicates, /queueInteractionDisabled/);
+  assert.match(duplicates, /selected\.blockedReason/);
+  assert.match(duplicates, /Merge unavailable/);
+  assert.match(duplicates, /name="duplicate-primary-record"/);
+  assert.match(duplicates, /Merge record/);
+  assert.match(duplicates, /Keep as primary/);
+  assert.match(duplicates, /scrollIntoView/);
+  assert.match(duplicates, /focus\(\{ preventScroll: true \}\)/);
+  assert.match(duplicates, /preventCloseWhileConfirming/);
+  assert.match(confirmDialog, /preventCloseWhileConfirming/);
+  assert.match(confirmDialog, /showCloseButton=\{!closeLocked\}/);
+  assert.match(confirmDialog, /disabled=\{closeLocked\}/);
   assert.match(documents, /StudentDocumentAccessButton/);
   assert.match(
     documents,
@@ -338,9 +367,9 @@ test("M1 high-risk workflows remain server controlled and protected", () => {
   assert.match(admissionCase, /reviewMutation\.mutate\(\{\s*action: "REJECT"/);
 });
 
-test("M1 student roster uses a focused backend summary, safe filters, and paginated roster contract", () => {
-  const page = read("app/dashboard/students/page.tsx");
-  const directory = read("components/forms/student-directory.tsx");
+test('M1 student roster uses a focused backend summary, safe filters, and paginated roster contract', () => {
+  const page = read('app/dashboard/students/page.tsx');
+  const directory = read('components/forms/student-directory.tsx');
 
   assert.match(page, /api\.getStudentModuleSummary\(summaryFilters\)/);
   assert.match(page, /limit: STUDENT_ROSTER_PAGE_SIZE/);
@@ -366,16 +395,16 @@ test("M1 student roster uses a focused backend summary, safe filters, and pagina
   );
 });
 
-test("M1 application queue keeps page-derived and decorative metrics out of the workspace", () => {
-  const pipeline = read("components/admissions/admissions-pipeline.tsx");
+test('M1 application queue keeps page-derived and decorative metrics out of the workspace', () => {
+  const pipeline = read('components/admissions/admissions-pipeline.tsx');
 
   assert.doesNotMatch(pipeline, /<KpiGrid|<KpiCard/);
   assert.doesNotMatch(pipeline, /No update in 7 days|Admission workflow/);
   assert.match(pipeline, /matching applications/);
 });
 
-test("M1 Admissions overview shows a real, actionable, honest KPI grid", () => {
-  const page = read("app/dashboard/admissions/page.tsx");
+test('M1 Admissions overview shows a real, actionable, honest KPI grid', () => {
+  const page = read('app/dashboard/admissions/page.tsx');
 
   // Counts come from each backend-filtered queue total, not from loaded rows.
   assert.match(page, /admissionCasesApi\.listQueues/);
@@ -394,17 +423,20 @@ test("M1 Admissions overview shows a real, actionable, honest KPI grid", () => {
 
   // Every card opens its real server-filtered queue.
   for (const queue of [
-    "NEEDS_INFORMATION",
-    "WAITING_FOR_REVIEW",
-    "READY_TO_ADMIT",
-    "DUPLICATE_WARNINGS",
+    'NEEDS_INFORMATION',
+    'WAITING_FOR_REVIEW',
+    'READY_TO_ADMIT',
+    'DUPLICATE_WARNINGS',
   ]) {
-    assert.match(page, new RegExp(`href="/dashboard/admissions\\?queue=${queue}"`));
+    assert.match(
+      page,
+      new RegExp(`href="/dashboard/admissions\\?queue=${queue}"`),
+    );
   }
 });
 
-test("student directory row actions use the shared keyboard-accessible ActionMenu, not a hover-only menu", () => {
-  const directory = read("components/forms/student-directory.tsx");
+test('student directory row actions use the shared keyboard-accessible ActionMenu, not a hover-only menu', () => {
+  const directory = read('components/forms/student-directory.tsx');
 
   // The old pattern was a CSS group-hover dropdown with no click/focus
   // toggle — unusable by keyboard. Every row action must go through the
@@ -419,10 +451,10 @@ test("student directory row actions use the shared keyboard-accessible ActionMen
   assert.match(directory, /label: 'Attendance'/);
 });
 
-test("admission case review actions have consistent visual risk hierarchy across both review surfaces", () => {
-  const caseDetail = read("components/m1/admission-case-detail.tsx");
+test('admission case review actions have consistent visual risk hierarchy across both review surfaces', () => {
+  const caseDetail = read('components/m1/admission-case-detail.tsx');
   const reviewWorkspace = read(
-    "components/m1/application-review-workspace.tsx",
+    'components/m1/application-review-workspace.tsx',
   );
 
   // Approve is the common, positive path — it must read as the primary
@@ -444,8 +476,8 @@ test("admission case review actions have consistent visual risk hierarchy across
   assert.match(caseDetail, /confirmLabel="Do not admit"/);
 });
 
-test("clear-selection and low-risk row icon buttons carry an accessible name", () => {
-  const selector = read("components/students/student-selector.tsx");
+test('clear-selection and low-risk row icon buttons carry an accessible name', () => {
+  const selector = read('components/students/student-selector.tsx');
 
   assert.match(selector, /aria-label="Clear selected student"/);
   assert.match(selector, /title="Clear selected student"/);

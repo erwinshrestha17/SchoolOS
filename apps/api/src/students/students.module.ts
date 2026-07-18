@@ -10,6 +10,7 @@ import { UsageModule } from '../usage/usage.module';
 import { StudentDocumentAccessController } from './student-document-access.controller';
 import { StudentDocumentAccessService } from './student-document-access.service';
 import { StudentDocumentRetentionCron } from './student-document-retention.cron';
+import { StudentDuplicateReviewService } from './student-duplicate-review.service';
 import { StudentPhotoController } from './student-photo.controller';
 import { StudentPhotoService } from './student-photo.service';
 import { StudentSearchController } from './student-search.controller';
@@ -36,6 +37,7 @@ import { StudentQrController } from './student-qr.controller';
     StudentPhotoService,
     StudentDocumentAccessService,
     StudentDocumentRetentionCron,
+    StudentDuplicateReviewService,
     StudentQrService,
   ],
   controllers: [
@@ -50,6 +52,7 @@ import { StudentQrController } from './student-qr.controller';
     StudentSearchService,
     StudentPhotoService,
     StudentDocumentAccessService,
+    StudentDuplicateReviewService,
     StudentQrService,
   ],
 })
