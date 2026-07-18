@@ -1139,6 +1139,16 @@ export function createPrismaMock() {
           }
           return Promise.resolve(enrichStudentRelations(item));
         }),
+        updateMany: jest.fn((q: PrismaQuery) => {
+          let count = 0;
+          for (const item of state.students) {
+            if (matchesWhere(enrichStudentRelations(item), q.where)) {
+              Object.assign(item, q.data ?? {});
+              count += 1;
+            }
+          }
+          return Promise.resolve({ count });
+        }),
         deleteMany: jest.fn((q: PrismaQuery) => {
           const before = state.students.length;
           state.students = state.students.filter((item) =>
