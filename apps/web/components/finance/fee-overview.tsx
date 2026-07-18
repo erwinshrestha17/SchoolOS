@@ -80,9 +80,7 @@ export function FeeOverview() {
           value={
             summary
               ? formatCurrency(summary.collectedToday.netAmount)
-              : summaryQuery.isError
-                ? "Unavailable"
-                : "Loading"
+              : "Unavailable"
           }
           loading={summaryQuery.isLoading}
           icon={<Wallet className="h-5 w-5" />}
@@ -95,9 +93,7 @@ export function FeeOverview() {
           value={
             summary
               ? formatCurrency(summary.outstanding.amount)
-              : summaryQuery.isError
-                ? "Unavailable"
-                : "Loading"
+              : "Unavailable"
           }
           loading={summaryQuery.isLoading}
           icon={<Wallet className="h-5 w-5" />}
@@ -112,9 +108,7 @@ export function FeeOverview() {
               ? "Restricted"
               : summary
                 ? formatCurrency(summary.overdue.amount)
-                : summaryQuery.isError
-                  ? "Unavailable"
-                  : "Loading"
+                : "Unavailable"
           }
           loading={canManage && summaryQuery.isLoading}
           icon={<AlertTriangle className="h-5 w-5" />}
@@ -132,9 +126,7 @@ export function FeeOverview() {
               : summary
                 ? closeStateLabel[summary.cashierClose.state] ??
                   summary.cashierClose.state
-                : summaryQuery.isError
-                  ? "Unavailable"
-                  : "Loading"
+                : "Unavailable"
           }
           loading={canClose && summaryQuery.isLoading}
           icon={<History className="h-5 w-5" />}

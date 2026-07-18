@@ -231,7 +231,7 @@ export default function PayrollReadinessPage() {
           value={
             query.isError
               ? "Unavailable"
-              : (readiness?.readinessStatus.replaceAll("_", " ") ?? "Loading")
+              : (readiness?.readinessStatus.replaceAll("_", " ") ?? "Unavailable")
           }
           icon={<BadgeCheck className="h-5 w-5" />}
           loading={query.isLoading}

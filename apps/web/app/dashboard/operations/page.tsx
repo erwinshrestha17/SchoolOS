@@ -25,8 +25,7 @@ import { canteenApi } from '@/lib/api/canteen';
 import { libraryApi } from '@/lib/api/library';
 import { transportApi } from '@/lib/api/transport';
 
-function safeValue(error: boolean, loading: boolean, value?: number) {
-  if (loading) return 'Loading';
+function safeValue(error: boolean, value?: number) {
   if (error || value === undefined) return 'Unavailable';
   return value;
 }
@@ -128,11 +127,11 @@ export default function OperationsPage() {
       >
         <KpiGrid className="sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           <KpiCard title="Books Issued Today" value={canUseLibrary ? 'Unavailable' : 'Restricted'} icon={<BookOpen size={20} />} tone="neutral" description="A date-bounded issue summary is not available." />
-          <KpiCard title="Active Trips" value={canUseTransport ? safeValue(transportSummaryQuery.isError, transportSummaryQuery.isLoading, transportSummaryQuery.data?.activeTrips) : 'Restricted'} icon={<Bus size={20} />} tone="info" description="Backend transport report." />
-          <KpiCard title="Meals Served" value={canUseCanteen ? safeValue(mealCountQuery.isError, mealCountQuery.isLoading, mealsServed) : 'Restricted'} icon={<Utensils size={20} />} tone="success" description="Backend daily meal-count report." />
-          <KpiCard title="Overdue Books" value={canUseLibrary ? safeValue(overdueQuery.isError, overdueQuery.isLoading, overdueQuery.data?.meta.total) : 'Restricted'} icon={<Clock3 size={20} />} tone="warning" description="Backend overdue report total." />
-          <KpiCard title="Stale GPS Alerts" value={canUseTransport ? safeValue(staleGpsQuery.isError, staleGpsQuery.isLoading, staleGpsAlerts) : 'Restricted'} icon={<MapPin size={20} />} tone="warning" description="Stale records are never presented as live." />
-          <KpiCard title="Low Wallets" value={canUseCanteen ? safeValue(lowWalletsQuery.isError, lowWalletsQuery.isLoading, lowWalletsQuery.data?.length) : 'Restricted'} icon={<CreditCard size={20} />} tone="warning" description="Backend low-balance report." />
+          <KpiCard title="Active Trips" value={canUseTransport ? safeValue(transportSummaryQuery.isError, transportSummaryQuery.data?.activeTrips) : 'Restricted'} loading={canUseTransport && transportSummaryQuery.isLoading} icon={<Bus size={20} />} tone="info" description="Backend transport report." />
+          <KpiCard title="Meals Served" value={canUseCanteen ? safeValue(mealCountQuery.isError, mealsServed) : 'Restricted'} loading={canUseCanteen && mealCountQuery.isLoading} icon={<Utensils size={20} />} tone="success" description="Backend daily meal-count report." />
+          <KpiCard title="Overdue Books" value={canUseLibrary ? safeValue(overdueQuery.isError, overdueQuery.data?.meta.total) : 'Restricted'} loading={canUseLibrary && overdueQuery.isLoading} icon={<Clock3 size={20} />} tone="warning" description="Backend overdue report total." />
+          <KpiCard title="Stale GPS Alerts" value={canUseTransport ? safeValue(staleGpsQuery.isError, staleGpsAlerts) : 'Restricted'} loading={canUseTransport && staleGpsQuery.isLoading} icon={<MapPin size={20} />} tone="warning" description="Stale records are never presented as live." />
+          <KpiCard title="Low Wallets" value={canUseCanteen ? safeValue(lowWalletsQuery.isError, lowWalletsQuery.data?.length) : 'Restricted'} loading={canUseCanteen && lowWalletsQuery.isLoading} icon={<CreditCard size={20} />} tone="warning" description="Backend low-balance report." />
         </KpiGrid>
       </ModuleHeader>
 
@@ -151,27 +150,39 @@ export default function OperationsPage() {
       <div className="mt-6 grid gap-6 xl:grid-cols-3">
         {canUseLibrary ? (
           <SectionCard title="Library" description="Issue, return, overdue, and borrower workflows.">
-            <p className="text-3xl font-black tabular-nums text-slate-950">
-              {safeValue(overdueQuery.isError, overdueQuery.isLoading, overdueQuery.data?.meta.total)}
-            </p>
+            {overdueQuery.isLoading ? (
+              <div className="h-9 w-16 animate-pulse rounded-md bg-slate-100" />
+            ) : (
+              <p className="text-3xl font-black tabular-nums text-slate-950">
+                {safeValue(overdueQuery.isError, overdueQuery.data?.meta.total)}
+              </p>
+            )}
             <p className="mt-1 text-sm text-slate-500">Overdue books from the backend report.</p>
             <Link href="/dashboard/library/issue-return" className="mt-5 inline-flex text-sm font-bold text-[var(--primary-dark)]">Open issue / return</Link>
           </SectionCard>
         ) : null}
         {canUseTransport ? (
           <SectionCard title="Transport" description="Trips, route status, and explicit GPS freshness.">
-            <p className="text-3xl font-black tabular-nums text-slate-950">
-              {safeValue(transportSummaryQuery.isError, transportSummaryQuery.isLoading, transportSummaryQuery.data?.activeTrips)}
-            </p>
+            {transportSummaryQuery.isLoading ? (
+              <div className="h-9 w-16 animate-pulse rounded-md bg-slate-100" />
+            ) : (
+              <p className="text-3xl font-black tabular-nums text-slate-950">
+                {safeValue(transportSummaryQuery.isError, transportSummaryQuery.data?.activeTrips)}
+              </p>
+            )}
             <p className="mt-1 text-sm text-slate-500">Active trips from the backend report.</p>
             <Link href="/dashboard/transport/live-status" className="mt-5 inline-flex text-sm font-bold text-[var(--primary-dark)]">View trip status</Link>
           </SectionCard>
         ) : null}
         {canUseCanteen ? (
           <SectionCard title="Canteen" description="POS, menu, serving, and wallet workflows.">
-            <p className="text-3xl font-black tabular-nums text-slate-950">
-              {safeValue(mealCountQuery.isError, mealCountQuery.isLoading, mealsServed)}
-            </p>
+            {mealCountQuery.isLoading ? (
+              <div className="h-9 w-16 animate-pulse rounded-md bg-slate-100" />
+            ) : (
+              <p className="text-3xl font-black tabular-nums text-slate-950">
+                {safeValue(mealCountQuery.isError, mealsServed)}
+              </p>
+            )}
             <p className="mt-1 text-sm text-slate-500">Meals served from the backend daily report.</p>
             <Link href="/dashboard/canteen/pos" className="mt-5 inline-flex text-sm font-bold text-[var(--primary-dark)]">Open POS</Link>
           </SectionCard>

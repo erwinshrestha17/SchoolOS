@@ -416,17 +416,19 @@ export function CollectionCounter({
                       value={
                         invoiceDetailQuery.data
                           ? formatCurrency(invoiceDetailQuery.data.totalAmount)
-                          : "Loading"
+                          : "Unavailable"
                       }
+                      loading={invoiceDetailQuery.isLoading}
                     />
                     <StatItem
                       label="Paid Amount"
                       value={
                         invoiceDetailQuery.data
                           ? formatCurrency(invoiceDetailQuery.data.paidAmount)
-                          : "Loading"
+                          : "Unavailable"
                       }
                       color="text-emerald-600"
+                      loading={invoiceDetailQuery.isLoading}
                     />
                     <StatItem
                       label="Current Balance"
@@ -435,9 +437,10 @@ export function CollectionCounter({
                           ? formatCurrency(
                               invoiceDetailQuery.data.outstandingAmount,
                             )
-                          : "Loading"
+                          : "Unavailable"
                       }
                       color="text-danger-600 font-black"
+                      loading={invoiceDetailQuery.isLoading}
                     />
                     <StatItem
                       label="Due Date"
@@ -831,19 +834,25 @@ function StatItem({
   label,
   value,
   color = "text-slate-900",
+  loading = false,
 }: {
   label: string;
   value: string;
   color?: string;
+  loading?: boolean;
 }) {
   return (
     <div className="flex flex-col">
       <span className="text-[0.6rem] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">
         {label}
       </span>
-      <span className={cn("text-lg font-black tracking-tight", color)}>
-        {value}
-      </span>
+      {loading ? (
+        <div className="h-6 w-20 animate-pulse rounded-md bg-slate-200" />
+      ) : (
+        <span className={cn("text-lg font-black tracking-tight", color)}>
+          {value}
+        </span>
+      )}
     </div>
   );
 }
