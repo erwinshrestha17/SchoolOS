@@ -74,13 +74,6 @@ const learningPermissions: PermissionKey[] = [
   'learning:progress',
 ];
 const noticesPermissions: PermissionKey[] = ['notices:read', 'notices:create'];
-const settingsPermissions: PermissionKey[] = [
-  'settings:read',
-  'roles:read',
-  'classes:read',
-  'academic_years:read',
-];
-
 /**
  * This map mirrors the module entitlement gates in the dashboard layout.
  * It is only used to avoid showing unavailable workspaces; direct routes are
@@ -310,7 +303,6 @@ export const settingsNavItem: NavItem = {
   href: '/dashboard/settings',
   label: 'Settings',
   icon: Settings,
-  permissions: settingsPermissions,
 };
 
 export type SidebarProps = {

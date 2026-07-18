@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { formatBsDate } from "@schoolos/core";
-import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { useState } from 'react';
+import { formatBsDate } from '@schoolos/core';
+import { useQuery } from '@tanstack/react-query';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import {
   Table,
   TableBody,
@@ -12,11 +12,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Loader2, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { api } from "../../lib/api";
-import { LeaveRequestCreateDialog } from "../hr/leave-request-create-dialog";
+} from '@/components/ui/table';
+import { Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { api } from '../../lib/api';
+import { LeaveRequestCreateDialog } from '../hr/leave-request-create-dialog';
+import { ErrorState } from '@/components/ui/error-state';
+import { LoadingState } from '@/components/ui/loading-state';
+import { useSession } from '@/components/session-provider';
 
 interface MyLeaveRequestsProps {
   staffId?: string;
@@ -24,34 +27,41 @@ interface MyLeaveRequestsProps {
 
 export function MyLeaveRequests({ staffId }: MyLeaveRequestsProps) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const { hasPermissions } = useSession();
+  const canRequestLeave = hasPermissions(['hr:leave:request']);
 
-  const {
-    data: requests = [],
-    isLoading,
-    error,
-  } = useQuery({
-    queryKey: ["my-leave-requests"],
-    queryFn: async () => {
-      const data = await api.listMyLeaveRequests();
-      return Array.isArray(data) ? data : [];
-    },
+  const requestsQuery = useQuery({
+    queryKey: ['my-leave-requests'],
+    queryFn: api.listMyLeaveRequests,
   });
 
-  if (isLoading)
+  if (requestsQuery.isLoading) {
+    return <LoadingState label="Loading your leave requests..." />;
+  }
+
+  if (requestsQuery.isError) {
     return (
-      <div className="flex justify-center p-8">
-        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-      </div>
+      <ErrorState
+        title="Leave history unavailable"
+        message="Your leave requests could not be loaded. The HR module may be unavailable for this school."
+        error={requestsQuery.error}
+        onRetry={() => void requestsQuery.refetch()}
+      />
     );
+  }
+
+  const requests = requestsQuery.data ?? [];
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold text-gray-900">Leave Requests</h3>
-        <Button size="sm" onClick={() => setIsCreateOpen(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Request Leave
-        </Button>
+        {canRequestLeave ? (
+          <Button size="sm" onClick={() => setIsCreateOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Request leave
+          </Button>
+        ) : null}
       </div>
 
       <Card>
@@ -67,16 +77,7 @@ export function MyLeaveRequests({ staffId }: MyLeaveRequestsProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {error ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={5}
-                    className="text-center text-red-500 py-8"
-                  >
-                    Failed to load leave requests.
-                  </TableCell>
-                </TableRow>
-              ) : requests.length === 0 ? (
+              {requests.length === 0 ? (
                 <TableRow>
                   <TableCell
                     colSpan={5}
@@ -86,30 +87,31 @@ export function MyLeaveRequests({ staffId }: MyLeaveRequestsProps) {
                   </TableCell>
                 </TableRow>
               ) : (
-                requests.map((req: any) => (
-                  <TableRow key={req.id}>
+                requests.map((request) => (
+                  <TableRow key={request.id}>
                     <TableCell className="pl-6 font-medium">
-                      {req.leaveType}
+                      {formatValue(request.leaveType)}
                     </TableCell>
                     <TableCell>
-                      {formatBsDate(req.startsOn)} - {formatBsDate(req.endsOn)}
+                      {formatBsDate(request.startsOn)} –{' '}
+                      {formatBsDate(request.endsOn)}
                     </TableCell>
-                    <TableCell>{req.totalDays}</TableCell>
+                    <TableCell>{String(request.days)}</TableCell>
                     <TableCell>
                       <Badge
                         variant={
-                          req.status === "APPROVED"
-                            ? ("success" as any)
-                            : req.status === "REJECTED"
-                              ? "destructive"
-                              : "secondary"
+                          request.status === 'APPROVED'
+                            ? 'success'
+                            : request.status === 'REJECTED'
+                              ? 'destructive'
+                              : 'warning'
                         }
                       >
-                        {req.status}
+                        {formatValue(request.status)}
                       </Badge>
                     </TableCell>
                     <TableCell className="pr-6 text-sm text-muted-foreground">
-                      {req.reviewerRemarks || "-"}
+                      {request.reviewNote || '—'}
                     </TableCell>
                   </TableRow>
                 ))
@@ -119,13 +121,21 @@ export function MyLeaveRequests({ staffId }: MyLeaveRequestsProps) {
         </CardContent>
       </Card>
 
-      {isCreateOpen && (
+      {isCreateOpen && canRequestLeave ? (
         <LeaveRequestCreateDialog
           isOpen={isCreateOpen}
           onClose={() => setIsCreateOpen(false)}
           lockedStaffId={staffId}
+          selfService
         />
-      )}
+      ) : null}
     </div>
   );
+}
+
+function formatValue(value: string) {
+  return value
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }

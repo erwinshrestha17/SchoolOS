@@ -54,7 +54,12 @@ describe('SchoolSettingsNavigationV1Service', () => {
 
   it('grants manage access across domains for full settings managers', async () => {
     const { service } = buildService();
-    const items = await itemsOf(service, ['settings:read', 'settings:manage']);
+    const items = await itemsOf(service, [
+      'settings:read',
+      'settings:manage',
+      'attendance:read',
+      'attendance:manage_all',
+    ]);
 
     for (const id of [
       'school-profile',
@@ -113,10 +118,46 @@ describe('SchoolSettingsNavigationV1Service', () => {
 
     expect(items.find((item) => item.id === 'fees')?.access).toBe('edit');
     expect(items.find((item) => item.id === 'accounting')?.access).toBe('edit');
-    expect(items.find((item) => item.id === 'attendance')?.access).toBe('view');
+    expect(items.find((item) => item.id === 'attendance')).toBeUndefined();
     expect(items.find((item) => item.id === 'hr-payroll')?.access).toBe('view');
     expect(items.find((item) => item.id === 'users-access')?.access).toBe(
       'view',
+    );
+  });
+
+  it('projects academic structure from the APIs that back the workspace', async () => {
+    const { service } = buildService();
+    const readOnlyItems = await itemsOf(service, [
+      'classes:read',
+      'sections:read',
+    ]);
+    expect(
+      readOnlyItems.find((item) => item.id === 'academic-structure')?.access,
+    ).toBe('view');
+
+    const editorItems = await itemsOf(service, [
+      'classes:read',
+      'classes:create',
+      'sections:read',
+    ]);
+    expect(
+      editorItems.find((item) => item.id === 'academic-structure')?.access,
+    ).toBe('edit');
+
+    const incompleteReadItems = await itemsOf(service, ['classes:read']);
+    expect(
+      incompleteReadItems.find((item) => item.id === 'academic-structure'),
+    ).toBeUndefined();
+  });
+
+  it('elevates user access for any supported account action', async () => {
+    const { service } = buildService();
+    const items = await itemsOf(service, [
+      'users:read',
+      'users:reset_password',
+    ]);
+    expect(items.find((item) => item.id === 'users-access')?.access).toBe(
+      'edit',
     );
   });
 

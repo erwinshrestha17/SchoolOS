@@ -3,33 +3,275 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, ChevronLeft, ChevronRight, FileClock, Search, ShieldCheck } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  FileClock,
+  Search,
+  ShieldCheck,
+} from 'lucide-react';
 import { formatBsDateTime } from '@schoolos/core';
 import { Button } from '../ui/button';
 import { ErrorState } from '../ui/error-state';
-import { PageHeader } from '../ui/page-header';
+import {
+  SchoolSettingsPageHeader,
+  SettingsPermissionNotice,
+} from './settings-page-header';
 import { settingsGovernanceApi } from '../../lib/api/settings-governance';
 
-export function AuditLogWorkspace({ includeExportDirectory = false }: { includeExportDirectory?: boolean }) {
+export function AuditLogWorkspace({
+  includeExportDirectory = false,
+}: {
+  includeExportDirectory?: boolean;
+}) {
   const [draft, setDraft] = useState({ action: '', resource: '' });
   const [filters, setFilters] = useState({ action: '', resource: '' });
   const [page, setPage] = useState(1);
-  const auditQuery = useQuery({ queryKey: ['school-settings', 'audit-log', page, filters], queryFn: () => settingsGovernanceApi.listTenantAuditLogs({ page, limit: 25, ...filters }) });
+  const auditQuery = useQuery({
+    queryKey: ['school-settings', 'audit-log', page, filters],
+    queryFn: () =>
+      settingsGovernanceApi.listTenantAuditLogs({
+        page,
+        limit: 25,
+        ...filters,
+      }),
+  });
 
-  if (auditQuery.isLoading) return <div className="space-y-5 p-6"><div className="h-28 animate-pulse rounded-2xl bg-slate-100" /><div className="h-[520px] animate-pulse rounded-2xl bg-slate-100" /></div>;
-  if (auditQuery.isError || !auditQuery.data) return <div className="p-6"><ErrorState title="Could not load the audit log" message="Please retry to load the tenant-scoped settings audit history." error={auditQuery.error} onRetry={() => void auditQuery.refetch()} /></div>;
+  if (auditQuery.isLoading)
+    return (
+      <div className="space-y-5 p-6">
+        <div className="h-28 animate-pulse rounded-2xl bg-slate-100" />
+        <div className="h-[520px] animate-pulse rounded-2xl bg-slate-100" />
+      </div>
+    );
+  if (auditQuery.isError || !auditQuery.data)
+    return (
+      <div className="p-6">
+        <ErrorState
+          title="Could not load the audit log"
+          message="Please retry to load the tenant-scoped settings audit history."
+          error={auditQuery.error}
+          onRetry={() => void auditQuery.refetch()}
+        />
+      </div>
+    );
 
   const result = auditQuery.data;
-  const applyFilters = () => { setPage(1); setFilters({ action: draft.action.trim(), resource: draft.resource.trim() }); };
-  const clearFilters = () => { setDraft({ action: '', resource: '' }); setFilters({ action: '', resource: '' }); setPage(1); };
+  const applyFilters = () => {
+    setPage(1);
+    setFilters({
+      action: draft.action.trim(),
+      resource: draft.resource.trim(),
+    });
+  };
+  const clearFilters = () => {
+    setDraft({ action: '', resource: '' });
+    setFilters({ action: '', resource: '' });
+    setPage(1);
+  };
 
-  return <div className="space-y-6 p-6 pb-24">
-    <PageHeader title={includeExportDirectory ? 'Audit Log & Data Export' : 'Audit log'} description="Review tenant-scoped, backend-recorded configuration and sensitive operational activity. Private payloads are intentionally not exposed here." actions={<Link href="/dashboard/settings" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"><ArrowLeft className="h-4 w-4" />All settings</Link>} />
-    <section className="rounded-2xl border border-sky-100 bg-sky-50 p-5 text-sm text-sky-900"><div className="flex gap-3"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-bold">Audit trail is backend-authoritative</p><p className="mt-1 leading-6">Each row is scoped to this school. The log shows safe actor, action, resource, and time metadata only—not raw request payloads, secrets, or private file paths.</p></div></div></section>
-    {includeExportDirectory ? <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-bold text-slate-950">Protected exports</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">Exports remain in their owning modules with permission, queued-job, and File Registry controls. A consolidated export-history API is not currently confirmed.</p><p className="sr-only">needs API contract</p></div><Link href="/dashboard/settings/data-operations" className="inline-flex shrink-0 items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">Open export directory</Link></div></section> : null}
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-100 p-5"><div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between"><div><h2 className="font-bold text-slate-950">Configuration activity</h2><p className="mt-1 text-sm text-slate-600">{result.total} matching audit records.</p></div><div className="grid gap-3 sm:grid-cols-2 lg:w-[540px]"><SearchField label="Action" value={draft.action} onChange={(value) => setDraft((current) => ({ ...current, action: value }))} placeholder="setting_updated" /><SearchField label="Resource" value={draft.resource} onChange={(value) => setDraft((current) => ({ ...current, resource: value }))} placeholder="tenant_setting" /></div></div><div className="mt-4 flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" size="sm" onClick={clearFilters}>Clear</Button><Button type="button" size="sm" onClick={applyFilters}><Search className="h-4 w-4" />Apply filters</Button></div></div>{result.items.length === 0 ? <div className="p-12 text-center"><FileClock className="mx-auto h-7 w-7 text-slate-400" /><p className="mt-3 font-semibold text-slate-900">No audit records found</p><p className="mt-1 text-sm text-slate-600">Clear the filters or complete an audited school configuration action.</p></div> : <div className="divide-y divide-slate-100">{result.items.map((log) => <article key={log.id} className="grid gap-2 px-5 py-4 sm:grid-cols-[1.2fr_1fr_1fr_1.2fr] sm:items-center sm:gap-4"><div><p className="text-sm font-bold text-slate-900">{formatBsDateTime(log.createdAt)}</p><p className="mt-1 text-xs text-slate-500">Nepal time</p></div><div><p className="text-xs font-bold uppercase tracking-wide text-slate-500 sm:hidden">Actor</p><p className="truncate text-sm font-semibold text-slate-800">{log.user?.email ?? log.user?.phone ?? 'System or removed user'}</p></div><div><p className="text-xs font-bold uppercase tracking-wide text-slate-500 sm:hidden">Action</p><p className="truncate text-sm font-semibold text-slate-900">{formatLabel(log.action)}</p></div><div><p className="text-xs font-bold uppercase tracking-wide text-slate-500 sm:hidden">Resource</p><p className="truncate text-sm font-semibold text-slate-800">{formatLabel(log.resource)}</p>{log.resourceId ? <p className="mt-1 truncate text-xs text-slate-500">Record reference available</p> : null}</div></article>)}</div>}<div className="flex items-center justify-between border-t border-slate-100 p-4"><p className="text-sm text-slate-600">Page {result.page ?? page}</p><div className="flex gap-2"><Button type="button" size="sm" variant="outline" disabled={(result.page ?? page) <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}><ChevronLeft className="h-4 w-4" />Previous</Button><Button type="button" size="sm" variant="outline" disabled={!result.hasNextPage} onClick={() => setPage((current) => current + 1)}>Next<ChevronRight className="h-4 w-4" /></Button></div></div></section>
-  </div>;
+  return (
+    <div className="space-y-6 p-6 pb-24">
+      <SchoolSettingsPageHeader
+        title={includeExportDirectory ? 'Audit log & data export' : 'Audit log'}
+        description="Review tenant-scoped, backend-recorded configuration and sensitive operational activity. Private payloads are intentionally not exposed here."
+        access="view-only"
+      />
+      <SettingsPermissionNotice
+        access="view-only"
+        description="Audit records are review-only. Changes must be made in their owning school workspace."
+      />
+      <section className="rounded-2xl border border-sky-100 bg-sky-50 p-5 text-sm text-sky-900">
+        <div className="flex gap-3">
+          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
+          <div>
+            <p className="font-bold">Audit trail is backend-authoritative</p>
+            <p className="mt-1 leading-6">
+              Each row is scoped to this school. The log shows safe actor,
+              action, resource, and time metadata only—not raw request payloads,
+              secrets, or private file paths.
+            </p>
+          </div>
+        </div>
+      </section>
+      {includeExportDirectory ? (
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="font-bold text-slate-950">Protected exports</h2>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
+                Exports remain in their owning modules with permission,
+                queued-job, and File Registry controls. A consolidated
+                export-history API is not currently confirmed.
+              </p>
+              <p className="sr-only">needs API contract</p>
+            </div>
+            <Link
+              href="/dashboard/settings/data-operations"
+              className="inline-flex shrink-0 items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+            >
+              Open export directory
+            </Link>
+          </div>
+        </section>
+      ) : null}
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-100 p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h2 className="font-bold text-slate-950">
+                Configuration activity
+              </h2>
+              <p className="mt-1 text-sm text-slate-600">
+                {result.total} matching audit records.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:w-[540px]">
+              <SearchField
+                label="Action"
+                value={draft.action}
+                onChange={(value) =>
+                  setDraft((current) => ({ ...current, action: value }))
+                }
+                placeholder="setting_updated"
+              />
+              <SearchField
+                label="Resource"
+                value={draft.resource}
+                onChange={(value) =>
+                  setDraft((current) => ({ ...current, resource: value }))
+                }
+                placeholder="tenant_setting"
+              />
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={clearFilters}
+            >
+              Clear
+            </Button>
+            <Button type="button" size="sm" onClick={applyFilters}>
+              <Search className="h-4 w-4" />
+              Apply filters
+            </Button>
+          </div>
+        </div>
+        {result.items.length === 0 ? (
+          <div className="p-12 text-center">
+            <FileClock className="mx-auto h-7 w-7 text-slate-400" />
+            <p className="mt-3 font-semibold text-slate-900">
+              No audit records found
+            </p>
+            <p className="mt-1 text-sm text-slate-600">
+              Clear the filters or complete an audited school configuration
+              action.
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {result.items.map((log) => (
+              <article
+                key={log.id}
+                className="grid gap-2 px-5 py-4 sm:grid-cols-[1.2fr_1fr_1fr_1.2fr] sm:items-center sm:gap-4"
+              >
+                <div>
+                  <p className="text-sm font-bold text-slate-900">
+                    {formatBsDateTime(log.createdAt)}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">Nepal time</p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500 sm:hidden">
+                    Actor
+                  </p>
+                  <p className="truncate text-sm font-semibold text-slate-800">
+                    {log.user?.email ??
+                      log.user?.phone ??
+                      'System or removed user'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500 sm:hidden">
+                    Action
+                  </p>
+                  <p className="truncate text-sm font-semibold text-slate-900">
+                    {formatLabel(log.action)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500 sm:hidden">
+                    Resource
+                  </p>
+                  <p className="truncate text-sm font-semibold text-slate-800">
+                    {formatLabel(log.resource)}
+                  </p>
+                  {log.resourceId ? (
+                    <p className="mt-1 truncate text-xs text-slate-500">
+                      Record reference available
+                    </p>
+                  ) : null}
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+        <div className="flex items-center justify-between border-t border-slate-100 p-4">
+          <p className="text-sm text-slate-600">Page {result.page ?? page}</p>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={(result.page ?? page) <= 1}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Previous
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={!result.hasNextPage}
+              onClick={() => setPage((current) => current + 1)}
+            >
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
 }
 
-function SearchField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder: string }) { return <label><span className="text-sm font-bold text-slate-900">{label}</span><input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="mt-2 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-900/5" /></label>; }
-function formatLabel(value: string) { return value.replace(/[_:-]/g, ' '); }
+function SearchField({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <label>
+      <span className="text-sm font-bold text-slate-900">{label}</span>
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="mt-2 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-900/5"
+      />
+    </label>
+  );
+}
+function formatLabel(value: string) {
+  return value.replace(/[_:-]/g, ' ');
+}

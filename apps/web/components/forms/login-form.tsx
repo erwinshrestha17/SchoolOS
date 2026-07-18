@@ -1,18 +1,18 @@
-"use client";
+'use client';
 
-import { formatNepalTime, loginSchema, type LoginInput } from "@schoolos/core";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { api, isAuthSession } from "../../lib/api";
-import { useSession } from "../session-provider";
+import { formatNepalTime, loginSchema, type LoginInput } from '@schoolos/core';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useMutation } from '@tanstack/react-query';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { api, isAuthSession } from '../../lib/api';
+import { useSession } from '../session-provider';
 
 const PLATFORM_ROLES = [
-  "platform_super_admin",
-  "platform_support",
-  "platform_billing_admin",
+  'platform_super_admin',
+  'platform_support',
+  'platform_billing_admin',
 ];
 
 export function LoginForm() {
@@ -28,9 +28,9 @@ export function LoginForm() {
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      tenantSlug: "",
-      email: "",
-      password: "",
+      tenantSlug: '',
+      email: '',
+      password: '',
     },
   });
 
@@ -43,12 +43,12 @@ export function LoginForm() {
         );
         const defaultRedirect = result.user.mustChangePassword
           ? isPlatformUser
-            ? "/platform/account-security"
-            : "/dashboard/account-security"
+            ? '/platform/account-security'
+            : '/dashboard/settings/personal/security'
           : isPlatformUser
-            ? "/platform/dashboard"
-            : "/dashboard";
-        const requestedRedirect = searchParams.get("next");
+            ? '/platform/dashboard'
+            : '/dashboard';
+        const requestedRedirect = searchParams.get('next');
         const safeRedirect = result.user.mustChangePassword
           ? defaultRedirect
           : resolvePostLoginRedirect(
@@ -82,7 +82,7 @@ export function LoginForm() {
           School Code
         </label>
         <input
-          {...register("tenantSlug")}
+          {...register('tenantSlug')}
           id="tenantSlug"
           placeholder="e.g. green-valley-school"
           autoComplete="organization"
@@ -102,7 +102,7 @@ export function LoginForm() {
           Email
         </label>
         <input
-          {...register("email")}
+          {...register('email')}
           id="email"
           type="email"
           placeholder="admin@school.edu.np"
@@ -122,7 +122,7 @@ export function LoginForm() {
         <input
           id="password"
           type="password"
-          {...register("password")}
+          {...register('password')}
           placeholder="Enter your password"
           autoComplete="current-password"
         />
@@ -138,7 +138,7 @@ export function LoginForm() {
         disabled={mutation.isPending}
         className="rounded-2xl bg-[var(--primary)] px-5 py-3 font-semibold text-white shadow-md shadow-[var(--primary-soft)] transition-all hover:bg-[var(--primary-dark)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
       >
-        {mutation.isPending ? "Signing in..." : "Sign in"}
+        {mutation.isPending ? 'Signing in...' : 'Sign in'}
       </button>
 
       {mutation.isError ? (
@@ -172,17 +172,17 @@ function resolvePostLoginRedirect(
   defaultRedirect: string,
   isPlatformUser: boolean,
 ) {
-  if (!requestedRedirect?.startsWith("/")) {
+  if (!requestedRedirect?.startsWith('/')) {
     return defaultRedirect;
   }
 
   if (isPlatformUser) {
-    return requestedRedirect.startsWith("/platform")
+    return requestedRedirect.startsWith('/platform')
       ? requestedRedirect
       : defaultRedirect;
   }
 
-  return requestedRedirect.startsWith("/dashboard")
+  return requestedRedirect.startsWith('/dashboard')
     ? requestedRedirect
     : defaultRedirect;
 }

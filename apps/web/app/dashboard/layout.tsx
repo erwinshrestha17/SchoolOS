@@ -10,11 +10,16 @@ import { DashboardShell } from "../../components/layout/dashboard-shell";
 import { UpgradePrompt } from "../../components/layout/upgrade-prompt";
 import { PermissionDenied } from "../../components/ui/permission-denied";
 import { OfflineLockedState } from "../../components/ui/offline-locked-state";
+import {
+  SETTINGS_NAVIGATION,
+  settingsDefinitionMatchesPath,
+} from "../../components/settings/settings-navigation.config";
 
 type RouteGate = {
   prefix: string;
   label: string;
   permissions: PermissionKey[];
+  permissionMode?: "any" | "all";
 };
 
 const dashboardRouteGates: RouteGate[] = [
@@ -132,6 +137,16 @@ const dashboardRouteGates: RouteGate[] = [
     permissions: ["notices:read"],
   },
   {
+    prefix: "/dashboard/my-workspace",
+    label: "My Workspace",
+    permissions: ["staff:read"],
+  },
+  {
+    prefix: "/dashboard/my-profile",
+    label: "My Workspace",
+    permissions: ["staff:read"],
+  },
+  {
     prefix: "/dashboard/messaging",
     label: "Chat removed",
     permissions: ["notices:read"],
@@ -193,20 +208,118 @@ const dashboardRouteGates: RouteGate[] = [
     label: "Reports",
     permissions: ["accounting:reports:read", "library:reports:read"],
   },
+];
+
+const settingsRouteGates: RouteGate[] = [
   {
-    prefix: "/dashboard/settings",
-    label: "Settings",
+    prefix: "/dashboard/settings/school/identity",
+    label: "School identity settings",
+    permissions: ["settings:identity:manage", "settings:manage"],
+  },
+  {
+    prefix: "/dashboard/settings/school/branding",
+    label: "School branding settings",
+    permissions: ["settings:identity:manage", "settings:manage"],
+  },
+  {
+    prefix: "/dashboard/settings/school/academic-year",
+    label: "Academic year settings",
+    permissions: ["settings:academic:manage", "settings:manage"],
+  },
+  {
+    prefix: "/dashboard/settings/school/academic-structure",
+    label: "Academic structure settings",
+    permissions: ["classes:read", "sections:read"],
+    permissionMode: "all",
+  },
+  {
+    prefix: "/dashboard/settings/school/modules",
+    label: "School module settings",
+    permissions: ["settings:read"],
+  },
+  {
+    prefix: "/dashboard/settings/policies/attendance",
+    label: "Attendance settings",
+    permissions: ["attendance:read"],
+  },
+  {
+    prefix: "/dashboard/settings/policies/exams",
+    label: "Exams and report-card settings",
     permissions: [
       "settings:read",
-      "roles:read",
-      "classes:read",
-      "academic_years:read",
-      "admission_policy:read",
+      "settings:academic:manage",
+      "settings:manage",
     ],
+  },
+  {
+    prefix: "/dashboard/settings/policies/homework",
+    label: "Homework settings",
+    permissions: [
+      "settings:read",
+      "settings:academic:manage",
+      "settings:manage",
+    ],
+  },
+  {
+    prefix: "/dashboard/settings/policies/activity-consent",
+    label: "Activity consent settings",
+    permissions: [
+      "settings:read",
+      "settings:communication:manage",
+      "settings:manage",
+    ],
+  },
+  {
+    prefix: "/dashboard/settings/access/roles",
+    label: "Roles and permissions",
+    permissions: ["roles:read"],
+  },
+  {
+    prefix: "/dashboard/settings/access/users",
+    label: "Users and access",
+    permissions: ["users:read"],
+  },
+  {
+    prefix: "/dashboard/settings/system/integrations",
+    label: "Integration settings",
+    permissions: ["settings:read"],
+  },
+  {
+    prefix: "/dashboard/settings/system/audit-log",
+    label: "Settings audit log",
+    permissions: ["settings:audit:read", "settings:manage"],
   },
 ];
 
 function getRequiredModuleForHref(href: string): string | null {
+  if (
+    href.startsWith("/dashboard/my-workspace") ||
+    href.startsWith("/dashboard/my-profile")
+  ) {
+    return "hr";
+  }
+  if (href.startsWith("/dashboard/settings/personal/notifications")) {
+    return "notifications";
+  }
+  if (href.startsWith("/dashboard/settings/policies/attendance")) {
+    return "attendance";
+  }
+  if (href.startsWith("/dashboard/settings/policies/exams")) {
+    return "exams";
+  }
+  if (href.startsWith("/dashboard/settings/policies/homework")) {
+    return "homework";
+  }
+  if (href.startsWith("/dashboard/settings/policies/activity-consent")) {
+    return "activity";
+  }
+  if (
+    href.startsWith("/dashboard/settings/school/academic-structure") ||
+    href.startsWith("/dashboard/settings/academic-structure") ||
+    href.startsWith("/dashboard/settings/classes-sections")
+  ) {
+    return "students";
+  }
   if (href.startsWith("/dashboard/communications")) return "notices";
   if (href.startsWith("/dashboard/notices/deliveries")) return "notifications";
   if (href.startsWith("/dashboard/notices/failures")) return "notifications";
@@ -235,21 +348,48 @@ function getRequiredModuleForHref(href: string): string | null {
 }
 
 function getRouteGateForHref(href: string): RouteGate | null {
+  // Personal settings are available to every authenticated school user.
+  // Each purpose-limited API (password, profile, notification preferences)
+  // remains the backend authorization authority for its own data.
+  if (
+    href === "/dashboard/settings" ||
+    href.startsWith("/dashboard/settings/personal/")
+  ) {
+    return null;
+  }
+  if (href.startsWith("/dashboard/settings")) {
+    const definition = SETTINGS_NAVIGATION.find((item) =>
+      settingsDefinitionMatchesPath(item, href),
+    );
+    const canonicalHref = definition?.href ?? href;
+    return (
+      settingsRouteGates.find((gate) =>
+        routeMatchesPrefix(canonicalHref, gate.prefix),
+      ) ?? null
+    );
+  }
   return (
-    dashboardRouteGates.find((gate) => href.startsWith(gate.prefix)) ?? null
+    dashboardRouteGates.find((gate) => routeMatchesPrefix(href, gate.prefix)) ??
+    null
   );
 }
 
-function hasAnyPermission(
-  grantedPermissions: PermissionKey[],
-  requiredPermissions: PermissionKey[],
+function routeMatchesPrefix(href: string, prefix: string) {
+  return href === prefix || href.startsWith(`${prefix}/`);
+}
+
+function hasRoutePermission(
+  grantedPermissions: readonly PermissionKey[],
+  routeGate: RouteGate,
 ) {
-  if (requiredPermissions.length === 0) {
+  if (routeGate.permissions.length === 0) {
     return true;
   }
 
-  const granted = new Set(grantedPermissions);
-  return requiredPermissions.some((permission) => granted.has(permission));
+  const granted = new Set<string>(grantedPermissions);
+  return routeGate.permissionMode === "all"
+    ? routeGate.permissions.every((permission) => granted.has(permission))
+    : routeGate.permissions.some((permission) => granted.has(permission));
 }
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
@@ -285,9 +425,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     if (
       !isParentOnlySession &&
       session?.user.mustChangePassword &&
-      pathname !== "/dashboard/account-security"
+      pathname !== "/dashboard/settings/personal/security"
     ) {
-      router.replace("/dashboard/account-security");
+      router.replace("/dashboard/settings/personal/security");
     }
   }, [isParentOnlySession, pathname, router, session?.user.mustChangePassword]);
 
@@ -400,7 +540,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   if (
     session.user.mustChangePassword &&
-    pathname !== "/dashboard/account-security"
+    pathname !== "/dashboard/settings/personal/security"
   ) {
     return (
       <DashboardShell>
@@ -465,10 +605,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   const routeGate = getRouteGateForHref(pathname || "");
-  if (
-    routeGate &&
-    !hasAnyPermission(session.user.permissions, routeGate.permissions)
-  ) {
+  if (routeGate && !hasRoutePermission(session.user.permissions, routeGate)) {
     return (
       <DashboardShell>
         <PermissionDenied

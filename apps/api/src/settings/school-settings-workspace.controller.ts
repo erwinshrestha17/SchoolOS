@@ -82,7 +82,7 @@ export class SchoolSettingsWorkspaceController {
         description: profileReady
           ? 'Official school profile is configured.'
           : 'Add the required official school profile details.',
-        href: '/dashboard/settings/school-profile',
+        href: '/dashboard/settings/school/identity',
         status: profileReady ? 'ready' : 'needs_attention',
       },
       {
@@ -91,7 +91,7 @@ export class SchoolSettingsWorkspaceController {
         description: brandingReady
           ? 'Official logo and document defaults are configured.'
           : 'Add an official logo and document defaults.',
-        href: '/dashboard/settings/branding-documents',
+        href: '/dashboard/settings/school/branding',
         status: brandingReady ? 'ready' : 'needs_attention',
       },
       {
@@ -100,7 +100,7 @@ export class SchoolSettingsWorkspaceController {
         description: calendarReady
           ? 'A current Bikram Sambat academic year is configured.'
           : 'Create and set the current Bikram Sambat academic year.',
-        href: '/dashboard/settings/academic-calendar',
+        href: '/dashboard/settings/school/academic-year',
         status: calendarReady ? 'ready' : 'needs_attention',
       },
     ];
@@ -120,7 +120,7 @@ export class SchoolSettingsWorkspaceController {
         ? { label: 'Complete setup', href: attention[0].href }
         : {
             label: 'Review recent changes',
-            href: '/dashboard/settings/audit-export',
+            href: '/dashboard/settings/system/audit-log',
           },
     };
   }

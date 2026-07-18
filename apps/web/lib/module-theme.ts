@@ -60,6 +60,7 @@ const DASHBOARD_SEGMENT_MODULES: Record<string, ModuleSlug> = {
   settings: 'settings',
   'account-security': 'settings',
   'my-profile': 'settings',
+  'my-workspace': 'hr',
   setup: 'settings',
 };
 

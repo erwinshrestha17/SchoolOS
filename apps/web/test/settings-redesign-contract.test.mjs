@@ -14,30 +14,43 @@ describe('School Settings redesign', () => {
     const hub = read('components/settings/settings-control-center.tsx');
     assert.match(layout, /SettingsRouteFrame/);
     assert.match(frame, /SettingsControlCenter/);
-    assert.match(hub, /Applies only to this school/);
+    assert.match(
+      frame,
+      /Manage your personal preferences and school configuration/,
+    );
+    assert.match(hub, /Choose a settings area/);
+    assert.doesNotMatch(frame, /Applies only to this school/);
     assert.doesNotMatch(hub, /Upgrade Plan/);
   });
 
   it('routes legacy ?section= and ?tab= links into the canonical information architecture', () => {
     const frame = read('components/settings/settings-route-frame.tsx');
     for (const destination of [
-      'settings/school-profile',
-      'settings/academic-calendar',
-      'settings/users-access',
-      'settings/attendance',
-      'settings/audit-export',
+      'settings/school/identity',
+      'settings/school/academic-year',
+      'settings/access/users',
+      'settings/policies/attendance',
+      'settings/system/audit-log',
       'settings/communication',
       'settings/hr-payroll',
       'settings/accounting',
-    ]) assert.match(frame, new RegExp(destination));
-    assert.match(frame, /migratedLegacySections/);
+    ])
+      assert.match(frame, new RegExp(destination));
+    assert.match(frame, /MIGRATED_LEGACY_SECTIONS/);
+    assert.match(frame, /remaining\.delete\('section'\)/);
+    assert.match(frame, /remaining\.delete\('tab'\)/);
   });
 
-  it('hides unauthorized items instead of hardcoding the full catalog', () => {
+  it('projects authenticated visibility onto one shared settings catalog', () => {
     const frame = read('components/settings/settings-route-frame.tsx');
+    const navigation = read(
+      'components/settings/settings-navigation.config.ts',
+    );
     assert.match(frame, /navigationQuery/);
-    assert.match(frame, /groups\.map/);
-    assert.doesNotMatch(frame, /SCHOOL_SETTINGS_CATEGORIES/);
+    assert.match(frame, /backendItemsById/);
+    assert.match(navigation, /SETTINGS_NAVIGATION_GROUPS/);
+    assert.match(navigation, /backendItemId/);
+    assert.doesNotMatch(frame, /View only/);
   });
 
   it('uses real settings APIs for policy configuration rather than browser-only state', () => {
@@ -47,10 +60,16 @@ describe('School Settings redesign', () => {
     assert.match(policy, /schoolSettingsApi\.getSchoolSettingsNavigation/);
   });
 
-  it('keeps access labels aligned with the six-level settings access contract', () => {
+  it('maps backend capabilities into the four user-facing access states', () => {
     const catalog = read('components/settings/school-settings-catalog.ts');
-    for (const label of ['View only', 'Edit', 'Approve', 'Manage', 'Delegate']) {
-      assert.match(catalog, new RegExp(label));
+    const header = read('components/settings/settings-page-header.tsx');
+    for (const label of [
+      'Can manage',
+      'View-only',
+      'No access',
+      'Platform managed',
+    ]) {
+      assert.match(header, new RegExp(label));
     }
     assert.match(catalog, /canEditSchoolSettings/);
   });

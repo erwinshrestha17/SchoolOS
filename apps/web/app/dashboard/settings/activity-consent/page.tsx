@@ -1,5 +1,15 @@
-import { SettingsPolicyWorkspace } from '@/components/settings/settings-policy-workspace';
+import {
+  redirectWithSearchParams,
+  type RouteSearchParams,
+} from '@/lib/redirect-with-search-params';
 
-export default function ActivityConsentSettingsPage() {
-  return <SettingsPolicyWorkspace policyId="activity-consent" />;
+export default function ActivityConsentSettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<RouteSearchParams>;
+}) {
+  return redirectWithSearchParams(
+    '/dashboard/settings/policies/activity-consent',
+    searchParams,
+  );
 }

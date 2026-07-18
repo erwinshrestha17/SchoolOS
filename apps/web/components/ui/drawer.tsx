@@ -1,7 +1,13 @@
 'use client';
 
 import { X } from 'lucide-react';
-import { useEffect, useId, useRef, type ReactNode } from 'react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '../../lib/utils';
 
@@ -14,6 +20,8 @@ export type DrawerProps = {
   footer?: ReactNode;
   /** Panel width. Use 'lg' for record detail that includes tables or protected files. */
   width?: 'sm' | 'md' | 'lg';
+  /** Focus target restored after the drawer closes. */
+  returnFocusRef?: RefObject<HTMLElement | null>;
 };
 
 const WIDTH_CLASSES: Record<NonNullable<DrawerProps['width']>, string> = {
@@ -38,36 +46,112 @@ export function Drawer({
   children,
   footer,
   width = 'md',
+  returnFocusRef,
 }: DrawerProps) {
   const titleId = useId();
   const descriptionId = useId();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const portalRootRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!isOpen) return;
 
-    closeButtonRef.current?.focus();
+    previousFocusRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const explicitReturnFocus = returnFocusRef?.current ?? null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const portalRoot = portalRootRef.current;
+    const backgroundElements = Array.from(document.body.children)
+      .filter((element) => element !== portalRoot)
+      .map((element) => ({
+        element: element as HTMLElement,
+        inert: (element as HTMLElement).inert,
+        ariaHidden: element.getAttribute('aria-hidden'),
+      }));
+    for (const { element } of backgroundElements) {
+      element.inert = true;
+      element.setAttribute('aria-hidden', 'true');
+    }
+    const focusFrame = window.requestAnimationFrame(() =>
+      closeButtonRef.current?.focus(),
+    );
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
-        onClose();
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== 'Tab' || !dialogRef.current) return;
+
+      const focusable = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter(
+        (element) =>
+          !element.hasAttribute('hidden') &&
+          element.getAttribute('aria-hidden') !== 'true',
+      );
+      if (focusable.length === 0) {
+        event.preventDefault();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (
+        event.shiftKey &&
+        (active === first || !dialogRef.current.contains(active))
+      ) {
+        event.preventDefault();
+        last.focus();
+      } else if (
+        !event.shiftKey &&
+        (active === last || !dialogRef.current.contains(active))
+      ) {
+        event.preventDefault();
+        first.focus();
       }
     }
 
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      for (const { element, inert, ariaHidden } of backgroundElements) {
+        element.inert = inert;
+        if (ariaHidden === null) element.removeAttribute('aria-hidden');
+        else element.setAttribute('aria-hidden', ariaHidden);
+      }
+      const focusTarget = explicitReturnFocus ?? previousFocusRef.current;
+      if (focusTarget?.isConnected) focusTarget.focus();
+    };
+  }, [isOpen, returnFocusRef]);
 
   if (!isOpen || typeof document === 'undefined') return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex justify-end">
+    <div ref={portalRootRef} className="fixed inset-0 z-50 flex justify-end">
       <div
         className="fixed inset-0 bg-black/50 backdrop-blur-sm animate-fade-in"
         onClick={onClose}
         aria-hidden="true"
       />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

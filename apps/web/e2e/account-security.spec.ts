@@ -39,7 +39,7 @@ test.describe.serial('M0 Account & Security browser E2E', () => {
     page,
   }) => {
     await login(page, schoolCredentials);
-    await page.goto('/dashboard/account-security');
+    await page.goto('/dashboard/settings/personal/security');
     await expect(
       page.getByRole('heading', { name: /Account & Security/i }),
     ).toBeVisible();
@@ -50,8 +50,48 @@ test.describe.serial('M0 Account & Security browser E2E', () => {
     await page.getByRole('button', { name: /^Change password$/i }).click();
 
     await expect(
-      page.getByText(/Current password is incorrect|Could not change password/i),
+      page.getByText(
+        /Current password is incorrect|Could not change password/i,
+      ),
     ).toBeVisible();
+  });
+
+  test('shows neutral password rules and accessible live validation', async ({
+    page,
+  }) => {
+    await login(page, schoolCredentials);
+    await page.goto('/dashboard/settings/personal/security');
+
+    const lengthRule = page
+      .getByRole('listitem')
+      .filter({ hasText: 'Minimum 8 characters' });
+    const uppercaseRule = page
+      .getByRole('listitem')
+      .filter({ hasText: 'At least 1 uppercase letter' });
+    const newPassword = page.getByLabel(/^New password$/i);
+    const confirmation = page.getByLabel(/Confirm new password/i);
+    const visibilityControl = page.getByRole('button', {
+      name: /Show new password/i,
+    });
+
+    await expect(lengthRule).toContainText('Required');
+    await expect(lengthRule).not.toContainText('Met');
+
+    await newPassword.fill('longpassword1!');
+    await expect(lengthRule).toContainText('Met');
+    await expect(uppercaseRule).toContainText('Not met');
+
+    await confirmation.fill('DoesNotMatch1!');
+    await confirmation.blur();
+    await expect(
+      page.getByText(/Confirm password must match new password/i),
+    ).toBeVisible();
+    await expect(confirmation).toHaveAttribute('aria-invalid', 'true');
+
+    await expect(newPassword).toHaveAttribute('type', 'password');
+    await visibilityControl.click();
+    await expect(newPassword).toHaveAttribute('type', 'text');
+    await expect(visibilityControl).toHaveAttribute('aria-pressed', 'true');
   });
 
   test('shows admin reset action in tenant-scoped user management', async ({
@@ -63,11 +103,13 @@ test.describe.serial('M0 Account & Security browser E2E', () => {
       'Admin reset visibility requires an admin account that is not forced through password change.',
     );
 
-    await page.goto('/dashboard/settings/users-access');
+    await page.goto('/dashboard/settings/access/users');
     await expect(
       page.getByRole('heading', { name: /Users & access/i }),
     ).toBeVisible();
-    await expect(page.getByRole('button', { name: /Reset password/i }).first()).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /Reset password/i }).first(),
+    ).toBeVisible();
   });
 
   test('admin reset forces next-login password change, then user changes password', async ({
@@ -87,7 +129,7 @@ test.describe.serial('M0 Account & Security browser E2E', () => {
       'Admin reset setup requires an admin account that is not forced through password change.',
     );
 
-    await page.goto('/dashboard/settings/users-access');
+    await page.goto('/dashboard/settings/access/users');
     const userRow = page.getByTestId(
       `settings-user-row-${passwordTestAccount.email}`,
     );
@@ -106,7 +148,9 @@ test.describe.serial('M0 Account & Security browser E2E', () => {
       password: passwordTestAccount.temporaryPassword!,
     });
     expect(forcedLogin.mustChangePassword).toBe(true);
-    await expect(page).toHaveURL(/\/dashboard\/account-security(?:$|[?#])/);
+    await expect(page).toHaveURL(
+      /\/dashboard\/settings\/personal\/security(?:$|[?#])/,
+    );
 
     await page
       .getByLabel(/Current password/i)
@@ -143,10 +187,7 @@ async function clearBrowserSession(context: BrowserContext, page: Page) {
   });
 }
 
-async function login(
-  page: Page,
-  credentials: Credentials,
-) {
+async function login(page: Page, credentials: Credentials) {
   await page.goto('/login');
   await expect(page.getByLabel(/School Code/i)).toBeVisible();
   await page.getByLabel(/School Code/i).fill(credentials.tenantSlug ?? '');
@@ -154,11 +195,17 @@ async function login(
   await page.getByLabel(/Password/i).fill(credentials.password ?? '');
 
   await Promise.all([
-    page.waitForURL(/\/(?:dashboard|platform)(?:\/account-security)?(?:$|[/?#])/, {
-      timeout: 20_000,
-    }),
+    page.waitForURL(
+      /\/(?:dashboard(?:\/settings\/personal\/security)?|platform(?:\/account-security)?)(?:$|[/?#])/,
+      { timeout: 20_000 },
+    ),
     page.getByRole('button', { name: /Sign in/i }).click(),
   ]);
 
-  return { mustChangePassword: /\/account-security(?:$|[?#])/.test(page.url()) };
+  return {
+    mustChangePassword:
+      /\/(?:account-security|settings\/personal\/security)(?:$|[?#])/.test(
+        page.url(),
+      ),
+  };
 }

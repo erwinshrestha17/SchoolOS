@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import type {
   SchoolIntegrationStatusItem,
@@ -8,7 +7,6 @@ import type {
   SchoolIntegrationStatusSignal,
 } from '@schoolos/core';
 import {
-  ArrowLeft,
   BellRing,
   Cable,
   CheckCircle2,
@@ -22,10 +20,10 @@ import { Button } from '../ui/button';
 import { ErrorState } from '../ui/error-state';
 import { LoadingState } from '../ui/loading-state';
 import { ModuleLockedState } from '../ui/module-locked-state';
-import { PageHeader } from '../ui/page-header';
 import { ApiRequestError } from '../../lib/api/client';
 import { schoolSettingsApi } from '../../lib/api/school-settings';
 import { formatDateTime } from '../../lib/utils';
+import { SchoolSettingsPageHeader } from './settings-page-header';
 
 const statusOrder: SchoolIntegrationStatusLabel[] = [
   'disabled',
@@ -97,27 +95,19 @@ export function IntegrationsStatusWorkspace() {
 
   return (
     <div className="space-y-6 p-6 pb-24">
-      <PageHeader
+      <SchoolSettingsPageHeader
         title="Integrations"
         description="Review safe school-visible integration modes for this school without credentials or platform controls."
+        access="platform-managed"
         actions={
-          <>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void integrationsQuery.refetch()}
-            >
-              <RefreshCcw className="h-4 w-4" />
-              Refresh
-            </Button>
-            <Link
-              href="/dashboard/settings"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              All settings
-            </Link>
-          </>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void integrationsQuery.refetch()}
+          >
+            <RefreshCcw className="h-4 w-4" />
+            Refresh
+          </Button>
         }
       />
 
@@ -135,7 +125,9 @@ export function IntegrationsStatusWorkspace() {
           </div>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm font-semibold text-slate-700">Needs attention</p>
+          <p className="text-sm font-semibold text-slate-700">
+            Needs attention
+          </p>
           <p className="mt-2 text-3xl font-black text-slate-950">
             {attentionCount}
           </p>
@@ -200,7 +192,9 @@ function IntegrationCard({ item }: { item: SchoolIntegrationStatusItem }) {
       </div>
       <p className="mt-5 border-t border-slate-100 pt-3 text-xs font-semibold text-slate-500">
         Checked {formatDateTime(item.checkedAt)}
-        {item.observedAt ? ` / observed ${formatDateTime(item.observedAt)}` : ''}
+        {item.observedAt
+          ? ` / observed ${formatDateTime(item.observedAt)}`
+          : ''}
       </p>
     </article>
   );

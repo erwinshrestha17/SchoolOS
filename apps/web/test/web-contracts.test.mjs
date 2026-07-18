@@ -1,17 +1,17 @@
-import assert from "node:assert/strict";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { describe, it } from "node:test";
-import { fileURLToPath } from "node:url";
+import assert from 'node:assert/strict';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { describe, it } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
-const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 function read(relativePath) {
-  return readFileSync(join(webRoot, relativePath), "utf8");
+  return readFileSync(join(webRoot, relativePath), 'utf8');
 }
 
 function readMany(relativePaths) {
-  return relativePaths.map((relativePath) => read(relativePath)).join("\n");
+  return relativePaths.map((relativePath) => read(relativePath)).join('\n');
 }
 
 function sourceFiles(relativeDir) {
@@ -23,7 +23,7 @@ function sourceFiles(relativeDir) {
     const absolute = join(root, entry);
     const relative = join(relativeDir, entry);
 
-    if (entry === ".next" || entry === "node_modules") {
+    if (entry === '.next' || entry === 'node_modules') {
       continue;
     }
 
@@ -45,60 +45,60 @@ function sourceFiles(relativeDir) {
 // (commit 7b23af3d). Contracts that pinned the old form now pin these
 // successor surfaces.
 const activitySurfaceFiles = [
-  "app/dashboard/activity/page.tsx",
-  "app/dashboard/activity/new/page.tsx",
-  "app/dashboard/activity/gallery/page.tsx",
-  "app/dashboard/activity/observations/page.tsx",
-  "app/dashboard/activity/milestones/page.tsx",
-  "app/dashboard/activity/moderation/page.tsx",
-  "app/dashboard/activity/deliveries/page.tsx",
-  "app/dashboard/activity/reports/page.tsx",
-  "app/dashboard/activity/[postId]/page.tsx",
-  "app/dashboard/activity/parent/page.tsx",
-  "components/activity/lifecycle-panel.tsx",
-  "components/activity/parent-activity-view.tsx",
+  'app/dashboard/activity/page.tsx',
+  'app/dashboard/activity/new/page.tsx',
+  'app/dashboard/activity/gallery/page.tsx',
+  'app/dashboard/activity/observations/page.tsx',
+  'app/dashboard/activity/milestones/page.tsx',
+  'app/dashboard/activity/moderation/page.tsx',
+  'app/dashboard/activity/deliveries/page.tsx',
+  'app/dashboard/activity/reports/page.tsx',
+  'app/dashboard/activity/[postId]/page.tsx',
+  'app/dashboard/activity/parent/page.tsx',
+  'components/activity/lifecycle-panel.tsx',
+  'components/activity/parent-activity-view.tsx',
 ];
 
-describe("SchoolOS web production contracts", () => {
-  it("uses a real test command instead of the placeholder script", () => {
-    const packageJson = JSON.parse(read("package.json"));
+describe('SchoolOS web production contracts', () => {
+  it('uses a real test command instead of the placeholder script', () => {
+    const packageJson = JSON.parse(read('package.json'));
 
-    assert.equal(packageJson.scripts.test, "node --test test/*.test.mjs");
+    assert.equal(packageJson.scripts.test, 'node --test test/*.test.mjs');
   });
 
-  it("defaults frontend API traffic to the Nest API on port 4000", () => {
-    const apiClient = read("lib/api/client.ts");
+  it('defaults frontend API traffic to the Nest API on port 4000', () => {
+    const apiClient = read('lib/api/client.ts');
 
     assert.match(apiClient, /http:\/\/localhost:4000\/api\/v1/);
     assert.doesNotMatch(apiClient, /http:\/\/localhost:3000\/api\/v1/);
   });
 
-  it("implements the shared UI primitives named by the UI/UX plan", () => {
+  it('implements the shared UI primitives named by the UI/UX plan', () => {
     const requiredComponents = [
-      "action-menu",
-      "audit-info",
-      "confirm-dialog",
-      "data-table",
-      "empty-state",
-      "error-state",
-      "export-button",
-      "filter-bar",
-      "loading-state",
-      "locked-record-banner",
-      "money-display",
-      "module-locked-state",
-      "notification-badge",
-      "page-header",
-      "permission-denied",
-      "protected-file",
-      "report-toolbar",
-      "search-input",
-      "section-card",
-      "stat-card",
-      "status-badge",
-      "table-pagination",
-      "tabs",
-      "toast",
+      'action-menu',
+      'audit-info',
+      'confirm-dialog',
+      'data-table',
+      'empty-state',
+      'error-state',
+      'export-button',
+      'filter-bar',
+      'loading-state',
+      'locked-record-banner',
+      'money-display',
+      'module-locked-state',
+      'notification-badge',
+      'page-header',
+      'permission-denied',
+      'protected-file',
+      'report-toolbar',
+      'search-input',
+      'section-card',
+      'stat-card',
+      'status-badge',
+      'table-pagination',
+      'tabs',
+      'toast',
     ];
 
     for (const component of requiredComponents) {
@@ -109,54 +109,54 @@ describe("SchoolOS web production contracts", () => {
       );
     }
 
-    const statusBadge = read("components/ui/status-badge.tsx");
+    const statusBadge = read('components/ui/status-badge.tsx');
     for (const status of [
-      "ACTIVE",
-      "PENDING",
-      "DRAFT",
-      "PUBLISHED",
-      "LOCKED",
-      "PAID",
-      "PARTIAL",
-      "UNPAID",
-      "OVERDUE",
-      "ESCALATED",
+      'ACTIVE',
+      'PENDING',
+      'DRAFT',
+      'PUBLISHED',
+      'LOCKED',
+      'PAID',
+      'PARTIAL',
+      'UNPAID',
+      'OVERDUE',
+      'ESCALATED',
     ]) {
       assert.match(statusBadge, new RegExp(status));
     }
 
-    const moneyDisplay = read("components/ui/money-display.tsx");
+    const moneyDisplay = read('components/ui/money-display.tsx');
     assert.match(moneyDisplay, /currency:\s*'NPR'/);
 
-    const dataTable = read("components/ui/data-table.tsx");
+    const dataTable = read('components/ui/data-table.tsx');
     assert.match(dataTable, /isLoading/);
     assert.match(dataTable, /error/);
     assert.match(dataTable, /EmptyState/);
     assert.match(dataTable, /getRowKey/);
 
     const sharedPrimitives = readMany([
-      "components/ui/action-menu.tsx",
-      "components/ui/approval-timeline.tsx",
-      "components/ui/avatar.tsx",
-      "components/ui/badge.tsx",
-      "components/ui/button.tsx",
-      "components/ui/checkbox.tsx",
-      "components/ui/confirm-dialog.tsx",
-      "components/ui/dialog.tsx",
-      "components/ui/file-uploader.tsx",
-      "components/ui/filter-bar.tsx",
-      "components/ui/error-state.tsx",
-      "components/ui/input.tsx",
-      "components/ui/loading-state.tsx",
-      "components/ui/module-locked-state.tsx",
-      "components/ui/page-state.tsx",
-      "components/ui/protected-file.tsx",
-      "components/ui/qr-resolver.tsx",
-      "components/ui/search-input.tsx",
-      "components/ui/select.tsx",
-      "components/ui/stat-card.tsx",
-      "components/ui/status-badge.tsx",
-      "components/ui/textarea.tsx",
+      'components/ui/action-menu.tsx',
+      'components/ui/approval-timeline.tsx',
+      'components/ui/avatar.tsx',
+      'components/ui/badge.tsx',
+      'components/ui/button.tsx',
+      'components/ui/checkbox.tsx',
+      'components/ui/confirm-dialog.tsx',
+      'components/ui/dialog.tsx',
+      'components/ui/file-uploader.tsx',
+      'components/ui/filter-bar.tsx',
+      'components/ui/error-state.tsx',
+      'components/ui/input.tsx',
+      'components/ui/loading-state.tsx',
+      'components/ui/module-locked-state.tsx',
+      'components/ui/page-state.tsx',
+      'components/ui/protected-file.tsx',
+      'components/ui/qr-resolver.tsx',
+      'components/ui/search-input.tsx',
+      'components/ui/select.tsx',
+      'components/ui/stat-card.tsx',
+      'components/ui/status-badge.tsx',
+      'components/ui/textarea.tsx',
     ]);
 
     assert.match(sharedPrimitives, /Loader2/);
@@ -165,11 +165,11 @@ describe("SchoolOS web production contracts", () => {
     assert.match(sharedPrimitives, /openProtectedFile/);
     assert.match(sharedPrimitives, /downloadProtectedFile/);
     assert.match(
-      read("lib/api/client.ts"),
+      read('lib/api/client.ts'),
       /\/files\/\$\{encodeURIComponent\(fileAssetId\)\}\/preview/,
     );
     assert.match(
-      read("lib/api/client.ts"),
+      read('lib/api/client.ts'),
       /\/files\/\$\{encodeURIComponent\(fileAssetId\)\}\/download/,
     );
     assert.match(sharedPrimitives, /bg-\[var\(--primary\)\]/);
@@ -192,8 +192,8 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps operator feedback inside the app UI instead of browser-native prompts", () => {
-    const files = [...sourceFiles("app"), ...sourceFiles("components")];
+  it('keeps operator feedback inside the app UI instead of browser-native prompts', () => {
+    const files = [...sourceFiles('app'), ...sourceFiles('components')];
 
     for (const file of files) {
       assert.doesNotMatch(
@@ -204,8 +204,8 @@ describe("SchoolOS web production contracts", () => {
     }
   });
 
-  it("keeps the shared student selector tokenized for reused dashboard workflows", () => {
-    const selector = read("components/students/student-selector.tsx");
+  it('keeps the shared student selector tokenized for reused dashboard workflows', () => {
+    const selector = read('components/students/student-selector.tsx');
 
     assert.match(selector, /focus:border-\[var\(--primary\)\]/);
     assert.match(selector, /focus:ring-\[var\(--primary-soft\)\]/);
@@ -217,8 +217,8 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps homework creation controls on the shared design tokens", () => {
-    const form = read("components/homework/homework-create-form.tsx");
+  it('keeps homework creation controls on the shared design tokens', () => {
+    const form = read('components/homework/homework-create-form.tsx');
 
     assert.match(form, /text-\[var\(--primary\)\]/);
     assert.match(form, /focus:ring-\[var\(--primary-soft\)\]/);
@@ -249,7 +249,7 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps the homework workspace route-backed and real API backed", () => {
+  it('keeps the homework workspace route-backed and real API backed', () => {
     // Post-redesign (fuzzy-gliding-hopper.md), /dashboard/homework is a
     // standalone, single-route, 4-tab (Today/All Homework/Completion/
     // Templates) workspace decoupled from the timetable module — it no
@@ -257,9 +257,9 @@ describe("SchoolOS web production contracts", () => {
     // routes, and it has no on-page reminder-batch-history panel (P0 scope
     // cut; the reminder APIs still exist and remain reachable from the
     // homework detail page).
-    const page = read("app/dashboard/homework/page.tsx");
-    const academicsApi = read("lib/api/academics.ts");
-    const workloadRoute = read("app/dashboard/timetable/workload/page.tsx");
+    const page = read('app/dashboard/homework/page.tsx');
+    const academicsApi = read('lib/api/academics.ts');
+    const workloadRoute = read('app/dashboard/timetable/workload/page.tsx');
 
     assert.match(page, /ModuleHeader/);
     assert.match(page, /SummaryGrid/);
@@ -282,8 +282,8 @@ describe("SchoolOS web production contracts", () => {
     assert.doesNotMatch(page, /window\.open|signedUrl|objectKey|bucket/);
   });
 
-  it("keeps the staff self-service profile shell tokenized and API-backed", () => {
-    const staffDashboard = read("components/staff/staff-dashboard.tsx");
+  it('keeps the staff self-service profile shell tokenized and API-backed', () => {
+    const staffDashboard = read('components/staff/staff-dashboard.tsx');
 
     assert.match(staffDashboard, /api\s*\.getMyProfile/);
     assert.match(staffDashboard, /useSession/);
@@ -302,8 +302,8 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps the student profile panel tokenized and connected to real student context", () => {
-    const panel = read("components/forms/student-profile-panel.tsx");
+  it('keeps the student profile panel tokenized and connected to real student context', () => {
+    const panel = read('components/forms/student-profile-panel.tsx');
 
     assert.match(panel, /StudentProfilePanelProps/);
     assert.match(panel, /student:\s*StudentProfile/);
@@ -317,13 +317,16 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps dashboard module tabs lightweight and route-aware", () => {
-    const moduleTabs = read("components/dashboard/module-tabs.tsx");
+  it('keeps dashboard module tabs lightweight and route-aware', () => {
+    const moduleTabs = read('components/dashboard/module-tabs.tsx');
 
     assert.match(moduleTabs, /usePathname/);
     assert.match(moduleTabs, /pathname === item\.href/);
     assert.match(moduleTabs, /pathname\?\.startsWith\(`\$\{item\.href\}\/`\)/);
-    assert.match(moduleTabs, /typeof item\.count === 'number' && item\.count > 0/);
+    assert.match(
+      moduleTabs,
+      /typeof item\.count === 'number' && item\.count > 0/,
+    );
     assert.match(
       moduleTabs,
       /bg-\[var\(--mod-soft,var\(--primary-soft\)\)\] text-\[color:var\(--mod-text,var\(--primary-dark\)\)\] shadow-sm/,
@@ -334,23 +337,23 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps Phase 1 and Phase 2 admin dashboard routes present", () => {
+  it('keeps Phase 1 and Phase 2 admin dashboard routes present', () => {
     const requiredRoutes = [
-      "admissions",
-      "attendance",
-      "fees",
-      "finance",
-      "activity",
-      "notices",
-      "academics",
-      "timetable",
-      "homework",
-      "hr",
-      "payroll",
-      "accounting",
-      "messaging",
-      "messages",
-      "settings",
+      'admissions',
+      'attendance',
+      'fees',
+      'finance',
+      'activity',
+      'notices',
+      'academics',
+      'timetable',
+      'homework',
+      'hr',
+      'payroll',
+      'accounting',
+      'messaging',
+      'messages',
+      'settings',
     ];
 
     for (const route of requiredRoutes) {
@@ -362,9 +365,9 @@ describe("SchoolOS web production contracts", () => {
     }
   });
 
-  it("keeps W4 operational routes behind matching module entitlement gates", () => {
-    const dashboardLayout = read("app/dashboard/layout.tsx");
-    const sidebar = read("components/layout/sidebar.tsx");
+  it('keeps W4 operational routes behind matching module entitlement gates', () => {
+    const dashboardLayout = read('app/dashboard/layout.tsx');
+    const sidebar = read('components/layout/sidebar.tsx');
 
     for (const source of [dashboardLayout, sidebar]) {
       assert.match(
@@ -394,104 +397,104 @@ describe("SchoolOS web production contracts", () => {
     }
   });
 
-  it("exposes client helpers for canonical Phase 1 and Phase 2 workflows", () => {
+  it('exposes client helpers for canonical Phase 1 and Phase 2 workflows', () => {
     const apiClient = readMany([
-      "lib/api/client.ts",
-      "lib/api/auth.ts",
-      "lib/api/academics.ts",
-      "lib/api/students.ts",
-      "lib/api/attendance.ts",
-      "lib/api/finance.ts",
-      "lib/api/accounting.ts",
-      "lib/api/payroll.ts",
-      "lib/api/communications.ts",
-      "lib/api/messaging.ts",
-      "lib/api/activity.ts",
-      "lib/api/platform.ts",
+      'lib/api/client.ts',
+      'lib/api/auth.ts',
+      'lib/api/academics.ts',
+      'lib/api/students.ts',
+      'lib/api/attendance.ts',
+      'lib/api/finance.ts',
+      'lib/api/accounting.ts',
+      'lib/api/payroll.ts',
+      'lib/api/communications.ts',
+      'lib/api/messaging.ts',
+      'lib/api/activity.ts',
+      'lib/api/platform.ts',
     ]);
     const requiredHelpers = [
-      "checkAdmissionDuplicates",
-      "bulkImportAdmissions",
-      "openStudentDocumentPdf",
-      "getStudentProfile",
-      "getInvoiceDetail",
-      "getStudentFeeLedger",
-      "refundPayment",
-      "previewCashierClose",
-      "listCashierCloses",
-      "finalizeCashierClose",
-      "getAttendanceRoster",
-      "syncAttendance",
-      "reviewAttendanceConflict",
-      "sendDefaulterReminders",
-      "openReceiptPdf",
-      "listLedgerEntries",
-      "createActivityReaction",
-      "createDevelopmentalMilestone",
-      "getGuardianConsentStatus",
-      "createSubject",
-      "createExamTerm",
-      "enterMark",
-      "generateReportCard",
-      "createTimetableSlot",
-      "listTimetablePeriods",
-      "createTimetablePeriod",
-      "listRooms",
-      "createRoom",
-      "listTimetableVersions",
-      "createTimetableVersion",
-      "validateTimetableVersion",
-      "publishTimetableVersion",
-      "lockTimetableVersion",
-      "archiveTimetableVersion",
-      "listTeacherAvailability",
-      "createTeacherAvailability",
-      "listSubstitutions",
-      "createSubstitution",
-      "assignSubstitution",
-      "createHomework",
-      "publishHomework",
-      "assignHomework",
-      "listHomeworkTemplates",
-      "closeHomework",
-      "previewHomeworkReminders",
-      "sendHomeworkReminders",
-      "listHomeworkReminderBatches",
-      "retryHomeworkReminderBatch",
-      "getHomeworkCompletionReport",
-      "getHomeworkMissingLateReport",
-      "getHomeworkAttachmentPreviewUrl",
-      "getHomeworkAttachmentDownloadUrl",
-      "openHomeworkAttachmentPreview",
-      "openHomeworkAttachmentDownload",
-      "listHomeworkAssignmentSubmissions",
-      "reviewHomeworkSubmissionById",
-      "requestHomeworkCorrection",
-      "reviewHomeworkSubmission",
-      "createStaffContract",
-      "createPayrollRun",
-      "postPayrollRun",
-      "getPayrollPreview",
-      "listAccountingReports",
-      "createConversation",
-      "createMessage",
-      "markMessageRead",
-      "listStaffHistory",
-      "listStaffAttendanceSummary",
-      "listLeaveRequests",
-      "approveLeaveRequest",
-      "rejectLeaveRequest",
-      "listStaffLeaveBalances",
-      "listPlatformTenants",
-      "getPlatformTenantDetail",
-      "updatePlatformTenantStatus",
-      "getTenantSettings",
-      "getPublicTenantSettings",
-      "updateTenantSetting",
-      "uploadSchoolLogo",
-      "getSchoolLogoPreview",
-      "getSchoolLogoDownload",
-      "removeSchoolLogo",
+      'checkAdmissionDuplicates',
+      'bulkImportAdmissions',
+      'openStudentDocumentPdf',
+      'getStudentProfile',
+      'getInvoiceDetail',
+      'getStudentFeeLedger',
+      'refundPayment',
+      'previewCashierClose',
+      'listCashierCloses',
+      'finalizeCashierClose',
+      'getAttendanceRoster',
+      'syncAttendance',
+      'reviewAttendanceConflict',
+      'sendDefaulterReminders',
+      'openReceiptPdf',
+      'listLedgerEntries',
+      'createActivityReaction',
+      'createDevelopmentalMilestone',
+      'getGuardianConsentStatus',
+      'createSubject',
+      'createExamTerm',
+      'enterMark',
+      'generateReportCard',
+      'createTimetableSlot',
+      'listTimetablePeriods',
+      'createTimetablePeriod',
+      'listRooms',
+      'createRoom',
+      'listTimetableVersions',
+      'createTimetableVersion',
+      'validateTimetableVersion',
+      'publishTimetableVersion',
+      'lockTimetableVersion',
+      'archiveTimetableVersion',
+      'listTeacherAvailability',
+      'createTeacherAvailability',
+      'listSubstitutions',
+      'createSubstitution',
+      'assignSubstitution',
+      'createHomework',
+      'publishHomework',
+      'assignHomework',
+      'listHomeworkTemplates',
+      'closeHomework',
+      'previewHomeworkReminders',
+      'sendHomeworkReminders',
+      'listHomeworkReminderBatches',
+      'retryHomeworkReminderBatch',
+      'getHomeworkCompletionReport',
+      'getHomeworkMissingLateReport',
+      'getHomeworkAttachmentPreviewUrl',
+      'getHomeworkAttachmentDownloadUrl',
+      'openHomeworkAttachmentPreview',
+      'openHomeworkAttachmentDownload',
+      'listHomeworkAssignmentSubmissions',
+      'reviewHomeworkSubmissionById',
+      'requestHomeworkCorrection',
+      'reviewHomeworkSubmission',
+      'createStaffContract',
+      'createPayrollRun',
+      'postPayrollRun',
+      'getPayrollPreview',
+      'listAccountingReports',
+      'createConversation',
+      'createMessage',
+      'markMessageRead',
+      'listStaffHistory',
+      'listStaffAttendanceSummary',
+      'listLeaveRequests',
+      'approveLeaveRequest',
+      'rejectLeaveRequest',
+      'listStaffLeaveBalances',
+      'listPlatformTenants',
+      'getPlatformTenantDetail',
+      'updatePlatformTenantStatus',
+      'getTenantSettings',
+      'getPublicTenantSettings',
+      'updateTenantSetting',
+      'uploadSchoolLogo',
+      'getSchoolLogoPreview',
+      'getSchoolLogoDownload',
+      'removeSchoolLogo',
     ];
 
     for (const helper of requiredHelpers) {
@@ -503,7 +506,7 @@ describe("SchoolOS web production contracts", () => {
     }
   });
 
-  it("exposes Phase 2B homework and timetable workflow controls without fake production data", () => {
+  it('exposes Phase 2B homework and timetable workflow controls without fake production data', () => {
     // As of the M6 homework redesign (see fuzzy-gliding-hopper.md), the
     // teacher-facing homework list/detail/grading UI that used to live inside
     // the timetable component tree (components/timetable/tabs/homework-tab.tsx,
@@ -512,34 +515,34 @@ describe("SchoolOS web production contracts", () => {
     // below were repointed at the surviving/introduced files rather than the
     // deleted ones.
     const timetableBuilder = read(
-      "components/timetable/tabs/timetable-builder-tab.tsx",
+      'components/timetable/tabs/timetable-builder-tab.tsx',
     );
-    const homeworkPage = read("app/dashboard/homework/page.tsx");
+    const homeworkPage = read('app/dashboard/homework/page.tsx');
     const homeworkCreateForm = read(
-      "components/homework/homework-create-form.tsx",
+      'components/homework/homework-create-form.tsx',
     );
     const homeworkDetailPage = read(
-      "components/homework/homework-detail-page.tsx",
+      'components/homework/homework-detail-page.tsx',
     );
     const homeworkReviewModal = read(
-      "components/homework/homework-review-modal.tsx",
+      'components/homework/homework-review-modal.tsx',
     );
     const teacherWorkloadTab = read(
-      "components/timetable/tabs/teacher-workload-tab.tsx",
+      'components/timetable/tabs/teacher-workload-tab.tsx',
     );
     const weeklyRequirementsList = read(
-      "components/timetable/weekly-requirements-list.tsx",
+      'components/timetable/weekly-requirements-list.tsx',
     );
     const activitySurfaces = readMany(activitySurfaceFiles);
 
     for (const label of [
-      "Periods",
-      "Rooms",
-      "Validate",
-      "Publish",
-      "Lock",
-      "Archive",
-      "Substitution Management",
+      'Periods',
+      'Rooms',
+      'Validate',
+      'Publish',
+      'Lock',
+      'Archive',
+      'Substitution Management',
     ]) {
       assert.match(timetableBuilder, new RegExp(label));
     }
@@ -595,8 +598,8 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps timetable dashboard summary cards backend-backed", () => {
-    const timetablePage = read("app/dashboard/timetable/page.tsx");
+  it('keeps timetable dashboard summary cards backend-backed', () => {
+    const timetablePage = read('app/dashboard/timetable/page.tsx');
 
     assert.match(timetablePage, /validateTimetableVersion/);
     assert.match(timetablePage, /listSubstitutions/);
@@ -617,58 +620,58 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("uses in-app feedback for timetable, report export, and accounting safety actions", () => {
+  it('uses in-app feedback for timetable, report export, and accounting safety actions', () => {
     const polishedSurfaces = readMany([
-      "components/timetable/versions-list.tsx",
-      "components/timetable/substitutions-list.tsx",
-      "app/dashboard/reports/page.tsx",
-      "components/accounting/accounting-dashboard-view.tsx",
-      "components/accounting/chart-of-accounts-view.tsx",
-      "components/accounting/journal-entries-view.tsx",
-      "components/accounting/journal-detail-dialog.tsx",
+      'components/timetable/versions-list.tsx',
+      'components/timetable/substitutions-list.tsx',
+      'app/dashboard/reports/page.tsx',
+      'components/accounting/accounting-dashboard-view.tsx',
+      'components/accounting/chart-of-accounts-view.tsx',
+      'components/accounting/journal-entries-view.tsx',
+      'components/accounting/journal-detail-dialog.tsx',
     ]);
     const accountingTokenSurfaces = readMany([
-      "components/accounting/accounting-dashboard-view.tsx",
-      "components/accounting/accounting-reports-view.tsx",
-      "components/accounting/bank-reconciliation-workspace.tsx",
-      "components/accounting/chart-of-accounts-view.tsx",
-      "components/accounting/fiscal-management-view.tsx",
-      "components/accounting/fiscal-year-close-dialog.tsx",
-      "components/accounting/journal-detail-dialog.tsx",
-      "components/accounting/journal-entry-dialog.tsx",
-      "components/accounting/journal-entries-view.tsx",
-      "components/accounting/opening-balance-dialog.tsx",
-      "components/accounting/report-table.tsx",
-      "components/accounting/voucher-dialog.tsx",
+      'components/accounting/accounting-dashboard-view.tsx',
+      'components/accounting/accounting-reports-view.tsx',
+      'components/accounting/bank-reconciliation-workspace.tsx',
+      'components/accounting/chart-of-accounts-view.tsx',
+      'components/accounting/fiscal-management-view.tsx',
+      'components/accounting/fiscal-year-close-dialog.tsx',
+      'components/accounting/journal-detail-dialog.tsx',
+      'components/accounting/journal-entry-dialog.tsx',
+      'components/accounting/journal-entries-view.tsx',
+      'components/accounting/opening-balance-dialog.tsx',
+      'components/accounting/report-table.tsx',
+      'components/accounting/voucher-dialog.tsx',
     ]);
     const accountingAuditSurface = read(
-      "components/accounting/accounting-audit-workspace.tsx",
+      'components/accounting/accounting-audit-workspace.tsx',
     );
 
     for (const marker of [
-      "Toast",
-      "Version published",
-      "Export ready",
-      "Record Absence",
-      "timetable-substitution-slots",
-      "api.listTimetable",
+      'Toast',
+      'Version published',
+      'Export ready',
+      'Record Absence',
+      'timetable-substitution-slots',
+      'api.listTimetable',
       'mode={selectedSub ? "assign" : "create"}',
-      "Select a class before recording an absence",
-      "Seed default chart accounts?",
-      "Cancel substitution?",
-      "Open fiscal year required",
-      "Active fiscal period required",
-      "Posting failed",
-      "Reversal failed",
-      "Correction failed",
-      "accounting-source-drilldown",
-      "buildSourceDrilldown",
-      "Open source record",
-      "Source route unavailable",
-      "/dashboard/fees/collect?invoiceId=",
-      "/dashboard/canteen/pos?saleId=",
-      "/dashboard/library?fineId=",
-      "/dashboard/hr/payroll?runId=",
+      'Select a class before recording an absence',
+      'Seed default chart accounts?',
+      'Cancel substitution?',
+      'Open fiscal year required',
+      'Active fiscal period required',
+      'Posting failed',
+      'Reversal failed',
+      'Correction failed',
+      'accounting-source-drilldown',
+      'buildSourceDrilldown',
+      'Open source record',
+      'Source route unavailable',
+      '/dashboard/fees/collect?invoiceId=',
+      '/dashboard/canteen/pos?saleId=',
+      '/dashboard/library?fineId=',
+      '/dashboard/hr/payroll?runId=',
     ]) {
       assert.ok(polishedSurfaces.includes(marker), `Missing marker: ${marker}`);
     }
@@ -686,9 +689,9 @@ describe("SchoolOS web production contracts", () => {
     assert.match(accountingAuditSurface, /Tenant scope not recorded/);
   });
 
-  it("keeps report export retry wired through the backend snapshot route", () => {
-    const reportsPage = read("app/dashboard/reports/page.tsx");
-    const financeApi = read("lib/api/finance.ts");
+  it('keeps report export retry wired through the backend snapshot route', () => {
+    const reportsPage = read('app/dashboard/reports/page.tsx');
+    const financeApi = read('lib/api/finance.ts');
 
     assert.match(financeApi, /retryReportSnapshot/);
     assert.match(
@@ -698,13 +701,13 @@ describe("SchoolOS web production contracts", () => {
     assert.match(financeApi, /method:\s*["']POST["']/);
 
     for (const marker of [
-      "handleRetrySnapshot",
-      "api.retryReportSnapshot(snapshot.id)",
-      "retryingSnapshotId",
-      "Export retry queued",
-      "Retry failed",
-      "canRetrySnapshot",
-      "Retry",
+      'handleRetrySnapshot',
+      'api.retryReportSnapshot(snapshot.id)',
+      'retryingSnapshotId',
+      'Export retry queued',
+      'Retry failed',
+      'canRetrySnapshot',
+      'Retry',
     ]) {
       assert.ok(reportsPage.includes(marker), `Missing marker: ${marker}`);
     }
@@ -717,8 +720,8 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps platform administration routes present and secure", () => {
-    const platformRoutes = ["dashboard", "schools", "demo-requests"];
+  it('keeps platform administration routes present and secure', () => {
+    const platformRoutes = ['dashboard', 'schools', 'demo-requests'];
 
     for (const route of platformRoutes) {
       assert.equal(
@@ -728,7 +731,7 @@ describe("SchoolOS web production contracts", () => {
       );
     }
 
-    const layout = read("app/platform/layout.tsx");
+    const layout = read('app/platform/layout.tsx');
     assert.match(
       layout,
       /platform_super_admin|platform_support|platform_billing_admin/,
@@ -736,11 +739,11 @@ describe("SchoolOS web production contracts", () => {
     assert.match(layout, /router\.push\(['"]\/dashboard['"]\)/);
   });
 
-  it("does not keep raw demo replacement IDs in production-facing forms", () => {
+  it('does not keep raw demo replacement IDs in production-facing forms', () => {
     const formFiles = [
-      "components/forms/attendance-form.tsx",
-      "app/dashboard/activity/new/page.tsx",
-      "components/forms/communications-form.tsx",
+      'components/forms/attendance-form.tsx',
+      'app/dashboard/activity/new/page.tsx',
+      'components/forms/communications-form.tsx',
     ];
 
     for (const formFile of formFiles) {
@@ -752,14 +755,14 @@ describe("SchoolOS web production contracts", () => {
     }
   });
 
-  it("centralizes browser session storage access in lib/session", () => {
-    const files = sourceFiles(".");
+  it('centralizes browser session storage access in lib/session', () => {
+    const files = sourceFiles('.');
 
     for (const file of files) {
       if (
-        file === "lib/session.ts" ||
-        file.startsWith("test/") ||
-        file.startsWith("e2e/")
+        file === 'lib/session.ts' ||
+        file.startsWith('test/') ||
+        file.startsWith('e2e/')
       ) {
         continue;
       }
@@ -772,20 +775,20 @@ describe("SchoolOS web production contracts", () => {
     }
   });
 
-  it("stores only metadata in browser session state", () => {
-    const sessionModule = read("lib/session.ts");
+  it('stores only metadata in browser session state', () => {
+    const sessionModule = read('lib/session.ts');
 
     assert.match(sessionModule, /Omit<AuthSession, ["']accessToken["']>/);
     assert.match(sessionModule, /toBrowserSession/);
     assert.doesNotMatch(
       sessionModule,
       /JSON\.stringify\(session\)/,
-      "raw AuthSession must not be persisted",
+      'raw AuthSession must not be persisted',
     );
   });
 
-  it("parses API JSON error messages before surfacing them to forms", () => {
-    const apiClient = read("lib/api/client.ts");
+  it('parses API JSON error messages before surfacing them to forms', () => {
+    const apiClient = read('lib/api/client.ts');
 
     assert.match(apiClient, /parseApiErrorMessage/);
     assert.match(apiClient, /JSON\.parse\(text\)/);
@@ -796,10 +799,10 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("submits public demo requests through the backend API instead of a local placeholder flow", () => {
-    const requestDemoForm = read("components/forms/request-demo-form.tsx");
-    const marketingApi = read("lib/api/marketing.ts");
-    const apiIndex = read("lib/api.ts");
+  it('submits public demo requests through the backend API instead of a local placeholder flow', () => {
+    const requestDemoForm = read('components/forms/request-demo-form.tsx');
+    const marketingApi = read('lib/api/marketing.ts');
+    const apiIndex = read('lib/api.ts');
 
     assert.match(requestDemoForm, /api\.submitDemoRequest/);
     assert.match(requestDemoForm, /Demo request submitted\./);
@@ -816,10 +819,10 @@ describe("SchoolOS web production contracts", () => {
     assert.match(apiIndex, /marketingApi/);
   });
 
-  it("exposes platform demo request review APIs and operator workspace", () => {
-    const platformApi = read("lib/api/platform.ts");
-    const demoRequestsPage = read("app/platform/demo-requests/page.tsx");
-    const platformShell = read("components/layout/platform-shell.tsx");
+  it('exposes platform demo request review APIs and operator workspace', () => {
+    const platformApi = read('lib/api/platform.ts');
+    const demoRequestsPage = read('app/platform/demo-requests/page.tsx');
+    const platformShell = read('components/layout/platform-shell.tsx');
 
     assert.match(platformApi, /listPlatformDemoRequests/);
     assert.match(platformApi, /getPlatformDemoRequest/);
@@ -833,24 +836,24 @@ describe("SchoolOS web production contracts", () => {
     assert.match(platformShell, /platform:demo-requests:read/);
   });
 
-  it("keeps the login entry page tokenized and security focused", () => {
-    const loginPage = read("app/login/page.tsx");
-    const loginForm = read("components/forms/login-form.tsx");
+  it('keeps the login entry page tokenized and security focused', () => {
+    const loginPage = read('app/login/page.tsx');
+    const loginForm = read('components/forms/login-form.tsx');
 
     for (const expected of [
-      "LoginForm",
-      "Staff & Admin Portal",
-      "secure cookies",
-      "school-level data isolation",
-      "LockKeyhole",
-      "ShieldCheck",
-      "ClipboardCheck",
-      "bg-[var(--primary)]",
-      "text-[var(--primary)]",
+      'LoginForm',
+      'Staff & Admin Portal',
+      'secure cookies',
+      'school-level data isolation',
+      'LockKeyhole',
+      'ShieldCheck',
+      'ClipboardCheck',
+      'bg-[var(--primary)]',
+      'text-[var(--primary)]',
     ]) {
       assert.match(
         loginPage,
-        new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+        new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
       );
     }
 
@@ -861,32 +864,32 @@ describe("SchoolOS web production contracts", () => {
     assert.match(loginForm, /method="post"/);
   });
 
-  it("uses cookie credentials instead of bearer tokens for browser API calls", () => {
-    const apiClient = read("lib/api/client.ts");
+  it('uses cookie credentials instead of bearer tokens for browser API calls', () => {
+    const apiClient = read('lib/api/client.ts');
 
     assert.match(apiClient, /credentials:\s*["']include["']/);
     assert.doesNotMatch(apiClient, /Authorization:\s*`Bearer/);
     assert.doesNotMatch(apiClient, /getAccessToken/);
   });
 
-  it("uses secure browser randomness for API request IDs", () => {
-    const apiClient = read("lib/api/client.ts");
+  it('uses secure browser randomness for API request IDs', () => {
+    const apiClient = read('lib/api/client.ts');
 
     assert.match(apiClient, /crypto\?\.randomUUID/);
     assert.match(apiClient, /crypto\?\.getRandomValues/);
     assert.doesNotMatch(apiClient, /Math\.random/);
   });
 
-  it("keeps Phase 1 pilot navigation permission-gated and prominent", () => {
-    const sidebar = read("components/layout/sidebar.tsx");
+  it('keeps Phase 1 pilot navigation permission-gated and prominent', () => {
+    const sidebar = read('components/layout/sidebar.tsx');
     const requiredPhaseOneLabels = [
-      "Students",
-      "Admissions",
-      "Attendance",
-      "Fees",
-      "Activity Feed",
-      "Notices",
-      "Settings",
+      'Students',
+      'Admissions',
+      'Attendance',
+      'Fees',
+      'Activity Feed',
+      'Notices',
+      'Settings',
     ];
 
     assert.match(sidebar, /export const dashboardNavGroups/);
@@ -896,7 +899,7 @@ describe("SchoolOS web production contracts", () => {
     assert.match(sidebar, /aria-label="School operations navigation"/);
 
     for (const label of requiredPhaseOneLabels) {
-      assert.match(sidebar, new RegExp(label.replace("/", "\\/")));
+      assert.match(sidebar, new RegExp(label.replace('/', '\\/')));
     }
 
     assert.match(sidebar, /href: '\/dashboard\/activity'/);
@@ -916,42 +919,42 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("guards direct dashboard module URLs with role permissions", () => {
-    const layout = read("app/dashboard/layout.tsx");
+  it('guards direct dashboard module URLs with role permissions', () => {
+    const layout = read('app/dashboard/layout.tsx');
     const requiredRoutes = [
-      "/dashboard/students",
-      "/dashboard/admissions",
-      "/dashboard/attendance",
-      "/dashboard/fees",
-      "/dashboard/activity",
-      "/dashboard/notices",
-      "/dashboard/academics",
-      "/dashboard/homework",
-      "/dashboard/timetable",
-      "/dashboard/hr",
-      "/dashboard/payroll",
-      "/dashboard/accounting",
-      "/dashboard/library",
-      "/dashboard/transport",
-      "/dashboard/canteen",
-      "/dashboard/settings",
+      '/dashboard/students',
+      '/dashboard/admissions',
+      '/dashboard/attendance',
+      '/dashboard/fees',
+      '/dashboard/activity',
+      '/dashboard/notices',
+      '/dashboard/academics',
+      '/dashboard/homework',
+      '/dashboard/timetable',
+      '/dashboard/hr',
+      '/dashboard/payroll',
+      '/dashboard/accounting',
+      '/dashboard/library',
+      '/dashboard/transport',
+      '/dashboard/canteen',
     ];
 
     assert.match(layout, /const dashboardRouteGates/);
+    assert.match(layout, /const settingsRouteGates/);
     assert.match(layout, /getRouteGateForHref/);
-    assert.match(layout, /hasAnyPermission\(session\.user\.permissions/);
+    assert.match(layout, /hasRoutePermission\(session\.user\.permissions/);
     assert.match(layout, /<PermissionDenied/);
 
     for (const route of requiredRoutes) {
       assert.match(
         layout,
-        new RegExp(`prefix: ['"]${route.replaceAll("/", "\\/")}['"]`),
+        new RegExp(`prefix: ['"]${route.replaceAll('/', '\\/')}['"]`),
       );
     }
   });
 
-  it("offers slow session recovery in the dashboard layout", () => {
-    const layout = read("app/dashboard/layout.tsx");
+  it('offers slow session recovery in the dashboard layout', () => {
+    const layout = read('app/dashboard/layout.tsx');
 
     assert.match(layout, /showSlowSessionHelp/);
     assert.match(layout, /setTimeout\(\(\) =>/);
@@ -960,9 +963,9 @@ describe("SchoolOS web production contracts", () => {
     assert.match(layout, /Sign in again/);
   });
 
-  it("uses authenticated session metadata and real shell APIs in the header", () => {
-    const header = read("components/layout/header.tsx");
-    const bell = read("components/layout/notification-bell.tsx");
+  it('uses authenticated session metadata and real shell APIs in the header', () => {
+    const header = read('components/layout/header.tsx');
+    const bell = read('components/layout/notification-bell.tsx');
 
     assert.match(
       header,
@@ -984,18 +987,18 @@ describe("SchoolOS web production contracts", () => {
     assert.doesNotMatch(header, /2081-82|2080-81|2079-80/);
   });
 
-  it("builds the admin dashboard from a backend-owned operational summary without fake KPI numbers", () => {
+  it('builds the admin dashboard from a backend-owned operational summary without fake KPI numbers', () => {
     const dashboard = readMany([
-      "app/dashboard/page.tsx",
-      "components/dashboard/dashboard-command-center.tsx",
-      "components/dashboard/dashboard-module-meta.tsx",
-      "components/dashboard/dashboard-summary-strip.tsx",
-      "components/dashboard/dashboard-attention-panel.tsx",
-      "components/dashboard/dashboard-operations-panel.tsx",
-      "components/dashboard/dashboard-readiness-section.tsx",
-      "components/dashboard/dashboard-activity-panel.tsx",
-      "components/ui/operational-summary.tsx",
-      "lib/api/operational-summary.ts",
+      'app/dashboard/page.tsx',
+      'components/dashboard/dashboard-command-center.tsx',
+      'components/dashboard/dashboard-module-meta.tsx',
+      'components/dashboard/dashboard-summary-strip.tsx',
+      'components/dashboard/dashboard-attention-panel.tsx',
+      'components/dashboard/dashboard-operations-panel.tsx',
+      'components/dashboard/dashboard-readiness-section.tsx',
+      'components/dashboard/dashboard-activity-panel.tsx',
+      'components/ui/operational-summary.tsx',
+      'lib/api/operational-summary.ts',
     ]);
 
     assert.match(dashboard, /api\.getDashboardSummary/);
@@ -1016,31 +1019,31 @@ describe("SchoolOS web production contracts", () => {
     assert.doesNotMatch(dashboard, /Phase 2 Academic Cycle/);
   });
 
-  it("keeps the dashboard shell polished and routes fee alerts to the canonical fees page", () => {
+  it('keeps the dashboard shell polished and routes fee alerts to the canonical fees page', () => {
     const dashboard = readMany([
-      "app/dashboard/page.tsx",
-      "components/dashboard/dashboard-command-center.tsx",
-      "components/dashboard/dashboard-module-meta.tsx",
-      "components/dashboard/dashboard-summary-strip.tsx",
-      "components/dashboard/dashboard-attention-panel.tsx",
-      "components/dashboard/dashboard-operations-panel.tsx",
-      "components/dashboard/dashboard-readiness-section.tsx",
-      "components/dashboard/dashboard-activity-panel.tsx",
-      "components/ui/operational-summary.tsx",
+      'app/dashboard/page.tsx',
+      'components/dashboard/dashboard-command-center.tsx',
+      'components/dashboard/dashboard-module-meta.tsx',
+      'components/dashboard/dashboard-summary-strip.tsx',
+      'components/dashboard/dashboard-attention-panel.tsx',
+      'components/dashboard/dashboard-operations-panel.tsx',
+      'components/dashboard/dashboard-readiness-section.tsx',
+      'components/dashboard/dashboard-activity-panel.tsx',
+      'components/ui/operational-summary.tsx',
     ]);
-    const shell = read("components/layout/dashboard-shell.tsx");
-    const globals = read("app/globals.css");
+    const shell = read('components/layout/dashboard-shell.tsx');
+    const globals = read('app/globals.css');
     const layoutBasics = readMany([
-      "components/layout/dashboard-shell.tsx",
-      "components/layout/global-student-search.tsx",
-      "components/layout/header.tsx",
-      "components/layout/notification-bell.tsx",
-      "components/layout/platform-shell.tsx",
-      "components/layout/sidebar.tsx",
-      "components/layout/upgrade-prompt.tsx",
+      'components/layout/dashboard-shell.tsx',
+      'components/layout/global-student-search.tsx',
+      'components/layout/header.tsx',
+      'components/layout/notification-bell.tsx',
+      'components/layout/platform-shell.tsx',
+      'components/layout/sidebar.tsx',
+      'components/layout/upgrade-prompt.tsx',
     ]);
     const dashboardPrimitives = readMany([
-      "components/dashboard/filter-bar.tsx",
+      'components/dashboard/filter-bar.tsx',
     ]);
 
     assert.match(shell, /Skip to workspace/);
@@ -1083,19 +1086,19 @@ describe("SchoolOS web production contracts", () => {
     assert.doesNotMatch(globals, /rgba\(99, 102, 241/);
   });
 
-  it("keeps admin dashboard quick actions on existing Phase 1 routes", () => {
+  it('keeps admin dashboard quick actions on existing Phase 1 routes', () => {
     const dashboard = readMany([
-      "app/dashboard/page.tsx",
-      "components/dashboard/dashboard-command-center.tsx",
-      "components/ui/operational-summary.tsx",
+      'app/dashboard/page.tsx',
+      'components/dashboard/dashboard-command-center.tsx',
+      'components/ui/operational-summary.tsx',
     ]);
     const requiredRoutes = [
-      "/dashboard/admissions",
-      "/dashboard/attendance",
-      "/dashboard/fees",
-      "/dashboard/activity",
-      "/dashboard/notices",
-      "/dashboard/settings",
+      '/dashboard/admissions',
+      '/dashboard/attendance',
+      '/dashboard/fees',
+      '/dashboard/activity',
+      '/dashboard/notices',
+      '/dashboard/settings',
     ];
 
     for (const route of requiredRoutes) {
@@ -1103,11 +1106,11 @@ describe("SchoolOS web production contracts", () => {
     }
   });
 
-  it("handles dashboard setup and empty-data states explicitly", () => {
+  it('handles dashboard setup and empty-data states explicitly', () => {
     const dashboard = readMany([
-      "app/dashboard/page.tsx", // keeps the `?? []` guard on summary fields
-      "components/dashboard/dashboard-operations-panel.tsx",
-      "components/dashboard/dashboard-activity-panel.tsx",
+      'app/dashboard/page.tsx', // keeps the `?? []` guard on summary fields
+      'components/dashboard/dashboard-operations-panel.tsx',
+      'components/dashboard/dashboard-activity-panel.tsx',
     ]);
 
     assert.match(
@@ -1118,8 +1121,8 @@ describe("SchoolOS web production contracts", () => {
     assert.match(dashboard, /\?\? \[\]/);
   });
 
-  it("keeps guardian phone validation required in the admissions schema", () => {
-    const coreValidation = read("../../packages/core/src/validation.ts");
+  it('keeps guardian phone validation required in the admissions schema', () => {
+    const coreValidation = read('../../packages/core/src/validation.ts');
 
     assert.match(
       coreValidation,
@@ -1128,8 +1131,8 @@ describe("SchoolOS web production contracts", () => {
     assert.match(coreValidation, /primaryPhone: nepalPhoneSchema/);
   });
 
-  it("requires iEMIS disability confirmation in the admissions schema", () => {
-    const coreValidation = read("../../packages/core/src/validation.ts");
+  it('requires iEMIS disability confirmation in the admissions schema', () => {
+    const coreValidation = read('../../packages/core/src/validation.ts');
 
     assert.match(coreValidation, /confirmNoDisability/);
     assert.match(
@@ -1138,8 +1141,8 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps a student directory workspace with core search filters", () => {
-    const directory = read("components/forms/student-directory.tsx");
+  it('keeps a student directory workspace with core search filters', () => {
+    const directory = read('components/forms/student-directory.tsx');
 
     assert.match(directory, /Academic Year/);
     assert.match(directory, /Class/);
@@ -1148,10 +1151,10 @@ describe("SchoolOS web production contracts", () => {
     assert.match(directory, /Name, student ID, guardian, or phone/);
   });
 
-  it("keeps admissions workspace aligned to M1 UI tokens without fake labels", () => {
+  it('keeps admissions workspace aligned to M1 UI tokens without fake labels', () => {
     const admissionsWorkspace = readMany([
-      "components/admissions/admissions-pipeline.tsx",
-      "app/dashboard/admissions/page.tsx",
+      'components/admissions/admissions-pipeline.tsx',
+      'app/dashboard/admissions/page.tsx',
     ]);
 
     assert.match(admissionsWorkspace, /color-mod-admissions-accent/);
@@ -1165,18 +1168,21 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps the student directory on M1 tokens with real linked actions", () => {
+  it('keeps the student directory on M1 tokens with real linked actions', () => {
     const studentDirectory = readMany([
-      "lib/api/students.ts",
-      "components/forms/student-directory.tsx",
-      "app/dashboard/students/page.tsx",
+      'lib/api/students.ts',
+      'components/forms/student-directory.tsx',
+      'app/dashboard/students/page.tsx',
     ]);
 
     assert.match(studentDirectory, /color-mod-admissions-accent/);
     assert.match(studentDirectory, /\/students\/summary/);
     assert.match(studentDirectory, /Student Roster/);
     assert.match(studentDirectory, /Possible matching student records/);
-    assert.doesNotMatch(studentDirectory, /Readiness & duplicate attention panels/);
+    assert.doesNotMatch(
+      studentDirectory,
+      /Readiness & duplicate attention panels/,
+    );
     assert.match(studentDirectory, /onOpenPdf\(student\.id, 'id-card'\)/);
     assert.match(studentDirectory, /\/dashboard\/fees\/collect\?studentId=/);
     assert.match(
@@ -1189,11 +1195,11 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps student profile header and overview aligned to M1 tokens", () => {
+  it('keeps student profile header and overview aligned to M1 tokens', () => {
     const studentProfileEntry = readMany([
-      "components/students/student-detail-page.tsx",
-      "components/students/profile/profile-header.tsx",
-      "components/students/profile/tabs/overview-tab.tsx",
+      'components/students/student-detail-page.tsx',
+      'components/students/profile/profile-header.tsx',
+      'components/students/profile/tabs/overview-tab.tsx',
     ]);
 
     assert.match(studentProfileEntry, /color-mod-admissions-accent/);
@@ -1224,9 +1230,9 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps student QR identity controls tokenized and API-backed", () => {
+  it('keeps student QR identity controls tokenized and API-backed', () => {
     const studentQrCard = read(
-      "components/students/profile/student-qr-card.tsx",
+      'components/students/profile/student-qr-card.tsx',
     );
 
     assert.match(studentQrCard, /api\.generateStudentQr\(studentId\)/);
@@ -1258,10 +1264,10 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps student lifecycle actions tokenized and clearance-backed", () => {
+  it('keeps student lifecycle actions tokenized and clearance-backed', () => {
     const lifecycleSurface = readMany([
-      "components/students/student-detail-page.tsx",
-      "components/students/profile/lifecycle-panel.tsx",
+      'components/students/student-detail-page.tsx',
+      'components/students/profile/lifecycle-panel.tsx',
     ]);
 
     assert.match(lifecycleSurface, /api\.getStudentFeeClearance\(studentId\)/);
@@ -1282,10 +1288,10 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps student academics and attendance tabs tokenized and data-backed", () => {
+  it('keeps student academics and attendance tabs tokenized and data-backed', () => {
     const readOnlyProfileTabs = readMany([
-      "components/students/profile/tabs/academics-tab.tsx",
-      "components/students/profile/tabs/attendance-tab.tsx",
+      'components/students/profile/tabs/academics-tab.tsx',
+      'components/students/profile/tabs/attendance-tab.tsx',
     ]);
 
     assert.match(
@@ -1304,10 +1310,10 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps student fees and activity tabs tokenized and explicit", () => {
+  it('keeps student fees and activity tabs tokenized and explicit', () => {
     const financeAndActivityTabs = readMany([
-      "components/students/profile/tabs/fees-tab.tsx",
-      "components/students/profile/tabs/activity-tab.tsx",
+      'components/students/profile/tabs/fees-tab.tsx',
+      'components/students/profile/tabs/activity-tab.tsx',
     ]);
 
     assert.match(
@@ -1323,10 +1329,10 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps student health and history tabs tokenized and explicit", () => {
+  it('keeps student health and history tabs tokenized and explicit', () => {
     const healthAndHistoryTabs = readMany([
-      "components/students/profile/tabs/health-tab.tsx",
-      "components/students/profile/tabs/history-tab.tsx",
+      'components/students/profile/tabs/health-tab.tsx',
+      'components/students/profile/tabs/history-tab.tsx',
     ]);
 
     assert.match(healthAndHistoryTabs, /color-mod-admissions-accent/);
@@ -1339,10 +1345,10 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps student guardians and documents tabs tokenized and protected", () => {
+  it('keeps student guardians and documents tabs tokenized and protected', () => {
     const guardianAndDocumentTabs = readMany([
-      "components/students/profile/tabs/guardians-tab.tsx",
-      "components/students/profile/tabs/documents-tab.tsx",
+      'components/students/profile/tabs/guardians-tab.tsx',
+      'components/students/profile/tabs/documents-tab.tsx',
     ]);
 
     assert.match(
@@ -1367,14 +1373,14 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps student profile and directory actions wired to real helpers", () => {
-    const directory = read("components/forms/student-directory.tsx");
+  it('keeps student profile and directory actions wired to real helpers', () => {
+    const directory = read('components/forms/student-directory.tsx');
     const detailPage = readMany([
-      "components/students/student-detail-page.tsx",
-      "components/students/profile/tabs/documents-tab.tsx",
-      "components/students/profile/tabs/fees-tab.tsx",
+      'components/students/student-detail-page.tsx',
+      'components/students/profile/tabs/documents-tab.tsx',
+      'components/students/profile/tabs/fees-tab.tsx',
     ]);
-    const studentsPage = read("app/dashboard/students/page.tsx");
+    const studentsPage = read('app/dashboard/students/page.tsx');
 
     assert.match(directory, /Profile/);
     assert.match(
@@ -1394,12 +1400,12 @@ describe("SchoolOS web production contracts", () => {
     assert.match(detailPage, /History/);
   });
 
-  it("adds the Phase 1B student detail route with tabbed profile sections", () => {
-    const route = read("app/dashboard/students/[studentId]/page.tsx");
-    const detailPage = read("components/students/student-detail-page.tsx");
+  it('adds the Phase 1B student detail route with tabbed profile sections', () => {
+    const route = read('app/dashboard/students/[studentId]/page.tsx');
+    const detailPage = read('components/students/student-detail-page.tsx');
 
     assert.equal(
-      existsSync(join(webRoot, "app/dashboard/students/[studentId]/page.tsx")),
+      existsSync(join(webRoot, 'app/dashboard/students/[studentId]/page.tsx')),
       true,
     );
     assert.match(route, /useParams/);
@@ -1407,14 +1413,14 @@ describe("SchoolOS web production contracts", () => {
     assert.match(detailPage, /const detailTabs = \[/);
 
     for (const tab of [
-      "Overview",
-      "Guardians",
-      "Health",
-      "Documents",
-      "Fees",
-      "Attendance",
-      "Activity",
-      "History",
+      'Overview',
+      'Guardians',
+      'Health',
+      'Documents',
+      'Fees',
+      'Attendance',
+      'Activity',
+      'History',
     ]) {
       assert.match(detailPage, new RegExp(tab));
     }
@@ -1422,13 +1428,13 @@ describe("SchoolOS web production contracts", () => {
     assert.doesNotMatch(detailPage, /replace-me|demo-student|student-123/i);
   });
 
-  it("adds student and guardian edit workflows to the student detail page", () => {
+  it('adds student and guardian edit workflows to the student detail page', () => {
     const detailPage = readMany([
-      "components/students/student-detail-page.tsx",
-      "components/students/profile/student-edit-card.tsx",
-      "components/students/profile/tabs/guardians-tab.tsx",
+      'components/students/student-detail-page.tsx',
+      'components/students/profile/student-edit-card.tsx',
+      'components/students/profile/tabs/guardians-tab.tsx',
     ]);
-    const apiClient = read("lib/api/students.ts");
+    const apiClient = read('lib/api/students.ts');
 
     assert.match(apiClient, /updateStudent:/);
     assert.match(apiClient, /method: 'PATCH'/);
@@ -1445,21 +1451,21 @@ describe("SchoolOS web production contracts", () => {
     assert.doesNotMatch(detailPage, /demo-guardian|student-123|guardian-123/i);
   });
 
-  it("adds lifecycle and transfer actions to the student detail page", () => {
+  it('adds lifecycle and transfer actions to the student detail page', () => {
     const detailPage = readMany([
-      "components/students/student-detail-page.tsx",
-      "components/students/profile/lifecycle-panel.tsx",
-      "components/students/profile/tabs/documents-tab.tsx",
+      'components/students/student-detail-page.tsx',
+      'components/students/profile/lifecycle-panel.tsx',
+      'components/students/profile/tabs/documents-tab.tsx',
     ]);
-    const apiClient = read("lib/api/students.ts");
+    const apiClient = read('lib/api/students.ts');
 
     for (const helper of [
-      "getStudentFeeClearance",
-      "transferStudent",
-      "archiveStudent",
-      "archiveStudentAsAlumni",
-      "softDeleteStudent",
-      "revokeGeneratedStudentDocument",
+      'getStudentFeeClearance',
+      'transferStudent',
+      'archiveStudent',
+      'archiveStudentAsAlumni',
+      'softDeleteStudent',
+      'revokeGeneratedStudentDocument',
     ]) {
       assert.match(apiClient, new RegExp(`${helper}:`));
     }
@@ -1480,14 +1486,14 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("adds a dedicated student document manager without exposing storage internals", () => {
+  it('adds a dedicated student document manager without exposing storage internals', () => {
     const detailPage = readMany([
-      "components/students/student-detail-page.tsx",
-      "components/students/profile/tabs/documents-tab.tsx",
-      "components/admissions/admissions-pipeline.tsx",
-      "components/m1/student-documents-workspace.tsx",
+      'components/students/student-detail-page.tsx',
+      'components/students/profile/tabs/documents-tab.tsx',
+      'components/admissions/admissions-pipeline.tsx',
+      'components/m1/student-documents-workspace.tsx',
     ]);
-    const apiClient = readMany(["lib/api/students.ts", "lib/api/client.ts"]);
+    const apiClient = readMany(['lib/api/students.ts', 'lib/api/client.ts']);
 
     assert.match(detailPage, /School-issued documents/);
     assert.match(detailPage, /All files/);
@@ -1573,11 +1579,11 @@ describe("SchoolOS web production contracts", () => {
     assert.doesNotMatch(detailPage, /demo-document|document-123/i);
   });
 
-  it("keeps student photo upload private, bounded, and app-controlled", () => {
+  it('keeps student photo upload private, bounded, and app-controlled', () => {
     const studentEditCard = read(
-      "components/students/profile/student-edit-card.tsx",
+      'components/students/profile/student-edit-card.tsx',
     );
-    const apiClient = read("lib/api/students.ts");
+    const apiClient = read('lib/api/students.ts');
 
     assert.match(apiClient, /uploadStudentPhoto:/);
     assert.match(apiClient, /removeStudentPhoto:/);
@@ -1600,15 +1606,15 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("validates PDF responses before opening blob tabs", () => {
+  it('validates PDF responses before opening blob tabs', () => {
     const apiClient = readMany([
-      "lib/api/client.ts",
-      "lib/api/students.ts",
-      "lib/api/finance.ts",
-      "lib/api/academics.ts",
+      'lib/api/client.ts',
+      'lib/api/students.ts',
+      'lib/api/finance.ts',
+      'lib/api/academics.ts',
     ]);
     const reportCardSurfaces = readMany([
-      "components/academics/report-cards/report-cards-workspace.tsx",
+      'components/academics/report-cards/report-cards-workspace.tsx',
     ]);
 
     assert.match(apiClient, /async function openPdfBlob/);
@@ -1628,42 +1634,42 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps attendance screen wired to real roster, submit, sync, analytics, and conflict APIs", () => {
+  it('keeps attendance screen wired to real roster, submit, sync, analytics, and conflict APIs', () => {
     const attendanceForm = readMany([
-      "components/forms/attendance-form.tsx",
-      "app/dashboard/attendance/page.tsx",
-      "app/dashboard/attendance/register/page.tsx",
-      "components/attendance/attendance-analytics.tsx",
-      "components/attendance/attendance-m2-workspaces.tsx",
-      "components/attendance/attendance-conflict-review.tsx",
-      "components/attendance/attendance-correction-review.tsx",
-      "lib/api/attendance.ts",
+      'components/forms/attendance-form.tsx',
+      'app/dashboard/attendance/page.tsx',
+      'app/dashboard/attendance/register/page.tsx',
+      'components/attendance/attendance-analytics.tsx',
+      'components/attendance/attendance-m2-workspaces.tsx',
+      'components/attendance/attendance-conflict-review.tsx',
+      'components/attendance/attendance-correction-review.tsx',
+      'lib/api/attendance.ts',
     ]);
     const requiredApis = [
-      "api.listAcademicYears",
-      "api.listClasses",
-      "api.listSections",
-      "api.getAttendanceRoster",
-      "api.submitAttendance",
-      "api.syncAttendance",
-      "api.listAttendanceAnalytics",
-      "api.listAttendanceConflicts",
-      "api.reviewAttendanceConflict",
-      "api.listAttendanceCorrections",
-      "api.approveAttendanceCorrection",
-      "api.rejectAttendanceCorrection",
-      "api.getAttendanceRegister",
-      "api.exportAttendanceRegister",
-      "api.listAttendanceRegisterExports",
-      "api.listM2HardenedAnomalies",
-      "api.listM2FollowUps",
-      "api.runM2FollowUps",
-      "api.listAttendanceDrafts",
-      "api.listM2OfflineConflicts",
+      'api.listAcademicYears',
+      'api.listClasses',
+      'api.listSections',
+      'api.getAttendanceRoster',
+      'api.submitAttendance',
+      'api.syncAttendance',
+      'api.listAttendanceAnalytics',
+      'api.listAttendanceConflicts',
+      'api.reviewAttendanceConflict',
+      'api.listAttendanceCorrections',
+      'api.approveAttendanceCorrection',
+      'api.rejectAttendanceCorrection',
+      'api.getAttendanceRegister',
+      'api.exportAttendanceRegister',
+      'api.listAttendanceRegisterExports',
+      'api.listM2HardenedAnomalies',
+      'api.listM2FollowUps',
+      'api.runM2FollowUps',
+      'api.listAttendanceDrafts',
+      'api.listM2OfflineConflicts',
     ];
 
     for (const apiCall of requiredApis) {
-      assert.match(attendanceForm, new RegExp(apiCall.replace(".", "\\.")));
+      assert.match(attendanceForm, new RegExp(apiCall.replace('.', '\\.')));
     }
 
     assert.match(attendanceForm, /AttendanceCorrectionReview/);
@@ -1684,18 +1690,18 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("supports the full Phase 1 attendance exception status cycle", () => {
+  it('supports the full Phase 1 attendance exception status cycle', () => {
     const attendanceForm = readMany([
-      "components/forms/attendance-form.tsx",
-      "components/attendance/attendance-roster-item.tsx",
+      'components/forms/attendance-form.tsx',
+      'components/attendance/attendance-roster-item.tsx',
     ]);
     const statuses = [
-      "PRESENT",
-      "ABSENT",
-      "LATE",
-      "SICK_LEAVE",
-      "EXCUSED_LEAVE",
-      "UNEXCUSED_LEAVE",
+      'PRESENT',
+      'ABSENT',
+      'LATE',
+      'SICK_LEAVE',
+      'EXCUSED_LEAVE',
+      'UNEXCUSED_LEAVE',
     ];
 
     assert.match(
@@ -1708,11 +1714,11 @@ describe("SchoolOS web production contracts", () => {
     }
   });
 
-  it("blocks future attendance dates and keeps teacher summary labels visible", () => {
+  it('blocks future attendance dates and keeps teacher summary labels visible', () => {
     const attendanceForm = readMany([
-      "components/forms/attendance-form.tsx",
-      "components/attendance/attendance-header.tsx",
-      "components/attendance/attendance-roster-item.tsx",
+      'components/forms/attendance-form.tsx',
+      'components/attendance/attendance-header.tsx',
+      'components/attendance/attendance-roster-item.tsx',
     ]);
 
     assert.match(attendanceForm, /max=\{today\}/);
@@ -1730,12 +1736,12 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps offline sync secondary and preserves analytics plus conflict review sections", () => {
+  it('keeps offline sync secondary and preserves analytics plus conflict review sections', () => {
     const attendanceForm = readMany([
-      "components/forms/attendance-form.tsx",
-      "app/dashboard/attendance/page.tsx",
-      "components/attendance/attendance-analytics.tsx",
-      "components/attendance/attendance-conflict-review.tsx",
+      'components/forms/attendance-form.tsx',
+      'app/dashboard/attendance/page.tsx',
+      'components/attendance/attendance-analytics.tsx',
+      'components/attendance/attendance-conflict-review.tsx',
     ]);
 
     assert.match(
@@ -1751,10 +1757,10 @@ describe("SchoolOS web production contracts", () => {
     assert.match(attendanceForm, /Mark Resolved|Mark reviewed/);
   });
 
-  it("blocks editing and resubmission once an attendance day is locked", () => {
+  it('blocks editing and resubmission once an attendance day is locked', () => {
     const attendanceForm = readMany([
-      "components/forms/attendance-form.tsx",
-      "components/attendance/attendance-roster-item.tsx",
+      'components/forms/attendance-form.tsx',
+      'components/attendance/attendance-roster-item.tsx',
     ]);
 
     // Reads the real backend-computed lock state, not the stale unused
@@ -1777,19 +1783,19 @@ describe("SchoolOS web production contracts", () => {
     assert.match(attendanceForm, /\/dashboard\/attendance\/corrections/);
   });
 
-  it("builds finance around the collection counter without fake IDs", () => {
-    const collectionCounter = read("components/finance/collection-counter.tsx");
+  it('builds finance around the collection counter without fake IDs', () => {
+    const collectionCounter = read('components/finance/collection-counter.tsx');
     const financeLedgerSurfaces = readMany([
-      "components/finance/billing-runs-tab.tsx",
-      "components/finance/cashier-close-section.tsx",
-      "components/finance/collection-counter.tsx",
-      "components/finance/defaulter-aging-summary.tsx",
-      "components/finance/defaulter-queue-tab.tsx",
-      "components/finance/discounts-waivers-tab.tsx",
-      "components/finance/dues-analysis-section.tsx",
-      "components/finance/fee-ledger.tsx",
-      "components/finance/fee-setup-tab.tsx",
-      "components/finance/reprint-dialog.tsx",
+      'components/finance/billing-runs-tab.tsx',
+      'components/finance/cashier-close-section.tsx',
+      'components/finance/collection-counter.tsx',
+      'components/finance/defaulter-aging-summary.tsx',
+      'components/finance/defaulter-queue-tab.tsx',
+      'components/finance/discounts-waivers-tab.tsx',
+      'components/finance/dues-analysis-section.tsx',
+      'components/finance/fee-ledger.tsx',
+      'components/finance/fee-setup-tab.tsx',
+      'components/finance/reprint-dialog.tsx',
     ]);
 
     assert.match(collectionCounter, /Invoice breakdown/);
@@ -1804,10 +1810,10 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("surfaces backend student fee ledger on the student detail page", () => {
+  it('surfaces backend student fee ledger on the student detail page', () => {
     const studentDetail = readMany([
-      "components/students/student-detail-page.tsx",
-      "components/students/profile/tabs/fees-tab.tsx",
+      'components/students/student-detail-page.tsx',
+      'components/students/profile/tabs/fees-tab.tsx',
     ]);
 
     assert.match(studentDetail, /Billing History/);
@@ -1821,11 +1827,11 @@ describe("SchoolOS web production contracts", () => {
     assert.doesNotMatch(studentDetail, /student-123|invoice-123|fake/i);
   });
 
-  it("keeps receipt QR verification wired to the backend receipt verifier", () => {
-    const financeApi = read("lib/api/finance.ts");
-    const ledgerSection = read("components/finance/ledger-section.tsx");
+  it('keeps receipt QR verification wired to the backend receipt verifier', () => {
+    const financeApi = read('lib/api/finance.ts');
+    const ledgerSection = read('components/finance/ledger-section.tsx');
     const verificationPanel = read(
-      "components/finance/receipt-verification-panel.tsx",
+      'components/finance/receipt-verification-panel.tsx',
     );
 
     assert.match(financeApi, /verifyReceipt/);
@@ -1839,13 +1845,13 @@ describe("SchoolOS web production contracts", () => {
     assert.doesNotMatch(verificationPanel, /localStorage|sessionStorage|mock/i);
   });
 
-  it("keeps day-end cashier close PDFs protected and app-opened", () => {
+  it('keeps day-end cashier close PDFs protected and app-opened', () => {
     const cashierCloseSection = read(
-      "components/finance/cashier-close-section.tsx",
+      'components/finance/cashier-close-section.tsx',
     );
-    const apiService = read("../api/src/finance/finance.service.ts");
-    const pdfBuilder = read("../api/src/common/pdf/simple-pdf.ts");
-    const coreTypes = read("../../packages/core/src/types.ts");
+    const apiService = read('../api/src/finance/finance.service.ts');
+    const pdfBuilder = read('../api/src/common/pdf/simple-pdf.ts');
+    const coreTypes = read('../../packages/core/src/types.ts');
 
     assert.match(apiService, /closePdfFile/);
     assert.match(apiService, /registerGeneratedFile/);
@@ -1861,17 +1867,17 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps active finance analysis exports app-controlled", () => {
-    const duesAnalysis = read("components/finance/dues-analysis-section.tsx");
+  it('keeps active finance analysis exports app-controlled', () => {
+    const duesAnalysis = read('components/finance/dues-analysis-section.tsx');
     const defaulterAging = read(
-      "components/finance/defaulter-aging-summary.tsx",
+      'components/finance/defaulter-aging-summary.tsx',
     );
 
     for (const marker of [
       'api.downloadReport("dues-table-report"',
-      "finance-dues-csv-export",
-      "Clear filters",
-      "exportMutation.error.message",
+      'finance-dues-csv-export',
+      'Clear filters',
+      'exportMutation.error.message',
     ]) {
       assert.ok(
         duesAnalysis.includes(marker),
@@ -1881,9 +1887,9 @@ describe("SchoolOS web production contracts", () => {
 
     for (const marker of [
       "api.downloadReport('defaulter-aging-report'",
-      "finance-defaulter-aging-csv-export",
-      "Export Summary",
-      "exportMutation.error.message",
+      'finance-defaulter-aging-csv-export',
+      'Export Summary',
+      'exportMutation.error.message',
     ]) {
       assert.ok(
         defaulterAging.includes(marker),
@@ -1892,23 +1898,23 @@ describe("SchoolOS web production contracts", () => {
     }
   });
 
-  it("keeps report-card corrections behind a review dialog with audited reason entry", () => {
+  it('keeps report-card corrections behind a review dialog with audited reason entry', () => {
     const reportCardsWorkspace = read(
-      "components/academics/report-cards/report-cards-workspace.tsx",
+      'components/academics/report-cards/report-cards-workspace.tsx',
     );
 
     for (const marker of [
-      "ReportCardCorrectionDialog",
-      "Review Locked Report-Card Correction",
-      "Regeneration creates a new report-card version",
+      'ReportCardCorrectionDialog',
+      'Review Locked Report-Card Correction',
+      'Regeneration creates a new report-card version',
       'data-testid="report-card-correction-panel"',
       'data-testid="report-card-correction-reason"',
       'data-testid="report-card-submit-correction"',
-      "disabled={isSubmitting || !reason.trim()}",
-      "reportCardStudentName",
-      "Confirm locked report-card generation",
-      "generationStudentIds",
-      "Could not load report card PDF",
+      'disabled={isSubmitting || !reason.trim()}',
+      'reportCardStudentName',
+      'Confirm locked report-card generation',
+      'generationStudentIds',
+      'Could not load report card PDF',
     ]) {
       assert.ok(
         reportCardsWorkspace.includes(marker),
@@ -1920,13 +1926,13 @@ describe("SchoolOS web production contracts", () => {
     assert.doesNotMatch(reportCardsWorkspace, /confirm\(/);
   });
 
-  it("keeps report-card generation explicit about the applied grading policy", () => {
+  it('keeps report-card generation explicit about the applied grading policy', () => {
     const reportCardsWorkspace = read(
-      "components/academics/report-cards/report-cards-workspace.tsx",
+      'components/academics/report-cards/report-cards-workspace.tsx',
     );
-    const academicsClient = read("lib/api/academics.ts");
+    const academicsClient = read('lib/api/academics.ts');
 
-    for (const marker of ["getGradingPolicy", "/academics/grading-policy"]) {
+    for (const marker of ['getGradingPolicy', '/academics/grading-policy']) {
       assert.ok(
         academicsClient.includes(marker),
         `Missing client marker: ${marker}`,
@@ -1935,11 +1941,11 @@ describe("SchoolOS web production contracts", () => {
 
     for (const marker of [
       "queryKey: ['academic-grading-policy']",
-      "api.getGradingPolicy",
+      'api.getGradingPolicy',
       'data-testid="grading-policy-panel"',
-      "Percentage Decimals",
-      "Rounding Mode",
-      "No failing band is configured",
+      'Percentage Decimals',
+      'Rounding Mode',
+      'No failing band is configured',
     ]) {
       assert.ok(
         reportCardsWorkspace.includes(marker),
@@ -1948,17 +1954,17 @@ describe("SchoolOS web production contracts", () => {
     }
   });
 
-  it("keeps M4 academics workspaces tokenized and production-backed", () => {
+  it('keeps M4 academics workspaces tokenized and production-backed', () => {
     const academicsSurfaces = readMany([
-      "components/academics/exams/exam-list.tsx",
-      "components/academics/exams/exams-workspace.tsx",
-      "components/academics/exams/assessment-components-dialog.tsx",
-      "components/academics/tabs/marks-entry-tab.tsx",
-      "components/academics/tabs/marks-lock-tab.tsx",
-      "components/academics/tabs/cas-records-tab.tsx",
-      "components/academics/tabs/promotion-tab.tsx",
-      "components/academics/tabs/subjects-tab.tsx",
-      "components/academics/report-cards/report-cards-workspace.tsx",
+      'components/academics/exams/exam-list.tsx',
+      'components/academics/exams/exams-workspace.tsx',
+      'components/academics/exams/assessment-components-dialog.tsx',
+      'components/academics/tabs/marks-entry-tab.tsx',
+      'components/academics/tabs/marks-lock-tab.tsx',
+      'components/academics/tabs/cas-records-tab.tsx',
+      'components/academics/tabs/promotion-tab.tsx',
+      'components/academics/tabs/subjects-tab.tsx',
+      'components/academics/report-cards/report-cards-workspace.tsx',
     ]);
 
     assert.match(academicsSurfaces, /color-mod-academics-accent/);
@@ -1968,45 +1974,45 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("labels the activity page as Activity Feed instead of Transport", () => {
-    const activityPage = read("app/dashboard/activity/page.tsx");
+  it('labels the activity page as Activity Feed instead of Transport', () => {
+    const activityPage = read('app/dashboard/activity/page.tsx');
 
     assert.match(activityPage, /Activity Feed/);
     assert.match(activityPage, /consent-aware classroom activities/);
     assert.doesNotMatch(activityPage, />\s*Transport\s*</);
   });
 
-  it("keeps activity screens wired to real M5 and M12 APIs", () => {
+  it('keeps activity screens wired to real M5 and M12 APIs', () => {
     const activitySurfaces = readMany(activitySurfaceFiles);
     const requiredApis = [
-      "api.listClasses",
-      "api.listSections",
-      "api.listStudents",
-      "api.listActivityPosts",
-      "api.listActivityGallery",
-      "api.listMoodLogs",
-      "api.listDevelopmentalMilestones",
-      "api.listMilestoneTemplates",
-      "api.listNotificationDeliveries",
-      "api.previewActivityAudience",
-      "api.getActivityPost",
-      "api.createActivityPost",
-      "api.updateActivityPost",
-      "api.moderateActivityPost",
-      "api.deleteActivityPost",
-      "api.restoreActivityPost",
-      "api.createMoodLog",
-      "api.createDevelopmentalMilestone",
-      "filesToBase64Payloads",
+      'api.listClasses',
+      'api.listSections',
+      'api.listStudents',
+      'api.listActivityPosts',
+      'api.listActivityGallery',
+      'api.listMoodLogs',
+      'api.listDevelopmentalMilestones',
+      'api.listMilestoneTemplates',
+      'api.listNotificationDeliveries',
+      'api.previewActivityAudience',
+      'api.getActivityPost',
+      'api.createActivityPost',
+      'api.updateActivityPost',
+      'api.moderateActivityPost',
+      'api.deleteActivityPost',
+      'api.restoreActivityPost',
+      'api.createMoodLog',
+      'api.createDevelopmentalMilestone',
+      'filesToBase64Payloads',
     ];
 
     for (const apiCall of requiredApis) {
-      assert.match(activitySurfaces, new RegExp(apiCall.replace(".", "\\.")));
+      assert.match(activitySurfaces, new RegExp(apiCall.replace('.', '\\.')));
     }
 
-    const parentRoute = read("app/dashboard/activity/parent/page.tsx");
+    const parentRoute = read('app/dashboard/activity/parent/page.tsx');
     const retiredParentView = read(
-      "components/activity/parent-activity-view.tsx",
+      'components/activity/parent-activity-view.tsx',
     );
     assert.match(
       parentRoute,
@@ -2018,9 +2024,9 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps canteen POS receipt preview and PDF reprint wired to real APIs", () => {
-    const canteenClient = read("lib/api/canteen.ts");
-    const canteenWorkspace = read("components/canteen/canteen-workspace.tsx");
+  it('keeps canteen POS receipt preview and PDF reprint wired to real APIs', () => {
+    const canteenClient = read('lib/api/canteen.ts');
+    const canteenWorkspace = read('components/canteen/canteen-workspace.tsx');
 
     assert.match(canteenClient, /getPosReceipt/);
     assert.match(canteenClient, /openPosReceiptPdf/);
@@ -2030,9 +2036,9 @@ describe("SchoolOS web production contracts", () => {
     assert.doesNotMatch(canteenWorkspace, /window\.print/);
   });
 
-  it("keeps canteen spending controls loaded from backend data", () => {
-    const canteenClient = read("lib/api/canteen.ts");
-    const canteenWorkspace = read("components/canteen/canteen-workspace.tsx");
+  it('keeps canteen spending controls loaded from backend data', () => {
+    const canteenClient = read('lib/api/canteen.ts');
+    const canteenWorkspace = read('components/canteen/canteen-workspace.tsx');
 
     assert.match(canteenClient, /getSpendingControl:/);
     assert.match(canteenClient, /\/canteen\/spending-controls\/student\//);
@@ -2046,18 +2052,18 @@ describe("SchoolOS web production contracts", () => {
     assert.doesNotMatch(canteenWorkspace, /Parent-facing control UI/);
   });
 
-  it("keeps canteen reports and CSV exports wired to backend report routes", () => {
-    const canteenClient = read("lib/api/canteen.ts");
-    const canteenWorkspace = read("components/canteen/canteen-workspace.tsx");
+  it('keeps canteen reports and CSV exports wired to backend report routes', () => {
+    const canteenClient = read('lib/api/canteen.ts');
+    const canteenWorkspace = read('components/canteen/canteen-workspace.tsx');
 
     for (const helper of [
-      "getDailyMealCountReport",
-      "downloadDailyMealCountCsv",
-      "getItemWiseSalesReport",
-      "downloadItemWiseSalesCsv",
-      "getLowBalanceWallets",
-      "getStudentSpendingSummary",
-      "getStockLedger",
+      'getDailyMealCountReport',
+      'downloadDailyMealCountCsv',
+      'getItemWiseSalesReport',
+      'downloadItemWiseSalesCsv',
+      'getLowBalanceWallets',
+      'getStudentSpendingSummary',
+      'getStockLedger',
     ]) {
       assert.match(
         canteenClient,
@@ -2067,34 +2073,34 @@ describe("SchoolOS web production contracts", () => {
     }
 
     for (const endpoint of [
-      "/canteen/reports/daily-meal-count",
-      "/canteen/reports/daily-meal-count.csv",
-      "/canteen/reports/item-wise-sales",
-      "/canteen/reports/item-wise-sales.csv",
-      "/canteen/reports/low-balance-wallets",
-      "/canteen/reports/student-spending-summary",
-      "/canteen/reports/stock-ledger",
+      '/canteen/reports/daily-meal-count',
+      '/canteen/reports/daily-meal-count.csv',
+      '/canteen/reports/item-wise-sales',
+      '/canteen/reports/item-wise-sales.csv',
+      '/canteen/reports/low-balance-wallets',
+      '/canteen/reports/student-spending-summary',
+      '/canteen/reports/stock-ledger',
     ]) {
-      assert.match(canteenClient, new RegExp(endpoint.replaceAll("/", "\\/")));
+      assert.match(canteenClient, new RegExp(endpoint.replaceAll('/', '\\/')));
     }
 
     for (const marker of [
-      "canteen-daily-meal-csv-export",
-      "canteen-item-sales-csv-export",
-      "Report range from",
-      "Report range to",
-      "Low-balance wallets",
-      "stockLedgerRows.slice(0, 10).map",
+      'canteen-daily-meal-csv-export',
+      'canteen-item-sales-csv-export',
+      'Report range from',
+      'Report range to',
+      'Low-balance wallets',
+      'stockLedgerRows.slice(0, 10).map',
     ]) {
       assert.ok(canteenWorkspace.includes(marker), `Missing marker: ${marker}`);
     }
   });
 
-  it("routes linked canteen meal-plan invoices into the finance counter", () => {
-    const canteenWorkspace = read("components/canteen/canteen-workspace.tsx");
-    const financePage = read("components/finance/fees-workspace.tsx");
-    const collectionSection = read("components/finance/collection-section.tsx");
-    const collectionCounter = read("components/finance/collection-counter.tsx");
+  it('routes linked canteen meal-plan invoices into the finance counter', () => {
+    const canteenWorkspace = read('components/canteen/canteen-workspace.tsx');
+    const financePage = read('components/finance/fees-workspace.tsx');
+    const collectionSection = read('components/finance/collection-section.tsx');
+    const collectionCounter = read('components/finance/collection-counter.tsx');
 
     assert.match(canteenWorkspace, /Open invoice/);
     assert.match(canteenWorkspace, /\/dashboard\/fees\/collect\?invoiceId=/);
@@ -2105,41 +2111,41 @@ describe("SchoolOS web production contracts", () => {
     assert.match(collectionCounter, /selectedInvoiceId === initialInvoiceId/);
   });
 
-  it("adds accounting audit summary context and richer log detail fields", () => {
+  it('adds accounting audit summary context and richer log detail fields', () => {
     const auditWorkspace = read(
-      "components/accounting/accounting-audit-workspace.tsx",
+      'components/accounting/accounting-audit-workspace.tsx',
     );
 
     for (const marker of [
-      "AuditSummaryCard",
-      "Records on page",
-      "activeFilterLabel",
+      'AuditSummaryCard',
+      'Records on page',
+      'activeFilterLabel',
       'data-testid="accounting-audit-page-summary"',
-      "AuditDetailField",
-      "Tenant scope",
-      "Resource ID",
-      "Actor ID",
+      'AuditDetailField',
+      'Tenant scope',
+      'Resource ID',
+      'Actor ID',
     ]) {
       assert.ok(auditWorkspace.includes(marker), `Missing marker: ${marker}`);
     }
   });
 
-  it("makes transport latest-location freshness explicit for operators", () => {
+  it('makes transport latest-location freshness explicit for operators', () => {
     const transportWorkspace = read(
-      "components/transport/transport-workspace.tsx",
+      'components/transport/transport-workspace.tsx',
     );
 
     for (const marker of [
-      "transport-location-freshness-panel",
-      "getLocationFreshness",
-      "LocationMetric",
-      "Latest backend coordinate from",
-      "Confirm with the driver before sharing transport updates",
-      "Treat the trip position as approximate",
-      "Persisted history",
-      "Redis latest cache",
-      "formatLocationSignal",
-      "No backend coordinate",
+      'transport-location-freshness-panel',
+      'getLocationFreshness',
+      'LocationMetric',
+      'Latest backend coordinate from',
+      'Confirm with the driver before sharing transport updates',
+      'Treat the trip position as approximate',
+      'Persisted history',
+      'Redis latest cache',
+      'formatLocationSignal',
+      'No backend coordinate',
     ]) {
       assert.ok(
         transportWorkspace.includes(marker),
@@ -2148,19 +2154,19 @@ describe("SchoolOS web production contracts", () => {
     }
   });
 
-  it("keeps transport safety boundary operational instead of placeholder-only", () => {
+  it('keeps transport safety boundary operational instead of placeholder-only', () => {
     const transportWorkspace = read(
-      "components/transport/transport-workspace.tsx",
+      'components/transport/transport-workspace.tsx',
     );
 
     for (const marker of [
-      "transport-safety-boundary-panel",
-      "SafetyMetric",
-      "activeTripsMissingDriver",
-      "activeTripsMissingStudents",
-      "Parent visibility stays scoped",
-      "Check latest location",
-      "Review assignments",
+      'transport-safety-boundary-panel',
+      'SafetyMetric',
+      'activeTripsMissingDriver',
+      'activeTripsMissingStudents',
+      'Parent visibility stays scoped',
+      'Check latest location',
+      'Review assignments',
     ]) {
       assert.ok(
         transportWorkspace.includes(marker),
@@ -2174,22 +2180,22 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps transport route operations and trip report exports backend-backed", () => {
-    const transportClient = read("lib/api/transport.ts");
+  it('keeps transport route operations and trip report exports backend-backed', () => {
+    const transportClient = read('lib/api/transport.ts');
     const transportWorkspace = read(
-      "components/transport/transport-workspace.tsx",
+      'components/transport/transport-workspace.tsx',
     );
 
     for (const helper of [
-      "getTripHistoryReport",
-      "downloadTripHistoryCsv",
-      "getBoardingReport",
-      "getReports",
-      "getGpsAcceptRejectReport",
-      "getStaleGpsReport",
-      "getOneDayRouteChangesReport",
-      "getVehicleDocumentExpiryReport",
-      "getMaintenanceReminderReport",
+      'getTripHistoryReport',
+      'downloadTripHistoryCsv',
+      'getBoardingReport',
+      'getReports',
+      'getGpsAcceptRejectReport',
+      'getStaleGpsReport',
+      'getOneDayRouteChangesReport',
+      'getVehicleDocumentExpiryReport',
+      'getMaintenanceReminderReport',
     ]) {
       assert.match(
         transportClient,
@@ -2199,38 +2205,38 @@ describe("SchoolOS web production contracts", () => {
     }
 
     for (const endpoint of [
-      "/transport/reports",
-      "/transport/reports/trips",
-      "/transport/reports/trips.csv",
-      "/transport/reports/boarding",
-      "/transport/reports/gps-pings",
-      "/transport/reports/stale-gps",
-      "/transport/reports/one-day-route-changes",
-      "/transport/reports/vehicle-documents",
-      "/transport/reports/maintenance",
+      '/transport/reports',
+      '/transport/reports/trips',
+      '/transport/reports/trips.csv',
+      '/transport/reports/boarding',
+      '/transport/reports/gps-pings',
+      '/transport/reports/stale-gps',
+      '/transport/reports/one-day-route-changes',
+      '/transport/reports/vehicle-documents',
+      '/transport/reports/maintenance',
     ]) {
       assert.match(
         transportClient,
-        new RegExp(endpoint.replaceAll("/", "\\/")),
+        new RegExp(endpoint.replaceAll('/', '\\/')),
       );
     }
 
     for (const marker of [
-      "transport-route-dashboard-panel",
-      "RouteOperationsPanel",
-      "Report filters",
-      "transport-trip-history-csv-export",
-      "Export full trip CSV",
-      "Trip-history CSV export uses server-side generation",
-      "setReportRouteId",
-      "setReportVehicleId",
-      "setReportDriverAssignmentId",
-      "transport-gps-quality-report",
-      "transport-stale-gps-report",
-      "transport-one-day-route-changes-report",
-      "transport-vehicle-documents-report",
-      "transport-maintenance-report",
-      "Remaining Issues",
+      'transport-route-dashboard-panel',
+      'RouteOperationsPanel',
+      'Report filters',
+      'transport-trip-history-csv-export',
+      'Export full trip CSV',
+      'Trip-history CSV export uses server-side generation',
+      'setReportRouteId',
+      'setReportVehicleId',
+      'setReportDriverAssignmentId',
+      'transport-gps-quality-report',
+      'transport-stale-gps-report',
+      'transport-one-day-route-changes-report',
+      'transport-vehicle-documents-report',
+      'transport-maintenance-report',
+      'Remaining Issues',
     ]) {
       assert.ok(
         transportWorkspace.includes(marker),
@@ -2239,31 +2245,31 @@ describe("SchoolOS web production contracts", () => {
     }
   });
 
-  it("keeps M9 transport navigation on shared module primitives", () => {
-    const transportLayout = read("app/dashboard/transport/layout.tsx");
-    const transportPage = read("app/dashboard/transport/page.tsx");
+  it('keeps M9 transport navigation on shared module primitives', () => {
+    const transportLayout = read('app/dashboard/transport/layout.tsx');
+    const transportPage = read('app/dashboard/transport/page.tsx');
     const transportWorkspace = read(
-      "components/transport/transport-workspace.tsx",
+      'components/transport/transport-workspace.tsx',
     );
 
     for (const marker of [
-      "ModuleHeader",
+      'ModuleHeader',
       'eyebrow="School Operations"',
-      "primaryAction",
-      "moreActionItems",
-      "WorkspaceTabs",
-      "Location Status",
-      "/dashboard/transport/location",
-      "Open Trips",
+      'primaryAction',
+      'moreActionItems',
+      'WorkspaceTabs',
+      'Location Status',
+      '/dashboard/transport/location',
+      'Open Trips',
     ]) {
       assert.ok(transportLayout.includes(marker), `Missing marker: ${marker}`);
     }
 
     for (const marker of [
-      "SummaryGrid",
-      "SummaryCard",
-      "WorkSurface",
-      "needs summary API",
+      'SummaryGrid',
+      'SummaryCard',
+      'WorkSurface',
+      'needs summary API',
     ]) {
       assert.ok(
         transportWorkspace.includes(marker),
@@ -2280,9 +2286,9 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps M9 transport workspace aligned to transport UI tokens", () => {
+  it('keeps M9 transport workspace aligned to transport UI tokens', () => {
     const transportWorkspace = read(
-      "components/transport/transport-workspace.tsx",
+      'components/transport/transport-workspace.tsx',
     );
 
     assert.match(transportWorkspace, /color-mod-transport/);
@@ -2292,24 +2298,24 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps canteen Serving and POS QR scan flows fast and backend-purpose compatible", () => {
-    const canteenWorkspace = read("components/canteen/canteen-workspace.tsx");
-    const resolver = read("components/ui/qr-resolver.tsx");
+  it('keeps canteen Serving and POS QR scan flows fast and backend-purpose compatible', () => {
+    const canteenWorkspace = read('components/canteen/canteen-workspace.tsx');
+    const resolver = read('components/ui/qr-resolver.tsx');
 
     for (const marker of [
-      "CanteenQrStudentCard",
-      "resolvedServingStudent",
-      "resolvedPosStudent",
-      "servingAllergyAcknowledged",
-      "servingHasAllergyWarnings",
-      "canteen-serving-control-preview",
-      "Scan a student QR; the serving form stays ready",
-      "Scan student QR to select wallet payment",
+      'CanteenQrStudentCard',
+      'resolvedServingStudent',
+      'resolvedPosStudent',
+      'servingAllergyAcknowledged',
+      'servingHasAllergyWarnings',
+      'canteen-serving-control-preview',
+      'Scan a student QR; the serving form stays ready',
+      'Scan student QR to select wallet payment',
       "I reviewed this student's allergy and medical warnings before",
-      "servingHasAllergyWarnings && !servingAllergyAcknowledged",
-      "!posForm.studentId",
-      "!posForm.items[0]?.menuItemId",
-      "Number(posForm.items[0]?.quantity ?? 0) <= 0",
+      'servingHasAllergyWarnings && !servingAllergyAcknowledged',
+      '!posForm.studentId',
+      '!posForm.items[0]?.menuItemId',
+      'Number(posForm.items[0]?.quantity ?? 0) <= 0',
     ]) {
       assert.ok(canteenWorkspace.includes(marker), `Missing marker: ${marker}`);
     }
@@ -2321,20 +2327,20 @@ describe("SchoolOS web production contracts", () => {
     assert.match(resolver, /return 'CANTEEN'/);
   });
 
-  it("keeps canteen inventory and supplier surfaces wired to real APIs", () => {
-    const canteenClient = read("lib/api/canteen.ts");
-    const canteenWorkspace = read("components/canteen/canteen-workspace.tsx");
+  it('keeps canteen inventory and supplier surfaces wired to real APIs', () => {
+    const canteenClient = read('lib/api/canteen.ts');
+    const canteenWorkspace = read('components/canteen/canteen-workspace.tsx');
 
     for (const helper of [
-      "listSuppliers",
-      "createSupplier",
-      "listInventoryItems",
-      "createInventoryItem",
-      "createPurchaseBill",
-      "recordWastage",
-      "adjustStock",
-      "getStockLedger",
-      "listWalletTransactions",
+      'listSuppliers',
+      'createSupplier',
+      'listInventoryItems',
+      'createInventoryItem',
+      'createPurchaseBill',
+      'recordWastage',
+      'adjustStock',
+      'getStockLedger',
+      'listWalletTransactions',
     ]) {
       assert.match(
         canteenClient,
@@ -2344,14 +2350,14 @@ describe("SchoolOS web production contracts", () => {
     }
 
     for (const endpoint of [
-      "/canteen/suppliers",
-      "/canteen/inventory-items",
-      "/canteen/purchase-bills",
-      "/canteen/wastage",
-      "/canteen/stock-adjustment",
-      "/canteen/reports/stock-ledger",
+      '/canteen/suppliers',
+      '/canteen/inventory-items',
+      '/canteen/purchase-bills',
+      '/canteen/wastage',
+      '/canteen/stock-adjustment',
+      '/canteen/reports/stock-ledger',
     ]) {
-      assert.match(canteenClient, new RegExp(endpoint.replaceAll("/", "\\/")));
+      assert.match(canteenClient, new RegExp(endpoint.replaceAll('/', '\\/')));
     }
 
     assert.match(canteenWorkspace, /supplierMutation/);
@@ -2362,7 +2368,7 @@ describe("SchoolOS web production contracts", () => {
     assert.match(canteenWorkspace, /walletTransactions = itemsFromResult/);
     assert.match(canteenWorkspace, /Stock ledger/);
     assert.equal(
-      existsSync(join(webRoot, "app/dashboard/canteen/inventory/page.tsx")),
+      existsSync(join(webRoot, 'app/dashboard/canteen/inventory/page.tsx')),
       true,
     );
     assert.doesNotMatch(
@@ -2371,9 +2377,9 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps M10 canteen workspace and selector aligned to canteen UI tokens", () => {
-    const canteenWorkspace = read("components/canteen/canteen-workspace.tsx");
-    const menuSelector = read("components/canteen/menu-item-selector.tsx");
+  it('keeps M10 canteen workspace and selector aligned to canteen UI tokens', () => {
+    const canteenWorkspace = read('components/canteen/canteen-workspace.tsx');
+    const menuSelector = read('components/canteen/menu-item-selector.tsx');
     const forbidden =
       /rounded-\[2rem\]|rounded-\[2\.5rem\]|rounded-\[3rem\]|rounded-\[30px\]|shadow-2xl|shadow-xl|bg-slate-900|bg-slate-950|primary-(50|100|200|300|400|500|600|700|800|900)|\bN\/A\b|\bUnknown\b|alert\(|confirm\(|Coming soon|fake|mock/i;
 
@@ -2385,30 +2391,30 @@ describe("SchoolOS web production contracts", () => {
     assert.match(canteenWorkspace, /Cashier not recorded/);
   });
 
-  it("keeps activity categories and upload limits explicit", () => {
-    const composerPage = read("app/dashboard/activity/new/page.tsx");
+  it('keeps activity categories and upload limits explicit', () => {
+    const composerPage = read('app/dashboard/activity/new/page.tsx');
     const categories = [
-      "CLASSROOM_LEARNING",
-      "MUSIC_AND_DANCE",
-      "SCIENCE_AND_PRACTICAL",
-      "PROJECT_WORK",
-      "EDUCATIONAL_TOUR",
-      "HEALTH_AND_HYGIENE",
-      "COMPETITION",
-      "ASSEMBLY",
-      "CLUB_ACTIVITY",
-      "COMMUNITY_SERVICE",
-      "FESTIVAL_AND_CULTURE",
-      "NATIONAL_PROGRAMME",
-      "ACHIEVEMENT",
-      "PRESCHOOL_ACTIVITY",
-      "OTHER",
-      "LEARNING",
-      "OUTDOOR_PLAY",
-      "ART_AND_CRAFT",
-      "CELEBRATION",
-      "SPORTS",
-      "GENERAL",
+      'CLASSROOM_LEARNING',
+      'MUSIC_AND_DANCE',
+      'SCIENCE_AND_PRACTICAL',
+      'PROJECT_WORK',
+      'EDUCATIONAL_TOUR',
+      'HEALTH_AND_HYGIENE',
+      'COMPETITION',
+      'ASSEMBLY',
+      'CLUB_ACTIVITY',
+      'COMMUNITY_SERVICE',
+      'FESTIVAL_AND_CULTURE',
+      'NATIONAL_PROGRAMME',
+      'ACHIEVEMENT',
+      'PRESCHOOL_ACTIVITY',
+      'OTHER',
+      'LEARNING',
+      'OUTDOOR_PLAY',
+      'ART_AND_CRAFT',
+      'CELEBRATION',
+      'SPORTS',
+      'GENERAL',
     ];
 
     for (const category of categories) {
@@ -2422,16 +2428,16 @@ describe("SchoolOS web production contracts", () => {
     assert.match(composerPage, /10MB/);
   });
 
-  it("preserves feed, media gallery, observations, milestones, and delivery records", () => {
-    const feedPage = read("app/dashboard/activity/page.tsx");
-    const galleryPage = read("app/dashboard/activity/gallery/page.tsx");
+  it('preserves feed, media gallery, observations, milestones, and delivery records', () => {
+    const feedPage = read('app/dashboard/activity/page.tsx');
+    const galleryPage = read('app/dashboard/activity/gallery/page.tsx');
     const observationsPage = read(
-      "app/dashboard/activity/observations/page.tsx",
+      'app/dashboard/activity/observations/page.tsx',
     );
-    const milestonesPage = read("app/dashboard/activity/milestones/page.tsx");
-    const deliveriesPage = read("app/dashboard/activity/deliveries/page.tsx");
-    const statusBadge = read("components/ui/status-badge.tsx");
-    const activityApi = read("lib/api/activity.ts");
+    const milestonesPage = read('app/dashboard/activity/milestones/page.tsx');
+    const deliveriesPage = read('app/dashboard/activity/deliveries/page.tsx');
+    const statusBadge = read('components/ui/status-badge.tsx');
+    const activityApi = read('lib/api/activity.ts');
 
     assert.match(feedPage, /Activity Feed & Milestones/);
     assert.match(feedPage, /No activity posts yet/);
@@ -2458,16 +2464,16 @@ describe("SchoolOS web production contracts", () => {
     assert.match(statusBadge, /SKIPPED/);
   });
 
-  it("routes every M5 workflow as a first-class activity page", () => {
-    const activityPage = read("app/dashboard/activity/page.tsx");
+  it('routes every M5 workflow as a first-class activity page', () => {
+    const activityPage = read('app/dashboard/activity/page.tsx');
     const workflowRoutes = [
-      "new",
-      "moderation",
-      "gallery",
-      "observations",
-      "milestones",
-      "deliveries",
-      "reports",
+      'new',
+      'moderation',
+      'gallery',
+      'observations',
+      'milestones',
+      'deliveries',
+      'reports',
     ];
 
     for (const route of workflowRoutes) {
@@ -2484,8 +2490,8 @@ describe("SchoolOS web production contracts", () => {
     }
   });
 
-  it("does not implement AI captions or permanent public media URLs in activity feed", () => {
-    const composerPage = read("app/dashboard/activity/new/page.tsx");
+  it('does not implement AI captions or permanent public media URLs in activity feed', () => {
+    const composerPage = read('app/dashboard/activity/new/page.tsx');
     const activitySurfaces = readMany(activitySurfaceFiles);
 
     assert.match(composerPage, /no permanent public URLs are exposed/);
@@ -2502,13 +2508,13 @@ describe("SchoolOS web production contracts", () => {
     assert.doesNotMatch(activitySurfaces, /replace-me/i);
   });
 
-  it("keeps activity post mutations invalidating every feed surface", () => {
-    const composerPage = read("app/dashboard/activity/new/page.tsx");
-    const activityDetail = read("app/dashboard/activity/[postId]/page.tsx");
+  it('keeps activity post mutations invalidating every feed surface', () => {
+    const composerPage = read('app/dashboard/activity/new/page.tsx');
+    const activityDetail = read('app/dashboard/activity/[postId]/page.tsx');
 
     for (const [surface, source] of [
-      ["composer", composerPage],
-      ["detail", activityDetail],
+      ['composer', composerPage],
+      ['detail', activityDetail],
     ]) {
       for (const marker of [
         /queryKey: \[["']activity-posts["']\]/,
@@ -2525,16 +2531,16 @@ describe("SchoolOS web production contracts", () => {
     }
   });
 
-  it("keeps M5 activity feed surfaces tokenized and production-backed", () => {
+  it('keeps M5 activity feed surfaces tokenized and production-backed', () => {
     // Utility surfaces (moderation queue, deliveries table, reports stub,
     // parent views) use shared neutral components and carry no module theme.
     const themedSurfaces = [
-      "app/dashboard/activity/new/page.tsx",
-      "app/dashboard/activity/gallery/page.tsx",
-      "app/dashboard/activity/observations/page.tsx",
-      "app/dashboard/activity/milestones/page.tsx",
-      "app/dashboard/activity/[postId]/page.tsx",
-      "components/activity/lifecycle-panel.tsx",
+      'app/dashboard/activity/new/page.tsx',
+      'app/dashboard/activity/gallery/page.tsx',
+      'app/dashboard/activity/observations/page.tsx',
+      'app/dashboard/activity/milestones/page.tsx',
+      'app/dashboard/activity/[postId]/page.tsx',
+      'components/activity/lifecycle-panel.tsx',
     ];
     const forbidden = [
       /bg-slate-900/,
@@ -2571,12 +2577,12 @@ describe("SchoolOS web production contracts", () => {
       );
     }
 
-    const landing = read("app/dashboard/activity/page.tsx");
+    const landing = read('app/dashboard/activity/page.tsx');
     for (const sharedPrimitive of [
-      "OperationalSummaryGrid",
-      "WorkspaceTabs",
-      "FilterBar",
-      "WorkSurface",
+      'OperationalSummaryGrid',
+      'WorkspaceTabs',
+      'FilterBar',
+      'WorkSurface',
     ]) {
       assert.match(landing, new RegExp(sharedPrimitive));
     }
@@ -2586,27 +2592,27 @@ describe("SchoolOS web production contracts", () => {
     );
   });
 
-  it("keeps notices screen wired to real M12 APIs", () => {
-    const communicationsForm = read("components/forms/communications-form.tsx");
-    const noticeDetailPage = read("app/dashboard/notices/[noticeId]/page.tsx");
-    const communicationsApi = read("lib/api/communications.ts");
+  it('keeps notices screen wired to real M12 APIs', () => {
+    const communicationsForm = read('components/forms/communications-form.tsx');
+    const noticeDetailPage = read('app/dashboard/notices/[noticeId]/page.tsx');
+    const communicationsApi = read('lib/api/communications.ts');
     const requiredApis = [
-      "api.listClasses",
-      "api.listSections",
-      "api.listNotificationDeliveries",
-      "api.listNotices",
-      "api.listEvents",
-      "api.listAdmissions",
-      "api.getGuardianConsentStatus",
-      "api.createNotice",
-      "api.previewNoticeRecipients",
-      "api.createEvent",
-      "api.captureGuardianConsent",
-      "api.revokeGuardianConsent",
+      'api.listClasses',
+      'api.listSections',
+      'api.listNotificationDeliveries',
+      'api.listNotices',
+      'api.listEvents',
+      'api.listAdmissions',
+      'api.getGuardianConsentStatus',
+      'api.createNotice',
+      'api.previewNoticeRecipients',
+      'api.createEvent',
+      'api.captureGuardianConsent',
+      'api.revokeGuardianConsent',
     ];
 
     for (const apiCall of requiredApis) {
-      assert.match(communicationsForm, new RegExp(apiCall.replace(".", "\\.")));
+      assert.match(communicationsForm, new RegExp(apiCall.replace('.', '\\.')));
     }
 
     assert.match(communicationsApi, /getNoticeDetail:/);
@@ -2626,16 +2632,16 @@ describe("SchoolOS web production contracts", () => {
     assert.doesNotMatch(noticeDetailPage, /fetchNoticeDetail|API_BASE_URL/);
   });
 
-  it("keeps communications sections and notice audience controls available", () => {
-    const communicationsForm = read("components/forms/communications-form.tsx");
+  it('keeps communications sections and notice audience controls available', () => {
+    const communicationsForm = read('components/forms/communications-form.tsx');
     const requiredSections = [
-      "Notices",
-      "Events",
-      "Delivery Records",
-      "Consent Management",
+      'Notices',
+      'Events',
+      'Delivery Records',
+      'Consent Management',
     ];
-    const priorities = ["NORMAL", "URGENT", "EMERGENCY"];
-    const audiences = ["ALL", "CLASS", "SECTION"];
+    const priorities = ['NORMAL', 'URGENT', 'EMERGENCY'];
+    const audiences = ['ALL', 'CLASS', 'SECTION'];
 
     for (const section of requiredSections) {
       assert.match(communicationsForm, new RegExp(section));
@@ -2661,16 +2667,16 @@ describe("SchoolOS web production contracts", () => {
     assert.match(communicationsForm, /Schedule notice/);
   });
 
-  it("preserves events, delivery records, and consent management behavior", () => {
-    const communicationsForm = read("components/forms/communications-form.tsx");
+  it('preserves events, delivery records, and consent management behavior', () => {
+    const communicationsForm = read('components/forms/communications-form.tsx');
     const deliveryStatuses = [
-      "QUEUED",
-      "SENT",
-      "FAILED",
-      "SKIPPED",
-      "PENDING",
-      "RETRYING",
-      "RETRY_PENDING",
+      'QUEUED',
+      'SENT',
+      'FAILED',
+      'SKIPPED',
+      'PENDING',
+      'RETRYING',
+      'RETRY_PENDING',
     ];
 
     assert.match(communicationsForm, /Event Publisher/);
@@ -2688,52 +2694,52 @@ describe("SchoolOS web production contracts", () => {
     }
   });
 
-  it("keeps parent-teacher messaging moderation and escalation decisions explicit", () => {
+  it('keeps parent-teacher messaging moderation and escalation decisions explicit', () => {
     const messaging = read(
-      "components/messaging/parent-teacher-messaging-workspace.tsx",
+      'components/messaging/parent-teacher-messaging-workspace.tsx',
     );
 
     for (const marker of [
-      "chat-moderation-decision-panel",
-      "Safety & Escalation Queue",
-      "getModerationDecision",
-      "Concern reason",
-      "Moderation reason",
-      "Escalation reason",
-      "Thread closed with an audited moderation reason.",
-      "Thread escalated for school leadership review.",
-      "Escalated thread needs owner review",
+      'chat-moderation-decision-panel',
+      'Safety & Escalation Queue',
+      'getModerationDecision',
+      'Concern reason',
+      'Moderation reason',
+      'Escalation reason',
+      'Thread closed with an audited moderation reason.',
+      'Thread escalated for school leadership review.',
+      'Escalated thread needs owner review',
     ]) {
       assert.ok(messaging.includes(marker), `Missing marker: ${marker}`);
     }
   });
 
-  it("keeps notice unread recipient follow-up controls available", () => {
-    const noticeDetail = read("app/dashboard/notices/[noticeId]/page.tsx");
+  it('keeps notice unread recipient follow-up controls available', () => {
+    const noticeDetail = read('app/dashboard/notices/[noticeId]/page.tsx');
 
     for (const marker of [
-      "notice-unread-recipient-controls",
-      "Search unread notice recipients",
-      "Filter unread recipients by channel",
-      "Filter unread recipients by class",
-      "Follow-up queue:",
-      "visible delivery records failed",
-      "visible recipients need contact cleanup",
-      "Contact:",
-      "No unread recipients match these filters",
+      'notice-unread-recipient-controls',
+      'Search unread notice recipients',
+      'Filter unread recipients by channel',
+      'Filter unread recipients by class',
+      'Follow-up queue:',
+      'visible delivery records failed',
+      'visible recipients need contact cleanup',
+      'Contact:',
+      'No unread recipients match these filters',
     ]) {
       assert.ok(noticeDetail.includes(marker), `Missing marker: ${marker}`);
     }
   });
 
-  it("keeps M12 notices and chat workspaces tokenized and production-backed", () => {
+  it('keeps M12 notices and chat workspaces tokenized and production-backed', () => {
     const surfaces = [
-      "components/notices/notices-workspace.tsx",
-      "components/forms/communications-form.tsx",
-      "components/forms/delivery-retry-panel.tsx",
-      "components/forms/notice-detail-links-panel.tsx",
-      "components/messaging/parent-teacher-messaging-workspace.tsx",
-      "app/dashboard/notices/[noticeId]/page.tsx",
+      'components/notices/notices-workspace.tsx',
+      'components/forms/communications-form.tsx',
+      'components/forms/delivery-retry-panel.tsx',
+      'components/forms/notice-detail-links-panel.tsx',
+      'components/messaging/parent-teacher-messaging-workspace.tsx',
+      'app/dashboard/notices/[noticeId]/page.tsx',
     ];
     const forbidden = [
       /bg-slate-900/,
@@ -2756,12 +2762,9 @@ describe("SchoolOS web production contracts", () => {
     for (const surface of surfaces) {
       const source = read(surface);
 
-      if (surface === "components/notices/notices-workspace.tsx") {
+      if (surface === 'components/notices/notices-workspace.tsx') {
         assert.match(source, /bg-\[var\(--primary\)\]/);
-        assert.doesNotMatch(
-          source,
-          /bg-\[var\(--color-mod-notices-accent\)\]/,
-        );
+        assert.doesNotMatch(source, /bg-\[var\(--color-mod-notices-accent\)\]/);
       } else {
         assert.match(source, /color-mod-notices/);
       }
@@ -2770,35 +2773,35 @@ describe("SchoolOS web production contracts", () => {
       }
     }
 
-    const retryPanel = read("components/forms/delivery-retry-panel.tsx");
+    const retryPanel = read('components/forms/delivery-retry-panel.tsx');
     for (const marker of [
-      "Batch retry reason",
-      "Retry reason is recorded in delivery audit metadata.",
-      "RETRY_PENDING",
-      "retryReasons",
-      "api.retryNotificationDelivery(deliveryId, { reason })",
-      "api.retryFailedNotificationDeliveries({ reason })",
+      'Batch retry reason',
+      'Retry reason is recorded in delivery audit metadata.',
+      'RETRY_PENDING',
+      'retryReasons',
+      'api.retryNotificationDelivery(deliveryId, { reason })',
+      'api.retryFailedNotificationDeliveries({ reason })',
     ]) {
       assert.ok(retryPanel.includes(marker), `Missing marker: ${marker}`);
     }
   });
 
-  it("uses the shared M15 workspace shell without browser-derived official totals", () => {
-    const workspace = read("components/notices/notices-workspace.tsx");
-    const communicationsForm = read("components/forms/communications-form.tsx");
+  it('uses the shared M15 workspace shell without browser-derived official totals', () => {
+    const workspace = read('components/notices/notices-workspace.tsx');
+    const communicationsForm = read('components/forms/communications-form.tsx');
     const messaging = read(
-      "components/messaging/parent-teacher-messaging-workspace.tsx",
+      'components/messaging/parent-teacher-messaging-workspace.tsx',
     );
 
     for (const marker of [
-      "<ModuleHeader",
-      "<SummaryGrid",
-      "<SummaryCard",
-      "<WorkspaceTabs",
-      "<WorkSurface",
-      "New notice",
-      "moreActionItems",
-      "communicationsApi.getCommunicationsSummary",
+      '<ModuleHeader',
+      '<SummaryGrid',
+      '<SummaryCard',
+      '<WorkspaceTabs',
+      '<WorkSurface',
+      'New notice',
+      'moreActionItems',
+      'communicationsApi.getCommunicationsSummary',
     ]) {
       assert.ok(workspace.includes(marker), `Missing marker: ${marker}`);
     }
@@ -2810,8 +2813,8 @@ describe("SchoolOS web production contracts", () => {
     assert.match(messaging, /escalated thread is locked/);
   });
 
-  it("removes default emergency sample copy from communications", () => {
-    const communicationsForm = read("components/forms/communications-form.tsx");
+  it('removes default emergency sample copy from communications', () => {
+    const communicationsForm = read('components/forms/communications-form.tsx');
 
     assert.doesNotMatch(communicationsForm, /Emergency holiday notice/);
     assert.doesNotMatch(
@@ -2822,20 +2825,20 @@ describe("SchoolOS web production contracts", () => {
     assert.doesNotMatch(communicationsForm, /replace-me/i);
   });
 
-  it("provides a dedicated HR & Payroll workspace with contract and leave management", () => {
-    const sidebar = read("components/layout/sidebar.tsx");
-    const hrWorkspace = read("components/hr/hr-workspace.tsx");
-    const hrOverview = read("components/hr/hr-overview.tsx");
-    const contractList = read("components/hr/contract-list.tsx");
-    const leaveList = read("components/hr/leave-request-list.tsx");
+  it('provides a dedicated HR & Payroll workspace with contract and leave management', () => {
+    const sidebar = read('components/layout/sidebar.tsx');
+    const hrWorkspace = read('components/hr/hr-workspace.tsx');
+    const hrOverview = read('components/hr/hr-overview.tsx');
+    const contractList = read('components/hr/contract-list.tsx');
+    const leaveList = read('components/hr/leave-request-list.tsx');
     const attendanceSummary = read(
-      "components/hr/staff-attendance-summary.tsx",
+      'components/hr/staff-attendance-summary.tsx',
     );
-    const staffDetail = read("components/hr/staff-detail-workspace.tsx");
-    const hrPage = read("app/dashboard/hr/page.tsx");
-    const payrollPage = read("app/dashboard/payroll/page.tsx");
-    const payrollApi = read("lib/api/payroll.ts");
-    const payslipList = read("components/hr/payslip-list.tsx");
+    const staffDetail = read('components/hr/staff-detail-workspace.tsx');
+    const hrPage = read('app/dashboard/hr/page.tsx');
+    const payrollPage = read('app/dashboard/payroll/page.tsx');
+    const payrollApi = read('lib/api/payroll.ts');
+    const payslipList = read('components/hr/payslip-list.tsx');
 
     assert.match(sidebar, /label: 'HR \/ Staff'/);
     assert.match(sidebar, /label: 'Payroll'/);
@@ -2870,7 +2873,7 @@ describe("SchoolOS web production contracts", () => {
     assert.match(payrollPage, /<WorkspaceTabs/);
     assert.match(payrollPage, /<WorkSurface/);
     assert.match(
-      read("app/dashboard/payroll/reports/page.tsx"),
+      read('app/dashboard/payroll/reports/page.tsx'),
       /api\.getPayrollReportSummary/,
     );
     assert.match(
@@ -2907,7 +2910,7 @@ describe("SchoolOS web production contracts", () => {
     assert.match(leaveList, /api\.rejectLeaveRequest/);
     assert.match(leaveList, /PENDING|APPROVED|REJECTED/);
 
-    const leaveBalanceList = read("components/hr/leave-balance-list.tsx");
+    const leaveBalanceList = read('components/hr/leave-balance-list.tsx');
     assert.match(leaveBalanceList, /api\.list(Staff|All)LeaveBalances/);
     assert.match(leaveBalanceList, /Entitlement|Used|Pending|Remaining/);
 
@@ -2918,7 +2921,7 @@ describe("SchoolOS web production contracts", () => {
     assert.match(staffDetail, /Lifecycle Audit/);
     assert.match(staffDetail, /staff-history/);
 
-    const payrollPreview = read("components/hr/payroll-preview.tsx");
+    const payrollPreview = read('components/hr/payroll-preview.tsx');
     assert.match(payrollPreview, /api\.getPayrollPreview/);
     assert.match(payrollPreview, /Preview Only/);
     assert.match(payrollPreview, /No accounting entries/);
@@ -2940,8 +2943,8 @@ describe("SchoolOS web production contracts", () => {
       /\/accounting\/journal-entries|\/accounting\/ledger/i,
     );
 
-    const payrollRuns = read("components/hr/payroll-runs.tsx");
-    const payrollActionDialog = read("components/hr/payroll-action-dialog.tsx");
+    const payrollRuns = read('components/hr/payroll-runs.tsx');
+    const payrollActionDialog = read('components/hr/payroll-action-dialog.tsx');
     assert.match(payrollRuns, /Post to M11 Accounting/);
     assert.match(
       payrollRuns,

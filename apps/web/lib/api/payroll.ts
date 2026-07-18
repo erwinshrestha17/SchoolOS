@@ -13,7 +13,7 @@ import type {
   StaffContractSummary,
   StaffDetail,
   StaffSummary,
-} from "@schoolos/core";
+} from '@schoolos/core';
 import {
   API_BASE_URL,
   JsonBody,
@@ -22,10 +22,10 @@ import {
   downloadCsv,
   request,
   withQuery,
-} from "./client";
+} from './client';
 
 export type StaffContractExpiryReminder = {
-  type: "CONTRACT_EXPIRY" | "PROBATION_END";
+  type: 'CONTRACT_EXPIRY' | 'PROBATION_END';
   staffId: string;
   employeeId: string | null;
   staffName: string;
@@ -71,6 +71,22 @@ export type LeaveQueueDepth = {
   preview: LeaveQueueDepthPreview[];
 };
 
+export type StaffSelfServiceTimelineItem = {
+  id: string;
+  type: string;
+  occurredAt: string;
+  title: string;
+  reason?: string | null;
+  notes?: string | null;
+  metadata?: Record<string, unknown> | null;
+};
+
+export type StaffSelfServiceTimeline = {
+  staffId: string;
+  total: number;
+  items: StaffSelfServiceTimelineItem[];
+};
+
 export type PayrollReportSummary = {
   runCount: number;
   staffCount: number;
@@ -112,15 +128,15 @@ export type PayrollExceptionParams = {
 };
 
 function protectedPdfFileName(prefix: string, id: string) {
-  const safeId = id.replace(/[^a-z0-9._-]+/gi, "-").replace(/^-+|-+$/g, "");
-  return `${prefix}-${safeId || "file"}.pdf`;
+  const safeId = id.replace(/[^a-z0-9._-]+/gi, '-').replace(/^-+|-+$/g, '');
+  return `${prefix}-${safeId || 'file'}.pdf`;
 }
 
 export const payrollApi = {
-  listStaff: () => request<StaffSummary[]>("/staff"),
+  listStaff: () => request<StaffSummary[]>('/staff'),
   listStaffDirectory: (params?: M7ListParams) =>
     request<PaginatedResponse<StaffSummary>>(
-      withQuery("/staff/directory", params ?? {}),
+      withQuery('/staff/directory', params ?? {}),
     ),
   getStaffDetail: (staffId: string) =>
     request<StaffDetail>(`/hr/staff/${encodeURIComponent(staffId)}`),
@@ -130,61 +146,61 @@ export const payrollApi = {
     ),
   updateStaffDetail: (staffId: string, body: JsonBody) =>
     request<StaffDetail>(`/hr/staff/${encodeURIComponent(staffId)}`, {
-      method: "PATCH",
+      method: 'PATCH',
       json: body,
     }),
   updateStaffLifecycle: (staffId: string, body: JsonBody) =>
     request<StaffDetail>(`/hr/staff/${encodeURIComponent(staffId)}/lifecycle`, {
-      method: "POST",
+      method: 'POST',
       json: body,
     }),
   createStaff: (body: JsonBody) =>
-    request<StaffSummary>("/staff", { method: "POST", json: body }),
-  listRoles: () => request<RoleSummary[]>("/roles"),
+    request<StaffSummary>('/staff', { method: 'POST', json: body }),
+  listRoles: () => request<RoleSummary[]>('/roles'),
   listStaffContractsPage: (params?: M7ListParams) =>
     request<PaginatedResponse<StaffContractSummary>>(
-      withQuery("/hr/contracts", params ?? {}),
+      withQuery('/hr/contracts', params ?? {}),
     ),
   listStaffContracts: async () => {
     const page = await payrollApi.listStaffContractsPage();
     return page.items;
   },
   createStaffContract: (body: JsonBody) =>
-    request<StaffContractSummary>("/hr/contracts", {
-      method: "POST",
+    request<StaffContractSummary>('/hr/contracts', {
+      method: 'POST',
       json: body,
     }),
   listContractExpiryReminders: (params?: { days?: number }) =>
     request<StaffContractExpiryReminderResponse>(
-      withQuery("/hr/staff/contract-expiry/reminders", params ?? {}),
+      withQuery('/hr/staff/contract-expiry/reminders', params ?? {}),
     ),
   getLeaveQueueDepth: (params?: { staleDays?: number }) =>
-    request<LeaveQueueDepth>(withQuery("/hr/leave-queue/depth", params ?? {})),
+    request<LeaveQueueDepth>(withQuery('/hr/leave-queue/depth', params ?? {})),
   getPayrollDashboardSummary: (params?: M7ListParams) =>
     request<PayrollDashboardSummary>(
-      withQuery("/payroll/dashboard-summary", params ?? {}),
+      withQuery('/payroll/dashboard-summary', params ?? {}),
     ),
   getPayrollReadiness: (params?: PayrollExceptionParams) =>
     request<PayrollReadinessSummary>(
-      withQuery("/payroll/readiness", params ?? {}),
+      withQuery('/payroll/readiness', params ?? {}),
     ),
   listPayrollExceptions: (params?: PayrollExceptionParams) =>
     request<PayrollExceptionPage>(
-      withQuery("/payroll/exceptions", params ?? {}),
+      withQuery('/payroll/exceptions', params ?? {}),
     ),
   recheckPayrollReadiness: (params?: PayrollExceptionParams) =>
     request<PayrollReadinessSummary>(
-      withQuery("/payroll/readiness/recheck", params ?? {}),
-      { method: "POST", json: {} },
+      withQuery('/payroll/readiness/recheck', params ?? {}),
+      { method: 'POST', json: {} },
     ),
   acknowledgePayrollException: (id: string, reason: string) =>
     request<PayrollExceptionSummary>(
       `/payroll/exceptions/${encodeURIComponent(id)}/acknowledge`,
-      { method: "POST", json: { reason } },
+      { method: 'POST', json: { reason } },
     ),
   listPayrollRunsPage: (params?: M7ListParams) =>
     request<PaginatedResponse<PayrollRunSummary>>(
-      withQuery("/payroll/runs", params ?? {}),
+      withQuery('/payroll/runs', params ?? {}),
     ),
   listPayrollRuns: async () => {
     const page = await payrollApi.listPayrollRunsPage();
@@ -193,101 +209,101 @@ export const payrollApi = {
   getPayrollRun: (id: string) =>
     request<PayrollRunSummary>(`/payroll/runs/${encodeURIComponent(id)}`),
   previewPayrollRun: (body: JsonBody) =>
-    request<PayrollPreviewResult[]>("/payroll/runs/preview", {
-      method: "POST",
+    request<PayrollPreviewResult[]>('/payroll/runs/preview', {
+      method: 'POST',
       json: body,
     }),
   createPayrollRun: (body: JsonBody) =>
-    request<PayrollRunSummary>("/payroll/runs", { method: "POST", json: body }),
+    request<PayrollRunSummary>('/payroll/runs', { method: 'POST', json: body }),
   reviewPayrollRun: (id: string) =>
     request<PayrollRunSummary>(`/payroll/runs/${id}/review`, {
-      method: "POST",
+      method: 'POST',
       json: {},
     }),
   approvePayrollRun: (id: string) =>
     request<PayrollRunSummary>(`/payroll/runs/${id}/approve`, {
-      method: "POST",
+      method: 'POST',
       json: {},
     }),
   postPayrollRun: (id: string) =>
     request<PayrollRunSummary>(`/payroll/runs/${id}/post`, {
-      method: "POST",
+      method: 'POST',
       json: {},
     }),
   submitPayrollRunReview: (id: string) =>
     request<PayrollRunSummary>(`/payroll/runs/${id}/submit-review`, {
-      method: "POST",
+      method: 'POST',
       json: {},
     }),
   rejectPayrollRun: (id: string, body: JsonBody) =>
     request<PayrollRunSummary>(`/payroll/runs/${id}/reject`, {
-      method: "POST",
+      method: 'POST',
       json: body,
     }),
   reversePayrollRun: (id: string, body: JsonBody) =>
     request<PayrollRunSummary>(`/payroll/runs/${id}/reverse`, {
-      method: "POST",
+      method: 'POST',
       json: body,
     }),
   listSalaryStructuresPage: (params?: M7ListParams) =>
     request<PaginatedResponse<SalaryStructureSummary>>(
-      withQuery("/payroll/salary-structures", params ?? {}),
+      withQuery('/payroll/salary-structures', params ?? {}),
     ),
   listSalaryStructures: async () => {
     const page = await payrollApi.listSalaryStructuresPage();
     return page.items;
   },
   createSalaryStructure: (body: JsonBody) =>
-    request<SalaryStructureSummary>("/payroll/salary-structures", {
-      method: "POST",
+    request<SalaryStructureSummary>('/payroll/salary-structures', {
+      method: 'POST',
       json: body,
     }),
   activateSalaryStructure: (id: string) =>
     request<SalaryStructureSummary>(
       `/payroll/salary-structures/${encodeURIComponent(id)}/activate`,
-      { method: "POST", json: {} },
+      { method: 'POST', json: {} },
     ),
   archiveSalaryStructure: (id: string) =>
     request<SalaryStructureSummary>(
       `/payroll/salary-structures/${encodeURIComponent(id)}/archive`,
-      { method: "POST", json: {} },
+      { method: 'POST', json: {} },
     ),
   getPayrollRegister: (params?: JsonBody) =>
-    request<unknown[]>(withQuery("/payroll/reports/register", params ?? {})),
+    request<unknown[]>(withQuery('/payroll/reports/register', params ?? {})),
   getPayrollReportSummary: (params?: JsonBody) =>
     request<PayrollReportSummary>(
-      withQuery("/payroll/reports/summary", params ?? {}),
+      withQuery('/payroll/reports/summary', params ?? {}),
     ),
   getPayrollPfSummary: (params?: JsonBody) =>
-    request<unknown>(withQuery("/payroll/reports/pf", params ?? {})),
+    request<unknown>(withQuery('/payroll/reports/pf', params ?? {})),
   getPayrollTdsSummary: (params?: JsonBody) =>
-    request<unknown>(withQuery("/payroll/reports/tds", params ?? {})),
+    request<unknown>(withQuery('/payroll/reports/tds', params ?? {})),
   getPayrollSalaryComponentSummary: (params?: JsonBody) =>
     request<unknown>(
-      withQuery("/payroll/reports/salary-components", params ?? {}),
+      withQuery('/payroll/reports/salary-components', params ?? {}),
     ),
   getPayrollLeaveDeductionSummary: (params?: JsonBody) =>
     request<unknown>(
-      withQuery("/payroll/reports/leave-deductions", params ?? {}),
+      withQuery('/payroll/reports/leave-deductions', params ?? {}),
     ),
   exportPayrollRegisterCsv: (params?: JsonBody) =>
     downloadCsv(
-      withQuery("/payroll/reports/register.csv", params ?? {}),
+      withQuery('/payroll/reports/register.csv', params ?? {}),
       `payroll-register-${new Date().toISOString().slice(0, 10)}.csv`,
     ),
   exportPayrollPfCsv: (params?: JsonBody) =>
     downloadCsv(
-      withQuery("/payroll/reports/pf/export.csv", params ?? {}),
+      withQuery('/payroll/reports/pf/export.csv', params ?? {}),
       `payroll-pf-${new Date().toISOString().slice(0, 10)}.csv`,
     ),
   exportPayrollTdsCsv: (params?: JsonBody) =>
     downloadCsv(
-      withQuery("/payroll/reports/tds/export.csv", params ?? {}),
+      withQuery('/payroll/reports/tds/export.csv', params ?? {}),
       `payroll-tds-${new Date().toISOString().slice(0, 10)}.csv`,
     ),
   listPayslipsPage: (params?: M7ListParams) =>
     request<PaginatedResponse<PayslipSummary>>(
-      withQuery("/payroll/payslips", params ?? {}),
+      withQuery('/payroll/payslips', params ?? {}),
     ),
   listPayslips: async () => {
     const page = await payrollApi.listPayslipsPage();
@@ -296,7 +312,7 @@ export const payrollApi = {
   queuePayslipRegeneration: (runId: string, payslipId: string) =>
     request<PayslipRegenerationJobSummary>(
       `/payroll/runs/${encodeURIComponent(runId)}/payslips/${encodeURIComponent(payslipId)}/regeneration-jobs`,
-      { method: "POST", json: {} },
+      { method: 'POST', json: {} },
     ),
   getPayslipRegenerationJob: (
     runId: string,
@@ -309,10 +325,10 @@ export const payrollApi = {
   openPayrollRunStaffPayslipPdf: async (runId: string, staffId: string) => {
     const response = await fetch(
       `${API_BASE_URL}/payroll/runs/${encodeURIComponent(runId)}/staff/${encodeURIComponent(staffId)}/payslip.pdf`,
-      { credentials: "include" },
+      { credentials: 'include' },
     );
 
-    await downloadBlob(response, protectedPdfFileName("payslip", staffId));
+    await downloadBlob(response, protectedPdfFileName('payslip', staffId));
   },
   getPayrollPreview: (params: {
     year: number;
@@ -320,7 +336,7 @@ export const payrollApi = {
     workingDays?: number;
   }) =>
     request<PayrollPreviewResult[]>(
-      withQuery("/payroll/preview", {
+      withQuery('/payroll/preview', {
         year: String(params.year),
         month: String(params.month),
         workingDays: params.workingDays
@@ -328,10 +344,12 @@ export const payrollApi = {
           : undefined,
       }),
     ),
-  getMyProfile: () => request<any>("/staff/me"),
+  getMyProfile: () => request<StaffDetail>('/staff/me'),
+  getMyStaffTimeline: () =>
+    request<StaffSelfServiceTimeline>('/staff/me/timeline'),
   listMyPayslipsPage: (params?: M7ListParams) =>
     request<PaginatedResponse<PayslipSummary>>(
-      withQuery("/payroll/me/payslips", params ?? {}),
+      withQuery('/payroll/me/payslips', params ?? {}),
     ),
   listMyPayslips: async () => {
     const page = await payrollApi.listMyPayslipsPage();
@@ -341,26 +359,26 @@ export const payrollApi = {
     const response = await fetch(
       `${API_BASE_URL}/payroll/me/payslips/${encodeURIComponent(payslipNumber)}.pdf`,
       {
-        credentials: "include",
+        credentials: 'include',
       },
     );
 
     await downloadBlob(
       response,
-      protectedPdfFileName("payslip", payslipNumber),
+      protectedPdfFileName('payslip', payslipNumber),
     );
   },
   openPayslipPdf: async (payslipNumber: string) => {
     const response = await fetch(
       `${API_BASE_URL}/payroll/payslips/${encodeURIComponent(payslipNumber)}.pdf`,
       {
-        credentials: "include",
+        credentials: 'include',
       },
     );
 
     await downloadBlob(
       response,
-      protectedPdfFileName("payslip", payslipNumber),
+      protectedPdfFileName('payslip', payslipNumber),
     );
   },
 
@@ -368,19 +386,19 @@ export const payrollApi = {
   openApprovedSalarySlipPdf: async (runId: string, lineId: string) => {
     const response = await fetch(
       `${API_BASE_URL}/payroll/runs/${encodeURIComponent(runId)}/lines/${encodeURIComponent(lineId)}/salary-slip.pdf`,
-      { credentials: "include" },
+      { credentials: 'include' },
     );
-    await downloadBlob(response, protectedPdfFileName("salary-slip", lineId));
+    await downloadBlob(response, protectedPdfFileName('salary-slip', lineId));
   },
 
   archiveStaff: (staffId: string, reason?: string) =>
     request<StaffDetail>(`/hr/staff/${encodeURIComponent(staffId)}/archive`, {
-      method: "POST",
+      method: 'POST',
       json: { reason },
     }),
   terminateStaff: (staffId: string, body: JsonBody) =>
     request<StaffDetail>(`/hr/staff/${encodeURIComponent(staffId)}/terminate`, {
-      method: "POST",
+      method: 'POST',
       json: body,
     }),
   listStaffDocuments: (
@@ -395,14 +413,14 @@ export const payrollApi = {
     ),
   addStaffDocument: (staffId: string, body: JsonBody) =>
     request<any>(`/hr/staff/${encodeURIComponent(staffId)}/documents`, {
-      method: "POST",
+      method: 'POST',
       json: body,
     }),
   verifyStaffDocument: (staffId: string, documentId: string, body: JsonBody) =>
     request<any>(
       `/hr/staff/${encodeURIComponent(staffId)}/documents/${encodeURIComponent(documentId)}/verify`,
       {
-        method: "POST",
+        method: 'POST',
         json: body,
       },
     ),
@@ -410,7 +428,7 @@ export const payrollApi = {
     request<SalaryStructureSummary>(
       `/payroll/salary-structures/${encodeURIComponent(id)}`,
       {
-        method: "PATCH",
+        method: 'PATCH',
         json: body,
       },
     ),
@@ -418,7 +436,7 @@ export const payrollApi = {
     request<PayrollRunSummary>(
       `/payroll/runs/${encodeURIComponent(id)}/mark-paid`,
       {
-        method: "POST",
+        method: 'POST',
         json: body,
       },
     ),
@@ -428,8 +446,8 @@ export const payrollApi = {
       `payroll-register-${id}-${new Date().toISOString().slice(0, 10)}.csv`,
     ),
   processLeaveAccruals: (body: { year: number; month: number }) =>
-    request<any>("/hr/staff/accruals/process", {
-      method: "POST",
+    request<any>('/hr/staff/accruals/process', {
+      method: 'POST',
       json: body,
     }),
 };

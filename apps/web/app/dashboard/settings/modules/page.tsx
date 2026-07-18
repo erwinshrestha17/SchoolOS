@@ -1,3 +1,15 @@
-import { SchoolModulesSettingsWorkspace } from '@/components/settings/school-modules-settings-workspace';
+import {
+  redirectWithSearchParams,
+  type RouteSearchParams,
+} from '@/lib/redirect-with-search-params';
 
-export default function SchoolModulesSettingsPage() { return <SchoolModulesSettingsWorkspace />; }
+export default function SchoolModulesSettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<RouteSearchParams>;
+}) {
+  return redirectWithSearchParams(
+    '/dashboard/settings/school/modules',
+    searchParams,
+  );
+}

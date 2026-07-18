@@ -2,35 +2,46 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useSession } from "../session-provider";
+import { useEntitlements } from "../entitlements-provider";
 import { api } from "../../lib/api";
 import { GlobalStudentSearch } from "./global-student-search";
 import { NotificationBell } from "./notification-bell";
 import {
+  BriefcaseBusiness,
   ChevronDown,
-  Menu,
-  User,
   LogOut,
+  Menu,
   School,
   Settings,
-  ShieldCheck,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useRef, useEffect, type RefObject } from "react";
+import { useState, type RefObject } from "react";
 
 import { Avatar } from "../ui/avatar";
 import { cn } from "../../lib/utils";
 import { Badge } from "../ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/primitives/dropdown-menu";
 
 export type HeaderProps = {
   onMobileMenuToggle: () => void;
   mobileMenuButtonRef?: RefObject<HTMLButtonElement | null>;
 };
 
-export function Header({ onMobileMenuToggle, mobileMenuButtonRef }: HeaderProps) {
+export function Header({
+  onMobileMenuToggle,
+  mobileMenuButtonRef,
+}: HeaderProps) {
   const router = useRouter();
   const { hasPermissions, session, status, logout } = useSession();
+  const { hasModule } = useEntitlements();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const userMenuRef = useRef<HTMLDivElement>(null);
 
   const canReadAcademicYears = hasPermissions(["academic_years:read"]);
   const canReadNotifications = hasPermissions(["notices:read"]);
@@ -40,36 +51,45 @@ export function Header({ onMobileMenuToggle, mobileMenuButtonRef }: HeaderProps)
     queryFn: api.listAcademicYears,
     enabled: status === "authenticated" && canReadAcademicYears,
   });
+  const profileQuery = useQuery({
+    queryKey: ["auth", "profile"],
+    queryFn: api.getProfile,
+    enabled: status === "authenticated",
+  });
 
   const academicYears = academicYearsQuery.data ?? [];
   const currentAcademicYear =
     academicYears.find((year) => year.isCurrent) ?? academicYears[0];
 
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (
-        userMenuRef.current &&
-        !userMenuRef.current.contains(e.target as Node)
-      ) {
-        setUserMenuOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const initials = session?.user.email
-    ? session.user.email
-        .split("@")[0]
-        .split(".")
+  const authenticatedName = profileQuery.data?.staff
+    ? [profileQuery.data.staff.firstName, profileQuery.data.staff.lastName]
+        .filter(Boolean)
+        .join(" ")
+    : profileQuery.data?.student
+      ? [
+          profileQuery.data.student.firstNameEn,
+          profileQuery.data.student.lastNameEn,
+        ]
+          .filter(Boolean)
+          .join(" ")
+      : null;
+  const displayName =
+    authenticatedName || session?.user.email?.split("@")[0] || "User";
+  const initials = displayName
+    ? displayName
+        .split(/[\s._-]+/)
         .map((p) => p[0]?.toUpperCase())
         .join("")
         .slice(0, 2)
     : "U";
 
-  const displayName = session?.user.email?.split("@")[0] ?? "User";
   const primaryRole = session?.user.roles[0]?.replace(/_/g, " ") ?? "User";
   const tenantName = session?.tenant.name ?? "SchoolOS";
+  const canOpenMyWorkspace = Boolean(
+    profileQuery.data?.staff &&
+    hasModule("hr") &&
+    session?.user.permissions.includes("staff:read"),
+  );
 
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-slate-200 bg-white/95 px-4 shadow-sm shadow-slate-200/40 backdrop-blur-md lg:px-8">
@@ -127,131 +147,109 @@ export function Header({ onMobileMenuToggle, mobileMenuButtonRef }: HeaderProps)
 
         <div className="mx-1 hidden h-8 w-px bg-slate-200 sm:block" />
 
-        <div className="relative" ref={userMenuRef}>
-          <button
-            type="button"
-            onClick={() => setUserMenuOpen(!userMenuOpen)}
-            className="group flex items-center gap-3 rounded-xl p-1 pr-2 transition-all hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2"
-            aria-expanded={userMenuOpen}
-            aria-haspopup="menu"
-            aria-label="User profile menu"
-          >
-            <Avatar
-              initials={initials}
-              size="sm"
-              className="shadow-sm shadow-[var(--primary-soft)] ring-2 ring-white transition-all group-hover:ring-[var(--primary-soft)]"
-            />
-            <div className="hidden min-w-0 text-left sm:block">
-              <p className="mb-1 max-w-[120px] truncate text-sm font-bold capitalize leading-none text-slate-900">
-                {displayName}
-              </p>
-              <p className="text-xs font-semibold capitalize leading-none text-slate-500">
-                {primaryRole}
-              </p>
-            </div>
-            <ChevronDown
-              size={14}
-              className={cn(
-                "hidden text-slate-400 transition-transform duration-200 sm:block",
-                userMenuOpen && "rotate-180",
-              )}
-            />
-          </button>
-
-          {userMenuOpen && (
-            <div
-              className="dropdown-menu animate-scale-in"
-              role="menu"
-              style={{ width: "240px" }}
+        <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="group flex items-center gap-3 rounded-xl p-1 pr-2 transition-all hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2"
+              aria-label="User profile menu"
             >
-              <div className="rounded-t-xl border-b border-slate-50 bg-slate-50/50 p-3">
-                <div className="flex items-center gap-3">
-                  <Avatar
-                    initials={initials}
-                    size="md"
-                    className="ring-2 ring-white"
+              <Avatar
+                initials={initials}
+                size="sm"
+                className="shadow-sm shadow-[var(--primary-soft)] ring-2 ring-white transition-all group-hover:ring-[var(--primary-soft)]"
+              />
+              <div className="hidden min-w-0 text-left sm:block">
+                <p className="mb-1 max-w-[120px] truncate text-sm font-bold capitalize leading-none text-slate-900">
+                  {displayName}
+                </p>
+                <p className="text-xs font-semibold capitalize leading-none text-slate-500">
+                  {primaryRole}
+                </p>
+              </div>
+              <ChevronDown
+                size={14}
+                className={cn(
+                  "hidden text-slate-400 transition-transform duration-200 sm:block",
+                  userMenuOpen && "rotate-180",
+                )}
+                aria-hidden="true"
+              />
+            </button>
+          </DropdownMenuTrigger>
+
+          <DropdownMenuContent
+            align="end"
+            sideOffset={8}
+            className="w-72 rounded-xl border-slate-200 bg-white p-1 text-slate-900 shadow-lg"
+          >
+            <DropdownMenuLabel className="rounded-lg bg-slate-50 p-3 font-normal">
+              <div className="flex items-center gap-3">
+                <Avatar
+                  initials={initials}
+                  size="md"
+                  className="ring-2 ring-white"
+                />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold capitalize text-slate-900">
+                    {displayName}
+                  </p>
+                  <p className="truncate text-xs text-slate-500">
+                    {session?.user.email ?? "No email available"}
+                  </p>
+                </div>
+              </div>
+              <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1 text-xs">
+                <dt className="font-semibold text-slate-500">Role</dt>
+                <dd className="truncate font-bold capitalize text-slate-700">
+                  {primaryRole}
+                </dd>
+                <dt className="font-semibold text-slate-500">School</dt>
+                <dd className="truncate font-bold text-slate-700">
+                  {tenantName}
+                </dd>
+              </dl>
+            </DropdownMenuLabel>
+
+            <div className="py-1">
+              {canOpenMyWorkspace ? (
+                <DropdownMenuItem
+                  className="cursor-pointer rounded-lg px-3 py-2.5 font-semibold text-slate-700 focus:bg-slate-100 focus:text-slate-950"
+                  onSelect={() => router.push("/dashboard/my-workspace")}
+                >
+                  <BriefcaseBusiness
+                    className="h-4 w-4 text-slate-400"
+                    aria-hidden="true"
                   />
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-bold capitalize text-slate-900">
-                      {displayName}
-                    </p>
-                    <p className="truncate text-[0.7rem] text-slate-500">
-                      {session?.user.email ?? session?.tenant.slug}
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-2.5 flex items-center gap-2">
-                  <Badge variant="neutral" className="py-0 capitalize">
-                    {primaryRole}
-                  </Badge>
-                  {session?.tenant.name && (
-                    <span className="truncate text-xs font-semibold text-slate-500">
-                      {session.tenant.name}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="p-1">
-                <button
-                  type="button"
-                  className="dropdown-item w-full"
-                  onClick={() => {
-                    setUserMenuOpen(false);
-                    router.push("/dashboard/my-profile");
-                  }}
-                  role="menuitem"
-                >
-                  <User size={16} className="text-slate-400" />
-                  <span className="font-medium">My Profile</span>
-                </button>
-
-                <button
-                  type="button"
-                  className="dropdown-item w-full"
-                  onClick={() => {
-                    setUserMenuOpen(false);
-                    router.push("/dashboard/settings");
-                  }}
-                  role="menuitem"
-                >
-                  <Settings size={16} className="text-slate-400" />
-                  <span className="font-medium">Account Settings</span>
-                </button>
-
-                <button
-                  type="button"
-                  className="dropdown-item w-full"
-                  onClick={() => {
-                    setUserMenuOpen(false);
-                    router.push("/dashboard/account-security");
-                  }}
-                  role="menuitem"
-                >
-                  <ShieldCheck size={16} className="text-slate-400" />
-                  <span className="font-medium">Account &amp; Security</span>
-                </button>
-              </div>
-
-              <div className="dropdown-divider" />
-
-              <div className="p-1">
-                <button
-                  type="button"
-                  className="dropdown-item dropdown-item-danger w-full"
-                  onClick={() => {
-                    setUserMenuOpen(false);
-                    void logout();
-                  }}
-                  role="menuitem"
-                >
-                  <LogOut size={16} />
-                  <span className="font-bold">Logout</span>
-                </button>
-              </div>
+                  My Workspace
+                </DropdownMenuItem>
+              ) : null}
+              <DropdownMenuItem
+                className="cursor-pointer rounded-lg px-3 py-2.5 font-semibold text-slate-700 focus:bg-slate-100 focus:text-slate-950"
+                onSelect={() =>
+                  router.push("/dashboard/settings/personal/profile")
+                }
+              >
+                <Settings
+                  className="h-4 w-4 text-slate-400"
+                  aria-hidden="true"
+                />
+                Personal Settings
+              </DropdownMenuItem>
             </div>
-          )}
-        </div>
+
+            <DropdownMenuSeparator className="bg-slate-200" />
+
+            <DropdownMenuItem
+              variant="destructive"
+              className="cursor-pointer rounded-lg px-3 py-2.5 font-bold text-rose-700 focus:bg-rose-50 focus:text-rose-800"
+              onSelect={() => void logout()}
+            >
+              <LogOut className="h-4 w-4" aria-hidden="true" />
+              Sign out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );

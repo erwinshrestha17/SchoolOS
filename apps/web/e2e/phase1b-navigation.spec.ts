@@ -21,45 +21,70 @@ test.describe('Phase 1B navigation smoke', () => {
 
     // Students / Admissions
     await page.goto('/dashboard/admissions');
-    await expect(page.getByRole('heading', { name: /^Students|Admissions$/i })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /^Students|Admissions$/i }),
+    ).toBeVisible();
 
     // Student Detail
     // Find the first "View Profile" link and navigate if available
-    const viewProfileLink = page.getByRole('link', { name: /View Profile/i }).first();
+    const viewProfileLink = page
+      .getByRole('link', { name: /View Profile/i })
+      .first();
     if (await viewProfileLink.isVisible()) {
       await viewProfileLink.click();
-      await expect(page.getByRole('heading', { name: /Student Profile/i })).toBeVisible();
+      await expect(
+        page.getByRole('heading', { name: /Student Profile/i }),
+      ).toBeVisible();
     }
 
     // Attendance & Register
     await page.goto('/dashboard/attendance');
-    await expect(page.getByRole('heading', { name: /Attendance/i })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /Attendance/i }),
+    ).toBeVisible();
     await page.goto('/dashboard/attendance/register');
-    await expect(page.getByRole('heading', { name: /Monthly Register/i })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /Monthly Register/i }),
+    ).toBeVisible();
 
     // Academics
     await page.goto('/dashboard/academics');
-    await expect(page.getByRole('heading', { name: /Academics/i })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /Academics/i }),
+    ).toBeVisible();
 
     // Finance
     await page.goto('/dashboard/fees');
-    await expect(page.getByRole('heading', { name: /Fees & Receipts/i })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /Fees & Receipts/i }),
+    ).toBeVisible();
 
     // Notices
     await page.goto('/dashboard/notices');
-    await expect(page.getByRole('heading', { name: /^Notices$/i })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /^Notices$/i }),
+    ).toBeVisible();
 
     // Settings
     await page.goto('/dashboard/settings');
-    await expect(page.getByText(/Applies only to this school/i).first()).toBeVisible();
-    
+    await expect(
+      page.getByText(
+        /Manage your personal preferences and school configuration/i,
+      ),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /Choose a settings area/i }),
+    ).toBeVisible();
+
     // Header components: Notifications, Global Search, and User Profile
     await expect(page.getByPlaceholder(/Search students/i)).toBeVisible();
     await expect(page.getByLabel(/Notifications/i)).toBeVisible();
-    
+
     // Click user profile to ensure it works
     await page.getByRole('button', { name: /User profile|Avatar/i }).click();
-    await expect(page.getByRole('menuitem', { name: /Log out/i })).toBeVisible();
+    await expect(
+      page.getByRole('menuitem', { name: /Sign out/i }),
+    ).toBeVisible();
   });
 });
 

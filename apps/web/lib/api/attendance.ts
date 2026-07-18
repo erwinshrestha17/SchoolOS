@@ -21,6 +21,25 @@ import {
   withQuery,
 } from "./client";
 
+export type StaffSelfAttendanceRecord = {
+  id: string;
+  attendanceDate: string;
+  status: string;
+  checkInAt: string | null;
+  checkOutAt: string | null;
+  note: string | null;
+};
+
+export type StaffSelfLeaveRequest = {
+  id: string;
+  leaveType: string;
+  startsOn: string;
+  endsOn: string;
+  days: number | string;
+  status: string;
+  reviewNote: string | null;
+};
+
 export const attendanceApi = {
   getAttendanceRoster: (params: {
     /** Omitted = the backend resolves the tenant's current academic year. */
@@ -308,9 +327,20 @@ export const attendanceApi = {
     ),
   listAllLeaveBalances: () =>
     request<StaffLeaveBalanceSummary[]>("/hr/leave-balances"),
-  listMyAttendance: () => request<unknown[]>("/attendance/me/attendance"),
+  listMyAttendance: () =>
+    request<StaffSelfAttendanceRecord[]>("/hr/me/attendance"),
   listMyLeaveRequests: () =>
-    request<unknown[]>("/attendance/me/leave-requests"),
+    request<StaffSelfLeaveRequest[]>("/hr/me/leave-requests"),
+  createMyLeaveRequest: (body: {
+    leaveType: string;
+    startsOn: string;
+    endsOn: string;
+    reason: string;
+  }) =>
+    request<StaffSelfLeaveRequest>("/hr/me/leave-requests", {
+      method: "POST",
+      json: body,
+    }),
 
   submitStaffAttendance: (body: JsonBody) =>
     request<unknown>("/hr/staff-attendance", {

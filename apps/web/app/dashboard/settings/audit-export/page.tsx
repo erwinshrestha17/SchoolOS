@@ -1,3 +1,15 @@
-import { AuditLogWorkspace } from '@/components/settings/audit-log-workspace';
+import {
+  redirectWithSearchParams,
+  type RouteSearchParams,
+} from '@/lib/redirect-with-search-params';
 
-export default function AuditExportSettingsPage() { return <AuditLogWorkspace includeExportDirectory />; }
+export default function AuditExportSettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<RouteSearchParams>;
+}) {
+  return redirectWithSearchParams(
+    '/dashboard/settings/system/audit-log',
+    searchParams,
+  );
+}

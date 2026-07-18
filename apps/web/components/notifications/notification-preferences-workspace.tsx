@@ -18,8 +18,13 @@ import { ErrorState } from '@/components/ui/error-state';
 import { PermissionDenied } from '@/components/ui/permission-denied';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { useSession } from '@/components/session-provider';
+import { SettingsPageHeader } from '@/components/settings/settings-page-header';
 
-export function NotificationPreferencesWorkspace() {
+export function NotificationPreferencesWorkspace({
+  embedded = false,
+}: {
+  embedded?: boolean;
+} = {}) {
   const { session } = useSession();
   const queryClient = useQueryClient();
   const permissions = new Set<PermissionKey>(session?.user.permissions ?? []);
@@ -80,13 +85,22 @@ export function NotificationPreferencesWorkspace() {
     setQuietHoursEnabled(override?.quietHoursEnabled ?? undefined);
   }
 
-  return (
-    <DashboardPageShell>
-      <ModuleHeader
-        eyebrow="Notifications"
-        title="My notification preferences"
-        description="Choose allowed personal channels while keeping mandatory school safety and security messages enabled."
-      />
+  const content = (
+    <>
+      {embedded ? (
+        <SettingsPageHeader
+          title="Notifications"
+          description="Choose allowed personal channels while keeping mandatory school safety and security messages enabled."
+          scope={{ type: 'personal', label: 'Personal setting' }}
+          access={canView ? 'can-manage' : 'no-access'}
+        />
+      ) : (
+        <ModuleHeader
+          eyebrow="Notifications"
+          title="Notifications"
+          description="Choose allowed personal channels while keeping mandatory school safety and security messages enabled."
+        />
+      )}
       {!canView ? (
         <PermissionDenied
           showNavigation={false}
@@ -245,7 +259,13 @@ export function NotificationPreferencesWorkspace() {
           </aside>
         </div>
       )}
-    </DashboardPageShell>
+    </>
+  );
+
+  return embedded ? (
+    <div className="space-y-6 p-4 pb-20 sm:p-6 lg:p-7">{content}</div>
+  ) : (
+    <DashboardPageShell>{content}</DashboardPageShell>
   );
 }
 

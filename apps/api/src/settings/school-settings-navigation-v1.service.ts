@@ -44,7 +44,7 @@ const DOMAIN_ITEMS: DomainItemDefinition[] = [
     groupId: 'school-setup',
     label: 'Identity',
     description: 'Official school identity, contacts, and registration.',
-    href: '/dashboard/settings/school-profile',
+    href: '/dashboard/settings/school/identity',
     domain: 'identity',
   },
   {
@@ -52,7 +52,7 @@ const DOMAIN_ITEMS: DomainItemDefinition[] = [
     groupId: 'school-setup',
     label: 'Branding',
     description: 'Protected school logo, colors, and paper defaults.',
-    href: '/dashboard/settings/branding-documents',
+    href: '/dashboard/settings/school/branding',
     domain: 'identity',
   },
   {
@@ -60,7 +60,7 @@ const DOMAIN_ITEMS: DomainItemDefinition[] = [
     groupId: 'school-setup',
     label: 'Academic year & calendar',
     description: 'Bikram Sambat years, Nepal school days, and holidays.',
-    href: '/dashboard/settings/academic-calendar',
+    href: '/dashboard/settings/school/academic-year',
     domain: 'academic',
   },
   {
@@ -68,7 +68,7 @@ const DOMAIN_ITEMS: DomainItemDefinition[] = [
     groupId: 'school-setup',
     label: 'Classes, sections & subjects',
     description: 'Foundational academic structure for this school.',
-    href: '/dashboard/settings/academic-structure',
+    href: '/dashboard/settings/school/academic-structure',
     domain: 'academic',
   },
   {
@@ -76,7 +76,7 @@ const DOMAIN_ITEMS: DomainItemDefinition[] = [
     groupId: 'academic-student-policy',
     label: 'Attendance',
     description: 'Lock windows, thresholds, correction, and visibility policy.',
-    href: '/dashboard/settings/attendance',
+    href: '/dashboard/settings/policies/attendance',
     domain: 'attendance',
   },
   {
@@ -84,7 +84,7 @@ const DOMAIN_ITEMS: DomainItemDefinition[] = [
     groupId: 'academic-student-policy',
     label: 'Exams & report cards',
     description: 'Grading, publishing, and report-card policy boundaries.',
-    href: '/dashboard/settings/exams-report-cards',
+    href: '/dashboard/settings/policies/exams',
     domain: 'academic',
   },
   {
@@ -92,7 +92,7 @@ const DOMAIN_ITEMS: DomainItemDefinition[] = [
     groupId: 'academic-student-policy',
     label: 'Homework & timetable',
     description: 'School-wide homework and timetable policy boundaries.',
-    href: '/dashboard/settings/homework-timetable-learning',
+    href: '/dashboard/settings/policies/homework',
     domain: 'academic',
   },
   {
@@ -100,7 +100,7 @@ const DOMAIN_ITEMS: DomainItemDefinition[] = [
     groupId: 'academic-student-policy',
     label: 'Activity, media & consent',
     description: 'Media consent policy for student activity publishing.',
-    href: '/dashboard/settings/activity-consent',
+    href: '/dashboard/settings/policies/activity-consent',
     domain: 'communication',
   },
   {
@@ -152,6 +152,12 @@ const DOMAIN_ITEMS: DomainItemDefinition[] = [
     domain: 'security',
   },
 ];
+
+const MANAGE_TO_VIEW_DOMAIN_ITEMS = new Set([
+  'school-profile',
+  'branding-documents',
+  'academic-calendar',
+]);
 
 type ModuleItemDefinition = {
   id: string;
@@ -210,7 +216,7 @@ export class SchoolSettingsNavigationV1Service {
 
   async getNavigation(auth: AuthContext): Promise<SchoolSettingsNavigation> {
     const has = (permission: string) => auth.permissions.includes(permission);
-    const canRead = has('settings:read') || has('settings:manage');
+    const canRead = has('settings:read');
     const canManageAll = has('settings:manage');
     const canDelegate = has('settings:delegate');
 
@@ -228,7 +234,14 @@ export class SchoolSettingsNavigationV1Service {
     }
 
     for (const definition of DOMAIN_ITEMS) {
-      const access = this.domainAccess(auth, definition.domain);
+      const access =
+        definition.id === 'attendance'
+          ? this.attendanceAccess(auth)
+          : definition.id === 'academic-structure'
+            ? this.academicStructureAccess(auth)
+            : MANAGE_TO_VIEW_DOMAIN_ITEMS.has(definition.id)
+              ? this.managedWorkspaceAccess(auth, definition.domain)
+              : this.domainAccess(auth, definition.domain);
       if (!access) continue;
       items.push({
         id: definition.id,
@@ -247,7 +260,7 @@ export class SchoolSettingsNavigationV1Service {
         label: 'School modules',
         description:
           'Enabled modules for this school. Entitlements are managed by SchoolOS Platform.',
-        href: '/dashboard/settings/modules',
+        href: '/dashboard/settings/school/modules',
         access: 'view',
       });
       items.push({
@@ -256,7 +269,7 @@ export class SchoolSettingsNavigationV1Service {
         label: 'Safe integration status',
         description:
           'Connection status only. Credentials stay with SchoolOS Platform.',
-        href: '/dashboard/settings/integrations',
+        href: '/dashboard/settings/system/integrations',
         access: 'view',
       });
     }
@@ -278,34 +291,32 @@ export class SchoolSettingsNavigationV1Service {
       });
     }
 
-    const usersAccess = this.explicitAccess(
-      auth,
-      ['users:read'],
-      ['users:create', 'users:update_status'],
-    );
+    const usersAccess = this.usersAccess(auth);
     if (usersAccess) {
       items.push({
         id: 'users-access',
         groupId: 'people-governance',
         label: 'Users',
         description: 'School user accounts, activation, and security actions.',
-        href: '/dashboard/settings/users-access',
+        href: '/dashboard/settings/access/users',
         access: usersAccess,
       });
     }
 
-    const rolesAccess = this.explicitAccess(
-      auth,
-      ['roles:read'],
-      ['roles:assign', 'roles:manage_permissions'],
-    );
+    const rolesAccess = has('roles:read')
+      ? this.explicitAccess(
+          auth,
+          ['roles:read'],
+          ['roles:assign', 'roles:manage_permissions'],
+        )
+      : null;
     if (rolesAccess) {
       items.push({
         id: 'roles-permissions',
         groupId: 'people-governance',
         label: 'Roles & permissions',
         description: 'Role coverage and permission boundaries for this school.',
-        href: '/dashboard/settings/roles-permissions',
+        href: '/dashboard/settings/access/roles',
         access:
           rolesAccess !== 'view' && canDelegate ? 'delegate' : rolesAccess,
       });
@@ -318,7 +329,7 @@ export class SchoolSettingsNavigationV1Service {
         label: 'Audit & exports',
         description:
           'Tenant-scoped configuration history and protected exports.',
-        href: '/dashboard/settings/audit-export',
+        href: '/dashboard/settings/system/audit-log',
         access: 'view',
       });
     }
@@ -374,6 +385,55 @@ export class SchoolSettingsNavigationV1Service {
       return 'view';
     }
     return null;
+  }
+
+  /**
+   * These workspaces currently use the same domain-manage permission for GET
+   * and mutation endpoints. Omit them for read-only users instead of
+   * advertising a view state the backend cannot fulfil.
+   */
+  private managedWorkspaceAccess(
+    auth: AuthContext,
+    domain: SchoolSettingsDomain,
+  ): SchoolSettingsAccess | null {
+    const has = (permission: string) => auth.permissions.includes(permission);
+    if (has('settings:manage')) {
+      return has('settings:delegate') ? 'delegate' : 'manage';
+    }
+    return has(SCHOOL_SETTINGS_DOMAIN_MANAGE_PERMISSIONS[domain])
+      ? 'edit'
+      : null;
+  }
+
+  private attendanceAccess(auth: AuthContext): SchoolSettingsAccess | null {
+    const has = (permission: string) => auth.permissions.includes(permission);
+    if (!has('attendance:read')) return null;
+    if (!has('attendance:manage_all')) return 'view';
+    if (has('settings:manage')) {
+      return has('settings:delegate') ? 'delegate' : 'manage';
+    }
+    return 'edit';
+  }
+
+  private academicStructureAccess(
+    auth: AuthContext,
+  ): SchoolSettingsAccess | null {
+    const has = (permission: string) => auth.permissions.includes(permission);
+    if (!has('classes:read') || !has('sections:read')) return null;
+    if (has('classes:create') || has('sections:create')) return 'edit';
+    return 'view';
+  }
+
+  private usersAccess(auth: AuthContext): SchoolSettingsAccess | null {
+    const has = (permission: string) => auth.permissions.includes(permission);
+    if (!has('users:read')) return null;
+    const canManage = [
+      'users:create',
+      'users:update_status',
+      'users:reset_password',
+    ].some(has);
+    if (!canManage) return 'view';
+    return has('settings:manage') ? 'manage' : 'edit';
   }
 
   private explicitAccess(

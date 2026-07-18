@@ -1,5 +1,15 @@
-import { AcademicCalendarWorkspace } from '../../../../components/settings/academic-calendar-workspace';
+import {
+  redirectWithSearchParams,
+  type RouteSearchParams,
+} from '@/lib/redirect-with-search-params';
 
-export default function AcademicCalendarPage() {
-  return <AcademicCalendarWorkspace />;
+export default function AcademicCalendarPage({
+  searchParams,
+}: {
+  searchParams: Promise<RouteSearchParams>;
+}) {
+  return redirectWithSearchParams(
+    '/dashboard/settings/school/academic-year',
+    searchParams,
+  );
 }

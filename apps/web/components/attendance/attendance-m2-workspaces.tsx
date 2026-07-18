@@ -52,6 +52,10 @@ import { SummaryCard, SummaryGrid } from "@/components/ui/summary-card";
 import { LoadingState } from "@/components/ui/loading-state";
 import { LockedRecordBanner } from "@/components/ui/locked-record-banner";
 import { ModuleHeader } from "@/components/ui/module-header";
+import {
+  SchoolSettingsPageHeader,
+  SettingsPermissionNotice,
+} from "@/components/settings/settings-page-header";
 import { ModuleTabs, WorkspaceTabs } from "@/components/ui/module-tabs";
 import { ProtectedFileButton } from "@/components/ui/protected-file";
 import { SectionCard } from "@/components/ui/section-card";
@@ -213,7 +217,8 @@ export function AttendanceOverviewWorkspace() {
           {
             label: "Settings",
             icon: <Settings size={16} />,
-            onClick: () => router.push("/dashboard/settings/attendance"),
+            onClick: () =>
+              router.push("/dashboard/settings/policies/attendance"),
           },
         ]}
       >
@@ -1759,6 +1764,8 @@ export function AttendanceReportsWorkspace() {
 
 export function AttendanceSettingsWorkspace() {
   const queryClient = useQueryClient();
+  const { session } = useSession();
+  const canManage = session?.user.permissions.includes("attendance:manage_all");
   const policyQuery = useQuery({
     queryKey: ["attendance-m2-policy"],
     queryFn: api.getM2Policy,
@@ -1782,11 +1789,12 @@ export function AttendanceSettingsWorkspace() {
 
   return (
     <DashboardPageShell>
-      <ModuleHeader
-        title="Attendance Settings"
+      <SchoolSettingsPageHeader
+        title="Attendance"
         description="Configure attendance rules, lock windows, calendar policy, notifications, and role summaries from backend policy APIs."
-        primaryAction={
-          lateThreshold ? (
+        access={canManage ? "can-manage" : "view-only"}
+        actions={
+          lateThreshold && canManage ? (
             <Button
               onClick={() => updateMutation.mutate()}
               disabled={updateMutation.isPending}
@@ -1797,6 +1805,7 @@ export function AttendanceSettingsWorkspace() {
           ) : undefined
         }
       />
+      {!canManage ? <SettingsPermissionNotice access="view-only" /> : null}
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="grid gap-6 lg:grid-cols-2">
           <SectionCard title="School Attendance Policy">
@@ -1830,6 +1839,7 @@ export function AttendanceSettingsWorkspace() {
             <input
               className="premium-input mt-2"
               value={lateThreshold}
+              disabled={!canManage}
               onChange={(event) => setLateThreshold(event.target.value)}
               placeholder="4"
             />

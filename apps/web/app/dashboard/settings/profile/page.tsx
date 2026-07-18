@@ -1,5 +1,15 @@
-import { redirect } from 'next/navigation';
+import {
+  redirectWithSearchParams,
+  type RouteSearchParams,
+} from '@/lib/redirect-with-search-params';
 
-export default function SchoolProfileLegacyRedirect() {
-  redirect('/dashboard/settings/school-profile');
+export default function SchoolProfileLegacyRedirect({
+  searchParams,
+}: {
+  searchParams: Promise<RouteSearchParams>;
+}) {
+  return redirectWithSearchParams(
+    '/dashboard/settings/school/identity',
+    searchParams,
+  );
 }

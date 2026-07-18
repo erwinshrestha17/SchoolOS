@@ -96,6 +96,8 @@ const SEGMENT_LABELS: Record<string, string> = {
   overview: 'Overview',
   profile: 'Profile',
   'my-profile': 'My Profile',
+  'my-workspace': 'My Workspace',
+  personal: 'Personal',
   'account-security': 'Account & Security',
   security: 'Security',
   'security-audit': 'Security Audit',

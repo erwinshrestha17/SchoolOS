@@ -1,9 +1,8 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { formatBsDate, formatNepalTime } from "@schoolos/core";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { useQuery } from '@tanstack/react-query';
+import { formatBsDate, formatNepalTime } from '@schoolos/core';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -11,108 +10,122 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import {
-  Loader2,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  AlertCircle,
-} from "lucide-react";
-import { api } from "../../lib/api";
+} from '@/components/ui/table';
+import { CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-react';
+import { ErrorState } from '@/components/ui/error-state';
+import { LoadingState } from '@/components/ui/loading-state';
+import { api } from '../../lib/api';
 
 export function MyAttendance() {
-  const [records, setRecords] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const attendanceQuery = useQuery({
+    queryKey: ['my-attendance'],
+    queryFn: api.listMyAttendance,
+  });
 
-  useEffect(() => {
-    api
-      .listMyAttendance()
-      .then((data) => {
-        setRecords(Array.isArray(data) ? data : []);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Failed to fetch attendance", err);
-        setLoading(false);
-      });
-  }, []);
+  if (attendanceQuery.isLoading) {
+    return <LoadingState label="Loading your attendance history..." />;
+  }
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "PRESENT":
-        return <CheckCircle2 className="w-4 h-4 text-green-500" />;
-      case "ABSENT":
-        return <XCircle className="w-4 h-4 text-red-500" />;
-      case "LATE":
-        return <Clock className="w-4 h-4 text-yellow-500" />;
-      default:
-        return <AlertCircle className="w-4 h-4 text-gray-500" />;
-    }
-  };
-
-  if (loading)
+  if (attendanceQuery.isError) {
     return (
-      <div className="flex justify-center p-8">
-        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-      </div>
+      <ErrorState
+        title="Attendance history unavailable"
+        message="Your attendance history could not be loaded. The Attendance module may be unavailable for this school."
+        error={attendanceQuery.error}
+        onRetry={() => void attendanceQuery.refetch()}
+      />
     );
+  }
+
+  const records = attendanceQuery.data ?? [];
 
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Recent Attendance History</CardTitle>
+          <CardTitle className="text-lg">Recent attendance history</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Check In</TableHead>
-                <TableHead>Check Out</TableHead>
-                <TableHead>Remarks</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {records.length === 0 ? (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell
-                    colSpan={5}
-                    className="text-center text-muted-foreground py-8"
-                  >
-                    No attendance records found.
-                  </TableCell>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Check in</TableHead>
+                  <TableHead>Check out</TableHead>
+                  <TableHead>Notes</TableHead>
                 </TableRow>
-              ) : (
-                records.map((record) => (
-                  <TableRow key={record.id}>
-                    <TableCell>{formatBsDate(record.attendanceDate)}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {getStatusIcon(record.status)}
-                        <span className="text-sm font-medium">
-                          {record.status}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {record.checkIn ? formatNepalTime(record.checkIn) : "-"}
-                    </TableCell>
-                    <TableCell>
-                      {record.checkOut ? formatNepalTime(record.checkOut) : "-"}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {record.remarks || "-"}
+              </TableHeader>
+              <TableBody>
+                {records.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={5}
+                      className="py-8 text-center text-muted-foreground"
+                    >
+                      No attendance records found.
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  records.map((record) => (
+                    <TableRow key={record.id}>
+                      <TableCell>
+                        {formatBsDate(record.attendanceDate)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <AttendanceStatusIcon status={record.status} />
+                          <span className="text-sm font-medium">
+                            {formatStatus(record.status)}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {record.checkInAt
+                          ? formatNepalTime(record.checkInAt)
+                          : '—'}
+                      </TableCell>
+                      <TableCell>
+                        {record.checkOutAt
+                          ? formatNepalTime(record.checkOutAt)
+                          : '—'}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {record.note || '—'}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>
   );
+}
+
+function AttendanceStatusIcon({ status }: { status: string }) {
+  switch (status) {
+    case 'PRESENT':
+      return (
+        <CheckCircle2 className="h-4 w-4 text-green-600" aria-hidden="true" />
+      );
+    case 'ABSENT':
+      return <XCircle className="h-4 w-4 text-red-600" aria-hidden="true" />;
+    case 'LATE':
+      return <Clock className="h-4 w-4 text-amber-600" aria-hidden="true" />;
+    default:
+      return (
+        <AlertCircle className="h-4 w-4 text-slate-500" aria-hidden="true" />
+      );
+  }
+}
+
+function formatStatus(value: string) {
+  return value
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
