@@ -1295,8 +1295,20 @@ export class AttendanceService {
   }
 
   async listConflicts(actor: AuthContext) {
+    // Confirmed gap: unscoped tenant-wide list, gated only by attendance:read
+    // (which a base teacher holds), exposing every other class/section's
+    // conflicts and the submittedById of whichever staff member triggered
+    // them. Narrowed to the caller's own sections, same helper as
+    // listAttendance/getAnalytics.
+    const teacherSectionIds = await this.getTeacherSectionIds(actor, {});
+
     const conflicts = await this.prisma.attendanceConflict.findMany({
-      where: { tenantId: actor.tenantId },
+      where: {
+        tenantId: actor.tenantId,
+        ...(teacherSectionIds
+          ? { attendanceSession: { sectionId: { in: teacherSectionIds } } }
+          : {}),
+      },
       include: {
         attendanceSession: {
           include: {
@@ -2793,8 +2805,13 @@ export class AttendanceService {
         tenantId: actor.tenantId,
         staffId: staff.id,
       },
+      // Confirmed gap: approvedBy: true returns the raw User row of
+      // whichever HR user approved a record -- including passwordHash,
+      // lockedUntil, failedLoginCount -- to every staff self-service caller.
+      // There is no global response-serialization layer that strips this;
+      // whatever Prisma returns here is what the HTTP response contains.
       include: {
-        approvedBy: true,
+        approvedBy: AttendanceService.SAFE_USER_SELECT,
       },
       orderBy: { attendanceDate: 'desc' },
       take: 100,
@@ -2815,8 +2832,9 @@ export class AttendanceService {
         tenantId: actor.tenantId,
         staffId: staff.id,
       },
+      // Same passwordHash-leak gap as listMyAttendance above, via reviewedBy.
       include: {
-        reviewedBy: true,
+        reviewedBy: AttendanceService.SAFE_USER_SELECT,
       },
       orderBy: { createdAt: 'desc' },
       take: 100,
@@ -2824,9 +2842,24 @@ export class AttendanceService {
   }
 
   async listStaffAttendance(actor: AuthContext) {
+    // Confirmed gap: tenant-wide staff attendance roster gated only by
+    // attendance:read (which a base teacher holds for STUDENT attendance,
+    // not staff attendance), with no self-reduction possible for an HR
+    // oversight report -- same shape as Library's getBorrowedStudents. Also
+    // leaked every staff member's unmasked Staff row (PAN/bank/DOB/address)
+    // and the approver's raw User row (passwordHash included).
+    if (!this.hasStaffAttendanceManagementAccess(actor)) {
+      throw new ForbiddenException(
+        'This report is limited to HR administrators',
+      );
+    }
+
     return this.prisma.staffAttendance.findMany({
       where: { tenantId: actor.tenantId },
-      include: { staff: true, approvedBy: true },
+      include: {
+        staff: true,
+        approvedBy: AttendanceService.SAFE_USER_SELECT,
+      },
       orderBy: [{ attendanceDate: 'desc' }],
       take: 100,
     });
@@ -2841,9 +2874,19 @@ export class AttendanceService {
       throw new NotFoundException('Staff not found in this tenant');
     }
 
+    // Defense in depth: this route is currently only wired behind
+    // hr:attendance:read (privileged roles), but apply the same
+    // self-or-privileged check as staff.service.ts's getStaffDetail/
+    // getStaffTimeline in case a future route reuses this method.
+    if (staff.userId !== actor.userId && !this.hasStaffAttendanceManagementAccess(actor)) {
+      throw new ForbiddenException(
+        'You can only view your own attendance history',
+      );
+    }
+
     return this.prisma.staffAttendance.findMany({
       where: { tenantId: actor.tenantId, staffId },
-      include: { approvedBy: true },
+      include: { approvedBy: AttendanceService.SAFE_USER_SELECT },
       orderBy: { attendanceDate: 'desc' },
       take: 180,
     });
@@ -3077,7 +3120,7 @@ export class AttendanceService {
         checkInAt: dto.checkInAt ? new Date(dto.checkInAt) : existing.checkInAt,
         approvedById: actor.userId,
       },
-      include: { staff: true, approvedBy: true },
+      include: { staff: true, approvedBy: AttendanceService.SAFE_USER_SELECT },
     });
 
     await this.auditService.record({
@@ -3175,9 +3218,34 @@ export class AttendanceService {
   }
 
   async listLeaveRequests(actor: AuthContext) {
+    // Confirmed gap: GET /hr/leave-requests and /hr/leaves are gated by
+    // hr:leave:read, which base teacher/subject_teacher hold for their OWN
+    // self-service leave visibility (a properly-scoped sibling already
+    // exists at listMyLeaveRequests) -- this generic route returned every
+    // staff member's leave requests, unmasked Staff PII, and the reviewer's
+    // raw User row (passwordHash) to any of them.
+    let ownStaffId: string | undefined;
+    if (!this.hasLeaveManagementAccess(actor)) {
+      const staff = await this.prisma.staff.findFirst({
+        where: { tenantId: actor.tenantId, userId: actor.userId },
+      });
+      if (!staff) {
+        throw new ForbiddenException(
+          'No active staff profile linked to this account',
+        );
+      }
+      ownStaffId = staff.id;
+    }
+
     return this.prisma.staffLeaveRequest.findMany({
-      where: { tenantId: actor.tenantId },
-      include: { staff: true, reviewedBy: true },
+      where: {
+        tenantId: actor.tenantId,
+        ...(ownStaffId ? { staffId: ownStaffId } : {}),
+      },
+      include: {
+        staff: true,
+        reviewedBy: AttendanceService.SAFE_USER_SELECT,
+      },
       orderBy: [{ createdAt: 'desc' }],
       take: 100,
     });
@@ -3186,11 +3254,23 @@ export class AttendanceService {
   async getLeaveRequest(id: string, actor: AuthContext) {
     const leave = await this.prisma.staffLeaveRequest.findFirst({
       where: { id, tenantId: actor.tenantId },
-      include: { staff: true, reviewedBy: true },
+      include: {
+        staff: true,
+        reviewedBy: AttendanceService.SAFE_USER_SELECT,
+      },
     });
 
     if (!leave) {
       throw new NotFoundException('Leave request not found in this tenant');
+    }
+
+    // Same confirmed gap as listLeaveRequests above, for the single-record
+    // route: no check that the leave request belongs to the caller.
+    if (
+      !this.hasLeaveManagementAccess(actor) &&
+      leave.staff.userId !== actor.userId
+    ) {
+      throw new ForbiddenException('You can only view your own leave requests');
     }
 
     return leave;
@@ -3209,6 +3289,16 @@ export class AttendanceService {
 
     if (!staff) {
       throw new NotFoundException('Staff not found in this tenant');
+    }
+
+    // Confirmed gap: POST /hr/leaves and /hr/leave-requests are gated by
+    // hr:leave:request (held by base teacher for their own leave requests),
+    // with no check that dto.staffId belongs to the caller -- a teacher
+    // could file a leave request attributed to any colleague.
+    if (staff.userId !== actor.userId && !this.hasLeaveManagementAccess(actor)) {
+      throw new ForbiddenException(
+        'You cannot create leave requests for another staff member',
+      );
     }
 
     const startsOn = new Date(dto.startsOn);
@@ -4146,9 +4236,20 @@ export class AttendanceService {
     const page = normalizePositiveInteger(query.page, 1);
     const limit = Math.min(normalizePositiveInteger(query.limit, 10), 50);
     const skip = (page - 1) * limit;
+
+    // Confirmed gap: unscoped tenant-wide export history, gated only by
+    // attendance:read, exposing every other teacher's export filters
+    // (which class/section/month they exported) and requestedBy identity.
+    // ReportExport.requestedBy is set to actor.userId on creation (see
+    // exportMonthlyRegister below), so this is naturally a "my own export
+    // history" endpoint for non-privileged actors -- reusing
+    // getTeacherSectionIds purely for its attendance:read_all/manage_all
+    // privilege check, not its section ids.
+    const teacherSectionIds = await this.getTeacherSectionIds(actor, {});
     const where: Prisma.ReportExportWhereInput = {
       tenantId: actor.tenantId,
       reportKey: 'attendance_monthly_register',
+      ...(teacherSectionIds ? { requestedBy: actor.userId } : {}),
     };
 
     const [exports, total] = await Promise.all([
@@ -4825,6 +4926,35 @@ export class AttendanceService {
     }
   }
 
+  /** Bypass for tenant-wide staff-attendance views (GET /attendance/staff,
+   * staff attendance history) -- distinct from ensureAttendanceReviewAuthority,
+   * which governs conflict *review*, not visibility of the raw roster. */
+  private hasStaffAttendanceManagementAccess(actor: AuthContext): boolean {
+    const permissions = actor.permissions ?? [];
+    return (
+      permissions.includes('hr:attendance:read') ||
+      permissions.includes('hr:manage') ||
+      permissions.includes('attendance:manage_all')
+    );
+  }
+
+  /** Bypass for viewing/creating leave requests on behalf of another staff
+   * member. Base teacher/subject_teacher hold hr:leave:read/hr:leave:request
+   * for their OWN self-service leave flow only. */
+  private hasLeaveManagementAccess(actor: AuthContext): boolean {
+    const permissions = actor.permissions ?? [];
+    return (
+      permissions.includes('hr:leave:approve') ||
+      permissions.includes('hr:manage')
+    );
+  }
+
+  /** Never return password hashes / lockout state via a raw Prisma include
+   * of a User relation (approvedBy, reviewedBy, submittedBy). */
+  private static readonly SAFE_USER_SELECT = {
+    select: { id: true, email: true },
+  } as const;
+
   private async loadM2AttendancePolicy(tenantId: string) {
     const setting = await this.prisma.tenantSetting.findUnique({
       where: {
@@ -4963,6 +5093,18 @@ export class AttendanceService {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
+    // Confirmed gap: this fed absence streaks, repeated lates, roster
+    // divergences, late-submission staff emails, and attendance drops for
+    // every class/section in the tenant to any attendance:read holder,
+    // including a base teacher -- unlike its siblings listAttendance/
+    // getAnalytics in this same file, which already narrow to the teacher's
+    // own sections via getTeacherSectionIds. Applying the same helper here.
+    const studentScope = await buildStudentScopeFilter(this.prisma, actor);
+    const teacherSectionIds = await this.getTeacherSectionIds(
+      actor,
+      studentScope,
+    );
+
     // 1. Fetch academic years, classes, and sections
     const [classes, sections, activeAcademicYear] = await Promise.all([
       this.prisma.class.findMany({ where: { tenantId: actor.tenantId } }),
@@ -4982,6 +5124,9 @@ export class AttendanceService {
         status: EnrollmentStatus.ACTIVE,
         ...(activeAcademicYear
           ? { academicYearId: activeAcademicYear.id }
+          : {}),
+        ...(teacherSectionIds
+          ? { sectionId: { in: teacherSectionIds } }
           : {}),
       },
       include: {
@@ -5015,6 +5160,9 @@ export class AttendanceService {
       where: {
         tenantId: actor.tenantId,
         attendanceDate: { gte: thirtyDaysAgo, lte: today },
+        ...(teacherSectionIds
+          ? { sectionId: { in: teacherSectionIds } }
+          : {}),
       },
       include: {
         records: true,
@@ -5037,6 +5185,9 @@ export class AttendanceService {
         tenantId: actor.tenantId,
         attendanceSession: {
           attendanceDate: { gte: streakLimitDate, lte: today },
+          ...(teacherSectionIds
+            ? { sectionId: { in: teacherSectionIds } }
+            : {}),
         },
       },
       select: {

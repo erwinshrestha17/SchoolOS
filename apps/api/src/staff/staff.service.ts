@@ -291,6 +291,16 @@ export class StaffService {
       throw new NotFoundException('Staff member not found in this tenant');
     }
 
+    // Confirmed gap (same shape as Timetable/Library/Students this session):
+    // GET /staff/:id and GET /hr-staff/:staffId both route here and were
+    // gated only by the broad staff:read/hr:staff:read permissions any
+    // teacher holds, with no check that staffId belongs to the caller. Salary
+    // and PAN/bank were already masked by mapStaffDetail, but home address,
+    // date of birth, emergency contact, and leave request reasons were not.
+    if (staff.userId !== actor.userId && !canManageHr(actor)) {
+      throw new ForbiddenException('You can only view your own staff profile');
+    }
+
     return mapStaffDetail(staff, actor);
   }
 
@@ -599,6 +609,17 @@ export class StaffService {
     actor: AuthContext,
     query: ContractExpiryReminderQueryDto = {},
   ) {
+    // Confirmed gap: a tenant-wide contract/probation-expiry report gated
+    // only by hr:staff:read, which a base teacher also holds. There's no
+    // meaningful "own" reduction of a multi-staff report, so it's hidden
+    // from non-HR-privileged actors entirely (same shape as Library's
+    // getBorrowedStudents fix earlier this session).
+    if (!canManageHr(actor)) {
+      throw new ForbiddenException(
+        'This report is limited to HR administrators',
+      );
+    }
+
     const days = clampReminderWindow(query.days);
     const now = startOfDay(new Date());
     const cutoff = addDays(now, days);
@@ -717,11 +738,21 @@ export class StaffService {
   async getStaffTimeline(staffId: string, actor: AuthContext) {
     const staff = await this.prisma.staff.findFirst({
       where: { id: staffId, tenantId: actor.tenantId },
-      select: { id: true, joiningDate: true },
+      select: { id: true, userId: true, joiningDate: true },
     });
 
     if (!staff) {
       throw new NotFoundException('Staff member not found in this tenant');
+    }
+
+    // Same confirmed gap as getStaffDetail above: this fed both the /me
+    // self-service timeline and the generic :staffId route with no check
+    // that the caller owns the record, exposing lifecycle-event reasons/notes
+    // and leave-request reasons for any staff member to any staff:read holder.
+    if (staff.userId !== actor.userId && !canManageHr(actor)) {
+      throw new ForbiddenException(
+        'You can only view your own staff timeline',
+      );
     }
 
     const [events, contracts, leaveRequests, payrollLines, documents] =

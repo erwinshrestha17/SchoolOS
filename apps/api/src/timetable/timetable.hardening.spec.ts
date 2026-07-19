@@ -288,4 +288,111 @@ describe('Timetable Hardening', () => {
       ).rejects.toThrow(ConflictException);
     });
   });
+
+  describe('Teacher Assignment Scoping (exportClassTimetable)', () => {
+    const teacherActor: AuthContext = {
+      userId: 'teacher-user-1',
+      tenantId: 'tenant-a',
+      tenantSlug: 'tenant-a',
+      email: 'teacher@example.com',
+      authMethod: AuthMethod.PASSWORD,
+      roles: ['subject_teacher'],
+      permissions: ['timetable:read'],
+    };
+
+    function mockPublishedVersion(p: any) {
+      p.timetableVersion.findFirst.mockResolvedValue({
+        id: 'version-1',
+        tenantId: 'tenant-a',
+        status: TimetableVersionStatus.PUBLISHED,
+        slots: [],
+      });
+    }
+
+    it('blocks a teacher with no assignment for the class/section (confirmed gap: previously had no check at all)', async () => {
+      const p = prisma as any;
+      p.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
+      p.subjectTeacherAssignment.findFirst.mockResolvedValue(null);
+      p.section.findFirst.mockResolvedValue(null);
+      mockPublishedVersion(p);
+
+      await expect(
+        timetableService.exportClassTimetable(
+          'class-1',
+          'section-1',
+          'year-1',
+          teacherActor,
+        ),
+      ).rejects.toThrow(NotFoundException);
+
+      // The version lookup must never even run for a denied request.
+      expect(p.timetableVersion.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('allows a Subject Teacher with a matching assignment', async () => {
+      const p = prisma as any;
+      p.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
+      p.subjectTeacherAssignment.findFirst.mockResolvedValue({
+        id: 'assignment-1',
+      });
+      p.section.findFirst.mockResolvedValue(null);
+      mockPublishedVersion(p);
+
+      await expect(
+        timetableService.exportClassTimetable(
+          'class-1',
+          'section-1',
+          'year-1',
+          teacherActor,
+        ),
+      ).resolves.toBeDefined();
+    });
+
+    it('allows a Class Teacher with no subject assignment via classTeacherId', async () => {
+      const p = prisma as any;
+      p.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
+      p.subjectTeacherAssignment.findFirst.mockResolvedValue(null);
+      p.section.findFirst.mockResolvedValue({ id: 'section-1' });
+      mockPublishedVersion(p);
+
+      await expect(
+        timetableService.exportClassTimetable(
+          'class-1',
+          'section-1',
+          'year-1',
+          teacherActor,
+        ),
+      ).resolves.toBeDefined();
+    });
+
+    it('denies a teacher with no active staff profile', async () => {
+      const p = prisma as any;
+      p.staff.findFirst.mockResolvedValue(null);
+      mockPublishedVersion(p);
+
+      await expect(
+        timetableService.exportClassTimetable(
+          'class-1',
+          'section-1',
+          'year-1',
+          teacherActor,
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('lets admins bypass the assignment check entirely', async () => {
+      const p = prisma as any;
+      mockPublishedVersion(p);
+
+      await expect(
+        timetableService.exportClassTimetable(
+          'class-1',
+          'section-1',
+          'year-1',
+          actor,
+        ),
+      ).resolves.toBeDefined();
+      expect(p.staff.findFirst).not.toHaveBeenCalled();
+    });
+  });
 });

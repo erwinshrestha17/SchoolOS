@@ -30,6 +30,10 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
+import {
+  getParentStudentIds,
+  getTeacherStaffOwnId,
+} from '../common/security/parent-scope';
 import { loadSchoolLogoForPdf } from '../common/pdf/school-logo-loader';
 import {
   buildCertificatePdf,
@@ -222,7 +226,7 @@ export class StudentsService {
       status,
     } = query;
     const skip = (page - 1) * limit;
-    const where = this.buildStudentDirectoryWhere(
+    const where = await this.buildStudentDirectoryWhere(
       {
         search,
         academicYearId,
@@ -343,7 +347,7 @@ export class StudentsService {
     actor: AuthContext,
   ): Promise<StudentModuleSummary> {
     const { search, academicYearId, classId, sectionId, status } = query;
-    const where = this.buildStudentDirectoryWhere(
+    const where = await this.buildStudentDirectoryWhere(
       {
         search,
         academicYearId,
@@ -487,73 +491,133 @@ export class StudentsService {
     };
   }
 
-  private buildStudentDirectoryWhere(
+  private async buildStudentDirectoryWhere(
     filters: Pick<
       ListStudentsDto,
       'academicYearId' | 'classId' | 'sectionId' | 'status' | 'search'
     >,
     actor: AuthContext,
-  ): Prisma.StudentWhereInput {
+  ): Promise<Prisma.StudentWhereInput> {
     const search = filters.search?.trim();
+    // AND-composed rather than spread into one object: the actor scope below
+    // and the search clause each need their own OR, and a second OR key in a
+    // plain object spread would silently overwrite the first.
+    const conditions: Prisma.StudentWhereInput[] = [{ tenantId: actor.tenantId }];
 
-    return {
-      tenantId: actor.tenantId,
-      ...(filters.status ? { lifecycleStatus: filters.status } : {}),
-      ...(filters.classId ? { classId: filters.classId } : {}),
-      ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
-      ...(filters.academicYearId
-        ? {
-            enrollments: {
+    const actorScope = await this.buildActorStudentScope(actor);
+    if (actorScope) conditions.push(actorScope);
+
+    if (filters.status) conditions.push({ lifecycleStatus: filters.status });
+    if (filters.classId) conditions.push({ classId: filters.classId });
+    if (filters.sectionId) conditions.push({ sectionId: filters.sectionId });
+    if (filters.academicYearId) {
+      conditions.push({
+        enrollments: {
+          some: {
+            tenantId: actor.tenantId,
+            academicYearId: filters.academicYearId,
+            ...(filters.classId ? { classId: filters.classId } : {}),
+            ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
+          },
+        },
+      });
+    }
+    if (search) {
+      conditions.push({
+        OR: [
+          { firstNameEn: { contains: search, mode: 'insensitive' } },
+          { lastNameEn: { contains: search, mode: 'insensitive' } },
+          { firstNameNp: { contains: search, mode: 'insensitive' } },
+          { lastNameNp: { contains: search, mode: 'insensitive' } },
+          { studentSystemId: { contains: search, mode: 'insensitive' } },
+          { admissionNumber: { contains: search, mode: 'insensitive' } },
+          {
+            guardianLinks: {
               some: {
-                tenantId: actor.tenantId,
-                academicYearId: filters.academicYearId,
-                ...(filters.classId ? { classId: filters.classId } : {}),
-                ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
-              },
-            },
-          }
-        : {}),
-      ...(search
-        ? {
-            OR: [
-              { firstNameEn: { contains: search, mode: 'insensitive' } },
-              { lastNameEn: { contains: search, mode: 'insensitive' } },
-              { firstNameNp: { contains: search, mode: 'insensitive' } },
-              { lastNameNp: { contains: search, mode: 'insensitive' } },
-              { studentSystemId: { contains: search, mode: 'insensitive' } },
-              { admissionNumber: { contains: search, mode: 'insensitive' } },
-              {
-                guardianLinks: {
-                  some: {
-                    guardian: {
-                      OR: [
-                        {
-                          fullName: {
-                            contains: search,
-                            mode: 'insensitive',
-                          },
-                        },
-                        {
-                          primaryPhone: {
-                            contains: search,
-                            mode: 'insensitive',
-                          },
-                        },
-                        {
-                          secondaryPhone: {
-                            contains: search,
-                            mode: 'insensitive',
-                          },
-                        },
-                      ],
+                guardian: {
+                  OR: [
+                    {
+                      fullName: {
+                        contains: search,
+                        mode: 'insensitive',
+                      },
                     },
-                  },
+                    {
+                      primaryPhone: {
+                        contains: search,
+                        mode: 'insensitive',
+                      },
+                    },
+                    {
+                      secondaryPhone: {
+                        contains: search,
+                        mode: 'insensitive',
+                      },
+                    },
+                  ],
                 },
               },
-            ],
-          }
-        : {}),
-    };
+            },
+          },
+        ],
+      });
+    }
+
+    return { AND: conditions };
+  }
+
+  /**
+   * Confirmed gap (same shape as Timetable/Library this session): the
+   * student directory was scoped only by tenantId, so any actor holding the
+   * broad `students:read` permission -- including Parent and base Teacher --
+   * got the entire tenant's student roster (names, class, guardian phone/
+   * email) regardless of the caller-supplied classId/sectionId filters,
+   * which are optional and caller-controlled, not enforced.
+   */
+  private async buildActorStudentScope(
+    actor: AuthContext,
+  ): Promise<Prisma.StudentWhereInput | null> {
+    const parentStudentIds = await getParentStudentIds(this.prisma, actor);
+    if (parentStudentIds !== null) {
+      return { id: { in: parentStudentIds } };
+    }
+
+    const teacherStaffId = await getTeacherStaffOwnId(this.prisma, actor);
+    if (teacherStaffId === null) {
+      return null; // no restriction for admin/principal/accountant/etc.
+    }
+
+    const [assignments, classTeacherSections] = await Promise.all([
+      this.prisma.subjectTeacherAssignment.findMany({
+        where: { tenantId: actor.tenantId, staffId: teacherStaffId },
+        select: { classId: true, sectionId: true },
+      }),
+      this.prisma.section.findMany({
+        where: { tenantId: actor.tenantId, classTeacherId: teacherStaffId },
+        select: { id: true, classId: true },
+      }),
+    ]);
+
+    const clauses: Prisma.StudentWhereInput[] = [
+      ...assignments.map(
+        (a): Prisma.StudentWhereInput =>
+          a.sectionId
+            ? { classId: a.classId, sectionId: a.sectionId }
+            : { classId: a.classId },
+      ),
+      ...classTeacherSections.map(
+        (s): Prisma.StudentWhereInput => ({
+          classId: s.classId,
+          sectionId: s.id,
+        }),
+      ),
+    ];
+
+    if (clauses.length === 0) {
+      return { id: { in: [] } }; // no active teaching assignment -> sees nobody
+    }
+
+    return { OR: clauses };
   }
 
   private async countDuplicateCandidatePairs(where: Prisma.StudentWhereInput) {

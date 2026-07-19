@@ -192,7 +192,13 @@ const dashboardRouteGates: RouteGate[] = [
   {
     prefix: "/dashboard/library",
     label: "Library",
-    permissions: ["library:read", "library:manage"],
+    permissions: [
+      "library:read",
+      "library:manage",
+      "library:books:read",
+      "library:copies:read",
+      "library:issues:read",
+    ],
   },
   {
     prefix: "/dashboard/transport",

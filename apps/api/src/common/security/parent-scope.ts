@@ -103,6 +103,58 @@ export async function getStudentOwnId(
 }
 
 /**
+ * Determines if the authenticated user is a teacher-only role (Class/Subject
+ * Teacher without admin/principal/librarian-level authority). Several
+ * read endpoints (library circulation/reservations, in particular) were
+ * written assuming "any staff actor" meant "trusted with tenant-wide
+ * visibility" -- true for admin/principal/librarian, but not for a base
+ * Teacher role, which per the Teacher Persona spec must not see other
+ * people's records just because it holds a base read permission.
+ */
+export function isTeacherOnly(actor: AuthContext): boolean {
+  const privilegedRoles = [
+    'platform_super_admin',
+    'admin',
+    'principal',
+    'librarian',
+  ];
+  return (
+    (actor.roles.includes('teacher') ||
+      actor.roles.includes('subject_teacher')) &&
+    !actor.roles.some((role) => privilegedRoles.includes(role))
+  );
+}
+
+/**
+ * Returns the Staff id a teacher-only actor is restricted to (their own).
+ * For non-teacher-only actors, returns null (meaning no restriction).
+ */
+export async function getTeacherStaffOwnId(
+  prisma: PrismaService,
+  actor: AuthContext,
+): Promise<string | null> {
+  if (!isTeacherOnly(actor)) {
+    return null; // no restriction
+  }
+
+  const staff = await prisma.staff.findFirst({
+    where: {
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      status: 'ACTIVE',
+    },
+  });
+
+  if (!staff) {
+    throw new ForbiddenException(
+      'No active staff profile linked to this account',
+    );
+  }
+
+  return staff.id;
+}
+
+/**
  * Builds a Prisma WHERE filter for studentId scoping.
  * Returns {} for staff/admin roles, or { studentId: { in: [...] } } for parents.
  */

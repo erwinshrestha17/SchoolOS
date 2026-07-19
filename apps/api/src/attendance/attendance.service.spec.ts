@@ -45,6 +45,18 @@ const teacherActor = {
   permissions: ['attendance:mark', 'attendance:read'],
 };
 
+const hrActor = {
+  ...adminActor,
+  userId: 'hr-user-1',
+  roles: ['hr_manager'],
+  permissions: [
+    'attendance:read',
+    'hr:manage',
+    'hr:attendance:read',
+    'hr:leave:approve',
+  ],
+};
+
 describe('attendance production hardening', () => {
   afterEach(() => {
     jest.useRealTimers();
@@ -2433,6 +2445,7 @@ describe('attendance production hardening', () => {
       where: {
         tenantId: adminActor.tenantId,
         reportKey: 'attendance_monthly_register',
+        requestedBy: adminActor.userId,
       },
       orderBy: [{ createdAt: 'desc' }],
       skip: 0,
@@ -2685,6 +2698,236 @@ describe('attendance production hardening', () => {
   });
 });
 
+describe('staff-attendance and leave confirmed-gap fixes (2026-07-19)', () => {
+  const attendanceManagerActor = {
+    ...adminActor,
+    userId: 'manager-1',
+    permissions: ['attendance:read', 'attendance:manage_all'],
+  };
+
+  it('blocks a base teacher from the tenant-wide staff attendance roster', async () => {
+    const { service } = buildService({});
+
+    await expect(service.listStaffAttendance(teacherActor)).rejects.toThrow(
+      ForbiddenException,
+    );
+  });
+
+  it('allows an HR-privileged actor to list the staff attendance roster without leaking passwordHash', async () => {
+    const { service, prisma } = buildService({
+      staffAttendanceRows: [{ id: 'sa-1', status: 'PRESENT' }],
+    });
+
+    await expect(
+      service.listStaffAttendance(hrActor),
+    ).resolves.toBeDefined();
+
+    expect(prisma.staffAttendance.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          approvedBy: { select: { id: true, email: true } },
+        }),
+      }),
+    );
+  });
+
+  it('never selects raw User fields (passwordHash) for a self-service attendance view', async () => {
+    const { service, prisma } = buildService({});
+
+    await service.listMyAttendance(teacherActor);
+
+    expect(prisma.staffAttendance.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: { approvedBy: { select: { id: true, email: true } } },
+      }),
+    );
+  });
+
+  it('never selects raw User fields (passwordHash) for a self-service leave-request view', async () => {
+    const { service, prisma } = buildService({});
+
+    await service.listMyLeaveRequests(teacherActor);
+
+    expect(prisma.staffLeaveRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: { reviewedBy: { select: { id: true, email: true } } },
+      }),
+    );
+  });
+
+  it('scopes the tenant-wide leave-requests list to the caller for a base teacher', async () => {
+    const { service, prisma } = buildService({
+      staffFindFirst: { id: 'staff-1', userId: teacherActor.userId },
+    });
+
+    await service.listLeaveRequests(teacherActor);
+
+    expect(prisma.staffLeaveRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { tenantId: teacherActor.tenantId, staffId: 'staff-1' },
+      }),
+    );
+  });
+
+  it('leaves the leave-requests list unrestricted for an HR-privileged actor', async () => {
+    const { service, prisma } = buildService({});
+
+    await service.listLeaveRequests(hrActor);
+
+    expect(prisma.staffLeaveRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { tenantId: hrActor.tenantId },
+      }),
+    );
+  });
+
+  it('blocks a teacher from viewing another staff member leave request', async () => {
+    const { service } = buildService({
+      leaveRequest: {
+        id: 'leave-1',
+        staffId: 'staff-2',
+        staff: { id: 'staff-2', userId: 'other-user' },
+      },
+    });
+
+    await expect(
+      service.getLeaveRequest('leave-1', teacherActor),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('allows a teacher to view their own leave request', async () => {
+    const { service } = buildService({
+      leaveRequest: {
+        id: 'leave-1',
+        staffId: 'staff-1',
+        staff: { id: 'staff-1', userId: teacherActor.userId },
+      },
+    });
+
+    await expect(
+      service.getLeaveRequest('leave-1', teacherActor),
+    ).resolves.toBeDefined();
+  });
+
+  it('allows an HR-privileged actor to view any leave request', async () => {
+    const { service } = buildService({
+      leaveRequest: {
+        id: 'leave-1',
+        staffId: 'staff-2',
+        staff: { id: 'staff-2', userId: 'other-user' },
+      },
+    });
+
+    await expect(
+      service.getLeaveRequest('leave-1', hrActor),
+    ).resolves.toBeDefined();
+  });
+
+  it('blocks a teacher from filing a leave request for another staff member', async () => {
+    const { service } = buildService({
+      staffFindFirst: { id: 'staff-2', userId: 'other-user' },
+    });
+
+    await expect(
+      service.createLeaveRequest(
+        {
+          staffId: 'staff-2',
+          leaveType: 'SICK',
+          startsOn: '2026-05-01',
+          endsOn: '2026-05-02',
+          reason: 'Fever',
+        } as never,
+        teacherActor,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('allows a teacher to file their own leave request', async () => {
+    const { service } = buildService({
+      staffFindFirst: { id: 'staff-1', userId: teacherActor.userId },
+    });
+
+    await expect(
+      service.createLeaveRequest(
+        {
+          staffId: 'staff-1',
+          leaveType: 'SICK',
+          startsOn: '2026-05-01',
+          endsOn: '2026-05-02',
+          reason: 'Fever',
+        } as never,
+        teacherActor,
+      ),
+    ).resolves.toBeDefined();
+  });
+
+  it('scopes the attendance conflicts list to the teacher own sections', async () => {
+    const { service, prisma } = buildService({
+      teacherAssignments: [{ sectionId: 'section-1' }],
+      classTeacherSections: [],
+    });
+
+    await service.listConflicts(teacherActor);
+
+    expect(prisma.attendanceConflict.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          attendanceSession: { sectionId: { in: ['section-1'] } },
+        }),
+      }),
+    );
+  });
+
+  it('leaves the attendance conflicts list unrestricted for a privileged actor', async () => {
+    const { service, prisma } = buildService({});
+
+    await service.listConflicts(attendanceManagerActor);
+
+    expect(prisma.attendanceConflict.findMany).toHaveBeenCalledWith({
+      where: { tenantId: attendanceManagerActor.tenantId },
+      include: expect.anything(),
+      orderBy: expect.anything(),
+      take: 100,
+    });
+  });
+
+  it('scopes attendance anomalies to the teacher own sections', async () => {
+    const { service, prisma } = buildService({
+      teacherAssignments: [{ sectionId: 'section-9' }],
+      classTeacherSections: [],
+    });
+
+    await service.getAttendanceAnomalies(teacherActor);
+
+    expect(prisma.enrollment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          sectionId: { in: ['section-9'] },
+        }),
+      }),
+    );
+    expect(prisma.attendanceSession.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          sectionId: { in: ['section-9'] },
+        }),
+      }),
+    );
+  });
+
+  it('leaves attendance anomalies tenant-wide for a privileged actor', async () => {
+    const { service, prisma } = buildService({});
+
+    await service.getAttendanceAnomalies(attendanceManagerActor);
+
+    expect(prisma.enrollment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.not.objectContaining({ sectionId: expect.anything() }),
+      }),
+    );
+  });
+});
+
 function bsTestDate(year: number, month: number, day: number) {
   const gregorian = toGregorianDateFromBs({ year, month, day });
   return new Date(
@@ -2775,6 +3018,7 @@ function buildService(options: {
     },
     class: {
       findFirst: jest.fn().mockResolvedValue(options.classroom ?? null),
+      findMany: jest.fn().mockResolvedValue(options.classroom ? [options.classroom] : []),
     },
     section: {
       findFirst: jest.fn().mockResolvedValue(options.section ?? null),
@@ -2901,6 +3145,7 @@ function buildService(options: {
       findMany: jest
         .fn()
         .mockResolvedValue(options.approvedLeaveRequests ?? []),
+      create: jest.fn().mockResolvedValue({ id: 'leave-created' }),
     },
     subjectTeacherAssignment: {
       findFirst: jest.fn().mockResolvedValue({ id: 'assign-1' }),

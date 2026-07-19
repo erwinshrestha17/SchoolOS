@@ -213,6 +213,76 @@ describe('StaffService M7 HR hardening', () => {
     expect(result.items[0]).not.toHaveProperty('bankAccount');
     expect(result.items[0]).not.toHaveProperty('panNumber');
   });
+
+  describe('staff detail/timeline actor scoping (confirmed gap: previously any staff:read holder could view anyone)', () => {
+    it('blocks a teacher from viewing another staff member full profile', async () => {
+      const { service } = buildService({
+        staff: buildStaff({ id: 'staff-2', userId: 'other-user' }),
+      });
+
+      await expect(
+        service.getStaffDetail('staff-2', actor),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('allows a teacher to view their own full profile', async () => {
+      const { service } = buildService({
+        staff: buildStaff({ id: 'staff-1', userId: actor.userId }),
+      });
+
+      await expect(
+        service.getStaffDetail('staff-1', actor),
+      ).resolves.toBeDefined();
+    });
+
+    it('allows an HR-privileged actor to view any staff member profile', async () => {
+      const { service } = buildService({
+        staff: buildStaff({ id: 'staff-2', userId: 'other-user' }),
+      });
+
+      await expect(
+        service.getStaffDetail('staff-2', hrActor),
+      ).resolves.toBeDefined();
+    });
+
+    it('blocks a teacher from viewing another staff member timeline', async () => {
+      const { service } = buildService({
+        staff: buildStaff({ id: 'staff-2', userId: 'other-user' }),
+      });
+
+      await expect(
+        service.getStaffTimeline('staff-2', actor),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('allows an HR-privileged actor to view another staff member timeline', async () => {
+      const { service } = buildService({
+        staff: buildStaff({ id: 'staff-2', userId: 'other-user' }),
+      });
+
+      await expect(
+        service.getStaffTimeline('staff-2', hrActor),
+      ).resolves.toBeDefined();
+    });
+  });
+
+  describe('contract expiry reminders (confirmed gap: tenant-wide report gated only by hr:staff:read)', () => {
+    it('blocks a base teacher from the contract-expiry report', async () => {
+      const { service } = buildService({});
+
+      await expect(
+        service.listContractExpiryReminders(actor),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('allows an HR-privileged actor to run the contract-expiry report', async () => {
+      const { service } = buildService({});
+
+      await expect(
+        service.listContractExpiryReminders(hrActor),
+      ).resolves.toBeDefined();
+    });
+  });
 });
 
 function buildService(
@@ -239,6 +309,7 @@ function buildService(
     staffLeaveRequest: {
       create: jest.fn(),
       findFirst: jest.fn().mockResolvedValue(options.leaveRequest ?? null),
+      findMany: jest.fn().mockResolvedValue([]),
       update: jest.fn(),
     },
     payrollRun: {
@@ -246,6 +317,18 @@ function buildService(
     },
     staffAttendance: {
       upsert: jest.fn(),
+    },
+    staffLifecycleEvent: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    staffContract: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    payrollLine: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    staffDocument: {
+      findMany: jest.fn().mockResolvedValue([]),
     },
     $transaction: jest.fn(async (callback: (tx: unknown) => unknown) =>
       callback(prisma),

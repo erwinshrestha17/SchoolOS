@@ -1509,6 +1509,15 @@ export class TimetableService {
     academicYearId: string,
     actor: AuthContext,
   ) {
+    // Confirmed gap (Teacher Persona spec 23.1 "cannot access an unassigned
+    // class through direct API calls"): unlike every other teacher-facing
+    // method in this file, this one had no assignment check at all -- any
+    // teacher-role actor could pull another class's full published schedule,
+    // room, and staffing by guessing/enumerating a classId. Mirrors the
+    // same isTeacherActor + resolveActorStaff pattern already used by
+    // listTimetable/getVersion/ensureStaffReadable above.
+    await this.ensureClassSectionReadableByTeacher(actor, classId, sectionId);
+
     const version = await this.prisma.timetableVersion.findFirst({
       where: {
         tenantId: actor.tenantId,
@@ -1866,6 +1875,55 @@ export class TimetableService {
       }
     }
     return staff;
+  }
+
+  /**
+   * Guards any class/section-scoped timetable read against the "no active
+   * assignment, no data" invariant. A non-privileged teacher actor must hold
+   * either a SubjectTeacherAssignment for this class(+section) or be the
+   * section's classTeacherId; a class-wide SubjectTeacherAssignment
+   * (sectionId null) covers every section of that class.
+   */
+  private async ensureClassSectionReadableByTeacher(
+    actor: AuthContext,
+    classId: string,
+    sectionId: string | null,
+  ) {
+    if (isPrivilegedTimetableActor(actor) || !isTeacherActor(actor)) {
+      return;
+    }
+
+    const staff = await this.resolveActorStaff(actor);
+    if (!staff) {
+      throw new NotFoundException('No active timetable found for this class');
+    }
+
+    const [subjectAssignment, classTeacherSection] = await Promise.all([
+      this.prisma.subjectTeacherAssignment.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          staffId: staff.id,
+          classId,
+          ...(sectionId ? { OR: [{ sectionId }, { sectionId: null }] } : {}),
+        },
+        select: { id: true },
+      }),
+      sectionId
+        ? this.prisma.section.findFirst({
+            where: {
+              tenantId: actor.tenantId,
+              id: sectionId,
+              classId,
+              classTeacherId: staff.id,
+            },
+            select: { id: true },
+          })
+        : null,
+    ]);
+
+    if (!subjectAssignment && !classTeacherSection) {
+      throw new NotFoundException('No active timetable found for this class');
+    }
   }
 
   private async getTeacherTimetableScope(

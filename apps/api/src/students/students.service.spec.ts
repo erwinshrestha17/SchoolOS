@@ -90,23 +90,29 @@ describe('students lifecycle hardening', () => {
     );
 
     expect(prisma.student.count).toHaveBeenCalledWith({
-      where: expect.objectContaining({
-        tenantId: actor.tenantId,
-        classId: 'class-1',
-        sectionId: 'section-1',
-        enrollments: {
-          some: expect.objectContaining({
-            tenantId: actor.tenantId,
-            academicYearId: 'academic-year-1',
-          }),
-        },
-        OR: expect.arrayContaining([
-          { admissionNumber: { contains: 'Maya', mode: 'insensitive' } },
+      where: {
+        AND: expect.arrayContaining([
+          { tenantId: actor.tenantId },
+          { classId: 'class-1' },
+          { sectionId: 'section-1' },
+          {
+            enrollments: {
+              some: expect.objectContaining({
+                tenantId: actor.tenantId,
+                academicYearId: 'academic-year-1',
+              }),
+            },
+          },
           expect.objectContaining({
-            guardianLinks: expect.any(Object),
+            OR: expect.arrayContaining([
+              { admissionNumber: { contains: 'Maya', mode: 'insensitive' } },
+              expect.objectContaining({
+                guardianLinks: expect.any(Object),
+              }),
+            ]),
           }),
         ]),
-      }),
+      },
     });
     expect(prisma.student.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -196,11 +202,13 @@ describe('students lifecycle hardening', () => {
     expect(prisma.student.groupBy).toHaveBeenCalledWith(
       expect.objectContaining({
         by: ['lifecycleStatus'],
-        where: expect.objectContaining({
-          tenantId: actor.tenantId,
-          classId: 'class-1',
-          sectionId: 'section-1',
-        }),
+        where: {
+          AND: expect.arrayContaining([
+            { tenantId: actor.tenantId },
+            { classId: 'class-1' },
+            { sectionId: 'section-1' },
+          ]),
+        },
       }),
     );
     expect(prisma.admissionApplication.count).toHaveBeenCalledWith({
@@ -228,6 +236,143 @@ describe('students lifecycle hardening', () => {
         }),
       }),
     );
+  });
+
+  describe('student directory actor scoping (confirmed gap: previously tenant-wide for any students:read holder)', () => {
+    it("scopes the directory to a parent's own linked children", async () => {
+      const parentActor = {
+        ...actor,
+        userId: 'parent-user-1',
+        roles: ['parent'],
+        permissions: ['students:read'],
+      };
+      const prisma = buildPrisma({
+        studentFindManyResult: [
+          { ...buildStudent(), qrCredentials: [], _count: { documents: 0 }, user: null },
+        ],
+        studentCountQueue: [1],
+        guardianFindFirstQueue: [
+          {
+            id: 'guardian-1',
+            tenantId: parentActor.tenantId,
+            userId: parentActor.userId,
+            studentLinks: [
+              { studentId: 'student-own-1' },
+              { studentId: 'student-own-2' },
+            ],
+          },
+        ],
+      });
+      const { service } = buildService(prisma);
+
+      await service.listStudents({}, parentActor);
+
+      expect(prisma.student.count).toHaveBeenCalledWith({
+        where: {
+          AND: expect.arrayContaining([
+            { tenantId: parentActor.tenantId },
+            { id: { in: ['student-own-1', 'student-own-2'] } },
+          ]),
+        },
+      });
+    });
+
+    it('blocks a parent with no linked guardian record from seeing any students', async () => {
+      const parentActor = {
+        ...actor,
+        userId: 'parent-user-2',
+        roles: ['parent'],
+        permissions: ['students:read'],
+      };
+      const prisma = buildPrisma({
+        studentFindManyResult: [],
+        studentCountQueue: [0],
+        guardianFindFirstQueue: [],
+      });
+      const { service } = buildService(prisma);
+
+      await service.listStudents({}, parentActor);
+
+      expect(prisma.student.count).toHaveBeenCalledWith({
+        where: {
+          AND: expect.arrayContaining([
+            { tenantId: parentActor.tenantId },
+            { id: { in: [] } },
+          ]),
+        },
+      });
+    });
+
+    it("scopes the directory to a teacher's assigned classes/sections", async () => {
+      const teacherActor = {
+        ...actor,
+        userId: 'teacher-user-1',
+        roles: ['subject_teacher'],
+        permissions: ['students:read'],
+      };
+      const prisma = buildPrisma({
+        studentFindManyResult: [
+          { ...buildStudent(), qrCredentials: [], _count: { documents: 0 }, user: null },
+        ],
+        studentCountQueue: [1],
+        staffFindFirstResult: { id: 'staff-1' },
+        subjectTeacherAssignmentFindManyResult: [
+          { classId: 'class-1', sectionId: 'section-1' },
+          { classId: 'class-2', sectionId: null },
+        ],
+        sectionFindManyResult: [{ id: 'section-9', classId: 'class-9' }],
+      });
+      const { service } = buildService(prisma);
+
+      await service.listStudents({}, teacherActor);
+
+      expect(prisma.student.count).toHaveBeenCalledWith({
+        where: {
+          AND: expect.arrayContaining([
+            { tenantId: teacherActor.tenantId },
+            {
+              OR: [
+                { classId: 'class-1', sectionId: 'section-1' },
+                { classId: 'class-2' },
+                { classId: 'class-9', sectionId: 'section-9' },
+              ],
+            },
+          ]),
+        },
+      });
+    });
+
+    it('rejects a teacher-role actor with no active staff profile', async () => {
+      const teacherActor = {
+        ...actor,
+        userId: 'teacher-user-2',
+        roles: ['teacher'],
+        permissions: ['students:read'],
+      };
+      const prisma = buildPrisma({ staffFindFirstResult: null });
+      const { service } = buildService(prisma);
+
+      await expect(service.listStudents({}, teacherActor)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('leaves the student directory unrestricted for admin/principal actors', async () => {
+      const prisma = buildPrisma({
+        studentFindManyResult: [
+          { ...buildStudent(), qrCredentials: [], _count: { documents: 0 }, user: null },
+        ],
+        studentCountQueue: [1],
+      });
+      const { service } = buildService(prisma);
+
+      await service.listStudents({}, actor);
+
+      expect(prisma.staff.findFirst).not.toHaveBeenCalled();
+      expect(prisma.student.count).toHaveBeenCalledWith({
+        where: { AND: [{ tenantId: actor.tenantId }] },
+      });
+    });
   });
 
   it('transfers an active student and records an immutable transition', async () => {
@@ -2222,6 +2367,9 @@ function buildPrisma(options: {
   studentDocumentExpiryTemplateFindManyResult?: unknown[];
   studentDocumentExpiryTemplateUpsertResult?: unknown;
   subjectTeacherAssignmentFindFirstResult?: unknown;
+  staffFindFirstResult?: unknown;
+  subjectTeacherAssignmentFindManyResult?: unknown[];
+  sectionFindManyResult?: unknown[];
 }) {
   const transaction = {
     enrollment: {
@@ -2375,6 +2523,14 @@ function buildPrisma(options: {
         .mockResolvedValue(
           options.subjectTeacherAssignmentFindFirstResult ?? null,
         ),
+      findMany: jest
+        .fn()
+        .mockResolvedValue(options.subjectTeacherAssignmentFindManyResult ?? []),
+    },
+    staff: {
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(options.staffFindFirstResult ?? null),
     },
     class: {
       findFirst: jest
@@ -2388,6 +2544,9 @@ function buildPrisma(options: {
       findFirst: jest
         .fn()
         .mockResolvedValue(options.sectionFindFirstResult ?? null),
+      findMany: jest
+        .fn()
+        .mockResolvedValue(options.sectionFindManyResult ?? []),
       findUnique: jest.fn().mockResolvedValue(null),
     },
     tenant: {

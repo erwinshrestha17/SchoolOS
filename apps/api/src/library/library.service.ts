@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -24,6 +25,7 @@ import { CommunicationsService } from '../communications/communications.service'
 import { ConfigService } from '../config/config.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { isTeacherOnly } from '../common/security/parent-scope';
 import { CreateLibraryBookDto } from './dto/create-library-book.dto';
 import { CreateLibraryCopyDto } from './dto/create-library-copy.dto';
 import { IssueLibraryCopyDto } from './dto/issue-library-copy.dto';
@@ -851,6 +853,19 @@ export class LibraryService {
   }
 
   async getBorrowedStudents(actor: AuthContext, options: PaginationQuery = {}) {
+    // Confirmed gap: unlike listIssuesScoped/listReservations, this had no
+    // actor-scoping of any kind (not even the parent/student self-scoping
+    // those have) -- a school-wide roster of every student currently holding
+    // a book, gated only by the same `library:issues:read` a base Teacher
+    // now holds. There's no meaningful "my own" reduction of a school-wide
+    // roster, so it is simply hidden from a Teacher (spec M8: "no other
+    // users' full borrowing history").
+    if (isTeacherOnly(actor)) {
+      throw new ForbiddenException(
+        'This report is limited to librarians and school administrators',
+      );
+    }
+
     const { skip, take, page } = this.pagination(options);
     const where: Prisma.StudentWhereInput = {
       tenantId: actor.tenantId,

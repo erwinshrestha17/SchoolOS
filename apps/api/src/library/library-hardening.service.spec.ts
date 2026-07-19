@@ -1,3 +1,4 @@
+import { ForbiddenException } from '@nestjs/common';
 import {
   AuthMethod,
   LibraryCopyStatus,
@@ -16,6 +17,16 @@ const actor: AuthContext = {
   authMethod: AuthMethod.PASSWORD,
   roles: ['librarian'],
   permissions: ['library:fines:post', 'library:issues:return'],
+};
+
+const teacherActor: AuthContext = {
+  tenantId: 'tenant-1',
+  tenantSlug: 'school-one',
+  userId: 'teacher-user-1',
+  email: 'teacher@school.test',
+  authMethod: AuthMethod.PASSWORD,
+  roles: ['subject_teacher'],
+  permissions: ['library:issues:read'],
 };
 
 describe('LibraryHardeningService M8A workflows', () => {
@@ -197,6 +208,87 @@ describe('LibraryHardeningService M8A workflows', () => {
   });
 });
 
+describe('LibraryHardeningService Teacher scoping (confirmed gap fix)', () => {
+  it('scopes listIssuesScoped to the teacher own staff record', async () => {
+    const { service, prisma } = buildService({
+      staff: { id: 'staff-teacher-1' },
+    });
+
+    await service.listIssuesScoped(teacherActor, {});
+
+    expect(prisma.staff.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: teacherActor.tenantId,
+          userId: teacherActor.userId,
+        }),
+      }),
+    );
+    expect(prisma.libraryIssue.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          borrowerStaffId: 'staff-teacher-1',
+        }),
+      }),
+    );
+  });
+
+  it('denies a teacher requesting another staff member library issues', async () => {
+    const { service } = buildService({ staff: { id: 'staff-teacher-1' } });
+
+    await expect(
+      service.listIssuesScoped(teacherActor, { staffId: 'staff-other' }),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('denies a teacher requesting a student library issue history', async () => {
+    const { service } = buildService({ staff: { id: 'staff-teacher-1' } });
+
+    await expect(
+      service.listIssuesScoped(teacherActor, { studentId: 'student-1' }),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('rejects a teacher-role actor with no active staff profile', async () => {
+    const { service } = buildService({ staff: null });
+
+    await expect(
+      service.listIssuesScoped(teacherActor, {}),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('scopes listReservations to the teacher own staff record', async () => {
+    const { service, prisma } = buildService({
+      staff: { id: 'staff-teacher-1' },
+    });
+
+    await service.listReservations(teacherActor, {});
+
+    expect(prisma.libraryReservation.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          borrowerStaffId: 'staff-teacher-1',
+        }),
+      }),
+    );
+  });
+
+  it('leaves librarian/admin actors unrestricted', async () => {
+    const { service, prisma } = buildService();
+
+    await service.listIssuesScoped(actor, {});
+
+    expect(prisma.staff.findFirst).not.toHaveBeenCalled();
+    expect(prisma.libraryIssue.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.not.objectContaining({
+          borrowerStaffId: expect.anything(),
+        }),
+      }),
+    );
+  });
+});
+
 function buildService(
   options: {
     fine?: ReturnType<typeof buildFine>;
@@ -206,6 +298,7 @@ function buildService(
     holidays?: { calendarDate: Date }[];
     copy?: ReturnType<typeof buildCopy>;
     fileRegistryService?: { registerGeneratedFile: jest.Mock };
+    staff?: { id: string } | null;
   } = {},
 ) {
   const issue = options.issue ?? buildIssue();
@@ -279,6 +372,13 @@ function buildService(
     },
     schoolCalendarDay: {
       findMany: jest.fn().mockResolvedValue(options.holidays ?? []),
+    },
+    staff: {
+      findFirst: jest.fn().mockResolvedValue(options.staff ?? null),
+    },
+    libraryReservation: {
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
     },
     $transaction: jest.fn().mockImplementation(async (callback: unknown) => {
       if (Array.isArray(callback)) {

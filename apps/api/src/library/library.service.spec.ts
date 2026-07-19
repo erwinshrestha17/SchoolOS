@@ -1,4 +1,8 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   AuthMethod,
   FileStatus,
@@ -505,6 +509,30 @@ describe('LibraryService Phase 3A foundation', () => {
       }),
     );
   });
+
+  it('blocks a base Teacher role from the tenant-wide borrowed-students roster (confirmed gap: previously had no scoping at all)', async () => {
+    const { service, prisma } = buildService();
+    const teacherActor = {
+      ...actor,
+      userId: 'teacher-user-1',
+      roles: ['subject_teacher'],
+      permissions: ['library:issues:read'],
+    };
+
+    await expect(
+      service.getBorrowedStudents(teacherActor as never),
+    ).rejects.toThrow(ForbiddenException);
+
+    expect(prisma.student.findMany).not.toHaveBeenCalled();
+  });
+
+  it('leaves the borrowed-students roster available to librarian/admin actors', async () => {
+    const { service, prisma } = buildService();
+
+    await service.getBorrowedStudents(actor);
+
+    expect(prisma.student.findMany).toHaveBeenCalled();
+  });
 });
 
 function buildService(
@@ -698,6 +726,8 @@ function buildService(
     },
     student: {
       findFirst: jest.fn().mockResolvedValue({ id: 'student-1' }),
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
     },
     staff: {
       findFirst: jest.fn().mockResolvedValue(options.staff ?? null),

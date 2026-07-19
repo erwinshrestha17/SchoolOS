@@ -18,6 +18,7 @@ import type { AuthContext } from '../auth/auth.types';
 import {
   getParentStudentIds,
   getStudentOwnId,
+  getTeacherStaffOwnId,
 } from '../common/security/parent-scope';
 import { PrismaService } from '../prisma/prisma.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
@@ -1552,6 +1553,25 @@ export class LibraryHardeningService {
       return where;
     }
 
+    // Confirmed gap (Teacher Persona spec M8 "no other users' full borrowing
+    // history"): this fell through to unrestricted tenant-wide access for
+    // any staff actor, including a base Teacher role. A Teacher may only see
+    // their own circulation records.
+    const teacherStaffId = await getTeacherStaffOwnId(this.prisma, actor);
+    if (teacherStaffId !== null) {
+      if (options.studentId)
+        throw new ForbiddenException(
+          'Teachers cannot read student library issues',
+        );
+      if (options.staffId && options.staffId !== teacherStaffId) {
+        throw new ForbiddenException(
+          'Teachers can only read their own library issues',
+        );
+      }
+      where.borrowerStaffId = teacherStaffId;
+      return where;
+    }
+
     if (options.studentId) where.borrowerStudentId = options.studentId;
     if (options.staffId) where.borrowerStaffId = options.staffId;
     return where;
@@ -1565,6 +1585,13 @@ export class LibraryHardeningService {
 
     const studentOwnId = await getStudentOwnId(this.prisma, actor);
     if (studentOwnId !== null) return { borrowerStudentId: studentOwnId };
+
+    // Same confirmed gap as buildScopedIssueWhere above, applied to
+    // reservations: a base Teacher role must only see/cancel their own
+    // reservations, not the whole tenant's.
+    const teacherStaffId = await getTeacherStaffOwnId(this.prisma, actor);
+    if (teacherStaffId !== null) return { borrowerStaffId: teacherStaffId };
+
     return {};
   }
 

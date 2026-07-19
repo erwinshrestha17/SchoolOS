@@ -1729,7 +1729,15 @@ export const systemRolePermissions: Record<string, string[]> = {
     "hr:leave:read",
     "hr:leave:request",
     "payroll:payslip:read",
-    "library:read",
+    // Deliberately not the broad "library:read" (which aliases into
+    // library:reports:read and exposes school-wide reports plus other
+    // users' full borrowing history -- explicitly prohibited by the
+    // Teacher Persona spec, M8). These three narrow permissions cover
+    // catalogue browsing and the caller's own circulation/reservations,
+    // which are now self-scoped in library-hardening.service.ts.
+    "library:books:read",
+    "library:copies:read",
+    "library:issues:read",
   ],
   subject_teacher: [
     "roles:read",
@@ -1768,7 +1776,10 @@ export const systemRolePermissions: Record<string, string[]> = {
     "hr:leave:read",
     "hr:leave:request",
     "payroll:payslip:read",
-    "library:read",
+    // See teacher role above for why not the broad "library:read".
+    "library:books:read",
+    "library:copies:read",
+    "library:issues:read",
   ],
   support_staff: [
     "roles:read",

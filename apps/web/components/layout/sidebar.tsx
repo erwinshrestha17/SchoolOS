@@ -385,7 +385,7 @@ export const teacherNavGroups: NavGroup[] = [
         href: '/dashboard/library',
         label: 'Library',
         icon: BookOpen,
-        permissions: ['library:read'],
+        permissions: ['library:books:read', 'library:issues:read'],
       },
       {
         href: '/dashboard/settings/personal/profile',
