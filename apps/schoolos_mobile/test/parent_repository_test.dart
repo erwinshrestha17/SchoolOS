@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:schoolos_mobile/core/network/api_client.dart';
@@ -10,6 +13,8 @@ class MockApiClient extends Mock implements ApiClient {}
 class MockDio extends Mock implements Dio {}
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   setUpAll(() {
     registerFallbackValue(Options());
   });
@@ -18,6 +23,7 @@ void main() {
     late MockApiClient apiClient;
     late MockDio dio;
     late ParentRepository repository;
+    late Directory tempDir;
 
     const child = GuardianChild(
       id: 'child-1',
@@ -33,6 +39,28 @@ void main() {
       dio = MockDio();
       when(() => apiClient.dio).thenReturn(dio);
       repository = ParentRepository(apiClient);
+      tempDir = Directory.systemTemp.createTempSync('schoolos_parent_test_');
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('plugins.flutter.io/path_provider'),
+            (call) async {
+              if (call.method == 'getTemporaryDirectory') {
+                return tempDir.path;
+              }
+              return null;
+            },
+          );
+    });
+
+    tearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('plugins.flutter.io/path_provider'),
+            null,
+          );
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
     });
 
     test('maps parent-safe child profile fields from mobile API', () async {
@@ -451,5 +479,69 @@ void main() {
       expect(milestones.single.domain, 'Motor skills');
       expect(milestones.single.status, 'PROGRESSING');
     });
+
+    test(
+      'downloads a student document through the signed download-url flow',
+      () async {
+        const document = ParentStudentDocument(
+          id: 'doc-1',
+          title: 'Birth certificate',
+          fileName: 'birth.pdf',
+          kind: 'BIRTH_CERTIFICATE',
+          status: 'VERIFIED',
+          mimeType: 'application/pdf',
+          sizeBytes: 1200,
+          downloadPath: '/mobile/students/child-1/documents/doc-1/download-url',
+        );
+
+        when(
+          () => apiClient.get<dynamic>(
+            '/mobile/students/child-1/documents/doc-1/download-url',
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(path: ''),
+            data: {
+              'documentId': 'doc-1',
+              'fileName': 'birth.pdf',
+              'kind': 'BIRTH_CERTIFICATE',
+              'url': 'https://files.example.test/signed/doc-1',
+              'expiresInSeconds': 60,
+            },
+          ),
+        );
+        when(
+          () => dio.get<List<int>>(
+            'https://files.example.test/signed/doc-1',
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(path: ''),
+            data: List<int>.filled(8, 1),
+          ),
+        );
+
+        final file = await repository.downloadStudentDocument(
+          childId: 'child-1',
+          document: document,
+        );
+
+        expect(file.fileName, 'birth.pdf');
+        expect(file.filePath, contains('birth.pdf'));
+
+        verify(
+          () => apiClient.get<dynamic>(
+            '/mobile/students/child-1/documents/doc-1/download-url',
+          ),
+        ).called(1);
+        verify(
+          () => dio.get<List<int>>(
+            'https://files.example.test/signed/doc-1',
+            options: any(named: 'options'),
+          ),
+        ).called(1);
+      },
+    );
   });
 }

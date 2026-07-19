@@ -199,6 +199,10 @@ class ParentPortalChildDetailScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 20),
+              const ParentSectionHeader(title: 'Documents'),
+              const SizedBox(height: 10),
+              _DocumentsSection(childId: portalChild.id),
+              const SizedBox(height: 20),
               ParentSectionHeader(
                 title: 'Today timeline',
                 trailing: TextButton(
@@ -315,6 +319,129 @@ class ParentPortalChildDetailScreen extends ConsumerWidget {
           ),
         ),
       );
+}
+
+class _DocumentsSection extends ConsumerWidget {
+  const _DocumentsSection({required this.childId});
+  final String childId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(parentChildProfileProvider(childId));
+
+    return profile.when(
+      loading: () => const PortalCard(
+        child: SizedBox(
+          height: 40,
+          child: Center(
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+        ),
+      ),
+      error: (_, _) => const PortalCard(
+        child: Text(
+          'Documents could not be loaded right now.',
+          style: TextStyle(color: ParentPortalColors.muted),
+        ),
+      ),
+      data: (childProfile) {
+        if (childProfile.documents.isEmpty) {
+          return const PortalCard(
+            child: Text(
+              'No verified documents on file yet.',
+              style: TextStyle(color: ParentPortalColors.muted),
+            ),
+          );
+        }
+        return PortalCard(
+          padding: EdgeInsets.zero,
+          child: Column(
+            children: [
+              for (var i = 0; i < childProfile.documents.length; i++) ...[
+                if (i > 0) const Divider(height: 1),
+                _DocumentRow(
+                  childId: childId,
+                  document: childProfile.documents[i],
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _DocumentRow extends ConsumerStatefulWidget {
+  const _DocumentRow({required this.childId, required this.document});
+  final String childId;
+  final ParentStudentDocument document;
+
+  @override
+  ConsumerState<_DocumentRow> createState() => _DocumentRowState();
+}
+
+class _DocumentRowState extends ConsumerState<_DocumentRow> {
+  bool _downloading = false;
+
+  Future<void> _download() async {
+    if (_downloading) return;
+    setState(() => _downloading = true);
+    try {
+      final file = await ref
+          .read(parentRepositoryProvider)
+          .downloadStudentDocument(
+            childId: widget.childId,
+            document: widget.document,
+          );
+      if (!mounted) return;
+      showFeatureSnack(context, 'Document downloaded: ${file.fileName}');
+    } catch (_) {
+      if (!mounted) return;
+      showFeatureSnack(
+        context,
+        'This document is not available to download right now.',
+      );
+    } finally {
+      if (mounted) setState(() => _downloading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final document = widget.document;
+    return ListTile(
+      leading: const FeatureIcon(Icons.description_rounded, size: 42),
+      title: Text(
+        document.title.isNotEmpty ? document.title : document.fileName,
+        style: const TextStyle(fontWeight: FontWeight.w800),
+      ),
+      subtitle: Text(_documentSubtitle(document)),
+      trailing: _downloading
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : IconButton(
+              tooltip: 'Download',
+              icon: const Icon(Icons.download_rounded),
+              onPressed: document.hasProtectedDownload ? _download : null,
+            ),
+    );
+  }
+}
+
+String _documentSubtitle(ParentStudentDocument document) {
+  final parts = <String>[
+    document.kind,
+    if (document.status.isNotEmpty) document.status,
+  ];
+  return parts.where((part) => part.isNotEmpty).join(' • ');
 }
 
 class ParentPortalHomeworkDetailScreen extends ConsumerStatefulWidget {

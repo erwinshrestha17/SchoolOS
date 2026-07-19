@@ -464,6 +464,49 @@ class ParentRepository {
     return ParentProtectedFileDownload(fileName: fileName, filePath: file.path);
   }
 
+  Future<ParentProtectedFileDownload> downloadStudentDocument({
+    required String childId,
+    required ParentStudentDocument document,
+  }) async {
+    if (!document.hasProtectedDownload) {
+      throw StateError('Student document download path was empty.');
+    }
+
+    final accessResponse = await _client.get(document.downloadPath);
+    final accessData = accessResponse.data as Map<String, dynamic>? ?? const {};
+    final url = accessData['url'] as String? ?? '';
+    if (url.isEmpty) {
+      throw StateError('Student document download URL was empty.');
+    }
+
+    final response = await _client.dio.get<List<int>>(
+      url,
+      options: Options(
+        responseType: ResponseType.bytes,
+        headers: {Headers.acceptHeader: document.mimeType},
+      ),
+    );
+    final bytes = response.data;
+    if (bytes == null || bytes.isEmpty) {
+      throw StateError('Student document was empty.');
+    }
+
+    final temporaryDir = await getTemporaryDirectory();
+    final documentsDir = Directory('${temporaryDir.path}/schoolos/documents');
+    if (!documentsDir.existsSync()) {
+      await documentsDir.create(recursive: true);
+    }
+
+    final baseName = document.fileName.isNotEmpty
+        ? document.fileName
+        : document.title;
+    final fileName = _safeFileName(baseName);
+    final file = File('${documentsDir.path}/$fileName');
+    await file.writeAsBytes(bytes, flush: true);
+
+    return ParentProtectedFileDownload(fileName: fileName, filePath: file.path);
+  }
+
   Future<ParentProtectedFileDownload> downloadHomeworkAttachment({
     required String childId,
     required String homeworkId,
