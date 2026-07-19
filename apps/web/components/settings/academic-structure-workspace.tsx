@@ -6,6 +6,7 @@ import {
   Building2,
   CheckCircle2,
   CircleAlert,
+  GraduationCap,
   Plus,
   School,
 } from 'lucide-react';
@@ -18,8 +19,13 @@ import {
   SettingsPermissionNotice,
 } from './settings-page-header';
 
+// Streams (Science, Management, ...) apply to Higher Secondary classes only.
+// Matches the backend's HIGHER_SECONDARY_MIN_LEVEL in classes.service.ts.
+const HIGHER_SECONDARY_MIN_LEVEL = 11;
+
 type ClassDraft = { name: string; level: string };
 type SectionDraft = { classId: string; name: string; capacity: string };
+type StreamDraft = { name: string; code: string };
 
 export function AcademicStructureWorkspace() {
   const client = useQueryClient();
@@ -27,6 +33,8 @@ export function AcademicStructureWorkspace() {
   const permissions = session?.user.permissions ?? [];
   const canCreateClass = permissions.includes('classes:create');
   const canCreateSection = permissions.includes('sections:create');
+  const canCreateStream = permissions.includes('streams:create');
+  const canReadStreams = canCreateStream || permissions.includes('streams:read');
   const canManageAny = canCreateClass || canCreateSection;
   const [classDraft, setClassDraft] = useState<ClassDraft>({
     name: '',
@@ -36,6 +44,10 @@ export function AcademicStructureWorkspace() {
     classId: '',
     name: '',
     capacity: '',
+  });
+  const [streamDraft, setStreamDraft] = useState<StreamDraft>({
+    name: '',
+    code: '',
   });
   const [notice, setNotice] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -47,6 +59,11 @@ export function AcademicStructureWorkspace() {
   const sectionsQuery = useQuery({
     queryKey: ['sections'],
     queryFn: api.listSections,
+  });
+  const streamsQuery = useQuery({
+    queryKey: ['streams'],
+    queryFn: api.listStreams,
+    enabled: canReadStreams,
   });
 
   useEffect(() => {
@@ -80,12 +97,40 @@ export function AcademicStructureWorkspace() {
         'Could not create the section. Check the selected class and try again.',
       ),
   });
+  const createStreamMutation = useMutation({
+    mutationFn: api.createStream,
+    onSuccess: async () => {
+      setStreamDraft({ name: '', code: '' });
+      setNotice('Stream created. Assign it to Higher Secondary classes below.');
+      await client.invalidateQueries({ queryKey: ['streams'] });
+    },
+    onError: () =>
+      setFormError(
+        'Could not create the stream. Check the name and code, then try again.',
+      ),
+  });
+  const assignStreamMutation = useMutation({
+    mutationFn: ({
+      classId,
+      streamId,
+    }: {
+      classId: string;
+      streamId: string | null;
+    }) => api.assignClassStream(classId, streamId),
+    onSuccess: async () => {
+      setNotice('Class stream updated.');
+      await client.invalidateQueries({ queryKey: ['classes'] });
+    },
+    onError: () =>
+      setFormError('Could not update the class stream. Try again.'),
+  });
 
   const classes = useMemo(() => classesQuery.data ?? [], [classesQuery.data]);
   const sections = useMemo(
     () => sectionsQuery.data ?? [],
     [sectionsQuery.data],
   );
+  const streams = useMemo(() => streamsQuery.data ?? [], [streamsQuery.data]);
   const sectionsByClass = useMemo(
     () =>
       new Map(
@@ -148,6 +193,17 @@ export function AcademicStructureWorkspace() {
       classId: sectionDraft.classId,
       name: sectionDraft.name.trim(),
       capacity,
+    });
+  };
+  const createStream = () => {
+    setFormError(null);
+    if (!streamDraft.name.trim() || !streamDraft.code.trim()) {
+      setFormError('Enter a stream name and code.');
+      return;
+    }
+    createStreamMutation.mutate({
+      name: streamDraft.name.trim(),
+      code: streamDraft.code.trim(),
     });
   };
 
@@ -304,6 +360,55 @@ export function AcademicStructureWorkspace() {
               </div>
             </div>
           ) : null}
+          {canCreateStream ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-start gap-3">
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white">
+                  <GraduationCap className="h-5 w-5" />
+                </span>
+                <div>
+                  <h2 className="font-bold text-slate-950">
+                    Add Higher Secondary stream
+                  </h2>
+                  <p className="mt-1 text-sm leading-5 text-slate-600">
+                    Streams (e.g. Science, Management) apply to Grade{' '}
+                    {HIGHER_SECONDARY_MIN_LEVEL}+ classes. Name them however
+                    this school labels them.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_140px]">
+                <Field
+                  label="Stream name"
+                  value={streamDraft.name}
+                  onChange={(value) =>
+                    setStreamDraft((current) => ({ ...current, name: value }))
+                  }
+                  placeholder="Science"
+                />
+                <Field
+                  label="Code"
+                  value={streamDraft.code}
+                  onChange={(value) =>
+                    setStreamDraft((current) => ({ ...current, code: value }))
+                  }
+                  placeholder="SCI"
+                />
+              </div>
+              <div className="mt-5 flex justify-end">
+                <Button
+                  type="button"
+                  onClick={createStream}
+                  disabled={createStreamMutation.isPending}
+                >
+                  <Plus className="h-4 w-4" />
+                  {createStreamMutation.isPending
+                    ? 'Creating…'
+                    : 'Create stream'}
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </section>
       ) : null}
 
@@ -363,6 +468,40 @@ export function AcademicStructureWorkspace() {
                       </span>
                     )}
                   </div>
+                  {(item.level ?? 0) >= HIGHER_SECONDARY_MIN_LEVEL &&
+                  canCreateStream ? (
+                    <label className="mt-4 block border-t border-slate-100 pt-4">
+                      <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                        Stream
+                      </span>
+                      <select
+                        value={item.streamId ?? ''}
+                        onChange={(event) =>
+                          assignStreamMutation.mutate({
+                            classId: item.id,
+                            streamId: event.target.value || null,
+                          })
+                        }
+                        disabled={assignStreamMutation.isPending}
+                        className="mt-2 h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"
+                      >
+                        <option value="">No stream</option>
+                        {streams.map((stream) => (
+                          <option key={stream.id} value={stream.id}>
+                            {stream.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : (item.level ?? 0) >= HIGHER_SECONDARY_MIN_LEVEL &&
+                    item.streamName ? (
+                    <p className="mt-4 border-t border-slate-100 pt-4 text-sm text-slate-600">
+                      Stream:{' '}
+                      <span className="font-bold text-slate-900">
+                        {item.streamName}
+                      </span>
+                    </p>
+                  ) : null}
                 </div>
               );
             })}

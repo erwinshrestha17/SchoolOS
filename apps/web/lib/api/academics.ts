@@ -22,6 +22,7 @@ import type {
   ResultPublishingReadiness,
   RoomSummary,
   SectionSummary,
+  StreamSummary,
   SubjectSummary,
   SubjectWeeklyRequirementSummary,
   TeacherAssignmentSummary,
@@ -176,6 +177,14 @@ export const academicsApi = {
   listClasses: () => request<ClassSummary[]>('/classes'),
   createClass: (body: JsonBody) =>
     request<ClassSummary>('/classes', { method: 'POST', json: body }),
+  assignClassStream: (classId: string, streamId: string | null) =>
+    request<ClassSummary>(`/classes/${classId}/stream`, {
+      method: 'PATCH',
+      json: { streamId },
+    }),
+  listStreams: () => request<StreamSummary[]>('/streams'),
+  createStream: (body: JsonBody) =>
+    request<StreamSummary>('/streams', { method: 'POST', json: body }),
   listSections: () => request<SectionSummary[]>('/sections'),
   createSection: (body: JsonBody) =>
     request<SectionSummary>('/sections', { method: 'POST', json: body }),
