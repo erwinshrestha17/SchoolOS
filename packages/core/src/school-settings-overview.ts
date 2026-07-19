@@ -13,6 +13,8 @@ export type SchoolProfileSettings = {
   province: string | null;
   schoolType: 'PRIVATE' | 'COMMUNITY' | 'TRUST' | null;
   iemisSchoolCode: string | null;
+  affiliationBoard: string | null;
+  affiliationNumber: string | null;
   updatedAt: string | null;
 };
 

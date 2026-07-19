@@ -51,7 +51,30 @@ describe('SchoolSettingsProfileService', () => {
       schoolName: 'Green Valley School',
       schoolEmail: 'office@greenvalley.edu.np',
       schoolPanNumber: null,
+      affiliationBoard: null,
+      affiliationNumber: null,
     });
+  });
+
+  it('returns saved affiliation board and number', async () => {
+    const { service, prisma } = buildService();
+    prisma.tenantSetting.findMany.mockResolvedValue([
+      {
+        key: 'affiliation_board',
+        value: 'NEB',
+        updatedAt: new Date('2026-06-20T00:00:00.000Z'),
+      },
+      {
+        key: 'affiliation_number',
+        value: 'AFF-2083-0142',
+        updatedAt: new Date('2026-06-20T00:00:00.000Z'),
+      },
+    ]);
+
+    const profile = await service.getProfile(tenantId);
+
+    expect(profile.affiliationBoard).toBe('NEB');
+    expect(profile.affiliationNumber).toBe('AFF-2083-0142');
   });
 
   it('updates profile fields atomically and audits only changed keys', async () => {

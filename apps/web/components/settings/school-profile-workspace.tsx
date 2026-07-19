@@ -33,6 +33,8 @@ const emptyProfile: ProfileForm = {
   province: null,
   schoolType: null,
   iemisSchoolCode: null,
+  affiliationBoard: null,
+  affiliationNumber: null,
 };
 
 export function SchoolProfileWorkspace() {
@@ -183,6 +185,17 @@ export function SchoolProfileWorkspace() {
             onChange={(value) => setValue('iemisSchoolCode', value)}
           />
           <TextField
+            label="Affiliation board"
+            value={form.affiliationBoard ?? ''}
+            onChange={(value) => setValue('affiliationBoard', value)}
+            placeholder="e.g. NEB for +2, CDC for Grade 1-10"
+          />
+          <TextField
+            label="Affiliation / permission number"
+            value={form.affiliationNumber ?? ''}
+            onChange={(value) => setValue('affiliationNumber', value)}
+          />
+          <TextField
             label="Principal name"
             value={form.principalName ?? ''}
             onChange={(value) => setValue('principalName', value)}
@@ -324,6 +337,7 @@ function TextField({
   required,
   type = 'text',
   className,
+  placeholder,
 }: {
   label: string;
   value: string;
@@ -331,6 +345,7 @@ function TextField({
   required?: boolean;
   type?: string;
   className?: string;
+  placeholder?: string;
 }) {
   return (
     <label className={className}>
@@ -341,6 +356,7 @@ function TextField({
       <input
         type={type}
         value={value}
+        placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
         className="mt-1.5 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5"
       />

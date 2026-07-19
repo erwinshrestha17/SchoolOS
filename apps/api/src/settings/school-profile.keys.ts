@@ -11,6 +11,8 @@ export const schoolProfileKeyMap = {
   province: 'province',
   schoolType: 'school_type',
   iemisSchoolCode: 'iemis_school_code',
+  affiliationBoard: 'affiliation_board',
+  affiliationNumber: 'affiliation_number',
 } as const;
 
 export const schoolProfileSettingKeys = Object.values(schoolProfileKeyMap);

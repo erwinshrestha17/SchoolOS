@@ -81,4 +81,14 @@ export class UpdateSchoolProfileDto {
   @IsString()
   @MaxLength(100)
   iemisSchoolCode?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  affiliationBoard?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  affiliationNumber?: string | null;
 }

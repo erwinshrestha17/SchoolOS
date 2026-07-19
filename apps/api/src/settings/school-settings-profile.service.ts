@@ -48,6 +48,8 @@ export class SchoolSettingsProfileService {
       province: stringValue(read('province')),
       schoolType: schoolTypeValue(read('schoolType')),
       iemisSchoolCode: stringValue(read('iemisSchoolCode')),
+      affiliationBoard: stringValue(read('affiliationBoard')),
+      affiliationNumber: stringValue(read('affiliationNumber')),
       updatedAt: latest?.toISOString() ?? null,
     };
   }
