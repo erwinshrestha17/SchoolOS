@@ -4,6 +4,7 @@ import {
   isValidEmail,
   isValidPersonName,
   normalizeEmail,
+  normalizeNepalContactPhone,
   normalizeNepalPhone,
   normalizePersonName,
 } from '@schoolos/core';
@@ -54,6 +55,23 @@ export function optionalNepalPhone(
 ): string | null {
   if (!value?.trim()) return null;
   return requireNepalPhone(value);
+}
+
+export function requireNepalContactPhone(value: string): string {
+  try {
+    return normalizeNepalContactPhone(value);
+  } catch {
+    throw new BadRequestException(
+      'Phone must be a valid Nepal mobile (NTC/Ncell) or landline number',
+    );
+  }
+}
+
+export function optionalNepalContactPhone(
+  value: string | null | undefined,
+): string | null {
+  if (!value?.trim()) return null;
+  return requireNepalContactPhone(value);
 }
 
 export function parseDateOfBirth(value: string): Date {

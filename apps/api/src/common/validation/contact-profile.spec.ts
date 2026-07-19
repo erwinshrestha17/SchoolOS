@@ -7,8 +7,10 @@ import {
   isValidEmail,
   isValidPersonName,
   normalizeEmail,
+  normalizeNepalContactPhone,
   normalizeNepalPhone,
   normalizePersonName,
+  tryNormalizeNepalContactPhone,
   tryNormalizeNepalPhone,
 } from '@schoolos/core';
 import { plainToInstance } from 'class-transformer';
@@ -39,6 +41,43 @@ describe('shared Nepal contact and profile validation', () => {
     '014123456',
   ])('rejects invalid Nepal phone %s', (input) => {
     expect(tryNormalizeNepalPhone(input)).toBeNull();
+  });
+
+  it.each([
+    ['+977-1-5555555', '+97715555555'],
+    ['01-5555555', '+97715555555'],
+    ['014123456', '+97714123456'],
+    ['021-470126', '+97721470126'],
+    ['+977 1 4123456', '+97714123456'],
+  ])(
+    'normalizes Nepal landline %s to E.164 as a contact phone',
+    (input, expected) => {
+      expect(normalizeNepalContactPhone(input)).toBe(expected);
+    },
+  );
+
+  it.each(['9841234567', '+9779841234567', '9801234567'])(
+    'still accepts Nepal mobile %s as a contact phone',
+    (input) => {
+      expect(tryNormalizeNepalContactPhone(input)).toBe(
+        tryNormalizeNepalPhone(input),
+      );
+    },
+  );
+
+  it.each([
+    '9779841234567',
+    '98412345678',
+    '9721234567',
+    '0123456789',
+    '01234567',
+    '00123456',
+  ])('rejects invalid Nepal contact phone %s', (input) => {
+    expect(tryNormalizeNepalContactPhone(input)).toBeNull();
+  });
+
+  it('does not treat a landline as a mobile carrier', () => {
+    expect(getNepalMobileCarrier('+977-1-5555555')).toBeNull();
   });
 
   it('normalizes and validates Nepali and English names', () => {
@@ -128,6 +167,19 @@ describe('shared Nepal contact and profile validation', () => {
     expect(await validate(settings)).toEqual([]);
     expect(settings.principalName).toBe('सरिता थापा');
     expect(settings.schoolEmail).toBe('info+office@school.edu.np');
+  });
+
+  it('accepts a Nepal landline as the school profile contact phone', async () => {
+    const settings = plainToInstance(UpdateSchoolProfileDto, {
+      schoolPhone: '+977-1-5555555',
+    });
+    expect(await validate(settings)).toEqual([]);
+    expect(settings.schoolPhone).toBe('+97715555555');
+
+    const rejected = plainToInstance(UpdateSchoolProfileDto, {
+      schoolPhone: '12345',
+    });
+    expect(await validate(rejected)).not.toEqual([]);
   });
 
   it('keeps shared guardian contact values non-unique and DOB columns date-only', () => {

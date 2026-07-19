@@ -4,6 +4,7 @@ import {
   isValidPersonName,
   normalizeEmail,
   normalizePersonName,
+  tryNormalizeNepalContactPhone,
   tryNormalizeNepalPhone,
 } from '@schoolos/core';
 import { Transform } from 'class-transformer';
@@ -14,6 +15,13 @@ export const NormalizeNepalPhone = () =>
     const value: unknown = parameters.value;
     if (typeof value !== 'string') return value;
     return tryNormalizeNepalPhone(value) ?? value;
+  });
+
+export const NormalizeNepalContactPhone = () =>
+  Transform((parameters) => {
+    const value: unknown = parameters.value;
+    if (typeof value !== 'string') return value;
+    return tryNormalizeNepalContactPhone(value) ?? value;
   });
 
 export const NormalizePersonName = () =>
@@ -37,6 +45,22 @@ export function IsNepalPhone(validationOptions?: ValidationOptions) {
           typeof value === 'string' && tryNormalizeNepalPhone(value) !== null,
         defaultMessage: () =>
           'Enter a valid 10-digit Nepal mobile number with an NTC or Ncell prefix.',
+      },
+    },
+    validationOptions,
+  );
+}
+
+export function IsNepalContactPhone(validationOptions?: ValidationOptions) {
+  return ValidateBy(
+    {
+      name: 'isNepalContactPhone',
+      validator: {
+        validate: (value) =>
+          typeof value === 'string' &&
+          tryNormalizeNepalContactPhone(value) !== null,
+        defaultMessage: () =>
+          'Enter a valid Nepal mobile (NTC/Ncell) or landline number.',
       },
     },
     validationOptions,

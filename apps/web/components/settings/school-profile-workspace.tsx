@@ -8,9 +8,9 @@ import {
   isValidEmail,
   isValidPersonName,
   normalizeEmail,
-  normalizeNepalPhone,
+  normalizeNepalContactPhone,
   normalizePersonName,
-  tryNormalizeNepalPhone,
+  tryNormalizeNepalContactPhone,
   type SchoolProfileSettings,
   type UpdateSchoolProfilePayload,
 } from '@schoolos/core';
@@ -94,8 +94,10 @@ export function SchoolProfileWorkspace() {
       setValidationError('Enter a valid principal name.');
       return;
     }
-    if (form.schoolPhone && !tryNormalizeNepalPhone(form.schoolPhone)) {
-      setValidationError('Enter a valid NTC or Ncell contact number.');
+    if (form.schoolPhone && !tryNormalizeNepalContactPhone(form.schoolPhone)) {
+      setValidationError(
+        'Enter a valid Nepal mobile (NTC/Ncell) or landline contact number.',
+      );
       return;
     }
     if (form.schoolEmail && !isValidEmail(form.schoolEmail)) {
@@ -108,7 +110,7 @@ export function SchoolProfileWorkspace() {
         ? normalizePersonName(form.principalName)
         : form.principalName,
       schoolPhone: form.schoolPhone
-        ? normalizeNepalPhone(form.schoolPhone)
+        ? normalizeNepalContactPhone(form.schoolPhone)
         : form.schoolPhone,
       schoolEmail: form.schoolEmail
         ? normalizeEmail(form.schoolEmail)

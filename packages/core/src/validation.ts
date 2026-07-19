@@ -49,13 +49,17 @@ export function toLatinDigits(value: string): string {
   }).join("");
 }
 
-export function tryNormalizeNepalPhone(value: string): string | null {
-  let normalized = toLatinDigits(value)
+function stripNepalCountryCode(value: string): string {
+  const normalized = toLatinDigits(value)
     .trim()
     .replace(/[\s()-]/g, "");
-  if (normalized.startsWith("+977")) normalized = normalized.slice(4);
-  else if (normalized.startsWith("00977")) normalized = normalized.slice(5);
+  if (normalized.startsWith("+977")) return normalized.slice(4);
+  if (normalized.startsWith("00977")) return normalized.slice(5);
+  return normalized;
+}
 
+export function tryNormalizeNepalPhone(value: string): string | null {
+  const normalized = stripNepalCountryCode(value);
   if (!/^\d{10}$/.test(normalized)) return null;
   if (!ALL_NEPAL_MOBILE_PREFIXES.has(normalized.slice(0, 3))) return null;
   return `+977${normalized}`;
@@ -65,6 +69,35 @@ export function normalizeNepalPhone(value: string): string {
   const normalized = tryNormalizeNepalPhone(value);
   if (!normalized) {
     throw new Error("Enter a valid 10-digit Nepal mobile number.");
+  }
+  return normalized;
+}
+
+// National landline numbers are an area code (1-3 digits, "1" for the
+// Kathmandu valley) plus a local number, dialled domestically behind a
+// trunk "0" (e.g. "01-5545456"). In E.164 the trunk "0" is dropped, leaving
+// a 7-8 digit national number, e.g. "+977-1-5545456".
+function tryNormalizeNepalLandline(value: string): string | null {
+  let national = stripNepalCountryCode(value);
+  if (/^0\d{8}$/.test(national)) national = national.slice(1);
+  if (!/^[1-8]\d{6,7}$/.test(national)) return null;
+  return `+977${national}`;
+}
+
+/**
+ * Accepts either an NTC/Ncell mobile number or a Nepal landline number.
+ * Intended for institutional contact numbers (e.g. a school office line)
+ * where a landline is common; guardian/staff personal numbers should keep
+ * using {@link tryNormalizeNepalPhone} since those need to be mobile.
+ */
+export function tryNormalizeNepalContactPhone(value: string): string | null {
+  return tryNormalizeNepalPhone(value) ?? tryNormalizeNepalLandline(value);
+}
+
+export function normalizeNepalContactPhone(value: string): string {
+  const normalized = tryNormalizeNepalContactPhone(value);
+  if (!normalized) {
+    throw new Error("Enter a valid Nepal mobile or landline number.");
   }
   return normalized;
 }

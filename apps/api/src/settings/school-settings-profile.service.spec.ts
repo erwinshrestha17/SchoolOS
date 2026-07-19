@@ -150,4 +150,25 @@ describe('SchoolSettingsProfileService', () => {
       }),
     );
   });
+
+  it('accepts a Nepal landline for the school contact phone', async () => {
+    const { service, prisma } = buildService();
+    prisma.tenantSetting.upsert.mockResolvedValue({});
+    prisma.tenantSetting.findMany.mockResolvedValue([]);
+
+    await service.updateProfile(
+      tenantId,
+      { schoolPhone: '+977-1-5555555' },
+      userId,
+    );
+
+    expect(prisma.tenantSetting.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          key: 'school_phone',
+          value: '+97715555555',
+        }),
+      }),
+    );
+  });
 });

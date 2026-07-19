@@ -8,11 +8,11 @@ import {
   Min,
 } from 'class-validator';
 import {
-  IsNepalPhone,
+  IsNepalContactPhone,
   IsPersonName,
   IsProfileEmail,
   NormalizeEmailAddress,
-  NormalizeNepalPhone,
+  NormalizeNepalContactPhone,
   NormalizePersonName,
 } from '../../common/validation/contact-profile.decorators';
 
@@ -29,8 +29,8 @@ export class UpdateSchoolProfileDto {
 
   @IsOptional()
   @IsString()
-  @NormalizeNepalPhone()
-  @IsNepalPhone()
+  @NormalizeNepalContactPhone()
+  @IsNepalContactPhone()
   @MaxLength(50)
   schoolPhone?: string | null;
 

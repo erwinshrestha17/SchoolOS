@@ -9,7 +9,7 @@ import {
   schoolProfileSettingKeys,
 } from './school-profile.keys';
 import {
-  optionalNepalPhone,
+  optionalNepalContactPhone,
   optionalPersonName,
   optionalProfileEmail,
 } from '../common/validation/contact-profile';
@@ -60,7 +60,7 @@ export class SchoolSettingsProfileService {
     userId: string,
   ) {
     if (dto.schoolPhone !== undefined) {
-      dto.schoolPhone = optionalNepalPhone(dto.schoolPhone);
+      dto.schoolPhone = optionalNepalContactPhone(dto.schoolPhone);
     }
     if (dto.schoolEmail !== undefined) {
       dto.schoolEmail = optionalProfileEmail(dto.schoolEmail);
