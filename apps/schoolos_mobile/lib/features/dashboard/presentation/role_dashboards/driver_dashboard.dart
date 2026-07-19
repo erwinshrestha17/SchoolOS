@@ -12,6 +12,7 @@ import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/app_exception_view.dart';
 import '../../../../shared/widgets/app_gradient_card.dart';
 import '../../../../shared/widgets/app_skeleton.dart';
+import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/widgets/dashboard_card.dart';
 import '../../../../shared/widgets/role_badge.dart';
 import '../../../../shared/widgets/role_shell_scaffold.dart';
@@ -532,6 +533,52 @@ class _TripManifestSheetState extends ConsumerState<_TripManifestSheet> {
     }
   }
 
+  Future<void> _contactGuardian(DriverManifestStudent student) async {
+    final reason = await _showEmergencyContactDialog(context, student);
+    if (reason == null) {
+      return;
+    }
+
+    final key = 'contact:${student.studentId}';
+    setState(() => _busyKey = key);
+    try {
+      final result = await ref
+          .read(driverTransportRepositoryProvider)
+          .recordEmergencyContact(
+            widget.tripId,
+            student.studentId,
+            reason: reason.reason,
+            channel: reason.channel,
+          );
+      if (!mounted) {
+        return;
+      }
+      final phone = result.emergencyPhone;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            phone == null || phone.isEmpty
+                ? 'Contact recorded for ${_studentName(student)}.'
+                : 'Contact recorded. ${result.emergencyName ?? 'Guardian'}: $phone',
+          ),
+          duration: const Duration(seconds: 6),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      _showDriverActionFailure(
+        context,
+        'Could not record this contact attempt. Try again.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _busyKey = null);
+      }
+    }
+  }
+
   Future<void> _completeTrip() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -686,6 +733,7 @@ class _TripManifestSheetState extends ConsumerState<_TripManifestSheet> {
         busyKey: _busyKey,
         isBusy: _isBusy,
         onMarkStudent: _markStudent,
+        onContactGuardian: _contactGuardian,
         onCompleteTrip: _completeTrip,
         onSendLocationPing: _sendLocationPing,
       ),
@@ -697,12 +745,112 @@ void _showDriverActionFailure(BuildContext context, String message) {
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
 }
 
+class _EmergencyContactInput {
+  const _EmergencyContactInput({required this.reason, required this.channel});
+
+  final String reason;
+  final String channel;
+}
+
+const _emergencyContactChannels = <String, String>{
+  'CALL': 'Phone call',
+  'SMS': 'SMS',
+  'IN_APP_NOTE': 'Note only (already reached another way)',
+};
+
+Future<_EmergencyContactInput?> _showEmergencyContactDialog(
+  BuildContext context,
+  DriverManifestStudent student,
+) {
+  final formKey = GlobalKey<FormState>();
+  final reasonController = TextEditingController();
+  var channel = 'CALL';
+
+  return showDialog<_EmergencyContactInput>(
+    context: context,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setDialogState) => AlertDialog(
+        title: Text('Contact guardian: ${_studentName(student)}'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if ((student.emergencyName ?? '').isNotEmpty ||
+                  (student.emergencyPhone ?? '').isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                  child: Text(
+                    [student.emergencyName, student.emergencyPhone]
+                        .whereType<String>()
+                        .where((v) => v.isNotEmpty)
+                        .join(' · '),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              AppTextField(
+                label: 'Reason',
+                controller: reasonController,
+                hintText: 'e.g. Student not at stop, calling guardian',
+                validator: (value) => (value == null || value.trim().isEmpty)
+                    ? 'Enter a reason for this contact attempt.'
+                    : null,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              DropdownButtonFormField<String>(
+                initialValue: channel,
+                decoration: const InputDecoration(labelText: 'How contacted'),
+                items: [
+                  for (final entry in _emergencyContactChannels.entries)
+                    DropdownMenuItem(
+                      value: entry.key,
+                      child: Text(entry.value),
+                    ),
+                ],
+                onChanged: (value) {
+                  if (value != null) {
+                    setDialogState(() => channel = value);
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState?.validate() != true) {
+                return;
+              }
+              Navigator.of(context).pop(
+                _EmergencyContactInput(
+                  reason: reasonController.text.trim(),
+                  channel: channel,
+                ),
+              );
+            },
+            child: const Text('Record contact'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 class _ManifestContent extends StatelessWidget {
   const _ManifestContent({
     required this.manifest,
     required this.busyKey,
     required this.isBusy,
     required this.onMarkStudent,
+    required this.onContactGuardian,
     required this.onCompleteTrip,
     required this.onSendLocationPing,
   });
@@ -715,6 +863,7 @@ class _ManifestContent extends StatelessWidget {
     _DriverStudentAction action,
   )
   onMarkStudent;
+  final Future<void> Function(DriverManifestStudent student) onContactGuardian;
   final Future<void> Function() onCompleteTrip;
   final Future<void> Function() onSendLocationPing;
 
@@ -858,6 +1007,7 @@ class _ManifestContent extends StatelessWidget {
               busyKey: busyKey,
               isBusy: isBusy,
               onMarkStudent: onMarkStudent,
+              onContactGuardian: onContactGuardian,
             ),
             const SizedBox(height: AppSpacing.md),
           ],
@@ -907,6 +1057,7 @@ class _ManifestStudentCard extends StatelessWidget {
     required this.busyKey,
     required this.isBusy,
     required this.onMarkStudent,
+    required this.onContactGuardian,
   });
 
   final DriverManifestStudent student;
@@ -917,6 +1068,7 @@ class _ManifestStudentCard extends StatelessWidget {
     _DriverStudentAction action,
   )
   onMarkStudent;
+  final Future<void> Function(DriverManifestStudent student) onContactGuardian;
 
   @override
   Widget build(BuildContext context) {
@@ -1012,6 +1164,13 @@ class _ManifestStudentCard extends StatelessWidget {
                     ? null
                     : () => onMarkStudent(student, _DriverStudentAction.absent),
               ),
+              if ((student.emergencyPhone ?? '').isNotEmpty)
+                _StudentActionButton(
+                  label: 'Contact',
+                  icon: Icons.phone_forwarded_rounded,
+                  isLoading: busyKey == 'contact:${student.studentId}',
+                  onPressed: isBusy ? null : () => onContactGuardian(student),
+                ),
             ],
           ),
         ],

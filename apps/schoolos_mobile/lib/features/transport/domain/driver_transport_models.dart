@@ -340,6 +340,34 @@ class DriverManifestStudent {
   }
 }
 
+/// Confirms an emergency-contact attempt was recorded on the backend audit
+/// trail and echoes back the guardian details the driver just contacted.
+class EmergencyContactResult {
+  const EmergencyContactResult({
+    required this.studentName,
+    required this.channel,
+    required this.recordedAt,
+    this.emergencyName,
+    this.emergencyPhone,
+  });
+
+  final String studentName;
+  final String? emergencyName;
+  final String? emergencyPhone;
+  final String channel;
+  final String recordedAt;
+
+  factory EmergencyContactResult.fromJson(Map<String, dynamic> json) {
+    return EmergencyContactResult(
+      studentName: json['studentName'] as String? ?? '',
+      emergencyName: json['emergencyName'] as String?,
+      emergencyPhone: json['emergencyPhone'] as String?,
+      channel: json['channel'] as String? ?? 'CALL',
+      recordedAt: json['recordedAt'] as String? ?? '',
+    );
+  }
+}
+
 Map<String, dynamic>? _asMap(Object? value) {
   return value is Map<String, dynamic> ? value : null;
 }

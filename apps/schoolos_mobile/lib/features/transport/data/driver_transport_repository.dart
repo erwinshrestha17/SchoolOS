@@ -58,6 +58,22 @@ class DriverTransportRepository {
     );
   }
 
+  /// Records an audited "contacted the guardian" event for one student on
+  /// an active trip. [channel] must be one of CALL, SMS, or IN_APP_NOTE.
+  Future<EmergencyContactResult> recordEmergencyContact(
+    String tripId,
+    String studentId, {
+    required String reason,
+    String channel = 'CALL',
+  }) async {
+    final response = await _client.post(
+      '/transport/driver/trips/$tripId/emergency-contact',
+      data: {'studentId': studentId, 'reason': reason, 'channel': channel},
+    );
+    final data = response.data as Map<String, dynamic>;
+    return EmergencyContactResult.fromJson(data);
+  }
+
   Future<void> recordLocationPing(
     String tripId, {
     required num latitude,

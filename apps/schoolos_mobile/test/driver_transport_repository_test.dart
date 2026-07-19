@@ -294,5 +294,54 @@ void main() {
         'recordedAt': '2026-06-02T07:45:00.000Z',
       });
     });
+
+    test(
+      'records an emergency contact attempt and returns guardian details',
+      () async {
+        when(
+          () => apiClient.post<dynamic>(
+            '/transport/driver/trips/trip-1/emergency-contact',
+            data: any(named: 'data'),
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(path: ''),
+            data: {
+              'studentName': 'Asha Rai',
+              'emergencyName': 'Parent',
+              'emergencyPhone': '9800000000',
+              'channel': 'CALL',
+              'reason': 'Not at stop',
+              'recordedAt': '2026-06-02T07:50:00.000Z',
+            },
+          ),
+        );
+
+        final result = await repository.recordEmergencyContact(
+          'trip-1',
+          'student-1',
+          reason: 'Not at stop',
+        );
+
+        expect(result.studentName, 'Asha Rai');
+        expect(result.emergencyName, 'Parent');
+        expect(result.emergencyPhone, '9800000000');
+        expect(result.channel, 'CALL');
+
+        final payload =
+            verify(
+                  () => apiClient.post<dynamic>(
+                    '/transport/driver/trips/trip-1/emergency-contact',
+                    data: captureAny(named: 'data'),
+                  ),
+                ).captured.single
+                as Map<String, dynamic>;
+        expect(payload, {
+          'studentId': 'student-1',
+          'reason': 'Not at stop',
+          'channel': 'CALL',
+        });
+      },
+    );
   });
 }
