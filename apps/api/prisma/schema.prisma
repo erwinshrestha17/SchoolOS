@@ -1282,12 +1282,14 @@ model AcademicYear {
 }
 
 model Class {
-  id       String @id @default(uuid())
+  id       String  @id @default(uuid())
   tenantId String
   name     String
   level    Int
+  streamId String?
 
   tenant                    Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  stream                    Stream?                    @relation(fields: [streamId], references: [id], onDelete: SetNull)
   students                  Student[]
   subjects                  Subject[]
   sections                  Section[]
@@ -1317,6 +1319,26 @@ model Class {
   learningSessions          LearningSession[]
 
   @@unique([tenantId, name])
+}
+
+// Tenant-configurable Higher Secondary (+2) stream/faculty label, e.g. Science,
+// Management, Humanities. SchoolOS does not hard-code any stream taxonomy —
+// each school defines its own; subject differentiation between streams comes
+// from each stream's classes owning their own Subject rows.
+model Stream {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String
+  code      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  classes Class[]
+
+  @@unique([tenantId, name])
+  @@unique([tenantId, code])
 }
 
 model Section {
@@ -6463,6 +6485,7 @@ model Tenant {
   users                         User[]
   roles                         Role[]
   classes                       Class[]
+  streams                       Stream[]
   students                      Student[]
   subjects                      Subject[]
   staff                         Staff[]

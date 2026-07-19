@@ -1,8 +1,19 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { AssignClassStreamDto } from './dto/assign-class-stream.dto';
 import { CreateClassDto } from './dto/create-class.dto';
+
+// Streams (Science, Management, ...) are a Higher Secondary / +2 concept.
+// This matches the existing Grade 11-12 threshold used for admission grade
+// banding in admission-cases.service.ts's gradeBand().
+const HIGHER_SECONDARY_MIN_LEVEL = 11;
 
 @Injectable()
 export class ClassesService {
@@ -15,6 +26,7 @@ export class ClassesService {
     const classes = await this.prisma.class.findMany({
       where: { tenantId: actor.tenantId },
       include: {
+        stream: true,
         _count: {
           select: {
             students: true,
@@ -33,7 +45,63 @@ export class ClassesService {
       studentCount: classroom._count.students,
       subjectCount: classroom._count.subjects,
       sectionCount: classroom._count.sections,
+      streamId: classroom.streamId,
+      streamName: classroom.stream?.name ?? null,
     }));
+  }
+
+  async assignClassStream(
+    classId: string,
+    dto: AssignClassStreamDto,
+    actor: AuthContext,
+  ) {
+    const classroom = await this.prisma.class.findFirst({
+      where: { id: classId, tenantId: actor.tenantId },
+    });
+    if (!classroom) {
+      throw new NotFoundException('Class not found in this tenant');
+    }
+
+    const streamId = dto.streamId ?? null;
+
+    if (streamId !== null) {
+      if (classroom.level < HIGHER_SECONDARY_MIN_LEVEL) {
+        throw new UnprocessableEntityException(
+          `Streams apply to Higher Secondary classes (level ${HIGHER_SECONDARY_MIN_LEVEL} and above) only.`,
+        );
+      }
+
+      const stream = await this.prisma.stream.findFirst({
+        where: { id: streamId, tenantId: actor.tenantId },
+      });
+      if (!stream) {
+        throw new NotFoundException('Stream not found in this tenant');
+      }
+    }
+
+    const updated = await this.prisma.class.update({
+      where: { id: classId },
+      data: { streamId },
+      include: { stream: true },
+    });
+
+    await this.auditService.record({
+      action: 'update',
+      resource: 'class',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: classId,
+      before: { streamId: classroom.streamId },
+      after: { streamId },
+    });
+
+    return {
+      id: updated.id,
+      name: updated.name,
+      level: updated.level,
+      streamId: updated.streamId,
+      streamName: updated.stream?.name ?? null,
+    };
   }
 
   async createClass(dto: CreateClassDto, actor: AuthContext) {

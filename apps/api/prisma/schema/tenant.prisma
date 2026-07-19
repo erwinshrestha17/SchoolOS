@@ -11,6 +11,7 @@ model Tenant {
   users                         User[]
   roles                         Role[]
   classes                       Class[]
+  streams                       Stream[]
   students                      Student[]
   subjects                      Subject[]
   staff                         Staff[]

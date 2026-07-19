@@ -17,6 +17,16 @@ export type ClassSummary = {
   studentCount?: number;
   sectionCount?: number;
   subjectCount?: number;
+  streamId?: string | null;
+  streamName?: string | null;
+};
+
+export type StreamSummary = {
+  id: string;
+  name: string;
+  code: string;
+  isActive: boolean;
+  classCount?: number;
 };
 
 export type SectionSummary = {

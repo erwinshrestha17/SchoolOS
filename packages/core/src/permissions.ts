@@ -21,6 +21,16 @@ export const permissionCatalog = [
     description: "Read classes inside a tenant",
   },
   {
+    resource: "streams",
+    action: "create",
+    description: "Create Higher Secondary streams and assign them to classes",
+  },
+  {
+    resource: "streams",
+    action: "read",
+    description: "Read Higher Secondary streams inside a tenant",
+  },
+  {
     resource: "academic_years",
     action: "create",
     description: "Create academic years inside a tenant",
