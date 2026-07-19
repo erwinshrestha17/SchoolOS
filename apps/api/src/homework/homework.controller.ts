@@ -196,16 +196,6 @@ export class HomeworkController {
     return this.homeworkService.reviewSubmission(submissionId, dto, auth);
   }
 
-  @Patch('submissions/:submissionId/mark-reviewed')
-  @Permissions('homework:review')
-  markAsReviewed(
-    @Param('submissionId') submissionId: string,
-    @Body('feedback') feedback: string,
-    @CurrentAuth() auth: AuthContext,
-  ) {
-    return this.homeworkService.markAsReviewed(auth, submissionId, feedback);
-  }
-
   @Post('submissions/:submissionId/request-correction')
   @Permissions('homework:review')
   requestCorrection(

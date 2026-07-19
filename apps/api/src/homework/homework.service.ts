@@ -399,47 +399,6 @@ export class HomeworkService {
     );
   }
 
-  async markAsReviewed(
-    actor: AuthContext,
-    submissionId: string,
-    feedback?: string,
-  ) {
-    const submission = await this.prisma.homeworkSubmission.findFirst({
-      where: { id: submissionId, tenantId: actor.tenantId },
-      include: { homework: true },
-    });
-    if (!submission) throw new NotFoundException('Submission not found');
-    await this.ensureSubjectTeacherScopeForRead(actor, submission.homework);
-    if (!REVIEWABLE_SUBMISSION_STATUSES.includes(submission.status)) {
-      throw new ConflictException(
-        `Cannot review a submission in ${submission.status} status`,
-      );
-    }
-
-    const updated = await this.prisma.homeworkSubmission.update({
-      where: { id: submissionId },
-      data: {
-        status: HomeworkSubmissionStatus.REVIEWED,
-        feedback: feedback ?? submission.feedback,
-        reviewedAt: new Date(),
-        reviewedById: actor.userId,
-      },
-    });
-
-    await this.auditService.record({
-      action: 'review',
-      resource: 'homework_submission',
-      resourceId: submissionId,
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      after: updated,
-    });
-
-    return mapHomeworkSubmission(
-      await this.findSubmissionOrThrow(actor, submissionId),
-    );
-  }
-
   async getAssignment(actor: AuthContext, id: string) {
     const assignment = await this.findAssignmentOrThrow(actor, id);
     await this.ensureAssignmentVisibleToActor(actor, assignment);
