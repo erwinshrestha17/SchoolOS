@@ -68,3 +68,20 @@ apps/api/tsc-output*.txt
 
 apps/web/typecheck_errors*.txt
 apps/web/typecheck_output*.txt
+
+
+/provinces.csv
+/districts.csv
+/local_level_types.csv
+/local_levels.csv
+/nepal_administrative_hierarchy.json
+/nepal_administrative_hierarchy.min.json
+/nepal_administrative_hierarchy_flat.csv
+/nepal_administrative_seed_postgresql.sql
+/province_summary.csv
+/manifest.json
+
+/datasets/
+/data/
+
+apps/schoolos_mobile/web/manifest.json
