@@ -1,4 +1,4 @@
-import { AttendanceStatus, AuthMethod } from '@prisma/client';
+import { AuthMethod } from '@prisma/client';
 import { AttendanceService } from '../attendance/attendance.service';
 import type { AuthContext } from '../auth/auth.types';
 import { MobileTeacherAttendanceController } from './mobile-teacher-attendance.controller';
@@ -10,7 +10,6 @@ describe('MobileTeacherAttendanceController', () => {
       | 'listTeacherMobileClassSections'
       | 'getTeacherMobileToday'
       | 'getRoster'
-      | 'submitAttendance'
       | 'syncAttendance'
     >
   >;
@@ -22,7 +21,6 @@ describe('MobileTeacherAttendanceController', () => {
       listTeacherMobileClassSections: jest.fn(),
       getTeacherMobileToday: jest.fn(),
       getRoster: jest.fn(),
-      submitAttendance: jest.fn(),
       syncAttendance: jest.fn(),
     };
     controller = new MobileTeacherAttendanceController(
@@ -143,24 +141,6 @@ describe('MobileTeacherAttendanceController', () => {
       'section-1',
       '2026-06-02',
     );
-  });
-
-  it('submits attendance through the existing scoped attendance service', async () => {
-    const dto = {
-      academicYearId: 'year-1',
-      classId: 'class-1',
-      sectionId: 'section-1',
-      attendanceDate: '2026-06-02',
-      exceptions: [{ studentId: 'student-1', status: AttendanceStatus.ABSENT }],
-    };
-    attendanceService.submitAttendance.mockResolvedValue({
-      sessionId: 's-1',
-    } as Awaited<ReturnType<AttendanceService['submitAttendance']>>);
-
-    await expect(controller.submit(dto, actor)).resolves.toEqual({
-      sessionId: 's-1',
-    });
-    expect(attendanceService.submitAttendance).toHaveBeenCalledWith(dto, actor);
   });
 
   it('syncs a replay-safe mobile attendance submission', async () => {

@@ -1,7 +1,6 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiCreatedResponse } from '@nestjs/swagger';
 import { AttendanceService } from '../attendance/attendance.service';
-import { SubmitAttendanceDto } from '../attendance/dto/submit-attendance.dto';
 import { SyncAttendanceDto } from '../attendance/dto/sync-attendance.dto';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
@@ -71,12 +70,6 @@ export class MobileTeacherAttendanceController {
         remark: student.remark,
       })),
     };
-  }
-
-  @Post('submit')
-  @Permissions('attendance:mark')
-  submit(@Body() dto: SubmitAttendanceDto, @CurrentAuth() auth: AuthContext) {
-    return this.attendanceService.submitAttendance(dto, auth);
   }
 
   @Post('sync')
