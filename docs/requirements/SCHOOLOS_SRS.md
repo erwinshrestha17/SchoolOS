@@ -56,7 +56,8 @@ This section records code evidence inspected during this documentation pass. It 
 | Next.js Web | IMPLEMENTED_UNVERIFIED | `apps/web/app/dashboard/**`, `apps/web/app/platform/**`, and domain API clients exist; web client uses cookie credentials, CSRF token header, support override headers, and shared core types. |
 | Flutter companion app | IMPLEMENTED_UNVERIFIED | One GoRouter app has parent, teacher, principal, staff, driver, admin, and limited student routes; secure token storage and private read cache exist. Device QA was not run here. |
 | Program/stage resolver | NEEDS_SCHEMA_DESIGN | No canonical tenant program-offering, class stage profile, stream/combination, or `ExperienceContext` implementation was found. Current evidence is activity milestone stage filters only. |
-| Higher Secondary streams/subject combinations/practicals/projects | NEEDS_SCHEMA_DESIGN | Subjects have practical marks and assessments; no configurable stream/subject-combination/practical/project lifecycle model was verified. |
+| Higher Secondary streams | IMPLEMENTED_UNVERIFIED | Tenant-scoped, school-named `Stream` model exists with Class-level assignment restricted to level >= 11 (`apps/api/src/classes/streams.service.ts`, `classes.service.ts#assignClassStream`); no hard-coded curriculum. Browser-verified locally 2026-07-18; staging/broader QA not run here. |
+| Higher Secondary subject combinations/practicals/projects | NEEDS_SCHEMA_DESIGN | Subjects have practical marks and assessments and are class-scoped (so distinct streams can already carry distinct subject lists via separate classes); no per-student compulsory/optional subject-selection or practical/project lifecycle model was verified. |
 
 ## 3. System Architecture Requirement
 
@@ -277,7 +278,8 @@ Mobile workflow priority:
 | Student care/allergy alerts | IMPLEMENTED_UNVERIFIED / NEEDS_AUTHORIZATION_RULE | Student care fields exist; narrow staff visibility rules need verification/design. |
 | School Grade 1-10 core workflows | IMPLEMENTED_UNVERIFIED | Authenticated browser E2E, pilot seed, mobile device QA, staging proof. |
 | Higher Secondary subject practical marks | IMPLEMENTED_UNVERIFIED | Confirm contracts, UI, report-card handling, and +2 policy fit. |
-| Higher Secondary streams/subject combinations | NEEDS_SCHEMA_DESIGN | Design configurable stream/program/combination model and migration plan. |
+| Higher Secondary streams | IMPLEMENTED_UNVERIFIED | Staging proof, staff QA of the streams settings workspace, RBAC/tenant tests at scale. |
+| Higher Secondary subject combinations | NEEDS_SCHEMA_DESIGN | Design configurable per-student compulsory/optional subject-selection model and migration plan. |
 | Higher Secondary projects/practicals lifecycle | NEEDS_SCHEMA_DESIGN | Design lifecycle, assessment, files, notifications, and parent/student visibility. |
 | Conceptual ExperienceContext | PROPOSED | Backend contract, OpenAPI, shared DTO, web/mobile integration, tests. |
 | Education-reporting compliance composition | PROPOSED / NEEDS_CONTRACT_DESIGN | Confirm applicable Nepal school-reporting fields and formats, module-owned projections, validation states, protected export contracts, permissions, retention, and pilot evidence. |
