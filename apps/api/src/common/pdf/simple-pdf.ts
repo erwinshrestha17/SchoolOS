@@ -671,6 +671,7 @@ export function buildReportCardPdf(input: {
     finalGpa: number;
     remarks?: string | null;
   };
+  footerText?: string | null;
   logo?: PdfImage | null;
 }) {
   const contentParts = [
@@ -741,6 +742,12 @@ export function buildReportCardPdf(input: {
       sectionLabel('Remarks', 60, summaryY),
       ...wrapPdfLine(input.summary.remarks, 60, summaryY - 16, 250, 9),
     );
+  }
+
+  if (input.footerText) {
+    // Single truncated line in the fixed gap above the signature block
+    // (y 68-86) so it never collides with variable-length remarks above.
+    contentParts.push(text(fitText(input.footerText, 95), 60, 100, 8, 'F1'));
   }
 
   contentParts.push(

@@ -183,6 +183,7 @@ export class ReportCardPdfService {
       schoolName:
         settingMap.get('school_name') ?? tenant?.name ?? 'SchoolOS School',
       panNumber: tenant?.panNumber ?? null,
+      footerText: settingMap.get('report_card_footer_text') ?? null,
       examName: reportCard.examTerm.name,
       academicYear: reportCard.academicYear.name,
       student: {
