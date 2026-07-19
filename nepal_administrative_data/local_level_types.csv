@@ -1,5 +1,0 @@
-﻿type_id,type_code,slug,name_en,name_ne,local_level_count
-1,METROPOLITAN_CITY,metropolitan-city,Metropolitan City,महानगरपालिका,6
-2,SUB_METROPOLITAN_CITY,sub-metropolitan-city,Sub-Metropolitan City,उपमहानगरपालिका,11
-3,MUNICIPALITY,municipality,Municipality,नगरपालिका,276
-4,RURAL_MUNICIPALITY,rural-municipality,Rural Municipality,गाउँपालिका,460
