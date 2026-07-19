@@ -1194,3 +1194,61 @@ export const LearningResourceStatus = {
   ACTIVE: 'ACTIVE',
   ARCHIVED: 'ARCHIVED',
 } as const;
+
+export const AddressOwnerType = {
+  TENANT: 'TENANT',
+  SCHOOL_CAMPUS: 'SCHOOL_CAMPUS',
+  STAFF: 'STAFF',
+  STUDENT: 'STUDENT',
+  GUARDIAN: 'GUARDIAN',
+  EMERGENCY_CONTACT: 'EMERGENCY_CONTACT',
+  TRANSPORT_STOP: 'TRANSPORT_STOP',
+  VENDOR: 'VENDOR',
+  ASSET: 'ASSET',
+} as const;
+
+export const AddressType = {
+  PERMANENT: 'PERMANENT',
+  CURRENT: 'CURRENT',
+  MAILING: 'MAILING',
+  EMERGENCY: 'EMERGENCY',
+  REGISTERED_OFFICE: 'REGISTERED_OFFICE',
+  CAMPUS: 'CAMPUS',
+  OTHER: 'OTHER',
+} as const;
+
+export const AddressMappingStatus = {
+  AUTO_MATCHED: 'AUTO_MATCHED',
+  MANUAL_REVIEW_REQUIRED: 'MANUAL_REVIEW_REQUIRED',
+  CONFIRMED: 'CONFIRMED',
+  UNMATCHED: 'UNMATCHED',
+} as const;
+
+export const TeacherAssignmentType = {
+  CLASS_TEACHER: 'CLASS_TEACHER',
+  SUBJECT_TEACHER: 'SUBJECT_TEACHER',
+  ASSISTANT_TEACHER: 'ASSISTANT_TEACHER',
+  SUBSTITUTE_TEACHER: 'SUBSTITUTE_TEACHER',
+  EXAM_INVIGILATOR: 'EXAM_INVIGILATOR',
+  COORDINATOR: 'COORDINATOR',
+} as const;
+
+export const TeacherAssignmentComponentScope = {
+  THEORY: 'THEORY',
+  PRACTICAL: 'PRACTICAL',
+  INTERNAL: 'INTERNAL',
+  PROJECT: 'PROJECT',
+  ALL_COMPONENTS: 'ALL_COMPONENTS',
+} as const;
+
+export const TeacherAssignmentStatus = {
+  ACTIVE: 'ACTIVE',
+  EXPIRED: 'EXPIRED',
+  REVOKED: 'REVOKED',
+} as const;
+
+export const TeacherDelegationStatus = {
+  ACTIVE: 'ACTIVE',
+  EXPIRED: 'EXPIRED',
+  REVOKED: 'REVOKED',
+} as const;

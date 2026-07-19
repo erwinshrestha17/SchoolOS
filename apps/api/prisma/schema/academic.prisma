@@ -30,6 +30,8 @@ model AcademicYear {
   subjectWeeklyRequirements SubjectWeeklyRequirement[]
   conversations             Conversation[]
   attendanceDrafts          AttendanceDraft[]
+  teacherAssignmentRecords  TeacherAssignment[]
+  teacherDelegations        TeacherDelegation[]
 
   @@unique([tenantId, name])
 }
@@ -70,6 +72,8 @@ model Class {
   attendanceDrafts          AttendanceDraft[]
   learningActivities        LearningActivity[]
   learningSessions          LearningSession[]
+  teacherAssignmentRecords  TeacherAssignment[]
+  teacherDelegations        TeacherDelegation[]
 
   @@unique([tenantId, name])
 }
@@ -130,6 +134,8 @@ model Section {
   attendanceDrafts          AttendanceDraft[]
   learningActivities        LearningActivity[]
   learningSessions          LearningSession[]
+  teacherAssignmentRecords  TeacherAssignment[]
+  teacherDelegations        TeacherDelegation[]
 
   @@unique([tenantId, classId, name])
 }
@@ -163,6 +169,8 @@ model Subject {
   learningProgress          LearningProgress[]
   learningResources         LearningResource[]
   reportCardSubjectResults  ReportCardSubjectResult[]
+  teacherAssignmentRecords  TeacherAssignment[]
+  teacherDelegations        TeacherDelegation[]
 
   @@unique([tenantId, classId, code])
 }

@@ -18,6 +18,13 @@ const TENANT_SCOPE_EXCLUDED_MODELS = [
   'ProviderConfig',
   'PlatformPlan',
   'PlatformPlanFeature',
+  // Nepal administrative geography reference data: global, shared by every
+  // tenant, read-only outside platform reference-data administration.
+  'NepalProvince',
+  'NepalDistrict',
+  'NepalLocalLevelType',
+  'NepalLocalLevel',
+  'ReferenceDatasetVersion',
 ];
 const TENANT_SCOPED_READ_WRITE_OPERATIONS = [
   'findUnique',

@@ -188,6 +188,7 @@ export const systemRolePermissions: Record<string, string[]> = {
     "hr:leave:read",
     "hr:leave:request",
     "payroll:payslip:read",
+    "library:read",
   ],
   subject_teacher: [
     "roles:read",
@@ -226,6 +227,7 @@ export const systemRolePermissions: Record<string, string[]> = {
     "hr:leave:read",
     "hr:leave:request",
     "payroll:payslip:read",
+    "library:read",
   ],
   support_staff: [
     "roles:read",

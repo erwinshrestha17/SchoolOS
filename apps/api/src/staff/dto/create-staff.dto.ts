@@ -7,7 +7,9 @@ import {
   IsOptional,
   IsString,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import {
   IsDateOfBirth,
   IsNepalPhone,
@@ -17,6 +19,7 @@ import {
   NormalizeNepalPhone,
   NormalizePersonName,
 } from '../../common/validation/contact-profile.decorators';
+import { AddressInputDto } from '../../addresses/dto/address-input.dto';
 
 export class CreateStaffDto {
   @IsOptional()
@@ -102,4 +105,13 @@ export class CreateStaffDto {
   @ArrayMinSize(1)
   @IsString({ each: true })
   roleIds!: string[];
+
+  // Normalized addresses (e.g. one PERMANENT + one CURRENT). Optional --
+  // omitting this leaves only the legacy free-text `address` field. The
+  // backend re-validates every localLevelId; never trust these ids as-is.
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AddressInputDto)
+  addresses?: AddressInputDto[];
 }

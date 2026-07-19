@@ -18,6 +18,7 @@
     "db:migrate": "pnpm --filter @schoolos/api db:migrate",
     "db:seed": "pnpm --filter @schoolos/api db:seed",
     "db:seed:platform": "pnpm --filter @schoolos/api db:seed:platform",
+    "db:seed:geography": "pnpm --filter @schoolos/api db:seed:geography",
     "test:web:e2e": "pnpm --filter @schoolos/web test:e2e",
     "verify:env:deploy": "node scripts/check-deploy-env.mjs",
     "verify:env:staging": "DEPLOY_ENV=staging NODE_ENV=production node scripts/check-deploy-env.mjs",

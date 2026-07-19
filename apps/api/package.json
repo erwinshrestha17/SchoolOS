@@ -14,6 +14,8 @@
     "db:migrate": "pnpm run db:preflight:qr-duplicate-active && prisma migrate deploy",
     "db:seed": "prisma db seed",
     "db:seed:platform": "tsx prisma/platform-seed.ts",
+    "db:seed:geography": "tsx prisma/seed-nepal-geography.ts",
+    "db:backfill:teacher-assignments": "tsx prisma/seed-teacher-assignment-backfill.ts",
     "start": "node dist/apps/api/src/main.js",
     "start:dev": "pnpm run dev",
     "start:debug": "pnpm --filter @schoolos/core build && pnpm run prisma:generate && nest start --debug --watch --entryFile apps/api/src/main",

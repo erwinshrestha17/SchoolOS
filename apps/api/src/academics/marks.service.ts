@@ -1,10 +1,12 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import {
   AssessmentRetakeStatus,
+  AssessmentType,
   MarkEntryStatus,
   Prisma,
 } from '@prisma/client';
@@ -14,13 +16,134 @@ import { PrismaService } from '../prisma/prisma.service';
 import { BulkUpsertMarksDto } from './dto/bulk-upsert-marks.dto';
 import { ListMarksDto } from './dto/list-marks.dto';
 import { UpdateMarkDto } from './dto/update-mark.dto';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
+import { TeacherCapability } from '../teacher-scope/teacher-capability';
+
+/**
+ * Roles that retain the pre-existing coarse permission-gated access to marks
+ * (academic administration, result approval/publication, etc). Every other
+ * actor holding the `teacher` or `subject_teacher` role must additionally
+ * hold an active TeacherAssignment (or delegation) for the exact
+ * class+section+subject+component being written -- see requireTeacherScope
+ * below. Mirrors the same admin/principal carve-out already used client-side
+ * in attendance-m2-workspaces.tsx.
+ */
+const ASSIGNMENT_SCOPE_EXEMPT_ROLES = [
+  'admin',
+  'principal',
+  'platform_super_admin',
+];
 
 @Injectable()
 export class MarksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly teacherScopeService: TeacherScopeService,
   ) {}
+
+  /**
+   * Closes the gap flagged during the Teacher Persona security audit: this
+   * endpoint previously relied solely on the coarse `marks:manage` /
+   * `academics:enter_marks` permissions, so any teacher/subject_teacher role
+   * holder could enter marks for *any* subject in the tenant. This re-derives
+   * each target student's actual section from the database (never trusting
+   * `dto.sectionId`) and requires a matching active assignment or delegation
+   * per section touched, component-scope included (a PRACTICAL-only teacher
+   * cannot write THEORY marks).
+   *
+   * Bulk-import rows are authorized row by row (spec 23.3 "Bulk operations
+   * reject unauthorized rows") rather than all-or-nothing: a student in a
+   * section the actor isn't assigned to is rejected individually while the
+   * rest of the batch still proceeds. The whole request is only rejected
+   * (403) when the actor has no active teacher profile, or *no* row is
+   * authorized.
+   */
+  private async resolveTeacherScopeAuthorization(
+    actor: AuthContext,
+    dto: BulkUpsertMarksDto,
+    academicYearId: string,
+    componentType: AssessmentType,
+    students: Array<{ id: string; sectionId: string | null }>,
+  ): Promise<{
+    authorizedStudentIds: Set<string>;
+    rejectedRows: Array<{ studentId: string; reason: string }>;
+  }> {
+    const isExempt = actor.roles.some((role) =>
+      ASSIGNMENT_SCOPE_EXEMPT_ROLES.includes(role),
+    );
+    const isTeacherActor =
+      !isExempt &&
+      (actor.roles.includes('teacher') ||
+        actor.roles.includes('subject_teacher'));
+    if (!isTeacherActor) {
+      return {
+        authorizedStudentIds: new Set(students.map((s) => s.id)),
+        rejectedRows: [],
+      };
+    }
+
+    const staffId = await this.teacherScopeService.resolveActiveStaffId(actor);
+    if (!staffId) {
+      throw new ForbiddenException('Active teacher profile is required');
+    }
+
+    const sectionAuthorized = new Map<string, boolean>();
+    const authorizedStudentIds = new Set<string>();
+    const rejectedRows: Array<{ studentId: string; reason: string }> = [];
+
+    for (const student of students) {
+      if (!student.sectionId) {
+        rejectedRows.push({
+          studentId: student.id,
+          reason: 'Student has no assigned section',
+        });
+        continue;
+      }
+
+      if (!sectionAuthorized.has(student.sectionId)) {
+        try {
+          await this.teacherScopeService.requireAccess(
+            {
+              tenantId: actor.tenantId,
+              staffId,
+              academicYearId,
+              classId: dto.classId,
+              sectionId: student.sectionId,
+              subjectId: dto.subjectId,
+              componentType,
+              capability: TeacherCapability.MARKS_ENTER,
+            },
+            actor,
+          );
+          sectionAuthorized.set(student.sectionId, true);
+        } catch (error) {
+          if (error instanceof ForbiddenException) {
+            sectionAuthorized.set(student.sectionId, false);
+          } else {
+            throw error;
+          }
+        }
+      }
+
+      if (sectionAuthorized.get(student.sectionId)) {
+        authorizedStudentIds.add(student.id);
+      } else {
+        rejectedRows.push({
+          studentId: student.id,
+          reason: 'Not authorized for this class/section/subject/component',
+        });
+      }
+    }
+
+    if (authorizedStudentIds.size === 0) {
+      throw new ForbiddenException(
+        'You are not authorized for this teaching scope',
+      );
+    }
+
+    return { authorizedStudentIds, rejectedRows };
+  }
 
   async bulkUpsert(dto: BulkUpsertMarksDto, actor: AuthContext) {
     const examTerm = await this.prisma.examTerm.findFirst({
@@ -85,8 +208,22 @@ export class MarksService {
       );
     }
 
+    const { authorizedStudentIds, rejectedRows } =
+      await this.resolveTeacherScopeAuthorization(
+        actor,
+        dto,
+        examTerm.academicYearId,
+        component.type,
+        students,
+      );
+
+    const entries = dto.entries.filter((entry) =>
+      authorizedStudentIds.has(entry.studentId),
+    );
+    const authorizedStudentIdList = entries.map((entry) => entry.studentId);
+
     const maxMarks = Number(component.maxMarks);
-    for (const entry of dto.entries) {
+    for (const entry of entries) {
       if (entry.isRetest) {
         throw new ConflictException(
           'Use the assessment-retakes workflow to request a retest or make-up',
@@ -126,7 +263,7 @@ export class MarksService {
           status: 'APPROVED',
           reportCard: {
             examTermId: dto.examTermId,
-            studentId: { in: studentIds },
+            studentId: { in: authorizedStudentIdList },
           },
         },
         include: {
@@ -138,7 +275,7 @@ export class MarksService {
     );
 
     if (examTerm.isLocked) {
-      const unapprovedStudents = studentIds.filter(
+      const unapprovedStudents = authorizedStudentIdList.filter(
         (id) => !approvedStudentIds.has(id),
       );
       if (unapprovedStudents.length > 0) {
@@ -152,7 +289,7 @@ export class MarksService {
       where: {
         tenantId: actor.tenantId,
         assessmentComponentId: dto.assessmentComponentId,
-        studentId: { in: studentIds },
+        studentId: { in: authorizedStudentIdList },
       },
     });
 
@@ -188,7 +325,7 @@ export class MarksService {
     }
 
     const results = await this.prisma.$transaction(
-      dto.entries.map((entry) => {
+      entries.map((entry) => {
         let status: MarkEntryStatus = MarkEntryStatus.SUBMITTED;
         if (entry.isDraft) status = MarkEntryStatus.DRAFT;
         else if (entry.isAbsent) status = MarkEntryStatus.ABSENT;
@@ -235,10 +372,11 @@ export class MarksService {
       after: {
         componentId: dto.assessmentComponentId,
         count: results.length,
+        rejectedCount: rejectedRows.length,
       },
     });
 
-    return { updated: results.length, entries: results };
+    return { updated: results.length, entries: results, rejectedRows };
   }
 
   async listMarks(actor: AuthContext, dto: ListMarksDto) {

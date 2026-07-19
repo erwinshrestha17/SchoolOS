@@ -6,6 +6,7 @@ import { MarksService } from '../src/academics/marks.service';
 import { AuditService } from '../src/audit/audit.service';
 import { AuthContext } from '../src/auth/auth.types';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { TeacherScopeService } from '../src/teacher-scope/teacher-scope.service';
 import { createPrismaMock, PrismaMock } from './test-helpers';
 
 describe('Academics Hardening (Service Layer)', () => {
@@ -29,6 +30,17 @@ describe('Academics Hardening (Service Layer)', () => {
         MarksService,
         { provide: PrismaService, useValue: prisma },
         { provide: AuditService, useValue: { record: jest.fn() } },
+        {
+          provide: TeacherScopeService,
+          useValue: {
+            resolveActiveStaffId: jest.fn().mockResolvedValue('staff-1'),
+            requireAccess: jest.fn().mockResolvedValue({
+              source: 'ASSIGNMENT',
+              assignmentId: 'assignment-1',
+              componentScope: null,
+            }),
+          },
+        },
       ],
     }).compile();
 
@@ -66,7 +78,12 @@ describe('Academics Hardening (Service Layer)', () => {
       },
     });
     p.student.findMany.mockResolvedValue([
-      { id: 'student-1', tenantId: 'tenant-a', classId: 'class-1' },
+      {
+        id: 'student-1',
+        tenantId: 'tenant-a',
+        classId: 'class-1',
+        sectionId: 'section-1',
+      },
     ]);
     p.reportCardCorrectionRequest = p.reportCardCorrectionRequest ?? {
       findMany: jest.fn(),

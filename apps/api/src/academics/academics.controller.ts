@@ -285,7 +285,7 @@ export class AcademicsController {
   }
 
   @Post('assessment-retakes')
-  @Permissions('academics:enter_marks', 'marks:manage')
+  @Permissions('academics:enter_marks')
   createAssessmentRetake(
     @Body() dto: CreateAssessmentRetakeDto,
     @CurrentAuth() auth: AuthContext,
@@ -386,7 +386,7 @@ export class AcademicsController {
   }
 
   @Post('marks/bulk-upsert')
-  @Permissions('marks:manage', 'academics:enter_marks')
+  @Permissions('academics:enter_marks')
   bulkUpsertMarks(
     @Body() dto: BulkUpsertMarksDto,
     @CurrentAuth() auth: AuthContext,
@@ -395,7 +395,7 @@ export class AcademicsController {
   }
 
   @Patch('marks/:id')
-  @Permissions('marks:manage', 'academics:enter_marks')
+  @Permissions('academics:enter_marks')
   updateMark(
     @Param('id') markId: string,
     @Body() dto: UpdateMarkDto,

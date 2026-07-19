@@ -7,6 +7,7 @@ import { FinanceModule } from '../finance/finance.module';
 import { FileRegistryModule } from '../file-registry/file-registry.module';
 import { SettingsModule } from '../settings/settings.module';
 import { UsageModule } from '../usage/usage.module';
+import { TeacherScopeModule } from '../teacher-scope/teacher-scope.module';
 import { AcademicsController } from './academics.controller';
 import { AcademicsFoundationService } from './academics-foundation.service';
 import { AcademicsService } from './academics.service';
@@ -36,6 +37,7 @@ import {
     FileRegistryModule,
     SettingsModule,
     UsageModule,
+    TeacherScopeModule,
     BullModule.registerQueue({
       name: 'academics',
     }),

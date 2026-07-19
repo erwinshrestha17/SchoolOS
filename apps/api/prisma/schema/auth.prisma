@@ -108,6 +108,10 @@ model User {
   archivedLearningActivities     LearningActivity[]               @relation("ArchivedLearningActivities")
   createdLearningResources       LearningResource[]               @relation("CreatedLearningResources")
   archivedLearningResources      LearningResource[]               @relation("ArchivedLearningResources")
+  createdTeacherAssignments      TeacherAssignment[]              @relation("CreatedTeacherAssignments")
+  revokedTeacherAssignments      TeacherAssignment[]               @relation("RevokedTeacherAssignments")
+  createdTeacherDelegations      TeacherDelegation[]              @relation("CreatedTeacherDelegations")
+  revokedTeacherDelegations      TeacherDelegation[]              @relation("RevokedTeacherDelegations")
 
   @@unique([tenantId, email])
   @@unique([tenantId, phone])

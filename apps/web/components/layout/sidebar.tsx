@@ -6,7 +6,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Bell,
   BookOpen,
+  BriefcaseBusiness,
   Bus,
   Calculator,
   CalendarCheck,
@@ -23,6 +25,7 @@ import {
   School,
   Search,
   Settings,
+  ShieldCheck,
   UserCog,
   UserPlus,
   Users,
@@ -299,6 +302,110 @@ export const dashboardNavGroups: NavGroup[] = [
   },
 ];
 
+/**
+ * Teacher-persona navigation (Teacher Persona spec section 14). Every entry
+ * points at a real, working destination -- no administrative labels
+ * ("Admissions", "HR & Payroll"), no selector that would load unrestricted
+ * school-wide data, and nothing that 403s on click. A few items from the
+ * spec's illustrative tree (My Homeroom, My Subjects as separate pages,
+ * Class Reports, and per-tab deep links into My Workspace) don't have a
+ * dedicated route yet and are intentionally left out rather than linked to a
+ * page that doesn't back them -- see the Stage 3 report for what's deferred.
+ */
+export const teacherNavGroups: NavGroup[] = [
+  {
+    label: 'Home',
+    icon: LayoutDashboard,
+    items: [{ href: '/dashboard', label: 'Home', icon: LayoutDashboard }],
+  },
+  {
+    label: 'My Teaching',
+    icon: GraduationCap,
+    items: [
+      {
+        href: '/dashboard/my-students',
+        label: 'My Students',
+        icon: Users,
+        permissions: ['students:read'],
+      },
+      {
+        href: '/dashboard/timetable',
+        label: 'Timetable',
+        icon: CalendarDays,
+        permissions: ['timetable:read'],
+      },
+    ],
+  },
+  {
+    label: 'Teaching',
+    icon: CalendarCheck,
+    items: [
+      {
+        href: '/dashboard/attendance',
+        label: 'Attendance',
+        icon: CalendarCheck,
+        permissions: ['attendance:read', 'attendance:mark'],
+      },
+      {
+        href: '/dashboard/homework',
+        label: 'Homework',
+        icon: ClipboardList,
+        permissions: ['homework:read'],
+      },
+      {
+        href: '/dashboard/academics/exams',
+        label: 'Assessments & Marks',
+        icon: FileCheck2,
+        permissions: ['academics:read', 'academics:enter_marks'],
+      },
+      {
+        href: '/dashboard/activity',
+        label: 'Activities',
+        icon: Images,
+        permissions: ['activity_feed:read', 'activity_feed:create'],
+      },
+      {
+        href: '/dashboard/notices',
+        label: 'Communication',
+        icon: MessageSquare,
+        permissions: ['notices:read'],
+      },
+    ],
+  },
+  {
+    label: 'My Workspace',
+    icon: BriefcaseBusiness,
+    items: [
+      {
+        href: '/dashboard/my-workspace',
+        label: 'My Workspace',
+        icon: BriefcaseBusiness,
+      },
+      {
+        href: '/dashboard/library',
+        label: 'Library',
+        icon: BookOpen,
+        permissions: ['library:read'],
+      },
+      {
+        href: '/dashboard/settings/personal/profile',
+        label: 'Profile',
+        icon: CircleUserRound,
+      },
+      {
+        href: '/dashboard/settings/personal/notifications',
+        label: 'Preferences',
+        icon: Bell,
+      },
+      {
+        href: '/dashboard/settings/personal/security',
+        label: 'Security',
+        icon: ShieldCheck,
+      },
+    ],
+  },
+];
+
 export const settingsNavItem: NavItem = {
   href: '/dashboard/settings',
   label: 'Settings',
@@ -338,6 +445,16 @@ export function Sidebar({
     notificationCenterQuery.data?.unreadCount ?? 0,
   );
 
+  // Class/Subject Teachers get the assignment-scoped nav tree in place of the
+  // administrative one, matching the same persona carve-out used for the
+  // Home/Today dashboard (app/dashboard/page.tsx) and attendance
+  // (attendance-m2-workspaces.tsx) -- admins/principals keep the full nav
+  // even if they also hold a teaching role.
+  const isTeacherPersona = Boolean(
+    session?.user.roles.some((role) => ['teacher', 'subject_teacher'].includes(role)) &&
+      !session.user.roles.some((role) => ['admin', 'principal'].includes(role)),
+  );
+
   const visibleGroups = dashboardNavGroups
     .map((group) => ({
       ...group,
@@ -351,15 +468,30 @@ export function Sidebar({
     }))
     .filter((group) => group.items.length > 0);
 
-  const visibleSettings = canDisplayNavItem(settingsNavItem, session, hasModule)
-    ? settingsNavItem
-    : null;
+  const teacherVisibleGroups = teacherNavGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) =>
+        canDisplayNavItem(item, session, hasModule),
+      ),
+    }))
+    .filter((group) => group.items.length > 0);
+
+  const groupsToRender = isTeacherPersona ? teacherVisibleGroups : visibleGroups;
+
+  // Teachers reach Profile/Preferences/Security directly from the "My
+  // Workspace" group above; the generic administrative Settings hub link is
+  // redundant (and would surface tenant-wide settings sections) for them.
+  const visibleSettings =
+    !isTeacherPersona && canDisplayNavItem(settingsNavItem, session, hasModule)
+      ? settingsNavItem
+      : null;
 
   const activeHref = useMemo(() => {
-    const allItems = visibleGroups.flatMap((group) => group.items);
+    const allItems = groupsToRender.flatMap((group) => group.items);
     if (visibleSettings) allItems.push(visibleSettings);
     return computeActiveHref(allItems, pathname);
-  }, [visibleGroups, visibleSettings, pathname]);
+  }, [groupsToRender, visibleSettings, pathname]);
 
   const schoolName = session?.tenant.name ?? 'School workspace';
   const roleLabel = formatRole(session?.user.roles[0] ?? 'school_user');
@@ -408,7 +540,7 @@ export function Sidebar({
       >
         <SidebarContent
           collapsed={false}
-          groups={visibleGroups}
+          groups={groupsToRender}
           activeHref={activeHref}
           schoolName={schoolName}
           roleLabel={roleLabel}
@@ -421,7 +553,7 @@ export function Sidebar({
       <aside className="sticky top-0 z-30 hidden h-screen lg:flex">
         <SidebarContent
           collapsed={collapsed}
-          groups={visibleGroups}
+          groups={groupsToRender}
           activeHref={activeHref}
           schoolName={schoolName}
           roleLabel={roleLabel}

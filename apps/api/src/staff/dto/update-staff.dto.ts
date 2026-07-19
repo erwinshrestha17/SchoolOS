@@ -4,7 +4,15 @@ import {
   StaffEmploymentType,
   StaffStatus,
 } from '@prisma/client';
-import { IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
+import {
+  IsArray,
+  IsDateString,
+  IsEnum,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import {
   IsDateOfBirth,
   IsNepalPhone,
@@ -14,6 +22,7 @@ import {
   NormalizeNepalPhone,
   NormalizePersonName,
 } from '../../common/validation/contact-profile.decorators';
+import { AddressInputDto } from '../../addresses/dto/address-input.dto';
 
 export class UpdateStaffDto {
   @IsOptional()
@@ -124,4 +133,10 @@ export class UpdateStaffDto {
   @NormalizeEmailAddress()
   @IsProfileEmail()
   email?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AddressInputDto)
+  addresses?: AddressInputDto[];
 }

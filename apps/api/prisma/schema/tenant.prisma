@@ -211,6 +211,9 @@ model Tenant {
   learningAnswers               LearningAnswer[]
   learningProgress              LearningProgress[]
   learningResources             LearningResource[]
+  addresses                     Address[]
+  teacherAssignmentRecords      TeacherAssignment[]
+  teacherDelegations            TeacherDelegation[]
 }
 
 model TenantSetting {

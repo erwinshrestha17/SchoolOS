@@ -147,6 +147,11 @@ const dashboardRouteGates: RouteGate[] = [
     permissions: ["staff:read"],
   },
   {
+    prefix: "/dashboard/my-students",
+    label: "My Students",
+    permissions: ["students:read"],
+  },
+  {
     prefix: "/dashboard/messaging",
     label: "Chat removed",
     permissions: ["notices:read"],

@@ -1243,6 +1243,72 @@ enum LearningResourceStatus {
   ARCHIVED
 }
 
+enum AddressOwnerType {
+  TENANT
+  SCHOOL_CAMPUS
+  STAFF
+  STUDENT
+  GUARDIAN
+  EMERGENCY_CONTACT
+  TRANSPORT_STOP
+  VENDOR
+  ASSET
+}
+
+enum AddressType {
+  PERMANENT
+  CURRENT
+  MAILING
+  EMERGENCY
+  REGISTERED_OFFICE
+  CAMPUS
+  OTHER
+}
+
+// Migration-confidence status for legacy free-text address fields being
+// mapped onto normalized Address rows. Ambiguous matches are logged as
+// MANUAL_REVIEW_REQUIRED rather than guessed; legacy text is never deleted
+// until a human (or a high-confidence automated match) confirms it.
+enum AddressMappingStatus {
+  AUTO_MATCHED
+  MANUAL_REVIEW_REQUIRED
+  CONFIRMED
+  UNMATCHED
+}
+
+enum TeacherAssignmentType {
+  CLASS_TEACHER
+  SUBJECT_TEACHER
+  ASSISTANT_TEACHER
+  SUBSTITUTE_TEACHER
+  EXAM_INVIGILATOR
+  COORDINATOR
+}
+
+// Which assessment component(s) an assignment authorizes grading for. Mirrors
+// AssessmentComponent.type (AssessmentType enum) plus an explicit
+// ALL_COMPONENTS wildcard; null componentScope on a SUBJECT_TEACHER
+// assignment is treated the same as ALL_COMPONENTS.
+enum TeacherAssignmentComponentScope {
+  THEORY
+  PRACTICAL
+  INTERNAL
+  PROJECT
+  ALL_COMPONENTS
+}
+
+enum TeacherAssignmentStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+enum TeacherDelegationStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
 
 // ─── Compiled from schema/academic.prisma ───
 model AcademicYear {
@@ -1277,6 +1343,8 @@ model AcademicYear {
   subjectWeeklyRequirements SubjectWeeklyRequirement[]
   conversations             Conversation[]
   attendanceDrafts          AttendanceDraft[]
+  teacherAssignmentRecords  TeacherAssignment[]
+  teacherDelegations        TeacherDelegation[]
 
   @@unique([tenantId, name])
 }
@@ -1317,6 +1385,8 @@ model Class {
   attendanceDrafts          AttendanceDraft[]
   learningActivities        LearningActivity[]
   learningSessions          LearningSession[]
+  teacherAssignmentRecords  TeacherAssignment[]
+  teacherDelegations        TeacherDelegation[]
 
   @@unique([tenantId, name])
 }
@@ -1377,6 +1447,8 @@ model Section {
   attendanceDrafts          AttendanceDraft[]
   learningActivities        LearningActivity[]
   learningSessions          LearningSession[]
+  teacherAssignmentRecords  TeacherAssignment[]
+  teacherDelegations        TeacherDelegation[]
 
   @@unique([tenantId, classId, name])
 }
@@ -1410,6 +1482,8 @@ model Subject {
   learningProgress          LearningProgress[]
   learningResources         LearningResource[]
   reportCardSubjectResults  ReportCardSubjectResult[]
+  teacherAssignmentRecords  TeacherAssignment[]
+  teacherDelegations        TeacherDelegation[]
 
   @@unique([tenantId, classId, code])
 }
@@ -2867,6 +2941,10 @@ model User {
   archivedLearningActivities     LearningActivity[]               @relation("ArchivedLearningActivities")
   createdLearningResources       LearningResource[]               @relation("CreatedLearningResources")
   archivedLearningResources      LearningResource[]               @relation("ArchivedLearningResources")
+  createdTeacherAssignments      TeacherAssignment[]              @relation("CreatedTeacherAssignments")
+  revokedTeacherAssignments      TeacherAssignment[]               @relation("RevokedTeacherAssignments")
+  createdTeacherDelegations      TeacherDelegation[]              @relation("CreatedTeacherDelegations")
+  revokedTeacherDelegations      TeacherDelegation[]              @relation("RevokedTeacherDelegations")
 
   @@unique([tenantId, email])
   @@unique([tenantId, phone])
@@ -4444,6 +4522,144 @@ model FinanceApprovalRequestHistory {
 }
 
 
+// ─── Compiled from schema/geography.prisma ───
+// Nepal administrative geography reference data.
+//
+// Global, platform-wide reference tables — NOT tenant-scoped. Shared read-only
+// by every tenant, seeded once from /nepal_administrative_data and idempotently
+// re-seedable via `pnpm --filter @schoolos/api db:seed:geography`.
+//
+// Primary keys intentionally use the dataset's own stable numeric identifiers
+// (not UUIDs) so reseeding never changes an id that business data may already
+// reference. These numeric ids are internal dataset identifiers, not official
+// government administrative codes — `officialCode` is reserved for those if a
+// verified government code source is added later.
+model NepalProvince {
+  id             Int      @id
+  nameEn         String   @unique
+  nameNe         String
+  headquartersEn String?
+  headquartersNe String?
+  officialCode   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  districts NepalDistrict[]
+
+  @@index([nameEn])
+  @@index([nameNe])
+}
+
+model NepalDistrict {
+  id             Int      @id
+  provinceId     Int
+  nameEn         String
+  nameNe         String
+  headquartersEn String?
+  headquartersNe String?
+  officialCode   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  province    NepalProvince     @relation(fields: [provinceId], references: [id], onDelete: Restrict)
+  localLevels NepalLocalLevel[]
+
+  @@unique([provinceId, nameEn])
+  @@index([provinceId])
+  @@index([nameEn])
+  @@index([nameNe])
+}
+
+model NepalLocalLevelType {
+  id     Int    @id
+  code   String @unique
+  slug   String @unique
+  nameEn String
+  nameNe String
+
+  localLevels NepalLocalLevel[]
+}
+
+model NepalLocalLevel {
+  id           Int      @id
+  districtId   Int
+  typeId       Int
+  nameEn       String
+  nameNe       String
+  officialCode String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  district NepalDistrict       @relation(fields: [districtId], references: [id], onDelete: Restrict)
+  type     NepalLocalLevelType @relation(fields: [typeId], references: [id], onDelete: Restrict)
+
+  addresses Address[]
+
+  @@unique([districtId, nameEn])
+  @@index([districtId])
+  @@index([typeId])
+  @@index([nameEn])
+  @@index([nameNe])
+}
+
+// Generic, versioned metadata for any platform reference dataset (Nepal
+// geography today; future reference datasets reuse the same row shape).
+// Lets web/mobile clients ask "is my cached copy current?" without
+// re-downloading the dataset itself.
+model ReferenceDatasetVersion {
+  id           String   @id @default(uuid())
+  datasetKey   String   @unique
+  version      String
+  generatedOn  DateTime
+  checksum     String
+  recordCounts Json
+  source       String
+  importedAt   DateTime @default(now())
+  status       String   @default("ACTIVE")
+}
+
+// Reusable, normalized SchoolOS address value. Referenced by (rather than
+// duplicated into) any entity that needs a physical address: staff, guardians,
+// students, school/campus profiles, transport stops, vendors, etc. Stores only
+// the normalized local-level FK — province/district/type/bilingual names are
+// always derived from the NepalLocalLevel -> NepalDistrict -> NepalProvince
+// chain, never copied onto the address row.
+//
+// Ownership is polymorphic (ownerType/ownerId, no DB-level FK) — the same
+// pattern already used by FileAsset in tenant.prisma — so one Address table
+// serves every owning entity without a join table or FK column per owner type.
+model Address {
+  id            String      @id @default(uuid())
+  tenantId      String
+  ownerType     AddressOwnerType
+  ownerId       String
+  countryCode   String      @default("NP")
+  localLevelId  Int?
+  wardNumber    String?
+  tole          String?
+  streetAddress String?
+  landmark      String?
+  postalCode    String?
+  latitude      Float?
+  longitude     Float?
+  addressType   AddressType @default(OTHER)
+  isPrimary     Boolean     @default(false)
+  isHistorical  Boolean     @default(false)
+  mappingStatus AddressMappingStatus @default(UNMATCHED)
+  legacyText    String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  tenant     Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  localLevel NepalLocalLevel? @relation(fields: [localLevelId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([localLevelId])
+  @@index([tenantId, ownerType, ownerId])
+  @@index([tenantId, addressType])
+}
+
+
 // ─── Compiled from schema/homework.prisma ───
 model HomeworkReminderBatch {
   id             String    @id @default(uuid())
@@ -5798,6 +6014,9 @@ model Staff {
   lifecycleEvents            StaffLifecycleEvent[]
   learningActivities         LearningActivity[]
   learningSessions           LearningSession[]
+  teacherAssignmentRecords   TeacherAssignment[]
+  delegationsGranted         TeacherDelegation[] @relation("DelegationGrantor")
+  delegationsReceived        TeacherDelegation[] @relation("DelegationRecipient")
 
   @@unique([tenantId, employeeId])
   @@unique([tenantId, staffCode])
@@ -6471,6 +6690,110 @@ model SiblingGroupMember {
 }
 
 
+// ─── Compiled from schema/teacher-assignment.prisma ───
+// Canonical Teacher authority model (Teacher Persona spec, sections 4 & 18).
+//
+// A Teacher's effective authority = base TEACHER role + active
+// TeacherAssignment rows + active, non-expired TeacherDelegation rows.
+// This is the single source of truth the TeacherScopeService resolver reads
+// from -- no controller/service should re-derive "is this teacher allowed
+// here" from ad hoc Section.classTeacherId / SubjectTeacherAssignment checks
+// once migrated onto this model.
+//
+// Existing Section.classTeacherId and SubjectTeacherAssignment rows remain in
+// place for backward compatibility (other code still reads them); a backfill
+// (see prisma/seed-teacher-assignment-backfill.ts) populates TeacherAssignment
+// from both sources, and staff/timetable assignment-creation flows are wired
+// to keep writing both going forward.
+model TeacherAssignment {
+  id             String                @id @default(uuid())
+  tenantId       String
+  academicYearId String
+  staffId        String
+
+  assignmentType TeacherAssignmentType
+  classId        String
+  sectionId      String
+  subjectId      String?
+  componentScope TeacherAssignmentComponentScope?
+
+  isPrimary      Boolean                 @default(true)
+  effectiveFrom  DateTime
+  effectiveUntil DateTime?
+  status         TeacherAssignmentStatus @default(ACTIVE)
+
+  createdById String?
+  revokedById String?
+  revokedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  staff        Staff        @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  class        Class        @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section      Section      @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  subject      Subject?     @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  createdBy    User?        @relation("CreatedTeacherAssignments", fields: [createdById], references: [id], onDelete: SetNull)
+  revokedBy    User?        @relation("RevokedTeacherAssignments", fields: [revokedById], references: [id], onDelete: SetNull)
+
+  delegations TeacherDelegation[] @relation("DelegationSourceAssignment")
+
+  @@unique([tenantId, academicYearId, staffId, assignmentType, classId, sectionId, subjectId, componentScope], name: "TeacherAssignment_scope_unique")
+  @@index([tenantId, staffId, academicYearId, status])
+  @@index([tenantId, classId, sectionId, status])
+  @@index([tenantId, subjectId])
+  @@index([tenantId, academicYearId, status, effectiveUntil])
+}
+
+// Time-bounded, capability-scoped substitute/temporary authority (Teacher
+// Persona spec section 18). A delegation never broadens a recipient's access
+// beyond `allowedCapabilities` on the delegated scope -- it does not grant
+// the recipient the grantor's full assignment.
+model TeacherDelegation {
+  id             String @id @default(uuid())
+  tenantId       String
+  academicYearId String
+
+  grantorStaffId    String
+  recipientStaffId  String
+  sourceAssignmentId String?
+
+  classId        String
+  sectionId      String
+  subjectId      String?
+  componentScope TeacherAssignmentComponentScope?
+
+  allowedCapabilities String[]
+  reason              String
+
+  effectiveFrom  DateTime
+  effectiveUntil DateTime
+  status         TeacherDelegationStatus @default(ACTIVE)
+
+  createdById String?
+  revokedById String?
+  revokedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant             Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear       AcademicYear       @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  grantor            Staff              @relation("DelegationGrantor", fields: [grantorStaffId], references: [id], onDelete: Restrict)
+  recipient          Staff              @relation("DelegationRecipient", fields: [recipientStaffId], references: [id], onDelete: Restrict)
+  sourceAssignment   TeacherAssignment? @relation("DelegationSourceAssignment", fields: [sourceAssignmentId], references: [id], onDelete: SetNull)
+  class              Class              @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section            Section            @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  subject            Subject?           @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  createdBy          User?              @relation("CreatedTeacherDelegations", fields: [createdById], references: [id], onDelete: SetNull)
+  revokedBy          User?              @relation("RevokedTeacherDelegations", fields: [revokedById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, recipientStaffId, status, effectiveUntil])
+  @@index([tenantId, grantorStaffId])
+  @@index([tenantId, classId, sectionId])
+}
+
+
 // ─── Compiled from schema/tenant.prisma ───
 model Tenant {
   id        String   @id @default(uuid())
@@ -6685,6 +7008,9 @@ model Tenant {
   learningAnswers               LearningAnswer[]
   learningProgress              LearningProgress[]
   learningResources             LearningResource[]
+  addresses                     Address[]
+  teacherAssignmentRecords      TeacherAssignment[]
+  teacherDelegations            TeacherDelegation[]
 }
 
 model TenantSetting {

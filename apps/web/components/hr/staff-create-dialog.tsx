@@ -10,6 +10,7 @@ import { FormField, Input, Select, TextArea } from '../ui/form-field';
 import { Toast } from '../ui/toast';
 import { X, Shield } from 'lucide-react';
 import { isValidDateOfBirth, isValidEmail, isValidPersonName, normalizeEmail, normalizeNepalPhone, normalizePersonName, tryNormalizeNepalPhone } from '@schoolos/core';
+import { NepalAddressSelector, type NepalAddressValue } from '../geography/nepal-address-selector';
 
 type StaffCreateDialogProps = {
   isOpen: boolean;
@@ -44,6 +45,12 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
     probationEndDate: '',
     roleIds: [] as string[],
   });
+
+  // Structured, backend-validated address (Province -> District -> Local
+  // Level -> Ward/Tole/Street/Landmark). Kept separate from the legacy
+  // free-text `address` field above -- both are sent together so the legacy
+  // text is preserved rather than replaced.
+  const [nepalAddress, setNepalAddress] = useState<NepalAddressValue>({});
 
   const rolesQuery = useQuery({
     queryKey: ['roles'],
@@ -132,6 +139,9 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
       qualifications: optionalTrim(formData.qualifications),
       experience: optionalTrim(formData.experience),
       probationEndDate: optionalTrim(formData.probationEndDate),
+      addresses: nepalAddress.localLevelId
+        ? [{ addressType: 'PERMANENT' as const, ...nepalAddress }]
+        : undefined,
     };
 
     createMutation.mutate(payload);
@@ -261,6 +271,15 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
                   required
                 />
               </FormField>
+              <div className="md:col-span-4">
+                <FormField label="Structured Address (Optional)">
+                  <NepalAddressSelector
+                    idPrefix="staff-create-address"
+                    value={nepalAddress}
+                    onChange={setNepalAddress}
+                  />
+                </FormField>
+              </div>
             </div>
           </div>
 

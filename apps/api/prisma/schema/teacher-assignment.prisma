@@ -1,0 +1,101 @@
+// Canonical Teacher authority model (Teacher Persona spec, sections 4 & 18).
+//
+// A Teacher's effective authority = base TEACHER role + active
+// TeacherAssignment rows + active, non-expired TeacherDelegation rows.
+// This is the single source of truth the TeacherScopeService resolver reads
+// from -- no controller/service should re-derive "is this teacher allowed
+// here" from ad hoc Section.classTeacherId / SubjectTeacherAssignment checks
+// once migrated onto this model.
+//
+// Existing Section.classTeacherId and SubjectTeacherAssignment rows remain in
+// place for backward compatibility (other code still reads them); a backfill
+// (see prisma/seed-teacher-assignment-backfill.ts) populates TeacherAssignment
+// from both sources, and staff/timetable assignment-creation flows are wired
+// to keep writing both going forward.
+model TeacherAssignment {
+  id             String                @id @default(uuid())
+  tenantId       String
+  academicYearId String
+  staffId        String
+
+  assignmentType TeacherAssignmentType
+  classId        String
+  sectionId      String
+  subjectId      String?
+  componentScope TeacherAssignmentComponentScope?
+
+  isPrimary      Boolean                 @default(true)
+  effectiveFrom  DateTime
+  effectiveUntil DateTime?
+  status         TeacherAssignmentStatus @default(ACTIVE)
+
+  createdById String?
+  revokedById String?
+  revokedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  staff        Staff        @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  class        Class        @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section      Section      @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  subject      Subject?     @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  createdBy    User?        @relation("CreatedTeacherAssignments", fields: [createdById], references: [id], onDelete: SetNull)
+  revokedBy    User?        @relation("RevokedTeacherAssignments", fields: [revokedById], references: [id], onDelete: SetNull)
+
+  delegations TeacherDelegation[] @relation("DelegationSourceAssignment")
+
+  @@unique([tenantId, academicYearId, staffId, assignmentType, classId, sectionId, subjectId, componentScope], name: "TeacherAssignment_scope_unique")
+  @@index([tenantId, staffId, academicYearId, status])
+  @@index([tenantId, classId, sectionId, status])
+  @@index([tenantId, subjectId])
+  @@index([tenantId, academicYearId, status, effectiveUntil])
+}
+
+// Time-bounded, capability-scoped substitute/temporary authority (Teacher
+// Persona spec section 18). A delegation never broadens a recipient's access
+// beyond `allowedCapabilities` on the delegated scope -- it does not grant
+// the recipient the grantor's full assignment.
+model TeacherDelegation {
+  id             String @id @default(uuid())
+  tenantId       String
+  academicYearId String
+
+  grantorStaffId    String
+  recipientStaffId  String
+  sourceAssignmentId String?
+
+  classId        String
+  sectionId      String
+  subjectId      String?
+  componentScope TeacherAssignmentComponentScope?
+
+  allowedCapabilities String[]
+  reason              String
+
+  effectiveFrom  DateTime
+  effectiveUntil DateTime
+  status         TeacherDelegationStatus @default(ACTIVE)
+
+  createdById String?
+  revokedById String?
+  revokedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant             Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear       AcademicYear       @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  grantor            Staff              @relation("DelegationGrantor", fields: [grantorStaffId], references: [id], onDelete: Restrict)
+  recipient          Staff              @relation("DelegationRecipient", fields: [recipientStaffId], references: [id], onDelete: Restrict)
+  sourceAssignment   TeacherAssignment? @relation("DelegationSourceAssignment", fields: [sourceAssignmentId], references: [id], onDelete: SetNull)
+  class              Class              @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section            Section            @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  subject            Subject?           @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  createdBy          User?              @relation("CreatedTeacherDelegations", fields: [createdById], references: [id], onDelete: SetNull)
+  revokedBy          User?              @relation("RevokedTeacherDelegations", fields: [revokedById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, recipientStaffId, status, effectiveUntil])
+  @@index([tenantId, grantorStaffId])
+  @@index([tenantId, classId, sectionId])
+}

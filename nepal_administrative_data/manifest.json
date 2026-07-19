@@ -1,0 +1,95 @@
+{
+  "metadata": {
+    "country": "Nepal",
+    "country_code": "NP",
+    "generated_on": "2026-07-18",
+    "counts": {
+      "provinces": 7,
+      "districts": 77,
+      "local_levels": 753,
+      "metropolitan_cities": 6,
+      "sub_metropolitan_cities": 11,
+      "municipalities": 276,
+      "rural_municipalities": 460
+    },
+    "validation": {
+      "official_structure_counts_matched": true,
+      "foreign_key_integrity_checked": true,
+      "unique_ids_checked": true,
+      "bilingual_names_checked": true,
+      "relationship_spot_checks": [
+        "Tilottama → Rupandehi → Lumbini Province",
+        "Kathmandu → Kathmandu → Bagmati Province",
+        "Pokhara → Kaski → Gandaki Province",
+        "Biratnagar → Morang → Koshi Province"
+      ]
+    },
+    "sources": {
+      "hierarchy_dataset": "states-nepal npm package",
+      "hierarchy_dataset_version": "0.3.1",
+      "hierarchy_dataset_published": "2025-07-19",
+      "hierarchy_dataset_license": "MIT",
+      "secondary_count_cross_check": "neplocalgov Python package",
+      "official_count_validation": [
+        "Government of Nepal Sthaniya GIS portal",
+        "MoFAGA local-level contact portal"
+      ]
+    },
+    "data_usage_note": "Numeric IDs are dataset identifiers for application seeding; they are not asserted to be official government administrative codes.",
+    "legal_note": "For gazette-sensitive, legal, or compliance use, confirm spellings and any boundary/name changes against the Nepal Gazette and relevant government office."
+  },
+  "province_counts": [
+    {
+      "province_id": 1,
+      "province_name_en": "Koshi Province",
+      "districts": 14,
+      "local_levels": 137
+    },
+    {
+      "province_id": 2,
+      "province_name_en": "Madhesh Province",
+      "districts": 8,
+      "local_levels": 136
+    },
+    {
+      "province_id": 3,
+      "province_name_en": "Bagmati Province",
+      "districts": 13,
+      "local_levels": 119
+    },
+    {
+      "province_id": 4,
+      "province_name_en": "Gandaki Province",
+      "districts": 11,
+      "local_levels": 85
+    },
+    {
+      "province_id": 5,
+      "province_name_en": "Lumbini Province",
+      "districts": 12,
+      "local_levels": 109
+    },
+    {
+      "province_id": 6,
+      "province_name_en": "Karnali Province",
+      "districts": 10,
+      "local_levels": 79
+    },
+    {
+      "province_id": 7,
+      "province_name_en": "Sudurpashchim Province",
+      "districts": 9,
+      "local_levels": 88
+    }
+  ],
+  "checks": {
+    "province_count_7": true,
+    "district_count_77": true,
+    "local_level_count_753": true,
+    "type_counts_match_official": true,
+    "all_foreign_keys_valid": true,
+    "all_ids_unique": true,
+    "all_names_bilingual": true,
+    "tilottama_relationship_valid": true
+  }
+}

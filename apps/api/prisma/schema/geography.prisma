@@ -1,0 +1,135 @@
+// Nepal administrative geography reference data.
+//
+// Global, platform-wide reference tables — NOT tenant-scoped. Shared read-only
+// by every tenant, seeded once from /nepal_administrative_data and idempotently
+// re-seedable via `pnpm --filter @schoolos/api db:seed:geography`.
+//
+// Primary keys intentionally use the dataset's own stable numeric identifiers
+// (not UUIDs) so reseeding never changes an id that business data may already
+// reference. These numeric ids are internal dataset identifiers, not official
+// government administrative codes — `officialCode` is reserved for those if a
+// verified government code source is added later.
+model NepalProvince {
+  id             Int      @id
+  nameEn         String   @unique
+  nameNe         String
+  headquartersEn String?
+  headquartersNe String?
+  officialCode   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  districts NepalDistrict[]
+
+  @@index([nameEn])
+  @@index([nameNe])
+}
+
+model NepalDistrict {
+  id             Int      @id
+  provinceId     Int
+  nameEn         String
+  nameNe         String
+  headquartersEn String?
+  headquartersNe String?
+  officialCode   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  province    NepalProvince     @relation(fields: [provinceId], references: [id], onDelete: Restrict)
+  localLevels NepalLocalLevel[]
+
+  @@unique([provinceId, nameEn])
+  @@index([provinceId])
+  @@index([nameEn])
+  @@index([nameNe])
+}
+
+model NepalLocalLevelType {
+  id     Int    @id
+  code   String @unique
+  slug   String @unique
+  nameEn String
+  nameNe String
+
+  localLevels NepalLocalLevel[]
+}
+
+model NepalLocalLevel {
+  id           Int      @id
+  districtId   Int
+  typeId       Int
+  nameEn       String
+  nameNe       String
+  officialCode String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  district NepalDistrict       @relation(fields: [districtId], references: [id], onDelete: Restrict)
+  type     NepalLocalLevelType @relation(fields: [typeId], references: [id], onDelete: Restrict)
+
+  addresses Address[]
+
+  @@unique([districtId, nameEn])
+  @@index([districtId])
+  @@index([typeId])
+  @@index([nameEn])
+  @@index([nameNe])
+}
+
+// Generic, versioned metadata for any platform reference dataset (Nepal
+// geography today; future reference datasets reuse the same row shape).
+// Lets web/mobile clients ask "is my cached copy current?" without
+// re-downloading the dataset itself.
+model ReferenceDatasetVersion {
+  id           String   @id @default(uuid())
+  datasetKey   String   @unique
+  version      String
+  generatedOn  DateTime
+  checksum     String
+  recordCounts Json
+  source       String
+  importedAt   DateTime @default(now())
+  status       String   @default("ACTIVE")
+}
+
+// Reusable, normalized SchoolOS address value. Referenced by (rather than
+// duplicated into) any entity that needs a physical address: staff, guardians,
+// students, school/campus profiles, transport stops, vendors, etc. Stores only
+// the normalized local-level FK — province/district/type/bilingual names are
+// always derived from the NepalLocalLevel -> NepalDistrict -> NepalProvince
+// chain, never copied onto the address row.
+//
+// Ownership is polymorphic (ownerType/ownerId, no DB-level FK) — the same
+// pattern already used by FileAsset in tenant.prisma — so one Address table
+// serves every owning entity without a join table or FK column per owner type.
+model Address {
+  id            String      @id @default(uuid())
+  tenantId      String
+  ownerType     AddressOwnerType
+  ownerId       String
+  countryCode   String      @default("NP")
+  localLevelId  Int?
+  wardNumber    String?
+  tole          String?
+  streetAddress String?
+  landmark      String?
+  postalCode    String?
+  latitude      Float?
+  longitude     Float?
+  addressType   AddressType @default(OTHER)
+  isPrimary     Boolean     @default(false)
+  isHistorical  Boolean     @default(false)
+  mappingStatus AddressMappingStatus @default(UNMATCHED)
+  legacyText    String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  tenant     Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  localLevel NepalLocalLevel? @relation(fields: [localLevelId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([localLevelId])
+  @@index([tenantId, ownerType, ownerId])
+  @@index([tenantId, addressType])
+}

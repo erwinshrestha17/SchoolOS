@@ -3,7 +3,19 @@ import { AuthMethod, MarkEntryStatus, Prisma } from '@prisma/client';
 import { MarksService } from './marks.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 import type { AuthContext } from '../auth/auth.types';
+
+function makeAllowingTeacherScopeService() {
+  return {
+    resolveActiveStaffId: jest.fn().mockResolvedValue('staff-1'),
+    requireAccess: jest.fn().mockResolvedValue({
+      source: 'ASSIGNMENT',
+      assignmentId: 'assignment-1',
+      componentScope: null,
+    }),
+  };
+}
 
 describe('MarksService', () => {
   let service: MarksService;
@@ -19,6 +31,10 @@ describe('MarksService', () => {
         {
           provide: AuditService,
           useValue: {}, // Mock AuditService
+        },
+        {
+          provide: TeacherScopeService,
+          useValue: {}, // Mock TeacherScopeService
         },
       ],
     }).compile();
@@ -64,9 +80,21 @@ describe('MarksService', () => {
       },
       student: {
         findMany: jest.fn().mockResolvedValue([
-          { id: 'student-absent', tenantId: actor.tenantId },
-          { id: 'student-withheld', tenantId: actor.tenantId },
-          { id: 'student-draft', tenantId: actor.tenantId },
+          {
+            id: 'student-absent',
+            tenantId: actor.tenantId,
+            sectionId: 'section-1',
+          },
+          {
+            id: 'student-withheld',
+            tenantId: actor.tenantId,
+            sectionId: 'section-1',
+          },
+          {
+            id: 'student-draft',
+            tenantId: actor.tenantId,
+            sectionId: 'section-1',
+          },
         ]),
       },
       reportCardCorrectionRequest: {
@@ -89,6 +117,7 @@ describe('MarksService', () => {
     const marksService = new MarksService(
       prisma as unknown as PrismaService,
       auditService as unknown as AuditService,
+      makeAllowingTeacherScopeService() as unknown as TeacherScopeService,
     );
 
     const result = await marksService.bulkUpsert(
@@ -197,14 +226,19 @@ describe('MarksService', () => {
         }),
       },
       student: {
-        findMany: jest
-          .fn()
-          .mockResolvedValue([{ id: 'student-1', tenantId: actor.tenantId }]),
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'student-1',
+            tenantId: actor.tenantId,
+            sectionId: 'section-1',
+          },
+        ]),
       },
     };
     const marksService = new MarksService(
       prisma as unknown as PrismaService,
       { record: jest.fn() } as unknown as AuditService,
+      makeAllowingTeacherScopeService() as unknown as TeacherScopeService,
     );
 
     await expect(

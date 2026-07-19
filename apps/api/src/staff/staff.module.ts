@@ -10,6 +10,7 @@ import { StaffLifecycleService } from './staff-lifecycle.service';
 import { StaffLeaveAccrualService } from '../hr/staff-leave-accrual.service';
 import { FileRegistryModule } from '../file-registry/file-registry.module';
 import { UsageModule } from '../usage/usage.module';
+import { AddressModule } from '../addresses/address.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { UsageModule } from '../usage/usage.module';
     AuditModule,
     FileRegistryModule,
     UsageModule,
+    AddressModule,
   ],
   providers: [
     StaffService,

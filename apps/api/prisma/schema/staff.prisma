@@ -64,6 +64,9 @@ model Staff {
   lifecycleEvents            StaffLifecycleEvent[]
   learningActivities         LearningActivity[]
   learningSessions           LearningSession[]
+  teacherAssignmentRecords   TeacherAssignment[]
+  delegationsGranted         TeacherDelegation[] @relation("DelegationGrantor")
+  delegationsReceived        TeacherDelegation[] @relation("DelegationRecipient")
 
   @@unique([tenantId, employeeId])
   @@unique([tenantId, staffCode])

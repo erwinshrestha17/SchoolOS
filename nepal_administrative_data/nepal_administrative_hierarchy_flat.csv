@@ -1,0 +1,754 @@
+﻿province_id,province_name_en,province_name_ne,district_id,district_name_en,district_name_ne,local_level_id,local_level_name_en,local_level_name_ne,local_level_type_id,local_level_type_code,local_level_type_en,local_level_type_ne
+1,Koshi Province,कोशी प्रदेश,1,Bhojpur,भोजपुर,2,Bhojpur,भोजपुर,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,1,Bhojpur,भोजपुर,1,Shadanand,षडानन्द,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,1,Bhojpur,भोजपुर,5,Aamchok,आमचोक,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,1,Bhojpur,भोजपुर,7,Arun,अरुण,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,1,Bhojpur,भोजपुर,3,Hatuwagadhi,हतुवागढी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,1,Bhojpur,भोजपुर,8,Pauwadungma,पौवादुङमा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,1,Bhojpur,भोजपुर,4,Ramprasad Rai,रामप्रसाद राई,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,1,Bhojpur,भोजपुर,9,Salpasilichho,साल्पासिलिछो,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,1,Bhojpur,भोजपुर,6,Tyamke Maiyum,टेम्केमैयुङ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,2,Dhankuta,धनकुटा,10,Dhankuta,धनकुटा,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,2,Dhankuta,धनकुटा,12,Mahalaxmi,महालक्ष्मी,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,2,Dhankuta,धनकुटा,11,Pakhribas,पाख्रिबास,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,2,Dhankuta,धनकुटा,14,Chaubise,चौविसे,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,2,Dhankuta,धनकुटा,16,Chhathar Jorpati,छथर जोरपाटी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,2,Dhankuta,धनकुटा,15,Sahidbhumi,सहिदभूमि,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,2,Dhankuta,धनकुटा,13,Sangurigadhi,साँगुरीगढी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,3,Ilam,इलाम,19,Deumai,देउमाई,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,3,Ilam,इलाम,18,Ilam,ईलाम,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,3,Ilam,इलाम,22,Mai,माई,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,3,Ilam,इलाम,17,Suryodaya,सूर्योदय,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,3,Ilam,इलाम,23,Chulachuli,चुलाचुली,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,3,Ilam,इलाम,20,Maijogmai,माईजोगमाई,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,3,Ilam,इलाम,25,Mangsebung,माङसेबुङ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,3,Ilam,इलाम,21,Phakphokthum,फाकफोकथुम,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,3,Ilam,इलाम,24,Rong,रोङ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,3,Ilam,इलाम,26,Sandakpur,सन्दकपुर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,4,Jhapa,झापा,32,Arjundhara,अर्जुनधारा,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,4,Jhapa,झापा,30,Bhadrapur,भद्रपुर,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,4,Jhapa,झापा,28,Birtamod,विर्तामोड,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,4,Jhapa,झापा,29,Damak,दमक,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,4,Jhapa,झापा,33,Gauradaha,गौरादह,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,4,Jhapa,झापा,34,Kankai,कन्काई,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,4,Jhapa,झापा,27,Mechinagar,मेचीनगर,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,4,Jhapa,झापा,31,Shivasatakshi,शिवशताक्षी,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,4,Jhapa,झापा,39,Barhadashi,बाह्रदशी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,4,Jhapa,झापा,36,Buddha Shanti,बुद्धशान्ति,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,4,Jhapa,झापा,40,Gaurigunj,गौरीगंज,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,4,Jhapa,झापा,41,Haldibari,हल्दिवारी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,4,Jhapa,झापा,38,Jhapa,झापा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,4,Jhapa,झापा,37,Kachankawal,कचनकवल,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,4,Jhapa,झापा,35,Kamal,कमल,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,5,Khotang,खोटाँग,42,Diktel Rupakot Majhuwagadhi,दिक्तेल रुपाकोट मझुवागढी,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,5,Khotang,खोटाँग,43,Halesi Tuwachung,हलेसी तुवाचुङ,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,5,Khotang,खोटाँग,46,Aiselukharka,ऐसेलुखर्क,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,5,Khotang,खोटाँग,49,Barahpokhari,वराहपोखरी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,5,Khotang,खोटाँग,45,Diprung Chuichumma,दिप्रुङ चुइचुम्मा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,5,Khotang,खोटाँग,47,Jantedhunga,जन्तेढुंगा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,5,Khotang,खोटाँग,48,Kepilasgadhi,केपिलासगढी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,5,Khotang,खोटाँग,44,Khotehang,खोटेहाङ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,5,Khotang,खोटाँग,50,Rawa Besi,रावा बेसी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,5,Khotang,खोटाँग,51,Sakela,साकेला,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,6,Morang,मोरंग,60,Biratnagar,विराटनगर,1,METROPOLITAN_CITY,Metropolitan City,महानगरपालिका
+1,Koshi Province,कोशी प्रदेश,6,Morang,मोरंग,53,Belbari,बेलवारी,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,6,Morang,मोरंग,59,Letang,लेटाङ,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,6,Morang,मोरंग,54,Pathari Shanischare,पथरी शनिश्चरे,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,6,Morang,मोरंग,57,Rangeli,रंगेली,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,6,Morang,मोरंग,55,Ratuwamai,रतुवामाई,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,6,Morang,मोरंग,58,Sunawarshi,सुनवर्षि,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,6,Morang,मोरंग,52,Sundar Haraicha,सुन्दरहरैचा,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,6,Morang,मोरंग,56,Urlabari,उर्लावारी,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,6,Morang,मोरंग,62,Budi Ganga,बुढीगंगा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,6,Morang,मोरंग,64,Dhanpalthan,धनपालथान,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,6,Morang,मोरंग,66,Gramthan,ग्रामथान,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,6,Morang,मोरंग,61,Jahada,जहदा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,6,Morang,मोरंग,65,Kanepokhari,कानेपोखरी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,6,Morang,मोरंग,63,Katahari,कटहरी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,6,Morang,मोरंग,67,Kerabari,केरावारी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,6,Morang,मोरंग,68,Miklajung,मिक्लाजुङ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,7,Okhaldhunga,ओखलढुंगा,69,Siddhicharan,सिद्दिचरण,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,7,Okhaldhunga,ओखलढुंगा,74,Champadevi,चम्पादेवी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,7,Okhaldhunga,ओखलढुंगा,71,Chisankhugadhi,चिशंखुगढी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,7,Okhaldhunga,ओखलढुंगा,70,Khiji Demba,खिजिदेम्बा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,7,Okhaldhunga,ओखलढुंगा,76,Likhu,लिखु,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,7,Okhaldhunga,ओखलढुंगा,75,Manebhanjyang,मानेभञ्याङ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,7,Okhaldhunga,ओखलढुंगा,72,Molung,मोलुङ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,7,Okhaldhunga,ओखलढुंगा,73,Sunkoshi,सुनकोशी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,8,Panchthar,पांचथर,77,Phidim,फिदिम,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,8,Panchthar,पांचथर,80,Hilihang,हिलिहाङ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,8,Panchthar,पांचथर,83,Kummayak,कुम्मायक,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,8,Panchthar,पांचथर,78,Miklajung,मिक्लाजुङ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,8,Panchthar,पांचथर,81,Phalelung,फालेलुङ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,8,Panchthar,पांचथर,79,Phalgunanda,फाल्गुनन्द,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,8,Panchthar,पांचथर,84,Tumbewa,तुम्बेवा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,8,Panchthar,पांचथर,82,Yangwarak,याङवरक,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,9,Sankhuwasabha,संखुवासभा,86,Chainpur,चैनपुर,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,9,Sankhuwasabha,संखुवासभा,87,Dharmadevi,धर्मदेवी,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,9,Sankhuwasabha,संखुवासभा,85,Khandbari,खाँदवारी,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,9,Sankhuwasabha,संखुवासभा,89,Madi,मादी,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,9,Sankhuwasabha,संखुवासभा,88,Panchkhapan,पाँचखपन,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,9,Sankhuwasabha,संखुवासभा,94,BhotKhola,भोटखोला,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,9,Sankhuwasabha,संखुवासभा,93,Chichila,चिचिला,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,9,Sankhuwasabha,संखुवासभा,90,Makalu,मकालु,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,9,Sankhuwasabha,संखुवासभा,92,Sabhapokhari,सभापोखरी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,9,Sankhuwasabha,संखुवासभा,91,Silichong,सिलीचोङ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,10,Solukhumbu,सोलुखुम्बू,95,Solu Dudhkunda,सोलुदुधकुण्ड,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,10,Solukhumbu,सोलुखुम्बू,101,Khumbu PasangLhamu,खुम्वु पासाङल्हमु,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,10,Solukhumbu,सोलुखुम्बू,102,Likhu Pike,लिखु पिके,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,10,Solukhumbu,सोलुखुम्बू,99,Maha Kulung,माहाकुलुङ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,10,Solukhumbu,सोलुखुम्बू,96,Mapya Dudhkoshi,माप्य दुधकोशी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,10,Solukhumbu,सोलुखुम्बू,97,Necha Salyan,नेचासल्यान,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,10,Solukhumbu,सोलुखुम्बू,100,Sotang,सोताङ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,10,Solukhumbu,सोलुखुम्बू,98,Thulung Dudhkoshi,थुलुङ दुधकोशी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,11,Sunsari,सुनसरी,108,Dharan,धरान,2,SUB_METROPOLITAN_CITY,Sub-Metropolitan City,उपमहानगरपालिका
+1,Koshi Province,कोशी प्रदेश,11,Sunsari,सुनसरी,107,Itahari,ईटहरी,2,SUB_METROPOLITAN_CITY,Sub-Metropolitan City,उपमहानगरपालिका
+1,Koshi Province,कोशी प्रदेश,11,Sunsari,सुनसरी,103,BarahaKshetra,बराहक्षेत्र,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,11,Sunsari,सुनसरी,105,Duhabi,दुहवी,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,11,Sunsari,सुनसरी,104,Inaruwa,ईनरुवा,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,11,Sunsari,सुनसरी,106,Ramdhuni,रामधुनी,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,11,Sunsari,सुनसरी,114,Barju,बर्जु,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,11,Sunsari,सुनसरी,111,Bhokraha Narsingh,भोक्राहा नरसिंह,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,11,Sunsari,सुनसरी,112,Dewangunj,देवानगञ्ज,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,11,Sunsari,सुनसरी,113,Gadhi,गढी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,11,Sunsari,सुनसरी,110,Harinagar,हरिनगर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,11,Sunsari,सुनसरी,109,Koshi,कोशी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,12,Taplejung,ताप्लेजुंग,115,Phungling,फुङलिङ,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,12,Taplejung,ताप्लेजुंग,117,Aathrai Triveni,आठराई त्रिवेणी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,12,Taplejung,ताप्लेजुंग,122,Maiwa Khola,मैवाखोला,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,12,Taplejung,ताप्लेजुंग,119,Meringden,मेरिङदेन,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,12,Taplejung,ताप्लेजुंग,123,Mikwa Khola,मिक्वाखोला,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,12,Taplejung,ताप्लेजुंग,118,Pathibhara Yangwarak,पाथीभरा याङवरक,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,12,Taplejung,ताप्लेजुंग,121,Phaktanglung,फक्ताङलुङ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,12,Taplejung,ताप्लेजुंग,120,Sidingwa,सिदिङ्वा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,12,Taplejung,ताप्लेजुंग,116,Sirijangha,सिरीजङ्घा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,13,Terhathum,तेह्रथुम,125,Laligurans,लालीगुराँस,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,13,Terhathum,तेह्रथुम,124,Myanglung,म्याङलुङ,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,13,Terhathum,तेह्रथुम,126,Aathrai,आठराई,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,13,Terhathum,तेह्रथुम,128,Chhathar,छथर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,13,Terhathum,तेह्रथुम,129,Menchayayem,मेन्छयायेम,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,13,Terhathum,तेह्रथुम,127,Phedap,फेदाप,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,14,Udayapur,उदयपुर,133,Belaka,वेलका,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,14,Udayapur,उदयपुर,132,Chaudandigadhi,चौदण्डीगढी,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,14,Udayapur,उदयपुर,131,Katari,कटारी,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,14,Udayapur,उदयपुर,130,Triyuga,त्रियुगा,3,MUNICIPALITY,Municipality,नगरपालिका
+1,Koshi Province,कोशी प्रदेश,14,Udayapur,उदयपुर,137,Limchungbung,लिम्चुङ्बुङ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,14,Udayapur,उदयपुर,135,Rautamai,रौतामाई,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,14,Udayapur,उदयपुर,136,Tapli,ताप्ली,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+1,Koshi Province,कोशी प्रदेश,14,Udayapur,उदयपुर,134,Udayapurgadhi,उदयपुरगढी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,16,Bara,बारा,153,Jitpur Simara,जीतपुर सिमरा,2,SUB_METROPOLITAN_CITY,Sub-Metropolitan City,उपमहानगरपालिका
+2,Madhesh Province,मधेश प्रदेश,16,Bara,बारा,152,Kalaiya,कलैया,2,SUB_METROPOLITAN_CITY,Sub-Metropolitan City,उपमहानगरपालिका
+2,Madhesh Province,मधेश प्रदेश,16,Bara,बारा,154,Kolhabi,कोल्हवी,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,16,Bara,बारा,156,Mahagadhimai,महागढीमाई,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,16,Bara,बारा,155,Nijgadh,निजगढ,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,16,Bara,बारा,158,Pacharauta,पचरौता,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,16,Bara,बारा,157,Simaraungadh,सिम्रौनगढ,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,16,Bara,बारा,162,Adarsh Kotwal,आदर्श कोटवाल,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,16,Bara,बारा,166,Baragadhi,बारागढी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,16,Bara,बारा,160,Bishrampur,विश्रामपुर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,16,Bara,बारा,164,Devtal,देवताल,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,16,Bara,बारा,163,Karaiyamai,करैयामाई,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,16,Bara,बारा,165,Parwanipur,परवानीपुर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,16,Bara,बारा,159,Pheta,फेटा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,16,Bara,बारा,161,Prasauni,प्रसौनी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,16,Bara,बारा,167,Suwarna,सुवर्ण,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,20,Dhanusha,धनुषा,223,Janakpurdham,जनकपुरधाम,2,SUB_METROPOLITAN_CITY,Sub-Metropolitan City,उपमहानगरपालिका
+2,Madhesh Province,मधेश प्रदेश,20,Dhanusha,धनुषा,228,Bideha,विदेह,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,20,Dhanusha,धनुषा,224,Chhireshwarnath,क्षिरेश्वरनाथ,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,20,Dhanusha,धनुषा,226,Dhanushadham,धनुषाधाम,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,20,Dhanusha,धनुषा,225,Ganeshman Charnath,गणेशमान चारनाथ,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,20,Dhanusha,धनुषा,234,Hansapur,हंसपुर,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,20,Dhanusha,धनुषा,232,Kamala,कमला,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,20,Dhanusha,धनुषा,229,Mithila,मिथिला,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,20,Dhanusha,धनुषा,233,MithilaBihari,मिथिला बिहारी,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,20,Dhanusha,धनुषा,227,Nagarain,नगराइन,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,20,Dhanusha,धनुषा,231,Sabaila,सबैला,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,20,Dhanusha,धनुषा,230,Sahidnagar,शहीदनगर,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,20,Dhanusha,धनुषा,239,Aaurahi,औरही,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,20,Dhanusha,धनुषा,236,Bateshwar,बटेश्वर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,20,Dhanusha,धनुषा,240,Dhanauji,धनौजी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,20,Dhanusha,धनुषा,235,Janaknandani,जनकनन्दिनी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,20,Dhanusha,धनुषा,238,Lakshminya,लक्ष्मीनिया,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,20,Dhanusha,धनुषा,237,Mukhiyapatti Musharniya,मुखियापट्टी मुसहरमिया,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,22,Mahottari,महोत्तरी,259,Aaurahi,औरही,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,22,Mahottari,महोत्तरी,260,Balawa,बलवा,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,22,Mahottari,महोत्तरी,261,Bardibas,बर्दिबास,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,22,Mahottari,महोत्तरी,262,Bhangaha,भँगाहा,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,22,Mahottari,महोत्तरी,263,Gaushala,गौशाला,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,22,Mahottari,महोत्तरी,264,Jaleshor,जलेश्वर,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,22,Mahottari,महोत्तरी,265,Loharpatti,लोहरपट्टी,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,22,Mahottari,महोत्तरी,266,Manara Shiswa,मनरा शिसवा,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,22,Mahottari,महोत्तरी,267,Matihani,मटिहानी,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,22,Mahottari,महोत्तरी,268,Ramgopalpur,रामगोपालपुर,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,22,Mahottari,महोत्तरी,269,Ekdara,एकडारा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,22,Mahottari,महोत्तरी,270,Mahottari,महोत्तरी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,22,Mahottari,महोत्तरी,271,Pipara,पिपरा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,22,Mahottari,महोत्तरी,272,Samsi,साम्सी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,22,Mahottari,महोत्तरी,273,Sonama,सोनमा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,15,Parsa,पर्सा,138,Birgunj,बिरगंज,1,METROPOLITAN_CITY,Metropolitan City,महानगरपालिका
+2,Madhesh Province,मधेश प्रदेश,15,Parsa,पर्सा,139,Bahudarmai,बहुदरमाई,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,15,Parsa,पर्सा,140,Parsagadhi,पर्सागढी,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,15,Parsa,पर्सा,141,Pokhariya,पोखरिया,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,15,Parsa,पर्सा,142,Bindabasini,बिन्दबासिनी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,15,Parsa,पर्सा,144,Chhipaharmai,छिपहरमाई,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,15,Parsa,पर्सा,143,Dhobini,धोबीनी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,15,Parsa,पर्सा,145,Jagarnathpur,जगरनाथपुर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,15,Parsa,पर्सा,146,Jirabhawani,जिरा भवानी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,15,Parsa,पर्सा,147,Kalikamai,कालिकामाई,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,15,Parsa,पर्सा,148,Pakaha Mainpur,पकाहा मैनपुर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,15,Parsa,पर्सा,149,Paterwa Sugauli,पटेर्वा सुगौली,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,15,Parsa,पर्सा,150,Sakhuwa Prasauni,सखुवा प्रसौनी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,15,Parsa,पर्सा,151,Thori,ठोरी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,17,Rautahat,रौतहट,168,Baudhimai,बौधीमाई,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,17,Rautahat,रौतहट,169,Brindaban,बृन्दावन,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,17,Rautahat,रौतहट,170,Chandrapur,चन्द्रपुर,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,17,Rautahat,रौतहट,171,Dewahi Gonahi,देवाही गोनाही,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,17,Rautahat,रौतहट,172,Gadhimai,गढीमाई,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,17,Rautahat,रौतहट,174,Gaur,गौर,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,17,Rautahat,रौतहट,175,Gujara,गुजरा,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,17,Rautahat,रौतहट,173,Guruda,गरुडा,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,17,Rautahat,रौतहट,176,Ishanath,ईशनाथ,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,17,Rautahat,रौतहट,177,Katahariya,कटहरिया,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,17,Rautahat,रौतहट,178,Madhav Narayan,माधव नारायण,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,17,Rautahat,रौतहट,179,Maulapur,मौलापुर,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,17,Rautahat,रौतहट,180,Paroha,परोहा,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,17,Rautahat,रौतहट,181,Phatuwa Bijayapur,फतुवाबिजयपुर,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,17,Rautahat,रौतहट,182,Rajdevi,राजदेवी,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,17,Rautahat,रौतहट,183,Rajpur,राजपुर,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,17,Rautahat,रौतहट,184,Durga Bhagwati,दुर्गा भगवती,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,17,Rautahat,रौतहट,185,Yamunamai,यमुनामाई,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,21,Saptari,सप्तरी,241,Bodebarsain,बोदेबरसाईन,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,21,Saptari,सप्तरी,242,Dakneshwori,डाक्नेश्वरी,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,21,Saptari,सप्तरी,243,Hanumannagar Kankalini,हनुमाननगर कङ्‌कालिनी,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,21,Saptari,सप्तरी,244,Kanchanrup,कञ्चनरुप,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,21,Saptari,सप्तरी,245,Khadak,खडक,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,21,Saptari,सप्तरी,249,Rajbiraj,राजविराज,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,21,Saptari,सप्तरी,247,Saptakoshi,सप्तकोशी,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,21,Saptari,सप्तरी,246,Shambhunath,शम्भुनाथ,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,21,Saptari,सप्तरी,248,Surunga,सुरुङ्‍गा,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,21,Saptari,सप्तरी,250,Agnisaira Krishnasavaran,अग्निसाइर कृष्णासरवन,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,21,Saptari,सप्तरी,251,Balan-Bihul,बलान-बिहुल,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,21,Saptari,सप्तरी,253,Bishnupur,बिष्णुपुर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,21,Saptari,सप्तरी,254,Chhinnamasta,छिन्नमस्ता,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,21,Saptari,सप्तरी,255,Mahadeva,महादेवा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,21,Saptari,सप्तरी,252,Rajgadh,राजगढ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,21,Saptari,सप्तरी,256,Rupani,रुपनी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,21,Saptari,सप्तरी,257,Tilathi Koiladi,तिलाठी कोईलाडी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,21,Saptari,सप्तरी,258,Tirhut,तिरहुत,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,18,Sarlahi,सर्लाही,186,Bagmati,बागमती,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,18,Sarlahi,सर्लाही,187,Balara,बलरा,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,18,Sarlahi,सर्लाही,188,Barahathwa,बरहथवा,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,18,Sarlahi,सर्लाही,189,Godaita,गोडैटा,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,18,Sarlahi,सर्लाही,191,Haripur,हरिपुर,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,18,Sarlahi,सर्लाही,192,Haripurwa,हरिपुर्वा,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,18,Sarlahi,सर्लाही,190,Hariwan,हरिवन,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,18,Sarlahi,सर्लाही,193,Ishowrpur,ईश्वरपुर,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,18,Sarlahi,सर्लाही,194,Kabilasi,कविलासी,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,18,Sarlahi,सर्लाही,195,Lalbandi,लालबन्दी,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,18,Sarlahi,सर्लाही,196,Malangawa,मलंगवा,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,18,Sarlahi,सर्लाही,197,Basbariya,बसबरीया,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,18,Sarlahi,सर्लाही,198,Bisnu,विष्णु,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,18,Sarlahi,सर्लाही,199,Brahampuri,ब्रह्मपुरी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,18,Sarlahi,सर्लाही,200,Chakraghatta,चक्रघट्टा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,18,Sarlahi,सर्लाही,201,Chandranagar,चन्द्रनगर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,18,Sarlahi,सर्लाही,202,Dhankaul,धनकौल,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,18,Sarlahi,सर्लाही,203,Kaudena,कौडेना,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,18,Sarlahi,सर्लाही,204,Parsa,पर्सा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,18,Sarlahi,सर्लाही,205,Ramnagar,रामनगर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,19,Siraha,सिराहा,207,Dhangadhimai,धनगढीमाई,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,19,Siraha,सिराहा,209,Golbazar,गोलबजार,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,19,Siraha,सिराहा,211,Kalyanpur,कल्याणपुर,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,19,Siraha,सिराहा,212,Karjanha,कर्जन्हा,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,19,Siraha,सिराहा,206,Lahan,लहान,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,19,Siraha,सिराहा,210,Mirchaiya,मिर्चैयाँ,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,19,Siraha,सिराहा,208,Siraha,सिरहा,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,19,Siraha,सिराहा,213,Sukhipur,सुखीपुर,3,MUNICIPALITY,Municipality,नगरपालिका
+2,Madhesh Province,मधेश प्रदेश,19,Siraha,सिराहा,221,Arnama,अर्नमा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,19,Siraha,सिराहा,215,Aurahi,औरही,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,19,Siraha,सिराहा,217,Bariyarpatti,बरियारपट्टी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,19,Siraha,सिराहा,214,Bhagwanpur,भगवानपुर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,19,Siraha,सिराहा,216,Bishnupur,विष्णुपुर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,19,Siraha,सिराहा,218,Lakshmipur Patari,लक्ष्मीपुर पतारी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,19,Siraha,सिराहा,219,Naraha,नरहा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,19,Siraha,सिराहा,222,Navarajpur,नवराजपुर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+2,Madhesh Province,मधेश प्रदेश,19,Siraha,सिराहा,220,SakhuwanankarKatti,सखुवानान्कारकट्टी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,23,Bhaktapur,भक्तपुर,274,Bhaktapur,भक्तपुर,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,23,Bhaktapur,भक्तपुर,275,Changunarayan,चाँगुनारायण,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,23,Bhaktapur,भक्तपुर,277,Madhyapur Thimi,मध्यपुर थिमी,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,23,Bhaktapur,भक्तपुर,276,Suryabinayak,सूर्यविनायक,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,24,Chitwan,चितवन,278,Bharatpur,भरतपुर,1,METROPOLITAN_CITY,Metropolitan City,महानगरपालिका
+3,Bagmati Province,बागमती प्रदेश,24,Chitwan,चितवन,279,Kalika,कालिका,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,24,Chitwan,चितवन,280,Khairhani,खैरहनी,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,24,Chitwan,चितवन,281,Madi,माडी,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,24,Chitwan,चितवन,283,Rapti,राप्ती,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,24,Chitwan,चितवन,282,Ratnagar,रत्ननगर,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,24,Chitwan,चितवन,284,Ichchhakamana,इच्छाकामना,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,25,Dhading,धादिंङ्ग,285,Dhunibeshi,धुनीबेंशी,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,25,Dhading,धादिंङ्ग,286,Nilkantha,निलकण्ठ,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,25,Dhading,धादिंङ्ग,294,Benighat Rorang,बेनीघाट रोराङ्ग,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,25,Dhading,धादिंङ्ग,288,Gajuri,गजुरी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,25,Dhading,धादिंङ्ग,289,Galchhi,गल्छी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,25,Dhading,धादिंङ्ग,290,Gangajamuna,गङ्गाजमुना,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,25,Dhading,धादिंङ्ग,291,Jwalamukhi,ज्वालामूखी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,25,Dhading,धादिंङ्ग,287,Khaniyabas,खनियाबास,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,25,Dhading,धादिंङ्ग,293,Netrawati Dabjong,नेत्रावती डबजोङ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,25,Dhading,धादिंङ्ग,295,Rubi Valley,रुवी भ्याली,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,25,Dhading,धादिंङ्ग,296,Siddhalek,सिद्धलेक,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,25,Dhading,धादिंङ्ग,292,Thakre,थाक्रे,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,25,Dhading,धादिंङ्ग,297,Tripurasundari,त्रिपुरासुन्दरी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,26,Dolakha,दोलखा,298,Bhimeswor,भिमेश्वर,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,26,Dolakha,दोलखा,299,Jiri,जिरी,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,26,Dolakha,दोलखा,304,Baiteshowr,वैतेश्वर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,26,Dolakha,दोलखा,302,Bigu,विगु,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,26,Dolakha,दोलखा,303,Gaurishankar,गौरीशङ्कर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,26,Dolakha,दोलखा,300,Kalinchok,कालिन्चोक,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,26,Dolakha,दोलखा,301,Melung,मेलुङ्ग,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,26,Dolakha,दोलखा,305,Sailung,शैलुङ्ग,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,26,Dolakha,दोलखा,306,Tamakoshi,तामाकोशी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,27,Kathmandu,काठमाडौँ,307,Kathmandu,काठमाण्डौं,1,METROPOLITAN_CITY,Metropolitan City,महानगरपालिका
+3,Bagmati Province,बागमती प्रदेश,27,Kathmandu,काठमाडौँ,316,Budhalikantha,बुढानिलकण्ठ,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,27,Kathmandu,काठमाडौँ,311,Chandragiri,चन्द्रागिरी,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,27,Kathmandu,काठमाडौँ,314,Dakshinkali,दक्षिणकाली,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,27,Kathmandu,काठमाडौँ,308,Gokarneshwar,गोकर्णेश्वर,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,27,Kathmandu,काठमाडौँ,310,Kageshwari-Manohara,कागेश्वरी मनोहरा,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,27,Kathmandu,काठमाडौँ,309,Kirtipur,कीर्तिपुर,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,27,Kathmandu,काठमाडौँ,315,Nagarjun,नागार्जुन,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,27,Kathmandu,काठमाडौँ,317,Shankharapur,शङ्खरापुर,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,27,Kathmandu,काठमाडौँ,313,Tarakeshwar,तारकेश्वर,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,27,Kathmandu,काठमाडौँ,312,Tokha,टोखा,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,28,Kavrepalanchok,काभ्रेपलान्चोक,322,Banepa,बनेपा,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,28,Kavrepalanchok,काभ्रेपलान्चोक,318,Dhulikhel,धुलिखेल,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,28,Kavrepalanchok,काभ्रेपलान्चोक,323,Mandandeupur,मण्डनदेउपुर,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,28,Kavrepalanchok,काभ्रेपलान्चोक,319,Namobuddha,नमोबुद्ध,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,28,Kavrepalanchok,काभ्रेपलान्चोक,320,Panauti,पनौती,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,28,Kavrepalanchok,काभ्रेपलान्चोक,321,Panchkhal,पाँचखाल,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,28,Kavrepalanchok,काभ्रेपलान्चोक,327,Bethanchok,बेथानचोक,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,28,Kavrepalanchok,काभ्रेपलान्चोक,328,Bhumlu,भुम्लु,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,28,Kavrepalanchok,काभ्रेपलान्चोक,325,Chauri Deurali,चौंरीदेउराली,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,28,Kavrepalanchok,काभ्रेपलान्चोक,324,Khani Khola,खानीखोला,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,28,Kavrepalanchok,काभ्रेपलान्चोक,329,Mahabharat,महाभारत,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,28,Kavrepalanchok,काभ्रेपलान्चोक,330,Roshi,रोशी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,28,Kavrepalanchok,काभ्रेपलान्चोक,326,Temal,तेमाल,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,29,Lalitpur,ललितपुर,331,Lalitpur,ललितपुर,1,METROPOLITAN_CITY,Metropolitan City,महानगरपालिका
+3,Bagmati Province,बागमती प्रदेश,29,Lalitpur,ललितपुर,333,Godawari,गोदावरी,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,29,Lalitpur,ललितपुर,332,Mahalaxmi,महालक्ष्मी,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,29,Lalitpur,ललितपुर,335,Bagmati,बागमती,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,29,Lalitpur,ललितपुर,334,Konjyosom,कोन्ज्योसोम,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,29,Lalitpur,ललितपुर,336,Mahankal,महाङ्काल,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,30,Makwanpur,मकवानपुर,337,Hetauda,हेटौडा,2,SUB_METROPOLITAN_CITY,Sub-Metropolitan City,उपमहानगरपालिका
+3,Bagmati Province,बागमती प्रदेश,30,Makwanpur,मकवानपुर,338,Thaha,थाहा,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,30,Makwanpur,मकवानपुर,344,Bagmati,बाग्मति,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,30,Makwanpur,मकवानपुर,343,Bakaiya,बकैया,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,30,Makwanpur,मकवानपुर,339,Bhimphedi,भिमफेदी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,30,Makwanpur,मकवानपुर,346,Indrasarowar,इन्द्रसरोबर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,30,Makwanpur,मकवानपुर,345,Kailash,कैलाश,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,30,Makwanpur,मकवानपुर,340,Makawanpurgadhi,मकवानपुरगढी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,30,Makwanpur,मकवानपुर,341,Manahari,मनहरी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,30,Makwanpur,मकवानपुर,342,Raksirang,राक्सिराङ्ग,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,31,Nuwakot,नुवाकोट,348,Belkotgadhi,बेलकोटगढी,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,31,Nuwakot,नुवाकोट,347,Bidur,विदुर,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,31,Nuwakot,नुवाकोट,352,Dupcheshwar,दुप्चेश्वर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,31,Nuwakot,नुवाकोट,349,Kakani,ककनी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,31,Nuwakot,नुवाकोट,357,Kispang,किस्पाङ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,31,Nuwakot,नुवाकोट,351,Likhu,लिखु,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,31,Nuwakot,नुवाकोट,358,Myagang,म्यगङ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,31,Nuwakot,नुवाकोट,350,Panchakanya,पञ्चकन्या,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,31,Nuwakot,नुवाकोट,353,Shivapuri,शिवपुरी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,31,Nuwakot,नुवाकोट,355,Suryagadhi,सुर्यगढी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,31,Nuwakot,नुवाकोट,354,Tadi,तादी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,31,Nuwakot,नुवाकोट,356,Tarkeshwar,तारकेश्वर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,32,Ramechhap,रामेछाप,359,Manthali,मन्थली,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,32,Ramechhap,रामेछाप,360,Ramechhap,रामेछाप,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,32,Ramechhap,रामेछाप,363,Doramba,दोरम्बा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,32,Ramechhap,रामेछाप,364,Gokulganga,गोकुलगङ्गा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,32,Ramechhap,रामेछाप,362,Khandadevi,खाँडादेवी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,32,Ramechhap,रामेछाप,365,LikhuTamakoshi,लिखु तामाकोशी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,32,Ramechhap,रामेछाप,366,Sunapati,सुनापती,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,32,Ramechhap,रामेछाप,361,Umakunda,उमाकुण्ड,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,33,Rasuwa,रसुवा,368,Gosaikunda,गोसाईकुण्ड,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,33,Rasuwa,रसुवा,367,Kalika,कालिका,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,33,Rasuwa,रसुवा,369,Naukunda,नौकुण्ड,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,33,Rasuwa,रसुवा,370,Parbatikunda,आमाछोदिङमो,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,33,Rasuwa,रसुवा,371,Uttargaya,उत्तरगया,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,34,Sindhuli,सिन्धुली,373,Dudhauli,दुधौली,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,34,Sindhuli,सिन्धुली,372,Kamalamai,कमलामाई,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,34,Sindhuli,सिन्धुली,380,Ghyanglekh,घ्याङलेख,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,34,Sindhuli,सिन्धुली,378,Golanjor,गोलन्जर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,34,Sindhuli,सिन्धुली,375,Hariharpurgadhi,हरिहरपुरगढी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,34,Sindhuli,सिन्धुली,377,Marin,मरिण,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,34,Sindhuli,सिन्धुली,379,Phikkal,फिक्कल,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,34,Sindhuli,सिन्धुली,374,Sunkoshi,सुनकोशी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,34,Sindhuli,सिन्धुली,376,Tinpatan,तीनपाटन,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,35,Sindhupalchok,सिन्धुपाल्चोक,382,Bahrabise,बाह्रविसे,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,35,Sindhupalchok,सिन्धुपाल्चोक,381,Chautara Sangachowkgadi,चौतारा साँगाचोकगढी,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,35,Sindhupalchok,सिन्धुपाल्चोक,383,Melamchi,मेलम्ची,3,MUNICIPALITY,Municipality,नगरपालिका
+3,Bagmati Province,बागमती प्रदेश,35,Sindhupalchok,सिन्धुपाल्चोक,384,Balephi,बलेफी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,35,Sindhupalchok,सिन्धुपाल्चोक,389,Bhotekoshi,भोटेकोशी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,35,Sindhupalchok,सिन्धुपाल्चोक,391,Helambu,हेलम्बु,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,35,Sindhupalchok,सिन्धुपाल्चोक,386,Indrawati,ईन्द्रावती,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,35,Sindhupalchok,सिन्धुपाल्चोक,387,Jugal,जुगल,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,35,Sindhupalchok,सिन्धुपाल्चोक,390,Lisankhu,लिसङ्खु पाखर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,35,Sindhupalchok,सिन्धुपाल्चोक,388,Panchpokhari,पाँचपोखरी थाङपाल,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,35,Sindhupalchok,सिन्धुपाल्चोक,385,Sunkoshi,सुनकोशी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+3,Bagmati Province,बागमती प्रदेश,35,Sindhupalchok,सिन्धुपाल्चोक,392,Tripurasundari,त्रिपुरासुन्दरी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,36,Baglung,बागलुङ,393,Baglung,बागलुङ,3,MUNICIPALITY,Municipality,नगरपालिका
+4,Gandaki Province,गण्डकी प्रदेश,36,Baglung,बागलुङ,394,Dhorpatan,ढोरपाटन,3,MUNICIPALITY,Municipality,नगरपालिका
+4,Gandaki Province,गण्डकी प्रदेश,36,Baglung,बागलुङ,395,Galkot,गल्कोट,3,MUNICIPALITY,Municipality,नगरपालिका
+4,Gandaki Province,गण्डकी प्रदेश,36,Baglung,बागलुङ,396,Jaimuni,जैमूनी,3,MUNICIPALITY,Municipality,नगरपालिका
+4,Gandaki Province,गण्डकी प्रदेश,36,Baglung,बागलुङ,402,Badigad,वडिगाड,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,36,Baglung,बागलुङ,397,Bareng,वरेङ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,36,Baglung,बागलुङ,398,Khathekhola,काठेखोला,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,36,Baglung,बागलुङ,401,Nishi Khola,निसीखोला,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,36,Baglung,बागलुङ,399,Taman Khola,तमानखोला,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,36,Baglung,बागलुङ,400,Tara Khola,ताराखोला,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,37,Gorkha,गोरखा,403,Gorkha,गोरखा,3,MUNICIPALITY,Municipality,नगरपालिका
+4,Gandaki Province,गण्डकी प्रदेश,37,Gorkha,गोरखा,404,Palungtar,पालुङटार,3,MUNICIPALITY,Municipality,नगरपालिका
+4,Gandaki Province,गण्डकी प्रदेश,37,Gorkha,गोरखा,412,Aarughat,आरूघाट,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,37,Gorkha,गोरखा,407,Ajirkot,अजिरकोट,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,37,Gorkha,गोरखा,410,Bhimsen Thapa,भिमसेनथापा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,37,Gorkha,गोरखा,408,Chumnubri,चुमनुव्री,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,37,Gorkha,गोरखा,409,Dharche,धार्चे,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,37,Gorkha,गोरखा,413,Gandaki,गण्डकी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,37,Gorkha,गोरखा,411,Sahid Lakhan,शहिद लखन,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,37,Gorkha,गोरखा,406,Siranchowk,सिरानचोक,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,37,Gorkha,गोरखा,405,Sulikot,बारपाक सुलिकोट,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,38,Kaski,कास्की,414,Pokhara,पोखरा,1,METROPOLITAN_CITY,Metropolitan City,महानगरपालिका
+4,Gandaki Province,गण्डकी प्रदेश,38,Kaski,कास्की,415,Annapurna,अन्नपूर्ण,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,38,Kaski,कास्की,416,Machhapuchchhre,माछापुच्छ्रे,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,38,Kaski,कास्की,417,Madi,मादी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,38,Kaski,कास्की,418,Rupa,रूपा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,39,Lamjung,लमजुङ,419,Besisahar,बेसीशहर,3,MUNICIPALITY,Municipality,नगरपालिका
+4,Gandaki Province,गण्डकी प्रदेश,39,Lamjung,लमजुङ,420,Madhya Nepal,मध्यनेपाल,3,MUNICIPALITY,Municipality,नगरपालिका
+4,Gandaki Province,गण्डकी प्रदेश,39,Lamjung,लमजुङ,421,Rainas,रारइनास,3,MUNICIPALITY,Municipality,नगरपालिका
+4,Gandaki Province,गण्डकी प्रदेश,39,Lamjung,लमजुङ,422,Sundarbazar,सुन्दरबजार,3,MUNICIPALITY,Municipality,नगरपालिका
+4,Gandaki Province,गण्डकी प्रदेश,39,Lamjung,लमजुङ,423,Dordi,दोर्दी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,39,Lamjung,लमजुङ,424,Dudhpokhari,दूधपोखरी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,39,Lamjung,लमजुङ,425,Kwhlosothar,क्व्होलासोथार,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,39,Lamjung,लमजुङ,426,Marsyangdi,मर्स्याङदी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,40,Manang,मनाङ,427,Chame,चामे,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,40,Manang,मनाङ,430,Manang Ngisyang,मनाङ ङिस्याङ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,40,Manang,मनाङ,429,NarpaBhumi,नार्पा भूमि,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,40,Manang,मनाङ,428,Nason,नासोँ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,41,Mustang,मुस्ताङ,433,Barhagaun Muktichhetra,वारागुङ मुक्तिक्षेत्र,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,41,Mustang,मुस्ताङ,431,Gharpajhong,घरपझोङ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,41,Mustang,मुस्ताङ,435,Lo-Ghekar Damodarkunda,लो-घेकर दामोदरकुण्ड,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,41,Mustang,मुस्ताङ,434,Lomanthang,लोमन्थाङ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,41,Mustang,मुस्ताङ,432,Thasang,थासाङ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,42,Myagdi,म्याग्दी,436,Beni,बेनी,3,MUNICIPALITY,Municipality,नगरपालिका
+4,Gandaki Province,गण्डकी प्रदेश,42,Myagdi,म्याग्दी,437,Annapurna,अन्नपुर्ण,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,42,Myagdi,म्याग्दी,438,Dhaulagiri,धवलागिरी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,42,Myagdi,म्याग्दी,440,Malika,मालिका,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,42,Myagdi,म्याग्दी,439,Mangala,मंगला,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,42,Myagdi,म्याग्दी,441,Raghuganga,रघुगंगा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,43,Nawalpur,नवलपुर,444,Devachuli,देवचुली,3,MUNICIPALITY,Municipality,नगरपालिका
+4,Gandaki Province,गण्डकी प्रदेश,43,Nawalpur,नवलपुर,443,Gaindakot,गैडाकोट,3,MUNICIPALITY,Municipality,नगरपालिका
+4,Gandaki Province,गण्डकी प्रदेश,43,Nawalpur,नवलपुर,442,Kawasoti,कावासोती,3,MUNICIPALITY,Municipality,नगरपालिका
+4,Gandaki Province,गण्डकी प्रदेश,43,Nawalpur,नवलपुर,445,Madhya Bindu,मध्यविन्दु,3,MUNICIPALITY,Municipality,नगरपालिका
+4,Gandaki Province,गण्डकी प्रदेश,43,Nawalpur,नवलपुर,446,Baudikali,बौदीकाली,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,43,Nawalpur,नवलपुर,448,Binayi Tribeni,विनयी त्रिवेणी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,43,Nawalpur,नवलपुर,447,Bulingtar,बुलिङटार,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,43,Nawalpur,नवलपुर,449,Hupsekot,हुप्सेकोट,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,44,Parbat,पर्वत,450,Kushma,कुश्मा,3,MUNICIPALITY,Municipality,नगरपालिका
+4,Gandaki Province,गण्डकी प्रदेश,44,Parbat,पर्वत,451,Phalewas,फलेवास,3,MUNICIPALITY,Municipality,नगरपालिका
+4,Gandaki Province,गण्डकी प्रदेश,44,Parbat,पर्वत,456,Bihadi,विहादी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,44,Parbat,पर्वत,452,Jaljala,जलजला,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,44,Parbat,पर्वत,454,Mahashila,महाशिला,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,44,Parbat,पर्वत,455,Modi,मोदी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,44,Parbat,पर्वत,453,Paiyun,पैयूं,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,45,Syangja,स्याङग्जा,460,Bheerkot,भीरकोट,3,MUNICIPALITY,Municipality,नगरपालिका
+4,Gandaki Province,गण्डकी प्रदेश,45,Syangja,स्याङग्जा,458,Chapakot,चापाकोट,3,MUNICIPALITY,Municipality,नगरपालिका
+4,Gandaki Province,गण्डकी प्रदेश,45,Syangja,स्याङग्जा,457,Galyang,गल्याङ,3,MUNICIPALITY,Municipality,नगरपालिका
+4,Gandaki Province,गण्डकी प्रदेश,45,Syangja,स्याङग्जा,459,Putalibazar,पुतलीबजार,3,MUNICIPALITY,Municipality,नगरपालिका
+4,Gandaki Province,गण्डकी प्रदेश,45,Syangja,स्याङग्जा,461,Waling,वालिङ,3,MUNICIPALITY,Municipality,नगरपालिका
+4,Gandaki Province,गण्डकी प्रदेश,45,Syangja,स्याङग्जा,463,Aandhikhola,आँधिखोला,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,45,Syangja,स्याङग्जा,462,Arjun Chaupari,अर्जुनचौपारी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,45,Syangja,स्याङग्जा,467,Biruwa,बिरुवा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,45,Syangja,स्याङग्जा,466,Harinas,हरिनास,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,45,Syangja,स्याङग्जा,464,Kaligandaki,कालीगण्डकी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,45,Syangja,स्याङग्जा,465,Phedikhola,फेदीखोला,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,46,Tanahun,तनहुँ,468,Bhanu,भानु,3,MUNICIPALITY,Municipality,नगरपालिका
+4,Gandaki Province,गण्डकी प्रदेश,46,Tanahun,तनहुँ,469,Bhimad,भिमाद,3,MUNICIPALITY,Municipality,नगरपालिका
+4,Gandaki Province,गण्डकी प्रदेश,46,Tanahun,तनहुँ,470,Byas,व्यास,3,MUNICIPALITY,Municipality,नगरपालिका
+4,Gandaki Province,गण्डकी प्रदेश,46,Tanahun,तनहुँ,471,Suklagandaki,शुक्लागण्डकी,3,MUNICIPALITY,Municipality,नगरपालिका
+4,Gandaki Province,गण्डकी प्रदेश,46,Tanahun,तनहुँ,472,AnbuKhaireni,आँबुखैरेनी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,46,Tanahun,तनहुँ,474,Bandipur,वन्दिपुर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,46,Tanahun,तनहुँ,473,Devghat,देवघाट,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,46,Tanahun,तनहुँ,476,Ghiring,घिरिङ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,46,Tanahun,तनहुँ,477,Myagde,म्याग्दे,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+4,Gandaki Province,गण्डकी प्रदेश,46,Tanahun,तनहुँ,475,Rishing,ऋषिङ्ग,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,50,Arghakhanchi,अर्घाखाँची,513,Bhumikasthan,भूमिकास्थान,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,50,Arghakhanchi,अर्घाखाँची,511,Sandhikharka,सन्धिखर्क,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,50,Arghakhanchi,अर्घाखाँची,512,Sitganga,शितगंगा,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,50,Arghakhanchi,अर्घाखाँची,514,Chhatradev,छत्रदेव,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,50,Arghakhanchi,अर्घाखाँची,516,Malarani,मालारानी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,50,Arghakhanchi,अर्घाखाँची,515,Panini,पाणिनी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,57,Banke,बाँके,571,Nepalgunj,नेपालगंज,2,SUB_METROPOLITAN_CITY,Sub-Metropolitan City,उपमहानगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,57,Banke,बाँके,572,Kohalpur,कोहलपुर,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,57,Banke,बाँके,578,Baijanath,बैजनाथ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,57,Banke,बाँके,575,Duduwa,डुडुवा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,57,Banke,बाँके,576,Janaki,जानकी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,57,Banke,बाँके,577,Khajura,खजुरा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,57,Banke,बाँके,574,Narainapur,नरैनापुर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,57,Banke,बाँके,573,Rapti-Sonari,राप्ती सोनारी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,58,Bardiya,बर्दिया,584,Barbardiya,बारबर्दिया,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,58,Bardiya,बर्दिया,583,Basgadhi,बाँसगढी,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,58,Bardiya,बर्दिया,579,Gulariya,गुलरिया,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,58,Bardiya,बर्दिया,581,Madhuwan,मधुवन,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,58,Bardiya,बर्दिया,580,Rajapur,राजापुर,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,58,Bardiya,बर्दिया,582,Thakurbaba,ठाकुरबाबा,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,58,Bardiya,बर्दिया,585,Badhaiyatal,बढैयाताल,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,58,Bardiya,बर्दिया,586,Geruwa,गेरुवा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,53,Dang,दाङ,539,Ghorahi,घोराही,2,SUB_METROPOLITAN_CITY,Sub-Metropolitan City,उपमहानगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,53,Dang,दाङ,540,Tulsipur,तुल्सीपुर,2,SUB_METROPOLITAN_CITY,Sub-Metropolitan City,उपमहानगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,53,Dang,दाङ,541,Lamahi,लमही,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,53,Dang,दाङ,548,Babai,बबई,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,53,Dang,दाङ,546,Banglachuli,बंगलाचुली,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,53,Dang,दाङ,547,Dangisharan,दंगीशरण,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,53,Dang,दाङ,542,Gadhawa,गढवा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,53,Dang,दाङ,543,Rajpur,राजपुर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,53,Dang,दाङ,545,Rapti,राप्ती,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,53,Dang,दाङ,544,Shantinagar,शान्तिनगर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,51,Gulmi,गुल्मी,518,Musikot,मुसिकोट,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,51,Gulmi,गुल्मी,517,Resunga,रेसुङ्गा,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,51,Gulmi,गुल्मी,522,Chandrakot,चन्द्रकोट,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,51,Gulmi,गुल्मी,520,Chhatrakot,छत्रकोट,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,51,Gulmi,गुल्मी,524,Dhurkot,धुर्कोट,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,51,Gulmi,गुल्मी,521,Gulmidarbar,गुल्मी दरबार,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,51,Gulmi,गुल्मी,526,Isma,ईस्मा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,51,Gulmi,गुल्मी,525,Kaligandaki,कालीगण्डकी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,51,Gulmi,गुल्मी,528,Madane,मदाने,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,51,Gulmi,गुल्मी,527,Malika,मालिका,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,51,Gulmi,गुल्मी,519,Rurukshetra,रुरुक्षेत्र,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,51,Gulmi,गुल्मी,523,Satyawati,सत्यवती,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,47,Kapilvastu,कपिलवस्तु,479,Banganga,बाणगंगा,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,47,Kapilvastu,कपिलवस्तु,480,Buddhabhumi,बुद्धभुमी,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,47,Kapilvastu,कपिलवस्तु,478,Kapilvastu,कपिलवस्तु,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,47,Kapilvastu,कपिलवस्तु,482,Krishnanagar,कृष्णनगर,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,47,Kapilvastu,कपिलवस्तु,483,Maharajgunj,महाराजगंज,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,47,Kapilvastu,कपिलवस्तु,481,Shivaraj,शिवराज,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,47,Kapilvastu,कपिलवस्तु,487,Bijaynagar,विजयनगर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,47,Kapilvastu,कपिलवस्तु,484,Mayadevi,मायादेवी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,47,Kapilvastu,कपिलवस्तु,486,Suddhodan,सुद्धोधन,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,47,Kapilvastu,कपिलवस्तु,485,Yashodhara,यसोधरा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,52,Palpa,पाल्पा,530,Rampur,रामपुर,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,52,Palpa,पाल्पा,529,Tansen,तानसेन,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,52,Palpa,पाल्पा,533,Bagnaskali,बगनासकाली,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,52,Palpa,पाल्पा,537,Mathagadhi,माथागढी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,52,Palpa,पाल्पा,536,Nisdi,निस्दी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,52,Palpa,पाल्पा,535,Purbakhola,पूर्वखोला,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,52,Palpa,पाल्पा,531,Rainadevi Chhahara,रैनादेवी छहरा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,52,Palpa,पाल्पा,534,Rambha,रम्भा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,52,Palpa,पाल्पा,532,Ripdikot,रिब्दिकोट,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,52,Palpa,पाल्पा,538,Tinahu,तिनाउ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,48,Parasi,परासी,488,Bardaghat,बर्दघाट,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,48,Parasi,परासी,489,Ramgram,रामग्राम,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,48,Parasi,परासी,490,Sunwal,सुनवल,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,48,Parasi,परासी,492,Palhi Nandan,पाल्हीनन्दन,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,48,Parasi,परासी,493,Pratappur,प्रतापपुर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,48,Parasi,परासी,494,Sarawal,सरावल,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,48,Parasi,परासी,491,Susta,सुस्ता,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,54,Pyuthan,प्युठान,550,Pyuthan,प्यूठान,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,54,Pyuthan,प्युठान,549,Sworgadwari,स्वर्गद्वारी,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,54,Pyuthan,प्युठान,553,Ayirawati,ऐरावती,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,54,Pyuthan,प्युठान,557,Gaumukhi,गौमुखी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,54,Pyuthan,प्युठान,555,Jhimruk,झिमरुक,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,54,Pyuthan,प्युठान,554,Mallarani,मल्लरानी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,54,Pyuthan,प्युठान,551,Mandavi,माण्डवी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,54,Pyuthan,प्युठान,556,Naubahini,नौवहिनी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,54,Pyuthan,प्युठान,552,Sarumarani,सरुमारानी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,55,Rolpa,रोल्पा,558,Rolpa,रोल्पा,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,55,Rolpa,रोल्पा,566,GangaDev,गंगादेव,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,55,Rolpa,रोल्पा,562,Lungri,लुङग्री,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,55,Rolpa,रोल्पा,565,Madi,माडी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,55,Rolpa,रोल्पा,567,Pariwartan,परिवर्तन,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,55,Rolpa,रोल्पा,559,Runtigadi,रुन्टीगढी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,55,Rolpa,रोल्पा,563,Sunchhahari,सुनछहरी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,55,Rolpa,रोल्पा,561,Sunil Smiriti,सुनिल स्मृति,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,55,Rolpa,रोल्पा,564,Thawang,थवाङ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,55,Rolpa,रोल्पा,560,Triveni,त्रिवेणी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,56,Rukum East,पूर्वी रूकुम,569,Bhume,भूमे,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,56,Rukum East,पूर्वी रूकुम,568,Putha Uttarganga,पुथा उत्तरगंगा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,56,Rukum East,पूर्वी रूकुम,570,Sisne,सिस्ने,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,49,Rupandehi,रुपन्देही,495,Butwal,बुटवल,2,SUB_METROPOLITAN_CITY,Sub-Metropolitan City,उपमहानगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,49,Rupandehi,रुपन्देही,496,Devdaha,देवदह,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,49,Rupandehi,रुपन्देही,497,Lumbini Sanskritik,लुम्बिनी सांस्कृतिक,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,49,Rupandehi,रुपन्देही,498,Sainamaina,सैनामैना,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,49,Rupandehi,रुपन्देही,499,Siddharthanagar,सिद्धार्थनगर,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,49,Rupandehi,रुपन्देही,500,Tilottama,तिलोत्तमा,3,MUNICIPALITY,Municipality,नगरपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,49,Rupandehi,रुपन्देही,501,Gaidahawa,गैडहवा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,49,Rupandehi,रुपन्देही,502,Kanchan,कन्चन,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,49,Rupandehi,रुपन्देही,503,Kotahimai,कोटहीमाई,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,49,Rupandehi,रुपन्देही,504,Marchawari,मर्चवारी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,49,Rupandehi,रुपन्देही,505,Mayadevi,मायादेवी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,49,Rupandehi,रुपन्देही,506,Omsatiya,ओमसतिया,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,49,Rupandehi,रुपन्देही,507,Rohini,रोहिणी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,49,Rupandehi,रुपन्देही,508,Sammarimai,सम्मरीमाई,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,49,Rupandehi,रुपन्देही,509,Siyari,सियारी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+5,Lumbini Province,लुम्बिनी प्रदेश,49,Rupandehi,रुपन्देही,510,Suddodhan,शुद्धोधन,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,67,Dailekh,दैलेख,656,Aathabis,आठबीस,3,MUNICIPALITY,Municipality,नगरपालिका
+6,Karnali Province,कर्णाली प्रदेश,67,Dailekh,दैलेख,658,Chamunda Bindrasaini,चामुण्डा विन्द्रासैनी,3,MUNICIPALITY,Municipality,नगरपालिका
+6,Karnali Province,कर्णाली प्रदेश,67,Dailekh,दैलेख,648,Dullu,दुल्लु,3,MUNICIPALITY,Municipality,नगरपालिका
+6,Karnali Province,कर्णाली प्रदेश,67,Dailekh,दैलेख,657,Narayan,नारायण,3,MUNICIPALITY,Municipality,नगरपालिका
+6,Karnali Province,कर्णाली प्रदेश,67,Dailekh,दैलेख,654,Bhagawatimai,भगवतीमाई,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,67,Dailekh,दैलेख,650,Bhairabi,भैरवी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,67,Dailekh,दैलेख,655,Dungeshwar,डुंगेश्वर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,67,Dailekh,दैलेख,649,Gurans,गुराँस,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,67,Dailekh,दैलेख,652,Mahabu,महावु,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,67,Dailekh,दैलेख,651,Naumule,नौमुले,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,67,Dailekh,दैलेख,653,Thantikandh,ठाँटीकाँध,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,61,Dolpa,डोल्पा,609,Thuli Bheri,ठूली भेरी,3,MUNICIPALITY,Municipality,नगरपालिका
+6,Karnali Province,कर्णाली प्रदेश,61,Dolpa,डोल्पा,610,Tripurasundari,त्रिपुरासुन्दरी,3,MUNICIPALITY,Municipality,नगरपालिका
+6,Karnali Province,कर्णाली प्रदेश,61,Dolpa,डोल्पा,608,Chharka Tongsong,छार्का ताङसोङ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,61,Dolpa,डोल्पा,607,Dolpo Buddha,डोल्पो बुद्ध,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,61,Dolpa,डोल्पा,606,Jagadulla,जगदुल्ला,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,61,Dolpa,डोल्पा,604,Kaike,काईके,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,61,Dolpa,डोल्पा,603,Mudkechula,मुड्केचुला,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,61,Dolpa,डोल्पा,605,She Phoksundo,शे फोक्सुन्डो,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,62,Humla,हुम्ला,613,Adanchuli,अदानचुली,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,62,Humla,हुम्ला,616,Chankheli,चंखेली,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,62,Humla,हुम्ला,614,Kharpunath,खार्पुनाथ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,62,Humla,हुम्ला,617,Namkha,नाम्खा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,62,Humla,हुम्ला,612,Sarkegad,सर्केगाड,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,62,Humla,हुम्ला,611,Simkot,सिमकोट,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,62,Humla,हुम्ला,615,Tanjakot,ताँजाकोट,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,68,Jajarkot,जाजरकोट,660,Bheri,भेरी,3,MUNICIPALITY,Municipality,नगरपालिका
+6,Karnali Province,कर्णाली प्रदेश,68,Jajarkot,जाजरकोट,659,Chhedagad,छेडागाड,3,MUNICIPALITY,Municipality,नगरपालिका
+6,Karnali Province,कर्णाली प्रदेश,68,Jajarkot,जाजरकोट,661,Nalgad,नलगाड,3,MUNICIPALITY,Municipality,नगरपालिका
+6,Karnali Province,कर्णाली प्रदेश,68,Jajarkot,जाजरकोट,664,Barekot,बारेकोट,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,68,Jajarkot,जाजरकोट,662,Junichande,जुनीचाँदे,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,68,Jajarkot,जाजरकोट,663,Kuse,कुसे,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,68,Jajarkot,जाजरकोट,665,Shivalaya,शिवालय,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,63,Jumla,जुम्ला,625,Chandannath,चन्दननाथ,3,MUNICIPALITY,Municipality,नगरपालिका
+6,Karnali Province,कर्णाली प्रदेश,63,Jumla,जुम्ला,624,Guthichaur,गुठिचौर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,63,Jumla,जुम्ला,623,Hima,हिमा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,63,Jumla,जुम्ला,621,Kanaka Sundari,कनकासुन्दरी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,63,Jumla,जुम्ला,619,Patarasi,पातारासी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,63,Jumla,जुम्ला,622,Sinja,सिंजा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,63,Jumla,जुम्ला,618,Tatopani,तातोपानी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,63,Jumla,जुम्ला,620,Tila,तिला,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,64,Kalikot,कालिकोट,626,Khandachakra,खाँडाचक्र,3,MUNICIPALITY,Municipality,नगरपालिका
+6,Karnali Province,कर्णाली प्रदेश,64,Kalikot,कालिकोट,627,Raskot,रास्कोट,3,MUNICIPALITY,Municipality,नगरपालिका
+6,Karnali Province,कर्णाली प्रदेश,64,Kalikot,कालिकोट,628,Tilagufa,तिलागुफा,3,MUNICIPALITY,Municipality,नगरपालिका
+6,Karnali Province,कर्णाली प्रदेश,64,Kalikot,कालिकोट,634,Mahawai,महावै,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,64,Kalikot,कालिकोट,629,Narharinath,नरहरिनाथ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,64,Kalikot,कालिकोट,633,Pachaljharana,पचालझरना,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,64,Kalikot,कालिकोट,630,Palata,पलाता,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,64,Kalikot,कालिकोट,632,Sanni Triveni,सान्नी त्रिवेणी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,64,Kalikot,कालिकोट,631,Shubha Kalika,शुभ कालीका,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,65,Mugu,मुगु,638,Chhayanath Rara,छायाँनाथ रारा,3,MUNICIPALITY,Municipality,नगरपालिका
+6,Karnali Province,कर्णाली प्रदेश,65,Mugu,मुगु,635,Khatyad,खत्याड,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,65,Mugu,मुगु,637,Mugum Karmarong,मुगुम कार्मारोंग,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,65,Mugu,मुगु,636,Soru,सोरु,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,59,Rukum West,रुकुम पश्चिम,587,Aathabiskot,आठबिसकोट,3,MUNICIPALITY,Municipality,नगरपालिका
+6,Karnali Province,कर्णाली प्रदेश,59,Rukum West,रुकुम पश्चिम,589,Chaurjahari,चौरजहारी,3,MUNICIPALITY,Municipality,नगरपालिका
+6,Karnali Province,कर्णाली प्रदेश,59,Rukum West,रुकुम पश्चिम,588,Musikot,मुसिकोट,3,MUNICIPALITY,Municipality,नगरपालिका
+6,Karnali Province,कर्णाली प्रदेश,59,Rukum West,रुकुम पश्चिम,592,Banphikot,बाँफिकोट,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,59,Rukum West,रुकुम पश्चिम,590,SaniBheri,सानी भेरी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,59,Rukum West,रुकुम पश्चिम,591,Triveni,त्रिवेणी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,60,Salyan,सल्यान,600,Bagchaur,बागचौर,3,MUNICIPALITY,Municipality,नगरपालिका
+6,Karnali Province,कर्णाली प्रदेश,60,Salyan,सल्यान,602,Bangad Kupinde,बनगाड कुपिण्डे,3,MUNICIPALITY,Municipality,नगरपालिका
+6,Karnali Province,कर्णाली प्रदेश,60,Salyan,सल्यान,601,Shaarda,शारदा,3,MUNICIPALITY,Municipality,नगरपालिका
+6,Karnali Province,कर्णाली प्रदेश,60,Salyan,सल्यान,595,Chhatreshwari,छत्रेश्वरी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,60,Salyan,सल्यान,596,Darma,दार्मा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,60,Salyan,सल्यान,594,Kalimati,कालिमाटी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,60,Salyan,सल्यान,597,Kapurkot,कपुरकोट,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,60,Salyan,सल्यान,593,Kumakh,कुमाख,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,60,Salyan,सल्यान,599,Siddha Kumakh,सिद्ध कुमाख,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,60,Salyan,सल्यान,598,Triveni,त्रिवेणी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,66,Surkhet,सुर्खेत,645,Bheriganga,भेरीगंगा,3,MUNICIPALITY,Municipality,नगरपालिका
+6,Karnali Province,कर्णाली प्रदेश,66,Surkhet,सुर्खेत,644,Birendranagar,बीरेन्द्रनगर,3,MUNICIPALITY,Municipality,नगरपालिका
+6,Karnali Province,कर्णाली प्रदेश,66,Surkhet,सुर्खेत,643,Gurbhakot,गुर्भाकोट,3,MUNICIPALITY,Municipality,नगरपालिका
+6,Karnali Province,कर्णाली प्रदेश,66,Surkhet,सुर्खेत,647,Lekbeshi,लेकवेशी,3,MUNICIPALITY,Municipality,नगरपालिका
+6,Karnali Province,कर्णाली प्रदेश,66,Surkhet,सुर्खेत,646,Panchapuri,पञ्चपुरी,3,MUNICIPALITY,Municipality,नगरपालिका
+6,Karnali Province,कर्णाली प्रदेश,66,Surkhet,सुर्खेत,640,Barahatal,बराहताल,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,66,Surkhet,सुर्खेत,641,Chaukune,चौकुने,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,66,Surkhet,सुर्खेत,642,Chingad,चिङ्गाड,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+6,Karnali Province,कर्णाली प्रदेश,66,Surkhet,सुर्खेत,639,Simta,सिम्ता,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,74,Achham,अछाम,722,Kamalbazar,कमलबजार,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,74,Achham,अछाम,721,Mangalsen,मंगलसेन,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,74,Achham,अछाम,724,Panchadewal Binayak,पन्चदेवल विनायक,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,74,Achham,अछाम,723,Sanfebagar,साँफेबगर,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,74,Achham,अछाम,720,Bannigadi Jayagad,बान्निगढी जयगढ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,74,Achham,अछाम,716,Chaurpati,चौरपाटी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,74,Achham,अछाम,719,Dhakari,ढकारी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,74,Achham,अछाम,718,Mellekh,मेल्लेख,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,74,Achham,अछाम,715,Ramaroshan,रामारोशन,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,74,Achham,अछाम,717,Turmakhand,तुर्माखाँद,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,72,Baitadi,बैतडी,696,Dashrathchanda,दशरथचन्द,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,72,Baitadi,बैतडी,698,Melauli,मेलौली,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,72,Baitadi,बैतडी,697,Patan,पाटन,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,72,Baitadi,बैतडी,699,Purchaudi,पुर्चौडी,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,72,Baitadi,बैतडी,701,Dilashaini,डीलासैनी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,72,Baitadi,बैतडी,700,Dogdakedar,दोगडाकेदार,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,72,Baitadi,बैतडी,703,Pancheshwar,पञ्चेश्वर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,72,Baitadi,बैतडी,705,Shivanath,शिवनाथ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,72,Baitadi,बैतडी,702,Sigas,सिगास,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,72,Baitadi,बैतडी,704,Surnaya,सुर्नया,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,70,Bajhang,बझाङ,676,Bungal,बुंगल,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,70,Bajhang,बझाङ,675,Jayaprithvi,जयपृथ्वी,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,70,Bajhang,बझाङ,679,Bitthadchir,वित्थडचिर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,70,Bajhang,बझाङ,680,Chhabis Pathibhera,छबिसपाथिभेरा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,70,Bajhang,बझाङ,683,Durgathali,दुर्गाथली,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,70,Bajhang,बझाङ,677,Kedarsyu,केदारस्युँ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,70,Bajhang,बझाङ,681,Khaptadchhanna,खप्तडछान्ना,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,70,Bajhang,बझाङ,682,Masta,मष्टा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,70,Bajhang,बझाङ,686,Saipal,साइपाल,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,70,Bajhang,बझाङ,685,Surma,सूर्मा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,70,Bajhang,बझाङ,684,Talkot,तलकोट,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,70,Bajhang,बझाङ,678,Thalara,थलारा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,71,Bajura,बाजुरा,687,Badimalika,बडीमालिका,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,71,Bajura,बाजुरा,689,Budhiganga,बुढीगंगा,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,71,Bajura,बाजुरा,690,Budhinanda,बुढीनन्दा,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,71,Bajura,बाजुरा,688,Triveni,त्रिवेणी,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,71,Bajura,बाजुरा,695,Gaumul,गौमुल,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,71,Bajura,बाजुरा,694,Himali,हिमाली,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,71,Bajura,बाजुरा,693,Jagannath,जगन्‍नाथ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,71,Bajura,बाजुरा,691,Khaptad Chhededaha,खप्तड छेडेदह,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,71,Bajura,बाजुरा,692,Swami Kartik Khapar,स्वामीकार्तिक खापर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,75,Dadeldhura,डडेलधुरा,730,Amargadhi,अमरगढी,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,75,Dadeldhura,डडेलधुरा,731,Parshuram,परशुराम,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,75,Dadeldhura,डडेलधुरा,726,Aalitaal,आलिताल,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,75,Dadeldhura,डडेलधुरा,729,Ajaymeru,अजयमेरु,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,75,Dadeldhura,डडेलधुरा,728,Bhageshwar,भागेश्वर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,75,Dadeldhura,डडेलधुरा,727,Ganyapadhura,गन्यापधुरा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,75,Dadeldhura,डडेलधुरा,725,Navadurga,नवदुर्गा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,69,Darchula,दार्चुला,666,Mahakali,महाकाली,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,69,Darchula,दार्चुला,667,Shailyashikhar,शैल्यशिखर,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,69,Darchula,दार्चुला,674,Apihimal,अपिहिमाल,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,69,Darchula,दार्चुला,672,Duhun,दुहुँ,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,69,Darchula,दार्चुला,671,Lekam,लेकम,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,69,Darchula,दार्चुला,669,Malikarjun,मालिकार्जुन,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,69,Darchula,दार्चुला,670,Marma,मार्मा,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,69,Darchula,दार्चुला,668,Naugad,नौगाड,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,69,Darchula,दार्चुला,673,Vyans,ब्याँस,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,73,Doti,डोटी,706,Dipayal Silgadhi,दिपायल सिलगढी,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,73,Doti,डोटी,707,Shikhar,शिखर,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,73,Doti,डोटी,708,Aadarsha,आदर्श,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,73,Doti,डोटी,714,Badikedar,बडीकेदार,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,73,Doti,डोटी,713,Bogatan-Phudsil,बोगटान फुड्सिल,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,73,Doti,डोटी,711,Jorayal,जोरायल,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,73,Doti,डोटी,710,K.I.Singh,के.आई.सिं.,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,73,Doti,डोटी,709,Purbichauki,पूर्वीचौकी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,73,Doti,डोटी,712,Sayal,सायल,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,77,Kailali,कैलाली,753,Dhangadhi,धनगढी,2,SUB_METROPOLITAN_CITY,Sub-Metropolitan City,उपमहानगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,77,Kailali,कैलाली,750,Bhajni,भजनी,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,77,Kailali,कैलाली,752,Gauriganga,गौरीगंगा,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,77,Kailali,कैलाली,748,Ghodaghodi,घोडाघोडी,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,77,Kailali,कैलाली,751,Godawari,गोदावरी,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,77,Kailali,कैलाली,749,Lamkichuha,लम्कीचुहा,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,77,Kailali,कैलाली,747,Tikapur,टिकापुर,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,77,Kailali,कैलाली,744,Bardagoriya,बर्दगोरिया,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,77,Kailali,कैलाली,746,Chure,चुरे,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,77,Kailali,कैलाली,741,Janaki,जानकी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,77,Kailali,कैलाली,743,Joshipur,जोशीपुर,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,77,Kailali,कैलाली,742,Kailari,कैलारी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,77,Kailali,कैलाली,745,Mohanyal,मोहन्याल,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,76,Kanchanpur,कञ्चनपुर,734,Bedkot,वेदकोट,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,76,Kanchanpur,कञ्चनपुर,737,Belauri,बेलौरी,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,76,Kanchanpur,कञ्चनपुर,732,Bhimdatta,भीमदत्त,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,76,Kanchanpur,कञ्चनपुर,738,Krishnapur,कृष्णपुर,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,76,Kanchanpur,कञ्चनपुर,735,Mahakali,माहाकाली,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,76,Kanchanpur,कञ्चनपुर,733,Punarbas,पुर्नवास,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,76,Kanchanpur,कञ्चनपुर,736,Shuklaphanta,शुक्लाफाँटा,3,MUNICIPALITY,Municipality,नगरपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,76,Kanchanpur,कञ्चनपुर,740,Beldandi,बेलडाडी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका
+7,Sudurpashchim Province,सुदूरपश्चिम प्रदेश,76,Kanchanpur,कञ्चनपुर,739,Laljhadi,लालझाडी,4,RURAL_MUNICIPALITY,Rural Municipality,गाउँपालिका

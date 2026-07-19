@@ -10,11 +10,14 @@ import {
   Prisma,
   StaffStatus,
   StaffLifecycleEventType,
+  AddressOwnerType,
+  AddressType,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
+import { AddressService } from '../addresses/address.service';
 import { CreateStaffDto } from './dto/create-staff.dto';
 import { StaffLifecycleDto } from './dto/staff-lifecycle.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
@@ -42,6 +45,7 @@ export class StaffService {
     private readonly auditService: AuditService,
     private readonly lifecycleService: StaffLifecycleService,
     private readonly usageService: UsageService,
+    private readonly addressService: AddressService,
   ) {}
 
   async createStaff(dto: CreateStaffDto, actor: AuthContext) {
@@ -107,6 +111,22 @@ export class StaffService {
         },
       },
     });
+
+    if (dto.addresses?.length) {
+      for (const addressInput of dto.addresses) {
+        await this.addressService.upsertAddress(this.prisma, {
+          tenantId: actor.tenantId,
+          ownerType: AddressOwnerType.STAFF,
+          ownerId: staff.id,
+          input: addressInput,
+          legacyText:
+            (addressInput.addressType ?? AddressType.OTHER) ===
+            AddressType.PERMANENT
+              ? dto.address
+              : undefined,
+        });
+      }
+    }
 
     const currentYear = new Date().getFullYear();
     await this.prisma.staffLeaveBalance.createMany({
@@ -320,6 +340,22 @@ export class StaffService {
           where: { id: existing.userId },
           data: { email: requireProfileEmail(dto.email) },
         });
+      }
+
+      if (dto.addresses?.length) {
+        for (const addressInput of dto.addresses) {
+          await this.addressService.upsertAddress(tx, {
+            tenantId: actor.tenantId,
+            ownerType: AddressOwnerType.STAFF,
+            ownerId: existing.id,
+            input: addressInput,
+            legacyText:
+              (addressInput.addressType ?? AddressType.OTHER) ===
+              AddressType.PERMANENT
+                ? (dto.address ?? existing.address)
+                : undefined,
+          });
+        }
       }
 
       return tx.staff.update({

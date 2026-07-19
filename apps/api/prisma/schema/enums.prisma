@@ -1226,3 +1226,69 @@ enum LearningResourceStatus {
   ACTIVE
   ARCHIVED
 }
+
+enum AddressOwnerType {
+  TENANT
+  SCHOOL_CAMPUS
+  STAFF
+  STUDENT
+  GUARDIAN
+  EMERGENCY_CONTACT
+  TRANSPORT_STOP
+  VENDOR
+  ASSET
+}
+
+enum AddressType {
+  PERMANENT
+  CURRENT
+  MAILING
+  EMERGENCY
+  REGISTERED_OFFICE
+  CAMPUS
+  OTHER
+}
+
+// Migration-confidence status for legacy free-text address fields being
+// mapped onto normalized Address rows. Ambiguous matches are logged as
+// MANUAL_REVIEW_REQUIRED rather than guessed; legacy text is never deleted
+// until a human (or a high-confidence automated match) confirms it.
+enum AddressMappingStatus {
+  AUTO_MATCHED
+  MANUAL_REVIEW_REQUIRED
+  CONFIRMED
+  UNMATCHED
+}
+
+enum TeacherAssignmentType {
+  CLASS_TEACHER
+  SUBJECT_TEACHER
+  ASSISTANT_TEACHER
+  SUBSTITUTE_TEACHER
+  EXAM_INVIGILATOR
+  COORDINATOR
+}
+
+// Which assessment component(s) an assignment authorizes grading for. Mirrors
+// AssessmentComponent.type (AssessmentType enum) plus an explicit
+// ALL_COMPONENTS wildcard; null componentScope on a SUBJECT_TEACHER
+// assignment is treated the same as ALL_COMPONENTS.
+enum TeacherAssignmentComponentScope {
+  THEORY
+  PRACTICAL
+  INTERNAL
+  PROJECT
+  ALL_COMPONENTS
+}
+
+enum TeacherAssignmentStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+enum TeacherDelegationStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}

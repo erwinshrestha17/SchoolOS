@@ -1,0 +1,754 @@
+﻿local_level_id,district_id,type_id,type_code,name_en,name_ne
+1,1,3,MUNICIPALITY,Shadanand,षडानन्द
+2,1,3,MUNICIPALITY,Bhojpur,भोजपुर
+3,1,4,RURAL_MUNICIPALITY,Hatuwagadhi,हतुवागढी
+4,1,4,RURAL_MUNICIPALITY,Ramprasad Rai,रामप्रसाद राई
+5,1,4,RURAL_MUNICIPALITY,Aamchok,आमचोक
+6,1,4,RURAL_MUNICIPALITY,Tyamke Maiyum,टेम्केमैयुङ
+7,1,4,RURAL_MUNICIPALITY,Arun,अरुण
+8,1,4,RURAL_MUNICIPALITY,Pauwadungma,पौवादुङमा
+9,1,4,RURAL_MUNICIPALITY,Salpasilichho,साल्पासिलिछो
+10,2,3,MUNICIPALITY,Dhankuta,धनकुटा
+11,2,3,MUNICIPALITY,Pakhribas,पाख्रिबास
+12,2,3,MUNICIPALITY,Mahalaxmi,महालक्ष्मी
+13,2,4,RURAL_MUNICIPALITY,Sangurigadhi,साँगुरीगढी
+14,2,4,RURAL_MUNICIPALITY,Chaubise,चौविसे
+15,2,4,RURAL_MUNICIPALITY,Sahidbhumi,सहिदभूमि
+16,2,4,RURAL_MUNICIPALITY,Chhathar Jorpati,छथर जोरपाटी
+17,3,3,MUNICIPALITY,Suryodaya,सूर्योदय
+18,3,3,MUNICIPALITY,Ilam,ईलाम
+19,3,3,MUNICIPALITY,Deumai,देउमाई
+20,3,4,RURAL_MUNICIPALITY,Maijogmai,माईजोगमाई
+21,3,4,RURAL_MUNICIPALITY,Phakphokthum,फाकफोकथुम
+22,3,3,MUNICIPALITY,Mai,माई
+23,3,4,RURAL_MUNICIPALITY,Chulachuli,चुलाचुली
+24,3,4,RURAL_MUNICIPALITY,Rong,रोङ
+25,3,4,RURAL_MUNICIPALITY,Mangsebung,माङसेबुङ
+26,3,4,RURAL_MUNICIPALITY,Sandakpur,सन्दकपुर
+27,4,3,MUNICIPALITY,Mechinagar,मेचीनगर
+28,4,3,MUNICIPALITY,Birtamod,विर्तामोड
+29,4,3,MUNICIPALITY,Damak,दमक
+30,4,3,MUNICIPALITY,Bhadrapur,भद्रपुर
+31,4,3,MUNICIPALITY,Shivasatakshi,शिवशताक्षी
+32,4,3,MUNICIPALITY,Arjundhara,अर्जुनधारा
+33,4,3,MUNICIPALITY,Gauradaha,गौरादह
+34,4,3,MUNICIPALITY,Kankai,कन्काई
+35,4,4,RURAL_MUNICIPALITY,Kamal,कमल
+36,4,4,RURAL_MUNICIPALITY,Buddha Shanti,बुद्धशान्ति
+37,4,4,RURAL_MUNICIPALITY,Kachankawal,कचनकवल
+38,4,4,RURAL_MUNICIPALITY,Jhapa,झापा
+39,4,4,RURAL_MUNICIPALITY,Barhadashi,बाह्रदशी
+40,4,4,RURAL_MUNICIPALITY,Gaurigunj,गौरीगंज
+41,4,4,RURAL_MUNICIPALITY,Haldibari,हल्दिवारी
+42,5,3,MUNICIPALITY,Diktel Rupakot Majhuwagadhi,दिक्तेल रुपाकोट मझुवागढी
+43,5,3,MUNICIPALITY,Halesi Tuwachung,हलेसी तुवाचुङ
+44,5,4,RURAL_MUNICIPALITY,Khotehang,खोटेहाङ
+45,5,4,RURAL_MUNICIPALITY,Diprung Chuichumma,दिप्रुङ चुइचुम्मा
+46,5,4,RURAL_MUNICIPALITY,Aiselukharka,ऐसेलुखर्क
+47,5,4,RURAL_MUNICIPALITY,Jantedhunga,जन्तेढुंगा
+48,5,4,RURAL_MUNICIPALITY,Kepilasgadhi,केपिलासगढी
+49,5,4,RURAL_MUNICIPALITY,Barahpokhari,वराहपोखरी
+50,5,4,RURAL_MUNICIPALITY,Rawa Besi,रावा बेसी
+51,5,4,RURAL_MUNICIPALITY,Sakela,साकेला
+52,6,3,MUNICIPALITY,Sundar Haraicha,सुन्दरहरैचा
+53,6,3,MUNICIPALITY,Belbari,बेलवारी
+54,6,3,MUNICIPALITY,Pathari Shanischare,पथरी शनिश्चरे
+55,6,3,MUNICIPALITY,Ratuwamai,रतुवामाई
+56,6,3,MUNICIPALITY,Urlabari,उर्लावारी
+57,6,3,MUNICIPALITY,Rangeli,रंगेली
+58,6,3,MUNICIPALITY,Sunawarshi,सुनवर्षि
+59,6,3,MUNICIPALITY,Letang,लेटाङ
+60,6,1,METROPOLITAN_CITY,Biratnagar,विराटनगर
+61,6,4,RURAL_MUNICIPALITY,Jahada,जहदा
+62,6,4,RURAL_MUNICIPALITY,Budi Ganga,बुढीगंगा
+63,6,4,RURAL_MUNICIPALITY,Katahari,कटहरी
+64,6,4,RURAL_MUNICIPALITY,Dhanpalthan,धनपालथान
+65,6,4,RURAL_MUNICIPALITY,Kanepokhari,कानेपोखरी
+66,6,4,RURAL_MUNICIPALITY,Gramthan,ग्रामथान
+67,6,4,RURAL_MUNICIPALITY,Kerabari,केरावारी
+68,6,4,RURAL_MUNICIPALITY,Miklajung,मिक्लाजुङ
+69,7,3,MUNICIPALITY,Siddhicharan,सिद्दिचरण
+70,7,4,RURAL_MUNICIPALITY,Khiji Demba,खिजिदेम्बा
+71,7,4,RURAL_MUNICIPALITY,Chisankhugadhi,चिशंखुगढी
+72,7,4,RURAL_MUNICIPALITY,Molung,मोलुङ
+73,7,4,RURAL_MUNICIPALITY,Sunkoshi,सुनकोशी
+74,7,4,RURAL_MUNICIPALITY,Champadevi,चम्पादेवी
+75,7,4,RURAL_MUNICIPALITY,Manebhanjyang,मानेभञ्याङ
+76,7,4,RURAL_MUNICIPALITY,Likhu,लिखु
+77,8,3,MUNICIPALITY,Phidim,फिदिम
+78,8,4,RURAL_MUNICIPALITY,Miklajung,मिक्लाजुङ
+79,8,4,RURAL_MUNICIPALITY,Phalgunanda,फाल्गुनन्द
+80,8,4,RURAL_MUNICIPALITY,Hilihang,हिलिहाङ
+81,8,4,RURAL_MUNICIPALITY,Phalelung,फालेलुङ
+82,8,4,RURAL_MUNICIPALITY,Yangwarak,याङवरक
+83,8,4,RURAL_MUNICIPALITY,Kummayak,कुम्मायक
+84,8,4,RURAL_MUNICIPALITY,Tumbewa,तुम्बेवा
+85,9,3,MUNICIPALITY,Khandbari,खाँदवारी
+86,9,3,MUNICIPALITY,Chainpur,चैनपुर
+87,9,3,MUNICIPALITY,Dharmadevi,धर्मदेवी
+88,9,3,MUNICIPALITY,Panchkhapan,पाँचखपन
+89,9,3,MUNICIPALITY,Madi,मादी
+90,9,4,RURAL_MUNICIPALITY,Makalu,मकालु
+91,9,4,RURAL_MUNICIPALITY,Silichong,सिलीचोङ
+92,9,4,RURAL_MUNICIPALITY,Sabhapokhari,सभापोखरी
+93,9,4,RURAL_MUNICIPALITY,Chichila,चिचिला
+94,9,4,RURAL_MUNICIPALITY,BhotKhola,भोटखोला
+95,10,3,MUNICIPALITY,Solu Dudhkunda,सोलुदुधकुण्ड
+96,10,4,RURAL_MUNICIPALITY,Mapya Dudhkoshi,माप्य दुधकोशी
+97,10,4,RURAL_MUNICIPALITY,Necha Salyan,नेचासल्यान
+98,10,4,RURAL_MUNICIPALITY,Thulung Dudhkoshi,थुलुङ दुधकोशी
+99,10,4,RURAL_MUNICIPALITY,Maha Kulung,माहाकुलुङ
+100,10,4,RURAL_MUNICIPALITY,Sotang,सोताङ
+101,10,4,RURAL_MUNICIPALITY,Khumbu PasangLhamu,खुम्वु पासाङल्हमु
+102,10,4,RURAL_MUNICIPALITY,Likhu Pike,लिखु पिके
+103,11,3,MUNICIPALITY,BarahaKshetra,बराहक्षेत्र
+104,11,3,MUNICIPALITY,Inaruwa,ईनरुवा
+105,11,3,MUNICIPALITY,Duhabi,दुहवी
+106,11,3,MUNICIPALITY,Ramdhuni,रामधुनी
+107,11,2,SUB_METROPOLITAN_CITY,Itahari,ईटहरी
+108,11,2,SUB_METROPOLITAN_CITY,Dharan,धरान
+109,11,4,RURAL_MUNICIPALITY,Koshi,कोशी
+110,11,4,RURAL_MUNICIPALITY,Harinagar,हरिनगर
+111,11,4,RURAL_MUNICIPALITY,Bhokraha Narsingh,भोक्राहा नरसिंह
+112,11,4,RURAL_MUNICIPALITY,Dewangunj,देवानगञ्ज
+113,11,4,RURAL_MUNICIPALITY,Gadhi,गढी
+114,11,4,RURAL_MUNICIPALITY,Barju,बर्जु
+115,12,3,MUNICIPALITY,Phungling,फुङलिङ
+116,12,4,RURAL_MUNICIPALITY,Sirijangha,सिरीजङ्घा
+117,12,4,RURAL_MUNICIPALITY,Aathrai Triveni,आठराई त्रिवेणी
+118,12,4,RURAL_MUNICIPALITY,Pathibhara Yangwarak,पाथीभरा याङवरक
+119,12,4,RURAL_MUNICIPALITY,Meringden,मेरिङदेन
+120,12,4,RURAL_MUNICIPALITY,Sidingwa,सिदिङ्वा
+121,12,4,RURAL_MUNICIPALITY,Phaktanglung,फक्ताङलुङ
+122,12,4,RURAL_MUNICIPALITY,Maiwa Khola,मैवाखोला
+123,12,4,RURAL_MUNICIPALITY,Mikwa Khola,मिक्वाखोला
+124,13,3,MUNICIPALITY,Myanglung,म्याङलुङ
+125,13,3,MUNICIPALITY,Laligurans,लालीगुराँस
+126,13,4,RURAL_MUNICIPALITY,Aathrai,आठराई
+127,13,4,RURAL_MUNICIPALITY,Phedap,फेदाप
+128,13,4,RURAL_MUNICIPALITY,Chhathar,छथर
+129,13,4,RURAL_MUNICIPALITY,Menchayayem,मेन्छयायेम
+130,14,3,MUNICIPALITY,Triyuga,त्रियुगा
+131,14,3,MUNICIPALITY,Katari,कटारी
+132,14,3,MUNICIPALITY,Chaudandigadhi,चौदण्डीगढी
+133,14,3,MUNICIPALITY,Belaka,वेलका
+134,14,4,RURAL_MUNICIPALITY,Udayapurgadhi,उदयपुरगढी
+135,14,4,RURAL_MUNICIPALITY,Rautamai,रौतामाई
+136,14,4,RURAL_MUNICIPALITY,Tapli,ताप्ली
+137,14,4,RURAL_MUNICIPALITY,Limchungbung,लिम्चुङ्बुङ
+138,15,1,METROPOLITAN_CITY,Birgunj,बिरगंज
+139,15,3,MUNICIPALITY,Bahudarmai,बहुदरमाई
+140,15,3,MUNICIPALITY,Parsagadhi,पर्सागढी
+141,15,3,MUNICIPALITY,Pokhariya,पोखरिया
+142,15,4,RURAL_MUNICIPALITY,Bindabasini,बिन्दबासिनी
+143,15,4,RURAL_MUNICIPALITY,Dhobini,धोबीनी
+144,15,4,RURAL_MUNICIPALITY,Chhipaharmai,छिपहरमाई
+145,15,4,RURAL_MUNICIPALITY,Jagarnathpur,जगरनाथपुर
+146,15,4,RURAL_MUNICIPALITY,Jirabhawani,जिरा भवानी
+147,15,4,RURAL_MUNICIPALITY,Kalikamai,कालिकामाई
+148,15,4,RURAL_MUNICIPALITY,Pakaha Mainpur,पकाहा मैनपुर
+149,15,4,RURAL_MUNICIPALITY,Paterwa Sugauli,पटेर्वा सुगौली
+150,15,4,RURAL_MUNICIPALITY,Sakhuwa Prasauni,सखुवा प्रसौनी
+151,15,4,RURAL_MUNICIPALITY,Thori,ठोरी
+152,16,2,SUB_METROPOLITAN_CITY,Kalaiya,कलैया
+153,16,2,SUB_METROPOLITAN_CITY,Jitpur Simara,जीतपुर सिमरा
+154,16,3,MUNICIPALITY,Kolhabi,कोल्हवी
+155,16,3,MUNICIPALITY,Nijgadh,निजगढ
+156,16,3,MUNICIPALITY,Mahagadhimai,महागढीमाई
+157,16,3,MUNICIPALITY,Simaraungadh,सिम्रौनगढ
+158,16,3,MUNICIPALITY,Pacharauta,पचरौता
+159,16,4,RURAL_MUNICIPALITY,Pheta,फेटा
+160,16,4,RURAL_MUNICIPALITY,Bishrampur,विश्रामपुर
+161,16,4,RURAL_MUNICIPALITY,Prasauni,प्रसौनी
+162,16,4,RURAL_MUNICIPALITY,Adarsh Kotwal,आदर्श कोटवाल
+163,16,4,RURAL_MUNICIPALITY,Karaiyamai,करैयामाई
+164,16,4,RURAL_MUNICIPALITY,Devtal,देवताल
+165,16,4,RURAL_MUNICIPALITY,Parwanipur,परवानीपुर
+166,16,4,RURAL_MUNICIPALITY,Baragadhi,बारागढी
+167,16,4,RURAL_MUNICIPALITY,Suwarna,सुवर्ण
+168,17,3,MUNICIPALITY,Baudhimai,बौधीमाई
+169,17,3,MUNICIPALITY,Brindaban,बृन्दावन
+170,17,3,MUNICIPALITY,Chandrapur,चन्द्रपुर
+171,17,3,MUNICIPALITY,Dewahi Gonahi,देवाही गोनाही
+172,17,3,MUNICIPALITY,Gadhimai,गढीमाई
+173,17,3,MUNICIPALITY,Guruda,गरुडा
+174,17,3,MUNICIPALITY,Gaur,गौर
+175,17,3,MUNICIPALITY,Gujara,गुजरा
+176,17,3,MUNICIPALITY,Ishanath,ईशनाथ
+177,17,3,MUNICIPALITY,Katahariya,कटहरिया
+178,17,3,MUNICIPALITY,Madhav Narayan,माधव नारायण
+179,17,3,MUNICIPALITY,Maulapur,मौलापुर
+180,17,3,MUNICIPALITY,Paroha,परोहा
+181,17,3,MUNICIPALITY,Phatuwa Bijayapur,फतुवाबिजयपुर
+182,17,3,MUNICIPALITY,Rajdevi,राजदेवी
+183,17,3,MUNICIPALITY,Rajpur,राजपुर
+184,17,4,RURAL_MUNICIPALITY,Durga Bhagwati,दुर्गा भगवती
+185,17,4,RURAL_MUNICIPALITY,Yamunamai,यमुनामाई
+186,18,3,MUNICIPALITY,Bagmati,बागमती
+187,18,3,MUNICIPALITY,Balara,बलरा
+188,18,3,MUNICIPALITY,Barahathwa,बरहथवा
+189,18,3,MUNICIPALITY,Godaita,गोडैटा
+190,18,3,MUNICIPALITY,Hariwan,हरिवन
+191,18,3,MUNICIPALITY,Haripur,हरिपुर
+192,18,3,MUNICIPALITY,Haripurwa,हरिपुर्वा
+193,18,3,MUNICIPALITY,Ishowrpur,ईश्वरपुर
+194,18,3,MUNICIPALITY,Kabilasi,कविलासी
+195,18,3,MUNICIPALITY,Lalbandi,लालबन्दी
+196,18,3,MUNICIPALITY,Malangawa,मलंगवा
+197,18,4,RURAL_MUNICIPALITY,Basbariya,बसबरीया
+198,18,4,RURAL_MUNICIPALITY,Bisnu,विष्णु
+199,18,4,RURAL_MUNICIPALITY,Brahampuri,ब्रह्मपुरी
+200,18,4,RURAL_MUNICIPALITY,Chakraghatta,चक्रघट्टा
+201,18,4,RURAL_MUNICIPALITY,Chandranagar,चन्द्रनगर
+202,18,4,RURAL_MUNICIPALITY,Dhankaul,धनकौल
+203,18,4,RURAL_MUNICIPALITY,Kaudena,कौडेना
+204,18,4,RURAL_MUNICIPALITY,Parsa,पर्सा
+205,18,4,RURAL_MUNICIPALITY,Ramnagar,रामनगर
+206,19,3,MUNICIPALITY,Lahan,लहान
+207,19,3,MUNICIPALITY,Dhangadhimai,धनगढीमाई
+208,19,3,MUNICIPALITY,Siraha,सिरहा
+209,19,3,MUNICIPALITY,Golbazar,गोलबजार
+210,19,3,MUNICIPALITY,Mirchaiya,मिर्चैयाँ
+211,19,3,MUNICIPALITY,Kalyanpur,कल्याणपुर
+212,19,3,MUNICIPALITY,Karjanha,कर्जन्हा
+213,19,3,MUNICIPALITY,Sukhipur,सुखीपुर
+214,19,4,RURAL_MUNICIPALITY,Bhagwanpur,भगवानपुर
+215,19,4,RURAL_MUNICIPALITY,Aurahi,औरही
+216,19,4,RURAL_MUNICIPALITY,Bishnupur,विष्णुपुर
+217,19,4,RURAL_MUNICIPALITY,Bariyarpatti,बरियारपट्टी
+218,19,4,RURAL_MUNICIPALITY,Lakshmipur Patari,लक्ष्मीपुर पतारी
+219,19,4,RURAL_MUNICIPALITY,Naraha,नरहा
+220,19,4,RURAL_MUNICIPALITY,SakhuwanankarKatti,सखुवानान्कारकट्टी
+221,19,4,RURAL_MUNICIPALITY,Arnama,अर्नमा
+222,19,4,RURAL_MUNICIPALITY,Navarajpur,नवराजपुर
+223,20,2,SUB_METROPOLITAN_CITY,Janakpurdham,जनकपुरधाम
+224,20,3,MUNICIPALITY,Chhireshwarnath,क्षिरेश्वरनाथ
+225,20,3,MUNICIPALITY,Ganeshman Charnath,गणेशमान चारनाथ
+226,20,3,MUNICIPALITY,Dhanushadham,धनुषाधाम
+227,20,3,MUNICIPALITY,Nagarain,नगराइन
+228,20,3,MUNICIPALITY,Bideha,विदेह
+229,20,3,MUNICIPALITY,Mithila,मिथिला
+230,20,3,MUNICIPALITY,Sahidnagar,शहीदनगर
+231,20,3,MUNICIPALITY,Sabaila,सबैला
+232,20,3,MUNICIPALITY,Kamala,कमला
+233,20,3,MUNICIPALITY,MithilaBihari,मिथिला बिहारी
+234,20,3,MUNICIPALITY,Hansapur,हंसपुर
+235,20,4,RURAL_MUNICIPALITY,Janaknandani,जनकनन्दिनी
+236,20,4,RURAL_MUNICIPALITY,Bateshwar,बटेश्वर
+237,20,4,RURAL_MUNICIPALITY,Mukhiyapatti Musharniya,मुखियापट्टी मुसहरमिया
+238,20,4,RURAL_MUNICIPALITY,Lakshminya,लक्ष्मीनिया
+239,20,4,RURAL_MUNICIPALITY,Aaurahi,औरही
+240,20,4,RURAL_MUNICIPALITY,Dhanauji,धनौजी
+241,21,3,MUNICIPALITY,Bodebarsain,बोदेबरसाईन
+242,21,3,MUNICIPALITY,Dakneshwori,डाक्नेश्वरी
+243,21,3,MUNICIPALITY,Hanumannagar Kankalini,हनुमाननगर कङ्‌कालिनी
+244,21,3,MUNICIPALITY,Kanchanrup,कञ्चनरुप
+245,21,3,MUNICIPALITY,Khadak,खडक
+246,21,3,MUNICIPALITY,Shambhunath,शम्भुनाथ
+247,21,3,MUNICIPALITY,Saptakoshi,सप्तकोशी
+248,21,3,MUNICIPALITY,Surunga,सुरुङ्‍गा
+249,21,3,MUNICIPALITY,Rajbiraj,राजविराज
+250,21,4,RURAL_MUNICIPALITY,Agnisaira Krishnasavaran,अग्निसाइर कृष्णासरवन
+251,21,4,RURAL_MUNICIPALITY,Balan-Bihul,बलान-बिहुल
+252,21,4,RURAL_MUNICIPALITY,Rajgadh,राजगढ
+253,21,4,RURAL_MUNICIPALITY,Bishnupur,बिष्णुपुर
+254,21,4,RURAL_MUNICIPALITY,Chhinnamasta,छिन्नमस्ता
+255,21,4,RURAL_MUNICIPALITY,Mahadeva,महादेवा
+256,21,4,RURAL_MUNICIPALITY,Rupani,रुपनी
+257,21,4,RURAL_MUNICIPALITY,Tilathi Koiladi,तिलाठी कोईलाडी
+258,21,4,RURAL_MUNICIPALITY,Tirhut,तिरहुत
+259,22,3,MUNICIPALITY,Aaurahi,औरही
+260,22,3,MUNICIPALITY,Balawa,बलवा
+261,22,3,MUNICIPALITY,Bardibas,बर्दिबास
+262,22,3,MUNICIPALITY,Bhangaha,भँगाहा
+263,22,3,MUNICIPALITY,Gaushala,गौशाला
+264,22,3,MUNICIPALITY,Jaleshor,जलेश्वर
+265,22,3,MUNICIPALITY,Loharpatti,लोहरपट्टी
+266,22,3,MUNICIPALITY,Manara Shiswa,मनरा शिसवा
+267,22,3,MUNICIPALITY,Matihani,मटिहानी
+268,22,3,MUNICIPALITY,Ramgopalpur,रामगोपालपुर
+269,22,4,RURAL_MUNICIPALITY,Ekdara,एकडारा
+270,22,4,RURAL_MUNICIPALITY,Mahottari,महोत्तरी
+271,22,4,RURAL_MUNICIPALITY,Pipara,पिपरा
+272,22,4,RURAL_MUNICIPALITY,Samsi,साम्सी
+273,22,4,RURAL_MUNICIPALITY,Sonama,सोनमा
+274,23,3,MUNICIPALITY,Bhaktapur,भक्तपुर
+275,23,3,MUNICIPALITY,Changunarayan,चाँगुनारायण
+276,23,3,MUNICIPALITY,Suryabinayak,सूर्यविनायक
+277,23,3,MUNICIPALITY,Madhyapur Thimi,मध्यपुर थिमी
+278,24,1,METROPOLITAN_CITY,Bharatpur,भरतपुर
+279,24,3,MUNICIPALITY,Kalika,कालिका
+280,24,3,MUNICIPALITY,Khairhani,खैरहनी
+281,24,3,MUNICIPALITY,Madi,माडी
+282,24,3,MUNICIPALITY,Ratnagar,रत्ननगर
+283,24,3,MUNICIPALITY,Rapti,राप्ती
+284,24,4,RURAL_MUNICIPALITY,Ichchhakamana,इच्छाकामना
+285,25,3,MUNICIPALITY,Dhunibeshi,धुनीबेंशी
+286,25,3,MUNICIPALITY,Nilkantha,निलकण्ठ
+287,25,4,RURAL_MUNICIPALITY,Khaniyabas,खनियाबास
+288,25,4,RURAL_MUNICIPALITY,Gajuri,गजुरी
+289,25,4,RURAL_MUNICIPALITY,Galchhi,गल्छी
+290,25,4,RURAL_MUNICIPALITY,Gangajamuna,गङ्गाजमुना
+291,25,4,RURAL_MUNICIPALITY,Jwalamukhi,ज्वालामूखी
+292,25,4,RURAL_MUNICIPALITY,Thakre,थाक्रे
+293,25,4,RURAL_MUNICIPALITY,Netrawati Dabjong,नेत्रावती डबजोङ
+294,25,4,RURAL_MUNICIPALITY,Benighat Rorang,बेनीघाट रोराङ्ग
+295,25,4,RURAL_MUNICIPALITY,Rubi Valley,रुवी भ्याली
+296,25,4,RURAL_MUNICIPALITY,Siddhalek,सिद्धलेक
+297,25,4,RURAL_MUNICIPALITY,Tripurasundari,त्रिपुरासुन्दरी
+298,26,3,MUNICIPALITY,Bhimeswor,भिमेश्वर
+299,26,3,MUNICIPALITY,Jiri,जिरी
+300,26,4,RURAL_MUNICIPALITY,Kalinchok,कालिन्चोक
+301,26,4,RURAL_MUNICIPALITY,Melung,मेलुङ्ग
+302,26,4,RURAL_MUNICIPALITY,Bigu,विगु
+303,26,4,RURAL_MUNICIPALITY,Gaurishankar,गौरीशङ्कर
+304,26,4,RURAL_MUNICIPALITY,Baiteshowr,वैतेश्वर
+305,26,4,RURAL_MUNICIPALITY,Sailung,शैलुङ्ग
+306,26,4,RURAL_MUNICIPALITY,Tamakoshi,तामाकोशी
+307,27,1,METROPOLITAN_CITY,Kathmandu,काठमाण्डौं
+308,27,3,MUNICIPALITY,Gokarneshwar,गोकर्णेश्वर
+309,27,3,MUNICIPALITY,Kirtipur,कीर्तिपुर
+310,27,3,MUNICIPALITY,Kageshwari-Manohara,कागेश्वरी मनोहरा
+311,27,3,MUNICIPALITY,Chandragiri,चन्द्रागिरी
+312,27,3,MUNICIPALITY,Tokha,टोखा
+313,27,3,MUNICIPALITY,Tarakeshwar,तारकेश्वर
+314,27,3,MUNICIPALITY,Dakshinkali,दक्षिणकाली
+315,27,3,MUNICIPALITY,Nagarjun,नागार्जुन
+316,27,3,MUNICIPALITY,Budhalikantha,बुढानिलकण्ठ
+317,27,3,MUNICIPALITY,Shankharapur,शङ्खरापुर
+318,28,3,MUNICIPALITY,Dhulikhel,धुलिखेल
+319,28,3,MUNICIPALITY,Namobuddha,नमोबुद्ध
+320,28,3,MUNICIPALITY,Panauti,पनौती
+321,28,3,MUNICIPALITY,Panchkhal,पाँचखाल
+322,28,3,MUNICIPALITY,Banepa,बनेपा
+323,28,3,MUNICIPALITY,Mandandeupur,मण्डनदेउपुर
+324,28,4,RURAL_MUNICIPALITY,Khani Khola,खानीखोला
+325,28,4,RURAL_MUNICIPALITY,Chauri Deurali,चौंरीदेउराली
+326,28,4,RURAL_MUNICIPALITY,Temal,तेमाल
+327,28,4,RURAL_MUNICIPALITY,Bethanchok,बेथानचोक
+328,28,4,RURAL_MUNICIPALITY,Bhumlu,भुम्लु
+329,28,4,RURAL_MUNICIPALITY,Mahabharat,महाभारत
+330,28,4,RURAL_MUNICIPALITY,Roshi,रोशी
+331,29,1,METROPOLITAN_CITY,Lalitpur,ललितपुर
+332,29,3,MUNICIPALITY,Mahalaxmi,महालक्ष्मी
+333,29,3,MUNICIPALITY,Godawari,गोदावरी
+334,29,4,RURAL_MUNICIPALITY,Konjyosom,कोन्ज्योसोम
+335,29,4,RURAL_MUNICIPALITY,Bagmati,बागमती
+336,29,4,RURAL_MUNICIPALITY,Mahankal,महाङ्काल
+337,30,2,SUB_METROPOLITAN_CITY,Hetauda,हेटौडा
+338,30,3,MUNICIPALITY,Thaha,थाहा
+339,30,4,RURAL_MUNICIPALITY,Bhimphedi,भिमफेदी
+340,30,4,RURAL_MUNICIPALITY,Makawanpurgadhi,मकवानपुरगढी
+341,30,4,RURAL_MUNICIPALITY,Manahari,मनहरी
+342,30,4,RURAL_MUNICIPALITY,Raksirang,राक्सिराङ्ग
+343,30,4,RURAL_MUNICIPALITY,Bakaiya,बकैया
+344,30,4,RURAL_MUNICIPALITY,Bagmati,बाग्मति
+345,30,4,RURAL_MUNICIPALITY,Kailash,कैलाश
+346,30,4,RURAL_MUNICIPALITY,Indrasarowar,इन्द्रसरोबर
+347,31,3,MUNICIPALITY,Bidur,विदुर
+348,31,3,MUNICIPALITY,Belkotgadhi,बेलकोटगढी
+349,31,4,RURAL_MUNICIPALITY,Kakani,ककनी
+350,31,4,RURAL_MUNICIPALITY,Panchakanya,पञ्चकन्या
+351,31,4,RURAL_MUNICIPALITY,Likhu,लिखु
+352,31,4,RURAL_MUNICIPALITY,Dupcheshwar,दुप्चेश्वर
+353,31,4,RURAL_MUNICIPALITY,Shivapuri,शिवपुरी
+354,31,4,RURAL_MUNICIPALITY,Tadi,तादी
+355,31,4,RURAL_MUNICIPALITY,Suryagadhi,सुर्यगढी
+356,31,4,RURAL_MUNICIPALITY,Tarkeshwar,तारकेश्वर
+357,31,4,RURAL_MUNICIPALITY,Kispang,किस्पाङ
+358,31,4,RURAL_MUNICIPALITY,Myagang,म्यगङ
+359,32,3,MUNICIPALITY,Manthali,मन्थली
+360,32,3,MUNICIPALITY,Ramechhap,रामेछाप
+361,32,4,RURAL_MUNICIPALITY,Umakunda,उमाकुण्ड
+362,32,4,RURAL_MUNICIPALITY,Khandadevi,खाँडादेवी
+363,32,4,RURAL_MUNICIPALITY,Doramba,दोरम्बा
+364,32,4,RURAL_MUNICIPALITY,Gokulganga,गोकुलगङ्गा
+365,32,4,RURAL_MUNICIPALITY,LikhuTamakoshi,लिखु तामाकोशी
+366,32,4,RURAL_MUNICIPALITY,Sunapati,सुनापती
+367,33,4,RURAL_MUNICIPALITY,Kalika,कालिका
+368,33,4,RURAL_MUNICIPALITY,Gosaikunda,गोसाईकुण्ड
+369,33,4,RURAL_MUNICIPALITY,Naukunda,नौकुण्ड
+370,33,4,RURAL_MUNICIPALITY,Parbatikunda,आमाछोदिङमो
+371,33,4,RURAL_MUNICIPALITY,Uttargaya,उत्तरगया
+372,34,3,MUNICIPALITY,Kamalamai,कमलामाई
+373,34,3,MUNICIPALITY,Dudhauli,दुधौली
+374,34,4,RURAL_MUNICIPALITY,Sunkoshi,सुनकोशी
+375,34,4,RURAL_MUNICIPALITY,Hariharpurgadhi,हरिहरपुरगढी
+376,34,4,RURAL_MUNICIPALITY,Tinpatan,तीनपाटन
+377,34,4,RURAL_MUNICIPALITY,Marin,मरिण
+378,34,4,RURAL_MUNICIPALITY,Golanjor,गोलन्जर
+379,34,4,RURAL_MUNICIPALITY,Phikkal,फिक्कल
+380,34,4,RURAL_MUNICIPALITY,Ghyanglekh,घ्याङलेख
+381,35,3,MUNICIPALITY,Chautara Sangachowkgadi,चौतारा साँगाचोकगढी
+382,35,3,MUNICIPALITY,Bahrabise,बाह्रविसे
+383,35,3,MUNICIPALITY,Melamchi,मेलम्ची
+384,35,4,RURAL_MUNICIPALITY,Balephi,बलेफी
+385,35,4,RURAL_MUNICIPALITY,Sunkoshi,सुनकोशी
+386,35,4,RURAL_MUNICIPALITY,Indrawati,ईन्द्रावती
+387,35,4,RURAL_MUNICIPALITY,Jugal,जुगल
+388,35,4,RURAL_MUNICIPALITY,Panchpokhari,पाँचपोखरी थाङपाल
+389,35,4,RURAL_MUNICIPALITY,Bhotekoshi,भोटेकोशी
+390,35,4,RURAL_MUNICIPALITY,Lisankhu,लिसङ्खु पाखर
+391,35,4,RURAL_MUNICIPALITY,Helambu,हेलम्बु
+392,35,4,RURAL_MUNICIPALITY,Tripurasundari,त्रिपुरासुन्दरी
+393,36,3,MUNICIPALITY,Baglung,बागलुङ
+394,36,3,MUNICIPALITY,Dhorpatan,ढोरपाटन
+395,36,3,MUNICIPALITY,Galkot,गल्कोट
+396,36,3,MUNICIPALITY,Jaimuni,जैमूनी
+397,36,4,RURAL_MUNICIPALITY,Bareng,वरेङ
+398,36,4,RURAL_MUNICIPALITY,Khathekhola,काठेखोला
+399,36,4,RURAL_MUNICIPALITY,Taman Khola,तमानखोला
+400,36,4,RURAL_MUNICIPALITY,Tara Khola,ताराखोला
+401,36,4,RURAL_MUNICIPALITY,Nishi Khola,निसीखोला
+402,36,4,RURAL_MUNICIPALITY,Badigad,वडिगाड
+403,37,3,MUNICIPALITY,Gorkha,गोरखा
+404,37,3,MUNICIPALITY,Palungtar,पालुङटार
+405,37,4,RURAL_MUNICIPALITY,Sulikot,बारपाक सुलिकोट
+406,37,4,RURAL_MUNICIPALITY,Siranchowk,सिरानचोक
+407,37,4,RURAL_MUNICIPALITY,Ajirkot,अजिरकोट
+408,37,4,RURAL_MUNICIPALITY,Chumnubri,चुमनुव्री
+409,37,4,RURAL_MUNICIPALITY,Dharche,धार्चे
+410,37,4,RURAL_MUNICIPALITY,Bhimsen Thapa,भिमसेनथापा
+411,37,4,RURAL_MUNICIPALITY,Sahid Lakhan,शहिद लखन
+412,37,4,RURAL_MUNICIPALITY,Aarughat,आरूघाट
+413,37,4,RURAL_MUNICIPALITY,Gandaki,गण्डकी
+414,38,1,METROPOLITAN_CITY,Pokhara,पोखरा
+415,38,4,RURAL_MUNICIPALITY,Annapurna,अन्नपूर्ण
+416,38,4,RURAL_MUNICIPALITY,Machhapuchchhre,माछापुच्छ्रे
+417,38,4,RURAL_MUNICIPALITY,Madi,मादी
+418,38,4,RURAL_MUNICIPALITY,Rupa,रूपा
+419,39,3,MUNICIPALITY,Besisahar,बेसीशहर
+420,39,3,MUNICIPALITY,Madhya Nepal,मध्यनेपाल
+421,39,3,MUNICIPALITY,Rainas,रारइनास
+422,39,3,MUNICIPALITY,Sundarbazar,सुन्दरबजार
+423,39,4,RURAL_MUNICIPALITY,Dordi,दोर्दी
+424,39,4,RURAL_MUNICIPALITY,Dudhpokhari,दूधपोखरी
+425,39,4,RURAL_MUNICIPALITY,Kwhlosothar,क्व्होलासोथार
+426,39,4,RURAL_MUNICIPALITY,Marsyangdi,मर्स्याङदी
+427,40,4,RURAL_MUNICIPALITY,Chame,चामे
+428,40,4,RURAL_MUNICIPALITY,Nason,नासोँ
+429,40,4,RURAL_MUNICIPALITY,NarpaBhumi,नार्पा भूमि
+430,40,4,RURAL_MUNICIPALITY,Manang Ngisyang,मनाङ ङिस्याङ
+431,41,4,RURAL_MUNICIPALITY,Gharpajhong,घरपझोङ
+432,41,4,RURAL_MUNICIPALITY,Thasang,थासाङ
+433,41,4,RURAL_MUNICIPALITY,Barhagaun Muktichhetra,वारागुङ मुक्तिक्षेत्र
+434,41,4,RURAL_MUNICIPALITY,Lomanthang,लोमन्थाङ
+435,41,4,RURAL_MUNICIPALITY,Lo-Ghekar Damodarkunda,लो-घेकर दामोदरकुण्ड
+436,42,3,MUNICIPALITY,Beni,बेनी
+437,42,4,RURAL_MUNICIPALITY,Annapurna,अन्नपुर्ण
+438,42,4,RURAL_MUNICIPALITY,Dhaulagiri,धवलागिरी
+439,42,4,RURAL_MUNICIPALITY,Mangala,मंगला
+440,42,4,RURAL_MUNICIPALITY,Malika,मालिका
+441,42,4,RURAL_MUNICIPALITY,Raghuganga,रघुगंगा
+442,43,3,MUNICIPALITY,Kawasoti,कावासोती
+443,43,3,MUNICIPALITY,Gaindakot,गैडाकोट
+444,43,3,MUNICIPALITY,Devachuli,देवचुली
+445,43,3,MUNICIPALITY,Madhya Bindu,मध्यविन्दु
+446,43,4,RURAL_MUNICIPALITY,Baudikali,बौदीकाली
+447,43,4,RURAL_MUNICIPALITY,Bulingtar,बुलिङटार
+448,43,4,RURAL_MUNICIPALITY,Binayi Tribeni,विनयी त्रिवेणी
+449,43,4,RURAL_MUNICIPALITY,Hupsekot,हुप्सेकोट
+450,44,3,MUNICIPALITY,Kushma,कुश्मा
+451,44,3,MUNICIPALITY,Phalewas,फलेवास
+452,44,4,RURAL_MUNICIPALITY,Jaljala,जलजला
+453,44,4,RURAL_MUNICIPALITY,Paiyun,पैयूं
+454,44,4,RURAL_MUNICIPALITY,Mahashila,महाशिला
+455,44,4,RURAL_MUNICIPALITY,Modi,मोदी
+456,44,4,RURAL_MUNICIPALITY,Bihadi,विहादी
+457,45,3,MUNICIPALITY,Galyang,गल्याङ
+458,45,3,MUNICIPALITY,Chapakot,चापाकोट
+459,45,3,MUNICIPALITY,Putalibazar,पुतलीबजार
+460,45,3,MUNICIPALITY,Bheerkot,भीरकोट
+461,45,3,MUNICIPALITY,Waling,वालिङ
+462,45,4,RURAL_MUNICIPALITY,Arjun Chaupari,अर्जुनचौपारी
+463,45,4,RURAL_MUNICIPALITY,Aandhikhola,आँधिखोला
+464,45,4,RURAL_MUNICIPALITY,Kaligandaki,कालीगण्डकी
+465,45,4,RURAL_MUNICIPALITY,Phedikhola,फेदीखोला
+466,45,4,RURAL_MUNICIPALITY,Harinas,हरिनास
+467,45,4,RURAL_MUNICIPALITY,Biruwa,बिरुवा
+468,46,3,MUNICIPALITY,Bhanu,भानु
+469,46,3,MUNICIPALITY,Bhimad,भिमाद
+470,46,3,MUNICIPALITY,Byas,व्यास
+471,46,3,MUNICIPALITY,Suklagandaki,शुक्लागण्डकी
+472,46,4,RURAL_MUNICIPALITY,AnbuKhaireni,आँबुखैरेनी
+473,46,4,RURAL_MUNICIPALITY,Devghat,देवघाट
+474,46,4,RURAL_MUNICIPALITY,Bandipur,वन्दिपुर
+475,46,4,RURAL_MUNICIPALITY,Rishing,ऋषिङ्ग
+476,46,4,RURAL_MUNICIPALITY,Ghiring,घिरिङ
+477,46,4,RURAL_MUNICIPALITY,Myagde,म्याग्दे
+478,47,3,MUNICIPALITY,Kapilvastu,कपिलवस्तु
+479,47,3,MUNICIPALITY,Banganga,बाणगंगा
+480,47,3,MUNICIPALITY,Buddhabhumi,बुद्धभुमी
+481,47,3,MUNICIPALITY,Shivaraj,शिवराज
+482,47,3,MUNICIPALITY,Krishnanagar,कृष्णनगर
+483,47,3,MUNICIPALITY,Maharajgunj,महाराजगंज
+484,47,4,RURAL_MUNICIPALITY,Mayadevi,मायादेवी
+485,47,4,RURAL_MUNICIPALITY,Yashodhara,यसोधरा
+486,47,4,RURAL_MUNICIPALITY,Suddhodan,सुद्धोधन
+487,47,4,RURAL_MUNICIPALITY,Bijaynagar,विजयनगर
+488,48,3,MUNICIPALITY,Bardaghat,बर्दघाट
+489,48,3,MUNICIPALITY,Ramgram,रामग्राम
+490,48,3,MUNICIPALITY,Sunwal,सुनवल
+491,48,4,RURAL_MUNICIPALITY,Susta,सुस्ता
+492,48,4,RURAL_MUNICIPALITY,Palhi Nandan,पाल्हीनन्दन
+493,48,4,RURAL_MUNICIPALITY,Pratappur,प्रतापपुर
+494,48,4,RURAL_MUNICIPALITY,Sarawal,सरावल
+495,49,2,SUB_METROPOLITAN_CITY,Butwal,बुटवल
+496,49,3,MUNICIPALITY,Devdaha,देवदह
+497,49,3,MUNICIPALITY,Lumbini Sanskritik,लुम्बिनी सांस्कृतिक
+498,49,3,MUNICIPALITY,Sainamaina,सैनामैना
+499,49,3,MUNICIPALITY,Siddharthanagar,सिद्धार्थनगर
+500,49,3,MUNICIPALITY,Tilottama,तिलोत्तमा
+501,49,4,RURAL_MUNICIPALITY,Gaidahawa,गैडहवा
+502,49,4,RURAL_MUNICIPALITY,Kanchan,कन्चन
+503,49,4,RURAL_MUNICIPALITY,Kotahimai,कोटहीमाई
+504,49,4,RURAL_MUNICIPALITY,Marchawari,मर्चवारी
+505,49,4,RURAL_MUNICIPALITY,Mayadevi,मायादेवी
+506,49,4,RURAL_MUNICIPALITY,Omsatiya,ओमसतिया
+507,49,4,RURAL_MUNICIPALITY,Rohini,रोहिणी
+508,49,4,RURAL_MUNICIPALITY,Sammarimai,सम्मरीमाई
+509,49,4,RURAL_MUNICIPALITY,Siyari,सियारी
+510,49,4,RURAL_MUNICIPALITY,Suddodhan,शुद्धोधन
+511,50,3,MUNICIPALITY,Sandhikharka,सन्धिखर्क
+512,50,3,MUNICIPALITY,Sitganga,शितगंगा
+513,50,3,MUNICIPALITY,Bhumikasthan,भूमिकास्थान
+514,50,4,RURAL_MUNICIPALITY,Chhatradev,छत्रदेव
+515,50,4,RURAL_MUNICIPALITY,Panini,पाणिनी
+516,50,4,RURAL_MUNICIPALITY,Malarani,मालारानी
+517,51,3,MUNICIPALITY,Resunga,रेसुङ्गा
+518,51,3,MUNICIPALITY,Musikot,मुसिकोट
+519,51,4,RURAL_MUNICIPALITY,Rurukshetra,रुरुक्षेत्र
+520,51,4,RURAL_MUNICIPALITY,Chhatrakot,छत्रकोट
+521,51,4,RURAL_MUNICIPALITY,Gulmidarbar,गुल्मी दरबार
+522,51,4,RURAL_MUNICIPALITY,Chandrakot,चन्द्रकोट
+523,51,4,RURAL_MUNICIPALITY,Satyawati,सत्यवती
+524,51,4,RURAL_MUNICIPALITY,Dhurkot,धुर्कोट
+525,51,4,RURAL_MUNICIPALITY,Kaligandaki,कालीगण्डकी
+526,51,4,RURAL_MUNICIPALITY,Isma,ईस्मा
+527,51,4,RURAL_MUNICIPALITY,Malika,मालिका
+528,51,4,RURAL_MUNICIPALITY,Madane,मदाने
+529,52,3,MUNICIPALITY,Tansen,तानसेन
+530,52,3,MUNICIPALITY,Rampur,रामपुर
+531,52,4,RURAL_MUNICIPALITY,Rainadevi Chhahara,रैनादेवी छहरा
+532,52,4,RURAL_MUNICIPALITY,Ripdikot,रिब्दिकोट
+533,52,4,RURAL_MUNICIPALITY,Bagnaskali,बगनासकाली
+534,52,4,RURAL_MUNICIPALITY,Rambha,रम्भा
+535,52,4,RURAL_MUNICIPALITY,Purbakhola,पूर्वखोला
+536,52,4,RURAL_MUNICIPALITY,Nisdi,निस्दी
+537,52,4,RURAL_MUNICIPALITY,Mathagadhi,माथागढी
+538,52,4,RURAL_MUNICIPALITY,Tinahu,तिनाउ
+539,53,2,SUB_METROPOLITAN_CITY,Ghorahi,घोराही
+540,53,2,SUB_METROPOLITAN_CITY,Tulsipur,तुल्सीपुर
+541,53,3,MUNICIPALITY,Lamahi,लमही
+542,53,4,RURAL_MUNICIPALITY,Gadhawa,गढवा
+543,53,4,RURAL_MUNICIPALITY,Rajpur,राजपुर
+544,53,4,RURAL_MUNICIPALITY,Shantinagar,शान्तिनगर
+545,53,4,RURAL_MUNICIPALITY,Rapti,राप्ती
+546,53,4,RURAL_MUNICIPALITY,Banglachuli,बंगलाचुली
+547,53,4,RURAL_MUNICIPALITY,Dangisharan,दंगीशरण
+548,53,4,RURAL_MUNICIPALITY,Babai,बबई
+549,54,3,MUNICIPALITY,Sworgadwari,स्वर्गद्वारी
+550,54,3,MUNICIPALITY,Pyuthan,प्यूठान
+551,54,4,RURAL_MUNICIPALITY,Mandavi,माण्डवी
+552,54,4,RURAL_MUNICIPALITY,Sarumarani,सरुमारानी
+553,54,4,RURAL_MUNICIPALITY,Ayirawati,ऐरावती
+554,54,4,RURAL_MUNICIPALITY,Mallarani,मल्लरानी
+555,54,4,RURAL_MUNICIPALITY,Jhimruk,झिमरुक
+556,54,4,RURAL_MUNICIPALITY,Naubahini,नौवहिनी
+557,54,4,RURAL_MUNICIPALITY,Gaumukhi,गौमुखी
+558,55,3,MUNICIPALITY,Rolpa,रोल्पा
+559,55,4,RURAL_MUNICIPALITY,Runtigadi,रुन्टीगढी
+560,55,4,RURAL_MUNICIPALITY,Triveni,त्रिवेणी
+561,55,4,RURAL_MUNICIPALITY,Sunil Smiriti,सुनिल स्मृति
+562,55,4,RURAL_MUNICIPALITY,Lungri,लुङग्री
+563,55,4,RURAL_MUNICIPALITY,Sunchhahari,सुनछहरी
+564,55,4,RURAL_MUNICIPALITY,Thawang,थवाङ
+565,55,4,RURAL_MUNICIPALITY,Madi,माडी
+566,55,4,RURAL_MUNICIPALITY,GangaDev,गंगादेव
+567,55,4,RURAL_MUNICIPALITY,Pariwartan,परिवर्तन
+568,56,4,RURAL_MUNICIPALITY,Putha Uttarganga,पुथा उत्तरगंगा
+569,56,4,RURAL_MUNICIPALITY,Bhume,भूमे
+570,56,4,RURAL_MUNICIPALITY,Sisne,सिस्ने
+571,57,2,SUB_METROPOLITAN_CITY,Nepalgunj,नेपालगंज
+572,57,3,MUNICIPALITY,Kohalpur,कोहलपुर
+573,57,4,RURAL_MUNICIPALITY,Rapti-Sonari,राप्ती सोनारी
+574,57,4,RURAL_MUNICIPALITY,Narainapur,नरैनापुर
+575,57,4,RURAL_MUNICIPALITY,Duduwa,डुडुवा
+576,57,4,RURAL_MUNICIPALITY,Janaki,जानकी
+577,57,4,RURAL_MUNICIPALITY,Khajura,खजुरा
+578,57,4,RURAL_MUNICIPALITY,Baijanath,बैजनाथ
+579,58,3,MUNICIPALITY,Gulariya,गुलरिया
+580,58,3,MUNICIPALITY,Rajapur,राजापुर
+581,58,3,MUNICIPALITY,Madhuwan,मधुवन
+582,58,3,MUNICIPALITY,Thakurbaba,ठाकुरबाबा
+583,58,3,MUNICIPALITY,Basgadhi,बाँसगढी
+584,58,3,MUNICIPALITY,Barbardiya,बारबर्दिया
+585,58,4,RURAL_MUNICIPALITY,Badhaiyatal,बढैयाताल
+586,58,4,RURAL_MUNICIPALITY,Geruwa,गेरुवा
+587,59,3,MUNICIPALITY,Aathabiskot,आठबिसकोट
+588,59,3,MUNICIPALITY,Musikot,मुसिकोट
+589,59,3,MUNICIPALITY,Chaurjahari,चौरजहारी
+590,59,4,RURAL_MUNICIPALITY,SaniBheri,सानी भेरी
+591,59,4,RURAL_MUNICIPALITY,Triveni,त्रिवेणी
+592,59,4,RURAL_MUNICIPALITY,Banphikot,बाँफिकोट
+593,60,4,RURAL_MUNICIPALITY,Kumakh,कुमाख
+594,60,4,RURAL_MUNICIPALITY,Kalimati,कालिमाटी
+595,60,4,RURAL_MUNICIPALITY,Chhatreshwari,छत्रेश्वरी
+596,60,4,RURAL_MUNICIPALITY,Darma,दार्मा
+597,60,4,RURAL_MUNICIPALITY,Kapurkot,कपुरकोट
+598,60,4,RURAL_MUNICIPALITY,Triveni,त्रिवेणी
+599,60,4,RURAL_MUNICIPALITY,Siddha Kumakh,सिद्ध कुमाख
+600,60,3,MUNICIPALITY,Bagchaur,बागचौर
+601,60,3,MUNICIPALITY,Shaarda,शारदा
+602,60,3,MUNICIPALITY,Bangad Kupinde,बनगाड कुपिण्डे
+603,61,4,RURAL_MUNICIPALITY,Mudkechula,मुड्केचुला
+604,61,4,RURAL_MUNICIPALITY,Kaike,काईके
+605,61,4,RURAL_MUNICIPALITY,She Phoksundo,शे फोक्सुन्डो
+606,61,4,RURAL_MUNICIPALITY,Jagadulla,जगदुल्ला
+607,61,4,RURAL_MUNICIPALITY,Dolpo Buddha,डोल्पो बुद्ध
+608,61,4,RURAL_MUNICIPALITY,Chharka Tongsong,छार्का ताङसोङ
+609,61,3,MUNICIPALITY,Thuli Bheri,ठूली भेरी
+610,61,3,MUNICIPALITY,Tripurasundari,त्रिपुरासुन्दरी
+611,62,4,RURAL_MUNICIPALITY,Simkot,सिमकोट
+612,62,4,RURAL_MUNICIPALITY,Sarkegad,सर्केगाड
+613,62,4,RURAL_MUNICIPALITY,Adanchuli,अदानचुली
+614,62,4,RURAL_MUNICIPALITY,Kharpunath,खार्पुनाथ
+615,62,4,RURAL_MUNICIPALITY,Tanjakot,ताँजाकोट
+616,62,4,RURAL_MUNICIPALITY,Chankheli,चंखेली
+617,62,4,RURAL_MUNICIPALITY,Namkha,नाम्खा
+618,63,4,RURAL_MUNICIPALITY,Tatopani,तातोपानी
+619,63,4,RURAL_MUNICIPALITY,Patarasi,पातारासी
+620,63,4,RURAL_MUNICIPALITY,Tila,तिला
+621,63,4,RURAL_MUNICIPALITY,Kanaka Sundari,कनकासुन्दरी
+622,63,4,RURAL_MUNICIPALITY,Sinja,सिंजा
+623,63,4,RURAL_MUNICIPALITY,Hima,हिमा
+624,63,4,RURAL_MUNICIPALITY,Guthichaur,गुठिचौर
+625,63,3,MUNICIPALITY,Chandannath,चन्दननाथ
+626,64,3,MUNICIPALITY,Khandachakra,खाँडाचक्र
+627,64,3,MUNICIPALITY,Raskot,रास्कोट
+628,64,3,MUNICIPALITY,Tilagufa,तिलागुफा
+629,64,4,RURAL_MUNICIPALITY,Narharinath,नरहरिनाथ
+630,64,4,RURAL_MUNICIPALITY,Palata,पलाता
+631,64,4,RURAL_MUNICIPALITY,Shubha Kalika,शुभ कालीका
+632,64,4,RURAL_MUNICIPALITY,Sanni Triveni,सान्नी त्रिवेणी
+633,64,4,RURAL_MUNICIPALITY,Pachaljharana,पचालझरना
+634,64,4,RURAL_MUNICIPALITY,Mahawai,महावै
+635,65,4,RURAL_MUNICIPALITY,Khatyad,खत्याड
+636,65,4,RURAL_MUNICIPALITY,Soru,सोरु
+637,65,4,RURAL_MUNICIPALITY,Mugum Karmarong,मुगुम कार्मारोंग
+638,65,3,MUNICIPALITY,Chhayanath Rara,छायाँनाथ रारा
+639,66,4,RURAL_MUNICIPALITY,Simta,सिम्ता
+640,66,4,RURAL_MUNICIPALITY,Barahatal,बराहताल
+641,66,4,RURAL_MUNICIPALITY,Chaukune,चौकुने
+642,66,4,RURAL_MUNICIPALITY,Chingad,चिङ्गाड
+643,66,3,MUNICIPALITY,Gurbhakot,गुर्भाकोट
+644,66,3,MUNICIPALITY,Birendranagar,बीरेन्द्रनगर
+645,66,3,MUNICIPALITY,Bheriganga,भेरीगंगा
+646,66,3,MUNICIPALITY,Panchapuri,पञ्चपुरी
+647,66,3,MUNICIPALITY,Lekbeshi,लेकवेशी
+648,67,3,MUNICIPALITY,Dullu,दुल्लु
+649,67,4,RURAL_MUNICIPALITY,Gurans,गुराँस
+650,67,4,RURAL_MUNICIPALITY,Bhairabi,भैरवी
+651,67,4,RURAL_MUNICIPALITY,Naumule,नौमुले
+652,67,4,RURAL_MUNICIPALITY,Mahabu,महावु
+653,67,4,RURAL_MUNICIPALITY,Thantikandh,ठाँटीकाँध
+654,67,4,RURAL_MUNICIPALITY,Bhagawatimai,भगवतीमाई
+655,67,4,RURAL_MUNICIPALITY,Dungeshwar,डुंगेश्वर
+656,67,3,MUNICIPALITY,Aathabis,आठबीस
+657,67,3,MUNICIPALITY,Narayan,नारायण
+658,67,3,MUNICIPALITY,Chamunda Bindrasaini,चामुण्डा विन्द्रासैनी
+659,68,3,MUNICIPALITY,Chhedagad,छेडागाड
+660,68,3,MUNICIPALITY,Bheri,भेरी
+661,68,3,MUNICIPALITY,Nalgad,नलगाड
+662,68,4,RURAL_MUNICIPALITY,Junichande,जुनीचाँदे
+663,68,4,RURAL_MUNICIPALITY,Kuse,कुसे
+664,68,4,RURAL_MUNICIPALITY,Barekot,बारेकोट
+665,68,4,RURAL_MUNICIPALITY,Shivalaya,शिवालय
+666,69,3,MUNICIPALITY,Mahakali,महाकाली
+667,69,3,MUNICIPALITY,Shailyashikhar,शैल्यशिखर
+668,69,4,RURAL_MUNICIPALITY,Naugad,नौगाड
+669,69,4,RURAL_MUNICIPALITY,Malikarjun,मालिकार्जुन
+670,69,4,RURAL_MUNICIPALITY,Marma,मार्मा
+671,69,4,RURAL_MUNICIPALITY,Lekam,लेकम
+672,69,4,RURAL_MUNICIPALITY,Duhun,दुहुँ
+673,69,4,RURAL_MUNICIPALITY,Vyans,ब्याँस
+674,69,4,RURAL_MUNICIPALITY,Apihimal,अपिहिमाल
+675,70,3,MUNICIPALITY,Jayaprithvi,जयपृथ्वी
+676,70,3,MUNICIPALITY,Bungal,बुंगल
+677,70,4,RURAL_MUNICIPALITY,Kedarsyu,केदारस्युँ
+678,70,4,RURAL_MUNICIPALITY,Thalara,थलारा
+679,70,4,RURAL_MUNICIPALITY,Bitthadchir,वित्थडचिर
+680,70,4,RURAL_MUNICIPALITY,Chhabis Pathibhera,छबिसपाथिभेरा
+681,70,4,RURAL_MUNICIPALITY,Khaptadchhanna,खप्तडछान्ना
+682,70,4,RURAL_MUNICIPALITY,Masta,मष्टा
+683,70,4,RURAL_MUNICIPALITY,Durgathali,दुर्गाथली
+684,70,4,RURAL_MUNICIPALITY,Talkot,तलकोट
+685,70,4,RURAL_MUNICIPALITY,Surma,सूर्मा
+686,70,4,RURAL_MUNICIPALITY,Saipal,साइपाल
+687,71,3,MUNICIPALITY,Badimalika,बडीमालिका
+688,71,3,MUNICIPALITY,Triveni,त्रिवेणी
+689,71,3,MUNICIPALITY,Budhiganga,बुढीगंगा
+690,71,3,MUNICIPALITY,Budhinanda,बुढीनन्दा
+691,71,4,RURAL_MUNICIPALITY,Khaptad Chhededaha,खप्तड छेडेदह
+692,71,4,RURAL_MUNICIPALITY,Swami Kartik Khapar,स्वामीकार्तिक खापर
+693,71,4,RURAL_MUNICIPALITY,Jagannath,जगन्‍नाथ
+694,71,4,RURAL_MUNICIPALITY,Himali,हिमाली
+695,71,4,RURAL_MUNICIPALITY,Gaumul,गौमुल
+696,72,3,MUNICIPALITY,Dashrathchanda,दशरथचन्द
+697,72,3,MUNICIPALITY,Patan,पाटन
+698,72,3,MUNICIPALITY,Melauli,मेलौली
+699,72,3,MUNICIPALITY,Purchaudi,पुर्चौडी
+700,72,4,RURAL_MUNICIPALITY,Dogdakedar,दोगडाकेदार
+701,72,4,RURAL_MUNICIPALITY,Dilashaini,डीलासैनी
+702,72,4,RURAL_MUNICIPALITY,Sigas,सिगास
+703,72,4,RURAL_MUNICIPALITY,Pancheshwar,पञ्चेश्वर
+704,72,4,RURAL_MUNICIPALITY,Surnaya,सुर्नया
+705,72,4,RURAL_MUNICIPALITY,Shivanath,शिवनाथ
+706,73,3,MUNICIPALITY,Dipayal Silgadhi,दिपायल सिलगढी
+707,73,3,MUNICIPALITY,Shikhar,शिखर
+708,73,4,RURAL_MUNICIPALITY,Aadarsha,आदर्श
+709,73,4,RURAL_MUNICIPALITY,Purbichauki,पूर्वीचौकी
+710,73,4,RURAL_MUNICIPALITY,K.I.Singh,के.आई.सिं.
+711,73,4,RURAL_MUNICIPALITY,Jorayal,जोरायल
+712,73,4,RURAL_MUNICIPALITY,Sayal,सायल
+713,73,4,RURAL_MUNICIPALITY,Bogatan-Phudsil,बोगटान फुड्सिल
+714,73,4,RURAL_MUNICIPALITY,Badikedar,बडीकेदार
+715,74,4,RURAL_MUNICIPALITY,Ramaroshan,रामारोशन
+716,74,4,RURAL_MUNICIPALITY,Chaurpati,चौरपाटी
+717,74,4,RURAL_MUNICIPALITY,Turmakhand,तुर्माखाँद
+718,74,4,RURAL_MUNICIPALITY,Mellekh,मेल्लेख
+719,74,4,RURAL_MUNICIPALITY,Dhakari,ढकारी
+720,74,4,RURAL_MUNICIPALITY,Bannigadi Jayagad,बान्निगढी जयगढ
+721,74,3,MUNICIPALITY,Mangalsen,मंगलसेन
+722,74,3,MUNICIPALITY,Kamalbazar,कमलबजार
+723,74,3,MUNICIPALITY,Sanfebagar,साँफेबगर
+724,74,3,MUNICIPALITY,Panchadewal Binayak,पन्चदेवल विनायक
+725,75,4,RURAL_MUNICIPALITY,Navadurga,नवदुर्गा
+726,75,4,RURAL_MUNICIPALITY,Aalitaal,आलिताल
+727,75,4,RURAL_MUNICIPALITY,Ganyapadhura,गन्यापधुरा
+728,75,4,RURAL_MUNICIPALITY,Bhageshwar,भागेश्वर
+729,75,4,RURAL_MUNICIPALITY,Ajaymeru,अजयमेरु
+730,75,3,MUNICIPALITY,Amargadhi,अमरगढी
+731,75,3,MUNICIPALITY,Parshuram,परशुराम
+732,76,3,MUNICIPALITY,Bhimdatta,भीमदत्त
+733,76,3,MUNICIPALITY,Punarbas,पुर्नवास
+734,76,3,MUNICIPALITY,Bedkot,वेदकोट
+735,76,3,MUNICIPALITY,Mahakali,माहाकाली
+736,76,3,MUNICIPALITY,Shuklaphanta,शुक्लाफाँटा
+737,76,3,MUNICIPALITY,Belauri,बेलौरी
+738,76,3,MUNICIPALITY,Krishnapur,कृष्णपुर
+739,76,4,RURAL_MUNICIPALITY,Laljhadi,लालझाडी
+740,76,4,RURAL_MUNICIPALITY,Beldandi,बेलडाडी
+741,77,4,RURAL_MUNICIPALITY,Janaki,जानकी
+742,77,4,RURAL_MUNICIPALITY,Kailari,कैलारी
+743,77,4,RURAL_MUNICIPALITY,Joshipur,जोशीपुर
+744,77,4,RURAL_MUNICIPALITY,Bardagoriya,बर्दगोरिया
+745,77,4,RURAL_MUNICIPALITY,Mohanyal,मोहन्याल
+746,77,4,RURAL_MUNICIPALITY,Chure,चुरे
+747,77,3,MUNICIPALITY,Tikapur,टिकापुर
+748,77,3,MUNICIPALITY,Ghodaghodi,घोडाघोडी
+749,77,3,MUNICIPALITY,Lamkichuha,लम्कीचुहा
+750,77,3,MUNICIPALITY,Bhajni,भजनी
+751,77,3,MUNICIPALITY,Godawari,गोदावरी
+752,77,3,MUNICIPALITY,Gauriganga,गौरीगंगा
+753,77,2,SUB_METROPOLITAN_CITY,Dhangadhi,धनगढी
