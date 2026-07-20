@@ -587,8 +587,8 @@ export class ReportCardsService {
             examTerm: true,
           },
         },
-        requestedBy: true,
-        reviewedBy: true,
+        requestedBy: { select: { id: true, email: true } },
+        reviewedBy: { select: { id: true, email: true } },
       },
       orderBy: { createdAt: 'desc' },
     });

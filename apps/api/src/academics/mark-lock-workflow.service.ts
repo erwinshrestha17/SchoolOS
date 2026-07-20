@@ -60,8 +60,8 @@ export class MarkLockWorkflowService {
               academicYear: true,
             },
           },
-          requestedBy: true,
-          reviewedBy: true,
+          requestedBy: { select: { id: true, email: true } },
+          reviewedBy: { select: { id: true, email: true } },
         },
         orderBy: [{ createdAt: 'desc' }],
         skip,
@@ -176,8 +176,8 @@ export class MarkLockWorkflowService {
           examTerm: {
             include: { academicYear: true },
           },
-          requestedBy: true,
-          reviewedBy: true,
+          requestedBy: { select: { id: true, email: true } },
+          reviewedBy: { select: { id: true, email: true } },
         },
       });
 
@@ -277,8 +277,8 @@ export class MarkLockWorkflowService {
           examTerm: {
             include: { academicYear: true },
           },
-          requestedBy: true,
-          reviewedBy: true,
+          requestedBy: { select: { id: true, email: true } },
+          reviewedBy: { select: { id: true, email: true } },
         },
       });
     });

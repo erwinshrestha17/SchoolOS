@@ -2107,6 +2107,17 @@ export class HomeworkService {
     if (!batch) {
       throw new NotFoundException('Reminder batch not found');
     }
+
+    // Minor inconsistency found during Homework audit: the FAILED path below
+    // already re-validates scope via sendHomeworkReminder, but these two
+    // early-return branches skipped that check entirely, letting any teacher
+    // read another class's reminder batch counts by guessing a batchId.
+    const homeworkForScope = await this.findAssignmentOrThrow(
+      actor,
+      batch.homeworkId,
+    );
+    await this.ensureSubjectTeacherScopeForRead(actor, homeworkForScope);
+
     if (batch.status === 'COMPLETED' || batch.status === 'PROCESSING') {
       return {
         ...batch,

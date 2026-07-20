@@ -1088,7 +1088,7 @@ export class CanteenService {
         student: true,
         staff: true,
         wallet: true,
-        createdBy: true,
+        createdBy: { select: { email: true } },
       },
     });
 
@@ -1517,7 +1517,10 @@ export class CanteenService {
           : {}),
         movementDate: { gte: from, lte: to },
       },
-      include: { inventoryItem: true, createdBy: true },
+      include: {
+        inventoryItem: true,
+        createdBy: { select: { id: true, email: true } },
+      },
       orderBy: [{ movementDate: 'desc' }, { createdAt: 'desc' }],
     });
   }

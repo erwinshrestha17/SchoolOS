@@ -1340,8 +1340,8 @@ export class ReportsService {
               : {}),
           },
           include: {
-            collectorUser: true,
-            closedBy: true,
+            collectorUser: { select: { email: true } },
+            closedBy: { select: { email: true } },
           },
           orderBy: { openedAt: 'desc' },
         });

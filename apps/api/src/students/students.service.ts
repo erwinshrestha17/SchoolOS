@@ -170,7 +170,7 @@ export class StudentsService {
       },
       include: {
         class: true,
-        user: true,
+        user: { select: { email: true } },
       },
     });
 
@@ -244,7 +244,7 @@ export class StudentsService {
         include: {
           class: true,
           sectionRef: true,
-          user: true,
+          user: { select: { email: true } },
           guardianLinks: {
             include: { guardian: true },
             orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],

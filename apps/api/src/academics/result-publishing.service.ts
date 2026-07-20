@@ -88,7 +88,7 @@ export class ResultPublishingService {
         section: true,
         academicYear: true,
         examTerm: true,
-        publishedBy: true,
+        publishedBy: { select: { email: true, phone: true } },
       },
       orderBy: [
         { class: { level: 'asc' } },

@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
@@ -15,6 +15,14 @@ describe('CasRecordsService', () => {
     tenantSlug: 'tenant-one',
     roles: ['admin'],
     permissions: [],
+  } as unknown as AuthContext;
+
+  const teacherActor = {
+    userId: 'teacher-user-1',
+    tenantId: 'tenant-1',
+    tenantSlug: 'tenant-one',
+    roles: ['teacher'],
+    permissions: ['cas-records:read', 'academics:read'],
   } as unknown as AuthContext;
 
   beforeEach(async () => {
@@ -34,9 +42,11 @@ describe('CasRecordsService', () => {
             },
             academicYear: { findFirst: jest.fn() },
             class: { findFirst: jest.fn() },
-            section: { findFirst: jest.fn() },
+            section: { findFirst: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
             subject: { findFirst: jest.fn() },
             student: { findMany: jest.fn(), findFirst: jest.fn() },
+            staff: { findFirst: jest.fn() },
+            subjectTeacherAssignment: { findMany: jest.fn().mockResolvedValue([]) },
             $transaction: jest.fn((promises: unknown[]) =>
               Promise.all(promises),
             ),
@@ -136,6 +146,75 @@ describe('CasRecordsService', () => {
           where: expect.objectContaining({ tenantId: mockActor.tenantId }),
         }),
       );
+    });
+  });
+
+  describe('teacher scoping (confirmed gap: previously tenant-wide for any cas-records:read holder)', () => {
+    it('scopes list() to the teacher own assigned class/section', async () => {
+      (prisma.staff.findFirst as jest.Mock).mockResolvedValue({ id: 'staff-1' });
+      (prisma.subjectTeacherAssignment.findMany as jest.Mock).mockResolvedValue([
+        { classId: 'class-1', sectionId: 'section-1' },
+      ]);
+      (prisma.casRecord.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.casRecord.count as jest.Mock).mockResolvedValue(0);
+
+      await service.list(teacherActor, {});
+
+      expect(prisma.casRecord.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            tenantId: teacherActor.tenantId,
+            OR: [
+              { classId: 'class-1', sectionId: 'section-1' },
+              { classId: 'class-1', sectionId: null },
+            ],
+          }),
+        }),
+      );
+    });
+
+    it('returns an empty page for a teacher with no active assignment', async () => {
+      (prisma.staff.findFirst as jest.Mock).mockResolvedValue({ id: 'staff-1' });
+      (prisma.subjectTeacherAssignment.findMany as jest.Mock).mockResolvedValue([]);
+
+      const result = await service.list(teacherActor, {});
+
+      expect(result).toEqual(
+        expect.objectContaining({ items: [], total: 0 }),
+      );
+      expect(prisma.casRecord.findMany).not.toHaveBeenCalled();
+    });
+
+    it('blocks a teacher from viewing a CAS record outside their scope', async () => {
+      (prisma.casRecord.findFirst as jest.Mock).mockResolvedValue({
+        id: 'cas-1',
+        classId: 'class-9',
+        sectionId: 'section-9',
+      });
+      (prisma.staff.findFirst as jest.Mock).mockResolvedValue({ id: 'staff-1' });
+      (prisma.subjectTeacherAssignment.findMany as jest.Mock).mockResolvedValue([
+        { classId: 'class-1', sectionId: 'section-1' },
+      ]);
+
+      await expect(service.findOne('cas-1', teacherActor)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('allows a teacher to view a CAS record within their scope', async () => {
+      (prisma.casRecord.findFirst as jest.Mock).mockResolvedValue({
+        id: 'cas-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+      });
+      (prisma.staff.findFirst as jest.Mock).mockResolvedValue({ id: 'staff-1' });
+      (prisma.subjectTeacherAssignment.findMany as jest.Mock).mockResolvedValue([
+        { classId: 'class-1', sectionId: 'section-1' },
+      ]);
+
+      await expect(
+        service.findOne('cas-1', teacherActor),
+      ).resolves.toBeDefined();
     });
   });
 

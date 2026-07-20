@@ -34,6 +34,7 @@ describe('ActivityFeedService', () => {
       },
       section: {
         findFirst: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
       },
       student: {
         count: jest.fn(),
@@ -1333,4 +1334,84 @@ describe('ActivityFeedService', () => {
       expect(fileRegistry.getSignedUrl).not.toHaveBeenCalled();
     },
   );
+
+  describe('teacher scoping for mood logs, milestones, and posts (confirmed gap: previously tenant-wide)', () => {
+    beforeEach(() => {
+      prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
+      prisma.subjectTeacherAssignment.findMany.mockResolvedValue([
+        { classId: 'class-1', sectionId: 'section-1' },
+      ]);
+      prisma.section.findMany.mockResolvedValue([]);
+    });
+
+    it('scopes listMoodLogs to the teacher own assigned class/section', async () => {
+      prisma.moodLog.findMany.mockResolvedValue([]);
+
+      await service.listMoodLogs(actor);
+
+      expect(prisma.moodLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            tenantId: actor.tenantId,
+            OR: [
+              { classId: 'class-1', sectionId: 'section-1' },
+              { classId: 'class-1', sectionId: null },
+            ],
+          }),
+        }),
+      );
+    });
+
+    it('returns no mood logs for a teacher with no active assignment', async () => {
+      prisma.subjectTeacherAssignment.findMany.mockResolvedValue([]);
+
+      const result = await service.listMoodLogs(actor);
+
+      expect(result).toEqual([]);
+      expect(prisma.moodLog.findMany).not.toHaveBeenCalled();
+    });
+
+    it('scopes listMilestones to the teacher own assigned class/section', async () => {
+      prisma.developmentalMilestone.findMany.mockResolvedValue([]);
+
+      await service.listMilestones(actor, {});
+
+      expect(prisma.developmentalMilestone.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            tenantId: actor.tenantId,
+            OR: [
+              { classId: 'class-1', sectionId: 'section-1' },
+              { classId: 'class-1', sectionId: null },
+            ],
+          }),
+        }),
+      );
+    });
+
+    it('blocks a teacher requesting milestones for a student outside their scope', async () => {
+      prisma.student.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.listMilestones(actor, { studentId: 'student-outside' }),
+      ).rejects.toThrow('Student is outside your teaching scope');
+    });
+
+    it('scopes listPosts to the teacher own assigned class/section', async () => {
+      prisma.activityPost.findMany.mockResolvedValue([]);
+
+      await service.listPosts(actor, {});
+
+      expect(prisma.activityPost.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: [
+              { classId: 'class-1', sectionId: 'section-1' },
+              { classId: 'class-1', sectionId: null },
+            ],
+          }),
+        }),
+      );
+    });
+  });
 });

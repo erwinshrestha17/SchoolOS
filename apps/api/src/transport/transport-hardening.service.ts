@@ -117,7 +117,7 @@ export class TransportHardeningService {
             route: true,
             vehicle: true,
             driverAssignment: {
-              include: { staff: { include: { user: true } } },
+              include: { staff: true },
             },
           },
         },
@@ -204,7 +204,11 @@ export class TransportHardeningService {
       include: {
         route: true,
         vehicle: true,
-        driverAssignment: { include: { staff: { include: { user: true } } } },
+        driverAssignment: {
+          include: {
+            staff: { include: { user: { select: { phone: true } } } },
+          },
+        },
         studentStatuses: true,
       },
       orderBy: [{ startedAt: 'desc' }],

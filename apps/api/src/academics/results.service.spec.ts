@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { GradeCalculatorService } from './grade-calculator.service';
@@ -14,6 +14,13 @@ describe('ResultsService', () => {
     userId: 'user-1',
     roles: ['admin'],
     permissions: ['results:read'],
+  } as unknown as AuthContext;
+
+  const teacherActor = {
+    tenantId: 'tenant-1',
+    userId: 'teacher-user-1',
+    roles: ['teacher'],
+    permissions: ['results:read', 'academics:read'],
   } as unknown as AuthContext;
 
   beforeEach(async () => {
@@ -37,6 +44,7 @@ describe('ResultsService', () => {
             },
             section: {
               findFirst: jest.fn(),
+              findMany: jest.fn().mockResolvedValue([]),
             },
             assessmentComponent: {
               findMany: jest.fn(),
@@ -46,6 +54,12 @@ describe('ResultsService', () => {
             },
             casRecord: {
               findMany: jest.fn(),
+            },
+            staff: {
+              findFirst: jest.fn(),
+            },
+            subjectTeacherAssignment: {
+              findMany: jest.fn().mockResolvedValue([]),
             },
           },
         },
@@ -206,6 +220,76 @@ describe('ResultsService', () => {
 
       expect(result.items).toHaveLength(1);
       expect(result.meta.total).toBe(10);
+    });
+  });
+
+  describe('teacher scoping (confirmed gap: previously any results:read holder could preview any student/class)', () => {
+    it('blocks a teacher from previewing a student outside their teaching scope', async () => {
+      (prisma.student.findFirst as jest.Mock).mockResolvedValue({
+        id: 's1',
+        tenantId: 'tenant-1',
+        classId: 'class-9',
+        sectionId: 'section-9',
+        class: { name: '10' },
+      });
+      (prisma.staff.findFirst as jest.Mock).mockResolvedValue({ id: 'staff-1' });
+      (prisma.subjectTeacherAssignment.findMany as jest.Mock).mockResolvedValue([
+        { classId: 'class-1', sectionId: 'section-1' },
+      ]);
+
+      await expect(
+        service.previewStudentResult('s1', teacherActor, {
+          examTermId: 'term-1',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('allows a teacher to preview a student within their teaching scope', async () => {
+      (prisma.student.findFirst as jest.Mock).mockResolvedValue({
+        id: 's1',
+        tenantId: 'tenant-1',
+        studentSystemId: 'SID001',
+        firstNameEn: 'John',
+        lastNameEn: 'Doe',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        class: { id: 'class-1', name: 'Class 10' },
+        sectionRef: { id: 'section-1', name: 'A' },
+        rollNumber: 1,
+      });
+      (prisma.examTerm.findFirst as jest.Mock).mockResolvedValue({
+        id: 'term-1',
+        name: 'First Term',
+        tenantId: 'tenant-1',
+      });
+      (prisma.assessmentComponent.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.markEntry.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.staff.findFirst as jest.Mock).mockResolvedValue({ id: 'staff-1' });
+      (prisma.subjectTeacherAssignment.findMany as jest.Mock).mockResolvedValue([
+        { classId: 'class-1', sectionId: 'section-1' },
+      ]);
+
+      await expect(
+        service.previewStudentResult('s1', teacherActor, {
+          examTermId: 'term-1',
+        }),
+      ).resolves.toBeDefined();
+    });
+
+    it('blocks a teacher from previewing a whole class they do not teach', async () => {
+      (prisma.staff.findFirst as jest.Mock).mockResolvedValue({ id: 'staff-1' });
+      (prisma.subjectTeacherAssignment.findMany as jest.Mock).mockResolvedValue([
+        { classId: 'class-1', sectionId: 'section-1' },
+      ]);
+
+      await expect(
+        service.previewClassResults(teacherActor, {
+          examTermId: 'term-1',
+          classId: 'class-9',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(prisma.examTerm.findFirst).not.toHaveBeenCalled();
     });
   });
 });

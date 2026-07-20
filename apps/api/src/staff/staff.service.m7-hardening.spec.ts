@@ -70,6 +70,28 @@ describe('StaffService M7 HR hardening', () => {
     ]);
   });
 
+  it('never leaks the raw User relation (passwordHash) via mapStaffDetail, even to a self-service viewer', async () => {
+    const { service } = buildService({
+      staff: buildStaff({
+        user: {
+          email: 'asha@school.test',
+          passwordHash: 'bcrypt$fake-hash-should-never-be-returned',
+          lockedUntil: null,
+          failedLoginCount: 0,
+          userRoles: [{ role: { name: 'teacher' } }],
+        },
+      }),
+    });
+
+    const detail = await service.getStaffDetail('staff-1', actor);
+
+    expect(detail.user).toBeUndefined();
+    expect(JSON.stringify(detail)).not.toContain('passwordHash');
+    expect(JSON.stringify(detail)).not.toContain('fake-hash-should-never-be-returned');
+    expect(detail.email).toBe('asha@school.test');
+    expect(detail.roles).toEqual(['teacher']);
+  });
+
   it('rejects paid leave requests that exceed the available balance', async () => {
     const { service, prisma } = buildService({
       staff: buildStaff(),

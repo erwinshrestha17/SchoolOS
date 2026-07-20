@@ -229,7 +229,7 @@ describe('CanteenService Phase 3C hardening', () => {
         student: true,
         staff: true,
         wallet: true,
-        createdBy: true,
+        createdBy: { select: { email: true } },
       },
     });
     expect(receipt).toEqual(

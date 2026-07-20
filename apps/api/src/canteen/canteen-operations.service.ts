@@ -156,7 +156,7 @@ export class CanteenOperationsService {
       include: {
         supplier: true,
         items: { include: { inventoryItem: true } },
-        createdBy: true,
+        createdBy: { select: { id: true, email: true } },
       },
     });
 

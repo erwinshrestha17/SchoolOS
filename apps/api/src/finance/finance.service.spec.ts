@@ -896,7 +896,7 @@ describe('finance production controls', () => {
       include: {
         payment: {
           include: {
-            collectedBy: true,
+            collectedBy: { select: { id: true, email: true } },
             invoice: {
               include: {
                 lines: {
@@ -1635,8 +1635,8 @@ describe('finance production controls', () => {
         ]),
       }),
       include: {
-        collectorUser: true,
-        closedBy: true,
+        collectorUser: { select: { id: true, email: true } },
+        closedBy: { select: { id: true, email: true } },
       },
     });
     expect(finalized.closeNumber).toBe('CLS-2026-00001');

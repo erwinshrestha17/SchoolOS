@@ -1,6 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { StaffStatus } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { isTeacherOnly } from '../common/security/parent-scope';
 import {
   GradeCalculatorService,
   SubjectGradeInput,
@@ -59,6 +61,11 @@ export class ResultsService {
     if (!student) {
       throw new NotFoundException('Student not found in this tenant');
     }
+
+    // Confirmed gap: this endpoint (results:read, held by a base teacher)
+    // computed and returned a student's full result across every subject
+    // with no check the caller actually teaches them.
+    await this.ensureTeacherResultScope(actor, student.classId, student.sectionId);
 
     // 2. Validate exam term belongs to tenant
     const examTerm = await this.prisma.examTerm.findFirst({
@@ -264,6 +271,15 @@ export class ResultsService {
     const limit = Math.min(options.limit ?? 50, 100);
     const skip = (page - 1) * limit;
 
+    // Same confirmed gap as previewStudentResult: classId is caller-supplied
+    // and mandatory, but was never checked against the actor's own teaching
+    // assignments, so any teacher could preview any class's full results.
+    await this.ensureTeacherResultScope(
+      actor,
+      options.classId,
+      options.sectionId ?? null,
+    );
+
     // 1. Validate exam term
     const examTerm = await this.prisma.examTerm.findFirst({
       where: { id: options.examTermId, tenantId: actor.tenantId },
@@ -336,5 +352,63 @@ export class ResultsService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  private async ensureTeacherResultScope(
+    actor: AuthContext,
+    classId: string,
+    sectionId: string | null,
+  ) {
+    if (!isTeacherOnly(actor)) return;
+
+    const classSections = await this.getTeacherAssignedClassSections(actor);
+    const inScope = classSections.some(
+      (cs) =>
+        cs.classId === classId &&
+        (cs.sectionId === null || cs.sectionId === sectionId),
+    );
+    if (!inScope) {
+      throw new ForbiddenException('This result is outside your teaching scope');
+    }
+  }
+
+  private async getTeacherAssignedClassSections(
+    actor: AuthContext,
+  ): Promise<Array<{ classId: string; sectionId: string | null }>> {
+    const staff = await this.prisma.staff.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        status: StaffStatus.ACTIVE,
+      },
+      select: { id: true },
+    });
+    if (!staff) return [];
+
+    const [assignments, classTeacherSections] = await Promise.all([
+      this.prisma.subjectTeacherAssignment.findMany({
+        where: { tenantId: actor.tenantId, staffId: staff.id },
+        select: { classId: true, sectionId: true },
+      }),
+      this.prisma.section.findMany({
+        where: { tenantId: actor.tenantId, classTeacherId: staff.id },
+        select: { id: true, classId: true },
+      }),
+    ]);
+
+    const combos = new Map<
+      string,
+      { classId: string; sectionId: string | null }
+    >();
+    for (const a of assignments) {
+      combos.set(`${a.classId}:${a.sectionId ?? 'none'}`, {
+        classId: a.classId,
+        sectionId: a.sectionId,
+      });
+    }
+    for (const s of classTeacherSections) {
+      combos.set(`${s.classId}:${s.id}`, { classId: s.classId, sectionId: s.id });
+    }
+    return Array.from(combos.values());
   }
 }

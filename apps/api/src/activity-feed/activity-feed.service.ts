@@ -37,6 +37,7 @@ import { FileRegistryService } from '../file-registry/file-registry.service';
 import {
   isParentOnly,
   isStudentOnly,
+  isTeacherOnly,
   getParentStudentIds,
   getStudentOwnId,
 } from '../common/security/parent-scope';
@@ -1491,10 +1492,28 @@ export class ActivityFeedService {
   async listMoodLogs(actor: AuthContext) {
     const studentScope = await this.buildActorStudentIdScope(actor);
 
+    // Confirmed gap: resolveVisibleStudentIds only scopes parent/student
+    // actors, so a base teacher previously got every mood log in the tenant.
+    let teacherFilter: Prisma.MoodLogWhereInput | undefined;
+    if (isTeacherOnly(actor)) {
+      const classSections = await this.getTeacherAssignedClassSections(actor);
+      if (classSections.length === 0) {
+        return [];
+      }
+      teacherFilter = {
+        OR: classSections.flatMap(({ classId, sectionId }) =>
+          sectionId
+            ? [{ classId, sectionId }, { classId, sectionId: null }]
+            : [{ classId, sectionId: null }],
+        ),
+      };
+    }
+
     return this.prisma.moodLog.findMany({
       where: {
         tenantId: actor.tenantId,
         ...(studentScope ? { studentId: studentScope } : {}),
+        ...(teacherFilter ?? {}),
       },
       include: {
         class: true,
@@ -1587,6 +1606,43 @@ export class ActivityFeedService {
       filters.studentId,
     );
 
+    // Confirmed gap: same shape as listMoodLogs above -- a base teacher had
+    // no restriction here and, with no studentId filter, saw developmental
+    // milestones for the entire tenant.
+    let teacherFilter: Prisma.DevelopmentalMilestoneWhereInput | undefined;
+    if (isTeacherOnly(actor)) {
+      const classSections = await this.getTeacherAssignedClassSections(actor);
+      if (classSections.length === 0) {
+        return [];
+      }
+      teacherFilter = {
+        OR: classSections.flatMap(({ classId, sectionId }) =>
+          sectionId
+            ? [{ classId, sectionId }, { classId, sectionId: null }]
+            : [{ classId, sectionId: null }],
+        ),
+      };
+      if (filters.studentId) {
+        const student = await this.prisma.student.findFirst({
+          where: {
+            id: filters.studentId,
+            tenantId: actor.tenantId,
+            OR: classSections.flatMap(({ classId, sectionId }) =>
+              sectionId
+                ? [{ classId, sectionId }, { classId, sectionId: null }]
+                : [{ classId, sectionId: null }],
+            ),
+          },
+          select: { id: true },
+        });
+        if (!student) {
+          throw new ForbiddenException(
+            'Student is outside your teaching scope',
+          );
+        }
+      }
+    }
+
     return this.prisma.developmentalMilestone.findMany({
       where: {
         tenantId: actor.tenantId,
@@ -1595,6 +1651,7 @@ export class ActivityFeedService {
           : filters.studentId
             ? { studentId: filters.studentId }
             : {}),
+        ...(teacherFilter ?? {}),
         ...(monthRange
           ? {
               observedAt: {
@@ -1891,10 +1948,95 @@ export class ActivityFeedService {
     }
   }
 
+  /**
+   * Confirmed gap: listPosts/listMoodLogs/listMilestones were scoped for
+   * parent/student (via resolveVisibleStudentIds) but had NO restriction for
+   * a base teacher/subject_teacher actor -- an omitted classId/studentId
+   * filter returned every post, mood log, and developmental milestone for
+   * every student in the tenant, including sensitive behavioral/wellbeing
+   * data outside the teacher's own classes. Returns the class/section combos
+   * a teacher is actually assigned to (empty array if none).
+   */
+  private async getTeacherAssignedClassSections(
+    actor: AuthContext,
+  ): Promise<Array<{ classId: string; sectionId: string | null }>> {
+    const staff = await this.prisma.staff.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        status: StaffStatus.ACTIVE,
+      },
+      select: { id: true },
+    });
+    if (!staff) return [];
+
+    const [assignments, classTeacherSections] = await Promise.all([
+      this.prisma.subjectTeacherAssignment.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          staffId: staff.id,
+          academicYear: { isCurrent: true },
+        },
+        select: { classId: true, sectionId: true },
+      }),
+      this.prisma.section.findMany({
+        where: { tenantId: actor.tenantId, classTeacherId: staff.id },
+        select: { id: true, classId: true },
+      }),
+    ]);
+
+    const combos = new Map<
+      string,
+      { classId: string; sectionId: string | null }
+    >();
+    for (const a of assignments) {
+      combos.set(`${a.classId}:${a.sectionId ?? 'none'}`, {
+        classId: a.classId,
+        sectionId: a.sectionId,
+      });
+    }
+    for (const s of classTeacherSections) {
+      combos.set(`${s.classId}:${s.id}`, { classId: s.classId, sectionId: s.id });
+    }
+    return Array.from(combos.values());
+  }
+
+  private buildClassSectionOrFilter(
+    classSections: Array<{ classId: string; sectionId: string | null }>,
+  ): Prisma.ActivityPostWhereInput['OR'] {
+    return classSections.flatMap(({ classId, sectionId }) =>
+      sectionId
+        ? [
+            { classId, sectionId },
+            { classId, sectionId: null },
+          ]
+        : [{ classId, sectionId: null }],
+    );
+  }
+
   private async buildActorPostVisibilityFilter(
     actor: AuthContext,
     requestedStudentId?: string,
   ): Promise<Prisma.ActivityPostWhereInput> {
+    if (isTeacherOnly(actor)) {
+      const classSections = await this.getTeacherAssignedClassSections(actor);
+      if (classSections.length === 0) {
+        return { id: '__no_visible_activity_posts__' };
+      }
+      const classSectionFilter = {
+        OR: this.buildClassSectionOrFilter(classSections),
+      };
+      if (requestedStudentId) {
+        return {
+          AND: [
+            classSectionFilter,
+            { studentTags: { some: { studentId: requestedStudentId } } },
+          ],
+        };
+      }
+      return classSectionFilter;
+    }
+
     const studentIds = await this.resolveVisibleStudentIds(
       actor,
       requestedStudentId,

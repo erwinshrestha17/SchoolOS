@@ -199,6 +199,61 @@ describe('Homework Reminders', () => {
     });
   });
 
+  describe('retryHomeworkReminderBatch scope check (confirmed gap: early-return paths skipped scope validation)', () => {
+    it('blocks a teacher retrying another class batch even when already COMPLETED', async () => {
+      prisma.homeworkReminderBatch.findFirst.mockResolvedValue({
+        id: 'batch-1',
+        homeworkId: 'hw-1',
+        status: 'COMPLETED',
+      });
+      prisma.homeworkAssignment.findFirst.mockResolvedValue(mockHomework);
+      prisma.subjectTeacherAssignment.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.retryHomeworkReminderBatch('batch-1', mockActor),
+      ).rejects.toThrow(
+        'You are not assigned to review homework for this class and subject',
+      );
+    });
+
+    it('blocks a teacher retrying another class batch even when PROCESSING', async () => {
+      prisma.homeworkReminderBatch.findFirst.mockResolvedValue({
+        id: 'batch-1',
+        homeworkId: 'hw-1',
+        status: 'PROCESSING',
+      });
+      prisma.homeworkAssignment.findFirst.mockResolvedValue(mockHomework);
+      prisma.subjectTeacherAssignment.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.retryHomeworkReminderBatch('batch-1', mockActor),
+      ).rejects.toThrow(
+        'You are not assigned to review homework for this class and subject',
+      );
+    });
+
+    it('allows a properly assigned teacher to retry their own COMPLETED batch', async () => {
+      prisma.homeworkReminderBatch.findFirst.mockResolvedValue({
+        id: 'batch-1',
+        homeworkId: 'hw-1',
+        status: 'COMPLETED',
+      });
+      prisma.homeworkAssignment.findFirst.mockResolvedValue(mockHomework);
+      prisma.subjectTeacherAssignment.findFirst.mockResolvedValue({
+        id: 'subject-teacher-1',
+      });
+
+      const result = await service.retryHomeworkReminderBatch(
+        'batch-1',
+        mockActor,
+      );
+
+      expect(result).toEqual(
+        expect.objectContaining({ id: 'batch-1', replayed: true }),
+      );
+    });
+  });
+
   describe('Target Resolution', () => {
     it('should exclude students who already submitted', async () => {
       prisma.homeworkAssignment.findFirst.mockResolvedValue(mockHomework);

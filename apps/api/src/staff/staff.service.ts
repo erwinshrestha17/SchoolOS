@@ -307,7 +307,7 @@ export class StaffService {
   async updateStaff(staffId: string, dto: UpdateStaffDto, actor: AuthContext) {
     const existing = await this.prisma.staff.findFirst({
       where: { id: staffId, tenantId: actor.tenantId },
-      include: { user: true },
+      include: { user: { select: { email: true } } },
     });
 
     if (!existing) {
@@ -1246,7 +1246,6 @@ export class StaffService {
   ) {
     const staff = await this.prisma.staff.findFirst({
       where: { id: staffId, tenantId: actor.tenantId },
-      include: { user: true },
     });
 
     if (!staff) {
@@ -1509,6 +1508,14 @@ function mapStaffDetail(
 
   return {
     ...staff,
+    // `staff.user` (spread above) is the raw Prisma User relation, which
+    // carries passwordHash/lockedUntil/failedLoginCount -- the type
+    // annotation on this function's parameter narrows it, but that's a
+    // compile-time-only guarantee; the actual object passed in by callers
+    // (getStaffDetail, getStaffProfile, updateStaff) includes the full row.
+    // Explicitly clear it so the raw relation never survives into the
+    // response; `email`/`roles` below are the only safe derived fields.
+    user: undefined,
     citizenshipNo: mask(staff.citizenshipNo),
     panNumber: mask(staff.panNumber),
     bankAccount: mask(staff.bankAccount),

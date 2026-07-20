@@ -1,12 +1,14 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, StaffStatus } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { isTeacherOnly } from '../common/security/parent-scope';
 import { BulkUpsertCasRecordsDto } from './dto/bulk-upsert-cas-records.dto';
 import { CreateCasRecordDto } from './dto/create-cas-record.dto';
 import { ListCasRecordsDto } from './dto/list-cas-records.dto';
@@ -36,6 +38,17 @@ export class CasRecordsService {
 
     const skip = (page - 1) * limit;
 
+    // Confirmed gap: this was scoped only by tenantId, with classId/sectionId
+    // caller-supplied and optional -- any actor with cas-records:read
+    // (a base teacher included) got every CAS record (character/behavior
+    // notes) in the tenant when no filter was supplied. create/update already
+    // call ensureCasScope for referential checks; this adds the missing
+    // actor-scoping to the read path.
+    const teacherFilter = await this.buildTeacherCasScopeFilter(actor);
+    if (teacherFilter === 'NONE') {
+      return { items: [], total: 0, page, limit, totalPages: 0 };
+    }
+
     const where: Prisma.CasRecordWhereInput = {
       tenantId: actor.tenantId,
       ...(academicYearId ? { academicYearId } : {}),
@@ -43,6 +56,7 @@ export class CasRecordsService {
       ...(sectionId ? { sectionId } : {}),
       ...(subjectId ? { subjectId } : {}),
       ...(studentId ? { studentId } : {}),
+      ...(teacherFilter ?? {}),
       ...(category
         ? { category: { contains: category, mode: 'insensitive' } }
         : {}),
@@ -115,7 +129,84 @@ export class CasRecordsService {
       throw new NotFoundException('CAS record not found in this tenant');
     }
 
+    if (isTeacherOnly(actor)) {
+      const classSections = await this.getTeacherAssignedClassSections(actor);
+      const inScope = classSections.some(
+        (cs) =>
+          cs.classId === record.classId &&
+          (cs.sectionId === null || cs.sectionId === record.sectionId),
+      );
+      if (!inScope) {
+        throw new ForbiddenException(
+          'CAS record is outside your teaching scope',
+        );
+      }
+    }
+
     return record;
+  }
+
+  /**
+   * Returns `null` for non-teacher (privileged) actors -- no restriction.
+   * Returns the literal string 'NONE' when a teacher-only actor has no
+   * active teaching assignment at all, distinguishing "see nothing" from
+   * "see everything" without an ambiguous empty-array/empty-object return.
+   */
+  private async buildTeacherCasScopeFilter(
+    actor: AuthContext,
+  ): Promise<Prisma.CasRecordWhereInput | 'NONE' | null> {
+    if (!isTeacherOnly(actor)) return null;
+
+    const classSections = await this.getTeacherAssignedClassSections(actor);
+    if (classSections.length === 0) return 'NONE';
+
+    return {
+      OR: classSections.flatMap(({ classId, sectionId }) =>
+        sectionId
+          ? [{ classId, sectionId }, { classId, sectionId: null }]
+          : [{ classId, sectionId: null }],
+      ),
+    };
+  }
+
+  private async getTeacherAssignedClassSections(
+    actor: AuthContext,
+  ): Promise<Array<{ classId: string; sectionId: string | null }>> {
+    const staff = await this.prisma.staff.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        status: StaffStatus.ACTIVE,
+      },
+      select: { id: true },
+    });
+    if (!staff) return [];
+
+    const [assignments, classTeacherSections] = await Promise.all([
+      this.prisma.subjectTeacherAssignment.findMany({
+        where: { tenantId: actor.tenantId, staffId: staff.id },
+        select: { classId: true, sectionId: true },
+      }),
+      this.prisma.section.findMany({
+        where: { tenantId: actor.tenantId, classTeacherId: staff.id },
+        select: { id: true, classId: true },
+      }),
+    ]);
+
+    const combos = new Map<
+      string,
+      { classId: string; sectionId: string | null }
+    >();
+    for (const a of assignments) {
+      combos.set(`${a.classId}:${a.sectionId ?? 'none'}`, {
+        classId: a.classId,
+        sectionId: a.sectionId,
+      });
+    }
+    for (const s of classTeacherSections) {
+      combos.set(`${s.classId}:${s.id}`, { classId: s.classId, sectionId: s.id });
+    }
+    return Array.from(combos.values());
   }
 
   async create(dto: CreateCasRecordDto, actor: AuthContext) {

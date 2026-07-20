@@ -524,8 +524,8 @@ export class AcademicsService {
       where: { tenantId: actor.tenantId },
       include: {
         examTerm: true,
-        requestedBy: true,
-        reviewedBy: true,
+        requestedBy: { select: { id: true, email: true } },
+        reviewedBy: { select: { id: true, email: true } },
       },
       orderBy: [{ createdAt: 'desc' }],
       take: 100,

@@ -202,8 +202,8 @@ export interface CashierCloseSummary {
 
 type CashierCloseWithUsers = Prisma.CashierCloseGetPayload<{
   include: {
-    collectorUser: true;
-    closedBy: true;
+    collectorUser: { select: { id: true; email: true } };
+    closedBy: { select: { id: true; email: true } };
   };
 }>;
 
@@ -530,7 +530,7 @@ export class FinanceService {
                 lines: { include: { feeHead: true } },
               },
             },
-            collectedBy: true,
+            collectedBy: { select: { id: true, email: true } },
           },
         },
       },
@@ -1344,7 +1344,7 @@ export class FinanceService {
         include: {
           student: true,
           feeHead: true,
-          approvedBy: true,
+          approvedBy: { select: { id: true, email: true } },
         },
         orderBy: [{ [sortBy]: sortDirection }, { id: 'asc' }],
         skip: pagination.skip,
@@ -2000,7 +2000,7 @@ export class FinanceService {
       },
       include: {
         receipt: true,
-        collectedBy: true,
+        collectedBy: { select: { id: true, email: true } },
         refunds: true,
         student: {
           include: {
@@ -2457,7 +2457,7 @@ export class FinanceService {
         },
         payments: {
           include: {
-            collectedBy: true,
+            collectedBy: { select: { id: true, email: true } },
             receipt: true,
             refunds: {
               orderBy: [{ refundDate: 'asc' }, { createdAt: 'asc' }],
@@ -2491,7 +2491,7 @@ export class FinanceService {
           invoiceId: invoice.id,
         },
         include: {
-          approvedBy: true,
+          approvedBy: { select: { id: true, email: true } },
           feeHead: true,
         },
         orderBy: [{ createdAt: 'asc' }],
@@ -3035,7 +3035,7 @@ export class FinanceService {
         },
         include: {
           feeHead: true,
-          approvedBy: true,
+          approvedBy: { select: { id: true, email: true } },
         },
         orderBy: [{ createdAt: 'asc' }],
       }),
@@ -4396,7 +4396,7 @@ export class FinanceService {
       },
       include: {
         payment: true,
-        requestedBy: true,
+        requestedBy: { select: { id: true, email: true } },
         history: { orderBy: [{ createdAt: 'asc' }] },
       },
     });
@@ -4484,7 +4484,7 @@ export class FinanceService {
         },
         include: {
           payment: true,
-          requestedBy: true,
+          requestedBy: { select: { id: true, email: true } },
           history: true,
         },
       });
@@ -4500,7 +4500,7 @@ export class FinanceService {
           },
           include: {
             payment: true,
-            requestedBy: true,
+            requestedBy: { select: { id: true, email: true } },
             history: { orderBy: [{ createdAt: 'asc' }] },
           },
         });
@@ -4555,7 +4555,7 @@ export class FinanceService {
       },
       include: {
         payment: true,
-        requestedBy: true,
+        requestedBy: { select: { id: true, email: true } },
         history: { orderBy: [{ createdAt: 'asc' }] },
       },
     });
@@ -4632,7 +4632,7 @@ export class FinanceService {
         },
         include: {
           payment: true,
-          requestedBy: true,
+          requestedBy: { select: { id: true, email: true } },
           history: true,
         },
       });
@@ -4648,7 +4648,7 @@ export class FinanceService {
           },
           include: {
             payment: true,
-            requestedBy: true,
+            requestedBy: { select: { id: true, email: true } },
             history: { orderBy: [{ createdAt: 'asc' }] },
           },
         });
@@ -4768,8 +4768,8 @@ export class FinanceService {
               invoice: true,
             },
           },
-          requestedBy: true,
-          reviewedBy: true,
+          requestedBy: { select: { id: true, email: true } },
+          reviewedBy: { select: { id: true, email: true } },
           history: {
             orderBy: [{ createdAt: 'asc' }],
           },
@@ -4856,8 +4856,8 @@ export class FinanceService {
           where: { id: request.id },
           include: {
             payment: true,
-            requestedBy: true,
-            reviewedBy: true,
+            requestedBy: { select: { id: true, email: true } },
+            reviewedBy: { select: { id: true, email: true } },
             history: { orderBy: [{ createdAt: 'asc' }] },
           },
         });
@@ -4975,8 +4975,8 @@ export class FinanceService {
       },
       include: {
         payment: true,
-        requestedBy: true,
-        reviewedBy: true,
+        requestedBy: { select: { id: true, email: true } },
+        reviewedBy: { select: { id: true, email: true } },
         history: { orderBy: [{ createdAt: 'asc' }] },
       },
     });
@@ -5605,8 +5605,8 @@ export class FinanceService {
       this.prisma.cashierClose.findMany({
         where,
         include: {
-          collectorUser: true,
-          closedBy: true,
+          collectorUser: { select: { id: true, email: true } },
+          closedBy: { select: { id: true, email: true } },
         },
         orderBy: [{ [sortBy]: sortDirection }, { id: 'asc' }],
         skip: pagination.skip,
@@ -5768,8 +5768,8 @@ export class FinanceService {
             closedById: actor.userId,
           },
           include: {
-            collectorUser: true,
-            closedBy: true,
+            collectorUser: { select: { id: true, email: true } },
+            closedBy: { select: { id: true, email: true } },
           },
         });
       });
@@ -7320,7 +7320,7 @@ export class FinanceService {
               },
             },
             refunds: true,
-            collectedBy: true,
+            collectedBy: { select: { id: true, email: true } },
           },
         },
         tenant: true,
@@ -7726,7 +7726,7 @@ export class FinanceService {
       },
       include: {
         receipt: true,
-        collectedBy: true,
+        collectedBy: { select: { id: true, email: true } },
         student: {
           include: {
             class: true,
