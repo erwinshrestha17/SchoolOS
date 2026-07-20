@@ -2080,7 +2080,9 @@ describe('Cross-Tenant Access Hardening', () => {
     });
     const prisma = buildPrisma({
       studentFindFirstQueue: [student],
+      staffFindFirstResult: { id: 'staff-unassigned' },
       subjectTeacherAssignmentFindFirstResult: null,
+      sectionFindFirstResult: null,
     });
     const { service } = buildService(prisma);
 
@@ -2092,6 +2094,40 @@ describe('Cross-Tenant Access Hardening', () => {
         permissions: ['students:read'],
       }),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('allows getStudentProfile for a homeroom-only class teacher tied to the class solely via Section.classTeacherId -- regression for a bug found via live edge-case testing (list endpoint already checked both sources, this detail endpoint only checked SubjectTeacherAssignment)', async () => {
+    const student = buildStudent({
+      enrollments: [
+        {
+          id: 'enrollment-1',
+          status: EnrollmentStatus.ACTIVE,
+          classId: 'class-1',
+          sectionId: 'section-1',
+          academicYear: { name: '2083' },
+          class: { name: 'Grade 1' },
+          section: { name: 'A' },
+          rollNumber: 7,
+          admissionDate: new Date('2026-04-01T00:00:00.000Z'),
+        },
+      ],
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      staffFindFirstResult: { id: 'staff-homeroom-1' },
+      subjectTeacherAssignmentFindFirstResult: null,
+      sectionFindFirstResult: { id: 'section-1' },
+    });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.getStudentProfile(student.id, {
+        ...actor,
+        userId: 'teacher-user-1',
+        roles: ['teacher'],
+        permissions: ['students:read'],
+      }),
+    ).resolves.toBeDefined();
   });
 
   it('rejects updateStudent for a student outside the actor tenant', async () => {

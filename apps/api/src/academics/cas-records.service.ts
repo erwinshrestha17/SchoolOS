@@ -131,10 +131,17 @@ export class CasRecordsService {
 
     if (isTeacherOnly(actor)) {
       const classSections = await this.getTeacherAssignedClassSections(actor);
+      // A record with sectionId === null is a whole-class observation and
+      // must be visible to every section-specific teacher of that class,
+      // not just class-wide-assigned ones -- this must mirror the OR built
+      // by buildTeacherCasScopeFilter above (list()), which already treats
+      // a null on either side as a wildcard match.
       const inScope = classSections.some(
         (cs) =>
           cs.classId === record.classId &&
-          (cs.sectionId === null || cs.sectionId === record.sectionId),
+          (cs.sectionId === null ||
+            record.sectionId === null ||
+            cs.sectionId === record.sectionId),
       );
       if (!inScope) {
         throw new ForbiddenException(

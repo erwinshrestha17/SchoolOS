@@ -620,6 +620,49 @@ export class StudentsService {
     return { OR: clauses };
   }
 
+  /**
+   * Confirmed via live edge-case testing: getStudentProfile/getStudentIemisReadiness
+   * only checked SubjectTeacherAssignment, so a homeroom-only class teacher
+   * (tied to their class solely via Section.classTeacherId, no
+   * SubjectTeacherAssignment row of their own) was wrongly forbidden from
+   * viewing their own students -- while the student directory list
+   * (buildActorStudentScope above) already checked both sources correctly.
+   */
+  private async isTeacherAssignedToClassSection(
+    actor: AuthContext,
+    classId: string,
+    sectionId: string | null,
+  ): Promise<boolean> {
+    const teacherStaffId = await getTeacherStaffOwnId(this.prisma, actor);
+    if (teacherStaffId === null) {
+      return true; // no restriction for admin/principal/etc.
+    }
+
+    const [assignment, classTeacherSection] = await Promise.all([
+      this.prisma.subjectTeacherAssignment.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          staffId: teacherStaffId,
+          classId,
+          OR: [{ sectionId }, { sectionId: null }],
+        },
+        select: { id: true },
+      }),
+      sectionId
+        ? this.prisma.section.findFirst({
+            where: {
+              tenantId: actor.tenantId,
+              id: sectionId,
+              classTeacherId: teacherStaffId,
+            },
+            select: { id: true },
+          })
+        : null,
+    ]);
+
+    return Boolean(assignment) || Boolean(classTeacherSection);
+  }
+
   private async countDuplicateCandidatePairs(where: Prisma.StudentWhereInput) {
     const students = await this.prisma.student.findMany({
       where: {
@@ -749,22 +792,15 @@ export class StudentsService {
       const activeEnrollment = student.enrollments.find(
         (enrollment) => enrollment.status === EnrollmentStatus.ACTIVE,
       );
-      const assignment = activeEnrollment
-        ? await this.prisma.subjectTeacherAssignment.findFirst({
-            where: {
-              tenantId: actor.tenantId,
-              staff: { userId: actor.userId },
-              classId: activeEnrollment.classId,
-              OR: [
-                { sectionId: activeEnrollment.sectionId },
-                { sectionId: null },
-              ],
-            },
-            select: { id: true },
-          })
-        : null;
+      const inScope =
+        activeEnrollment &&
+        (await this.isTeacherAssignedToClassSection(
+          actor,
+          activeEnrollment.classId,
+          activeEnrollment.sectionId,
+        ));
 
-      if (!assignment) {
+      if (!inScope) {
         throw new ForbiddenException(
           'Student profile is outside your teaching scope',
         );
@@ -3354,22 +3390,15 @@ export class StudentsService {
       !actor.roles.some((role) => role === 'admin' || role === 'principal')
     ) {
       const activeEnrollment = student.enrollments[0] ?? null;
-      const assignment = activeEnrollment
-        ? await this.prisma.subjectTeacherAssignment.findFirst({
-            where: {
-              tenantId: actor.tenantId,
-              staff: { userId: actor.userId },
-              classId: activeEnrollment.classId,
-              OR: [
-                { sectionId: activeEnrollment.sectionId },
-                { sectionId: null },
-              ],
-            },
-            select: { id: true },
-          })
-        : null;
+      const inScope =
+        activeEnrollment &&
+        (await this.isTeacherAssignedToClassSection(
+          actor,
+          activeEnrollment.classId,
+          activeEnrollment.sectionId,
+        ));
 
-      if (!assignment) {
+      if (!inScope) {
         throw new ForbiddenException(
           'Student reporting readiness is outside your teaching scope',
         );

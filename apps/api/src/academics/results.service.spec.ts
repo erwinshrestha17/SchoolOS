@@ -291,5 +291,37 @@ describe('ResultsService', () => {
 
       expect(prisma.examTerm.findFirst).not.toHaveBeenCalled();
     });
+
+    it('allows a section-specific teacher to preview a section-agnostic (sectionId: null) student in their class -- regression for an asymmetric wildcard check found via live edge-case testing', async () => {
+      (prisma.student.findFirst as jest.Mock).mockResolvedValue({
+        id: 's1',
+        tenantId: 'tenant-1',
+        studentSystemId: 'SID001',
+        firstNameEn: 'John',
+        lastNameEn: 'Doe',
+        classId: 'class-1',
+        sectionId: null,
+        class: { id: 'class-1', name: 'Class 10' },
+        sectionRef: null,
+        rollNumber: 1,
+      });
+      (prisma.examTerm.findFirst as jest.Mock).mockResolvedValue({
+        id: 'term-1',
+        name: 'First Term',
+        tenantId: 'tenant-1',
+      });
+      (prisma.assessmentComponent.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.markEntry.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.staff.findFirst as jest.Mock).mockResolvedValue({ id: 'staff-1' });
+      (prisma.subjectTeacherAssignment.findMany as jest.Mock).mockResolvedValue([
+        { classId: 'class-1', sectionId: 'section-1' },
+      ]);
+
+      await expect(
+        service.previewStudentResult('s1', teacherActor, {
+          examTermId: 'term-1',
+        }),
+      ).resolves.toBeDefined();
+    });
   });
 });

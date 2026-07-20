@@ -33,6 +33,13 @@ describe('CommunicationsService', () => {
       },
       section: {
         findFirst: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      staff: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      subjectTeacherAssignment: {
+        findMany: jest.fn().mockResolvedValue([]),
       },
       event: {
         create: jest.fn(),
@@ -1574,7 +1581,7 @@ describe('CommunicationsService', () => {
     );
   });
 
-  describe('teacher scoping (confirmed gap: previously any notices:read/events:read holder saw every notice/event in the tenant)', () => {
+  describe('teacher scoping (confirmed gap: previously any notices:read/events:read holder saw every notice/event in the tenant regardless of audience or lifecycle state)', () => {
     const teacherActor: AuthContext = {
       userId: 'teacher-1',
       tenantId: 'tenant-1',
@@ -1585,7 +1592,16 @@ describe('CommunicationsService', () => {
       permissions: ['notices:read', 'events:read'],
     };
 
-    it('scopes listNotices to notices the teacher actually received', async () => {
+    function mockTeacherAssignment() {
+      prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
+      prisma.subjectTeacherAssignment.findMany.mockResolvedValue([
+        { classId: 'class-1', sectionId: 'section-1' },
+      ]);
+      prisma.section.findMany.mockResolvedValue([]);
+    }
+
+    it('scopes listNotices to ALL-audience, own-class/section, or actually-delivered published notices', async () => {
+      mockTeacherAssignment();
       prisma.notice.findMany.mockResolvedValue([]);
       prisma.notice.count.mockResolvedValue(0);
 
@@ -1596,14 +1612,47 @@ describe('CommunicationsService', () => {
           where: expect.objectContaining({
             AND: expect.arrayContaining([
               {
-                deliveries: {
-                  some: { recipientUserId: teacherActor.userId },
+                OR: [
+                  { audienceType: AudienceType.ALL },
+                  {
+                    deliveries: {
+                      some: { recipientUserId: teacherActor.userId },
+                    },
+                  },
+                  { audienceType: AudienceType.CLASS, classId: { in: ['class-1'] } },
+                  {
+                    audienceType: AudienceType.SECTION,
+                    sectionId: { in: ['section-1'] },
+                  },
+                ],
+              },
+              {
+                lifecycleStatus: {
+                  in: [NoticeLifecycleStatus.PUBLISHED, NoticeLifecycleStatus.EXPIRED],
                 },
               },
             ]),
           }),
         }),
       );
+    });
+
+    it('ignores a caller-supplied lifecycleStatus filter for a non-administrator', async () => {
+      mockTeacherAssignment();
+      prisma.notice.findMany.mockResolvedValue([]);
+      prisma.notice.count.mockResolvedValue(0);
+
+      await service.listNotices(teacherActor, {
+        page: 1,
+        limit: 25,
+        lifecycleStatus: NoticeLifecycleStatus.DRAFT,
+      });
+
+      const call = (prisma.notice.findMany as jest.Mock).mock.calls[0][0];
+      const andClauses = call.where.AND as Array<Record<string, unknown>>;
+      expect(
+        andClauses.some((clause) => clause.lifecycleStatus === NoticeLifecycleStatus.DRAFT),
+      ).toBe(false);
     });
 
     it('does not scope listNotices for a notice administrator', async () => {
@@ -1619,12 +1668,13 @@ describe('CommunicationsService', () => {
           (clause) =>
             typeof clause === 'object' &&
             clause !== null &&
-            'deliveries' in clause,
+            ('deliveries' in clause || 'OR' in clause),
         ),
       ).toBe(false);
     });
 
-    it('scopes listEvents to events the teacher actually received', async () => {
+    it('scopes listEvents to ALL-audience, own-class/section, or actually-delivered events', async () => {
+      mockTeacherAssignment();
       prisma.event.findMany.mockResolvedValue([]);
 
       await service.listEvents(teacherActor);
@@ -1633,7 +1683,19 @@ describe('CommunicationsService', () => {
         expect.objectContaining({
           where: expect.objectContaining({
             tenantId: 'tenant-1',
-            deliveries: { some: { recipientUserId: teacherActor.userId } },
+            OR: [
+              { audienceType: AudienceType.ALL },
+              {
+                deliveries: {
+                  some: { recipientUserId: teacherActor.userId },
+                },
+              },
+              { audienceType: AudienceType.CLASS, classId: { in: ['class-1'] } },
+              {
+                audienceType: AudienceType.SECTION,
+                sectionId: { in: ['section-1'] },
+              },
+            ],
           }),
         }),
       );
@@ -1649,6 +1711,24 @@ describe('CommunicationsService', () => {
           where: { tenantId: 'tenant-1' },
         }),
       );
+    });
+
+    it('returns no notices for a teacher with no active staff assignment beyond ALL/delivered', async () => {
+      prisma.staff.findFirst.mockResolvedValue(null);
+      prisma.notice.findMany.mockResolvedValue([]);
+      prisma.notice.count.mockResolvedValue(0);
+
+      await service.listNotices(teacherActor, { page: 1, limit: 25 });
+
+      const call = (prisma.notice.findMany as jest.Mock).mock.calls[0][0];
+      const andClauses = call.where.AND as Array<Record<string, unknown>>;
+      const orClause = andClauses.find((clause) => Array.isArray(clause.OR)) as
+        | { OR: unknown[] }
+        | undefined;
+      expect(orClause?.OR).toEqual([
+        { audienceType: AudienceType.ALL },
+        { deliveries: { some: { recipientUserId: teacherActor.userId } } },
+      ]);
     });
   });
 

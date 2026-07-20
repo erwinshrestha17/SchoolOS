@@ -362,10 +362,16 @@ export class ResultsService {
     if (!isTeacherOnly(actor)) return;
 
     const classSections = await this.getTeacherAssignedClassSections(actor);
+    // A null on either side is a wildcard match: a class-wide teaching
+    // assignment (cs.sectionId === null) covers every section, and a
+    // section-agnostic target (sectionId === null) is visible to every
+    // section-specific teacher of that class -- mirrors the fix applied to
+    // the equivalent (and previously asymmetric) check in
+    // cas-records.service.ts::findOne, found via live edge-case testing.
     const inScope = classSections.some(
       (cs) =>
         cs.classId === classId &&
-        (cs.sectionId === null || cs.sectionId === sectionId),
+        (cs.sectionId === null || sectionId === null || cs.sectionId === sectionId),
     );
     if (!inScope) {
       throw new ForbiddenException('This result is outside your teaching scope');

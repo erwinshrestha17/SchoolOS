@@ -26,6 +26,7 @@ import {
   ParentTeacherThreadStatus,
   Prisma,
   ProviderType,
+  StaffStatus,
   StudentLifecycleStatus,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
@@ -54,6 +55,7 @@ import {
   NotificationEventService,
 } from './notification-event.service';
 import { NOTICE_ADMINISTRATION_PERMISSIONS } from './notice-detail.service';
+import { isTeacherOnly } from '../common/security/parent-scope';
 
 const TEMPLATE_SELECT = {
   id: true,
@@ -142,17 +144,23 @@ export class CommunicationsService {
     const limit = Math.min(100, Math.max(1, query.limit ?? 25));
     const search = query.search?.trim();
     // Confirmed gap: this endpoint (notices:read, held by every role including
-    // base teacher) returned every notice in the tenant with no recipient
-    // check, unlike getNoticeDetail which already scopes non-administrators
-    // to notices they actually received. Non-administrators are now limited
-    // to notices where they have a delivery record.
+    // base teacher) returned every notice in the tenant regardless of
+    // audience/class/section targeting or lifecycle state, unlike
+    // getNoticeDetail which already scopes non-administrators to notices
+    // they actually received. Non-administrators are now limited to
+    // published, tenant-wide/own-class/own-section notices (or anything
+    // they have an actual delivery record for), matching getNoticeDetail's
+    // trust model.
     const canAdministerNotices = actor.permissions.some((permission) =>
       NOTICE_ADMINISTRATION_PERMISSIONS.has(permission),
     );
+    const audienceScope = canAdministerNotices
+      ? []
+      : await this.buildActorNoticeVisibilityScope(actor);
     const where: Prisma.NoticeWhereInput = {
       AND: [
         { tenantId: actor.tenantId },
-        ...(query.lifecycleStatus
+        ...(canAdministerNotices && query.lifecycleStatus
           ? [{ lifecycleStatus: query.lifecycleStatus }]
           : []),
         ...(query.priority ? [{ priority: query.priority }] : []),
@@ -167,9 +175,7 @@ export class CommunicationsService {
               },
             ]
           : []),
-        ...(canAdministerNotices
-          ? []
-          : [{ deliveries: { some: { recipientUserId: actor.userId } } }]),
+        ...audienceScope,
       ],
     };
     const [items, total] = await Promise.all([
@@ -200,6 +206,102 @@ export class CommunicationsService {
       limit,
       hasNextPage: page * limit < total,
     };
+  }
+
+  private async buildActorNoticeVisibilityScope(
+    actor: AuthContext,
+  ): Promise<Prisma.NoticeWhereInput[]> {
+    const visibilityOr: Prisma.NoticeWhereInput[] = [
+      { audienceType: AudienceType.ALL },
+      { deliveries: { some: { recipientUserId: actor.userId } } },
+    ];
+    if (isTeacherOnly(actor)) {
+      const { classIds, sectionIds } =
+        await this.getTeacherAssignedClassSections(actor);
+      if (classIds.length) {
+        visibilityOr.push({
+          audienceType: AudienceType.CLASS,
+          classId: { in: classIds },
+        });
+      }
+      if (sectionIds.length) {
+        visibilityOr.push({
+          audienceType: AudienceType.SECTION,
+          sectionId: { in: sectionIds },
+        });
+      }
+    }
+    return [
+      { OR: visibilityOr },
+      {
+        lifecycleStatus: {
+          in: [NoticeLifecycleStatus.PUBLISHED, NoticeLifecycleStatus.EXPIRED],
+        },
+      },
+    ];
+  }
+
+  private async buildActorEventVisibilityScope(
+    actor: AuthContext,
+  ): Promise<Prisma.EventWhereInput> {
+    const visibilityOr: Prisma.EventWhereInput[] = [
+      { audienceType: AudienceType.ALL },
+      { deliveries: { some: { recipientUserId: actor.userId } } },
+    ];
+    if (isTeacherOnly(actor)) {
+      const { classIds, sectionIds } =
+        await this.getTeacherAssignedClassSections(actor);
+      if (classIds.length) {
+        visibilityOr.push({
+          audienceType: AudienceType.CLASS,
+          classId: { in: classIds },
+        });
+      }
+      if (sectionIds.length) {
+        visibilityOr.push({
+          audienceType: AudienceType.SECTION,
+          sectionId: { in: sectionIds },
+        });
+      }
+    }
+    return { OR: visibilityOr };
+  }
+
+  private async getTeacherAssignedClassSections(
+    actor: AuthContext,
+  ): Promise<{ classIds: string[]; sectionIds: string[] }> {
+    const staff = await this.prisma.staff.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        status: StaffStatus.ACTIVE,
+      },
+      select: { id: true },
+    });
+    if (!staff) return { classIds: [], sectionIds: [] };
+
+    const [assignments, classTeacherSections] = await Promise.all([
+      this.prisma.subjectTeacherAssignment.findMany({
+        where: { tenantId: actor.tenantId, staffId: staff.id },
+        select: { classId: true, sectionId: true },
+      }),
+      this.prisma.section.findMany({
+        where: { tenantId: actor.tenantId, classTeacherId: staff.id },
+        select: { id: true, classId: true },
+      }),
+    ]);
+
+    const classIds = new Set<string>();
+    const sectionIds = new Set<string>();
+    for (const assignment of assignments) {
+      classIds.add(assignment.classId);
+      if (assignment.sectionId) sectionIds.add(assignment.sectionId);
+    }
+    for (const section of classTeacherSections) {
+      classIds.add(section.classId);
+      sectionIds.add(section.id);
+    }
+    return { classIds: Array.from(classIds), sectionIds: Array.from(sectionIds) };
   }
 
   async createNotice(dto: CreateNoticeDto, actor: AuthContext) {
@@ -884,14 +986,16 @@ export class CommunicationsService {
     // Confirmed gap: same pattern as listNotices above — every events:read
     // holder (including base teacher) saw every event in the tenant
     // regardless of audience/class/section targeting. Non-administrators are
-    // now limited to events where they have a delivery record.
+    // now limited to tenant-wide/own-class/own-section events (or anything
+    // they have an actual delivery record for).
     const canAdministerEvents = actor.permissions.includes('events:create');
+    const visibilityScope = canAdministerEvents
+      ? {}
+      : await this.buildActorEventVisibilityScope(actor);
     return this.prisma.event.findMany({
       where: {
         tenantId: actor.tenantId,
-        ...(canAdministerEvents
-          ? {}
-          : { deliveries: { some: { recipientUserId: actor.userId } } }),
+        ...visibilityScope,
       },
       orderBy: [{ startsAt: 'asc' }],
       take: 100,

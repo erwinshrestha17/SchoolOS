@@ -41,6 +41,23 @@ export class LearningActivitiesService {
       status: query.status ?? { not: LearningActivityStatus.ARCHIVED },
     };
 
+    // Confirmed gap: every write path on this activity (create/update/archive)
+    // and every read path in the sibling resources service already scope
+    // through assertActorCanControlScope / assertCanReadActivity (own
+    // teacherId, or admin), but this list endpoint never applied the same
+    // check — any learning:read holder (base teacher included) could browse
+    // every activity in the tenant, including other teachers' unpublished
+    // DRAFT quizzes with full question/correctAnswer content. A
+    // caller-supplied teacherId is overridden for non-admins so it can't be
+    // used to bypass the restriction.
+    if (!isSchoolAdmin(actor)) {
+      const staffId = await this.permissions.resolveActorStaffId(actor);
+      if (!staffId) {
+        return { items: [], total: 0, page, limit };
+      }
+      where.teacherId = staffId;
+    }
+
     const [items, total] = await Promise.all([
       this.prisma.learningActivity.findMany({
         where,
@@ -127,6 +144,24 @@ export class LearningActivitiesService {
 
     if (!activity) {
       throw new NotFoundException('Learning activity not found');
+    }
+
+    // Confirmed gap: same as listActivities above — this was the only read
+    // path in the module that never called assertActorCanControlScope,
+    // unlike its own create/update/archive siblings and unlike
+    // learning-resources.service.ts's assertCanReadActivity, which already
+    // gates activity reads through this exact check.
+    if (!isSchoolAdmin(actor)) {
+      await this.permissions.assertActorCanControlScope(
+        actor,
+        activity.teacherId,
+        {
+          classId: activity.classId,
+          sectionId: activity.sectionId,
+          subjectId: activity.subjectId,
+          topicId: activity.topicId,
+        },
+      );
     }
 
     return activity;
@@ -301,6 +336,12 @@ export function activityDetailInclude() {
     questions: { orderBy: [{ sortOrder: 'asc' as const }] },
     resources: true,
   };
+}
+
+function isSchoolAdmin(actor: AuthContext) {
+  return actor.roles.some((role) =>
+    ['admin', 'principal', 'platform_super_admin'].includes(role),
+  );
 }
 
 function toJsonOrNull(value: unknown) {

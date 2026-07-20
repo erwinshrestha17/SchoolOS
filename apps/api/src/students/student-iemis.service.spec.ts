@@ -53,6 +53,12 @@ describe('StudentsService (iEMIS Export)', () => {
             subjectTeacherAssignment: {
               findFirst: jest.fn(),
             },
+            staff: {
+              findFirst: jest.fn(),
+            },
+            section: {
+              findFirst: jest.fn(),
+            },
           },
         },
         { provide: AuditService, useValue: { record: jest.fn() } },
@@ -342,6 +348,9 @@ describe('StudentsService (iEMIS Export)', () => {
       (prisma.student.findFirst as jest.Mock).mockResolvedValue(
         buildReadinessStudent(),
       );
+      (prisma.staff.findFirst as jest.Mock).mockResolvedValue({
+        id: 'staff-1',
+      });
       (
         prisma.subjectTeacherAssignment.findFirst as jest.Mock
       ).mockResolvedValue({ id: 'assignment-1' });
@@ -355,7 +364,7 @@ describe('StudentsService (iEMIS Export)', () => {
         expect.objectContaining({
           where: expect.objectContaining({
             tenantId: teacherAuth.tenantId,
-            staff: { userId: teacherAuth.userId },
+            staffId: 'staff-1',
             classId: 'class-12',
           }),
         }),
@@ -372,9 +381,13 @@ describe('StudentsService (iEMIS Export)', () => {
       (prisma.student.findFirst as jest.Mock).mockResolvedValue(
         buildReadinessStudent(),
       );
+      (prisma.staff.findFirst as jest.Mock).mockResolvedValue({
+        id: 'staff-2',
+      });
       (
         prisma.subjectTeacherAssignment.findFirst as jest.Mock
       ).mockResolvedValue(null);
+      (prisma.section.findFirst as jest.Mock).mockResolvedValue(null);
 
       await expect(
         service.getIemisReadiness('student-unassigned', teacherAuth),

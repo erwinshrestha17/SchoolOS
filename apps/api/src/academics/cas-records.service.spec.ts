@@ -216,6 +216,22 @@ describe('CasRecordsService', () => {
         service.findOne('cas-1', teacherActor),
       ).resolves.toBeDefined();
     });
+
+    it('allows a section-specific teacher to view a whole-class (sectionId: null) CAS record for their class -- regression for an asymmetric wildcard check found via live edge-case testing', async () => {
+      (prisma.casRecord.findFirst as jest.Mock).mockResolvedValue({
+        id: 'cas-1',
+        classId: 'class-1',
+        sectionId: null,
+      });
+      (prisma.staff.findFirst as jest.Mock).mockResolvedValue({ id: 'staff-1' });
+      (prisma.subjectTeacherAssignment.findMany as jest.Mock).mockResolvedValue([
+        { classId: 'class-1', sectionId: 'section-1' },
+      ]);
+
+      await expect(
+        service.findOne('cas-1', teacherActor),
+      ).resolves.toBeDefined();
+    });
   });
 
   describe('bulkUpsert', () => {
