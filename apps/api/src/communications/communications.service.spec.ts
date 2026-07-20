@@ -137,7 +137,11 @@ describe('CommunicationsService', () => {
       email: 'admin@school.test',
       authMethod: AuthMethod.PASSWORD,
       roles: ['admin'],
-      permissions: ['events:create', 'communications:read_deliveries'],
+      permissions: [
+        'events:create',
+        'notices:create',
+        'communications:read_deliveries',
+      ],
     };
 
     service = new CommunicationsService(
@@ -1558,14 +1562,94 @@ describe('CommunicationsService', () => {
     expect(prisma.notice.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          tenantId: 'tenant-1',
-          lifecycleStatus: NoticeLifecycleStatus.SCHEDULED,
-          priority: NoticePriority.URGENT,
+          AND: expect.arrayContaining([
+            { tenantId: 'tenant-1' },
+            { lifecycleStatus: NoticeLifecycleStatus.SCHEDULED },
+            { priority: NoticePriority.URGENT },
+          ]),
         }),
         skip: 0,
         take: 25,
       }),
     );
+  });
+
+  describe('teacher scoping (confirmed gap: previously any notices:read/events:read holder saw every notice/event in the tenant)', () => {
+    const teacherActor: AuthContext = {
+      userId: 'teacher-1',
+      tenantId: 'tenant-1',
+      tenantSlug: 'green-valley',
+      email: 'teacher@school.test',
+      authMethod: AuthMethod.PASSWORD,
+      roles: ['teacher'],
+      permissions: ['notices:read', 'events:read'],
+    };
+
+    it('scopes listNotices to notices the teacher actually received', async () => {
+      prisma.notice.findMany.mockResolvedValue([]);
+      prisma.notice.count.mockResolvedValue(0);
+
+      await service.listNotices(teacherActor, { page: 1, limit: 25 });
+
+      expect(prisma.notice.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            AND: expect.arrayContaining([
+              {
+                deliveries: {
+                  some: { recipientUserId: teacherActor.userId },
+                },
+              },
+            ]),
+          }),
+        }),
+      );
+    });
+
+    it('does not scope listNotices for a notice administrator', async () => {
+      prisma.notice.findMany.mockResolvedValue([]);
+      prisma.notice.count.mockResolvedValue(0);
+
+      await service.listNotices(actor, { page: 1, limit: 25 });
+
+      const call = (prisma.notice.findMany as jest.Mock).mock.calls[0][0];
+      const andClauses = call.where.AND as unknown[];
+      expect(
+        andClauses.some(
+          (clause) =>
+            typeof clause === 'object' &&
+            clause !== null &&
+            'deliveries' in clause,
+        ),
+      ).toBe(false);
+    });
+
+    it('scopes listEvents to events the teacher actually received', async () => {
+      prisma.event.findMany.mockResolvedValue([]);
+
+      await service.listEvents(teacherActor);
+
+      expect(prisma.event.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            tenantId: 'tenant-1',
+            deliveries: { some: { recipientUserId: teacherActor.userId } },
+          }),
+        }),
+      );
+    });
+
+    it('does not scope listEvents for an events administrator', async () => {
+      prisma.event.findMany.mockResolvedValue([]);
+
+      await service.listEvents(actor);
+
+      expect(prisma.event.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { tenantId: 'tenant-1' },
+        }),
+      );
+    });
   });
 
   it('omits sourceType and activityPostId filters when not provided, preserving prior behavior', async () => {

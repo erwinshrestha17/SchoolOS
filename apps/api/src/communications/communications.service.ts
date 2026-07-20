@@ -53,6 +53,7 @@ import {
   type AcceptNotificationEventInput,
   NotificationEventService,
 } from './notification-event.service';
+import { NOTICE_ADMINISTRATION_PERMISSIONS } from './notice-detail.service';
 
 const TEMPLATE_SELECT = {
   id: true,
@@ -140,21 +141,36 @@ export class CommunicationsService {
     const page = Math.max(1, query.page ?? 1);
     const limit = Math.min(100, Math.max(1, query.limit ?? 25));
     const search = query.search?.trim();
+    // Confirmed gap: this endpoint (notices:read, held by every role including
+    // base teacher) returned every notice in the tenant with no recipient
+    // check, unlike getNoticeDetail which already scopes non-administrators
+    // to notices they actually received. Non-administrators are now limited
+    // to notices where they have a delivery record.
+    const canAdministerNotices = actor.permissions.some((permission) =>
+      NOTICE_ADMINISTRATION_PERMISSIONS.has(permission),
+    );
     const where: Prisma.NoticeWhereInput = {
-      tenantId: actor.tenantId,
-      ...(query.lifecycleStatus
-        ? { lifecycleStatus: query.lifecycleStatus }
-        : {}),
-      ...(query.priority ? { priority: query.priority } : {}),
-      ...(query.audienceType ? { audienceType: query.audienceType } : {}),
-      ...(search
-        ? {
-            OR: [
-              { title: { contains: search, mode: 'insensitive' } },
-              { body: { contains: search, mode: 'insensitive' } },
-            ],
-          }
-        : {}),
+      AND: [
+        { tenantId: actor.tenantId },
+        ...(query.lifecycleStatus
+          ? [{ lifecycleStatus: query.lifecycleStatus }]
+          : []),
+        ...(query.priority ? [{ priority: query.priority }] : []),
+        ...(query.audienceType ? [{ audienceType: query.audienceType }] : []),
+        ...(search
+          ? [
+              {
+                OR: [
+                  { title: { contains: search, mode: 'insensitive' as const } },
+                  { body: { contains: search, mode: 'insensitive' as const } },
+                ],
+              },
+            ]
+          : []),
+        ...(canAdministerNotices
+          ? []
+          : [{ deliveries: { some: { recipientUserId: actor.userId } } }]),
+      ],
     };
     const [items, total] = await Promise.all([
       this.prisma.notice.findMany({
@@ -865,8 +881,18 @@ export class CommunicationsService {
   }
 
   async listEvents(actor: AuthContext) {
+    // Confirmed gap: same pattern as listNotices above — every events:read
+    // holder (including base teacher) saw every event in the tenant
+    // regardless of audience/class/section targeting. Non-administrators are
+    // now limited to events where they have a delivery record.
+    const canAdministerEvents = actor.permissions.includes('events:create');
     return this.prisma.event.findMany({
-      where: { tenantId: actor.tenantId },
+      where: {
+        tenantId: actor.tenantId,
+        ...(canAdministerEvents
+          ? {}
+          : { deliveries: { some: { recipientUserId: actor.userId } } }),
+      },
       orderBy: [{ startsAt: 'asc' }],
       take: 100,
     });

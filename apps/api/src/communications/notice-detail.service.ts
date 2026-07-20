@@ -274,7 +274,7 @@ export class NoticeDetailService {
   }
 }
 
-const NOTICE_ADMINISTRATION_PERMISSIONS = new Set([
+export const NOTICE_ADMINISTRATION_PERMISSIONS = new Set([
   'notices:create',
   'notices:edit',
   'notices:publish',
