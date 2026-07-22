@@ -20,6 +20,7 @@ import {
 } from '@prisma/client';
 import {
   ADMISSION_CASE_REVIEW_ACTIONS,
+  educationProgramForClassLevel,
   getNepalSchoolDay,
   toGregorianDateFromBs,
   zonedNepalDateTimeToUtc,
@@ -30,6 +31,7 @@ import {
   type AdmissionAssessmentStatus,
   type AdmissionAssessmentTab,
   type AdmissionCaseReviewAction,
+  type EducationProgram,
 } from '@schoolos/core';
 import type { AuthContext } from '../auth/auth.types';
 import { ApprovalWorkflowService } from '../advanced-operations/approval-workflow.service';
@@ -272,6 +274,7 @@ interface PolicyResolutionContext {
   policies: PolicyCandidate[];
   classLevelById: Map<string, number | null>;
   classNameById: Map<string, string>;
+  classProgramById: Map<string, EducationProgram | null>;
   versionsById: Map<string, ResolvableVersion>;
 }
 
@@ -313,6 +316,49 @@ interface AdmissionCaseRecord {
   createdAt: Date;
   updatedAt: Date;
 }
+
+export type AdmissionDocumentReminderCandidate =
+  | {
+      admissionCaseId: string;
+      state: 'READY';
+      applicantName: string;
+      guardianPhone: string;
+      sourceUpdatedAt: string;
+      missingDocumentLabels: string[];
+    }
+  | {
+      admissionCaseId: string;
+      state: 'SKIPPED';
+      reason:
+        | 'CASE_UNAVAILABLE'
+        | 'CASE_CLOSED'
+        | 'NO_GUARDIAN_PHONE'
+        | 'NO_LONGER_MISSING';
+    };
+
+type AdmissionDocumentRequestRow = {
+  admissionCaseId: string;
+  admittedStudentId: string | null;
+  applicantName: string;
+  guardianFullName: string | null;
+  guardianPhone: string | null;
+  classId: string | null;
+  className: string | null;
+  program: EducationProgram | null;
+  displayStatus: AdmissionDisplayStatus;
+  policyId: string | null;
+  policyName: string | null;
+  missingDocuments: Array<{
+    documentKind: string;
+    label: string;
+    timing: 'BEFORE_REVIEW' | 'BEFORE_ENROLLMENT';
+    requiresOriginalVerification: boolean;
+    canBeWaived: boolean;
+  }>;
+  daysPending: number;
+  createdAt: string;
+  updatedAt: string;
+};
 
 interface CapacityStatus {
   state: 'NOT_CONFIGURED' | 'AVAILABLE' | 'NEARLY_FULL' | 'FULL';
@@ -375,6 +421,8 @@ interface AdmissionEvaluation {
     sectionRequired?: boolean;
     academicYearName?: string | null;
     className?: string | null;
+    classLevel?: number | null;
+    program?: EducationProgram | null;
     sectionName?: string | null;
     message: string | null;
   };
@@ -650,6 +698,9 @@ export class AdmissionCasesService implements OnModuleInit {
           className: item.admissionCase.classId
             ? (context.classNameById.get(item.admissionCase.classId) ?? null)
             : null,
+          program: item.admissionCase.classId
+            ? (context.classProgramById.get(item.admissionCase.classId) ?? null)
+            : null,
           policyId: resolved.policyId,
           policyName: resolved.policyName,
         }),
@@ -674,6 +725,7 @@ export class AdmissionCasesService implements OnModuleInit {
     const cases = await this.prisma.admissionApplication.findMany({
       where: {
         tenantId: actor.tenantId,
+        ...(query.admissionCaseId ? { id: query.admissionCaseId } : {}),
         status: { notIn: [...TERMINAL_STATUSES] },
         ...(query.classId ? { classId: query.classId } : {}),
         assessmentSessions: { none: {} },
@@ -701,6 +753,9 @@ export class AdmissionCasesService implements OnModuleInit {
         classId: record.classId,
         className: record.classId
           ? (context.classNameById.get(record.classId) ?? null)
+          : null,
+        program: record.classId
+          ? (context.classProgramById.get(record.classId) ?? null)
           : null,
         displayStatus: this.displayStatus(record.status),
         policyId: resolved.policyId,
@@ -948,101 +1003,18 @@ export class AdmissionCasesService implements OnModuleInit {
     });
     const context = await this.buildPolicyResolutionContext(actor, cases);
 
-    const rows: Array<{
-      admissionCaseId: string;
-      admittedStudentId: string | null;
-      applicantName: string;
-      guardianFullName: string | null;
-      guardianPhone: string | null;
-      classId: string | null;
-      className: string | null;
-      displayStatus: AdmissionDisplayStatus;
-      policyId: string | null;
-      policyName: string | null;
-      missingDocuments: Array<{
-        documentKind: string;
-        label: string;
-        timing: 'BEFORE_REVIEW' | 'BEFORE_ENROLLMENT';
-        requiresOriginalVerification: boolean;
-        canBeWaived: boolean;
-      }>;
-      daysPending: number;
-      createdAt: string;
-      updatedAt: string;
-    }> = [];
+    const rows: AdmissionDocumentRequestRow[] = [];
     const documentKindFilter = query.documentKind
       ? this.normalizeDocumentKind(query.documentKind)
       : null;
     for (const record of cases) {
-      const metadata = this.readMetadata(record.duplicateReview);
-      const resolved = await this.resolvePolicy(
-        record,
-        metadata,
-        actor,
-        context,
-      );
-      const required = this.requiredDocumentDetails(
-        resolved.rule,
-        resolved.documentRequirements,
-        metadata,
-        record.source,
-      );
-      const present = new Set(
-        (metadata.documents ?? []).map((document) =>
-          this.normalizeDocumentKind(document.kind),
-        ),
-      );
-      const waived = new Set(
-        (metadata.documentWaivers ?? []).map((waiver) =>
-          this.normalizeDocumentKind(waiver.documentKind),
-        ),
-      );
-      const missingDocuments = required.filter(
-        (document) =>
-          !present.has(document.documentKind) &&
-          !waived.has(document.documentKind),
-      );
-      if (missingDocuments.length === 0) continue;
-      if (query.policyId && resolved.policyId !== query.policyId) continue;
-      const filteredMissingDocuments = missingDocuments.filter((document) => {
-        if (
-          documentKindFilter &&
-          document.documentKind !== documentKindFilter
-        ) {
-          return false;
-        }
-        if (query.timing && document.timing !== query.timing) return false;
-        return true;
+      const row = await this.documentRequestRow(record, actor, context, {
+        policyId: query.policyId,
+        documentKind: documentKindFilter,
+        timing: query.timing,
+        minDaysPending: query.minDaysPending,
       });
-      if (filteredMissingDocuments.length === 0) continue;
-      const daysPending = Math.max(
-        0,
-        Math.floor((Date.now() - record.createdAt.getTime()) / 86_400_000),
-      );
-      if (
-        query.minDaysPending !== undefined &&
-        daysPending < query.minDaysPending
-      ) {
-        continue;
-      }
-      rows.push({
-        admissionCaseId: record.id,
-        admittedStudentId: record.convertedStudentId,
-        applicantName: `${record.firstNameEn} ${record.lastNameEn}`.trim(),
-        guardianFullName: record.guardianFullName,
-        guardianPhone: record.guardianPhone,
-        classId: record.classId,
-        className: record.classId
-          ? (context.classNameById.get(record.classId) ?? null)
-          : null,
-        displayStatus: this.displayStatus(record.status),
-        policyId: resolved.policyId,
-        policyName: resolved.policyName,
-        missingDocuments: filteredMissingDocuments,
-        daysPending,
-        createdAt: record.createdAt.toISOString(),
-        updatedAt: record.updatedAt.toISOString(),
-      });
+      if (row) rows.push(row);
     }
     rows.sort(
       (left, right) =>
@@ -1090,6 +1062,149 @@ export class AdmissionCasesService implements OnModuleInit {
       // the UI must say so rather than present a partial count as complete.
       scanComplete: cases.length < DOCUMENT_REQUESTS_SCAN_LIMIT,
       summary,
+    };
+  }
+
+  async resolveDocumentReminderCandidates(
+    admissionCaseIds: string[],
+    actor: AuthContext,
+  ): Promise<AdmissionDocumentReminderCandidate[]> {
+    const requestedIds = [...new Set(admissionCaseIds)].slice(0, 25);
+    const cases = await this.prisma.admissionApplication.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        id: { in: requestedIds },
+      },
+      take: 25,
+    });
+    const byId = new Map(cases.map((record) => [record.id, record]));
+    const context = await this.buildPolicyResolutionContext(actor, cases);
+    const results: AdmissionDocumentReminderCandidate[] = [];
+
+    for (const admissionCaseId of requestedIds) {
+      const record = byId.get(admissionCaseId);
+      if (!record) {
+        results.push({
+          admissionCaseId,
+          state: 'SKIPPED',
+          reason: 'CASE_UNAVAILABLE',
+        });
+        continue;
+      }
+      if (DOCUMENT_REQUEST_EXCLUDED_STATUSES.has(record.status)) {
+        results.push({
+          admissionCaseId,
+          state: 'SKIPPED',
+          reason: 'CASE_CLOSED',
+        });
+        continue;
+      }
+
+      const row = await this.documentRequestRow(record, actor, context);
+      if (!row) {
+        results.push({
+          admissionCaseId,
+          state: 'SKIPPED',
+          reason: 'NO_LONGER_MISSING',
+        });
+        continue;
+      }
+      if (!row.guardianPhone) {
+        results.push({
+          admissionCaseId,
+          state: 'SKIPPED',
+          reason: 'NO_GUARDIAN_PHONE',
+        });
+        continue;
+      }
+
+      results.push({
+        admissionCaseId,
+        state: 'READY',
+        applicantName: row.applicantName,
+        guardianPhone: row.guardianPhone,
+        sourceUpdatedAt: row.updatedAt,
+        missingDocumentLabels: row.missingDocuments.map(
+          (document) => document.label,
+        ),
+      });
+    }
+
+    return results;
+  }
+
+  private async documentRequestRow(
+    record: AdmissionCaseRecord,
+    actor: AuthContext,
+    context: PolicyResolutionContext,
+    filters: {
+      policyId?: string;
+      documentKind?: string | null;
+      timing?: 'BEFORE_REVIEW' | 'BEFORE_ENROLLMENT';
+      minDaysPending?: number;
+    } = {},
+  ): Promise<AdmissionDocumentRequestRow | null> {
+    const metadata = this.readMetadata(record.duplicateReview);
+    const resolved = await this.resolvePolicy(record, metadata, actor, context);
+    if (filters.policyId && resolved.policyId !== filters.policyId) return null;
+
+    const required = this.requiredDocumentDetails(
+      resolved.rule,
+      resolved.documentRequirements,
+      metadata,
+      record.source,
+    );
+    const present = new Set(
+      (metadata.documents ?? []).map((document) =>
+        this.normalizeDocumentKind(document.kind),
+      ),
+    );
+    const waived = new Set(
+      (metadata.documentWaivers ?? []).map((waiver) =>
+        this.normalizeDocumentKind(waiver.documentKind),
+      ),
+    );
+    const missingDocuments = required.filter(
+      (document) =>
+        !present.has(document.documentKind) &&
+        !waived.has(document.documentKind) &&
+        (!filters.documentKind ||
+          document.documentKind === filters.documentKind) &&
+        (!filters.timing || document.timing === filters.timing),
+    );
+    if (missingDocuments.length === 0) return null;
+
+    const daysPending = Math.max(
+      0,
+      Math.floor((Date.now() - record.createdAt.getTime()) / 86_400_000),
+    );
+    if (
+      filters.minDaysPending !== undefined &&
+      daysPending < filters.minDaysPending
+    ) {
+      return null;
+    }
+
+    return {
+      admissionCaseId: record.id,
+      admittedStudentId: record.convertedStudentId,
+      applicantName: `${record.firstNameEn} ${record.lastNameEn}`.trim(),
+      guardianFullName: record.guardianFullName,
+      guardianPhone: record.guardianPhone,
+      classId: record.classId,
+      className: record.classId
+        ? (context.classNameById.get(record.classId) ?? null)
+        : null,
+      program: record.classId
+        ? (context.classProgramById.get(record.classId) ?? null)
+        : null,
+      displayStatus: this.displayStatus(record.status),
+      policyId: resolved.policyId,
+      policyName: resolved.policyName,
+      missingDocuments,
+      daysPending,
+      createdAt: record.createdAt.toISOString(),
+      updatedAt: record.updatedAt.toISOString(),
     };
   }
 
@@ -1143,6 +1258,12 @@ export class AdmissionCasesService implements OnModuleInit {
       policies,
       classLevelById: new Map(classes.map((item) => [item.id, item.level])),
       classNameById: new Map(classes.map((item) => [item.id, item.name])),
+      classProgramById: new Map(
+        classes.map((item) => [
+          item.id,
+          educationProgramForClassLevel(item.level),
+        ]),
+      ),
       versionsById,
     };
   }
@@ -1265,6 +1386,9 @@ export class AdmissionCasesService implements OnModuleInit {
       className: session.admissionCase.classId
         ? (context.classNameById.get(session.admissionCase.classId) ?? null)
         : null,
+      program: session.admissionCase.classId
+        ? (context.classProgramById.get(session.admissionCase.classId) ?? null)
+        : null,
       policyId: resolved.policyId,
       policyName: resolved.policyName,
     });
@@ -1275,6 +1399,7 @@ export class AdmissionCasesService implements OnModuleInit {
     record: AdmissionCaseRecord,
     context: {
       className: string | null;
+      program: EducationProgram | null;
       policyId: string | null;
       policyName: string | null;
     },
@@ -1287,6 +1412,7 @@ export class AdmissionCasesService implements OnModuleInit {
       guardianPhone: record.guardianPhone,
       classId: record.classId,
       className: context.className,
+      program: context.program,
       displayStatus: this.displayStatus(record.status),
       policyId: context.policyId,
       policyName: context.policyName,
@@ -2038,6 +2164,7 @@ export class AdmissionCasesService implements OnModuleInit {
       academic: {
         academicYearId: record.academicYearId,
         classId: record.classId,
+        program: evaluation.classSection.program ?? null,
         sectionId: record.sectionId,
         admissionDate: metadata.admissionDate ?? null,
         rollNumber: metadata.rollNumber ?? null,
@@ -2200,6 +2327,7 @@ export class AdmissionCasesService implements OnModuleInit {
     const formattedAssessmentSession = assessmentSession
       ? this.formatAssessmentSession(assessmentSession, record, {
           className: placement.classSection.className ?? null,
+          program: placement.classSection.program ?? null,
           policyId: resolved.policyId,
           policyName: resolved.policyName,
         })
@@ -2746,6 +2874,8 @@ export class AdmissionCasesService implements OnModuleInit {
           valid: false,
           academicYearName: null,
           className: null,
+          classLevel: null,
+          program: null,
           sectionName: null,
           message: 'Academic year and class are required.',
         },
@@ -2760,7 +2890,7 @@ export class AdmissionCasesService implements OnModuleInit {
       }),
       this.prisma.class.findFirst({
         where: { id: record.classId, tenantId: actor.tenantId },
-        select: { id: true, name: true },
+        select: { id: true, name: true, level: true },
       }),
       record.sectionId
         ? this.prisma.section.findFirst({
@@ -2792,6 +2922,8 @@ export class AdmissionCasesService implements OnModuleInit {
           valid: false,
           academicYearName: null,
           className: null,
+          classLevel: null,
+          program: null,
           sectionName: null,
           message: 'Choose a valid class and section for this school.',
         },
@@ -2833,6 +2965,8 @@ export class AdmissionCasesService implements OnModuleInit {
         valid: true,
         academicYearName: academicYear.name,
         className: classroom.name,
+        classLevel: classroom.level,
+        program: educationProgramForClassLevel(classroom.level),
         sectionName: section?.name ?? null,
         message: null,
       },

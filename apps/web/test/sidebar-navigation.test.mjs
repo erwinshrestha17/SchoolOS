@@ -117,6 +117,8 @@ describe('school operations sidebar', () => {
     // on close.
     assert.match(sidebar, /role="dialog"/);
     assert.match(sidebar, /aria-modal="true"/);
+    assert.match(sidebar, /aria-hidden=\{!mobileOpen\}/);
+    assert.match(sidebar, /inert=\{!mobileOpen\}/);
     assert.match(sidebar, /mobilePanelRef\.current\?\.focus\(\)/);
     assert.match(sidebar, /document\.addEventListener\('keydown', handleKeyDown\)/);
     assert.match(sidebar, /event\.key === 'Escape'/);

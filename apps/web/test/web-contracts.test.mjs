@@ -1238,12 +1238,18 @@ describe('SchoolOS web production contracts', () => {
     assert.match(studentQrCard, /api\.generateStudentQr\(studentId\)/);
     assert.match(
       studentQrCard,
-      /api\.rotateStudentQr\(studentId, \{ reason: rotateReason \}\)/,
+      /api\.rotateStudentQr\(studentId, \{ reason: rotateReason\.trim\(\) \}\)/,
     );
     assert.match(
       studentQrCard,
-      /api\.revokeStudentQr\(studentId, \{ reason: revokeReason \}\)/,
+      /api\.revokeStudentQr\(studentId, \{ reason: revokeReason\.trim\(\) \}\)/,
     );
+    assert.match(studentQrCard, /ConfirmDialog/);
+    assert.match(studentQrCard, /preventCloseWhileConfirming/);
+    assert.match(studentQrCard, /STUDENT_QR_REASON_MIN_LENGTH/);
+    assert.match(studentQrCard, /STUDENT_QR_REASON_MAX_LENGTH/);
+    assert.match(studentQrCard, /QrActionError/);
+    assert.match(studentQrCard, /role="alert"/);
     assert.match(studentQrCard, /color-mod-admissions-accent/);
     assert.match(studentQrCard, /ProtectedFileButton/);
     assert.match(
@@ -1252,7 +1258,7 @@ describe('SchoolOS web production contracts', () => {
     );
     assert.match(
       studentQrCard,
-      /credential secrets are held only in backend memory/i,
+      /credential secrets are held\s+only in backend memory/i,
     );
     assert.doesNotMatch(
       studentQrCard,

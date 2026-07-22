@@ -31,6 +31,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { StudentPhotoPreview } from './student-photo-preview';
 import { BsDateField } from '@/components/ui/bs-date-field';
 import { api } from '@/lib/api';
+import { schoolFacingErrorMessage } from '@/lib/school-facing-error';
 
 const STUDENT_PHOTO_MAX_BYTES = 2 * 1024 * 1024;
 const STUDENT_PHOTO_MIME_TYPES = new Set([
@@ -167,11 +168,7 @@ export function StudentEditCard({
       const gregorian = toGregorianDateFromBs(parseBsDateInput(dateOfBirthBs));
       dateOfBirth = `${gregorian.year}-${String(gregorian.month).padStart(2, '0')}-${String(gregorian.day).padStart(2, '0')}`;
     } catch (error) {
-      setValidationError(
-        error instanceof Error
-          ? error.message
-          : 'Enter a valid BS date of birth.',
-      );
+      setValidationError('Enter a valid BS date of birth.');
       return;
     }
     if (!isValidDateOfBirth(dateOfBirth)) {
@@ -320,7 +317,15 @@ export function StudentEditCard({
             ) : null}
             {photoError ? (
               <p className="mt-3 text-sm font-bold text-danger-500">
-                {photoError.message}
+                {schoolFacingErrorMessage(photoError, {
+                  fallback:
+                    'The student photo could not be updated. The existing photo was not changed.',
+                  invalid:
+                    'Use a valid JPG, PNG, or WEBP image that is 2MB or smaller.',
+                  forbidden:
+                    'You do not have permission to change this student photo.',
+                  notFound: 'This student record is no longer available.',
+                })}
               </p>
             ) : null}
           </div>
@@ -571,7 +576,19 @@ export function StudentEditCard({
             </p>
           ) : null}
           {error ? (
-            <p className="text-sm font-bold text-danger-500">{error.message}</p>
+            <p className="text-sm font-bold text-danger-500">
+              {schoolFacingErrorMessage(error, {
+                fallback:
+                  'The student profile could not be saved. Existing details were not changed.',
+                invalid:
+                  'Review the student identity, enrollment, and required support details.',
+                forbidden:
+                  'You do not have permission to update this student profile.',
+                notFound: 'This student record is no longer available.',
+                conflict:
+                  'This student profile changed while you were editing it. Refresh and try again.',
+              })}
+            </p>
           ) : null}
           <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-6">
             <button

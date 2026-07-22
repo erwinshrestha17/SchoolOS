@@ -23,11 +23,16 @@ import {
   UserRoundCheck,
 } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/api";
 import { ApiRequestError } from "../../lib/api/client";
 import { admissionCasesApi } from "../../lib/api/admission-cases";
 import { admissionPoliciesApi } from "../../lib/api/admission-policies";
+import { schoolFacingErrorMessage } from "../../lib/school-facing-error";
+import {
+  classOptionLabel,
+  educationProgramLabel,
+} from "../../lib/education-program";
 import { useUrlFilters } from "../../lib/hooks/use-url-filters";
 import { useSession } from "../session-provider";
 import { Button } from "../ui/button";
@@ -63,11 +68,13 @@ export function AssessmentInterviewWorkspace() {
   const canManage = hasPermissions(["students:manage_lifecycle"]);
   const [filters, setFilters] = useUrlFilters<{
     tab: AdmissionAssessmentTab;
+    admissionCaseId: string;
     policyId: string;
     classId: string;
     page: number;
   }>({
     tab: "TODAY",
+    admissionCaseId: "",
     policyId: "",
     classId: "",
     page: 1,
@@ -116,11 +123,13 @@ export function AssessmentInterviewWorkspace() {
   const candidatesQuery = useQuery({
     queryKey: [
       "admission-assessment-candidates",
+      filters.admissionCaseId,
       filters.policyId,
       filters.classId,
     ],
     queryFn: () =>
       admissionCasesApi.listAssessmentCandidates({
+        admissionCaseId: filters.admissionCaseId || undefined,
         policyId: filters.policyId || undefined,
         classId: filters.classId || undefined,
         page: 1,
@@ -144,6 +153,19 @@ export function AssessmentInterviewWorkspace() {
     (candidate) => candidate.admissionCaseId === scheduleForm.admissionCaseId,
   );
 
+  useEffect(() => {
+    if (!filters.admissionCaseId) return;
+    const candidate = candidatesQuery.data?.items.find(
+      (item) => item.admissionCaseId === filters.admissionCaseId,
+    );
+    if (!candidate) return;
+    setScheduleForm((current) =>
+      current.admissionCaseId === candidate.admissionCaseId
+        ? current
+        : { ...current, admissionCaseId: candidate.admissionCaseId },
+    );
+  }, [candidatesQuery.data?.items, filters.admissionCaseId]);
+
   const scheduleMutation = useMutation({
     mutationFn: () =>
       admissionCasesApi.scheduleAssessmentSession(
@@ -158,6 +180,7 @@ export function AssessmentInterviewWorkspace() {
         },
       ),
     onSuccess: async () => {
+      setFilters({ admissionCaseId: "" }, { history: "replace" });
       setScheduleForm((current) => ({
         ...current,
         admissionCaseId: "",
@@ -275,7 +298,7 @@ export function AssessmentInterviewWorkspace() {
               <option value="">All classes</option>
               {(classesQuery.data ?? []).map((schoolClass) => (
                 <option key={schoolClass.id} value={schoolClass.id}>
-                  {schoolClass.name}
+                  {classOptionLabel(schoolClass)}
                 </option>
               ))}
             </select>
@@ -301,7 +324,7 @@ export function AssessmentInterviewWorkspace() {
             </h2>
             <p className="mt-1 text-sm text-slate-600">
               {selectedCandidate
-                ? `${selectedCandidate.applicantName} · ${selectedCandidate.className ?? "Class not selected"}`
+                ? `${selectedCandidate.applicantName} · ${selectedCandidate.className ?? "Class not selected"} · ${educationProgramLabel(selectedCandidate.program)}`
                 : "Choose an interview-required admission case."}
             </p>
           </div>
@@ -316,12 +339,14 @@ export function AssessmentInterviewWorkspace() {
             Case
             <select
               value={scheduleForm.admissionCaseId}
-              onChange={(event) =>
+              onChange={(event) => {
+                const admissionCaseId = event.target.value;
                 setScheduleForm((current) => ({
                   ...current,
-                  admissionCaseId: event.target.value,
-                }))
-              }
+                  admissionCaseId,
+                }));
+                setFilters({ admissionCaseId }, { history: "replace" });
+              }}
               disabled={!canManage}
               className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
             >
@@ -332,11 +357,33 @@ export function AssessmentInterviewWorkspace() {
                   value={candidate.admissionCaseId}
                 >
                   {candidate.applicantName} ·{" "}
-                  {candidate.className ?? "No class"}
+                  {candidate.className ?? "No class"} ·{" "}
+                  {educationProgramLabel(candidate.program)}
                 </option>
               ))}
             </select>
           </label>
+          {candidatesQuery.isError ? (
+            <div
+              role="alert"
+              className="lg:col-span-5 rounded-xl border border-danger-200 bg-danger-50 p-3 text-sm text-danger-900"
+            >
+              <p className="font-bold">Scheduling candidates could not load.</p>
+              <p className="mt-1">
+                No assessment was changed. Refresh the eligible case list and
+                try again.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-3"
+                onClick={() => void candidatesQuery.refetch()}
+              >
+                <RefreshCw className="h-4 w-4" />
+                Retry candidates
+              </Button>
+            </div>
+          ) : null}
           <label className="block text-sm font-bold text-slate-700">
             BS date
             <input
@@ -695,7 +742,8 @@ function AssessmentRow({
           {row.policyName ?? "No matched policy"}
         </p>
         <p className="mt-1 text-xs text-slate-500">
-          {row.className ?? "Class not selected"}
+          {row.className ?? "Class not selected"} ·{" "}
+          {educationProgramLabel(row.program)}
         </p>
         <div className="mt-2">
           <StatusBadge status={row.displayStatus} />
@@ -810,9 +858,17 @@ async function refreshAssessmentQueries(
 
 function readError(error: unknown) {
   if (!error) return "";
-  return error instanceof Error
-    ? error.message
-    : "The action could not be saved.";
+  return schoolFacingErrorMessage(error, {
+    fallback:
+      "The assessment action could not be saved. No candidate result was changed.",
+    invalid:
+      "Review the schedule, candidate, mode, and result details before continuing.",
+    forbidden:
+      "You do not have permission to change assessment or interview records.",
+    notFound: "This candidate or assessment session is no longer available.",
+    conflict:
+      "This assessment record changed while you were working. Refresh and try again.",
+  });
 }
 
 function isModuleLockedError(error: unknown) {

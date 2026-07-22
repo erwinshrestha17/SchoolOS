@@ -8,6 +8,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ApiOkResponse } from '@nestjs/swagger';
 import type { AuthContext } from '../auth/auth.types';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
@@ -16,6 +17,7 @@ import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { AdmissionCasesService } from './admission-cases.service';
+import { AdmissionDocumentReminderService } from './admission-document-reminder.service';
 import {
   CreateAdmissionCaseDto,
   DirectAdmitAdmissionCaseDto,
@@ -24,6 +26,7 @@ import {
   ListAdmissionAssessmentSessionsDto,
   ListDocumentRequestsDto,
   RecordAdmissionAssessmentResultDto,
+  RequestAdmissionDocumentRemindersDto,
   ReviewAdmissionCaseDto,
   ScheduleAdmissionAssessmentDto,
   UpdateAdmissionCaseDto,
@@ -34,7 +37,10 @@ import {
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
 @Entitlement('module.students')
 export class AdmissionCasesController {
-  constructor(private readonly admissionCasesService: AdmissionCasesService) {}
+  constructor(
+    private readonly admissionCasesService: AdmissionCasesService,
+    private readonly admissionDocumentReminderService: AdmissionDocumentReminderService,
+  ) {}
 
   @Get('document-requests')
   @Permissions('enrollments:read', 'students:read', 'guardians:read')
@@ -43,6 +49,53 @@ export class AdmissionCasesController {
     @CurrentAuth() actor: AuthContext,
   ) {
     return this.admissionCasesService.listDocumentRequests(query, actor);
+  }
+
+  @Post('document-requests/reminders')
+  @Permissions('students:manage_lifecycle', 'guardians:read')
+  @ApiOkResponse({
+    description: 'Bounded tenant-scoped reminder queue outcome.',
+    schema: {
+      type: 'object',
+      required: ['requested', 'queued', 'alreadyQueued', 'skipped', 'results'],
+      properties: {
+        requested: { type: 'integer', minimum: 1, maximum: 25 },
+        queued: { type: 'integer', minimum: 0 },
+        alreadyQueued: { type: 'integer', minimum: 0 },
+        skipped: { type: 'integer', minimum: 0 },
+        results: {
+          type: 'array',
+          items: {
+            type: 'object',
+            required: ['admissionCaseId', 'state', 'reason'],
+            properties: {
+              admissionCaseId: { type: 'string', format: 'uuid' },
+              state: {
+                type: 'string',
+                enum: ['QUEUED', 'ALREADY_QUEUED', 'SKIPPED'],
+              },
+              reason: {
+                type: 'string',
+                nullable: true,
+                enum: [
+                  'CASE_UNAVAILABLE',
+                  'CASE_CLOSED',
+                  'NO_GUARDIAN_PHONE',
+                  'NO_LONGER_MISSING',
+                  'DELIVERY_UNAVAILABLE',
+                ],
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+  requestDocumentReminders(
+    @Body() dto: RequestAdmissionDocumentRemindersDto,
+    @CurrentAuth() actor: AuthContext,
+  ) {
+    return this.admissionDocumentReminderService.requestReminders(dto, actor);
   }
 
   @Get('assessment-sessions')

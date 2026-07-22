@@ -1,9 +1,10 @@
 "use client";
 
-import type {
-  AdmissionCase,
-  CreateAdmissionCasePayload,
-  ReviewAdmissionCasePayload,
+import {
+  toGregorianDateFromBs,
+  type AdmissionCase,
+  type CreateAdmissionCasePayload,
+  type ReviewAdmissionCasePayload,
 } from "@schoolos/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -20,7 +21,9 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { api } from "../../lib/api";
 import { admissionCasesApi } from "../../lib/api/admission-cases";
+import { schoolFacingErrorMessage } from "../../lib/school-facing-error";
 import { Button } from "../ui/button";
+import { BsDateField } from "../ui/bs-date-field";
 import { ConfirmDialog } from "../ui/confirm-dialog";
 import { ErrorState } from "../ui/error-state";
 import { ProtectedFileButton } from "../ui/protected-file";
@@ -33,9 +36,10 @@ export function AdmissionCaseDetail({
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [reviewAction, setReviewAction] = useState<
-    Exclude<ReviewAdmissionCasePayload["action"], "REJECT"> | null
-  >(null);
+  const [reviewAction, setReviewAction] = useState<Exclude<
+    ReviewAdmissionCasePayload["action"],
+    "REJECT"
+  > | null>(null);
   const [reason, setReason] = useState("");
   const [confirmDuplicateOverride, setConfirmDuplicateOverride] =
     useState(false);
@@ -467,10 +471,7 @@ export function AdmissionCaseDetail({
             </Button>
           ) : null}
           {availableReviewActions.has("APPROVE") ? (
-            <Button
-              type="button"
-              onClick={() => setReviewAction("APPROVE")}
-            >
+            <Button type="button" onClick={() => setReviewAction("APPROVE")}>
               <ClipboardCheck className="h-4 w-4" />
               Approve
             </Button>
@@ -619,6 +620,8 @@ function AdmissionCaseMissingDetails({
   const [corrections, setCorrections] = useState<
     Partial<CreateAdmissionCasePayload>
   >({});
+  const [dateOfBirthBs, setDateOfBirthBs] = useState("");
+  const [admissionDateBs, setAdmissionDateBs] = useState("");
   const needsPlacement = admissionCase.missingRequiredFields.some((field) =>
     ["academicYearId", "classId", "sectionId"].includes(field),
   );
@@ -646,6 +649,8 @@ function AdmissionCaseMissingDetails({
       admissionCasesApi.updateCase(admissionCase.id, corrections),
     onSuccess: async () => {
       setCorrections({});
+      setDateOfBirthBs("");
+      setAdmissionDateBs("");
       await onSaved();
     },
   });
@@ -653,6 +658,26 @@ function AdmissionCaseMissingDetails({
     key: K,
     value: CreateAdmissionCasePayload[K],
   ) => setCorrections((current) => ({ ...current, [key]: value }));
+  const updateBsDate = (
+    field: "dateOfBirth" | "admissionDate",
+    value: string,
+  ) => {
+    if (field === "dateOfBirth") setDateOfBirthBs(value);
+    else setAdmissionDateBs(value);
+    try {
+      const date = toGregorianDateFromBs(value);
+      update(
+        field,
+        `${String(date.year).padStart(4, "0")}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`,
+      );
+    } catch {
+      setCorrections((current) => {
+        const next = { ...current };
+        delete next[field];
+        return next;
+      });
+    }
+  };
 
   return (
     <SectionCard
@@ -661,17 +686,60 @@ function AdmissionCaseMissingDetails({
     >
       <div className="grid gap-4 md:grid-cols-2">
         {admissionCase.missingRequiredFields.map((field) => {
-          if (field === "dateOfBirth")
+          if (field === "firstNameEn")
             return (
-              <CorrectionField key={field} label="Date of birth">
+              <CorrectionField key={field} label="First name (English)">
                 <input
-                  type="date"
-                  value={corrections.dateOfBirth ?? ""}
+                  value={corrections.firstNameEn ?? ""}
                   onChange={(event) =>
-                    update("dateOfBirth", event.target.value)
+                    update("firstNameEn", event.target.value)
                   }
                 />
               </CorrectionField>
+            );
+          if (field === "lastNameEn")
+            return (
+              <CorrectionField key={field} label="Last name (English)">
+                <input
+                  value={corrections.lastNameEn ?? ""}
+                  onChange={(event) => update("lastNameEn", event.target.value)}
+                />
+              </CorrectionField>
+            );
+          if (field === "firstNameNp")
+            return (
+              <CorrectionField key={field} label="First name (Nepali)">
+                <input
+                  value={corrections.firstNameNp ?? ""}
+                  onChange={(event) =>
+                    update("firstNameNp", event.target.value)
+                  }
+                />
+              </CorrectionField>
+            );
+          if (field === "lastNameNp")
+            return (
+              <CorrectionField key={field} label="Last name (Nepali)">
+                <input
+                  value={corrections.lastNameNp ?? ""}
+                  onChange={(event) => update("lastNameNp", event.target.value)}
+                />
+              </CorrectionField>
+            );
+          if (field === "dateOfBirth")
+            return (
+              <BsDateField
+                key={field}
+                label="Date of birth (BS)"
+                value={dateOfBirthBs}
+                onChange={(value) => updateBsDate("dateOfBirth", value)}
+                error={
+                  dateOfBirthBs && !corrections.dateOfBirth
+                    ? "Enter a valid BS date in YYYY-MM-DD format."
+                    : null
+                }
+                required
+              />
             );
           if (field === "gender")
             return (
@@ -806,15 +874,18 @@ function AdmissionCaseMissingDetails({
             );
           if (field === "admissionDate")
             return (
-              <CorrectionField key={field} label="Admission date">
-                <input
-                  type="date"
-                  value={corrections.admissionDate ?? ""}
-                  onChange={(event) =>
-                    update("admissionDate", event.target.value)
-                  }
-                />
-              </CorrectionField>
+              <BsDateField
+                key={field}
+                label="Admission date (BS)"
+                value={admissionDateBs}
+                onChange={(value) => updateBsDate("admissionDate", value)}
+                error={
+                  admissionDateBs && !corrections.admissionDate
+                    ? "Enter a valid BS date in YYYY-MM-DD format."
+                    : null
+                }
+                required
+              />
             );
           if (field === "nationalStudentId")
             return (
@@ -855,7 +926,9 @@ function AdmissionCaseMissingDetails({
               key={field}
               className="rounded-xl border border-warning-200 bg-warning-50 p-3 text-sm font-semibold text-warning-900"
             >
-              {humanize(field)} needs backend-supported correction.
+              This policy asks for {humanize(field).toLowerCase()}, which is not
+              available in this form. Ask a school administrator to update the
+              admission policy.
             </p>
           );
         })}
@@ -1021,9 +1094,15 @@ function humanize(value: string) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 function readError(error: unknown) {
-  return error instanceof Error
-    ? error.message
-    : error
-      ? "The admission action could not be completed."
-      : "";
+  if (!error) return "";
+  return schoolFacingErrorMessage(error, {
+    fallback:
+      "The admission action could not be completed. The case was not changed.",
+    invalid:
+      "Review the action, reason, and admission requirements before continuing.",
+    forbidden: "You do not have permission to complete this admission action.",
+    notFound: "This admission case is no longer available.",
+    conflict:
+      "This admission case changed while you were working. Refresh it and try again.",
+  });
 }

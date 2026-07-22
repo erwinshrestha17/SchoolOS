@@ -1,6 +1,9 @@
 import type {
   AdmissionCase,
   AdmissionCaseEligibility,
+  AdmissionCaseQueueItem,
+  AdmissionCaseQueueName,
+  AdmissionCaseQueuePage,
   AdmissionAssessmentCandidatePage,
   AdmissionAssessmentMode,
   AdmissionAssessmentResult,
@@ -8,6 +11,7 @@ import type {
   AdmissionAssessmentSessionPage,
   AdmissionAssessmentTab,
   AdmissionDocumentRequestPage,
+  AdmissionDocumentReminderBatchResult,
   AdmissionDocumentTiming,
   CreateAdmissionCasePayload,
   DirectAdmitAdmissionCasePayload,
@@ -16,31 +20,8 @@ import type {
 } from "@schoolos/core";
 import { request } from "./client";
 
-export type AdmissionCaseQueue =
-  | "NEEDS_INFORMATION"
-  | "WAITING_FOR_REVIEW"
-  | "READY_TO_ADMIT"
-  | "WAITLISTED"
-  | "APPROVED"
-  | "NOT_ADMITTED"
-  | "DOCUMENTS_PENDING"
-  | "DUPLICATE_WARNINGS"
-  | "COMPLETED";
-
-export type AdmissionCaseQueueItem = {
-  id: string;
-  displayStatus: string;
-  fullNameEn: string;
-  guardianFullName: string | null;
-  guardianPhone: string | null;
-  source: string;
-  classId: string | null;
-  sectionId: string | null;
-  admittedStudentId: string | null;
-  hasDuplicateWarning: boolean;
-  hasDocumentsPending: boolean;
-  updatedAt: string;
-};
+export type AdmissionCaseQueue = AdmissionCaseQueueName;
+export type { AdmissionCaseQueueItem };
 
 export type AdmissionFollowUp = {
   code: string;
@@ -68,12 +49,15 @@ export const admissionCasesApi = {
     );
   },
   listAssessmentCandidates: (query: {
+    admissionCaseId?: string;
     policyId?: string;
     classId?: string;
     page?: number;
     limit?: number;
   }) => {
     const searchParams = new URLSearchParams();
+    if (query.admissionCaseId)
+      searchParams.set("admissionCaseId", query.admissionCaseId);
     if (query.policyId) searchParams.set("policyId", query.policyId);
     if (query.classId) searchParams.set("classId", query.classId);
     if (query.page) searchParams.set("page", String(query.page));
@@ -142,6 +126,14 @@ export const admissionCasesApi = {
       `/admissions/document-requests${suffix ? `?${suffix}` : ""}`,
     );
   },
+  requestDocumentReminders: (admissionCaseIds: string[]) =>
+    request<AdmissionDocumentReminderBatchResult>(
+      "/admissions/document-requests/reminders",
+      {
+        method: "POST",
+        json: { admissionCaseIds },
+      },
+    ),
   listQueues: (query: {
     queue?: AdmissionCaseQueue;
     page?: number;
@@ -154,13 +146,9 @@ export const admissionCasesApi = {
     if (query.limit) searchParams.set("limit", String(query.limit));
     if (query.search?.trim()) searchParams.set("search", query.search.trim());
     const suffix = searchParams.toString();
-    return request<{
-      items: AdmissionCaseQueueItem[];
-      total: number;
-      page: number;
-      limit: number;
-      hasNextPage: boolean;
-    }>(`/admissions/cases${suffix ? `?${suffix}` : ""}`);
+    return request<AdmissionCaseQueuePage>(
+      `/admissions/cases${suffix ? `?${suffix}` : ""}`,
+    );
   },
   getStudentFollowUps: (studentId: string) =>
     request<{

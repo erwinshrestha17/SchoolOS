@@ -2,6 +2,7 @@ import type {
   AdmissionDocumentTiming,
   AdmissionPolicyResolution,
 } from "./admission-policies.js";
+import type { EducationProgram } from "./types.js";
 
 export const ADMISSION_CASE_DISPLAY_STATUSES = [
   "DRAFT",
@@ -21,6 +22,32 @@ export const ADMISSION_CASE_SOURCES = [
   "PHONE_INQUIRY",
   "TRANSFER_REQUEST",
   "IMPORT",
+] as const;
+
+/**
+ * Admission-policy fields that the case evaluator can resolve from persisted
+ * application data. Keeping this list in the shared contract prevents a
+ * policy from creating a blocker that no API or client can satisfy.
+ */
+export const ADMISSION_POLICY_REQUIRED_FIELDS = [
+  "firstNameEn",
+  "lastNameEn",
+  "firstNameNp",
+  "lastNameNp",
+  "dateOfBirth",
+  "gender",
+  "guardianFullName",
+  "guardianRelation",
+  "guardianPhone",
+  "guardianEmail",
+  "academicYearId",
+  "classId",
+  "sectionId",
+  "previousSchool",
+  "admissionDate",
+  "nationalStudentId",
+  "emergencyName",
+  "emergencyPhone",
 ] as const;
 
 export const ADMISSION_CASE_REVIEW_ACTIONS = [
@@ -64,6 +91,8 @@ export const ADMISSION_ASSESSMENT_RESULTS = [
 export type AdmissionCaseDisplayStatus =
   (typeof ADMISSION_CASE_DISPLAY_STATUSES)[number];
 export type AdmissionCaseSource = (typeof ADMISSION_CASE_SOURCES)[number];
+export type AdmissionPolicyRequiredField =
+  (typeof ADMISSION_POLICY_REQUIRED_FIELDS)[number];
 export type AdmissionCaseReviewAction =
   (typeof ADMISSION_CASE_REVIEW_ACTIONS)[number];
 export type AdmissionAssessmentTab = (typeof ADMISSION_ASSESSMENT_TABS)[number];
@@ -73,6 +102,57 @@ export type AdmissionAssessmentStatus =
   (typeof ADMISSION_ASSESSMENT_STATUSES)[number];
 export type AdmissionAssessmentResult =
   (typeof ADMISSION_ASSESSMENT_RESULTS)[number];
+
+export const ADMISSION_CASE_QUEUE_NAMES = [
+  "NEEDS_INFORMATION",
+  "WAITING_FOR_REVIEW",
+  "READY_TO_ADMIT",
+  "WAITLISTED",
+  "APPROVED",
+  "NOT_ADMITTED",
+  "DOCUMENTS_PENDING",
+  "DUPLICATE_WARNINGS",
+  "COMPLETED",
+] as const;
+
+export type AdmissionCaseQueueName =
+  (typeof ADMISSION_CASE_QUEUE_NAMES)[number];
+
+export type AdmissionWaitlistCapacity = {
+  state: "NOT_CONFIGURED" | "AVAILABLE" | "NEARLY_FULL" | "FULL";
+  capacity: number | null;
+  enrolled: number | null;
+  seatsAvailable: number | null;
+  enforced: boolean;
+};
+
+export type AdmissionCaseQueueItem = {
+  id: string;
+  displayStatus: AdmissionCaseDisplayStatus;
+  fullNameEn: string;
+  guardianFullName: string | null;
+  guardianPhone: string | null;
+  source: AdmissionCaseSource;
+  classId: string | null;
+  className: string | null;
+  sectionId: string | null;
+  sectionName: string | null;
+  admittedStudentId: string | null;
+  hasDuplicateWarning: boolean;
+  hasDocumentsPending: boolean;
+  waitlistCapacity: AdmissionWaitlistCapacity | null;
+  canPromoteFromWaitlist: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdmissionCaseQueuePage = {
+  items: AdmissionCaseQueueItem[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+};
 
 export type AdmissionCaseDocumentReference = {
   fileId: string;
@@ -108,6 +188,7 @@ export type AdmissionDocumentRequestItem = {
   guardianPhone: string | null;
   classId: string | null;
   className: string | null;
+  program: EducationProgram | null;
   displayStatus: AdmissionCaseDisplayStatus;
   policyId: string | null;
   policyName: string | null;
@@ -136,6 +217,44 @@ export type AdmissionDocumentRequestPage = {
   summary: AdmissionDocumentRequestSummary;
 };
 
+export const ADMISSION_DOCUMENT_REMINDER_STATES = [
+  "QUEUED",
+  "ALREADY_QUEUED",
+  "SKIPPED",
+] as const;
+
+export type AdmissionDocumentReminderState =
+  (typeof ADMISSION_DOCUMENT_REMINDER_STATES)[number];
+
+export const ADMISSION_DOCUMENT_REMINDER_SKIP_REASONS = [
+  "CASE_UNAVAILABLE",
+  "CASE_CLOSED",
+  "NO_GUARDIAN_PHONE",
+  "NO_LONGER_MISSING",
+  "DELIVERY_UNAVAILABLE",
+] as const;
+
+export type AdmissionDocumentReminderSkipReason =
+  (typeof ADMISSION_DOCUMENT_REMINDER_SKIP_REASONS)[number];
+
+export type RequestAdmissionDocumentRemindersPayload = {
+  admissionCaseIds: string[];
+};
+
+export type AdmissionDocumentReminderResult = {
+  admissionCaseId: string;
+  state: AdmissionDocumentReminderState;
+  reason: AdmissionDocumentReminderSkipReason | null;
+};
+
+export type AdmissionDocumentReminderBatchResult = {
+  requested: number;
+  queued: number;
+  alreadyQueued: number;
+  skipped: number;
+  results: AdmissionDocumentReminderResult[];
+};
+
 export type AdmissionAssessmentSessionSummary = {
   id: string;
   admissionCaseId: string;
@@ -144,6 +263,7 @@ export type AdmissionAssessmentSessionSummary = {
   guardianPhone: string | null;
   classId: string | null;
   className: string | null;
+  program: EducationProgram | null;
   displayStatus: AdmissionCaseDisplayStatus;
   policyId: string | null;
   policyName: string | null;
@@ -170,6 +290,7 @@ export type AdmissionAssessmentCandidate = {
   guardianPhone: string | null;
   classId: string | null;
   className: string | null;
+  program: EducationProgram | null;
   displayStatus: AdmissionCaseDisplayStatus;
   policyId: string | null;
   policyName: string | null;
@@ -275,6 +396,8 @@ export type AdmissionCaseEligibility = {
     sectionRequired?: boolean;
     academicYearName?: string | null;
     className?: string | null;
+    classLevel?: number | null;
+    program?: EducationProgram | null;
     sectionName?: string | null;
     message: string | null;
   };
@@ -323,6 +446,7 @@ export type AdmissionCase = {
   academic: {
     academicYearId: string | null;
     classId: string | null;
+    program: EducationProgram | null;
     sectionId: string | null;
     admissionDate: string | null;
     rollNumber: number | null;

@@ -70,7 +70,7 @@ export const NOTIFICATION_EVENT_CATALOGUE: Readonly<
   },
   ADMISSION_DOCUMENTS_REQUESTED: {
     sourceModule: "M1_ADMISSIONS",
-    sourceEntityType: "admission_application",
+    sourceEntityType: "admission_case",
     defaultPriority: "IMPORTANT",
   },
   ATTENDANCE_STUDENT_ABSENT: {

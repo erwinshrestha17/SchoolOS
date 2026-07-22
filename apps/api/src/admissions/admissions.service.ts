@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   EnrollmentStatus,
@@ -35,7 +36,11 @@ import {
   ListAdmissionApplicationsDto,
   UpdateAdmissionApplicationStatusDto,
 } from './dto/admission-application.dto';
-import { BulkAdmissionImportDto } from './dto/bulk-admission-import.dto';
+import {
+  BulkAdmissionImportDto,
+  MAX_ADMISSION_IMPORT_CHARACTERS,
+  MAX_ADMISSION_IMPORT_ROWS,
+} from './dto/bulk-admission-import.dto';
 import { ListAdmissionImportBatchesDto } from './dto/list-admission-import-batches.dto';
 import { ListAdmissionsDto } from './dto/list-admissions.dto';
 import { CheckAdmissionDuplicateDto } from './dto/check-admission-duplicate.dto';
@@ -55,6 +60,8 @@ interface AdmissionReferenceContext {
   classroom: { id: string; name: string };
   section: { id: string; name: string; classId: string } | null;
 }
+
+const ADMISSION_IMPORT_VALIDATION_TTL_MS = 30 * 60 * 1000;
 
 type AdmissionGuardianInput = CreateAdmissionDto['guardians'][number];
 type AdmissionPersistenceClient = Prisma.TransactionClient | PrismaService;
@@ -726,24 +733,60 @@ export class AdmissionsService {
   }
 
   async bulkImport(dto: BulkAdmissionImportDto, actor: AuthContext) {
+    if (dto.csvContent.length > MAX_ADMISSION_IMPORT_CHARACTERS) {
+      throw new BadRequestException(
+        'The admission CSV exceeds the supported one-megabyte limit.',
+      );
+    }
+    if (dto.confirmDuplicates === true) {
+      throw new BadRequestException(
+        'Bulk duplicate overrides are not allowed. Review possible matches individually before creating another student record.',
+      );
+    }
     const rows = parseAdmissionCsv(dto.csvContent);
+    if (rows.length === 0) {
+      throw new BadRequestException(
+        'The admission CSV must include a header and at least one data row.',
+      );
+    }
+    if (rows.length > MAX_ADMISSION_IMPORT_ROWS) {
+      throw new BadRequestException(
+        `Admission imports are limited to ${MAX_ADMISSION_IMPORT_ROWS} rows per batch.`,
+      );
+    }
+
+    const dryRun = dto.dryRun ?? false;
+    const confirmDuplicates = dto.confirmDuplicates ?? false;
+    const contentSha256 = createHash('sha256')
+      .update(dto.csvContent, 'utf8')
+      .digest('hex');
     const startedAt = new Date();
-    const batch = await this.prisma.admissionImportBatch.create({
-      data: {
-        tenantId: actor.tenantId,
-        sourceFileName: dto.sourceFileName?.trim() || null,
-        dryRun: dto.dryRun ?? false,
-        confirmDuplicates: dto.confirmDuplicates ?? false,
-        status: 'PROCESSING',
-        totalRows: rows.length,
-        createdById: actor.userId,
-        startedAt,
-        metadata: {
-          source: 'admissions.bulk_import',
-          hasHeader: dto.csvContent.trim().split(/\r?\n/).length > 1,
-        },
+    const batchData: Prisma.AdmissionImportBatchUncheckedCreateInput = {
+      tenantId: actor.tenantId,
+      sourceFileName: dto.sourceFileName?.trim() || null,
+      dryRun,
+      confirmDuplicates,
+      status: 'PROCESSING',
+      totalRows: rows.length,
+      createdById: actor.userId,
+      startedAt,
+      metadata: {
+        source: 'admissions.bulk_import',
+        hasHeader: true,
+        contentSha256,
+        validationBatchId: dto.validationBatchId ?? null,
       },
-    });
+    };
+    const batch = dryRun
+      ? await this.prisma.admissionImportBatch.create({ data: batchData })
+      : await this.createConfirmedImportBatch(
+          batchData,
+          dto.validationBatchId,
+          contentSha256,
+          confirmDuplicates,
+          actor,
+          startedAt,
+        );
     const results: Array<{
       rowNumber: number;
       status: 'created' | 'validated' | 'failed';
@@ -768,7 +811,7 @@ export class AdmissionsService {
         continue;
       }
 
-      if (dto.dryRun) {
+      if (dryRun) {
         const errors: string[] = [];
         let duplicates: BulkImportDuplicateWarning[] = [];
 
@@ -808,7 +851,7 @@ export class AdmissionsService {
     }
 
     await this.auditService.record({
-      action: dto.dryRun ? 'bulk_import_validate' : 'bulk_import',
+      action: dryRun ? 'bulk_import_validate' : 'bulk_import',
       resource: 'admission',
       tenantId: actor.tenantId,
       userId: actor.userId,
@@ -816,7 +859,7 @@ export class AdmissionsService {
       after: {
         batchId: batch.id,
         totalRows: rows.length,
-        dryRun: dto.dryRun ?? false,
+        dryRun,
         created: results.filter((result) => result.status === 'created').length,
         validated: results.filter((result) => result.status === 'validated')
           .length,
@@ -878,6 +921,7 @@ export class AdmissionsService {
 
     return {
       batchId: batch.id,
+      dryRun,
       totalRows: rows.length,
       created,
       validated,
@@ -885,6 +929,45 @@ export class AdmissionsService {
       results,
       errorReportCsv,
     };
+  }
+
+  private async createConfirmedImportBatch(
+    batchData: Prisma.AdmissionImportBatchUncheckedCreateInput,
+    validationBatchId: string | undefined,
+    contentSha256: string,
+    confirmDuplicates: boolean,
+    actor: AuthContext,
+    startedAt: Date,
+  ) {
+    if (!validationBatchId) {
+      throw new BadRequestException(
+        'Validate this CSV before creating student records.',
+      );
+    }
+
+    const validAfter = new Date(
+      startedAt.getTime() - ADMISSION_IMPORT_VALIDATION_TTL_MS,
+    );
+    return this.prisma.$transaction(async (tx) => {
+      const consumed = await tx.admissionImportBatch.updateMany({
+        where: {
+          id: validationBatchId,
+          tenantId: actor.tenantId,
+          dryRun: true,
+          confirmDuplicates,
+          status: { in: ['COMPLETED', 'COMPLETED_WITH_ERRORS'] },
+          completedAt: { gte: validAfter },
+          metadata: { path: ['contentSha256'], equals: contentSha256 },
+        },
+        data: { status: 'CONSUMED' },
+      });
+      if (consumed.count !== 1) {
+        throw new ConflictException(
+          'This CSV validation is missing, expired, changed, or already used. Validate the file again.',
+        );
+      }
+      return tx.admissionImportBatch.create({ data: batchData });
+    });
   }
 
   async listImportBatches(
@@ -1765,20 +1848,39 @@ const normalizeGuardianPhone = requireNepalPhone;
 
 function formatImportError(error: unknown) {
   if (error instanceof HttpException) {
+    if (error.getStatus() >= 500) {
+      return 'This row could not be processed. Review the row and try again.';
+    }
     const response = error.getResponse();
 
     if (typeof response === 'string') {
-      return response;
+      return boundedImportError(response);
     }
 
     if (isErrorResponse(response)) {
-      return Array.isArray(response.message)
-        ? response.message.join('; ')
-        : response.message;
+      return boundedImportError(
+        Array.isArray(response.message)
+          ? response.message.join('; ')
+          : response.message,
+      );
     }
   }
 
-  return error instanceof Error ? error.message : 'Unknown import error';
+  return 'This row could not be processed. Review the row and try again.';
+}
+
+function boundedImportError(value: string) {
+  const normalized = value
+    // eslint-disable-next-line no-control-regex -- imported row errors must strip control characters before persistence or CSV output.
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!normalized) {
+    return 'This row could not be processed. Review the row and try again.';
+  }
+  return normalized.length <= 300
+    ? normalized
+    : `${normalized.slice(0, 297)}...`;
 }
 
 interface BulkImportDuplicateWarning {

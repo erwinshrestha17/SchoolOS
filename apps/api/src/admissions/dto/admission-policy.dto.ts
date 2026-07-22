@@ -1,6 +1,8 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
+  ArrayMaxSize,
+  ArrayUnique,
   IsBoolean,
   IsEnum,
   IsIn,
@@ -8,6 +10,7 @@ import {
   IsOptional,
   IsString,
   MaxLength,
+  MinLength,
   Min,
   Max,
   ValidateNested,
@@ -18,6 +21,10 @@ import {
   AdmissionDocumentTiming,
 } from '@prisma/client';
 import {
+  ADMISSION_POLICY_REQUIRED_FIELDS,
+  ADMISSION_POLICY_TEMPLATE_IDS,
+} from '@schoolos/core';
+import {
   ADMISSION_GRADE_BANDS,
   ADMISSION_MODES,
   ADMISSION_SOURCES,
@@ -25,6 +32,7 @@ import {
 
 export class CreateAdmissionPolicyDto {
   @IsString() @MaxLength(160) name!: string;
+  @IsOptional() @IsIn(ADMISSION_POLICY_TEMPLATE_IDS) templateId?: string;
   @IsOptional() @IsString() academicYearId?: string;
   @IsOptional() @IsString() classId?: string;
   @IsOptional() @IsIn(ADMISSION_GRADE_BANDS) gradeBand?: string;
@@ -50,7 +58,10 @@ export class UpdateAdmissionPolicyVersionDto {
   @IsOptional() @IsBoolean() transferStudent?: boolean;
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(ADMISSION_POLICY_REQUIRED_FIELDS.length)
+  @ArrayUnique()
   @IsString({ each: true })
+  @IsIn(ADMISSION_POLICY_REQUIRED_FIELDS, { each: true })
   requiredFields?: string[];
   @IsOptional() @IsBoolean() requireSection?: boolean;
   @IsOptional() @IsBoolean() requireDocumentReview?: boolean;
@@ -88,6 +99,16 @@ export class ActivateAdmissionPolicyVersionDto {
 
 export class DuplicateAdmissionPolicyDto {
   @IsOptional() @IsString() @MaxLength(160) name?: string;
+}
+
+export class ArchiveAdmissionPolicyDto {
+  @Transform(({ value }: { value: unknown }): unknown =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @IsString()
+  @MinLength(5)
+  @MaxLength(500)
+  reason!: string;
 }
 
 export class ApprovalChainStageDto {

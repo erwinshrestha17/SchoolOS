@@ -9,7 +9,7 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit --project tsconfig.json",
     "test": "node --test test/*.test.mjs",
-    "test:e2e": "playwright test e2e/public-smoke.spec.ts e2e/phase2f-browser-smoke.spec.ts e2e/dashboard-route-audit.spec.ts e2e/phase4-hardening-smoke.spec.ts e2e/account-security.spec.ts e2e/m12-m15-notice-workflows.spec.ts"
+    "test:e2e": "playwright test e2e/public-smoke.spec.ts e2e/student-admissions-smoke.spec.ts e2e/phase2f-browser-smoke.spec.ts e2e/dashboard-route-audit.spec.ts e2e/phase4-hardening-smoke.spec.ts e2e/account-security.spec.ts e2e/m12-m15-notice-workflows.spec.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",

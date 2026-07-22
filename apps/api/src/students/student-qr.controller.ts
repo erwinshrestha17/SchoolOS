@@ -29,6 +29,7 @@ import {
   StudentCredentialArtifactResponseDto,
   StudentQrCredentialResponseDto,
   StudentQrStatusHistoryResponseDto,
+  StudentQrWorkspaceSummaryResponseDto,
 } from './dto/student-qr.dto';
 import { StudentQrService } from './student-qr.service';
 
@@ -39,6 +40,16 @@ import { StudentQrService } from './student-qr.service';
 @Controller('students')
 export class StudentQrController {
   constructor(private readonly studentQrService: StudentQrService) {}
+
+  @Get('qr/summary')
+  @Permissions('students:qr:read')
+  @ApiOperation({
+    summary: 'Get tenant-scoped QR and protected ID-card workspace totals',
+  })
+  @ApiOkResponse({ type: StudentQrWorkspaceSummaryResponseDto })
+  async getQrWorkspaceSummary(@CurrentAuth() auth: AuthContext) {
+    return this.studentQrService.getQrWorkspaceSummary(auth.tenantId);
+  }
 
   @Get(':studentId/qr')
   @Permissions('students:qr:read')

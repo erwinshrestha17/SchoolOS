@@ -1,10 +1,6 @@
 'use client';
 
-import type {
-  AdmissionPolicyApplicantType,
-  AdmissionPolicyDetail,
-  UpdateAdmissionPolicyVersionPayload,
-} from '@schoolos/core';
+import type { AdmissionPolicyApplicantType, AdmissionPolicyDetail, AdmissionPolicyRequiredField, AdmissionPolicyTemplate } from '@schoolos/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -15,16 +11,9 @@ import { ErrorState } from '../ui/error-state';
 import { SectionCard } from '../ui/section-card';
 import { Button } from '../ui/button';
 import { ApprovalChainBuilder } from './approval-chain-builder';
-import { DocumentChecklistBuilder, toDocumentKind } from './document-checklist-builder';
+import { DocumentChecklistBuilder } from './document-checklist-builder';
 
-const STEPS = [
-  'Basic Information',
-  'Who Can Apply',
-  'Required Information',
-  'Required Documents',
-  'Assessment & Decision',
-  'Review & Activate',
-];
+const STEPS = ['Basic Information', 'Who Can Apply', 'Required Information', 'Required Documents', 'Assessment & Decision', 'Review & Activate'];
 
 const REQUIRED_FIELD_OPTIONS = [
   { value: 'previousSchool', label: 'Previous school' },
@@ -32,93 +21,10 @@ const REQUIRED_FIELD_OPTIONS = [
   { value: 'nationalStudentId', label: 'IEMIS student ID' },
   { value: 'emergencyName', label: 'Emergency contact name' },
   { value: 'emergencyPhone', label: 'Emergency contact phone' },
-];
-
-type PolicyTemplateDefaults = {
-  id: string;
+] satisfies ReadonlyArray<{
+  value: AdmissionPolicyRequiredField;
   label: string;
-  description: string;
-  gradeBand: string;
-  applicantType: AdmissionPolicyApplicantType;
-  requiredFields: string[];
-  admissionMode: 'DIRECT_ALLOWED' | 'REVIEW_REQUIRED';
-  requireDocumentReview: boolean;
-  requireInterview: boolean;
-  requirePrincipalApproval: boolean;
-  requireTransferCertificate: boolean;
-  requirePriorMarksheet: boolean;
-  requireStreamOrMarksReview: boolean;
-  documents: string[];
-};
-
-// Starting points only — every field stays editable in the steps that follow.
-// Scope (Step 2) and document set (Step 4) still need a human to confirm them.
-const POLICY_TEMPLATES: PolicyTemplateDefaults[] = [
-  {
-    id: 'grade-1-10-new',
-    label: 'Grade 1-10 New Admission',
-    description: 'Normal office admission for new students joining Grades 1 through 10.',
-    gradeBand: '',
-    applicantType: 'NEW',
-    requiredFields: [],
-    admissionMode: 'DIRECT_ALLOWED',
-    requireDocumentReview: false,
-    requireInterview: false,
-    requirePrincipalApproval: false,
-    requireTransferCertificate: false,
-    requirePriorMarksheet: false,
-    requireStreamOrMarksReview: false,
-    documents: ['Birth certificate', 'Student passport photo', 'Parent/guardian citizenship', 'Previous report card'],
-  },
-  {
-    id: 'grade-1-10-transfer',
-    label: 'Grade 1-10 Transfer Admission',
-    description: 'Document review and principal approval for students transferring from another school.',
-    gradeBand: '',
-    applicantType: 'TRANSFER',
-    requiredFields: ['previousSchool'],
-    admissionMode: 'REVIEW_REQUIRED',
-    requireDocumentReview: true,
-    requireInterview: false,
-    requirePrincipalApproval: true,
-    requireTransferCertificate: true,
-    requirePriorMarksheet: false,
-    requireStreamOrMarksReview: false,
-    documents: ['Birth certificate', 'Student passport photo', 'Parent/guardian citizenship', 'Previous report card', 'Transfer certificate', 'Character certificate'],
-  },
-  {
-    id: 'grade-11-12',
-    label: 'Grade 11-12 / +2 Admission',
-    description: 'Entrance test, interview, and principal approval for higher secondary admission.',
-    gradeBand: 'GRADE_11_12',
-    applicantType: 'NEW',
-    requiredFields: ['previousSchool'],
-    admissionMode: 'REVIEW_REQUIRED',
-    requireDocumentReview: true,
-    requireInterview: true,
-    requirePrincipalApproval: true,
-    requireTransferCertificate: false,
-    requirePriorMarksheet: true,
-    requireStreamOrMarksReview: true,
-    documents: ['SEE marksheet', 'Character certificate', 'Transfer certificate', 'Student passport photo', 'Parent/guardian citizenship'],
-  },
-  {
-    id: 'scholarship',
-    label: 'Scholarship / Quota Admission',
-    description: 'Committee review for scholarship or quota applicants of any grade.',
-    gradeBand: '',
-    applicantType: 'BOTH',
-    requiredFields: ['previousSchool', 'guardianEmail'],
-    admissionMode: 'REVIEW_REQUIRED',
-    requireDocumentReview: true,
-    requireInterview: false,
-    requirePrincipalApproval: true,
-    requireTransferCertificate: false,
-    requirePriorMarksheet: false,
-    requireStreamOrMarksReview: false,
-    documents: ['Scholarship proof', 'Residence proof', 'Recommendation letter', 'Previous report card'],
-  },
-];
+}>;
 
 export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?: string }) {
   const router = useRouter();
@@ -131,7 +37,7 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
   const [gradeBand, setGradeBand] = useState('');
   const [applicantType, setApplicantType] = useState<AdmissionPolicyApplicantType>('BOTH');
   const [source, setSource] = useState('');
-  const [requiredFields, setRequiredFields] = useState<string[]>([]);
+  const [requiredFields, setRequiredFields] = useState<AdmissionPolicyRequiredField[]>([]);
   const [requireSection, setRequireSection] = useState(false);
   const [admissionMode, setAdmissionMode] = useState<'DIRECT_ALLOWED' | 'REVIEW_REQUIRED'>('DIRECT_ALLOWED');
   const [requireDocumentReview, setRequireDocumentReview] = useState(false);
@@ -145,13 +51,21 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
   const [notesForOffice, setNotesForOffice] = useState('');
   const [hydrated, setHydrated] = useState(false);
   const [localError, setLocalError] = useState('');
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
-  const [pendingTemplateDocuments, setPendingTemplateDocuments] = useState<string[]>([]);
-  const [pendingTemplateVersionFields, setPendingTemplateVersionFields] =
-    useState<UpdateAdmissionPolicyVersionPayload | null>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<AdmissionPolicyTemplate['id'] | null>(null);
 
-  const academicYearsQuery = useQuery({ queryKey: ['academic-years'], queryFn: api.listAcademicYears });
-  const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
+  const academicYearsQuery = useQuery({
+    queryKey: ['academic-years'],
+    queryFn: api.listAcademicYears,
+  });
+  const classesQuery = useQuery({
+    queryKey: ['classes'],
+    queryFn: api.listClasses,
+  });
+  const templatesQuery = useQuery({
+    queryKey: ['admission-policy-templates'],
+    queryFn: admissionPoliciesApi.listTemplates,
+    enabled: !initialPolicyId && !policyId,
+  });
   const policyQuery = useQuery({
     queryKey: ['admission-policy', policyId],
     queryFn: () => admissionPoliciesApi.get(policyId!),
@@ -192,7 +106,10 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
     mutationFn: () => admissionPoliciesApi.startDraftVersion(policyId!),
     onSuccess: (detail) => {
       hydrateFrom(detail);
-      void queryClient.invalidateQueries({ queryKey: ['admission-policy', policyId] });
+      queryClient.setQueryData(['admission-policy', policyId], detail);
+      void queryClient.invalidateQueries({
+        queryKey: ['admission-policy', policyId],
+      });
     },
   });
 
@@ -212,65 +129,52 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
         gradeBand: gradeBand || undefined,
         applicantType,
         source: source || undefined,
+        templateId: selectedTemplateId ?? undefined,
       }),
-    onSuccess: async (detail) => {
+    onSuccess: (detail) => {
       setPolicyId(detail.id);
-      const versionId = detail.draftVersion?.id;
-      // Template selections only exist in this component's local state, which
-      // is discarded when the redirect below remounts the page at the /edit
-      // route — so the template's version-level fields must be pushed to the
-      // draft version now, in the same request wave as identity + documents,
-      // not left to whichever later step the user happens to reach.
-      if (versionId && pendingTemplateVersionFields) {
-        await admissionPoliciesApi.updateDraftVersion(detail.id, pendingTemplateVersionFields);
-        setPendingTemplateVersionFields(null);
-      }
-      if (versionId && pendingTemplateDocuments.length > 0) {
-        await Promise.all(
-          pendingTemplateDocuments.map((label) =>
-            admissionPoliciesApi.upsertDocumentRequirement(detail.id, versionId, {
-              documentKind: toDocumentKind(label),
-              label,
-            }),
-          ),
-        );
-        setPendingTemplateDocuments([]);
-      }
-      void queryClient.invalidateQueries({ queryKey: ['admission-policy', detail.id] });
+      void queryClient.invalidateQueries({
+        queryKey: ['admission-policy', detail.id],
+      });
       router.replace(`/dashboard/settings/admissions/${detail.id}/edit`);
     },
   });
 
-  function applyTemplate(template: PolicyTemplateDefaults) {
+  function applyTemplate(template: AdmissionPolicyTemplate) {
     setSelectedTemplateId(template.id);
     if (!name.trim()) setName(template.label);
-    setGradeBand(template.gradeBand);
+    setGradeBand(template.gradeBand ?? '');
     setApplicantType(template.applicantType);
-    setRequiredFields(template.requiredFields);
-    setAdmissionMode(template.admissionMode);
-    setRequireDocumentReview(template.requireDocumentReview);
-    setRequireInterview(template.requireInterview);
-    setRequirePrincipalApproval(template.requirePrincipalApproval);
-    setRequireTransferCertificate(template.requireTransferCertificate);
-    setRequirePriorMarksheet(template.requirePriorMarksheet);
-    setRequireStreamOrMarksReview(template.requireStreamOrMarksReview);
-    setPendingTemplateDocuments(template.documents);
-    setPendingTemplateVersionFields({
-      requiredFields: template.requiredFields,
-      admissionMode: template.admissionMode,
-      requireDocumentReview: template.requireDocumentReview,
-      requireInterview: template.requireInterview,
-      requirePrincipalApproval: template.requirePrincipalApproval,
-      requireTransferCertificate: template.requireTransferCertificate,
-      requirePriorMarksheet: template.requirePriorMarksheet,
-      requireStreamOrMarksReview: template.requireStreamOrMarksReview,
-    });
+    setRequiredFields([...template.version.requiredFields]);
+    setRequireSection(template.version.requireSection);
+    setAdmissionMode(template.version.admissionMode);
+    setRequireDocumentReview(template.version.requireDocumentReview);
+    setRequireInterview(template.version.requireInterview);
+    setRequirePrincipalApproval(template.version.requirePrincipalApproval);
+    setRequireTransferCertificate(template.version.requireTransferCertificate);
+    setRequirePriorMarksheet(template.version.requirePriorMarksheet);
+    setRequireStreamOrMarksReview(template.version.requireStreamOrMarksReview);
+    setAllowAdmissionWithDocumentsPending(template.version.allowAdmissionWithDocumentsPending);
+    setEnforceCapacityWhenAvailable(template.version.enforceCapacityWhenAvailable);
+    setNotesForOffice(template.version.notesForOffice ?? '');
   }
 
   function clearTemplate() {
     setSelectedTemplateId(null);
-    setPendingTemplateDocuments([]);
-    setPendingTemplateVersionFields(null);
+    setGradeBand('');
+    setApplicantType('BOTH');
+    setRequiredFields([]);
+    setRequireSection(false);
+    setAdmissionMode('DIRECT_ALLOWED');
+    setRequireDocumentReview(false);
+    setRequireInterview(false);
+    setRequirePrincipalApproval(false);
+    setRequireTransferCertificate(false);
+    setRequirePriorMarksheet(false);
+    setRequireStreamOrMarksReview(false);
+    setAllowAdmissionWithDocumentsPending(true);
+    setEnforceCapacityWhenAvailable(false);
+    setNotesForOffice('');
   }
 
   const updateIdentityMutation = useMutation({
@@ -305,15 +209,15 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
 
   const activateMutation = useMutation({
     mutationFn: () => {
-      const versionId = policyQuery.data?.draftVersion?.id ?? policyQuery.data?.currentVersion?.id;
+      const versionId = policyQuery.data?.draftVersion?.id;
       if (!versionId) throw new Error('No draft version to activate.');
       return admissionPoliciesApi.activate(policyId!, versionId);
     },
     onSuccess: () => router.push(`/dashboard/settings/admissions/${policyId}`),
   });
 
-  const setupLoading = academicYearsQuery.isLoading || classesQuery.isLoading || (Boolean(policyId) && policyQuery.isLoading);
-  const setupError = academicYearsQuery.isError || classesQuery.isError || policyQuery.isError;
+  const setupLoading = academicYearsQuery.isLoading || classesQuery.isLoading || templatesQuery.isLoading || (Boolean(policyId) && policyQuery.isLoading) || startDraftMutation.isPending;
+  const setupError = academicYearsQuery.isError || classesQuery.isError || templatesQuery.isError || policyQuery.isError || startDraftMutation.isError;
 
   if (setupLoading) {
     return (
@@ -332,7 +236,12 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
         onRetry={() => {
           void academicYearsQuery.refetch();
           void classesQuery.refetch();
+          void templatesQuery.refetch();
           void policyQuery.refetch();
+          if (startDraftMutation.isError) {
+            startDraftMutation.reset();
+            startDraftMutation.mutate();
+          }
         }}
       />
     );
@@ -363,10 +272,9 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
     }
   }
 
-  const draftVersion = policyQuery.data?.draftVersion ?? policyQuery.data?.currentVersion ?? null;
+  const draftVersion = policyQuery.data?.draftVersion ?? null;
   const documentRequirements = draftVersion?.documentRequirements ?? [];
-  const mutationError =
-    createMutation.error || updateIdentityMutation.error || updateVersionMutation.error || activateMutation.error;
+  const mutationError = createMutation.error || updateIdentityMutation.error || updateVersionMutation.error || activateMutation.error;
 
   return (
     <div className="space-y-5">
@@ -378,58 +286,27 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
       </div>
       <ol className="grid gap-2 sm:grid-cols-3 xl:grid-cols-6" aria-label="Admission policy steps">
         {STEPS.map((label, index) => (
-          <li
-            key={label}
-            aria-current={index === step ? 'step' : undefined}
-            className={`flex items-center gap-2 rounded-xl border p-3 text-xs font-bold ${
-              index === step
-                ? 'border-[var(--color-mod-admissions-accent)] bg-blue-50 text-slate-900'
-                : index < step
-                  ? 'border-success-200 bg-success-50 text-success-800'
-                  : 'border-slate-200 bg-white text-slate-500'
-            }`}
-          >
+          <li key={label} aria-current={index === step ? 'step' : undefined} className={`flex items-center gap-2 rounded-xl border p-3 text-xs font-bold ${index === step ? 'border-[var(--color-mod-admissions-accent)] bg-blue-50 text-slate-900' : index < step ? 'border-success-200 bg-success-50 text-success-800' : 'border-slate-200 bg-white text-slate-500'}`}>
             <span className="flex h-6 w-6 items-center justify-center rounded-full border bg-white text-[0.65rem]">{index + 1}</span>
             {label}
           </li>
         ))}
       </ol>
 
-      {localError || mutationError ? (
-        <p className="rounded-xl border border-danger-200 bg-danger-50 p-3 text-sm font-semibold text-danger-800">
-          {localError || 'This step could not be saved. Please try again.'}
-        </p>
-      ) : null}
+      {localError || mutationError ? <p className="rounded-xl border border-danger-200 bg-danger-50 p-3 text-sm font-semibold text-danger-800">{localError || 'This step could not be saved. Please try again.'}</p> : null}
 
       {step === 0 ? (
         <div className="space-y-5">
           {!initialPolicyId && !policyId ? (
             <SectionCard title="Start from a template" description="Pick the closest match to pre-fill scope, documents, and decision defaults. Every field stays editable in the steps that follow.">
               <div className="grid gap-3 sm:grid-cols-2">
-                {POLICY_TEMPLATES.map((template) => (
-                  <button
-                    key={template.id}
-                    type="button"
-                    onClick={() => applyTemplate(template)}
-                    className={`rounded-xl border p-4 text-left transition ${
-                      selectedTemplateId === template.id
-                        ? 'border-[var(--color-mod-admissions-accent)] bg-blue-50'
-                        : 'border-slate-200 bg-white hover:border-slate-300'
-                    }`}
-                  >
+                {(templatesQuery.data ?? []).map((template) => (
+                  <button key={template.id} type="button" onClick={() => applyTemplate(template)} className={`rounded-xl border p-4 text-left transition ${selectedTemplateId === template.id ? 'border-[var(--color-mod-admissions-accent)] bg-blue-50' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
                     <p className="font-bold text-slate-900">{template.label}</p>
                     <p className="mt-1 text-xs text-slate-500">{template.description}</p>
                   </button>
                 ))}
-                <button
-                  type="button"
-                  onClick={clearTemplate}
-                  className={`rounded-xl border p-4 text-left transition ${
-                    selectedTemplateId === null
-                      ? 'border-[var(--color-mod-admissions-accent)] bg-blue-50'
-                      : 'border-slate-200 bg-white hover:border-slate-300'
-                  }`}
-                >
+                <button type="button" onClick={clearTemplate} className={`rounded-xl border p-4 text-left transition ${selectedTemplateId === null ? 'border-[var(--color-mod-admissions-accent)] bg-blue-50' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
                   <p className="font-bold text-slate-900">Blank Policy</p>
                   <p className="mt-1 text-xs text-slate-500">Start with no defaults and configure every step yourself.</p>
                 </button>
@@ -440,12 +317,7 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
           <SectionCard title="Policy name" description="Give staff a plain-language name for this policy, e.g. Grade 1 Admission 2083.">
             <label className="block space-y-2 text-sm font-bold text-slate-700">
               <span>Policy name</span>
-              <input
-                className="block w-full max-w-lg rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="Grade 11 Science Admission 2083"
-              />
+              <input className="block w-full max-w-lg rounded-lg border border-slate-200 px-3 py-2 text-sm" value={name} onChange={(event) => setName(event.target.value)} placeholder="Grade 11 Science Admission 2083" />
             </label>
           </SectionCard>
         </div>
@@ -459,7 +331,9 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
               <select className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" value={academicYearId} onChange={(event) => setAcademicYearId(event.target.value)}>
                 <option value="">Any academic year</option>
                 {(academicYearsQuery.data ?? []).map((year) => (
-                  <option key={year.id} value={year.id}>{year.name}</option>
+                  <option key={year.id} value={year.id}>
+                    {year.name}
+                  </option>
                 ))}
               </select>
             </label>
@@ -468,7 +342,9 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
               <select className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" value={classId} onChange={(event) => setClassId(event.target.value)}>
                 <option value="">Any class</option>
                 {(classesQuery.data ?? []).map((schoolClass) => (
-                  <option key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}</option>
+                  <option key={schoolClass.id} value={schoolClass.id}>
+                    {schoolClass.name}
+                  </option>
                 ))}
               </select>
             </label>
@@ -513,9 +389,7 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
                   type="checkbox"
                   checked={requiredFields.includes(option.value)}
                   onChange={(event) => {
-                    setRequiredFields((current) =>
-                      event.target.checked ? [...current, option.value] : current.filter((value) => value !== option.value),
-                    );
+                    setRequiredFields((current) => (event.target.checked ? [...current, option.value] : current.filter((value) => value !== option.value)));
                   }}
                 />
                 {option.label}
@@ -566,11 +440,7 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
           </label>
           {policyId && draftVersion ? (
             <div className="mt-5 border-t border-slate-100 pt-4">
-              <ApprovalChainBuilder
-                policyId={policyId}
-                versionId={draftVersion.id}
-                chain={draftVersion.approvalChain}
-              />
+              <ApprovalChainBuilder policyId={policyId} versionId={draftVersion.id} chain={draftVersion.approvalChain} />
             </div>
           ) : null}
         </SectionCard>
@@ -591,7 +461,9 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
             </p>
           ) : null}
           <div className="mt-5 flex flex-wrap gap-3">
-            <Button type="button" variant="outline" onClick={() => router.push('/dashboard/settings/admissions')}>Save as Draft</Button>
+            <Button type="button" variant="outline" onClick={() => router.push('/dashboard/settings/admissions')}>
+              Save as Draft
+            </Button>
             <Button type="button" onClick={() => activateMutation.mutate()} disabled={activateMutation.isPending}>
               {activateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               Activate Policy
@@ -605,11 +477,7 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
           <Button type="button" variant="outline" onClick={() => setStep((current) => Math.max(0, current - 1))} disabled={step === 0}>
             Back
           </Button>
-          <Button
-            type="button"
-            onClick={continueStep}
-            disabled={createMutation.isPending || updateIdentityMutation.isPending || updateVersionMutation.isPending}
-          >
+          <Button type="button" onClick={continueStep} disabled={createMutation.isPending || updateIdentityMutation.isPending || updateVersionMutation.isPending}>
             {createMutation.isPending || updateIdentityMutation.isPending || updateVersionMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             Continue
           </Button>

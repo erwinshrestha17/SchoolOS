@@ -41,6 +41,71 @@ SCHOOLOS_E2E_PASSWORD_TEST_FINAL=<final-password> \
 pnpm test:web:e2e
 ```
 
+The state-changing M1 QR lifecycle smoke is disabled by default. Run it only
+against a dedicated seeded student whose credential may be rotated, revoked,
+and regenerated during the test:
+
+```bash
+SCHOOLOS_E2E_M1_MUTATIONS=true \
+SCHOOLOS_E2E_M1_QR_STUDENT_SEARCH=<exact-seeded-student-name> \
+pnpm --filter @schoolos/web exec playwright test e2e/student-admissions-smoke.spec.ts
+```
+
+The workflow restores an active QR credential before it finishes. It still
+retains the rotation and revocation history as required audit evidence.
+
+The M1 missing-document reminder smoke uses two dedicated, idempotently seeded
+admission cases. Seed only those fixtures, then run the authenticated workflow:
+
+```bash
+SCHOOLOS_E2E_M1_REMINDER_FIXTURES=true \
+pnpm db:seed:e2e:m1-reminders
+
+SCHOOLOS_E2E_M1_MUTATIONS=true \
+SCHOOLOS_E2E_M1_REMINDER_FIXTURES=true \
+pnpm --filter @schoolos/web exec playwright test e2e/student-admissions-smoke.spec.ts
+```
+
+The browser test selects one case with a guardian phone and one without. It
+confirms the backend-authoritative queued, already-queued, or
+delivery-unavailable result plus the safe no-phone skip; no browser-derived
+delivery state is accepted. A provider-disabled local environment therefore
+passes only when the server reports that honest unavailable state.
+
+The M1 waitlist promotion smoke uses one dedicated, idempotently seeded case
+with a pinned review policy and an available seat. The policy is kept out of
+normal policy resolution, and the seed restores the case to `WAITLISTED` so
+the state-changing browser flow is repeatable:
+
+```bash
+SCHOOLOS_E2E_M1_WAITLIST_FIXTURES=true \
+pnpm db:seed:e2e:m1-waitlist
+
+SCHOOLOS_E2E_M1_MUTATIONS=true \
+SCHOOLOS_E2E_M1_WAITLIST_FIXTURES=true \
+pnpm --filter @schoolos/web exec playwright test e2e/student-admissions-smoke.spec.ts
+```
+
+The browser test opens the Waitlisted queue, confirms the backend-owned live
+capacity state, approves the return-to-review action, and verifies that the
+case leaves the waitlist. The backend rechecks capacity and records the status
+transition in the audit log; the browser does not calculate seat truth.
+
+The M1 admission CSV smoke is an explicit state-changing check. It discovers
+the signed-in tenant's current academic year and Class 5 (or the first
+available class), creates a uniquely named admission through the real
+validation-and-confirmation workflow, and verifies the new student in the
+server-backed directory. It does not delete school records, so use it only in
+the dedicated local/E2E tenant:
+
+```bash
+SCHOOLOS_E2E_M1_MUTATIONS=true \
+SCHOOLOS_E2E_M1_BULK_IMPORT=true \
+pnpm --filter @schoolos/web exec playwright test \
+  e2e/student-admissions-smoke.spec.ts \
+  --grep "validates and creates a tenant-scoped admission from CSV"
+```
+
 ## Persona smoke expectations
 
 Every persona smoke should prove that the user:

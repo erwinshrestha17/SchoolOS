@@ -1,4 +1,8 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import {
+  ADMISSION_CASE_QUEUE_NAMES,
+  type AdmissionCaseQueueName,
+} from '@schoolos/core';
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import type { AuthContext } from '../auth/auth.types';
@@ -10,22 +14,10 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { AdmissionCaseQueuesService } from './admission-case-queues.service';
 
-const ADMISSION_QUEUE_NAMES = [
-  'NEEDS_INFORMATION',
-  'WAITING_FOR_REVIEW',
-  'READY_TO_ADMIT',
-  'WAITLISTED',
-  'APPROVED',
-  'NOT_ADMITTED',
-  'DOCUMENTS_PENDING',
-  'DUPLICATE_WARNINGS',
-  'COMPLETED',
-] as const;
-
 class ListAdmissionCaseQueuesDto {
   @IsOptional()
-  @IsIn(ADMISSION_QUEUE_NAMES)
-  queue?: (typeof ADMISSION_QUEUE_NAMES)[number];
+  @IsIn(ADMISSION_CASE_QUEUE_NAMES)
+  queue?: AdmissionCaseQueueName;
 
   @IsOptional()
   @IsInt()

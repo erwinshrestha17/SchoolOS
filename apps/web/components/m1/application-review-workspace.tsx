@@ -3,23 +3,26 @@
 import {
   formatBsDate,
   formatBsDateTime,
+  type AdmissionCase,
   type AdmissionCaseReviewAction,
   type ReviewAdmissionCasePayload,
 } from "@schoolos/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
+  CalendarClock,
   CheckCircle2,
   ClipboardCheck,
   FileText,
   Loader2,
-  ShieldAlert,
   UserCheck,
   UserRound,
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { admissionCasesApi } from "../../lib/api/admission-cases";
+import { educationProgramLabel } from "../../lib/education-program";
+import { schoolFacingErrorMessage } from "../../lib/school-facing-error";
 import { useSession } from "../session-provider";
 import { Button } from "../ui/button";
 import { EmptyState } from "../ui/empty-state";
@@ -218,6 +221,12 @@ export function ApplicationReviewWorkspace({
                 admissionCase.classSection.academicYearName ?? "Not selected",
               ],
               ["Class", admissionCase.classSection.className ?? "Not selected"],
+              [
+                "Program",
+                educationProgramLabel(
+                  admissionCase.classSection.program ?? null,
+                ),
+              ],
               [
                 "Section",
                 admissionCase.classSection.sectionName ?? "Not selected",
@@ -462,9 +471,18 @@ export function ApplicationReviewWorkspace({
               className="mt-4 rounded-xl border border-danger-100 bg-danger-50 p-3 text-xs font-semibold text-danger-800"
               role="alert"
             >
-              {mutation.error instanceof Error
-                ? mutation.error.message
-                : "The review action could not be recorded."}
+              {schoolFacingErrorMessage(mutation.error, {
+                fallback:
+                  "The review action could not be recorded. The application was not changed.",
+                invalid:
+                  "Review the selected action and required reason before continuing.",
+                forbidden:
+                  "You do not have permission to record this admission review action.",
+                notFound:
+                  "This admission case is no longer available for review.",
+                conflict:
+                  "This admission case changed during review. Refresh it before recording another action.",
+              })}
             </p>
           ) : null}
           {successMessage ? (
@@ -535,19 +553,96 @@ export function ApplicationReviewWorkspace({
           )}
         </section>
 
-        <section className="rounded-2xl border border-warning-100 bg-warning-50 p-4 text-xs leading-5 text-warning-900">
-          <div className="flex items-start gap-2">
-            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-            <div>
-              <strong className="block">Still unavailable</strong>
-              Reviewer scoring and interview scheduling are not shown because M1
-              has no backend-owned rubric, score contract, or persisted
-              interview record yet.
-            </div>
-          </div>
-        </section>
+        <AssessmentStatusCard
+          admissionCase={admissionCase}
+          canManage={canReview}
+        />
       </aside>
     </div>
+  );
+}
+
+function AssessmentStatusCard({
+  admissionCase,
+  canManage,
+}: {
+  admissionCase: AdmissionCase;
+  canManage: boolean;
+}) {
+  const required = admissionCase.policyRequirements.requireInterview;
+  const session = admissionCase.assessmentSession;
+  const assessmentHref = session
+    ? "/dashboard/admissions/assessments"
+    : `/dashboard/admissions/assessments?admissionCaseId=${encodeURIComponent(admissionCase.id)}`;
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-start gap-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-mod-admissions-soft)] text-[var(--color-mod-admissions-text)]">
+          <CalendarClock className="h-4 w-4" aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-black text-slate-950">
+            Assessment &amp; interview
+          </h2>
+          <p className="mt-1 text-xs leading-5 text-slate-600">
+            {!required
+              ? "The matched admission policy does not require an assessment or interview."
+              : session
+                ? "This persisted session and its result are owned by the admission assessment workflow."
+                : "The matched policy requires an assessment or interview before admission review can finish."}
+          </p>
+
+          {required ? (
+            <dl className="mt-3 space-y-2 text-xs">
+              <div className="flex justify-between gap-3">
+                <dt className="text-slate-500">Status</dt>
+                <dd className="text-right font-bold text-slate-800">
+                  {session ? label(session.status) : "Needs scheduling"}
+                </dd>
+              </div>
+              {session ? (
+                <>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-slate-500">Scheduled</dt>
+                    <dd className="text-right font-bold text-slate-800">
+                      {formatBsDateTime(session.scheduledAt)}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-slate-500">Result</dt>
+                    <dd className="text-right font-bold text-slate-800">
+                      {session.result ? label(session.result) : "Pending"}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-slate-500">Score</dt>
+                    <dd className="text-right font-bold text-slate-800">
+                      {session.resultScore === null
+                        ? "Not recorded"
+                        : `${session.resultScore}/100`}
+                    </dd>
+                  </div>
+                </>
+              ) : null}
+            </dl>
+          ) : null}
+
+          {required ? (
+            <Link
+              href={assessmentHref}
+              className="mt-4 inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-200 px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mod-admissions-accent)] focus-visible:ring-offset-2"
+            >
+              {session
+                ? "Open assessment workspace"
+                : canManage
+                  ? "Schedule assessment"
+                  : "View assessment workspace"}
+            </Link>
+          ) : null}
+        </div>
+      </div>
+    </section>
   );
 }
 

@@ -14,7 +14,15 @@ import {
   TransportEnrollmentStatus,
 } from '@prisma/client';
 import { randomBytes } from 'crypto';
-import { StudentQrResolvePurpose } from '@schoolos/core';
+import {
+  formatBsDateOnly,
+  getNepalSchoolDay,
+  NEPAL_TIME_ZONE,
+  STUDENT_QR_REASON_MAX_LENGTH,
+  STUDENT_QR_REASON_MIN_LENGTH,
+  StudentQrResolvePurpose,
+  type StudentQrWorkspaceSummary,
+} from '@schoolos/core';
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
 import { hashToken, hmacToken } from '../auth/auth.utils';
@@ -110,6 +118,60 @@ export class StudentQrService {
     private readonly configService: ConfigService,
     private readonly fileRegistryService: FileRegistryService,
   ) {}
+
+  async getQrWorkspaceSummary(
+    tenantId: string,
+    now = new Date(),
+  ): Promise<StudentQrWorkspaceSummary> {
+    const day = getNepalSchoolDay(now);
+    const [
+      activeCredentials,
+      replacementFilesNeeded,
+      inactiveCredentials,
+      successfulScansToday,
+    ] = await Promise.all([
+      this.prisma.studentQrCredential.count({
+        where: { tenantId, status: StudentQrStatus.ACTIVE },
+      }),
+      this.prisma.studentQrCredential.count({
+        where: {
+          tenantId,
+          status: StudentQrStatus.ACTIVE,
+          fileAssetId: null,
+        },
+      }),
+      this.prisma.studentQrCredential.count({
+        where: {
+          tenantId,
+          status: { in: [StudentQrStatus.ROTATED, StudentQrStatus.REVOKED] },
+        },
+      }),
+      this.prisma.auditLog.count({
+        where: {
+          tenantId,
+          resource: 'student_qr',
+          action: 'QR_RESOLVED',
+          createdAt: {
+            gte: day.startUtc,
+            lt: day.endExclusiveUtc,
+          },
+        },
+      }),
+    ]);
+
+    return {
+      activeCredentials,
+      replacementFilesNeeded,
+      inactiveCredentials,
+      successfulScansToday,
+      period: {
+        bsDate: formatBsDateOnly(day.bsDate, { preset: 'short' }),
+        startUtc: day.startUtc.toISOString(),
+        endExclusiveUtc: day.endExclusiveUtc.toISOString(),
+        timeZone: NEPAL_TIME_ZONE,
+      },
+    };
+  }
 
   /**
    * Generates a new QR credential for an active student when no active credential
@@ -211,11 +273,7 @@ export class StudentQrService {
     auth: AuthContext,
     reason?: string,
   ): Promise<StudentCredentialArtifactResult> {
-    if (!reason?.trim()) {
-      throw new BadRequestException(
-        'A reason is required to rotate a student QR',
-      );
-    }
+    const normalizedReason = this.normalizeQrMutationReason(reason, 'rotate');
 
     await this.assertPersonaStudentScope(tenantId, studentId, auth);
     await this.assertActiveStudent(tenantId, studentId);
@@ -242,7 +300,7 @@ export class StudentQrService {
           status: StudentQrStatus.ROTATED,
           rotatedAt,
           updatedById: auth.userId,
-          rotateReason: reason.trim(),
+          rotateReason: normalizedReason,
         },
       });
 
@@ -283,7 +341,7 @@ export class StudentQrService {
       },
       after: {
         studentId,
-        reason: reason.trim(),
+        reason: normalizedReason,
         fileAssetId: completed.fileAssetId,
       },
     });
@@ -302,11 +360,7 @@ export class StudentQrService {
     auth: AuthContext,
     reason?: string,
   ) {
-    if (!reason?.trim()) {
-      throw new BadRequestException(
-        'A reason is required to revoke a student QR',
-      );
-    }
+    const normalizedReason = this.normalizeQrMutationReason(reason, 'revoke');
 
     await this.assertPersonaStudentScope(tenantId, studentId, auth);
 
@@ -319,14 +373,55 @@ export class StudentQrService {
       throw new NotFoundException('QR credential not found');
     }
 
-    const credential = await this.prisma.studentQrCredential.update({
-      where: { id: existing.id },
-      data: {
+    const revokedAt = new Date();
+    const credential = await this.prisma.$transaction(async (tx) => {
+      const revoked = await tx.studentQrCredential.updateMany({
+        where: {
+          id: existing.id,
+          tenantId,
+          studentId,
+          status: StudentQrStatus.ACTIVE,
+        },
+        data: {
+          status: StudentQrStatus.REVOKED,
+          revokedAt,
+          updatedById: auth.userId,
+          revokeReason: normalizedReason,
+        },
+      });
+
+      if (revoked.count !== 1) {
+        throw new ConflictException(
+          'The QR credential changed before revocation completed. Refresh and try again.',
+        );
+      }
+
+      const revokedCredential: QrCredentialRecord = {
+        ...existing,
         status: StudentQrStatus.REVOKED,
-        revokedAt: new Date(),
+        revokedAt,
         updatedById: auth.userId,
-        revokeReason: reason.trim(),
-      },
+        revokeReason: normalizedReason,
+      };
+
+      await this.auditService.record(
+        {
+          action: 'QR_REVOKED',
+          resource: 'student_qr',
+          tenantId,
+          userId: auth.userId,
+          resourceId: revokedCredential.id,
+          before: {
+            status: existing.status,
+            rotatedAt: existing.rotatedAt,
+            revokedAt: existing.revokedAt,
+          },
+          after: { studentId, reason: normalizedReason },
+        },
+        tx,
+      );
+
+      return revokedCredential;
     });
 
     if (existing.fileAssetId) {
@@ -336,20 +431,6 @@ export class StudentQrService {
         auth.userId,
       );
     }
-
-    await this.auditService.record({
-      action: 'QR_REVOKED',
-      resource: 'student_qr',
-      tenantId,
-      userId: auth.userId,
-      resourceId: credential.id,
-      before: {
-        status: existing.status,
-        rotatedAt: existing.rotatedAt,
-        revokedAt: existing.revokedAt,
-      },
-      after: { studentId, reason: reason.trim() },
-    });
 
     return this.sanitizeCredential(credential);
   }
@@ -505,8 +586,12 @@ export class StudentQrService {
         !Array.isArray(audit.after)
           ? (audit.after as Record<string, unknown>)
           : {};
-      const purpose = String(details.purpose ?? 'UNKNOWN');
-      const failureCode = String(details.failureCode ?? 'unknown');
+      const purpose =
+        typeof details.purpose === 'string' ? details.purpose : 'UNKNOWN';
+      const failureCode =
+        typeof details.failureCode === 'string'
+          ? details.failureCode
+          : 'unknown';
       const date = audit.createdAt.toISOString().slice(0, 10);
       const success = audit.action === 'QR_RESOLVED';
 
@@ -1054,7 +1139,7 @@ export class StudentQrService {
         fileAssetId: asset.id,
         fileName,
       };
-    } catch (error) {
+    } catch {
       if (registeredFileAssetId) {
         try {
           await this.fileRegistryService.softDeleteFile(
@@ -1092,6 +1177,22 @@ export class StudentQrService {
         'The protected credential artifact could not be generated. No active credential was issued.',
       );
     }
+  }
+
+  private normalizeQrMutationReason(
+    reason: string | undefined,
+    action: 'rotate' | 'revoke',
+  ) {
+    const normalized = reason?.trim() ?? '';
+    if (
+      normalized.length < STUDENT_QR_REASON_MIN_LENGTH ||
+      normalized.length > STUDENT_QR_REASON_MAX_LENGTH
+    ) {
+      throw new BadRequestException(
+        `A reason between ${STUDENT_QR_REASON_MIN_LENGTH} and ${STUDENT_QR_REASON_MAX_LENGTH} characters is required to ${action} a student QR credential.`,
+      );
+    }
+    return normalized;
   }
 
   private artifactFileName(studentReference: string) {

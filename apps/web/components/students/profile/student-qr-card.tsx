@@ -2,12 +2,18 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { formatBsDate, type StudentProfile } from '@schoolos/core';
+import {
+  formatBsDate,
+  STUDENT_QR_REASON_MAX_LENGTH,
+  STUDENT_QR_REASON_MIN_LENGTH,
+  type StudentProfile,
+} from '@schoolos/core';
 import { api } from '@/lib/api';
 import type { StudentQrScanAudit } from '@/lib/api/students';
 import { SectionCard } from '@/components/ui/section-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { ProtectedFileButton } from '@/components/ui/protected-file';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   AlertCircle,
   CheckCircle2,
@@ -20,6 +26,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { schoolFacingErrorMessage } from '@/lib/school-facing-error';
 
 type StudentQrCardProps = {
   studentId: string;
@@ -27,7 +34,16 @@ type StudentQrCardProps = {
   qrCredential?: StudentProfile['qrCredential'];
 };
 
-export function StudentQrCard({ studentId, studentSystemId, qrCredential }: StudentQrCardProps) {
+const QR_WORKSPACE_QUERY_KEYS = [
+  ['student-qr-workspace-summary'],
+  ['students', 'qr-workspace'],
+] as const;
+
+export function StudentQrCard({
+  studentId,
+  studentSystemId,
+  qrCredential,
+}: StudentQrCardProps) {
   const queryClient = useQueryClient();
   const [generatedArtifact, setGeneratedArtifact] = useState<{
     fileAssetId: string;
@@ -45,9 +61,18 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential }: Stud
     queryKey: ['student-qr-scans', studentId],
     queryFn: () => api.listStudentQrScans(studentId),
   });
-  const currentCredential = qrStatusQuery.data?.activeCredential ?? qrCredential ?? null;
+  const currentCredential =
+    qrStatusQuery.data !== undefined
+      ? qrStatusQuery.data.activeCredential
+      : (qrCredential ?? null);
   const credentialHistory = qrStatusQuery.data?.history ?? [];
   const scanHistory = qrScansQuery.data ?? [];
+
+  function refreshQrWorkspace() {
+    for (const queryKey of QR_WORKSPACE_QUERY_KEYS) {
+      void queryClient.invalidateQueries({ queryKey: [...queryKey] });
+    }
+  }
 
   const generateMutation = useMutation({
     mutationFn: () => api.generateStudentQr(studentId),
@@ -57,14 +82,22 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential }: Stud
           ? { fileAssetId: data.fileAssetId, fileName: data.fileName }
           : null,
       );
-      void queryClient.invalidateQueries({ queryKey: ['student-profile', studentId] });
-      void queryClient.invalidateQueries({ queryKey: ['student-qr-status', studentId] });
-      void queryClient.invalidateQueries({ queryKey: ['student-qr-scans', studentId] });
+      void queryClient.invalidateQueries({
+        queryKey: ['student-profile', studentId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['student-qr-status', studentId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['student-qr-scans', studentId],
+      });
+      refreshQrWorkspace();
     },
   });
 
   const rotateMutation = useMutation({
-    mutationFn: () => api.rotateStudentQr(studentId, { reason: rotateReason }),
+    mutationFn: () =>
+      api.rotateStudentQr(studentId, { reason: rotateReason.trim() }),
     onSuccess: (data) => {
       setGeneratedArtifact(
         data.fileAssetId && data.fileName
@@ -73,21 +106,36 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential }: Stud
       );
       setShowConfirmRotate(false);
       setRotateReason('');
-      void queryClient.invalidateQueries({ queryKey: ['student-profile', studentId] });
-      void queryClient.invalidateQueries({ queryKey: ['student-qr-status', studentId] });
-      void queryClient.invalidateQueries({ queryKey: ['student-qr-scans', studentId] });
+      void queryClient.invalidateQueries({
+        queryKey: ['student-profile', studentId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['student-qr-status', studentId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['student-qr-scans', studentId],
+      });
+      refreshQrWorkspace();
     },
   });
 
   const revokeMutation = useMutation({
-    mutationFn: () => api.revokeStudentQr(studentId, { reason: revokeReason }),
+    mutationFn: () =>
+      api.revokeStudentQr(studentId, { reason: revokeReason.trim() }),
     onSuccess: () => {
       setGeneratedArtifact(null);
       setShowConfirmRevoke(false);
       setRevokeReason('');
-      void queryClient.invalidateQueries({ queryKey: ['student-profile', studentId] });
-      void queryClient.invalidateQueries({ queryKey: ['student-qr-status', studentId] });
-      void queryClient.invalidateQueries({ queryKey: ['student-qr-scans', studentId] });
+      void queryClient.invalidateQueries({
+        queryKey: ['student-profile', studentId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['student-qr-status', studentId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['student-qr-scans', studentId],
+      });
+      refreshQrWorkspace();
     },
   });
 
@@ -95,25 +143,31 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential }: Stud
   const isActive = status === 'ACTIVE';
 
   return (
-    <SectionCard 
-      title="Student Identity QR" 
+    <SectionCard
+      title="Student Identity QR"
       description="Secure token-based identity for library, canteen, and attendance."
     >
       <div className="space-y-6">
         <div className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/50 p-4">
           <div className="flex items-center gap-3">
-            <div className={cn(
-              "flex h-10 w-10 items-center justify-center rounded-xl",
-              isActive ? "bg-success-50 text-success-600" : "bg-slate-200 text-slate-500"
-            )}>
+            <div
+              className={cn(
+                'flex h-10 w-10 items-center justify-center rounded-xl',
+                isActive
+                  ? 'bg-success-50 text-success-600'
+                  : 'bg-slate-200 text-slate-500',
+              )}
+            >
               <QrCode size={20} />
             </div>
             <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">QR Status</p>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                QR Status
+              </p>
               <StatusBadge status={status} className="mt-0.5" />
             </div>
           </div>
-          
+
           {!isActive && !generateMutation.isPending && (
             <button
               onClick={() => generateMutation.mutate()}
@@ -135,9 +189,12 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential }: Stud
             <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-2xl bg-white shadow-sm ring-8 ring-white/70">
               <FileText className="h-9 w-9 text-[var(--color-mod-admissions-accent)]" />
             </div>
-            <p className="text-sm font-bold text-slate-900">Protected ID card generated</p>
+            <p className="text-sm font-bold text-slate-900">
+              Protected ID card generated
+            </p>
             <p className="mt-1 text-xs text-slate-500 max-w-[240px] mx-auto">
-              The QR credential is embedded by the backend. Its secret is never returned to this browser.
+              The QR credential is embedded by the backend. Its secret is never
+              returned to this browser.
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               <ProtectedFileButton
@@ -152,14 +209,14 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential }: Stud
                 action="download"
                 label="Download ID card"
               />
-               <button 
+              <button
                 className="flex items-center gap-2 rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[var(--color-mod-admissions-text)]"
                 onClick={() => {
                   setGeneratedArtifact(null);
                 }}
-               >
-                 Done
-               </button>
+              >
+                Done
+              </button>
             </div>
           </div>
         )}
@@ -169,7 +226,9 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential }: Stud
             {currentCredential?.lastScannedAt && (
               <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/30 px-4 py-2.5 text-xs text-slate-500">
                 <ShieldCheck size={14} className="text-success-500" />
-                <span>Last scanned {formatBsDate(currentCredential.lastScannedAt)}</span>
+                <span>
+                  Last scanned {formatBsDate(currentCredential.lastScannedAt)}
+                </span>
               </div>
             )}
             {currentCredential?.fileAssetId ? (
@@ -189,19 +248,31 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential }: Stud
               </div>
             ) : (
               <p className="rounded-xl border border-warning-100 bg-warning-50 px-3 py-2 text-xs font-semibold text-warning-700">
-                The protected ID-card file is unavailable. Rotate the credential to create a replacement.
+                The protected ID-card file is unavailable. Rotate the credential
+                to create a replacement.
               </p>
             )}
             <div className="grid grid-cols-2 gap-3">
-               <button
-                onClick={() => setShowConfirmRotate(true)}
+              <button
+                onClick={() => {
+                  rotateMutation.reset();
+                  setRotateReason('');
+                  setShowConfirmRotate(true);
+                }}
                 className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white p-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
               >
-                <RefreshCw size={16} className="text-[var(--color-mod-admissions-accent)]" />
+                <RefreshCw
+                  size={16}
+                  className="text-[var(--color-mod-admissions-accent)]"
+                />
                 Rotate (Lost Card)
               </button>
               <button
-                onClick={() => setShowConfirmRevoke(true)}
+                onClick={() => {
+                  revokeMutation.reset();
+                  setRevokeReason('');
+                  setShowConfirmRevoke(true);
+                }}
                 className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white p-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
               >
                 <XCircle size={16} className="text-danger-500" />
@@ -211,84 +282,92 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential }: Stud
           </div>
         )}
 
-        {showConfirmRotate && (
-          <div className="rounded-2xl border border-[var(--color-mod-admissions-border)] bg-[var(--color-mod-admissions-soft)] p-4 space-y-3 animate-in slide-in-from-top-2">
-            <div className="flex items-center gap-2 text-[var(--color-mod-admissions-text)]">
-              <RefreshCw size={16} />
-              <p className="text-xs font-bold uppercase">Confirm QR Rotation</p>
-            </div>
-            <p className="text-xs text-[var(--color-mod-admissions-text)]">
-              The existing QR code will be immediately invalidated. Provide a reason for this rotation.
-            </p>
-            <input 
-              className="premium-input text-xs" 
-              placeholder="e.g. Card lost by student" 
-              value={rotateReason}
-              onChange={(e) => setRotateReason(e.target.value)}
-            />
-            <div className="flex gap-2">
-              <button 
-                className="flex-1 rounded-xl bg-[var(--color-mod-admissions-accent)] py-2 text-xs font-bold text-white transition hover:bg-[var(--color-mod-admissions-text)] disabled:opacity-50"
-                disabled={!rotateReason || rotateMutation.isPending}
-                onClick={() => rotateMutation.mutate()}
-              >
-                {rotateMutation.isPending ? 'Rotating...' : 'Rotate Now'}
-              </button>
-              <button 
-                className="flex-1 rounded-xl bg-white border border-[var(--color-mod-admissions-border)] py-2 text-xs font-bold text-[var(--color-mod-admissions-text)]"
-                onClick={() => setShowConfirmRotate(false)}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
+        <ConfirmDialog
+          isOpen={showConfirmRotate}
+          title="Rotate student QR credential?"
+          description="The current QR and protected ID-card file will stop working immediately. A replacement credential and file will be generated."
+          confirmLabel="Rotate credential"
+          isConfirming={rotateMutation.isPending}
+          preventCloseWhileConfirming
+          confirmDisabled={
+            rotateReason.trim().length < STUDENT_QR_REASON_MIN_LENGTH
+          }
+          onConfirm={() => rotateMutation.mutate()}
+          onClose={() => {
+            rotateMutation.reset();
+            setRotateReason('');
+            setShowConfirmRotate(false);
+          }}
+        >
+          <QrReasonField
+            id="student-qr-rotate-reason"
+            label="Rotation reason"
+            value={rotateReason}
+            onChange={setRotateReason}
+          />
+          <QrActionError
+            error={rotateMutation.error}
+            fallback="The QR credential could not be rotated. The current credential may have changed; refresh and try again."
+          />
+        </ConfirmDialog>
 
-        {showConfirmRevoke && (
-          <div className="rounded-2xl border border-danger-100 bg-danger-50 p-4 space-y-3 animate-in slide-in-from-top-2">
-            <div className="flex items-center gap-2 text-danger-700">
-              <AlertCircle size={16} />
-              <p className="text-xs font-bold uppercase">Revoke QR Identity</p>
-            </div>
-            <p className="text-xs text-danger-600">
-              This will disable all school services (Library, Canteen) for this student until a new QR is generated.
-            </p>
-            <input 
-              className="premium-input text-xs" 
-              placeholder="e.g. Disciplinary suspension" 
-              value={revokeReason}
-              onChange={(e) => setRevokeReason(e.target.value)}
-            />
-            <div className="flex gap-2">
-              <button 
-                className="flex-1 rounded-xl bg-danger-500 py-2 text-xs font-bold text-white transition hover:bg-danger-600 disabled:opacity-50"
-                disabled={!revokeReason || revokeMutation.isPending}
-                onClick={() => revokeMutation.mutate()}
-              >
-                {revokeMutation.isPending ? 'Revoking...' : 'Revoke Access'}
-              </button>
-              <button 
-                className="flex-1 rounded-xl bg-white border border-danger-200 py-2 text-xs font-bold text-danger-600"
-                onClick={() => setShowConfirmRevoke(false)}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
+        <ConfirmDialog
+          isOpen={showConfirmRevoke}
+          title="Revoke student QR credential?"
+          description="This disables the current QR and its protected ID-card file for school services until a new credential is generated."
+          confirmLabel="Revoke credential"
+          destructive
+          isConfirming={revokeMutation.isPending}
+          preventCloseWhileConfirming
+          confirmDisabled={
+            revokeReason.trim().length < STUDENT_QR_REASON_MIN_LENGTH
+          }
+          onConfirm={() => revokeMutation.mutate()}
+          onClose={() => {
+            revokeMutation.reset();
+            setRevokeReason('');
+            setShowConfirmRevoke(false);
+          }}
+        >
+          <QrReasonField
+            id="student-qr-revoke-reason"
+            label="Revocation reason"
+            value={revokeReason}
+            onChange={setRevokeReason}
+          />
+          <QrActionError
+            error={revokeMutation.error}
+            fallback="The QR credential could not be revoked. The current credential may have changed; refresh and try again."
+          />
+        </ConfirmDialog>
 
-        {(generateMutation.error || rotateMutation.error || revokeMutation.error) && (
+        {generateMutation.error && (
           <div className="rounded-xl border border-danger-200 bg-danger-50 p-3 text-xs font-bold text-danger-600 animate-in fade-in">
-            {(generateMutation.error || rotateMutation.error || revokeMutation.error)?.message || 'An error occurred'}
+            {schoolFacingErrorMessage(generateMutation.error, {
+              fallback:
+                'The QR credential action could not be completed. The current credential was not changed.',
+              invalid:
+                'Review the required reason before changing this QR credential.',
+              forbidden:
+                'You do not have permission to manage this student QR credential.',
+              notFound: 'This student or QR credential is no longer available.',
+              conflict:
+                'This QR credential changed while you were working. Refresh and try again.',
+            })}
           </div>
         )}
 
         {credentialHistory.length > 0 && (
           <div className="rounded-2xl border border-slate-100 bg-white p-4">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Credential history</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              Credential history
+            </p>
             <div className="mt-3 space-y-2">
               {credentialHistory.slice(0, 4).map((item) => (
-                <div key={item.id} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"
+                >
                   <div>
                     <StatusBadge status={item.status} />
                     <p className="mt-1 text-[0.65rem] text-slate-500">
@@ -309,13 +388,19 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential }: Stud
         <div className="rounded-2xl border border-slate-100 bg-white p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Scan audit history</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                Scan audit history
+              </p>
               <p className="mt-1 text-[0.65rem] font-medium text-slate-500">
-                Recent QR lifecycle and resolve attempts recorded by the backend audit log.
+                Recent QR lifecycle and resolve attempts recorded by the backend
+                audit log.
               </p>
             </div>
             {qrScansQuery.isLoading ? (
-              <Loader2 size={16} className="shrink-0 animate-spin text-slate-400" />
+              <Loader2
+                size={16}
+                className="shrink-0 animate-spin text-slate-400"
+              />
             ) : (
               <Clock3 size={16} className="shrink-0 text-slate-400" />
             )}
@@ -323,9 +408,14 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential }: Stud
 
           {qrScansQuery.isError ? (
             <div className="mt-3 rounded-xl border border-danger-100 bg-danger-50 px-3 py-2 text-[0.65rem] font-bold text-danger-600">
-              {qrScansQuery.error instanceof Error
-                ? qrScansQuery.error.message
-                : 'QR scan audit history could not be loaded.'}
+              {schoolFacingErrorMessage(qrScansQuery.error, {
+                fallback:
+                  'QR scan audit history could not be loaded. Try again after refreshing the student profile.',
+                forbidden:
+                  'You do not have permission to view QR scan audit history.',
+                notFound:
+                  'QR scan audit history is not available for this student.',
+              })}
             </div>
           ) : scanHistory.length > 0 ? (
             <div className="mt-3 space-y-2">
@@ -341,13 +431,17 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential }: Stud
         </div>
 
         <div className="rounded-2xl bg-slate-50 p-4 border border-slate-100">
-           <div className="flex items-center gap-2 text-slate-400 mb-2">
-             <ShieldCheck size={14} />
-             <p className="text-[0.6rem] font-bold uppercase tracking-wider">Audit Security Policy</p>
-           </div>
-           <p className="text-[0.65rem] text-slate-500 leading-relaxed">
-             QR Identity uses protected token hashes. Credential secrets are held only in backend memory while the protected ID-card artifact is generated. Rotation invalidates the previous card and file.
-           </p>
+          <div className="flex items-center gap-2 text-slate-400 mb-2">
+            <ShieldCheck size={14} />
+            <p className="text-[0.6rem] font-bold uppercase tracking-wider">
+              Audit Security Policy
+            </p>
+          </div>
+          <p className="text-[0.65rem] text-slate-500 leading-relaxed">
+            QR Identity uses protected token hashes. Credential secrets are held
+            only in backend memory while the protected ID-card artifact is
+            generated. Rotation invalidates the previous card and file.
+          </p>
         </div>
       </div>
     </SectionCard>
@@ -356,7 +450,11 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential }: Stud
 
 function QrScanAuditRow({ entry }: { entry: StudentQrScanAudit }) {
   const success = entry.success !== false;
-  const actor = entry.performedByEmail ?? entry.scannedByEmail ?? entry.performedBy ?? 'System';
+  const actor =
+    entry.performedByEmail ??
+    entry.scannedByEmail ??
+    entry.performedBy ??
+    'System';
   const detail = [
     formatQrAction(entry.action),
     entry.purpose ? entry.purpose.replaceAll('_', ' ').toLowerCase() : null,
@@ -389,9 +487,68 @@ function QrScanAuditRow({ entry }: { entry: StudentQrScanAudit }) {
   );
 }
 
+function QrReasonField({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label htmlFor={id} className="block text-sm font-semibold text-slate-700">
+      {label}
+      <textarea
+        id={id}
+        rows={3}
+        maxLength={STUDENT_QR_REASON_MAX_LENGTH}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder="Record a clear school-office reason."
+        className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5"
+      />
+      <span className="mt-1 flex justify-between text-xs font-normal text-slate-500">
+        <span>
+          Required · {STUDENT_QR_REASON_MIN_LENGTH}–
+          {STUDENT_QR_REASON_MAX_LENGTH} characters
+        </span>
+        <span>
+          {value.length}/{STUDENT_QR_REASON_MAX_LENGTH}
+        </span>
+      </span>
+    </label>
+  );
+}
+
+function QrActionError({
+  error,
+  fallback,
+}: {
+  error: unknown;
+  fallback: string;
+}) {
+  if (!error) return null;
+  return (
+    <p
+      className="rounded-xl border border-danger-200 bg-danger-50 px-3 py-2 text-xs font-semibold text-danger-700"
+      role="alert"
+    >
+      {schoolFacingErrorMessage(error, {
+        fallback,
+        invalid: `Enter a reason between ${STUDENT_QR_REASON_MIN_LENGTH} and ${STUDENT_QR_REASON_MAX_LENGTH} characters.`,
+        forbidden:
+          'You do not have permission to manage this student QR credential.',
+        notFound: 'This student or QR credential is no longer available.',
+        conflict:
+          'This QR credential changed while you were working. Refresh and try again.',
+      })}
+    </p>
+  );
+}
+
 function formatQrAction(action: string) {
-  return action
-    .replace(/^QR_/, '')
-    .replaceAll('_', ' ')
-    .toLowerCase();
+  return action.replace(/^QR_/, '').replaceAll('_', ' ').toLowerCase();
 }

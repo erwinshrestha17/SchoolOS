@@ -3,7 +3,10 @@ import { AdmissionCaseQueuesService } from './admission-case-queues.service';
 
 const actor = { tenantId: 'tenant-a' } as any;
 
-function record(duplicateReview: unknown = {}) {
+function record(
+  duplicateReview: unknown = {},
+  overrides: Record<string, unknown> = {},
+) {
   return {
     id: 'case-a',
     status: 'READY_TO_ADMIT',
@@ -12,11 +15,15 @@ function record(duplicateReview: unknown = {}) {
     guardianFullName: 'Sita Shrestha',
     guardianPhone: '9800000000',
     source: 'OFFICE_WALK_IN',
+    academicYearId: 'year-a',
     classId: 'class-a',
     sectionId: 'section-a',
     convertedStudentId: null,
     duplicateReview,
+    policyVersion: null,
+    createdAt: new Date('2026-06-01T00:00:00.000Z'),
     updatedAt: new Date('2026-06-20T00:00:00.000Z'),
+    ...overrides,
   };
 }
 
@@ -56,7 +63,9 @@ describe('AdmissionCaseQueuesService', () => {
               },
             ]),
           }),
-          expect.objectContaining({ OR: expect.any(Array) }),
+          expect.objectContaining({
+            OR: expect.arrayContaining([{ id: { equals: 'Aarav' } }]),
+          }),
         ]),
       }),
     });
@@ -124,5 +133,139 @@ describe('AdmissionCaseQueuesService', () => {
         status: { in: ['ADMITTED', 'ENROLLED'] },
       }),
     });
+  });
+
+  it('returns a stable, tenant-scoped waitlist with batched capacity truth', async () => {
+    const prisma = {
+      admissionApplication: {
+        count: jest.fn().mockResolvedValue(2),
+        findMany: jest.fn().mockResolvedValue([
+          record(
+            {},
+            {
+              id: 'case-oldest',
+              status: 'WAITLISTED',
+              policyVersion: {
+                tenantId: 'tenant-a',
+                enforceCapacityWhenAvailable: true,
+                capacityOverride: 3,
+              },
+            },
+          ),
+          record(
+            {},
+            {
+              id: 'case-next',
+              status: 'WAITLISTED',
+              sectionId: 'section-b',
+              policyVersion: {
+                tenantId: 'tenant-b',
+                enforceCapacityWhenAvailable: true,
+                capacityOverride: 1,
+              },
+            },
+          ),
+        ]),
+      },
+      class: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([{ id: 'class-a', name: 'Grade 8' }]),
+      },
+      section: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'section-a',
+            classId: 'class-a',
+            name: 'Himalaya',
+            capacity: 30,
+          },
+          {
+            id: 'section-b',
+            classId: 'class-a',
+            name: 'Sagarmatha',
+            capacity: 10,
+          },
+        ]),
+      },
+      enrollment: {
+        groupBy: jest.fn().mockResolvedValue([
+          {
+            academicYearId: 'year-a',
+            sectionId: 'section-a',
+            _count: { _all: 3 },
+          },
+          {
+            academicYearId: 'year-a',
+            sectionId: 'section-b',
+            _count: { _all: 9 },
+          },
+        ]),
+      },
+    } as any;
+    const service = new AdmissionCaseQueuesService(prisma);
+
+    const result = await service.list(actor, {
+      queue: 'WAITLISTED',
+      page: 1,
+      limit: 25,
+    });
+
+    expect(prisma.admissionApplication.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      }),
+    );
+    expect(prisma.class.findMany).toHaveBeenCalledWith({
+      where: { tenantId: 'tenant-a', id: { in: ['class-a'] } },
+      select: { id: true, name: true },
+    });
+    expect(prisma.section.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          tenantId: 'tenant-a',
+          id: { in: ['section-a', 'section-b'] },
+        },
+      }),
+    );
+    expect(prisma.enrollment.groupBy).toHaveBeenCalledWith({
+      by: ['academicYearId', 'sectionId'],
+      where: {
+        tenantId: 'tenant-a',
+        status: 'ACTIVE',
+        OR: [
+          { academicYearId: 'year-a', sectionId: 'section-a' },
+          { academicYearId: 'year-a', sectionId: 'section-b' },
+        ],
+      },
+      _count: { _all: true },
+    });
+    expect(result.items).toEqual([
+      expect.objectContaining({
+        id: 'case-oldest',
+        className: 'Grade 8',
+        sectionName: 'Himalaya',
+        canPromoteFromWaitlist: false,
+        waitlistCapacity: {
+          state: 'FULL',
+          capacity: 3,
+          enrolled: 3,
+          seatsAvailable: 0,
+          enforced: true,
+        },
+      }),
+      expect.objectContaining({
+        id: 'case-next',
+        sectionName: 'Sagarmatha',
+        canPromoteFromWaitlist: true,
+        waitlistCapacity: {
+          state: 'NEARLY_FULL',
+          capacity: 10,
+          enrolled: 9,
+          seatsAvailable: 1,
+          enforced: false,
+        },
+      }),
+    ]);
   });
 });

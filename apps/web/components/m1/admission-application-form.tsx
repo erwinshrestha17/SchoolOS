@@ -10,6 +10,7 @@ import { CheckCircle2, ClipboardList, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { api } from '../../lib/api';
+import { schoolFacingErrorMessage } from '../../lib/school-facing-error';
 import { Button } from '../ui/button';
 import { ErrorState } from '../ui/error-state';
 import { SectionCard } from '../ui/section-card';
@@ -351,9 +352,16 @@ export function AdmissionApplicationForm() {
           className="rounded-xl border border-danger-200 bg-danger-50 p-3 text-sm font-semibold text-danger-800"
           role="alert"
         >
-          {mutation.error instanceof Error
-            ? mutation.error.message
-            : 'Application could not be created.'}
+          {schoolFacingErrorMessage(mutation.error, {
+            fallback:
+              'The application could not be created. No student was enrolled. Try again.',
+            invalid:
+              'Review the applicant, guardian, and academic placement details before continuing.',
+            forbidden:
+              'You do not have permission to create an admission application.',
+            conflict:
+              'A matching application changed while this one was being prepared. Refresh and try again.',
+          })}
         </p>
       ) : null}
 

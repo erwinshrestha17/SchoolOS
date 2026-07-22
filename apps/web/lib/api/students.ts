@@ -5,6 +5,7 @@ import type {
   LegacyAdmissionApplicationStatus,
   AdmissionDuplicateCheckResult,
   AdmissionSummary,
+  BulkAdmissionImportPayload,
   BulkAdmissionImportResult,
   CreateAdmissionApplicationPayload,
   CreateStudentGuardianPayload,
@@ -32,6 +33,7 @@ import type {
   StudentProfileDetail,
   StudentModuleSummary,
   StudentQrStatusHistory,
+  StudentQrWorkspaceSummary,
   StudentCredentialArtifactResult,
   StudentTransferPayload,
   UpdateStudentGuardianPayload,
@@ -162,6 +164,8 @@ export const studentsApi = {
     request<StudentQrStatusHistory>(
       `/students/${encodeURIComponent(studentId)}/qr`,
     ),
+  getStudentQrWorkspaceSummary: () =>
+    request<StudentQrWorkspaceSummary>('/students/qr/summary'),
   listStudentQrScans: (studentId: string) =>
     request<StudentQrScanAudit[]>(
       `/students/${encodeURIComponent(studentId)}/qr/scans`,
@@ -230,7 +234,7 @@ export const studentsApi = {
       method: 'POST',
       json: body,
     }),
-  bulkImportAdmissions: (body: JsonBody) =>
+  bulkImportAdmissions: (body: BulkAdmissionImportPayload) =>
     request<BulkAdmissionImportResult>('/admissions/bulk-import', {
       method: 'POST',
       json: body,

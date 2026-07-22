@@ -4,6 +4,10 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import {
+  educationProgramForClassLevel,
+  HIGHER_SECONDARY_MIN_CLASS_LEVEL,
+} from '@schoolos/core';
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
@@ -13,7 +17,7 @@ import { CreateClassDto } from './dto/create-class.dto';
 // Streams (Science, Management, ...) are a Higher Secondary / +2 concept.
 // This matches the existing Grade 11-12 threshold used for admission grade
 // banding in admission-cases.service.ts's gradeBand().
-const HIGHER_SECONDARY_MIN_LEVEL = 11;
+const HIGHER_SECONDARY_MIN_LEVEL = HIGHER_SECONDARY_MIN_CLASS_LEVEL;
 
 @Injectable()
 export class ClassesService {
@@ -42,6 +46,7 @@ export class ClassesService {
       id: classroom.id,
       name: classroom.name,
       level: classroom.level,
+      program: educationProgramForClassLevel(classroom.level),
       studentCount: classroom._count.students,
       subjectCount: classroom._count.subjects,
       sectionCount: classroom._count.sections,
@@ -99,6 +104,7 @@ export class ClassesService {
       id: updated.id,
       name: updated.name,
       level: updated.level,
+      program: educationProgramForClassLevel(updated.level),
       streamId: updated.streamId,
       streamName: updated.stream?.name ?? null,
     };
@@ -138,6 +144,13 @@ export class ClassesService {
       },
     });
 
-    return classroom;
+    return {
+      id: classroom.id,
+      name: classroom.name,
+      level: classroom.level,
+      program: educationProgramForClassLevel(classroom.level),
+      streamId: classroom.streamId,
+      streamName: null,
+    };
   }
 }

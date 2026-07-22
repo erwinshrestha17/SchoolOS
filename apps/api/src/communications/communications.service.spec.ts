@@ -165,6 +165,120 @@ describe('CommunicationsService', () => {
     );
   });
 
+  it('queues an admission document reminder through canonical M12 intake with daily idempotency', async () => {
+    const notificationEventService = {
+      accept: jest.fn().mockResolvedValue({ id: 'notification-event-1' }),
+      markDispatched: jest.fn().mockResolvedValue(undefined),
+      markFailed: jest.fn().mockResolvedValue(undefined),
+    };
+    const reminderService = new CommunicationsService(
+      prisma,
+      notificationsService,
+      auditService,
+      {
+        verifyLimit: jest.fn(),
+        checkLimit: jest.fn(),
+        incrementUsage: jest.fn(),
+      } as never,
+      redisService,
+      fileRegistryService,
+      undefined,
+      notificationEventService as never,
+    );
+    const recordDeliveryRecords = jest
+      .spyOn(reminderService, 'recordDeliveryRecords')
+      .mockResolvedValueOnce({ count: 1, replayed: false } as never)
+      .mockResolvedValueOnce({ count: 1, replayed: true } as never);
+    prisma.notificationDelivery.findMany.mockResolvedValue([
+      { status: NotificationStatus.QUEUED },
+    ]);
+    const input = {
+      actor,
+      admissionCaseId: 'admission-case-1',
+      applicantName: 'Aarav Shrestha',
+      guardianPhone: '9800000000',
+      sourceUpdatedAt: '2026-07-20T04:00:00.000Z',
+      missingDocumentLabels: ['Birth certificate'],
+    };
+
+    await expect(
+      reminderService.recordAdmissionDocumentReminder(input),
+    ).resolves.toEqual({ state: 'QUEUED', reason: null });
+    await expect(
+      reminderService.recordAdmissionDocumentReminder(input),
+    ).resolves.toEqual({ state: 'ALREADY_QUEUED', reason: null });
+
+    const firstEventInput = notificationEventService.accept.mock.calls[0][0];
+    expect(firstEventInput).toEqual(
+      expect.objectContaining({
+        tenantId: 'tenant-1',
+        type: 'ADMISSION_DOCUMENTS_REQUESTED',
+        sourceEntityId: 'admission-case-1',
+        actorId: 'admin-1',
+        idempotencyKey: expect.stringMatching(
+          /^admission-document-request:admission-case-1:\d{4}-\d{2}-\d{2}$/,
+        ),
+        metadata: expect.objectContaining({
+          sourceUpdatedAt: '2026-07-20T04:00:00.000Z',
+          missingDocumentCount: 1,
+        }),
+      }),
+    );
+    expect(
+      notificationEventService.accept.mock.calls[1][0].idempotencyKey,
+    ).toBe(firstEventInput.idempotencyKey);
+    expect(recordDeliveryRecords).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceType: 'admission_document_request',
+        sourceId: firstEventInput.idempotencyKey,
+        notificationEventId: 'notification-event-1',
+        channels: [NotificationChannel.SMS],
+        directRecipients: [
+          expect.objectContaining({ phone: '9800000000', userId: null }),
+        ],
+      }),
+    );
+    expect(notificationEventService.markDispatched).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports an admission reminder as unavailable when M12 creates no deliverable row', async () => {
+    const notificationEventService = {
+      accept: jest.fn().mockResolvedValue({ id: 'notification-event-1' }),
+      markDispatched: jest.fn().mockResolvedValue(undefined),
+      markFailed: jest.fn().mockResolvedValue(undefined),
+    };
+    const reminderService = new CommunicationsService(
+      prisma,
+      notificationsService,
+      auditService,
+      {} as never,
+      redisService,
+      fileRegistryService,
+      undefined,
+      notificationEventService as never,
+    );
+    jest
+      .spyOn(reminderService, 'recordDeliveryRecords')
+      .mockResolvedValue({ count: 1 } as never);
+    prisma.notificationDelivery.findMany.mockResolvedValue([
+      { status: NotificationStatus.SKIPPED },
+    ]);
+
+    await expect(
+      reminderService.recordAdmissionDocumentReminder({
+        actor,
+        admissionCaseId: 'admission-case-1',
+        applicantName: 'Aarav Shrestha',
+        guardianPhone: '9800000000',
+        sourceUpdatedAt: '2026-07-20T04:00:00.000Z',
+        missingDocumentLabels: ['Birth certificate'],
+      }),
+    ).resolves.toEqual({
+      state: 'SKIPPED',
+      reason: 'DELIVERY_UNAVAILABLE',
+    });
+  });
+
   it('lists communication templates with tenant-scoped server pagination', async () => {
     prisma.communicationTemplate.findMany.mockResolvedValue([
       { id: 'template-1' },
@@ -1619,7 +1733,10 @@ describe('CommunicationsService', () => {
                       some: { recipientUserId: teacherActor.userId },
                     },
                   },
-                  { audienceType: AudienceType.CLASS, classId: { in: ['class-1'] } },
+                  {
+                    audienceType: AudienceType.CLASS,
+                    classId: { in: ['class-1'] },
+                  },
                   {
                     audienceType: AudienceType.SECTION,
                     sectionId: { in: ['section-1'] },
@@ -1628,7 +1745,10 @@ describe('CommunicationsService', () => {
               },
               {
                 lifecycleStatus: {
-                  in: [NoticeLifecycleStatus.PUBLISHED, NoticeLifecycleStatus.EXPIRED],
+                  in: [
+                    NoticeLifecycleStatus.PUBLISHED,
+                    NoticeLifecycleStatus.EXPIRED,
+                  ],
                 },
               },
             ]),
@@ -1651,7 +1771,9 @@ describe('CommunicationsService', () => {
       const call = (prisma.notice.findMany as jest.Mock).mock.calls[0][0];
       const andClauses = call.where.AND as Array<Record<string, unknown>>;
       expect(
-        andClauses.some((clause) => clause.lifecycleStatus === NoticeLifecycleStatus.DRAFT),
+        andClauses.some(
+          (clause) => clause.lifecycleStatus === NoticeLifecycleStatus.DRAFT,
+        ),
       ).toBe(false);
     });
 
@@ -1690,7 +1812,10 @@ describe('CommunicationsService', () => {
                   some: { recipientUserId: teacherActor.userId },
                 },
               },
-              { audienceType: AudienceType.CLASS, classId: { in: ['class-1'] } },
+              {
+                audienceType: AudienceType.CLASS,
+                classId: { in: ['class-1'] },
+              },
               {
                 audienceType: AudienceType.SECTION,
                 sectionId: { in: ['section-1'] },

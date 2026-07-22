@@ -13,7 +13,7 @@ export default async function AdmissionApplicationReviewPage({
     <DashboardPageShell>
       <M1PageHeader
         title="Application review"
-        description="Review the admission case, record a reasoned decision, and keep unsupported scoring or interview work unavailable."
+        description="Review the admission case, complete any required assessment or interview, and record a reasoned decision."
       />
       <ApplicationReviewWorkspace admissionCaseId={applicationId} />
     </DashboardPageShell>

@@ -3,6 +3,7 @@
 import {
   formatBsDate,
   formatBsDateTime,
+  type BulkAdmissionImportResult,
   type IemisExportResult,
   type StudentIemisReadinessSummary,
 } from "@schoolos/core";
@@ -17,8 +18,10 @@ import {
   Upload,
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
-import { api } from "../../lib/api";
+import { api, ApiRequestError } from "../../lib/api";
+import { useSession } from "../session-provider";
 import { Button } from "../ui/button";
+import { ConfirmDialog } from "../ui/confirm-dialog";
 import { EmptyState } from "../ui/empty-state";
 import { ErrorState } from "../ui/error-state";
 import { KpiCard, KpiGrid } from "../ui/kpi-card";
@@ -34,8 +37,17 @@ type IssueRow = {
   message: string;
 };
 
+type PendingAdmissionImport = {
+  fileName: string;
+  csvContent: string;
+  preview: BulkAdmissionImportResult;
+};
+
+const MAX_ADMISSION_IMPORT_FILE_BYTES = 1_000_000;
+
 export function IemisReadinessWorkspace() {
   const queryClient = useQueryClient();
+  const { hasPermissions } = useSession();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<"all" | "ready" | "has_issues">(
     "has_issues",
@@ -46,11 +58,19 @@ export function IemisReadinessWorkspace() {
   const [importResult, setImportResult] = useState<Awaited<
     ReturnType<typeof api.bulkImportAdmissions>
   > | null>(null);
+  const [pendingImport, setPendingImport] =
+    useState<PendingAdmissionImport | null>(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [toast, setToast] = useState<{
     title: string;
     description: string;
     tone: "success" | "danger" | "info";
   } | null>(null);
+  const canImportAdmissions = hasPermissions([
+    "enrollments:create",
+    "students:create",
+    "guardians:create",
+  ]);
 
   const readinessQuery = useQuery({
     queryKey: ["student-iemis-readiness-list", "workspace", status],
@@ -78,23 +98,61 @@ export function IemisReadinessWorkspace() {
     onError: (error) =>
       setToast({
         title: "Export failed",
-        description:
-          error instanceof Error
-            ? error.message
-            : "The export could not be prepared.",
+        description: transferFailureMessage(error, "export"),
+        tone: "danger",
+      }),
+  });
+
+  const validateImportMutation = useMutation({
+    mutationFn: async (file: File) => {
+      if (file.size > MAX_ADMISSION_IMPORT_FILE_BYTES) {
+        throw new Error("Admission CSV exceeds the one-megabyte limit.");
+      }
+      const csvContent = await file.text();
+      const preview = await api.bulkImportAdmissions({
+        csvContent,
+        sourceFileName: file.name,
+        dryRun: true,
+        confirmDuplicates: false,
+      });
+      return { fileName: file.name, csvContent, preview };
+    },
+    onSuccess: (pending) => {
+      setPendingImport(pending);
+      setImportDialogOpen(true);
+      setToast({
+        title: "Admission CSV validated",
+        description: `${pending.preview.validated} rows are ready and ${pending.preview.failed} need attention. No student records were created.`,
+        tone: pending.preview.failed ? "info" : "success",
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["admission-import-batches"],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["admission-import-review-queue"],
+      });
+    },
+    onError: (error) =>
+      setToast({
+        title: "CSV validation failed",
+        description: transferFailureMessage(error, "import"),
         tone: "danger",
       }),
   });
 
   const importMutation = useMutation({
-    mutationFn: async (file: File) =>
+    mutationFn: async (pending: PendingAdmissionImport) =>
       api.bulkImportAdmissions({
-        csvContent: await file.text(),
+        csvContent: pending.csvContent,
+        sourceFileName: pending.fileName,
         dryRun: false,
         confirmDuplicates: false,
+        validationBatchId: pending.preview.batchId,
       }),
     onSuccess: (result) => {
       setImportResult(result);
+      setPendingImport(null);
+      setImportDialogOpen(false);
       setToast({
         title: "Import processed",
         description: `${result.created} created, ${result.failed} failed, ${result.validated} validated.`,
@@ -114,10 +172,7 @@ export function IemisReadinessWorkspace() {
     onError: (error) =>
       setToast({
         title: "Import failed",
-        description:
-          error instanceof Error
-            ? error.message
-            : "The import could not be processed.",
+        description: transferFailureMessage(error, "import"),
         tone: "danger",
       }),
   });
@@ -161,7 +216,11 @@ export function IemisReadinessWorkspace() {
         className="hidden"
         onChange={(event) => {
           const file = event.target.files?.[0];
-          if (file) importMutation.mutate(file);
+          if (file) {
+            setPendingImport(null);
+            setImportDialogOpen(false);
+            validateImportMutation.mutate(file);
+          }
           event.currentTarget.value = "";
         }}
       />
@@ -205,12 +264,16 @@ export function IemisReadinessWorkspace() {
         <KpiCard
           title="Import Jobs"
           value={
-            importMutation.isPending
+            importMutation.isPending || validateImportMutation.isPending
               ? "Running"
               : (importBatchesQuery.data?.total ?? "Unavailable")
           }
           icon={<Upload size={19} />}
-          tone={importMutation.isPending ? "warning" : "info"}
+          tone={
+            importMutation.isPending || validateImportMutation.isPending
+              ? "warning"
+              : "info"
+          }
           description="Persisted admission import batches"
         />
       </KpiGrid>
@@ -321,10 +384,12 @@ export function IemisReadinessWorkspace() {
             <h3 className="text-sm font-black text-slate-900">
               Recent import result
             </h3>
-            {importMutation.isPending ? (
+            {importMutation.isPending || validateImportMutation.isPending ? (
               <p className="mt-3 flex items-center gap-2 text-sm text-slate-600">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Processing CSV through the admissions import API…
+                {validateImportMutation.isPending
+                  ? "Validating CSV without creating records…"
+                  : "Creating the confirmed admission records…"}
               </p>
             ) : importResult ? (
               <div className="mt-3 grid gap-3 sm:grid-cols-4">
@@ -518,9 +583,18 @@ export function IemisReadinessWorkspace() {
                 type="button"
                 variant="outline"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={importMutation.isPending}
+                disabled={
+                  !canImportAdmissions ||
+                  importMutation.isPending ||
+                  validateImportMutation.isPending
+                }
               >
-                <Upload className="h-4 w-4" /> Import students
+                {validateImportMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Upload className="h-4 w-4" />
+                )}{" "}
+                Validate admission CSV
               </Button>
               <ProtectedFileButton
                 action="download"
@@ -532,6 +606,29 @@ export function IemisReadinessWorkspace() {
                 Download latest protected export
               </ProtectedFileButton>
             </div>
+            {!canImportAdmissions ? (
+              <p className="mt-3 text-xs font-semibold text-slate-500">
+                Your role can review import history but cannot create admission
+                records.
+              </p>
+            ) : pendingImport ? (
+              <div className="mt-4 rounded-xl border border-info-100 bg-info-50 p-3 text-sm text-info-900">
+                <p className="font-bold">Validation ready</p>
+                <p className="mt-1 text-xs">
+                  {pendingImport.preview.validated} ready ·{" "}
+                  {pendingImport.preview.failed} need attention
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-3"
+                  onClick={() => setImportDialogOpen(true)}
+                >
+                  Review validated import
+                </Button>
+              </div>
+            ) : null}
             {exportResult ? (
               <dl className="mt-4 space-y-2 border-t border-slate-100 pt-4 text-xs">
                 <div className="flex justify-between gap-3">
@@ -555,6 +652,115 @@ export function IemisReadinessWorkspace() {
           </div>
         </aside>
       </div>
+
+      <ConfirmDialog
+        isOpen={importDialogOpen && pendingImport !== null}
+        title="Create the validated admission records?"
+        description="Only rows that passed the server validation will be attempted. Rows with errors or possible duplicates stay in the review queue. SchoolOS rechecks the one-time validation receipt before creating any records."
+        confirmLabel={
+          pendingImport
+            ? `Create ${pendingImport.preview.validated} admission${pendingImport.preview.validated === 1 ? "" : "s"}`
+            : "Create admissions"
+        }
+        isConfirming={importMutation.isPending}
+        preventCloseWhileConfirming
+        confirmDisabled={
+          !pendingImport || pendingImport.preview.validated === 0
+        }
+        onClose={() => {
+          if (!importMutation.isPending) {
+            setImportDialogOpen(false);
+            importMutation.reset();
+          }
+        }}
+        onConfirm={() => {
+          if (pendingImport) importMutation.mutate(pendingImport);
+        }}
+      >
+        {pendingImport ? (
+          <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+            <div>
+              <p className="font-bold text-slate-950">
+                {pendingImport.fileName}
+              </p>
+              <p className="mt-1 text-xs text-slate-600">
+                Validation batch {pendingImport.preview.batchId}
+              </p>
+            </div>
+            <dl className="grid grid-cols-3 gap-2 text-center">
+              <ImportPreviewMetric
+                label="Rows"
+                value={pendingImport.preview.totalRows}
+              />
+              <ImportPreviewMetric
+                label="Ready"
+                value={pendingImport.preview.validated}
+              />
+              <ImportPreviewMetric
+                label="Need attention"
+                value={pendingImport.preview.failed}
+              />
+            </dl>
+            {pendingImport.preview.validated === 0 ? (
+              <p className="font-semibold text-danger-700" role="alert">
+                No rows passed validation. Correct the CSV and validate it again
+                before importing.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+        {importMutation.isError ? (
+          <p className="text-sm font-semibold text-danger-700" role="alert">
+            {transferFailureMessage(importMutation.error, "import")}
+          </p>
+        ) : null}
+      </ConfirmDialog>
     </div>
   );
+}
+
+function ImportPreviewMetric({
+  label,
+  value,
+}: {
+  label: string;
+  value: number;
+}) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-2">
+      <dt className="text-xs font-semibold text-slate-500">{label}</dt>
+      <dd className="mt-1 text-lg font-black text-slate-950">{value}</dd>
+    </div>
+  );
+}
+
+function transferFailureMessage(
+  error: unknown,
+  operation: "import" | "export",
+) {
+  if (error instanceof ApiRequestError) {
+    if (error.statusCode === 401) {
+      return "Your session expired. Sign in again before continuing.";
+    }
+    if (error.statusCode === 403) {
+      return `You do not have permission to ${operation} student records.`;
+    }
+    if ([400, 413, 422].includes(error.statusCode)) {
+      return operation === "import"
+        ? "The selected CSV was not accepted. Review its headers, row values, and file size, then try again."
+        : "The export filters were not accepted. Refresh the readiness list and try again.";
+    }
+    if (error.statusCode === 409) {
+      return operation === "import"
+        ? "The import conflicts with current student records. Review the import queue before retrying."
+        : "Student records changed while the export was prepared. Refresh and try again.";
+    }
+    if (error.statusCode === 429) {
+      return "Too many requests were submitted. Wait a moment and try again.";
+    }
+  }
+
+  return operation === "import"
+    ? "The import could not be processed. No completed student rows were rolled back or hidden. Try again, or contact support with the request time."
+    : "The export could not be prepared. Student records were not changed. Try again, or contact support with the request time.";
 }

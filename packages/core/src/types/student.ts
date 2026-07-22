@@ -129,6 +129,9 @@ export enum StudentQrResolvePurpose {
   ATTENDANCE = "ATTENDANCE",
 }
 
+export const STUDENT_QR_REASON_MIN_LENGTH = 5;
+export const STUDENT_QR_REASON_MAX_LENGTH = 500;
+
 export type StudentQrCredentialSummary = {
   id: string;
   studentId: string;
@@ -156,6 +159,19 @@ export type StudentCredentialArtifactResult = {
 export type StudentQrStatusHistory = {
   activeCredential: StudentQrCredentialSummary | null;
   history: StudentQrCredentialSummary[];
+};
+
+export type StudentQrWorkspaceSummary = {
+  activeCredentials: number;
+  replacementFilesNeeded: number;
+  inactiveCredentials: number;
+  successfulScansToday: number;
+  period: {
+    bsDate: string;
+    startUtc: string;
+    endExclusiveUtc: string;
+    timeZone: "Asia/Kathmandu";
+  };
 };
 
 export type StudentProfileEnrollment = {

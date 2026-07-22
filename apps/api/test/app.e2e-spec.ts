@@ -167,6 +167,7 @@ describe('School OS Auth + RBAC integration', () => {
       adminRequest.auth as unknown as AuthContext,
     );
     expect(createdClass.name).toBe('Class 6');
+    expect(createdClass.program).toBe('SCHOOL');
 
     const teacherRole = prisma.__state.roles.find(
       (role) =>

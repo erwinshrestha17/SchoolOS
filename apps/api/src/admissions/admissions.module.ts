@@ -15,6 +15,7 @@ import { AdmissionCaseQueuesController } from './admission-case-queues.controlle
 import { AdmissionCaseQueuesService } from './admission-case-queues.service';
 import { AdmissionCasesController } from './admission-cases.controller';
 import { AdmissionCasesService } from './admission-cases.service';
+import { AdmissionDocumentReminderService } from './admission-document-reminder.service';
 import { AdmissionPolicyController } from './admission-policy.controller';
 import { AdmissionPolicyService } from './admission-policy.service';
 import { AdmissionsController } from './admissions.controller';
@@ -51,6 +52,7 @@ import { UsageModule } from '../usage/usage.module';
   providers: [
     AdmissionsService,
     AdmissionCasesService,
+    AdmissionDocumentReminderService,
     AdmissionPolicyService,
     AdmissionCaseQueuesService,
     AdmissionCaseFollowUpsService,

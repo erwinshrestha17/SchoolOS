@@ -1,7 +1,18 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsNotEmpty, IsString } from 'class-validator';
+import { Transform } from 'class-transformer';
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
-import { StudentQrResolvePurpose } from '@schoolos/core';
+import {
+  STUDENT_QR_REASON_MAX_LENGTH,
+  STUDENT_QR_REASON_MIN_LENGTH,
+  StudentQrResolvePurpose,
+} from '@schoolos/core';
 
 export class ResolveStudentQrDto {
   @ApiProperty({
@@ -25,8 +36,12 @@ export class RotateStudentQrDto {
   @ApiProperty({
     description: 'Reason for rotating the QR credential',
   })
+  @Transform(({ value }: { value: unknown }): unknown =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsString()
-  @IsNotEmpty()
+  @MinLength(STUDENT_QR_REASON_MIN_LENGTH)
+  @MaxLength(STUDENT_QR_REASON_MAX_LENGTH)
   reason!: string;
 }
 
@@ -34,8 +49,12 @@ export class RevokeStudentQrDto {
   @ApiProperty({
     description: 'Reason for revoking the QR credential',
   })
+  @Transform(({ value }: { value: unknown }): unknown =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsString()
-  @IsNotEmpty()
+  @MinLength(STUDENT_QR_REASON_MIN_LENGTH)
+  @MaxLength(STUDENT_QR_REASON_MAX_LENGTH)
   reason!: string;
 }
 
@@ -109,4 +128,35 @@ export class StudentQrStatusHistoryResponseDto {
 
   @ApiProperty({ type: [StudentQrCredentialResponseDto] })
   history!: StudentQrCredentialResponseDto[];
+}
+
+export class StudentQrWorkspacePeriodResponseDto {
+  @ApiProperty({ example: '2083-04-06' })
+  bsDate!: string;
+
+  @ApiProperty({ format: 'date-time' })
+  startUtc!: string;
+
+  @ApiProperty({ format: 'date-time' })
+  endExclusiveUtc!: string;
+
+  @ApiProperty({ enum: ['Asia/Kathmandu'] })
+  timeZone!: 'Asia/Kathmandu';
+}
+
+export class StudentQrWorkspaceSummaryResponseDto {
+  @ApiProperty()
+  activeCredentials!: number;
+
+  @ApiProperty()
+  replacementFilesNeeded!: number;
+
+  @ApiProperty()
+  inactiveCredentials!: number;
+
+  @ApiProperty()
+  successfulScansToday!: number;
+
+  @ApiProperty({ type: StudentQrWorkspacePeriodResponseDto })
+  period!: StudentQrWorkspacePeriodResponseDto;
 }

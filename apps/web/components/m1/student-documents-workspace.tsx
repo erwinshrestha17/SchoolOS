@@ -9,6 +9,7 @@ import { useSearchParams } from 'next/navigation';
 import { api } from '../../lib/api';
 import { ApiRequestError, downloadProtectedFile, openProtectedFile } from '../../lib/api/client';
 import { fileToBase64Payload } from '../../lib/files';
+import { schoolFacingErrorMessage } from '../../lib/school-facing-error';
 import { Avatar } from '../ui/avatar';
 import { Button, type ButtonProps } from '../ui/button';
 import { BsDateField } from '../ui/bs-date-field';
@@ -127,9 +128,9 @@ export function StudentDocumentsWorkspace() {
       buildUploadMetadata();
       setUploadMetadataError(null);
       uploadMutation.mutate(file);
-    } catch (error: unknown) {
+    } catch {
       setUploadMetadataError(
-        error instanceof Error ? error.message : 'Review upload details before sending this file.',
+        'Review the replacement reason and expiry date before sending this file.',
       );
     }
   }
@@ -160,7 +161,24 @@ export function StudentDocumentsWorkspace() {
       void queryClient.invalidateQueries({ queryKey: ['student-profile', selectedStudent?.id] });
       void queryClient.invalidateQueries({ queryKey: ['student-document-history', selectedStudent?.id] });
     },
-    onError: (error) => setToast({ tone: 'danger', title: 'Upload failed', description: error instanceof Error ? error.message : 'The document could not be uploaded.' }),
+    onError: (error) =>
+      setToast({
+        tone: 'danger',
+        title: 'Upload failed',
+        description: schoolFacingErrorMessage(error, {
+          fallback:
+            'The document could not be uploaded. No existing document was replaced.',
+          invalid:
+            'Review the file type, size, replacement reason, and expiry date before uploading.',
+          forbidden:
+            'You do not have permission to upload documents for this student.',
+          notFound: 'This student record is no longer available.',
+          conflict:
+            'This document record changed while the upload was prepared. Refresh and try again.',
+          payloadTooLarge:
+            'The selected document is too large. Choose a smaller PDF or image and try again.',
+        }),
+      }),
   });
 
   const verifyMutation = useMutation({
@@ -171,7 +189,22 @@ export function StudentDocumentsWorkspace() {
       void queryClient.invalidateQueries({ queryKey: ['student-profile', selectedStudent?.id] });
       void queryClient.invalidateQueries({ queryKey: ['student-document-history', selectedStudent?.id] });
     },
-    onError: (error) => setToast({ tone: 'danger', title: 'Verification failed', description: error instanceof Error ? error.message : 'The review could not be saved.' }),
+    onError: (error) =>
+      setToast({
+        tone: 'danger',
+        title: 'Verification failed',
+        description: schoolFacingErrorMessage(error, {
+          fallback:
+            'The document review could not be saved. Its verification status was not changed.',
+          invalid:
+            'Select a valid review result and record the required review note.',
+          forbidden:
+            'You do not have permission to verify this student document.',
+          notFound: 'This student document is no longer available.',
+          conflict:
+            'This document changed during review. Refresh the student record and try again.',
+        }),
+      }),
   });
   const archiveMutation = useMutation({
     mutationFn: ({ documentId, reason }: { documentId: string; reason: string }) =>
@@ -184,7 +217,22 @@ export function StudentDocumentsWorkspace() {
       void queryClient.invalidateQueries({ queryKey: ['student-profile', selectedStudent?.id] });
       void queryClient.invalidateQueries({ queryKey: ['student-document-history', selectedStudent?.id] });
     },
-    onError: (error) => setToast({ tone: 'danger', title: 'Archive failed', description: error instanceof Error ? error.message : 'The document could not be archived.' }),
+    onError: (error) =>
+      setToast({
+        tone: 'danger',
+        title: 'Archive failed',
+        description: schoolFacingErrorMessage(error, {
+          fallback:
+            'The document could not be archived. It remains available under its current status.',
+          invalid:
+            'Record the required archive reason before continuing.',
+          forbidden:
+            'You do not have permission to archive this student document.',
+          notFound: 'This student document is no longer available.',
+          conflict:
+            'This document changed before it could be archived. Refresh and try again.',
+        }),
+      }),
   });
   const removeGuardianMutation = useMutation({
     mutationFn: () => {
@@ -206,7 +254,23 @@ export function StudentDocumentsWorkspace() {
       void queryClient.invalidateQueries({ queryKey: ['student-profile', selectedStudent?.id] });
       void queryClient.invalidateQueries({ queryKey: ['student-document-history', selectedStudent?.id] });
     },
-    onError: (error) => setToast({ tone: 'danger', title: 'Guardian access was not changed', description: error instanceof Error ? error.message : 'The backend rejected this request.' }),
+    onError: (error) =>
+      setToast({
+        tone: 'danger',
+        title: 'Guardian access was not changed',
+        description: schoolFacingErrorMessage(error, {
+          fallback:
+            'Guardian access was not changed. Review the relationship and try again.',
+          invalid:
+            'Review the removal reason, protected-file access confirmation, and replacement primary guardian.',
+          forbidden:
+            'You do not have permission to remove this guardian relationship.',
+          notFound:
+            'This student or guardian relationship is no longer available.',
+          conflict:
+            'This guardian relationship changed while you were working. Refresh and try again.',
+        }),
+      }),
   });
 
   if (studentsQuery.isLoading && !requestedStudentId) return <LoadingState variant="page" label="Loading student documents…" />;
@@ -389,7 +453,16 @@ function StudentDocumentAccessButton({
       setMessage(action === 'download' ? 'Protected download started.' : 'Protected preview opened.');
     } catch (error: unknown) {
       setStatus('error');
-      setMessage(error instanceof Error ? error.message : 'This protected document is unavailable right now.');
+      setMessage(
+        schoolFacingErrorMessage(error, {
+          fallback:
+            'This protected document is unavailable right now. No document record was changed.',
+          forbidden:
+            'You do not have permission to open this protected document.',
+          notFound:
+            'This protected document is missing, expired, or no longer available.',
+        }),
+      );
     }
   }
 

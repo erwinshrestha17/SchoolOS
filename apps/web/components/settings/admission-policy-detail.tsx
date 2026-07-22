@@ -2,10 +2,12 @@
 
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { admissionPoliciesApi } from '../../lib/api/admission-policies';
 import { formatSchoolDate } from '../../lib/date-utils';
 import { useSession } from '../session-provider';
 import { Button } from '../ui/button';
+import { ConfirmDialog } from '../ui/confirm-dialog';
 import { ErrorState } from '../ui/error-state';
 import { LoadingState } from '../ui/loading-state';
 import { SectionCard } from '../ui/section-card';
@@ -16,6 +18,8 @@ export function AdmissionPolicyDetail({ policyId }: { policyId: string }) {
   const router = useRouter();
   const { hasPermissions } = useSession();
   const canManage = hasPermissions(['admission_policy:manage']);
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [archiveReason, setArchiveReason] = useState('');
 
   const policyQuery = useQuery({
     queryKey: ['admission-policy', policyId],
@@ -32,6 +36,15 @@ export function AdmissionPolicyDetail({ policyId }: { policyId: string }) {
   const duplicateMutation = useMutation({
     mutationFn: () => admissionPoliciesApi.duplicate(policyId, {}),
     onSuccess: (duplicated) => router.push(`/dashboard/settings/admissions/${duplicated.id}/edit`),
+  });
+  const archiveMutation = useMutation({
+    mutationFn: () =>
+      admissionPoliciesApi.archive(policyId, { reason: archiveReason.trim() }),
+    onSuccess: () => {
+      setArchiveDialogOpen(false);
+      setArchiveReason('');
+      router.push('/dashboard/settings/admissions');
+    },
   });
 
   if (policyQuery.isLoading) {
@@ -69,9 +82,16 @@ export function AdmissionPolicyDetail({ policyId }: { policyId: string }) {
             <Button type="button" variant="outline" disabled={duplicateMutation.isPending} onClick={() => duplicateMutation.mutate()}>
               Duplicate policy
             </Button>
-            <Button type="button" onClick={() => router.push(`/dashboard/settings/admissions/${policyId}/edit`)}>
-              Edit policy
-            </Button>
+            {policy.status !== 'ARCHIVED' ? (
+              <Button type="button" onClick={() => router.push(`/dashboard/settings/admissions/${policyId}/edit`)}>
+                Edit policy
+              </Button>
+            ) : null}
+            {!policy.isDefault && policy.status !== 'ARCHIVED' ? (
+              <Button type="button" variant="destructive" onClick={() => setArchiveDialogOpen(true)}>
+                Archive policy
+              </Button>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -79,6 +99,18 @@ export function AdmissionPolicyDetail({ policyId }: { policyId: string }) {
       {duplicateMutation.isError ? (
         <p className="rounded-xl border border-danger-200 bg-danger-50 p-3 text-sm font-semibold text-danger-800" role="alert">
           This policy could not be duplicated. Please try again.
+        </p>
+      ) : null}
+
+      {policy.status === 'ARCHIVED' ? (
+        <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700">
+          This policy is archived and read-only. Duplicate it to create a new editable draft.
+        </p>
+      ) : null}
+
+      {archiveMutation.isError ? (
+        <p className="rounded-xl border border-danger-200 bg-danger-50 p-3 text-sm font-semibold text-danger-800" role="alert">
+          This policy could not be archived. Reload the page and try again.
         </p>
       ) : null}
 
@@ -90,7 +122,6 @@ export function AdmissionPolicyDetail({ policyId }: { policyId: string }) {
           <TabsTrigger value="eligibility">Eligibility</TabsTrigger>
           <TabsTrigger value="assessment">Assessment</TabsTrigger>
           <TabsTrigger value="decisions">Decisions</TabsTrigger>
-          <TabsTrigger value="communication">Communication</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
 
@@ -193,12 +224,6 @@ export function AdmissionPolicyDetail({ policyId }: { policyId: string }) {
           </SectionCard>
         </TabsContent>
 
-        <TabsContent value="communication">
-          <SectionCard title="Communication" description="Parent-facing communication templates for this policy.">
-            <p className="text-sm text-slate-500">Coming soon — communication templates are not yet configurable per policy.</p>
-          </SectionCard>
-        </TabsContent>
-
         <TabsContent value="history">
           <SectionCard title="Version history">
             {versionsQuery.data?.length ? (
@@ -230,6 +255,35 @@ export function AdmissionPolicyDetail({ policyId }: { policyId: string }) {
           </SectionCard>
         </TabsContent>
       </Tabs>
+
+      <ConfirmDialog
+        isOpen={archiveDialogOpen}
+        title="Archive admission policy?"
+        description="New and editable admission cases will stop using this policy. Reviewed cases retain their locked policy version for audit and completion."
+        confirmLabel="Archive policy"
+        variant="destructive"
+        isConfirming={archiveMutation.isPending}
+        preventCloseWhileConfirming
+        confirmDisabled={archiveReason.trim().length < 5}
+        onConfirm={() => archiveMutation.mutate()}
+        onClose={() => {
+          if (archiveMutation.isPending) return;
+          setArchiveDialogOpen(false);
+          setArchiveReason('');
+        }}
+      >
+        <label className="block text-sm font-semibold text-slate-700">
+          Archive reason
+          <textarea
+            value={archiveReason}
+            onChange={(event) => setArchiveReason(event.target.value)}
+            rows={3}
+            maxLength={500}
+            placeholder="Why is this policy no longer used?"
+            className="mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 font-normal text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5"
+          />
+        </label>
+      </ConfirmDialog>
     </div>
   );
 }

@@ -137,6 +137,48 @@ describe('students lifecycle hardening', () => {
     );
   });
 
+  it('matches a full student name across separate first-name and last-name fields', async () => {
+    const prisma = buildPrisma({
+      studentFindManyResult: [],
+      studentCountQueue: [0],
+    });
+    const { service } = buildService(prisma);
+
+    await service.listStudents({ search: '  Erwin   Shrestha  ' }, actor);
+
+    expect(prisma.student.count).toHaveBeenCalledWith({
+      where: {
+        AND: expect.arrayContaining([
+          { tenantId: actor.tenantId },
+          {
+            AND: [
+              expect.objectContaining({
+                OR: expect.arrayContaining([
+                  {
+                    firstNameEn: {
+                      contains: 'Erwin',
+                      mode: 'insensitive',
+                    },
+                  },
+                ]),
+              }),
+              expect.objectContaining({
+                OR: expect.arrayContaining([
+                  {
+                    lastNameEn: {
+                      contains: 'Shrestha',
+                      mode: 'insensitive',
+                    },
+                  },
+                ]),
+              }),
+            ],
+          },
+        ]),
+      },
+    });
+  });
+
   it('returns module-owned M1 summary counts from tenant-scoped backend queries', async () => {
     const duplicateA = buildStudent({
       id: 'student-a',
@@ -248,7 +290,12 @@ describe('students lifecycle hardening', () => {
       };
       const prisma = buildPrisma({
         studentFindManyResult: [
-          { ...buildStudent(), qrCredentials: [], _count: { documents: 0 }, user: null },
+          {
+            ...buildStudent(),
+            qrCredentials: [],
+            _count: { documents: 0 },
+            user: null,
+          },
         ],
         studentCountQueue: [1],
         guardianFindFirstQueue: [
@@ -312,7 +359,12 @@ describe('students lifecycle hardening', () => {
       };
       const prisma = buildPrisma({
         studentFindManyResult: [
-          { ...buildStudent(), qrCredentials: [], _count: { documents: 0 }, user: null },
+          {
+            ...buildStudent(),
+            qrCredentials: [],
+            _count: { documents: 0 },
+            user: null,
+          },
         ],
         studentCountQueue: [1],
         staffFindFirstResult: { id: 'staff-1' },
@@ -360,7 +412,12 @@ describe('students lifecycle hardening', () => {
     it('leaves the student directory unrestricted for admin/principal actors', async () => {
       const prisma = buildPrisma({
         studentFindManyResult: [
-          { ...buildStudent(), qrCredentials: [], _count: { documents: 0 }, user: null },
+          {
+            ...buildStudent(),
+            qrCredentials: [],
+            _count: { documents: 0 },
+            user: null,
+          },
         ],
         studentCountQueue: [1],
       });
@@ -2561,7 +2618,9 @@ function buildPrisma(options: {
         ),
       findMany: jest
         .fn()
-        .mockResolvedValue(options.subjectTeacherAssignmentFindManyResult ?? []),
+        .mockResolvedValue(
+          options.subjectTeacherAssignmentFindManyResult ?? [],
+        ),
     },
     staff: {
       findFirst: jest

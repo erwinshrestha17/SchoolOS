@@ -5,6 +5,7 @@ import { CreateStudentGuardianPayload, GuardianProfile, UpdateStudentGuardianPay
 import { SectionCard } from '@/components/ui/section-card';
 import { Badge } from '@/components/ui/badge';
 import { Phone, Mail, MapPin, Edit3, Plus, Trash2 } from 'lucide-react';
+import { schoolFacingErrorMessage } from '@/lib/school-facing-error';
 
 type GuardiansTabProps = {
   guardians: GuardianProfile[];
@@ -213,7 +214,18 @@ function GuardianEditForm({
     <form onSubmit={handleSubmit} className="space-y-4">
       {!!error && (
         <div className="rounded-xl border border-rose-100 bg-rose-50 p-3 text-xs font-bold text-rose-700">
-          {error instanceof Error ? error.message : 'Failed to save guardian'}
+          {schoolFacingErrorMessage(error, {
+            fallback:
+              'The guardian could not be saved. Existing guardian access was not changed.',
+            invalid:
+              'Review the guardian name, relationship, phone, email, and primary status.',
+            forbidden:
+              'You do not have permission to change this guardian relationship.',
+            notFound:
+              'This student or guardian relationship is no longer available.',
+            conflict:
+              'This guardian relationship changed while you were editing it. Refresh and try again.',
+          })}
         </div>
       )}
       <div className="space-y-2">

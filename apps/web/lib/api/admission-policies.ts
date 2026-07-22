@@ -1,7 +1,9 @@
 import type {
   AdmissionPolicyAuditEvent,
+  ArchiveAdmissionPolicyPayload,
   AdmissionPolicyDetail,
   AdmissionPolicyListResponse,
+  AdmissionPolicyTemplate,
   AdmissionPolicyVersionSummary,
   CreateAdmissionPolicyPayload,
   DuplicateAdmissionPolicyPayload,
@@ -14,6 +16,8 @@ import { request } from "./client";
 
 export const admissionPoliciesApi = {
   list: () => request<AdmissionPolicyListResponse>("/admissions/policies"),
+  listTemplates: () =>
+    request<AdmissionPolicyTemplate[]>("/admissions/policies/templates"),
   get: (policyId: string) =>
     request<AdmissionPolicyDetail>(`/admissions/policies/${policyId}`),
   listVersions: (policyId: string) =>
@@ -73,9 +77,10 @@ export const admissionPoliciesApi = {
       method: "POST",
       json: { versionId },
     }),
-  archive: (policyId: string) =>
+  archive: (policyId: string, payload: ArchiveAdmissionPolicyPayload) =>
     request<AdmissionPolicyDetail>(`/admissions/policies/${policyId}/archive`, {
       method: "POST",
+      json: payload,
     }),
   duplicate: (policyId: string, payload: DuplicateAdmissionPolicyPayload = {}) =>
     request<AdmissionPolicyDetail>(`/admissions/policies/${policyId}/duplicate`, {

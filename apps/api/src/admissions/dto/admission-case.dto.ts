@@ -1,6 +1,10 @@
 import { Type } from 'class-transformer';
+import { ApiProperty } from '@nestjs/swagger';
 import {
   IsArray,
+  ArrayMaxSize,
+  ArrayMinSize,
+  ArrayUnique,
   IsBoolean,
   IsDateString,
   IsEnum,
@@ -8,6 +12,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   Max,
   MaxLength,
@@ -50,27 +55,6 @@ export const ADMISSION_GRADE_BANDS = [
   'PRIMARY',
   'BASIC_SECONDARY',
   'GRADE_11_12',
-] as const;
-
-export const ADMISSION_REQUIRED_FIELDS = [
-  'firstNameEn',
-  'lastNameEn',
-  'firstNameNp',
-  'lastNameNp',
-  'dateOfBirth',
-  'gender',
-  'guardianFullName',
-  'guardianRelation',
-  'guardianPhone',
-  'guardianEmail',
-  'academicYearId',
-  'classId',
-  'sectionId',
-  'previousSchool',
-  'admissionDate',
-  'nationalStudentId',
-  'emergencyName',
-  'emergencyPhone',
 ] as const;
 
 export type AdmissionSource = (typeof ADMISSION_SOURCES)[number];
@@ -293,6 +277,23 @@ export class ListDocumentRequestsDto {
   limit?: number = 25;
 }
 
+export class RequestAdmissionDocumentRemindersDto {
+  @ApiProperty({
+    type: [String],
+    minItems: 1,
+    maxItems: 25,
+    uniqueItems: true,
+    description:
+      'Tenant-owned admission case IDs selected from the missing-document queue.',
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(25)
+  @ArrayUnique()
+  @IsUUID('4', { each: true })
+  admissionCaseIds!: string[];
+}
+
 export class ListAdmissionAssessmentSessionsDto {
   @IsOptional()
   @IsIn(ADMISSION_ASSESSMENT_TABS)
@@ -321,6 +322,10 @@ export class ListAdmissionAssessmentSessionsDto {
 }
 
 export class ListAdmissionAssessmentCandidatesDto {
+  @IsOptional()
+  @IsUUID('4')
+  admissionCaseId?: string;
+
   @IsOptional()
   @IsString()
   policyId?: string;

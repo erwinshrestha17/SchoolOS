@@ -1,13 +1,17 @@
 "use client";
 
 import type {
+  AdmissionDocumentReminderBatchResult,
+  AdmissionDocumentReminderSkipReason,
   AdmissionDocumentRequestItem,
   AdmissionDocumentTiming,
 } from "@schoolos/core";
 import { formatBsDate } from "@schoolos/core";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  AlertTriangle,
   Bell,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   FileWarning,
@@ -16,18 +20,24 @@ import {
   RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { admissionCasesApi } from "../../lib/api/admission-cases";
 import { admissionPoliciesApi } from "../../lib/api/admission-policies";
+import {
+  classOptionLabel,
+  educationProgramLabel,
+} from "../../lib/education-program";
 import { api } from "../../lib/api";
 import { useUrlFilters } from "../../lib/hooks/use-url-filters";
 import { ApiRequestError } from "../../lib/api/client";
 import { Button } from "../ui/button";
+import { ConfirmDialog } from "../ui/confirm-dialog";
 import { EmptyState } from "../ui/empty-state";
 import { KpiCard, KpiGrid } from "../ui/kpi-card";
 import { ModuleLockedState } from "../ui/module-locked-state";
 import { PageState } from "../ui/page-state";
 import { StatusBadge } from "../ui/status-badge";
+import { useSession } from "../session-provider";
 
 const DOCUMENT_KIND_OPTIONS = [
   "BIRTH_CERTIFICATE",
@@ -42,7 +52,18 @@ const DOCUMENT_KIND_OPTIONS = [
 
 const PENDING_DAY_OPTIONS = [0, 3, 7, 14, 30];
 
+const REMINDER_SKIP_COPY: Record<AdmissionDocumentReminderSkipReason, string> =
+  {
+    CASE_UNAVAILABLE: "Case unavailable",
+    CASE_CLOSED: "Case closed",
+    NO_GUARDIAN_PHONE: "No guardian phone",
+    NO_LONGER_MISSING: "Documents already complete",
+    DELIVERY_UNAVAILABLE: "Delivery unavailable",
+  };
+
 export function DocumentRequestCenter() {
+  const queryClient = useQueryClient();
+  const { hasPermissions } = useSession();
   const [filters, setFilters] = useUrlFilters({
     policyId: "",
     classId: "",
@@ -52,6 +73,9 @@ export function DocumentRequestCenter() {
     page: 1,
   });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
+  const [reminderResult, setReminderResult] =
+    useState<AdmissionDocumentReminderBatchResult | null>(null);
 
   const requestQuery = useQuery({
     queryKey: ["admission-document-requests", filters],
@@ -88,6 +112,36 @@ export function DocumentRequestCenter() {
     [rows, selectedIds],
   );
   const selectedWithPhones = selectedRows.filter((row) => row.guardianPhone);
+  const canQueueReminders = hasPermissions([
+    "students:manage_lifecycle",
+    "guardians:read",
+  ]);
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setReminderResult(null);
+  }, [
+    filters.classId,
+    filters.documentKind,
+    filters.minDaysPending,
+    filters.page,
+    filters.policyId,
+    filters.timing,
+  ]);
+
+  const reminderMutation = useMutation({
+    mutationFn: (admissionCaseIds: string[]) =>
+      admissionCasesApi.requestDocumentReminders(admissionCaseIds),
+    onSuccess: async (result) => {
+      setReminderDialogOpen(false);
+      setReminderResult(result);
+      setSelectedIds(new Set());
+      await queryClient.invalidateQueries({
+        queryKey: ["admission-document-requests"],
+      });
+    },
+    onError: () => setReminderResult(null),
+  });
 
   function updateSelected(caseId: string, selected: boolean) {
     setSelectedIds((current) => {
@@ -218,7 +272,7 @@ export function DocumentRequestCenter() {
               <option value="">All classes</option>
               {(classesQuery.data ?? []).map((schoolClass) => (
                 <option key={schoolClass.id} value={schoolClass.id}>
-                  {schoolClass.name}
+                  {classOptionLabel(schoolClass)}
                 </option>
               ))}
             </select>
@@ -285,10 +339,18 @@ export function DocumentRequestCenter() {
             Missing document requests
           </h2>
           <p className="mt-1 text-sm text-slate-600">
-            {selectedIds.size
-              ? `${selectedIds.size} selected; ${selectedWithPhones.length} have guardian phones.`
+            {selectedRows.length
+              ? `${selectedRows.length} selected; ${selectedWithPhones.length} have guardian phones.`
               : "Select cases for reminder follow-up."}
           </p>
+          {!canQueueReminders ? (
+            <p
+              id="reminder-permission-note"
+              className="mt-1 text-xs font-semibold text-slate-500"
+            >
+              You do not have permission to queue guardian reminders.
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
@@ -301,14 +363,45 @@ export function DocumentRequestCenter() {
           </Button>
           <Button
             type="button"
-            disabled
-            title="Notification delivery is not enabled for this admissions workspace yet."
+            disabled={
+              !canQueueReminders ||
+              selectedRows.length === 0 ||
+              reminderMutation.isPending
+            }
+            aria-describedby={
+              canQueueReminders ? undefined : "reminder-permission-note"
+            }
+            onClick={() => {
+              reminderMutation.reset();
+              setReminderDialogOpen(true);
+            }}
           >
-            <Bell className="h-4 w-4" />
-            Send reminders
+            {reminderMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Bell className="h-4 w-4" />
+            )}
+            Queue reminders
           </Button>
         </div>
       </div>
+
+      {reminderResult ? <ReminderBatchResult result={reminderResult} /> : null}
+
+      {reminderMutation.isError ? (
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-2xl border border-danger-200 bg-danger-50 p-4 text-sm text-danger-900"
+        >
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
+          <div>
+            <p className="font-bold">Reminders were not queued.</p>
+            <p className="mt-1">
+              {reminderErrorMessage(reminderMutation.error)}
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         {requestQuery.isLoading ? (
@@ -393,7 +486,86 @@ export function DocumentRequestCenter() {
           </div>
         </div>
       ) : null}
+
+      <ConfirmDialog
+        isOpen={reminderDialogOpen}
+        title="Queue guardian reminders?"
+        description={`SchoolOS will re-check all ${selectedRows.length} selected cases before queueing one SMS reminder per eligible guardian.`}
+        confirmLabel="Queue reminders"
+        isConfirming={reminderMutation.isPending}
+        preventCloseWhileConfirming
+        confirmDisabled={selectedRows.length === 0 || !canQueueReminders}
+        onClose={() => {
+          if (!reminderMutation.isPending) setReminderDialogOpen(false);
+        }}
+        onConfirm={() =>
+          reminderMutation.mutate(
+            selectedRows.map((row) => row.admissionCaseId),
+          )
+        }
+      >
+        <div className="rounded-xl border border-info-200 bg-info-50 p-3 text-sm text-info-900">
+          <p className="font-bold">
+            {selectedWithPhones.length} of {selectedRows.length} selected cases
+            currently have a guardian phone.
+          </p>
+          <p className="mt-1 text-info-800">
+            Closed cases, completed document requests, changed contacts, and
+            unavailable delivery channels will be safely skipped. Queued does
+            not mean delivered.
+          </p>
+        </div>
+      </ConfirmDialog>
     </section>
+  );
+}
+
+function ReminderBatchResult({
+  result,
+}: {
+  result: AdmissionDocumentReminderBatchResult;
+}) {
+  const skipCounts = result.results.reduce<
+    Partial<Record<AdmissionDocumentReminderSkipReason, number>>
+  >((counts, item) => {
+    if (item.state === "SKIPPED" && item.reason) {
+      counts[item.reason] = (counts[item.reason] ?? 0) + 1;
+    }
+    return counts;
+  }, {});
+  const skippedReasons = Object.entries(skipCounts) as Array<
+    [AdmissionDocumentReminderSkipReason, number]
+  >;
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="rounded-2xl border border-success-200 bg-success-50 p-4 text-success-900"
+    >
+      <div className="flex items-start gap-3">
+        <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
+        <div className="min-w-0">
+          <p className="font-bold">Reminder requests checked</p>
+          <p className="mt-1 text-sm text-success-800">
+            {result.queued} queued · {result.alreadyQueued} already queued ·{" "}
+            {result.skipped} skipped out of {result.requested} selected.
+          </p>
+          {skippedReasons.length > 0 ? (
+            <ul className="mt-2 flex flex-wrap gap-2 text-xs font-semibold text-success-900">
+              {skippedReasons.map(([reason, count]) => (
+                <li
+                  key={reason}
+                  className="rounded-full border border-success-200 bg-white/70 px-2.5 py-1"
+                >
+                  {REMINDER_SKIP_COPY[reason]}: {count}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -431,7 +603,8 @@ function DocumentRequestRow({
           {row.policyName ?? "No matched policy"}
         </p>
         <p className="mt-1 text-xs text-slate-500">
-          {row.className ?? "Class not selected"}
+          {row.className ?? "Class not selected"} ·{" "}
+          {educationProgramLabel(row.program)}
         </p>
         <div className="mt-2">
           <StatusBadge status={row.displayStatus} />
@@ -540,6 +713,18 @@ function isModuleLockedError(error: unknown) {
     message.includes("not enabled") ||
     message.includes("module.students")
   );
+}
+
+function reminderErrorMessage(error: unknown) {
+  if (error instanceof ApiRequestError) {
+    if (error.statusCode === 403) {
+      return "You do not have permission to queue these reminders, or Admissions is not enabled for this school.";
+    }
+    if (error.statusCode === 409) {
+      return "The selected cases changed before the reminders could be queued. Refresh the list and try again.";
+    }
+  }
+  return "Your admission cases were not changed. Check your connection and try again.";
 }
 
 function humanize(value: string) {

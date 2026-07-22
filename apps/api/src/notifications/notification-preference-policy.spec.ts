@@ -31,6 +31,13 @@ describe('NotificationPreferencePolicy', () => {
       studentGuardian: {
         findFirst: jest.fn().mockResolvedValue({ id: 'link-1' }),
       },
+      admissionApplication: {
+        findFirst: jest.fn().mockResolvedValue({
+          status: 'APPLIED',
+          guardianPhone: '9800000000',
+          updatedAt: new Date('2026-07-20T04:00:00.000Z'),
+        }),
+      },
     };
     policy = new NotificationPreferencePolicy(prisma);
   });
@@ -180,7 +187,85 @@ describe('NotificationPreferencePolicy', () => {
       mandatory: false,
     });
   });
+
+  it('allows a current admission reminder without requiring a user account', async () => {
+    prisma.notificationDelivery.findFirst.mockResolvedValueOnce(
+      admissionReminderDelivery(),
+    );
+
+    await expect(
+      policy.evaluateDelivery(
+        'tenant-1',
+        'delivery-1',
+        new Date('2026-07-20T05:00:00.000Z'),
+      ),
+    ).resolves.toEqual({
+      action: 'IMMEDIATE',
+      reason: 'Current admission case and guardian contact are valid',
+      mandatory: false,
+    });
+  });
+
+  it('skips an admission reminder when the case or guardian contact changed', async () => {
+    prisma.notificationDelivery.findFirst.mockResolvedValueOnce(
+      admissionReminderDelivery(),
+    );
+    prisma.admissionApplication.findFirst.mockResolvedValueOnce({
+      status: 'APPLIED',
+      guardianPhone: '9811111111',
+      updatedAt: new Date('2026-07-20T04:00:00.000Z'),
+    });
+
+    await expect(
+      policy.evaluateDelivery('tenant-1', 'delivery-1'),
+    ).resolves.toEqual({
+      action: 'SKIP',
+      reason: 'Admission case or guardian contact changed before delivery',
+      mandatory: false,
+    });
+  });
+
+  it('delays a current admission reminder during tenant quiet hours', async () => {
+    prisma.notificationDelivery.findFirst.mockResolvedValueOnce(
+      admissionReminderDelivery(),
+    );
+
+    await expect(
+      policy.evaluateDelivery(
+        'tenant-1',
+        'delivery-1',
+        new Date('2026-07-20T15:00:00.000Z'),
+      ),
+    ).resolves.toEqual({
+      action: 'DELAY',
+      reason: 'Recipient is currently in quiet hours',
+      resumeAt: new Date('2026-07-21T00:15:00.000Z'),
+      mandatory: false,
+    });
+  });
 });
+
+function admissionReminderDelivery() {
+  return {
+    id: 'delivery-1',
+    channel: NotificationChannel.SMS,
+    sourceType: 'admission_document_request',
+    destination: '9800000000',
+    recipientUserId: null,
+    guardianId: null,
+    studentId: null,
+    noticeId: null,
+    recipientUser: null,
+    notice: null,
+    notificationEvent: {
+      type: 'ADMISSION_DOCUMENTS_REQUESTED',
+      priority: NotificationEventPriority.NORMAL,
+      status: 'DISPATCHED',
+      sourceEntityId: 'admission-case-1',
+      metadata: { sourceUpdatedAt: '2026-07-20T04:00:00.000Z' },
+    },
+  };
+}
 
 function baseDelivery(
   overrides: {
@@ -193,6 +278,7 @@ function baseDelivery(
     id: 'delivery-1',
     channel: NotificationChannel.PUSH,
     sourceType: overrides.sourceType ?? 'notice',
+    destination: null,
     recipientUserId: 'guardian-user-1',
     guardianId: 'guardian-1',
     studentId: 'student-1',
@@ -206,6 +292,8 @@ function baseDelivery(
             type: overrides.type ?? 'NOTICE_PUBLISHED',
             priority: overrides.priority ?? NotificationEventPriority.NORMAL,
             status: 'DISPATCHED',
+            sourceEntityId: 'notice-1',
+            metadata: {},
           },
   };
 }

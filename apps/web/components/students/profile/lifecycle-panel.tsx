@@ -21,6 +21,7 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { schoolFacingErrorMessage } from '@/lib/school-facing-error';
 
 type LifecycleAction = 'transfer' | 'archive' | 'alumni' | 'delete';
 type LifecycleRequest =
@@ -229,9 +230,18 @@ export function LifecyclePanel({
                   <div>
                     <p className="font-bold">Lifecycle action could not be completed</p>
                     <p className="mt-1 text-sm">
-                      {error instanceof Error
-                        ? error.message
-                        : 'Please review the details and try again.'}
+                      {schoolFacingErrorMessage(error, {
+                        fallback:
+                          'The lifecycle action was not completed. Review the details and try again.',
+                        invalid:
+                          'Review the reason, effective date, fee clearance, and required confirmation.',
+                        forbidden:
+                          'You do not have permission to change this student lifecycle status.',
+                        notFound:
+                          'This student record is no longer available for a lifecycle change.',
+                        conflict:
+                          'This student record changed while you were working. Refresh it and try again.',
+                      })}
                     </p>
                   </div>
                 </div>

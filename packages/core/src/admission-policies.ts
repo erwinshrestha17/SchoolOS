@@ -1,3 +1,5 @@
+import type { AdmissionPolicyRequiredField } from "./admission-cases.js";
+
 export const ADMISSION_POLICY_STATUSES = [
   "DRAFT",
   "ACTIVE",
@@ -18,11 +20,57 @@ export const ADMISSION_DOCUMENT_TIMINGS = [
   "BEFORE_ENROLLMENT",
 ] as const;
 
+export const ADMISSION_POLICY_TEMPLATE_IDS = [
+  "grade-1-10-new",
+  "grade-1-10-transfer",
+  "grade-11-12",
+  "scholarship-quota",
+] as const;
+
 export type AdmissionPolicyStatus = (typeof ADMISSION_POLICY_STATUSES)[number];
 export type AdmissionPolicyApplicantType =
   (typeof ADMISSION_POLICY_APPLICANT_TYPES)[number];
 export type AdmissionDocumentTiming =
   (typeof ADMISSION_DOCUMENT_TIMINGS)[number];
+export type AdmissionPolicyTemplateId =
+  (typeof ADMISSION_POLICY_TEMPLATE_IDS)[number];
+
+export type AdmissionPolicyTemplateDocument = {
+  documentKind: string;
+  label: string;
+  isRequired: boolean;
+  requiresOriginalVerification: boolean;
+  timing: AdmissionDocumentTiming;
+  expiresAfterDays: number | null;
+  canBeWaived: boolean;
+  waivableByRoleKeys: string[];
+  sortOrder: number;
+};
+
+export type AdmissionPolicyTemplate = {
+  id: AdmissionPolicyTemplateId;
+  label: string;
+  description: string;
+  gradeBand: string | null;
+  applicantType: AdmissionPolicyApplicantType;
+  version: {
+    admissionMode: "DIRECT_ALLOWED" | "REVIEW_REQUIRED";
+    transferStudent: boolean | null;
+    requiredFields: AdmissionPolicyRequiredField[];
+    requireSection: boolean;
+    requireDocumentReview: boolean;
+    requireInterview: boolean;
+    requirePrincipalApproval: boolean;
+    requireTransferCertificate: boolean;
+    requirePriorMarksheet: boolean;
+    requireStreamOrMarksReview: boolean;
+    allowAdmissionWithDocumentsPending: boolean;
+    enforceCapacityWhenAvailable: boolean;
+    capacityOverride: number | null;
+    notesForOffice: string | null;
+  };
+  documents: AdmissionPolicyTemplateDocument[];
+};
 
 export type AdmissionPolicyResolutionCandidate = {
   policyId: string;
@@ -70,7 +118,7 @@ export type AdmissionPolicyVersionSummary = {
   status: AdmissionPolicyStatus;
   admissionMode: "DIRECT_ALLOWED" | "REVIEW_REQUIRED";
   transferStudent: boolean | null;
-  requiredFields: string[];
+  requiredFields: AdmissionPolicyRequiredField[];
   requireSection: boolean;
   requireDocumentReview: boolean;
   requireInterview: boolean;
@@ -135,6 +183,7 @@ export type AdmissionPolicyAuditEvent = {
 
 export type CreateAdmissionPolicyPayload = {
   name: string;
+  templateId?: AdmissionPolicyTemplateId;
   academicYearId?: string;
   classId?: string;
   gradeBand?: string;
@@ -148,7 +197,7 @@ export type UpdateAdmissionPolicyIdentityPayload =
 export type UpdateAdmissionPolicyVersionPayload = Partial<{
   admissionMode: "DIRECT_ALLOWED" | "REVIEW_REQUIRED";
   transferStudent: boolean;
-  requiredFields: string[];
+  requiredFields: AdmissionPolicyRequiredField[];
   requireSection: boolean;
   requireDocumentReview: boolean;
   requireInterview: boolean;
@@ -164,6 +213,10 @@ export type UpdateAdmissionPolicyVersionPayload = Partial<{
 
 export type DuplicateAdmissionPolicyPayload = {
   name?: string;
+};
+
+export type ArchiveAdmissionPolicyPayload = {
+  reason: string;
 };
 
 export type UpsertDocumentRequirementPayload = {

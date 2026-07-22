@@ -43,6 +43,15 @@ describe('AdmissionCasesController review contract', () => {
     ]);
   });
 
+  it('requires lifecycle and guardian-read permissions for document reminders', () => {
+    expect(
+      Reflect.getMetadata(
+        PERMISSIONS_KEY,
+        AdmissionCasesController.prototype.requestDocumentReminders,
+      ),
+    ).toEqual(['students:manage_lifecycle', 'guardians:read']);
+  });
+
   it('requires admission read permissions for assessment workspace lists', () => {
     expect(
       Reflect.getMetadata(
@@ -77,7 +86,10 @@ describe('AdmissionCasesController review contract', () => {
     const service = {
       listDocumentRequests: jest.fn().mockReturnValue({ items: [] }),
     };
-    const controller = new AdmissionCasesController(service as never);
+    const controller = new AdmissionCasesController(
+      service as never,
+      {} as never,
+    );
     const query = {
       classId: 'class-a',
       documentKind: 'TRANSFER_CERTIFICATE',
@@ -97,7 +109,10 @@ describe('AdmissionCasesController review contract', () => {
       scheduleAssessmentSession: jest.fn().mockReturnValue({ id: 'session-a' }),
       recordAssessmentResult: jest.fn().mockReturnValue({ id: 'session-a' }),
     };
-    const controller = new AdmissionCasesController(service as never);
+    const controller = new AdmissionCasesController(
+      service as never,
+      {} as never,
+    );
     const sessionQuery = { tab: 'TODAY' as const, classId: 'class-a' };
     const candidateQuery = { policyId: 'policy-a' };
     const scheduleDto = {
@@ -143,7 +158,10 @@ describe('AdmissionCasesController review contract', () => {
     const service = {
       reviewCase: jest.fn().mockReturnValue({ id: 'case-a' }),
     };
-    const controller = new AdmissionCasesController(service as never);
+    const controller = new AdmissionCasesController(
+      service as never,
+      {} as never,
+    );
     const dto = {
       action: 'REJECT' as const,
       reason: 'Recorded admission requirements were not met.',
@@ -153,5 +171,29 @@ describe('AdmissionCasesController review contract', () => {
       id: 'case-a',
     });
     expect(service.reviewCase).toHaveBeenCalledWith('case-a', dto, actor);
+  });
+
+  it('delegates the bounded reminder command with authenticated context', () => {
+    const reminders = {
+      requestReminders: jest.fn().mockReturnValue({
+        requested: 1,
+        queued: 1,
+        alreadyQueued: 0,
+        skipped: 0,
+        results: [],
+      }),
+    };
+    const controller = new AdmissionCasesController(
+      {} as never,
+      reminders as never,
+    );
+    const dto = {
+      admissionCaseIds: ['11111111-1111-4111-8111-111111111111'],
+    };
+
+    expect(controller.requestDocumentReminders(dto, actor)).toEqual(
+      expect.objectContaining({ requested: 1, queued: 1 }),
+    );
+    expect(reminders.requestReminders).toHaveBeenCalledWith(dto, actor);
   });
 });

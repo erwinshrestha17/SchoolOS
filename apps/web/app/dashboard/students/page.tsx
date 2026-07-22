@@ -18,6 +18,7 @@ import { M1PageHeader } from '../../../components/m1/m1-page-header';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useUrlFilters } from '../../../lib/hooks/use-url-filters';
+import { schoolFacingErrorMessage } from '../../../lib/school-facing-error';
 import { Button } from '../../../components/ui/primitives/button';
 
 const STUDENT_ROSTER_PAGE_SIZE = 25;
@@ -90,7 +91,14 @@ export default function StudentsPage() {
       await api.openStudentDocumentPdf(studentId, kind);
     } catch (error) {
       setPdfError(
-        error instanceof Error ? error.message : 'Unable to open generated PDF',
+        schoolFacingErrorMessage(error, {
+          fallback:
+            'The protected student PDF could not be opened. No student record was changed.',
+          forbidden:
+            'You do not have permission to open this student document.',
+          notFound:
+            'This student document is not available. Generate it again if permitted.',
+        }),
       );
     }
   }
@@ -110,7 +118,16 @@ export default function StudentsPage() {
         filters,
       });
     } catch (error) {
-      setPdfError(error instanceof Error ? error.message : 'Export failed');
+      setPdfError(
+        schoolFacingErrorMessage(error, {
+          fallback:
+            'The roster export could not be prepared. Student records were not changed.',
+          invalid:
+            'The selected roster filters were not accepted. Refresh the directory and try again.',
+          forbidden:
+            'You do not have permission to export this student roster.',
+        }),
+      );
     }
   }
 
@@ -124,7 +141,16 @@ export default function StudentsPage() {
       );
     } catch (error) {
       setPdfError(
-        error instanceof Error ? error.message : 'iEMIS export failed',
+        schoolFacingErrorMessage(error, {
+          fallback:
+            'The iEMIS export could not be prepared. Student records were not changed.',
+          invalid:
+            'Some export filters or student readiness rules were not accepted. Refresh and try again.',
+          forbidden:
+            'You do not have permission to export iEMIS student records.',
+          conflict:
+            'Student records changed while the export was prepared. Refresh and try again.',
+        }),
       );
     } finally {
       setIsExportingIemis(false);

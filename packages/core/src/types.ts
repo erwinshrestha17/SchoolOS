@@ -366,7 +366,17 @@ export type AdmissionDuplicateCheckResult = {
   matches: AdmissionDuplicateWarning[];
 };
 
+export type BulkAdmissionImportPayload = {
+  csvContent: string;
+  sourceFileName?: string;
+  dryRun?: boolean;
+  confirmDuplicates?: boolean;
+  validationBatchId?: string;
+};
+
 export type BulkAdmissionImportResult = {
+  batchId: string;
+  dryRun: boolean;
   totalRows: number;
   created: number;
   validated: number;
@@ -776,6 +786,28 @@ export type FileAssetSummary = {
 
 // ─── Compiled from types/academic.ts ───
 
+export const EDUCATION_PROGRAMS = ["SCHOOL", "HIGHER_SECONDARY"] as const;
+export type EducationProgram = (typeof EDUCATION_PROGRAMS)[number];
+
+export const MIN_SUPPORTED_CLASS_LEVEL = 1;
+export const MAX_SUPPORTED_CLASS_LEVEL = 12;
+export const HIGHER_SECONDARY_MIN_CLASS_LEVEL = 11;
+
+export function educationProgramForClassLevel(
+  level: number,
+): EducationProgram | null {
+  if (
+    !Number.isInteger(level) ||
+    level < MIN_SUPPORTED_CLASS_LEVEL ||
+    level > MAX_SUPPORTED_CLASS_LEVEL
+  ) {
+    return null;
+  }
+  return level >= HIGHER_SECONDARY_MIN_CLASS_LEVEL
+    ? "HIGHER_SECONDARY"
+    : "SCHOOL";
+}
+
 export type AcademicYearSummary = {
   id: string;
   name: string;
@@ -789,6 +821,7 @@ export type ClassSummary = {
   name: string;
   code?: string | null;
   level?: number;
+  program?: EducationProgram | null;
   studentCount?: number;
   sectionCount?: number;
   subjectCount?: number;
@@ -3060,7 +3093,7 @@ export const NOTIFICATION_EVENT_CATALOGUE: Readonly<
   },
   ADMISSION_DOCUMENTS_REQUESTED: {
     sourceModule: "M1_ADMISSIONS",
-    sourceEntityType: "admission_application",
+    sourceEntityType: "admission_case",
     defaultPriority: "IMPORTANT",
   },
   ATTENDANCE_STUDENT_ABSENT: {
@@ -4157,6 +4190,9 @@ export enum StudentQrResolvePurpose {
   ATTENDANCE = "ATTENDANCE",
 }
 
+export const STUDENT_QR_REASON_MIN_LENGTH = 5;
+export const STUDENT_QR_REASON_MAX_LENGTH = 500;
+
 export type StudentQrCredentialSummary = {
   id: string;
   studentId: string;
@@ -4184,6 +4220,19 @@ export type StudentCredentialArtifactResult = {
 export type StudentQrStatusHistory = {
   activeCredential: StudentQrCredentialSummary | null;
   history: StudentQrCredentialSummary[];
+};
+
+export type StudentQrWorkspaceSummary = {
+  activeCredentials: number;
+  replacementFilesNeeded: number;
+  inactiveCredentials: number;
+  successfulScansToday: number;
+  period: {
+    bsDate: string;
+    startUtc: string;
+    endExclusiveUtc: string;
+    timeZone: "Asia/Kathmandu";
+  };
 };
 
 export type StudentProfileEnrollment = {

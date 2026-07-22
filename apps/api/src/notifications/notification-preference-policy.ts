@@ -2,6 +2,8 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import {
   NotificationChannel,
   NotificationEventPriority,
+  NotificationEventStatus,
+  NotificationEventType,
   NotificationPreferenceCategory,
   NotificationStatus,
   UserStatus,
@@ -91,6 +93,7 @@ export class NotificationPreferencePolicy {
         id: true,
         channel: true,
         sourceType: true,
+        destination: true,
         recipientUserId: true,
         guardianId: true,
         studentId: true,
@@ -98,12 +101,25 @@ export class NotificationPreferencePolicy {
         recipientUser: { select: { status: true } },
         notice: { select: { lifecycleStatus: true } },
         notificationEvent: {
-          select: { type: true, priority: true, status: true },
+          select: {
+            type: true,
+            priority: true,
+            status: true,
+            sourceEntityId: true,
+            metadata: true,
+          },
         },
       },
     });
     if (!delivery) {
       throw new NotFoundException('Notification delivery not found');
+    }
+
+    if (
+      delivery.notificationEvent?.type ===
+      NotificationEventType.ADMISSION_DOCUMENTS_REQUESTED
+    ) {
+      return this.evaluateAdmissionDocumentReminder(tenantId, delivery, now);
     }
 
     if (
@@ -200,6 +216,84 @@ export class NotificationPreferencePolicy {
     };
   }
 
+  private async evaluateAdmissionDocumentReminder(
+    tenantId: string,
+    delivery: {
+      channel: NotificationChannel;
+      destination: string | null;
+      notificationEvent: {
+        status: NotificationEventStatus;
+        sourceEntityId: string;
+        metadata: unknown;
+      } | null;
+    },
+    now: Date,
+  ): Promise<NotificationPolicyDecision> {
+    const notificationEvent = delivery.notificationEvent;
+    if (
+      !notificationEvent ||
+      (notificationEvent.status !== NotificationEventStatus.ACCEPTED &&
+        notificationEvent.status !== NotificationEventStatus.DISPATCHED) ||
+      delivery.channel !== NotificationChannel.SMS ||
+      !delivery.destination
+    ) {
+      return inactiveDecision('Admission reminder is no longer deliverable');
+    }
+
+    const sourceUpdatedAt = metadataString(
+      notificationEvent.metadata,
+      'sourceUpdatedAt',
+    );
+    if (!sourceUpdatedAt) {
+      return inactiveDecision('Admission reminder source is incomplete');
+    }
+
+    const admissionCase = await this.prisma.admissionApplication.findFirst({
+      where: {
+        id: notificationEvent.sourceEntityId,
+        tenantId,
+      },
+      select: {
+        status: true,
+        guardianPhone: true,
+        updatedAt: true,
+      },
+    });
+    if (
+      !admissionCase ||
+      ['NOT_ADMITTED', 'REJECTED', 'CLOSED'].includes(admissionCase.status) ||
+      admissionCase.guardianPhone !== delivery.destination ||
+      admissionCase.updatedAt.toISOString() !== sourceUpdatedAt
+    ) {
+      return inactiveDecision(
+        'Admission case or guardian contact changed before delivery',
+      );
+    }
+
+    const defaults = await this.getTenantDefaults(tenantId);
+    if (
+      defaults.quietHoursEnabled &&
+      isDuringQuietHours(now, defaults.quietHoursStart, defaults.quietHoursEnd)
+    ) {
+      return {
+        action: 'DELAY',
+        reason: 'Recipient is currently in quiet hours',
+        resumeAt: nextQuietHoursEnd(
+          now,
+          defaults.quietHoursStart,
+          defaults.quietHoursEnd,
+        ),
+        mandatory: false,
+      };
+    }
+
+    return {
+      action: 'IMMEDIATE',
+      reason: 'Current admission case and guardian contact are valid',
+      mandatory: false,
+    };
+  }
+
   private async getTenantDefaults(tenantId: string) {
     const rows = await this.prisma.tenantSetting.findMany({
       where: {
@@ -232,6 +326,14 @@ export class NotificationPreferencePolicy {
 
 function inactiveDecision(reason: string): NotificationPolicyDecision {
   return { action: 'SKIP', reason, mandatory: false };
+}
+
+function metadataString(metadata: unknown, key: string) {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+    return null;
+  }
+  const value = (metadata as Record<string, unknown>)[key];
+  return typeof value === 'string' ? value : null;
 }
 
 function categoryForDelivery(

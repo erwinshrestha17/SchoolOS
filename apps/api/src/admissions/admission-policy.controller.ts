@@ -19,6 +19,7 @@ import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { AdmissionPolicyService } from './admission-policy.service';
 import {
   ActivateAdmissionPolicyVersionDto,
+  ArchiveAdmissionPolicyDto,
   CreateAdmissionPolicyDto,
   DuplicateAdmissionPolicyDto,
   UpdateAdmissionPolicyIdentityDto,
@@ -39,6 +40,12 @@ export class AdmissionPolicyController {
   @Permissions('admission_policy:read')
   list(@CurrentAuth() actor: AuthContext) {
     return this.admissionPolicyService.list(actor);
+  }
+
+  @Get('templates')
+  @Permissions('admission_policy:read')
+  listTemplates() {
+    return this.admissionPolicyService.listTemplates();
   }
 
   @Get(':policyId')
@@ -179,9 +186,10 @@ export class AdmissionPolicyController {
   @Permissions('admission_policy:manage')
   archive(
     @Param('policyId') policyId: string,
+    @Body() dto: ArchiveAdmissionPolicyDto,
     @CurrentAuth() actor: AuthContext,
   ) {
-    return this.admissionPolicyService.archive(policyId, actor);
+    return this.admissionPolicyService.archive(policyId, dto, actor);
   }
 
   @Post(':policyId/duplicate')

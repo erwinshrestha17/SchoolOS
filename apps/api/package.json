@@ -13,6 +13,8 @@
     "db:preflight:qr-duplicate-active": "tsx prisma/qr-migration-replay/duplicate-active-preflight.ts",
     "db:migrate": "pnpm run db:preflight:qr-duplicate-active && prisma migrate deploy",
     "db:seed": "prisma db seed",
+    "db:seed:e2e:m1-reminders": "tsx prisma/seed-m1-reminder-e2e.ts",
+    "db:seed:e2e:m1-waitlist": "tsx prisma/seed-m1-waitlist-e2e.ts",
     "db:seed:platform": "tsx prisma/platform-seed.ts",
     "db:seed:geography": "tsx prisma/seed-nepal-geography.ts",
     "db:backfill:teacher-assignments": "tsx prisma/seed-teacher-assignment-backfill.ts",

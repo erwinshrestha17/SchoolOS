@@ -1,6 +1,28 @@
 import type { StudentProfile } from "./student.js";
 import type { PromotionResult } from "./common.js";
 
+export const EDUCATION_PROGRAMS = ["SCHOOL", "HIGHER_SECONDARY"] as const;
+export type EducationProgram = (typeof EDUCATION_PROGRAMS)[number];
+
+export const MIN_SUPPORTED_CLASS_LEVEL = 1;
+export const MAX_SUPPORTED_CLASS_LEVEL = 12;
+export const HIGHER_SECONDARY_MIN_CLASS_LEVEL = 11;
+
+export function educationProgramForClassLevel(
+  level: number,
+): EducationProgram | null {
+  if (
+    !Number.isInteger(level) ||
+    level < MIN_SUPPORTED_CLASS_LEVEL ||
+    level > MAX_SUPPORTED_CLASS_LEVEL
+  ) {
+    return null;
+  }
+  return level >= HIGHER_SECONDARY_MIN_CLASS_LEVEL
+    ? "HIGHER_SECONDARY"
+    : "SCHOOL";
+}
+
 export type AcademicYearSummary = {
   id: string;
   name: string;
@@ -14,6 +36,7 @@ export type ClassSummary = {
   name: string;
   code?: string | null;
   level?: number;
+  program?: EducationProgram | null;
   studentCount?: number;
   sectionCount?: number;
   subjectCount?: number;

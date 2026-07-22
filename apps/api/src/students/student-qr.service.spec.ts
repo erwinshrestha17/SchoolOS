@@ -27,6 +27,7 @@ function createService() {
       create: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      count: jest.fn(),
     },
     $transaction: jest.fn(async (callback) => callback(prisma)),
     subjectTeacherAssignment: {
@@ -46,6 +47,7 @@ function createService() {
     },
     auditLog: {
       findMany: jest.fn(),
+      count: jest.fn(),
     },
   };
 
@@ -158,6 +160,47 @@ const credentialArtifactStudent = {
 };
 
 describe('StudentQrService', () => {
+  it('returns tenant-scoped QR workspace totals for the Nepal school day', async () => {
+    const { service, prisma } = createService();
+    prisma.studentQrCredential.count
+      .mockResolvedValueOnce(12)
+      .mockResolvedValueOnce(2)
+      .mockResolvedValueOnce(5);
+    prisma.auditLog.count.mockResolvedValue(9);
+
+    const result = await service.getQrWorkspaceSummary(
+      'tenant-1',
+      new Date('2026-07-22T03:00:00.000Z'),
+    );
+
+    expect(result).toEqual({
+      activeCredentials: 12,
+      replacementFilesNeeded: 2,
+      inactiveCredentials: 5,
+      successfulScansToday: 9,
+      period: {
+        bsDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        startUtc: '2026-07-21T18:15:00.000Z',
+        endExclusiveUtc: '2026-07-22T18:15:00.000Z',
+        timeZone: 'Asia/Kathmandu',
+      },
+    });
+    expect(prisma.studentQrCredential.count).toHaveBeenNthCalledWith(1, {
+      where: { tenantId: 'tenant-1', status: StudentQrStatus.ACTIVE },
+    });
+    expect(prisma.auditLog.count).toHaveBeenCalledWith({
+      where: {
+        tenantId: 'tenant-1',
+        resource: 'student_qr',
+        action: 'QR_RESOLVED',
+        createdAt: {
+          gte: new Date('2026-07-21T18:15:00.000Z'),
+          lt: new Date('2026-07-22T18:15:00.000Z'),
+        },
+      },
+    });
+  });
+
   it('stores only tokenHash and never returns raw QR token on generation', async () => {
     const { service, prisma, fileRegistryService } = createService();
     prisma.student.findFirst.mockResolvedValue(credentialArtifactStudent);
@@ -272,17 +315,20 @@ describe('StudentQrService', () => {
     expect(result.credential).not.toHaveProperty('tokenHash');
   });
 
-  it('requires a reason when rotating or revoking QR credentials', async () => {
-    const { service } = createService();
+  it.each(['', '   ', 'no', 'x'.repeat(501)])(
+    'rejects unsafe QR mutation reason %p',
+    async (reason) => {
+      const { service } = createService();
 
-    await expect(
-      service.rotateQr('tenant-1', 'student-1', adminAuth, ''),
-    ).rejects.toBeInstanceOf(BadRequestException);
+      await expect(
+        service.rotateQr('tenant-1', 'student-1', adminAuth, reason),
+      ).rejects.toBeInstanceOf(BadRequestException);
 
-    await expect(
-      service.revokeQr('tenant-1', 'student-1', adminAuth, ''),
-    ).rejects.toBeInstanceOf(BadRequestException);
-  });
+      await expect(
+        service.revokeQr('tenant-1', 'student-1', adminAuth, reason),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    },
+  );
 
   it('rejects revoked QR scans', async () => {
     const { service, prisma } = createService();
@@ -328,7 +374,7 @@ describe('StudentQrService', () => {
       'tenant-1',
       'student-1',
       adminAuth,
-      'Lost printed card',
+      '  Lost printed card  ',
     );
 
     expect(prisma.$transaction).toHaveBeenCalled();
@@ -700,7 +746,43 @@ describe('StudentQrService', () => {
           reason: 'Disciplinary action',
         }),
       }),
+      prisma,
     );
+  });
+
+  it('fails a stale QR revocation before file cleanup or audit', async () => {
+    const { service, prisma, auditService, fileRegistryService } =
+      createService();
+    prisma.studentQrCredential.findFirst.mockResolvedValue({
+      ...baseCredential,
+      fileAssetId: 'qr-file-existing',
+    });
+    prisma.studentQrCredential.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      service.revokeQr(
+        'tenant-1',
+        'student-1',
+        adminAuth,
+        'Printed card was reported lost',
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(prisma.studentQrCredential.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: baseCredential.id,
+        tenantId: 'tenant-1',
+        studentId: 'student-1',
+        status: StudentQrStatus.ACTIVE,
+      },
+      data: expect.objectContaining({
+        status: StudentQrStatus.REVOKED,
+        updatedById: adminAuth.userId,
+        revokeReason: 'Printed card was reported lost',
+      }),
+    });
+    expect(fileRegistryService.softDeleteFile).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
   });
 
   it('creates audit log for QR resolve/scan', async () => {
@@ -854,7 +936,7 @@ describe('StudentQrService', () => {
       select: { id: true },
     });
     expect(prisma.$transaction).not.toHaveBeenCalled();
-    expect(prisma.studentQrCredential.update).not.toHaveBeenCalled();
+    expect(prisma.studentQrCredential.updateMany).not.toHaveBeenCalled();
     expect(prisma.studentQrCredential.create).not.toHaveBeenCalled();
   });
 

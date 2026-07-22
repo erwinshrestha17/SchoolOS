@@ -371,7 +371,17 @@ export type AdmissionDuplicateCheckResult = {
   matches: AdmissionDuplicateWarning[];
 };
 
+export type BulkAdmissionImportPayload = {
+  csvContent: string;
+  sourceFileName?: string;
+  dryRun?: boolean;
+  confirmDuplicates?: boolean;
+  validationBatchId?: string;
+};
+
 export type BulkAdmissionImportResult = {
+  batchId: string;
+  dryRun: boolean;
   totalRows: number;
   created: number;
   validated: number;

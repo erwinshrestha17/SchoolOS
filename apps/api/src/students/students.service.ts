@@ -502,7 +502,9 @@ export class StudentsService {
     // AND-composed rather than spread into one object: the actor scope below
     // and the search clause each need their own OR, and a second OR key in a
     // plain object spread would silently overwrite the first.
-    const conditions: Prisma.StudentWhereInput[] = [{ tenantId: actor.tenantId }];
+    const conditions: Prisma.StudentWhereInput[] = [
+      { tenantId: actor.tenantId },
+    ];
 
     const actorScope = await this.buildActorStudentScope(actor);
     if (actorScope) conditions.push(actorScope);
@@ -523,44 +525,7 @@ export class StudentsService {
       });
     }
     if (search) {
-      conditions.push({
-        OR: [
-          { firstNameEn: { contains: search, mode: 'insensitive' } },
-          { lastNameEn: { contains: search, mode: 'insensitive' } },
-          { firstNameNp: { contains: search, mode: 'insensitive' } },
-          { lastNameNp: { contains: search, mode: 'insensitive' } },
-          { studentSystemId: { contains: search, mode: 'insensitive' } },
-          { admissionNumber: { contains: search, mode: 'insensitive' } },
-          {
-            guardianLinks: {
-              some: {
-                guardian: {
-                  OR: [
-                    {
-                      fullName: {
-                        contains: search,
-                        mode: 'insensitive',
-                      },
-                    },
-                    {
-                      primaryPhone: {
-                        contains: search,
-                        mode: 'insensitive',
-                      },
-                    },
-                    {
-                      secondaryPhone: {
-                        contains: search,
-                        mode: 'insensitive',
-                      },
-                    },
-                  ],
-                },
-              },
-            },
-          },
-        ],
-      });
+      conditions.push(buildStudentDirectorySearchWhere(search));
     }
 
     return { AND: conditions };
@@ -4325,6 +4290,48 @@ export class StudentsService {
 
     return document;
   }
+}
+
+function buildStudentDirectorySearchWhere(
+  search: string,
+): Prisma.StudentWhereInput {
+  const termConditions = search.split(/\s+/).map((term) => ({
+    OR: [
+      { firstNameEn: { contains: term, mode: 'insensitive' as const } },
+      { lastNameEn: { contains: term, mode: 'insensitive' as const } },
+      { firstNameNp: { contains: term, mode: 'insensitive' as const } },
+      { lastNameNp: { contains: term, mode: 'insensitive' as const } },
+      { studentSystemId: { contains: term, mode: 'insensitive' as const } },
+      { admissionNumber: { contains: term, mode: 'insensitive' as const } },
+      {
+        guardianLinks: {
+          some: {
+            guardian: {
+              OR: [
+                { fullName: { contains: term, mode: 'insensitive' as const } },
+                {
+                  primaryPhone: {
+                    contains: term,
+                    mode: 'insensitive' as const,
+                  },
+                },
+                {
+                  secondaryPhone: {
+                    contains: term,
+                    mode: 'insensitive' as const,
+                  },
+                },
+              ],
+            },
+          },
+        },
+      },
+    ],
+  }));
+
+  return termConditions.length === 1
+    ? termConditions[0]
+    : { AND: termConditions };
 }
 
 function parseOptionalStudentDocumentExpiryDate(value?: string) {

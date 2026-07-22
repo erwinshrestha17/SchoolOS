@@ -230,6 +230,38 @@ export class NotificationEventService {
       return;
     }
 
+    if (type === 'ADMISSION_DOCUMENTS_REQUESTED') {
+      const sourceUpdatedAt = metadata?.sourceUpdatedAt;
+      const missingDocumentCount = metadata?.missingDocumentCount;
+      if (
+        typeof sourceUpdatedAt !== 'string' ||
+        typeof missingDocumentCount !== 'number' ||
+        missingDocumentCount < 1
+      ) {
+        throw new BadRequestException(
+          'Admission document reminder events require current source metadata',
+        );
+      }
+      const admissionCase = await this.prisma.admissionApplication.findFirst({
+        where: {
+          id: sourceEntityId,
+          tenantId,
+          status: { notIn: ['NOT_ADMITTED', 'REJECTED', 'CLOSED'] },
+          guardianPhone: { not: null },
+        },
+        select: { updatedAt: true },
+      });
+      if (
+        !admissionCase ||
+        admissionCase.updatedAt.toISOString() !== sourceUpdatedAt
+      ) {
+        throw new ConflictException(
+          'Admission document reminder source is no longer current',
+        );
+      }
+      return;
+    }
+
     if (type === 'FEE_PAYMENT_CONFIRMED') {
       const payment = await this.prisma.payment.findFirst({
         where: {

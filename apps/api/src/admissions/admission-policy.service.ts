@@ -4,19 +4,29 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import type { AdmissionPolicyVersion, ApprovalPolicy } from '@prisma/client';
-import { ApprovalWorkflowType } from '@prisma/client';
+import {
+  ApprovalWorkflowType,
+  type AdmissionPolicyVersion,
+  type ApprovalPolicy,
+  type Prisma,
+} from '@prisma/client';
+import { ADMISSION_POLICY_REQUIRED_FIELDS } from '@schoolos/core';
 import type { AuthContext } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateAdmissionPolicyDto,
+  ArchiveAdmissionPolicyDto,
   DuplicateAdmissionPolicyDto,
   UpdateAdmissionPolicyIdentityDto,
   UpdateAdmissionPolicyVersionDto,
   UpsertApprovalChainDto,
   UpsertDocumentRequirementDto,
 } from './dto/admission-policy.dto';
+import {
+  ADMISSION_POLICY_TEMPLATES,
+  findAdmissionPolicyTemplate,
+} from './admission-policy-templates';
 
 const APPROVAL_CHAIN_FINAL_ACTION_KEY = 'admissions.case.approve';
 
@@ -34,6 +44,21 @@ type ResolvableVersionFields = AdmissionPolicyVersion & {
   }>;
   approvalPolicy?: ApprovalPolicy | null;
 };
+
+type AdmissionPolicyCopyClient = Pick<
+  Prisma.TransactionClient,
+  | 'admissionPolicyDocumentRequirement'
+  | 'admissionPolicyVersion'
+  | 'approvalPolicy'
+>;
+
+interface EditableAdmissionPolicy {
+  id: string;
+  tenantId: string;
+  status: string;
+  archivedAt: Date | null;
+  updatedAt: Date;
+}
 
 const POLICY_WITH_VERSIONS_INCLUDE = {
   versions: {
@@ -76,6 +101,20 @@ export class AdmissionPolicyService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
   ) {}
+
+  listTemplates() {
+    return ADMISSION_POLICY_TEMPLATES.map((template) => ({
+      ...template,
+      version: {
+        ...template.version,
+        requiredFields: [...template.version.requiredFields],
+      },
+      documents: template.documents.map((requirement) => ({
+        ...requirement,
+        waivableByRoleKeys: [...requirement.waivableByRoleKeys],
+      })),
+    }));
+  }
 
   async list(actor: AuthContext) {
     const policies = await this.prisma.admissionPolicy.findMany({
@@ -154,39 +193,85 @@ export class AdmissionPolicyService {
   }
 
   async create(dto: CreateAdmissionPolicyDto, actor: AuthContext) {
+    const policyName = dto.name.trim();
+    if (!policyName) {
+      throw new BadRequestException('Admission policy name is required.');
+    }
+    const template = dto.templateId
+      ? findAdmissionPolicyTemplate(dto.templateId)
+      : null;
+    if (dto.templateId && !template) {
+      throw new BadRequestException('Admission policy template not found.');
+    }
     await this.validateScopeReferences(dto, actor);
-    const policy = await this.prisma.admissionPolicy.create({
-      data: {
-        tenantId: actor.tenantId,
-        name: dto.name,
-        academicYearId: dto.academicYearId ?? null,
-        classId: dto.classId ?? null,
-        gradeBand: dto.gradeBand ?? null,
-        applicantType: dto.applicantType ?? 'BOTH',
-        source: dto.source ?? null,
-        status: 'DRAFT',
-        createdById: actor.userId,
-        updatedById: actor.userId,
-      },
+
+    const policyId = await this.prisma.$transaction(async (tx) => {
+      const policy = await tx.admissionPolicy.create({
+        data: {
+          tenantId: actor.tenantId,
+          name: policyName,
+          academicYearId: dto.academicYearId ?? null,
+          classId: dto.classId ?? null,
+          gradeBand: dto.gradeBand ?? template?.gradeBand ?? null,
+          applicantType: dto.applicantType ?? template?.applicantType ?? 'BOTH',
+          source: dto.source ?? null,
+          status: 'DRAFT',
+          createdById: actor.userId,
+          updatedById: actor.userId,
+        },
+      });
+      const version = await tx.admissionPolicyVersion.create({
+        data: {
+          tenantId: actor.tenantId,
+          policyId: policy.id,
+          version: 1,
+          status: 'DRAFT',
+          createdById: actor.userId,
+          ...(template
+            ? {
+                ...template.version,
+                requiredFields: [...template.version.requiredFields],
+              }
+            : {}),
+        },
+      });
+      if (template?.documents.length) {
+        await tx.admissionPolicyDocumentRequirement.createMany({
+          data: template.documents.map((requirement) => ({
+            tenantId: actor.tenantId,
+            policyVersionId: version.id,
+            documentKind: requirement.documentKind,
+            label: requirement.label,
+            isRequired: requirement.isRequired,
+            requiresOriginalVerification:
+              requirement.requiresOriginalVerification,
+            timing: requirement.timing,
+            expiresAfterDays: requirement.expiresAfterDays,
+            canBeWaived: requirement.canBeWaived,
+            waivableByRoleKeys: [...requirement.waivableByRoleKeys],
+            sortOrder: requirement.sortOrder,
+          })),
+        });
+      }
+      await this.auditService.record(
+        {
+          action: 'admission_policy_create',
+          resource: 'admission_policy',
+          resourceId: policy.id,
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          after: {
+            name: policy.name,
+            templateId: template?.id ?? null,
+            versionId: version.id,
+            documentRequirementCount: template?.documents.length ?? 0,
+          },
+        },
+        tx,
+      );
+      return policy.id;
     });
-    await this.prisma.admissionPolicyVersion.create({
-      data: {
-        tenantId: actor.tenantId,
-        policyId: policy.id,
-        version: 1,
-        status: 'DRAFT',
-        createdById: actor.userId,
-      },
-    });
-    await this.auditService.record({
-      action: 'admission_policy_create',
-      resource: 'admission_policy',
-      resourceId: policy.id,
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      after: { name: policy.name },
-    });
-    return this.get(policy.id, actor);
+    return this.get(policyId, actor);
   }
 
   async updateIdentity(
@@ -195,27 +280,40 @@ export class AdmissionPolicyService {
     actor: AuthContext,
   ) {
     const policy = await this.findPolicyOrThrow(policyId, actor.tenantId);
+    this.assertPolicyEditable(policy);
     await this.validateScopeReferences(dto, actor);
-    const updated = await this.prisma.admissionPolicy.update({
-      where: { id: policy.id },
-      data: {
-        name: dto.name,
-        academicYearId: dto.academicYearId,
-        classId: dto.classId,
-        gradeBand: dto.gradeBand,
-        applicantType: dto.applicantType,
-        source: dto.source,
-        updatedById: actor.userId,
-      },
-    });
-    await this.auditService.record({
-      action: 'admission_policy_update_identity',
-      resource: 'admission_policy',
-      resourceId: policy.id,
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      before: { name: policy.name },
-      after: { name: updated.name },
+    await this.prisma.$transaction(async (tx) => {
+      const result = await tx.admissionPolicy.updateMany({
+        where: {
+          id: policy.id,
+          tenantId: actor.tenantId,
+          updatedAt: policy.updatedAt,
+          archivedAt: null,
+          status: { not: 'ARCHIVED' },
+        },
+        data: {
+          name: dto.name,
+          academicYearId: dto.academicYearId,
+          classId: dto.classId,
+          gradeBand: dto.gradeBand,
+          applicantType: dto.applicantType,
+          source: dto.source,
+          updatedById: actor.userId,
+        },
+      });
+      if (result.count !== 1) this.throwPolicyChanged();
+      await this.auditService.record(
+        {
+          action: 'admission_policy_update_identity',
+          resource: 'admission_policy',
+          resourceId: policy.id,
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          before: { name: policy.name },
+          after: { changedFields: Object.keys(dto) },
+        },
+        tx,
+      );
     });
     return this.get(policyId, actor);
   }
@@ -228,23 +326,40 @@ export class AdmissionPolicyService {
     const policy = await this.findPolicyOrThrow(policyId, actor.tenantId, {
       versions: true,
     });
+    this.assertPolicyEditable(policy);
     const draft = policy.versions.find((version) => version.status === 'DRAFT');
     if (!draft) {
       throw new BadRequestException(
         'This policy has no draft version to edit. Start a new draft first.',
       );
     }
-    const updated = await this.prisma.admissionPolicyVersion.update({
-      where: { id: draft.id },
-      data: dto,
-    });
-    await this.auditService.record({
-      action: 'admission_policy_update_version',
-      resource: 'admission_policy',
-      resourceId: policyId,
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      after: { versionId: updated.id, changedFields: Object.keys(dto) },
+    await this.prisma.$transaction(async (tx) => {
+      await this.claimEditablePolicy(tx, policy, actor);
+      const result = await tx.admissionPolicyVersion.updateMany({
+        where: {
+          id: draft.id,
+          tenantId: actor.tenantId,
+          policyId,
+          status: 'DRAFT',
+        },
+        data: dto,
+      });
+      if (result.count !== 1) {
+        throw new ConflictException(
+          'This policy draft changed. Reload it before saving again.',
+        );
+      }
+      await this.auditService.record(
+        {
+          action: 'admission_policy_update_version',
+          resource: 'admission_policy',
+          resourceId: policyId,
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          after: { versionId: draft.id, changedFields: Object.keys(dto) },
+        },
+        tx,
+      );
     });
     return this.get(policyId, actor);
   }
@@ -253,6 +368,7 @@ export class AdmissionPolicyService {
     const policy = await this.findPolicyOrThrow(policyId, actor.tenantId, {
       versions: { include: { documentRequirements: true } },
     });
+    this.assertPolicyEditable(policy);
     const existingDraft = policy.versions.find(
       (version) => version.status === 'DRAFT',
     );
@@ -267,30 +383,37 @@ export class AdmissionPolicyService {
         (max, version) => Math.max(max, version.version),
         0,
       ) + 1;
-    const draft = await this.prisma.admissionPolicyVersion.create({
-      data: {
-        tenantId: actor.tenantId,
-        policyId,
-        version: nextVersionNumber,
-        status: 'DRAFT',
-        createdById: actor.userId,
-        ...this.versionFieldsFrom(source),
-      },
-    });
-    await this.copyDocumentRequirements(source, draft.id, actor.tenantId);
-    await this.copyApprovalChain(
-      source,
-      draft.id,
-      actor.tenantId,
-      actor.userId,
-    );
-    await this.auditService.record({
-      action: 'admission_policy_draft_started',
-      resource: 'admission_policy',
-      resourceId: policyId,
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      after: { versionId: draft.id, version: draft.version },
+    await this.prisma.$transaction(async (tx) => {
+      await this.claimEditablePolicy(tx, policy, actor);
+      const draft = await tx.admissionPolicyVersion.create({
+        data: {
+          tenantId: actor.tenantId,
+          policyId,
+          version: nextVersionNumber,
+          status: 'DRAFT',
+          createdById: actor.userId,
+          ...this.versionFieldsFrom(source),
+        },
+      });
+      await this.copyDocumentRequirements(source, draft.id, actor.tenantId, tx);
+      await this.copyApprovalChain(
+        source,
+        draft.id,
+        actor.tenantId,
+        actor.userId,
+        tx,
+      );
+      await this.auditService.record(
+        {
+          action: 'admission_policy_draft_started',
+          resource: 'admission_policy',
+          resourceId: policyId,
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          after: { versionId: draft.id, version: draft.version },
+        },
+        tx,
+      );
     });
     return this.get(policyId, actor);
   }
@@ -310,47 +433,59 @@ export class AdmissionPolicyService {
       policy.versions.find((version) => version.status === 'DRAFT') ??
       null;
 
-    const copy = await this.prisma.admissionPolicy.create({
-      data: {
-        tenantId: actor.tenantId,
-        name: dto.name?.trim() || `${policy.name} (Copy)`,
-        // Scope is intentionally not carried over: a duplicated policy would
-        // otherwise silently tie for every case the source already wins,
-        // forcing disambiguation until staff re-scope it deliberately.
-        applicantType: policy.applicantType,
-        isDefault: false,
-        status: 'DRAFT',
-        createdById: actor.userId,
-        updatedById: actor.userId,
-      },
-    });
-    const version = await this.prisma.admissionPolicyVersion.create({
-      data: {
-        tenantId: actor.tenantId,
-        policyId: copy.id,
-        version: 1,
-        status: 'DRAFT',
-        createdById: actor.userId,
-        ...this.versionFieldsFrom(source),
-      },
-    });
-    await this.copyDocumentRequirements(source, version.id, actor.tenantId);
-    await this.copyApprovalChain(
-      source,
-      version.id,
-      actor.tenantId,
-      actor.userId,
-    );
+    const copyId = await this.prisma.$transaction(async (tx) => {
+      const copy = await tx.admissionPolicy.create({
+        data: {
+          tenantId: actor.tenantId,
+          name: dto.name?.trim() || `${policy.name} (Copy)`,
+          // Scope is intentionally not carried over: a duplicated policy would
+          // otherwise silently tie for every case the source already wins,
+          // forcing disambiguation until staff re-scope it deliberately.
+          applicantType: policy.applicantType,
+          isDefault: false,
+          status: 'DRAFT',
+          createdById: actor.userId,
+          updatedById: actor.userId,
+        },
+      });
+      const version = await tx.admissionPolicyVersion.create({
+        data: {
+          tenantId: actor.tenantId,
+          policyId: copy.id,
+          version: 1,
+          status: 'DRAFT',
+          createdById: actor.userId,
+          ...this.versionFieldsFrom(source),
+        },
+      });
+      await this.copyDocumentRequirements(
+        source,
+        version.id,
+        actor.tenantId,
+        tx,
+      );
+      await this.copyApprovalChain(
+        source,
+        version.id,
+        actor.tenantId,
+        actor.userId,
+        tx,
+      );
 
-    await this.auditService.record({
-      action: 'admission_policy_duplicate',
-      resource: 'admission_policy',
-      resourceId: copy.id,
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      after: { name: copy.name, duplicatedFromPolicyId: policyId },
+      await this.auditService.record(
+        {
+          action: 'admission_policy_duplicate',
+          resource: 'admission_policy',
+          resourceId: copy.id,
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          after: { name: copy.name, duplicatedFromPolicyId: policyId },
+        },
+        tx,
+      );
+      return copy.id;
     });
-    return this.get(copy.id, actor);
+    return this.get(copyId, actor);
   }
 
   private versionFieldsFrom(source: ResolvableVersionFields | null) {
@@ -378,10 +513,11 @@ export class AdmissionPolicyService {
     source: ResolvableVersionFields | null,
     targetVersionId: string,
     tenantId: string,
+    client: AdmissionPolicyCopyClient = this.prisma,
   ) {
     const requirements = source?.documentRequirements ?? [];
     if (requirements.length === 0) return;
-    await this.prisma.admissionPolicyDocumentRequirement.createMany({
+    await client.admissionPolicyDocumentRequirement.createMany({
       data: requirements.map((requirement) => ({
         tenantId,
         policyVersionId: targetVersionId,
@@ -403,10 +539,11 @@ export class AdmissionPolicyService {
     targetVersionId: string,
     tenantId: string,
     userId: string,
+    client: AdmissionPolicyCopyClient = this.prisma,
   ) {
     const sourceChain = source?.approvalPolicy;
     if (!sourceChain) return;
-    const created = await this.prisma.approvalPolicy.create({
+    const created = await client.approvalPolicy.create({
       data: {
         tenantId,
         workflowType: ApprovalWorkflowType.ADMISSION_CASE,
@@ -418,7 +555,7 @@ export class AdmissionPolicyService {
         createdById: userId,
       },
     });
-    await this.prisma.admissionPolicyVersion.update({
+    await client.admissionPolicyVersion.update({
       where: { id: targetVersionId },
       data: { approvalPolicyId: created.id },
     });
@@ -430,6 +567,8 @@ export class AdmissionPolicyService {
     dto: UpsertApprovalChainDto,
     actor: AuthContext,
   ) {
+    const policy = await this.findPolicyOrThrow(policyId, actor.tenantId);
+    this.assertPolicyEditable(policy);
     const version = await this.findDraftVersionOrThrow(
       policyId,
       versionId,
@@ -441,45 +580,70 @@ export class AdmissionPolicyService {
     );
     const minApprovals = dto.minApprovals ?? dto.stages.length;
 
-    if (!version.approvalPolicyId) {
-      const created = await this.prisma.approvalPolicy.create({
-        data: {
-          tenantId: actor.tenantId,
-          workflowType: ApprovalWorkflowType.ADMISSION_CASE,
-          name: `admission-policy-version:${version.id}`,
-          minApprovals,
-          approverRoles: approverRoles as never,
-          approverPermissions: approverPermissions as never,
-          finalActionKey: APPROVAL_CHAIN_FINAL_ACTION_KEY,
-          createdById: actor.userId,
-        },
-      });
-      await this.prisma.admissionPolicyVersion.update({
-        where: { id: version.id },
-        data: { approvalPolicyId: created.id },
-      });
-    } else {
-      await this.prisma.approvalPolicy.update({
-        where: { id: version.approvalPolicyId },
-        data: {
-          minApprovals,
-          approverRoles: approverRoles as never,
-          approverPermissions: approverPermissions as never,
-        },
-      });
-    }
+    await this.prisma.$transaction(async (tx) => {
+      await this.claimEditablePolicy(tx, policy, actor);
+      if (!version.approvalPolicyId) {
+        const created = await tx.approvalPolicy.create({
+          data: {
+            tenantId: actor.tenantId,
+            workflowType: ApprovalWorkflowType.ADMISSION_CASE,
+            name: `admission-policy-version:${version.id}`,
+            minApprovals,
+            approverRoles: approverRoles as never,
+            approverPermissions: approverPermissions as never,
+            finalActionKey: APPROVAL_CHAIN_FINAL_ACTION_KEY,
+            createdById: actor.userId,
+          },
+        });
+        const attached = await tx.admissionPolicyVersion.updateMany({
+          where: {
+            id: version.id,
+            tenantId: actor.tenantId,
+            policyId,
+            status: 'DRAFT',
+            approvalPolicyId: null,
+          },
+          data: { approvalPolicyId: created.id },
+        });
+        if (attached.count !== 1) {
+          throw new ConflictException(
+            'This policy approval chain changed. Reload it before saving again.',
+          );
+        }
+      } else {
+        const updated = await tx.approvalPolicy.updateMany({
+          where: {
+            id: version.approvalPolicyId,
+            tenantId: actor.tenantId,
+          },
+          data: {
+            minApprovals,
+            approverRoles: approverRoles as never,
+            approverPermissions: approverPermissions as never,
+          },
+        });
+        if (updated.count !== 1) {
+          throw new ConflictException(
+            'This policy approval chain is no longer available.',
+          );
+        }
+      }
 
-    await this.auditService.record({
-      action: 'admission_policy_update_approval_chain',
-      resource: 'admission_policy',
-      resourceId: policyId,
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      after: {
-        versionId: version.id,
-        stageCount: dto.stages.length,
-        minApprovals,
-      },
+      await this.auditService.record(
+        {
+          action: 'admission_policy_update_approval_chain',
+          resource: 'admission_policy',
+          resourceId: policyId,
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          after: {
+            versionId: version.id,
+            stageCount: dto.stages.length,
+            minApprovals,
+          },
+        },
+        tx,
+      );
     });
     return this.get(policyId, actor);
   }
@@ -489,27 +653,49 @@ export class AdmissionPolicyService {
     versionId: string,
     actor: AuthContext,
   ) {
+    const policy = await this.findPolicyOrThrow(policyId, actor.tenantId);
+    this.assertPolicyEditable(policy);
     const version = await this.findDraftVersionOrThrow(
       policyId,
       versionId,
       actor.tenantId,
     );
-    if (version.approvalPolicyId) {
-      await this.prisma.admissionPolicyVersion.update({
-        where: { id: version.id },
-        data: { approvalPolicyId: null },
-      });
-      await this.prisma.approvalPolicy.delete({
-        where: { id: version.approvalPolicyId },
-      });
-    }
-    await this.auditService.record({
-      action: 'admission_policy_delete_approval_chain',
-      resource: 'admission_policy',
-      resourceId: policyId,
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      after: { versionId: version.id },
+    await this.prisma.$transaction(async (tx) => {
+      await this.claimEditablePolicy(tx, policy, actor);
+      if (version.approvalPolicyId) {
+        const detached = await tx.admissionPolicyVersion.updateMany({
+          where: {
+            id: version.id,
+            tenantId: actor.tenantId,
+            policyId,
+            status: 'DRAFT',
+            approvalPolicyId: version.approvalPolicyId,
+          },
+          data: { approvalPolicyId: null },
+        });
+        if (detached.count !== 1) {
+          throw new ConflictException(
+            'This policy approval chain changed. Reload it before removing it.',
+          );
+        }
+        await tx.approvalPolicy.deleteMany({
+          where: {
+            id: version.approvalPolicyId,
+            tenantId: actor.tenantId,
+          },
+        });
+      }
+      await this.auditService.record(
+        {
+          action: 'admission_policy_delete_approval_chain',
+          resource: 'admission_policy',
+          resourceId: policyId,
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          after: { versionId: version.id },
+        },
+        tx,
+      );
     });
     return this.get(policyId, actor);
   }
@@ -520,13 +706,16 @@ export class AdmissionPolicyService {
     dto: UpsertDocumentRequirementDto,
     actor: AuthContext,
   ) {
+    const policy = await this.findPolicyOrThrow(policyId, actor.tenantId);
+    this.assertPolicyEditable(policy);
     const version = await this.findDraftVersionOrThrow(
       policyId,
       versionId,
       actor.tenantId,
     );
-    const requirement =
-      await this.prisma.admissionPolicyDocumentRequirement.upsert({
+    const requirement = await this.prisma.$transaction(async (tx) => {
+      await this.claimEditablePolicy(tx, policy, actor);
+      const saved = await tx.admissionPolicyDocumentRequirement.upsert({
         where: {
           policyVersionId_documentKind: {
             policyVersionId: version.id,
@@ -558,6 +747,23 @@ export class AdmissionPolicyService {
           sortOrder: dto.sortOrder,
         },
       });
+      await this.auditService.record(
+        {
+          action: 'admission_policy_upsert_document_requirement',
+          resource: 'admission_policy',
+          resourceId: policyId,
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          after: {
+            versionId: version.id,
+            requirementId: saved.id,
+            documentKind: saved.documentKind,
+          },
+        },
+        tx,
+      );
+      return saved;
+    });
     return requirement;
   }
 
@@ -567,13 +773,32 @@ export class AdmissionPolicyService {
     requirementId: string,
     actor: AuthContext,
   ) {
+    const policy = await this.findPolicyOrThrow(policyId, actor.tenantId);
+    this.assertPolicyEditable(policy);
     await this.findDraftVersionOrThrow(policyId, versionId, actor.tenantId);
-    await this.prisma.admissionPolicyDocumentRequirement.deleteMany({
-      where: {
-        id: requirementId,
-        tenantId: actor.tenantId,
-        policyVersionId: versionId,
-      },
+    await this.prisma.$transaction(async (tx) => {
+      await this.claimEditablePolicy(tx, policy, actor);
+      const deleted = await tx.admissionPolicyDocumentRequirement.deleteMany({
+        where: {
+          id: requirementId,
+          tenantId: actor.tenantId,
+          policyVersionId: versionId,
+        },
+      });
+      if (deleted.count !== 1) {
+        throw new NotFoundException('Document requirement not found.');
+      }
+      await this.auditService.record(
+        {
+          action: 'admission_policy_delete_document_requirement',
+          resource: 'admission_policy',
+          resourceId: policyId,
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          before: { versionId, requirementId },
+        },
+        tx,
+      );
     });
     return { deleted: true };
   }
@@ -582,69 +807,137 @@ export class AdmissionPolicyService {
     const policy = await this.findPolicyOrThrow(policyId, actor.tenantId, {
       versions: true,
     });
+    this.assertPolicyEditable(policy);
     const target = policy.versions.find((version) => version.id === versionId);
     if (!target) throw new NotFoundException('Policy version not found.');
     if (target.status !== 'DRAFT') {
       throw new BadRequestException('Only a draft version can be activated.');
     }
+    this.assertSupportedRequiredFields(target.requiredFields);
     const previousActiveId = policy.currentVersionId;
+    const activatedAt = new Date();
 
-    await this.prisma.admissionPolicyVersion.update({
-      where: { id: target.id },
-      data: {
-        status: 'ACTIVE',
-        activatedAt: new Date(),
-        activatedById: actor.userId,
-      },
-    });
-    if (previousActiveId && previousActiveId !== target.id) {
-      await this.prisma.admissionPolicyVersion.update({
-        where: { id: previousActiveId },
-        data: { status: 'EXPIRED' },
+    await this.prisma.$transaction(async (tx) => {
+      // Claim the policy using its last-seen timestamp. This prevents two
+      // concurrent activation requests from both replacing the current
+      // version and leaving a split active-version history.
+      const policyClaim = await tx.admissionPolicy.updateMany({
+        where: {
+          id: policyId,
+          tenantId: actor.tenantId,
+          updatedAt: policy.updatedAt,
+        },
+        data: {
+          currentVersionId: target.id,
+          status: 'ACTIVE',
+          updatedById: actor.userId,
+        },
       });
-    }
-    await this.prisma.admissionPolicy.update({
-      where: { id: policyId },
-      data: {
-        currentVersionId: target.id,
-        status: 'ACTIVE',
-        updatedById: actor.userId,
-      },
-    });
+      if (policyClaim.count !== 1) {
+        throw new ConflictException(
+          'This admission policy changed. Reload it before activating a version.',
+        );
+      }
 
-    await this.auditService.record({
-      action: 'admission_policy_activate',
-      resource: 'admission_policy',
-      resourceId: policyId,
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      before: { previousActiveVersionId: previousActiveId },
-      after: { versionId: target.id, version: target.version },
+      const versionClaim = await tx.admissionPolicyVersion.updateMany({
+        where: {
+          id: target.id,
+          tenantId: actor.tenantId,
+          policyId,
+          status: 'DRAFT',
+        },
+        data: {
+          status: 'ACTIVE',
+          activatedAt,
+          activatedById: actor.userId,
+        },
+      });
+      if (versionClaim.count !== 1) {
+        throw new ConflictException(
+          'This policy version is no longer a draft. Reload the policy before trying again.',
+        );
+      }
+
+      if (previousActiveId && previousActiveId !== target.id) {
+        await tx.admissionPolicyVersion.updateMany({
+          where: {
+            id: previousActiveId,
+            tenantId: actor.tenantId,
+            policyId,
+            status: 'ACTIVE',
+          },
+          data: { status: 'EXPIRED' },
+        });
+      }
+
+      await this.auditService.record(
+        {
+          action: 'admission_policy_activate',
+          resource: 'admission_policy',
+          resourceId: policyId,
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          before: { previousActiveVersionId: previousActiveId },
+          after: { versionId: target.id, version: target.version },
+        },
+        tx,
+      );
     });
     return this.get(policyId, actor);
   }
 
-  async archive(policyId: string, actor: AuthContext) {
+  async archive(
+    policyId: string,
+    dto: ArchiveAdmissionPolicyDto,
+    actor: AuthContext,
+  ) {
     const policy = await this.findPolicyOrThrow(policyId, actor.tenantId);
+    if (policy.status === 'ARCHIVED' || policy.archivedAt) {
+      return this.get(policyId, actor);
+    }
     if (policy.isDefault) {
       throw new ConflictException(
         'The school default policy cannot be archived.',
       );
     }
-    await this.prisma.admissionPolicy.update({
-      where: { id: policyId },
-      data: {
-        status: 'ARCHIVED',
-        archivedAt: new Date(),
-        updatedById: actor.userId,
-      },
-    });
-    await this.auditService.record({
-      action: 'admission_policy_archive',
-      resource: 'admission_policy',
-      resourceId: policyId,
-      tenantId: actor.tenantId,
-      userId: actor.userId,
+    const reason = dto.reason.trim();
+    if (reason.length < 5 || reason.length > 500) {
+      throw new BadRequestException(
+        'Archive reason must be between 5 and 500 characters.',
+      );
+    }
+    const archivedAt = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      const archived = await tx.admissionPolicy.updateMany({
+        where: {
+          id: policyId,
+          tenantId: actor.tenantId,
+          updatedAt: policy.updatedAt,
+          archivedAt: null,
+          status: { not: 'ARCHIVED' },
+        },
+        data: {
+          status: 'ARCHIVED',
+          archivedAt,
+          updatedById: actor.userId,
+        },
+      });
+      if (archived.count !== 1) this.throwPolicyChanged();
+      await this.auditService.record(
+        {
+          action: 'admission_policy_archive',
+          resource: 'admission_policy',
+          resourceId: policyId,
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          before: {
+            status: policy.status,
+            currentVersionId: policy.currentVersionId,
+          },
+          after: { status: 'ARCHIVED', archivedAt, reason },
+        },
+        tx,
+      );
     });
     return this.get(policyId, actor);
   }
@@ -673,6 +966,48 @@ export class AdmissionPolicyService {
     ) {
       throw new BadRequestException(
         'Admission policy scopes must use academic years and classes from this school.',
+      );
+    }
+  }
+
+  private assertPolicyEditable(policy: EditableAdmissionPolicy) {
+    if (policy.status === 'ARCHIVED' || policy.archivedAt) {
+      throw new ConflictException(
+        'Archived admission policies are read-only. Duplicate this policy to create a new editable draft.',
+      );
+    }
+  }
+
+  private async claimEditablePolicy(
+    client: Pick<Prisma.TransactionClient, 'admissionPolicy'>,
+    policy: EditableAdmissionPolicy,
+    actor: AuthContext,
+  ) {
+    const claimed = await client.admissionPolicy.updateMany({
+      where: {
+        id: policy.id,
+        tenantId: actor.tenantId,
+        updatedAt: policy.updatedAt,
+        archivedAt: null,
+        status: { not: 'ARCHIVED' },
+      },
+      data: { updatedById: actor.userId },
+    });
+    if (claimed.count !== 1) this.throwPolicyChanged();
+  }
+
+  private throwPolicyChanged(): never {
+    throw new ConflictException(
+      'This admission policy changed. Reload it before making another change.',
+    );
+  }
+
+  private assertSupportedRequiredFields(requiredFields: string[]) {
+    const supported = new Set<string>(ADMISSION_POLICY_REQUIRED_FIELDS);
+    const unsupported = requiredFields.filter((field) => !supported.has(field));
+    if (unsupported.length > 0) {
+      throw new BadRequestException(
+        'This policy contains unsupported required information. Edit the draft and choose only the available fields before activation.',
       );
     }
   }

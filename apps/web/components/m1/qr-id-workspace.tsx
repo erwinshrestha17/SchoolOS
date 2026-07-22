@@ -6,16 +6,10 @@ import {
   type StudentProfile,
 } from "@schoolos/core";
 import { useQuery } from "@tanstack/react-query";
-import {
-  CreditCard,
-  History,
-  Printer,
-  QrCode,
-  RefreshCw,
-  Search,
-} from "lucide-react";
+import { CreditCard, History, Printer, QrCode, Search } from "lucide-react";
 import { useDeferredValue, useState } from "react";
 import { api } from "../../lib/api";
+import { schoolFacingErrorMessage } from "../../lib/school-facing-error";
 import { StudentQrCard } from "../students/profile/student-qr-card";
 import { Button } from "../ui/button";
 import { EmptyState } from "../ui/empty-state";
@@ -29,7 +23,6 @@ export function QrIdWorkspace() {
   const deferredSearch = useDeferredValue(search);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<StudentProfile | null>(null);
-  const [pdfError, setPdfError] = useState("");
 
   const studentsQuery = useQuery({
     queryKey: ["students", "qr-workspace", deferredSearch, page],
@@ -40,6 +33,10 @@ export function QrIdWorkspace() {
         limit: 20,
       }),
   });
+  const summaryQuery = useQuery({
+    queryKey: ["student-qr-workspace-summary"],
+    queryFn: () => api.getStudentQrWorkspaceSummary(),
+  });
 
   if (studentsQuery.isLoading)
     return (
@@ -49,68 +46,66 @@ export function QrIdWorkspace() {
     return (
       <ErrorState
         title="QR card records could not load"
-        message="No credentials were changed."
+        message={schoolFacingErrorMessage(studentsQuery.error, {
+          fallback:
+            "QR card records could not load. No credentials were changed.",
+          forbidden:
+            "You do not have permission to view school QR card records.",
+        })}
         onRetry={() => void studentsQuery.refetch()}
       />
     );
 
   const students = studentsQuery.data?.items ?? [];
-  const currentPageActive = students.filter(
-    (student) => student.qrCredential?.status === "ACTIVE",
-  ).length;
-  const currentPageInactive = students.filter(
-    (student) =>
-      student.qrCredential && student.qrCredential.status !== "ACTIVE",
-  ).length;
-
-  async function openIdCard(studentId: string) {
-    setPdfError("");
-    try {
-      await api.openStudentDocumentPdf(studentId, "id-card");
-    } catch (error) {
-      setPdfError(
-        error instanceof Error ? error.message : "ID card could not be opened.",
-      );
-    }
-  }
+  const summary = summaryQuery.data;
+  const summaryUnavailable = summaryQuery.isError;
 
   return (
     <div className="space-y-6">
-      <KpiGrid className="sm:grid-cols-2 xl:grid-cols-5">
+      <KpiGrid className="sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           title="Active QR Cards"
-          value="Unavailable"
+          value={summary?.activeCredentials ?? "Unavailable"}
           icon={<QrCode size={19} />}
-          tone="neutral"
-          description={`${currentPageActive} active on this page; no aggregate endpoint`}
+          tone="success"
+          description={
+            summaryUnavailable
+              ? "School-wide total could not load"
+              : "Ready for protected school workflows"
+          }
         />
         <KpiCard
-          title="Pending Prints"
-          value="Unavailable"
+          title="Replacement Files"
+          value={summary?.replacementFilesNeeded ?? "Unavailable"}
           icon={<Printer size={19} />}
-          tone="neutral"
-          description="Print queue API is not available"
+          tone={summary?.replacementFilesNeeded ? "warning" : "neutral"}
+          description={
+            summaryUnavailable
+              ? "Protected-file status could not load"
+              : "Active credentials missing an ID-card file"
+          }
         />
         <KpiCard
-          title="Rotated This Month"
-          value="Unavailable"
-          icon={<RefreshCw size={19} />}
-          tone="neutral"
-          description="Credential history is student-scoped"
-        />
-        <KpiCard
-          title="Inactive Cards"
-          value="Unavailable"
+          title="Inactive Credentials"
+          value={summary?.inactiveCredentials ?? "Unavailable"}
           icon={<CreditCard size={19} />}
           tone="neutral"
-          description={`${currentPageInactive} inactive on this page`}
+          description={
+            summaryUnavailable
+              ? "Credential history could not load"
+              : "Rotated or revoked audit history"
+          }
         />
         <KpiCard
-          title="Scan Events Today"
-          value="Unavailable"
+          title="Scans Today"
+          value={summary?.successfulScansToday ?? "Unavailable"}
           icon={<History size={19} />}
           tone="neutral"
-          description="Scan audit is student-scoped"
+          description={
+            summary
+              ? `Successful scans on ${summary.period.bsDate} BS`
+              : "Nepal school-day total could not load"
+          }
         />
       </KpiGrid>
 
@@ -278,14 +273,6 @@ export function QrIdWorkspace() {
               </p>
             </div>
           )}
-          {pdfError ? (
-            <p
-              className="mt-3 rounded-xl border border-danger-100 bg-danger-50 p-3 text-xs font-bold text-danger-700"
-              role="alert"
-            >
-              {pdfError}
-            </p>
-          ) : null}
         </aside>
       </div>
     </div>

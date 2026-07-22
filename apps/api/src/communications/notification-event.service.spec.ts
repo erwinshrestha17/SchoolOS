@@ -28,6 +28,7 @@ describe('NotificationEventService', () => {
       student: { findFirst: jest.fn() },
       payment: { findFirst: jest.fn() },
       attendanceRecord: { findFirst: jest.fn() },
+      admissionApplication: { findFirst: jest.fn() },
     };
     plansService = {
       assertTenantActive: jest.fn().mockResolvedValue(undefined),
@@ -129,5 +130,62 @@ describe('NotificationEventService', () => {
         idempotencyKey: 'notice:notice-1:published',
       }),
     ).rejects.toThrow('School access is suspended');
+  });
+
+  it('accepts a current tenant-scoped admission document reminder source', async () => {
+    const sourceUpdatedAt = '2026-07-20T04:00:00.000Z';
+    prisma.admissionApplication.findFirst.mockResolvedValueOnce({
+      updatedAt: new Date(sourceUpdatedAt),
+    });
+
+    await expect(
+      service.accept({
+        tenantId: 'tenant-1',
+        type: 'ADMISSION_DOCUMENTS_REQUESTED',
+        sourceEntityId: 'admission-case-1',
+        actorId: 'admin-1',
+        idempotencyKey:
+          'admission-document-request:admission-case-1:2026-07-20',
+        metadata: {
+          sourceUpdatedAt,
+          missingDocumentCount: 2,
+          schoolDay: '2026-07-20',
+        },
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        type: 'ADMISSION_DOCUMENTS_REQUESTED',
+        sourceModule: 'M1_ADMISSIONS',
+        sourceEntityType: 'admission_case',
+      }),
+    );
+    expect(prisma.admissionApplication.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'admission-case-1',
+        tenantId: 'tenant-1',
+        status: { notIn: ['NOT_ADMITTED', 'REJECTED', 'CLOSED'] },
+        guardianPhone: { not: null },
+      },
+      select: { updatedAt: true },
+    });
+  });
+
+  it('rejects a stale or cross-tenant admission document reminder source', async () => {
+    prisma.admissionApplication.findFirst.mockResolvedValueOnce(null);
+
+    await expect(
+      service.accept({
+        tenantId: 'tenant-1',
+        type: 'ADMISSION_DOCUMENTS_REQUESTED',
+        sourceEntityId: 'other-tenant-case',
+        idempotencyKey:
+          'admission-document-request:other-tenant-case:2026-07-20',
+        metadata: {
+          sourceUpdatedAt: '2026-07-20T04:00:00.000Z',
+          missingDocumentCount: 1,
+        },
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.notificationEvent.create).not.toHaveBeenCalled();
   });
 });

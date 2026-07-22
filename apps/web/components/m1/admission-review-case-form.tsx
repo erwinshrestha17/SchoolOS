@@ -18,6 +18,8 @@ import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 import { api } from "../../lib/api";
 import { admissionCasesApi } from "../../lib/api/admission-cases";
+import { classOptionLabel } from "../../lib/education-program";
+import { schoolFacingErrorMessage } from "../../lib/school-facing-error";
 import { Button } from "../ui/button";
 import { ErrorState } from "../ui/error-state";
 import { SectionCard } from "../ui/section-card";
@@ -105,9 +107,16 @@ export function AdmissionReviewCaseForm() {
       router.push(`/dashboard/admissions/applications/${admissionCase.id}`),
     onError: (cause) =>
       setError(
-        cause instanceof Error
-          ? cause.message
-          : "The admission review case could not be created.",
+        schoolFacingErrorMessage(cause, {
+          fallback:
+            "The admission review case could not be created. No student was enrolled. Try again.",
+          invalid:
+            "Review the applicant, guardian, and academic placement details before continuing.",
+          forbidden:
+            "You do not have permission to create an admission review case.",
+          conflict:
+            "A matching admission record changed while this case was being prepared. Refresh and try again.",
+        }),
       ),
   });
 
@@ -328,7 +337,7 @@ export function AdmissionReviewCaseForm() {
               <option value="">Select class</option>
               {(classes.data ?? []).map((schoolClass) => (
                 <option key={schoolClass.id} value={schoolClass.id}>
-                  {schoolClass.name}
+                  {classOptionLabel(schoolClass)}
                 </option>
               ))}
             </select>

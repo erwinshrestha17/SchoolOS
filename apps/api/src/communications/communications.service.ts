@@ -118,6 +118,20 @@ export interface NoticeDraftInput {
   idempotencyKey: string;
 }
 
+export interface AdmissionDocumentReminderDeliveryInput {
+  actor: AuthContext;
+  admissionCaseId: string;
+  applicantName: string;
+  guardianPhone: string;
+  sourceUpdatedAt: string;
+  missingDocumentLabels: string[];
+}
+
+export type AdmissionDocumentReminderDeliveryOutcome = {
+  state: 'QUEUED' | 'ALREADY_QUEUED' | 'SKIPPED';
+  reason: 'DELIVERY_UNAVAILABLE' | null;
+};
+
 @Injectable()
 export class CommunicationsService {
   private readonly logger = new Logger(CommunicationsService.name);
@@ -301,7 +315,10 @@ export class CommunicationsService {
       classIds.add(section.classId);
       sectionIds.add(section.id);
     }
-    return { classIds: Array.from(classIds), sectionIds: Array.from(sectionIds) };
+    return {
+      classIds: Array.from(classIds),
+      sectionIds: Array.from(sectionIds),
+    };
   }
 
   async createNotice(dto: CreateNoticeDto, actor: AuthContext) {
@@ -1870,6 +1887,92 @@ export class CommunicationsService {
     });
   }
 
+  async recordAdmissionDocumentReminder(
+    input: AdmissionDocumentReminderDeliveryInput,
+  ): Promise<AdmissionDocumentReminderDeliveryOutcome> {
+    if (!this.notificationEventService) {
+      throw new ConflictException(
+        'Notification event intake is unavailable for admission reminders',
+      );
+    }
+
+    const schoolDay = getNepalSchoolDay().gregorianDate;
+    const sourceId = `admission-document-request:${input.admissionCaseId}:${schoolDay}`;
+    const notificationEvent = await this.notificationEventService.accept({
+      tenantId: input.actor.tenantId,
+      type: 'ADMISSION_DOCUMENTS_REQUESTED',
+      sourceEntityId: input.admissionCaseId,
+      actorId: input.actor.userId,
+      idempotencyKey: sourceId,
+      metadata: {
+        sourceUpdatedAt: input.sourceUpdatedAt,
+        missingDocumentCount: input.missingDocumentLabels.length,
+        schoolDay,
+      },
+    });
+
+    try {
+      const result = await this.recordDeliveryRecords({
+        actor: input.actor,
+        sourceType: 'admission_document_request',
+        sourceId,
+        notificationEventId: notificationEvent.id,
+        audienceType: AudienceType.ALL,
+        title: 'Admission documents required',
+        body: admissionDocumentReminderBody(
+          input.applicantName,
+          input.missingDocumentLabels,
+        ),
+        channels: [NotificationChannel.SMS],
+        communicationCategory: 'ESSENTIAL',
+        directRecipients: [
+          {
+            studentId: '',
+            guardianId: null,
+            userId: null,
+            email: null,
+            phone: input.guardianPhone,
+          },
+        ],
+      });
+      const deliveries = await this.prisma.notificationDelivery.findMany({
+        where: {
+          tenantId: input.actor.tenantId,
+          sourceType: 'admission_document_request',
+          sourceId,
+        },
+        select: { status: true },
+      });
+      await this.notificationEventService.markDispatched(
+        input.actor.tenantId,
+        notificationEvent.id,
+      );
+
+      const deliverable = deliveries.some(
+        (delivery) =>
+          delivery.status === NotificationStatus.QUEUED ||
+          delivery.status === NotificationStatus.RETRY_PENDING ||
+          delivery.status === NotificationStatus.SENT ||
+          delivery.status === NotificationStatus.DELIVERED,
+      );
+      if (!deliverable) {
+        return { state: 'SKIPPED', reason: 'DELIVERY_UNAVAILABLE' };
+      }
+      return {
+        state:
+          'replayed' in result && result.replayed ? 'ALREADY_QUEUED' : 'QUEUED',
+        reason: null,
+      };
+    } catch (error) {
+      await this.notificationEventService.markFailed(
+        input.actor.tenantId,
+        notificationEvent.id,
+        'DELIVERY_INTAKE_FAILED',
+      );
+      throw error;
+    }
+  }
+
   async recordDeliveryRecords(input: DeliveryRecordInput) {
     const redis = this.redisService.getClient();
     const lockKey = `lock:delivery:${input.actor.tenantId}:${input.sourceType}:${input.sourceId}`;
@@ -1938,7 +2041,9 @@ export class CommunicationsService {
         return summarizeExistingDeliveries(existingDeliveries);
       }
 
-      const recipients = await this.resolveAudienceRecipients(input);
+      const recipients = input.directRecipients
+        ? deduplicateRecipients(input.directRecipients)
+        : await this.resolveAudienceRecipients(input);
       const { allowedRecipients, skippedRecipients } =
         await this.partitionRecipientsByCommunicationPolicy(input, recipients);
 
@@ -2779,6 +2884,7 @@ interface DeliveryRecordInput {
   staffIds?: string[];
   roleNames?: string[];
   recipientUserIds?: string[];
+  directRecipients?: DeliveryRecipient[];
   title: string;
   body: string;
   channels: NotificationChannel[];
@@ -2944,6 +3050,25 @@ function resolveDestination(
   }
 
   return recipient.userId ?? recipient.phone ?? recipient.email;
+}
+
+function admissionDocumentReminderBody(
+  applicantName: string,
+  missingDocumentLabels: string[],
+) {
+  const safeName = applicantName.trim().slice(0, 120) || 'the applicant';
+  const labels = missingDocumentLabels
+    .map((label) => label.trim())
+    .filter(Boolean)
+    .slice(0, 3);
+  const remaining = Math.max(0, missingDocumentLabels.length - labels.length);
+  const documentText = labels.length
+    ? `${labels.join(', ')}${remaining ? ` and ${remaining} more` : ''}`
+    : 'required admission documents';
+  return `School records for ${safeName} still need ${documentText}. Please contact the admissions office.`.slice(
+    0,
+    500,
+  );
 }
 
 function deliveryIdempotencyKey(

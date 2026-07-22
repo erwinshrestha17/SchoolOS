@@ -8,7 +8,8 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { api } from '../../lib/api';
 import { admissionCasesApi } from '../../lib/api/admission-cases';
-import { ApiRequestError } from '../../lib/api/client';
+import { classOptionLabel, educationProgramLabel } from '../../lib/education-program';
+import { schoolFacingErrorMessage } from '../../lib/school-facing-error';
 import { Button } from '../ui/button';
 import { ErrorState } from '../ui/error-state';
 import { SectionCard } from '../ui/section-card';
@@ -362,7 +363,7 @@ export function AdmissionCaseWizard({ initialCaseId }: { initialCaseId?: string 
             <Field label="Class" required>
               <select value={form.classId ?? ''} disabled={setupLoading} onChange={(event) => { update('classId', event.target.value); update('sectionId', ''); }}>
                 <option value="">Select class</option>
-                {(classesQuery.data ?? []).map((schoolClass) => <option key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}</option>)}
+                {(classesQuery.data ?? []).map((schoolClass) => <option key={schoolClass.id} value={schoolClass.id}>{classOptionLabel(schoolClass)}</option>)}
               </select>
             </Field>
             <Field label="Section">
@@ -430,7 +431,7 @@ export function AdmissionCaseWizard({ initialCaseId }: { initialCaseId?: string 
             <div className="grid gap-4 md:grid-cols-3">
               <Summary label="Student" value={`${form.firstNameEn} ${form.lastNameEn}`.trim()} />
               <Summary label="Guardian" value={`${form.guardianFullName ?? ''} · ${form.guardianPhone ?? ''}`.trim()} />
-              <Summary label="Placement" value={`${(academicYearsQuery.data ?? []).find((year) => year.id === form.academicYearId)?.name ?? 'Academic year'} · ${(classesQuery.data ?? []).find((schoolClass) => schoolClass.id === form.classId)?.name ?? 'Class'}${availableSections.find((section) => section.id === form.sectionId) ? ` · ${availableSections.find((section) => section.id === form.sectionId)?.name}` : ''}`} />
+              <Summary label="Placement" value={`${(academicYearsQuery.data ?? []).find((year) => year.id === form.academicYearId)?.name ?? 'Academic year'} · ${(classesQuery.data ?? []).find((schoolClass) => schoolClass.id === form.classId)?.name ?? 'Class'} · ${educationProgramLabel((classesQuery.data ?? []).find((schoolClass) => schoolClass.id === form.classId)?.program ?? null)}${availableSections.find((section) => section.id === form.sectionId) ? ` · ${availableSections.find((section) => section.id === form.sectionId)?.name}` : ''}`} />
             </div>
           </SectionCard>
 
@@ -634,8 +635,17 @@ function humanize(value: string) {
 
 function readError(error: unknown) {
   if (!error) return '';
-  if (error instanceof ApiRequestError) return error.message;
-  return error instanceof Error ? error.message : 'The admission could not be completed. Please try again.';
+  return schoolFacingErrorMessage(error, {
+    fallback:
+      'The admission could not be completed. No student record was finalized. Try again.',
+    invalid: 'Review the admission details and correct the highlighted information.',
+    forbidden:
+      'You do not have permission to create or update this admission case.',
+    notFound:
+      'This admission case or its academic placement is no longer available.',
+    conflict:
+      'This admission case changed while you were working. Reload it before continuing.',
+  });
 }
 
 function buildAdmissionCasePayload(form: CreateAdmissionCasePayload): CreateAdmissionCasePayload {

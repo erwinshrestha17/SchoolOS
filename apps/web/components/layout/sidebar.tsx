@@ -532,6 +532,8 @@ export function Sidebar({
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
+        aria-hidden={!mobileOpen}
+        inert={!mobileOpen}
         aria-label="School operations navigation"
         className={cn(
           'fixed inset-y-0 left-0 z-50 lg:hidden sidebar-transition focus:outline-none',

@@ -24,8 +24,9 @@ import {
   UsersRound,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { ApiRequestError, api } from '../../lib/api';
+import { api } from '../../lib/api';
 import { useUrlFilters } from '../../lib/hooks/use-url-filters';
+import { schoolFacingErrorMessage } from '../../lib/school-facing-error';
 import { ConfirmDialog } from '../ui/confirm-dialog';
 import { EmptyState } from '../ui/empty-state';
 import { ErrorState } from '../ui/error-state';
@@ -1022,10 +1023,15 @@ function confirmationCopy(
 }
 
 function errorMessage(error: unknown, fallback: string) {
-  return error instanceof ApiRequestError &&
-    error.statusCode >= 400 &&
-    error.statusCode < 500 &&
-    error.message.trim()
-    ? error.message
-    : fallback;
+  return schoolFacingErrorMessage(error, {
+    fallback,
+    invalid:
+      'Review the selected duplicate decision and required reason before continuing.',
+    forbidden:
+      'You do not have permission to review or merge duplicate student records.',
+    notFound:
+      'One of these student records is no longer available for duplicate review.',
+    conflict:
+      'This duplicate review changed while you were working. Refresh the queue and try again.',
+  });
 }

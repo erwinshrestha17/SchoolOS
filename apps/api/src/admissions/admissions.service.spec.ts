@@ -422,6 +422,154 @@ describe('AdmissionsService production hardening', () => {
     });
   });
 
+  it('rejects empty and oversized admission import batches before persistence', async () => {
+    const prisma = buildPrisma();
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.bulkImport(
+        { dryRun: true, csvContent: 'firstNameEn,lastNameEn' },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    const rows = Array.from(
+      { length: 501 },
+      (_, index) => `Student${index},Family${index}`,
+    );
+    await expect(
+      service.bulkImport(
+        {
+          dryRun: true,
+          csvContent: ['firstNameEn,lastNameEn', ...rows].join('\n'),
+        },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.admissionImportBatch.create).not.toHaveBeenCalled();
+  });
+
+  it('fails closed instead of applying one duplicate override to a bulk batch', async () => {
+    const prisma = buildPrisma();
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.bulkImport(
+        {
+          dryRun: true,
+          confirmDuplicates: true,
+          csvContent: ['firstNameEn,lastNameEn', 'Asha,Tamang'].join('\n'),
+        },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.admissionImportBatch.create).not.toHaveBeenCalled();
+  });
+
+  it('requires a fresh server validation receipt before creating import records', async () => {
+    const prisma = buildPrisma();
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.bulkImport(
+        {
+          dryRun: false,
+          csvContent: ['firstNameEn,lastNameEn', 'Asha,Tamang'].join('\n'),
+        },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('atomically consumes one matching validation receipt before an import', async () => {
+    const prisma = buildPrisma();
+    const validationBatchId = '11111111-1111-4111-8111-111111111111';
+    const confirmationTx = {
+      admissionImportBatch: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        create: jest.fn().mockResolvedValue({ id: 'import-batch-confirmed' }),
+      },
+    };
+    const persistenceTx = buildTransaction();
+    prisma.$transaction
+      .mockImplementationOnce(async (callback) => callback(confirmationTx))
+      .mockImplementationOnce(async (callback) => callback(persistenceTx));
+    const { service } = buildService(prisma);
+    const csvContent = [
+      'firstNameEn,lastNameEn,dateOfBirth,gender,admissionDate,academicYearId,classId,guardianFullName,guardianRelation,guardianPhone,confirmNoDisability',
+      'Asha,Tamang,2020-01-02,FEMALE,2026-04-15,ay-1,class-1,Maya Tamang,mother,,true',
+    ].join('\n');
+
+    const result = await service.bulkImport(
+      {
+        dryRun: false,
+        validationBatchId,
+        sourceFileName: 'admissions.csv',
+        csvContent,
+      },
+      actor,
+    );
+
+    expect(confirmationTx.admissionImportBatch.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: validationBatchId,
+          tenantId: actor.tenantId,
+          dryRun: true,
+          status: { in: ['COMPLETED', 'COMPLETED_WITH_ERRORS'] },
+          metadata: {
+            path: ['contentSha256'],
+            equals: expect.stringMatching(/^[a-f0-9]{64}$/),
+          },
+        }),
+        data: { status: 'CONSUMED' },
+      }),
+    );
+    expect(confirmationTx.admissionImportBatch.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: actor.tenantId,
+        dryRun: false,
+        sourceFileName: 'admissions.csv',
+        metadata: expect.objectContaining({ validationBatchId }),
+      }),
+    });
+    expect(result).toEqual(
+      expect.objectContaining({
+        batchId: 'import-batch-confirmed',
+        dryRun: false,
+        totalRows: 1,
+        failed: 1,
+      }),
+    );
+  });
+
+  it('rejects an expired, changed, cross-tenant, or already-consumed validation receipt', async () => {
+    const prisma = buildPrisma();
+    const confirmationTx = {
+      admissionImportBatch: {
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        create: jest.fn(),
+      },
+    };
+    prisma.$transaction.mockImplementationOnce(async (callback) =>
+      callback(confirmationTx),
+    );
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.bulkImport(
+        {
+          dryRun: false,
+          validationBatchId: '11111111-1111-4111-8111-111111111111',
+          csvContent: ['firstNameEn,lastNameEn', 'Asha,Tamang'].join('\n'),
+        },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(confirmationTx.admissionImportBatch.create).not.toHaveBeenCalled();
+  });
+
   it('keeps duplicate candidates structured in bulk import review rows', async () => {
     const existingStudent = {
       id: 'student-existing',
@@ -483,6 +631,51 @@ describe('AdmissionsService production hardening', () => {
       }),
     );
     expect(result.errorReportCsv).toContain('SCH-2026-0007 Asha Tamang');
+  });
+
+  it('never persists unexpected database details in bulk import row errors', async () => {
+    const prisma = buildPrisma();
+    const tx = buildTransaction();
+    prisma.$transaction.mockImplementation(async (callback) => callback(tx));
+    prisma.academicYear.findFirst.mockRejectedValueOnce(
+      new Error(
+        'Prisma P2022: column tenant_secret does not exist at postgresql://private-host',
+      ),
+    );
+    const { service } = buildService(prisma);
+
+    const result = await service.bulkImport(
+      {
+        dryRun: true,
+        csvContent: [
+          'firstNameEn,lastNameEn,dateOfBirth,gender,admissionDate,academicYearId,classId,guardianFullName,guardianRelation,guardianPhone,confirmNoDisability',
+          'Asha,Tamang,2020-01-02,FEMALE,2026-04-15,ay-1,class-1,Maya Tamang,mother,9800000000,true',
+        ].join('\n'),
+      },
+      actor,
+    );
+
+    expect(result.results[0]).toEqual(
+      expect.objectContaining({
+        status: 'failed',
+        errors: [
+          'This row could not be processed. Review the row and try again.',
+        ],
+      }),
+    );
+    expect(result.errorReportCsv).not.toMatch(
+      /Prisma|P2022|tenant_secret|private-host/,
+    );
+    expect(tx.admissionImportRow.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          status: 'FAILED',
+          errors: [
+            'This row could not be processed. Review the row and try again.',
+          ],
+        }),
+      ],
+    });
   });
 
   it('creates a tenant-scoped admission application with duplicate review metadata', async () => {

@@ -103,8 +103,17 @@ describe('M1 Admissions HTTP ownership hardening (E2E)', () => {
           };
         }) => {
           const req = context.switchToHttp().getRequest();
-          req.auth =
+          const actor =
             req.headers['x-test-tenant'] === tenantBId ? actorB : actorA;
+          req.auth =
+            req.headers['x-test-permission'] === 'without-qr-read'
+              ? {
+                  ...actor,
+                  permissions: actor.permissions.filter(
+                    (permission) => permission !== 'students:qr:read',
+                  ),
+                }
+              : actor;
           return true;
         },
       })
@@ -517,6 +526,53 @@ describe('M1 Admissions HTTP ownership hardening (E2E)', () => {
       .get('/students/student-a/qr/analytics')
       .set('x-test-tenant', tenantBId)
       .expect(404);
+  });
+
+  it('returns only tenant-owned QR workspace totals over HTTP', async () => {
+    const tenantASummary = await request(app.getHttpServer())
+      .get('/students/qr/summary')
+      .set('x-test-tenant', tenantAId)
+      .expect(200);
+
+    expect(tenantASummary.body).toEqual({
+      activeCredentials: 1,
+      replacementFilesNeeded: 1,
+      inactiveCredentials: 0,
+      successfulScansToday: 0,
+      period: {
+        bsDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        startUtc: expect.stringMatching(/Z$/),
+        endExclusiveUtc: expect.stringMatching(/Z$/),
+        timeZone: 'Asia/Kathmandu',
+      },
+    });
+    expect(JSON.stringify(tenantASummary.body)).not.toMatch(
+      /student-a|secret-token-hash|tokenHash|objectKey|privateUrl/,
+    );
+
+    const tenantBSummary = await request(app.getHttpServer())
+      .get('/students/qr/summary')
+      .set('x-test-tenant', tenantBId)
+      .expect(200);
+
+    expect(tenantBSummary.body).toEqual(
+      expect.objectContaining({
+        activeCredentials: 0,
+        replacementFilesNeeded: 0,
+        inactiveCredentials: 0,
+      }),
+    );
+    expect(JSON.stringify(tenantBSummary.body)).not.toContain(tenantAId);
+
+    const denied = await request(app.getHttpServer())
+      .get('/students/qr/summary')
+      .set('x-test-tenant', tenantAId)
+      .set('x-test-permission', 'without-qr-read')
+      .expect(403);
+
+    expect(JSON.stringify(denied.body)).not.toMatch(
+      /activeCredentials|student-a|secret-token-hash|tenant-m1-http-a/,
+    );
   });
 
   it('confirms removed guardians cannot reach the old student ownership surface', async () => {

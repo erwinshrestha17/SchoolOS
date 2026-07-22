@@ -1,9 +1,63 @@
 import type { AuthContext } from '../auth/auth.types';
+import { educationProgramForClassLevel } from '@schoolos/core';
 import { ClassesService } from './classes.service';
 
 const actor = { tenantId: 'tenant-a', userId: 'user-1' } as AuthContext;
 
 describe('ClassesService.assignClassStream', () => {
+  it('maps the supported Grade 1-12 levels to one shared program contract', () => {
+    expect(educationProgramForClassLevel(1)).toBe('SCHOOL');
+    expect(educationProgramForClassLevel(10)).toBe('SCHOOL');
+    expect(educationProgramForClassLevel(11)).toBe('HIGHER_SECONDARY');
+    expect(educationProgramForClassLevel(12)).toBe('HIGHER_SECONDARY');
+    expect(educationProgramForClassLevel(0)).toBeNull();
+    expect(educationProgramForClassLevel(13)).toBeNull();
+    expect(educationProgramForClassLevel(11.5)).toBeNull();
+  });
+
+  it('lists only tenant classes with backend-owned program projections', async () => {
+    const prisma = {
+      class: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'class-10',
+            name: 'Grade 10',
+            level: 10,
+            streamId: null,
+            stream: null,
+            _count: { students: 24, subjects: 8, sections: 2 },
+          },
+          {
+            id: 'class-11',
+            name: 'Grade 11 Science',
+            level: 11,
+            streamId: 'stream-1',
+            stream: { name: 'Science' },
+            _count: { students: 18, subjects: 6, sections: 1 },
+          },
+        ]),
+      },
+    };
+    const service = new ClassesService(prisma as never, {} as never);
+
+    await expect(service.listClasses(actor)).resolves.toEqual([
+      expect.objectContaining({
+        id: 'class-10',
+        level: 10,
+        program: 'SCHOOL',
+      }),
+      expect.objectContaining({
+        id: 'class-11',
+        level: 11,
+        program: 'HIGHER_SECONDARY',
+        streamName: 'Science',
+      }),
+    ]);
+    expect(prisma.class.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { tenantId: 'tenant-a' } }),
+    );
+  });
+
   it('assigns a stream to a Higher Secondary class and records an audit entry', async () => {
     const prisma = {
       class: {
@@ -52,6 +106,7 @@ describe('ClassesService.assignClassStream', () => {
       id: 'class-11',
       name: 'Class 11',
       level: 11,
+      program: 'HIGHER_SECONDARY',
       streamId: 'stream-1',
       streamName: 'Science',
     });
@@ -154,5 +209,45 @@ describe('ClassesService.assignClassStream', () => {
         actor,
       ),
     ).rejects.toThrow('Class not found');
+  });
+
+  it('creates a tenant class with an auditable program projection', async () => {
+    const prisma = {
+      class: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({
+          id: 'class-12',
+          tenantId: 'tenant-a',
+          name: 'Grade 12',
+          level: 12,
+          streamId: null,
+        }),
+      },
+    };
+    const auditService = { record: jest.fn().mockResolvedValue(undefined) };
+    const service = new ClassesService(prisma as never, auditService as never);
+
+    const result = await service.createClass(
+      { name: 'Grade 12', level: 12 },
+      actor,
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: 'class-12',
+        program: 'HIGHER_SECONDARY',
+        streamName: null,
+      }),
+    );
+    expect(result).not.toHaveProperty('tenantId');
+    expect(prisma.class.create).toHaveBeenCalledWith({
+      data: { tenantId: 'tenant-a', name: 'Grade 12', level: 12 },
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        resource: 'class',
+        tenantId: 'tenant-a',
+        after: { name: 'Grade 12', level: 12 },
+      }),
+    );
   });
 });
