@@ -30,19 +30,18 @@ test.describe.serial('SchoolOS M4 Academics Admin Flow Smoke Tests', () => {
   test('Academics Hub: Workflow navigation', async ({ page }) => {
     await page.goto('/dashboard/academics');
     await expect(page).toHaveURL(/\/dashboard\/academics/);
-    await expect(page.getByRole('heading', { name: /Academic Workflow/i })).toBeVisible();
-    
-    const workflowSteps = [
-      'Setup',
-      'Marks/CAS',
-      'Lock',
-      'Report Cards',
-      'Promotion',
-      'Publish'
+    await expect(page.getByRole('heading', { name: 'Academics', exact: true })).toBeVisible();
+
+    // Backend-owned KPI cards replaced the earlier decorative workflow-step
+    // cards; verify the real overview surfaces instead of the stale steps.
+    const overviewKpis = [
+      'Marks Entry Open',
+      'Mark Lock Requests',
+      'Report Cards Unpublished',
     ];
 
-    for (const step of workflowSteps) {
-      await expect(page.getByRole('heading', { name: new RegExp(step, 'i') }).first()).toBeVisible();
+    for (const kpi of overviewKpis) {
+      await expect(page.getByText(kpi, { exact: true })).toBeVisible();
     }
   });
 
@@ -72,13 +71,17 @@ test.describe.serial('SchoolOS M4 Academics Admin Flow Smoke Tests', () => {
   test('CAS Records: Management workspace', async ({ page }) => {
     await page.goto('/dashboard/academics/cas');
     await expect(page.getByRole('heading', { name: /CAS Records/i })).toBeVisible();
-    await expect(page.getByText(/CAS Entry/i)).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Continuous Assessment' }),
+    ).toBeVisible();
   });
 
   test('Marks Lock & Review: Request list', async ({ page }) => {
     await page.goto('/dashboard/academics/locks');
     await expect(page.getByRole('heading', { name: /Marks Lock & Review/i })).toBeVisible();
-    await expect(page.getByRole('tab', { name: /Marks Lock/i })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Security & Locks' }),
+    ).toBeVisible();
   });
 
   test('Report Cards: Batch generation', async ({ page }) => {
@@ -111,7 +114,9 @@ test.describe.serial('SchoolOS M4 Academics Admin Flow Smoke Tests', () => {
   test('Promotion Readiness: Eligibility check', async ({ page }) => {
     await page.goto('/dashboard/academics/promotion');
     await expect(page.getByRole('heading', { name: /Promotion Readiness/i })).toBeVisible();
-    await expect(page.getByRole('tab', { name: /Promotion/i })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Year-End Promotion' }),
+    ).toBeVisible();
   });
 
   test('Result Publishing: Notifications and visibility', async ({ page }) => {
@@ -120,6 +125,91 @@ test.describe.serial('SchoolOS M4 Academics Admin Flow Smoke Tests', () => {
     await expect(page.getByText(/Select an exam term to control result visibility/i)).toBeVisible();
   });
 });
+
+const m4TeacherCredentials = {
+  tenantSlug: process.env.SCHOOLOS_E2E_TENANT_SLUG,
+  email: process.env.SCHOOLOS_E2E_M4_TEACHER_EMAIL,
+  password: process.env.SCHOOLOS_E2E_M4_TEACHER_PASSWORD,
+};
+const m4MarksMutationsEnabled =
+  process.env.SCHOOLOS_E2E_M4_MARKS_MUTATIONS === 'true';
+
+test.describe('M4 Marks Entry Assigned-Teacher Smoke', () => {
+  test.beforeEach(async ({ context, page }) => {
+    test.skip(
+      !m4MarksMutationsEnabled ||
+        !m4TeacherCredentials.tenantSlug ||
+        !m4TeacherCredentials.email ||
+        !m4TeacherCredentials.password,
+      'Set SCHOOLOS_E2E_M4_MARKS_MUTATIONS=true, SCHOOLOS_E2E_TENANT_SLUG, SCHOOLOS_E2E_M4_TEACHER_EMAIL, and SCHOOLOS_E2E_M4_TEACHER_PASSWORD for a class/subject teacher with an unlocked exam term to run the M4 marks-entry smoke.',
+    );
+    await context.clearCookies();
+    await login(page, m4TeacherCredentials as {
+      tenantSlug: string;
+      email: string;
+      password: string;
+    });
+  });
+
+  test('an assigned teacher enters a mark within bounds and it persists through the real API', async ({
+    page,
+  }) => {
+    await page.goto('/dashboard/academics/marks');
+    await expect(
+      page.getByRole('heading', { name: /Marks Entry/i }),
+    ).toBeVisible();
+
+    const examTermSelect = page.getByTestId('filter-exam-term');
+    await expect(examTermSelect).toBeVisible();
+    await examTermSelect.selectOption('4cadc976-55d2-4de0-94aa-2d490aca3a6e');
+    await page
+      .getByTestId('filter-class')
+      .selectOption('cbf6af3f-bc7c-4798-91d2-817bcd3d5475');
+    await page
+      .getByTestId('filter-subject')
+      .selectOption('b2b241c1-8a4e-41d5-959d-ac4466db0654');
+    const componentSelect = page.getByTestId('filter-component');
+    await expect(componentSelect.locator('option')).not.toHaveCount(1);
+    await componentSelect.selectOption('dadb4277-3750-4c08-96c9-5a35c17d7c33');
+
+    const markInput = page.locator('#mark-input-0');
+    await expect(markInput).toBeVisible();
+    const saveButton = page.getByRole('button', { name: /^Save/ });
+
+    // Boundary check: the client does not clamp an over-limit value (the
+    // backend is the authority), so saving 150 against a 100-max component
+    // must surface a real error, not a false "Sync Complete".
+    await markInput.fill('150');
+    await saveButton.click();
+    await expect(page.getByText(/Save failed/i)).toBeVisible();
+    await expect(page.getByText(/Sync Complete/i)).toHaveCount(0);
+
+    await markInput.fill('85');
+    await saveButton.click();
+
+    await expect(page.getByText(/Sync Complete/i)).toBeVisible();
+    await expect(
+      page.getByText(/Successfully saved 1 entr/i),
+    ).toBeVisible();
+
+    const marksResponse = await page.request.get(
+      `${API_BASE_URL}/academics/marks?examTermId=4cadc976-55d2-4de0-94aa-2d490aca3a6e&classId=cbf6af3f-bc7c-4798-91d2-817bcd3d5475&subjectId=b2b241c1-8a4e-41d5-959d-ac4466db0654&assessmentComponentId=dadb4277-3750-4c08-96c9-5a35c17d7c33`,
+    );
+    expect(marksResponse.ok()).toBe(true);
+    const persisted = unwrapAcademicsApiData<{
+      items: Array<{ marksObtained: string | number; isLocked: boolean }>;
+    }>(await marksResponse.json());
+    expect(persisted.items.length).toBeGreaterThan(0);
+    expect(Number(persisted.items[0].marksObtained)).toBe(85);
+  });
+});
+
+function unwrapAcademicsApiData<T>(payload: unknown): T {
+  if (typeof payload === 'object' && payload !== null && 'data' in payload) {
+    return (payload as { data: T }).data;
+  }
+  return payload as T;
+}
 
 async function login(
   page: Page,

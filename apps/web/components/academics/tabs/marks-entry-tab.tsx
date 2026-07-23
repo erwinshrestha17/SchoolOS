@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useMemo } from 'react';
 import type { MarkEntrySummary } from '@schoolos/core';
 import { api } from '../../../lib/api';
+import { schoolFacingErrorMessage } from '../../../lib/school-facing-error';
 import { 
   Trophy, 
   Search, 
@@ -83,6 +84,18 @@ export function MarksEntryTab({ academicYears, classes, allSections, exams }: Pr
       setTimeout(() => setSaveSuccess(null), 5000);
     },
   });
+
+  const saveErrorMessage = batchMut.isError
+    ? schoolFacingErrorMessage(batchMut.error, {
+        fallback:
+          'These marks could not be saved. No entries were changed.',
+        invalid:
+          'Review the marks, status, and remarks before saving — a value is out of range or otherwise invalid.',
+        forbidden: 'You do not have permission to enter marks for this class or subject.',
+        notFound: 'This exam term, component, class, or section is no longer available.',
+        conflict: 'These marks changed on the server. Refresh and try again.',
+      })
+    : '';
 
   const selectedExam = exams.find((e) => e.id === filters.examTermId);
   const isLocked = selectedExam?.isLocked;
@@ -249,7 +262,7 @@ export function MarksEntryTab({ academicYears, classes, allSections, exams }: Pr
                  <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mt-0.5">Successfully saved {saveSuccess} entries.</p>
               </div>
            </div>
-           <button 
+           <button
             onClick={() => setSaveSuccess(null)}
             className="text-[10px] font-black uppercase tracking-widest text-emerald-400 hover:text-emerald-600 transition-colors"
            >
@@ -257,6 +270,29 @@ export function MarksEntryTab({ academicYears, classes, allSections, exams }: Pr
            </button>
         </div>
       )}
+
+      {saveErrorMessage ? (
+        <div
+          role="alert"
+          className="p-6 bg-rose-50 border border-rose-100 rounded-2xl flex items-center justify-between shadow-lg shadow-rose-500/5 animate-in slide-in-from-top-4 duration-500"
+        >
+          <div className="flex items-center gap-4">
+            <div className="h-10 w-10 rounded-full bg-rose-500 text-white flex items-center justify-center shadow-lg shadow-rose-500/20">
+              <XCircle size={24} />
+            </div>
+            <div>
+              <p className="text-sm font-black text-rose-900 tracking-tight">Save failed</p>
+              <p className="text-[10px] font-bold text-rose-600 uppercase tracking-widest mt-0.5">{saveErrorMessage}</p>
+            </div>
+          </div>
+          <button
+            onClick={() => batchMut.reset()}
+            className="text-[10px] font-black uppercase tracking-widest text-rose-400 hover:text-rose-600 transition-colors"
+          >
+            Dismiss
+          </button>
+        </div>
+      ) : null}
 
       {retakeSuccess ? (
         <div

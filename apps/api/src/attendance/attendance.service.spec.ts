@@ -2977,6 +2977,7 @@ function buildService(options: {
   enrollments?: unknown[];
   enrollmentFindFirst?: unknown;
   calendarDays?: unknown[];
+  activeAttendanceScopes?: unknown[];
 }) {
   const tx = {
     attendanceConflict: {
@@ -3057,6 +3058,9 @@ function buildService(options: {
       findFirst: jest
         .fn()
         .mockResolvedValue(options.enrollmentFindFirst ?? null),
+      groupBy: jest
+        .fn()
+        .mockResolvedValue(options.activeAttendanceScopes ?? []),
     },
     attendanceSyncSubmission: {
       findUnique: jest
@@ -3273,3 +3277,164 @@ function buildSyncSubmission(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+
+describe('getAnalytics principal summary accuracy (2026-07-23)', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('computes exact today/monthly/annual attendance totals from real session and record data', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-04-15T06:00:00.000Z'));
+    const today = new Date('2026-04-15T00:00:00.000Z');
+
+    const student = (id: string) => ({
+      id,
+      firstNameEn: `Student`,
+      lastNameEn: id,
+      studentSystemId: `SID-${id}`,
+    });
+    const record = (studentId: string, status: AttendanceStatus) => ({
+      studentId,
+      status,
+      student: student(studentId),
+    });
+
+    // Submitted session A: 2 present, 1 absent, 1 late.
+    const sessionA = {
+      id: 'session-a',
+      attendanceDate: today,
+      submittedAt: new Date('2026-04-15T04:00:00.000Z'),
+      classId: 'class-1',
+      sectionId: 'section-1',
+      conflictStatus: 'NONE',
+      class: { name: 'Class 1' },
+      section: { name: 'A' },
+      records: [
+        record('s1', AttendanceStatus.PRESENT),
+        record('s2', AttendanceStatus.PRESENT),
+        record('s3', AttendanceStatus.ABSENT),
+        record('s4', AttendanceStatus.LATE),
+      ],
+    };
+    // Submitted session B: 3 present, 1 absent.
+    const sessionB = {
+      id: 'session-b',
+      attendanceDate: today,
+      submittedAt: new Date('2026-04-15T04:30:00.000Z'),
+      classId: 'class-1',
+      sectionId: 'section-2',
+      conflictStatus: 'NONE',
+      class: { name: 'Class 1' },
+      section: { name: 'B' },
+      records: [
+        record('s5', AttendanceStatus.PRESENT),
+        record('s6', AttendanceStatus.PRESENT),
+        record('s7', AttendanceStatus.PRESENT),
+        record('s8', AttendanceStatus.ABSENT),
+      ],
+    };
+    // Draft (unsubmitted) session C: its record must NOT count toward totals.
+    const sessionC = {
+      id: 'session-c',
+      attendanceDate: today,
+      submittedAt: null,
+      classId: 'class-2',
+      sectionId: 'section-3',
+      conflictStatus: 'NONE',
+      class: { name: 'Class 2' },
+      section: { name: 'C' },
+      records: [record('s9', AttendanceStatus.PRESENT)],
+    };
+
+    // Three active scopes exist school-wide; only class-1/section-1 and
+    // class-1/section-2 have a submitted session today, so class-2/section-3
+    // must be the one "not marked" scope.
+    const activeAttendanceScopes = [
+      { classId: 'class-1', sectionId: 'section-1' },
+      { classId: 'class-1', sectionId: 'section-2' },
+      { classId: 'class-2', sectionId: 'section-3' },
+    ];
+
+    // Shared by both the monthly and annual record queries in this test
+    // harness (a single mock backs both calls); every record here genuinely
+    // falls within both the current month and current year, so asserting one
+    // expected percentage against both fields is accurate, not a shortcut.
+    const periodRecords = [
+      { status: AttendanceStatus.PRESENT },
+      { status: AttendanceStatus.PRESENT },
+      { status: AttendanceStatus.PRESENT },
+      { status: AttendanceStatus.PRESENT },
+      { status: AttendanceStatus.PRESENT },
+      { status: AttendanceStatus.LATE },
+      { status: AttendanceStatus.ABSENT },
+      { status: AttendanceStatus.ABSENT },
+    ];
+
+    const { service } = buildService({
+      attendanceSessions: [sessionA, sessionB, sessionC],
+      attendanceRecords: periodRecords,
+      activeAttendanceScopes,
+      calendarDay: {
+        calendarDate: today,
+        isWorkingDay: true,
+        label: null,
+        holidayType: null,
+      },
+      calendarDays: [
+        {
+          calendarDate: today,
+          isWorkingDay: true,
+          label: null,
+          holidayType: null,
+        },
+      ],
+    });
+
+    const analytics = await service.getAnalytics(adminActor);
+
+    expect(analytics.todaySummary.sessionCount).toBe(3);
+    expect(analytics.todaySummary.submittedSessionCount).toBe(2);
+    expect(analytics.todaySummary.draftSessionCount).toBe(1);
+    expect(analytics.todaySummary.notMarkedSessionCount).toBe(1);
+    expect(analytics.todaySummary.totals).toMatchObject({
+      totalStudents: 8,
+      present: 5,
+      absent: 2,
+      late: 1,
+      leave: 0,
+      sickLeave: 0,
+      excusedLeave: 0,
+      unexcusedLeave: 0,
+    });
+
+    // present+late (6) of 8 = 75%; the harness returns the same record set
+    // for both the monthly and annual queries, so both match.
+    expect(analytics.monthlyAttendance.attendancePercent).toBe(75);
+    expect(analytics.annualAttendance.attendancePercent).toBe(75);
+  });
+
+  it('reports zero notMarkedSessionCount on a non-working day even with unsubmitted scopes', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-04-18T06:00:00.000Z'));
+    const today = new Date('2026-04-18T00:00:00.000Z');
+
+    const { service } = buildService({
+      attendanceSessions: [],
+      attendanceRecords: [],
+      activeAttendanceScopes: [
+        { classId: 'class-1', sectionId: 'section-1' },
+        { classId: 'class-1', sectionId: 'section-2' },
+      ],
+      calendarDay: {
+        calendarDate: today,
+        isWorkingDay: false,
+        label: 'Saturday',
+        holidayType: 'WEEKLY_OFF',
+      },
+      calendarDays: [],
+    });
+
+    const analytics = await service.getAnalytics(adminActor);
+
+    expect(analytics.todaySummary.notMarkedSessionCount).toBe(0);
+  });
+});

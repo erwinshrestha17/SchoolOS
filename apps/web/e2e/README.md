@@ -130,6 +130,42 @@ Awaiting Results tab, records a passing result with a score, and confirms the
 row updates from "Pending" to the recorded result — no browser-derived
 capacity, eligibility, or result truth is accepted.
 
+The M2 attendance offline draft and reconnect smoke is a genuine browser-level
+network test: it marks a student while the browser context is truly offline
+(`context.setOffline(true)`), confirms the draft is saved only in IndexedDB
+(no server sync banner appears), then goes back online and confirms the
+browser's native `online` event automatically replays the draft to the server
+without any manual action. Requires a seeded class teacher with an assigned
+section:
+
+```bash
+SCHOOLOS_E2E_TENANT_SLUG=<tenant-slug> \
+SCHOOLOS_E2E_M2_TEACHER_EMAIL=<seeded-class-teacher-email> \
+SCHOOLOS_E2E_M2_TEACHER_PASSWORD=<seeded-class-teacher-password> \
+SCHOOLOS_E2E_M2_OFFLINE_MUTATIONS=true \
+pnpm --filter @schoolos/web exec playwright test e2e/attendance-fees-smoke.spec.ts \
+  --grep "offline"
+```
+
+The M3 fees collection smoke is a genuine state-changing money workflow: it
+collects a partial payment against a dedicated fixture invoice, verifies the
+resulting balance through the real API (never browser-derived), reloads the
+page to confirm the remaining balance is served fresh (not client-cached),
+then collects the remainder and confirms the invoice reaches `PAID`. Requires
+a seeded accountant:
+
+```bash
+SCHOOLOS_E2E_M3_COLLECTION_FIXTURES=true \
+pnpm db:seed:e2e:m3-collection
+
+SCHOOLOS_E2E_TENANT_SLUG=<tenant-slug> \
+SCHOOLOS_E2E_M3_ACCOUNTANT_EMAIL=<seeded-accountant-email> \
+SCHOOLOS_E2E_M3_ACCOUNTANT_PASSWORD=<seeded-accountant-password> \
+SCHOOLOS_E2E_M3_COLLECTION_MUTATIONS=true \
+pnpm --filter @schoolos/web exec playwright test e2e/attendance-fees-smoke.spec.ts \
+  --grep "collects a partial payment"
+```
+
 ## Persona smoke expectations
 
 Every persona smoke should prove that the user:

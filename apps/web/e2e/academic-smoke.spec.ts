@@ -30,20 +30,18 @@ test.describe.serial('SchoolOS Academic Workflow Smoke Tests', () => {
   test('Academic Overview: Navigation and shell integrity', async ({ page }) => {
     await page.goto('/dashboard/academics');
     await expect(page).toHaveURL(/\/dashboard\/academics/);
-    await expect(page.getByRole('heading', { name: /School Academics/i })).toBeVisible();
-    
-    // Verify cards/links for core academic modules
-    const academicModules = [
-      'Homework',
-      'Timetable',
-      'Exams',
-      'Marks Entry',
-      'Results Publishing',
-      'Report Cards',
+    await expect(page.getByRole('heading', { name: 'Academics', exact: true })).toBeVisible();
+
+    // Backend-owned KPI cards replaced the earlier decorative module-card
+    // grid; verify the real overview surfaces instead of stale card labels.
+    const overviewKpis = [
+      'Marks Entry Open',
+      'Mark Lock Requests',
+      'Report Cards Unpublished',
     ];
 
-    for (const academicModule of academicModules) {
-      await expect(page.getByRole('heading', { name: new RegExp(academicModule, 'i') })).toBeVisible();
+    for (const kpi of overviewKpis) {
+      await expect(page.getByText(kpi, { exact: true })).toBeVisible();
     }
   });
 
@@ -108,11 +106,7 @@ test.describe.serial('SchoolOS Academic Workflow Smoke Tests', () => {
 
   test('Results: Publishing dashboard', async ({ page }) => {
     await page.goto('/dashboard/academics/results');
-    await expect(page.getByText(/Select exam term to view readiness/i)).toBeVisible();
-    
-    // Verify stats exist
-    await expect(page.getByText(/Ready to Publish/i)).toBeVisible();
-    await expect(page.getByText(/Published Results/i)).toBeVisible();
+    await expect(page.getByText(/Select class and term/i)).toBeVisible();
   });
 
   test('Report Cards: Generation hub', async ({ page }) => {
@@ -120,7 +114,7 @@ test.describe.serial('SchoolOS Academic Workflow Smoke Tests', () => {
     await expect(page.getByRole('heading', { name: /Report Cards/i })).toBeVisible();
     
     // Verify batch generation button exists
-    await expect(page.getByRole('button', { name: /Generate Batch/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Start Generation/i })).toBeVisible();
   });
 });
 
