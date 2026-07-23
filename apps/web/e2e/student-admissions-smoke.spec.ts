@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { formatBsDateForInput, toNepalLocalDateTime } from "@schoolos/core";
 
 const credentials = {
   tenantSlug: process.env.SCHOOLOS_E2E_TENANT_SLUG,
@@ -13,6 +14,12 @@ const m1ReminderFixturesEnabled =
 const m1WaitlistFixturesEnabled =
   process.env.SCHOOLOS_E2E_M1_WAITLIST_FIXTURES === "true";
 const m1BulkImportEnabled = process.env.SCHOOLOS_E2E_M1_BULK_IMPORT === "true";
+const m1AssessmentFixturesEnabled =
+  process.env.SCHOOLOS_E2E_M1_ASSESSMENT_FIXTURES === "true";
+// Match apps/api/prisma/seed-m1-assessment-e2e.ts's fixed IDs; the schedule ID
+// only selects the seeded option, the result ID only verifies via the API.
+const M1_ASSESSMENT_SCHEDULE_CASE_ID = "a13f2e04-8f41-4b7a-9c2a-51e6d3c8b903";
+const M1_ASSESSMENT_RESULT_CASE_ID = "a13f2e04-8f41-4b7a-9c2a-51e6d3c8b904";
 const apiBaseUrl =
   process.env.SCHOOLOS_E2E_API_BASE_URL ??
   process.env.NEXT_PUBLIC_API_BASE_URL ??
@@ -371,6 +378,123 @@ test.describe("Students & Admissions Workflow Smoke", () => {
     await expect(roster.getByText(studentName, { exact: true })).toHaveCount(1);
     await expect(roster).toContainText(classroom.name);
   });
+
+  test("schedules a dedicated seeded interview-required admission case", async ({
+    page,
+  }) => {
+    test.skip(
+      !m1MutationsEnabled || !m1AssessmentFixturesEnabled,
+      "Set SCHOOLOS_E2E_M1_MUTATIONS=true and SCHOOLOS_E2E_M1_ASSESSMENT_FIXTURES=true to run the M1 assessment scheduling smoke.",
+    );
+
+    await page.goto("/dashboard/admissions/assessments");
+    await expect(
+      page.getByRole("heading", {
+        name: "Assessment & Interview",
+        exact: true,
+      }),
+    ).toBeVisible();
+
+    const caseSelect = page.getByLabel("Case");
+    await expect(
+      caseSelect.locator("option", { hasText: "Priya Gurung E2E" }),
+    ).toHaveCount(1);
+    await caseSelect.selectOption(M1_ASSESSMENT_SCHEDULE_CASE_ID);
+
+    const scheduledAt = new Date(Date.now() + 5 * 60 * 1000);
+    const nepalTime = toNepalLocalDateTime(scheduledAt);
+    const startTime = `${pad2(nepalTime.hour)}:${pad2(nepalTime.minute)}`;
+
+    await page.getByLabel("BS date").fill(formatBsDateForInput(scheduledAt));
+    await page.getByLabel("NPT time").fill(startTime);
+    await page.getByLabel("Mode").selectOption("IN_PERSON");
+    await page.getByLabel("Location").fill("Front office");
+    await page.getByLabel("Notes").fill("E2E scheduling smoke.");
+
+    await page.getByRole("button", { name: "Schedule", exact: true }).click();
+
+    // The candidate must drop out of the "needs scheduling" list once its
+    // assessment session is created (assessmentSessions: { none: {} } filter).
+    await expect(
+      caseSelect.locator("option", { hasText: "Priya Gurung E2E" }),
+    ).toHaveCount(0);
+
+    const sessionsResponse = await page.request.get(
+      `${apiBaseUrl}/admissions/assessment-sessions?tab=TODAY&limit=100`,
+    );
+    expect(sessionsResponse.ok()).toBe(true);
+    const sessions = unwrapApiData<{
+      items: Array<{
+        applicantName: string;
+        mode: string;
+        location: string | null;
+        scheduledAt: string;
+      }>;
+    }>(await sessionsResponse.json());
+    const scheduled = sessions.items.find(
+      (item) => item.applicantName === "Priya Gurung E2E",
+    );
+    expect(scheduled).toBeTruthy();
+    expect(scheduled?.mode).toBe("IN_PERSON");
+    expect(scheduled?.location).toBe("Front office");
+    expect(new Date(scheduled!.scheduledAt).getTime()).toBeGreaterThan(
+      Date.now() - 60_000,
+    );
+  });
+
+  test("records a result for a dedicated seeded past-due assessment session", async ({
+    page,
+  }) => {
+    test.skip(
+      !m1MutationsEnabled || !m1AssessmentFixturesEnabled,
+      "Set SCHOOLOS_E2E_M1_MUTATIONS=true and SCHOOLOS_E2E_M1_ASSESSMENT_FIXTURES=true to run the M1 assessment result smoke.",
+    );
+
+    await page.goto("/dashboard/admissions/assessments?tab=AWAITING_RESULTS");
+    await expect(
+      page.getByRole("heading", {
+        name: "Assessment & Interview",
+        exact: true,
+      }),
+    ).toBeVisible();
+
+    const row = page.locator("tr").filter({ hasText: "Rohan Thapa E2E" });
+    await expect(row).toBeVisible();
+    await expect(row).toContainText("Pending");
+    await row.getByRole("button", { name: "Record result" }).click();
+
+    const saveButton = page.getByRole("button", {
+      name: "Save result",
+      exact: true,
+    });
+    const resultFields = saveButton.locator("xpath=..");
+    await resultFields.getByLabel("Result").selectOption("PASSED");
+    await resultFields.getByLabel("Score").fill("82");
+    await resultFields
+      .getByLabel("Notes")
+      .fill("Confident responses; recommend admission.");
+    await saveButton.click();
+
+    // A recorded result flips the session's status away from SCHEDULED, so it
+    // drops out of the Awaiting Results tab entirely (that tab only lists
+    // still-SCHEDULED sessions) rather than updating in place.
+    await expect(row).toHaveCount(0);
+
+    const caseResponse = await page.request.get(
+      `${apiBaseUrl}/admissions/cases/${M1_ASSESSMENT_RESULT_CASE_ID}/eligibility`,
+    );
+    expect(caseResponse.ok()).toBe(true);
+    const evaluation = unwrapApiData<{
+      assessmentSession: {
+        status: string;
+        result: string | null;
+        resultScore: number | null;
+      } | null;
+    }>(await caseResponse.json());
+    expect(evaluation.assessmentSession?.status).toBe("COMPLETED");
+    expect(evaluation.assessmentSession?.result).toBe("PASSED");
+    expect(evaluation.assessmentSession?.resultScore).toBe(82);
+  });
 });
 
 function unwrapApiData<T>(payload: unknown): T {
@@ -388,6 +512,10 @@ function alphabeticSuffix(value: number) {
     remaining = Math.floor(remaining / 26);
   }
   return result || "a";
+}
+
+function pad2(value: number) {
+  return String(value).padStart(2, "0");
 }
 
 async function ensureActiveQrCredential(page: Page) {

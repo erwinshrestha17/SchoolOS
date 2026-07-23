@@ -4099,7 +4099,10 @@ async function validateCanonicalSeed(tenantId: string, academicYearId: string) {
       tenantId,
       name: { in: classDefinitions.map((item) => item.name) },
     },
-    include: { sections: true, subjects: true },
+    include: {
+      sections: { where: { name: { in: sectionNames } } },
+      subjects: true,
+    },
   });
   const classIds = classRows.map((item) => item.id);
   const sectionIds = classRows.flatMap((item) =>
@@ -4179,12 +4182,13 @@ async function validateCanonicalSeed(tenantId: string, academicYearId: string) {
   ]);
 
   const activeSectionCount = await prisma.section.count({
-    where: { tenantId, classId: { in: classIds } },
+    where: { tenantId, classId: { in: classIds }, name: { in: sectionNames } },
   });
   const classTeacherSectionCount = await prisma.section.count({
     where: {
       tenantId,
       classId: { in: classIds },
+      name: { in: sectionNames },
       classTeacherId: { not: null },
     },
   });

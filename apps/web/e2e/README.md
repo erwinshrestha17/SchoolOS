@@ -106,6 +106,30 @@ pnpm --filter @schoolos/web exec playwright test \
   --grep "validates and creates a tenant-scoped admission from CSV"
 ```
 
+The M1 assessment/interview smoke uses two dedicated, idempotently seeded
+admission cases pinned to a policy that requires an interview: one unscheduled
+case for the scheduling workflow, and one with a session already scheduled in
+the past for the result-recording workflow. Seed the fixtures, then run the
+authenticated workflow:
+
+```bash
+SCHOOLOS_E2E_M1_ASSESSMENT_FIXTURES=true \
+pnpm db:seed:e2e:m1-assessment
+
+SCHOOLOS_E2E_M1_MUTATIONS=true \
+SCHOOLOS_E2E_M1_ASSESSMENT_FIXTURES=true \
+pnpm --filter @schoolos/web exec playwright test e2e/student-admissions-smoke.spec.ts \
+  --grep "assessment"
+```
+
+The scheduling test picks the dedicated candidate from the assessment
+workspace, schedules it for a few minutes in the future, confirms it drops out
+of the "needs scheduling" list, and confirms the persisted session via the
+real API. The result test opens the dedicated past-due session in the
+Awaiting Results tab, records a passing result with a score, and confirms the
+row updates from "Pending" to the recorded result — no browser-derived
+capacity, eligibility, or result truth is accepted.
+
 ## Persona smoke expectations
 
 Every persona smoke should prove that the user:
