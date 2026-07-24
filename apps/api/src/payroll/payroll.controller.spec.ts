@@ -1,3 +1,4 @@
+import { StreamableFile } from '@nestjs/common';
 import type { AuthContext } from '../auth/auth.types';
 import { PayrollController } from './payroll.controller';
 
@@ -225,26 +226,46 @@ describe('PayrollController M7 contracts', () => {
     expect(payrollService.listStatutoryDeductions).toHaveBeenCalledWith(actor);
   });
 
-  it('delegates payslip access through staff/HR scoped service methods', () => {
+  it('delegates payslip access through staff/HR scoped service methods', async () => {
     const { controller, payrollService, salarySlipService } =
       createController();
     const pdf = Buffer.from('%PDF-1.4');
     payrollService.listPayslips.mockReturnValue([{ id: 'payslip-1' }]);
     payrollService.listMyPayslips.mockReturnValue([{ id: 'my-payslip-1' }]);
-    payrollService.getPayslipPdf.mockReturnValue(pdf);
-    payrollService.getPayslipPdfForRunStaff.mockReturnValue(pdf);
-    salarySlipService.getApprovedSalarySlipPdf.mockReturnValue(pdf);
+    payrollService.getPayslipPdf.mockResolvedValue(pdf);
+    payrollService.getPayslipPdfForRunStaff.mockResolvedValue(pdf);
+    salarySlipService.getApprovedSalarySlipPdf.mockResolvedValue(pdf);
 
     expect(controller.listPayslips({}, actor)).toEqual([{ id: 'payslip-1' }]);
     expect(controller.listMyPayslips({}, actor)).toEqual([
       { id: 'my-payslip-1' },
     ]);
-    expect(controller.getMyPayslipPdf('PS-001', actor)).toBe(pdf);
-    expect(controller.getPayslipPdf('PS-001', actor)).toBe(pdf);
-    expect(controller.getStaffPayslipPdf('run-1', 'staff-1', actor)).toBe(pdf);
-    expect(controller.getApprovedSalarySlipPdf('run-1', 'line-1', actor)).toBe(
-      pdf,
-    );
+
+    // Must resolve to a StreamableFile so the global ResponseEnvelopeInterceptor
+    // passes it through untouched instead of JSON-wrapping the PDF bytes (the
+    // same bug class fixed for report cards 2026-07-24: a raw Buffer return
+    // gets silently wrapped in {success, message, data}, breaking every
+    // payslip/salary-slip download despite the Content-Type header still
+    // claiming application/pdf).
+    const results = await Promise.all([
+      controller.getMyPayslipPdf('PS-001', actor),
+      controller.getPayslipPdf('PS-001', actor),
+      controller.getStaffPayslipPdf('run-1', 'staff-1', actor),
+      controller.getApprovedSalarySlipPdf('run-1', 'line-1', actor),
+    ]);
+
+    for (const result of results) {
+      expect(result).toBeInstanceOf(StreamableFile);
+      const streamed = await new Promise<Buffer>((resolve, reject) => {
+        const chunks: Buffer[] = [];
+        const stream = result.getStream();
+        stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+        stream.on('end', () => resolve(Buffer.concat(chunks)));
+        stream.on('error', reject);
+      });
+      expect(streamed).toEqual(pdf);
+    }
+
     expect(payrollService.getPayslipPdf).toHaveBeenCalledWith('PS-001', actor);
     expect(payrollService.getPayslipPdf).toHaveBeenCalledTimes(2);
     expect(payrollService.getPayslipPdfForRunStaff).toHaveBeenCalledWith(

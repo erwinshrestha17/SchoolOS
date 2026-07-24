@@ -123,3 +123,15 @@ export class RecordStaffAttendanceDto {
   @IsString()
   note?: string;
 }
+
+export class ProcessAccrualsDto {
+  @IsInt()
+  @Min(2000)
+  @Max(2100)
+  year!: number;
+
+  @IsInt()
+  @Min(1)
+  @Max(12)
+  month!: number;
+}

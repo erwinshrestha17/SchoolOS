@@ -28,6 +28,7 @@ import {
   AddStaffDocumentDto,
   ContractExpiryReminderQueryDto,
   CreateStaffLeaveRequestDto,
+  ProcessAccrualsDto,
   RecordStaffAttendanceDto,
   ReviewStaffLeaveRequestDto,
   TerminateStaffDto,
@@ -48,7 +49,7 @@ export class HrStaffController {
   @Post('accruals/process')
   @Permissions('hr:manage')
   processAccruals(
-    @Body() dto: { year: number; month: number },
+    @Body() dto: ProcessAccrualsDto,
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.accrualService.processMonthlyAccruals(

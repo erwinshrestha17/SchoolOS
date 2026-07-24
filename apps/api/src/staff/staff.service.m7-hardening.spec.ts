@@ -87,7 +87,9 @@ describe('StaffService M7 HR hardening', () => {
 
     expect(detail.user).toBeUndefined();
     expect(JSON.stringify(detail)).not.toContain('passwordHash');
-    expect(JSON.stringify(detail)).not.toContain('fake-hash-should-never-be-returned');
+    expect(JSON.stringify(detail)).not.toContain(
+      'fake-hash-should-never-be-returned',
+    );
     expect(detail.email).toBe('asha@school.test');
     expect(detail.roles).toEqual(['teacher']);
   });
@@ -150,6 +152,88 @@ describe('StaffService M7 HR hardening', () => {
     await expect(
       service.reviewLeaveRequest('leave-1', { status: 'APPROVED' }, hrActor),
     ).rejects.toThrow(/Reverse\/regenerate payroll/);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('blocks a new leave request that overlaps an existing pending or approved request', async () => {
+    const { service, prisma } = buildService({
+      staff: buildStaff(),
+    });
+    (prisma.staffLeaveRequest.findFirst as jest.Mock).mockResolvedValueOnce({
+      id: 'leave-existing',
+      status: 'PENDING',
+      startsOn: new Date('2026-05-01T00:00:00.000Z'),
+      endsOn: new Date('2026-05-03T00:00:00.000Z'),
+    });
+
+    await expect(
+      service.createLeaveRequest(
+        'staff-1',
+        {
+          leaveType: 'SICK',
+          startsOn: '2026-05-02',
+          endsOn: '2026-05-04',
+          reason: 'Fever',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(ConflictException);
+
+    expect(prisma.staffLeaveRequest.create).not.toHaveBeenCalled();
+  });
+
+  it('blocks leave approval for a staff member who has since been terminated', async () => {
+    const { service, prisma } = buildService({
+      staff: buildStaff({ status: StaffStatus.TERMINATED }),
+      leaveRequest: {
+        id: 'leave-1',
+        tenantId: actor.tenantId,
+        staffId: 'staff-1',
+        leaveType: 'SICK',
+        isPaid: true,
+        startsOn: new Date('2026-05-10T00:00:00.000Z'),
+        endsOn: new Date('2026-05-11T00:00:00.000Z'),
+        days: new Prisma.Decimal(2),
+        reason: 'Fever',
+        status: 'PENDING',
+      },
+    });
+
+    await expect(
+      service.reviewLeaveRequest('leave-1', { status: 'APPROVED' }, hrActor),
+    ).rejects.toThrow(ConflictException);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('blocks leave approval that would overlap another already-approved leave request', async () => {
+    const { service, prisma } = buildService({
+      staff: buildStaff(),
+      leaveRequest: {
+        id: 'leave-1',
+        tenantId: actor.tenantId,
+        staffId: 'staff-1',
+        leaveType: 'SICK',
+        isPaid: true,
+        startsOn: new Date('2026-05-10T00:00:00.000Z'),
+        endsOn: new Date('2026-05-11T00:00:00.000Z'),
+        days: new Prisma.Decimal(2),
+        reason: 'Fever',
+        status: 'PENDING',
+      },
+    });
+    (prisma.staffLeaveRequest.findMany as jest.Mock).mockResolvedValueOnce([
+      {
+        id: 'leave-other',
+        startsOn: new Date('2026-05-09T00:00:00.000Z'),
+        endsOn: new Date('2026-05-10T00:00:00.000Z'),
+      },
+    ]);
+
+    await expect(
+      service.reviewLeaveRequest('leave-1', { status: 'APPROVED' }, hrActor),
+    ).rejects.toThrow(ConflictException);
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
@@ -242,9 +326,9 @@ describe('StaffService M7 HR hardening', () => {
         staff: buildStaff({ id: 'staff-2', userId: 'other-user' }),
       });
 
-      await expect(
-        service.getStaffDetail('staff-2', actor),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(service.getStaffDetail('staff-2', actor)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('allows a teacher to view their own full profile', async () => {
@@ -272,9 +356,9 @@ describe('StaffService M7 HR hardening', () => {
         staff: buildStaff({ id: 'staff-2', userId: 'other-user' }),
       });
 
-      await expect(
-        service.getStaffTimeline('staff-2', actor),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(service.getStaffTimeline('staff-2', actor)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('allows an HR-privileged actor to view another staff member timeline', async () => {
@@ -292,9 +376,9 @@ describe('StaffService M7 HR hardening', () => {
     it('blocks a base teacher from the contract-expiry report', async () => {
       const { service } = buildService({});
 
-      await expect(
-        service.listContractExpiryReminders(actor),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(service.listContractExpiryReminders(actor)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('allows an HR-privileged actor to run the contract-expiry report', async () => {

@@ -181,6 +181,7 @@ export const StaffStatus = {
   ON_LEAVE: 'ON_LEAVE',
   SUSPENDED: 'SUSPENDED',
   TERMINATED: 'TERMINATED',
+  RESIGNED: 'RESIGNED',
   INACTIVE: 'INACTIVE',
 } as const;
 

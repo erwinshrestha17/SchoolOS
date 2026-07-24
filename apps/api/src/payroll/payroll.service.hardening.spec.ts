@@ -169,7 +169,7 @@ describe('PayrollService hardening boundaries', () => {
       effectiveTo: null,
       status: SalaryStructureStatus.ACTIVE,
     });
-    const { service, prisma } = buildService({
+    const { service, prisma, tx } = buildService({
       salaryStructureFindFirstQueue: [structure, overlapping],
       salaryStructures: [overlapping],
     });
@@ -181,7 +181,7 @@ describe('PayrollService hardening boundaries', () => {
     expect(prisma.salaryStructure.findFirst).toHaveBeenNthCalledWith(1, {
       where: { id: 'salary-1', tenantId: actor.tenantId },
     });
-    expect(prisma.salaryStructure.findMany).toHaveBeenCalledWith(
+    expect(tx.salaryStructure.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           tenantId: actor.tenantId,
@@ -191,7 +191,7 @@ describe('PayrollService hardening boundaries', () => {
         }),
       }),
     );
-    expect(prisma.salaryStructure.update).not.toHaveBeenCalled();
+    expect(tx.salaryStructure.update).not.toHaveBeenCalled();
   });
 
   it('closes the previous open-ended salary version when activating a later version', async () => {
@@ -387,6 +387,15 @@ describe('PayrollService hardening boundaries', () => {
       actor,
       tx,
     );
+    expect(tx.payrollRun.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'run-1',
+        tenantId: actor.tenantId,
+        status: run.status,
+        journalEntryId: null,
+      },
+      data: { status: PayrollRunStatus.POSTED },
+    });
     expect(tx.payrollLine.updateMany).toHaveBeenCalledWith({
       where: { tenantId: actor.tenantId, payrollRunId: 'run-1' },
       data: { status: PayrollLineStatus.POSTED },
@@ -395,7 +404,6 @@ describe('PayrollService hardening boundaries', () => {
       expect.objectContaining({
         where: { id: 'run-1' },
         data: expect.objectContaining({
-          status: PayrollRunStatus.POSTED,
           postedById: actor.userId,
           journalEntryId: 'journal-1',
         }),
@@ -421,6 +429,28 @@ describe('PayrollService hardening boundaries', () => {
     ).rejects.toThrow('Payroll run is already posted');
 
     expect(accountingPostingService.postPayrollAccrual).not.toHaveBeenCalled();
+  });
+
+  it('fails closed instead of double-posting when a concurrent transaction wins the status claim', async () => {
+    // Simulates the race window between the pre-transaction status check and
+    // the transaction itself: another request already flipped the run to
+    // POSTED between our read and our write, so the guarded updateMany
+    // claims 0 rows. Must reject cleanly rather than proceed to post a
+    // second journal entry for the same payroll run.
+    const run = buildPayrollRun({ status: PayrollRunStatus.APPROVED });
+    const { service, tx, accountingPostingService } = buildService({
+      payrollRun: run,
+    });
+    (tx.payrollRun.updateMany as jest.Mock).mockResolvedValueOnce({
+      count: 0,
+    });
+
+    await expect(
+      service.postPayrollRun('run-1', actor as never),
+    ).rejects.toThrow('Payroll run is already posted');
+
+    expect(accountingPostingService.postPayrollAccrual).not.toHaveBeenCalled();
+    expect(tx.payrollLine.updateMany).not.toHaveBeenCalled();
   });
 
   it('scopes payroll run register reports by tenant and selected payroll run', async () => {
@@ -1228,9 +1258,11 @@ function buildService(options: {
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     salaryStructure: {
+      findMany: jest.fn().mockResolvedValue(options.salaryStructures ?? []),
       update: jest.fn().mockResolvedValue(buildSalaryStructure()),
     },
     payrollRun: {
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       update: jest
         .fn()
         .mockResolvedValue(options.postedPayrollRun ?? buildPayrollRun()),

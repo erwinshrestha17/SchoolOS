@@ -86,7 +86,7 @@ test.describe.serial("M7 payroll readiness and exception workflow", () => {
     const page = await context.newPage();
     await page.goto("/dashboard/payroll/readiness");
     await expect(
-      page.getByRole("heading", { name: "Payroll Access Restricted" }),
+      page.getByRole("heading", { name: "Payroll access is restricted" }),
     ).toBeVisible();
     await expect(page.getByText(/Prisma|database|stack trace/i)).toHaveCount(0);
     await context.close();

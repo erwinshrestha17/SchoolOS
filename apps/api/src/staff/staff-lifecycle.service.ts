@@ -65,6 +65,7 @@ export class StaffLifecycleService {
           },
         },
       },
+      take: 200,
     });
   }
 }

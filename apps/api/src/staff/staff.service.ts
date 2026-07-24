@@ -750,9 +750,7 @@ export class StaffService {
     // that the caller owns the record, exposing lifecycle-event reasons/notes
     // and leave-request reasons for any staff member to any staff:read holder.
     if (staff.userId !== actor.userId && !canManageHr(actor)) {
-      throw new ForbiddenException(
-        'You can only view your own staff timeline',
-      );
+      throw new ForbiddenException('You can only view your own staff timeline');
     }
 
     const [events, contracts, leaveRequests, payrollLines, documents] =
@@ -904,6 +902,22 @@ export class StaffService {
     const leaveType = normalizeLeaveType(dto.leaveType);
     const isPaid = dto.isPaid ?? leaveType !== 'UNPAID';
 
+    const overlapping = await this.prisma.staffLeaveRequest.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        staffId,
+        status: { in: ['PENDING', 'APPROVED'] },
+        startsOn: { lte: endsOn },
+        endsOn: { gte: startsOn },
+      },
+    });
+
+    if (overlapping) {
+      throw new ConflictException(
+        'A pending or approved leave request already overlaps this date range',
+      );
+    }
+
     if (isPaid) {
       await this.assertLeaveBalanceAvailable(
         staffId,
@@ -964,6 +978,39 @@ export class StaffService {
     }
 
     if (dto.status === 'APPROVED') {
+      const staff = await this.prisma.staff.findFirst({
+        where: { id: request.staffId, tenantId: actor.tenantId },
+        select: { status: true },
+      });
+
+      if (
+        !staff ||
+        staff.status === StaffStatus.TERMINATED ||
+        staff.status === StaffStatus.RESIGNED
+      ) {
+        throw new ConflictException(
+          'Cannot approve leave for a staff member who is no longer active',
+        );
+      }
+
+      const conflictingApproved = await this.prisma.staffLeaveRequest.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          staffId: request.staffId,
+          status: 'APPROVED',
+          id: { not: request.id },
+          startsOn: { lte: request.endsOn },
+          endsOn: { gte: request.startsOn },
+        },
+        take: 1,
+      });
+
+      if (conflictingApproved.length > 0) {
+        throw new ConflictException(
+          'Another approved leave request already overlaps this date range',
+        );
+      }
+
       await this.assertLeaveApprovalDoesNotRequirePayrollAdjustment(
         request.startsOn,
         request.endsOn,
@@ -1429,7 +1476,12 @@ function buildStaffUpdateData(dto: UpdateStaffDto): Prisma.StaffUpdateInput {
     joiningDate: dto.joiningDate ? new Date(dto.joiningDate) : undefined,
     contractType: dto.contractType,
     employmentType: dto.employmentType,
-    status: dto.status,
+    // status is intentionally excluded here: lifecycle transitions must go
+    // through transitionStaffStatus, which suspends/reactivates the linked
+    // User account and records a StaffLifecycleEvent. Honoring dto.status in
+    // this general update path let a caller with only staff:update flip a
+    // colleague to TERMINATED/RESIGNED with no lifecycle audit trail and no
+    // account suspension.
     department: dto.department,
     designation: dto.designation,
     contractStatus: dto.contractStatus,

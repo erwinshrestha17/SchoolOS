@@ -532,53 +532,56 @@ export class PayrollService {
       structure.effectiveTo,
     );
 
-    const overlappingStructures = await this.prisma.salaryStructure.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        staffId: structure.staffId,
-        status: SalaryStructureStatus.ACTIVE,
-        id: { not: structure.id },
-        effectiveFrom: {
-          lte: structure.effectiveTo ?? structure.effectiveFrom,
-        },
-        OR: [
-          { effectiveTo: null },
-          { effectiveTo: { gte: structure.effectiveFrom } },
-        ],
-      },
-      orderBy: { effectiveFrom: 'asc' },
-    });
-
-    const unsafeOverlap = overlappingStructures.find(
-      (activeStructure) =>
-        !canClosePreviousSalaryVersion(activeStructure, structure),
-    );
-
-    if (unsafeOverlap) {
-      throw new ConflictException(
-        'Only one ACTIVE salary structure is allowed for an effective date range',
-      );
-    }
-
-    const updated = await this.prisma.$transaction(async (tx) => {
-      for (const previousVersion of overlappingStructures) {
-        await tx.salaryStructure.update({
-          where: { id: previousVersion.id },
-          data: {
-            effectiveTo: previousDayUtc(structure.effectiveFrom),
+    const updated = await this.prisma.$transaction(
+      async (tx) => {
+        const overlappingStructures = await tx.salaryStructure.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            staffId: structure.staffId,
+            status: SalaryStructureStatus.ACTIVE,
+            id: { not: structure.id },
+            effectiveFrom: {
+              lte: structure.effectiveTo ?? structure.effectiveFrom,
+            },
+            OR: [
+              { effectiveTo: null },
+              { effectiveTo: { gte: structure.effectiveFrom } },
+            ],
           },
+          orderBy: { effectiveFrom: 'asc' },
         });
-      }
 
-      return tx.salaryStructure.update({
-        where: { id: structure.id },
-        data: {
-          status: SalaryStructureStatus.ACTIVE,
-          activatedAt: new Date(),
-        },
-        include: { staff: true, components: true },
-      });
-    });
+        const unsafeOverlap = overlappingStructures.find(
+          (activeStructure) =>
+            !canClosePreviousSalaryVersion(activeStructure, structure),
+        );
+
+        if (unsafeOverlap) {
+          throw new ConflictException(
+            'Only one ACTIVE salary structure is allowed for an effective date range',
+          );
+        }
+
+        for (const previousVersion of overlappingStructures) {
+          await tx.salaryStructure.update({
+            where: { id: previousVersion.id },
+            data: {
+              effectiveTo: previousDayUtc(structure.effectiveFrom),
+            },
+          });
+        }
+
+        return tx.salaryStructure.update({
+          where: { id: structure.id },
+          data: {
+            status: SalaryStructureStatus.ACTIVE,
+            activatedAt: new Date(),
+          },
+          include: { staff: true, components: true },
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
 
     await this.auditService.record({
       action: 'activate',
@@ -919,54 +922,66 @@ export class PayrollService {
       throw new NotFoundException('No active staff contracts found to process');
     }
 
-    const run = await this.prisma.payrollRun.create({
-      data: {
-        tenantId: actor.tenantId,
-        periodMonth: dto.periodMonth,
-        periodYear: dto.periodYear,
-        periodStart: getPayrollPeriod(dto.periodYear, dto.periodMonth).startsOn,
-        periodEnd: getPayrollPeriod(dto.periodYear, dto.periodMonth).endsOn,
-        status: PayrollRunStatus.GENERATED,
-        generatedById: actor.userId,
-        notes: dto.notes ?? null,
-        grossAmount: new Prisma.Decimal(totals.grossAmount),
-        deductionAmount: new Prisma.Decimal(totals.deductionAmount),
-        netAmount: new Prisma.Decimal(totals.netAmount),
-        pfEmployeeAmount: new Prisma.Decimal(totals.pfEmployeeAmount),
-        pfEmployerAmount: new Prisma.Decimal(totals.pfEmployerAmount),
-        tdsAmount: new Prisma.Decimal(totals.tdsAmount),
-        lines: {
-          create: lines.map((line) => ({
-            tenantId: actor.tenantId,
-            staffId: line.staffId,
-            contractId: line.contractId,
-            salaryStructureId: line.salaryStructureId,
-            basicSalary: new Prisma.Decimal(line.baseSalary),
-            earnings: new Prisma.Decimal(line.earnings),
-            grossSalary: new Prisma.Decimal(line.grossSalary),
-            allowances: new Prisma.Decimal(line.allowances),
-            leaveDeductions: new Prisma.Decimal(line.leaveDeductions),
-            pfEmployee: new Prisma.Decimal(line.pfEmployee),
-            pfEmployer: new Prisma.Decimal(line.pfEmployer),
-            tds: new Prisma.Decimal(line.tds),
-            otherDeductions: new Prisma.Decimal(line.otherDeductions),
-            deductions: new Prisma.Decimal(line.deductions),
-            netSalary: new Prisma.Decimal(line.netSalary),
-            paidDays: new Prisma.Decimal(line.attendanceDays),
-            unpaidDays: new Prisma.Decimal(line.unpaidLeaveDays),
-            attendanceDays: line.attendanceDays,
-            workingDays: line.workingDays,
-          })),
-        },
-      },
-      include: {
-        lines: {
-          include: {
-            staff: true,
+    let run;
+    try {
+      run = await this.prisma.payrollRun.create({
+        data: {
+          tenantId: actor.tenantId,
+          periodMonth: dto.periodMonth,
+          periodYear: dto.periodYear,
+          periodStart: getPayrollPeriod(dto.periodYear, dto.periodMonth)
+            .startsOn,
+          periodEnd: getPayrollPeriod(dto.periodYear, dto.periodMonth).endsOn,
+          status: PayrollRunStatus.GENERATED,
+          generatedById: actor.userId,
+          notes: dto.notes ?? null,
+          grossAmount: new Prisma.Decimal(totals.grossAmount),
+          deductionAmount: new Prisma.Decimal(totals.deductionAmount),
+          netAmount: new Prisma.Decimal(totals.netAmount),
+          pfEmployeeAmount: new Prisma.Decimal(totals.pfEmployeeAmount),
+          pfEmployerAmount: new Prisma.Decimal(totals.pfEmployerAmount),
+          tdsAmount: new Prisma.Decimal(totals.tdsAmount),
+          lines: {
+            create: lines.map((line) => ({
+              tenantId: actor.tenantId,
+              staffId: line.staffId,
+              contractId: line.contractId,
+              salaryStructureId: line.salaryStructureId,
+              basicSalary: new Prisma.Decimal(line.baseSalary),
+              earnings: new Prisma.Decimal(line.earnings),
+              grossSalary: new Prisma.Decimal(line.grossSalary),
+              allowances: new Prisma.Decimal(line.allowances),
+              leaveDeductions: new Prisma.Decimal(line.leaveDeductions),
+              pfEmployee: new Prisma.Decimal(line.pfEmployee),
+              pfEmployer: new Prisma.Decimal(line.pfEmployer),
+              tds: new Prisma.Decimal(line.tds),
+              otherDeductions: new Prisma.Decimal(line.otherDeductions),
+              deductions: new Prisma.Decimal(line.deductions),
+              netSalary: new Prisma.Decimal(line.netSalary),
+              paidDays: new Prisma.Decimal(line.attendanceDays),
+              unpaidDays: new Prisma.Decimal(line.unpaidLeaveDays),
+              attendanceDays: line.attendanceDays,
+              workingDays: line.workingDays,
+            })),
           },
         },
-      },
-    });
+        include: {
+          lines: {
+            include: {
+              staff: true,
+            },
+          },
+        },
+      });
+    } catch (error) {
+      const err = error as Record<string, unknown>;
+      if (err?.code === 'P2002') {
+        throw new ConflictException(
+          'A payroll run already exists for this period. Void the existing one first if a re-run is needed.',
+        );
+      }
+      throw error;
+    }
 
     await this.auditService.record({
       action: 'create',
@@ -1430,6 +1445,25 @@ export class PayrollService {
     }
 
     const posted = await this.prisma.$transaction(async (tx) => {
+      // Claim the row by flipping status inside the transaction, guarded by
+      // the exact status/journalEntryId we validated above. A concurrent
+      // posting request racing in blocks on the row lock, then finds this
+      // where clause no longer matches once we commit, so it fails closed
+      // with a clean conflict instead of a raw duplicate-journal P2002.
+      const claimed = await tx.payrollRun.updateMany({
+        where: {
+          id: run.id,
+          tenantId: actor.tenantId,
+          status: run.status,
+          journalEntryId: null,
+        },
+        data: { status: PayrollRunStatus.POSTED },
+      });
+
+      if (claimed.count === 0) {
+        throw new ConflictException('Payroll run is already posted');
+      }
+
       const journalEntry =
         await this.accountingPostingService.postPayrollAccrual(
           {
@@ -1459,7 +1493,6 @@ export class PayrollService {
       return tx.payrollRun.update({
         where: { id: run.id },
         data: {
-          status: PayrollRunStatus.POSTED,
           postedAt: new Date(),
           postedById: actor.userId,
           journalEntryId: journalEntry.id,

@@ -3316,19 +3316,19 @@ export class AttendanceService {
       );
     }
 
-    const overlappingApproved = await this.prisma.staffLeaveRequest.findFirst({
+    const overlapping = await this.prisma.staffLeaveRequest.findFirst({
       where: {
         tenantId: actor.tenantId,
         staffId: staff.id,
-        status: 'APPROVED',
+        status: { in: ['PENDING', 'APPROVED'] },
         startsOn: { lte: endsOn },
         endsOn: { gte: startsOn },
       },
     });
 
-    if (overlappingApproved) {
+    if (overlapping) {
       throw new ConflictException(
-        'An approved leave request already overlaps this date range',
+        'A pending or approved leave request already overlaps this date range',
       );
     }
 
@@ -3388,6 +3388,41 @@ export class AttendanceService {
       throw new ConflictException(
         'A review note is required when rejecting a leave request',
       );
+    }
+
+    if (dto.status === 'APPROVED') {
+      const staff = await this.prisma.staff.findFirst({
+        where: { id: leave.staffId, tenantId: actor.tenantId },
+        select: { status: true },
+      });
+
+      if (
+        !staff ||
+        staff.status === StaffStatus.TERMINATED ||
+        staff.status === StaffStatus.RESIGNED
+      ) {
+        throw new ConflictException(
+          'Cannot approve leave for a staff member who is no longer active',
+        );
+      }
+
+      const conflictingApproved = await this.prisma.staffLeaveRequest.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          staffId: leave.staffId,
+          status: 'APPROVED',
+          id: { not: leave.id },
+          startsOn: { lte: leave.endsOn },
+          endsOn: { gte: leave.startsOn },
+        },
+        take: 1,
+      });
+
+      if (conflictingApproved.length > 0) {
+        throw new ConflictException(
+          'Another approved leave request already overlaps this date range',
+        );
+      }
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {

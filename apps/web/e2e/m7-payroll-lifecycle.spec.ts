@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures/auth';
 
@@ -138,10 +139,20 @@ test.describe.serial('M7 payroll lifecycle', () => {
     await expectPayrollStatus(page, 'APPROVED');
     await expect(page.getByRole('button', { name: 'Post to M11 Accounting' })).toBeVisible();
 
+    // openApprovedSalarySlipPdf() now opens the PDF through the shared
+    // openPdfBlob() helper (magic-byte/content-type validated, same as
+    // every other protected PDF download), which opens a new tab rather
+    // than triggering a named `download` attribute. Chromium still surfaces
+    // that blob-URL navigation as a download event with an opaque
+    // browser-assigned filename, so assert on the real PDF bytes instead of
+    // a filename pattern that no longer applies.
     const downloadPromise = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Download Salary Slip PDF' }).first().click();
     const download = await downloadPromise;
-    expect(download.suggestedFilename()).toMatch(/salary-slip-.*\.pdf$/);
+    const downloadPath = await download.path();
+    expect(downloadPath).not.toBeNull();
+    const pdfBytes = await readFile(downloadPath as string);
+    expect(pdfBytes.subarray(0, 5).toString('latin1')).toBe('%PDF-');
 
     await performAction(page, 'Post to M11 Accounting', 'Post to M11');
     await expectPayrollStatus(page, 'POSTED');

@@ -2297,6 +2297,86 @@ describe('attendance production hardening', () => {
     expect(tx.staffLeaveRequest.update).not.toHaveBeenCalled();
   });
 
+  it('blocks leave approval for a staff member who has resigned', async () => {
+    const leaveRequest = {
+      id: 'leave-1',
+      tenantId: adminActor.tenantId,
+      staffId: 'staff-1',
+      leaveType: 'SICK',
+      isPaid: true,
+      startsOn: new Date('2026-04-28T00:00:00.000Z'),
+      endsOn: new Date('2026-04-29T00:00:00.000Z'),
+      days: new Prisma.Decimal(2),
+      status: 'PENDING',
+    };
+    const { service, tx } = buildService({
+      leaveRequest,
+      staffFindFirst: { id: 'staff-1', userId: 'user-1', status: 'RESIGNED' },
+    });
+
+    await expect(
+      service.reviewLeaveRequest('leave-1', { status: 'APPROVED' }, adminActor),
+    ).rejects.toThrow(ConflictException);
+    expect(tx.staffLeaveRequest.update).not.toHaveBeenCalled();
+  });
+
+  it('blocks leave approval for a terminated staff member', async () => {
+    const leaveRequest = {
+      id: 'leave-1',
+      tenantId: adminActor.tenantId,
+      staffId: 'staff-1',
+      leaveType: 'SICK',
+      isPaid: true,
+      startsOn: new Date('2026-04-28T00:00:00.000Z'),
+      endsOn: new Date('2026-04-29T00:00:00.000Z'),
+      days: new Prisma.Decimal(2),
+      status: 'PENDING',
+    };
+    const { service, tx } = buildService({
+      leaveRequest,
+      staffFindFirst: {
+        id: 'staff-1',
+        userId: 'user-1',
+        status: 'TERMINATED',
+      },
+    });
+
+    await expect(
+      service.reviewLeaveRequest('leave-1', { status: 'APPROVED' }, adminActor),
+    ).rejects.toThrow(ConflictException);
+    expect(tx.staffLeaveRequest.update).not.toHaveBeenCalled();
+  });
+
+  it('blocks leave approval that would overlap another already-approved leave request', async () => {
+    const leaveRequest = {
+      id: 'leave-1',
+      tenantId: adminActor.tenantId,
+      staffId: 'staff-1',
+      leaveType: 'SICK',
+      isPaid: true,
+      startsOn: new Date('2026-04-28T00:00:00.000Z'),
+      endsOn: new Date('2026-04-29T00:00:00.000Z'),
+      days: new Prisma.Decimal(2),
+      status: 'PENDING',
+    };
+    const { service, tx } = buildService({
+      leaveRequest,
+      staffFindFirst: { id: 'staff-1', userId: 'user-1', status: 'ACTIVE' },
+      approvedLeaveRequests: [
+        {
+          id: 'leave-other',
+          startsOn: new Date('2026-04-27T00:00:00.000Z'),
+          endsOn: new Date('2026-04-28T00:00:00.000Z'),
+        },
+      ],
+    });
+
+    await expect(
+      service.reviewLeaveRequest('leave-1', { status: 'APPROVED' }, adminActor),
+    ).rejects.toThrow(ConflictException);
+    expect(tx.staffLeaveRequest.update).not.toHaveBeenCalled();
+  });
+
   it('deduplicates daily escalation warnings by source type and source id', async () => {
     const sessionA = buildAttendanceSession({
       id: 'session-a',
@@ -2857,6 +2937,31 @@ describe('staff-attendance and leave confirmed-gap fixes (2026-07-19)', () => {
         teacherActor,
       ),
     ).resolves.toBeDefined();
+  });
+
+  it('blocks a new leave request that overlaps an existing pending request', async () => {
+    const { service } = buildService({
+      staffFindFirst: { id: 'staff-1', userId: teacherActor.userId },
+      leaveRequest: {
+        id: 'leave-existing',
+        status: 'PENDING',
+        startsOn: new Date('2026-05-01T00:00:00.000Z'),
+        endsOn: new Date('2026-05-02T00:00:00.000Z'),
+      },
+    });
+
+    await expect(
+      service.createLeaveRequest(
+        {
+          staffId: 'staff-1',
+          leaveType: 'SICK',
+          startsOn: '2026-05-01',
+          endsOn: '2026-05-02',
+          reason: 'Fever',
+        } as never,
+        teacherActor,
+      ),
+    ).rejects.toThrow(ConflictException);
   });
 
   it('scopes the attendance conflicts list to the teacher own sections', async () => {

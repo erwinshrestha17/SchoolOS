@@ -13,6 +13,7 @@ import {
   FileText,
   History,
   ShieldCheck,
+  UserX,
   Users,
 } from "lucide-react";
 import Link from "next/link";
@@ -71,10 +72,15 @@ export default function HRDashboardPage() {
     queryKey: ["payroll-dashboard-summary", "hr-page"],
     queryFn: () => api.getPayrollDashboardSummary({ contractWindowDays: 30 }),
   });
+  const coverageQuery = useQuery({
+    queryKey: ["hr-staff-coverage-summary"],
+    queryFn: () => api.getStaffCoverageSummary(),
+  });
 
   const leaveQueue = leaveQueueQuery.data;
   const reminders = contractRemindersQuery.data;
   const payrollSummary = payrollSummaryQuery.data;
+  const coverage = coverageQuery.data;
   const postingBacklog = [
     "GENERATED",
     "UNDER_REVIEW",
@@ -439,6 +445,96 @@ export default function HRDashboardPage() {
           </div>
         </WorkSurface>
       </div>
+
+      <WorkSurface
+        title="Staffing Coverage"
+        description={
+          coverage
+            ? `Backend-owned, as of ${formatBsDate(coverage.asOf)}`
+            : "Backend-owned staffing gaps that could block payroll or leave a class uncovered."
+        }
+        variant="monitoring"
+      >
+        {coverageQuery.isLoading ? (
+          <LoadingState variant="spinner" label="Loading staffing coverage..." />
+        ) : coverageQuery.isError ? (
+          <ErrorState
+            title="Staffing coverage unavailable"
+            message="The staffing coverage summary could not be loaded. Check your HR permission and retry."
+            onRetry={() => void coverageQuery.refetch()}
+          />
+        ) : coverage ? (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <Link
+              href="/dashboard/hr/contracts"
+              className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 transition hover:border-[var(--primary-soft)] hover:bg-white"
+            >
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                Without Active Contract
+              </p>
+              <p className="mt-2 text-2xl font-black tabular-nums text-slate-950">
+                {coverage.staffWithoutActiveContract}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Active staff with no ACTIVE contract on file
+              </p>
+            </Link>
+            <Link
+              href="/dashboard/payroll/salary-structures"
+              className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 transition hover:border-[var(--primary-soft)] hover:bg-white"
+            >
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                Without Salary Structure
+              </p>
+              <p className="mt-2 text-2xl font-black tabular-nums text-slate-950">
+                {coverage.staffWithoutActiveSalaryStructure}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Active staff with no ACTIVE salary structure
+              </p>
+            </Link>
+            <Link
+              href="/dashboard/payroll/readiness"
+              className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 transition hover:border-[var(--primary-soft)] hover:bg-white"
+            >
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                Payroll Blockers
+              </p>
+              <p className="mt-2 text-2xl font-black tabular-nums text-slate-950">
+                {coverage.payrollReadiness.available
+                  ? coverage.payrollReadiness.blockingCount
+                  : "N/A"}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                {coverage.payrollReadiness.available
+                  ? `Period ${coverage.payrollReadiness.periodMonth}/${coverage.payrollReadiness.periodYear}`
+                  : coverage.payrollReadiness.reason}
+              </p>
+            </Link>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                Uncovered Periods Today
+              </p>
+              <p className="mt-2 text-2xl font-black tabular-nums text-slate-950">
+                {coverage.classCoverage.available
+                  ? coverage.classCoverage.uncoveredPeriods
+                  : "N/A"}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                {coverage.classCoverage.available
+                  ? `Out of ${coverage.classCoverage.scheduledPeriods} scheduled periods`
+                  : coverage.classCoverage.reason}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <EmptyState
+            title="No coverage data"
+            description="The staffing coverage summary returned no data for this tenant."
+            icon={<UserX className="h-7 w-7" />}
+          />
+        )}
+      </WorkSurface>
     </DashboardPageShell>
   );
 }

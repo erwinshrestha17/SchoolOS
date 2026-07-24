@@ -54,6 +54,7 @@ interface TransactionMock {
   };
   payrollRun: {
     update: jest.Mock;
+    updateMany: jest.Mock;
   };
 }
 
@@ -487,6 +488,13 @@ function buildTransactionMock(root: PayrollM9PrismaMock): TransactionMock {
       updateMany: jest.fn(() => Promise.resolve({ count: 1 })),
     },
     payrollRun: {
+      updateMany: jest.fn((q: { data?: Record<string, unknown> }) => {
+        root.__currentRun = {
+          ...root.__currentRun,
+          ...q.data,
+        };
+        return Promise.resolve({ count: 1 });
+      }),
       update: jest.fn((q: { data?: Record<string, unknown> }) => {
         root.__currentRun = {
           ...root.__currentRun,

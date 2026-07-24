@@ -4065,6 +4065,46 @@ export type StaffContractSummary = {
   status: string;
 };
 
+/**
+ * Backend-owned HR/staff-coverage summary (M7 catalog gap). Every count is a
+ * bounded aggregate query scoped to the current tenant and "today" in Nepal
+ * local time. Never includes salary, bank, or PAN data. Sub-sections that
+ * cannot be reliably derived from existing data report `available: false`
+ * with a `reason` instead of a fabricated zero.
+ */
+export type StaffCoverageSummary = {
+  asOf: string;
+  staffCounts: {
+    activeTeaching: number;
+    activeNonTeaching: number;
+  };
+  attendanceToday: {
+    absent: number;
+    onApprovedLeave: number;
+  };
+  pendingLeaveApprovals: number;
+  contractsExpiring: {
+    windowDays: number;
+    count: number;
+  };
+  staffWithoutActiveContract: number;
+  staffWithoutActiveSalaryStructure: number;
+  payrollReadiness: {
+    available: boolean;
+    reason?: string;
+    periodMonth?: number;
+    periodYear?: number;
+    blockingCount?: number;
+  };
+  classCoverage: {
+    available: boolean;
+    reason?: string;
+    dayOfWeek?: number;
+    scheduledPeriods?: number;
+    uncoveredPeriods?: number;
+  };
+};
+
 
 // ─── Compiled from types/student.ts ───
 

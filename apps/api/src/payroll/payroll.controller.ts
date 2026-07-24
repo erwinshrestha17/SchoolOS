@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Query,
+  StreamableFile,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -278,12 +279,20 @@ export class PayrollController {
   @Get('runs/:runId/lines/:lineId/salary-slip.pdf')
   @Header('Content-Type', 'application/pdf')
   @Permissions('payroll:read')
-  getApprovedSalarySlipPdf(
+  async getApprovedSalarySlipPdf(
     @Param('runId') runId: string,
     @Param('lineId') lineId: string,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.salarySlipService.getApprovedSalarySlipPdf(runId, lineId, auth);
+    const pdf = await this.salarySlipService.getApprovedSalarySlipPdf(
+      runId,
+      lineId,
+      auth,
+    );
+    return new StreamableFile(pdf, {
+      type: 'application/pdf',
+      disposition: `inline; filename="${safePdfFileName(`${runId}-${lineId}-salary-slip.pdf`)}"`,
+    });
   }
 
   @Post('runs/:id/post')
@@ -342,42 +351,62 @@ export class PayrollController {
   @Get('me/payslips/:payslipNumber.pdf')
   @Header('Content-Type', 'application/pdf')
   @Permissions('staff:read')
-  getMyPayslipPdf(
+  async getMyPayslipPdf(
     @Param('payslipNumber') payslipNumber: string,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.payrollService.getPayslipPdf(payslipNumber, auth);
+    const pdf = await this.payrollService.getPayslipPdf(payslipNumber, auth);
+    return new StreamableFile(pdf, {
+      type: 'application/pdf',
+      disposition: `inline; filename="${safePdfFileName(`${payslipNumber}.pdf`)}"`,
+    });
   }
 
   @Get('payslips/:payslipNumber/pdf')
   @Header('Content-Type', 'application/pdf')
   @Permissions('payroll:payslip:read')
-  getPayslipPdfAlias(
+  async getPayslipPdfAlias(
     @Param('payslipNumber') payslipNumber: string,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.payrollService.getPayslipPdf(payslipNumber, auth);
+    const pdf = await this.payrollService.getPayslipPdf(payslipNumber, auth);
+    return new StreamableFile(pdf, {
+      type: 'application/pdf',
+      disposition: `inline; filename="${safePdfFileName(`${payslipNumber}.pdf`)}"`,
+    });
   }
 
   @Get('payslips/:payslipNumber.pdf')
   @Header('Content-Type', 'application/pdf')
   @Permissions('payroll:payslip:read')
-  getPayslipPdf(
+  async getPayslipPdf(
     @Param('payslipNumber') payslipNumber: string,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.payrollService.getPayslipPdf(payslipNumber, auth);
+    const pdf = await this.payrollService.getPayslipPdf(payslipNumber, auth);
+    return new StreamableFile(pdf, {
+      type: 'application/pdf',
+      disposition: `inline; filename="${safePdfFileName(`${payslipNumber}.pdf`)}"`,
+    });
   }
 
   @Get('runs/:runId/staff/:staffId/payslip.pdf')
   @Header('Content-Type', 'application/pdf')
   @Permissions('payroll:read')
-  getStaffPayslipPdf(
+  async getStaffPayslipPdf(
     @Param('runId') runId: string,
     @Param('staffId') staffId: string,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.payrollService.getPayslipPdfForRunStaff(runId, staffId, auth);
+    const pdf = await this.payrollService.getPayslipPdfForRunStaff(
+      runId,
+      staffId,
+      auth,
+    );
+    return new StreamableFile(pdf, {
+      type: 'application/pdf',
+      disposition: `inline; filename="${safePdfFileName(`${runId}-${staffId}.pdf`)}"`,
+    });
   }
 
   @Get('statutory-deductions')
@@ -550,4 +579,8 @@ export class PayrollController {
   ) {
     return this.payrollService.exportPayrollTdsCsv(auth, query);
   }
+}
+
+function safePdfFileName(value: string) {
+  return value.replace(/[^a-zA-Z0-9._-]/g, '-');
 }

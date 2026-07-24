@@ -11,6 +11,7 @@ import type {
   RoleSummary,
   SalaryStructureSummary,
   StaffContractSummary,
+  StaffCoverageSummary,
   StaffDetail,
   StaffSummary,
 } from '@schoolos/core';
@@ -18,8 +19,8 @@ import {
   API_BASE_URL,
   JsonBody,
   StaffLifecycleHistoryEvent,
-  downloadBlob,
   downloadCsv,
+  openPdfBlob,
   request,
   withQuery,
 } from './client';
@@ -127,11 +128,6 @@ export type PayrollExceptionParams = {
   limit?: number;
 };
 
-function protectedPdfFileName(prefix: string, id: string) {
-  const safeId = id.replace(/[^a-z0-9._-]+/gi, '-').replace(/^-+|-+$/g, '');
-  return `${prefix}-${safeId || 'file'}.pdf`;
-}
-
 export const payrollApi = {
   listStaff: () => request<StaffSummary[]>('/staff'),
   listStaffDirectory: (params?: M7ListParams) =>
@@ -176,6 +172,8 @@ export const payrollApi = {
     ),
   getLeaveQueueDepth: (params?: { staleDays?: number }) =>
     request<LeaveQueueDepth>(withQuery('/hr/leave-queue/depth', params ?? {})),
+  getStaffCoverageSummary: () =>
+    request<StaffCoverageSummary>('/hr/coverage-summary'),
   getPayrollDashboardSummary: (params?: M7ListParams) =>
     request<PayrollDashboardSummary>(
       withQuery('/payroll/dashboard-summary', params ?? {}),
@@ -328,7 +326,7 @@ export const payrollApi = {
       { credentials: 'include' },
     );
 
-    await downloadBlob(response, protectedPdfFileName('payslip', staffId));
+    await openPdfBlob(response);
   },
   getPayrollPreview: (params: {
     year: number;
@@ -363,10 +361,7 @@ export const payrollApi = {
       },
     );
 
-    await downloadBlob(
-      response,
-      protectedPdfFileName('payslip', payslipNumber),
-    );
+    await openPdfBlob(response);
   },
   openPayslipPdf: async (payslipNumber: string) => {
     const response = await fetch(
@@ -376,10 +371,7 @@ export const payrollApi = {
       },
     );
 
-    await downloadBlob(
-      response,
-      protectedPdfFileName('payslip', payslipNumber),
-    );
+    await openPdfBlob(response);
   },
 
   // Accounting Verification
@@ -388,7 +380,7 @@ export const payrollApi = {
       `${API_BASE_URL}/payroll/runs/${encodeURIComponent(runId)}/lines/${encodeURIComponent(lineId)}/salary-slip.pdf`,
       { credentials: 'include' },
     );
-    await downloadBlob(response, protectedPdfFileName('salary-slip', lineId));
+    await openPdfBlob(response);
   },
 
   archiveStaff: (staffId: string, reason?: string) =>
