@@ -28,30 +28,29 @@ export class AccountingM9Service {
 
   async principalSnapshot(actor: AuthContext) {
     const now = new Date();
-    const [fiscalYear, postingQueueCounts, reconciliation] =
-      await Promise.all([
-        this.prisma.fiscalYear.findFirst({
-          where: { tenantId: actor.tenantId, status: FiscalYearStatus.OPEN },
-          orderBy: { startDate: 'desc' },
-          include: {
-            periods: {
-              where: { startDate: { lte: now }, endDate: { gte: now } },
-              take: 1,
-            },
+    const [fiscalYear, postingQueueCounts, reconciliation] = await Promise.all([
+      this.prisma.fiscalYear.findFirst({
+        where: { tenantId: actor.tenantId, status: FiscalYearStatus.OPEN },
+        orderBy: { startDate: 'desc' },
+        include: {
+          periods: {
+            where: { startDate: { lte: now }, endDate: { gte: now } },
+            take: 1,
           },
-        }),
-        this.prisma.journalEntry.groupBy({
-          by: ['status'],
-          _count: { _all: true },
-          where: {
-            tenantId: actor.tenantId,
-            status: {
-              in: [JournalEntryStatus.SUBMITTED, JournalEntryStatus.APPROVED],
-            },
+        },
+      }),
+      this.prisma.journalEntry.groupBy({
+        by: ['status'],
+        _count: { _all: true },
+        where: {
+          tenantId: actor.tenantId,
+          status: {
+            in: [JournalEntryStatus.SUBMITTED, JournalEntryStatus.APPROVED],
           },
-        }),
-        this.sourceMappings.getSourceMappingHealth(actor),
-      ]);
+        },
+      }),
+      this.sourceMappings.getSourceMappingHealth(actor),
+    ]);
 
     const currentPeriod = fiscalYear?.periods[0] ?? null;
     const netPosition = fiscalYear

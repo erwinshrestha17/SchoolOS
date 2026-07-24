@@ -947,6 +947,11 @@ export const AccountingPeriodStatus = {
   CLOSED: 'CLOSED',
 } as const;
 
+export const FiscalYearStatus = {
+  OPEN: 'OPEN',
+  CLOSED: 'CLOSED',
+} as const;
+
 export const ConversationType = {
   DIRECT: 'DIRECT',
   CLASS: 'CLASS',

@@ -1657,6 +1657,34 @@ const PRINCIPAL_EXCLUDED_SETTINGS_KEYS = [
   ...SETTINGS_DOMAIN_MANAGE_KEYS,
 ];
 
+/**
+ * PRD 11.12 requires "Principal read-only summary separate from accountant
+ * operations." Principals keep every accounting:*:read and
+ * accounting:reports:* key but lose the write/approve/post/close surface,
+ * which stays with the accountant preset and explicitly granted roles.
+ */
+const PRINCIPAL_EXCLUDED_ACCOUNTING_OPERATIONAL_KEYS = [
+  "accounting:close",
+  "accounting:reverse",
+  "accounting:accounts:write",
+  "accounting:fiscal:manage",
+  "accounting:fiscal:reopen",
+  "accounting:journals:create",
+  "accounting:journals:submit",
+  "accounting:journals:approve",
+  "accounting:journals:reject",
+  "accounting:journals:post",
+  "accounting:journals:cancel",
+  "accounting:journals:reverse",
+  "accounting:settings:update",
+  "accounting:exports:create",
+];
+
+const PRINCIPAL_EXCLUDED_KEYS = [
+  ...PRINCIPAL_EXCLUDED_SETTINGS_KEYS,
+  ...PRINCIPAL_EXCLUDED_ACCOUNTING_OPERATIONAL_KEYS,
+];
+
 const SCHOOL_CONFIG_OWNER_PERMISSION_KEYS = [
   "settings:read_public",
   "settings:read",
@@ -1687,7 +1715,7 @@ export const systemRolePermissions: Record<string, string[]> = {
   admin: [...TENANT_PERMISSION_KEYS],
   school_config_owner: [...SCHOOL_CONFIG_OWNER_PERMISSION_KEYS],
   principal: TENANT_PERMISSION_KEYS.filter(
-    (key) => !PRINCIPAL_EXCLUDED_SETTINGS_KEYS.includes(key),
+    (key) => !PRINCIPAL_EXCLUDED_KEYS.includes(key),
   ),
   teacher: [
     "roles:read",

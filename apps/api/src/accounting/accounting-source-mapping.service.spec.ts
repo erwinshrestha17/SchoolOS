@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
+import { JournalSourceType } from '@prisma/client';
 import { AccountingSourceMappingService } from './accounting-source-mapping.service';
 
 const actor = {
@@ -143,7 +144,195 @@ describe('AccountingSourceMappingService', () => {
 
     expect(tx.accountingSourceMapping.create).not.toHaveBeenCalled();
   });
+
+  describe('getSourceMappingHealth', () => {
+    it('classifies posted entries by source module and flags missing source ids', async () => {
+      const prisma = {
+        journalEntry: {
+          findMany: jest.fn().mockResolvedValue([
+            sourceEntry({
+              id: 'fees-entry',
+              sourceModule: 'FINANCE',
+              sourceType: JournalSourceType.FEE_PAYMENT,
+              sourceId: 'payment-1',
+              accountCodes: ['1000', '4000'],
+            }),
+            sourceEntry({
+              id: 'payroll-entry',
+              sourceModule: 'PAYROLL',
+              sourceType: JournalSourceType.PAYROLL_RUN,
+              sourceId: 'payroll-run-1',
+              accountCodes: ['5010', '2200'],
+            }),
+            sourceEntry({
+              id: 'canteen-entry',
+              sourceModule: 'CANTEEN',
+              sourceType: JournalSourceType.FEE_PAYMENT,
+              sourceId: 'canteen-sale-1',
+              accountCodes: ['1000', '4050'],
+            }),
+            sourceEntry({
+              id: 'library-entry',
+              sourceModule: 'FINANCE',
+              sourceType: JournalSourceType.INVOICE,
+              sourceId: 'library-fine-1',
+              accountCodes: ['1200', '4040'],
+            }),
+            sourceEntry({
+              id: 'transport-entry',
+              sourceModule: 'FINANCE',
+              sourceType: JournalSourceType.INVOICE,
+              sourceId: null,
+              accountCodes: ['1200', '4030'],
+            }),
+          ]),
+        },
+        accountingSourceMapping: {
+          groupBy: jest.fn().mockResolvedValue([
+            { sourceModule: 'FEES', _count: { _all: 1 } },
+            { sourceModule: 'PAYROLL', _count: { _all: 1 } },
+            { sourceModule: 'CANTEEN', _count: { _all: 1 } },
+            { sourceModule: 'LIBRARY', _count: { _all: 1 } },
+          ]),
+        },
+      };
+      const service = new AccountingSourceMappingService(
+        prisma as never,
+        { record: jest.fn() } as never,
+      );
+
+      const result = await service.getSourceMappingHealth(actor as never);
+
+      expect(prisma.journalEntry.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ tenantId: actor.tenantId }),
+          take: 1000,
+        }),
+      );
+      expect(result.sampledPostedSourceEntries).toBe(5);
+      expect(result.modules).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            sourceModule: 'FEES',
+            postedCount: 1,
+            missingSourceIdCount: 0,
+            configuredMappingCount: 1,
+          }),
+          expect.objectContaining({
+            sourceModule: 'PAYROLL',
+            postedCount: 1,
+            missingSourceIdCount: 0,
+            configuredMappingCount: 1,
+          }),
+          expect.objectContaining({
+            sourceModule: 'CANTEEN',
+            postedCount: 1,
+            missingSourceIdCount: 0,
+            configuredMappingCount: 1,
+          }),
+          expect.objectContaining({
+            sourceModule: 'LIBRARY',
+            postedCount: 1,
+            missingSourceIdCount: 0,
+            configuredMappingCount: 1,
+          }),
+          expect.objectContaining({
+            sourceModule: 'TRANSPORT',
+            postedCount: 1,
+            missingSourceIdCount: 1,
+            configuredMappingCount: 0,
+          }),
+        ]),
+      );
+      expect(result.missingSourceId).toEqual(
+        expect.objectContaining({
+          count: 1,
+          samples: [
+            expect.objectContaining({
+              id: 'transport-entry',
+              sourceModule: 'FINANCE',
+              sourceType: JournalSourceType.INVOICE,
+            }),
+          ],
+        }),
+      );
+      expect(result.isClean).toBe(false);
+    });
+
+    it('flags unclean when a module has posted activity but no configured mapping, even with no missing source ids', async () => {
+      const prisma = {
+        journalEntry: {
+          findMany: jest.fn().mockResolvedValue([
+            sourceEntry({
+              id: 'payroll-entry',
+              sourceModule: 'PAYROLL',
+              sourceType: JournalSourceType.PAYROLL_RUN,
+              sourceId: 'payroll-run-1',
+              accountCodes: ['5010', '2200'],
+            }),
+          ]),
+        },
+        accountingSourceMapping: {
+          groupBy: jest.fn().mockResolvedValue([]),
+        },
+      };
+      const service = new AccountingSourceMappingService(
+        prisma as never,
+        { record: jest.fn() } as never,
+      );
+
+      const result = await service.getSourceMappingHealth(actor as never);
+
+      expect(result.missingSourceId.count).toBe(0);
+      expect(result.modules.find((m) => m.sourceModule === 'PAYROLL')).toEqual(
+        expect.objectContaining({
+          postedCount: 1,
+          missingSourceIdCount: 0,
+          configuredMappingCount: 0,
+        }),
+      );
+      expect(result.isClean).toBe(false);
+    });
+
+    it('is clean when every module with posted activity has a configured mapping and no missing source ids', async () => {
+      const prisma = {
+        journalEntry: { findMany: jest.fn().mockResolvedValue([]) },
+        accountingSourceMapping: { groupBy: jest.fn().mockResolvedValue([]) },
+      };
+      const service = new AccountingSourceMappingService(
+        prisma as never,
+        { record: jest.fn() } as never,
+      );
+
+      const result = await service.getSourceMappingHealth(actor as never);
+
+      expect(result.sampledPostedSourceEntries).toBe(0);
+      expect(result.isClean).toBe(true);
+    });
+  });
 });
+
+function sourceEntry(input: {
+  id: string;
+  sourceModule: string;
+  sourceType: JournalSourceType;
+  sourceId: string | null;
+  accountCodes: string[];
+}) {
+  return {
+    id: input.id,
+    entryNumber: `JE-${input.id}`,
+    sourceModule: input.sourceModule,
+    sourceType: input.sourceType,
+    sourceId: input.sourceId,
+    lines: input.accountCodes.map((code) => ({
+      chartAccount: {
+        code,
+        type: code.startsWith('4') ? 'REVENUE' : 'ASSET',
+      },
+    })),
+  };
+}
 
 function buildService(
   options: { accounts?: unknown[]; overlap?: unknown } = {},

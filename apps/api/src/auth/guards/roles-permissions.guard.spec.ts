@@ -66,4 +66,46 @@ describe('RolesPermissionsGuard', () => {
 
     await expect(guard.canActivate(context)).resolves.toBe(true);
   });
+
+  it('does not let accounting:close alone unlock chart-of-accounts write', async () => {
+    (reflector.getAllAndOverride as jest.Mock)
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce(['accounting:accounts:write']);
+    request.auth.permissions = ['accounting:close'];
+
+    await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
+  it('does not let accounting:close alone unlock fiscal year management', async () => {
+    (reflector.getAllAndOverride as jest.Mock)
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce(['accounting:fiscal:manage']);
+    request.auth.permissions = ['accounting:close'];
+
+    await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
+  it('does not let accounting:close alone unlock accounting exports', async () => {
+    (reflector.getAllAndOverride as jest.Mock)
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce(['accounting:exports:create']);
+    request.auth.permissions = ['accounting:close'];
+
+    await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
+  it('still accepts the generic reports:export alias for accounting exports', async () => {
+    (reflector.getAllAndOverride as jest.Mock)
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce(['accounting:exports:create']);
+    request.auth.permissions = ['reports:export'];
+
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+  });
 });

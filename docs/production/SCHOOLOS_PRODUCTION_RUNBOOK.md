@@ -320,7 +320,8 @@ Train in this order:
 8. **M12 Notifications and M15 Notices:** normal/urgent/emergency notice, recipient preview, normalized publication event, in-app/delivery records, guardian consent capture/revoke, and chat-write denial.
 9. **HR & Payroll (M7):** staff directory/profile, staff attendance register, leave request/approval, salary structure activation, payroll run generate -> readiness/exception resolution -> submit for review -> approve -> post to accounting, payslip issue and PDF download, staff self-service own-record boundary.
 10. **Library (M8):** book catalogue and copy management, barcode/QR scanner-assisted issue and return, reservations, fine calculation/manual fine/waive/post-to-fees, overdue reports and reminders, parent linked-child library status.
-11. **Logout/session behavior:** avatar menu logout.
+11. **Accounting & Finance (M11):** chart of accounts and Nepal chart template import, manual journal and voucher (expense/payment/receipt/contra) entry, submit -> approve (a different staff member) -> post workflow, fiscal year/period lock/close/reopen with reasoned exceptions, bank statement import and reconciliation, Trial Balance/General Ledger/Cash Book/Income Statement/Balance Sheet/Tax Summary reports and exports, principal read-only financial summary boundary.
+12. **Logout/session behavior:** avatar menu logout.
 
 ### Day-1 Pilot Script
 1. Log in as admin.
@@ -337,7 +338,8 @@ Train in this order:
 12. Create one staff member with an active salary structure. Submit one staff leave request and approve it.
 13. Generate one payroll run for the current period. Resolve any blocking readiness exceptions, submit for review, approve, and post to accounting. Open one generated payslip PDF.
 14. Add one library book with a physical copy. Issue the copy to a student, then return it and confirm the copy is available again.
-15. Log out and confirm dashboard redirect.
+15. Create one manual journal entry and submit it for approval. Have a second staff member approve and post it to the ledger. Generate one Trial Balance report and export it.
+16. Log out and confirm dashboard redirect.
 
 ### Browser QA Checklist
 - **Authentication:** Login works with cookie-first auth. No raw tokens in browser storage. Logout clears local session metadata. Unauthenticated access redirects to login.
@@ -349,6 +351,7 @@ Train in this order:
 - **M12 Notifications and M15 Notices:** Normal notice publishes through the normalized event handoff. Emergency warning appears for emergency priority. Delivery records distinguish in-app success from skipped/failed external providers. Guardian consent capture/revoke and chat-write denial work.
 - **HR & Payroll (M7):** Staff directory/profile loads and is tenant-scoped. Staff attendance register and leave request/approval enforce overlap and staff-status checks. Salary structure activation blocks overlapping effective windows. Payroll readiness surfaces blocking exceptions (missing salary structure/contract, zero gross pay, negative net pay, missing PAN/bank/account mapping) before Submit for Review is allowed. Approve/Post actions are gated by the run's allowed-actions state. Payslip PDF opens via an authenticated stream, not a public link. Staff self-service (profile/leave/payslip) is limited to the signed-in staff member's own records.
 - **Library (M8):** Book/copy catalogue loads and archive requires an audit reason. Scanner-assisted issue blocks a copy that is already checked out; return clears it back to available and calculates any overdue fine. Reservations block issuing a reserved copy to a different borrower. A teacher's issue/reservation history and borrowed-students roster stay scoped to their own records, never school-wide. Fines can be waived or posted to the M3 Fees counter with a mandatory audit reason. Parent linked-child library status is read-only and limited to the linked child.
+- **Accounting & Finance (M11):** Chart of accounts and Nepal chart template import work. Manual journal and voucher entry require a balanced double-entry before submission, and posting is blocked outside an open, unlocked fiscal period. A journal cannot be approved by the same user who created it. Bank statement import and reconciliation match statement lines to journal lines. Trial Balance, General Ledger, Cash Book, Income Statement, Balance Sheet, and Tax Summary reports load and export. The principal role sees financial reports and summaries read-only, with no journal approve/post/reverse, fiscal management, or accounting settings-update actions available.
 
 ### Controlled-Pilot Boundaries
 - The supported workflow slice must be recorded for each pilot; module presence in the repository does not prove that a workflow is pilot validated.

@@ -58,7 +58,7 @@ export class AccountingM9Controller {
 
   @Get('principal/snapshot')
   @Permissions('accounting:reports:read')
-  principalSnapshot() {
-    return { readOnly: true, status: 'pending-report-snapshot-service' };
+  principalSnapshot(@CurrentAuth() auth: AuthContext) {
+    return this.m9.principalSnapshot(auth);
   }
 }

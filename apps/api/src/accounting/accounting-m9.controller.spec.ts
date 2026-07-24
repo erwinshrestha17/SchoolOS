@@ -59,11 +59,42 @@ describe('AccountingM9Controller', () => {
     });
     expect(sources.getSourceMappingHealth).toHaveBeenCalledWith(actor);
   });
+
+  it('delegates the principal snapshot to the real M9 service with current actor', async () => {
+    const { controller, m9 } = buildController();
+    m9.principalSnapshot.mockResolvedValue({
+      readOnly: true,
+      generatedAt: '2026-07-24T00:00:00.000Z',
+      fiscalYear: { id: 'fy-1', name: 'FY 2082-83', status: 'OPEN' },
+      currentPeriod: null,
+      postingQueue: { awaitingReview: 2, awaitingPosting: 1 },
+      netPosition: null,
+      reconciliation: {
+        isClean: true,
+        missingSourceIdCount: 0,
+        checkedAt: '2026-07-24T00:00:00.000Z',
+      },
+    });
+
+    const result = await controller.principalSnapshot(actor);
+
+    expect(m9.principalSnapshot).toHaveBeenCalledWith(actor);
+    expect(result).toEqual(
+      expect.objectContaining({
+        readOnly: true,
+        postingQueue: { awaitingReview: 2, awaitingPosting: 1 },
+      }),
+    );
+    expect(result).not.toEqual(
+      expect.objectContaining({ status: 'pending-report-snapshot-service' }),
+    );
+  });
 });
 
 function buildController() {
   const m9 = {
     health: jest.fn(),
+    principalSnapshot: jest.fn(),
   };
   const sources = {
     listMappings: jest.fn(),
@@ -78,6 +109,7 @@ function buildController() {
       sources as any,
       templates as any,
     ),
+    m9,
     sources,
     templates,
   };
