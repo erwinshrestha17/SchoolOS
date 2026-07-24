@@ -309,6 +309,11 @@ export const libraryApi = {
       method: 'PATCH',
       json: body,
     }),
+  archiveBook: (bookId: string, body: { reason: string }) =>
+    request<LibraryBook>(
+      `/library/books/${encodeURIComponent(bookId)}/archive`,
+      { method: 'POST', json: body },
+    ),
   listCopies: (params?: {
     bookId?: string | null;
     status?: string | null;
@@ -340,6 +345,11 @@ export const libraryApi = {
     request<LibraryCopy>(
       `/library/copies/${encodeURIComponent(copyId)}/archive`,
       { method: 'POST', json: body },
+    ),
+  deleteCopy: (copyId: string, body: { reason: string }) =>
+    request<LibraryCopy | { deleted: true; id: string }>(
+      `/library/copies/${encodeURIComponent(copyId)}`,
+      { method: 'DELETE', json: body },
     ),
   listIssues: (params?: {
     status?: string | null;
@@ -411,6 +421,8 @@ export const libraryApi = {
     request<LibraryPaginatedResult<LibraryFine>>(
       withQuery('/library/fines', params ?? {}),
     ),
+  createFine: (body: LibraryFinePayload) =>
+    request<LibraryFine>('/library/fines', { method: 'POST', json: body }),
   updateFine: (fineId: string, body: UpdateLibraryFinePayload) =>
     request<LibraryFine>(`/library/fines/${encodeURIComponent(fineId)}`, {
       method: 'PATCH',
@@ -473,4 +485,9 @@ export const libraryApi = {
       '/library/overdue/reminders',
       { method: 'POST', json: {} },
     ),
+  resolveQrBorrower: (token: string) =>
+    request<Record<string, unknown>>('/library/qr-lookup', {
+      method: 'POST',
+      json: { token },
+    }),
 };

@@ -26,6 +26,7 @@ import {
   type LibraryCopy,
   type LibraryCopyPayload,
   type LibraryCopyStatus,
+  type LibraryFinePayload,
   type LibraryFineSummaryReport,
   type LibraryIssue,
   type LibraryIssuePayload,
@@ -177,6 +178,9 @@ export function LibraryWorkspace({
   const [copyStatusReasons, setCopyStatusReasons] = useState<
     Record<string, string>
   >({});
+  const [bookArchiveReasons, setBookArchiveReasons] = useState<
+    Record<string, string>
+  >({});
 
   const queryClient = useQueryClient();
 
@@ -296,6 +300,14 @@ export function LibraryWorkspace({
     enabled: Boolean(viewingHistory),
   });
 
+  const createFineMutation = useMutation({
+    mutationFn: libraryApi.createFine,
+    onSuccess: () => {
+      setNotice("Manual fine recorded.");
+      void queryClient.invalidateQueries({ queryKey: ["library-fines"] });
+    },
+  });
+
   const updateFineMutation = useMutation({
     mutationFn: ({ id, body }: { id: string; body: any }) =>
       libraryApi.updateFine(id, body),
@@ -352,6 +364,15 @@ export function LibraryWorkspace({
     },
   });
 
+  const archiveBookMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      libraryApi.archiveBook(id, { reason }),
+    onSuccess: () => {
+      setNotice("Book archived with audit reason.");
+      invalidateLibrary();
+    },
+  });
+
   const createCopyMutation = useMutation({
     mutationFn: libraryApi.createCopy,
     onSuccess: () => {
@@ -398,6 +419,15 @@ export function LibraryWorkspace({
       libraryApi.archiveCopy(id, { reason }),
     onSuccess: () => {
       setNotice("Copy archived with audit reason.");
+      invalidateLibrary();
+    },
+  });
+
+  const deleteCopyMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      libraryApi.deleteCopy(id, { reason }),
+    onSuccess: () => {
+      setNotice("Copy removed.");
       invalidateLibrary();
     },
   });
@@ -653,6 +683,16 @@ export function LibraryWorkspace({
           onSubmit={handleBookSubmit}
           onEdit={editBook}
           onViewHistory={(type, id) => setViewingHistory({ type, id })}
+          onArchiveBook={(book, reason) =>
+            archiveBookMutation.mutate({ id: book.id, reason })
+          }
+          reasons={bookArchiveReasons}
+          setReason={(bookId, reason) =>
+            setBookArchiveReasons((current) => ({
+              ...current,
+              [bookId]: reason,
+            }))
+          }
           isLoading={booksQuery.isLoading}
           isSaving={
             createBookMutation.isPending || updateBookMutation.isPending
@@ -695,6 +735,9 @@ export function LibraryWorkspace({
           }
           onArchiveCopy={(copy, reason) =>
             archiveCopyMutation.mutate({ id: copy.id, reason })
+          }
+          onDeleteCopy={(copy, reason) =>
+            deleteCopyMutation.mutate({ id: copy.id, reason })
           }
           reasons={copyStatusReasons}
           setReason={(copyId, reason) =>
@@ -854,6 +897,10 @@ export function LibraryWorkspace({
       {activeTab === "fines" && (
         <FinesPanel
           fines={finesQuery.data?.items ?? []}
+          issues={issues}
+          onCreateFine={(body) => createFineMutation.mutate(body)}
+          isCreating={createFineMutation.isPending}
+          createError={createFineMutation.error}
           isLoading={finesQuery.isLoading}
           onUpdateFine={(id, body) => updateFineMutation.mutate({ id, body })}
           isUpdating={updateFineMutation.isPending}
@@ -1050,6 +1097,9 @@ function BooksPanel(props: {
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   onEdit: (book: LibraryBook) => void;
   onViewHistory: (type: "book" | "copy", id: string) => void;
+  onArchiveBook: (book: LibraryBook, reason: string) => void;
+  reasons: Record<string, string>;
+  setReason: (bookId: string, reason: string) => void;
   isLoading: boolean;
   isSaving: boolean;
   error: Error | null;
@@ -1058,6 +1108,8 @@ function BooksPanel(props: {
   meta?: LibraryPaginationMeta;
   onPageChange: (page: number) => void;
 }) {
+  const [pendingArchiveBook, setPendingArchiveBook] =
+    useState<LibraryBook | null>(null);
   const categories = Array.from(
     new Set(props.books.map((book) => book.subjectCategory).filter(Boolean)),
   ) as string[];
@@ -1136,6 +1188,9 @@ function BooksPanel(props: {
             const availableCopies = copiesForBook.filter(
               (copy) => copy.status === "AVAILABLE",
             ).length;
+            const hasIssuedCopy = copiesForBook.some(
+              (copy) => copy.status === "ISSUED",
+            );
             return (
               <div
                 key={book.id}
@@ -1193,6 +1248,15 @@ function BooksPanel(props: {
                     >
                       Copies
                     </Link>
+                    {!hasIssuedCopy && (
+                      <button
+                        type="button"
+                        onClick={() => setPendingArchiveBook(book)}
+                        className="btn-secondary text-red-600"
+                      >
+                        Archive
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1203,6 +1267,44 @@ function BooksPanel(props: {
           meta={props.meta}
           onPageChange={props.onPageChange}
         />
+        <ConfirmDialog
+          isOpen={Boolean(pendingArchiveBook)}
+          onClose={() => setPendingArchiveBook(null)}
+          onConfirm={() => {
+            if (pendingArchiveBook) {
+              props.onArchiveBook(
+                pendingArchiveBook,
+                props.reasons[pendingArchiveBook.id]?.trim() ?? "",
+              );
+            }
+            setPendingArchiveBook(null);
+          }}
+          title="Archive library book?"
+          description="Archives this book and all of its copies. Reservations against it are cancelled. Books with an issued copy cannot be archived."
+          confirmLabel="Archive book"
+          confirmDisabled={
+            pendingArchiveBook
+              ? !(props.reasons[pendingArchiveBook.id] ?? "").trim()
+              : false
+          }
+          variant="destructive"
+        >
+          {pendingArchiveBook ? (
+            <label className="block px-6 pb-2">
+              <span className="text-xs font-bold uppercase tracking-widest text-slate-500">
+                Audit reason
+              </span>
+              <textarea
+                value={props.reasons[pendingArchiveBook.id] ?? ""}
+                onChange={(event) =>
+                  props.setReason(pendingArchiveBook.id, event.target.value)
+                }
+                className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700"
+                placeholder="Record why this book is being retired from the catalogue."
+              />
+            </label>
+          ) : null}
+        </ConfirmDialog>
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -1323,6 +1425,7 @@ function CopiesPanel(props: {
   onViewHistory: (type: "book" | "copy", id: string) => void;
   onStatusChange: (copy: LibraryCopy, status: LibraryCopyStatus) => void;
   onArchiveCopy: (copy: LibraryCopy, reason: string) => void;
+  onDeleteCopy: (copy: LibraryCopy, reason: string) => void;
   reasons: Record<string, string>;
   setReason: (copyId: string, reason: string) => void;
   isLoading: boolean;
@@ -1338,6 +1441,8 @@ function CopiesPanel(props: {
     status: LibraryCopyStatus;
   } | null>(null);
   const [pendingArchiveCopy, setPendingArchiveCopy] =
+    useState<LibraryCopy | null>(null);
+  const [pendingDeleteCopy, setPendingDeleteCopy] =
     useState<LibraryCopy | null>(null);
 
   return (
@@ -1425,6 +1530,15 @@ function CopiesPanel(props: {
                       className="btn-secondary text-red-600"
                     >
                       Archive
+                    </button>
+                  )}
+                  {copy.status !== "ISSUED" && (
+                    <button
+                      type="button"
+                      onClick={() => setPendingDeleteCopy(copy)}
+                      className="btn-secondary text-red-600"
+                    >
+                      Delete
                     </button>
                   )}
                   {copy.status !== "ISSUED" &&
@@ -1535,6 +1649,44 @@ function CopiesPanel(props: {
                 }
                 className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700"
                 placeholder="Record why this copy is being archived and where the physical item is stored."
+              />
+            </label>
+          ) : null}
+        </ConfirmDialog>
+        <ConfirmDialog
+          isOpen={Boolean(pendingDeleteCopy)}
+          onClose={() => setPendingDeleteCopy(null)}
+          onConfirm={() => {
+            if (pendingDeleteCopy) {
+              props.onDeleteCopy(
+                pendingDeleteCopy,
+                props.reasons[pendingDeleteCopy.id]?.trim() ?? "",
+              );
+            }
+            setPendingDeleteCopy(null);
+          }}
+          title="Delete library copy?"
+          description="Permanently removes this copy if it has no circulation history. If the copy has issue or history records, it is archived instead of deleted."
+          confirmLabel="Delete copy"
+          confirmDisabled={
+            pendingDeleteCopy
+              ? !(props.reasons[pendingDeleteCopy.id] ?? "").trim()
+              : false
+          }
+          variant="destructive"
+        >
+          {pendingDeleteCopy ? (
+            <label className="block px-6 pb-2">
+              <span className="text-xs font-bold uppercase tracking-widest text-slate-500">
+                Audit reason
+              </span>
+              <textarea
+                value={props.reasons[pendingDeleteCopy.id] ?? ""}
+                onChange={(event) =>
+                  props.setReason(pendingDeleteCopy.id, event.target.value)
+                }
+                className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700"
+                placeholder="Record why this copy is being removed (e.g. duplicate barcode entered by mistake)."
               />
             </label>
           ) : null}
@@ -1897,6 +2049,7 @@ function IssuesPanel(props: {
             helperText="Scan or paste a student QR token; the borrower field updates automatically."
             submitLabel="Select"
             onResolved={handleBorrowerResolved}
+            resolve={(body) => libraryApi.resolveQrBorrower(body.token)}
             className="mt-4"
           />
           {resolvedBorrower ? (
@@ -2986,6 +3139,10 @@ function staffName(staff: {
 
 function FinesPanel({
   fines,
+  issues,
+  onCreateFine,
+  isCreating,
+  createError,
   isLoading,
   onUpdateFine,
   isUpdating,
@@ -2998,6 +3155,10 @@ function FinesPanel({
   onPageChange,
 }: {
   fines: any[];
+  issues: LibraryIssue[];
+  onCreateFine: (body: LibraryFinePayload) => void;
+  isCreating: boolean;
+  createError: Error | null;
   isLoading: boolean;
   onUpdateFine: (id: string, body: any) => void;
   isUpdating: boolean;
@@ -3014,6 +3175,9 @@ function FinesPanel({
   const [waiveAmount, setWaiveAmount] = useState<number>(0);
   const [postingId, setPostingId] = useState<string | null>(null);
   const [postReason, setPostReason] = useState("");
+  const [newFineIssueId, setNewFineIssueId] = useState("");
+  const [newFineAmount, setNewFineAmount] = useState<number>(0);
+  const [newFineNotes, setNewFineNotes] = useState("");
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -3022,6 +3186,68 @@ function FinesPanel({
         description="Track, waive, and hand student library fines to the Fees counter with mandatory audit logging."
       />
       {postError && <ErrorNotice message={postError.message} />}
+      <div className="mb-5 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+        <h3 className="text-sm font-bold text-slate-900">
+          Record a manual fine
+        </h3>
+        <p className="mt-1 text-xs text-slate-500">
+          For damage or loss found after a book was already returned. Most
+          overdue/lost fines are created automatically during return.
+        </p>
+        {createError && <ErrorNotice message={createError.message} />}
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!newFineIssueId || newFineAmount <= 0) return;
+            onCreateFine({
+              issueId: newFineIssueId,
+              amount: newFineAmount,
+              notes: newFineNotes.trim() || undefined,
+            });
+            setNewFineIssueId("");
+            setNewFineAmount(0);
+            setNewFineNotes("");
+          }}
+          className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto] sm:items-end"
+        >
+          <label className="block text-sm font-semibold text-slate-700">
+            Issue
+            <select
+              required
+              value={newFineIssueId}
+              onChange={(e) => setNewFineIssueId(e.target.value)}
+              className="input-control mt-1"
+            >
+              <option value="">Select an issue...</option>
+              {issues.map((issue) => (
+                <option key={issue.id} value={issue.id}>
+                  {issue.copy?.book?.title ?? "Untitled"} —{" "}
+                  {borrowerName(issue)} ({issue.status})
+                </option>
+              ))}
+            </select>
+          </label>
+          <TextInput
+            label="Amount (NPR)"
+            type="number"
+            value={newFineAmount.toString()}
+            onChange={(val) => setNewFineAmount(Number(val))}
+          />
+          <button
+            type="submit"
+            className="btn-primary"
+            disabled={isCreating || !newFineIssueId || newFineAmount <= 0}
+          >
+            {isCreating ? "Saving..." : "Add fine"}
+          </button>
+          <TextInput
+            label="Notes"
+            value={newFineNotes}
+            onChange={setNewFineNotes}
+            placeholder="e.g. Water damage found after return"
+          />
+        </form>
+      </div>
       <div className="mt-5 space-y-3">
         {queryError ? (
           <ErrorState

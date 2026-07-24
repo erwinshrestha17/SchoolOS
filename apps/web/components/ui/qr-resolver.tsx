@@ -19,6 +19,14 @@ type QRResolverProps = {
   helperText?: string;
   placeholder?: string;
   submitLabel?: string;
+  /**
+   * Override the resolve call for this purpose. Defaults to the generic
+   * `/students/qr/resolve` endpoint (`students:qr:resolve`), which no
+   * school-level role currently holds. Callers whose actors don't have that
+   * permission (e.g. Library's `librarian` role) must pass their own
+   * purpose-scoped resolver instead of relying on the default.
+   */
+  resolve?: (body: { token: string; purpose: string }) => Promise<any>;
 };
 
 export function QRResolver({
@@ -29,6 +37,7 @@ export function QRResolver({
   helperText = 'Scanner input stays ready after every successful scan.',
   placeholder = 'Scan student QR or paste token...',
   submitLabel = 'Resolve',
+  resolve = (body) => api.resolveStudentQr(body),
 }: QRResolverProps) {
   const [token, setToken] = useState('');
   const [isResolving, setIsResolving] = useState(false);
@@ -50,7 +59,7 @@ export function QRResolver({
     setSuccess(false);
 
     try {
-      const data = await api.resolveStudentQr({
+      const data = await resolve({
         token: submittedToken.trim(),
         purpose: normalizeQrPurpose(purpose),
       });

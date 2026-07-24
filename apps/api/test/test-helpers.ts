@@ -79,6 +79,13 @@ export interface MockState {
   learningAnswers: Record<string, unknown>[];
   learningProgress: Record<string, unknown>[];
   learningResources: Record<string, unknown>[];
+  libraryBooks: Record<string, unknown>[];
+  libraryCopies: Record<string, unknown>[];
+  libraryIssues: Record<string, unknown>[];
+  libraryFines: Record<string, unknown>[];
+  libraryReservations: Record<string, unknown>[];
+  librarySettings: Record<string, unknown>[];
+  libraryCopyHistories: Record<string, unknown>[];
   [key: string]: Record<string, unknown>[];
 }
 
@@ -355,6 +362,13 @@ export function createPrismaMock() {
     notificationPreferences: [] as Record<string, unknown>[],
     communicationPreferences: [] as Record<string, unknown>[],
     noticeAcknowledgements: [] as Record<string, unknown>[],
+    libraryBooks: [] as Record<string, unknown>[],
+    libraryCopies: [] as Record<string, unknown>[],
+    libraryIssues: [] as Record<string, unknown>[],
+    libraryFines: [] as Record<string, unknown>[],
+    libraryReservations: [] as Record<string, unknown>[],
+    librarySettings: [] as Record<string, unknown>[],
+    libraryCopyHistories: [] as Record<string, unknown>[],
   };
 
   const nextId = (prefix: string) =>
@@ -2413,6 +2427,12 @@ export function createPrismaMock() {
     'learningAnswer',
     'learningProgress',
     'learningResource',
+    'libraryBook',
+    'libraryCopy',
+    'libraryFine',
+    'libraryReservation',
+    'librarySetting',
+    'libraryCopyHistory',
   ];
 
   for (const model of dummyModels) {
@@ -2644,6 +2664,48 @@ export function createPrismaMock() {
               state.fileAssets.find(
                 (asset) => asset.id === enriched.fileAssetId,
               ) ?? null;
+          }
+        }
+        if (model === 'libraryCopy') {
+          if (qInclude.book) {
+            enriched.book =
+              state.libraryBooks.find((b) => b.id === enriched.bookId) ?? null;
+          }
+        }
+        if (model === 'libraryIssue') {
+          const resolveCopy = () =>
+            state.libraryCopies.find((c) => c.id === enriched.copyId) ?? null;
+          if (qInclude.copy) {
+            const copy = resolveCopy();
+            enriched.copy = copy
+              ? {
+                  ...copy,
+                  book:
+                    qInclude.copy === true || !qInclude.copy.include?.book
+                      ? undefined
+                      : (state.libraryBooks.find(
+                          (b) => b.id === (copy as any).bookId,
+                        ) ?? null),
+                }
+              : null;
+          }
+          if (qInclude.borrowerStudent) {
+            enriched.borrowerStudent =
+              state.students.find((s) => s.id === enriched.borrowerStudentId) ??
+              null;
+          }
+          if (qInclude.borrowerStaff) {
+            enriched.borrowerStaff =
+              state.staff.find((s) => s.id === enriched.borrowerStaffId) ??
+              null;
+          }
+          if (qInclude.fines) {
+            enriched.fines = state.libraryFines.filter(
+              (f) => f.issueId === enriched.id,
+            );
+          }
+          if (qInclude.invoice) {
+            enriched.invoice = null;
           }
         }
         return enriched;
