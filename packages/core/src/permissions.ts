@@ -1696,6 +1696,8 @@ const SCHOOL_CONFIG_OWNER_PERMISSION_KEYS = [
   "admission_policy:manage",
   "accounting:settings:read",
   "accounting:settings:update",
+  "consents:manage",
+  "communications:manage_consent",
   "users:create",
   "users:read",
   "users:update_status",

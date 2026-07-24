@@ -14,14 +14,15 @@ import { AuthenticatedRequest } from '../auth-request.interface';
 const permissionAliases: Record<string, string[]> = {
   'notifications:view_own': ['notices:read'],
   'notifications:manage_templates': ['communications:manage_templates'],
-  'notifications:manage_preferences': [
-    'communications:manage_consent',
-    'notices:read',
-  ],
+  // Gates only the self-scoped GET/PATCH .../communications/preferences and
+  // marketing opt-in/out routes, which resolve strictly to the caller's own
+  // linked guardian record (see M10HardeningService.getGuardianForActor) —
+  // safe to satisfy with the near-universal notices:read grant. Guardian
+  // consent capture/revoke for OTHER people and consent-template management
+  // are gated separately by consents:manage / communications:manage_consent.
+  'notifications:manage_preferences': ['notices:read'],
   'notifications:view_delivery_diagnostics': ['communications:read_deliveries'],
   'notifications:retry_deliveries': ['communications:retry_deliveries'],
-  'notices:approve': ['notices:create'],
-  'notices:send_emergency': ['notices:create'],
   'notices:read_reports': ['communications:read_deliveries'],
   'academics:create': ['academics:manage'],
   'academics:update': ['academics:manage'],

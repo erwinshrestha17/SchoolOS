@@ -108,4 +108,53 @@ describe('RolesPermissionsGuard', () => {
 
     await expect(guard.canActivate(context)).resolves.toBe(true);
   });
+
+  it('lets notices:read satisfy the self-scoped notification-preference gate', async () => {
+    (reflector.getAllAndOverride as jest.Mock)
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce(['notifications:manage_preferences']);
+    request.auth.permissions = ['notices:read'];
+
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+  });
+
+  it('does not let notices:read alone unlock guardian consent management', async () => {
+    (reflector.getAllAndOverride as jest.Mock)
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce(['consents:manage']);
+    request.auth.permissions = ['notices:read'];
+
+    await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
+  it('does not let notices:read alone unlock consent-template management', async () => {
+    (reflector.getAllAndOverride as jest.Mock)
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce(['communications:manage_consent']);
+    request.auth.permissions = ['notices:read'];
+
+    await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
+  it('does not let notices:create alone unlock notices:approve or notices:send_emergency', async () => {
+    request.auth.permissions = ['notices:create'];
+
+    (reflector.getAllAndOverride as jest.Mock)
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce(['notices:approve']);
+    await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+
+    (reflector.getAllAndOverride as jest.Mock)
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce(['notices:send_emergency']);
+    await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
 });

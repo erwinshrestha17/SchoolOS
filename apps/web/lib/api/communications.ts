@@ -23,13 +23,23 @@ import {
 export type NoticeDetail = {
   id: string;
   title: string;
+  titleNe: string | null;
   body: string;
+  bodyNe: string | null;
+  category: string;
+  isPinned: boolean;
+  templateId: string | null;
   priority: string;
   audienceType: string;
   classId: string | null;
   className: string | null;
   sectionId: string | null;
   sectionName: string | null;
+  roleNames: string[];
+  staffIds: string[];
+  studentIds: string[];
+  guardianIds: string[];
+  recipientUserIds: string[];
   createdBy: {
     id: string;
     email: string | null;

@@ -1,5 +1,5 @@
-import { ParentTeacherMessagingWorkspace } from '@/components/messaging/parent-teacher-messaging-workspace';
+import { ChatRemovedState } from '@/components/messaging/chat-removed-state';
 
 export default function MessagingPage() {
-  return <ParentTeacherMessagingWorkspace />;
+  return <ChatRemovedState />;
 }

@@ -1,10 +1,18 @@
-import { AudienceType, NoticePriority } from '@prisma/client';
 import {
+  AudienceType,
+  CommunicationTemplateCategory,
+  NoticePriority,
+} from '@prisma/client';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUUID,
   Length,
   MaxLength,
 } from 'class-validator';
@@ -15,10 +23,32 @@ export class CreateNoticeDraftDto {
   @MaxLength(200)
   title!: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  titleNe?: string;
+
   @IsString()
   @IsNotEmpty()
   @MaxLength(10_000)
   body!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(10_000)
+  bodyNe?: string;
+
+  @IsOptional()
+  @IsEnum(CommunicationTemplateCategory)
+  category?: CommunicationTemplateCategory;
+
+  @IsOptional()
+  @IsBoolean()
+  isPinned?: boolean;
+
+  @IsOptional()
+  @IsString()
+  templateId?: string;
 
   @IsOptional()
   @IsEnum(NoticePriority)
@@ -35,6 +65,36 @@ export class CreateNoticeDraftDto {
   @IsOptional()
   @IsString()
   sectionId?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  roleNames?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(500)
+  @IsUUID('4', { each: true })
+  staffIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(500)
+  @IsUUID('4', { each: true })
+  studentIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(500)
+  @IsUUID('4', { each: true })
+  guardianIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(500)
+  @IsUUID('4', { each: true })
+  recipientUserIds?: string[];
 
   @IsOptional()
   @IsString()
@@ -59,9 +119,31 @@ export class UpdateNoticeDraftDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(200)
+  titleNe?: string;
+
+  @IsOptional()
+  @IsString()
   @IsNotEmpty()
   @MaxLength(10_000)
   body?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(10_000)
+  bodyNe?: string;
+
+  @IsOptional()
+  @IsEnum(CommunicationTemplateCategory)
+  category?: CommunicationTemplateCategory;
+
+  @IsOptional()
+  @IsBoolean()
+  isPinned?: boolean;
+
+  @IsOptional()
+  @IsString()
+  templateId?: string;
 
   @IsOptional()
   @IsEnum(NoticePriority)
@@ -78,6 +160,36 @@ export class UpdateNoticeDraftDto {
   @IsOptional()
   @IsString()
   sectionId?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  roleNames?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(500)
+  @IsUUID('4', { each: true })
+  staffIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(500)
+  @IsUUID('4', { each: true })
+  studentIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(500)
+  @IsUUID('4', { each: true })
+  guardianIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(500)
+  @IsUUID('4', { each: true })
+  recipientUserIds?: string[];
 
   @IsOptional()
   @IsString()

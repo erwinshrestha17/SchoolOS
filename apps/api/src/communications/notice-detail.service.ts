@@ -1,5 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import type { NoticeLifecycleStatus } from '@prisma/client';
+import type {
+  CommunicationTemplateCategory,
+  NoticeLifecycleStatus,
+} from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -7,13 +10,23 @@ import { PrismaService } from '../prisma/prisma.service';
 export interface NoticeDetail {
   id: string;
   title: string;
+  titleNe: string | null;
   body: string;
+  bodyNe: string | null;
+  category: CommunicationTemplateCategory;
+  isPinned: boolean;
+  templateId: string | null;
   priority: string;
   audienceType: string;
   classId: string | null;
   className: string | null;
   sectionId: string | null;
   sectionName: string | null;
+  roleNames: string[];
+  staffIds: string[];
+  studentIds: string[];
+  guardianIds: string[];
+  recipientUserIds: string[];
   createdBy: {
     id: string;
     email: string | null;
@@ -174,13 +187,23 @@ export class NoticeDetailService {
     return {
       id: notice.id,
       title: notice.title,
+      titleNe: notice.titleNe,
       body: notice.body,
+      bodyNe: notice.bodyNe,
+      category: notice.category,
+      isPinned: notice.isPinned,
+      templateId: notice.templateId,
       priority: notice.priority,
       audienceType: notice.audienceType,
       classId: notice.classId,
       className: notice.class?.name ?? null,
       sectionId: notice.sectionId,
       sectionName: notice.section?.name ?? null,
+      roleNames: notice.roleNames,
+      staffIds: notice.staffIds,
+      studentIds: notice.studentIds,
+      guardianIds: notice.guardianIds,
+      recipientUserIds: notice.recipientUserIds,
       createdBy:
         canAdministerNotice && notice.createdBy
           ? {

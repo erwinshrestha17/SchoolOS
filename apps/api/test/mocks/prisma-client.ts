@@ -621,6 +621,7 @@ export const AudienceType = {
   CLASS: 'CLASS',
   SECTION: 'SECTION',
   ROLE: 'ROLE',
+  STAFF: 'STAFF',
   STUDENT: 'STUDENT',
 } as const;
 

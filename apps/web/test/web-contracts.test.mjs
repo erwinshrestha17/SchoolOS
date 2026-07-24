@@ -2699,26 +2699,6 @@ describe('SchoolOS web production contracts', () => {
     }
   });
 
-  it('keeps parent-teacher messaging moderation and escalation decisions explicit', () => {
-    const messaging = read(
-      'components/messaging/parent-teacher-messaging-workspace.tsx',
-    );
-
-    for (const marker of [
-      'chat-moderation-decision-panel',
-      'Safety & Escalation Queue',
-      'getModerationDecision',
-      'Concern reason',
-      'Moderation reason',
-      'Escalation reason',
-      'Thread closed with an audited moderation reason.',
-      'Thread escalated for school leadership review.',
-      'Escalated thread needs owner review',
-    ]) {
-      assert.ok(messaging.includes(marker), `Missing marker: ${marker}`);
-    }
-  });
-
   it('keeps notice unread recipient follow-up controls available', () => {
     const noticeDetail = read('app/dashboard/notices/[noticeId]/page.tsx');
 
@@ -2743,7 +2723,6 @@ describe('SchoolOS web production contracts', () => {
       'components/forms/communications-form.tsx',
       'components/forms/delivery-retry-panel.tsx',
       'components/forms/notice-detail-links-panel.tsx',
-      'components/messaging/parent-teacher-messaging-workspace.tsx',
       'app/dashboard/notices/[noticeId]/page.tsx',
     ];
     const forbidden = [
@@ -2794,9 +2773,6 @@ describe('SchoolOS web production contracts', () => {
   it('uses the shared M15 workspace shell without browser-derived official totals', () => {
     const workspace = read('components/notices/notices-workspace.tsx');
     const communicationsForm = read('components/forms/communications-form.tsx');
-    const messaging = read(
-      'components/messaging/parent-teacher-messaging-workspace.tsx',
-    );
 
     for (const marker of [
       '<ModuleHeader',
@@ -2814,8 +2790,6 @@ describe('SchoolOS web production contracts', () => {
     assert.match(communicationsForm, /<FilterBar/);
     assert.doesNotMatch(communicationsForm, /delivery\.destination \?\?/);
     assert.doesNotMatch(communicationsForm, /delivery\.sourceId/);
-    assert.match(messaging, /TablePagination/);
-    assert.match(messaging, /escalated thread is locked/);
   });
 
   it('removes default emergency sample copy from communications', () => {
@@ -2828,6 +2802,29 @@ describe('SchoolOS web production contracts', () => {
     );
     assert.doesNotMatch(communicationsForm, /Parent-teacher meeting/);
     assert.doesNotMatch(communicationsForm, /replace-me/i);
+  });
+
+  it('keeps every legacy chat/messaging route on the removed-state stub, not a live workspace', () => {
+    for (const route of [
+      'dashboard/messages',
+      'dashboard/messages/[threadId]',
+      'dashboard/messages/threads',
+      'dashboard/messages/moderation',
+      'dashboard/messaging',
+    ]) {
+      const page = read(`app/${route}/page.tsx`);
+      assert.match(page, /ChatRemovedState/, `${route} must render ChatRemovedState`);
+    }
+
+    assert.ok(
+      !existsSync(
+        join(
+          webRoot,
+          'components/messaging/parent-teacher-messaging-workspace.tsx',
+        ),
+      ),
+      'the removed live messaging workspace component must not be reintroduced',
+    );
   });
 
   it('provides a dedicated HR & Payroll workspace with contract and leave management', () => {

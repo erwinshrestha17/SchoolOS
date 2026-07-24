@@ -15,6 +15,7 @@ import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import {
   AudienceType,
   AuthMethod,
+  type CommunicationTemplateCategory,
   CommunicationTemplateStatus,
   ConsentType,
   EventType,
@@ -108,11 +109,21 @@ const PROVIDER_CHANNELS = [
 
 export interface NoticeDraftInput {
   title: string;
+  titleNe?: string;
   body: string;
+  bodyNe?: string;
+  category?: CommunicationTemplateCategory;
+  isPinned?: boolean;
+  templateId?: string;
   priority: NoticePriority;
   audienceType: AudienceType;
   classId?: string;
   sectionId?: string;
+  roleNames?: string[];
+  staffIds?: string[];
+  studentIds?: string[];
+  guardianIds?: string[];
+  recipientUserIds?: string[];
   attachmentFileId?: string;
   scheduledFor?: string;
   idempotencyKey: string;
@@ -343,11 +354,21 @@ export class CommunicationsService {
         tenantId: actor.tenantId,
         createdById: actor.userId,
         title: dto.title,
+        titleNe: dto.titleNe ?? null,
         body: dto.body,
+        bodyNe: dto.bodyNe ?? null,
+        category: dto.category ?? undefined,
+        isPinned: dto.isPinned ?? false,
+        templateId: dto.templateId ?? null,
         priority,
         audienceType: dto.audienceType ?? AudienceType.ALL,
         classId: dto.classId ?? null,
         sectionId: dto.sectionId ?? null,
+        roleNames: dto.roleNames ?? [],
+        staffIds: dto.staffIds ?? [],
+        studentIds: dto.studentIds ?? [],
+        guardianIds: dto.guardianIds ?? [],
+        recipientUserIds: dto.recipientUserIds ?? [],
         attachmentUrl,
         lifecycleStatus,
         scheduledFor: dto.scheduledFor ? new Date(dto.scheduledFor) : null,
@@ -407,11 +428,21 @@ export class CommunicationsService {
           tenantId: actor.tenantId,
           createdById: actor.userId,
           title: input.title.trim(),
+          titleNe: input.titleNe?.trim() || null,
           body: input.body.trim(),
+          bodyNe: input.bodyNe?.trim() || null,
+          category: input.category ?? undefined,
+          isPinned: input.isPinned ?? false,
+          templateId: input.templateId ?? null,
           priority: input.priority,
           audienceType: input.audienceType,
           classId: input.classId ?? null,
           sectionId: input.sectionId ?? null,
+          roleNames: input.roleNames ?? [],
+          staffIds: input.staffIds ?? [],
+          studentIds: input.studentIds ?? [],
+          guardianIds: input.guardianIds ?? [],
+          recipientUserIds: input.recipientUserIds ?? [],
           attachmentUrl: null,
           idempotencyKey: input.idempotencyKey,
           lifecycleStatus: NoticeLifecycleStatus.DRAFT,
@@ -491,11 +522,21 @@ export class CommunicationsService {
       where: { id: notice.id },
       data: {
         title: dto.title?.trim(),
+        titleNe: dto.titleNe?.trim(),
         body: dto.body?.trim(),
+        bodyNe: dto.bodyNe?.trim(),
+        category: dto.category,
+        isPinned: dto.isPinned,
+        templateId: dto.templateId,
         priority: dto.priority,
         audienceType: dto.audienceType,
         classId: dto.classId,
         sectionId: dto.sectionId,
+        roleNames: dto.roleNames,
+        staffIds: dto.staffIds,
+        studentIds: dto.studentIds,
+        guardianIds: dto.guardianIds,
+        recipientUserIds: dto.recipientUserIds,
         scheduledFor: dto.scheduledFor ? scheduledFor : undefined,
         expiresAt: dto.expiresAt ? expiresAt : undefined,
       },
@@ -561,6 +602,11 @@ export class CommunicationsService {
         audienceType: notice.audienceType,
         classId: notice.classId ?? undefined,
         sectionId: notice.sectionId ?? undefined,
+        roleNames: notice.roleNames,
+        staffIds: notice.staffIds,
+        studentIds: notice.studentIds,
+        guardianIds: notice.guardianIds,
+        recipientUserIds: notice.recipientUserIds,
       },
       actor,
     );
@@ -957,6 +1003,11 @@ export class CommunicationsService {
       audienceType: dto.audienceType ?? AudienceType.ALL,
       classId: dto.classId ?? null,
       sectionId: dto.sectionId ?? null,
+      roleNames: dto.roleNames,
+      staffIds: dto.staffIds,
+      studentIds: dto.studentIds,
+      guardianIds: dto.guardianIds,
+      recipientUserIds: dto.recipientUserIds,
       title: dto.title,
       body: dto.body,
       channels,
@@ -2610,6 +2661,37 @@ export class CommunicationsService {
       );
     }
 
+    // Reached only when staffIds was not provided: a STAFF audience without
+    // an explicit staff selection has no one to notify (safer than falling
+    // through to the unrelated student query below).
+    if (input.audienceType === AudienceType.STAFF) {
+      return [];
+    }
+
+    // Guardians targeted directly (PRD "linked-parent" audience), not as a
+    // sub-filter on a known student's guardian links (that case always pairs
+    // guardianIds with studentIds and is handled by the student query below,
+    // e.g. students.service.ts's guardian-invitation flow).
+    if (input.guardianIds?.length && !input.studentIds?.length) {
+      const guardians = await this.prisma.guardian.findMany({
+        where: {
+          tenantId: input.actor.tenantId,
+          id: { in: input.guardianIds },
+        },
+        include: { user: true },
+      });
+
+      return deduplicateRecipients(
+        guardians.map((guardian) => ({
+          studentId: '',
+          guardianId: guardian.id,
+          userId: guardian.userId,
+          email: guardian.email ?? guardian.user?.email ?? null,
+          phone: guardian.primaryPhone,
+        })),
+      );
+    }
+
     const students = await this.prisma.student.findMany({
       where: {
         tenantId: input.actor.tenantId,
@@ -2690,6 +2772,11 @@ export class CommunicationsService {
       audienceType: notice.audienceType,
       classId: notice.classId,
       sectionId: notice.sectionId,
+      roleNames: notice.roleNames,
+      staffIds: notice.staffIds,
+      studentIds: notice.studentIds,
+      guardianIds: notice.guardianIds,
+      recipientUserIds: notice.recipientUserIds,
       title: notice.title,
       body: notice.body,
       priority: notice.priority,
@@ -2737,6 +2824,11 @@ export class CommunicationsService {
         audienceType: event.audienceType,
         classId: event.classId,
         sectionId: event.sectionId,
+        roleNames: event.roleNames,
+        staffIds: event.staffIds,
+        studentIds: event.studentIds,
+        guardianIds: event.guardianIds,
+        recipientUserIds: event.recipientUserIds,
         title: event.title,
         body: event.body,
         channels: noticeChannels(event.priority),
@@ -2933,6 +3025,11 @@ type NoticePublishedEvent = TenantDomainEvent & {
   audienceType: AudienceType;
   classId: string | null;
   sectionId: string | null;
+  roleNames: string[];
+  staffIds: string[];
+  studentIds: string[];
+  guardianIds: string[];
+  recipientUserIds: string[];
   title: string;
   body: string;
   priority: NoticePriority;

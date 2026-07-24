@@ -5,6 +5,7 @@ import { AlertTriangle, Eye, FileText, Save } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
+import { usersApi } from "@/lib/api/users";
 import {
   communicationsApi,
   type NoticeRecipientPreview,
@@ -15,27 +16,75 @@ import { ErrorState } from "@/components/ui/error-state";
 import { PermissionDenied } from "@/components/ui/permission-denied";
 import { useSession } from "@/components/session-provider";
 
+const CATEGORY_OPTIONS = [
+  "GENERAL",
+  "HOLIDAY",
+  "EMERGENCY",
+  "FEES",
+  "EXAMS",
+  "TRANSPORT_DELAY",
+  "EVENT",
+] as const;
+
+// GUARDIANS and RECIPIENTS are client-side-only audience choices. Neither
+// maps to a distinct backend AudienceType: the resolver targets guardianIds
+// or recipientUserIds directly whenever they're present (see
+// resolveAudienceRecipients in communications.service.ts), so both send
+// audienceType "ALL" alongside the relevant id list.
+type ComposerAudienceType =
+  | "ALL"
+  | "CLASS"
+  | "SECTION"
+  | "ROLE"
+  | "STAFF"
+  | "STUDENT"
+  | "GUARDIANS"
+  | "RECIPIENTS";
+
 type NoticeDraftForm = {
   title: string;
+  titleNe: string;
   body: string;
+  bodyNe: string;
+  category: (typeof CATEGORY_OPTIONS)[number];
+  isPinned: boolean;
   priority: "NORMAL" | "URGENT" | "EMERGENCY";
-  audienceType: "ALL" | "CLASS" | "SECTION";
+  audienceType: ComposerAudienceType;
   classId: string;
   sectionId: string;
+  roleNames: string[];
+  idListText: string;
   attachmentFileId: string;
   attachmentFileName: string;
 };
 
 const emptyDraft: NoticeDraftForm = {
   title: "",
+  titleNe: "",
   body: "",
+  bodyNe: "",
+  category: "GENERAL",
+  isPinned: false,
   priority: "NORMAL",
   audienceType: "ALL",
   classId: "",
   sectionId: "",
+  roleNames: [],
+  idListText: "",
   attachmentFileId: "",
   attachmentFileName: "",
 };
+
+function parseIdList(text: string): string[] {
+  return Array.from(
+    new Set(
+      text
+        .split(/[\s,]+/)
+        .map((value) => value.trim())
+        .filter(Boolean),
+    ),
+  );
+}
 
 export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
   const router = useRouter();
@@ -69,16 +118,43 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
     enabled: (canCreate || canEdit) && form.audienceType === "SECTION",
   });
 
+  const rolesQuery = useQuery({
+    queryKey: ["role-catalog"],
+    queryFn: () => usersApi.listRoleCatalog(),
+    enabled: canCreate || canEdit,
+  });
+
   useEffect(() => {
     const notice = detailQuery.data;
     if (!notice) return;
+    let audienceType: ComposerAudienceType =
+      notice.audienceType as ComposerAudienceType;
+    let idListText = "";
+    if (notice.guardianIds.length > 0 && notice.studentIds.length === 0) {
+      audienceType = "GUARDIANS";
+      idListText = notice.guardianIds.join(", ");
+    } else if (notice.recipientUserIds.length > 0) {
+      audienceType = "RECIPIENTS";
+      idListText = notice.recipientUserIds.join(", ");
+    } else if (notice.audienceType === "STAFF") {
+      idListText = notice.staffIds.join(", ");
+    } else if (notice.audienceType === "STUDENT") {
+      idListText = notice.studentIds.join(", ");
+    }
     setForm({
       title: notice.title,
+      titleNe: notice.titleNe ?? "",
       body: notice.body,
+      bodyNe: notice.bodyNe ?? "",
+      category: (notice.category ??
+        "GENERAL") as NoticeDraftForm["category"],
+      isPinned: notice.isPinned ?? false,
       priority: notice.priority as NoticeDraftForm["priority"],
-      audienceType: notice.audienceType as NoticeDraftForm["audienceType"],
+      audienceType,
       classId: notice.classId ?? "",
       sectionId: notice.sectionId ?? "",
+      roleNames: notice.roleNames ?? [],
+      idListText,
       attachmentFileId: notice.attachmentFileId ?? "",
       attachmentFileName: notice.attachmentFileId ? "Protected attachment" : "",
     });
@@ -98,7 +174,9 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
     form.audienceType,
     form.body,
     form.classId,
+    form.idListText,
     form.priority,
+    form.roleNames,
     form.sectionId,
     form.title,
   ]);
@@ -219,6 +297,17 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
             className="min-h-11"
           />
         </Field>
+        <Field label="Title (Nepali, optional)">
+          <input
+            value={form.titleNe}
+            maxLength={200}
+            onChange={(event) =>
+              change(setForm, setDirty, "titleNe", event.target.value)
+            }
+            placeholder="बिदाको सूचना"
+            className="min-h-11"
+          />
+        </Field>
         <Field label="Concise message">
           <textarea
             value={form.body}
@@ -229,6 +318,18 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
             }
             placeholder="Write the school-facing message"
             className="min-h-44 rounded-xl border border-slate-200 px-3 py-2"
+          />
+        </Field>
+        <Field label="Message (Nepali, optional)">
+          <textarea
+            value={form.bodyNe}
+            maxLength={10_000}
+            rows={6}
+            onChange={(event) =>
+              change(setForm, setDirty, "bodyNe", event.target.value)
+            }
+            placeholder="विद्यालय-सम्बन्धी सन्देश नेपालीमा लेख्नुहोस्"
+            className="min-h-32 rounded-xl border border-slate-200 px-3 py-2"
           />
         </Field>
 
@@ -251,17 +352,53 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
               <option value="EMERGENCY">Emergency</option>
             </select>
           </Field>
+          <Field label="Category">
+            <select
+              value={form.category}
+              onChange={(event) =>
+                change(
+                  setForm,
+                  setDirty,
+                  "category",
+                  event.target.value as NoticeDraftForm["category"],
+                )
+              }
+              className="min-h-11"
+            >
+              {CATEGORY_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {formatCategoryLabel(option)}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <label className="flex items-center gap-2 self-end pb-2 text-sm font-semibold text-slate-700">
+            <input
+              type="checkbox"
+              checked={form.isPinned}
+              onChange={(event) =>
+                change(setForm, setDirty, "isPinned", event.target.checked)
+              }
+              className="h-4 w-4"
+            />
+            Pin to top of notices list
+          </label>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
           <Field label="Audience">
             <select
               value={form.audienceType}
               onChange={(event) => {
                 const audienceType = event.target
-                  .value as NoticeDraftForm["audienceType"];
+                  .value as ComposerAudienceType;
                 setForm((current) => ({
                   ...current,
                   audienceType,
                   classId: "",
                   sectionId: "",
+                  roleNames: [],
+                  idListText: "",
                 }));
                 setDirty(true);
               }}
@@ -270,9 +407,14 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
               <option value="ALL">Whole school</option>
               <option value="CLASS">Class</option>
               <option value="SECTION">Section</option>
+              <option value="ROLE">Role</option>
+              <option value="STAFF">Specific staff</option>
+              <option value="STUDENT">Specific students</option>
+              <option value="GUARDIANS">Specific guardians (linked parents)</option>
+              <option value="RECIPIENTS">Specific people</option>
             </select>
           </Field>
-          {form.audienceType !== "ALL" ? (
+          {form.audienceType === "CLASS" || form.audienceType === "SECTION" ? (
             <Field label="Class">
               <select
                 value={form.classId}
@@ -295,24 +437,70 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
               </select>
             </Field>
           ) : null}
+          {form.audienceType === "SECTION" ? (
+            <Field label="Section">
+              <select
+                value={form.sectionId}
+                onChange={(event) =>
+                  change(setForm, setDirty, "sectionId", event.target.value)
+                }
+                className="min-h-11"
+              >
+                <option value="">Select section</option>
+                {sections.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ) : null}
         </div>
 
-        {form.audienceType === "SECTION" ? (
-          <Field label="Section">
+        {form.audienceType === "ROLE" ? (
+          <Field label="Roles to notify">
             <select
-              value={form.sectionId}
-              onChange={(event) =>
-                change(setForm, setDirty, "sectionId", event.target.value)
-              }
-              className="min-h-11"
+              multiple
+              value={form.roleNames}
+              onChange={(event) => {
+                const selected = Array.from(
+                  event.target.selectedOptions,
+                  (option) => option.value,
+                );
+                change(setForm, setDirty, "roleNames", selected);
+              }}
+              className="min-h-28 rounded-xl border border-slate-200 px-3 py-2"
             >
-              <option value="">Select section</option>
-              {sections.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
+              {(rolesQuery.data ?? []).map((role) => (
+                <option key={role.id} value={role.name}>
+                  {role.name}
                 </option>
               ))}
             </select>
+            <p className="text-xs font-normal text-slate-500">
+              Hold Ctrl/Cmd to select multiple roles.
+            </p>
+          </Field>
+        ) : null}
+
+        {form.audienceType === "STAFF" ||
+        form.audienceType === "STUDENT" ||
+        form.audienceType === "GUARDIANS" ||
+        form.audienceType === "RECIPIENTS" ? (
+          <Field label={idListLabel(form.audienceType)}>
+            <textarea
+              value={form.idListText}
+              rows={3}
+              onChange={(event) =>
+                change(setForm, setDirty, "idListText", event.target.value)
+              }
+              placeholder="Paste IDs separated by commas or new lines"
+              className="min-h-20 rounded-xl border border-slate-200 px-3 py-2 font-mono text-xs"
+            />
+            <p className="text-xs font-normal text-slate-500">
+              {parseIdList(form.idListText).length} ID
+              {parseIdList(form.idListText).length === 1 ? "" : "s"} entered.
+            </p>
           </Field>
         ) : null}
 
@@ -430,13 +618,34 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
 }
 
 function payload(form: NoticeDraftForm) {
+  const ids = parseIdList(form.idListText);
+  // GUARDIANS and RECIPIENTS are composer-only concepts: the backend
+  // resolver targets guardianIds/recipientUserIds directly whenever they're
+  // present, regardless of audienceType, so both send audienceType "ALL".
+  const audienceType =
+    form.audienceType === "GUARDIANS" || form.audienceType === "RECIPIENTS"
+      ? "ALL"
+      : form.audienceType;
+
   return {
     title: form.title.trim(),
+    titleNe: form.titleNe.trim() || undefined,
     body: form.body.trim(),
+    bodyNe: form.bodyNe.trim() || undefined,
+    category: form.category,
+    isPinned: form.isPinned,
     priority: form.priority,
-    audienceType: form.audienceType,
-    classId: form.audienceType === "ALL" ? null : form.classId || null,
+    audienceType,
+    classId:
+      form.audienceType === "CLASS" || form.audienceType === "SECTION"
+        ? form.classId || null
+        : null,
     sectionId: form.audienceType === "SECTION" ? form.sectionId || null : null,
+    roleNames: form.audienceType === "ROLE" ? form.roleNames : undefined,
+    staffIds: form.audienceType === "STAFF" ? ids : undefined,
+    studentIds: form.audienceType === "STUDENT" ? ids : undefined,
+    guardianIds: form.audienceType === "GUARDIANS" ? ids : undefined,
+    recipientUserIds: form.audienceType === "RECIPIENTS" ? ids : undefined,
     attachmentFileId: form.attachmentFileId || undefined,
   };
 }
@@ -444,11 +653,45 @@ function payload(form: NoticeDraftForm) {
 function validate(form: NoticeDraftForm) {
   if (!form.title.trim()) return "Enter a notice title.";
   if (!form.body.trim()) return "Enter a concise notice message.";
-  if (form.audienceType !== "ALL" && !form.classId)
+  if (
+    (form.audienceType === "CLASS" || form.audienceType === "SECTION") &&
+    !form.classId
+  )
     return "Select a class for this audience.";
   if (form.audienceType === "SECTION" && !form.sectionId)
     return "Select a section for this audience.";
+  if (form.audienceType === "ROLE" && form.roleNames.length === 0)
+    return "Select at least one role for this audience.";
+  if (
+    (form.audienceType === "STAFF" ||
+      form.audienceType === "STUDENT" ||
+      form.audienceType === "GUARDIANS" ||
+      form.audienceType === "RECIPIENTS") &&
+    parseIdList(form.idListText).length === 0
+  )
+    return "Enter at least one ID for this audience.";
   return null;
+}
+
+function formatCategoryLabel(category: string) {
+  return category
+    .toLowerCase()
+    .split("_")
+    .map((word) => word[0]?.toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function idListLabel(audienceType: ComposerAudienceType) {
+  switch (audienceType) {
+    case "STAFF":
+      return "Staff IDs";
+    case "STUDENT":
+      return "Student IDs";
+    case "GUARDIANS":
+      return "Guardian IDs";
+    default:
+      return "Recipient user IDs";
+  }
 }
 
 function change<K extends keyof NoticeDraftForm>(

@@ -116,7 +116,7 @@ export class M10HardeningController {
   }
 
   @Post('communications/consent/templates')
-  @Permissions('notifications:manage_preferences')
+  @Permissions('communications:manage_consent')
   createConsentTemplate(
     @Body() dto: CreateConsentTemplateDto,
     @CurrentAuth() auth: AuthContext,
@@ -125,19 +125,19 @@ export class M10HardeningController {
   }
 
   @Get('communications/consent/templates')
-  @Permissions('notifications:manage_preferences')
+  @Permissions('communications:manage_consent')
   listConsentTemplates(@CurrentAuth() auth: AuthContext) {
     return this.m10HardeningService.listConsentTemplates(auth, false);
   }
 
   @Get('communications/consent/templates/active')
-  @Permissions('notifications:manage_preferences')
+  @Permissions('communications:manage_consent')
   listActiveConsentTemplates(@CurrentAuth() auth: AuthContext) {
     return this.m10HardeningService.listConsentTemplates(auth, true);
   }
 
   @Patch('communications/consent/templates/:templateId')
-  @Permissions('notifications:manage_preferences')
+  @Permissions('communications:manage_consent')
   updateConsentTemplate(
     @Param('templateId') templateId: string,
     @Body() dto: UpdateConsentTemplateDto,
@@ -151,7 +151,7 @@ export class M10HardeningController {
   }
 
   @Post('communications/consent/templates/:templateId/publish')
-  @Permissions('notifications:manage_preferences')
+  @Permissions('communications:manage_consent')
   publishConsentTemplate(
     @Param('templateId') templateId: string,
     @CurrentAuth() auth: AuthContext,
@@ -160,7 +160,7 @@ export class M10HardeningController {
   }
 
   @Post('communications/consent/templates/:templateId/archive')
-  @Permissions('notifications:manage_preferences')
+  @Permissions('communications:manage_consent')
   archiveConsentTemplate(
     @Param('templateId') templateId: string,
     @CurrentAuth() auth: AuthContext,

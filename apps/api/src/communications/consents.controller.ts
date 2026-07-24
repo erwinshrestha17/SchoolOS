@@ -17,13 +17,13 @@ export class ConsentsController {
   constructor(private readonly communicationsService: CommunicationsService) {}
 
   @Get()
-  @Permissions('notifications:manage_preferences')
+  @Permissions('consents:manage')
   listConsents(@CurrentAuth() auth: AuthContext) {
     return this.communicationsService.listConsents(auth);
   }
 
   @Post()
-  @Permissions('notifications:manage_preferences')
+  @Permissions('consents:manage')
   captureConsent(
     @Body() dto: CaptureConsentDto,
     @CurrentAuth() auth: AuthContext,
@@ -32,7 +32,7 @@ export class ConsentsController {
   }
 
   @Get('guardians/:guardianId/status')
-  @Permissions('notifications:manage_preferences')
+  @Permissions('consents:manage')
   getGuardianConsentStatus(
     @Param('guardianId') guardianId: string,
     @CurrentAuth() auth: AuthContext,
@@ -44,7 +44,7 @@ export class ConsentsController {
   }
 
   @Post('guardians/:guardianId/capture')
-  @Permissions('notifications:manage_preferences')
+  @Permissions('consents:manage')
   captureGuardianConsent(
     @Param('guardianId') guardianId: string,
     @Body() dto: GuardianConsentActionDto,
@@ -61,7 +61,7 @@ export class ConsentsController {
   }
 
   @Post('guardians/:guardianId/revoke')
-  @Permissions('notifications:manage_preferences')
+  @Permissions('consents:manage')
   revokeGuardianConsent(
     @Param('guardianId') guardianId: string,
     @Body() dto: GuardianConsentActionDto,

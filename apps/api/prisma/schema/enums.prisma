@@ -227,6 +227,7 @@ enum AudienceType {
   CLASS
   SECTION
   ROLE
+  STAFF
   STUDENT
 }
 

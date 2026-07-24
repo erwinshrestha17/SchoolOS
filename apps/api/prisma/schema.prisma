@@ -243,6 +243,7 @@ enum AudienceType {
   CLASS
   SECTION
   ROLE
+  STAFF
   STUDENT
 }
 
@@ -3423,9 +3424,19 @@ model Notice {
   sectionId          String?
   createdById        String?
   title              String
+  titleNe            String?
   body               String
+  bodyNe             String?
+  category           CommunicationTemplateCategory @default(GENERAL)
+  isPinned           Boolean               @default(false)
+  templateId         String?
   priority           NoticePriority        @default(NORMAL)
   audienceType       AudienceType          @default(ALL)
+  roleNames          String[]              @default([])
+  staffIds           String[]              @default([])
+  studentIds         String[]              @default([])
+  guardianIds        String[]              @default([])
+  recipientUserIds   String[]              @default([])
   attachmentUrl      String?
   idempotencyKey     String?
   lifecycleStatus    NoticeLifecycleStatus @default(DRAFT)
@@ -3447,11 +3458,13 @@ model Notice {
   class      Class?                 @relation(fields: [classId], references: [id])
   section    Section?               @relation(fields: [sectionId], references: [id])
   createdBy  User?                  @relation("CreatedNotices", fields: [createdById], references: [id])
+  template   CommunicationTemplate? @relation(fields: [templateId], references: [id])
   deliveries NotificationDelivery[]
   acknowledgements NoticeAcknowledgement[]
 
   @@unique([tenantId, idempotencyKey])
   @@index([tenantId, lifecycleStatus, scheduledFor])
+  @@index([tenantId, isPinned, publishedAt])
 }
 
 model NoticeAcknowledgement {
@@ -3668,7 +3681,8 @@ model CommunicationTemplate {
   createdAt   DateTime                      @default(now())
   updatedAt   DateTime                      @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  notices Notice[]
 
   @@unique([tenantId, key, version])
   @@index([tenantId, status, category])

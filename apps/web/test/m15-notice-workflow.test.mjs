@@ -40,7 +40,10 @@ describe('M15 saved-draft review and publication workflow', () => {
   it('hides whole-school class and section fields and clears stale audience selections', () => {
     const composer = read('components/notices/notice-composer-workspace.tsx');
 
-    assert.match(composer, /form\.audienceType !== "ALL" \? \(/);
+    assert.match(
+      composer,
+      /form\.audienceType === "CLASS" \|\| form\.audienceType === "SECTION" \? \(/,
+    );
     assert.match(composer, /form\.audienceType === "SECTION" \? \(/);
     assert.match(
       composer,

@@ -37,6 +37,7 @@ describe('CommunicationsService', () => {
       },
       staff: {
         findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
       },
       subjectTeacherAssignment: {
         findMany: jest.fn().mockResolvedValue([]),
@@ -101,6 +102,7 @@ describe('CommunicationsService', () => {
       },
       guardian: {
         findFirst: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
         update: jest.fn(),
       },
       guardianConsent: {
@@ -675,6 +677,93 @@ describe('CommunicationsService', () => {
         attachmentUrl: 'http://localhost:4000/api/v1/files/file-1/preview',
       }),
     });
+  });
+
+  it('persists category, bilingual content, pin, template, and audience targeting fields', async () => {
+    prisma.notice.create.mockResolvedValue({
+      id: 'notice-1',
+      title: 'Holiday notice',
+      body: 'School is closed for Dashain.',
+      priority: NoticePriority.NORMAL,
+      audienceType: AudienceType.STAFF,
+      staffIds: ['staff-1'],
+      classId: null,
+      sectionId: null,
+      publishedAt: new Date('2026-07-24T00:00:00.000Z'),
+    });
+    prisma.staff.findMany.mockResolvedValue([]);
+    prisma.notificationDelivery.findMany.mockResolvedValue([]);
+
+    await service.createNotice(
+      {
+        title: 'Holiday notice',
+        titleNe: 'बिदाको सूचना',
+        body: 'School is closed for Dashain.',
+        bodyNe: 'दशैंको लागि विद्यालय बन्द छ।',
+        category: CommunicationTemplateCategory.HOLIDAY,
+        isPinned: true,
+        templateId: 'template-1',
+        audienceType: AudienceType.STAFF,
+        staffIds: ['staff-1'],
+      },
+      actor,
+    );
+
+    expect(prisma.notice.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        titleNe: 'बिदाको सूचना',
+        bodyNe: 'दशैंको लागि विद्यालय बन्द छ।',
+        category: CommunicationTemplateCategory.HOLIDAY,
+        isPinned: true,
+        templateId: 'template-1',
+        audienceType: AudienceType.STAFF,
+        staffIds: ['staff-1'],
+        roleNames: [],
+        studentIds: [],
+        guardianIds: [],
+        recipientUserIds: [],
+      }),
+    });
+  });
+
+  it('carries audience targeting fields from the published notice row into the delivery pipeline', async () => {
+    prisma.notice.create.mockResolvedValue({
+      id: 'notice-1',
+      title: 'Role update',
+      body: 'For accountants only.',
+      priority: NoticePriority.NORMAL,
+      audienceType: AudienceType.ROLE,
+      roleNames: ['accountant'],
+      staffIds: [],
+      studentIds: [],
+      guardianIds: [],
+      recipientUserIds: [],
+      classId: null,
+      sectionId: null,
+      publishedAt: new Date('2026-07-24T00:00:00.000Z'),
+    });
+    prisma.user.findMany.mockResolvedValue([
+      { id: 'user-9', email: 'accountant@school.test', phone: null },
+    ]);
+    prisma.notificationDelivery.findMany.mockResolvedValue([]);
+
+    await service.createNotice(
+      {
+        title: 'Role update',
+        body: 'For accountants only.',
+        audienceType: AudienceType.ROLE,
+        roleNames: ['accountant'],
+      },
+      actor,
+    );
+
+    expect(prisma.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          userRoles: { some: { role: { name: { in: ['accountant'] } } } },
+        }),
+      }),
+    );
   });
 
   it('creates idempotent mobile notice drafts without storing or returning file URLs', async () => {
@@ -1950,5 +2039,285 @@ describe('CommunicationsService', () => {
         }),
       }),
     );
+  });
+
+  describe('guardian consent management', () => {
+    it('lists the 100 most recent tenant-scoped consent records', async () => {
+      prisma.guardianConsent.findMany.mockResolvedValue([
+        { id: 'consent-1', guardianId: 'guardian-1' },
+      ]);
+
+      const result = await service.listConsents(actor);
+
+      expect(prisma.guardianConsent.findMany).toHaveBeenCalledWith({
+        where: { tenantId: actor.tenantId },
+        include: { guardian: true },
+        orderBy: [{ capturedAt: 'desc' }],
+        take: 100,
+      });
+      expect(result).toEqual([{ id: 'consent-1', guardianId: 'guardian-1' }]);
+    });
+
+    it('rejects capturing consent for a guardian outside the tenant', async () => {
+      prisma.guardian.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.captureConsent(
+          {
+            guardianId: 'guardian-1',
+            consentType: ConsentType.MESSAGING,
+            granted: true,
+          } as never,
+          actor,
+        ),
+      ).rejects.toThrow('Guardian not found in this tenant');
+      expect(prisma.guardianConsent.create).not.toHaveBeenCalled();
+    });
+
+    it('captures granted consent, stamps privacy consent on the guardian, and records an audit entry', async () => {
+      prisma.guardian.findFirst.mockResolvedValue({ id: 'guardian-1' });
+      prisma.guardianConsent.create.mockResolvedValue({
+        id: 'consent-1',
+        consentType: ConsentType.PRIVACY,
+        granted: true,
+        capturedAt: new Date('2026-07-24T00:00:00.000Z'),
+      });
+
+      const consent = await service.captureConsent(
+        {
+          guardianId: 'guardian-1',
+          consentType: ConsentType.PRIVACY,
+          granted: true,
+          version: 2,
+        } as never,
+        actor,
+      );
+
+      expect(prisma.guardianConsent.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          tenantId: actor.tenantId,
+          guardianId: 'guardian-1',
+          consentType: ConsentType.PRIVACY,
+          granted: true,
+          version: 2,
+          revokedAt: null,
+        }),
+      });
+      expect(prisma.guardian.update).toHaveBeenCalledWith({
+        where: { id: 'guardian-1' },
+        data: { privacyConsentAt: consent.capturedAt },
+      });
+      expect(auditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'capture',
+          resource: 'guardian_consent',
+          resourceId: 'consent-1',
+        }),
+      );
+    });
+
+    it('revoking consent stamps revokedAt and does not touch guardian privacy timestamp', async () => {
+      prisma.guardian.findFirst.mockResolvedValue({ id: 'guardian-1' });
+      prisma.guardianConsent.create.mockResolvedValue({
+        id: 'consent-2',
+        consentType: ConsentType.PRIVACY,
+        granted: false,
+        capturedAt: new Date('2026-07-24T00:00:00.000Z'),
+      });
+
+      await service.captureConsent(
+        {
+          guardianId: 'guardian-1',
+          consentType: ConsentType.PRIVACY,
+          granted: false,
+        } as never,
+        actor,
+      );
+
+      expect(prisma.guardianConsent.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          granted: false,
+          revokedAt: expect.any(Date),
+        }),
+      });
+      expect(prisma.guardian.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects reading consent status for a guardian outside the tenant', async () => {
+      prisma.guardian.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.getGuardianConsentStatus('guardian-1', actor),
+      ).rejects.toThrow('Guardian not found in this tenant');
+    });
+
+    it('reports the latest consent per type, defaulting ungranted types to not granted', async () => {
+      prisma.guardian.findFirst.mockResolvedValue({ id: 'guardian-1' });
+      prisma.guardianConsent.findMany.mockResolvedValue([
+        {
+          id: 'consent-latest',
+          consentType: ConsentType.MESSAGING,
+          granted: true,
+          revokedAt: null,
+          version: 1,
+          capturedAt: new Date('2026-07-24T00:00:00.000Z'),
+        },
+        {
+          id: 'consent-older',
+          consentType: ConsentType.MESSAGING,
+          granted: false,
+          revokedAt: new Date('2026-01-01T00:00:00.000Z'),
+          version: 1,
+          capturedAt: new Date('2026-01-01T00:00:00.000Z'),
+        },
+      ]);
+
+      const statuses = await service.getGuardianConsentStatus(
+        'guardian-1',
+        actor,
+      );
+
+      const messaging = statuses.find(
+        (row: { consentType: ConsentType }) =>
+          row.consentType === ConsentType.MESSAGING,
+      );
+      expect(messaging).toEqual(
+        expect.objectContaining({
+          granted: true,
+          latestConsentId: 'consent-latest',
+        }),
+      );
+
+      const untouchedType = statuses.find(
+        (row: { consentType: ConsentType }) =>
+          row.consentType === ConsentType.PRIVACY,
+      );
+      expect(untouchedType).toEqual(
+        expect.objectContaining({ granted: false, latestConsentId: null }),
+      );
+    });
+  });
+
+  describe('expanded notice audience resolution', () => {
+    it('targets an explicit staff list regardless of audienceType', async () => {
+      prisma.staff.findMany.mockResolvedValue([
+        {
+          id: 'staff-1',
+          userId: 'staff-user-1',
+          user: { email: 'staff1@school.test', phone: '+9779811111111' },
+        },
+      ]);
+
+      const preview = await service.previewNoticeRecipients(
+        {
+          title: 'Staff meeting',
+          body: 'Please attend the staff meeting.',
+          priority: NoticePriority.NORMAL,
+          audienceType: AudienceType.STAFF,
+          staffIds: ['staff-1'],
+        } as never,
+        actor,
+      );
+
+      expect(prisma.staff.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ id: { in: ['staff-1'] } }),
+        }),
+      );
+      expect(preview.recipientCount).toBe(1);
+    });
+
+    it('returns no recipients for a STAFF audience with no staffIds, instead of falling through to the student query', async () => {
+      const preview = await service.previewNoticeRecipients(
+        {
+          title: 'Staff meeting',
+          body: 'Please attend the staff meeting.',
+          priority: NoticePriority.NORMAL,
+          audienceType: AudienceType.STAFF,
+        } as never,
+        actor,
+      );
+
+      expect(prisma.student.findMany).not.toHaveBeenCalled();
+      expect(preview.recipientCount).toBe(0);
+    });
+
+    it('targets a role by name', async () => {
+      prisma.user.findMany.mockResolvedValue([
+        { id: 'user-9', email: 'accountant@school.test', phone: null },
+      ]);
+
+      const preview = await service.previewNoticeRecipients(
+        {
+          title: 'Finance update',
+          body: 'New fiscal period is open.',
+          priority: NoticePriority.NORMAL,
+          audienceType: AudienceType.ROLE,
+          roleNames: ['accountant'],
+        } as never,
+        actor,
+      );
+
+      expect(prisma.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            userRoles: {
+              some: { role: { name: { in: ['accountant'] } } },
+            },
+          }),
+        }),
+      );
+      expect(preview.recipientCount).toBe(1);
+    });
+
+    it('targets guardians directly (linked-parent audience) without going through a student query', async () => {
+      prisma.guardian.findMany.mockResolvedValue([
+        {
+          id: 'guardian-5',
+          userId: 'guardian-user-5',
+          email: 'guardian5@example.com',
+          primaryPhone: '+9779822222222',
+          user: null,
+        },
+      ]);
+
+      const preview = await service.previewNoticeRecipients(
+        {
+          title: 'PTA meeting',
+          body: 'You are invited to the PTA meeting.',
+          priority: NoticePriority.NORMAL,
+          audienceType: AudienceType.ALL,
+          guardianIds: ['guardian-5'],
+        } as never,
+        actor,
+      );
+
+      expect(prisma.guardian.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ id: { in: ['guardian-5'] } }),
+        }),
+      );
+      expect(prisma.student.findMany).not.toHaveBeenCalled();
+      expect(preview.recipientCount).toBe(1);
+    });
+
+    it('targets specific recipient users directly', async () => {
+      prisma.user.findMany.mockResolvedValue([
+        { id: 'user-42', email: 'someone@school.test', phone: null },
+      ]);
+
+      const preview = await service.previewNoticeRecipients(
+        {
+          title: 'Direct note',
+          body: 'A note for you.',
+          priority: NoticePriority.NORMAL,
+          audienceType: AudienceType.ALL,
+          recipientUserIds: ['user-42'],
+        } as never,
+        actor,
+      );
+
+      expect(preview.recipientCount).toBe(1);
+    });
   });
 });
