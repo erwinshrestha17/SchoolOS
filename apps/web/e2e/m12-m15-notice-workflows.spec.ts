@@ -17,7 +17,7 @@ test.describe.serial('M12 and M15 authenticated notice workflows', () => {
   }) => {
     const title = `E2E normal notice ${Date.now()}`;
     await page.goto('/dashboard/notices/new');
-    await page.getByLabel('Title').fill(title);
+    await page.getByLabel('Title', { exact: true }).fill(title);
     await page
       .getByLabel('Concise message')
       .fill('This notice verifies the draft-first web workflow.');
@@ -33,12 +33,16 @@ test.describe.serial('M12 and M15 authenticated notice workflows', () => {
     await page.getByRole('button', { name: 'Save draft' }).click();
 
     await page.getByRole('link', { name: 'Preview & publish' }).click();
-    await expect(page.getByText('Backend recipient preview')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Backend recipient preview' }),
+    ).toBeVisible();
     await page.getByRole('button', { name: 'Publish now' }).click();
     const publishDialog = page.getByRole('dialog');
     await expect(publishDialog).toContainText('eligible recipients');
     await publishDialog.getByRole('button', { name: 'Publish now' }).click();
-    await expect(page.getByText('Published', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('notice-lifecycle-badge')).toHaveText(
+      'Published',
+    );
 
     await page.getByRole('button', { name: 'Archive' }).click();
     await page
@@ -48,7 +52,9 @@ test.describe.serial('M12 and M15 authenticated notice workflows', () => {
       .getByRole('dialog')
       .getByRole('button', { name: 'Archive' })
       .click();
-    await expect(page.getByText('Archived', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('notice-lifecycle-badge')).toHaveText(
+      'Archived',
+    );
 
     await page.getByRole('button', { name: 'Restore' }).click();
     await page
@@ -58,7 +64,9 @@ test.describe.serial('M12 and M15 authenticated notice workflows', () => {
       .getByRole('dialog')
       .getByRole('button', { name: 'Restore' })
       .click();
-    await expect(page.getByText('Published', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('notice-lifecycle-badge')).toHaveText(
+      'Published',
+    );
   });
 
   test('scheduled notice appears in the scheduled workspace and can be cancelled with a reason', async ({
@@ -66,7 +74,7 @@ test.describe.serial('M12 and M15 authenticated notice workflows', () => {
   }) => {
     const title = `E2E scheduled notice ${Date.now()}`;
     await page.goto('/dashboard/notices/new');
-    await page.getByLabel('Title').fill(title);
+    await page.getByLabel('Title', { exact: true }).fill(title);
     await page
       .getByLabel('Concise message')
       .fill('Scheduled lifecycle evidence.');
@@ -97,7 +105,9 @@ test.describe.serial('M12 and M15 authenticated notice workflows', () => {
       .getByRole('dialog')
       .getByRole('button', { name: 'Cancel' })
       .click();
-    await expect(page.getByText('Cancelled', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('notice-lifecycle-badge')).toHaveText(
+      'Cancelled',
+    );
   });
 
   test('urgent draft requires approval and pagination remains server driven', async ({
@@ -105,7 +115,7 @@ test.describe.serial('M12 and M15 authenticated notice workflows', () => {
   }) => {
     const title = `E2E urgent notice ${Date.now()}`;
     await page.goto('/dashboard/notices/new');
-    await page.getByLabel('Title').fill(title);
+    await page.getByLabel('Title', { exact: true }).fill(title);
     await page
       .getByLabel('Concise message')
       .fill('Approval boundary evidence.');

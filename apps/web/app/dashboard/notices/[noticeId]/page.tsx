@@ -233,7 +233,10 @@ export default function NoticeDetailPage() {
         <span className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold text-gray-600">
           {formatEnumLabel(notice.audienceType)} audience
         </span>
-        <span className="rounded-full border border-info-100 bg-info-50 px-3 py-1 text-xs font-semibold text-info-700">
+        <span
+          data-testid="notice-lifecycle-badge"
+          className="rounded-full border border-info-100 bg-info-50 px-3 py-1 text-xs font-semibold text-info-700"
+        >
           {resolveNoticeState(notice)}
         </span>
       </div>
@@ -370,6 +373,7 @@ export default function NoticeDetailPage() {
         confirmLabel={
           pendingAction ? formatEnumLabel(pendingAction) : "Confirm"
         }
+        cancelLabel={pendingAction === "cancel" ? "Keep notice" : undefined}
         destructive={pendingAction === "cancel"}
         isConfirming={lifecycleMutation.isPending}
         confirmDisabled={!actionReason.trim()}

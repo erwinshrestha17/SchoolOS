@@ -4,6 +4,7 @@ import {
   ExamTermStatus,
   AttendanceStatus,
   AudienceType,
+  ConsentType,
   ContractType,
   Gender,
   HomeworkAssignmentStatus,
@@ -328,6 +329,7 @@ async function main() {
   await seedSubjects(tenant.id);
   await seedCanonicalSchoolDataset(tenant.id, academicYear.id);
   await seedAcademicData(tenant.id, academicYear.id);
+  await seedGuardianConsent(tenant.id);
   await seedTenantSettings(tenant.id);
   await seedPlatformUser(tenant.id);
   await seedLibraryData(tenant.id);
@@ -403,6 +405,45 @@ async function cleanupLegacyData(tenantId: string) {
       },
     });
   }
+}
+
+async function seedGuardianConsent(tenantId: string) {
+  console.log('Seeding baseline guardian consent...');
+
+  const guardians = await prisma.guardian.findMany({
+    where: { tenantId },
+    select: { id: true },
+  });
+  if (guardians.length === 0) return;
+
+  const existing = await prisma.guardianConsent.findMany({
+    where: { tenantId, consentType: ConsentType.MESSAGING },
+    select: { guardianId: true },
+  });
+  const alreadyConsented = new Set(existing.map((row) => row.guardianId));
+  const pending = guardians.filter(
+    (guardian) => !alreadyConsented.has(guardian.id),
+  );
+  if (pending.length === 0) return;
+
+  const capturedAt = new Date();
+  await prisma.guardianConsent.createMany({
+    data: pending.map((guardian) => ({
+      tenantId,
+      guardianId: guardian.id,
+      consentType: ConsentType.MESSAGING,
+      granted: true,
+      version: '1.0',
+      capturedAt,
+    })),
+  });
+  await prisma.guardian.updateMany({
+    where: { tenantId, id: { in: pending.map((guardian) => guardian.id) } },
+    data: { privacyConsentAt: capturedAt },
+  });
+  console.log(
+    `- Granted baseline MESSAGING consent for ${pending.length} guardians.`,
+  );
 }
 
 async function seedTenantSettings(tenantId: string) {

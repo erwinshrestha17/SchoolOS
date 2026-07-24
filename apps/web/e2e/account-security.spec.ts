@@ -44,9 +44,9 @@ test.describe.serial('M0 Account & Security browser E2E', () => {
       page.getByRole('heading', { name: /Account & Security/i }),
     ).toBeVisible();
 
-    await page.getByLabel(/Current password/i).fill('WrongCurrent1!');
+    await page.getByLabel(/^Current password$/i).fill('WrongCurrent1!');
     await page.getByLabel(/^New password$/i).fill('ValidWrong1!');
-    await page.getByLabel(/Confirm new password/i).fill('ValidWrong1!');
+    await page.getByLabel(/^Confirm new password$/i).fill('ValidWrong1!');
     await page.getByRole('button', { name: /^Change password$/i }).click();
 
     await expect(
@@ -69,9 +69,12 @@ test.describe.serial('M0 Account & Security browser E2E', () => {
       .getByRole('listitem')
       .filter({ hasText: 'At least 1 uppercase letter' });
     const newPassword = page.getByLabel(/^New password$/i);
-    const confirmation = page.getByLabel(/Confirm new password/i);
+    const confirmation = page.getByLabel(/^Confirm new password$/i);
     const visibilityControl = page.getByRole('button', {
-      name: /Show new password/i,
+      // The accessible name flips between "Show new password" and
+      // "Hide new password" when toggled, so this must match both states
+      // for the same locator to keep resolving after the click below.
+      name: /^(Show|Hide) new password$/i,
     });
 
     await expect(lengthRule).toContainText('Required');
@@ -153,13 +156,13 @@ test.describe.serial('M0 Account & Security browser E2E', () => {
     );
 
     await page
-      .getByLabel(/Current password/i)
+      .getByLabel(/^Current password$/i)
       .fill(passwordTestAccount.temporaryPassword!);
     await page
       .getByLabel(/^New password$/i)
       .fill(passwordTestAccount.finalPassword!);
     await page
-      .getByLabel(/Confirm new password/i)
+      .getByLabel(/^Confirm new password$/i)
       .fill(passwordTestAccount.finalPassword!);
     await page.getByRole('button', { name: /^Change password$/i }).click();
 

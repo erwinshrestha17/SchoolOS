@@ -10,6 +10,19 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: schoolos
+          POSTGRES_PASSWORD: password123
+          POSTGRES_DB: schoolos_db
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U schoolos -d schoolos_db"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
       redis:
         image: redis:7-alpine
         ports:
@@ -19,6 +32,32 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+
+    env:
+      NODE_ENV: development
+      ALLOW_PROD_BOOT: 'false'
+      PORT: '4000'
+      DATABASE_URL: postgresql://schoolos:password123@localhost:5433/schoolos_db?schema=public
+      REDIS_HOST: localhost
+      REDIS_PORT: '6379'
+      JWT_SECRET: ci-e2e-jwt-secret-not-for-production-use
+      JWT_CHALLENGE_SECRET: ci-e2e-challenge-secret-not-for-production-use
+      TOKEN_HASH_PEPPER: ci-e2e-token-pepper-not-for-production-use
+      MEDICAL_ENCRYPTION_KEY: ci-e2e-medical-key-not-for-production-use
+      JWT_ISSUER: schoolos
+      JWT_AUDIENCE_WEB: schoolos-web
+      JWT_AUDIENCE_MOBILE: schoolos-mobile
+      FRONTEND_ORIGIN: http://localhost:3000
+      PASSWORD_RESET_APP_URL: http://localhost:3000/reset-password
+      SCHOOLOS_DEMO_PASSWORD: ci-e2e-demo-password-not-for-production-use
+      SCHOOLOS_DEMO_PASSWORDS_REQUIRE_CHANGE: 'false'
+      PLATFORM_SEED_PASSWORD_REQUIRE_CHANGE: 'false'
+      SCHOOLOS_E2E_TENANT_SLUG: default-school
+      SCHOOLOS_E2E_EMAIL: admin@schoolos.com
+      SCHOOLOS_E2E_PASSWORD: ci-e2e-demo-password-not-for-production-use
+      SCHOOLOS_E2E_PLATFORM_TENANT_SLUG: default-school
+      SCHOOLOS_E2E_PLATFORM_EMAIL: platform@schoolos.com
+      SCHOOLOS_E2E_PLATFORM_PASSWORD: ci-e2e-demo-password-not-for-production-use
 
     steps:
       - name: Checkout
@@ -59,6 +98,33 @@ jobs:
       - name: Verify deploy gate
         run: pnpm verify:deploy:core
 
+      - name: Migrate and seed e2e database
+        if: steps.changes.outputs.web == 'true'
+        run: |
+          pnpm db:generate
+          pnpm --filter @schoolos/api exec prisma migrate deploy
+          pnpm db:seed
+
+      - name: Start API server for e2e
+        if: steps.changes.outputs.web == 'true'
+        run: |
+          pnpm --filter @schoolos/api build
+          nohup pnpm --filter @schoolos/api start > api-server.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:4000/api/v1/health > /dev/null; then
+              echo "API server is up."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "API server did not become healthy in time."
+          cat api-server.log
+          exit 1
+
       - name: Web e2e smoke
         if: steps.changes.outputs.web == 'true'
         run: pnpm test:web:e2e
+
+      - name: API server logs
+        if: always() && steps.changes.outputs.web == 'true'
+        run: cat api-server.log || true
