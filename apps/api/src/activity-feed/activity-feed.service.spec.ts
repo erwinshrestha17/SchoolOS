@@ -821,10 +821,20 @@ describe('ActivityFeedService', () => {
         }),
       }),
     );
+    // A teacher may satisfy this either as the subject-assigned teacher
+    // (checked via Staff.teacherAssignments) or as the section's homeroom
+    // class teacher (checked separately via Section.classTeacherId) —
+    // ensureClassSectionAndWriteAccess queries both.
     expect(prisma.staff.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           status: StaffStatus.ACTIVE,
+        }),
+      }),
+    );
+    expect(prisma.staff.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
           teacherAssignments: {
             some: expect.objectContaining({
               academicYear: { isCurrent: true },

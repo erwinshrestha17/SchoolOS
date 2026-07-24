@@ -1867,27 +1867,57 @@ export class ActivityFeedService {
       return;
     }
 
-    const staffAssignment = await this.prisma.staff.findFirst({
+    const staff = await this.prisma.staff.findFirst({
       where: {
         tenantId: actor.tenantId,
         userId: actor.userId,
         status: StaffStatus.ACTIVE,
-        teacherAssignments: {
-          some: {
-            classId: input.classId,
-            ...(input.sectionId
-              ? {
-                  OR: [{ sectionId: input.sectionId }, { sectionId: null }],
-                }
-              : { sectionId: null }),
-            academicYear: { isCurrent: true },
-          },
-        },
       },
       select: { id: true },
     });
 
-    if (!staffAssignment) {
+    if (!staff) {
+      throw new ForbiddenException(
+        'Teacher is not assigned to this class/section',
+      );
+    }
+
+    // A teacher may post either as the assigned subject teacher for this
+    // class/section (Staff.teacherAssignments -> SubjectTeacherAssignment)
+    // or as the section's homeroom class teacher (Section.classTeacherId) —
+    // matching the same dual check AttendanceService.getTeacherSectionIds
+    // already uses. Checking only the former silently locked every homeroom
+    // class teacher out of posting for their own class.
+    const [subjectAssignment, classTeacherSection] = await Promise.all([
+      this.prisma.staff.findFirst({
+        where: {
+          id: staff.id,
+          teacherAssignments: {
+            some: {
+              classId: input.classId,
+              ...(input.sectionId
+                ? {
+                    OR: [{ sectionId: input.sectionId }, { sectionId: null }],
+                  }
+                : { sectionId: null }),
+              academicYear: { isCurrent: true },
+            },
+          },
+        },
+        select: { id: true },
+      }),
+      this.prisma.section.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          classId: input.classId,
+          classTeacherId: staff.id,
+          ...(input.sectionId ? { id: input.sectionId } : {}),
+        },
+        select: { id: true },
+      }),
+    ]);
+
+    if (!subjectAssignment && !classTeacherSection) {
       throw new ForbiddenException(
         'Teacher is not assigned to this class/section',
       );

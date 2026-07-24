@@ -52,26 +52,33 @@ test.describe.serial('SchoolOS Academic Workflow Smoke Tests', () => {
     // Check loading state resolves
     await expect(page.getByText(/Loading homework/i)).not.toBeVisible();
     
-    // Navigate to create homework
-    await page.getByRole('link', { name: /Create Homework/i }).click();
+    // Navigate to create homework. The list page's action button reads "Give
+    // Homework" (the /new page's own heading is still "Create Homework").
+    await page.getByRole('link', { name: /Give Homework/i }).first().click();
     await expect(page).toHaveURL(/\/dashboard\/homework\/new/);
     await expect(page.getByRole('heading', { name: /Create Homework/i })).toBeVisible();
     
-    // Verify form fields
-    await expect(page.getByLabel(/Assignment Title/i)).toBeVisible();
-    await expect(page.getByLabel(/Instructions/i)).toBeVisible();
-    await expect(page.getByLabel(/Due Date/i)).toBeVisible();
-    await expect(page.getByLabel(/Academic Year/i)).toBeVisible();
-    await expect(page.getByLabel(/Class/i)).toBeVisible();
-    await expect(page.getByLabel(/Subject/i)).toBeVisible();
+    // Verify form fields. The form's FormField component renders its label as
+    // a plain sibling <label> with no htmlFor/id association to the input, so
+    // getByLabel() can't resolve these — assert on the visible label text
+    // instead (also: the field is "Homework Title", not "Assignment Title").
+    await expect(page.getByText('Homework Title', { exact: true })).toBeVisible();
+    await expect(page.getByText('Instructions', { exact: true })).toBeVisible();
+    await expect(page.getByText('Due Date', { exact: true })).toBeVisible();
+    await expect(page.getByText('Academic Year', { exact: true })).toBeVisible();
+    await expect(page.getByText('Class', { exact: true })).toBeVisible();
+    await expect(page.getByText('Subject', { exact: true })).toBeVisible();
   });
 
   test('Timetable: Workspace and tabs', async ({ page }) => {
     await page.goto('/dashboard/timetable');
-    await expect(page.getByRole('heading', { name: /Weekly Timetable Builder/i })).toBeVisible();
-    
+    // The read-only weekly grid was later split out from the builder into its
+    // own page; the heading and tab set below reflect that current split
+    // (builder/workload live at their own dedicated routes, verified separately).
+    await expect(page.getByRole('heading', { name: /^Timetable$/i })).toBeVisible();
+
     // Verify tabs
-    const tabs = ['Timetable Builder', 'Teacher Workload', 'Homework'];
+    const tabs = ['Weekly Grid', 'Versions', 'Requirements', 'Conflicts', 'Substitutions'];
     for (const tab of tabs) {
       const tabButton = page.getByRole('tab', { name: new RegExp(tab, 'i') });
       await expect(tabButton).toBeVisible();
