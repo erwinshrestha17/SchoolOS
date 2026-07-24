@@ -318,7 +318,8 @@ Train in this order:
 6. **Fee Collection:** invoice search, outstanding amount, overpayment block, partial/full payment, receipt PDF, ledger preview.
 7. **Activity Feed:** audience targeting, 1-5 image rule, private media object-key behavior, feed preview, delivery records.
 8. **M12 Notifications and M15 Notices:** normal/urgent/emergency notice, recipient preview, normalized publication event, in-app/delivery records, guardian consent capture/revoke, and chat-write denial.
-9. **Logout/session behavior:** avatar menu logout.
+9. **HR & Payroll (M7):** staff directory/profile, staff attendance register, leave request/approval, salary structure activation, payroll run generate -> readiness/exception resolution -> submit for review -> approve -> post to accounting, payslip issue and PDF download, staff self-service own-record boundary.
+10. **Logout/session behavior:** avatar menu logout.
 
 ### Day-1 Pilot Script
 1. Log in as admin.
@@ -332,7 +333,9 @@ Train in this order:
 9. Capture and revoke one guardian consent record.
 10. Create one activity post with one image.
 11. Confirm delivery records appear for notice/activity/attendance/fee events.
-12. Log out and confirm dashboard redirect.
+12. Create one staff member with an active salary structure. Submit one staff leave request and approve it.
+13. Generate one payroll run for the current period. Resolve any blocking readiness exceptions, submit for review, approve, and post to accounting. Open one generated payslip PDF.
+14. Log out and confirm dashboard redirect.
 
 ### Browser QA Checklist
 - **Authentication:** Login works with cookie-first auth. No raw tokens in browser storage. Logout clears local session metadata. Unauthenticated access redirects to login.
@@ -342,6 +345,7 @@ Train in this order:
 - **Fees:** Invoice search works. Overpayment blocked. Partial payment succeeds. Receipt success panel appears. Receipt PDF opens. Ledger preview is labeled preview-only.
 - **Activity:** Target selection clear. Upload blocks >5 images. Feed preview shows new post. Delivery record is queued.
 - **M12 Notifications and M15 Notices:** Normal notice publishes through the normalized event handoff. Emergency warning appears for emergency priority. Delivery records distinguish in-app success from skipped/failed external providers. Guardian consent capture/revoke and chat-write denial work.
+- **HR & Payroll (M7):** Staff directory/profile loads and is tenant-scoped. Staff attendance register and leave request/approval enforce overlap and staff-status checks. Salary structure activation blocks overlapping effective windows. Payroll readiness surfaces blocking exceptions (missing salary structure/contract, zero gross pay, negative net pay, missing PAN/bank/account mapping) before Submit for Review is allowed. Approve/Post actions are gated by the run's allowed-actions state. Payslip PDF opens via an authenticated stream, not a public link. Staff self-service (profile/leave/payslip) is limited to the signed-in staff member's own records.
 
 ### Controlled-Pilot Boundaries
 - The supported workflow slice must be recorded for each pilot; module presence in the repository does not prove that a workflow is pilot validated.
