@@ -41,7 +41,11 @@ export class TeacherTodayService {
     private readonly timetableService: TimetableService,
   ) {}
 
-  async getToday(actor: AuthContext, dateInput?: string, now: Date = new Date()) {
+  async getToday(
+    actor: AuthContext,
+    dateInput?: string,
+    now: Date = new Date(),
+  ) {
     const [attendanceToday, homeworkSummary, timetableToday, marksDeadlines] =
       await Promise.all([
         this.attendanceService.getTeacherMobileToday(actor, dateInput),
@@ -98,14 +102,15 @@ export class TeacherTodayService {
     });
     if (!currentYear) return [];
 
-    const subjectAssignments = await this.prisma.subjectTeacherAssignment.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        staffId: staff.id,
-        academicYearId: currentYear.id,
-      },
-      select: { subjectId: true },
-    });
+    const subjectAssignments =
+      await this.prisma.subjectTeacherAssignment.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          staffId: staff.id,
+          academicYearId: currentYear.id,
+        },
+        select: { subjectId: true },
+      });
     const subjectIds = [...new Set(subjectAssignments.map((a) => a.subjectId))];
     if (subjectIds.length === 0) return [];
 

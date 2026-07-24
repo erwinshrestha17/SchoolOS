@@ -33,11 +33,13 @@ function makePeriod(id: string, startsAt: string, endsAt: string) {
 }
 
 describe('TeacherTodayService', () => {
-  function makeService(overrides: {
-    periods?: ReturnType<typeof makePeriod>[];
-    subjectAssignments?: Array<{ subjectId: string }>;
-    examTerms?: Array<{ id: string; name: string; endsOn: Date }>;
-  } = {}) {
+  function makeService(
+    overrides: {
+      periods?: ReturnType<typeof makePeriod>[];
+      subjectAssignments?: Array<{ subjectId: string }>;
+      examTerms?: Array<{ id: string; name: string; endsOn: Date }>;
+    } = {},
+  ) {
     const attendanceToday = {
       date: NOW_NPT_09_15.toISOString(),
       periods: overrides.periods ?? [],
@@ -67,7 +69,9 @@ describe('TeacherTodayService', () => {
       subjectTeacherAssignment: {
         findMany: jest
           .fn()
-          .mockResolvedValue(overrides.subjectAssignments ?? [{ subjectId: 'subject-1' }]),
+          .mockResolvedValue(
+            overrides.subjectAssignments ?? [{ subjectId: 'subject-1' }],
+          ),
       },
       examTerm: {
         findMany: jest.fn().mockResolvedValue(overrides.examTerms ?? []),
@@ -136,18 +140,22 @@ describe('TeacherTodayService', () => {
     expect(result.substitutions).toEqual([{ id: 'sub-1', role: 'SUBSTITUTE' }]);
   });
 
-  it('only surfaces exam terms within the next 7 days for the teacher\'s own assigned subjects', async () => {
-    const withinWindow = new Date(NOW_NPT_09_15.getTime() + 3 * 24 * 60 * 60 * 1000);
+  it("only surfaces exam terms within the next 7 days for the teacher's own assigned subjects", async () => {
+    const withinWindow = new Date(
+      NOW_NPT_09_15.getTime() + 3 * 24 * 60 * 60 * 1000,
+    );
     const { service, prisma } = makeService({
-      examTerms: [
-        { id: 'term-1', name: 'Unit Test 2', endsOn: withinWindow },
-      ],
+      examTerms: [{ id: 'term-1', name: 'Unit Test 2', endsOn: withinWindow }],
     });
 
     const result = await service.getToday(actor, undefined, NOW_NPT_09_15);
 
     expect(result.marksDeadlines).toEqual([
-      { examTermId: 'term-1', examTermName: 'Unit Test 2', endsOn: withinWindow },
+      {
+        examTermId: 'term-1',
+        examTermName: 'Unit Test 2',
+        endsOn: withinWindow,
+      },
     ]);
     expect(prisma.examTerm.findMany).toHaveBeenCalledWith(
       expect.objectContaining({

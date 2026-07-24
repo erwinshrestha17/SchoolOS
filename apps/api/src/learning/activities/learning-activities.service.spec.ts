@@ -46,8 +46,8 @@ describe('LearningActivitiesService', () => {
     service = new LearningActivitiesService(prisma, permissions, auditService);
   });
 
-  describe('teacher scoping (confirmed gap: previously any learning:read holder could list/read every activity in the tenant, including other teachers\' unpublished drafts)', () => {
-    it('scopes listActivities to the teacher\'s own activities', async () => {
+  describe("teacher scoping (confirmed gap: previously any learning:read holder could list/read every activity in the tenant, including other teachers' unpublished drafts)", () => {
+    it("scopes listActivities to the teacher's own activities", async () => {
       permissions.resolveActorStaffId.mockResolvedValue('staff-1');
       prisma.learningActivity.findMany.mockResolvedValue([]);
       prisma.learningActivity.count.mockResolvedValue(0);

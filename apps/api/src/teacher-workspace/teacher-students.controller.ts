@@ -12,7 +12,9 @@ import { TeacherStudentsService } from './teacher-students.service';
 @UseGuards(JwtAuthGuard, TenantActiveGuard, RolesPermissionsGuard)
 @Roles('teacher', 'subject_teacher')
 export class TeacherStudentsController {
-  constructor(private readonly teacherStudentsService: TeacherStudentsService) {}
+  constructor(
+    private readonly teacherStudentsService: TeacherStudentsService,
+  ) {}
 
   @Get('my-students')
   @Permissions('students:read')
