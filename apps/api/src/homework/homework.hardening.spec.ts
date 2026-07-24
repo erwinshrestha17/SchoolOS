@@ -1,4 +1,8 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   AuthMethod,
@@ -343,6 +347,125 @@ describe('Homework Hardening', () => {
         where: {
           tenantId: 'tenant-a',
           id: 'section-1',
+          classTeacherId: 'teacher-1',
+        },
+        select: { id: true },
+      });
+    });
+
+    it('denies a class teacher of Section A from creating homework for Section B in the same class', async () => {
+      // The class-teacher fallback must stay scoped to the teacher's own
+      // section, not the whole class: Section.findFirst is queried with the
+      // REQUESTED sectionId, so a class teacher of Section A querying
+      // Section B (same class, different homeroom teacher) must still fail.
+      const p = prisma as any;
+      const teacherActor: AuthContext = {
+        ...actor,
+        roles: ['subject_teacher'],
+      };
+
+      p.academicYear.findFirst.mockResolvedValue({
+        id: 'year-1',
+        tenantId: 'tenant-a',
+      });
+      p.class.findFirst.mockResolvedValue({
+        id: 'class-1',
+        tenantId: 'tenant-a',
+      });
+      p.subject.findFirst.mockResolvedValue({
+        id: 'sub-1',
+        tenantId: 'tenant-a',
+        classId: 'class-1',
+      });
+      p.staff.findFirst.mockResolvedValue({
+        id: 'teacher-1',
+        tenantId: 'tenant-a',
+        userId: 'user-1',
+      });
+
+      p.subjectTeacherAssignment.findFirst.mockResolvedValue(null);
+      // Section B's homeroom teacher is someone else entirely.
+      p.section.findFirst.mockResolvedValue(null);
+
+      await expect(
+        homeworkService.createAssignment(
+          {
+            academicYearId: 'year-1',
+            classId: 'class-1',
+            sectionId: 'section-b',
+            subjectId: 'sub-1',
+            title: 'Not my section',
+            instructions: 'Test',
+            dueDate: '2026-12-31',
+          },
+          teacherActor,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(p.section.findFirst).toHaveBeenCalledWith({
+        where: {
+          tenantId: 'tenant-a',
+          id: 'section-b',
+          classTeacherId: 'teacher-1',
+        },
+        select: { id: true },
+      });
+    });
+
+    it('denies the class-teacher fallback across tenants even with a matching section id', async () => {
+      // The fallback's own Section.findFirst query is tenant-scoped
+      // independently of the earlier class/academicYear/subject lookups, so
+      // a cross-tenant sectionId collision cannot bypass it.
+      const p = prisma as any;
+      const teacherActor: AuthContext = {
+        ...actor,
+        roles: ['subject_teacher'],
+      };
+
+      p.academicYear.findFirst.mockResolvedValue({
+        id: 'year-1',
+        tenantId: 'tenant-a',
+      });
+      p.class.findFirst.mockResolvedValue({
+        id: 'class-1',
+        tenantId: 'tenant-a',
+      });
+      p.subject.findFirst.mockResolvedValue({
+        id: 'sub-1',
+        tenantId: 'tenant-a',
+        classId: 'class-1',
+      });
+      p.staff.findFirst.mockResolvedValue({
+        id: 'teacher-1',
+        tenantId: 'tenant-a',
+        userId: 'user-1',
+      });
+
+      p.subjectTeacherAssignment.findFirst.mockResolvedValue(null);
+      // A same-id section exists, but only under a different tenant; the
+      // mock proves the query itself is tenant-scoped by returning null
+      // for this tenant's lookup regardless of what another tenant holds.
+      p.section.findFirst.mockResolvedValue(null);
+
+      await expect(
+        homeworkService.createAssignment(
+          {
+            academicYearId: 'year-1',
+            classId: 'class-1',
+            sectionId: 'section-shared-id',
+            subjectId: 'sub-1',
+            title: 'Cross-tenant probe',
+            instructions: 'Test',
+            dueDate: '2026-12-31',
+          },
+          teacherActor,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(p.section.findFirst).toHaveBeenCalledWith({
+        where: {
+          tenantId: 'tenant-a',
+          id: 'section-shared-id',
           classTeacherId: 'teacher-1',
         },
         select: { id: true },
