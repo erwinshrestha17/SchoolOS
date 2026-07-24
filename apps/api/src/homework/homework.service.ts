@@ -753,21 +753,16 @@ export class HomeworkService {
       actor.roles.includes('platform_super_admin');
 
     if (isTeacher && !isAdmin) {
-      const isAssigned = await this.prisma.subjectTeacherAssignment.findFirst({
-        where: {
-          tenantId: actor.tenantId,
+      await this.ensureSubjectTeacherScope(
+        actor,
+        {
           academicYearId: dto.academicYearId,
-          subjectId: dto.subjectId,
-          staffId,
           classId: dto.classId,
-          OR: dto.sectionId
-            ? [{ sectionId: dto.sectionId }, { sectionId: null }]
-            : [{ sectionId: null }],
+          sectionId: dto.sectionId ?? null,
+          subjectId: dto.subjectId,
         },
-      });
-      if (!isAssigned) {
-        throw new ForbiddenException('You are not assigned to this subject');
-      }
+        staffId,
+      );
     }
 
     const occurrences = buildHomeworkOccurrences({
@@ -1619,7 +1614,26 @@ export class HomeworkService {
       },
     });
 
-    if (!assignment) {
+    if (assignment) return;
+
+    // A teacher may also satisfy this as the section's homeroom class
+    // teacher (Section.classTeacherId), not just as the assigned subject
+    // teacher — matching the same dual check ensureHomeworkRegisterReadAccess
+    // and AttendanceService.getTeacherSectionIds already use. Checking only
+    // SubjectTeacherAssignment silently locked every homeroom class teacher
+    // out of creating/managing homework for their own class.
+    const isClassTeacher = homework.sectionId
+      ? await this.prisma.section.findFirst({
+          where: {
+            tenantId: actor.tenantId,
+            id: homework.sectionId,
+            classTeacherId: staffId,
+          },
+          select: { id: true },
+        })
+      : null;
+
+    if (!isClassTeacher) {
       throw new ForbiddenException(
         'You are not assigned to review homework for this class and subject',
       );

@@ -2718,9 +2718,7 @@ describe('staff-attendance and leave confirmed-gap fixes (2026-07-19)', () => {
       staffAttendanceRows: [{ id: 'sa-1', status: 'PRESENT' }],
     });
 
-    await expect(
-      service.listStaffAttendance(hrActor),
-    ).resolves.toBeDefined();
+    await expect(service.listStaffAttendance(hrActor)).resolves.toBeDefined();
 
     expect(prisma.staffAttendance.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -3019,7 +3017,9 @@ function buildService(options: {
     },
     class: {
       findFirst: jest.fn().mockResolvedValue(options.classroom ?? null),
-      findMany: jest.fn().mockResolvedValue(options.classroom ? [options.classroom] : []),
+      findMany: jest
+        .fn()
+        .mockResolvedValue(options.classroom ? [options.classroom] : []),
     },
     section: {
       findFirst: jest.fn().mockResolvedValue(options.section ?? null),

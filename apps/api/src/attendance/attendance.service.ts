@@ -2878,7 +2878,10 @@ export class AttendanceService {
     // hr:attendance:read (privileged roles), but apply the same
     // self-or-privileged check as staff.service.ts's getStaffDetail/
     // getStaffTimeline in case a future route reuses this method.
-    if (staff.userId !== actor.userId && !this.hasStaffAttendanceManagementAccess(actor)) {
+    if (
+      staff.userId !== actor.userId &&
+      !this.hasStaffAttendanceManagementAccess(actor)
+    ) {
       throw new ForbiddenException(
         'You can only view your own attendance history',
       );
@@ -3295,7 +3298,10 @@ export class AttendanceService {
     // hr:leave:request (held by base teacher for their own leave requests),
     // with no check that dto.staffId belongs to the caller -- a teacher
     // could file a leave request attributed to any colleague.
-    if (staff.userId !== actor.userId && !this.hasLeaveManagementAccess(actor)) {
+    if (
+      staff.userId !== actor.userId &&
+      !this.hasLeaveManagementAccess(actor)
+    ) {
       throw new ForbiddenException(
         'You cannot create leave requests for another staff member',
       );
@@ -5125,9 +5131,7 @@ export class AttendanceService {
         ...(activeAcademicYear
           ? { academicYearId: activeAcademicYear.id }
           : {}),
-        ...(teacherSectionIds
-          ? { sectionId: { in: teacherSectionIds } }
-          : {}),
+        ...(teacherSectionIds ? { sectionId: { in: teacherSectionIds } } : {}),
       },
       include: {
         student: {
@@ -5160,9 +5164,7 @@ export class AttendanceService {
       where: {
         tenantId: actor.tenantId,
         attendanceDate: { gte: thirtyDaysAgo, lte: today },
-        ...(teacherSectionIds
-          ? { sectionId: { in: teacherSectionIds } }
-          : {}),
+        ...(teacherSectionIds ? { sectionId: { in: teacherSectionIds } } : {}),
       },
       include: {
         records: true,

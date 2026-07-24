@@ -286,6 +286,69 @@ describe('Homework Hardening', () => {
       });
     });
 
+    it('allows a homeroom class teacher with no subject assignment to create homework for their own section', async () => {
+      // Confirmed gap: this checkpoint (shared by create/update/review/bulk-
+      // complete/reminder paths) only checked SubjectTeacherAssignment,
+      // silently locking every homeroom class teacher out of managing
+      // homework for their own class/section — mirrors the same dual-check
+      // pattern TimetableService.exportClassTimetable already applies.
+      const p = prisma as any;
+      const teacherActor: AuthContext = {
+        ...actor,
+        roles: ['subject_teacher'],
+      };
+
+      p.academicYear.findFirst.mockResolvedValue({
+        id: 'year-1',
+        tenantId: 'tenant-a',
+      });
+      p.class.findFirst.mockResolvedValue({
+        id: 'class-1',
+        tenantId: 'tenant-a',
+      });
+      p.subject.findFirst.mockResolvedValue({
+        id: 'sub-1',
+        tenantId: 'tenant-a',
+        classId: 'class-1',
+      });
+      p.staff.findFirst.mockResolvedValue({
+        id: 'teacher-1',
+        tenantId: 'tenant-a',
+        userId: 'user-1',
+      });
+
+      // No subject assignment for this teacher...
+      p.subjectTeacherAssignment.findFirst.mockResolvedValue(null);
+      // ...but they are the section's homeroom class teacher.
+      p.section.findFirst.mockResolvedValue({
+        id: 'section-1',
+        classTeacherId: 'teacher-1',
+      });
+
+      const result = (await homeworkService.createAssignment(
+        {
+          academicYearId: 'year-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: 'sub-1',
+          title: 'Homeroom homework',
+          instructions: 'Test',
+          dueDate: '2026-12-31',
+        },
+        teacherActor,
+      )) as any;
+
+      expect(result.id).toBeDefined();
+      expect(p.section.findFirst).toHaveBeenCalledWith({
+        where: {
+          tenantId: 'tenant-a',
+          id: 'section-1',
+          classTeacherId: 'teacher-1',
+        },
+        select: { id: true },
+      });
+    });
+
     it('should let an admin create homework for any class without an assignment check', async () => {
       const p = prisma as any;
       const adminActor: AuthContext = { ...actor, roles: ['admin'] };

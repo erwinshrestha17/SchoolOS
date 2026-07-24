@@ -46,6 +46,7 @@ export class SectionsService {
       id: section.id,
       name: section.name,
       capacity: section.capacity,
+      classId: section.classId,
       class: {
         id: section.class.id,
         name: section.class.name,

@@ -222,6 +222,73 @@ test.describe('M5 Activity Post Moderation & Parent Visibility', () => {
   });
 });
 
+// classteacher.1a (reused from the M5 fixture above) is Section A's homeroom
+// teacher with zero SubjectTeacherAssignment rows for any subject — exactly
+// the actor HomeworkService.ensureSubjectTeacherScope previously locked out
+// of creating homework for their own class/section (fixed 2026-07-24).
+const M6_CLASS_ID = 'cbf6af3f-bc7c-4798-91d2-817bcd3d5475';
+const M6_SECTION_ID = 'bc5b67a8-0dd9-42a3-89cc-c91aa1c5e080';
+const M6_SUBJECT_ID = '0abbb2ff-2c65-4710-8d62-f4dce7a8f553'; // Nepali
+const M6_ACADEMIC_YEAR_ID = 'd67a3e8c-9440-4f86-ba95-b259fcdff12a';
+const m6HomeworkMutationsEnabled =
+  process.env.SCHOOLOS_E2E_M6_HOMEWORK_MUTATIONS === 'true';
+
+test.describe('M6 Homework Class-Teacher Creation', () => {
+  test.beforeEach(async ({ context }) => {
+    test.skip(
+      !m6HomeworkMutationsEnabled ||
+        !m5TeacherCredentials.tenantSlug ||
+        !m5TeacherCredentials.email ||
+        !m5TeacherCredentials.password,
+      'Set SCHOOLOS_E2E_M6_HOMEWORK_MUTATIONS=true, SCHOOLOS_E2E_TENANT_SLUG, SCHOOLOS_E2E_M5_TEACHER_EMAIL, and SCHOOLOS_E2E_M5_TEACHER_PASSWORD for a homeroom class teacher with no subject assignment to run the M6 homework-creation smoke.',
+    );
+    await context.clearCookies();
+  });
+
+  test('a homeroom class teacher with no subject assignment can create homework for their own section', async ({
+    page,
+  }) => {
+    const homeworkTitle = `M6 E2E Homework ${Date.now()}`;
+
+    await login(page, m5TeacherCredentials);
+    await page.goto('/dashboard/homework/new');
+    await expect(
+      page.getByRole('heading', { name: 'Create Homework' }),
+    ).toBeVisible();
+
+    const selects = page.locator('select');
+    await selects.nth(0).selectOption(M6_ACADEMIC_YEAR_ID); // Academic Year
+    await selects.nth(1).selectOption(M6_CLASS_ID); // Class
+    await selects.nth(2).selectOption(M6_SECTION_ID); // Section
+    await selects.nth(3).selectOption(M6_SUBJECT_ID); // Subject
+
+    await page
+      .getByPlaceholder('e.g. Weekly Math Quiz Review')
+      .fill(homeworkTitle);
+    await page
+      .getByPlaceholder(/What should students do/i)
+      .fill('E2E class-teacher homework-creation smoke test.');
+
+    const dueDateInput = page.locator('input[type="date"]').nth(1);
+    await dueDateInput.fill('2026-08-15');
+
+    // Before the 2026-07-24 fix, this would 403 with "You are not assigned
+    // to this subject" since the teacher holds no SubjectTeacherAssignment
+    // for Nepali (or any subject) — only Section.classTeacherId.
+    await Promise.all([
+      page.waitForURL(/\/dashboard\/homework\/[0-9a-f-]{36}$/, {
+        timeout: 15_000,
+      }),
+      page.getByRole('button', { name: 'Save as Draft' }).click(),
+    ]);
+
+    await expect(
+      page.getByRole('heading', { name: 'Homework Detail' }),
+    ).toBeVisible();
+    await expect(page.getByText(homeworkTitle)).toBeVisible();
+  });
+});
+
 function unwrapM5ApiData<T>(payload: unknown): T {
   if (typeof payload === 'object' && payload !== null && 'data' in payload) {
     return (payload as { data: T }).data;

@@ -232,10 +232,12 @@ describe('ResultsService', () => {
         sectionId: 'section-9',
         class: { name: '10' },
       });
-      (prisma.staff.findFirst as jest.Mock).mockResolvedValue({ id: 'staff-1' });
-      (prisma.subjectTeacherAssignment.findMany as jest.Mock).mockResolvedValue([
-        { classId: 'class-1', sectionId: 'section-1' },
-      ]);
+      (prisma.staff.findFirst as jest.Mock).mockResolvedValue({
+        id: 'staff-1',
+      });
+      (prisma.subjectTeacherAssignment.findMany as jest.Mock).mockResolvedValue(
+        [{ classId: 'class-1', sectionId: 'section-1' }],
+      );
 
       await expect(
         service.previewStudentResult('s1', teacherActor, {
@@ -264,10 +266,12 @@ describe('ResultsService', () => {
       });
       (prisma.assessmentComponent.findMany as jest.Mock).mockResolvedValue([]);
       (prisma.markEntry.findMany as jest.Mock).mockResolvedValue([]);
-      (prisma.staff.findFirst as jest.Mock).mockResolvedValue({ id: 'staff-1' });
-      (prisma.subjectTeacherAssignment.findMany as jest.Mock).mockResolvedValue([
-        { classId: 'class-1', sectionId: 'section-1' },
-      ]);
+      (prisma.staff.findFirst as jest.Mock).mockResolvedValue({
+        id: 'staff-1',
+      });
+      (prisma.subjectTeacherAssignment.findMany as jest.Mock).mockResolvedValue(
+        [{ classId: 'class-1', sectionId: 'section-1' }],
+      );
 
       await expect(
         service.previewStudentResult('s1', teacherActor, {
@@ -277,10 +281,12 @@ describe('ResultsService', () => {
     });
 
     it('blocks a teacher from previewing a whole class they do not teach', async () => {
-      (prisma.staff.findFirst as jest.Mock).mockResolvedValue({ id: 'staff-1' });
-      (prisma.subjectTeacherAssignment.findMany as jest.Mock).mockResolvedValue([
-        { classId: 'class-1', sectionId: 'section-1' },
-      ]);
+      (prisma.staff.findFirst as jest.Mock).mockResolvedValue({
+        id: 'staff-1',
+      });
+      (prisma.subjectTeacherAssignment.findMany as jest.Mock).mockResolvedValue(
+        [{ classId: 'class-1', sectionId: 'section-1' }],
+      );
 
       await expect(
         service.previewClassResults(teacherActor, {
@@ -312,10 +318,12 @@ describe('ResultsService', () => {
       });
       (prisma.assessmentComponent.findMany as jest.Mock).mockResolvedValue([]);
       (prisma.markEntry.findMany as jest.Mock).mockResolvedValue([]);
-      (prisma.staff.findFirst as jest.Mock).mockResolvedValue({ id: 'staff-1' });
-      (prisma.subjectTeacherAssignment.findMany as jest.Mock).mockResolvedValue([
-        { classId: 'class-1', sectionId: 'section-1' },
-      ]);
+      (prisma.staff.findFirst as jest.Mock).mockResolvedValue({
+        id: 'staff-1',
+      });
+      (prisma.subjectTeacherAssignment.findMany as jest.Mock).mockResolvedValue(
+        [{ classId: 'class-1', sectionId: 'section-1' }],
+      );
 
       await expect(
         service.previewStudentResult('s1', teacherActor, {

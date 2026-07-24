@@ -68,6 +68,9 @@ describe('Homework Reminders', () => {
       subjectTeacherAssignment: {
         findFirst: jest.fn().mockResolvedValue({ id: 'subject-teacher-1' }),
       },
+      section: {
+        findFirst: jest.fn(),
+      },
       $transaction: jest.fn((cb) => cb(prisma)),
     };
 

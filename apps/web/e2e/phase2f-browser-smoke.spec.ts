@@ -50,8 +50,11 @@ test.describe('Phase 2F.2 authenticated school admin browser smoke', () => {
   }) => {
     const targets = [
       {
+        // The dashboard home was redesigned around a "School Overview"
+        // heading with backend-owned readiness sections; the old generic
+        // "Dashboard/Quick Actions/Total Students" copy no longer appears.
         route: '/dashboard',
-        visible: /Dashboard|Quick Actions|Total Students/i,
+        visible: /School Overview|Needs your attention|Today.s operations/i,
       },
       { route: '/dashboard/students', visible: /Student Directory/i },
       {

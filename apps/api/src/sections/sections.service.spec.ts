@@ -108,4 +108,20 @@ describe('SectionsService.listSections', () => {
     });
     expect(sections[0].isAssignedClassTeacher).toBe(false);
   });
+
+  it('includes a flat classId alongside the nested class object', async () => {
+    // Confirmed gap: every web consumer that filters this endpoint's
+    // response by `section.classId` (homework/CAS/report-card/timetable
+    // class-section pickers) was silently broken because this response
+    // only ever populated the nested `class` object, never the flat
+    // `classId` the shared SectionSummary type also declares.
+    const { service } = buildService({
+      sections: [buildSection({ id: 'section-1', classId: 'class-1' })],
+      staff: { id: 'staff-9' },
+    });
+
+    const sections = await service.listSections(teacherActor);
+
+    expect(sections[0].classId).toBe('class-1');
+  });
 });

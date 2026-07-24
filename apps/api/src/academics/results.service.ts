@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { StaffStatus } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
@@ -65,7 +69,11 @@ export class ResultsService {
     // Confirmed gap: this endpoint (results:read, held by a base teacher)
     // computed and returned a student's full result across every subject
     // with no check the caller actually teaches them.
-    await this.ensureTeacherResultScope(actor, student.classId, student.sectionId);
+    await this.ensureTeacherResultScope(
+      actor,
+      student.classId,
+      student.sectionId,
+    );
 
     // 2. Validate exam term belongs to tenant
     const examTerm = await this.prisma.examTerm.findFirst({
@@ -371,10 +379,14 @@ export class ResultsService {
     const inScope = classSections.some(
       (cs) =>
         cs.classId === classId &&
-        (cs.sectionId === null || sectionId === null || cs.sectionId === sectionId),
+        (cs.sectionId === null ||
+          sectionId === null ||
+          cs.sectionId === sectionId),
     );
     if (!inScope) {
-      throw new ForbiddenException('This result is outside your teaching scope');
+      throw new ForbiddenException(
+        'This result is outside your teaching scope',
+      );
     }
   }
 
@@ -413,7 +425,10 @@ export class ResultsService {
       });
     }
     for (const s of classTeacherSections) {
-      combos.set(`${s.classId}:${s.id}`, { classId: s.classId, sectionId: s.id });
+      combos.set(`${s.classId}:${s.id}`, {
+        classId: s.classId,
+        sectionId: s.id,
+      });
     }
     return Array.from(combos.values());
   }

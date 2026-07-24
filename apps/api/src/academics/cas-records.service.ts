@@ -170,7 +170,10 @@ export class CasRecordsService {
     return {
       OR: classSections.flatMap(({ classId, sectionId }) =>
         sectionId
-          ? [{ classId, sectionId }, { classId, sectionId: null }]
+          ? [
+              { classId, sectionId },
+              { classId, sectionId: null },
+            ]
           : [{ classId, sectionId: null }],
       ),
     };
@@ -211,7 +214,10 @@ export class CasRecordsService {
       });
     }
     for (const s of classTeacherSections) {
-      combos.set(`${s.classId}:${s.id}`, { classId: s.classId, sectionId: s.id });
+      combos.set(`${s.classId}:${s.id}`, {
+        classId: s.classId,
+        sectionId: s.id,
+      });
     }
     return Array.from(combos.values());
   }
