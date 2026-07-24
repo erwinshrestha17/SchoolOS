@@ -3,11 +3,11 @@ import {
   Controller,
   Delete,
   Get,
-  Header,
   Param,
   Patch,
   Post,
   Query,
+  StreamableFile,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
@@ -615,13 +615,20 @@ export class AcademicsController {
   }
 
   @Get('report-cards/:id.pdf')
-  @Header('Content-Type', 'application/pdf')
   @Permissions('academics:read')
-  getReportCardPdf(
+  async getReportCardPdf(
     @Param('id') reportCardId: string,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.reportCardPdfService.getReportCardPdf(reportCardId, auth);
+    const pdf = await this.reportCardPdfService.getReportCardPdf(
+      reportCardId,
+      auth,
+    );
+
+    return new StreamableFile(pdf, {
+      type: 'application/pdf',
+      disposition: `inline; filename="${safePdfFileName(`${reportCardId}.pdf`)}"`,
+    });
   }
 
   @Get('remedial')
@@ -759,4 +766,8 @@ export class AcademicsController {
       limit: dto.limit,
     });
   }
+}
+
+function safePdfFileName(value: string) {
+  return value.replace(/[^a-zA-Z0-9._-]/g, '-');
 }

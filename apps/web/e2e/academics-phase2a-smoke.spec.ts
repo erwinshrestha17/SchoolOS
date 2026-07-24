@@ -204,6 +204,113 @@ test.describe('M4 Marks Entry Assigned-Teacher Smoke', () => {
   });
 });
 
+// Matches apps/api/prisma/seed-m4-report-card-e2e.ts's fixed IDs.
+const M4_REPORT_CARD_PUBLISHED_TERM_ID = 'd4a1f2b3-1c2d-4e5f-8a9b-0c1d2e3f4a01';
+const M4_REPORT_CARD_CLASS_ID = 'cbf6af3f-bc7c-4798-91d2-817bcd3d5475';
+const M4_REPORT_CARD_PUBLISHED_ID = 'd4a1f2b3-1c2d-4e5f-8a9b-0c1d2e3f4a04';
+const M4_REPORT_CARD_STUDENT_ID = 'b464b734-550e-4cdd-8a77-9f60fda31109';
+const m4ReportCardFixturesEnabled =
+  process.env.SCHOOLOS_E2E_M4_REPORT_CARD_FIXTURES === 'true';
+
+test.describe('M4 Report Card Protected File Smoke', () => {
+  test.beforeEach(async ({ context, page }) => {
+    test.skip(
+      !m4ReportCardFixturesEnabled,
+      'Set SCHOOLOS_E2E_M4_REPORT_CARD_FIXTURES=true after seeding db:seed:e2e:m4-report-card to run the M4 report card protected-file smoke.',
+    );
+    await context.clearCookies();
+    await login(page, schoolAdminCredentials);
+  });
+
+  test('admin downloads a real protected report card PDF, not a raw storage link', async ({
+    page,
+  }) => {
+    await page.goto('/dashboard/academics/report-cards');
+    await expect(
+      page.getByRole('heading', { name: /Report Cards/i }),
+    ).toBeVisible();
+
+    const selects = page.locator('select');
+    await selects.nth(0).selectOption('d67a3e8c-9440-4f86-ba95-b259fcdff12a');
+    await selects.nth(1).selectOption(M4_REPORT_CARD_PUBLISHED_TERM_ID);
+    await selects.nth(2).selectOption(M4_REPORT_CARD_CLASS_ID);
+
+    // The row rendering with a download action confirms the generated report
+    // card is real (not a placeholder); fetch through the same authenticated
+    // browser session to verify the actual protected-file bytes, since the
+    // click-triggered blob download isn't reliably interceptable.
+    const downloadButton = page
+      .getByTestId('report-card-download-pdf')
+      .first();
+    await expect(downloadButton).toBeVisible();
+
+    const pdfResponse = await page.request.get(
+      `${API_BASE_URL}/academics/report-cards/${M4_REPORT_CARD_PUBLISHED_ID}.pdf`,
+    );
+    expect(pdfResponse.ok()).toBe(true);
+    expect(pdfResponse.headers()['content-type']).toContain('application/pdf');
+    const body = await pdfResponse.body();
+    expect(body.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+  });
+});
+
+const m4ParentCredentials = {
+  tenantSlug: process.env.SCHOOLOS_E2E_TENANT_SLUG ?? 'default-school',
+  linkedEmail: 'guardian.c01a002@schoolos.test',
+  unrelatedEmail: 'guardian.c01a003@schoolos.test',
+  password: process.env.SCHOOLOS_E2E_M4_GUARDIAN_PASSWORD ?? 'schoolos-local-demo-only',
+};
+
+test.describe('M4 Parent Published-Only Report Card Access', () => {
+  test.beforeEach(async ({ context }) => {
+    test.skip(
+      !m4ReportCardFixturesEnabled,
+      'Set SCHOOLOS_E2E_M4_REPORT_CARD_FIXTURES=true after seeding db:seed:e2e:m4-report-card to run the M4 parent access smoke.',
+    );
+    await context.clearCookies();
+  });
+
+  test('a linked parent sees only the published report card, never the unpublished one', async ({
+    page,
+  }) => {
+    await login(page, {
+      tenantSlug: m4ParentCredentials.tenantSlug,
+      email: m4ParentCredentials.linkedEmail,
+      password: m4ParentCredentials.password,
+    });
+
+    const response = await page.request.get(
+      `${API_BASE_URL}/mobile/students/${M4_REPORT_CARD_STUDENT_ID}/report-cards`,
+    );
+    expect(response.ok()).toBe(true);
+    const result = unwrapAcademicsApiData<{
+      items: Array<{ id: string; examTerm: { name: string } }>;
+    }>(await response.json());
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].id).toBe(M4_REPORT_CARD_PUBLISHED_ID);
+    expect(result.items[0].examTerm.name).toBe('M4 E2E Published Term');
+    expect(
+      result.items.some((item) => item.examTerm.name.includes('Unpublished')),
+    ).toBe(false);
+  });
+
+  test('an unrelated parent is denied access to another guardian\'s child', async ({
+    page,
+  }) => {
+    await login(page, {
+      tenantSlug: m4ParentCredentials.tenantSlug,
+      email: m4ParentCredentials.unrelatedEmail,
+      password: m4ParentCredentials.password,
+    });
+
+    const response = await page.request.get(
+      `${API_BASE_URL}/mobile/students/${M4_REPORT_CARD_STUDENT_ID}/report-cards`,
+    );
+    expect(response.status()).toBe(403);
+  });
+});
+
 function unwrapAcademicsApiData<T>(payload: unknown): T {
   if (typeof payload === 'object' && payload !== null && 'data' in payload) {
     return (payload as { data: T }).data;

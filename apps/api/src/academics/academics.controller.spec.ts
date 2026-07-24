@@ -1,3 +1,4 @@
+import { StreamableFile } from '@nestjs/common';
 import type { AuthContext } from '../auth/auth.types';
 import { AcademicsController } from './academics.controller';
 
@@ -378,18 +379,36 @@ describe('AcademicsController M4 contracts', () => {
     );
   });
 
-  it('delegates report card PDF access through PDF service', () => {
+  it('delegates report card PDF access through PDF service and streams raw bytes, not the JSON envelope', async () => {
     const { controller, reportCardPdfService } = createController();
     const pdf = Buffer.from('%PDF-1.4');
-    reportCardPdfService.getReportCardPdf.mockReturnValue(pdf);
+    reportCardPdfService.getReportCardPdf.mockResolvedValue(pdf);
 
-    const result = controller.getReportCardPdf('report-card-1', actor);
+    const result = await controller.getReportCardPdf('report-card-1', actor);
 
     expect(reportCardPdfService.getReportCardPdf).toHaveBeenCalledWith(
       'report-card-1',
       actor,
     );
-    expect(result).toBe(pdf);
+    // Must be a StreamableFile so the global ResponseEnvelopeInterceptor
+    // passes it through untouched instead of JSON-wrapping the PDF bytes
+    // (a real bug found and fixed 2026-07-24: the raw Buffer return was
+    // silently wrapped in {success, message, data}, breaking every
+    // report-card download despite the Content-Type header still claiming
+    // application/pdf).
+    expect(result).toBeInstanceOf(StreamableFile);
+    const streamed = await new Promise<Buffer>((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      const stream = result.getStream();
+      stream.on('data', (chunk: Buffer) => {
+        chunks.push(chunk);
+      });
+      stream.on('end', () => {
+        resolve(Buffer.concat(chunks));
+      });
+      stream.on('error', reject);
+    });
+    expect(streamed).toEqual(pdf);
   });
 
   it('delegates result publishing, unpublishing, and notifications with current actor', () => {
