@@ -83,6 +83,14 @@ class Decimal {
     return this.numericValue === 0;
   }
 
+  isNegative() {
+    return this.numericValue < 0;
+  }
+
+  isPositive() {
+    return this.numericValue > 0;
+  }
+
   toNumber() {
     return this.numericValue;
   }
@@ -915,6 +923,7 @@ export const PayrollExceptionCode = {
   MISSING_STATUTORY_CONFIGURATION: 'MISSING_STATUTORY_CONFIGURATION',
   INVALID_WORKING_DAYS: 'INVALID_WORKING_DAYS',
   NEGATIVE_NET_PAY: 'NEGATIVE_NET_PAY',
+  ZERO_GROSS_PAY: 'ZERO_GROSS_PAY',
   MISSING_ACCOUNT_MAPPING: 'MISSING_ACCOUNT_MAPPING',
   FISCAL_PERIOD_LOCKED: 'FISCAL_PERIOD_LOCKED',
   ACCOUNTING_POSTING_FAILED: 'ACCOUNTING_POSTING_FAILED',

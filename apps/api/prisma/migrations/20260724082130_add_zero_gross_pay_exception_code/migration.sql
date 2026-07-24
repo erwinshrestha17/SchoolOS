@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "PayrollExceptionCode" ADD VALUE IF NOT EXISTS 'ZERO_GROSS_PAY';

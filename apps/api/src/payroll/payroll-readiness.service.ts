@@ -52,6 +52,7 @@ interface ReadinessLine {
   contractId: string | null;
   workingDays: number;
   attendanceDays: number;
+  grossSalary: Prisma.Decimal;
   netSalary: Prisma.Decimal;
   tds: Prisma.Decimal;
   staff: {
@@ -401,6 +402,7 @@ export class PayrollReadinessService {
               contractId: true,
               workingDays: true,
               attendanceDays: true,
+              grossSalary: true,
               netSalary: true,
               tds: true,
               staff: {
@@ -587,6 +589,26 @@ export class PayrollReadinessService {
             title: 'Negative net pay',
             safeMessage: 'This payroll line has a negative net-pay amount.',
             resolutionRoute: `/dashboard/payroll/runs`,
+            blockedActions: ['SUBMIT_REVIEW', 'APPROVE', 'POST'],
+          }),
+        );
+      }
+      if (line.grossSalary.isZero()) {
+        // A fully-unpaid line (e.g. no attendance/leave recorded yet for a
+        // brand-new period) produces a $0 gross salary. That line's M11
+        // accrual journal entry always includes an unconditional gross-
+        // salary debit, which the accounting posting boundary correctly
+        // rejects ("a journal line must have either a debit or a credit
+        // amount"). Block earlier, at readiness, instead of letting HR
+        // discover this only after approving the run and attempting to post.
+        candidates.push(
+          candidate(year, month, runId, line.staffId, {
+            code: PayrollExceptionCode.ZERO_GROSS_PAY,
+            severity: PayrollExceptionSeverity.BLOCKING,
+            title: 'Zero gross pay',
+            safeMessage:
+              'This payroll line has zero gross pay, usually because no attendance or approved leave is recorded yet for this period. It will fail when posted to accounting.',
+            resolutionRoute: `/dashboard/hr/attendance`,
             blockedActions: ['SUBMIT_REVIEW', 'APPROVE', 'POST'],
           }),
         );
