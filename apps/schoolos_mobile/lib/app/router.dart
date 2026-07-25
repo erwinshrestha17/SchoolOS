@@ -130,9 +130,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.parentChildAttendance,
-        builder: (context, state) => ParentAttendanceScreen(
-          studentId: state.pathParameters['id'] ?? 'aarav',
-        ),
+        builder: (context, state) =>
+            ParentAttendanceScreen(studentId: state.pathParameters['id']),
       ),
       GoRoute(
         path: AppRoutes.parentFees,

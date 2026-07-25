@@ -193,7 +193,7 @@ class _ReportCardsBody extends ConsumerWidget {
   }
 }
 
-class _ReportCardTile extends ConsumerWidget {
+class _ReportCardTile extends ConsumerStatefulWidget {
   const _ReportCardTile({
     required this.childId,
     required this.child,
@@ -205,7 +205,23 @@ class _ReportCardTile extends ConsumerWidget {
   final ParentReportCard card;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ReportCardTile> createState() => _ReportCardTileState();
+}
+
+class _ReportCardTileState extends ConsumerState<_ReportCardTile> {
+  // Both actions fetch the PDF and write it to a path derived from the report
+  // card id. Without these guards a second tap starts a concurrent write to
+  // that same path, interleaving two responses into one corrupt file.
+  bool _downloading = false;
+  bool _sharing = false;
+
+  String get childId => widget.childId;
+  GuardianChild get child => widget.child;
+  ParentReportCard get card => widget.card;
+
+  @override
+  Widget build(BuildContext context) {
+    final busy = _downloading || _sharing;
     return PortalCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -311,21 +327,33 @@ class _ReportCardTile extends ConsumerWidget {
             children: [
               Expanded(
                 child: FilledButton.icon(
-                  onPressed: card.hasFile
-                      ? () => _downloadReportCard(context, ref)
-                      : null,
-                  icon: const Icon(Icons.download_rounded),
-                  label: Text(card.hasFile ? 'Download' : 'No file'),
+                  onPressed: card.hasFile && !busy ? _downloadReportCard : null,
+                  icon: _downloading
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.download_rounded),
+                  label: Text(
+                    _downloading
+                        ? 'Downloading'
+                        : card.hasFile
+                        ? 'Download'
+                        : 'No file',
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: card.hasFile
-                      ? () => _shareReportCard(context, ref)
-                      : null,
-                  icon: const Icon(Icons.ios_share_rounded),
-                  label: const Text('Share'),
+                  onPressed: card.hasFile && !busy ? _shareReportCard : null,
+                  icon: _sharing
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.ios_share_rounded),
+                  label: Text(_sharing ? 'Preparing' : 'Share'),
                 ),
               ),
             ],
@@ -335,20 +363,26 @@ class _ReportCardTile extends ConsumerWidget {
     );
   }
 
-  Future<void> _downloadReportCard(BuildContext context, WidgetRef ref) async {
+  Future<void> _downloadReportCard() async {
+    if (_downloading || _sharing) return;
+    setState(() => _downloading = true);
     try {
       final file = await ref
           .read(parentRepositoryProvider)
           .downloadReportCardPdf(childId: childId, reportCard: card);
-      if (!context.mounted) return;
+      if (!mounted) return;
       showFeatureSnack(context, 'Report card downloaded: ${file.fileName}');
     } catch (_) {
-      if (!context.mounted) return;
+      if (!mounted) return;
       showFeatureSnack(context, 'Report card PDF is not available right now.');
+    } finally {
+      if (mounted) setState(() => _downloading = false);
     }
   }
 
-  Future<void> _shareReportCard(BuildContext context, WidgetRef ref) async {
+  Future<void> _shareReportCard() async {
+    if (_downloading || _sharing) return;
+    setState(() => _sharing = true);
     try {
       final file = await ref
           .read(parentRepositoryProvider)
@@ -358,11 +392,13 @@ class _ReportCardTile extends ConsumerWidget {
         mimeType: 'application/pdf',
         subject: file.fileName,
       );
-      if (!context.mounted) return;
+      if (!mounted) return;
       showFeatureSnack(context, 'Report card ready to share.');
     } catch (_) {
-      if (!context.mounted) return;
+      if (!mounted) return;
       showFeatureSnack(context, 'Could not share this report card.');
+    } finally {
+      if (mounted) setState(() => _sharing = false);
     }
   }
 }

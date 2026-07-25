@@ -34,10 +34,20 @@ class ParentPortalChildDetailScreen extends ConsumerWidget {
                   'Ask the school office to link this parent account to a child record.',
             );
           }
+          // A deep link naming a child this guardian is not linked to - a
+          // stale push payload, or a child since unlinked - must say so.
+          // Quietly showing the first linked child instead would present one
+          // child's record under another child's route.
           final matches = data.children.where((item) => item.id == childId);
-          final portalChild = matches.isEmpty
-              ? data.children.first
-              : matches.first;
+          if (matches.isEmpty) {
+            return const _DetailUnavailable(
+              icon: Icons.child_care_rounded,
+              title: 'Child not available',
+              message:
+                  'This child is not linked to your account, or the link has been removed. Open Children to see who you can view.',
+            );
+          }
+          final portalChild = matches.first;
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
             children: [
@@ -474,10 +484,21 @@ class _ParentPortalHomeworkDetailScreenState
                   'Homework details will appear here after the school publishes assignments for linked children.',
             );
           }
+          // Homework deep links arrive from push payloads and can outlive the
+          // assignment. Falling through to the first item would show a
+          // different child's homework as though it were the one tapped.
           final matches = portal.homework.where(
             (entry) => entry.id == widget.homeworkId,
           );
-          final item = matches.isEmpty ? portal.homework.first : matches.first;
+          if (matches.isEmpty) {
+            return const _DetailUnavailable(
+              icon: Icons.assignment_outlined,
+              title: 'Homework not available',
+              message:
+                  'This assignment is no longer published, or it belongs to a child who is not linked to your account.',
+            );
+          }
+          final item = matches.first;
           final attachments = ref.watch(
             parentHomeworkAttachmentsProvider((
               childId: item.childId,

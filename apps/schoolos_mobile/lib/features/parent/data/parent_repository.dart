@@ -10,10 +10,36 @@ import '../../../core/storage/private_read_cache.dart';
 import '../domain/parent_models.dart';
 
 class ParentRepository {
-  const ParentRepository(this._client, {this.cache});
+  ParentRepository(this._client, {this.cache});
 
   final ApiClient _client;
   final PrivateReadCache? cache;
+
+  /// Downloads currently being written, keyed by their destination file.
+  ///
+  /// Every protected download writes to a path derived from the record id, so
+  /// two overlapping downloads of the same record would interleave their bytes
+  /// into one corrupt file. Screens guard their own buttons, but the invariant
+  /// belongs here: this is the layer that owns the path. Callers that ask for
+  /// a download already in flight join it instead of starting a second write.
+  final Map<String, Future<Object>> _downloadsInFlight = {};
+
+  Future<T> _singleFlightDownload<T extends Object>(
+    String key,
+    Future<T> Function() download,
+  ) {
+    final existing = _downloadsInFlight[key];
+    if (existing is Future<T>) return existing;
+
+    late final Future<T> pending;
+    pending = download().whenComplete(() {
+      if (identical(_downloadsInFlight[key], pending)) {
+        _downloadsInFlight.remove(key);
+      }
+    });
+    _downloadsInFlight[key] = pending;
+    return pending;
+  }
 
   Future<List<GuardianChild>> getGuardianChildren() async {
     final data = await _getMap(
@@ -403,6 +429,16 @@ class ParentRepository {
   Future<ParentReceiptPdfDownload> downloadReceiptPdf({
     required String childId,
     required ParentFeeReceipt receipt,
+  }) {
+    return _singleFlightDownload(
+      'receipt:$childId:${receipt.receiptNumber}',
+      () => _downloadReceiptPdf(childId: childId, receipt: receipt),
+    );
+  }
+
+  Future<ParentReceiptPdfDownload> _downloadReceiptPdf({
+    required String childId,
+    required ParentFeeReceipt receipt,
   }) async {
     final response = await _client.get<List<int>>(
       '/mobile/students/$childId/receipts/${Uri.encodeComponent(receipt.receiptNumber)}.pdf',
@@ -436,6 +472,16 @@ class ParentRepository {
   Future<ParentProtectedFileDownload> downloadReportCardPdf({
     required String childId,
     required ParentReportCard reportCard,
+  }) {
+    return _singleFlightDownload(
+      'report-card:$childId:${reportCard.id}',
+      () => _downloadReportCardPdf(childId: childId, reportCard: reportCard),
+    );
+  }
+
+  Future<ParentProtectedFileDownload> _downloadReportCardPdf({
+    required String childId,
+    required ParentReportCard reportCard,
   }) async {
     final response = await _client.get<List<int>>(
       '/mobile/students/$childId/report-cards/${reportCard.id}.pdf',
@@ -465,6 +511,16 @@ class ParentRepository {
   }
 
   Future<ParentProtectedFileDownload> downloadStudentDocument({
+    required String childId,
+    required ParentStudentDocument document,
+  }) {
+    return _singleFlightDownload(
+      'student-document:$childId:${document.id}',
+      () => _downloadStudentDocument(childId: childId, document: document),
+    );
+  }
+
+  Future<ParentProtectedFileDownload> _downloadStudentDocument({
     required String childId,
     required ParentStudentDocument document,
   }) async {
@@ -511,6 +567,21 @@ class ParentRepository {
   }
 
   Future<ParentProtectedFileDownload> downloadHomeworkAttachment({
+    required String childId,
+    required String homeworkId,
+    required ParentHomeworkAttachment attachment,
+  }) {
+    return _singleFlightDownload(
+      'homework-attachment:$childId:$homeworkId:${attachment.id}',
+      () => _downloadHomeworkAttachment(
+        childId: childId,
+        homeworkId: homeworkId,
+        attachment: attachment,
+      ),
+    );
+  }
+
+  Future<ParentProtectedFileDownload> _downloadHomeworkAttachment({
     required String childId,
     required String homeworkId,
     required ParentHomeworkAttachment attachment,

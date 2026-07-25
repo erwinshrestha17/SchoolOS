@@ -550,11 +550,14 @@ class _LegendDot extends StatelessWidget {
 GuardianChild? _selectedChild(ParentState state, String? studentId) {
   if (state.children.isEmpty) return null;
   if (studentId != null && studentId.isNotEmpty) {
-    return state.children.firstWhere(
-      (child) => child.id == studentId,
-      orElse: () => state.selectedChild ?? state.children.first,
-    );
+    // An explicit child in the route is a request for that child. If it is not
+    // linked, deny rather than silently swapping in another child's
+    // attendance under the requested child's URL.
+    final matches = state.children.where((child) => child.id == studentId);
+    return matches.isEmpty ? null : matches.first;
   }
+  // No child in the route: the screen is the generic entry point, so the
+  // active selection is the right one to show.
   return state.selectedChild ?? state.children.first;
 }
 
