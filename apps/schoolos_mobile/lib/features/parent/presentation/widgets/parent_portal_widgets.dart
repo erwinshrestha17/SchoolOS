@@ -8,10 +8,16 @@ import '../../domain/parent_portal_models.dart';
 class ParentPortalColors {
   const ParentPortalColors._();
 
-  static const green = Color(0xFF168C69);
+  // `green` and `muted` carry text - the selected and unselected bottom-nav
+  // labels, and most secondary copy in the portal. At their previous values
+  // (#168C69 and #718096) they measured 4.21:1 and 4.02:1 against white, both
+  // short of the 4.5:1 WCAG AA needs for normal text, and lower again on the
+  // #F6F8FB page background. Darkened to clear AA on both surfaces; see
+  // `accessibility_audit_test.dart`, which pins the ratios.
+  static const green = Color(0xFF0F7355);
   static const greenSoft = Color(0xFFE9F7F1);
   static const navy = Color(0xFF172033);
-  static const muted = Color(0xFF718096);
+  static const muted = Color(0xFF5C6B7A);
   static const purple = Color(0xFF7656D6);
   static const purpleSoft = Color(0xFFF2EDFF);
   static const blue = Color(0xFF377DDF);

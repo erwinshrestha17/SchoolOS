@@ -50,6 +50,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
         leading: forceChange
             ? null
             : IconButton(
+                tooltip: 'Back',
                 icon: const Icon(Icons.arrow_back_rounded),
                 onPressed: () {
                   if (context.canPop()) {

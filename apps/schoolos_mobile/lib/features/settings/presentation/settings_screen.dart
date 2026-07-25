@@ -26,6 +26,7 @@ class SettingsScreen extends ConsumerWidget {
     return AppScaffold(
       appBar: AppBar(
         leading: IconButton(
+          tooltip: 'Back',
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () {
             if (context.canPop()) {
@@ -103,12 +104,19 @@ class SettingsScreen extends ConsumerWidget {
                         ? 'The app is using online API requests.'
                         : 'Offline preview is active for draft-capable flows.',
                   ),
-                  trailing: Switch(
-                    value: isOnline,
-                    activeTrackColor: AppColors.success,
-                    onChanged: (value) {
-                      ref.read(connectivityProvider.notifier).setOnline(value);
-                    },
+                  trailing: Semantics(
+                    // The switch is its own tappable node; the ListTile title
+                    // beside it is not announced as its label.
+                    label: 'Online mode',
+                    child: Switch(
+                      value: isOnline,
+                      activeTrackColor: AppColors.success,
+                      onChanged: (value) {
+                        ref
+                            .read(connectivityProvider.notifier)
+                            .setOnline(value);
+                      },
+                    ),
                   ),
                 ),
                 const Divider(),

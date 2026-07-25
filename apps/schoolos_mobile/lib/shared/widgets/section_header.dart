@@ -42,8 +42,11 @@ class SectionHeader extends StatelessWidget {
                 horizontal: AppSpacing.sm,
                 vertical: AppSpacing.xs,
               ),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              // `Size.zero` + `shrinkWrap` opted this out of the 48dp minimum
+              // touch target and measured 27dp tall. The label stays visually
+              // compact; only the hit area grows.
+              minimumSize: const Size(0, 48),
+              tapTargetSize: MaterialTapTargetSize.padded,
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,

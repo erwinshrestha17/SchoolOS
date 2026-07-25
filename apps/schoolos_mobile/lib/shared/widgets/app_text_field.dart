@@ -48,6 +48,9 @@ class _AppTextFieldState extends State<AppTextField> {
     Widget? getSuffix() {
       if (widget.obscureText) {
         return IconButton(
+          // Without this the only thing a screen reader can announce for the
+          // reveal control is "button".
+          tooltip: _obscured ? 'Show password' : 'Hide password',
           icon: Icon(
             _obscured ? Icons.visibility_off_rounded : Icons.visibility_rounded,
             size: 20,

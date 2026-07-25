@@ -430,6 +430,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         appBar: AppBar(
           title: const Text('Page Not Found'),
           leading: IconButton(
+            tooltip: 'Back',
             icon: const Icon(Icons.arrow_back_rounded),
             onPressed: () => context.go(AppRoutes.home),
           ),

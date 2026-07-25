@@ -783,6 +783,7 @@ class _HomeworkAttachmentList extends ConsumerWidget {
               ),
             ),
             IconButton(
+              tooltip: 'Retry loading attachments',
               onPressed: () => ref.invalidate(
                 parentHomeworkAttachmentsProvider((
                   childId: childId,

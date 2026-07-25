@@ -136,12 +136,24 @@ class AppTopBar extends ConsumerWidget implements PreferredSizeWidget {
         ),
         Padding(
           padding: const EdgeInsets.only(right: 10),
-          child: InkWell(
-            onTap: () => context.push(AppRoutes.profile),
-            borderRadius: BorderRadius.circular(999),
-            child: Padding(
-              padding: const EdgeInsets.all(4),
-              child: AvatarInitials(name: parentName, radius: 18),
+          // The avatar renders the parent's initials, which a screen reader
+          // would otherwise announce as meaningless letters ("SR"). Label the
+          // control by what it does and hide the decorative initials. The
+          // 48dp box also brings the target up from 44dp.
+          child: Semantics(
+            button: true,
+            label: 'Profile',
+            excludeSemantics: true,
+            child: InkWell(
+              onTap: () => context.push(AppRoutes.profile),
+              borderRadius: BorderRadius.circular(999),
+              child: SizedBox(
+                width: 48,
+                height: 48,
+                child: Center(
+                  child: AvatarInitials(name: parentName, radius: 18),
+                ),
+              ),
             ),
           ),
         ),

@@ -1507,6 +1507,7 @@ class _PrincipalHeader extends StatelessWidget {
             icon: const Icon(Icons.notifications_none_rounded, size: 30),
           ),
           IconButton(
+            tooltip: 'Profile',
             color: Colors.white,
             onPressed: () => context.go(AppRoutes.profile),
             icon: const Icon(Icons.account_circle_rounded, size: 34),
@@ -2043,7 +2044,11 @@ class _SegmentedFilters extends StatelessWidget {
                 onTap: () => onChanged(value),
                 borderRadius: BorderRadius.circular(AppRadius.lg),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  // 14 + text line box clears the 48dp minimum touch target;
+                  // at 13 these chips measured 46dp.
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  constraints: const BoxConstraints(minHeight: 48),
+                  alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: active == value
                         ? AppColors.info
