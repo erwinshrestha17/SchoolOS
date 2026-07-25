@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../shared/utils/money_format.dart';
 import '../../application/parent_providers.dart';
 import '../widgets/parent_state_view.dart';
 import '../../domain/parent_models.dart';
@@ -283,8 +284,7 @@ class _LibraryMetric extends StatelessWidget {
   );
 }
 
-String _money(num value) =>
-    value <= 0 ? 'NPR 0' : 'NPR ${value.toStringAsFixed(0)}';
+String _money(num value) => formatMoney(value);
 
 String _date(String? value) {
   final date = DateTime.tryParse(value ?? '');

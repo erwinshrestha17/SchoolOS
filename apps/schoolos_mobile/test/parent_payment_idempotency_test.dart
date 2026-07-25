@@ -82,9 +82,9 @@ void main() {
   }
 
   Future<void> topUp(WidgetTester tester) async {
-    await tester.tap(find.text('Sandbox top-up'));
+    await tester.tap(find.text('Add test balance'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Confirm top-up'));
+    await tester.tap(find.text('Add balance'));
     await tester.pumpAndSettle();
   }
 

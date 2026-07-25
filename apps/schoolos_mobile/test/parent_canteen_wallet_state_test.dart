@@ -65,7 +65,7 @@ void main() {
       ),
     );
 
-    expect(find.text('NPR 450'), findsOneWidget);
+    expect(find.text('Rs 450'), findsOneWidget);
     expect(find.text('OK'), findsOneWidget);
     expect(find.text('Not set up'), findsNothing);
   });
@@ -113,9 +113,9 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('Checking availability...'), findsOneWidget);
+    expect(find.text('Checking…'), findsOneWidget);
     expect(
-      find.text('Top-up unavailable'),
+      find.text('Top-up not available'),
       findsNothing,
       reason: 'a verdict must wait for the answer it reports',
     );

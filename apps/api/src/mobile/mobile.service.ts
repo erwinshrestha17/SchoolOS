@@ -746,6 +746,15 @@ export class MobileService {
         status: { in: ['ISSUED', 'PARTIAL', 'PAID'] },
       },
       include: {
+        // The printed receipt has always itemised the bill (see buildReceiptPdf
+        // in finance.service.ts). The app showed only a total, so a parent
+        // could not tell what a charge was for without the paper copy.
+        lines: {
+          include: {
+            feeHead: { select: { code: true, name: true } },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
         payments: {
           where: {
             status: 'SUCCESS',
@@ -804,10 +813,24 @@ export class MobileService {
         status: invoice.status,
         dueDate: toIso(invoice.dueDate),
         issuedAt: toIso(invoice.issuedAt),
+        subtotal: money(invoice.subtotal),
+        vatAmount: money(invoice.vatAmount),
         totalAmount,
         paidAmount,
         outstandingAmount,
         isOverdue: outstandingAmount > 0 && invoice.dueDate < now,
+        lines: invoice.lines.map((line) => ({
+          id: line.id,
+          description: line.description,
+          feeHead: {
+            code: line.feeHead.code,
+            name: line.feeHead.name,
+          },
+          quantity: line.quantity,
+          unitAmount: money(line.unitAmount),
+          vatAmount: money(line.vatAmount),
+          totalAmount: money(line.totalAmount),
+        })),
         receipts,
       };
     });

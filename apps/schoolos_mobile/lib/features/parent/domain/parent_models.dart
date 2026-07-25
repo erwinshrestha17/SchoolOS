@@ -304,16 +304,62 @@ class ParentDashboardSummary {
   }
 }
 
+/// One charge on a bill - "Tuition Fee", "Transport Fee". The school's own
+/// `description` is often an internal note ("Demo tuition invoice line"), so
+/// the fee head name is what a parent should read.
+class ParentFeeInvoiceLine {
+  const ParentFeeInvoiceLine({
+    required this.id,
+    required this.name,
+    this.description,
+    this.quantity = 1,
+    this.unitAmount = 0,
+    this.vatAmount = 0,
+    required this.totalAmount,
+  });
+
+  final String id;
+  final String name;
+  final String? description;
+  final int quantity;
+  final num unitAmount;
+  final num vatAmount;
+  final num totalAmount;
+
+  factory ParentFeeInvoiceLine.fromJson(Map<String, dynamic> json) {
+    final feeHead = _asMap(json['feeHead']);
+    final headName = feeHead?['name'] as String?;
+    final description = json['description'] as String?;
+    return ParentFeeInvoiceLine(
+      id: json['id'] as String? ?? '',
+      name: headName?.isNotEmpty == true
+          ? headName!
+          : description?.isNotEmpty == true
+          ? description!
+          : 'School charge',
+      description: description,
+      quantity: _asInt(json['quantity']) == 0 ? 1 : _asInt(json['quantity']),
+      unitAmount: _asNum(json['unitAmount']),
+      vatAmount: _asNum(json['vatAmount']),
+      totalAmount: _asNum(json['totalAmount']),
+    );
+  }
+}
+
 class ParentFeeInvoice {
   const ParentFeeInvoice({
     required this.id,
     required this.invoiceNumber,
     required this.status,
     this.dueDate,
+    this.issuedAt,
     required this.totalAmount,
     required this.paidAmount,
     required this.outstandingAmount,
     required this.isOverdue,
+    this.subtotal = 0,
+    this.vatAmount = 0,
+    this.lines = const [],
     this.receipts = const [],
   });
 
@@ -321,11 +367,19 @@ class ParentFeeInvoice {
   final String invoiceNumber;
   final String status;
   final String? dueDate;
+  final String? issuedAt;
   final num totalAmount;
   final num paidAmount;
   final num outstandingAmount;
   final bool isOverdue;
+  final num subtotal;
+  final num vatAmount;
+  final List<ParentFeeInvoiceLine> lines;
   final List<ParentFeeReceipt> receipts;
+
+  bool get isItemised => lines.isNotEmpty;
+
+  bool get isSettled => outstandingAmount <= 0;
 
   factory ParentFeeInvoice.fromJson(Map<String, dynamic> json) {
     return ParentFeeInvoice(
@@ -333,10 +387,18 @@ class ParentFeeInvoice {
       invoiceNumber: json['invoiceNumber'] as String? ?? 'Invoice',
       status: json['status'] as String? ?? 'ISSUED',
       dueDate: json['dueDate'] as String?,
+      issuedAt: json['issuedAt'] as String?,
       totalAmount: _asNum(json['totalAmount']),
       paidAmount: _asNum(json['paidAmount']),
       outstandingAmount: _asNum(json['outstandingAmount']),
       isOverdue: json['isOverdue'] as bool? ?? false,
+      subtotal: _asNum(json['subtotal']),
+      vatAmount: _asNum(json['vatAmount']),
+      // Absent on an older API build; an un-itemised bill still renders.
+      lines: _asList(json['lines'])
+          .whereType<Map<String, dynamic>>()
+          .map(ParentFeeInvoiceLine.fromJson)
+          .toList(),
       receipts: _asList(json['receipts'])
           .whereType<Map<String, dynamic>>()
           .map(ParentFeeReceipt.fromJson)

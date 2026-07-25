@@ -416,7 +416,10 @@ describe('MobileService', () => {
         status: 'PARTIAL',
         dueDate: new Date('2026-01-10T00:00:00.000Z'),
         issuedAt: new Date('2025-12-20T00:00:00.000Z'),
+        subtotal: 200,
+        vatAmount: 0,
         totalAmount: 200,
+        lines: [],
         payments: [{ amount: 50 }],
       },
       {
@@ -425,7 +428,10 @@ describe('MobileService', () => {
         status: 'ISSUED',
         dueDate: new Date('2026-12-10T00:00:00.000Z'),
         issuedAt: new Date('2026-11-20T00:00:00.000Z'),
+        subtotal: 25.25,
+        vatAmount: 0,
         totalAmount: 25.25,
+        lines: [],
         payments: [],
       },
       {
@@ -434,7 +440,10 @@ describe('MobileService', () => {
         status: 'PAID',
         dueDate: new Date('2026-02-10T00:00:00.000Z'),
         issuedAt: new Date('2026-01-20T00:00:00.000Z'),
+        subtotal: 100,
+        vatAmount: 0,
         totalAmount: 100,
+        lines: [],
         payments: [
           {
             id: 'payment-3',
@@ -517,6 +526,141 @@ describe('MobileService', () => {
         },
       ],
     });
+  });
+
+  it('itemises each bill so a parent can see what a charge is for', async () => {
+    // The printed receipt has always listed the fee heads. The app sent only a
+    // total, so a parent could not tell tuition from transport without the
+    // paper copy.
+    prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [{ studentId: 'student-1' }],
+    });
+    prisma.invoice.findMany.mockResolvedValue([
+      {
+        id: 'invoice-1',
+        invoiceNumber: 'INV-001',
+        status: 'ISSUED',
+        dueDate: new Date('2026-08-08T00:00:00.000Z'),
+        issuedAt: new Date('2026-07-10T00:00:00.000Z'),
+        subtotal: 4200,
+        vatAmount: 300,
+        totalAmount: 4500,
+        lines: [
+          {
+            id: 'line-1',
+            description: 'Monthly tuition',
+            quantity: 1,
+            unitAmount: 3000,
+            vatAmount: 0,
+            totalAmount: 3000,
+            feeHead: { code: 'TUITION', name: 'Tuition Fee' },
+          },
+          {
+            id: 'line-2',
+            description: 'Route A',
+            quantity: 1,
+            unitAmount: 1200,
+            vatAmount: 300,
+            totalAmount: 1500,
+            feeHead: { code: 'TRANSPORT', name: 'Transport Fee' },
+          },
+        ],
+        payments: [],
+      },
+    ]);
+
+    const summary = await service.getStudentFeesSummary('student-1', actor);
+
+    expect(prisma.invoice.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          lines: expect.objectContaining({
+            include: { feeHead: { select: { code: true, name: true } } },
+          }),
+        }),
+      }),
+    );
+    expect(summary.recentInvoices[0]).toEqual(
+      expect.objectContaining({
+        subtotal: 4200,
+        vatAmount: 300,
+        totalAmount: 4500,
+        lines: [
+          {
+            id: 'line-1',
+            description: 'Monthly tuition',
+            feeHead: { code: 'TUITION', name: 'Tuition Fee' },
+            quantity: 1,
+            unitAmount: 3000,
+            vatAmount: 0,
+            totalAmount: 3000,
+          },
+          {
+            id: 'line-2',
+            description: 'Route A',
+            feeHead: { code: 'TRANSPORT', name: 'Transport Fee' },
+            quantity: 1,
+            unitAmount: 1200,
+            vatAmount: 300,
+            totalAmount: 1500,
+          },
+        ],
+      }),
+    );
+  });
+
+  it('keeps every field the fee summary already published', async () => {
+    // The addition must be additive: an older app build still reads these.
+    prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [{ studentId: 'student-1' }],
+    });
+    prisma.invoice.findMany.mockResolvedValue([
+      {
+        id: 'invoice-1',
+        invoiceNumber: 'INV-001',
+        status: 'ISSUED',
+        dueDate: new Date('2026-08-08T00:00:00.000Z'),
+        issuedAt: new Date('2026-07-10T00:00:00.000Z'),
+        subtotal: 100,
+        vatAmount: 0,
+        totalAmount: 100,
+        lines: [],
+        payments: [],
+      },
+    ]);
+
+    const summary = await service.getStudentFeesSummary('student-1', actor);
+
+    for (const key of [
+      'status',
+      'totalAmount',
+      'paidAmount',
+      'totalOutstanding',
+      'overdueCount',
+      'nextDueDate',
+      'recentInvoices',
+      'recentReceipts',
+    ]) {
+      expect(summary).toHaveProperty(key);
+    }
+    for (const key of [
+      'id',
+      'invoiceNumber',
+      'status',
+      'dueDate',
+      'issuedAt',
+      'totalAmount',
+      'paidAmount',
+      'outstandingAmount',
+      'isOverdue',
+      'receipts',
+    ]) {
+      expect(summary.recentInvoices[0]).toHaveProperty(key);
+    }
   });
 
   it('returns class teacher details on linked-child profiles', async () => {

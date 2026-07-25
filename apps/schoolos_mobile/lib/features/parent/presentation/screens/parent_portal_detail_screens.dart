@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../shared/utils/money_format.dart';
 import '../../../../app/constants/app_routes.dart';
 import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../application/parent_providers.dart';
@@ -122,7 +123,7 @@ class ParentPortalChildDetailScreen extends ConsumerWidget {
                     child: SummaryMetric(
                       icon: Icons.credit_card_rounded,
                       label: 'Fees due',
-                      value: 'NPR ${portalChild.feesDue.toStringAsFixed(0)}',
+                      value: formatMoney(portalChild.feesDue),
                       color: portalChild.feesDue > 0
                           ? ParentPortalColors.orange
                           : ParentPortalColors.green,

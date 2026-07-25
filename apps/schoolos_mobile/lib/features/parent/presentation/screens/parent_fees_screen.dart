@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/errors/app_exception.dart';
 import '../widgets/parent_state_view.dart';
 import '../../../../core/platform/file_share_service.dart';
+import '../../../../shared/utils/money_format.dart';
 import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../application/parent_providers.dart';
 import '../../domain/parent_models.dart';
@@ -120,27 +121,34 @@ class _FeesContent extends ConsumerWidget {
         const SizedBox(height: 12),
         _PaymentReadinessCard(readiness: readiness),
         const SizedBox(height: 20),
-        const ParentSectionHeader(title: 'Invoices'),
-        const SizedBox(height: 8),
-        if (summary.recentInvoices.isEmpty)
-          const PortalCard(child: Text('No issued invoices for this child.'))
-        else
-          for (final invoice in summary.recentInvoices) ...[
-            _InvoiceCard(
-              childId: child.id,
-              invoice: invoice,
-              readiness: readiness.valueOrNull,
-              readinessLoading: readiness.isLoading,
-            ),
-            const SizedBox(height: 12),
+        if (summary.recentInvoices.isEmpty) ...[
+          const ParentSectionHeader(title: 'Bills'),
+          const SizedBox(height: 8),
+          const PortalCard(child: Text('No bills for this child yet.')),
+        ] else
+          for (final group in groupInvoicesByDueMonth(
+            summary.recentInvoices,
+          )) ...[
+            _MonthHeader(group: group),
+            const SizedBox(height: 8),
+            for (final invoice in group.invoices) ...[
+              _InvoiceCard(
+                childId: child.id,
+                invoice: invoice,
+                readiness: readiness.valueOrNull,
+                readinessLoading: readiness.isLoading,
+              ),
+              const SizedBox(height: 12),
+            ],
+            const SizedBox(height: 8),
           ],
-        const SizedBox(height: 18),
-        const ParentSectionHeader(title: 'Confirmed receipts'),
+        const SizedBox(height: 10),
+        const ParentSectionHeader(title: 'Your receipts'),
         const SizedBox(height: 8),
         if (summary.recentReceipts.isEmpty)
           const PortalCard(
             child: Text(
-              'No confirmed receipts available yet. Receipts appear after the backend confirms payment.',
+              'No receipts yet. A receipt appears here once the school confirms your payment.',
             ),
           )
         else
@@ -149,6 +157,97 @@ class _FeesContent extends ConsumerWidget {
             const SizedBox(height: 12),
           ],
       ],
+    );
+  }
+}
+
+/// Bills that fall due in the same Bikram Sambat month.
+class ParentFeeMonthGroup {
+  const ParentFeeMonthGroup({
+    required this.label,
+    required this.invoices,
+    required this.sortKey,
+  });
+
+  final String label;
+  final List<ParentFeeInvoice> invoices;
+
+  /// `year * 12 + month`, or -1 when the school gave no due date.
+  final int sortKey;
+
+  num get outstanding =>
+      invoices.fold<num>(0, (sum, item) => sum + item.outstandingAmount);
+}
+
+/// Groups bills by the BS month they fall due, newest month first.
+///
+/// Deliberately keyed on `dueDate` rather than `FeeBillingRun.runMonth`: that
+/// field's calendar convention is unenforced (the DTO accepts any year over
+/// 2000, the finance spec uses AD 2026, seeded invoice numbers use BS 2083),
+/// so a month label taken from it could name the wrong month. A due date is a
+/// real timestamp and converts unambiguously. The label says "Due in ..." for
+/// the same reason - it is true whatever period the school billed for.
+List<ParentFeeMonthGroup> groupInvoicesByDueMonth(
+  List<ParentFeeInvoice> invoices,
+) {
+  final buckets = <int, List<ParentFeeInvoice>>{};
+  final labels = <int, String>{};
+
+  for (final invoice in invoices) {
+    final due = DateTime.tryParse(invoice.dueDate ?? '');
+    if (due == null) {
+      buckets.putIfAbsent(-1, () => []).add(invoice);
+      labels[-1] = 'No due date given';
+      continue;
+    }
+    final bs = NepaliBsCalendar.fromAd(due);
+    final key = bs.year * 12 + bs.month;
+    buckets.putIfAbsent(key, () => []).add(invoice);
+    labels[key] = 'Due in ${NepaliBsCalendar.monthName(bs.month)} ${bs.year}';
+  }
+
+  final keys = buckets.keys.toList()..sort((a, b) => b.compareTo(a));
+  return [
+    for (final key in keys)
+      ParentFeeMonthGroup(
+        label: labels[key] ?? 'Bills',
+        sortKey: key,
+        invoices: buckets[key]!
+          ..sort((a, b) => (a.dueDate ?? '').compareTo(b.dueDate ?? '')),
+      ),
+  ];
+}
+
+class _MonthHeader extends StatelessWidget {
+  const _MonthHeader({required this.group});
+
+  final ParentFeeMonthGroup group;
+
+  @override
+  Widget build(BuildContext context) {
+    final owing = group.outstanding > 0;
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(child: ParentSectionHeader(title: group.label)),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              owing ? '${_money(group.outstanding)} to pay' : 'All paid',
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+                color: owing
+                    ? ParentPortalColors.orange
+                    : ParentPortalColors.green,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -171,7 +270,7 @@ class _PaymentReadinessCard extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Checking the school payment provider...',
+                'Checking if you can pay online…',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: ParentPortalColors.muted,
                 ),
@@ -183,7 +282,7 @@ class _PaymentReadinessCard extends StatelessWidget {
       error: (_, _) => const PortalCard(
         color: ParentPortalColors.orangeSoft,
         child: Text(
-          'We could not confirm payment provider readiness. No payment can be started from mobile.',
+          'We cannot start a payment right now. Nothing has been charged.',
           style: TextStyle(color: ParentPortalColors.muted),
         ),
       ),
@@ -209,9 +308,9 @@ class _PaymentReadinessCard extends StatelessWidget {
                   StatusBadge(
                     label: value.enabled
                         ? value.sandbox
-                              ? 'Sandbox ready'
-                              : 'Online ready'
-                        : 'Unavailable',
+                              ? 'Test mode'
+                              : 'You can pay online'
+                        : 'Not available',
                     color: value.enabled
                         ? ParentPortalColors.green
                         : ParentPortalColors.orange,
@@ -226,7 +325,7 @@ class _PaymentReadinessCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'SchoolOS never queues fee payments offline.',
+                    'You need internet to pay. Nothing is charged while you are offline.',
                     style: TextStyle(
                       color: ParentPortalColors.muted,
                       fontSize: 12,
@@ -295,17 +394,17 @@ class _FeesSummaryCard extends StatelessWidget {
                   hasDues
                       ? 'Paid ${_money(summary.feesPaidAmount)} of ${_money(summary.feesTotalAmount)}'
                       : nothingBilled
-                      ? 'The school has not issued any fee invoice for this child.'
-                      : 'No outstanding school fee balance from the backend.',
+                      ? 'The school has not sent a bill for this child yet.'
+                      : 'Nothing left to pay.',
                   style: const TextStyle(color: ParentPortalColors.muted),
                 ),
                 Text(
                   nothingBilled
                       ? 'Nothing is payable right now.'
                       : !hasDues
-                      ? 'Receipts remain available after confirmation.'
+                      ? 'Your payment receipts are saved below.'
                       : summary.nextFeeDueDate == null
-                      ? 'No upcoming due date from school.'
+                      ? 'The school has not set a due date.'
                       : 'Next due ${_date(summary.nextFeeDueDate)}',
                   style: const TextStyle(color: ParentPortalColors.muted),
                 ),
@@ -337,6 +436,139 @@ class _FeesSummaryCard extends StatelessWidget {
   }
 }
 
+/// What the school actually charged for. The printed receipt has always listed
+/// this; until now the app showed only a total, so a parent could not tell
+/// tuition from transport without the paper copy.
+class _BillBreakdown extends StatelessWidget {
+  const _BillBreakdown({
+    required this.invoice,
+    required this.expanded,
+    required this.onToggle,
+  });
+
+  final ParentFeeInvoice invoice;
+  final bool expanded;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!invoice.isItemised) {
+      return const Padding(
+        padding: EdgeInsets.only(top: 8),
+        child: Text(
+          'The school has not itemised this bill.',
+          style: TextStyle(color: ParentPortalColors.muted, fontSize: 12),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // A plain button rather than ExpansionTile: the tile brings its own
+        // padding, divider and 56dp row height, which fights the card.
+        Semantics(
+          button: true,
+          expanded: expanded,
+          child: TextButton.icon(
+            onPressed: onToggle,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              minimumSize: const Size(0, 44),
+              tapTargetSize: MaterialTapTargetSize.padded,
+              foregroundColor: ParentPortalColors.green,
+            ),
+            icon: Icon(
+              expanded
+                  ? Icons.keyboard_arrow_up_rounded
+                  : Icons.keyboard_arrow_down_rounded,
+              size: 20,
+            ),
+            label: Text(
+              expanded ? 'Hide details' : 'See what this covers',
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+        ),
+        if (expanded) ...[
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: ParentPortalColors.surfaceAlt,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              children: [
+                for (final line in invoice.lines)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _BreakdownRow(
+                      label: line.quantity > 1
+                          ? '${line.name} × ${line.quantity}'
+                          : line.name,
+                      amount: _money(line.totalAmount),
+                    ),
+                  ),
+                if (invoice.vatAmount > 0) ...[
+                  _BreakdownRow(
+                    label: 'VAT',
+                    amount: _money(invoice.vatAmount),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                const Divider(height: 12),
+                _BreakdownRow(
+                  label: 'Total',
+                  amount: _money(invoice.totalAmount),
+                  emphasised: true,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _BreakdownRow extends StatelessWidget {
+  const _BreakdownRow({
+    required this.label,
+    required this.amount,
+    this.emphasised = false,
+  });
+
+  final String label;
+  final String amount;
+  final bool emphasised;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = TextStyle(
+      fontWeight: emphasised ? FontWeight.w900 : FontWeight.w600,
+      color: emphasised ? ParentPortalColors.navy : ParentPortalColors.muted,
+    );
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: Text(label, style: style)),
+        const SizedBox(width: 12),
+        Text(amount, style: style.copyWith(color: ParentPortalColors.navy)),
+      ],
+    );
+  }
+}
+
+/// The backend status is a database enum (ISSUED, PARTIAL, PAID). A parent
+/// wants to know whether they still owe money.
+String _billStatusLabel(ParentFeeInvoice invoice) {
+  if (invoice.isSettled) return 'Paid';
+  if (invoice.isOverdue) return 'Overdue';
+  if (invoice.paidAmount > 0) return 'Part paid';
+  return 'To pay';
+}
+
 class _InvoiceCard extends ConsumerStatefulWidget {
   const _InvoiceCard({
     required this.childId,
@@ -356,6 +588,7 @@ class _InvoiceCard extends ConsumerStatefulWidget {
 
 class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
   bool _startingPayment = false;
+  bool _showBreakdown = false;
   String? _paymentRequestKey;
 
   @override
@@ -363,11 +596,11 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
     final invoice = widget.invoice;
     final canPay = widget.readiness?.enabled == true && !_startingPayment;
     final paymentStatusMessage = widget.readinessLoading
-        ? 'Checking provider readiness before payment.'
+        ? 'Checking if you can pay online…'
         : widget.readiness?.enabled == true
-        ? 'Payment starts online only and remains backend-gated.'
+        ? 'You can pay online. The school confirms every payment.'
         : widget.readiness?.message ??
-              'Online payment is not available for this school right now.';
+              'This school does not accept online payment right now.';
     return PortalCard(
       borderColor: invoice.isOverdue
           ? ParentPortalColors.orange.withValues(alpha: .4)
@@ -383,19 +616,29 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      invoice.invoiceNumber,
-                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    // The bill is the parent's; the invoice number is the
+                    // school's filing reference, so it reads underneath
+                    // rather than as the heading.
+                    const Text(
+                      'School fees',
+                      style: TextStyle(fontWeight: FontWeight.w900),
                     ),
                     Text(
                       'Due ${_date(invoice.dueDate)}',
                       style: const TextStyle(color: ParentPortalColors.muted),
                     ),
+                    Text(
+                      invoice.invoiceNumber,
+                      style: const TextStyle(
+                        color: ParentPortalColors.muted,
+                        fontSize: 11,
+                      ),
+                    ),
                   ],
                 ),
               ),
               StatusBadge(
-                label: invoice.status,
+                label: _billStatusLabel(invoice),
                 color: invoice.outstandingAmount > 0
                     ? ParentPortalColors.orange
                     : ParentPortalColors.green,
@@ -406,14 +649,24 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
             ],
           ),
           const Divider(height: 24),
-          Row(
+          // Wrap, not Row: a seven-figure fee at large text scale cannot
+          // share a phone width three ways, and "Rs 12,345,678" has no break
+          // point for a Text to wrap on. Wrap reflows to a second run instead
+          // of overflowing.
+          Wrap(
+            spacing: 20,
+            runSpacing: 12,
             children: [
-              Expanded(child: _FeeMetric('Total', _money(invoice.totalAmount))),
-              Expanded(child: _FeeMetric('Paid', _money(invoice.paidAmount))),
-              Expanded(
-                child: _FeeMetric('Balance', _money(invoice.outstandingAmount)),
-              ),
+              _FeeMetric('Total', _money(invoice.totalAmount)),
+              _FeeMetric('Paid', _money(invoice.paidAmount)),
+              _FeeMetric('Left to pay', _money(invoice.outstandingAmount)),
             ],
+          ),
+          const SizedBox(height: 4),
+          _BillBreakdown(
+            invoice: invoice,
+            expanded: _showBreakdown,
+            onToggle: () => setState(() => _showBreakdown = !_showBreakdown),
           ),
           if (invoice.outstandingAmount > 0) ...[
             const SizedBox(height: 12),
@@ -443,12 +696,12 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
                       ),
                 label: Text(
                   _startingPayment
-                      ? 'Starting secure payment...'
+                      ? 'Opening payment…'
                       : widget.readinessLoading
-                      ? 'Checking payment provider'
+                      ? 'Checking…'
                       : canPay
                       ? 'Pay ${_money(invoice.outstandingAmount)}'
-                      : 'Payment unavailable',
+                      : 'Online payment not available',
                 ),
               ),
             ),
@@ -472,9 +725,9 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Continue to secure payment?'),
+        title: Text('Pay ${_money(widget.invoice.outstandingAmount)}?'),
         content: Text(
-          '${widget.invoice.invoiceNumber}\nAmount: ${_money(widget.invoice.outstandingAmount)}\nProvider: ${_providerLabel(provider)}${readiness.sandbox ? '\n\nSandbox mode: this test payment will be confirmed immediately.' : ''}',
+          'School fees · due ${_date(widget.invoice.dueDate)}\nPaying with ${_providerLabel(provider)}${readiness.sandbox ? '\n\nTest mode: this is a practice payment, not a real one.' : ''}',
         ),
         actions: [
           TextButton(
@@ -518,7 +771,7 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
         if (!mounted) return;
         showFeatureSnack(
           context,
-          'Sandbox payment confirmed${result.receiptNumber == null ? '' : ' • Receipt ${result.receiptNumber}'}.',
+          'Test payment recorded${result.receiptNumber == null ? '' : ' • Receipt ${result.receiptNumber}'}.',
         );
         return;
       }
@@ -549,7 +802,7 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
       if (!mounted) return;
       showFeatureSnack(
         context,
-        'Secure checkout opened. The receipt will appear after payment confirmation.',
+        'Payment page opened. Your receipt appears here once the school confirms it.',
       );
     } catch (error) {
       if (!mounted) return;
@@ -574,7 +827,7 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Choose payment provider',
+                'How do you want to pay?',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: 12),
@@ -587,8 +840,8 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
                   ),
                   subtitle: Text(
                     sandbox
-                        ? 'Sandbox payment - confirmed immediately'
-                        : 'Secure online checkout - internet required',
+                        ? 'Practice payment, confirmed straight away'
+                        : 'Opens a secure page. You need internet.',
                   ),
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: () => Navigator.pop(context, provider),
@@ -654,7 +907,7 @@ class _ReceiptCardState extends ConsumerState<_ReceiptCard> {
                 ),
               ),
               IconButton(
-                tooltip: 'Download protected receipt',
+                tooltip: 'Save receipt',
                 onPressed: busy ? null : () => _downloadReceipt(context),
                 icon: _downloading
                     ? const SizedBox.square(
@@ -664,7 +917,7 @@ class _ReceiptCardState extends ConsumerState<_ReceiptCard> {
                     : const Icon(Icons.download_rounded),
               ),
               IconButton(
-                tooltip: 'Share protected receipt',
+                tooltip: 'Share receipt',
                 onPressed: busy ? null : () => _shareReceipt(context),
                 icon: _sharing
                     ? const SizedBox.square(
@@ -677,7 +930,7 @@ class _ReceiptCardState extends ConsumerState<_ReceiptCard> {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Protected PDF. Available only after confirmed backend receipt generation.',
+            'Official receipt. Only you can open it.',
             style: TextStyle(color: ParentPortalColors.muted, fontSize: 12),
           ),
         ],
@@ -727,17 +980,17 @@ class _ReceiptCardState extends ConsumerState<_ReceiptCard> {
 
 String _safePaymentFailureMessage(Object error) {
   if (error is NetworkException || error is TimeoutException) {
-    return 'Payment could not be started. This action needs internet and no charge was recorded.';
+    return 'We could not start the payment. You need internet, and nothing was charged.';
   }
   if (error is AppException) {
     return error.message;
   }
-  return 'Payment could not be started. No charge was recorded. Please try again.';
+  return 'We could not start the payment. Nothing was charged. Please try again.';
 }
 
 String _safeReceiptFailureMessage(Object error) {
   if (error is NetworkException || error is TimeoutException) {
-    return 'We could not download this receipt. Check your connection and try again.';
+    return 'We could not open this receipt. Check your internet and try again.';
   }
   if (error is AppException) {
     return error.message;
@@ -770,7 +1023,7 @@ class _FeeMetric extends StatelessWidget {
   );
 }
 
-String _money(num value) => 'NPR ${value.toStringAsFixed(0)}';
+String _money(num value) => formatMoney(value);
 
 String _date(String? value) {
   final date = DateTime.tryParse(value ?? '');

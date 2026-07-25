@@ -323,7 +323,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('NPR 12345678'), findsWidgets);
+      expect(find.textContaining('Rs 12,345,678'), findsWidgets);
       expect(tester.takeException(), isNull);
     },
   );
@@ -404,11 +404,11 @@ void main() {
       }
       if (screen is ParentFeesReceiptsScreen) {
         expect(
-          find.text('SchoolOS never queues fee payments offline.'),
+          find.textContaining('You need internet to pay'),
           findsOneWidget,
         );
         expect(
-          find.textContaining('Receipts appear after the backend confirms'),
+          find.textContaining('once the school confirms your payment'),
           findsOneWidget,
         );
       }

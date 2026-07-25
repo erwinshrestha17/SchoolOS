@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../shared/utils/money_format.dart';
 import '../../../../app/constants/app_routes.dart';
 import '../../../../core/storage/app_preferences_service.dart';
 import '../../application/parent_portal_providers.dart';
@@ -378,7 +379,7 @@ List<_ParentAction> _actionsFor(ParentPortalChild child) {
     actions.add(
       _ParentAction(
         icon: Icons.account_balance_wallet_outlined,
-        label: 'NPR ${child.feesDue.toStringAsFixed(0)} fees due',
+        label: '${formatMoney(child.feesDue)} fees due',
         route: AppRoutes.parentFees,
       ),
     );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../shared/utils/money_format.dart';
 import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../application/parent_portal_providers.dart';
 import '../../domain/parent_portal_models.dart';
@@ -650,7 +651,7 @@ List<_CalendarMarker> _calendarMarkers(ParentPortalData data) {
       markers.add(
         _CalendarMarker(
           childId: child.id,
-          title: 'Fees due NPR ${child.feesDue.toStringAsFixed(0)}',
+          title: 'Fees due ${formatMoney(child.feesDue)}',
           bs: NepaliBsCalendar.fromAd(feeDue),
           color: ParentPortalColors.orange,
           icon: Icons.account_balance_wallet_outlined,

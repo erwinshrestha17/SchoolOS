@@ -66,7 +66,7 @@ void main() {
     );
     expect(find.text('No invoices'), findsOneWidget);
     expect(
-      find.text('The school has not issued any fee invoice for this child.'),
+      find.text('The school has not sent a bill for this child yet.'),
       findsOneWidget,
     );
   });
@@ -121,7 +121,7 @@ void main() {
       ),
     );
 
-    expect(find.text('NPR 1200'), findsWidgets);
+    expect(find.text('Rs 1,200'), findsWidgets);
     expect(find.text('1 overdue'), findsOneWidget);
     expect(find.text('Not billed'), findsNothing);
   });

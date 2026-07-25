@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../shared/utils/money_format.dart';
 import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../widgets/parent_state_view.dart';
 import '../../application/parent_providers.dart';
@@ -311,12 +312,12 @@ class _WalletCardState extends ConsumerState<_WalletCard> {
             // gateway readiness is still in flight nothing is known yet.
             label: Text(
               _isToppingUp
-                  ? 'Adding balance...'
+                  ? 'Adding balance…'
                   : readiness.isLoading
-                  ? 'Checking availability...'
+                  ? 'Checking…'
                   : canTopUp
-                  ? 'Sandbox top-up'
-                  : 'Top-up unavailable',
+                  ? 'Add test balance'
+                  : 'Top-up not available',
             ),
           ),
         ],
@@ -335,12 +336,12 @@ class _WalletCardState extends ConsumerState<_WalletCard> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Sandbox wallet top-up'),
+          title: const Text('Add test balance'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Choose amount'),
+              const Text('How much?'),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -354,7 +355,7 @@ class _WalletCardState extends ConsumerState<_WalletCard> {
                 ],
               ),
               const SizedBox(height: 16),
-              const Text('Payment provider'),
+              const Text('Pay with'),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 initialValue: provider,
@@ -373,7 +374,7 @@ class _WalletCardState extends ConsumerState<_WalletCard> {
               ),
               const SizedBox(height: 12),
               const Text(
-                'This is a test payment. SchoolOS will add the amount immediately.',
+                'This is a practice payment, not a real one. The balance is added straight away.',
                 style: TextStyle(color: ParentPortalColors.muted),
               ),
             ],
@@ -385,7 +386,7 @@ class _WalletCardState extends ConsumerState<_WalletCard> {
             ),
             FilledButton(
               onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Confirm top-up'),
+              child: const Text('Add balance'),
             ),
           ],
         ),
@@ -415,13 +416,13 @@ class _WalletCardState extends ConsumerState<_WalletCard> {
       if (!mounted) return;
       showFeatureSnack(
         context,
-        '${_providerLabel(provider)} sandbox top-up added. Balance ${_money(result.walletBalance ?? 0)}.',
+        'Test balance added with ${_providerLabel(provider)}. Balance is now ${_money(result.walletBalance ?? 0)}.',
       );
     } catch (_) {
       if (!mounted) return;
       showFeatureSnack(
         context,
-        'Top-up failed. No wallet balance was changed.',
+        'That did not work. The balance has not changed.',
       );
     } finally {
       if (mounted) setState(() => _isToppingUp = false);
@@ -459,7 +460,7 @@ class _TransactionTile extends StatelessWidget {
   }
 }
 
-String _money(num value) => 'NPR ${value.toStringAsFixed(0)}';
+String _money(num value) => formatMoney(value);
 
 String _dateLabel(String? value) {
   final date = DateTime.tryParse(value ?? '');

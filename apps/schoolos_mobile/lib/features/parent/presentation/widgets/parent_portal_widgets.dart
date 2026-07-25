@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../shared/utils/money_format.dart';
 import '../../../../app/design_system/app_radius.dart';
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
@@ -420,7 +421,7 @@ class ParentChildCard extends StatelessWidget {
                 ? ParentPortalColors.muted
                 : ParentPortalColors.green,
             title: child.hasFeesDue
-                ? 'Fees due NPR ${child.feesDue.toStringAsFixed(0)}'
+                ? 'Fees due ${formatMoney(child.feesDue)}'
                 : child.hasNoFeeInvoices
                 ? 'No fee invoice issued'
                 : 'Fees paid',
