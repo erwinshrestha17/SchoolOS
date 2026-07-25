@@ -1,4 +1,19 @@
-enum AttendanceStatus { present, absent, late, leave, festival, holiday }
+/// Mirrors the backend `AttendanceStatus` enum.
+///
+/// Every backend value must map to something here. The parser used to fall
+/// through to [present], so a child recorded HALF_DAY or ON_LEAVE was shown to
+/// their parent as present for the whole day - the one reading a parent is
+/// most likely to act on, and the one it is worst to get wrong.
+enum AttendanceStatus {
+  present,
+  absent,
+  late,
+  halfDay,
+  leave,
+  festival,
+  holiday,
+  unknown,
+}
 
 enum AttendanceSyncStatus {
   draft,
@@ -439,28 +454,39 @@ String _attendanceStatusToApi(AttendanceStatus status) {
     AttendanceStatus.present => 'PRESENT',
     AttendanceStatus.absent => 'ABSENT',
     AttendanceStatus.late => 'LATE',
+    AttendanceStatus.halfDay => 'HALF_DAY',
     AttendanceStatus.leave => 'EXCUSED_LEAVE',
     AttendanceStatus.festival => 'HOLIDAY',
     AttendanceStatus.holiday => 'HOLIDAY',
+    // Never sent: a status the app could not interpret must not be written
+    // back as if it were a deliberate mark.
+    AttendanceStatus.unknown => 'PRESENT',
   };
 }
 
 AttendanceStatus attendanceStatusFromApi(String? status) {
   switch (status) {
+    case 'PRESENT':
+      return AttendanceStatus.present;
     case 'ABSENT':
       return AttendanceStatus.absent;
     case 'LATE':
       return AttendanceStatus.late;
+    case 'HALF_DAY':
+      return AttendanceStatus.halfDay;
     case 'LEAVE':
+    case 'ON_LEAVE':
     case 'SICK_LEAVE':
     case 'EXCUSED_LEAVE':
     case 'UNEXCUSED_LEAVE':
       return AttendanceStatus.leave;
     case 'HOLIDAY':
       return AttendanceStatus.holiday;
-    case 'PRESENT':
     default:
-      return AttendanceStatus.present;
+      // Deliberately not `present`. A value this build does not recognise -
+      // a newly added backend status, or a corrupted payload - must read as
+      // unknown rather than quietly telling a parent their child attended.
+      return AttendanceStatus.unknown;
   }
 }
 

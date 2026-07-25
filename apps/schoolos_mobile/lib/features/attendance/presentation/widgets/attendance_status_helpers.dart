@@ -12,12 +12,16 @@ extension AttendanceStatusUi on AttendanceStatus {
         return 'Absent';
       case AttendanceStatus.late:
         return 'Late';
+      case AttendanceStatus.halfDay:
+        return 'Half day';
       case AttendanceStatus.leave:
         return 'Leave';
       case AttendanceStatus.festival:
         return 'Festival';
       case AttendanceStatus.holiday:
         return 'Holiday';
+      case AttendanceStatus.unknown:
+        return 'Not recorded';
     }
   }
 
@@ -29,11 +33,15 @@ extension AttendanceStatusUi on AttendanceStatus {
         return AppColors.danger;
       case AttendanceStatus.late:
         return AppColors.warning;
+      case AttendanceStatus.halfDay:
+        return AppColors.warning;
       case AttendanceStatus.leave:
         return AppColors.info;
       case AttendanceStatus.festival:
         return AppColors.teacherAccent;
       case AttendanceStatus.holiday:
+        return AppColors.slate400;
+      case AttendanceStatus.unknown:
         return AppColors.slate400;
     }
   }

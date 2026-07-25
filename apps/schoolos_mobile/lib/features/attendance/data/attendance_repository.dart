@@ -514,12 +514,17 @@ String _statusToApi(AttendanceStatus status) {
       return 'ABSENT';
     case AttendanceStatus.late:
       return 'LATE';
+    case AttendanceStatus.halfDay:
+      return 'HALF_DAY';
     case AttendanceStatus.leave:
       return 'EXCUSED_LEAVE';
     case AttendanceStatus.festival:
     case AttendanceStatus.holiday:
       return 'HOLIDAY';
     case AttendanceStatus.present:
+    // A status this build could not interpret is never written back as a
+    // deliberate mark; the teacher re-marks it explicitly instead.
+    case AttendanceStatus.unknown:
       return 'PRESENT';
   }
 }

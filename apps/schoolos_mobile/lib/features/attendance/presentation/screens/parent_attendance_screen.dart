@@ -574,9 +574,11 @@ Color _statusColor(AttendanceStatus status) {
     AttendanceStatus.present => ParentPortalColors.green,
     AttendanceStatus.late => ParentPortalColors.orange,
     AttendanceStatus.absent => ParentPortalColors.red,
+    AttendanceStatus.halfDay => ParentPortalColors.orange,
     AttendanceStatus.leave => ParentPortalColors.blue,
     AttendanceStatus.festival ||
     AttendanceStatus.holiday => ParentPortalColors.purple,
+    AttendanceStatus.unknown => ParentPortalColors.muted,
   };
 }
 
@@ -585,9 +587,11 @@ IconData _statusIcon(AttendanceStatus status) {
     AttendanceStatus.present => Icons.check_rounded,
     AttendanceStatus.late => Icons.schedule_rounded,
     AttendanceStatus.absent => Icons.close_rounded,
+    AttendanceStatus.halfDay => Icons.timelapse_rounded,
     AttendanceStatus.leave => Icons.event_busy_rounded,
     AttendanceStatus.festival ||
     AttendanceStatus.holiday => Icons.celebration_rounded,
+    AttendanceStatus.unknown => Icons.help_outline_rounded,
   };
 }
 
@@ -596,9 +600,11 @@ String _statusLabel(AttendanceStatus status) {
     AttendanceStatus.present => 'Present',
     AttendanceStatus.late => 'Late',
     AttendanceStatus.absent => 'Absent',
+    AttendanceStatus.halfDay => 'Half day',
     AttendanceStatus.leave => 'Leave',
     AttendanceStatus.festival => 'Festival',
     AttendanceStatus.holiday => 'Holiday',
+    AttendanceStatus.unknown => 'Not recorded',
   };
 }
 
