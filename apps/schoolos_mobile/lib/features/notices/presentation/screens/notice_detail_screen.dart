@@ -141,11 +141,11 @@ class NoticeDetailScreen extends ConsumerWidget {
               _NoticeAttachmentCard(
                 attachment: notice.attachment,
                 onDownload: notice.attachment == null
-                    ? () => _attachmentUnavailable(context)
+                    ? () async => _attachmentUnavailable(context)
                     : () =>
                           _downloadAttachment(context, ref, notice.attachment!),
                 onShare: notice.attachment == null
-                    ? () => _attachmentUnavailable(context)
+                    ? () async => _attachmentUnavailable(context)
                     : () => _shareAttachment(context, ref, notice.attachment!),
               ),
             ],
@@ -251,7 +251,7 @@ class NoticeDetailScreen extends ConsumerWidget {
   }
 }
 
-class _NoticeAttachmentCard extends StatelessWidget {
+class _NoticeAttachmentCard extends StatefulWidget {
   const _NoticeAttachmentCard({
     required this.attachment,
     required this.onDownload,
@@ -259,11 +259,39 @@ class _NoticeAttachmentCard extends StatelessWidget {
   });
 
   final NoticeAttachment? attachment;
-  final VoidCallback onDownload;
-  final VoidCallback onShare;
+  final Future<void> Function() onDownload;
+  final Future<void> Function() onShare;
+
+  @override
+  State<_NoticeAttachmentCard> createState() => _NoticeAttachmentCardState();
+}
+
+class _NoticeAttachmentCardState extends State<_NoticeAttachmentCard> {
+  // Both actions fetch the file and write it to disk. Without these guards a
+  // second tap starts a concurrent write to the same path.
+  bool _downloading = false;
+  bool _sharing = false;
+
+  NoticeAttachment? get attachment => widget.attachment;
+
+  Future<void> _run(
+    Future<void> Function() action, {
+    required bool share,
+  }) async {
+    if (_downloading || _sharing) return;
+    setState(() => share ? _sharing = true : _downloading = true);
+    try {
+      await action();
+    } finally {
+      if (mounted) {
+        setState(() => share ? _sharing = false : _downloading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final busy = _downloading || _sharing;
     final label = attachment == null
         ? 'Protected attachment unavailable'
         : attachment!.fileName;
@@ -304,17 +332,31 @@ class _NoticeAttachmentCard extends StatelessWidget {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: onDownload,
-                  icon: const Icon(Icons.download_rounded, size: 18),
-                  label: const Text('Download'),
+                  onPressed: busy
+                      ? null
+                      : () => _run(widget.onDownload, share: false),
+                  icon: _downloading
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.download_rounded, size: 18),
+                  label: Text(_downloading ? 'Downloading' : 'Download'),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: onShare,
-                  icon: const Icon(Icons.ios_share_rounded, size: 18),
-                  label: const Text('Share'),
+                  onPressed: busy
+                      ? null
+                      : () => _run(widget.onShare, share: true),
+                  icon: _sharing
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.ios_share_rounded, size: 18),
+                  label: Text(_sharing ? 'Preparing' : 'Share'),
                 ),
               ),
             ],

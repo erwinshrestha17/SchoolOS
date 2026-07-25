@@ -9,10 +9,18 @@ import '../../../core/storage/private_read_cache.dart';
 import '../domain/notice_models.dart';
 
 class NoticesRepository {
-  const NoticesRepository(this._client, {this.cache});
+  NoticesRepository(this._client, {this.cache});
 
   final ApiClient _client;
   final PrivateReadCache? cache;
+
+  /// Attachment downloads currently being written, keyed by attachment.
+  ///
+  /// Download and Share both fetch the file and write it to disk, and neither
+  /// button was guarded, so a second tap started a concurrent write to the
+  /// same path and interleaved two responses into one corrupt file - the file
+  /// the reader then opens or shares.
+  final Map<String, Future<NoticeAttachmentDownload>> _downloadsInFlight = {};
 
   Future<List<Notice>> getNotices() async {
     final center = await _getCenter();
@@ -91,6 +99,23 @@ class NoticesRepository {
 
   Future<NoticeAttachmentDownload> downloadNoticeAttachment(
     NoticeAttachment attachment,
+  ) {
+    final key = attachment.id.isEmpty ? attachment.downloadPath : attachment.id;
+    final existing = _downloadsInFlight[key];
+    if (existing != null) return existing;
+
+    late final Future<NoticeAttachmentDownload> pending;
+    pending = _downloadNoticeAttachment(attachment).whenComplete(() {
+      if (identical(_downloadsInFlight[key], pending)) {
+        _downloadsInFlight.remove(key);
+      }
+    });
+    _downloadsInFlight[key] = pending;
+    return pending;
+  }
+
+  Future<NoticeAttachmentDownload> _downloadNoticeAttachment(
+    NoticeAttachment attachment,
   ) async {
     if (attachment.downloadPath.isEmpty) {
       throw StateError('Notice attachment download path was empty.');
@@ -108,13 +133,18 @@ class NoticesRepository {
       throw StateError('Notice attachment was empty.');
     }
 
+    final fileName = _safeFileName(attachment.fileName);
+    // Scoped by attachment id, because two notices can carry attachments with
+    // the same display name.
     final temporaryDir = await getTemporaryDirectory();
-    final noticeDir = Directory('${temporaryDir.path}/schoolos/notices');
+    final noticeDir = Directory(
+      '${temporaryDir.path}/schoolos/notices/'
+      '${_safeFileName(attachment.id.isEmpty ? fileName : attachment.id)}',
+    );
     if (!noticeDir.existsSync()) {
       await noticeDir.create(recursive: true);
     }
 
-    final fileName = _safeFileName(attachment.fileName);
     final file = File('${noticeDir.path}/$fileName');
     await file.writeAsBytes(bytes, flush: true);
 

@@ -550,17 +550,14 @@ class ParentRepository {
       throw StateError('Student document was empty.');
     }
 
-    final temporaryDir = await getTemporaryDirectory();
-    final documentsDir = Directory('${temporaryDir.path}/schoolos/documents');
-    if (!documentsDir.existsSync()) {
-      await documentsDir.create(recursive: true);
-    }
-
     final baseName = document.fileName.isNotEmpty
         ? document.fileName
         : document.title;
     final fileName = _safeFileName(baseName);
-    final file = File('${documentsDir.path}/$fileName');
+    // Scoped by record id: the display name alone is not unique, so two
+    // different documents both called "birth.pdf" would otherwise share one
+    // path and could be written concurrently.
+    final file = await _protectedFile('documents', document.id, fileName);
     await file.writeAsBytes(bytes, flush: true);
 
     return ParentProtectedFileDownload(fileName: fileName, filePath: file.path);
@@ -610,16 +607,12 @@ class ParentRepository {
       throw StateError('Homework attachment was empty.');
     }
 
-    final temporaryDir = await getTemporaryDirectory();
-    final attachmentDir = Directory(
-      '${temporaryDir.path}/schoolos/homework-attachments',
-    );
-    if (!attachmentDir.existsSync()) {
-      await attachmentDir.create(recursive: true);
-    }
-
     final fileName = _safeFileName(access.fileName);
-    final file = File('${attachmentDir.path}/$fileName');
+    final file = await _protectedFile(
+      'homework-attachments',
+      attachment.id,
+      fileName,
+    );
     await file.writeAsBytes(bytes, flush: true);
 
     return ParentProtectedFileDownload(fileName: fileName, filePath: file.path);
@@ -651,6 +644,27 @@ class ParentRepository {
       return cached.withMetadata();
     }
   }
+}
+
+/// Resolves the on-disk location for a protected download.
+///
+/// The record id is part of the path, not just the display name, so two
+/// records that happen to share a filename cannot collide - and cannot be
+/// written concurrently, which [_singleFlightDownload] only prevents for
+/// repeat requests of the *same* record.
+Future<File> _protectedFile(
+  String bucket,
+  String recordId,
+  String fileName,
+) async {
+  final temporaryDir = await getTemporaryDirectory();
+  final directory = Directory(
+    '${temporaryDir.path}/schoolos/$bucket/${_safeFileName(recordId)}',
+  );
+  if (!directory.existsSync()) {
+    await directory.create(recursive: true);
+  }
+  return File('${directory.path}/$fileName');
 }
 
 String _safeFileName(String value) {
