@@ -272,21 +272,32 @@ class _WalletCardState extends ConsumerState<_WalletCard> {
                   ],
                 ),
               ),
-              StatusBadge(
-                label: widget.info.isLowBalance ? 'Low balance' : 'OK',
-                color: widget.info.isLowBalance
-                    ? ParentPortalColors.orange
-                    : ParentPortalColors.green,
-                background: widget.info.isLowBalance
-                    ? ParentPortalColors.orangeSoft
-                    : Colors.white,
-              ),
+              // A child with no canteen wallet has no balance to be OK about.
+              // The badge used to fall through to a green "OK" beside the words
+              // "No wallet", which reads as reassurance about an account that
+              // does not exist.
+              if (balance == null)
+                const StatusBadge(
+                  label: 'Not set up',
+                  color: ParentPortalColors.muted,
+                  background: ParentPortalColors.surfaceAlt,
+                )
+              else
+                StatusBadge(
+                  label: widget.info.isLowBalance ? 'Low balance' : 'OK',
+                  color: widget.info.isLowBalance
+                      ? ParentPortalColors.orange
+                      : ParentPortalColors.green,
+                  background: widget.info.isLowBalance
+                      ? ParentPortalColors.orangeSoft
+                      : Colors.white,
+                ),
             ],
           ),
           const SizedBox(height: 12),
           OutlinedButton.icon(
             onPressed: canTopUp ? _topUp : null,
-            icon: _isToppingUp
+            icon: _isToppingUp || readiness.isLoading
                 ? const SizedBox.square(
                     dimension: 18,
                     child: CircularProgressIndicator(strokeWidth: 2),
@@ -296,9 +307,13 @@ class _WalletCardState extends ConsumerState<_WalletCard> {
                         ? Icons.add_card_rounded
                         : Icons.lock_outline_rounded,
                   ),
+            // "Top-up unavailable" is a verdict, so it waits for one. While
+            // gateway readiness is still in flight nothing is known yet.
             label: Text(
               _isToppingUp
                   ? 'Adding balance...'
+                  : readiness.isLoading
+                  ? 'Checking availability...'
                   : canTopUp
                   ? 'Sandbox top-up'
                   : 'Top-up unavailable',

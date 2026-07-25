@@ -121,6 +121,10 @@ class ParentPortalChild {
   final String academicYear;
 
   bool get hasFeesDue => feesDue > 0;
+
+  /// The backend reports nothing outstanding both for a settled account and
+  /// for a child the school has never invoiced. Only the first is "paid".
+  bool get hasNoFeeInvoices => !hasFeesDue && feesTotalAmount <= 0;
 }
 
 class ParentPortalHomework {

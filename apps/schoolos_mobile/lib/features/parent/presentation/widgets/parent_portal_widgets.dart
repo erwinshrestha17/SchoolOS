@@ -411,12 +411,18 @@ class ParentChildCard extends StatelessWidget {
           _InfoLine(
             icon: child.hasFeesDue
                 ? Icons.account_balance_wallet_outlined
+                : child.hasNoFeeInvoices
+                ? Icons.receipt_long_outlined
                 : Icons.verified_rounded,
             color: child.hasFeesDue
                 ? ParentPortalColors.orange
+                : child.hasNoFeeInvoices
+                ? ParentPortalColors.muted
                 : ParentPortalColors.green,
             title: child.hasFeesDue
                 ? 'Fees due NPR ${child.feesDue.toStringAsFixed(0)}'
+                : child.hasNoFeeInvoices
+                ? 'No fee invoice issued'
                 : 'Fees paid',
             subtitle: child.nextFeeDueDate == null
                 ? 'School fee status'

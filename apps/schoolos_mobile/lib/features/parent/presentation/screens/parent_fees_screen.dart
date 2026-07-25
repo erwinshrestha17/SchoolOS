@@ -250,13 +250,24 @@ class _FeesSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasDues = summary.feesDue > 0;
+    // The backend reports status PAID whenever nothing is outstanding, which
+    // includes a child the school has never billed. Announcing "Paid" there
+    // claims a settlement that never happened, and would mask a school that
+    // simply has not issued this term's invoices yet.
+    final nothingBilled = !hasDues && summary.feesTotalAmount <= 0;
     return PortalCard(
       child: Row(
         children: [
           FeatureIcon(
-            hasDues ? Icons.warning_amber_rounded : Icons.check_circle_rounded,
+            hasDues
+                ? Icons.warning_amber_rounded
+                : nothingBilled
+                ? Icons.receipt_long_rounded
+                : Icons.check_circle_rounded,
             color: hasDues
                 ? ParentPortalColors.orange
+                : nothingBilled
+                ? ParentPortalColors.muted
                 : ParentPortalColors.green,
           ),
           const SizedBox(width: 12),
@@ -269,7 +280,11 @@ class _FeesSummaryCard extends StatelessWidget {
                   style: TextStyle(color: ParentPortalColors.muted),
                 ),
                 Text(
-                  hasDues ? _money(summary.feesDue) : 'Paid',
+                  hasDues
+                      ? _money(summary.feesDue)
+                      : nothingBilled
+                      ? 'Not billed'
+                      : 'Paid',
                   style: const TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.w900,
@@ -279,11 +294,15 @@ class _FeesSummaryCard extends StatelessWidget {
                 Text(
                   hasDues
                       ? 'Paid ${_money(summary.feesPaidAmount)} of ${_money(summary.feesTotalAmount)}'
+                      : nothingBilled
+                      ? 'The school has not issued any fee invoice for this child.'
                       : 'No outstanding school fee balance from the backend.',
                   style: const TextStyle(color: ParentPortalColors.muted),
                 ),
                 Text(
-                  !hasDues
+                  nothingBilled
+                      ? 'Nothing is payable right now.'
+                      : !hasDues
                       ? 'Receipts remain available after confirmation.'
                       : summary.nextFeeDueDate == null
                       ? 'No upcoming due date from school.'
@@ -298,12 +317,18 @@ class _FeesSummaryCard extends StatelessWidget {
                 ? summary.feesStatus == 'PARTIAL'
                       ? 'Partial'
                       : '${summary.overdueFeesCount} overdue'
+                : nothingBilled
+                ? 'No invoices'
                 : 'Paid',
             color: hasDues
                 ? ParentPortalColors.orange
+                : nothingBilled
+                ? ParentPortalColors.muted
                 : ParentPortalColors.green,
             background: hasDues
                 ? ParentPortalColors.orangeSoft
+                : nothingBilled
+                ? ParentPortalColors.surfaceAlt
                 : ParentPortalColors.greenSoft,
           ),
         ],
