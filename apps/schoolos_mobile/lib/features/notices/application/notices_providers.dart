@@ -36,6 +36,89 @@ final noticeDetailProvider = FutureProvider.autoDispose.family<Notice, String>((
   return notice.copyWith(isRead: true);
 });
 
+enum NoticeAcknowledgementStatus { idle, submitting, acknowledged, failed }
+
+class NoticeAcknowledgementState {
+  const NoticeAcknowledgementState({required this.status, this.error});
+
+  const NoticeAcknowledgementState.idle()
+    : status = NoticeAcknowledgementStatus.idle,
+      error = null;
+
+  final NoticeAcknowledgementStatus status;
+  final AppException? error;
+
+  bool get isBusy => status == NoticeAcknowledgementStatus.submitting;
+  bool get isAcknowledged => status == NoticeAcknowledgementStatus.acknowledged;
+}
+
+/// Records a guardian's acknowledgement of a single notice.
+///
+/// Acknowledgement is an online-only write: it is a legal record of who
+/// confirmed a school communication and when, so it is never queued offline
+/// where the timestamp would be wrong and the parent could not be told
+/// whether it landed.
+class NoticeAcknowledgementController
+    extends StateNotifier<NoticeAcknowledgementState> {
+  NoticeAcknowledgementController({
+    required this._repository,
+    required this._isOnline,
+  }) : super(const NoticeAcknowledgementState.idle());
+
+  final NoticesRepository _repository;
+  final bool _isOnline;
+
+  Future<bool> acknowledge(String noticeId) async {
+    if (state.isBusy || state.isAcknowledged) return state.isAcknowledged;
+    if (!_isOnline) {
+      state = const NoticeAcknowledgementState(
+        status: NoticeAcknowledgementStatus.failed,
+        error: NetworkException(
+          'Internet access is required to confirm a notice.',
+        ),
+      );
+      return false;
+    }
+
+    state = const NoticeAcknowledgementState(
+      status: NoticeAcknowledgementStatus.submitting,
+    );
+    try {
+      await _repository.acknowledgeNotice(noticeId);
+      state = const NoticeAcknowledgementState(
+        status: NoticeAcknowledgementStatus.acknowledged,
+      );
+      return true;
+    } on AppException catch (error) {
+      state = NoticeAcknowledgementState(
+        status: NoticeAcknowledgementStatus.failed,
+        error: error,
+      );
+      return false;
+    } catch (_) {
+      state = const NoticeAcknowledgementState(
+        status: NoticeAcknowledgementStatus.failed,
+        error: UnknownException(
+          'This notice could not be confirmed. Please try again.',
+        ),
+      );
+      return false;
+    }
+  }
+}
+
+final noticeAcknowledgementProvider = StateNotifierProvider.autoDispose
+    .family<
+      NoticeAcknowledgementController,
+      NoticeAcknowledgementState,
+      String
+    >((ref, noticeId) {
+      return NoticeAcknowledgementController(
+        repository: ref.watch(noticesRepositoryProvider),
+        isOnline: ref.watch(connectivityProvider),
+      );
+    });
+
 final parentNotificationsProvider =
     StateNotifierProvider<
       ParentNotificationsController,

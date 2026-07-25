@@ -20,6 +20,7 @@ class Notice {
     required this.audience,
     required this.category,
     required this.isRead,
+    this.noticeId,
     this.hasAttachment = false,
     this.attachment,
   });
@@ -33,8 +34,19 @@ class Notice {
   final String audience;
   final NoticeCategory category;
   final bool isRead;
+
+  /// The underlying notice this entry came from, when it is a notice at all.
+  ///
+  /// [id] is the *notification* id, which is what the parent-scoped
+  /// `/mobile/me/notifications` endpoints key on. Notice-level actions such as
+  /// acknowledgement are keyed on the notice instead, and passing the
+  /// notification id there 404s. Null for entries that are not notices
+  /// (events, activity posts), which therefore cannot be acknowledged.
+  final String? noticeId;
   final bool hasAttachment;
   final NoticeAttachment? attachment;
+
+  bool get canAcknowledge => (noticeId ?? '').isNotEmpty;
 
   bool get isEmergency => category == NoticeCategory.emergency;
   bool get isImportant => category == NoticeCategory.important || isEmergency;
@@ -50,6 +62,7 @@ class Notice {
       audience: audience,
       category: category,
       isRead: isRead ?? this.isRead,
+      noticeId: noticeId,
       hasAttachment: hasAttachment,
       attachment: attachment,
     );

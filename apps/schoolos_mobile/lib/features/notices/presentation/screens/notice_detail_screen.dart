@@ -27,7 +27,8 @@ class NoticeDetailScreen extends ConsumerWidget {
     final detail = ref.watch(provider);
     return ParentDetailScaffold(
       title: 'Notice',
-      selectedIndex: 3,
+      // 4 is Notices; 3 highlighted Homework while reading a notice.
+      selectedIndex: 4,
       body: detail.when(
         loading: () => const PortalLoadingState(),
         error: (_, _) => PortalErrorState(
@@ -134,6 +135,14 @@ class NoticeDetailScreen extends ConsumerWidget {
                 ),
               ),
             ),
+            // Only true notices can be acknowledged; events and activity
+            // posts arrive through the same feed but have no notice record.
+            if (notice.canAcknowledge) ...[
+              const SizedBox(height: 18),
+              const ParentSectionHeader(title: 'Confirm you have read this'),
+              const SizedBox(height: 8),
+              _NoticeAcknowledgementCard(noticeId: notice.noticeId!),
+            ],
             if (notice.hasAttachment) ...[
               const SizedBox(height: 18),
               const ParentSectionHeader(title: 'Attachment'),
@@ -372,4 +381,99 @@ String _formatSize(int bytes) {
   if (bytes < 1024) return '$bytes B';
   if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
   return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+}
+
+/// Records the guardian's acknowledgement of a notice.
+///
+/// The school's own record is `firstAcknowledgedAt`, so tapping again after a
+/// reload is harmless. It is shown for every notice because the backend has no
+/// `requiresAcknowledgement` flag to distinguish mandatory ones, and the
+/// confirmed state cannot survive a reload because parent-facing payloads do
+/// not return acknowledgement state. Both are backend gaps, recorded in
+/// `NoticesRepository.acknowledgeNotice`.
+class _NoticeAcknowledgementCard extends ConsumerWidget {
+  const _NoticeAcknowledgementCard({required this.noticeId});
+
+  final String noticeId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final provider = noticeAcknowledgementProvider(noticeId);
+    final state = ref.watch(provider);
+
+    if (state.isAcknowledged) {
+      return PortalCard(
+        color: ParentPortalColors.greenSoft,
+        child: Row(
+          children: [
+            const FeatureIcon(
+              Icons.verified_rounded,
+              color: ParentPortalColors.green,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Confirmed',
+                    style: TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                  Text(
+                    'The school has recorded that you read this notice.',
+                    style: TextStyle(color: ParentPortalColors.muted),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return PortalCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Let the school know you have read this notice. Your name and the '
+            'time are recorded once.',
+            style: TextStyle(color: ParentPortalColors.muted),
+          ),
+          if (state.error != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              state.error!.message,
+              style: const TextStyle(
+                color: ParentPortalColors.red,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: state.isBusy
+                  ? null
+                  : () async {
+                      final confirmed = await ref
+                          .read(provider.notifier)
+                          .acknowledge(noticeId);
+                      if (!confirmed || !context.mounted) return;
+                      showFeatureSnack(context, 'Notice confirmed.');
+                    },
+              icon: state.isBusy
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.check_rounded),
+              label: Text(state.isBusy ? 'Confirming' : 'I have read this'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
