@@ -8,6 +8,7 @@ import 'theme/app_theme.dart';
 import '../core/auth/auth_provider.dart';
 import '../core/notifications/push_deep_link_resolver.dart';
 import '../core/notifications/push_notification_controller.dart';
+import '../features/parent/application/parent_providers.dart';
 
 class SchoolOSApp extends ConsumerWidget {
   const SchoolOSApp({super.key});
@@ -60,15 +61,14 @@ Future<void> _openPushNotification(
       payload: payload,
       role: user.role,
       tenantId: user.tenantId!,
+      // Guardian scope is owned by the parent repository, which already applies
+      // the linked-children contract and its offline cache. Calling the
+      // endpoint inline here duplicated that rule in the widget layer.
       canAccessChild: (childId) async {
-        final response = await ref
-            .read(apiClientProvider)
-            .get('/mobile/me/students');
-        final data = response.data as Map<String, dynamic>;
-        final items = data['items'] as List<dynamic>? ?? const [];
-        return items.whereType<Map<String, dynamic>>().any(
-          (item) => item['id'] == childId,
-        );
+        final children = await ref
+            .read(parentRepositoryProvider)
+            .getGuardianChildren();
+        return children.any((child) => child.id == childId);
       },
     );
     if (route != null) {

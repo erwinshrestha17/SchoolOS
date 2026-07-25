@@ -85,6 +85,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final PrivateDataCleanupService _privateDataCleanup;
   final DeviceInstallationService? _deviceInstallationService;
 
+  /// Guards against overlapping sign-outs. Every in-flight request that fails
+  /// with 401 asks for a logout, so a single expired session can request one
+  /// many times at once; without this the app would post `/auth/logout`,
+  /// re-run private-data cleanup and re-emit auth state once per failure.
+  Future<void>? _logoutInFlight;
+  bool _sessionCleared = false;
+
   static const _supportedMobileRoles = {
     MobileRole.parent,
     MobileRole.teacher,
@@ -123,6 +130,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         await _tokenStorage.saveCachedUser(jsonEncode(user.toJson()));
         await _appPrefs.removeCachedUser();
 
+        _sessionCleared = false;
         state = AuthState(
           status: AuthStatus.authenticated,
           role: verifiedRole,
@@ -188,6 +196,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await _appPrefs.removeCachedUser();
       await _tokenStorage.saveAccessToken(response.tokenPair.accessToken);
 
+      _sessionCleared = false;
       state = AuthState(
         status: AuthStatus.authenticated,
         role: verifiedRole,
@@ -253,6 +262,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       return;
     }
 
+    _sessionCleared = false;
     state = AuthState(
       status: AuthStatus.authenticated,
       role: cachedRole,
@@ -311,8 +321,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// Gracefully sign out
-  Future<void> logout() async {
+  /// Gracefully sign out.
+  ///
+  /// Safe to call repeatedly and concurrently: overlapping callers share the
+  /// single in-flight sign-out, and calls made after the session is already
+  /// cleared are no-ops rather than another round of network, storage and
+  /// state churn.
+  Future<void> logout() {
+    if (_sessionCleared && state.status == AuthStatus.unauthenticated) {
+      return Future<void>.value();
+    }
+    return _logoutInFlight ??= _performLogout().whenComplete(() {
+      _logoutInFlight = null;
+    });
+  }
+
+  Future<void> _performLogout() async {
     state = state.copyWith(status: AuthStatus.loading);
     try {
       await _authRepository.logout(
@@ -325,6 +349,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } finally {
       await _tokenStorage.clearTokens();
       await _privateDataCleanup.clearPrivateData();
+      _sessionCleared = true;
       state = AuthState(status: AuthStatus.unauthenticated);
     }
   }

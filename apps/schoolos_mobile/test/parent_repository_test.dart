@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:schoolos_mobile/core/network/api_client.dart';
+import 'package:schoolos_mobile/core/network/api_path_resolver.dart';
 import 'package:schoolos_mobile/features/parent/data/parent_repository.dart';
 import 'package:schoolos_mobile/features/parent/domain/parent_models.dart';
 
@@ -38,6 +39,22 @@ void main() {
       apiClient = MockApiClient();
       dio = MockDio();
       when(() => apiClient.dio).thenReturn(dio);
+      // Delegate to the real resolver so these tests exercise the production
+      // rule that backend-supplied file URLs are reduced to an API-relative
+      // path before the authenticated client requests them.
+      when(
+        () => apiClient.toApiPath(
+          any(),
+          unavailableMessage: any(named: 'unavailableMessage'),
+        ),
+      ).thenAnswer(
+        (invocation) => resolveApiPath(
+          invocation.positionalArguments.first as String,
+          baseUrl: 'https://api.schoolos.test/api/v1',
+          unavailableMessage:
+              invocation.namedArguments[#unavailableMessage] as String,
+        ),
+      );
       repository = ParentRepository(apiClient);
       tempDir = Directory.systemTemp.createTempSync('schoolos_parent_test_');
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -230,7 +247,7 @@ void main() {
       'downloads activity media only through the protected API path',
       () async {
         when(
-          () => dio.get<List<int>>(
+          () => apiClient.get<List<int>>(
             '/activity-feed/attachments/attachment-1/preview',
             options: any(named: 'options'),
           ),
@@ -247,7 +264,7 @@ void main() {
 
         expect(bytes, [0xff, 0xd8, 0xff, 0xd9]);
         verify(
-          () => dio.get<List<int>>(
+          () => apiClient.get<List<int>>(
             '/activity-feed/attachments/attachment-1/preview',
             options: any(named: 'options'),
           ),
@@ -259,7 +276,7 @@ void main() {
       'downloads activity thumbnails only through the protected path',
       () async {
         when(
-          () => dio.get<List<int>>(
+          () => apiClient.get<List<int>>(
             '/activity-feed/attachments/attachment-1/thumbnail',
             options: any(named: 'options'),
           ),
@@ -276,7 +293,7 @@ void main() {
 
         expect(bytes, [0x52, 0x49, 0x46, 0x46]);
         verify(
-          () => dio.get<List<int>>(
+          () => apiClient.get<List<int>>(
             '/activity-feed/attachments/attachment-1/thumbnail',
             options: any(named: 'options'),
           ),
@@ -510,9 +527,12 @@ void main() {
             },
           ),
         );
+        // The backend advertises an absolute URL. Only its path may be used:
+        // requesting the advertised host with the authenticated client would
+        // hand the session bearer token to that host.
         when(
-          () => dio.get<List<int>>(
-            'https://files.example.test/signed/doc-1',
+          () => apiClient.get<List<int>>(
+            '/signed/doc-1',
             options: any(named: 'options'),
           ),
         ).thenAnswer(
@@ -536,11 +556,17 @@ void main() {
           ),
         ).called(1);
         verify(
-          () => dio.get<List<int>>(
-            'https://files.example.test/signed/doc-1',
+          () => apiClient.get<List<int>>(
+            '/signed/doc-1',
             options: any(named: 'options'),
           ),
         ).called(1);
+        verifyNever(
+          () => dio.get<List<int>>(
+            any(that: contains('files.example.test')),
+            options: any(named: 'options'),
+          ),
+        );
       },
     );
   });

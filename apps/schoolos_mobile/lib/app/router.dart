@@ -513,6 +513,7 @@ bool isPrincipalRoute(String location) {
   return location == AppRoutes.principalToday ||
       location == AppRoutes.principalAttention ||
       location == AppRoutes.principalApprovals ||
+      location == AppRoutes.principalAdmissions ||
       location == AppRoutes.principalNotices ||
       location == AppRoutes.principalMore ||
       location == AppRoutes.principalAttendanceRisk ||

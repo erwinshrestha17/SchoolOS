@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -59,8 +61,10 @@ class _HomeRedirectScreenState extends ConsumerState<HomeRedirectScreen> {
           context.go(AppRoutes.adminHome);
           break;
         default:
-          // Fallback to role picker home
-          context.go(AppRoutes.home);
+          // No mobile surface exists for this role. Signing out ends the
+          // redirect here; sending it back to `/home` would re-enter this
+          // screen and spin forever.
+          unawaited(ref.read(authProvider.notifier).logout());
           break;
       }
     }

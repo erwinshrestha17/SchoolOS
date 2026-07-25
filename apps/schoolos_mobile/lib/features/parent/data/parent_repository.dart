@@ -355,7 +355,7 @@ class ParentRepository {
       );
     }
 
-    final response = await _client.dio.get<List<int>>(
+    final response = await _client.get<List<int>>(
       previewPath,
       options: Options(responseType: ResponseType.bytes),
     );
@@ -374,7 +374,7 @@ class ParentRepository {
       );
     }
 
-    final response = await _client.dio.get<List<int>>(
+    final response = await _client.get<List<int>>(
       thumbnailPath,
       options: Options(responseType: ResponseType.bytes),
     );
@@ -479,8 +479,11 @@ class ParentRepository {
       throw StateError('Student document download URL was empty.');
     }
 
-    final response = await _client.dio.get<List<int>>(
-      url,
+    final response = await _client.get<List<int>>(
+      _client.toApiPath(
+        url,
+        unavailableMessage: 'This student document is unavailable.',
+      ),
       options: Options(
         responseType: ResponseType.bytes,
         headers: {Headers.acceptHeader: document.mimeType},
@@ -521,8 +524,11 @@ class ParentRepository {
       throw StateError('Homework attachment download URL was empty.');
     }
 
-    final response = await _client.dio.get<List<int>>(
-      access.url,
+    final response = await _client.get<List<int>>(
+      _client.toApiPath(
+        access.url,
+        unavailableMessage: 'This homework attachment is unavailable.',
+      ),
       options: Options(
         responseType: ResponseType.bytes,
         headers: {Headers.acceptHeader: access.mimeType},

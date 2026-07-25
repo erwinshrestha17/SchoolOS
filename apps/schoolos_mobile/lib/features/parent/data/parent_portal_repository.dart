@@ -25,32 +25,34 @@ class ParentPortalRepository {
         : children.isEmpty
         ? null
         : children.first.id;
-    final dashboards = <String, ParentDashboardSummary>{};
-    final profiles = <String, ChildProfile>{};
-    final homework = <ParentPortalHomework>[];
+    // Each child needs a dashboard, a profile and (when homework is unlocked)
+    // an assignment list. Running those per child in sequence made a guardian
+    // with three children wait on ten round trips before Today painted, which
+    // is painful on the low-bandwidth connections this app targets. Fetch the
+    // independent calls together instead and keep the school-wide notification
+    // fetch in flight alongside them. Results are still assembled in the
+    // original child order, and the first failure still fails the whole load.
+    // `Future.wait` is left in its default non-eager mode throughout so every
+    // branch keeps an error handler attached: an early failure in one call
+    // must not turn a sibling's failure into an unhandled async error.
+    final results = await Future.wait<Object>([
+      Future.wait(children.map(_loadChildBundle)),
+      noticesRepository.getNotificationCenter(limit: 30),
+    ]);
+    final childBundles = results[0] as List<_ParentChildBundle>;
+    final notifications = results[1] as ParentNotificationPage;
 
-    for (final child in children) {
-      final dashboard = await parentRepository
-          .getParentDashboardSummaryForChild(child);
-      dashboards[child.id] = dashboard;
-      profiles[child.id] = await parentRepository.getChildProfileForChild(
-        child,
-      );
-
-      if (dashboard.homeworkEnabled) {
-        final assignments = await parentRepository.getHomeworkForChild(
-          child.id,
-          take: 20,
-        );
-        homework.addAll(
-          assignments.map((item) => _homeworkFromApi(child, item)),
-        );
-      }
-    }
-
-    final notifications = await noticesRepository.getNotificationCenter(
-      limit: 30,
-    );
+    final dashboards = <String, ParentDashboardSummary>{
+      for (final bundle in childBundles) bundle.child.id: bundle.dashboard,
+    };
+    final profiles = <String, ChildProfile>{
+      for (final bundle in childBundles) bundle.child.id: bundle.profile,
+    };
+    final homework = <ParentPortalHomework>[
+      for (final bundle in childBundles)
+        for (final item in bundle.homework)
+          _homeworkFromApi(bundle.child, item),
+    ];
 
     final dashboardValues = dashboards.values;
     final fromCache = dashboardValues.any((dashboard) => dashboard.fromCache);
@@ -75,6 +77,24 @@ class ParentPortalRepository {
         for (final item in notifications.items) _updateFromApi(item, children),
       ],
       unreadUpdates: notifications.unreadCount,
+    );
+  }
+
+  Future<_ParentChildBundle> _loadChildBundle(GuardianChild child) async {
+    final results = await Future.wait<Object>([
+      parentRepository.getParentDashboardSummaryForChild(child),
+      parentRepository.getChildProfileForChild(child),
+    ]);
+    final dashboard = results[0] as ParentDashboardSummary;
+    final profile = results[1] as ChildProfile;
+
+    return _ParentChildBundle(
+      child: child,
+      dashboard: dashboard,
+      profile: profile,
+      homework: dashboard.homeworkEnabled
+          ? await parentRepository.getHomeworkForChild(child.id, take: 20)
+          : const <ParentHomeworkItem>[],
     );
   }
 
@@ -165,6 +185,20 @@ class ParentPortalRepository {
       unreadCount: item.isRead ? 0 : 1,
     );
   }
+}
+
+class _ParentChildBundle {
+  const _ParentChildBundle({
+    required this.child,
+    required this.dashboard,
+    required this.profile,
+    required this.homework,
+  });
+
+  final GuardianChild child;
+  final ParentDashboardSummary dashboard;
+  final ChildProfile profile;
+  final List<ParentHomeworkItem> homework;
 }
 
 String _homeworkSummary(int pending) {

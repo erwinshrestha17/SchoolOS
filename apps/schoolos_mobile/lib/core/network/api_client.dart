@@ -6,6 +6,7 @@ import '../errors/app_exception.dart';
 import '../storage/token_storage_service.dart';
 import '../utils/logger.dart';
 
+import 'api_path_resolver.dart';
 import 'interceptors/token_refresh_interceptor.dart';
 
 class ApiClient {
@@ -41,6 +42,19 @@ class ApiClient {
   void Function()? onSessionExpired;
 
   Dio get dio => _dio;
+
+  /// Converts a backend-supplied file URL into a path safe to request through
+  /// this authenticated client. See [resolveApiPath].
+  String toApiPath(
+    String rawUrl, {
+    String unavailableMessage = 'This file is unavailable.',
+  }) {
+    return resolveApiPath(
+      rawUrl,
+      baseUrl: _dio.options.baseUrl,
+      unavailableMessage: unavailableMessage,
+    );
+  }
 
   /// Interceptor to unwrap standard NestJS response envelope
   Interceptor _envelopeInterceptor() {

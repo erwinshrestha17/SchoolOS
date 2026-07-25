@@ -9,6 +9,7 @@ import '../../../../shared/widgets/bs_date_picker.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/app_exception_view.dart';
+import '../../../../shared/widgets/dispose_scope.dart';
 import '../../../../shared/widgets/app_skeleton.dart';
 import '../../../../shared/widgets/role_shell_scaffold.dart';
 import '../../../../shared/widgets/status_chip.dart';
@@ -310,235 +311,244 @@ class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) => Padding(
-          padding: EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.lg,
-            AppSpacing.lg,
-            MediaQuery.viewInsetsOf(context).bottom + AppSpacing.lg,
-          ),
-          child: SingleChildScrollView(
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Create homework draft',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w900,
+      builder: (sheetContext) => DisposeScope(
+        onDispose: () {
+          title.dispose();
+          instructions.dispose();
+        },
+        child: StatefulBuilder(
+          builder: (context, setSheetState) => Padding(
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.lg,
+              AppSpacing.lg,
+              MediaQuery.viewInsetsOf(context).bottom + AppSpacing.lg,
+            ),
+            child: SingleChildScrollView(
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Create homework draft',
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.w900),
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  if (scopes.length == 1)
-                    InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'Class and subject',
-                      ),
-                      child: Text(
-                        selectedScope.label,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                    )
-                  else
-                    DropdownButtonFormField<TeacherHomeworkScope>(
-                      initialValue: selectedScope,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Class and subject',
-                      ),
-                      selectedItemBuilder: (context) => [
-                        for (final scope in scopes)
-                          Text(
-                            scope.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                      ],
-                      items: [
-                        for (final scope in scopes)
-                          DropdownMenuItem(
-                            value: scope,
-                            child: Text(
+                    const SizedBox(height: AppSpacing.lg),
+                    if (scopes.length == 1)
+                      InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Class and subject',
+                        ),
+                        child: Text(
+                          selectedScope.label,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      )
+                    else
+                      DropdownButtonFormField<TeacherHomeworkScope>(
+                        initialValue: selectedScope,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Class and subject',
+                        ),
+                        selectedItemBuilder: (context) => [
+                          for (final scope in scopes)
+                            Text(
                               scope.label,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                      ],
-                      onChanged: saving
-                          ? null
-                          : (value) {
-                              if (value != null) {
-                                setSheetState(() => selectedScope = value);
-                              }
-                            },
-                    ),
-                  const SizedBox(height: AppSpacing.md),
-                  TextFormField(
-                    controller: title,
-                    enabled: !saving,
-                    maxLength: 160,
-                    decoration: const InputDecoration(labelText: 'Title'),
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? 'Enter a homework title.'
-                        : null,
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  TextFormField(
-                    controller: instructions,
-                    enabled: !saving,
-                    minLines: 3,
-                    maxLines: 6,
-                    maxLength: 5000,
-                    decoration: const InputDecoration(
-                      labelText: 'Instructions',
-                    ),
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? 'Enter homework instructions.'
-                        : null,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.event_rounded),
-                    title: const Text('Due date'),
-                    subtitle: Text(NepaliBsCalendar.formatBsDate(dueDate)),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: saving
-                        ? null
-                        : () async {
-                            final picked = await showSchoolBsDatePicker(
-                              context: context,
-                              initialDate: dueDate,
-                              firstDate: DateTime.now(),
-                              lastDate: DateTime.now().add(
-                                const Duration(days: 365),
+                        ],
+                        items: [
+                          for (final scope in scopes)
+                            DropdownMenuItem(
+                              value: scope,
+                              child: Text(
+                                scope.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            );
-                            if (picked != null) {
-                              setSheetState(() => dueDate = picked);
-                            }
-                          },
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: AppSpacing.xs,
+                            ),
+                        ],
+                        onChanged: saving
+                            ? null
+                            : (value) {
+                                if (value != null) {
+                                  setSheetState(() => selectedScope = value);
+                                }
+                              },
+                      ),
+                    const SizedBox(height: AppSpacing.md),
+                    TextFormField(
+                      controller: title,
+                      enabled: !saving,
+                      maxLength: 160,
+                      decoration: const InputDecoration(labelText: 'Title'),
+                      validator: (value) =>
+                          value == null || value.trim().isEmpty
+                          ? 'Enter a homework title.'
+                          : null,
                     ),
-                    child: Row(
-                      children: [
-                        const Expanded(
-                          child: Text(
-                            'Student submission required',
-                            softWrap: true,
-                            style: TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                        Switch(
-                          value: submissionRequired,
-                          onChanged: saving
-                              ? null
-                              : (value) => setSheetState(
-                                  () => submissionRequired = value,
-                                ),
-                        ),
-                      ],
+                    const SizedBox(height: AppSpacing.md),
+                    TextFormField(
+                      controller: instructions,
+                      enabled: !saving,
+                      minLines: 3,
+                      maxLines: 6,
+                      maxLength: 5000,
+                      decoration: const InputDecoration(
+                        labelText: 'Instructions',
+                      ),
+                      validator: (value) =>
+                          value == null || value.trim().isEmpty
+                          ? 'Enter homework instructions.'
+                          : null,
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  _HomeworkAttachmentSection(
-                    attachments: attachments,
-                    maxCount: _maxHomeworkAttachmentCount,
-                    saving: saving,
-                    onCamera: () => _pickHomeworkAttachments(
-                      sheetContext: sheetContext,
-                      setSheetState: setSheetState,
-                      attachments: attachments,
-                      source: ImageSource.camera,
-                    ),
-                    onGallery: () => _pickHomeworkAttachments(
-                      sheetContext: sheetContext,
-                      setSheetState: setSheetState,
-                      attachments: attachments,
-                      source: ImageSource.gallery,
-                    ),
-                    onRemove: (index) =>
-                        setSheetState(() => attachments.removeAt(index)),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: saving
+                    const SizedBox(height: AppSpacing.sm),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.event_rounded),
+                      title: const Text('Due date'),
+                      subtitle: Text(NepaliBsCalendar.formatBsDate(dueDate)),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: saving
                           ? null
                           : () async {
-                              if (!formKey.currentState!.validate()) return;
-                              setSheetState(() => saving = true);
-                              try {
-                                await ref
-                                    .read(teacherRepositoryProvider)
-                                    .createHomework(
-                                      scope: selectedScope,
-                                      title: title.text,
-                                      instructions: instructions.text,
-                                      dueDate: dueDate,
-                                      submissionRequired: submissionRequired,
-                                      attachments: List.unmodifiable(
-                                        attachments,
-                                      ),
-                                    );
-                                ref.invalidate(
-                                  teacherHomeworkProvider(_currentQuery()),
-                                );
-                                if (sheetContext.mounted) {
-                                  Navigator.pop(sheetContext);
-                                }
-                                if (mounted) {
-                                  ScaffoldMessenger.of(
-                                    this.context,
-                                  ).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Homework draft created.'),
-                                    ),
-                                  );
-                                }
-                              } catch (_) {
-                                setSheetState(() => saving = false);
-                                if (sheetContext.mounted) {
-                                  ScaffoldMessenger.of(
-                                    sheetContext,
-                                  ).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Draft could not be created. Please retry.',
-                                      ),
-                                    ),
-                                  );
-                                }
+                              final picked = await showSchoolBsDatePicker(
+                                context: context,
+                                initialDate: dueDate,
+                                firstDate: DateTime.now(),
+                                lastDate: DateTime.now().add(
+                                  const Duration(days: 365),
+                                ),
+                              );
+                              if (picked != null) {
+                                setSheetState(() => dueDate = picked);
                               }
                             },
-                      icon: saving
-                          ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.save_outlined),
-                      label: Text(saving ? 'Saving' : 'Save draft'),
                     ),
-                  ),
-                ],
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppSpacing.xs,
+                      ),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Student submission required',
+                              softWrap: true,
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                          Switch(
+                            value: submissionRequired,
+                            onChanged: saving
+                                ? null
+                                : (value) => setSheetState(
+                                    () => submissionRequired = value,
+                                  ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    _HomeworkAttachmentSection(
+                      attachments: attachments,
+                      maxCount: _maxHomeworkAttachmentCount,
+                      saving: saving,
+                      onCamera: () => _pickHomeworkAttachments(
+                        sheetContext: sheetContext,
+                        setSheetState: setSheetState,
+                        attachments: attachments,
+                        source: ImageSource.camera,
+                      ),
+                      onGallery: () => _pickHomeworkAttachments(
+                        sheetContext: sheetContext,
+                        setSheetState: setSheetState,
+                        attachments: attachments,
+                        source: ImageSource.gallery,
+                      ),
+                      onRemove: (index) =>
+                          setSheetState(() => attachments.removeAt(index)),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: saving
+                            ? null
+                            : () async {
+                                if (!formKey.currentState!.validate()) return;
+                                setSheetState(() => saving = true);
+                                try {
+                                  await ref
+                                      .read(teacherRepositoryProvider)
+                                      .createHomework(
+                                        scope: selectedScope,
+                                        title: title.text,
+                                        instructions: instructions.text,
+                                        dueDate: dueDate,
+                                        submissionRequired: submissionRequired,
+                                        attachments: List.unmodifiable(
+                                          attachments,
+                                        ),
+                                      );
+                                  ref.invalidate(
+                                    teacherHomeworkProvider(_currentQuery()),
+                                  );
+                                  if (sheetContext.mounted) {
+                                    Navigator.pop(sheetContext);
+                                  }
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(
+                                      this.context,
+                                    ).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Homework draft created.',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                } catch (_) {
+                                  setSheetState(() => saving = false);
+                                  if (sheetContext.mounted) {
+                                    ScaffoldMessenger.of(
+                                      sheetContext,
+                                    ).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Draft could not be created. Please retry.',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                        icon: saving
+                            ? const SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.save_outlined),
+                        label: Text(saving ? 'Saving' : 'Save draft'),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
         ),
       ),
     );
-    title.dispose();
-    instructions.dispose();
   }
 
   Future<void> _pickHomeworkAttachments({
@@ -622,158 +632,167 @@ class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) => Padding(
-          padding: EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.lg,
-            AppSpacing.lg,
-            MediaQuery.viewInsetsOf(context).bottom + AppSpacing.lg,
-          ),
-          child: SingleChildScrollView(
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Edit homework draft',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w900,
+      builder: (sheetContext) => DisposeScope(
+        onDispose: () {
+          title.dispose();
+          instructions.dispose();
+        },
+        child: StatefulBuilder(
+          builder: (context, setSheetState) => Padding(
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.lg,
+              AppSpacing.lg,
+              MediaQuery.viewInsetsOf(context).bottom + AppSpacing.lg,
+            ),
+            child: SingleChildScrollView(
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Edit homework draft',
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.w900),
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    item.classLabel,
-                    style: const TextStyle(
-                      color: AppColors.slate500,
-                      fontWeight: FontWeight.w700,
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      item.classLabel,
+                      style: const TextStyle(
+                        color: AppColors.slate500,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  TextFormField(
-                    controller: title,
-                    enabled: !saving,
-                    maxLength: 160,
-                    decoration: const InputDecoration(labelText: 'Title'),
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? 'Enter a homework title.'
-                        : null,
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  TextFormField(
-                    controller: instructions,
-                    enabled: !saving,
-                    minLines: 3,
-                    maxLines: 6,
-                    maxLength: 5000,
-                    decoration: const InputDecoration(
-                      labelText: 'Instructions',
+                    const SizedBox(height: AppSpacing.lg),
+                    TextFormField(
+                      controller: title,
+                      enabled: !saving,
+                      maxLength: 160,
+                      decoration: const InputDecoration(labelText: 'Title'),
+                      validator: (value) =>
+                          value == null || value.trim().isEmpty
+                          ? 'Enter a homework title.'
+                          : null,
                     ),
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? 'Enter homework instructions.'
-                        : null,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.event_rounded),
-                    title: const Text('Due date'),
-                    subtitle: Text(NepaliBsCalendar.formatBsDate(dueDate)),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: saving
-                        ? null
-                        : () async {
-                            final picked = await showSchoolBsDatePicker(
-                              context: context,
-                              initialDate: dueDate,
-                              firstDate: DateTime.now(),
-                              lastDate: DateTime.now().add(
-                                const Duration(days: 365),
-                              ),
-                            );
-                            if (picked != null) {
-                              setSheetState(() => dueDate = picked);
-                            }
-                          },
-                  ),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Student submission required'),
-                    value: submissionRequired,
-                    onChanged: saving
-                        ? null
-                        : (value) =>
-                              setSheetState(() => submissionRequired = value),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: saving
+                    const SizedBox(height: AppSpacing.md),
+                    TextFormField(
+                      controller: instructions,
+                      enabled: !saving,
+                      minLines: 3,
+                      maxLines: 6,
+                      maxLength: 5000,
+                      decoration: const InputDecoration(
+                        labelText: 'Instructions',
+                      ),
+                      validator: (value) =>
+                          value == null || value.trim().isEmpty
+                          ? 'Enter homework instructions.'
+                          : null,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.event_rounded),
+                      title: const Text('Due date'),
+                      subtitle: Text(NepaliBsCalendar.formatBsDate(dueDate)),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: saving
                           ? null
                           : () async {
-                              if (!formKey.currentState!.validate()) return;
-                              setSheetState(() => saving = true);
-                              try {
-                                await ref
-                                    .read(teacherRepositoryProvider)
-                                    .updateHomeworkDraft(
-                                      homeworkId: item.id,
-                                      title: title.text,
-                                      instructions: instructions.text,
-                                      dueDate: dueDate,
-                                      submissionRequired: submissionRequired,
-                                    );
-                                ref.invalidate(
-                                  teacherHomeworkProvider(_currentQuery()),
-                                );
-                                if (sheetContext.mounted) {
-                                  Navigator.pop(sheetContext);
-                                }
-                                if (mounted) {
-                                  ScaffoldMessenger.of(
-                                    this.context,
-                                  ).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Homework draft updated.'),
-                                    ),
-                                  );
-                                }
-                              } catch (_) {
-                                setSheetState(() => saving = false);
-                                if (sheetContext.mounted) {
-                                  ScaffoldMessenger.of(
-                                    sheetContext,
-                                  ).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Draft could not be updated. Please retry.',
-                                      ),
-                                    ),
-                                  );
-                                }
+                              final picked = await showSchoolBsDatePicker(
+                                context: context,
+                                initialDate: dueDate,
+                                firstDate: DateTime.now(),
+                                lastDate: DateTime.now().add(
+                                  const Duration(days: 365),
+                                ),
+                              );
+                              if (picked != null) {
+                                setSheetState(() => dueDate = picked);
                               }
                             },
-                      icon: saving
-                          ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.save_outlined),
-                      label: Text(saving ? 'Saving' : 'Save changes'),
                     ),
-                  ),
-                ],
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Student submission required'),
+                      value: submissionRequired,
+                      onChanged: saving
+                          ? null
+                          : (value) =>
+                                setSheetState(() => submissionRequired = value),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: saving
+                            ? null
+                            : () async {
+                                if (!formKey.currentState!.validate()) return;
+                                setSheetState(() => saving = true);
+                                try {
+                                  await ref
+                                      .read(teacherRepositoryProvider)
+                                      .updateHomeworkDraft(
+                                        homeworkId: item.id,
+                                        title: title.text,
+                                        instructions: instructions.text,
+                                        dueDate: dueDate,
+                                        submissionRequired: submissionRequired,
+                                      );
+                                  ref.invalidate(
+                                    teacherHomeworkProvider(_currentQuery()),
+                                  );
+                                  if (sheetContext.mounted) {
+                                    Navigator.pop(sheetContext);
+                                  }
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(
+                                      this.context,
+                                    ).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Homework draft updated.',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                } catch (_) {
+                                  setSheetState(() => saving = false);
+                                  if (sheetContext.mounted) {
+                                    ScaffoldMessenger.of(
+                                      sheetContext,
+                                    ).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Draft could not be updated. Please retry.',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                        icon: saving
+                            ? const SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.save_outlined),
+                        label: Text(saving ? 'Saving' : 'Save changes'),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
         ),
       ),
     );
-    title.dispose();
-    instructions.dispose();
   }
 
   Future<void> _showSubmissions(TeacherHomeworkItem item) async {
