@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/errors/app_exception.dart';
+import '../widgets/parent_state_view.dart';
 import '../../../../core/platform/file_share_service.dart';
 import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../application/parent_providers.dart';
@@ -27,36 +28,40 @@ class ParentFeesScreen extends ConsumerWidget {
     return ParentDetailScaffold(
       title: title,
       selectedIndex: 5,
-      body: switch (state.status) {
-        ParentDataStatus.loading => const PortalLoadingState(),
-        ParentDataStatus.empty => const Center(
-          child: Text('No linked children are available.'),
-        ),
-        ParentDataStatus.success when child != null && summary != null =>
-          RefreshIndicator(
-            onRefresh: controller.load,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-              children: [
-                if (state.children.length == 1) ...[
-                  ParentApiChildSelector(
-                    child: child,
-                    children: state.children,
-                    onChanged: controller.selectChild,
-                    statusLabel: state.isOffline ? 'Offline copy' : null,
-                  ),
-                  const SizedBox(height: 14),
-                  _FeesContent(child: child, summary: summary),
-                ] else
-                  for (final linkedChild in state.children) ...[
-                    _ChildFeesSection(child: linkedChild),
-                    const SizedBox(height: 18),
+      // Fees needs the dashboard summary, which is deliberately not cached for
+      // offline use. When it is missing because the device is offline, say so
+      // with the offline surface rather than a generic failure.
+      body: ParentStateView(
+        status: child != null && summary == null && state.isOffline
+            ? ParentDataStatus.offline
+            : state.status,
+        message: state.message,
+        onRetry: controller.load,
+        child: child == null || summary == null
+            ? const SizedBox.shrink()
+            : RefreshIndicator(
+                onRefresh: controller.load,
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+                  children: [
+                    if (state.children.length == 1) ...[
+                      ParentApiChildSelector(
+                        child: child,
+                        children: state.children,
+                        onChanged: controller.selectChild,
+                        statusLabel: state.isOffline ? 'Offline copy' : null,
+                      ),
+                      const SizedBox(height: 14),
+                      _FeesContent(child: child, summary: summary),
+                    ] else
+                      for (final linkedChild in state.children) ...[
+                        _ChildFeesSection(child: linkedChild),
+                        const SizedBox(height: 18),
+                      ],
                   ],
-              ],
-            ),
-          ),
-        _ => PortalErrorState(onRetry: controller.load),
-      },
+                ),
+              ),
+      ),
     );
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/utils/nepali_bs_calendar.dart';
+import '../widgets/parent_state_view.dart';
 import '../../application/parent_providers.dart';
 import '../../domain/parent_models.dart';
 import '../widgets/parent_detail_widgets.dart';
@@ -19,25 +20,32 @@ class ParentTransportScreen extends ConsumerWidget {
     return ParentDetailScaffold(
       title: 'Transport',
       selectedIndex: 5,
-      body: switch (state.status) {
-        ParentDataStatus.loading => const PortalLoadingState(),
-        ParentDataStatus.success when child != null => RefreshIndicator(
-          onRefresh: controller.load,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-            children: [
-              ParentApiChildSelector(
-                child: child,
-                children: state.children,
-                onChanged: controller.selectChild,
+      // Shared state mapping: offline, module-locked, permission-denied and
+      // session-expired each get their own surface instead of collapsing into
+      // one generic error.
+      body: ParentStateView(
+        status: state.status,
+        message: state.message,
+        onRetry: controller.load,
+        child: child == null
+            ? const SizedBox.shrink()
+            : RefreshIndicator(
+                onRefresh: controller.load,
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+                  children: [
+                    ParentApiChildSelector(
+                      child: child,
+                      children: state.children,
+                      onChanged: controller.selectChild,
+                      statusLabel: state.isOffline ? 'Offline copy' : null,
+                    ),
+                    const SizedBox(height: 14),
+                    _TransportBody(childId: child.id),
+                  ],
+                ),
               ),
-              const SizedBox(height: 14),
-              _TransportBody(childId: child.id),
-            ],
-          ),
-        ),
-        _ => PortalErrorState(onRetry: controller.load),
-      },
+      ),
     );
   }
 }

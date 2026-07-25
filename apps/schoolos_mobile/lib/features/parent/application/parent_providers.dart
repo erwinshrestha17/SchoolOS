@@ -369,24 +369,42 @@ class ParentController extends StateNotifier<ParentState> {
 
       await _preferences.saveSelectedChildId(selectedChildId);
       if (generation != _loadGeneration) return;
-      final dashboard = await _repository.getParentDashboardSummaryForChild(
-        selectedChild,
-      );
-      if (generation != _loadGeneration) return;
-      final profile = await _repository.getChildProfileForChild(selectedChild);
+
+      // The linked-children list has an offline cache; the dashboard summary
+      // and child profile deliberately do not, because they carry live counts
+      // and medical detail we do not keep on the device. Losing them offline
+      // must therefore degrade rather than fail: every screen gated on this
+      // controller only needs `children` plus the selection, and the screens
+      // that show per-child records (attendance, homework, timetable) read
+      // their own cached providers underneath.
+      ParentDashboardSummary? dashboard;
+      ChildProfile? profile;
+      var reachedServer = true;
+      try {
+        dashboard = await _repository.getParentDashboardSummaryForChild(
+          selectedChild,
+        );
+        if (generation != _loadGeneration) return;
+        profile = await _repository.getChildProfileForChild(selectedChild);
+      } on AppException catch (error) {
+        if (error is! NetworkException && error is! TimeoutException) rethrow;
+        reachedServer = false;
+      }
       if (generation != _loadGeneration) return;
 
+      final isOffline =
+          !_isOnline || !reachedServer || (dashboard?.fromCache ?? false);
       state = ParentState(
         status: ParentDataStatus.success,
         children: children,
         selectedChildId: selectedChildId,
         dashboard: dashboard,
         profile: profile,
-        lastUpdated: dashboard.lastUpdated,
-        isOffline: !_isOnline || dashboard.fromCache,
-        message: _isOnline && !dashboard.fromCache
-            ? null
-            : 'You are offline. Showing last saved parent data.',
+        lastUpdated: dashboard?.lastUpdated,
+        isOffline: isOffline,
+        message: isOffline
+            ? 'You are offline. Showing last saved parent data.'
+            : null,
       );
     } catch (error) {
       if (generation != _loadGeneration) return;

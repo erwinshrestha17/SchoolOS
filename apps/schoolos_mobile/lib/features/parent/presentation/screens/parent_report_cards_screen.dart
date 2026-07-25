@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/platform/file_share_service.dart';
+import '../widgets/parent_state_view.dart';
 import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../application/parent_providers.dart';
 import '../../domain/parent_models.dart';
@@ -20,48 +21,53 @@ class ParentReportCardsScreen extends ConsumerWidget {
     return ParentDetailScaffold(
       title: 'Exams & Results',
       selectedIndex: 5,
-      body: switch (state.status) {
-        ParentDataStatus.loading => const PortalLoadingState(),
-        ParentDataStatus.success when child != null => RefreshIndicator(
-          onRefresh: () async {
-            for (final linkedChild in state.children) {
-              ref.invalidate(parentExamScheduleProvider(linkedChild.id));
-              ref.invalidate(parentReportCardsProvider(linkedChild.id));
-            }
-            await controller.load();
-          },
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-            children: [
-              if (state.children.length == 1) ...[
-                ParentApiChildSelector(
-                  child: child,
-                  children: state.children,
-                  onChanged: controller.selectChild,
-                  statusLabel: state.isOffline ? 'Offline copy' : null,
+      body: ParentStateView(
+        status: state.status,
+        message: state.message,
+        onRetry: controller.load,
+        child: child == null
+            ? const SizedBox.shrink()
+            : RefreshIndicator(
+                onRefresh: () async {
+                  for (final linkedChild in state.children) {
+                    ref.invalidate(parentExamScheduleProvider(linkedChild.id));
+                    ref.invalidate(parentReportCardsProvider(linkedChild.id));
+                  }
+                  await controller.load();
+                },
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+                  children: [
+                    if (state.children.length == 1) ...[
+                      ParentApiChildSelector(
+                        child: child,
+                        children: state.children,
+                        onChanged: controller.selectChild,
+                        statusLabel: state.isOffline ? 'Offline copy' : null,
+                      ),
+                      const SizedBox(height: 16),
+                      const ParentSectionHeader(
+                        title: 'Published exam schedule',
+                      ),
+                      const SizedBox(height: 8),
+                      _ExamScheduleBody(child: child),
+                      const SizedBox(height: 22),
+                      const ParentSectionHeader(title: 'Published results'),
+                      const SizedBox(height: 8),
+                      _ReportCardsBody(child: child),
+                    ] else
+                      for (final linkedChild in state.children) ...[
+                        ParentSectionHeader(title: linkedChild.name),
+                        const SizedBox(height: 8),
+                        _ExamScheduleBody(child: linkedChild),
+                        const SizedBox(height: 18),
+                        _ReportCardsBody(child: linkedChild),
+                        const SizedBox(height: 18),
+                      ],
+                  ],
                 ),
-                const SizedBox(height: 16),
-                const ParentSectionHeader(title: 'Published exam schedule'),
-                const SizedBox(height: 8),
-                _ExamScheduleBody(child: child),
-                const SizedBox(height: 22),
-                const ParentSectionHeader(title: 'Published results'),
-                const SizedBox(height: 8),
-                _ReportCardsBody(child: child),
-              ] else
-                for (final linkedChild in state.children) ...[
-                  ParentSectionHeader(title: linkedChild.name),
-                  const SizedBox(height: 8),
-                  _ExamScheduleBody(child: linkedChild),
-                  const SizedBox(height: 18),
-                  _ReportCardsBody(child: linkedChild),
-                  const SizedBox(height: 18),
-                ],
-            ],
-          ),
-        ),
-        _ => PortalErrorState(onRetry: controller.load),
-      },
+              ),
+      ),
     );
   }
 }

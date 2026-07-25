@@ -87,6 +87,63 @@ void main() {
     },
   );
 
+  test(
+    'stays usable offline when only the cached children list survives',
+    () async {
+      // Device QA 2026-07-25: the linked-children list has an offline cache but
+      // the dashboard summary and child profile deliberately do not. Letting
+      // their failure abort the whole load left every ParentController-gated
+      // screen - attendance, fees, canteen, library, transport, timetable,
+      // report cards - showing a bare "could not be loaded" error offline
+      // instead of the cached record with an offline marker.
+      when(
+        () => repository.getParentDashboardSummaryForChild(childA),
+      ).thenAnswer((_) async => throw const NetworkException());
+      when(
+        () => repository.getChildProfileForChild(childA),
+      ).thenAnswer((_) async => throw const NetworkException());
+
+      final controller = ParentController(
+        repository: repository,
+        preferences: preferences,
+        isOnline: false,
+      );
+      await _waitForSettled(controller);
+
+      expect(
+        controller.state.status,
+        ParentDataStatus.success,
+        reason: 'cached children are enough to keep the screen usable',
+      );
+      expect(controller.state.children, hasLength(2));
+      expect(controller.state.selectedChild?.id, childA.id);
+      expect(controller.state.isOffline, isTrue);
+      expect(controller.state.message, contains('offline'));
+      expect(controller.state.dashboard, isNull);
+    },
+  );
+
+  test('a definite failure is still surfaced, not swallowed', () async {
+    when(
+      () => repository.getParentDashboardSummaryForChild(childA),
+    ).thenAnswer((_) async => throw const PermissionException());
+
+    final controller = ParentController(
+      repository: repository,
+      preferences: preferences,
+      isOnline: true,
+    );
+    await _waitForSettled(controller);
+
+    expect(
+      controller.state.status,
+      ParentDataStatus.forbidden,
+      reason:
+          'only network and timeout failures degrade; a permission failure '
+          'must reach the permission-denied surface',
+    );
+  });
+
   test('a late child response cannot replace the latest selection', () async {
     final controller = ParentController(
       repository: repository,
@@ -189,6 +246,13 @@ Future<void> _waitForSuccess(ParentController controller) async {
     await Future<void>.delayed(Duration.zero);
   }
   fail('ParentController did not reach success.');
+}
+
+Future<void> _waitForSettled(ParentController controller) async {
+  for (var i = 0; i < 50; i++) {
+    if (controller.state.status != ParentDataStatus.loading) return;
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
 }
 
 ParentDashboardSummary _summary(GuardianChild child) {
