@@ -342,7 +342,7 @@ void main() {
                   subject: 'English',
                   title: 'Read the phonics worksheet',
                   dueLabel: 'Due tomorrow',
-                  status: 'Pending',
+                  rawStatus: 'NOT_SUBMITTED',
                   attachmentCount: 1,
                   teacher: 'Assigned by school',
                 ),

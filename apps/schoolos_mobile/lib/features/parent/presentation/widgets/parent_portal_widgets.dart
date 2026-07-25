@@ -501,7 +501,7 @@ class HomeworkCard extends StatelessWidget {
             runSpacing: 8,
             children: [
               StatusBadge(
-                label: item.status,
+                label: item.statusLabel,
                 color: completed
                     ? ParentPortalColors.green
                     : ParentPortalColors.orange,
@@ -516,8 +516,50 @@ class HomeworkCard extends StatelessWidget {
                 backgroundColor: ParentPortalColors.blueSoft,
                 icon: Icons.attach_file_rounded,
               ),
+              // What the child actually did. A parent cannot hand work in for
+              // them, so the useful signal is whether it went in and when.
+              if (item.submittedAt != null)
+                StatusBadge(
+                  label: 'Handed in ${_dayMonth(item.submittedAt!)}',
+                  color: ParentPortalColors.green,
+                  backgroundColor: ParentPortalColors.greenSoft,
+                  icon: Icons.check_circle_outline_rounded,
+                ),
+              if (item.hasMark)
+                StatusBadge(
+                  label: 'Scored ${_trimNumber(item.score!)}',
+                  color: ParentPortalColors.purple,
+                  backgroundColor: ParentPortalColors.purpleSoft,
+                  icon: Icons.grade_outlined,
+                ),
             ],
           ),
+          if ((item.feedback ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: ParentPortalColors.surfaceAlt,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Teacher feedback',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                      color: ParentPortalColors.muted,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(item.feedback!.trim()),
+                ],
+              ),
+            ),
+          ],
           const Divider(height: 28),
           Row(
             children: [
@@ -696,4 +738,13 @@ String _shortDate(String? value) {
     return 'date unavailable';
   }
   return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+}
+
+String _dayMonth(DateTime value) => '${value.day}/${value.month}';
+
+/// Marks come back as decimals ("9.00"); parents read "9".
+String _trimNumber(num value) {
+  return value == value.roundToDouble()
+      ? value.round().toString()
+      : value.toString();
 }

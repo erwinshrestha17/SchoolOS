@@ -576,7 +576,7 @@ class _ParentPortalHomeworkDetailScreenState
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      item.status,
+                      item.statusLabel,
                       style: const TextStyle(fontSize: 16, height: 1.5),
                     ),
                     const Divider(height: 28),
@@ -629,7 +629,7 @@ class _ParentPortalHomeworkDetailScreenState
                             style: TextStyle(color: ParentPortalColors.muted),
                           ),
                           Text(
-                            item.status,
+                            item.statusLabel,
                             style: const TextStyle(
                               color: ParentPortalColors.orange,
                               fontSize: 18,

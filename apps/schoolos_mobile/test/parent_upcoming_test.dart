@@ -116,7 +116,7 @@ ParentPortalData _data({List<ParentPortalHomework>? homework}) {
             childId: 'child-a',
             title: 'Finished work',
             dueAt: now.add(const Duration(days: 1)),
-            status: 'Completed',
+            rawStatus: 'COMPLETED',
           ),
           _hw(
             id: 'hw-4',
@@ -134,7 +134,7 @@ ParentPortalHomework _hw({
   required String childId,
   required String title,
   required DateTime dueAt,
-  String status = 'Pending',
+  String rawStatus = 'NOT_SUBMITTED',
 }) {
   return ParentPortalHomework(
     id: id,
@@ -145,7 +145,7 @@ ParentPortalHomework _hw({
     title: title,
     dueLabel: 'Due',
     dueAt: dueAt,
-    status: status,
+    rawStatus: rawStatus,
     attachmentCount: 0,
     teacher: 'Assigned by school',
   );

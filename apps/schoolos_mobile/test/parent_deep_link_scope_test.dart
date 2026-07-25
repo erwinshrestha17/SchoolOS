@@ -145,7 +145,7 @@ ParentPortalData _portal() {
         subject: 'Mathematics',
         title: 'Fractions worksheet',
         dueLabel: 'Due tomorrow',
-        status: 'Pending',
+        rawStatus: 'NOT_SUBMITTED',
         attachmentCount: 0,
         teacher: 'Assigned by school',
       ),

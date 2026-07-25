@@ -150,9 +150,12 @@ class ParentPortalRepository {
       title: item.title,
       dueLabel: _dueLabel(item),
       dueAt: DateTime.tryParse(item.dueAt ?? item.dueDate ?? ''),
-      status: _submissionLabel(item.submissionStatus),
+      rawStatus: item.submissionStatus,
       attachmentCount: item.attachmentCount,
       teacher: 'Assigned by school',
+      submittedAt: DateTime.tryParse(item.submittedAt ?? ''),
+      score: item.score,
+      feedback: item.feedback,
     );
   }
 
@@ -213,15 +216,6 @@ String _updatesSummary(int unread) {
     return 'No unread updates';
   }
   return '$unread unread update${unread == 1 ? '' : 's'}';
-}
-
-String _submissionLabel(String value) {
-  return switch (value) {
-    'SUBMITTED' => 'Submitted',
-    'GRADED' => 'Completed',
-    'NEEDS_CORRECTION' => 'Needs correction',
-    _ => 'Pending',
-  };
 }
 
 String _dueLabel(ParentHomeworkItem item) {
