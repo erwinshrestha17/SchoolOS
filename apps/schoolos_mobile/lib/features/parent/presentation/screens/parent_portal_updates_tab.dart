@@ -42,7 +42,12 @@ class _ParentPortalUpdatesTabState extends ConsumerState<ParentPortalUpdatesTab>
             children: [
               _filter('All', null),
               _filter('Notices', ParentUpdateCategory.notice),
-              _filter('Messages', ParentUpdateCategory.message),
+              // No "Messages" filter: chat and direct messaging are removed
+              // from the product, so the app must not present a messaging
+              // surface. `ParentUpdateCategory.message` is kept because
+              // historical message-type notifications still exist and must
+              // stay readable - they appear under "All" and open the
+              // notification inbox, never a conversation.
               _filter('Events', ParentUpdateCategory.event),
               _filter('Gallery', ParentUpdateCategory.gallery),
             ],
