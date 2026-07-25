@@ -93,14 +93,62 @@ class NoticesRepository {
     );
     final data = response.data as Map<String, dynamic>;
     final items = data['items'] as List<dynamic>? ?? const [];
-    return ParentNotificationPage(
-      items: items
+    final deduped = _collapseDeliveryChannels(
+      items
           .whereType<Map<String, dynamic>>()
           .map(ParentNotification.fromJson)
           .toList(),
-      unreadCount: data['unreadCount'] as int? ?? 0,
+    );
+    return ParentNotificationPage(
+      items: deduped,
+      // Recounted from the collapsed list so the badge matches what the
+      // parent can actually see; the server counts deliveries, not
+      // notifications.
+      unreadCount: deduped.where((item) => !item.isRead).length,
       nextCursor: data['nextCursor'] as String?,
     );
+  }
+
+  /// Collapses the per-channel delivery rows the notification centre returns
+  /// into one entry per notification.
+  ///
+  /// `/mobile/me/notifications` is backed by `NotificationDelivery`, which
+  /// holds a row per channel, so a notice sent IN_APP and PUSH arrives twice -
+  /// three times where SMS is also used. Verified 2026-07-25 against a seeded
+  /// tenant: every notice in the parent feed appeared exactly twice, one
+  /// IN_APP row and one PUSH row with the same noticeId and childId.
+  ///
+  /// Collapsing here rather than in the shared query keeps the web
+  /// notification centre and the API contract untouched. Entries are grouped
+  /// by source *and* child, because one notice legitimately reaches a guardian
+  /// once per linked child and those are distinct to the parent. Read state is
+  /// merged optimistically: `markNoticeRead` clears every delivery for a
+  /// notice, so if any row is read the notification is read.
+  static List<ParentNotification> _collapseDeliveryChannels(
+    List<ParentNotification> items,
+  ) {
+    final byKey = <String, ParentNotification>{};
+    final ordered = <String>[];
+
+    for (final item in items) {
+      final source = item.sourceUpdateId ?? '';
+      // Without a source id there is nothing to group on; keep the row as-is.
+      final key = source.isEmpty
+          ? 'delivery:${item.id}'
+          : 'source:$source:child:${item.childId ?? ''}';
+
+      final existing = byKey[key];
+      if (existing == null) {
+        byKey[key] = item;
+        ordered.add(key);
+        continue;
+      }
+      if (existing.readAt == null && item.readAt != null) {
+        byKey[key] = existing.copyWith(readAt: item.readAt);
+      }
+    }
+
+    return [for (final key in ordered) byKey[key]!];
   }
 
   Future<int> getUnreadCount() async {
@@ -178,12 +226,15 @@ class NoticesRepository {
     );
     final items = data['items'] as List<dynamic>? ?? const [];
 
-    return _NotificationCenterPayload(
-      unreadCount: data['unreadCount'] as int? ?? 0,
-      items: items
+    final deduped = _collapseDeliveryChannels(
+      items
           .whereType<Map<String, dynamic>>()
           .map(ParentNotification.fromJson)
           .toList(),
+    );
+    return _NotificationCenterPayload(
+      unreadCount: deduped.where((item) => !item.isRead).length,
+      items: deduped,
       lastUpdated:
           DateTime.tryParse(data['_mobileLastUpdated'] as String? ?? '') ??
           DateTime.now(),

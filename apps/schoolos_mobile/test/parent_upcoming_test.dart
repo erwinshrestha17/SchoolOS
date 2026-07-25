@@ -13,7 +13,9 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
-      MaterialApp(home: Scaffold(body: ParentPortalHomeTab(data: data))),
+      MaterialApp(
+        home: Scaffold(body: ParentPortalHomeTab(data: data)),
+      ),
     );
     await tester.pumpAndSettle();
   }
@@ -51,7 +53,9 @@ void main() {
     final titles = tester
         .widgetList<Text>(find.byType(Text))
         .map((text) => text.data)
-        .where((value) => value == 'Overdue maths' || value == 'Nepali Practice')
+        .where(
+          (value) => value == 'Overdue maths' || value == 'Nepali Practice',
+        )
         .toList();
 
     expect(
