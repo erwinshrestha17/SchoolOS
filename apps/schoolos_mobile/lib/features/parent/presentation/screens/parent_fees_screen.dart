@@ -461,6 +461,9 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
     if (confirmed != true || !mounted) return;
 
     setState(() => _startingPayment = true);
+    // Held across retries so an ambiguous failure replays the same attempt
+    // instead of creating a second payment. It is cleared once an attempt is
+    // confirmed settled, so a later payment is a genuinely new request.
     _paymentRequestKey ??= _newPaymentRequestKey();
     try {
       if (readiness.sandbox) {
@@ -476,6 +479,9 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
         if (result.status != 'SUCCEEDED') {
           throw StateError('Sandbox payment was not confirmed.');
         }
+        // Settled. A replayed key would return this same receipt instead of
+        // collecting the next instalment.
+        _paymentRequestKey = null;
         await ref
             .read(parentControllerProvider.notifier)
             .load(childId: widget.childId);

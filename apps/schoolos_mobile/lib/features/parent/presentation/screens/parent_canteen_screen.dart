@@ -371,6 +371,8 @@ class _WalletCardState extends ConsumerState<_WalletCard> {
     if (confirmed != true || !mounted) return;
 
     setState(() => _isToppingUp = true);
+    // Held across retries so an ambiguous failure replays rather than tops up
+    // twice, and cleared on success below so the next top-up is a new request.
     _requestKey ??= _sandboxRequestKey();
     try {
       final result = await ref
@@ -381,6 +383,10 @@ class _WalletCardState extends ConsumerState<_WalletCard> {
             provider: provider,
             idempotencyKey: _requestKey!,
           );
+      // The backend returns the original transaction for a replayed key,
+      // whatever amount is sent. Keeping the key would make a second top-up
+      // report success while silently adding nothing.
+      _requestKey = null;
       ref.invalidate(parentCanteenProvider(widget.childId));
       await ref.read(parentCanteenProvider(widget.childId).future);
       if (!mounted) return;

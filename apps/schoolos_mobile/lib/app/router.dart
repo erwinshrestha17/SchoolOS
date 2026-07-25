@@ -50,10 +50,22 @@ import '../shared/widgets/school_os_app_shell.dart';
 import 'constants/app_routes.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
-  final auth = ref.watch(authProvider);
+  // The router must outlive individual auth transitions. Watching `authProvider`
+  // here rebuilt the whole GoRouter on every state change - including the
+  // loading hop in the middle of sign-in and sign-out - which handed
+  // MaterialApp.router a brand new routerConfig, tore down the Navigator and
+  // reset the stack to `initialLocation`. Instead the instance is built once
+  // and told to re-run `redirect` through `refreshListenable`, and `redirect`
+  // reads the current auth state at evaluation time.
+  final authRefresh = ValueNotifier<AuthState>(ref.read(authProvider));
+  ref.listen<AuthState>(authProvider, (previous, next) {
+    authRefresh.value = next;
+  });
+  ref.onDispose(authRefresh.dispose);
 
-  return GoRouter(
+  final router = GoRouter(
     initialLocation: AppRoutes.splash,
+    refreshListenable: authRefresh,
     routes: [
       GoRoute(
         path: AppRoutes.splash,
@@ -408,65 +420,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
     ],
 
-    // Auth redirect rules
-    redirect: (context, state) {
-      final status = auth.status;
-      final goingToPublic =
-          state.matchedLocation == AppRoutes.login ||
-          state.matchedLocation == AppRoutes.forgotPassword ||
-          state.matchedLocation == AppRoutes.splash;
-
-      if (status == AuthStatus.unauthenticated && !goingToPublic) {
-        return AppRoutes.login;
-      }
-
-      if (status == AuthStatus.authenticated) {
-        if (goingToPublic) {
-          return AppRoutes.home;
-        }
-
-        // Role-based route guard
-        final location = state.matchedLocation;
-        if (auth.user?.mustChangePassword == true &&
-            location != AppRoutes.changePassword) {
-          return AppRoutes.changePassword;
-        }
-
-        final role = MobileRole.normalize(
-          auth.role,
-          roles: auth.user?.roles ?? const [],
-        );
-
-        if (role == MobileRole.student &&
-            location != AppRoutes.home &&
-            location != AppRoutes.studentSession) {
-          return AppRoutes.studentSession;
-        }
-        if (isParentRoute(location) && role != MobileRole.parent) {
-          return AppRoutes.home;
-        }
-        if (isStudentRoute(location) && role != MobileRole.student) {
-          return AppRoutes.home;
-        }
-        if (isTeacherRoute(location) && role != MobileRole.teacher) {
-          return AppRoutes.home;
-        }
-        if (isDriverRoute(location) && role != MobileRole.driver) {
-          return AppRoutes.home;
-        }
-        if (isStaffRoute(location) && role != MobileRole.staff) {
-          return AppRoutes.home;
-        }
-        if (isPrincipalRoute(location) && role != MobileRole.principal) {
-          return AppRoutes.home;
-        }
-        if (location == AppRoutes.adminHome && role != MobileRole.admin) {
-          return AppRoutes.home;
-        }
-      }
-
-      return null;
-    },
+    // Auth redirect rules. The auth state is read at evaluation time so this
+    // single router instance always guards against the current session.
+    redirect: (context, state) =>
+        resolveAuthRedirect(authRefresh.value, state.matchedLocation),
 
     // Polished unknown route screen
     errorBuilder: (context, state) {
@@ -488,7 +445,71 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       );
     },
   );
+
+  ref.onDispose(router.dispose);
+  return router;
 });
+
+/// Decides where [location] should be sent for the given [auth] state, or
+/// `null` to allow it.
+///
+/// Kept as a pure function so the persona guards can be exercised directly:
+/// the redirect it backs is the only thing standing between a signed-in user
+/// and another persona's screens.
+@visibleForTesting
+String? resolveAuthRedirect(AuthState auth, String location) {
+  final goingToPublic =
+      location == AppRoutes.login ||
+      location == AppRoutes.forgotPassword ||
+      location == AppRoutes.splash;
+
+  if (auth.status == AuthStatus.unauthenticated && !goingToPublic) {
+    return AppRoutes.login;
+  }
+
+  if (auth.status != AuthStatus.authenticated) return null;
+
+  if (goingToPublic) return AppRoutes.home;
+
+  if (auth.user?.mustChangePassword == true &&
+      location != AppRoutes.changePassword) {
+    return AppRoutes.changePassword;
+  }
+
+  final role = MobileRole.normalize(
+    auth.role,
+    roles: auth.user?.roles ?? const [],
+  );
+
+  if (role == MobileRole.student &&
+      location != AppRoutes.home &&
+      location != AppRoutes.studentSession) {
+    return AppRoutes.studentSession;
+  }
+  if (isParentRoute(location) && role != MobileRole.parent) {
+    return AppRoutes.home;
+  }
+  if (isStudentRoute(location) && role != MobileRole.student) {
+    return AppRoutes.home;
+  }
+  if (isTeacherRoute(location) && role != MobileRole.teacher) {
+    return AppRoutes.home;
+  }
+  if (isDriverRoute(location) && role != MobileRole.driver) {
+    return AppRoutes.home;
+  }
+  if (isStaffRoute(location) && role != MobileRole.staff) {
+    return AppRoutes.home;
+  }
+  if (isPrincipalRoute(location) && role != MobileRole.principal) {
+    return AppRoutes.home;
+  }
+  if (location == AppRoutes.adminHome && role != MobileRole.admin) {
+    return AppRoutes.home;
+  }
+
+  return null;
+}
 
 @visibleForTesting
 bool isStudentRoute(String location) {

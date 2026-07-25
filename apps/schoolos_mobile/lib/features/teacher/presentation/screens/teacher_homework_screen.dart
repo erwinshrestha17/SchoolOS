@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../../core/errors/app_exception.dart';
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../shared/utils/nepali_bs_calendar.dart';
@@ -515,15 +516,26 @@ class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
                                       ),
                                     );
                                   }
-                                } catch (_) {
+                                } catch (error) {
                                   setSheetState(() => saving = false);
+                                  // Homework create carries no idempotency key
+                                  // (the DTO is shared with the web app), so a
+                                  // dropped reply may still have created the
+                                  // draft. Refresh the list and say so rather
+                                  // than inviting a blind retry that would
+                                  // duplicate it.
+                                  ref.invalidate(
+                                    teacherHomeworkProvider(_currentQuery()),
+                                  );
                                   if (sheetContext.mounted) {
                                     ScaffoldMessenger.of(
                                       sheetContext,
                                     ).showSnackBar(
-                                      const SnackBar(
+                                      SnackBar(
                                         content: Text(
-                                          'Draft could not be created. Please retry.',
+                                          _isAmbiguousWriteFailure(error)
+                                              ? 'SchoolOS did not confirm this draft. Check the homework list before saving again so you do not create it twice.'
+                                              : 'Draft could not be created. Please retry.',
                                         ),
                                       ),
                                     );
@@ -1371,3 +1383,15 @@ String _formatHomeworkAttachmentBytes(int bytes) {
   }
   return '$bytes B';
 }
+
+/// Whether a failed write may still have been applied on the server.
+///
+/// Network drops, timeouts and 5xx responses all leave the outcome unknown, so
+/// the teacher must be told to check before retrying. A validation or
+/// permission failure is definite - nothing was written - and can be retried
+/// freely once corrected.
+bool _isAmbiguousWriteFailure(Object error) =>
+    error is NetworkException ||
+    error is TimeoutException ||
+    error is ServerException ||
+    error is UnknownException;

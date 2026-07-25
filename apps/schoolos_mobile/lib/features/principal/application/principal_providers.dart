@@ -59,10 +59,19 @@ final principalStudentSearchProvider = FutureProvider.autoDispose
       );
     });
 
+/// Snapshot keys the principal app renders as module-locked because no
+/// backend snapshot endpoint exists for them yet. They are listed here so the
+/// provider does not fall through to the dashboard endpoint and spend a round
+/// trip fetching data the screen will never show.
+const _principalSnapshotsWithoutBackend = {'canteen', 'library'};
+
 final principalSnapshotProvider = FutureProvider.autoDispose
     .family<Map<String, dynamic>, String>((ref, key) async {
       final repository = ref.watch(principalRepositoryProvider);
       final isOnline = ref.watch(connectivityProvider);
+      if (_principalSnapshotsWithoutBackend.contains(key)) {
+        return withConnectivityMeta(const {'status': 'unavailable'}, isOnline);
+      }
       final data = switch (key) {
         'admissions' => await repository.getAdmissionsSummary(),
         'attendance' => await repository.getAttendanceSummary(),
