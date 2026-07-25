@@ -256,7 +256,6 @@ export class MobilePrincipalService implements OnModuleInit {
       transportItems,
       noticeItems,
       feeItems,
-      escalationItems,
       academicsItems,
       activityItems,
     ] = await Promise.all([
@@ -265,7 +264,6 @@ export class MobilePrincipalService implements OnModuleInit {
       modules.transport ? this.transportAttention(actor) : [],
       modules.notices ? this.noticeAttention(actor) : [],
       modules.fees ? this.feeAttention(actor) : [],
-      this.escalationAttention(actor),
       modules.exams ? this.academicsAttention(actor) : [],
       modules.activity ? this.activityAttention(actor) : [],
     ]);
@@ -276,7 +274,6 @@ export class MobilePrincipalService implements OnModuleInit {
       ...transportItems,
       ...noticeItems,
       ...feeItems,
-      ...escalationItems,
       ...academicsItems,
       ...activityItems,
     ].sort(compareAttention);
@@ -2891,17 +2888,6 @@ export class MobilePrincipalService implements OnModuleInit {
       });
     }
     return items;
-  }
-
-  private async escalationAttention(
-    actor: AuthContext,
-  ): Promise<PrincipalItem[]> {
-    const escalations = await this.getEscalations(actor, 'open');
-    return escalations.items.map((item) => ({
-      ...item,
-      severity: item.severity,
-      route: '/principal/escalations',
-    }));
   }
 
   private async academicsAttention(

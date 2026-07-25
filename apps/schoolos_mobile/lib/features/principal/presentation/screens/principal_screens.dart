@@ -210,99 +210,6 @@ class _PrincipalApprovalsScreenState
   }
 }
 
-class PrincipalEscalationsScreen extends ConsumerStatefulWidget {
-  const PrincipalEscalationsScreen({super.key});
-
-  @override
-  ConsumerState<PrincipalEscalationsScreen> createState() =>
-      _PrincipalEscalationsScreenState();
-}
-
-class _PrincipalEscalationsScreenState
-    extends ConsumerState<PrincipalEscalationsScreen> {
-  String status = 'open';
-
-  @override
-  Widget build(BuildContext context) {
-    final provider = principalEscalationsProvider(status);
-    final asyncData = ref.watch(provider);
-    return PrincipalShell(
-      selectedIndex: 4,
-      title: 'Escalations',
-      subtitle: 'Parent concerns and school issues needing follow-up',
-      showBack: true,
-      child: asyncData.when(
-        loading: () => const _PrincipalLoading(),
-        error: (error, _) => AppExceptionView(
-          error: error,
-          onRetry: () => ref.invalidate(provider),
-        ),
-        data: (data) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _CacheBanner(data: data),
-            _SegmentedFilters(
-              values: const ['open', 'assigned', 'resolved', 'reopened'],
-              active: status,
-              labels: const {
-                'open': 'Open',
-                'assigned': 'Mine',
-                'resolved': 'Resolved',
-                'reopened': 'Reopened',
-              },
-              onChanged: (value) => setState(() => status = value),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            _SummaryCards(
-              values: [
-                _SummaryValue(
-                  'Critical',
-                  _num(data, 'metrics.critical'),
-                  AppColors.danger,
-                  Icons.warning_rounded,
-                ),
-                _SummaryValue(
-                  'Due Today',
-                  _num(data, 'metrics.dueToday'),
-                  AppColors.warning,
-                  Icons.today_rounded,
-                ),
-                _SummaryValue(
-                  'Pending',
-                  _num(data, 'metrics.pendingResponse'),
-                  AppColors.info,
-                  Icons.mark_chat_unread_rounded,
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            _ItemList(
-              items: _list(data['items']),
-              actionBuilder: (item) => SizedBox(
-                width: 128,
-                child: OutlinedButton.icon(
-                  onPressed: () =>
-                      _showEscalationSheet(context, ref, item, status),
-                  icon: const Icon(Icons.edit_note_rounded, size: 18),
-                  label: const Text('Manage'),
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            const _Callout(
-              icon: Icons.verified_user_rounded,
-              title: 'Actions are audited',
-              message:
-                  'Assign, note, resolve, and reopen actions use principal-scoped backend contracts and audit history.',
-              color: AppColors.info,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class PrincipalStudentsScreen extends ConsumerStatefulWidget {
   const PrincipalStudentsScreen({super.key});
 
@@ -767,12 +674,6 @@ class _MoreBody extends StatelessWidget {
         _MenuGroup(
           title: '4. Notices and alerts',
           items: [
-            _MenuItem(
-              'Escalations',
-              Icons.warning_rounded,
-              AppColors.danger,
-              AppRoutes.principalEscalations,
-            ),
             _MenuItem(
               'Notice Archive',
               Icons.inventory_2_rounded,
@@ -1430,7 +1331,6 @@ List<_SnapshotSection> _snapshotSections(
       _SnapshotSection('Route Status', _list(data['routes'])),
       _SnapshotSection('Driver Contacts', _list(data['driverContacts'])),
     ],
-    'escalations' => [_SnapshotSection('Open Cases', _list(data['items']))],
     _ => [_SnapshotSection('Items', _list(data['items']))],
   };
 }
@@ -1503,7 +1403,7 @@ class _PrincipalHeader extends StatelessWidget {
           IconButton(
             tooltip: 'Notifications',
             color: Colors.white,
-            onPressed: () => context.go(AppRoutes.notifications),
+            onPressed: () => context.push(AppRoutes.notifications),
             icon: const Icon(Icons.notifications_none_rounded, size: 30),
           ),
           IconButton(
@@ -2418,178 +2318,6 @@ void _showReviewSheet(
   );
 }
 
-void _showEscalationSheet(
-  BuildContext context,
-  WidgetRef ref,
-  Map<String, dynamic> item,
-  String activeStatus,
-) {
-  final parentContext = context;
-  final escalationId = _string(item['id']);
-  final status = _string(item['status']).toUpperCase();
-  final isResolved = status == 'RESOLVED' || activeStatus == 'resolved';
-  final noteController = TextEditingController();
-  var saving = false;
-  String? validationMessage;
-
-  showModalBottomSheet<void>(
-    context: context,
-    showDragHandle: true,
-    isScrollControlled: true,
-    useSafeArea: true,
-    builder: (sheetContext) => DisposeScope(
-      onDispose: noteController.dispose,
-      child: StatefulBuilder(
-        builder: (context, setSheetState) {
-          Future<void> runAction(String action) async {
-            final note = noteController.text.trim();
-            if (action != 'assign' && note.isEmpty) {
-              setSheetState(
-                () => validationMessage = action == 'reopen'
-                    ? 'A reopen reason is required.'
-                    : action == 'resolve'
-                    ? 'A resolution reason is required.'
-                    : 'A note is required.',
-              );
-              return;
-            }
-            setSheetState(() {
-              saving = true;
-              validationMessage = null;
-            });
-            try {
-              final repository = ref.read(principalRepositoryProvider);
-              if (action == 'assign') {
-                await repository.assignEscalationToSelf(escalationId);
-              } else if (action == 'note') {
-                await repository.addEscalationNote(
-                  escalationId: escalationId,
-                  note: note,
-                );
-              } else if (action == 'resolve') {
-                await repository.resolveEscalation(
-                  escalationId: escalationId,
-                  resolutionReason: note,
-                );
-              } else {
-                await repository.reopenEscalation(
-                  escalationId: escalationId,
-                  reason: note,
-                );
-              }
-              for (final tab in const [
-                'open',
-                'assigned',
-                'resolved',
-                'reopened',
-              ]) {
-                ref.invalidate(principalEscalationsProvider(tab));
-              }
-              ref.invalidate(principalDashboardProvider);
-              ref.invalidate(principalAttentionProvider('all'));
-              ref.invalidate(principalSnapshotProvider('escalations'));
-              if (sheetContext.mounted) Navigator.pop(sheetContext);
-              if (!parentContext.mounted) return;
-              _showPrincipalSnack(parentContext, 'Escalation action saved.');
-            } catch (_) {
-              if (!sheetContext.mounted) return;
-              setSheetState(() => saving = false);
-              if (!parentContext.mounted) return;
-              _showPrincipalSnack(
-                parentContext,
-                'Escalation action could not be saved. Please retry.',
-              );
-            }
-          }
-
-          return Padding(
-            padding: EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.lg,
-              AppSpacing.lg,
-              MediaQuery.viewInsetsOf(context).bottom + AppSpacing.lg,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _string(item['title'], fallback: 'Escalation'),
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    _itemSubtitle(item),
-                    style: const TextStyle(color: AppColors.slate600),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  _PlainCard(
-                    title: 'Reason',
-                    body: _string(
-                      item['detail'],
-                      fallback: 'No context provided.',
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  TextField(
-                    controller: noteController,
-                    minLines: 2,
-                    maxLines: 4,
-                    decoration: InputDecoration(
-                      labelText: isResolved
-                          ? 'Reopen reason'
-                          : 'Note or reason',
-                      helperText: isResolved
-                          ? 'Required to reopen a resolved escalation.'
-                          : 'Required for notes and resolution.',
-                      errorText: validationMessage,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.lg),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Wrap(
-                    spacing: AppSpacing.sm,
-                    runSpacing: AppSpacing.sm,
-                    children: [
-                      if (!isResolved) ...[
-                        OutlinedButton.icon(
-                          onPressed: saving ? null : () => runAction('assign'),
-                          icon: const Icon(Icons.person_pin_circle_rounded),
-                          label: const Text('Assign to me'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: saving ? null : () => runAction('note'),
-                          icon: const Icon(Icons.edit_note_rounded),
-                          label: const Text('Add note'),
-                        ),
-                        FilledButton.icon(
-                          onPressed: saving ? null : () => runAction('resolve'),
-                          icon: const Icon(Icons.check_circle_rounded),
-                          label: const Text('Resolve'),
-                        ),
-                      ] else
-                        FilledButton.icon(
-                          onPressed: saving ? null : () => runAction('reopen'),
-                          icon: const Icon(Icons.replay_rounded),
-                          label: const Text('Reopen'),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    ),
-  );
-}
-
 void _showEmergencyNoticeSheet(BuildContext context, WidgetRef ref) {
   final parentContext = context;
   final formKey = GlobalKey<FormState>();
@@ -3039,7 +2767,6 @@ IconData _iconFor(String key) {
   }
   if (clean.contains('task')) return Icons.checklist_rounded;
   if (clean.contains('student')) return Icons.face_rounded;
-  if (clean.contains('escalation')) return Icons.warning_rounded;
   if (clean.contains('walkthrough')) return Icons.directions_walk_rounded;
   return Icons.info_rounded;
 }

@@ -374,10 +374,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(
-        path: AppRoutes.principalEscalations,
-        builder: (context, state) => const PrincipalEscalationsScreen(),
-      ),
-      GoRoute(
         path: AppRoutes.principalStudents,
         builder: (context, state) => const PrincipalStudentsScreen(),
       ),
@@ -542,7 +538,6 @@ bool isPrincipalRoute(String location) {
       location == AppRoutes.principalFees ||
       location == AppRoutes.principalAcademics ||
       location == AppRoutes.principalTransport ||
-      location == AppRoutes.principalEscalations ||
       location == AppRoutes.principalStudents ||
       location == AppRoutes.principalReports ||
       location == AppRoutes.principalTasks ||

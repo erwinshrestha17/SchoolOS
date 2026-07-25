@@ -73,6 +73,7 @@ describe('MobilePrincipalService', () => {
   let entitlements: {
     assertModuleEnabled: jest.Mock;
     assertFeatureEnabled: jest.Mock;
+    getEntitlements: jest.Mock;
   };
   let approvalWorkflow: {
     registerFinalAction: jest.Mock;
@@ -135,6 +136,10 @@ describe('MobilePrincipalService', () => {
     entitlements = {
       assertModuleEnabled: jest.fn().mockResolvedValue(undefined),
       assertFeatureEnabled: jest.fn().mockResolvedValue(undefined),
+      getEntitlements: jest.fn().mockResolvedValue({
+        modules: [],
+        features: [],
+      }),
     };
     approvalWorkflow = {
       registerFinalAction: jest.fn(),
@@ -299,6 +304,20 @@ describe('MobilePrincipalService', () => {
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.chatEscalation.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('keeps chat escalations out of the attention centre', async () => {
+    // Escalations only exist for parent-teacher chat, and the chat module is
+    // unconditionally stripped from entitlements. The attention centre was the
+    // one source not gated on a module, so it listed items whose next action
+    // pointed at /principal/escalations - a screen guarded by
+    // `messaging:manage`, which no principal holds. The items were a dead end.
+    const attention = await service.getAttention(actor);
+
+    expect(prisma.chatEscalation.findMany).not.toHaveBeenCalled();
+    expect(attention.items.some((item) => item.type === 'escalation')).toBe(
+      false,
+    );
   });
 
   it('prevents a requester from deciding their own approval', async () => {

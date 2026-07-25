@@ -67,7 +67,6 @@ class AppRoutes {
   static const principalFees = '/principal/fees-snapshot';
   static const principalAcademics = '/principal/academics-readiness';
   static const principalTransport = '/principal/transport-alerts';
-  static const principalEscalations = '/principal/escalations';
   static const principalStudents = '/principal/students';
   static const principalReports = '/principal/reports-snapshot';
   static const principalTasks = '/principal/tasks';

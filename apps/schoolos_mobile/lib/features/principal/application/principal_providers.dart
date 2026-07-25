@@ -37,17 +37,6 @@ final principalApprovalsProvider = FutureProvider.autoDispose
       );
     });
 
-final principalEscalationsProvider = FutureProvider.autoDispose
-    .family<Map<String, dynamic>, String>((ref, status) async {
-      final isOnline = ref.watch(connectivityProvider);
-      return withConnectivityMeta(
-        await ref
-            .watch(principalRepositoryProvider)
-            .getEscalations(status: status),
-        isOnline,
-      );
-    });
-
 final principalStudentSearchProvider = FutureProvider.autoDispose
     .family<Map<String, dynamic>, String>((ref, query) async {
       final isOnline = ref.watch(connectivityProvider);
@@ -79,7 +68,6 @@ final principalSnapshotProvider = FutureProvider.autoDispose
         'fees' => await repository.getFeesSummary(),
         'academics' => await repository.getAcademicsReadiness(),
         'transport' => await repository.getTransportAlerts(),
-        'escalations' => await repository.getEscalations(),
         'reports' => await repository.getReportsSnapshot(),
         'tasks' => await repository.getTasks(),
         'walkthroughs' => await repository.getClassroomWalkthroughs(),

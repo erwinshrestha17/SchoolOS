@@ -951,6 +951,47 @@ describe('MobileService', () => {
     });
   });
 
+  it('counts a staff members own notifications instead of denying them', async () => {
+    // Notification visibility is "addressed to me" OR "about my children".
+    // Only the second half is parent-specific, but resolving it through the
+    // parent student scope made every notification route 403 for staff, which
+    // broke the unread count on the teacher dashboard.
+    const teacherActor: AuthContext = {
+      ...actor,
+      userId: 'teacher-user',
+      email: 'teacher@school.test',
+      roles: ['teacher'],
+    };
+    prisma.notificationDelivery.count.mockResolvedValue(2);
+
+    await expect(
+      service.getNotificationUnreadCount(teacherActor),
+    ).resolves.toEqual({ unreadCount: 2 });
+    expect(prisma.notificationDelivery.count).toHaveBeenCalledWith({
+      where: {
+        tenantId: 'tenant-1',
+        OR: [{ recipientUserId: 'teacher-user' }],
+        readReceipts: {
+          none: { tenantId: 'tenant-1', userId: 'teacher-user' },
+        },
+      },
+    });
+    expect(prisma.guardian.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('still denies staff the parent student surfaces', async () => {
+    // Widening notification scope must not widen anything else.
+    const teacherActor: AuthContext = {
+      ...actor,
+      userId: 'teacher-user',
+      roles: ['teacher'],
+    };
+
+    await expect(service.listMyStudents(teacherActor)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
   it('marks only the signed-in parents visible unread notifications as read', async () => {
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',

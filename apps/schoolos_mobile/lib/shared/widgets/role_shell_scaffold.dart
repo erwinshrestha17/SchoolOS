@@ -45,7 +45,7 @@ class RoleShellScaffold extends StatelessWidget {
                   : [
                       IconButton(
                         tooltip: 'Notifications',
-                        onPressed: () => context.go(AppRoutes.notifications),
+                        onPressed: () => context.push(AppRoutes.notifications),
                         icon: const Icon(Icons.notifications_none_rounded),
                       ),
                       IconButton(

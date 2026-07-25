@@ -70,62 +70,6 @@ class PrincipalRepository {
     '/mobile/principal/transport-alerts',
   );
 
-  Future<Map<String, dynamic>> getEscalations({String status = 'open'}) =>
-      _getCached(
-        'principal_escalations_$status',
-        '/mobile/principal/escalations',
-        queryParameters: {'status': status},
-      );
-
-  Future<Map<String, dynamic>> getEscalationDetail(String escalationId) =>
-      _getCached(
-        'principal_escalation_$escalationId',
-        '/mobile/principal/escalations/$escalationId',
-      );
-
-  Future<Map<String, dynamic>> assignEscalationToSelf(String escalationId) {
-    return _postJson(
-      '/mobile/principal/escalations/$escalationId/assign-self',
-      const <String, dynamic>{},
-    );
-  }
-
-  Future<Map<String, dynamic>> assignEscalation({
-    required String escalationId,
-    required String assigneeUserId,
-  }) {
-    return _postJson('/mobile/principal/escalations/$escalationId/assign', {
-      'assigneeUserId': assigneeUserId,
-    });
-  }
-
-  Future<Map<String, dynamic>> addEscalationNote({
-    required String escalationId,
-    required String note,
-  }) {
-    return _postJson('/mobile/principal/escalations/$escalationId/notes', {
-      'note': note.trim(),
-    });
-  }
-
-  Future<Map<String, dynamic>> resolveEscalation({
-    required String escalationId,
-    required String resolutionReason,
-  }) {
-    return _postJson('/mobile/principal/escalations/$escalationId/resolve', {
-      'resolutionReason': resolutionReason.trim(),
-    });
-  }
-
-  Future<Map<String, dynamic>> reopenEscalation({
-    required String escalationId,
-    required String reason,
-  }) {
-    return _postJson('/mobile/principal/escalations/$escalationId/reopen', {
-      'reason': reason.trim(),
-    });
-  }
-
   Future<Map<String, dynamic>> searchStudents({String? query}) => _getCached(
     'principal_student_search_${query ?? 'initial'}',
     '/mobile/principal/student-search',

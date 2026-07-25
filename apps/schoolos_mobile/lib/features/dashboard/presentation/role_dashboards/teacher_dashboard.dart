@@ -55,7 +55,7 @@ class TeacherDashboard extends ConsumerWidget {
             teacherName: teacherName,
             roleLabel: roleLabel,
             unreadCount: noticeSummary.valueOrNull?.unreadCount,
-            onNotifications: () => context.go(AppRoutes.notifications),
+            onNotifications: () => context.push(AppRoutes.notifications),
           ),
           slivers: [
             SliverPadding(

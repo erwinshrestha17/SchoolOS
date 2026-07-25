@@ -8,6 +8,16 @@ import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/status_chip.dart';
 import '../../../../shared/widgets/user_avatar.dart';
 
+/// The header greeted every teacher with "Good morning" whatever the clock
+/// said, so an evening attendance check opened with a greeting that was wrong
+/// most of the day.
+String teacherGreeting(DateTime now) {
+  final hour = now.hour;
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
 class TeacherPersonaHeader extends StatelessWidget {
   const TeacherPersonaHeader({
     super.key,
@@ -62,7 +72,7 @@ class TeacherPersonaHeader extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Good morning, $teacherName',
+                    '${teacherGreeting(DateTime.now())}, $teacherName',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(

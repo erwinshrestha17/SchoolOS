@@ -243,7 +243,7 @@ export class MobileService {
     scopedStudentIds?: string[],
   ) {
     const studentIds =
-      scopedStudentIds ?? (await this.getAllowedStudentIds(actor));
+      scopedStudentIds ?? (await this.getNotificationStudentScope(actor));
     const childScoped = scopedStudentIds !== undefined;
     const visibility = this.parentNotificationVisibility(
       actor,
@@ -342,14 +342,14 @@ export class MobileService {
   }
 
   async getNotificationUnreadCount(actor: AuthContext) {
-    const studentIds = await this.getAllowedStudentIds(actor);
+    const studentIds = await this.getNotificationStudentScope(actor);
     return {
       unreadCount: await this.countUnreadNotifications(actor, studentIds),
     };
   }
 
   async markAllNotificationsRead(actor: AuthContext) {
-    const studentIds = await this.getAllowedStudentIds(actor);
+    const studentIds = await this.getNotificationStudentScope(actor);
     const unread = await this.prisma.notificationDelivery.findMany({
       where: {
         ...this.parentNotificationVisibility(actor, studentIds),
@@ -377,7 +377,7 @@ export class MobileService {
   }
 
   async markNotificationRead(notificationId: string, actor: AuthContext) {
-    const studentIds = await this.getAllowedStudentIds(actor);
+    const studentIds = await this.getNotificationStudentScope(actor);
     const notification = await this.prisma.notificationDelivery.findFirst({
       where: {
         id: notificationId,
@@ -484,7 +484,7 @@ export class MobileService {
     notificationId: string,
     actor: AuthContext,
   ) {
-    const studentIds = await this.getAllowedStudentIds(actor);
+    const studentIds = await this.getNotificationStudentScope(actor);
     const notification = await this.prisma.notificationDelivery.findFirst({
       where: {
         id: notificationId,
@@ -1872,6 +1872,22 @@ export class MobileService {
         },
       },
     });
+  }
+
+  /**
+   * Notification visibility is the union of "addressed to me" and "about one
+   * of my children". Only the second half is parent-specific, so a teacher or
+   * principal has a legitimate, non-empty answer here: their own deliveries.
+   * Resolving the child fan-out through `getAllowedStudentIds` made every
+   * notification route 403 for staff, which broke the unread count on the
+   * teacher dashboard. Non-parents simply get no child fan-out.
+   */
+  private async getNotificationStudentScope(actor: AuthContext) {
+    if (!isParentOnly(actor)) {
+      return [];
+    }
+
+    return this.getAllowedStudentIds(actor);
   }
 
   private async getAllowedStudentIds(actor: AuthContext) {

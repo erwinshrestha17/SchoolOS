@@ -136,7 +136,7 @@ class AdminDashboard extends ConsumerWidget {
             iconColor: AppColors.success,
             subtitle:
                 'Open the mobile notification center for account-visible updates.',
-            onTap: () => context.go(AppRoutes.notifications),
+            onTap: () => context.push(AppRoutes.notifications),
           ),
           const SizedBox(height: AppSpacing.xl),
           const SectionHeader(title: 'Admin work queue'),
@@ -193,7 +193,7 @@ class AdminDashboard extends ConsumerWidget {
                       title: 'Alerts',
                       icon: Icons.notifications_active_rounded,
                       color: AppColors.primary,
-                      onTap: () => context.go(AppRoutes.notifications),
+                      onTap: () => context.push(AppRoutes.notifications),
                     ),
                   ),
                   SizedBox(
