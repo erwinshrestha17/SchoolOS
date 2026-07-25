@@ -194,6 +194,13 @@ class _ParentPortalHomeTabState extends ConsumerState<ParentPortalHomeTab>
                 context.push(AppRoutes.parentChildDetail(activeChild.id)),
           ),
           const SizedBox(height: 12),
+          if (_upcomingFor(widget.data, activeChild.id) case final upcoming
+              when upcoming.isNotEmpty) ...[
+            const ParentSectionHeader(title: 'Coming up'),
+            const SizedBox(height: 10),
+            _UpcomingCard(items: upcoming),
+            const SizedBox(height: 12),
+          ],
           const ParentSectionHeader(title: 'Quick actions'),
           const SizedBox(height: 10),
           LayoutBuilder(
@@ -407,3 +414,155 @@ String _firstName(String value) {
   final parts = value.trim().split(RegExp(r'\s+'));
   return parts.isEmpty || parts.first.isEmpty ? 'Parent' : parts.first;
 }
+
+/// A dated thing the parent should know is coming, nearest deadline first.
+///
+/// Only homework carries real dates today. Exams and school events have
+/// working endpoints (`students/:id/exam-schedule`, `/events`) but no
+/// published records in any tenant seen so far, so they contribute nothing
+/// yet; this list is shaped so they slot in without reworking the card.
+class _UpcomingItem {
+  const _UpcomingItem({
+    required this.title,
+    required this.subtitle,
+    required this.dueAt,
+    required this.route,
+  });
+
+  final String title;
+  final String subtitle;
+  final DateTime dueAt;
+  final String route;
+
+  bool isOverdue(DateTime today) => _dayOf(dueAt).isBefore(today);
+  bool isToday(DateTime today) => _dayOf(dueAt) == today;
+}
+
+DateTime _dayOf(DateTime value) => DateTime(value.year, value.month, value.day);
+
+/// Pending, dated work for the selected child only.
+///
+/// Completed work is excluded - it is not "coming up" - and the list is capped
+/// so the card cannot grow without bound on a heavy homework week.
+List<_UpcomingItem> _upcomingFor(ParentPortalData data, String childId) {
+  final items =
+      data.homework
+          .where(
+            (item) =>
+                item.childId == childId &&
+                !item.isCompleted &&
+                item.dueAt != null,
+          )
+          .map(
+            (item) => _UpcomingItem(
+              title: item.title,
+              subtitle: item.subject,
+              dueAt: item.dueAt!,
+              route: AppRoutes.parentHomeworkDetail(item.id),
+            ),
+          )
+          .toList()
+        ..sort((a, b) => a.dueAt.compareTo(b.dueAt));
+
+  return items.take(4).toList();
+}
+
+class _UpcomingCard extends StatelessWidget {
+  const _UpcomingCard({required this.items});
+
+  final List<_UpcomingItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    return PortalCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          for (var index = 0; index < items.length; index++) ...[
+            if (index > 0) const Divider(height: 1),
+            _UpcomingRow(item: items[index], today: today),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _UpcomingRow extends StatelessWidget {
+  const _UpcomingRow({required this.item, required this.today});
+
+  final _UpcomingItem item;
+  final DateTime today;
+
+  @override
+  Widget build(BuildContext context) {
+    final overdue = item.isOverdue(today);
+    final dueToday = item.isToday(today);
+    // Status carries a word as well as a colour, so it survives a
+    // colour-blind reader and a greyscale screenshot.
+    final label = overdue
+        ? 'Overdue'
+        : dueToday
+        ? 'Due today'
+        : 'Due ${_shortDate(item.dueAt)}';
+    final colour = overdue
+        ? ParentPortalColors.red
+        : dueToday
+        ? ParentPortalColors.orange
+        : ParentPortalColors.muted;
+
+    return InkWell(
+      onTap: () => context.push(item.route),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Icon(
+              overdue ? Icons.error_outline_rounded : Icons.menu_book_outlined,
+              color: colour,
+              size: 22,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  Text(
+                    item.subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: ParentPortalColors.muted,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              label,
+              style: TextStyle(
+                color: colour,
+                fontWeight: FontWeight.w800,
+                fontSize: 12,
+              ),
+            ),
+            const ListChevron(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _shortDate(DateTime value) => '${value.day}/${value.month}';
