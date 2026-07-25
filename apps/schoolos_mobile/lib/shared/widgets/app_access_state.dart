@@ -12,6 +12,7 @@ class AppAccessState extends StatelessWidget {
     required this.icon,
     this.actionLabel,
     this.onAction,
+    this.compact = false,
   });
 
   final String title;
@@ -20,27 +21,43 @@ class AppAccessState extends StatelessWidget {
   final String? actionLabel;
   final VoidCallback? onAction;
 
+  /// Renders the same state inside a small slot - a media thumbnail, a tile,
+  /// an inline panel - where the full-page treatment would overflow. The
+  /// title is dropped and the message carries the meaning, so the copy stays
+  /// in one place instead of being re-invented per slot.
+  final bool compact;
+
   @override
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
+        padding: EdgeInsets.all(compact ? AppSpacing.md : AppSpacing.xl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 48, color: AppColors.slate400),
-            const SizedBox(height: AppSpacing.lg),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+            Icon(icon, size: compact ? 28 : 48, color: AppColors.slate400),
+            SizedBox(height: compact ? AppSpacing.sm : AppSpacing.lg),
+            if (!compact) ...[
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+            Flexible(
+              child: Text(
+                message,
+                textAlign: TextAlign.center,
+                maxLines: compact ? 3 : null,
+                overflow: compact ? TextOverflow.ellipsis : null,
+                style: compact ? Theme.of(context).textTheme.bodySmall : null,
+              ),
             ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(message, textAlign: TextAlign.center),
             if (actionLabel != null && onAction != null) ...[
-              const SizedBox(height: AppSpacing.xl),
+              SizedBox(height: compact ? AppSpacing.sm : AppSpacing.xl),
               AppButton(
                 label: actionLabel!,
                 onPressed: onAction,
@@ -98,35 +115,42 @@ class SessionExpiredState extends StatelessWidget {
 }
 
 class ProtectedFileUnavailableState extends StatelessWidget {
-  const ProtectedFileUnavailableState({super.key, this.onRetry});
+  const ProtectedFileUnavailableState({
+    super.key,
+    this.onRetry,
+    this.message,
+    this.compact = false,
+  });
 
   final VoidCallback? onRetry;
+
+  /// Overrides the default copy where the surface knows what kind of file it
+  /// is showing (for example protected activity media).
+  final String? message;
+
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return AppAccessState(
       title: 'File unavailable',
-      message: 'This protected file is unavailable or your access has expired.',
+      message:
+          message ??
+          'This protected file is unavailable or your access has expired.',
       icon: Icons.file_download_off_outlined,
       actionLabel: onRetry == null ? null : 'Try again',
       onAction: onRetry,
+      compact: compact,
     );
   }
 }
 
-class PendingSyncState extends StatelessWidget {
-  const PendingSyncState({super.key, this.onRetry});
-
-  final VoidCallback? onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppAccessState(
-      title: 'Waiting to sync',
-      message: 'This approved draft is still on this device.',
-      icon: Icons.sync_problem_outlined,
-      actionLabel: onRetry == null ? null : 'Retry sync',
-      onAction: onRetry,
-    );
-  }
-}
+// The pending-sync state DESIGN_SYSTEM.md section 10 requires is a *banner*
+// (`PendingSyncBanner`), not a centered full-area state, and it already exists:
+// `_SyncBanner` in teacher attendance carries the queued / syncing /
+// server-checking / failed statuses with a retry, next-step copy and a
+// last-updated timestamp. Promote that to this file when a second surface
+// needs it; extracting a shared abstraction from its single consumer now would
+// be guesswork. A centered `PendingSyncState` stub used to sit here and was
+// removed rather than wired in, because it would have been a downgrade
+// wherever it landed.

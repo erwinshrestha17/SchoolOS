@@ -5,6 +5,7 @@ import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/errors/app_exception.dart';
 import '../../../../shared/utils/nepali_bs_calendar.dart';
+import '../../../../shared/widgets/app_access_state.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/app_exception_view.dart';
@@ -465,24 +466,12 @@ class _ProtectedActivityThumbnail extends ConsumerWidget {
           ),
           error: (_, _) => Container(
             color: AppColors.slate100,
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.image_not_supported_outlined),
-                const SizedBox(height: AppSpacing.sm),
-                const Text(
-                  'Protected media is unavailable.',
-                  textAlign: TextAlign.center,
-                ),
-                IconButton(
-                  tooltip: 'Retry media',
-                  onPressed: () => ref.invalidate(
-                    parentActivityThumbnailProvider(attachment.thumbnailPath),
-                  ),
-                  icon: const Icon(Icons.refresh_rounded),
-                ),
-              ],
+            child: ProtectedFileUnavailableState(
+              compact: true,
+              message: 'Protected media is unavailable.',
+              onRetry: () => ref.invalidate(
+                parentActivityThumbnailProvider(attachment.thumbnailPath),
+              ),
             ),
           ),
           data: (bytes) => InkWell(
@@ -629,21 +618,10 @@ class _ActivityMediaDialog extends ConsumerWidget {
                   padding: EdgeInsets.all(AppSpacing.xl),
                   child: CircularProgressIndicator(),
                 ),
-                error: (_, _) => Padding(
-                  padding: const EdgeInsets.all(AppSpacing.xl),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.image_not_supported_outlined),
-                      const SizedBox(height: AppSpacing.sm),
-                      const Text('Protected media is unavailable.'),
-                      TextButton(
-                        onPressed: () => ref.invalidate(
-                          parentActivityPreviewProvider(attachment.previewPath),
-                        ),
-                        child: const Text('Retry'),
-                      ),
-                    ],
+                error: (_, _) => ProtectedFileUnavailableState(
+                  message: 'Protected media is unavailable.',
+                  onRetry: () => ref.invalidate(
+                    parentActivityPreviewProvider(attachment.previewPath),
                   ),
                 ),
                 data: (bytes) => InteractiveViewer(
