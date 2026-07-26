@@ -1,12 +1,15 @@
 import {
   IsArray,
+  IsDateString,
   IsEnum,
   IsInt,
   IsNotEmpty,
   IsObject,
   IsOptional,
   IsString,
+  IsUUID,
   Max,
+  MaxLength,
   Min,
 } from 'class-validator';
 import { ApprovalDecisionType, ApprovalWorkflowType } from '@prisma/client';
@@ -95,6 +98,10 @@ export class CreateApprovalRequestDto {
   @IsOptional()
   @IsString()
   idempotencyKey?: string;
+
+  @IsOptional()
+  @IsDateString()
+  deadlineAt?: string;
 }
 
 export class DecideApprovalRequestDto {
@@ -128,4 +135,14 @@ export class AttachApprovalFileDto {
   @IsOptional()
   @IsString()
   label?: string;
+}
+
+export class DelegateApprovalRequestDto {
+  @IsUUID()
+  delegatedToUserId!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
+  reason!: string;
 }

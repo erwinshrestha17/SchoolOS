@@ -44,6 +44,24 @@ class PrincipalRepository {
     );
   }
 
+  Future<Map<String, dynamic>> getApprovalDelegationCandidates(
+    String approvalRequestId,
+  ) => _getCached(
+    'principal_approval_delegation_candidates_$approvalRequestId',
+    '/mobile/principal/approvals/$approvalRequestId/delegation-candidates',
+  );
+
+  Future<Map<String, dynamic>> delegateApproval({
+    required String approvalRequestId,
+    required String delegatedToUserId,
+    required String reason,
+  }) {
+    return _postJson(
+      '/mobile/principal/approvals/$approvalRequestId/delegation',
+      {'delegatedToUserId': delegatedToUserId, 'reason': reason.trim()},
+    );
+  }
+
   Future<Map<String, dynamic>> getAdmissionsSummary() => _getCached(
     'principal_admissions_summary',
     '/mobile/principal/admissions-summary',

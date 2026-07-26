@@ -34,6 +34,81 @@ final parentAttendanceProvider = FutureProvider.autoDispose
       );
     });
 
+final parentAttendanceCorrectionsProvider = FutureProvider.autoDispose
+    .family<List<ParentAttendanceCorrection>, String>((ref, studentId) {
+      return ref
+          .watch(attendanceRepositoryProvider)
+          .getParentAttendanceCorrections(studentId);
+    });
+
+final parentAttendanceCorrectionControllerProvider = StateNotifierProvider
+    .autoDispose
+    .family<ParentAttendanceCorrectionController, AsyncValue<void>, String>((
+      ref,
+      studentId,
+    ) {
+      return ParentAttendanceCorrectionController(
+        ref.watch(attendanceRepositoryProvider),
+        studentId,
+        () => ref.invalidate(parentAttendanceCorrectionsProvider(studentId)),
+      );
+    });
+
+class ParentAttendanceCorrectionController
+    extends StateNotifier<AsyncValue<void>> {
+  ParentAttendanceCorrectionController(
+    this._repository,
+    this._studentId,
+    this._onChanged,
+  ) : super(const AsyncValue.data(null));
+
+  final AttendanceRepository _repository;
+  final String _studentId;
+  final void Function() _onChanged;
+
+  Future<bool> create({
+    required DateTime attendanceDate,
+    required AttendanceStatus requestedStatus,
+    required String reason,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      await _repository.createParentAttendanceCorrection(
+        studentId: _studentId,
+        attendanceDate: attendanceDate,
+        requestedStatus: requestedStatus,
+        reason: reason,
+      );
+      state = const AsyncValue.data(null);
+      _onChanged();
+      return true;
+    } catch (error, stackTrace) {
+      state = AsyncValue.error(error, stackTrace);
+      return false;
+    }
+  }
+
+  Future<bool> cancel({
+    required String requestId,
+    required String reason,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      await _repository.cancelParentAttendanceCorrection(
+        studentId: _studentId,
+        requestId: requestId,
+        reason: reason,
+      );
+      state = const AsyncValue.data(null);
+      _onChanged();
+      return true;
+    } catch (error, stackTrace) {
+      state = AsyncValue.error(error, stackTrace);
+      return false;
+    }
+  }
+}
+
 final teacherAttendanceControllerProvider =
     StateNotifierProvider<TeacherAttendanceController, TeacherAttendanceState>((
       ref,

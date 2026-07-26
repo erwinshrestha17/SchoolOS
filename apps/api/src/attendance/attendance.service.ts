@@ -63,6 +63,7 @@ import {
   buildStudentScopeFilter,
   getParentStudentIds,
   getStudentOwnId,
+  isParentOnly,
 } from '../common/security/parent-scope';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SettingsService } from '../settings/settings.service';
@@ -2099,15 +2100,90 @@ export class AttendanceService {
     dto: CreateAttendanceCorrectionDto,
     actor: AuthContext,
   ) {
+    return this.createCorrectionRequestForActor(dto, actor, 'staff');
+  }
+
+  async createParentCorrectionRequest(
+    input: {
+      studentId: string;
+      attendanceDate: string;
+      requestedStatus: AttendanceStatus;
+      reason: string;
+    },
+    actor: AuthContext,
+  ) {
+    if (!isParentOnly(actor)) {
+      throw new ForbiddenException(
+        'Parent attendance correction is not available for this account.',
+      );
+    }
+    await this.ensureStudentAttendanceAccess(input.studentId, actor);
+    const attendanceDate = stripTime(new Date(input.attendanceDate));
+    if (
+      Number.isNaN(attendanceDate.getTime()) ||
+      attendanceDate > stripTime(new Date())
+    ) {
+      throw new BadRequestException(
+        'Choose a recorded attendance date that is not in the future.',
+      );
+    }
+    const record = await this.prisma.attendanceRecord.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        studentId: input.studentId,
+        attendanceSession: {
+          tenantId: actor.tenantId,
+          attendanceDate,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+    if (!record) {
+      throw new NotFoundException(
+        'Recorded attendance was not found for this child and date.',
+      );
+    }
+
+    return this.createCorrectionRequestForActor(
+      {
+        studentId: input.studentId,
+        attendanceDate: input.attendanceDate,
+        attendanceRecordId: record.id,
+        requestedStatus: input.requestedStatus,
+        reason: input.reason,
+      },
+      actor,
+      'parent',
+    );
+  }
+
+  private async createCorrectionRequestForActor(
+    dto: CreateAttendanceCorrectionDto,
+    actor: AuthContext,
+    requesterType: 'staff' | 'parent',
+  ) {
     if (!dto.reason.trim()) {
       throw new ConflictException('Attendance correction requires a reason.');
     }
-    const staff = await this.prisma.staff.findUnique({
-      where: { userId: actor.userId },
-      select: { id: true },
-    });
-    if (!staff) {
-      throw new ForbiddenException('Only staff can create correction requests');
+    if (requesterType === 'parent' && dto.reason.trim().length < 8) {
+      throw new BadRequestException(
+        'Attendance correction reason must be at least 8 characters.',
+      );
+    }
+    if (requesterType === 'staff') {
+      const staff = await this.prisma.staff.findUnique({
+        where: { userId: actor.userId },
+        select: { id: true },
+      });
+      if (!staff) {
+        throw new ForbiddenException(
+          'Only staff can create correction requests',
+        );
+      }
+    } else {
+      await this.ensureStudentAttendanceAccess(dto.studentId, actor);
     }
 
     const attendanceDate = stripTime(new Date(dto.attendanceDate));
@@ -2157,11 +2233,13 @@ export class AttendanceService {
       throw new NotFoundException('Student not found in this school.');
     }
 
-    await this.checkTeacherAssignment(
-      actor,
-      student.classId,
-      student.sectionId,
-    );
+    if (requesterType === 'staff') {
+      await this.checkTeacherAssignment(
+        actor,
+        student.classId,
+        student.sectionId,
+      );
+    }
 
     const [record, session] = await Promise.all([
       dto.attendanceRecordId
@@ -2256,6 +2334,14 @@ export class AttendanceService {
         'Student attendance record was not found in this session.',
       );
     }
+    if (
+      resolvedRecord?.status &&
+      resolvedRecord.status === dto.requestedStatus
+    ) {
+      throw new ConflictException(
+        'Requested attendance matches the recorded status.',
+      );
+    }
 
     const request = await this.prisma.attendanceCorrectionRequest.create({
       data: {
@@ -2269,6 +2355,7 @@ export class AttendanceService {
         reason: dto.reason.trim(),
         requestedById: actor.userId,
         status: 'PENDING',
+        metadata: { requesterType },
       },
       select: attendanceCorrectionRequestSelect,
     });
@@ -2283,6 +2370,109 @@ export class AttendanceService {
     });
 
     return request;
+  }
+
+  async listParentCorrectionRequests(
+    studentId: string,
+    actor: AuthContext,
+  ) {
+    if (!isParentOnly(actor)) {
+      throw new ForbiddenException(
+        'Parent attendance correction is not available for this account.',
+      );
+    }
+    await this.ensureStudentAttendanceAccess(studentId, actor);
+    const items = await this.prisma.attendanceCorrectionRequest.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        studentId,
+        requestedById: actor.userId,
+      },
+      select: attendanceCorrectionRequestSelect,
+      orderBy: [{ requestedAt: 'desc' }],
+      take: 50,
+    });
+    return {
+      items: items.map((item) => ({
+        id: item.id,
+        attendanceDate: item.attendanceDate.toISOString(),
+        previousStatus: item.previousStatus,
+        requestedStatus: item.requestedStatus,
+        reason: item.reason,
+        status: item.status,
+        requestedAt: item.requestedAt.toISOString(),
+        reviewedAt: item.reviewedAt?.toISOString() ?? null,
+        reviewReason: item.reviewReason ?? item.reviewNote,
+        canCancel: item.status === 'PENDING',
+        canResubmit: ['REJECTED', 'CANCELLED'].includes(item.status),
+      })),
+      total: items.length,
+    };
+  }
+
+  async cancelParentCorrectionRequest(
+    requestId: string,
+    reasonInput: string,
+    actor: AuthContext,
+  ) {
+    if (!isParentOnly(actor)) {
+      throw new ForbiddenException(
+        'Parent attendance correction is not available for this account.',
+      );
+    }
+    const reason = reasonInput.trim();
+    const request = await this.prisma.attendanceCorrectionRequest.findFirst({
+      where: {
+        id: requestId,
+        tenantId: actor.tenantId,
+        requestedById: actor.userId,
+      },
+      select: {
+        ...attendanceCorrectionRequestSelect,
+        metadata: true,
+      },
+    });
+    if (!request) {
+      throw new NotFoundException('Attendance correction request not found.');
+    }
+    await this.ensureStudentAttendanceAccess(request.studentId, actor);
+    if (request.status === 'CANCELLED') {
+      return request;
+    }
+    if (request.status !== 'PENDING') {
+      throw new ConflictException(
+        'Only a pending attendance correction can be cancelled.',
+      );
+    }
+    const metadata =
+      request.metadata &&
+      typeof request.metadata === 'object' &&
+      !Array.isArray(request.metadata)
+        ? (request.metadata as Prisma.JsonObject)
+        : {};
+    const updated = await this.prisma.attendanceCorrectionRequest.update({
+      where: { id: request.id },
+      data: {
+        status: 'CANCELLED',
+        metadata: {
+          ...metadata,
+          cancelledBy: 'parent',
+          cancellationReason: reason,
+          cancelledAt: new Date().toISOString(),
+        },
+      },
+      select: attendanceCorrectionRequestSelect,
+    });
+    await this.auditService.record({
+      action: 'cancel',
+      resource: 'attendance_correction_request',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: request.id,
+      before: { status: request.status },
+      after: { status: updated.status, reason },
+    });
+    return updated;
   }
 
   async listCorrectionRequests(

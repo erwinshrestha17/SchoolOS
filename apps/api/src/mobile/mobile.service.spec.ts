@@ -24,7 +24,12 @@ describe('MobileService', () => {
   }
 
   let prisma: MobileServicePrismaMock;
-  let attendanceService: { getParentSummary: jest.Mock };
+  let attendanceService: {
+    getParentSummary: jest.Mock;
+    listParentCorrectionRequests: jest.Mock;
+    createParentCorrectionRequest: jest.Mock;
+    cancelParentCorrectionRequest: jest.Mock;
+  };
   let financeService: {
     getReceiptPdfForStudent: jest.Mock;
     getParentPaymentGatewayReadiness: jest.Mock;
@@ -47,6 +52,16 @@ describe('MobileService', () => {
     getSignedUrl: jest.Mock;
   };
   let storageService: { getObjectBuffer: jest.Mock };
+  let serviceRequestsService: {
+    listParentRequests: jest.Mock;
+    createParentRequest: jest.Mock;
+    getParentRequest: jest.Mock;
+    cancelParentRequest: jest.Mock;
+    confirmParentResolution: jest.Mock;
+    reopenParentRequest: jest.Mock;
+    uploadParentAttachment: jest.Mock;
+    downloadAttachment: jest.Mock;
+  };
   let service: MobileService;
   let actor: AuthContext;
 
@@ -107,6 +122,9 @@ describe('MobileService', () => {
     };
     attendanceService = {
       getParentSummary: jest.fn(),
+      listParentCorrectionRequests: jest.fn(),
+      createParentCorrectionRequest: jest.fn(),
+      cancelParentCorrectionRequest: jest.fn(),
     };
     financeService = {
       getReceiptPdfForStudent: jest.fn(),
@@ -153,6 +171,16 @@ describe('MobileService', () => {
     canteenService = {
       topUpWallet: jest.fn(),
     };
+    serviceRequestsService = {
+      listParentRequests: jest.fn(),
+      createParentRequest: jest.fn(),
+      getParentRequest: jest.fn(),
+      cancelParentRequest: jest.fn(),
+      confirmParentResolution: jest.fn(),
+      reopenParentRequest: jest.fn(),
+      uploadParentAttachment: jest.fn(),
+      downloadAttachment: jest.fn(),
+    };
     service = new MobileService(
       prisma as never,
       attendanceService as never,
@@ -164,6 +192,7 @@ describe('MobileService', () => {
       fileRegistryService as never,
       storageService as never,
       canteenService as never,
+      serviceRequestsService as never,
     );
     actor = {
       userId: 'parent-1',
@@ -229,6 +258,66 @@ describe('MobileService', () => {
       service.getStudentFeesSummary('student-other', actor),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.invoice.findMany).not.toHaveBeenCalled();
+  });
+
+  it('delegates linked-child attendance corrections through the M2 service', async () => {
+    prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [{ studentId: 'student-1' }],
+    });
+    attendanceService.listParentCorrectionRequests.mockResolvedValue({
+      items: [],
+      total: 0,
+    });
+    attendanceService.createParentCorrectionRequest.mockResolvedValue({
+      id: 'correction-1',
+      status: 'PENDING',
+    });
+    attendanceService.cancelParentCorrectionRequest.mockResolvedValue({
+      id: 'correction-1',
+      status: 'CANCELLED',
+    });
+
+    await service.listStudentAttendanceCorrections('student-1', actor);
+    await service.createStudentAttendanceCorrection(
+      'student-1',
+      {
+        attendanceDate: '2026-07-24',
+        requestedStatus: 'PRESENT',
+        reason: 'The child attended the full school day.',
+      },
+      actor,
+    );
+    await service.cancelStudentAttendanceCorrection(
+      'student-1',
+      'correction-1',
+      { reason: 'The original request was submitted by mistake.' },
+      actor,
+    );
+
+    expect(attendanceService.listParentCorrectionRequests).toHaveBeenCalledWith(
+      'student-1',
+      actor,
+    );
+    expect(
+      attendanceService.createParentCorrectionRequest,
+    ).toHaveBeenCalledWith(
+      {
+        studentId: 'student-1',
+        attendanceDate: '2026-07-24',
+        requestedStatus: 'PRESENT',
+        reason: 'The child attended the full school day.',
+      },
+      actor,
+    );
+    expect(
+      attendanceService.cancelParentCorrectionRequest,
+    ).toHaveBeenCalledWith(
+      'correction-1',
+      'The original request was submitted by mistake.',
+      actor,
+    );
   });
 
   it('fails closed immediately after a guardian link is removed', async () => {

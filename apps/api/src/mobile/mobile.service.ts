@@ -28,6 +28,16 @@ import {
   ParentSandboxFeePaymentDto,
 } from './dto/parent-sandbox-payment.dto';
 import { MobileParentConsentDecisionDto } from './dto/mobile-parent-consent.dto';
+import {
+  MobileParentAttendanceCorrectionCancelDto,
+  MobileParentAttendanceCorrectionDto,
+} from './dto/mobile-parent-attendance-correction.dto';
+import { ServiceRequestsService } from '../service-requests/service-requests.service';
+import {
+  CreateSchoolServiceRequestDto,
+  ReasonedSchoolServiceRequestDto,
+  UploadSchoolServiceRequestAttachmentDto,
+} from '../service-requests/dto/service-request.dto';
 
 interface MobileStudentRow extends Student {
   class: { id: string; name: string };
@@ -70,6 +80,7 @@ export class MobileService {
     private readonly fileRegistryService: FileRegistryService,
     private readonly storageService: StorageService,
     private readonly canteenService: CanteenService,
+    private readonly serviceRequestsService: ServiceRequestsService,
   ) {}
 
   async listMyStudents(actor: AuthContext) {
@@ -735,6 +746,128 @@ export class MobileService {
   ) {
     await this.assertStudentAccess(studentId, actor);
     return this.attendanceService.getParentSummary(studentId, actor, query);
+  }
+
+  async listStudentAttendanceCorrections(
+    studentId: string,
+    actor: AuthContext,
+  ) {
+    await this.assertStudentAccess(studentId, actor);
+    return this.attendanceService.listParentCorrectionRequests(
+      studentId,
+      actor,
+    );
+  }
+
+  async createStudentAttendanceCorrection(
+    studentId: string,
+    dto: MobileParentAttendanceCorrectionDto,
+    actor: AuthContext,
+  ) {
+    await this.assertStudentAccess(studentId, actor);
+    return this.attendanceService.createParentCorrectionRequest(
+      {
+        studentId,
+        attendanceDate: dto.attendanceDate,
+        requestedStatus: dto.requestedStatus,
+        reason: dto.reason,
+      },
+      actor,
+    );
+  }
+
+  async cancelStudentAttendanceCorrection(
+    studentId: string,
+    requestId: string,
+    dto: MobileParentAttendanceCorrectionCancelDto,
+    actor: AuthContext,
+  ) {
+    await this.assertStudentAccess(studentId, actor);
+    return this.attendanceService.cancelParentCorrectionRequest(
+      requestId,
+      dto.reason,
+      actor,
+    );
+  }
+
+  async listStudentServiceRequests(studentId: string, actor: AuthContext) {
+    await this.assertStudentAccess(studentId, actor);
+    return this.serviceRequestsService.listParentRequests(studentId, actor);
+  }
+
+  async createStudentServiceRequest(
+    studentId: string,
+    dto: CreateSchoolServiceRequestDto,
+    actor: AuthContext,
+  ) {
+    await this.assertStudentAccess(studentId, actor);
+    return this.serviceRequestsService.createParentRequest(
+      studentId,
+      dto,
+      actor,
+    );
+  }
+
+  async getStudentServiceRequest(requestId: string, actor: AuthContext) {
+    return this.serviceRequestsService.getParentRequest(requestId, actor);
+  }
+
+  async cancelStudentServiceRequest(
+    requestId: string,
+    dto: ReasonedSchoolServiceRequestDto,
+    actor: AuthContext,
+  ) {
+    return this.serviceRequestsService.cancelParentRequest(
+      requestId,
+      dto,
+      actor,
+    );
+  }
+
+  async confirmStudentServiceRequestResolution(
+    requestId: string,
+    actor: AuthContext,
+  ) {
+    return this.serviceRequestsService.confirmParentResolution(
+      requestId,
+      actor,
+    );
+  }
+
+  async reopenStudentServiceRequest(
+    requestId: string,
+    dto: ReasonedSchoolServiceRequestDto,
+    actor: AuthContext,
+  ) {
+    return this.serviceRequestsService.reopenParentRequest(
+      requestId,
+      dto,
+      actor,
+    );
+  }
+
+  async uploadStudentServiceRequestAttachment(
+    requestId: string,
+    dto: UploadSchoolServiceRequestAttachmentDto,
+    actor: AuthContext,
+  ) {
+    return this.serviceRequestsService.uploadParentAttachment(
+      requestId,
+      dto,
+      actor,
+    );
+  }
+
+  async downloadStudentServiceRequestAttachment(
+    requestId: string,
+    attachmentId: string,
+    actor: AuthContext,
+  ) {
+    return this.serviceRequestsService.downloadAttachment(
+      requestId,
+      attachmentId,
+      actor,
+    );
   }
 
   async getStudentFeesSummary(studentId: string, actor: AuthContext) {

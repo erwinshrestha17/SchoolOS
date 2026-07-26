@@ -142,6 +142,65 @@ export class FileRegistryService {
     return this.markUploaded(input.tenantId, asset.id, input.generatedByUserId);
   }
 
+  async registerUploadedBase64File(input: {
+    tenantId: string;
+    uploadedByUserId: string;
+    originalFilename: string;
+    mimeType: string;
+    base64Content: string;
+    module: string;
+    entityId: string;
+    metadata?: Prisma.InputJsonValue;
+  }) {
+    const stored = await this.storageService.saveBase64Object({
+      tenantId: input.tenantId,
+      prefix: input.module,
+      fileName: input.originalFilename,
+      contentType: input.mimeType,
+      base64Content: input.base64Content,
+    });
+    const asset = await this.registerFile({
+      tenantId: input.tenantId,
+      uploadedByUserId: input.uploadedByUserId,
+      originalFilename: input.originalFilename,
+      objectKey: stored.objectKey,
+      mimeType: input.mimeType,
+      sizeBytes: stored.sizeBytes,
+      provider: stored.provider,
+      bucket: stored.bucket,
+      checksumSha256: stored.checksumSha256,
+      module: input.module,
+      entityId: input.entityId,
+      metadata: input.metadata,
+    });
+    return this.markUploaded(input.tenantId, asset.id, input.uploadedByUserId);
+  }
+
+  async downloadLinkedFile(
+    auth: AuthContext,
+    input: {
+      assetId: string;
+      module: string;
+      entityId: string;
+    },
+  ) {
+    const asset = await this.getFileMetadata(auth.tenantId, input.assetId);
+    if (
+      asset.status !== FileStatus.UPLOADED ||
+      asset.module !== input.module ||
+      asset.entityId !== input.entityId
+    ) {
+      throw new NotFoundException('Linked file is not available');
+    }
+    await this.auditAccess(auth.tenantId, asset.id, auth.userId, 'download');
+    return {
+      fileName: asset.originalFilename,
+      mimeType: asset.mimeType,
+      sizeBytes: Number(asset.sizeBytes),
+      content: await this.storageService.getObjectBuffer(asset.objectKey),
+    };
+  }
+
   async createSignedUpload(
     auth: AuthContext,
     input: {

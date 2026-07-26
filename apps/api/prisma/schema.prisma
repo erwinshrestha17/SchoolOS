@@ -1046,6 +1046,39 @@ enum ApprovalFinalActionStatus {
   FAILED
 }
 
+enum SchoolServiceRequestType {
+  GENERAL_COMPLAINT
+  PAYMENT_DISPUTE
+}
+
+enum SchoolServiceRequestCategory {
+  ACADEMICS
+  ATTENDANCE
+  FEES_AND_PAYMENTS
+  SCHOOL_OPERATIONS
+  OTHER
+}
+
+enum SchoolServiceRequestPriority {
+  NORMAL
+  HIGH
+}
+
+enum SchoolServiceRequestStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+  REOPENED
+  CANCELLED
+}
+
+enum SchoolServiceRequestNoteVisibility {
+  PARENT
+  INTERNAL
+}
+
 enum AutomationTriggerType {
   STUDENT_MARKED_ABSENT
   ATTENDANCE_NOT_MARKED_BY_CUTOFF
@@ -2184,21 +2217,30 @@ model ApprovalRequest {
   finalActionAppliedAt  DateTime?
   finalActionError      String?
   idempotencyKey        String?
+  deadlineAt            DateTime?
+  delegatedToId         String?
+  delegatedById         String?
+  delegatedAt           DateTime?
+  delegationReason      String?
   createdAt             DateTime                  @default(now())
   updatedAt             DateTime                  @updatedAt
 
-  tenant      Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  policy      ApprovalPolicy?      @relation(fields: [policyId], references: [id], onDelete: SetNull)
-  requestedBy User                 @relation("RequestedApprovalRequests", fields: [requestedById], references: [id], onDelete: Restrict)
-  steps       ApprovalStep[]
-  decisions   ApprovalDecision[]
-  comments    ApprovalComment[]
-  attachments ApprovalAttachment[]
+  tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  policy       ApprovalPolicy?      @relation(fields: [policyId], references: [id], onDelete: SetNull)
+  requestedBy  User                 @relation("RequestedApprovalRequests", fields: [requestedById], references: [id], onDelete: Restrict)
+  delegatedTo  User?                @relation("DelegatedApprovalRequests", fields: [delegatedToId], references: [id], onDelete: SetNull)
+  delegatedBy  User?                @relation("DelegatedApprovalRequestActions", fields: [delegatedById], references: [id], onDelete: SetNull)
+  steps        ApprovalStep[]
+  decisions    ApprovalDecision[]
+  comments     ApprovalComment[]
+  attachments  ApprovalAttachment[]
 
   @@unique([tenantId, idempotencyKey])
   @@index([tenantId, status, createdAt])
   @@index([tenantId, workflowType, status])
   @@index([tenantId, targetModule, targetType, targetId])
+  @@index([tenantId, delegatedToId, status])
+  @@index([tenantId, status, deadlineAt])
 }
 
 model ApprovalStep {
@@ -2922,6 +2964,16 @@ model User {
   reviewedFinanceApprovals       FinanceApprovalRequest[]         @relation("ReviewedFinanceApprovals")
   createdApprovalPolicies        ApprovalPolicy[]                 @relation("CreatedApprovalPolicies")
   requestedApprovalRequests      ApprovalRequest[]                @relation("RequestedApprovalRequests")
+  delegatedApprovalRequests      ApprovalRequest[]                @relation("DelegatedApprovalRequests")
+  delegatedApprovalRequestActions ApprovalRequest[]               @relation("DelegatedApprovalRequestActions")
+  requestedSchoolServiceRequests SchoolServiceRequest[]           @relation("RequestedSchoolServiceRequests")
+  assignedSchoolServiceRequests SchoolServiceRequest[]            @relation("AssignedSchoolServiceRequests")
+  assignedSchoolServiceRequestActions SchoolServiceRequest[]      @relation("AssignedSchoolServiceRequestActions")
+  escalatedSchoolServiceRequests SchoolServiceRequest[]           @relation("EscalatedSchoolServiceRequests")
+  resolvedSchoolServiceRequests SchoolServiceRequest[]            @relation("ResolvedSchoolServiceRequests")
+  closedSchoolServiceRequests SchoolServiceRequest[]              @relation("ClosedSchoolServiceRequests")
+  schoolServiceRequestNotes SchoolServiceRequestNote[]            @relation("SchoolServiceRequestNoteAuthors")
+  schoolServiceRequestAttachments SchoolServiceRequestAttachment[] @relation("SchoolServiceRequestAttachmentAuthors")
   approvalStepDecisions          ApprovalStep[]                   @relation("ApprovalStepDeciders")
   approvalDecisions              ApprovalDecision[]               @relation("ApprovalDecisionActors")
   approvalComments               ApprovalComment[]                @relation("ApprovalCommentAuthors")
@@ -4202,6 +4254,7 @@ model Invoice {
   payments      Payment[]
   onlinePaymentIntents OnlinePaymentIntent[]
   libraryIssues LibraryIssue[]
+  schoolServiceRequests SchoolServiceRequest[]
 
   @@unique([tenantId, invoiceNumber])
   @@index([tenantId, status, dueDate])
@@ -5962,6 +6015,95 @@ model ProviderConfig {
 }
 
 
+// ─── Compiled from schema/service-request.prisma ───
+model SchoolServiceRequest {
+  id                   String                       @id @default(uuid())
+  tenantId             String
+  studentId            String
+  invoiceId            String?
+  requestedById        String
+  type                 SchoolServiceRequestType
+  category             SchoolServiceRequestCategory
+  priority             SchoolServiceRequestPriority @default(NORMAL)
+  subject              String
+  description          String
+  status               SchoolServiceRequestStatus   @default(OPEN)
+  idempotencyKey       String
+  assignedToId         String?
+  assignedById         String?
+  assignedAt           DateTime?
+  responseDeadline     DateTime
+  escalatedAt          DateTime?
+  escalatedById        String?
+  escalationReason     String?
+  resolutionSummary    String?
+  resolvedAt           DateTime?
+  resolvedById         String?
+  parentConfirmedAt    DateTime?
+  closedAt             DateTime?
+  closedById           String?
+  reopenedAt           DateTime?
+  reopenReason         String?
+  cancelledAt          DateTime?
+  cancellationReason   String?
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  student      Student  @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  invoice      Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  requestedBy  User     @relation("RequestedSchoolServiceRequests", fields: [requestedById], references: [id], onDelete: Restrict)
+  assignedTo   User?    @relation("AssignedSchoolServiceRequests", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedBy   User?    @relation("AssignedSchoolServiceRequestActions", fields: [assignedById], references: [id], onDelete: SetNull)
+  escalatedBy  User?    @relation("EscalatedSchoolServiceRequests", fields: [escalatedById], references: [id], onDelete: SetNull)
+  resolvedBy   User?    @relation("ResolvedSchoolServiceRequests", fields: [resolvedById], references: [id], onDelete: SetNull)
+  closedBy     User?    @relation("ClosedSchoolServiceRequests", fields: [closedById], references: [id], onDelete: SetNull)
+  notes        SchoolServiceRequestNote[]
+  attachments  SchoolServiceRequestAttachment[]
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, status, priority, responseDeadline])
+  @@index([tenantId, studentId, createdAt])
+  @@index([tenantId, requestedById, createdAt])
+  @@index([tenantId, assignedToId, status])
+  @@index([tenantId, invoiceId, status])
+}
+
+model SchoolServiceRequestNote {
+  id           String                             @id @default(uuid())
+  tenantId     String
+  requestId    String
+  createdById  String
+  body         String
+  visibility   SchoolServiceRequestNoteVisibility @default(PARENT)
+  createdAt    DateTime                           @default(now())
+
+  tenant      Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  request     SchoolServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  createdBy   User                 @relation("SchoolServiceRequestNoteAuthors", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, requestId, createdAt])
+}
+
+model SchoolServiceRequestAttachment {
+  id           String   @id @default(uuid())
+  tenantId     String
+  requestId    String
+  fileAssetId  String
+  createdById  String
+  label        String?
+  createdAt    DateTime @default(now())
+
+  tenant      Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  request     SchoolServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  fileAsset   FileAsset            @relation(fields: [fileAssetId], references: [id], onDelete: Restrict)
+  createdBy   User                 @relation("SchoolServiceRequestAttachmentAuthors", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@unique([requestId, fileAssetId])
+  @@index([tenantId, requestId, createdAt])
+}
+
+
 // ─── Compiled from schema/staff.prisma ───
 model Staff {
   id                       String               @id @default(uuid())
@@ -6241,6 +6383,7 @@ model Student {
   canteenPosSales              CanteenPosSale[]
   canteenSpendingControls      CanteenSpendingControl[]
   attendanceCorrectionRequests AttendanceCorrectionRequest[]
+  schoolServiceRequests         SchoolServiceRequest[]
   qrCredentials                StudentQrCredential[]
   learningParticipants         LearningParticipant[]
   learningAttempts             LearningAttempt[]
@@ -6873,6 +7016,9 @@ model Tenant {
   noticeAcknowledgements        NoticeAcknowledgement[]
   notificationReadReceipts      NotificationReadReceipt[]
   mobilePushTokens              MobilePushToken[]
+  schoolServiceRequests         SchoolServiceRequest[]
+  schoolServiceRequestNotes     SchoolServiceRequestNote[]
+  schoolServiceRequestAttachments SchoolServiceRequestAttachment[]
   guardianConsents              GuardianConsent[]
   guardianIdentityVerifications GuardianIdentityVerification[]
   generatedStudentDocuments     GeneratedStudentDocument[]
@@ -7075,6 +7221,7 @@ model FileAsset {
   reportCardHistories ReportCardHistory[]  @relation("ReportCardHistoryFile")
   learningResources   LearningResource[]
   approvalAttachments ApprovalAttachment[]
+  schoolServiceRequestAttachments SchoolServiceRequestAttachment[]
   generatedDocuments  GeneratedDocument[]
   dataExportJobs      DataExportJob[]
 

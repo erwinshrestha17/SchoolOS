@@ -106,6 +106,7 @@ model Invoice {
   payments      Payment[]
   onlinePaymentIntents OnlinePaymentIntent[]
   libraryIssues LibraryIssue[]
+  schoolServiceRequests SchoolServiceRequest[]
 
   @@unique([tenantId, invoiceNumber])
   @@index([tenantId, status, dueDate])

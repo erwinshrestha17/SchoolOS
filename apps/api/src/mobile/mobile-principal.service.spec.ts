@@ -39,6 +39,26 @@ describe('MobilePrincipalService', () => {
     student: {
       findMany: jest.Mock;
       count: jest.Mock;
+      groupBy: jest.Mock;
+    };
+    assessmentComponent: {
+      groupBy: jest.Mock;
+    };
+    subject: {
+      findMany: jest.Mock;
+    };
+    markEntry: {
+      groupBy: jest.Mock;
+    };
+    reportCard: {
+      count: jest.Mock;
+    };
+    reportCardCorrectionRequest: {
+      count: jest.Mock;
+      findMany: jest.Mock;
+    };
+    class: {
+      findMany: jest.Mock;
     };
     approvalRequest: {
       findFirst: jest.Mock;
@@ -102,6 +122,26 @@ describe('MobilePrincipalService', () => {
       student: {
         findMany: jest.fn(),
         count: jest.fn(),
+        groupBy: jest.fn(),
+      },
+      assessmentComponent: {
+        groupBy: jest.fn(),
+      },
+      subject: {
+        findMany: jest.fn(),
+      },
+      markEntry: {
+        groupBy: jest.fn(),
+      },
+      reportCard: {
+        count: jest.fn(),
+      },
+      reportCardCorrectionRequest: {
+        count: jest.fn(),
+        findMany: jest.fn(),
+      },
+      class: {
+        findMany: jest.fn(),
       },
       approvalRequest: {
         findFirst: jest.fn(),
@@ -206,6 +246,82 @@ describe('MobilePrincipalService', () => {
             feeRisk: 'Clear',
           }),
         ],
+      }),
+    );
+  });
+
+  it('calculates marks readiness from expected active-student entries', async () => {
+    prisma.assessmentComponent.groupBy.mockResolvedValue([
+      { subjectId: 'subject-1', _count: { _all: 2 } },
+      { subjectId: 'subject-2', _count: { _all: 1 } },
+    ]);
+    prisma.subject.findMany.mockResolvedValue([
+      { id: 'subject-1', classId: 'class-1' },
+      { id: 'subject-2', classId: 'class-2' },
+    ]);
+    prisma.student.groupBy.mockResolvedValue([
+      { classId: 'class-1', _count: { _all: 2 } },
+      { classId: 'class-2', _count: { _all: 1 } },
+    ]);
+    prisma.markEntry.groupBy.mockResolvedValue([
+      { subjectId: 'subject-1', _count: { _all: 3 } },
+      { subjectId: 'subject-2', _count: { _all: 1 } },
+    ]);
+    prisma.reportCard.count.mockResolvedValue(2);
+    prisma.reportCardCorrectionRequest.count.mockResolvedValue(1);
+    prisma.reportCardCorrectionRequest.findMany.mockResolvedValue([]);
+    prisma.class.findMany.mockResolvedValue([
+      { id: 'class-1', name: 'Class 1' },
+      { id: 'class-2', name: 'Class 2' },
+    ]);
+
+    await expect(service.getAcademicsReadiness(actor)).resolves.toEqual(
+      expect.objectContaining({
+        metrics: {
+          pendingMarks: 1,
+          publishBlockers: 1,
+          reportCardsReady: 2,
+          examReadinessPercent: 80,
+          expectedMarks: 5,
+          submittedMarks: 4,
+        },
+        marksEntryStatus: [
+          expect.objectContaining({
+            id: 'class-1',
+            percent: 75,
+            expectedEntries: 4,
+            submittedEntries: 3,
+            missingEntries: 1,
+          }),
+          expect.objectContaining({
+            id: 'class-2',
+            percent: 100,
+            expectedEntries: 1,
+            submittedEntries: 1,
+            missingEntries: 0,
+          }),
+        ],
+      }),
+    );
+
+    expect(prisma.assessmentComponent.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        by: ['subjectId'],
+        where: expect.objectContaining({
+          tenantId: 'tenant-1',
+          examTerm: {
+            status: 'ACTIVE',
+            academicYear: { isCurrent: true },
+          },
+        }),
+      }),
+    );
+    expect(prisma.markEntry.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: 'tenant-1',
+          status: { not: 'DRAFT' },
+        }),
       }),
     );
   });

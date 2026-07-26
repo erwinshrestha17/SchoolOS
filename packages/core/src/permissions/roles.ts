@@ -302,6 +302,8 @@ export const systemRolePermissions: Record<string, string[]> = {
     "learning:read",
     "learning:progress",
     "messaging:read",
+    "service_requests:create",
+    "service_requests:read",
     "transport:tracking:parent",
     "canteen:parent:read",
     "settings:read_public",
@@ -365,6 +367,8 @@ export const systemRolePermissions: Record<string, string[]> = {
     "accounting:exports:create",
     "settings:finance:manage",
     "settings:accounting:manage",
+    "service_requests:read",
+    "service_requests:manage",
   ],
   hr_manager: [
     "roles:read",

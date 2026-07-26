@@ -43,21 +43,30 @@ model ApprovalRequest {
   finalActionAppliedAt  DateTime?
   finalActionError      String?
   idempotencyKey        String?
+  deadlineAt            DateTime?
+  delegatedToId         String?
+  delegatedById         String?
+  delegatedAt           DateTime?
+  delegationReason      String?
   createdAt             DateTime                  @default(now())
   updatedAt             DateTime                  @updatedAt
 
-  tenant      Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  policy      ApprovalPolicy?      @relation(fields: [policyId], references: [id], onDelete: SetNull)
-  requestedBy User                 @relation("RequestedApprovalRequests", fields: [requestedById], references: [id], onDelete: Restrict)
-  steps       ApprovalStep[]
-  decisions   ApprovalDecision[]
-  comments    ApprovalComment[]
-  attachments ApprovalAttachment[]
+  tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  policy       ApprovalPolicy?      @relation(fields: [policyId], references: [id], onDelete: SetNull)
+  requestedBy  User                 @relation("RequestedApprovalRequests", fields: [requestedById], references: [id], onDelete: Restrict)
+  delegatedTo  User?                @relation("DelegatedApprovalRequests", fields: [delegatedToId], references: [id], onDelete: SetNull)
+  delegatedBy  User?                @relation("DelegatedApprovalRequestActions", fields: [delegatedById], references: [id], onDelete: SetNull)
+  steps        ApprovalStep[]
+  decisions    ApprovalDecision[]
+  comments     ApprovalComment[]
+  attachments  ApprovalAttachment[]
 
   @@unique([tenantId, idempotencyKey])
   @@index([tenantId, status, createdAt])
   @@index([tenantId, workflowType, status])
   @@index([tenantId, targetModule, targetType, targetId])
+  @@index([tenantId, delegatedToId, status])
+  @@index([tenantId, status, deadlineAt])
 }
 
 model ApprovalStep {

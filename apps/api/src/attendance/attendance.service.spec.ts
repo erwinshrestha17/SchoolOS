@@ -45,6 +45,14 @@ const teacherActor = {
   permissions: ['attendance:mark', 'attendance:read'],
 };
 
+const parentActor = {
+  ...adminActor,
+  userId: 'parent-user-1',
+  email: 'parent@schoolos.test',
+  roles: ['parent'],
+  permissions: ['attendance:read'],
+};
+
 const hrActor = {
   ...adminActor,
   userId: 'hr-user-1',
@@ -832,6 +840,92 @@ describe('attendance production hardening', () => {
         }),
       }),
     );
+  });
+
+  it('creates a parent correction only for linked-child recorded attendance', async () => {
+    const request = {
+      id: 'correction-parent-1',
+      previousStatus: AttendanceStatus.ABSENT,
+      requestedStatus: AttendanceStatus.PRESENT,
+      status: 'PENDING',
+    };
+    const attendanceDate = new Date('2026-04-27T18:15:00.000Z');
+    const { service, prisma } = buildService({
+      studentFindFirst: {
+        id: 'student-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+      },
+      guardianFindFirst: {
+        id: 'guardian-1',
+        studentLinks: [{ studentId: 'student-1' }],
+      },
+      attendanceRecord: {
+        id: 'record-1',
+        attendanceSessionId: 'session-1',
+        status: AttendanceStatus.ABSENT,
+        attendanceSession: {
+          id: 'session-1',
+          attendanceDate,
+          classId: 'class-1',
+          sectionId: 'section-1',
+          submittedAt: new Date('2026-04-28T04:00:00.000Z'),
+        },
+      },
+      correctionUpdated: request,
+    });
+
+    await expect(
+      service.createParentCorrectionRequest(
+        {
+          studentId: 'student-1',
+          attendanceDate: '2026-04-28',
+          requestedStatus: AttendanceStatus.PRESENT,
+          reason: 'The child was present and arrived before assembly.',
+        },
+        parentActor,
+      ),
+    ).resolves.toEqual(request);
+    expect(prisma.attendanceCorrectionRequest.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          tenantId: parentActor.tenantId,
+          studentId: 'student-1',
+          attendanceRecordId: 'record-1',
+          previousStatus: AttendanceStatus.ABSENT,
+          requestedById: parentActor.userId,
+          metadata: { requesterType: 'parent' },
+        }),
+      }),
+    );
+    expect(prisma.staff.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('denies a parent correction when the child link is absent', async () => {
+    const { service, prisma } = buildService({
+      studentFindFirst: {
+        id: 'student-other',
+        classId: 'class-1',
+        sectionId: 'section-1',
+      },
+      guardianFindFirst: {
+        id: 'guardian-1',
+        studentLinks: [{ studentId: 'student-1' }],
+      },
+    });
+
+    await expect(
+      service.createParentCorrectionRequest(
+        {
+          studentId: 'student-other',
+          attendanceDate: '2026-04-28',
+          requestedStatus: AttendanceStatus.PRESENT,
+          reason: 'This must fail before attendance history is queried.',
+        },
+        parentActor,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.attendanceRecord.findFirst).not.toHaveBeenCalled();
   });
 
   it('submits a saved draft through replay-safe attendance submission and deletes it after success', async () => {

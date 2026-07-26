@@ -24,6 +24,15 @@ import {
   ParentSandboxFeePaymentDto,
 } from './dto/parent-sandbox-payment.dto';
 import { MobileParentConsentDecisionDto } from './dto/mobile-parent-consent.dto';
+import {
+  MobileParentAttendanceCorrectionCancelDto,
+  MobileParentAttendanceCorrectionDto,
+} from './dto/mobile-parent-attendance-correction.dto';
+import {
+  CreateSchoolServiceRequestDto,
+  ReasonedSchoolServiceRequestDto,
+  UploadSchoolServiceRequestAttachmentDto,
+} from '../service-requests/dto/service-request.dto';
 
 @Controller('mobile')
 @UseGuards(JwtAuthGuard, EntitlementGuard)
@@ -129,6 +138,133 @@ export class MobileController {
     return this.mobileService.getStudentAttendanceSummary(studentId, auth, {
       month: query.month,
       year: query.year,
+    });
+  }
+
+  @Get('students/:id/attendance-corrections')
+  @RequiredModule('attendance')
+  listStudentAttendanceCorrections(
+    @Param('id') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.mobileService.listStudentAttendanceCorrections(studentId, auth);
+  }
+
+  @Post('students/:id/attendance-corrections')
+  @RequiredModule('attendance')
+  createStudentAttendanceCorrection(
+    @Param('id') studentId: string,
+    @Body() dto: MobileParentAttendanceCorrectionDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.mobileService.createStudentAttendanceCorrection(
+      studentId,
+      dto,
+      auth,
+    );
+  }
+
+  @Post('students/:id/attendance-corrections/:requestId/cancel')
+  @RequiredModule('attendance')
+  cancelStudentAttendanceCorrection(
+    @Param('id') studentId: string,
+    @Param('requestId') requestId: string,
+    @Body() dto: MobileParentAttendanceCorrectionCancelDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.mobileService.cancelStudentAttendanceCorrection(
+      studentId,
+      requestId,
+      dto,
+      auth,
+    );
+  }
+
+  @Get('students/:id/service-requests')
+  @RequiredModule('students')
+  listStudentServiceRequests(
+    @Param('id') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.mobileService.listStudentServiceRequests(studentId, auth);
+  }
+
+  @Post('students/:id/service-requests')
+  @RequiredModule('students')
+  createStudentServiceRequest(
+    @Param('id') studentId: string,
+    @Body() dto: CreateSchoolServiceRequestDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.mobileService.createStudentServiceRequest(studentId, dto, auth);
+  }
+
+  @Get('service-requests/:requestId')
+  getStudentServiceRequest(
+    @Param('requestId') requestId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.mobileService.getStudentServiceRequest(requestId, auth);
+  }
+
+  @Post('service-requests/:requestId/cancel')
+  cancelStudentServiceRequest(
+    @Param('requestId') requestId: string,
+    @Body() dto: ReasonedSchoolServiceRequestDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.mobileService.cancelStudentServiceRequest(requestId, dto, auth);
+  }
+
+  @Post('service-requests/:requestId/confirm-resolution')
+  confirmStudentServiceRequestResolution(
+    @Param('requestId') requestId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.mobileService.confirmStudentServiceRequestResolution(
+      requestId,
+      auth,
+    );
+  }
+
+  @Post('service-requests/:requestId/reopen')
+  reopenStudentServiceRequest(
+    @Param('requestId') requestId: string,
+    @Body() dto: ReasonedSchoolServiceRequestDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.mobileService.reopenStudentServiceRequest(requestId, dto, auth);
+  }
+
+  @Post('service-requests/:requestId/attachments')
+  uploadStudentServiceRequestAttachment(
+    @Param('requestId') requestId: string,
+    @Body() dto: UploadSchoolServiceRequestAttachmentDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.mobileService.uploadStudentServiceRequestAttachment(
+      requestId,
+      dto,
+      auth,
+    );
+  }
+
+  @Get('service-requests/:requestId/attachments/:attachmentId')
+  async downloadStudentServiceRequestAttachment(
+    @Param('requestId') requestId: string,
+    @Param('attachmentId') attachmentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    const file =
+      await this.mobileService.downloadStudentServiceRequestAttachment(
+        requestId,
+        attachmentId,
+        auth,
+      );
+    return new StreamableFile(file.content, {
+      type: file.mimeType,
+      disposition: `attachment; filename="${safePdfFileName(file.fileName)}"`,
+      length: file.sizeBytes,
     });
   }
 

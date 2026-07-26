@@ -1,0 +1,86 @@
+model SchoolServiceRequest {
+  id                   String                       @id @default(uuid())
+  tenantId             String
+  studentId            String
+  invoiceId            String?
+  requestedById        String
+  type                 SchoolServiceRequestType
+  category             SchoolServiceRequestCategory
+  priority             SchoolServiceRequestPriority @default(NORMAL)
+  subject              String
+  description          String
+  status               SchoolServiceRequestStatus   @default(OPEN)
+  idempotencyKey       String
+  assignedToId         String?
+  assignedById         String?
+  assignedAt           DateTime?
+  responseDeadline     DateTime
+  escalatedAt          DateTime?
+  escalatedById        String?
+  escalationReason     String?
+  resolutionSummary    String?
+  resolvedAt           DateTime?
+  resolvedById         String?
+  parentConfirmedAt    DateTime?
+  closedAt             DateTime?
+  closedById           String?
+  reopenedAt           DateTime?
+  reopenReason         String?
+  cancelledAt          DateTime?
+  cancellationReason   String?
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  student      Student  @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  invoice      Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  requestedBy  User     @relation("RequestedSchoolServiceRequests", fields: [requestedById], references: [id], onDelete: Restrict)
+  assignedTo   User?    @relation("AssignedSchoolServiceRequests", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedBy   User?    @relation("AssignedSchoolServiceRequestActions", fields: [assignedById], references: [id], onDelete: SetNull)
+  escalatedBy  User?    @relation("EscalatedSchoolServiceRequests", fields: [escalatedById], references: [id], onDelete: SetNull)
+  resolvedBy   User?    @relation("ResolvedSchoolServiceRequests", fields: [resolvedById], references: [id], onDelete: SetNull)
+  closedBy     User?    @relation("ClosedSchoolServiceRequests", fields: [closedById], references: [id], onDelete: SetNull)
+  notes        SchoolServiceRequestNote[]
+  attachments  SchoolServiceRequestAttachment[]
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, status, priority, responseDeadline])
+  @@index([tenantId, studentId, createdAt])
+  @@index([tenantId, requestedById, createdAt])
+  @@index([tenantId, assignedToId, status])
+  @@index([tenantId, invoiceId, status])
+}
+
+model SchoolServiceRequestNote {
+  id           String                             @id @default(uuid())
+  tenantId     String
+  requestId    String
+  createdById  String
+  body         String
+  visibility   SchoolServiceRequestNoteVisibility @default(PARENT)
+  createdAt    DateTime                           @default(now())
+
+  tenant      Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  request     SchoolServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  createdBy   User                 @relation("SchoolServiceRequestNoteAuthors", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, requestId, createdAt])
+}
+
+model SchoolServiceRequestAttachment {
+  id           String   @id @default(uuid())
+  tenantId     String
+  requestId    String
+  fileAssetId  String
+  createdById  String
+  label        String?
+  createdAt    DateTime @default(now())
+
+  tenant      Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  request     SchoolServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  fileAsset   FileAsset            @relation(fields: [fileAssetId], references: [id], onDelete: Restrict)
+  createdBy   User                 @relation("SchoolServiceRequestAttachmentAuthors", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@unique([requestId, fileAssetId])
+  @@index([tenantId, requestId, createdAt])
+}

@@ -2291,6 +2291,34 @@ void _showReviewSheet(
                           icon: const Icon(Icons.close_rounded),
                           label: const Text('Reject'),
                         ),
+                        OutlinedButton.icon(
+                          onPressed: saving
+                              ? null
+                              : () async {
+                                  setSheetState(() => saving = true);
+                                  final delegated =
+                                      await _showApprovalDelegationDialog(
+                                        sheetContext,
+                                        ref,
+                                        approvalRequestId,
+                                        activeTab,
+                                      );
+                                  if (!sheetContext.mounted) return;
+                                  if (delegated) {
+                                    Navigator.pop(sheetContext);
+                                    if (parentContext.mounted) {
+                                      _showPrincipalSnack(
+                                        parentContext,
+                                        'Approval delegated.',
+                                      );
+                                    }
+                                    return;
+                                  }
+                                  setSheetState(() => saving = false);
+                                },
+                          icon: const Icon(Icons.forward_to_inbox_rounded),
+                          label: const Text('Delegate'),
+                        ),
                         FilledButton.icon(
                           onPressed: saving ? null : () => submit('APPROVE'),
                           icon: saving
@@ -2316,6 +2344,157 @@ void _showReviewSheet(
       ),
     ),
   );
+}
+
+Future<bool> _showApprovalDelegationDialog(
+  BuildContext context,
+  WidgetRef ref,
+  String approvalRequestId,
+  String activeTab,
+) async {
+  Map<String, dynamic> response;
+  try {
+    response = await ref
+        .read(principalRepositoryProvider)
+        .getApprovalDelegationCandidates(approvalRequestId);
+  } catch (_) {
+    if (context.mounted) {
+      _showPrincipalSnack(
+        context,
+        'Eligible approvers could not be loaded. Please retry.',
+      );
+    }
+    return false;
+  }
+  if (!context.mounted) return false;
+
+  final candidates = _list(response['items']);
+  if (candidates.isEmpty) {
+    _showPrincipalSnack(
+      context,
+      'No other eligible approver is available for this step.',
+    );
+    return false;
+  }
+
+  final reasonController = TextEditingController();
+  String? selectedUserId;
+  String? validationMessage;
+  var submitting = false;
+
+  final delegated = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => DisposeScope(
+      onDispose: reasonController.dispose,
+      child: StatefulBuilder(
+        builder: (context, setDialogState) {
+          Future<void> submit() async {
+            final reason = reasonController.text.trim();
+            if (selectedUserId == null || reason.isEmpty) {
+              setDialogState(
+                () => validationMessage =
+                    'Choose an approver and explain the delegation.',
+              );
+              return;
+            }
+            setDialogState(() {
+              submitting = true;
+              validationMessage = null;
+            });
+            try {
+              await ref
+                  .read(principalRepositoryProvider)
+                  .delegateApproval(
+                    approvalRequestId: approvalRequestId,
+                    delegatedToUserId: selectedUserId!,
+                    reason: reason,
+                  );
+              ref.invalidate(principalApprovalsProvider(activeTab));
+              ref.invalidate(principalApprovalsProvider('pending'));
+              ref.invalidate(principalDashboardProvider);
+              ref.invalidate(principalAttentionProvider('all'));
+              if (dialogContext.mounted) {
+                Navigator.pop(dialogContext, true);
+              }
+            } catch (_) {
+              if (!dialogContext.mounted) return;
+              setDialogState(() {
+                submitting = false;
+                validationMessage =
+                    'Delegation could not be saved. Please retry.';
+              });
+            }
+          }
+
+          return AlertDialog(
+            title: const Text('Delegate approval'),
+            content: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'The selected person becomes the only user who can decide this approval step.',
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedUserId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Eligible approver',
+                    ),
+                    items: candidates
+                        .map(
+                          (candidate) => DropdownMenuItem<String>(
+                            value: _string(candidate['id']),
+                            child: Text(
+                              _string(
+                                candidate['name'],
+                                fallback: 'School approver',
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: submitting
+                        ? null
+                        : (value) =>
+                              setDialogState(() => selectedUserId = value),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  TextField(
+                    controller: reasonController,
+                    minLines: 2,
+                    maxLines: 4,
+                    maxLength: 500,
+                    enabled: !submitting,
+                    decoration: InputDecoration(
+                      labelText: 'Delegation reason',
+                      errorText: validationMessage,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: submitting
+                    ? null
+                    : () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: submitting ? null : submit,
+                child: Text(submitting ? 'Delegating...' : 'Delegate'),
+              ),
+            ],
+          );
+        },
+      ),
+    ),
+  );
+  return delegated == true;
 }
 
 void _showEmergencyNoticeSheet(BuildContext context, WidgetRef ref) {

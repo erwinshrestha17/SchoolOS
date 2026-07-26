@@ -1269,3 +1269,36 @@ export const TeacherDelegationStatus = {
   EXPIRED: 'EXPIRED',
   REVOKED: 'REVOKED',
 } as const;
+
+export const SchoolServiceRequestType = {
+  GENERAL_COMPLAINT: 'GENERAL_COMPLAINT',
+  PAYMENT_DISPUTE: 'PAYMENT_DISPUTE',
+} as const;
+
+export const SchoolServiceRequestCategory = {
+  ACADEMICS: 'ACADEMICS',
+  ATTENDANCE: 'ATTENDANCE',
+  FEES_AND_PAYMENTS: 'FEES_AND_PAYMENTS',
+  SCHOOL_OPERATIONS: 'SCHOOL_OPERATIONS',
+  OTHER: 'OTHER',
+} as const;
+
+export const SchoolServiceRequestPriority = {
+  NORMAL: 'NORMAL',
+  HIGH: 'HIGH',
+} as const;
+
+export const SchoolServiceRequestStatus = {
+  OPEN: 'OPEN',
+  ASSIGNED: 'ASSIGNED',
+  IN_PROGRESS: 'IN_PROGRESS',
+  RESOLVED: 'RESOLVED',
+  CLOSED: 'CLOSED',
+  REOPENED: 'REOPENED',
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export const SchoolServiceRequestNoteVisibility = {
+  PARENT: 'PARENT',
+  INTERNAL: 'INTERNAL',
+} as const;

@@ -662,7 +662,12 @@ describe('AuthService', () => {
       // handle ("guardian.c01a004").
       prisma.user.findUnique.mockResolvedValue({
         ...authUser,
-        tenant: { id: 'tenant-1', name: 'School', slug: 'default-school', plan: 'STANDARD' },
+        tenant: {
+          id: 'tenant-1',
+          name: 'School',
+          slug: 'default-school',
+          plan: 'STANDARD',
+        },
         staff: null,
         student: null,
         guardian: {
@@ -688,7 +693,12 @@ describe('AuthService', () => {
     it('leaves guardian null for non-guardian accounts', async () => {
       prisma.user.findUnique.mockResolvedValue({
         ...authUser,
-        tenant: { id: 'tenant-1', name: 'School', slug: 'default-school', plan: 'STANDARD' },
+        tenant: {
+          id: 'tenant-1',
+          name: 'School',
+          slug: 'default-school',
+          plan: 'STANDARD',
+        },
         staff: null,
         student: null,
         guardian: null,
@@ -708,7 +718,12 @@ describe('AuthService', () => {
     it('never selects a guardian home address or phone number', async () => {
       prisma.user.findUnique.mockResolvedValue({
         ...authUser,
-        tenant: { id: 'tenant-1', name: 'School', slug: 'default-school', plan: 'STANDARD' },
+        tenant: {
+          id: 'tenant-1',
+          name: 'School',
+          slug: 'default-school',
+          plan: 'STANDARD',
+        },
         staff: null,
         student: null,
         guardian: { id: 'g1', fullName: 'Narayan Lama', relation: 'Guardian' },

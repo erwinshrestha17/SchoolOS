@@ -77,6 +77,109 @@ void main() {
       ).called(1);
     });
 
+    test('lists, creates, and cancels linked-child correction requests', () async {
+      when(
+        () => apiClient.get<dynamic>(
+          '/mobile/students/child-1/attendance-corrections',
+        ),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(
+            path: '/mobile/students/child-1/attendance-corrections',
+          ),
+          data: {
+            'items': [
+              {
+                'id': 'correction-1',
+                'attendanceDate': '2026-07-24T00:00:00.000Z',
+                'previousStatus': 'ABSENT',
+                'requestedStatus': 'PRESENT',
+                'reason': 'The child attended the full school day.',
+                'status': 'PENDING',
+                'requestedAt': '2026-07-25T04:00:00.000Z',
+                'canCancel': true,
+                'canResubmit': false,
+              },
+            ],
+          },
+        ),
+      );
+      when(
+        () => apiClient.post<dynamic>(
+          '/mobile/students/child-1/attendance-corrections',
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(
+            path: '/mobile/students/child-1/attendance-corrections',
+          ),
+          data: {
+            'id': 'correction-1',
+            'attendanceDate': '2026-07-24T00:00:00.000Z',
+            'previousStatus': 'ABSENT',
+            'requestedStatus': 'PRESENT',
+            'reason': 'The child attended the full school day.',
+            'status': 'PENDING',
+            'requestedAt': '2026-07-25T04:00:00.000Z',
+          },
+        ),
+      );
+      when(
+        () => apiClient.post<dynamic>(
+          '/mobile/students/child-1/attendance-corrections/correction-1/cancel',
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(
+            path:
+                '/mobile/students/child-1/attendance-corrections/correction-1/cancel',
+          ),
+          data: {
+            'id': 'correction-1',
+            'attendanceDate': '2026-07-24T00:00:00.000Z',
+            'previousStatus': 'ABSENT',
+            'requestedStatus': 'PRESENT',
+            'reason': 'The child attended the full school day.',
+            'status': 'CANCELLED',
+            'requestedAt': '2026-07-25T04:00:00.000Z',
+          },
+        ),
+      );
+
+      final listed = await repository.getParentAttendanceCorrections('child-1');
+      final created = await repository.createParentAttendanceCorrection(
+        studentId: 'child-1',
+        attendanceDate: DateTime.utc(2026, 7, 24),
+        requestedStatus: AttendanceStatus.present,
+        reason: 'The child attended the full school day.',
+      );
+      final cancelled = await repository.cancelParentAttendanceCorrection(
+        studentId: 'child-1',
+        requestId: 'correction-1',
+        reason: 'The request was submitted by mistake.',
+      );
+
+      expect(listed.single.canCancel, isTrue);
+      expect(listed.single.previousStatus, AttendanceStatus.absent);
+      expect(created.status, 'PENDING');
+      expect(cancelled.status, 'CANCELLED');
+      final createPayload =
+          verify(
+                () => apiClient.post<dynamic>(
+                  '/mobile/students/child-1/attendance-corrections',
+                  data: captureAny(named: 'data'),
+                ),
+              ).captured.single
+              as Map<String, dynamic>;
+      expect(createPayload, {
+        'attendanceDate': '2026-07-24',
+        'requestedStatus': 'PRESENT',
+        'reason': 'The child attended the full school day.',
+      });
+    });
+
     test(
       'loads teacher classes from purpose-limited mobile endpoint',
       () async {

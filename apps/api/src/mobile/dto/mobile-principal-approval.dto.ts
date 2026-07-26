@@ -28,3 +28,13 @@ export class MobilePrincipalApprovalDecisionDto {
   @IsUUID()
   idempotencyKey!: string;
 }
+
+export class MobilePrincipalApprovalDelegationDto {
+  @IsUUID()
+  delegatedToUserId!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
+  reason!: string;
+}

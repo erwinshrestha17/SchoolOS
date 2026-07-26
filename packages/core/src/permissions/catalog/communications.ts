@@ -109,4 +109,19 @@ export const communicationsPermissions = [
     action: "manage",
     description: "Capture and revoke guardian consent records",
   },
+  {
+    resource: "service_requests",
+    action: "create",
+    description: "Create own scoped school service requests",
+  },
+  {
+    resource: "service_requests",
+    action: "read",
+    description: "Read permitted school service requests",
+  },
+  {
+    resource: "service_requests",
+    action: "manage",
+    description: "Assign, respond to, resolve, and reopen service requests",
+  },
 ] as const;

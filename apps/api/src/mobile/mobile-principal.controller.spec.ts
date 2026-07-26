@@ -16,6 +16,8 @@ describe('MobilePrincipalController', () => {
       | 'getApprovals'
       | 'getApprovalDetail'
       | 'decideApproval'
+      | 'getApprovalDelegationCandidates'
+      | 'delegateApproval'
       | 'getAttendanceSummary'
       | 'getStaffAbsence'
       | 'getFeesSummary'
@@ -48,6 +50,8 @@ describe('MobilePrincipalController', () => {
       getApprovals: jest.fn(),
       getApprovalDetail: jest.fn(),
       decideApproval: jest.fn(),
+      getApprovalDelegationCandidates: jest.fn(),
+      delegateApproval: jest.fn(),
       getAttendanceSummary: jest.fn(),
       getStaffAbsence: jest.fn(),
       getFeesSummary: jest.fn(),
@@ -131,6 +135,12 @@ describe('MobilePrincipalController', () => {
   it('delegates purpose-limited approval and escalation mutations', async () => {
     service.getApprovalDetail.mockResolvedValue({ id: 'approval-1' } as never);
     service.decideApproval.mockResolvedValue({ status: 'APPLIED' } as never);
+    service.getApprovalDelegationCandidates.mockResolvedValue({
+      items: [],
+    } as never);
+    service.delegateApproval.mockResolvedValue({
+      status: 'PENDING',
+    } as never);
     service.assignEscalationToSelf.mockResolvedValue({
       status: 'OPEN',
     } as never);
@@ -156,6 +166,11 @@ describe('MobilePrincipalController', () => {
       reason: 'Policy checked.',
       idempotencyKey: '11111111-1111-4111-8111-111111111111',
     });
+    await controller.approvalDelegationCandidates(actor, 'approval-1');
+    await controller.delegateApproval(actor, 'approval-1', {
+      delegatedToUserId: '22222222-2222-4222-8222-222222222222',
+      reason: 'Covering the school visit.',
+    });
     await controller.escalationDetail(actor, 'escalation-1');
     await controller.assignEscalationToSelf(actor, 'escalation-1');
     await controller.assignEscalation(actor, 'escalation-1', {
@@ -177,6 +192,18 @@ describe('MobilePrincipalController', () => {
       reason: 'Policy checked.',
       idempotencyKey: '11111111-1111-4111-8111-111111111111',
     });
+    expect(service.getApprovalDelegationCandidates).toHaveBeenCalledWith(
+      actor,
+      'approval-1',
+    );
+    expect(service.delegateApproval).toHaveBeenCalledWith(
+      actor,
+      'approval-1',
+      {
+        delegatedToUserId: '22222222-2222-4222-8222-222222222222',
+        reason: 'Covering the school visit.',
+      },
+    );
     expect(service.resolveEscalation).toHaveBeenCalledWith(
       actor,
       'escalation-1',

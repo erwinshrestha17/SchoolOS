@@ -54,6 +54,7 @@ import { GeographyModule } from './geography/geography.module';
 import { AddressModule } from './addresses/address.module';
 import { TeacherScopeModule } from './teacher-scope/teacher-scope.module';
 import { TeacherWorkspaceModule } from './teacher-workspace/teacher-workspace.module';
+import { ServiceRequestsModule } from './service-requests/service-requests.module';
 import { UsageInterceptor } from './usage/usage.interceptor';
 import { RequestIdInterceptor } from './common/interceptors/request-id.interceptor';
 import { CsrfGuard } from './auth/guards/csrf.guard';
@@ -137,6 +138,7 @@ import { AppThrottlerGuard } from './auth/guards/app-throttler.guard';
     AddressModule,
     TeacherScopeModule,
     TeacherWorkspaceModule,
+    ServiceRequestsModule,
   ],
   controllers: [AppController],
   providers: [

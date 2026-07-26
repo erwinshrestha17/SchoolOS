@@ -22,6 +22,7 @@ import { ActivityFeedModule } from '../activity-feed/activity-feed.module';
 import { MobileTeacherActivityController } from './mobile-teacher-activity.controller';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { MobilePushTokensController } from './mobile-push-tokens.controller';
+import { ServiceRequestsModule } from '../service-requests/service-requests.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { MobilePushTokensController } from './mobile-push-tokens.controller';
     AdvancedOperationsModule,
     ActivityFeedModule,
     NotificationsModule,
+    ServiceRequestsModule,
   ],
   controllers: [
     MobileController,

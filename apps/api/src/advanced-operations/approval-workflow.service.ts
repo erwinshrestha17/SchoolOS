@@ -20,6 +20,7 @@ import {
   CreateApprovalCommentDto,
   CreateApprovalPolicyDto,
   CreateApprovalRequestDto,
+  DelegateApprovalRequestDto,
   DecideApprovalRequestDto,
 } from './dto/approval.dto';
 import { approvalWorkflowCatalog } from './advanced-operations.catalog';
@@ -148,6 +149,9 @@ export class ApprovalWorkflowService {
       policy?.finalActionKey ??
       catalogEntry?.defaultFinalActionKey ??
       null;
+    const deadlineAt = dto.deadlineAt
+      ? this.parseFutureDeadline(dto.deadlineAt)
+      : null;
 
     const request = await this.prisma.approvalRequest.create({
       data: {
@@ -167,6 +171,7 @@ export class ApprovalWorkflowService {
         finalActionPayload: (dto.finalActionPayload ??
           {}) as Prisma.InputJsonValue,
         idempotencyKey: dto.idempotencyKey ?? null,
+        deadlineAt,
         steps: {
           create: this.buildSteps(policy).map((step) => ({
             tenantId: actor.tenantId,
@@ -218,6 +223,14 @@ export class ApprovalWorkflowService {
     if (dto.decision === ApprovalDecisionType.REJECT && !reason) {
       throw new BadRequestException('Rejection reason is required');
     }
+    if (
+      dto.decision === ApprovalDecisionType.APPROVE &&
+      !this.hasFinalActionExecutor(request.finalActionKey)
+    ) {
+      throw new ConflictException(
+        'Approval is unavailable until the module final action is registered',
+      );
+    }
 
     const step = request.steps.find(
       (item) => item.status === ApprovalStepStatus.PENDING,
@@ -225,7 +238,7 @@ export class ApprovalWorkflowService {
     if (!step) {
       throw new ConflictException('No pending approval step remains');
     }
-    this.assertStepActor(step, actor);
+    this.assertStepActor(step, actor, request.delegatedToId);
 
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.approvalDecision.create({
@@ -323,23 +336,23 @@ export class ApprovalWorkflowService {
     const executor = request.finalActionKey
       ? this.finalActionExecutors.get(request.finalActionKey)
       : null;
+    if (!executor) {
+      throw new ConflictException(
+        'Approval is unavailable until the module final action is registered',
+      );
+    }
 
     try {
-      const result = executor
-        ? await executor.apply({
-            tenantId: actor.tenantId,
-            requestId: request.id,
-            workflowType: request.workflowType,
-            targetModule: request.targetModule,
-            targetType: request.targetType,
-            targetId: request.targetId,
-            payload: request.finalActionPayload,
-            actor,
-          })
-        : {
-            deferredToModuleBoundary: true,
-            finalActionKey: request.finalActionKey,
-          };
+      const result = await executor.apply({
+        tenantId: actor.tenantId,
+        requestId: request.id,
+        workflowType: request.workflowType,
+        targetModule: request.targetModule,
+        targetType: request.targetType,
+        targetId: request.targetId,
+        payload: request.finalActionPayload,
+        actor,
+      });
 
       const updated = await this.prisma.approvalRequest.update({
         where: { id: request.id },
@@ -376,6 +389,117 @@ export class ApprovalWorkflowService {
       });
       throw error;
     }
+  }
+
+  async delegate(
+    requestId: string,
+    dto: DelegateApprovalRequestDto,
+    actor: AuthContext,
+  ) {
+    const reason = dto.reason.trim();
+    const request = await this.prisma.approvalRequest.findFirst({
+      where: { id: requestId, tenantId: actor.tenantId },
+      include: { steps: { orderBy: { sequence: 'asc' } } },
+    });
+    if (!request) {
+      throw new NotFoundException('Approval request not found in this tenant');
+    }
+    if (request.status !== ApprovalRequestStatus.PENDING) {
+      throw new ConflictException('Only pending approvals can be delegated');
+    }
+    if (dto.delegatedToUserId === actor.userId) {
+      throw new BadRequestException('Choose another eligible approver');
+    }
+    if (
+      request.delegatedToId === dto.delegatedToUserId &&
+      request.delegationReason === reason
+    ) {
+      return request;
+    }
+
+    const pendingStep = request.steps.find(
+      (step) => step.status === ApprovalStepStatus.PENDING,
+    );
+    if (!pendingStep) {
+      throw new ConflictException('No pending approval step remains');
+    }
+    this.assertStepActor(pendingStep, actor, request.delegatedToId);
+
+    const delegate = await this.prisma.user.findFirst({
+      where: {
+        id: dto.delegatedToUserId,
+        tenantId: actor.tenantId,
+        status: 'ACTIVE',
+      },
+      select: {
+        id: true,
+        userRoles: {
+          where: { tenantId: actor.tenantId },
+          select: {
+            role: {
+              select: {
+                name: true,
+                rolePermissions: {
+                  select: {
+                    permission: { select: { resource: true, action: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!delegate) {
+      throw new NotFoundException(
+        'Eligible delegate not found in this tenant',
+      );
+    }
+
+    const delegateRoles = delegate.userRoles.map((item) => item.role.name);
+    const delegatePermissions = delegate.userRoles.flatMap((item) =>
+      item.role.rolePermissions.map(
+        ({ permission }) => `${permission.resource}:${permission.action}`,
+      ),
+    );
+    if (
+      !this.canUserDecideStep(
+        pendingStep,
+        delegateRoles,
+        delegatePermissions,
+      )
+    ) {
+      throw new ForbiddenException(
+        'Selected user cannot decide the current approval step',
+      );
+    }
+
+    const updated = await this.prisma.approvalRequest.update({
+      where: { id: request.id },
+      data: {
+        delegatedToId: delegate.id,
+        delegatedById: actor.userId,
+        delegatedAt: new Date(),
+        delegationReason: reason,
+      },
+      include: { steps: true, decisions: true, comments: true },
+    });
+
+    await this.auditService.record({
+      action: 'approval_request_delegated',
+      resource: 'approval_request',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: request.id,
+      before: { delegatedToId: request.delegatedToId },
+      after: {
+        delegatedToId: delegate.id,
+        reason,
+        stepId: pendingStep.id,
+      },
+    });
+
+    return updated;
   }
 
   async addComment(
@@ -470,20 +594,53 @@ export class ApprovalWorkflowService {
       approverPermission: string | null;
     },
     actor: AuthContext,
+    delegatedToId?: string | null,
   ) {
-    if (actor.roles.includes('admin') || actor.roles.includes('principal')) {
-      return;
-    }
-    if (step.approverRole && actor.roles.includes(step.approverRole)) {
-      return;
+    if (delegatedToId) {
+      if (actor.userId === delegatedToId) return;
+      throw new ForbiddenException(
+        'This approval step is delegated to another user',
+      );
     }
     if (
-      step.approverPermission &&
-      actor.permissions.includes(step.approverPermission)
+      actor.roles.includes('admin') ||
+      actor.roles.includes('principal') ||
+      actor.roles.includes('platform_super_admin')
     ) {
       return;
     }
+    if (this.canUserDecideStep(step, actor.roles, actor.permissions)) {
+      return;
+    }
     throw new ForbiddenException('You cannot decide this approval step');
+  }
+
+  private canUserDecideStep(
+    step: {
+      approverRole: string | null;
+      approverPermission: string | null;
+    },
+    roles: string[],
+    permissions: string[],
+  ) {
+    if (!step.approverRole && !step.approverPermission) {
+      return roles.includes('principal') || roles.includes('admin');
+    }
+    return Boolean(
+      (step.approverRole && roles.includes(step.approverRole)) ||
+      (step.approverPermission &&
+        permissions.includes(step.approverPermission)),
+    );
+  }
+
+  private parseFutureDeadline(value: string) {
+    const deadline = new Date(value);
+    if (Number.isNaN(deadline.getTime()) || deadline <= new Date()) {
+      throw new BadRequestException(
+        'Approval deadline must be a future date and time',
+      );
+    }
+    return deadline;
   }
 
   private policyAudit(policy: {

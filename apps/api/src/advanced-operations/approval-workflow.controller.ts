@@ -12,6 +12,7 @@ import {
   CreateApprovalCommentDto,
   CreateApprovalPolicyDto,
   CreateApprovalRequestDto,
+  DelegateApprovalRequestDto,
   DecideApprovalRequestDto,
 } from './dto/approval.dto';
 
@@ -71,6 +72,16 @@ export class ApprovalWorkflowController {
   @Permissions('advanced:approvals:decide')
   apply(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
     return this.service.applyFinalAction(id, auth);
+  }
+
+  @Post(':id/delegation')
+  @Permissions('advanced:approvals:manage')
+  delegate(
+    @Param('id') id: string,
+    @Body() dto: DelegateApprovalRequestDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.service.delegate(id, dto, auth);
   }
 
   @Post(':id/comments')

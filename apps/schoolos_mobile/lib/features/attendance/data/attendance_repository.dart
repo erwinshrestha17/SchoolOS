@@ -82,6 +82,54 @@ class AttendanceRepository {
     return snapshot.days;
   }
 
+  Future<List<ParentAttendanceCorrection>> getParentAttendanceCorrections(
+    String studentId,
+  ) async {
+    final response = await _client.get(
+      '/mobile/students/$studentId/attendance-corrections',
+    );
+    final data = response.data is Map<String, dynamic>
+        ? response.data as Map<String, dynamic>
+        : const <String, dynamic>{};
+    return _asList(data['items'])
+        .whereType<Map<String, dynamic>>()
+        .map(ParentAttendanceCorrection.fromJson)
+        .toList();
+  }
+
+  Future<ParentAttendanceCorrection> createParentAttendanceCorrection({
+    required String studentId,
+    required DateTime attendanceDate,
+    required AttendanceStatus requestedStatus,
+    required String reason,
+  }) async {
+    final response = await _client.post(
+      '/mobile/students/$studentId/attendance-corrections',
+      data: {
+        'attendanceDate': _dateOnly(attendanceDate),
+        'requestedStatus': attendanceStatusToApi(requestedStatus),
+        'reason': reason.trim(),
+      },
+    );
+    return ParentAttendanceCorrection.fromJson(
+      Map<String, dynamic>.from(response.data as Map),
+    );
+  }
+
+  Future<ParentAttendanceCorrection> cancelParentAttendanceCorrection({
+    required String studentId,
+    required String requestId,
+    required String reason,
+  }) async {
+    final response = await _client.post(
+      '/mobile/students/$studentId/attendance-corrections/$requestId/cancel',
+      data: {'reason': reason.trim()},
+    );
+    return ParentAttendanceCorrection.fromJson(
+      Map<String, dynamic>.from(response.data as Map),
+    );
+  }
+
   Map<String, dynamic>? _asMap(Object? value) {
     return value is Map<String, dynamic> ? value : null;
   }

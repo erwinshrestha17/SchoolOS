@@ -21,6 +21,7 @@ import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import {
+  MobilePrincipalApprovalDelegationDto,
   MobilePrincipalApprovalDecisionDto,
   MobilePrincipalApprovalQueryDto,
 } from './dto/mobile-principal-approval.dto';
@@ -88,6 +89,30 @@ export class MobilePrincipalController {
     @Body() dto: MobilePrincipalApprovalDecisionDto,
   ) {
     return this.service.decideApproval(auth, approvalRequestId, dto);
+  }
+
+  @Get('approvals/:approvalRequestId/delegation-candidates')
+  @Permissions('advanced:approvals:manage')
+  approvalDelegationCandidates(
+    @CurrentAuth() auth: AuthContext,
+    @Param('approvalRequestId', new ParseUUIDPipe())
+    approvalRequestId: string,
+  ) {
+    return this.service.getApprovalDelegationCandidates(
+      auth,
+      approvalRequestId,
+    );
+  }
+
+  @Post('approvals/:approvalRequestId/delegation')
+  @Permissions('advanced:approvals:manage')
+  delegateApproval(
+    @CurrentAuth() auth: AuthContext,
+    @Param('approvalRequestId', new ParseUUIDPipe())
+    approvalRequestId: string,
+    @Body() dto: MobilePrincipalApprovalDelegationDto,
+  ) {
+    return this.service.delegateApproval(auth, approvalRequestId, dto);
   }
 
   @Get('attendance-summary')

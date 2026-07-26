@@ -1435,6 +1435,9 @@ interface RequestMeta {
 }
 
 type UserWithRoles = User & {
+  guardian: {
+    fullName: string;
+  } | null;
   userRoles: Array<{
     role: {
       name: string;

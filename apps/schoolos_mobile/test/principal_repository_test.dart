@@ -134,6 +134,67 @@ void main() {
     });
 
     test(
+      'loads candidates and delegates through purpose-limited contracts',
+      () async {
+        when(
+          () => apiClient.get<dynamic>(
+            '/mobile/principal/approvals/approval-1/delegation-candidates',
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(
+              path:
+                  '/mobile/principal/approvals/approval-1/delegation-candidates',
+            ),
+            data: {
+              'items': [
+                {'id': 'user-2', 'name': 'Sita Shrestha'},
+              ],
+            },
+          ),
+        );
+        when(
+          () => apiClient.post<dynamic>(
+            '/mobile/principal/approvals/approval-1/delegation',
+            data: any(named: 'data'),
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(
+              path: '/mobile/principal/approvals/approval-1/delegation',
+            ),
+            data: {'id': 'approval-1', 'status': 'PENDING'},
+          ),
+        );
+
+        final repository = PrincipalRepository(apiClient);
+        final candidates = await repository.getApprovalDelegationCandidates(
+          'approval-1',
+        );
+        final result = await repository.delegateApproval(
+          approvalRequestId: 'approval-1',
+          delegatedToUserId: 'user-2',
+          reason: 'Covering the school visit.',
+        );
+
+        expect((candidates['items'] as List).single['id'], 'user-2');
+        expect(result['status'], 'PENDING');
+        final captured =
+            verify(
+                  () => apiClient.post<dynamic>(
+                    '/mobile/principal/approvals/approval-1/delegation',
+                    data: captureAny(named: 'data'),
+                  ),
+                ).captured.single
+                as Map<String, dynamic>;
+        expect(captured, {
+          'delegatedToUserId': 'user-2',
+          'reason': 'Covering the school visit.',
+        });
+      },
+    );
+
+    test(
       'previews and submits emergency notices through mobile contracts',
       () async {
         when(

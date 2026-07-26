@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/design_system/app_radius.dart';
+import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../../parent/presentation/widgets/parent_state_view.dart';
 import '../../../parent/application/parent_providers.dart';
 import '../../../parent/domain/parent_models.dart';
@@ -108,6 +109,12 @@ class _AttendanceBodyState extends ConsumerState<_AttendanceBody> {
         children: [
           _TodayCard(summary: data.summary, isOffline: data.isOffline),
           const SizedBox(height: 14),
+          _CorrectionSection(
+            studentId: widget.studentId,
+            days: data.days,
+            isOffline: data.isOffline,
+          ),
+          const SizedBox(height: 14),
           _MonthNavHeader(
             month: _visibleMonth,
             onPrevious: _goToPreviousMonth,
@@ -124,6 +131,230 @@ class _AttendanceBodyState extends ConsumerState<_AttendanceBody> {
             _MonthCalendarCard(days: data.days),
         ],
       ),
+    );
+  }
+}
+
+class _CorrectionSection extends ConsumerWidget {
+  const _CorrectionSection({
+    required this.studentId,
+    required this.days,
+    required this.isOffline,
+  });
+
+  final String studentId;
+  final List<AttendanceDay> days;
+  final bool isOffline;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (isOffline) {
+      return const PortalCard(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            FeatureIcon(
+              Icons.wifi_off_rounded,
+              color: ParentPortalColors.orange,
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Attendance correction requests need internet. Reconnect to submit or check their status.',
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final requests = ref.watch(parentAttendanceCorrectionsProvider(studentId));
+    return PortalCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const FeatureIcon(
+                Icons.edit_calendar_rounded,
+                color: ParentPortalColors.blue,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Need a correction?',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: ParentPortalColors.navy,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const Text(
+                      'Ask the school to review a recorded attendance day.',
+                      style: TextStyle(color: ParentPortalColors.muted),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _recordedCorrectionDays(days).isEmpty
+                  ? null
+                  : () => _openCorrectionRequestSheet(
+                      context,
+                      studentId: studentId,
+                      days: days,
+                    ),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Request a correction'),
+            ),
+          ),
+          if (_recordedCorrectionDays(days).isEmpty) ...[
+            const SizedBox(height: 8),
+            const Text(
+              'No recorded attendance day is available in this month.',
+              style: TextStyle(color: ParentPortalColors.muted),
+            ),
+          ],
+          const Divider(height: 28),
+          Text(
+            'Recent requests',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: ParentPortalColors.navy,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 10),
+          requests.when(
+            loading: () => const Center(
+              child: Padding(
+                padding: EdgeInsets.all(12),
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+            error: (_, _) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Correction requests could not be loaded.',
+                  style: TextStyle(color: ParentPortalColors.muted),
+                ),
+                TextButton(
+                  onPressed: () => ref.invalidate(
+                    parentAttendanceCorrectionsProvider(studentId),
+                  ),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+            data: (items) => items.isEmpty
+                ? const Text(
+                    'No correction requests yet.',
+                    style: TextStyle(color: ParentPortalColors.muted),
+                  )
+                : Column(
+                    children: [
+                      for (var index = 0; index < items.length; index++) ...[
+                        if (index > 0) const Divider(height: 20),
+                        _CorrectionRequestRow(
+                          studentId: studentId,
+                          item: items[index],
+                          days: days,
+                        ),
+                      ],
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CorrectionRequestRow extends ConsumerWidget {
+  const _CorrectionRequestRow({
+    required this.studentId,
+    required this.item,
+    required this.days,
+  });
+
+  final String studentId;
+  final ParentAttendanceCorrection item;
+  final List<AttendanceDay> days;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final color = _correctionStatusColor(item.status);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                NepaliBsCalendar.formatBsDate(item.attendanceDate),
+                style: const TextStyle(
+                  color: ParentPortalColors.navy,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            StatusBadge(label: _correctionStatusLabel(item.status)),
+          ],
+        ),
+        const SizedBox(height: 5),
+        Text(
+          '${_statusLabel(item.previousStatus)} → ${_statusLabel(item.requestedStatus)}',
+          style: TextStyle(color: color, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 4),
+        Text(item.reason),
+        if (item.reviewReason?.trim().isNotEmpty == true) ...[
+          const SizedBox(height: 4),
+          Text(
+            'School response: ${item.reviewReason}',
+            style: const TextStyle(color: ParentPortalColors.muted),
+          ),
+        ],
+        if (item.canCancel || item.canResubmit) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (item.canCancel)
+                TextButton.icon(
+                  onPressed: () => _confirmCorrectionCancellation(
+                    context,
+                    ref,
+                    studentId,
+                    item,
+                  ),
+                  icon: const Icon(Icons.close_rounded),
+                  label: const Text('Cancel request'),
+                ),
+              if (item.canResubmit)
+                TextButton.icon(
+                  onPressed: () => _openCorrectionRequestSheet(
+                    context,
+                    studentId: studentId,
+                    days: days,
+                    initialDate: item.attendanceDate,
+                    initialStatus: item.requestedStatus,
+                  ),
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Request again'),
+                ),
+            ],
+          ),
+        ],
+      ],
     );
   }
 }
@@ -553,6 +784,385 @@ class _LegendDot extends StatelessWidget {
       ],
     );
   }
+}
+
+Future<void> _openCorrectionRequestSheet(
+  BuildContext context, {
+  required String studentId,
+  required List<AttendanceDay> days,
+  DateTime? initialDate,
+  AttendanceStatus? initialStatus,
+}) async {
+  final recordedDays = _recordedCorrectionDays(days);
+  if (recordedDays.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('No recorded attendance day is available in this month.'),
+      ),
+    );
+    return;
+  }
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (_) => _CorrectionRequestSheet(
+      studentId: studentId,
+      days: recordedDays,
+      initialDate: initialDate,
+      initialStatus: initialStatus,
+    ),
+  );
+}
+
+class _CorrectionRequestSheet extends ConsumerStatefulWidget {
+  const _CorrectionRequestSheet({
+    required this.studentId,
+    required this.days,
+    this.initialDate,
+    this.initialStatus,
+  });
+
+  final String studentId;
+  final List<AttendanceDay> days;
+  final DateTime? initialDate;
+  final AttendanceStatus? initialStatus;
+
+  @override
+  ConsumerState<_CorrectionRequestSheet> createState() =>
+      _CorrectionRequestSheetState();
+}
+
+class _CorrectionRequestSheetState
+    extends ConsumerState<_CorrectionRequestSheet> {
+  late final TextEditingController _reasonController;
+  late DateTime _selectedDate;
+  late AttendanceStatus _requestedStatus;
+  String? _validationMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _reasonController = TextEditingController();
+    _selectedDate =
+        widget.days
+            .where(
+              (day) =>
+                  widget.initialDate != null &&
+                  _sameCalendarDay(day.date, widget.initialDate!),
+            )
+            .firstOrNull
+            ?.date ??
+        widget.days.first.date;
+    _requestedStatus =
+        widget.initialStatus ??
+        _correctionStatusOptions.firstWhere(
+          (status) => status != _selectedDay.status,
+          orElse: () => AttendanceStatus.present,
+        );
+  }
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  AttendanceDay get _selectedDay => widget.days.firstWhere(
+    (day) => _sameCalendarDay(day.date, _selectedDate),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final controllerState = ref.watch(
+      parentAttendanceCorrectionControllerProvider(widget.studentId),
+    );
+    final saving = controllerState.isLoading;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        4,
+        20,
+        MediaQuery.viewInsetsOf(context).bottom + 24,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Request attendance correction',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: ParentPortalColors.navy,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'The school will review this request. Attendance changes only after approval.',
+              style: TextStyle(color: ParentPortalColors.muted),
+            ),
+            const SizedBox(height: 18),
+            DropdownButtonFormField<DateTime>(
+              initialValue: _selectedDate,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Recorded day'),
+              items: widget.days
+                  .map(
+                    (day) => DropdownMenuItem<DateTime>(
+                      value: day.date,
+                      child: Text(
+                        '${NepaliBsCalendar.formatBsDate(day.date)} • ${_statusLabel(day.status)}',
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: saving
+                  ? null
+                  : (value) {
+                      if (value == null) return;
+                      setState(() {
+                        _selectedDate = value;
+                        if (_requestedStatus == _selectedDay.status) {
+                          _requestedStatus = _correctionStatusOptions
+                              .firstWhere(
+                                (status) => status != _selectedDay.status,
+                              );
+                        }
+                        _validationMessage = null;
+                      });
+                    },
+            ),
+            const SizedBox(height: 14),
+            DropdownButtonFormField<AttendanceStatus>(
+              initialValue: _requestedStatus,
+              decoration: const InputDecoration(
+                labelText: 'Correct attendance to',
+              ),
+              items: _correctionStatusOptions
+                  .map(
+                    (status) => DropdownMenuItem<AttendanceStatus>(
+                      value: status,
+                      child: Text(_statusLabel(status)),
+                    ),
+                  )
+                  .toList(),
+              onChanged: saving
+                  ? null
+                  : (value) {
+                      if (value == null) return;
+                      setState(() {
+                        _requestedStatus = value;
+                        _validationMessage = null;
+                      });
+                    },
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _reasonController,
+              minLines: 3,
+              maxLines: 5,
+              maxLength: 500,
+              enabled: !saving,
+              decoration: InputDecoration(
+                labelText: 'Why is this attendance incorrect?',
+                helperText: 'Add at least 8 characters.',
+                errorText: _validationMessage,
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: saving ? null : _submit,
+                child: Text(saving ? 'Submitting...' : 'Submit request'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submit() async {
+    final reason = _reasonController.text.trim();
+    if (reason.length < 8) {
+      setState(() {
+        _validationMessage = 'Please explain the correction in more detail.';
+      });
+      return;
+    }
+    if (_requestedStatus == _selectedDay.status) {
+      setState(() {
+        _validationMessage =
+            'Choose a status different from the recorded attendance.';
+      });
+      return;
+    }
+
+    final saved = await ref
+        .read(
+          parentAttendanceCorrectionControllerProvider(
+            widget.studentId,
+          ).notifier,
+        )
+        .create(
+          attendanceDate: _selectedDate,
+          requestedStatus: _requestedStatus,
+          reason: reason,
+        );
+    if (!mounted) return;
+    if (!saved) {
+      setState(() {
+        _validationMessage =
+            'The request could not be submitted. Check the latest status and try again.';
+      });
+      return;
+    }
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Attendance correction requested.')),
+    );
+  }
+}
+
+Future<void> _confirmCorrectionCancellation(
+  BuildContext context,
+  WidgetRef ref,
+  String studentId,
+  ParentAttendanceCorrection item,
+) async {
+  final reasonController = TextEditingController();
+  String? validationMessage;
+  var saving = false;
+  final cancelled = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => StatefulBuilder(
+      builder: (context, setDialogState) => AlertDialog(
+        title: const Text('Cancel correction request?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              NepaliBsCalendar.formatBsDate(item.attendanceDate),
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonController,
+              minLines: 2,
+              maxLines: 4,
+              maxLength: 500,
+              enabled: !saving,
+              decoration: InputDecoration(
+                labelText: 'Cancellation reason',
+                errorText: validationMessage,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: saving
+                ? null
+                : () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep request'),
+          ),
+          FilledButton(
+            onPressed: saving
+                ? null
+                : () async {
+                    final reason = reasonController.text.trim();
+                    if (reason.length < 8) {
+                      setDialogState(() {
+                        validationMessage =
+                            'Please add a clear cancellation reason.';
+                      });
+                      return;
+                    }
+                    setDialogState(() {
+                      saving = true;
+                      validationMessage = null;
+                    });
+                    final saved = await ref
+                        .read(
+                          parentAttendanceCorrectionControllerProvider(
+                            studentId,
+                          ).notifier,
+                        )
+                        .cancel(requestId: item.id, reason: reason);
+                    if (!dialogContext.mounted) return;
+                    if (saved) {
+                      Navigator.pop(dialogContext, true);
+                    } else {
+                      setDialogState(() {
+                        saving = false;
+                        validationMessage =
+                            'The request could not be cancelled. Refresh and try again.';
+                      });
+                    }
+                  },
+            child: Text(saving ? 'Cancelling...' : 'Cancel request'),
+          ),
+        ],
+      ),
+    ),
+  );
+  reasonController.dispose();
+  if (cancelled == true && context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Correction request cancelled.')),
+    );
+  }
+}
+
+List<AttendanceDay> _recordedCorrectionDays(List<AttendanceDay> days) {
+  final today = NepaliBsCalendar.today();
+  final recorded = days.where((day) {
+    final date = NepaliBsCalendar.fromAd(day.date);
+    final isFuture =
+        date.year > today.year ||
+        (date.year == today.year && date.month > today.month) ||
+        (date.year == today.year &&
+            date.month == today.month &&
+            date.day > today.day);
+    return !isFuture && _correctionStatusOptions.contains(day.status);
+  }).toList();
+  recorded.sort((left, right) => right.date.compareTo(left.date));
+  return recorded;
+}
+
+bool _sameCalendarDay(DateTime left, DateTime right) =>
+    left.year == right.year &&
+    left.month == right.month &&
+    left.day == right.day;
+
+const _correctionStatusOptions = <AttendanceStatus>[
+  AttendanceStatus.present,
+  AttendanceStatus.absent,
+  AttendanceStatus.late,
+  AttendanceStatus.halfDay,
+  AttendanceStatus.leave,
+];
+
+Color _correctionStatusColor(String status) {
+  return switch (status) {
+    'APPROVED' => ParentPortalColors.green,
+    'REJECTED' || 'CANCELLED' => ParentPortalColors.red,
+    _ => ParentPortalColors.orange,
+  };
+}
+
+String _correctionStatusLabel(String status) {
+  return switch (status) {
+    'APPROVED' => 'Approved',
+    'REJECTED' => 'Rejected',
+    'CANCELLED' => 'Cancelled',
+    _ => 'Pending review',
+  };
 }
 
 GuardianChild? _selectedChild(ParentState state, String? studentId) {

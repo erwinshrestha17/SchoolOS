@@ -27,7 +27,10 @@ import { CommunicationsService } from '../communications/communications.service'
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { EntitlementsService } from '../plans/entitlements.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { MobilePrincipalApprovalDecisionDto } from './dto/mobile-principal-approval.dto';
+import {
+  MobilePrincipalApprovalDelegationDto,
+  MobilePrincipalApprovalDecisionDto,
+} from './dto/mobile-principal-approval.dto';
 import {
   MobilePrincipalEscalationAssignmentDto,
   MobilePrincipalEscalationNoteDto,
@@ -521,6 +524,22 @@ export class MobilePrincipalService implements OnModuleInit {
             guardian: { select: { fullName: true } },
           },
         },
+        delegatedTo: {
+          select: {
+            id: true,
+            email: true,
+            staff: { select: safeStaffSelect },
+            guardian: { select: { fullName: true } },
+          },
+        },
+        delegatedBy: {
+          select: {
+            id: true,
+            email: true,
+            staff: { select: safeStaffSelect },
+            guardian: { select: { fullName: true } },
+          },
+        },
         steps: {
           orderBy: { sequence: 'asc' },
           select: {
@@ -572,7 +591,12 @@ export class MobilePrincipalService implements OnModuleInit {
       request.status === ApprovalRequestStatus.PENDING &&
       request.requestedById !== actor.userId &&
       Boolean(
-        pendingStep && this.canActorDecideApprovalStep(pendingStep, actor),
+        pendingStep &&
+          this.canActorDecideApprovalStep(
+            pendingStep,
+            actor,
+            request.delegatedToId,
+          ),
       );
     const approvalActionAvailable =
       actorCanDecide &&
@@ -615,7 +639,32 @@ export class MobilePrincipalService implements OnModuleInit {
         createdAt: toIso(request.createdAt),
         updatedAt: toIso(request.updatedAt),
         appliedAt: toIso(request.finalActionAppliedAt),
+        deadlineAt: toIso(request.deadlineAt),
+        delegatedAt: toIso(request.delegatedAt),
       },
+      deadline: {
+        at: toIso(request.deadlineAt),
+        overdue:
+          Boolean(request.deadlineAt) &&
+          request.status === ApprovalRequestStatus.PENDING &&
+          request.deadlineAt!.getTime() < Date.now(),
+      },
+      delegation: request.delegatedTo
+        ? {
+            delegatedTo: {
+              id: request.delegatedTo.id,
+              name: mobileUserLabel(request.delegatedTo),
+            },
+            delegatedBy: request.delegatedBy
+              ? {
+                  id: request.delegatedBy.id,
+                  name: mobileUserLabel(request.delegatedBy),
+                }
+              : null,
+            reason: request.delegationReason,
+            delegatedAt: toIso(request.delegatedAt),
+          }
+        : null,
       steps: request.steps.map((step) => ({
         sequence: step.sequence,
         name: step.name,
@@ -643,6 +692,7 @@ export class MobilePrincipalService implements OnModuleInit {
       actions: {
         approve: approvalActionAvailable,
         reject: actorCanDecide,
+        delegate: actorCanDecide,
         requiresApprovalReason: HIGH_IMPACT_MOBILE_APPROVAL_TYPES.has(
           request.workflowType,
         ),
@@ -658,6 +708,138 @@ export class MobilePrincipalService implements OnModuleInit {
       },
       lastUpdated: nowIso(),
     };
+  }
+
+  async getApprovalDelegationCandidates(
+    actor: AuthContext,
+    approvalRequestId: string,
+  ) {
+    this.assertPrincipal(actor);
+    this.assertActorPermissions(actor, ['advanced:approvals:manage']);
+    const request = await this.prisma.approvalRequest.findFirst({
+      where: {
+        id: approvalRequestId,
+        tenantId: actor.tenantId,
+        status: ApprovalRequestStatus.PENDING,
+        OR: [...MOBILE_APPROVAL_TARGET_FILTERS],
+      },
+      select: {
+        id: true,
+        delegatedToId: true,
+        steps: {
+          where: { status: ApprovalStepStatus.PENDING },
+          orderBy: { sequence: 'asc' },
+          take: 1,
+          select: {
+            id: true,
+            approverRole: true,
+            approverPermission: true,
+          },
+        },
+      },
+    });
+    if (!request || !request.steps[0]) {
+      throw new NotFoundException(
+        'Pending approval request not found or is not available on mobile.',
+      );
+    }
+    if (
+      !this.canActorDecideApprovalStep(
+        request.steps[0],
+        actor,
+        request.delegatedToId,
+      )
+    ) {
+      throw new ForbiddenException(
+        'You cannot delegate the current approval step.',
+      );
+    }
+
+    const users = await this.prisma.user.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        status: UserStatus.ACTIVE,
+        id: { not: actor.userId },
+      },
+      select: {
+        id: true,
+        staff: { select: safeStaffSelect },
+        userRoles: {
+          where: { tenantId: actor.tenantId },
+          select: {
+            role: {
+              select: {
+                name: true,
+                rolePermissions: {
+                  select: {
+                    permission: { select: { resource: true, action: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+      take: 100,
+    });
+
+    const candidates = users.flatMap((user) => {
+      const roles = user.userRoles.map((item) => item.role.name);
+      const permissions = user.userRoles.flatMap((item) =>
+        item.role.rolePermissions.map(
+          ({ permission }) => `${permission.resource}:${permission.action}`,
+        ),
+      );
+      if (
+        !this.canRoleSetDecideApprovalStep(
+          request.steps[0],
+          roles,
+          permissions,
+        )
+      ) {
+        return [];
+      }
+      return [
+        {
+          id: user.id,
+          name: user.staff ? staffName(user.staff) : 'School approver',
+          roles,
+        },
+      ];
+    });
+
+    return {
+      approvalRequestId: request.id,
+      items: candidates,
+      total: candidates.length,
+    };
+  }
+
+  async delegateApproval(
+    actor: AuthContext,
+    approvalRequestId: string,
+    dto: MobilePrincipalApprovalDelegationDto,
+  ) {
+    this.assertPrincipal(actor);
+    this.assertActorPermissions(actor, ['advanced:approvals:manage']);
+    await this.approvalWorkflowService.delegate(
+      approvalRequestId,
+      {
+        delegatedToUserId: dto.delegatedToUserId,
+        reason: dto.reason,
+      },
+      actor,
+    );
+    await this.auditService.record({
+      action: 'principal_mobile_approval_delegated',
+      resource: 'approval_request',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: approvalRequestId,
+      after: { delegatedToUserId: dto.delegatedToUserId },
+    });
+    return this.getApprovalDetail(actor, approvalRequestId);
   }
 
   async decideApproval(
@@ -691,6 +873,7 @@ export class MobilePrincipalService implements OnModuleInit {
       select: {
         id: true,
         requestedById: true,
+        delegatedToId: true,
         workflowType: true,
         targetModule: true,
         targetType: true,
@@ -763,7 +946,13 @@ export class MobilePrincipalService implements OnModuleInit {
     if (!pendingStep) {
       throw new ConflictException('No pending approval step remains.');
     }
-    if (!this.canActorDecideApprovalStep(pendingStep, actor)) {
+    if (
+      !this.canActorDecideApprovalStep(
+        pendingStep,
+        actor,
+        request.delegatedToId,
+      )
+    ) {
       throw new ForbiddenException(
         'You cannot decide the current approval step.',
       );
@@ -1172,55 +1361,152 @@ export class MobilePrincipalService implements OnModuleInit {
 
   async getAcademicsReadiness(actor: AuthContext) {
     this.assertPrincipal(actor);
-    const [components, marks, reportCardsReady, reportCardBlockers, classes] =
-      await Promise.all([
-        this.prisma.assessmentComponent.count({
-          where: { tenantId: actor.tenantId },
-        }),
-        this.prisma.markEntry.count({ where: { tenantId: actor.tenantId } }),
-        this.prisma.reportCard.count({
-          where: {
-            tenantId: actor.tenantId,
-            isCurrent: true,
-            publishStatus: { in: ['READY', 'PUBLISHED'] },
+    const [
+      componentCountsBySubject,
+      activeStudentCounts,
+      submittedMarkCounts,
+      subjects,
+      reportCardsReady,
+      reportCardBlockers,
+      classes,
+    ] = await Promise.all([
+      this.prisma.assessmentComponent.groupBy({
+        by: ['subjectId'],
+        where: {
+          tenantId: actor.tenantId,
+          examTerm: {
+            status: 'ACTIVE',
+            academicYear: { isCurrent: true },
           },
-        }),
-        this.prisma.reportCardCorrectionRequest.count({
-          where: { tenantId: actor.tenantId, status: 'PENDING' },
-        }),
-        this.prisma.class.findMany({
-          where: { tenantId: actor.tenantId },
-          select: {
-            id: true,
-            name: true,
-            _count: { select: { students: true, reportCards: true } },
+        },
+        _count: { _all: true },
+      }),
+      this.prisma.student.groupBy({
+        by: ['classId'],
+        where: {
+          tenantId: actor.tenantId,
+          lifecycleStatus: 'ACTIVE',
+        },
+        _count: { _all: true },
+      }),
+      this.prisma.markEntry.groupBy({
+        by: ['subjectId'],
+        where: {
+          tenantId: actor.tenantId,
+          status: { not: 'DRAFT' },
+          student: { lifecycleStatus: 'ACTIVE' },
+          assessmentComponent: {
+            examTerm: {
+              status: 'ACTIVE',
+              academicYear: { isCurrent: true },
+            },
           },
-          orderBy: { level: 'asc' },
-          take: 8,
-        }),
-      ]);
+        },
+        _count: { _all: true },
+      }),
+      this.prisma.subject.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          assessmentComponents: {
+            some: {
+              examTerm: {
+                status: 'ACTIVE',
+                academicYear: { isCurrent: true },
+              },
+            },
+          },
+        },
+        select: { id: true, classId: true },
+      }),
+      this.prisma.reportCard.count({
+        where: {
+          tenantId: actor.tenantId,
+          isCurrent: true,
+          publishStatus: { in: ['READY', 'PUBLISHED'] },
+        },
+      }),
+      this.prisma.reportCardCorrectionRequest.count({
+        where: { tenantId: actor.tenantId, status: 'PENDING' },
+      }),
+      this.prisma.class.findMany({
+        where: { tenantId: actor.tenantId },
+        select: {
+          id: true,
+          name: true,
+        },
+        orderBy: { level: 'asc' },
+        take: 8,
+      }),
+    ]);
+    const activeStudentsByClass = new Map(
+      activeStudentCounts.map((row) => [row.classId, row._count._all]),
+    );
+    const classBySubject = new Map(
+      subjects.map((subject) => [subject.id, subject.classId]),
+    );
+    const componentCountsByClass = new Map<string, number>();
+    const submittedMarksByClass = new Map<string, number>();
+    for (const component of componentCountsBySubject) {
+      const classId = classBySubject.get(component.subjectId);
+      if (!classId) continue;
+      componentCountsByClass.set(
+        classId,
+        (componentCountsByClass.get(classId) ?? 0) + component._count._all,
+      );
+    }
+    for (const markCount of submittedMarkCounts) {
+      const classId = classBySubject.get(markCount.subjectId);
+      if (!classId) continue;
+      submittedMarksByClass.set(
+        classId,
+        (submittedMarksByClass.get(classId) ?? 0) + markCount._count._all,
+      );
+    }
+    const expectedMarks = [...componentCountsByClass.entries()].reduce(
+      (total, [classId, componentCount]) =>
+        total + (activeStudentsByClass.get(classId) ?? 0) * componentCount,
+      0,
+    );
+    const submittedMarks = Math.min(
+      expectedMarks,
+      [...submittedMarksByClass.values()].reduce(
+        (total, count) => total + count,
+        0,
+      ),
+    );
     const readiness =
-      components > 0
-        ? Math.min(100, Math.round((marks / components) * 100))
+      expectedMarks > 0
+        ? Math.round((submittedMarks / expectedMarks) * 100)
         : 0;
 
     return {
       metrics: {
-        pendingMarks: Math.max(0, components - marks),
+        pendingMarks: Math.max(0, expectedMarks - submittedMarks),
         publishBlockers: reportCardBlockers,
         reportCardsReady,
         examReadinessPercent: readiness,
+        expectedMarks,
+        submittedMarks,
       },
       marksEntryStatus: classes.map((klass) => {
-        const total = Math.max(klass._count.students, 1);
-        const percent = Math.min(
-          100,
-          Math.round((klass._count.reportCards / total) * 100),
+        const expectedEntries =
+          (activeStudentsByClass.get(klass.id) ?? 0) *
+          (componentCountsByClass.get(klass.id) ?? 0);
+        const submittedEntries = Math.min(
+          expectedEntries,
+          submittedMarksByClass.get(klass.id) ?? 0,
         );
+        const percent =
+          expectedEntries > 0
+            ? Math.round((submittedEntries / expectedEntries) * 100)
+            : 0;
         return {
           id: klass.id,
           title: klass.name,
           percent,
+          expectedEntries,
+          submittedEntries,
+          missingEntries: Math.max(0, expectedEntries - submittedEntries),
           status:
             percent >= 90
               ? 'Nearly complete'
@@ -2511,17 +2797,36 @@ export class MobilePrincipalService implements OnModuleInit {
       approverPermission: string | null;
     },
     actor: AuthContext,
+    delegatedToId?: string | null,
   ) {
     if (actor.roles.includes('platform_super_admin')) {
       return true;
     }
+    if (delegatedToId) {
+      return actor.userId === delegatedToId;
+    }
+    return this.canRoleSetDecideApprovalStep(
+      step,
+      actor.roles,
+      actor.permissions,
+    );
+  }
+
+  private canRoleSetDecideApprovalStep(
+    step: {
+      approverRole: string | null;
+      approverPermission: string | null;
+    },
+    roles: string[],
+    permissions: string[],
+  ) {
     if (!step.approverRole && !step.approverPermission) {
-      return actor.roles.includes('principal') || actor.roles.includes('admin');
+      return roles.includes('principal') || roles.includes('admin');
     }
     return Boolean(
-      (step.approverRole && actor.roles.includes(step.approverRole)) ||
+      (step.approverRole && roles.includes(step.approverRole)) ||
       (step.approverPermission &&
-        actor.permissions.includes(step.approverPermission)),
+        permissions.includes(step.approverPermission)),
     );
   }
 

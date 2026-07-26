@@ -101,6 +101,58 @@ class AttendanceSnapshot {
   final bool fromCache;
 }
 
+class ParentAttendanceCorrection {
+  const ParentAttendanceCorrection({
+    required this.id,
+    required this.attendanceDate,
+    required this.previousStatus,
+    required this.requestedStatus,
+    required this.reason,
+    required this.status,
+    required this.requestedAt,
+    this.reviewedAt,
+    this.reviewReason,
+    this.canCancel = false,
+    this.canResubmit = false,
+  });
+
+  final String id;
+  final DateTime attendanceDate;
+  final AttendanceStatus previousStatus;
+  final AttendanceStatus requestedStatus;
+  final String reason;
+  final String status;
+  final DateTime requestedAt;
+  final DateTime? reviewedAt;
+  final String? reviewReason;
+  final bool canCancel;
+  final bool canResubmit;
+
+  factory ParentAttendanceCorrection.fromJson(Map<String, dynamic> json) {
+    return ParentAttendanceCorrection(
+      id: json['id'] as String? ?? '',
+      attendanceDate:
+          DateTime.tryParse(json['attendanceDate'] as String? ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+      previousStatus: attendanceStatusFromApi(
+        json['previousStatus'] as String?,
+      ),
+      requestedStatus: attendanceStatusFromApi(
+        json['requestedStatus'] as String?,
+      ),
+      reason: json['reason'] as String? ?? '',
+      status: json['status'] as String? ?? 'PENDING',
+      requestedAt:
+          DateTime.tryParse(json['requestedAt'] as String? ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+      reviewedAt: DateTime.tryParse(json['reviewedAt'] as String? ?? ''),
+      reviewReason: json['reviewReason'] as String?,
+      canCancel: json['canCancel'] as bool? ?? false,
+      canResubmit: json['canResubmit'] as bool? ?? false,
+    );
+  }
+}
+
 class TeacherClassSection {
   const TeacherClassSection({
     required this.id,
@@ -355,7 +407,7 @@ class AttendanceStudentEntry {
     'studentId': studentId,
     'studentName': studentName,
     'rollNumber': rollNumber,
-    'status': _attendanceStatusToApi(status),
+    'status': attendanceStatusToApi(status),
   };
 }
 
@@ -449,7 +501,7 @@ class TeacherStudentAttendance {
   }
 }
 
-String _attendanceStatusToApi(AttendanceStatus status) {
+String attendanceStatusToApi(AttendanceStatus status) {
   return switch (status) {
     AttendanceStatus.present => 'PRESENT',
     AttendanceStatus.absent => 'ABSENT',
@@ -458,9 +510,10 @@ String _attendanceStatusToApi(AttendanceStatus status) {
     AttendanceStatus.leave => 'EXCUSED_LEAVE',
     AttendanceStatus.festival => 'HOLIDAY',
     AttendanceStatus.holiday => 'HOLIDAY',
-    // Never sent: a status the app could not interpret must not be written
-    // back as if it were a deliberate mark.
-    AttendanceStatus.unknown => 'PRESENT',
+    // Never turn an unreadable server value into a deliberate write.
+    AttendanceStatus.unknown => throw StateError(
+      'Unknown attendance status cannot be submitted.',
+    ),
   };
 }
 

@@ -1,4 +1,8 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import {
   AnalyticsSummaryDomain,
   ApprovalDecisionType,
@@ -135,6 +139,71 @@ describe('advanced operations services', () => {
     });
   });
 
+  it('blocks approval before mutation when the module final action is unavailable', async () => {
+    const prisma = {
+      approvalRequest: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'approval-1',
+          tenantId: actor.tenantId,
+          status: ApprovalRequestStatus.PENDING,
+          policyId: null,
+          finalActionKey: 'academics.marks.correct',
+          finalActionStatus: ApprovalFinalActionStatus.NOT_READY,
+          steps: [
+            {
+              id: 'step-1',
+              status: ApprovalStepStatus.PENDING,
+              approverRole: null,
+              approverPermission: null,
+            },
+          ],
+        }),
+      },
+      $transaction: jest.fn(),
+    };
+    const service = new ApprovalWorkflowService(prisma as any, audit as any);
+
+    await expect(
+      service.decide(
+        'approval-1',
+        { decision: ApprovalDecisionType.APPROVE },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('never labels an approved request applied without its module executor', async () => {
+    const prisma = {
+      approvalRequest: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'approval-1',
+          tenantId: actor.tenantId,
+          workflowType: ApprovalWorkflowType.MARKS_CORRECTION,
+          targetModule: 'academics',
+          targetType: 'mark_entry',
+          targetId: 'mark-1',
+          status: ApprovalRequestStatus.APPROVED,
+          finalActionStatus: ApprovalFinalActionStatus.READY,
+          finalActionKey: 'academics.marks.correct',
+          finalActionPayload: { markId: 'mark-1' },
+          steps: [],
+          decisions: [],
+          comments: [],
+        }),
+        update: jest.fn(),
+      },
+    };
+    const service = new ApprovalWorkflowService(prisma as any, audit as any);
+
+    await expect(
+      service.applyFinalAction('approval-1', actor),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(prisma.approvalRequest.update).not.toHaveBeenCalled();
+  });
+
   it('applies approval final action idempotently', async () => {
     const executor = { apply: jest.fn().mockResolvedValue({ ok: true }) };
     const prisma = {
@@ -179,6 +248,121 @@ describe('advanced operations services', () => {
 
     expect(executor.apply).toHaveBeenCalledTimes(1);
     expect(prisma.approvalRequest.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('delegates a pending approval only to an eligible same-tenant approver', async () => {
+    const request = {
+      id: 'approval-1',
+      tenantId: actor.tenantId,
+      status: ApprovalRequestStatus.PENDING,
+      delegatedToId: null,
+      steps: [
+        {
+          id: 'step-1',
+          status: ApprovalStepStatus.PENDING,
+          approverRole: 'principal',
+          approverPermission: null,
+        },
+      ],
+    };
+    const prisma = {
+      approvalRequest: {
+        findFirst: jest.fn().mockResolvedValue(request),
+        update: jest.fn().mockResolvedValue({
+          ...request,
+          delegatedToId: 'user-2',
+          delegatedById: actor.userId,
+        }),
+      },
+      user: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'user-2',
+          userRoles: [
+            {
+              role: {
+                name: 'principal',
+                rolePermissions: [],
+              },
+            },
+          ],
+        }),
+      },
+    };
+    const service = new ApprovalWorkflowService(prisma as any, audit as any);
+
+    await service.delegate(
+      'approval-1',
+      {
+        delegatedToUserId: 'user-2',
+        reason: 'Covering the approval queue during my school visit.',
+      },
+      actor,
+    );
+
+    expect(prisma.user.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: 'user-2',
+          tenantId: actor.tenantId,
+          status: 'ACTIVE',
+        }),
+      }),
+    );
+    expect(prisma.approvalRequest.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'approval-1' },
+        data: expect.objectContaining({
+          delegatedToId: 'user-2',
+          delegatedById: actor.userId,
+          delegationReason:
+            'Covering the approval queue during my school visit.',
+        }),
+      }),
+    );
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'approval_request_delegated',
+        tenantId: actor.tenantId,
+        resourceId: 'approval-1',
+      }),
+    );
+  });
+
+  it('keeps a delegated approval step exclusive to its named approver', async () => {
+    const prisma = {
+      approvalRequest: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'approval-1',
+          tenantId: actor.tenantId,
+          status: ApprovalRequestStatus.PENDING,
+          policyId: null,
+          delegatedToId: 'user-2',
+          finalActionStatus: ApprovalFinalActionStatus.NOT_READY,
+          steps: [
+            {
+              id: 'step-1',
+              status: ApprovalStepStatus.PENDING,
+              approverRole: 'principal',
+              approverPermission: null,
+            },
+          ],
+        }),
+      },
+      $transaction: jest.fn(),
+    };
+    const service = new ApprovalWorkflowService(prisma as any, audit as any);
+
+    await expect(
+      service.decide(
+        'approval-1',
+        {
+          decision: ApprovalDecisionType.REJECT,
+          reason: 'This decision belongs to the named delegate.',
+        },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
   it('executes deterministic automation once per rule idempotency key', async () => {

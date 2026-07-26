@@ -1030,6 +1030,39 @@ enum ApprovalFinalActionStatus {
   FAILED
 }
 
+enum SchoolServiceRequestType {
+  GENERAL_COMPLAINT
+  PAYMENT_DISPUTE
+}
+
+enum SchoolServiceRequestCategory {
+  ACADEMICS
+  ATTENDANCE
+  FEES_AND_PAYMENTS
+  SCHOOL_OPERATIONS
+  OTHER
+}
+
+enum SchoolServiceRequestPriority {
+  NORMAL
+  HIGH
+}
+
+enum SchoolServiceRequestStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+  REOPENED
+  CANCELLED
+}
+
+enum SchoolServiceRequestNoteVisibility {
+  PARENT
+  INTERNAL
+}
+
 enum AutomationTriggerType {
   STUDENT_MARKED_ABSENT
   ATTENDANCE_NOT_MARKED_BY_CUTOFF
