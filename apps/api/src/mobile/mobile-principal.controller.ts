@@ -3,7 +3,9 @@ import {
   Controller,
   Get,
   Param,
+  ParseEnumPipe,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -44,6 +46,25 @@ import {
   ResolveSchoolServiceRequestDto,
 } from '../service-requests/dto/service-request.dto';
 import { MobilePrincipalServiceRequestTriageDto } from './dto/mobile-principal-service-request.dto';
+import {
+  AddStudentInterventionEntryDto,
+  EarlyWarningQueryDto,
+  ListStudentInterventionsDto,
+  UpdateStudentInterventionDto,
+} from '../learning-improvement/dto/learning-improvement.dto';
+import { LearningImprovementService } from '../learning-improvement/learning-improvement.service';
+import {
+  CreateTeacherObservationDto,
+  UpdateSchoolImprovementActionDto,
+  UpdateTeacherObservationDto,
+} from '../institutional-improvement/dto/institutional-improvement.dto';
+import { InstitutionalImprovementService } from '../institutional-improvement/institutional-improvement.service';
+
+enum BoardReadinessTrackParam {
+  GRADE_8 = 'GRADE_8',
+  SEE = 'SEE',
+  GRADE_12 = 'GRADE_12',
+}
 
 @ApiTags('mobile-principal')
 @Controller('mobile/principal')
@@ -51,7 +72,11 @@ import { MobilePrincipalServiceRequestTriageDto } from './dto/mobile-principal-s
 @Entitlement(FEATURE_KEYS.MOBILE_FULL_ROLE)
 @Roles('principal', 'admin', 'platform_super_admin')
 export class MobilePrincipalController {
-  constructor(private readonly service: MobilePrincipalService) {}
+  constructor(
+    private readonly service: MobilePrincipalService,
+    private readonly learningImprovementService: LearningImprovementService,
+    private readonly institutionalImprovementService: InstitutionalImprovementService,
+  ) {}
 
   @Get('dashboard')
   @Permissions('students:read', 'attendance:read', 'notices:read')
@@ -207,6 +232,66 @@ export class MobilePrincipalController {
     return this.service.getAcademicsReadiness(auth);
   }
 
+  @Get('learning-attention')
+  @Permissions('academics:read')
+  @RequiredModule('academics')
+  learningAttention(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: EarlyWarningQueryDto,
+  ) {
+    return this.learningImprovementService.getEarlyWarnings(auth, query);
+  }
+
+  @Get('intervention-cases')
+  @Permissions('academics:read')
+  @RequiredModule('academics')
+  interventionCases(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: ListStudentInterventionsDto,
+  ) {
+    return this.learningImprovementService.listInterventions(auth, query);
+  }
+
+  @Get('intervention-cases/:caseId')
+  @Permissions('academics:read')
+  @RequiredModule('academics')
+  interventionCase(
+    @CurrentAuth() auth: AuthContext,
+    @Param('caseId', new ParseUUIDPipe()) caseId: string,
+  ) {
+    return this.learningImprovementService.getIntervention(auth, caseId);
+  }
+
+  @Post('intervention-cases/:caseId/entries')
+  @Permissions('academics:enter_marks')
+  @RequiredModule('academics')
+  addInterventionCaseEntry(
+    @CurrentAuth() auth: AuthContext,
+    @Param('caseId', new ParseUUIDPipe()) caseId: string,
+    @Body() dto: AddStudentInterventionEntryDto,
+  ) {
+    return this.learningImprovementService.addInterventionEntry(
+      auth,
+      caseId,
+      dto,
+    );
+  }
+
+  @Patch('intervention-cases/:caseId')
+  @Permissions('academics:enter_marks')
+  @RequiredModule('academics')
+  updateInterventionCase(
+    @CurrentAuth() auth: AuthContext,
+    @Param('caseId', new ParseUUIDPipe()) caseId: string,
+    @Body() dto: UpdateStudentInterventionDto,
+  ) {
+    return this.learningImprovementService.updateIntervention(
+      auth,
+      caseId,
+      dto,
+    );
+  }
+
   @Get('transport-alerts')
   @Permissions('transport:reports:read', 'transport:trips:read')
   transportAlerts(@CurrentAuth() auth: AuthContext) {
@@ -304,9 +389,72 @@ export class MobilePrincipalController {
   }
 
   @Get('classroom-walkthroughs')
-  @Permissions('academics:read')
+  @Permissions('hr:read')
   classroomWalkthroughs(@CurrentAuth() auth: AuthContext) {
-    return this.service.getClassroomWalkthroughs(auth);
+    return this.institutionalImprovementService.getPrincipalTeacherDevelopment(
+      auth,
+    );
+  }
+
+  @Post('classroom-walkthroughs')
+  @Permissions('hr:manage')
+  createClassroomWalkthrough(
+    @CurrentAuth() auth: AuthContext,
+    @Body() dto: CreateTeacherObservationDto,
+  ) {
+    return this.institutionalImprovementService.createTeacherObservation(
+      auth,
+      dto,
+    );
+  }
+
+  @Patch('classroom-walkthroughs/:observationId')
+  @Permissions('hr:manage')
+  updateClassroomWalkthrough(
+    @CurrentAuth() auth: AuthContext,
+    @Param('observationId', new ParseUUIDPipe()) observationId: string,
+    @Body() dto: UpdateTeacherObservationDto,
+  ) {
+    return this.institutionalImprovementService.updateTeacherObservation(
+      auth,
+      observationId,
+      dto,
+    );
+  }
+
+  @Get('school-improvement-plans')
+  @Permissions('reports:read')
+  schoolImprovementPlans(@CurrentAuth() auth: AuthContext) {
+    return this.institutionalImprovementService.listSchoolImprovementPlans(
+      auth,
+      { page: 1, limit: 20 },
+    );
+  }
+
+  @Patch('school-improvement-actions/:actionId')
+  @Permissions('settings:manage')
+  updateSchoolImprovementAction(
+    @CurrentAuth() auth: AuthContext,
+    @Param('actionId', new ParseUUIDPipe()) actionId: string,
+    @Body() dto: UpdateSchoolImprovementActionDto,
+  ) {
+    return this.institutionalImprovementService.updateSchoolImprovementAction(
+      auth,
+      actionId,
+      dto,
+    );
+  }
+
+  @Get('board-exam-readiness/:track')
+  @Permissions('academics:read')
+  boardExamReadiness(
+    @CurrentAuth() auth: AuthContext,
+    @Param('track', new ParseEnumPipe(BoardReadinessTrackParam))
+    track: BoardReadinessTrackParam,
+  ) {
+    return this.institutionalImprovementService.getBoardExamReadiness(auth, {
+      track,
+    });
   }
 
   @Get('emergency-notice')

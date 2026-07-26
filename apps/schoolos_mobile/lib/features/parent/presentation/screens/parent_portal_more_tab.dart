@@ -67,6 +67,12 @@ class ParentPortalMoreTab extends ConsumerWidget {
         const SizedBox(height: 24),
         _group(context, 'Academic', [
           _Menu(
+            Icons.insights_rounded,
+            'Weekly Progress',
+            'Attendance, homework, feedback, results, and next actions',
+            AppRoutes.parentWeeklyProgress,
+          ),
+          _Menu(
             Icons.event_note_outlined,
             'Subject Timetable',
             'Subjects, periods, teachers, rooms, and class teacher',
@@ -90,6 +96,12 @@ class ParentPortalMoreTab extends ConsumerWidget {
             'Supportive progress for linked children',
             AppRoutes.parentLearning,
           ),
+          _Menu(
+            Icons.volunteer_activism_outlined,
+            'Learning Support',
+            'Teacher guidance, classroom progress, and current support',
+            AppRoutes.parentLearningSupport,
+          ),
         ]),
         _group(context, 'Finance', [
           _Menu(
@@ -106,6 +118,12 @@ class ParentPortalMoreTab extends ConsumerWidget {
           ),
         ]),
         _group(context, 'Services', [
+          _Menu(
+            Icons.task_alt_rounded,
+            'Action Centre',
+            'Live school tasks that need your attention',
+            AppRoutes.parentActionCentre,
+          ),
           _Menu(
             Icons.directions_bus_outlined,
             'Transport',

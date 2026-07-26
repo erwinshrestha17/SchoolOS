@@ -201,8 +201,11 @@ void main() {
             'title': 'Bus update',
             'message': 'The bus has arrived.',
             'sourceType': 'TRANSPORT',
+            'sourceId': 'notice-2',
             'createdAt': '2026-06-01T10:00:00.000Z',
             'isRead': false,
+            'requiresAcknowledgement': true,
+            'acknowledgedAt': '2026-06-01T11:00:00.000Z',
             'attachment': {
               'id': 'file-1',
               'fileName': 'bus-circular.pdf',
@@ -221,6 +224,8 @@ void main() {
       expect(notice.body, 'The bus has arrived.');
       expect(notice.hasAttachment, isTrue);
       expect(notice.attachment?.downloadPath, contains('/attachment'));
+      expect(notice.requiresAcknowledgement, isTrue);
+      expect(notice.isAcknowledged, isTrue);
     });
 
     test(

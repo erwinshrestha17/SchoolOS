@@ -88,6 +88,16 @@ describe('NoticeAcknowledgementService', () => {
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'acknowledge' }),
     );
+    expect(prisma.notificationDelivery.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          notice: {
+            lifecycleStatus: 'PUBLISHED',
+            requiresAcknowledgement: true,
+          },
+        }),
+      }),
+    );
   });
 
   it('returns the existing acknowledgement on replay without duplication', async () => {

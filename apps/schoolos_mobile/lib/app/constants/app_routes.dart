@@ -12,6 +12,8 @@ class AppRoutes {
   static const notices = '/notices';
 
   static const parentHome = '/parent/home';
+  static const parentActionCentre = '/parent/actions';
+  static const parentWeeklyProgress = '/parent/more/weekly-progress';
   static const parentChildren = '/parent/children';
   static const parentChild = '/parent/child/:id';
   static const parentAttendance = '/parent/attendance';
@@ -26,6 +28,7 @@ class AppRoutes {
   static const parentFeesReceipts = '/parent/more/fees-receipts';
   static const parentActivity = '/parent/activity';
   static const parentLearning = '/parent/more/learning-summary';
+  static const parentLearningSupport = '/parent/more/learning-support';
   static const parentTransport = '/parent/more/transport';
   static const parentCanteen = '/parent/more/canteen-wallet';
   static const parentConsents = '/parent/more/consents';
@@ -41,6 +44,8 @@ class AppRoutes {
   static const teacherHome = '/teacher/home';
   static const teacherClasses = '/teacher/classes';
   static const teacherClass = '/teacher/class/:classSectionId';
+  static const teacherStudentLearningSupport =
+      '/teacher/students/:studentId/learning-support';
   static const teacherAttendance = '/teacher/attendance';
   static const teacherActivity = '/teacher/activity';
   static const teacherHomework = '/teacher/homework';
@@ -70,6 +75,7 @@ class AppRoutes {
   static const principalStaffAbsence = '/principal/staff-absence';
   static const principalFees = '/principal/fees-snapshot';
   static const principalAcademics = '/principal/academics-readiness';
+  static const principalLearningSupport = '/principal/learning-support';
   static const principalTransport = '/principal/transport-alerts';
   static const principalStudents = '/principal/students';
   static const principalReports = '/principal/reports-snapshot';
@@ -86,6 +92,24 @@ class AppRoutes {
   static String noticeDetail(String id) => '/notices/$id';
   static String teacherClassDetail(String classSectionId) =>
       '/teacher/class/${Uri.encodeComponent(classSectionId)}';
+  static String teacherStudentLearningSupportDetail({
+    required String studentId,
+    required String academicYearId,
+    required String classId,
+    String? sectionId,
+  }) {
+    return Uri(
+      path:
+          '/teacher/students/${Uri.encodeComponent(studentId)}/learning-support',
+      queryParameters: {
+        'academicYearId': academicYearId,
+        'classId': classId,
+        if (sectionId != null && sectionId.trim().isNotEmpty)
+          'sectionId': sectionId,
+      },
+    ).toString();
+  }
+
   static String principalServiceRequestDetail(String requestId) =>
       '/principal/service-requests/${Uri.encodeComponent(requestId)}';
   static String teacherAttendanceFor(String classSectionId) =>

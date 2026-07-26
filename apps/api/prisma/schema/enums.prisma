@@ -964,6 +964,109 @@ enum AssessmentRetakeResultDecision {
   USE_RETAKE
 }
 
+enum LearningOutcomeDomain {
+  GENERAL
+  FOUNDATIONAL_READING
+  FOUNDATIONAL_NUMERACY
+}
+
+enum LearningMasteryStatus {
+  BEGINNING
+  DEVELOPING
+  SECURE
+  EXTENDING
+}
+
+enum FormativeAssessmentKind {
+  OBSERVATION
+  EXIT_TICKET
+  QUIZ
+  ORAL
+  PRACTICAL
+  CHECKLIST
+  REASSESSMENT
+}
+
+enum StudentInterventionStatus {
+  OPEN
+  IN_PROGRESS
+  MONITORING
+  RESOLVED
+  CLOSED
+}
+
+enum StudentInterventionPriority {
+  ROUTINE
+  IMPORTANT
+  URGENT
+}
+
+enum StudentInterventionEntryType {
+  NOTE
+  PARENT_CONTACT
+  ACTION
+  FOLLOW_UP
+  PROGRESS
+  ESCALATION
+  RESOLUTION
+}
+
+enum RemedialGroupStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum CurriculumProgressStatus {
+  PLANNED
+  COMPLETED
+  MISSED
+  RETEACH_REQUIRED
+}
+
+enum ParentLearningGuidanceStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum TeacherObservationStatus {
+  DRAFT
+  COMPLETED
+  ACKNOWLEDGED
+  FOLLOW_UP_DUE
+  CLOSED
+}
+
+enum TeacherDevelopmentGoalStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum TeacherTrainingStatus {
+  PLANNED
+  COMPLETED
+  CANCELLED
+}
+
+enum SchoolImprovementPlanStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum SchoolImprovementActionStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  BLOCKED
+  COMPLETED
+  CANCELLED
+}
+
 enum FinanceRequestType {
   REFUND
   REVERSAL

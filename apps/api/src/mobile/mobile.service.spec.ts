@@ -1082,11 +1082,23 @@ describe('MobileService', () => {
         body: 'Term fee due.',
         sourceType: 'NOTICE',
         sourceId: 'source-1',
+        noticeId: 'source-1',
         channel: 'PUSH',
         status: 'SENT',
         createdAt: new Date('2026-05-01T08:00:00.000Z'),
         sentAt: new Date('2026-05-01T08:01:00.000Z'),
         readReceipts: [],
+        notice: {
+          audienceType: 'ALL',
+          requiresAcknowledgement: true,
+          acknowledgements: [
+            {
+              firstAcknowledgedAt: new Date('2026-05-01T08:30:00.000Z'),
+            },
+          ],
+          class: null,
+          section: null,
+        },
       },
       {
         id: 'notice-2',
@@ -1123,6 +1135,8 @@ describe('MobileService', () => {
         id: 'notice-1',
         message: 'Term fee due.',
         isRead: false,
+        requiresAcknowledgement: true,
+        acknowledgedAt: '2026-05-01T08:30:00.000Z',
       }),
       expect.objectContaining({
         id: 'notice-2',
@@ -1618,26 +1632,24 @@ describe('MobileService', () => {
         },
       ],
     });
-    jest
-      .spyOn(service, 'listStudentAttendanceCorrections')
-      .mockResolvedValue({
-        total: 1,
-        items: [
-          {
-            id: 'correction-1',
-            attendanceDate: '2026-07-20T00:00:00.000Z',
-            previousStatus: 'ABSENT',
-            requestedStatus: 'PRESENT',
-            reason: 'Present at school',
-            status: 'REJECTED',
-            requestedAt: '2026-07-21T00:00:00.000Z',
-            reviewedAt: '2026-07-22T00:00:00.000Z',
-            reviewReason: 'Please add more detail.',
-            canCancel: false,
-            canResubmit: true,
-          },
-        ],
-      } as never);
+    jest.spyOn(service, 'listStudentAttendanceCorrections').mockResolvedValue({
+      total: 1,
+      items: [
+        {
+          id: 'correction-1',
+          attendanceDate: '2026-07-20T00:00:00.000Z',
+          previousStatus: 'ABSENT',
+          requestedStatus: 'PRESENT',
+          reason: 'Present at school',
+          status: 'REJECTED',
+          requestedAt: '2026-07-21T00:00:00.000Z',
+          reviewedAt: '2026-07-22T00:00:00.000Z',
+          reviewReason: 'Please add more detail.',
+          canCancel: false,
+          canResubmit: true,
+        },
+      ],
+    } as never);
     jest.spyOn(service, 'listStudentServiceRequests').mockResolvedValue({
       total: 1,
       items: [
@@ -1659,7 +1671,9 @@ describe('MobileService', () => {
           examTerm: { id: 'term-1', name: 'First Term' },
           subject: { id: 'subject-1', name: 'Mathematics', code: 'MATH' },
           startsAt: new Date(Date.now() + 2 * 86_400_000).toISOString(),
-          endsAt: new Date(Date.now() + 2 * 86_400_000 + 3_600_000).toISOString(),
+          endsAt: new Date(
+            Date.now() + 2 * 86_400_000 + 3_600_000,
+          ).toISOString(),
           room: '4A',
           publishedAt: '2026-07-20T00:00:00.000Z',
         },
@@ -1680,9 +1694,9 @@ describe('MobileService', () => {
         'UPCOMING_EXAM',
       ]),
     );
-    expect(
-      result.items.some((item) => item.id === 'notice-ack:notice-2'),
-    ).toBe(false);
+    expect(result.items.some((item) => item.id === 'notice-ack:notice-2')).toBe(
+      false,
+    );
     expect(result.items[0]?.priority).toBe('URGENT');
     expect(service.listNotifications).toHaveBeenCalledWith(
       actor,
@@ -1726,10 +1740,7 @@ describe('MobileService', () => {
     } as never);
     const homework = jest.spyOn(service, 'getStudentHomework');
     const fees = jest.spyOn(service, 'getStudentFeesSummary');
-    const corrections = jest.spyOn(
-      service,
-      'listStudentAttendanceCorrections',
-    );
+    const corrections = jest.spyOn(service, 'listStudentAttendanceCorrections');
     const exams = jest.spyOn(service, 'getStudentExamSchedule');
 
     const result = await service.getParentActionCentre(actor);
@@ -1775,6 +1786,310 @@ describe('MobileService', () => {
 
     expect(entitlementsService.getEntitlements).not.toHaveBeenCalled();
     expect(notifications).not.toHaveBeenCalled();
+  });
+
+  it('builds a linked-child weekly digest from bounded source-owned evidence', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-26T10:00:00.000Z'));
+    try {
+      jest.spyOn(service as never, 'getAccessibleStudent').mockResolvedValue({
+        id: 'student-1',
+        firstNameEn: 'Asha',
+        lastNameEn: 'Rai',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        class: { id: 'class-1', name: 'Grade 4' },
+        sectionRef: { id: 'section-1', name: 'A' },
+        guardianLinks: [],
+        enrollments: [],
+      } as never);
+      entitlementsService.getEntitlements.mockResolvedValue({
+        modules: ['students', 'attendance', 'homework', 'academics'],
+        features: [],
+        addOns: [],
+        tier: null,
+      });
+      jest.spyOn(service, 'getStudentAttendanceSummary').mockResolvedValue({
+        recentHistory: [
+          {
+            date: new Date('2026-07-25T00:00:00.000Z'),
+            status: 'PRESENT',
+          },
+          {
+            date: new Date('2026-07-24T00:00:00.000Z'),
+            status: 'LATE',
+          },
+          {
+            date: new Date('2026-07-23T00:00:00.000Z'),
+            status: 'ABSENT',
+          },
+          {
+            date: new Date('2026-07-01T00:00:00.000Z'),
+            status: 'PRESENT',
+          },
+        ],
+      } as never);
+      prisma.homeworkAssignment.findMany.mockResolvedValue([
+        {
+          id: 'homework-reviewed',
+          title: 'Fractions review',
+          dueAt: new Date('2026-07-24T00:00:00.000Z'),
+          submissionRequired: true,
+          subject: { id: 'subject-1', name: 'Mathematics' },
+          submissions: [
+            {
+              status: 'REVIEWED',
+              feedback: 'Clear working and good improvement.',
+              reviewedAt: new Date('2026-07-25T00:00:00.000Z'),
+              returnedAt: null,
+              updatedAt: new Date('2026-07-25T00:00:00.000Z'),
+            },
+          ],
+        },
+        {
+          id: 'homework-missing',
+          title: 'Reading response',
+          dueAt: new Date('2026-07-22T00:00:00.000Z'),
+          submissionRequired: true,
+          subject: { id: 'subject-2', name: 'English' },
+          submissions: [],
+        },
+      ]);
+      jest.spyOn(service, 'getStudentReportCards').mockResolvedValue({
+        items: [
+          {
+            id: 'report-current',
+            academicYear: { id: 'year-1', name: '2083' },
+            examTerm: { id: 'term-2', name: 'Second Term' },
+            percentage: 80,
+            publishedAt: '2026-07-20T00:00:00.000Z',
+            subjects: [
+              { subjectId: 'subject-1', maxMarks: 100 },
+              { subjectId: 'subject-2', maxMarks: 100 },
+            ],
+          },
+          {
+            id: 'report-previous',
+            academicYear: { id: 'year-1', name: '2083' },
+            examTerm: { id: 'term-1', name: 'First Term' },
+            percentage: 75,
+            publishedAt: '2026-05-20T00:00:00.000Z',
+            subjects: [
+              { subjectId: 'subject-1', maxMarks: 100 },
+              { subjectId: 'subject-2', maxMarks: 100 },
+            ],
+          },
+        ],
+      } as never);
+      jest.spyOn(service, 'getParentActionCentre').mockResolvedValue({
+        summary: { isPartial: false },
+        items: [
+          {
+            id: 'exam:exam-1',
+            type: 'UPCOMING_EXAM',
+            title: 'Mathematics exam',
+            detail: 'Second term',
+            priority: 'UPCOMING',
+            studentId: 'student-1',
+            studentName: 'Asha Rai',
+            dueAt: '2026-07-28T00:00:00.000Z',
+            createdAt: '2026-07-20T00:00:00.000Z',
+            route: '/parent/more/calendar',
+            actionLabel: 'View calendar',
+          },
+        ],
+      } as never);
+
+      const result = await service.getStudentWeeklyProgress('student-1', actor);
+
+      expect(result.period.days).toBe(7);
+      expect(result.attendance).toEqual(
+        expect.objectContaining({
+          availability: 'AVAILABLE',
+          recordedDays: 3,
+          presentDays: 2,
+          absentDays: 1,
+          lateDays: 1,
+          attendanceRate: 66.67,
+        }),
+      );
+      expect(result.homework).toEqual({
+        availability: 'AVAILABLE',
+        requiredCount: 2,
+        completedCount: 1,
+        needsFollowUpCount: 1,
+        completionRate: 50,
+      });
+      expect(result.academicTrend).toEqual(
+        expect.objectContaining({
+          availability: 'AVAILABLE',
+          direction: 'IMPROVED',
+          changePoints: 5,
+        }),
+      );
+      expect(result.teacherComments).toEqual([
+        expect.objectContaining({
+          subject: 'Mathematics',
+          comment: 'Clear working and good improvement.',
+        }),
+      ]);
+      expect(result.upcomingDeadlines).toHaveLength(1);
+      expect(result.requiredActions).toHaveLength(1);
+      expect(result.isPartial).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('does not claim an academic trend from non-comparable published results', async () => {
+    jest.spyOn(service as never, 'getAccessibleStudent').mockResolvedValue({
+      id: 'student-1',
+      firstNameEn: 'Asha',
+      lastNameEn: 'Rai',
+      classId: 'class-1',
+      sectionId: 'section-1',
+      class: { id: 'class-1', name: 'Grade 4' },
+      sectionRef: { id: 'section-1', name: 'A' },
+      guardianLinks: [],
+      enrollments: [],
+    } as never);
+    entitlementsService.getEntitlements.mockResolvedValue({
+      modules: ['students', 'academics'],
+      features: [],
+      addOns: [],
+      tier: null,
+    });
+    jest.spyOn(service, 'getStudentReportCards').mockResolvedValue({
+      items: [
+        {
+          id: 'report-current',
+          academicYear: { id: 'year-2', name: '2084' },
+          examTerm: { id: 'term-2', name: 'Second Term' },
+          percentage: 85,
+          publishedAt: '2026-07-20T00:00:00.000Z',
+          subjects: [{ subjectId: 'subject-1', maxMarks: 100 }],
+        },
+        {
+          id: 'report-previous',
+          academicYear: { id: 'year-1', name: '2083' },
+          examTerm: { id: 'term-1', name: 'First Term' },
+          percentage: 70,
+          publishedAt: '2026-05-20T00:00:00.000Z',
+          subjects: [{ subjectId: 'subject-1', maxMarks: 100 }],
+        },
+      ],
+    } as never);
+    jest.spyOn(service, 'getParentActionCentre').mockResolvedValue({
+      summary: { isPartial: false },
+      items: [],
+    } as never);
+
+    const result = await service.getStudentWeeklyProgress('student-1', actor);
+
+    expect(result.academicTrend).toEqual(
+      expect.objectContaining({
+        availability: 'UNAVAILABLE',
+        direction: null,
+        changePoints: null,
+      }),
+    );
+    expect(result.sources.academics).toEqual(
+      expect.objectContaining({ status: 'empty' }),
+    );
+  });
+
+  it('keeps disabled weekly digest sources locked without querying them', async () => {
+    jest.spyOn(service as never, 'getAccessibleStudent').mockResolvedValue({
+      id: 'student-1',
+      firstNameEn: 'Asha',
+      lastNameEn: 'Rai',
+      classId: 'class-1',
+      sectionId: 'section-1',
+      class: { id: 'class-1', name: 'Grade 4' },
+      sectionRef: { id: 'section-1', name: 'A' },
+      guardianLinks: [],
+      enrollments: [],
+    } as never);
+    entitlementsService.getEntitlements.mockResolvedValue({
+      modules: ['students'],
+      features: [],
+      addOns: [],
+      tier: null,
+    });
+    const attendance = jest.spyOn(service, 'getStudentAttendanceSummary');
+    const reports = jest.spyOn(service, 'getStudentReportCards');
+    jest.spyOn(service, 'getParentActionCentre').mockResolvedValue({
+      summary: { isPartial: true },
+      items: [],
+    } as never);
+
+    const result = await service.getStudentWeeklyProgress('student-1', actor);
+
+    expect(result.attendance).toEqual(
+      expect.objectContaining({
+        availability: 'LOCKED',
+        attendanceRate: null,
+      }),
+    );
+    expect(result.homework).toEqual(
+      expect.objectContaining({
+        availability: 'LOCKED',
+        completionRate: null,
+      }),
+    );
+    expect(result.academicTrend).toEqual(
+      expect.objectContaining({
+        availability: 'LOCKED',
+        direction: null,
+      }),
+    );
+    expect(result.isPartial).toBe(true);
+    expect(attendance).not.toHaveBeenCalled();
+    expect(prisma.homeworkAssignment.findMany).not.toHaveBeenCalled();
+    expect(reports).not.toHaveBeenCalled();
+  });
+
+  it('marks both homework and teacher comments unavailable when their shared source fails', async () => {
+    jest.spyOn(service as never, 'getAccessibleStudent').mockResolvedValue({
+      id: 'student-1',
+      firstNameEn: 'Asha',
+      lastNameEn: 'Rai',
+      classId: 'class-1',
+      sectionId: 'section-1',
+      class: { id: 'class-1', name: 'Grade 4' },
+      sectionRef: { id: 'section-1', name: 'A' },
+      guardianLinks: [],
+      enrollments: [],
+    } as never);
+    entitlementsService.getEntitlements.mockResolvedValue({
+      modules: ['students', 'homework'],
+      features: [],
+      addOns: [],
+      tier: null,
+    });
+    prisma.homeworkAssignment.findMany.mockRejectedValue(
+      new Error('source unavailable'),
+    );
+    jest.spyOn(service, 'getParentActionCentre').mockResolvedValue({
+      summary: { isPartial: false },
+      items: [],
+    } as never);
+
+    const result = await service.getStudentWeeklyProgress('student-1', actor);
+
+    expect(result.sources.homework).toEqual(
+      expect.objectContaining({ status: 'unavailable' }),
+    );
+    expect(result.sources.comments).toEqual(
+      expect.objectContaining({ status: 'unavailable' }),
+    );
+    expect(result.homework).toEqual(
+      expect.objectContaining({
+        availability: 'UNAVAILABLE',
+        completionRate: null,
+      }),
+    );
+    expect(result.teacherComments).toEqual([]);
+    expect(result.isPartial).toBe(true);
   });
 
   it('returns protected activity preview paths without storage internals', async () => {

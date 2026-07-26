@@ -66,6 +66,35 @@ void main() {
     test('parent activity route remains guarded as a parent-only route', () {
       expect(isParentRoute(AppRoutes.parentActivity), isTrue);
     });
+
+    test('parent action centre remains guarded as a parent-only route', () {
+      expect(isParentRoute(AppRoutes.parentActionCentre), isTrue);
+      expect(isPrincipalRoute(AppRoutes.parentActionCentre), isFalse);
+      expect(isTeacherRoute(AppRoutes.parentActionCentre), isFalse);
+    });
+
+    test('parent weekly progress remains guarded as a parent-only route', () {
+      expect(isParentRoute(AppRoutes.parentWeeklyProgress), isTrue);
+      expect(isPrincipalRoute(AppRoutes.parentWeeklyProgress), isFalse);
+      expect(isTeacherRoute(AppRoutes.parentWeeklyProgress), isFalse);
+    });
+
+    test('learning-support routes remain isolated by persona', () {
+      expect(isParentRoute(AppRoutes.parentLearningSupport), isTrue);
+      expect(isTeacherRoute(AppRoutes.parentLearningSupport), isFalse);
+      expect(isPrincipalRoute(AppRoutes.parentLearningSupport), isFalse);
+
+      expect(isTeacherRoute(AppRoutes.teacherStudentLearningSupport), isTrue);
+      expect(isParentRoute(AppRoutes.teacherStudentLearningSupport), isFalse);
+      expect(
+        isPrincipalRoute(AppRoutes.teacherStudentLearningSupport),
+        isFalse,
+      );
+
+      expect(isPrincipalRoute(AppRoutes.principalLearningSupport), isTrue);
+      expect(isParentRoute(AppRoutes.principalLearningSupport), isFalse);
+      expect(isTeacherRoute(AppRoutes.principalLearningSupport), isFalse);
+    });
   });
 }
 

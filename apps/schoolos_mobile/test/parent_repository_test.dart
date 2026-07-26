@@ -7,8 +7,10 @@ import 'package:mocktail/mocktail.dart';
 import 'package:schoolos_mobile/core/network/api_client.dart';
 import 'package:schoolos_mobile/core/network/api_path_resolver.dart';
 import 'package:schoolos_mobile/features/parent/data/parent_repository.dart';
+import 'package:schoolos_mobile/features/parent/domain/parent_action_centre_models.dart';
 import 'package:schoolos_mobile/features/parent/domain/parent_models.dart';
 import 'package:schoolos_mobile/features/parent/domain/parent_service_request_models.dart';
+import 'package:schoolos_mobile/features/parent/domain/parent_weekly_progress_models.dart';
 
 class MockApiClient extends Mock implements ApiClient {}
 
@@ -80,6 +82,156 @@ void main() {
         tempDir.deleteSync(recursive: true);
       }
     });
+
+    test(
+      'loads the live action centre with an optional linked-child scope',
+      () async {
+        when(
+          () => apiClient.get<dynamic>(
+            '/mobile/me/action-centre',
+            queryParameters: {'studentId': 'child-1'},
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(path: '/mobile/me/action-centre'),
+            data: {
+              'generatedAt': '2026-07-26T10:00:00.000Z',
+              'dataState': 'LIVE',
+              'scope': {
+                'selectedStudentId': 'child-1',
+                'children': [
+                  {
+                    'id': 'child-1',
+                    'name': 'Asha Rai',
+                    'classSection': 'Grade 4 - A',
+                  },
+                ],
+              },
+              'summary': {
+                'visibleActionCount': 1,
+                'urgentCount': 0,
+                'returnedCount': 1,
+                'isPartial': false,
+              },
+              'items': [
+                {
+                  'id': 'fee:child-1:invoice-1',
+                  'source': 'fees',
+                  'type': 'FEE_DUE',
+                  'priority': 'HIGH',
+                  'title': 'Fee balance for INV-001',
+                  'description': 'NPR 500.00 remains due.',
+                  'child': {
+                    'id': 'child-1',
+                    'name': 'Asha Rai',
+                    'classSection': 'Grade 4 - A',
+                  },
+                  'dueAt': '2026-07-30T00:00:00.000Z',
+                  'isOverdue': false,
+                  'action': {
+                    'label': 'Review fees',
+                    'route': '/parent/fees?child=child-1',
+                  },
+                },
+              ],
+              'truncated': false,
+              'sources': {
+                'fees': {'status': 'available', 'reason': null},
+              },
+            },
+          ),
+        );
+
+        final centre = await repository.getActionCentre(studentId: 'child-1');
+
+        expect(centre, isA<ParentActionCentre>());
+        expect(centre.items.single.child?.id, 'child-1');
+        expect(centre.items.single.route, '/parent/fees?child=child-1');
+        verify(
+          () => apiClient.get<dynamic>(
+            '/mobile/me/action-centre',
+            queryParameters: {'studentId': 'child-1'},
+          ),
+        ).called(1);
+      },
+    );
+
+    test(
+      'loads a live linked-child weekly digest without a device cache',
+      () async {
+        when(
+          () => apiClient.get<dynamic>(
+            '/mobile/students/child-1/weekly-progress',
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(
+              path: '/mobile/students/child-1/weekly-progress',
+            ),
+            data: {
+              'generatedAt': '2026-07-26T10:00:00.000Z',
+              'dataState': 'LIVE',
+              'student': {
+                'id': 'child-1',
+                'name': 'Asha Rai',
+                'classSection': 'Grade 4 - A',
+              },
+              'period': {
+                'startAt': '2026-07-19T10:00:00.000Z',
+                'endAt': '2026-07-26T10:00:00.000Z',
+                'upcomingEndAt': '2026-08-02T10:00:00.000Z',
+                'days': 7,
+              },
+              'attendance': {
+                'availability': 'EMPTY',
+                'recordedDays': 0,
+                'presentDays': 0,
+                'absentDays': 0,
+                'lateDays': 0,
+                'excusedDays': 0,
+                'attendanceRate': null,
+              },
+              'homework': {
+                'availability': 'EMPTY',
+                'requiredCount': 0,
+                'completedCount': 0,
+                'needsFollowUpCount': 0,
+                'completionRate': null,
+              },
+              'academicTrend': {
+                'availability': 'UNAVAILABLE',
+                'direction': null,
+                'changePoints': null,
+                'current': null,
+                'previous': null,
+                'reason': 'Comparable published results are not available.',
+              },
+              'teacherComments': [],
+              'upcomingDeadlines': [],
+              'requiredActions': [],
+              'sources': {
+                'attendance': {
+                  'status': 'empty',
+                  'reason': 'No attendance was recorded.',
+                },
+              },
+              'isPartial': false,
+            },
+          ),
+        );
+
+        final progress = await repository.getWeeklyProgress('child-1');
+
+        expect(progress, isA<ParentWeeklyProgress>());
+        expect(progress.student.id, 'child-1');
+        expect(progress.attendance.attendanceRate, isNull);
+        verify(
+          () => apiClient.get<dynamic>(
+            '/mobile/students/child-1/weekly-progress',
+          ),
+        ).called(1);
+      },
+    );
 
     test('maps parent-safe child profile fields from mobile API', () async {
       when(

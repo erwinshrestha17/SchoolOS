@@ -8,8 +8,11 @@ import '../../../core/storage/app_preferences_service.dart';
 import '../../../core/storage/private_read_cache.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../data/parent_repository.dart';
+import '../domain/parent_action_centre_models.dart';
 import '../domain/parent_models.dart';
 import '../domain/parent_service_request_models.dart';
+import '../domain/parent_weekly_progress_models.dart';
+import '../../learning_support/domain/learning_support_models.dart';
 
 final parentRepositoryProvider = Provider<ParentRepository>((ref) {
   return ParentRepository(
@@ -30,6 +33,23 @@ final parentControllerProvider =
 final parentHomeworkProvider = FutureProvider.autoDispose
     .family<List<ParentHomeworkItem>, String>((ref, childId) {
       return ref.watch(parentRepositoryProvider).getHomeworkForChild(childId);
+    });
+
+final parentActionCentreProvider = FutureProvider.autoDispose
+    .family<ParentActionCentre, String?>((ref, studentId) {
+      return ref
+          .watch(parentRepositoryProvider)
+          .getActionCentre(studentId: studentId);
+    });
+
+final parentWeeklyProgressProvider = FutureProvider.autoDispose
+    .family<ParentWeeklyProgress, String>((ref, childId) {
+      return ref.watch(parentRepositoryProvider).getWeeklyProgress(childId);
+    });
+
+final parentLearningSupportProvider = FutureProvider.autoDispose
+    .family<ParentLearningSupportSummary, String>((ref, childId) {
+      return ref.watch(parentRepositoryProvider).getLearningSupport(childId);
     });
 
 final parentDashboardSummaryProvider = FutureProvider.autoDispose

@@ -33,12 +33,16 @@ import {
   ReasonedSchoolServiceRequestDto,
   UploadSchoolServiceRequestAttachmentDto,
 } from '../service-requests/dto/service-request.dto';
+import { LearningImprovementService } from '../learning-improvement/learning-improvement.service';
 
 @Controller('mobile')
 @UseGuards(JwtAuthGuard, EntitlementGuard)
 @Entitlement(FEATURE_KEYS.MOBILE_PARENT_BASIC)
 export class MobileController {
-  constructor(private readonly mobileService: MobileService) {}
+  constructor(
+    private readonly mobileService: MobileService,
+    private readonly learningImprovementService: LearningImprovementService,
+  ) {}
 
   @Get('me/students')
   @RequiredModule('students')
@@ -62,6 +66,27 @@ export class MobileController {
     @Query('studentId') studentId?: string,
   ) {
     return this.mobileService.getParentActionCentre(auth, studentId);
+  }
+
+  @Get('students/:id/weekly-progress')
+  @RequiredModule('students')
+  getStudentWeeklyProgress(
+    @Param('id') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.mobileService.getStudentWeeklyProgress(studentId, auth);
+  }
+
+  @Get('students/:id/learning-summary')
+  @RequiredModule('academics')
+  getStudentLearningSummary(
+    @Param('id') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.learningImprovementService.getParentLearningSummary(
+      studentId,
+      auth,
+    );
   }
 
   @Get('me/notifications')

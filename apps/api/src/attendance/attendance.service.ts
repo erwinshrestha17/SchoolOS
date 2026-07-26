@@ -2878,7 +2878,7 @@ export class AttendanceService {
     const totals = summarizeAttendance(monthRecords);
     const totalMarked = monthRecords.length;
     const percentage =
-      totalMarked > 0 ? (totals.present / totalMarked) * 100 : 100;
+      totalMarked > 0 ? (totals.present / totalMarked) * 100 : null;
 
     return {
       studentId,
@@ -2899,7 +2899,8 @@ export class AttendanceService {
       monthSummary: {
         ...totals,
         totalMarked,
-        attendancePercentage: Math.round(percentage * 100) / 100,
+        attendancePercentage:
+          percentage === null ? null : Math.round(percentage * 100) / 100,
       },
       monthHistory: monthRecords.map((record) => ({
         date: record.attendanceSession.attendanceDate,

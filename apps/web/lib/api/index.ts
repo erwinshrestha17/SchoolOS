@@ -17,3 +17,4 @@ export * from './library';
 export * from './transport';
 export * from './learning';
 export * from './school-settings';
+export * from './learning-improvement';

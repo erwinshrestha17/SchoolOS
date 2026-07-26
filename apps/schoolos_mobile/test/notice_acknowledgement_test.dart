@@ -110,6 +110,7 @@ void main() {
         category: NoticeCategory.general,
         isRead: false,
         hasAttachment: false,
+        requiresAcknowledgement: true,
       );
 
       expect(notice.canAcknowledge, isTrue);
@@ -132,6 +133,7 @@ void main() {
         category: NoticeCategory.general,
         isRead: false,
         hasAttachment: false,
+        requiresAcknowledgement: true,
       );
 
       expect(
@@ -154,9 +156,12 @@ void main() {
         category: NoticeCategory.general,
         isRead: false,
         hasAttachment: false,
+        requiresAcknowledgement: true,
       );
 
-      expect(notice.copyWith(isRead: true).noticeId, 'notice-1');
+      final updated = notice.copyWith(isRead: true);
+      expect(updated.noticeId, 'notice-1');
+      expect(updated.requiresAcknowledgement, isTrue);
     });
   });
 

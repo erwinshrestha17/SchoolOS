@@ -6,6 +6,8 @@ import { REQUIRED_MODULE_KEY } from '../auth/decorators/required-module.decorato
 import type { AuthContext } from '../auth/auth.types';
 import { MobilePrincipalController } from './mobile-principal.controller';
 import { MobilePrincipalService } from './mobile-principal.service';
+import { LearningImprovementService } from '../learning-improvement/learning-improvement.service';
+import { InstitutionalImprovementService } from '../institutional-improvement/institutional-improvement.service';
 
 describe('MobilePrincipalController', () => {
   let service: jest.Mocked<
@@ -44,6 +46,27 @@ describe('MobilePrincipalController', () => {
       | 'previewEmergencyNoticeRecipients'
       | 'submitEmergencyNotice'
       | 'getEmergencyNoticeStatus'
+    >
+  >;
+  let learningImprovementService: jest.Mocked<
+    Pick<
+      LearningImprovementService,
+      | 'getEarlyWarnings'
+      | 'listInterventions'
+      | 'getIntervention'
+      | 'addInterventionEntry'
+      | 'updateIntervention'
+    >
+  >;
+  let institutionalImprovementService: jest.Mocked<
+    Pick<
+      InstitutionalImprovementService,
+      | 'getPrincipalTeacherDevelopment'
+      | 'createTeacherObservation'
+      | 'updateTeacherObservation'
+      | 'listSchoolImprovementPlans'
+      | 'updateSchoolImprovementAction'
+      | 'getBoardExamReadiness'
     >
   >;
   let controller: MobilePrincipalController;
@@ -85,8 +108,25 @@ describe('MobilePrincipalController', () => {
       submitEmergencyNotice: jest.fn(),
       getEmergencyNoticeStatus: jest.fn(),
     };
+    learningImprovementService = {
+      getEarlyWarnings: jest.fn(),
+      listInterventions: jest.fn(),
+      getIntervention: jest.fn(),
+      addInterventionEntry: jest.fn(),
+      updateIntervention: jest.fn(),
+    };
+    institutionalImprovementService = {
+      getPrincipalTeacherDevelopment: jest.fn(),
+      createTeacherObservation: jest.fn(),
+      updateTeacherObservation: jest.fn(),
+      listSchoolImprovementPlans: jest.fn(),
+      updateSchoolImprovementAction: jest.fn(),
+      getBoardExamReadiness: jest.fn(),
+    };
     controller = new MobilePrincipalController(
       service as unknown as MobilePrincipalService,
+      learningImprovementService as unknown as LearningImprovementService,
+      institutionalImprovementService as unknown as InstitutionalImprovementService,
     );
     actor = {
       userId: 'principal-user-1',
@@ -175,6 +215,62 @@ describe('MobilePrincipalController', () => {
 
     expect(service.getDashboard).toHaveBeenCalledWith(actor);
     expect(service.getAttention).toHaveBeenCalledWith(actor, 'critical');
+  });
+
+  it('delegates explainable learning signals and versioned follow-up writes', async () => {
+    learningImprovementService.getEarlyWarnings.mockResolvedValue({
+      items: [],
+      nonPredictive: true,
+    } as never);
+    learningImprovementService.listInterventions.mockResolvedValue({
+      items: [],
+    } as never);
+    learningImprovementService.getIntervention.mockResolvedValue({
+      id: 'case-1',
+    } as never);
+    learningImprovementService.addInterventionEntry.mockResolvedValue({
+      id: 'entry-1',
+    } as never);
+    learningImprovementService.updateIntervention.mockResolvedValue({
+      id: 'case-1',
+      status: 'IN_PROGRESS',
+    } as never);
+
+    const query = { page: 1, limit: 20 };
+    const entry = {
+      entryType: 'NOTE',
+      body: 'Reviewed with the assigned class teacher.',
+      parentVisible: false,
+      clientRequestId: '11111111-1111-4111-8111-111111111111',
+    };
+    const update = {
+      status: 'IN_PROGRESS',
+      reason: 'Principal reviewed the current evidence.',
+      expectedVersion: 2,
+    };
+
+    await controller.learningAttention(actor, query);
+    await controller.interventionCases(actor, query);
+    await controller.interventionCase(actor, 'case-1');
+    await controller.addInterventionCaseEntry(actor, 'case-1', entry as never);
+    await controller.updateInterventionCase(actor, 'case-1', update as never);
+
+    expect(learningImprovementService.getEarlyWarnings).toHaveBeenCalledWith(
+      actor,
+      query,
+    );
+    expect(learningImprovementService.listInterventions).toHaveBeenCalledWith(
+      actor,
+      query,
+    );
+    expect(
+      learningImprovementService.addInterventionEntry,
+    ).toHaveBeenCalledWith(actor, 'case-1', entry);
+    expect(learningImprovementService.updateIntervention).toHaveBeenCalledWith(
+      actor,
+      'case-1',
+      update,
+    );
   });
 
   it('delegates approval, attendance, and staff coverage snapshots', async () => {
@@ -290,8 +386,8 @@ describe('MobilePrincipalController', () => {
     service.getTasks.mockResolvedValue({
       createTask: { supported: false },
     } as never);
-    service.getClassroomWalkthroughs.mockResolvedValue({
-      newObservation: { supported: false },
+    institutionalImprovementService.getPrincipalTeacherDevelopment.mockResolvedValue({
+      createObservationSupported: true,
     } as never);
     service.getEmergencyNotice.mockResolvedValue({
       actions: { approveAndSend: false },
@@ -314,6 +410,9 @@ describe('MobilePrincipalController', () => {
       classId: 'class-1',
       sectionId: 'section-1',
     });
+    expect(
+      institutionalImprovementService.getPrincipalTeacherDevelopment,
+    ).toHaveBeenCalledWith(actor);
     expect(service.getEmergencyNotice).toHaveBeenCalledWith(actor);
   });
 

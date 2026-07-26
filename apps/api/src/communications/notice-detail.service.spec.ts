@@ -28,6 +28,9 @@ describe('NoticeDetailService', () => {
       approvalRequest: {
         findFirst: jest.fn().mockResolvedValue(null),
       },
+      noticeAcknowledgement: {
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
     };
     const fileRegistry = {
       listFilesByEntity: jest.fn().mockResolvedValue([]),
@@ -173,9 +176,39 @@ describe('NoticeDetailService', () => {
     expect(prisma.auditLog.findMany).not.toHaveBeenCalled();
     expect(prisma.approvalRequest.findFirst).not.toHaveBeenCalled();
   });
+
+  it('returns required acknowledgement and the current recipient state', async () => {
+    const { service, prisma } = buildService();
+    prisma.notice.findFirst.mockResolvedValue(
+      noticeRecord({ requiresAcknowledgement: true }),
+    );
+    prisma.noticeAcknowledgement.findUnique.mockResolvedValue({
+      firstAcknowledgedAt: new Date('2026-07-26T03:00:00.000Z'),
+    });
+
+    const detail = await service.getNoticeDetail('notice-1', actor);
+
+    expect(detail.requiresAcknowledgement).toBe(true);
+    expect(detail.acknowledgedAt).toBe('2026-07-26T03:00:00.000Z');
+    expect(prisma.noticeAcknowledgement.findUnique).toHaveBeenCalledWith({
+      where: {
+        tenantId_noticeId_recipientUserId: {
+          tenantId: actor.tenantId,
+          noticeId: 'notice-1',
+          recipientUserId: actor.userId,
+        },
+      },
+      select: { firstAcknowledgedAt: true },
+    });
+  });
 });
 
-function noticeRecord(overrides: { attachmentUrl?: string | null } = {}) {
+function noticeRecord(
+  overrides: {
+    attachmentUrl?: string | null;
+    requiresAcknowledgement?: boolean;
+  } = {},
+) {
   return {
     id: 'notice-1',
     title: 'Circular',
@@ -188,6 +221,7 @@ function noticeRecord(overrides: { attachmentUrl?: string | null } = {}) {
     section: null,
     createdBy: { id: 'user-1', email: 'admin@school.test' },
     attachmentUrl: overrides.attachmentUrl ?? null,
+    requiresAcknowledgement: overrides.requiresAcknowledgement ?? false,
     lifecycleStatus: 'PUBLISHED',
     approvalRequestId: null,
     scheduledFor: null,

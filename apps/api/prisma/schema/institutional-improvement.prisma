@@ -1,0 +1,180 @@
+model TeacherClassroomObservation {
+  id                 String                    @id @default(uuid())
+  tenantId           String
+  teacherStaffId     String
+  observerUserId     String
+  academicYearId     String
+  classId            String?
+  sectionId          String?
+  subjectId          String?
+  timetableSlotId    String?
+  observedOn         DateTime                  @db.Date
+  strengths          String
+  developmentFocus   String
+  agreedAction       String?
+  teacherResponse    String?
+  followUpOn         DateTime?                 @db.Date
+  status             TeacherObservationStatus @default(DRAFT)
+  version            Int                       @default(1)
+  clientRequestId    String
+  requestFingerprint String
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+
+  tenant  Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  teacher Staff  @relation(fields: [teacherStaffId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, observerUserId, clientRequestId])
+  @@index([tenantId, academicYearId, status, followUpOn])
+  @@index([tenantId, teacherStaffId, observedOn])
+}
+
+model TeacherDevelopmentGoal {
+  id                 String                       @id @default(uuid())
+  tenantId           String
+  teacherStaffId     String
+  mentorStaffId      String?
+  academicYearId     String
+  createdByUserId    String
+  title              String
+  baseline           String
+  target             String
+  actionPlan         String
+  startsOn           DateTime                     @db.Date
+  dueOn              DateTime                     @db.Date
+  status             TeacherDevelopmentGoalStatus @default(DRAFT)
+  progressNote       String?
+  completedOn        DateTime?                    @db.Date
+  version            Int                          @default(1)
+  clientRequestId    String
+  requestFingerprint String
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
+
+  tenant  Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  teacher Staff  @relation("DevelopmentGoalTeacher", fields: [teacherStaffId], references: [id], onDelete: Restrict)
+  mentor  Staff? @relation("DevelopmentGoalMentor", fields: [mentorStaffId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, createdByUserId, clientRequestId])
+  @@index([tenantId, academicYearId, status, dueOn])
+  @@index([tenantId, teacherStaffId, status])
+  @@index([tenantId, mentorStaffId, status])
+}
+
+model TeacherTrainingRecord {
+  id                     String                @id @default(uuid())
+  tenantId               String
+  teacherStaffId         String
+  createdByUserId        String
+  title                  String
+  providerName           String?
+  startsOn               DateTime              @db.Date
+  endsOn                 DateTime?             @db.Date
+  status                 TeacherTrainingStatus @default(PLANNED)
+  learningSummary        String?
+  certificateFileAssetId String?
+  clientRequestId        String
+  requestFingerprint     String
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+
+  tenant  Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  teacher Staff  @relation(fields: [teacherStaffId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, createdByUserId, clientRequestId])
+  @@index([tenantId, teacherStaffId, startsOn])
+  @@index([tenantId, status, startsOn])
+  @@index([tenantId, certificateFileAssetId])
+}
+
+model SchoolImprovementPlan {
+  id                 String                      @id @default(uuid())
+  tenantId           String
+  academicYearId     String
+  createdByUserId    String
+  ownerUserId        String
+  title              String
+  baselineSummary    String
+  targetSummary      String
+  startsOn           DateTime                    @db.Date
+  endsOn             DateTime                    @db.Date
+  status             SchoolImprovementPlanStatus @default(DRAFT)
+  version            Int                         @default(1)
+  clientRequestId    String
+  requestFingerprint String
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
+
+  tenant  Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  kpis    SchoolImprovementKpi[]
+  actions SchoolImprovementAction[]
+  reviews SchoolImprovementReview[]
+
+  @@unique([tenantId, createdByUserId, clientRequestId])
+  @@index([tenantId, academicYearId, status])
+  @@index([tenantId, ownerUserId, status])
+}
+
+model SchoolImprovementKpi {
+  id            String   @id @default(uuid())
+  tenantId      String
+  planId        String
+  ownerUserId   String
+  name          String
+  unit          String
+  baselineValue Decimal  @db.Decimal(14, 2)
+  targetValue   Decimal  @db.Decimal(14, 2)
+  latestValue   Decimal? @db.Decimal(14, 2)
+  dueOn         DateTime @db.Date
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  plan   SchoolImprovementPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, planId, dueOn])
+  @@index([tenantId, ownerUserId, dueOn])
+}
+
+model SchoolImprovementAction {
+  id                  String                        @id @default(uuid())
+  tenantId            String
+  planId              String
+  ownerUserId         String
+  title               String
+  details             String
+  dueOn               DateTime                      @db.Date
+  status              SchoolImprovementActionStatus @default(NOT_STARTED)
+  progressNote        String?
+  evidenceFileAssetId String?
+  version             Int                           @default(1)
+  createdAt           DateTime                      @default(now())
+  updatedAt           DateTime                      @updatedAt
+
+  tenant Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  plan   SchoolImprovementPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, planId, status, dueOn])
+  @@index([tenantId, ownerUserId, status])
+  @@index([tenantId, evidenceFileAssetId])
+}
+
+model SchoolImprovementReview {
+  id                 String   @id @default(uuid())
+  tenantId           String
+  planId             String
+  reviewedByUserId   String
+  reviewedOn         DateTime @db.Date
+  summary            String
+  nextActions        String
+  kpiSnapshot        Json
+  clientRequestId    String
+  requestFingerprint String
+  createdAt          DateTime @default(now())
+
+  tenant Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  plan   SchoolImprovementPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, reviewedByUserId, clientRequestId])
+  @@index([tenantId, planId, reviewedOn])
+}

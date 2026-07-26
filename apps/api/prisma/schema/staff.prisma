@@ -67,6 +67,15 @@ model Staff {
   teacherAssignmentRecords   TeacherAssignment[]
   delegationsGranted         TeacherDelegation[] @relation("DelegationGrantor")
   delegationsReceived        TeacherDelegation[] @relation("DelegationRecipient")
+  formativeAssessmentEvidence FormativeAssessmentEvidence[]
+  ownedStudentInterventions   StudentInterventionCase[]
+  remedialGroups              RemedialGroup[]
+  curriculumProgressItems     CurriculumProgressItem[]
+  parentLearningGuidance      ParentLearningGuidance[]
+  classroomObservations       TeacherClassroomObservation[]
+  developmentGoals            TeacherDevelopmentGoal[] @relation("DevelopmentGoalTeacher")
+  mentoredDevelopmentGoals    TeacherDevelopmentGoal[] @relation("DevelopmentGoalMentor")
+  trainingRecords             TeacherTrainingRecord[]
 
   @@unique([tenantId, employeeId])
   @@unique([tenantId, staffCode])

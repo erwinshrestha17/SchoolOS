@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../../core/errors/app_exception.dart';
 import '../../../core/network/api_client.dart';
+import '../../learning_support/domain/learning_support_models.dart';
 
 class PrincipalRepository {
   const PrincipalRepository(this._client);
@@ -20,6 +21,80 @@ class PrincipalRepository {
         '/mobile/principal/attention',
         queryParameters: {'filter': filter},
       );
+
+  Future<LearningAttentionPage> getLearningAttention({int page = 1}) async {
+    final response = await _client.get(
+      '/mobile/principal/learning-attention',
+      queryParameters: {'page': page, 'limit': 20},
+    );
+    return LearningAttentionPage.fromJson(
+      Map<String, dynamic>.from(response.data as Map<String, dynamic>),
+    );
+  }
+
+  Future<List<LearningInterventionCase>> getLearningInterventionCases({
+    int page = 1,
+  }) async {
+    final response = await _client.get(
+      '/mobile/principal/intervention-cases',
+      queryParameters: {'page': page, 'limit': 20},
+    );
+    final data = Map<String, dynamic>.from(
+      response.data as Map<String, dynamic>,
+    );
+    return (data['items'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(LearningInterventionCase.fromJson)
+        .toList();
+  }
+
+  Future<LearningInterventionCase> getLearningInterventionCase(
+    String caseId,
+  ) async {
+    final response = await _client.get(
+      '/mobile/principal/intervention-cases/${Uri.encodeComponent(caseId)}',
+    );
+    return LearningInterventionCase.fromJson(
+      Map<String, dynamic>.from(response.data as Map<String, dynamic>),
+    );
+  }
+
+  Future<void> addLearningInterventionEntry({
+    required String caseId,
+    required String entryType,
+    required String body,
+    required bool parentVisible,
+    required String clientRequestId,
+  }) async {
+    await _client.post(
+      '/mobile/principal/intervention-cases/${Uri.encodeComponent(caseId)}/entries',
+      data: {
+        'entryType': entryType,
+        'body': body.trim(),
+        'parentVisible': parentVisible,
+        'clientRequestId': clientRequestId,
+      },
+    );
+  }
+
+  Future<void> updateLearningIntervention({
+    required String caseId,
+    required String status,
+    required String reason,
+    required int expectedVersion,
+    String? resolutionSummary,
+  }) async {
+    await _client.patch(
+      '/mobile/principal/intervention-cases/${Uri.encodeComponent(caseId)}',
+      data: {
+        'status': status,
+        'reason': reason.trim(),
+        'expectedVersion': expectedVersion,
+        if (resolutionSummary != null && resolutionSummary.trim().isNotEmpty)
+          'resolutionSummary': resolutionSummary.trim(),
+      },
+    );
+  }
 
   Future<Map<String, dynamic>> getApprovals({String status = 'pending'}) =>
       _getCached(

@@ -4,6 +4,7 @@ import '../../../core/errors/app_exception.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/storage/private_read_cache.dart';
 import '../domain/teacher_models.dart';
+import '../../learning_support/domain/learning_support_models.dart';
 
 class TeacherRepository {
   const TeacherRepository(this._client, {this.cache});
@@ -19,6 +20,87 @@ class TeacherRepository {
     return TeacherNoticeSummary(
       unreadCount: _asInt(data['unreadCount']),
       lastUpdated: DateTime.now(),
+    );
+  }
+
+  Future<TeacherStudentLearningSupport> getStudentLearningSupport({
+    required String studentId,
+    required String academicYearId,
+    required String classId,
+    String? sectionId,
+  }) async {
+    final response = await _client.get(
+      '/mobile/teacher/students/${Uri.encodeComponent(studentId)}/learning-support',
+      queryParameters: {
+        'academicYearId': academicYearId,
+        'classId': classId,
+        if (sectionId != null && sectionId.trim().isNotEmpty)
+          'sectionId': sectionId,
+      },
+    );
+    return TeacherStudentLearningSupport.fromJson(
+      Map<String, dynamic>.from(response.data as Map<String, dynamic>),
+    );
+  }
+
+  Future<void> recordFormativeCheck({
+    required String studentId,
+    required String outcomeId,
+    required String academicYearId,
+    required String classId,
+    required String subjectId,
+    String? sectionId,
+    required String kind,
+    required String masteryStatus,
+    required DateTime assessedOn,
+    String? note,
+    String? parentSummary,
+    required String clientSubmissionId,
+  }) async {
+    await _client.post(
+      '/mobile/teacher/students/${Uri.encodeComponent(studentId)}/formative-assessments',
+      data: {
+        'outcomeId': outcomeId,
+        'academicYearId': academicYearId,
+        'classId': classId,
+        if (sectionId != null && sectionId.trim().isNotEmpty)
+          'sectionId': sectionId,
+        'subjectId': subjectId,
+        'kind': kind,
+        'masteryStatus': masteryStatus,
+        'assessedOn': assessedOn.toUtc().toIso8601String(),
+        if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+        if (parentSummary != null && parentSummary.trim().isNotEmpty)
+          'parentSummary': parentSummary.trim(),
+        'clientSubmissionId': clientSubmissionId,
+      },
+    );
+  }
+
+  Future<void> startLearningFollowUp({
+    required String studentId,
+    required String academicYearId,
+    required String priority,
+    required String title,
+    required String concernSummary,
+    String? parentVisibleSummary,
+    DateTime? nextFollowUpOn,
+    required String clientRequestId,
+  }) async {
+    await _client.post(
+      '/mobile/teacher/students/${Uri.encodeComponent(studentId)}/interventions',
+      data: {
+        'academicYearId': academicYearId,
+        'priority': priority,
+        'title': title.trim(),
+        'concernSummary': concernSummary.trim(),
+        if (parentVisibleSummary != null &&
+            parentVisibleSummary.trim().isNotEmpty)
+          'parentVisibleSummary': parentVisibleSummary.trim(),
+        if (nextFollowUpOn != null)
+          'nextFollowUpOn': nextFollowUpOn.toUtc().toIso8601String(),
+        'clientRequestId': clientRequestId,
+      },
     );
   }
 

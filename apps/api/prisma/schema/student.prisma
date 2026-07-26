@@ -105,6 +105,10 @@ model Student {
   learningParticipants         LearningParticipant[]
   learningAttempts             LearningAttempt[]
   learningProgress             LearningProgress[]
+  formativeAssessmentEvidence  FormativeAssessmentEvidence[]
+  interventionCases            StudentInterventionCase[]
+  remedialGroupMemberships     RemedialGroupMember[]
+  parentLearningGuidance       ParentLearningGuidance[]
 
   @@unique([tenantId, studentSystemId])
   @@index([tenantId, classId, sectionId])

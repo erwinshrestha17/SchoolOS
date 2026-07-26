@@ -2095,6 +2095,78 @@ describe('attendance production hardening', () => {
     expect(prisma.attendanceRecord.findMany).not.toHaveBeenCalled();
   });
 
+  it('does not fabricate perfect parent attendance when no days are marked', async () => {
+    const parentActor = {
+      ...teacherActor,
+      userId: 'parent-1',
+      roles: ['parent'],
+      permissions: ['attendance:read'],
+    };
+    const { service } = buildService({
+      studentFindFirst: {
+        id: 'student-1',
+        classId: 'class-1',
+        sectionId: null,
+      },
+      guardianFindFirst: {
+        id: 'guardian-1',
+        studentLinks: [{ studentId: 'student-1' }],
+      },
+      attendanceRecords: [],
+    });
+
+    const result = await service.getParentSummary('student-1', parentActor);
+
+    expect(result.monthSummary).toEqual(
+      expect.objectContaining({
+        totalMarked: 0,
+        attendancePercentage: null,
+      }),
+    );
+  });
+
+  it('keeps parent attendance percentages backend-derived when days exist', async () => {
+    const parentActor = {
+      ...teacherActor,
+      userId: 'parent-1',
+      roles: ['parent'],
+      permissions: ['attendance:read'],
+    };
+    const attendanceDate = new Date('2026-07-20T00:00:00.000Z');
+    const { service } = buildService({
+      studentFindFirst: {
+        id: 'student-1',
+        classId: 'class-1',
+        sectionId: null,
+      },
+      guardianFindFirst: {
+        id: 'guardian-1',
+        studentLinks: [{ studentId: 'student-1' }],
+      },
+      attendanceRecords: [
+        {
+          status: AttendanceStatus.PRESENT,
+          remark: null,
+          attendanceSession: { attendanceDate },
+        },
+        {
+          status: AttendanceStatus.ABSENT,
+          remark: null,
+          attendanceSession: { attendanceDate },
+        },
+      ],
+    });
+
+    const result = await service.getParentSummary('student-1', parentActor);
+
+    expect(result.monthSummary).toEqual(
+      expect.objectContaining({
+        totalMarked: 2,
+        attendancePercentage: 50,
+      }),
+    );
+  });
+
   it('enforces tenant M2 locked-session override minimum reason length before mutating records', async () => {
     const session = buildAttendanceSession({
       records: [

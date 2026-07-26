@@ -23,6 +23,8 @@ import { MobileTeacherActivityController } from './mobile-teacher-activity.contr
 import { NotificationsModule } from '../notifications/notifications.module';
 import { MobilePushTokensController } from './mobile-push-tokens.controller';
 import { ServiceRequestsModule } from '../service-requests/service-requests.module';
+import { LearningImprovementModule } from '../learning-improvement/learning-improvement.module';
+import { InstitutionalImprovementModule } from '../institutional-improvement/institutional-improvement.module';
 
 @Module({
   imports: [
@@ -40,6 +42,8 @@ import { ServiceRequestsModule } from '../service-requests/service-requests.modu
     ActivityFeedModule,
     NotificationsModule,
     ServiceRequestsModule,
+    LearningImprovementModule,
+    InstitutionalImprovementModule,
   ],
   controllers: [
     MobileController,

@@ -22,6 +22,7 @@ export * from './api/school-settings';
 export * from './api/geography';
 export * from './api/teacher-workspace';
 export * from './api/teacher-students';
+export * from './api/learning-improvement';
 
 import { authApi } from './api/auth';
 import {
@@ -49,6 +50,7 @@ import { filesApi } from './api/client';
 import { geographyApi } from './api/geography';
 import { teacherWorkspaceApi } from './api/teacher-workspace';
 import { teacherStudentsApi } from './api/teacher-students';
+import { learningImprovementApi } from './api/learning-improvement';
 
 function normalizeHomeworkReminderBatches(
   result: unknown,
@@ -99,4 +101,5 @@ export const api = {
   ...geographyApi,
   ...teacherWorkspaceApi,
   ...teacherStudentsApi,
+  ...learningImprovementApi,
 };

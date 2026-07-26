@@ -45,7 +45,10 @@ export class NoticeAcknowledgementService {
         tenantId: actor.tenantId,
         noticeId,
         recipientUserId: actor.userId,
-        notice: { lifecycleStatus: NoticeLifecycleStatus.PUBLISHED },
+        notice: {
+          lifecycleStatus: NoticeLifecycleStatus.PUBLISHED,
+          requiresAcknowledgement: true,
+        },
       },
       orderBy: { createdAt: 'asc' },
       select: {

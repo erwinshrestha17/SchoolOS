@@ -21,10 +21,14 @@ import '../features/teacher/presentation/screens/teacher_profile_screen.dart';
 import '../features/teacher/presentation/screens/teacher_timetable_screen.dart';
 import '../features/learning/presentation/screens/learning_summary_screen.dart';
 import '../features/learning/presentation/screens/student_learning_session_screen.dart';
+import '../features/learning_support/presentation/parent_learning_support_screen.dart';
+import '../features/learning_support/presentation/principal_learning_support_screen.dart';
+import '../features/learning_support/presentation/teacher_student_learning_support_screen.dart';
 import '../features/notices/presentation/screens/notice_detail_screen.dart';
 import '../features/notices/presentation/screens/notice_list_screen.dart';
 import '../features/notices/presentation/screens/notification_center_screen.dart';
 import '../features/parent/presentation/screens/parent_activity_screen.dart';
+import '../features/parent/presentation/screens/parent_action_centre_screen.dart';
 import '../features/parent/presentation/screens/parent_calendar_screen.dart';
 import '../features/parent/presentation/screens/parent_canteen_screen.dart';
 import '../features/parent/presentation/screens/parent_consents_screen.dart';
@@ -36,6 +40,7 @@ import '../features/parent/presentation/screens/parent_report_cards_screen.dart'
 import '../features/parent/presentation/screens/parent_timetable_screen.dart';
 import '../features/parent/presentation/screens/parent_transport_screen.dart';
 import '../features/parent/presentation/screens/parent_service_requests_screen.dart';
+import '../features/parent/presentation/screens/parent_weekly_progress_screen.dart';
 import '../features/principal/presentation/screens/principal_screens.dart';
 import '../features/profile/presentation/change_password_screen.dart';
 import '../features/profile/presentation/profile_screen.dart';
@@ -116,6 +121,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const SchoolOsAppShell(),
       ),
       GoRoute(
+        path: AppRoutes.parentActionCentre,
+        builder: (context, state) => ParentActionCentreScreen(
+          initialStudentId: state.uri.queryParameters['studentId'],
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.parentWeeklyProgress,
+        builder: (context, state) => const ParentWeeklyProgressScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.parentChildren,
         builder: (context, state) => const SchoolOsAppShell(initialIndex: 1),
       ),
@@ -180,6 +195,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const LearningSummaryScreen(),
       ),
       GoRoute(
+        path: AppRoutes.parentLearningSupport,
+        builder: (context, state) => const ParentLearningSupportScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.parentTransport,
         builder: (context, state) => const ParentTransportScreen(),
       ),
@@ -242,6 +261,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.teacherClass,
         builder: (context, state) => TeacherClassHubScreen(
           classSectionId: state.pathParameters['classSectionId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.teacherStudentLearningSupport,
+        builder: (context, state) => TeacherStudentLearningSupportScreen(
+          studentId: state.pathParameters['studentId'] ?? '',
+          academicYearId: state.uri.queryParameters['academicYearId'] ?? '',
+          classId: state.uri.queryParameters['classId'] ?? '',
+          sectionId: state.uri.queryParameters['sectionId'],
         ),
       ),
       GoRoute(
@@ -379,6 +407,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           title: 'Academics Readiness',
           subtitle: 'Assessment and report-card readiness overview',
         ),
+      ),
+      GoRoute(
+        path: AppRoutes.principalLearningSupport,
+        builder: (context, state) => const PrincipalLearningSupportScreen(),
       ),
       GoRoute(
         path: AppRoutes.principalTransport,
@@ -553,6 +585,7 @@ bool isPrincipalRoute(String location) {
       location == AppRoutes.principalStaffAbsence ||
       location == AppRoutes.principalFees ||
       location == AppRoutes.principalAcademics ||
+      location == AppRoutes.principalLearningSupport ||
       location == AppRoutes.principalTransport ||
       location == AppRoutes.principalStudents ||
       location == AppRoutes.principalReports ||
@@ -575,6 +608,7 @@ bool isTeacherRoute(String location) {
   return location == AppRoutes.teacherHome ||
       location == AppRoutes.teacherClasses ||
       location.startsWith('/teacher/class/') ||
+      location.startsWith('/teacher/students/') ||
       location == AppRoutes.teacherAttendance ||
       location.startsWith('${AppRoutes.teacherAttendance}/') ||
       location == AppRoutes.teacherHomework ||
@@ -589,6 +623,8 @@ bool isTeacherRoute(String location) {
 @visibleForTesting
 bool isParentRoute(String location) {
   return location == AppRoutes.parentHome ||
+      location == AppRoutes.parentActionCentre ||
+      location == AppRoutes.parentWeeklyProgress ||
       location == AppRoutes.parentChildren ||
       location.startsWith('/parent/child/') ||
       location.startsWith('/parent/children/') ||
@@ -603,6 +639,7 @@ bool isParentRoute(String location) {
       location == AppRoutes.parentFeesReceipts ||
       location == AppRoutes.parentActivity ||
       location == AppRoutes.parentLearning ||
+      location == AppRoutes.parentLearningSupport ||
       location == AppRoutes.parentTransport ||
       location == AppRoutes.parentCanteen ||
       location == AppRoutes.parentConsents ||

@@ -1,0 +1,253 @@
+model LearningOutcome {
+  id             String                @id @default(uuid())
+  tenantId       String
+  academicYearId String
+  classId        String
+  subjectId      String
+  code           String
+  title          String
+  description    String?
+  domain         LearningOutcomeDomain @default(GENERAL)
+  isActive       Boolean               @default(true)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  tenant             Tenant                        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear       AcademicYear                  @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  class              Class                         @relation(fields: [classId], references: [id], onDelete: Restrict)
+  subject            Subject                       @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  assessmentEvidence FormativeAssessmentEvidence[]
+  remedialGroups     RemedialGroup[]
+  curriculumItems    CurriculumProgressItem[]
+  parentGuidance     ParentLearningGuidance[]
+
+  @@unique([tenantId, academicYearId, classId, subjectId, code])
+  @@index([tenantId, academicYearId, classId, subjectId, isActive])
+}
+
+model FormativeAssessmentEvidence {
+  id                   String                   @id @default(uuid())
+  tenantId             String
+  outcomeId            String
+  studentId            String
+  academicYearId       String
+  classId              String
+  sectionId            String?
+  subjectId            String
+  teacherStaffId       String
+  kind                 FormativeAssessmentKind
+  masteryStatus        LearningMasteryStatus
+  score                Decimal?                 @db.Decimal(8, 2)
+  maxScore             Decimal?                 @db.Decimal(8, 2)
+  assessedOn           DateTime                 @db.Date
+  note                 String?
+  observationChecklist Json?
+  parentSummary        String?
+  reassessmentOfId     String?
+  clientSubmissionId   String?
+  requestFingerprint   String?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+
+  tenant         Tenant                        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  outcome        LearningOutcome               @relation(fields: [outcomeId], references: [id], onDelete: Restrict)
+  student        Student                       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  academicYear   AcademicYear                  @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  class          Class                         @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section        Section?                      @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  subject        Subject                       @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  teacher        Staff                         @relation(fields: [teacherStaffId], references: [id], onDelete: Restrict)
+  reassessmentOf FormativeAssessmentEvidence?  @relation("FormativeAssessmentReassessment", fields: [reassessmentOfId], references: [id], onDelete: SetNull)
+  reassessments  FormativeAssessmentEvidence[] @relation("FormativeAssessmentReassessment")
+
+  @@unique([tenantId, teacherStaffId, clientSubmissionId], map: "formative_assessment_client_submission_key")
+  @@index([tenantId, studentId, assessedOn])
+  @@index([tenantId, outcomeId, masteryStatus, assessedOn])
+  @@index([tenantId, academicYearId, classId, sectionId, subjectId])
+}
+
+model StudentInterventionCase {
+  id                   String                       @id @default(uuid())
+  tenantId             String
+  studentId            String
+  academicYearId       String
+  classId              String
+  sectionId            String?
+  ownerStaffId         String?
+  sourceSignalKey      String?
+  priority             StudentInterventionPriority @default(ROUTINE)
+  status               StudentInterventionStatus   @default(OPEN)
+  title                String
+  concernSummary       String
+  parentVisibleSummary String?
+  nextFollowUpOn       DateTime?                    @db.Date
+  escalatedAt          DateTime?
+  resolvedAt           DateTime?
+  resolutionSummary    String?
+  createdByUserId      String
+  clientRequestId      String?
+  requestFingerprint   String?
+  version              Int                          @default(1)
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+
+  tenant       Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  student      Student                    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear               @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  class        Class                      @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section      Section?                   @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  owner        Staff?                     @relation(fields: [ownerStaffId], references: [id], onDelete: SetNull)
+  entries      StudentInterventionEntry[]
+
+  @@unique([tenantId, createdByUserId, clientRequestId], map: "student_intervention_client_request_key")
+  @@index([tenantId, status, nextFollowUpOn])
+  @@index([tenantId, studentId, status])
+  @@index([tenantId, ownerStaffId, status])
+}
+
+model StudentInterventionEntry {
+  id              String                       @id @default(uuid())
+  tenantId        String
+  caseId          String
+  entryType       StudentInterventionEntryType
+  body            String
+  parentVisible   Boolean                      @default(false)
+  contactedAt     DateTime?
+  nextFollowUpOn  DateTime?                    @db.Date
+  actorUserId     String
+  clientRequestId String?
+  requestFingerprint String?
+  createdAt       DateTime                     @default(now())
+
+  tenant Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  case   StudentInterventionCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, actorUserId, clientRequestId], map: "student_intervention_entry_client_request_key")
+  @@index([tenantId, caseId, createdAt])
+}
+
+model RemedialGroup {
+  id              String              @id @default(uuid())
+  tenantId        String
+  academicYearId  String
+  classId         String
+  sectionId       String?
+  subjectId       String
+  outcomeId       String?
+  teacherStaffId  String
+  name            String
+  purpose         String
+  status          RemedialGroupStatus @default(PLANNED)
+  startsOn        DateTime             @db.Date
+  endsOn          DateTime?            @db.Date
+  scheduleNote    String?
+  parentSummary   String?
+  createdByUserId String
+  clientRequestId String?
+  requestFingerprint String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  tenant         Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear   AcademicYear             @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  class          Class                    @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section        Section?                 @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  subject        Subject                  @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  outcome        LearningOutcome?         @relation(fields: [outcomeId], references: [id], onDelete: SetNull)
+  teacher        Staff                    @relation(fields: [teacherStaffId], references: [id], onDelete: Restrict)
+  memberships    RemedialGroupMember[]
+  parentGuidance ParentLearningGuidance[]
+
+  @@unique([tenantId, createdByUserId, clientRequestId], map: "remedial_group_client_request_key")
+  @@index([tenantId, academicYearId, classId, sectionId, subjectId, status])
+  @@index([tenantId, teacherStaffId, status])
+}
+
+model RemedialGroupMember {
+  id            String   @id @default(uuid())
+  tenantId      String
+  groupId       String
+  studentId     String
+  isActive      Boolean  @default(true)
+  joinedAt      DateTime @default(now())
+  leftAt        DateTime?
+  addedByUserId String
+
+  tenant  Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  group   RemedialGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  student Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, groupId, studentId])
+  @@index([tenantId, studentId, isActive])
+}
+
+model CurriculumProgressItem {
+  id              String                   @id @default(uuid())
+  tenantId        String
+  academicYearId  String
+  classId         String
+  sectionId       String?
+  subjectId       String
+  outcomeId       String?
+  teacherStaffId  String
+  title           String
+  status          CurriculumProgressStatus @default(PLANNED)
+  plannedOn       DateTime                  @db.Date
+  completedOn     DateTime?                 @db.Date
+  missedReason    String?
+  reteachPlan     String?
+  resourceUrl     String?
+  note            String?
+  createdByUserId String
+  clientRequestId String?
+  requestFingerprint String?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear AcademicYear     @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  class        Class            @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section      Section?         @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  subject      Subject          @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  outcome      LearningOutcome? @relation(fields: [outcomeId], references: [id], onDelete: SetNull)
+  teacher      Staff            @relation(fields: [teacherStaffId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, createdByUserId, clientRequestId], map: "curriculum_progress_client_request_key")
+  @@index([tenantId, academicYearId, classId, sectionId, subjectId, status, plannedOn])
+  @@index([tenantId, teacherStaffId, plannedOn])
+}
+
+model ParentLearningGuidance {
+  id               String                       @id @default(uuid())
+  tenantId         String
+  studentId        String
+  academicYearId   String
+  subjectId        String
+  outcomeId        String?
+  remedialGroupId  String?
+  teacherStaffId   String
+  title            String
+  skillExplanation String
+  homeActivity     String
+  status           ParentLearningGuidanceStatus @default(DRAFT)
+  visibleFrom      DateTime?
+  visibleUntil     DateTime?
+  createdByUserId  String
+  clientRequestId  String?
+  requestFingerprint String?
+  publishedAt      DateTime?
+  createdAt        DateTime                     @default(now())
+  updatedAt        DateTime                     @updatedAt
+
+  tenant        Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  student       Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  academicYear  AcademicYear     @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  subject       Subject          @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  outcome       LearningOutcome? @relation(fields: [outcomeId], references: [id], onDelete: SetNull)
+  remedialGroup RemedialGroup?   @relation(fields: [remedialGroupId], references: [id], onDelete: SetNull)
+  teacher       Staff            @relation(fields: [teacherStaffId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, createdByUserId, clientRequestId], map: "parent_learning_guidance_client_request_key")
+  @@index([tenantId, studentId, status, visibleFrom])
+  @@index([tenantId, academicYearId, subjectId])
+}

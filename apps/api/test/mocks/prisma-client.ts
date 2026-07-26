@@ -866,6 +866,73 @@ export const HomeworkSubmissionMethod = {
   NO_SUBMISSION_REQUIRED: 'NO_SUBMISSION_REQUIRED',
 } as const;
 
+export const LearningOutcomeDomain = {
+  GENERAL: 'GENERAL',
+  FOUNDATIONAL_READING: 'FOUNDATIONAL_READING',
+  FOUNDATIONAL_NUMERACY: 'FOUNDATIONAL_NUMERACY',
+} as const;
+
+export const LearningMasteryStatus = {
+  BEGINNING: 'BEGINNING',
+  DEVELOPING: 'DEVELOPING',
+  SECURE: 'SECURE',
+  EXTENDING: 'EXTENDING',
+} as const;
+
+export const FormativeAssessmentKind = {
+  OBSERVATION: 'OBSERVATION',
+  EXIT_TICKET: 'EXIT_TICKET',
+  QUIZ: 'QUIZ',
+  ORAL: 'ORAL',
+  PRACTICAL: 'PRACTICAL',
+  CHECKLIST: 'CHECKLIST',
+  REASSESSMENT: 'REASSESSMENT',
+} as const;
+
+export const StudentInterventionStatus = {
+  OPEN: 'OPEN',
+  IN_PROGRESS: 'IN_PROGRESS',
+  MONITORING: 'MONITORING',
+  RESOLVED: 'RESOLVED',
+  CLOSED: 'CLOSED',
+} as const;
+
+export const StudentInterventionPriority = {
+  ROUTINE: 'ROUTINE',
+  IMPORTANT: 'IMPORTANT',
+  URGENT: 'URGENT',
+} as const;
+
+export const StudentInterventionEntryType = {
+  NOTE: 'NOTE',
+  PARENT_CONTACT: 'PARENT_CONTACT',
+  ACTION: 'ACTION',
+  FOLLOW_UP: 'FOLLOW_UP',
+  PROGRESS: 'PROGRESS',
+  ESCALATION: 'ESCALATION',
+  RESOLUTION: 'RESOLUTION',
+} as const;
+
+export const RemedialGroupStatus = {
+  PLANNED: 'PLANNED',
+  ACTIVE: 'ACTIVE',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export const CurriculumProgressStatus = {
+  PLANNED: 'PLANNED',
+  COMPLETED: 'COMPLETED',
+  MISSED: 'MISSED',
+  RETEACH_REQUIRED: 'RETEACH_REQUIRED',
+} as const;
+
+export const ParentLearningGuidanceStatus = {
+  DRAFT: 'DRAFT',
+  PUBLISHED: 'PUBLISHED',
+  ARCHIVED: 'ARCHIVED',
+} as const;
+
 export const TimetableVersionStatus = {
   DRAFT: 'DRAFT',
   PUBLISHED: 'PUBLISHED',
@@ -1301,4 +1368,40 @@ export const SchoolServiceRequestStatus = {
 export const SchoolServiceRequestNoteVisibility = {
   PARENT: 'PARENT',
   INTERNAL: 'INTERNAL',
+} as const;
+
+export const TeacherObservationStatus = {
+  DRAFT: 'DRAFT',
+  COMPLETED: 'COMPLETED',
+  ACKNOWLEDGED: 'ACKNOWLEDGED',
+  FOLLOW_UP_DUE: 'FOLLOW_UP_DUE',
+  CLOSED: 'CLOSED',
+} as const;
+
+export const TeacherDevelopmentGoalStatus = {
+  DRAFT: 'DRAFT',
+  ACTIVE: 'ACTIVE',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export const TeacherTrainingStatus = {
+  PLANNED: 'PLANNED',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export const SchoolImprovementPlanStatus = {
+  DRAFT: 'DRAFT',
+  ACTIVE: 'ACTIVE',
+  COMPLETED: 'COMPLETED',
+  ARCHIVED: 'ARCHIVED',
+} as const;
+
+export const SchoolImprovementActionStatus = {
+  NOT_STARTED: 'NOT_STARTED',
+  IN_PROGRESS: 'IN_PROGRESS',
+  BLOCKED: 'BLOCKED',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED',
 } as const;

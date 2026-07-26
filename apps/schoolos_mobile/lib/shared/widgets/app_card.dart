@@ -50,7 +50,10 @@ class AppCard extends StatelessWidget {
         ),
         child: ClipRRect(
           borderRadius: cardBorderRadius,
-          child: Padding(padding: padding, child: child),
+          child: Material(
+            type: MaterialType.transparency,
+            child: Padding(padding: padding, child: child),
+          ),
         ),
       ),
     );

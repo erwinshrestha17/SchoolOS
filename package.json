@@ -22,6 +22,7 @@
     "db:seed:e2e:m1-assessment": "pnpm --filter @schoolos/api db:seed:e2e:m1-assessment",
     "db:seed:e2e:m3-collection": "pnpm --filter @schoolos/api db:seed:e2e:m3-collection",
     "db:seed:e2e:m4-report-card": "pnpm --filter @schoolos/api db:seed:e2e:m4-report-card",
+    "db:seed:e2e:stage3-learning-improvement": "pnpm --filter @schoolos/api db:seed:e2e:stage3-learning-improvement",
     "db:clean:e2e-notices": "pnpm --filter @schoolos/api db:clean:e2e-notices",
     "db:seed:platform": "pnpm --filter @schoolos/api db:seed:platform",
     "db:seed:geography": "pnpm --filter @schoolos/api db:seed:geography",
@@ -38,6 +39,9 @@
     "smoke:core": "node scripts/smoke-runner-local.mjs core",
     "smoke:platform": "node scripts/smoke-runner-local.mjs platform",
     "smoke:service-requests": "node scripts/verify-service-requests-local.mjs",
+    "smoke:parent-actions": "node scripts/verify-parent-action-centre-local.mjs",
+    "smoke:stage2": "node scripts/verify-stage2-operational-control-local.mjs",
+    "smoke:stage3": "node scripts/verify-stage3-learning-improvement-local.mjs",
     "smoke:learning": "node scripts/smoke-runner-local.mjs learning",
     "smoke:full": "node scripts/smoke-runner-local.mjs full",
     "smoke:phase1": "pnpm smoke:pilot"

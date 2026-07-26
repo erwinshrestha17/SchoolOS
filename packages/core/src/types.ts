@@ -2816,6 +2816,538 @@ export type FinanceApprovalRequestPage =
   FinancePaginatedResponse<FinanceApprovalRequestView>;
 
 
+// ─── Compiled from types/institutional-improvement.ts ───
+export type TeacherObservationStatus =
+  | 'DRAFT'
+  | 'COMPLETED'
+  | 'ACKNOWLEDGED'
+  | 'FOLLOW_UP_DUE'
+  | 'CLOSED';
+
+export type TeacherDevelopmentGoalStatus =
+  | 'DRAFT'
+  | 'ACTIVE'
+  | 'COMPLETED'
+  | 'CANCELLED';
+
+export type TeacherTrainingStatus = 'PLANNED' | 'COMPLETED' | 'CANCELLED';
+
+export type SchoolImprovementPlanStatus =
+  | 'DRAFT'
+  | 'ACTIVE'
+  | 'COMPLETED'
+  | 'ARCHIVED';
+
+export type SchoolImprovementActionStatus =
+  | 'NOT_STARTED'
+  | 'IN_PROGRESS'
+  | 'BLOCKED'
+  | 'COMPLETED'
+  | 'CANCELLED';
+
+export type InstitutionalImprovementPage<T> = {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+};
+
+export type StaffReference = {
+  id: string;
+  employeeId: string;
+  fullName: string;
+  designation: string | null;
+};
+
+export type TeacherObservationRecord = {
+  id: string;
+  teacher: StaffReference;
+  observerUserId: string;
+  academicYearId: string;
+  classId: string | null;
+  sectionId: string | null;
+  subjectId: string | null;
+  timetableSlotId: string | null;
+  observedOn: string;
+  strengths: string;
+  developmentFocus: string;
+  agreedAction: string | null;
+  teacherResponse: string | null;
+  followUpOn: string | null;
+  status: TeacherObservationStatus;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TeacherDevelopmentGoalRecord = {
+  id: string;
+  teacher: StaffReference;
+  mentor: StaffReference | null;
+  academicYearId: string;
+  title: string;
+  baseline: string;
+  target: string;
+  actionPlan: string;
+  startsOn: string;
+  dueOn: string;
+  status: TeacherDevelopmentGoalStatus;
+  progressNote: string | null;
+  completedOn: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TeacherTrainingRecord = {
+  id: string;
+  teacher: StaffReference;
+  title: string;
+  providerName: string | null;
+  startsOn: string;
+  endsOn: string | null;
+  status: TeacherTrainingStatus;
+  learningSummary: string | null;
+  certificateFileAssetId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TeacherDevelopmentOverview = {
+  generatedAt: string;
+  academicYearId: string;
+  metrics: {
+    observationsDue: number;
+    activeGoals: number;
+    overdueGoals: number;
+    completedTraining: number;
+  };
+  sourceStates: {
+    observations: 'available' | 'empty';
+    goals: 'available' | 'empty';
+    training: 'available' | 'empty';
+  };
+  observations: TeacherObservationRecord[];
+  goals: TeacherDevelopmentGoalRecord[];
+  training: TeacherTrainingRecord[];
+};
+
+export type SchoolImprovementKpiRecord = {
+  id: string;
+  ownerUserId: string;
+  name: string;
+  unit: string;
+  baselineValue: string;
+  targetValue: string;
+  latestValue: string | null;
+  dueOn: string;
+};
+
+export type SchoolImprovementActionRecord = {
+  id: string;
+  ownerUserId: string;
+  title: string;
+  details: string;
+  dueOn: string;
+  status: SchoolImprovementActionStatus;
+  progressNote: string | null;
+  evidenceFileAssetId: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SchoolImprovementReviewRecord = {
+  id: string;
+  reviewedByUserId: string;
+  reviewedOn: string;
+  summary: string;
+  nextActions: string;
+  kpiSnapshot: Array<{
+    kpiId: string;
+    value: number;
+    note?: string;
+  }>;
+  createdAt: string;
+};
+
+export type SchoolImprovementPlanRecord = {
+  id: string;
+  academicYearId: string;
+  ownerUserId: string;
+  title: string;
+  baselineSummary: string;
+  targetSummary: string;
+  startsOn: string;
+  endsOn: string;
+  status: SchoolImprovementPlanStatus;
+  version: number;
+  kpis: SchoolImprovementKpiRecord[];
+  actions: SchoolImprovementActionRecord[];
+  reviews: SchoolImprovementReviewRecord[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type BoardReadinessTrack = 'GRADE_8' | 'SEE' | 'GRADE_12';
+export type BoardReadinessState =
+  | 'READY'
+  | 'NEEDS_ATTENTION'
+  | 'BLOCKED'
+  | 'UNAVAILABLE';
+
+export type BoardReadinessIndicator = {
+  code: string;
+  label: string;
+  state: BoardReadinessState;
+  observed: number | null;
+  expected: number | null;
+  explanation: string;
+  actionRoute: string | null;
+};
+
+export type BoardExamReadiness = {
+  generatedAt: string;
+  academicYearId: string;
+  track: BoardReadinessTrack;
+  classLevel: 8 | 10 | 12;
+  state: BoardReadinessState;
+  nonPredictive: true;
+  sourceStates: {
+    students: 'available' | 'empty' | 'unavailable';
+    examTerms: 'available' | 'empty' | 'unavailable';
+    marks: 'available' | 'empty' | 'unavailable';
+    reportCards: 'available' | 'empty' | 'unavailable';
+    iemis: 'available' | 'empty' | 'unavailable';
+  };
+  indicators: BoardReadinessIndicator[];
+};
+
+
+// ─── Compiled from types/learning-improvement.ts ───
+export type LearningOutcomeDomain =
+  | 'GENERAL'
+  | 'FOUNDATIONAL_READING'
+  | 'FOUNDATIONAL_NUMERACY';
+
+export type LearningMasteryStatus =
+  | 'BEGINNING'
+  | 'DEVELOPING'
+  | 'SECURE'
+  | 'EXTENDING';
+
+export type FormativeAssessmentKind =
+  | 'OBSERVATION'
+  | 'EXIT_TICKET'
+  | 'QUIZ'
+  | 'ORAL'
+  | 'PRACTICAL'
+  | 'CHECKLIST'
+  | 'REASSESSMENT';
+
+export type StudentInterventionStatus =
+  | 'OPEN'
+  | 'IN_PROGRESS'
+  | 'MONITORING'
+  | 'RESOLVED'
+  | 'CLOSED';
+
+export type StudentInterventionPriority =
+  | 'ROUTINE'
+  | 'IMPORTANT'
+  | 'URGENT';
+
+export type StudentInterventionEntryType =
+  | 'NOTE'
+  | 'PARENT_CONTACT'
+  | 'ACTION'
+  | 'FOLLOW_UP'
+  | 'PROGRESS'
+  | 'ESCALATION'
+  | 'RESOLUTION';
+
+export type RemedialGroupStatus =
+  | 'PLANNED'
+  | 'ACTIVE'
+  | 'COMPLETED'
+  | 'CANCELLED';
+
+export type CurriculumProgressStatus =
+  | 'PLANNED'
+  | 'COMPLETED'
+  | 'MISSED'
+  | 'RETEACH_REQUIRED';
+
+export type ParentLearningGuidanceStatus =
+  | 'DRAFT'
+  | 'PUBLISHED'
+  | 'ARCHIVED';
+
+export type LearningImprovementSourceState =
+  | 'available'
+  | 'empty'
+  | 'partial'
+  | 'locked'
+  | 'unavailable';
+
+export type LearningImprovementPage<T> = {
+  items: T[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+};
+
+export type LearningImprovementStudentRef = {
+  id: string;
+  studentSystemId: string;
+  fullName: string;
+  classId: string;
+  className: string;
+  classLevel: number;
+  sectionId: string | null;
+  sectionName: string | null;
+};
+
+export type LearningImprovementSubjectRef = {
+  id: string;
+  code: string;
+  name: string;
+};
+
+export type LearningOutcomeRecord = {
+  id: string;
+  academicYearId: string;
+  classId: string;
+  subject: LearningImprovementSubjectRef;
+  code: string;
+  title: string;
+  description: string | null;
+  domain: LearningOutcomeDomain;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type FormativeAssessmentEvidenceRecord = {
+  id: string;
+  outcome: Pick<
+    LearningOutcomeRecord,
+    'id' | 'code' | 'title' | 'domain'
+  >;
+  student: LearningImprovementStudentRef;
+  academicYearId: string;
+  subject: LearningImprovementSubjectRef;
+  teacher: { id: string; fullName: string };
+  kind: FormativeAssessmentKind;
+  masteryStatus: LearningMasteryStatus;
+  score: string | null;
+  maxScore: string | null;
+  assessedOn: string;
+  note: string | null;
+  observationChecklist: Record<string, boolean> | null;
+  parentSummary: string | null;
+  reassessmentOfId: string | null;
+  createdAt: string;
+};
+
+export type LearningOutcomeProgress = {
+  outcome: Pick<
+    LearningOutcomeRecord,
+    'id' | 'code' | 'title' | 'domain'
+  >;
+  latestMasteryStatus: LearningMasteryStatus;
+  latestAssessedOn: string;
+  previousMasteryStatus: LearningMasteryStatus | null;
+  assessmentCount: number;
+  parentSummary: string | null;
+};
+
+export type StudentEarlyWarningReasonCode =
+  | 'ATTENDANCE_PATTERN'
+  | 'FORMATIVE_SUPPORT'
+  | 'HOMEWORK_FOLLOW_UP';
+
+export type StudentEarlyWarningItem = {
+  signalKey: string;
+  student: LearningImprovementStudentRef;
+  attentionLevel: 'WATCH' | 'NEEDS_ATTENTION';
+  reasons: Array<{
+    code: StudentEarlyWarningReasonCode;
+    label: string;
+    explanation: string;
+    observedValue: number;
+    threshold: number;
+  }>;
+  sourceStates: {
+    attendance: LearningImprovementSourceState;
+    formativeAssessment: LearningImprovementSourceState;
+    homework: LearningImprovementSourceState;
+  };
+  activeInterventionCaseId: string | null;
+  generatedAt: string;
+};
+
+export type StudentEarlyWarningResponse = LearningImprovementPage<StudentEarlyWarningItem> & {
+  generatedAt: string;
+  rulesVersion: 'stage3-v1';
+  nonPredictive: true;
+};
+
+export type StudentInterventionEntryRecord = {
+  id: string;
+  entryType: StudentInterventionEntryType;
+  body: string;
+  parentVisible: boolean;
+  contactedAt: string | null;
+  nextFollowUpOn: string | null;
+  createdAt: string;
+};
+
+export type StudentInterventionCaseRecord = {
+  id: string;
+  student: LearningImprovementStudentRef;
+  academicYearId: string;
+  owner: { id: string; fullName: string } | null;
+  sourceSignalKey: string | null;
+  priority: StudentInterventionPriority;
+  status: StudentInterventionStatus;
+  title: string;
+  concernSummary: string;
+  parentVisibleSummary: string | null;
+  nextFollowUpOn: string | null;
+  escalatedAt: string | null;
+  resolvedAt: string | null;
+  resolutionSummary: string | null;
+  version: number;
+  entries: StudentInterventionEntryRecord[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type RemedialGroupRecord = {
+  id: string;
+  academicYearId: string;
+  classId: string;
+  sectionId: string | null;
+  subject: LearningImprovementSubjectRef;
+  outcome: Pick<LearningOutcomeRecord, 'id' | 'code' | 'title'> | null;
+  teacher: { id: string; fullName: string };
+  name: string;
+  purpose: string;
+  status: RemedialGroupStatus;
+  startsOn: string;
+  endsOn: string | null;
+  scheduleNote: string | null;
+  parentSummary: string | null;
+  members: Array<{ student: LearningImprovementStudentRef; joinedAt: string }>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CurriculumProgressItemRecord = {
+  id: string;
+  academicYearId: string;
+  classId: string;
+  sectionId: string | null;
+  subject: LearningImprovementSubjectRef;
+  outcome: Pick<LearningOutcomeRecord, 'id' | 'code' | 'title'> | null;
+  teacher: { id: string; fullName: string };
+  title: string;
+  status: CurriculumProgressStatus;
+  plannedOn: string;
+  completedOn: string | null;
+  missedReason: string | null;
+  reteachPlan: string | null;
+  resourceUrl: string | null;
+  note: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CurriculumProgressSummary = {
+  totalItems: number;
+  planned: number;
+  completed: number;
+  missed: number;
+  reteachRequired: number;
+  completionPercent: number | null;
+  paceState: 'on_track' | 'attention_needed' | 'unavailable';
+};
+
+export type ParentLearningGuidanceRecord = {
+  id: string;
+  studentId: string;
+  student: LearningImprovementStudentRef;
+  academicYearId: string;
+  subject: LearningImprovementSubjectRef;
+  outcome: Pick<LearningOutcomeRecord, 'id' | 'code' | 'title' | 'domain'> | null;
+  remedialGroup: {
+    id: string;
+    name: string;
+    scheduleNote: string | null;
+  } | null;
+  teacher: { id: string; fullName: string };
+  title: string;
+  skillExplanation: string;
+  homeActivity: string;
+  status: ParentLearningGuidanceStatus;
+  visibleFrom: string | null;
+  visibleUntil: string | null;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ParentLearningSummary = {
+  generatedAt: string;
+  student: LearningImprovementStudentRef;
+  sourceStates: {
+    outcomeProgress: LearningImprovementSourceState;
+    guidance: LearningImprovementSourceState;
+    remedialSupport: LearningImprovementSourceState;
+    interventionUpdates: LearningImprovementSourceState;
+  };
+  outcomeProgress: LearningOutcomeProgress[];
+  guidance: ParentLearningGuidanceRecord[];
+  remedialSupport: Array<{
+    id: string;
+    name: string;
+    subject: LearningImprovementSubjectRef;
+    startsOn: string;
+    endsOn: string | null;
+    scheduleNote: string | null;
+    parentSummary: string | null;
+  }>;
+  interventionUpdates: Array<{
+    caseId: string;
+    status: StudentInterventionStatus;
+    title: string;
+    summary: string;
+    nextFollowUpOn: string | null;
+    updatedAt: string;
+  }>;
+};
+
+export type TeacherStudentLearningHub = {
+  generatedAt: string;
+  student: LearningImprovementStudentRef;
+  sourceStates: {
+    outcomes: LearningImprovementSourceState;
+    outcomeProgress: LearningImprovementSourceState;
+    interventions: LearningImprovementSourceState;
+    remedialSupport: LearningImprovementSourceState;
+    parentGuidance: LearningImprovementSourceState;
+  };
+  availableOutcomes: LearningOutcomeRecord[];
+  outcomeProgress: LearningOutcomeProgress[];
+  interventions: StudentInterventionCaseRecord[];
+  remedialGroups: RemedialGroupRecord[];
+  parentGuidance: ParentLearningGuidanceRecord[];
+};
+
+
 // ─── Compiled from types/library.ts ───
 export type LibraryBookSummary = {
   id: string;

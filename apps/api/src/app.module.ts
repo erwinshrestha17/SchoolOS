@@ -34,6 +34,8 @@ import { HomeworkModule } from './homework/homework.module';
 import { PayrollModule } from './payroll/payroll.module';
 import { MessagingModule } from './messaging/messaging.module';
 import { LibraryModule } from './library/library.module';
+import { LearningImprovementModule } from './learning-improvement/learning-improvement.module';
+import { InstitutionalImprovementModule } from './institutional-improvement/institutional-improvement.module';
 import { TransportModule } from './transport/transport.module';
 import { CanteenModule } from './canteen/canteen.module';
 import { PlatformModule } from './platform/platform.module';
@@ -118,6 +120,8 @@ import { AppThrottlerGuard } from './auth/guards/app-throttler.guard';
     AccountingModule,
     MessagingModule,
     LibraryModule,
+    LearningImprovementModule,
+    InstitutionalImprovementModule,
     TransportModule,
     CanteenModule,
     PlatformModule,

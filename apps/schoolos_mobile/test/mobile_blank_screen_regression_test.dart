@@ -31,6 +31,7 @@ import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_ho
 import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_profile_screen.dart';
 import 'package:schoolos_mobile/features/teacher/presentation/screens/teacher_timetable_screen.dart';
 import 'package:schoolos_mobile/features/teacher/presentation/widgets/teacher_app_widgets.dart';
+import 'package:schoolos_mobile/shared/widgets/app_card.dart';
 
 class _MockAttendanceRepository extends Mock implements AttendanceRepository {}
 
@@ -130,6 +131,32 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+  });
+
+  testWidgets('app cards support tappable list tiles without an assertion', (
+    tester,
+  ) async {
+    var tapped = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AppCard(
+            padding: EdgeInsets.zero,
+            child: ListTile(
+              title: const Text('Open details'),
+              onTap: () => tapped = true,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.text('Open details'));
+    await tester.pump();
+    expect(tapped, isTrue);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('principal today stays overflow-free on a compact phone', (
@@ -336,6 +363,60 @@ void main() {
     expect(find.text('Nothing needs action here'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'principal parent requests paints a populated row on a compact phone',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 700);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final sharedPrefs = await SharedPreferences.getInstance();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appPreferencesServiceProvider.overrideWithValue(
+              AppPreferencesService(sharedPrefs),
+            ),
+            tokenStorageServiceProvider.overrideWithValue(_FakeTokenStorage()),
+            authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+            authProvider.overrideWith((ref) {
+              return _FakeAuthNotifier(
+                ref.watch(tokenStorageServiceProvider),
+                ref.watch(authRepositoryProvider),
+                ref.watch(appPreferencesServiceProvider),
+              );
+            }),
+            principalServiceRequestsProvider.overrideWith((ref, status) async {
+              return {
+                'total': 1,
+                'page': 1,
+                'hasNextPage': false,
+                'items': [
+                  {
+                    'id': 'request-1',
+                    'type': 'GENERAL_COMPLAINT',
+                    'title': 'Bus stop safety concern',
+                    'subtitle': 'Asha Rai • Grade 4 - A',
+                    'detail': 'Response due soon',
+                    'status': 'OPEN',
+                    'severity': 'high',
+                  },
+                ],
+              };
+            }),
+          ],
+          child: const MaterialApp(home: PrincipalServiceRequestsScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Parent Requests'), findsOneWidget);
+      expect(find.text('Bus stop safety concern'), findsOneWidget);
+      expect(find.text('Review'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('principal tasks keeps unsupported task creation unavailable', (
     tester,

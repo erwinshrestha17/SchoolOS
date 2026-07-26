@@ -5,6 +5,7 @@ import '../../../core/network/connectivity_provider.dart';
 import '../../../core/storage/private_read_cache.dart';
 import '../data/teacher_repository.dart';
 import '../domain/teacher_models.dart';
+import '../../learning_support/domain/learning_support_models.dart';
 
 final teacherRepositoryProvider = Provider<TeacherRepository>((ref) {
   return TeacherRepository(
@@ -16,6 +17,47 @@ final teacherRepositoryProvider = Provider<TeacherRepository>((ref) {
 final teacherNoticeSummaryProvider =
     FutureProvider.autoDispose<TeacherNoticeSummary>((ref) async {
       return ref.watch(teacherRepositoryProvider).getNoticeSummary();
+    });
+
+class TeacherLearningSupportQuery {
+  const TeacherLearningSupportQuery({
+    required this.studentId,
+    required this.academicYearId,
+    required this.classId,
+    this.sectionId,
+  });
+
+  final String studentId;
+  final String academicYearId;
+  final String classId;
+  final String? sectionId;
+
+  @override
+  bool operator ==(Object other) =>
+      other is TeacherLearningSupportQuery &&
+      other.studentId == studentId &&
+      other.academicYearId == academicYearId &&
+      other.classId == classId &&
+      other.sectionId == sectionId;
+
+  @override
+  int get hashCode =>
+      Object.hash(studentId, academicYearId, classId, sectionId);
+}
+
+final teacherLearningSupportProvider = FutureProvider.autoDispose
+    .family<TeacherStudentLearningSupport, TeacherLearningSupportQuery>((
+      ref,
+      query,
+    ) {
+      return ref
+          .watch(teacherRepositoryProvider)
+          .getStudentLearningSupport(
+            studentId: query.studentId,
+            academicYearId: query.academicYearId,
+            classId: query.classId,
+            sectionId: query.sectionId,
+          );
     });
 
 final teacherHomeworkProvider = FutureProvider.autoDispose

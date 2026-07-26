@@ -9,7 +9,10 @@ import '../../../core/network/api_client.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/storage/private_read_cache.dart';
 import '../domain/parent_models.dart';
+import '../domain/parent_action_centre_models.dart';
 import '../domain/parent_service_request_models.dart';
+import '../domain/parent_weekly_progress_models.dart';
+import '../../learning_support/domain/learning_support_models.dart';
 
 class ParentRepository {
   ParentRepository(this._client, {this.cache});
@@ -54,6 +57,48 @@ class ParentRepository {
         .whereType<Map<String, dynamic>>()
         .map(GuardianChild.fromJson)
         .toList();
+  }
+
+  Future<ParentActionCentre> getActionCentre({String? studentId}) async {
+    // Deliberately uncached. The action centre combines current deadlines,
+    // balances, acknowledgement state, and private school responses. Showing
+    // an old snapshot as actionable would be unsafe.
+    final response = await _client.get(
+      '/mobile/me/action-centre',
+      queryParameters: {
+        if (studentId != null && studentId.trim().isNotEmpty)
+          'studentId': studentId,
+      },
+    );
+    return ParentActionCentre.fromJson(
+      Map<String, dynamic>.from(response.data as Map<String, dynamic>),
+    );
+  }
+
+  Future<ParentWeeklyProgress> getWeeklyProgress(String childId) async {
+    // Deliberately uncached. The digest combines current attendance,
+    // submissions, feedback, deadlines, and required actions. An old snapshot
+    // must not be presented as a current weekly summary.
+    final response = await _client.get(
+      '/mobile/students/${Uri.encodeComponent(childId)}/weekly-progress',
+    );
+    return ParentWeeklyProgress.fromJson(
+      Map<String, dynamic>.from(response.data as Map<String, dynamic>),
+    );
+  }
+
+  Future<ParentLearningSupportSummary> getLearningSupport(
+    String childId,
+  ) async {
+    // Current teacher-authored guidance and intervention updates are
+    // deliberately online-only. An old snapshot must not be presented as the
+    // child's current support plan.
+    final response = await _client.get(
+      '/mobile/students/${Uri.encodeComponent(childId)}/learning-summary',
+    );
+    return ParentLearningSupportSummary.fromJson(
+      Map<String, dynamic>.from(response.data as Map<String, dynamic>),
+    );
   }
 
   Future<ChildProfile> getChildProfile(String childId) async {

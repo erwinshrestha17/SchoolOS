@@ -89,6 +89,18 @@ interface ParentActionItem {
   action: { label: string; route: string };
 }
 
+type ParentDigestSourceStatus =
+  | 'available'
+  | 'empty'
+  | 'partial'
+  | 'locked'
+  | 'unavailable';
+
+interface ParentDigestSourceState {
+  status: ParentDigestSourceStatus;
+  reason: string | null;
+}
+
 @Injectable()
 export class MobileService {
   constructor(
@@ -551,6 +563,373 @@ export class MobileService {
       items: returnedItems,
       truncated: actions.length > returnedItems.length,
       sources: sourceStates,
+    };
+  }
+
+  async getStudentWeeklyProgress(studentId: string, actor: AuthContext) {
+    if (!isParentOnly(actor)) {
+      throw new ForbiddenException(
+        'Parent weekly progress is not available for this account.',
+      );
+    }
+    const student = await this.getAccessibleStudent(studentId, actor);
+    const generatedAt = new Date();
+    const periodStart = new Date(
+      generatedAt.getTime() - 7 * 24 * 60 * 60 * 1000,
+    );
+    const upcomingEnd = new Date(
+      generatedAt.getTime() + 7 * 24 * 60 * 60 * 1000,
+    );
+    const entitlements = await this.entitlementsService.getEntitlements(
+      actor.tenantId,
+    );
+    const modules = new Set(entitlements.modules);
+    const enabled = (moduleName: string) => modules.has(moduleName);
+    const sources: Record<
+      'attendance' | 'homework' | 'academics' | 'comments' | 'actions',
+      ParentDigestSourceState
+    > = {
+      attendance: enabled('attendance')
+        ? { status: 'available', reason: null }
+        : {
+            status: 'locked',
+            reason: 'Attendance is not enabled for this school.',
+          },
+      homework: enabled('homework')
+        ? { status: 'available', reason: null }
+        : {
+            status: 'locked',
+            reason: 'Homework is not enabled for this school.',
+          },
+      academics: enabled('academics')
+        ? { status: 'available', reason: null }
+        : {
+            status: 'locked',
+            reason: 'Published results are not enabled for this school.',
+          },
+      comments: enabled('homework')
+        ? { status: 'available', reason: null }
+        : {
+            status: 'locked',
+            reason: 'Teacher homework feedback is not enabled for this school.',
+          },
+      actions: { status: 'available', reason: null },
+    };
+    const load = async <T>(
+      source: keyof typeof sources,
+      work: () => Promise<T>,
+    ): Promise<T | null> => {
+      try {
+        return await work();
+      } catch {
+        sources[source] = {
+          status: 'unavailable',
+          reason: `Could not load ${parentDigestSourceLabel(source)} right now.`,
+        };
+        return null;
+      }
+    };
+
+    const [attendance, homeworkRows, reportCards, actionCentre] =
+      await Promise.all([
+        enabled('attendance')
+          ? load('attendance', () =>
+              this.getStudentAttendanceSummary(studentId, actor),
+            )
+          : Promise.resolve(null),
+        enabled('homework')
+          ? load('homework', () =>
+              this.prisma.homeworkAssignment.findMany({
+                where: {
+                  tenantId: actor.tenantId,
+                  classId: student.classId,
+                  status: { in: ['ASSIGNED', 'CLOSED'] },
+                  OR: [
+                    {
+                      AND: [
+                        { dueAt: { gte: periodStart, lte: generatedAt } },
+                        {
+                          OR: [
+                            { sectionId: null },
+                            { sectionId: student.sectionId },
+                          ],
+                        },
+                      ],
+                    },
+                    {
+                      submissions: {
+                        some: {
+                          tenantId: actor.tenantId,
+                          studentId,
+                          updatedAt: {
+                            gte: periodStart,
+                            lte: generatedAt,
+                          },
+                          feedback: { not: null },
+                        },
+                      },
+                    },
+                  ],
+                },
+                select: {
+                  id: true,
+                  title: true,
+                  dueAt: true,
+                  submissionRequired: true,
+                  subject: { select: { id: true, name: true } },
+                  submissions: {
+                    where: {
+                      tenantId: actor.tenantId,
+                      studentId,
+                    },
+                    select: {
+                      status: true,
+                      feedback: true,
+                      reviewedAt: true,
+                      returnedAt: true,
+                      updatedAt: true,
+                    },
+                    take: 1,
+                  },
+                },
+                orderBy: [{ dueAt: 'desc' }, { id: 'asc' }],
+                take: 101,
+              }),
+            )
+          : Promise.resolve(null),
+        enabled('academics')
+          ? load('academics', () =>
+              this.getStudentReportCards(studentId, actor),
+            )
+          : Promise.resolve(null),
+        load('actions', () => this.getParentActionCentre(actor, studentId)),
+      ]);
+
+    const attendanceRows = (attendance?.recentHistory ?? []).filter((record) =>
+      isTimestampBetween(record.date, periodStart, generatedAt),
+    );
+    const presentStatuses = new Set(['PRESENT', 'LATE']);
+    const attendanceSummary = {
+      availability:
+        sources.attendance.status === 'locked'
+          ? 'LOCKED'
+          : attendance === null
+            ? 'UNAVAILABLE'
+            : attendanceRows.length === 0
+              ? 'EMPTY'
+              : 'AVAILABLE',
+      recordedDays: attendanceRows.length,
+      presentDays: attendanceRows.filter((record) =>
+        presentStatuses.has(record.status),
+      ).length,
+      absentDays: attendanceRows.filter((record) => record.status === 'ABSENT')
+        .length,
+      lateDays: attendanceRows.filter((record) => record.status === 'LATE')
+        .length,
+      excusedDays: attendanceRows.filter((record) =>
+        ['EXCUSED', 'LEAVE'].includes(record.status),
+      ).length,
+      attendanceRate:
+        attendanceRows.length > 0
+          ? roundMoney(
+              (attendanceRows.filter((record) =>
+                presentStatuses.has(record.status),
+              ).length /
+                attendanceRows.length) *
+                100,
+            )
+          : null,
+    };
+    if (attendance && attendanceRows.length === 0) {
+      sources.attendance = {
+        status: 'empty',
+        reason: 'No attendance was recorded in this seven-day period.',
+      };
+    }
+
+    const boundedHomework = (homeworkRows ?? []).slice(0, 100);
+    if (enabled('homework') && homeworkRows === null) {
+      sources.comments = {
+        status: 'unavailable',
+        reason: 'Could not load teacher feedback right now.',
+      };
+    }
+    if ((homeworkRows?.length ?? 0) > boundedHomework.length) {
+      sources.homework = {
+        status: 'partial',
+        reason:
+          'More than 100 homework records changed in this period; the digest is bounded.',
+      };
+      sources.comments = sources.homework;
+    }
+    const periodHomework = boundedHomework.filter(
+      (assignment) =>
+        assignment.submissionRequired &&
+        isTimestampBetween(assignment.dueAt, periodStart, generatedAt),
+    );
+    const completedStatuses = new Set([
+      'SUBMITTED',
+      'LATE',
+      'REVIEWED',
+      'EXCUSED',
+      'COMPLETED',
+    ]);
+    const completedHomework = periodHomework.filter((assignment) =>
+      completedStatuses.has(
+        assignment.submissions[0]?.status ?? 'NOT_SUBMITTED',
+      ),
+    );
+    const needsFollowUp = periodHomework.filter((assignment) =>
+      ['NOT_SUBMITTED', 'NEEDS_CORRECTION', 'INCOMPLETE', 'ABSENT'].includes(
+        assignment.submissions[0]?.status ?? 'NOT_SUBMITTED',
+      ),
+    ).length;
+    const homeworkSummary = {
+      availability:
+        sources.homework.status === 'locked'
+          ? 'LOCKED'
+          : homeworkRows === null
+            ? 'UNAVAILABLE'
+            : periodHomework.length === 0
+              ? 'EMPTY'
+              : 'AVAILABLE',
+      requiredCount: periodHomework.length,
+      completedCount: completedHomework.length,
+      needsFollowUpCount: needsFollowUp,
+      completionRate:
+        periodHomework.length > 0
+          ? roundMoney((completedHomework.length / periodHomework.length) * 100)
+          : null,
+    };
+    if (
+      homeworkRows &&
+      periodHomework.length === 0 &&
+      sources.homework.status === 'available'
+    ) {
+      sources.homework = {
+        status: 'empty',
+        reason: 'No submission-required homework was due in this period.',
+      };
+    }
+
+    const comments = boundedHomework
+      .flatMap((assignment) => {
+        const submission = assignment.submissions[0];
+        const feedback = submission?.feedback?.trim();
+        const sharedAt =
+          submission?.reviewedAt ??
+          submission?.returnedAt ??
+          submission?.updatedAt;
+        if (
+          !feedback ||
+          !sharedAt ||
+          !isTimestampBetween(sharedAt, periodStart, generatedAt)
+        ) {
+          return [];
+        }
+        return [
+          {
+            id: `homework-feedback:${assignment.id}`,
+            subject: assignment.subject.name,
+            title: assignment.title,
+            comment: feedback,
+            sharedAt: toIso(sharedAt),
+          },
+        ];
+      })
+      .sort(
+        (left, right) =>
+          timestampOrZero(right.sharedAt) - timestampOrZero(left.sharedAt),
+      )
+      .slice(0, 5);
+    if (
+      homeworkRows &&
+      comments.length === 0 &&
+      sources.comments.status === 'available'
+    ) {
+      sources.comments = {
+        status: 'empty',
+        reason: 'No parent-visible teacher feedback was shared this period.',
+      };
+    }
+
+    const academicTrend =
+      sources.academics.status === 'locked'
+        ? {
+            availability: 'LOCKED',
+            direction: null,
+            changePoints: null,
+            current: null,
+            previous: null,
+            reason: sources.academics.reason,
+          }
+        : reportCards === null
+          ? {
+              availability: 'UNAVAILABLE',
+              direction: null,
+              changePoints: null,
+              current: null,
+              previous: null,
+              reason: sources.academics.reason,
+            }
+          : buildParentAcademicTrend(reportCards.items);
+    if (reportCards && academicTrend.availability === 'UNAVAILABLE') {
+      sources.academics = {
+        status: 'empty',
+        reason: academicTrend.reason,
+      };
+    }
+
+    const requiredActions = (actionCentre?.items ?? []).slice(0, 10);
+    const upcomingDeadlines = requiredActions
+      .filter((item) =>
+        isTimestampBetween(item.dueAt, generatedAt, upcomingEnd),
+      )
+      .slice(0, 5);
+    if (actionCentre?.summary.isPartial) {
+      sources.actions = {
+        status: 'partial',
+        reason:
+          'Some action sources are locked or unavailable; only visible actions are included.',
+      };
+    } else if (actionCentre && requiredActions.length === 0) {
+      sources.actions = {
+        status: 'empty',
+        reason: 'No parent action is visible right now.',
+      };
+    }
+
+    return {
+      generatedAt: generatedAt.toISOString(),
+      dataState: 'LIVE',
+      student: {
+        id: student.id,
+        name: [student.firstNameEn, student.lastNameEn]
+          .filter(Boolean)
+          .join(' '),
+        classSection: [student.class.name, student.sectionRef?.name]
+          .filter(Boolean)
+          .join(' - '),
+      },
+      period: {
+        startAt: periodStart.toISOString(),
+        endAt: generatedAt.toISOString(),
+        upcomingEndAt: upcomingEnd.toISOString(),
+        days: 7,
+      },
+      attendance: attendanceSummary,
+      homework: homeworkSummary,
+      academicTrend,
+      teacherComments: comments,
+      upcomingDeadlines,
+      requiredActions,
+      sources,
+      isPartial: Object.values(sources).some(
+        (source) =>
+          source.status === 'partial' ||
+          source.status === 'locked' ||
+          source.status === 'unavailable',
+      ),
     };
   }
 
@@ -2606,6 +2985,98 @@ function parentActionSourceLabel(source: ParentActionSource) {
     exams: 'upcoming examinations',
   };
   return labels[source];
+}
+
+function parentDigestSourceLabel(
+  source: 'attendance' | 'homework' | 'academics' | 'comments' | 'actions',
+) {
+  const labels = {
+    attendance: 'weekly attendance',
+    homework: 'weekly homework',
+    academics: 'published result comparisons',
+    comments: 'teacher feedback',
+    actions: 'required parent actions',
+  };
+  return labels[source];
+}
+
+function isTimestampBetween(
+  value: Date | string | null | undefined,
+  start: Date,
+  end: Date,
+) {
+  if (!value) return false;
+  const timestamp = value instanceof Date ? value.getTime() : Date.parse(value);
+  return (
+    Number.isFinite(timestamp) &&
+    timestamp >= start.getTime() &&
+    timestamp <= end.getTime()
+  );
+}
+
+function buildParentAcademicTrend(
+  cards: Array<{
+    id: string;
+    academicYear: { id: string; name: string };
+    examTerm: { id: string; name: string };
+    percentage: number;
+    publishedAt: string | null;
+    subjects: Array<{
+      subjectId: string;
+      maxMarks: number;
+    }>;
+  }>,
+) {
+  const [current, previous] = cards;
+  const unavailable = {
+    availability: 'UNAVAILABLE' as const,
+    direction: null,
+    changePoints: null,
+    current: null,
+    previous: null,
+    reason:
+      'Two comparable published results are not available for this child.',
+  };
+  if (!current || !previous) return unavailable;
+  if (
+    current.academicYear.id !== previous.academicYear.id ||
+    current.examTerm.id === previous.examTerm.id ||
+    current.subjects.length === 0 ||
+    current.subjects.length !== previous.subjects.length
+  ) {
+    return unavailable;
+  }
+  const previousSubjects = new Map(
+    previous.subjects.map((subject) => [subject.subjectId, subject.maxMarks]),
+  );
+  const comparableSubjects = current.subjects.every(
+    (subject) =>
+      previousSubjects.has(subject.subjectId) &&
+      previousSubjects.get(subject.subjectId) === subject.maxMarks,
+  );
+  if (!comparableSubjects) return unavailable;
+
+  const changePoints = roundMoney(current.percentage - previous.percentage);
+  const direction =
+    changePoints > 0 ? 'IMPROVED' : changePoints < 0 ? 'DECLINED' : 'STABLE';
+  return {
+    availability: 'AVAILABLE' as const,
+    direction,
+    changePoints,
+    current: {
+      reportCardId: current.id,
+      termName: current.examTerm.name,
+      percentage: current.percentage,
+      publishedAt: current.publishedAt,
+    },
+    previous: {
+      reportCardId: previous.id,
+      termName: previous.examTerm.name,
+      percentage: previous.percentage,
+      publishedAt: previous.publishedAt,
+    },
+    reason: null,
+  };
 }
 
 function boundedTake(value: string | undefined, fallback: number) {

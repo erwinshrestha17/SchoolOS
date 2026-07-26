@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/network/connectivity_provider.dart';
 import '../data/principal_repository.dart';
+import '../../learning_support/domain/learning_support_models.dart';
 
 final principalRepositoryProvider = Provider<PrincipalRepository>((ref) {
   return PrincipalRepository(ref.watch(apiClientProvider));
@@ -24,6 +25,25 @@ final principalAttentionProvider = FutureProvider.autoDispose
             .getAttention(filter: filter),
         isOnline,
       );
+    });
+
+final principalLearningAttentionProvider =
+    FutureProvider.autoDispose<LearningAttentionPage>((ref) {
+      return ref.watch(principalRepositoryProvider).getLearningAttention();
+    });
+
+final principalLearningCasesProvider =
+    FutureProvider.autoDispose<List<LearningInterventionCase>>((ref) {
+      return ref
+          .watch(principalRepositoryProvider)
+          .getLearningInterventionCases();
+    });
+
+final principalLearningCaseProvider = FutureProvider.autoDispose
+    .family<LearningInterventionCase, String>((ref, caseId) {
+      return ref
+          .watch(principalRepositoryProvider)
+          .getLearningInterventionCase(caseId);
     });
 
 final principalApprovalsProvider = FutureProvider.autoDispose

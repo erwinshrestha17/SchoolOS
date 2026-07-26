@@ -16,7 +16,10 @@ import {
   Settings,
 } from 'lucide-react';
 import { useSession } from '@/components/session-provider';
-import { academicsWorkspaceTabs } from '@/components/academics/academics-tabs';
+import {
+  academicsWorkspaceOverflowTabs,
+  academicsWorkspaceTabs,
+} from '@/components/academics/academics-tabs';
 import { DashboardPageShell } from '@/components/dashboard/dashboard-page-shell';
 import { SummaryCard, SummaryGrid } from '@/components/ui/summary-card';
 import { ModuleHeader } from '@/components/ui/module-header';
@@ -180,7 +183,10 @@ export default function AcademicsOverviewPage() {
       </ModuleHeader>
 
       <div className="flex flex-col gap-6">
-        <WorkspaceTabs items={academicsWorkspaceTabs} />
+        <WorkspaceTabs
+          items={academicsWorkspaceTabs}
+          overflowItems={academicsWorkspaceOverflowTabs}
+        />
 
         <WorkSurface
           title="Core academic workspaces"

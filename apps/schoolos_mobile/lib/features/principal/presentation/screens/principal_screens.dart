@@ -295,11 +295,16 @@ class _PrincipalServiceRequestsScreenState
             const SizedBox(height: AppSpacing.md),
             _ItemList(
               items: _list(data['items']),
-              actionBuilder: (item) => OutlinedButton(
-                onPressed: () => context.go(
-                  AppRoutes.principalServiceRequestDetail(_string(item['id'])),
+              actionBuilder: (item) => SizedBox(
+                width: 104,
+                child: OutlinedButton(
+                  onPressed: () => context.go(
+                    AppRoutes.principalServiceRequestDetail(
+                      _string(item['id']),
+                    ),
+                  ),
+                  child: const Text('Review'),
                 ),
-                child: const Text('Review'),
               ),
             ),
           ],
@@ -1307,6 +1312,13 @@ class _MoreBody extends StatelessWidget {
               Icons.menu_book_rounded,
               AppColors.info,
               AppRoutes.principalAcademics,
+              enabled: modules['exams'] == true,
+            ),
+            _MenuItem(
+              'Learning Support',
+              Icons.volunteer_activism_rounded,
+              AppColors.teacherAccent,
+              AppRoutes.principalLearningSupport,
               enabled: modules['exams'] == true,
             ),
             _MenuItem(
