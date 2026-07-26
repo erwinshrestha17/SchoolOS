@@ -67,6 +67,28 @@ interface MobileStudentRow extends Student {
   }>;
 }
 
+type ParentActionPriority = 'URGENT' | 'HIGH' | 'NORMAL';
+type ParentActionSource =
+  | 'notices'
+  | 'homework'
+  | 'fees'
+  | 'attendance'
+  | 'serviceRequests'
+  | 'exams';
+
+interface ParentActionItem {
+  id: string;
+  source: ParentActionSource;
+  type: string;
+  priority: ParentActionPriority;
+  title: string;
+  description: string;
+  child: { id: string; name: string; classSection: string } | null;
+  dueAt: string | null;
+  isOverdue: boolean;
+  action: { label: string; route: string };
+}
+
 @Injectable()
 export class MobileService {
   constructor(
@@ -248,6 +270,290 @@ export class MobileService {
     };
   }
 
+  async getParentActionCentre(actor: AuthContext, requestedStudentId?: string) {
+    if (!isParentOnly(actor)) {
+      throw new ForbiddenException(
+        'Parent action centre is not available for this account.',
+      );
+    }
+    const children = await this.listMyStudents(actor);
+    if (
+      requestedStudentId &&
+      !children.items.some((child) => child.id === requestedStudentId)
+    ) {
+      throw new ForbiddenException(
+        'Mobile access denied for this active student.',
+      );
+    }
+    const scopedChildren = requestedStudentId
+      ? children.items.filter((child) => child.id === requestedStudentId)
+      : children.items;
+    const studentIds = scopedChildren.map((child) => child.id);
+    const entitlements = await this.entitlementsService.getEntitlements(
+      actor.tenantId,
+    );
+    const modules = new Set(entitlements.modules);
+    const enabled = (moduleName: string) => modules.has(moduleName);
+    const sourceStates: Record<
+      ParentActionSource,
+      {
+        status: 'available' | 'partial' | 'locked' | 'unavailable';
+        reason: string | null;
+      }
+    > = {
+      notices: { status: 'available', reason: null },
+      homework: enabled('homework')
+        ? { status: 'available', reason: null }
+        : {
+            status: 'locked',
+            reason: 'Homework is not enabled for this school.',
+          },
+      fees: enabled('fees')
+        ? { status: 'available', reason: null }
+        : { status: 'locked', reason: 'Fees are not enabled for this school.' },
+      attendance: enabled('attendance')
+        ? { status: 'available', reason: null }
+        : {
+            status: 'locked',
+            reason: 'Attendance is not enabled for this school.',
+          },
+      serviceRequests: { status: 'available', reason: null },
+      exams: enabled('academics')
+        ? { status: 'available', reason: null }
+        : {
+            status: 'locked',
+            reason: 'Examinations are not enabled for this school.',
+          },
+    };
+    const actions: ParentActionItem[] = [];
+    const load = async <T>(
+      source: ParentActionSource,
+      work: () => Promise<T>,
+    ): Promise<T | null> => {
+      try {
+        return await work();
+      } catch {
+        sourceStates[source] = {
+          status: 'unavailable',
+          reason: `Could not load ${parentActionSourceLabel(source)} right now.`,
+        };
+        return null;
+      }
+    };
+
+    const notifications = await load('notices', () =>
+      this.listNotifications(actor, { limit: 100 }, studentIds),
+    );
+    if (notifications?.nextCursor) {
+      sourceStates.notices = {
+        status: 'partial',
+        reason: 'More notices are available in Updates.',
+      };
+    }
+    for (const notice of notifications?.items ?? []) {
+      if (
+        !notice.requiresAcknowledgement ||
+        notice.acknowledgedAt ||
+        !notice.noticeId
+      ) {
+        continue;
+      }
+      const child = notice.childId
+        ? scopedChildren.find((item) => item.id === notice.childId)
+        : null;
+      actions.push({
+        id: `notice-ack:${notice.noticeId}`,
+        source: 'notices',
+        type: 'NOTICE_ACKNOWLEDGEMENT',
+        priority: 'URGENT',
+        title: notice.title,
+        description: 'Review and confirm this school notice.',
+        child: child ? parentActionChild(child) : null,
+        dueAt: null,
+        isOverdue: false,
+        action: { label: 'Review notice', route: notice.route },
+      });
+    }
+
+    await Promise.all(
+      scopedChildren.map(async (child) => {
+        const [homework, fees, corrections, requests, exams] =
+          await Promise.all([
+            enabled('homework')
+              ? load('homework', () =>
+                  this.getStudentHomework(child.id, actor, '30'),
+                )
+              : Promise.resolve(null),
+            enabled('fees')
+              ? load('fees', () => this.getStudentFeesSummary(child.id, actor))
+              : Promise.resolve(null),
+            enabled('attendance')
+              ? load('attendance', () =>
+                  this.listStudentAttendanceCorrections(child.id, actor),
+                )
+              : Promise.resolve(null),
+            load('serviceRequests', () =>
+              this.listStudentServiceRequests(child.id, actor),
+            ),
+            enabled('academics')
+              ? load('exams', () =>
+                  this.getStudentExamSchedule(child.id, actor),
+                )
+              : Promise.resolve(null),
+          ]);
+        const actionChild = parentActionChild(child);
+
+        for (const item of homework?.items ?? []) {
+          if (
+            !item.submissionRequired ||
+            !['NOT_SUBMITTED', 'NEEDS_CORRECTION'].includes(
+              item.submissionStatus,
+            )
+          ) {
+            continue;
+          }
+          const dueAt = item.dueAt ?? item.dueDate;
+          actions.push({
+            id: `homework:${child.id}:${item.id}`,
+            source: 'homework',
+            type: 'HOMEWORK_DUE',
+            priority: parentActionPriorityForDate(dueAt),
+            title: item.title,
+            description:
+              item.submissionStatus === 'NEEDS_CORRECTION'
+                ? `${item.subject.name} needs correction before resubmission.`
+                : `${item.subject.name} homework is not submitted.`,
+            child: actionChild,
+            dueAt,
+            isOverdue: isPastDate(dueAt),
+            action: {
+              label: 'View homework',
+              route: `/parent/homework/${encodeURIComponent(item.id)}`,
+            },
+          });
+        }
+
+        for (const invoice of fees?.recentInvoices ?? []) {
+          if (invoice.outstandingAmount <= 0) continue;
+          actions.push({
+            id: `fee:${child.id}:${invoice.id}`,
+            source: 'fees',
+            type: 'FEE_DUE',
+            priority: invoice.isOverdue ? 'URGENT' : 'HIGH',
+            title: `Fee balance for ${invoice.invoiceNumber}`,
+            description: `NPR ${invoice.outstandingAmount.toFixed(2)} remains due.`,
+            child: actionChild,
+            dueAt: invoice.dueDate,
+            isOverdue: invoice.isOverdue,
+            action: {
+              label: 'Review fees',
+              route: `/parent/fees?child=${encodeURIComponent(child.id)}`,
+            },
+          });
+        }
+
+        for (const correction of corrections?.items ?? []) {
+          if (correction.status !== 'REJECTED' || !correction.canResubmit) {
+            continue;
+          }
+          actions.push({
+            id: `attendance-correction:${child.id}:${correction.id}`,
+            source: 'attendance',
+            type: 'ATTENDANCE_CORRECTION_REJECTED',
+            priority: 'HIGH',
+            title: 'Attendance correction needs follow-up',
+            description:
+              correction.reviewReason ??
+              'Review the school response and resubmit if needed.',
+            child: actionChild,
+            dueAt: null,
+            isOverdue: false,
+            action: {
+              label: 'Review correction',
+              route: `/parent/attendance?child=${encodeURIComponent(child.id)}`,
+            },
+          });
+        }
+
+        for (const request of requests?.items ?? []) {
+          if (
+            request.status !== 'RESOLVED' ||
+            !request.actions.confirmResolution
+          ) {
+            continue;
+          }
+          actions.push({
+            id: `service-request:${child.id}:${request.id}`,
+            source: 'serviceRequests',
+            type: 'SERVICE_REQUEST_CONFIRMATION',
+            priority: request.isOverdue ? 'URGENT' : 'HIGH',
+            title: request.subject,
+            description:
+              'Review the school response and confirm the resolution.',
+            child: actionChild,
+            dueAt: request.responseDeadline,
+            isOverdue: request.isOverdue,
+            action: {
+              label: 'Review response',
+              route: `/parent/more/help-requests?child=${encodeURIComponent(child.id)}`,
+            },
+          });
+        }
+
+        const examWindowEnd = Date.now() + 30 * 24 * 60 * 60 * 1000;
+        for (const exam of exams?.items ?? []) {
+          const startsAt = Date.parse(exam.startsAt);
+          if (
+            !Number.isFinite(startsAt) ||
+            startsAt < Date.now() ||
+            startsAt > examWindowEnd
+          ) {
+            continue;
+          }
+          actions.push({
+            id: `exam:${child.id}:${exam.id}`,
+            source: 'exams',
+            type: 'UPCOMING_EXAM',
+            priority: parentActionPriorityForDate(exam.startsAt),
+            title: `${exam.subject.name} examination`,
+            description: `${exam.examTerm.name} is coming up.`,
+            child: actionChild,
+            dueAt: exam.startsAt,
+            isOverdue: false,
+            action: {
+              label: 'View calendar',
+              route: `/parent/more/calendar?child=${encodeURIComponent(child.id)}`,
+            },
+          });
+        }
+      }),
+    );
+
+    actions.sort(compareParentActions);
+    const returnedItems = actions.slice(0, 20);
+    const partialSources = Object.entries(sourceStates)
+      .filter(([, value]) => value.status !== 'available')
+      .map(([source]) => source);
+    return {
+      generatedAt: new Date().toISOString(),
+      dataState: 'LIVE',
+      scope: {
+        selectedStudentId: requestedStudentId ?? null,
+        children: scopedChildren.map(parentActionChild),
+      },
+      summary: {
+        visibleActionCount: actions.length,
+        urgentCount: actions.filter((item) => item.priority === 'URGENT')
+          .length,
+        returnedCount: returnedItems.length,
+        isPartial: partialSources.length > 0,
+      },
+      items: returnedItems,
+      truncated: actions.length > returnedItems.length,
+      sources: sourceStates,
+    };
+  }
+
   async listNotifications(
     actor: AuthContext,
     query: { limit?: number; cursor?: string; unreadOnly?: boolean } = {},
@@ -295,6 +601,15 @@ export class MobileService {
         notice: {
           select: {
             audienceType: true,
+            requiresAcknowledgement: true,
+            acknowledgements: {
+              where: {
+                tenantId: actor.tenantId,
+                recipientUserId: actor.userId,
+              },
+              select: { firstAcknowledgedAt: true },
+              take: 1,
+            },
             class: { select: { name: true } },
             section: { select: { name: true } },
           },
@@ -338,6 +653,10 @@ export class MobileService {
       sentAt: toIso(item.sentAt),
       readAt: toIso(item.readReceipts[0]?.readAt),
       isRead: item.readReceipts.length > 0,
+      requiresAcknowledgement: item.notice?.requiresAcknowledgement ?? false,
+      acknowledgedAt: toIso(
+        item.notice?.acknowledgements[0]?.firstAcknowledgedAt,
+      ),
       audience: parentNotificationAudience(item),
     }));
 
@@ -454,6 +773,11 @@ export class MobileService {
       sentAt: toIso(notification.sentAt),
       readAt: toIso(notification.readReceipts[0]?.readAt),
       isRead: notification.readReceipts.length > 0,
+      requiresAcknowledgement:
+        notification.notice?.requiresAcknowledgement ?? false,
+      acknowledgedAt: toIso(
+        notification.notice?.acknowledgements[0]?.firstAcknowledgedAt,
+      ),
       audience: parentNotificationAudience(notification),
       attachment,
     };
@@ -522,6 +846,15 @@ export class MobileService {
         notice: {
           select: {
             audienceType: true,
+            requiresAcknowledgement: true,
+            acknowledgements: {
+              where: {
+                tenantId: actor.tenantId,
+                recipientUserId: actor.userId,
+              },
+              select: { firstAcknowledgedAt: true },
+              take: 1,
+            },
             class: { select: { name: true } },
             section: { select: { name: true } },
           },
@@ -2213,6 +2546,66 @@ function parentNotificationAudience(item: {
     className: null,
     sectionName: null,
   };
+}
+
+function parentActionChild(child: {
+  id: string;
+  name: string;
+  classSection: string;
+}) {
+  return {
+    id: child.id,
+    name: child.name,
+    classSection: child.classSection,
+  };
+}
+
+function parentActionPriorityForDate(
+  value: string | null | undefined,
+): ParentActionPriority {
+  if (!value) return 'NORMAL';
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return 'NORMAL';
+  const remaining = timestamp - Date.now();
+  if (remaining <= 24 * 60 * 60 * 1000) return 'URGENT';
+  if (remaining <= 7 * 24 * 60 * 60 * 1000) return 'HIGH';
+  return 'NORMAL';
+}
+
+function isPastDate(value: string | null | undefined) {
+  if (!value) return false;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) && timestamp < Date.now();
+}
+
+function compareParentActions(left: ParentActionItem, right: ParentActionItem) {
+  const ranks: Record<ParentActionPriority, number> = {
+    URGENT: 0,
+    HIGH: 1,
+    NORMAL: 2,
+  };
+  const priority = ranks[left.priority] - ranks[right.priority];
+  if (priority !== 0) return priority;
+  const leftDue = left.dueAt
+    ? Date.parse(left.dueAt)
+    : Number.POSITIVE_INFINITY;
+  const rightDue = right.dueAt
+    ? Date.parse(right.dueAt)
+    : Number.POSITIVE_INFINITY;
+  if (leftDue !== rightDue) return leftDue - rightDue;
+  return left.id.localeCompare(right.id);
+}
+
+function parentActionSourceLabel(source: ParentActionSource) {
+  const labels: Record<ParentActionSource, string> = {
+    notices: 'required notices',
+    homework: 'homework actions',
+    fees: 'fee actions',
+    attendance: 'attendance follow-up',
+    serviceRequests: 'school request follow-up',
+    exams: 'upcoming examinations',
+  };
+  return labels[source];
 }
 
 function boundedTake(value: string | undefined, fallback: number) {

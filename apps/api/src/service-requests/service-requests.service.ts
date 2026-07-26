@@ -875,6 +875,10 @@ export class ServiceRequestsService {
     const parentView = this.toParentView(request);
     return {
       ...parentView,
+      attachments: parentView.attachments.map((attachment) => ({
+        ...attachment,
+        downloadPath: `/service-requests/${request.id}/attachments/${attachment.id}`,
+      })),
       requestedBy: {
         id: request.requestedBy.id,
         name:

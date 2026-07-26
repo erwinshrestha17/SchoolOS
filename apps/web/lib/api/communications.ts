@@ -28,6 +28,8 @@ export type NoticeDetail = {
   bodyNe: string | null;
   category: string;
   isPinned: boolean;
+  requiresAcknowledgement: boolean;
+  acknowledgedAt: string | null;
   templateId: string | null;
   priority: string;
   audienceType: string;

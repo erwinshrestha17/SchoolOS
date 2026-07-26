@@ -9,6 +9,7 @@ import '../../../core/storage/private_read_cache.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../data/parent_repository.dart';
 import '../domain/parent_models.dart';
+import '../domain/parent_service_request_models.dart';
 
 final parentRepositoryProvider = Provider<ParentRepository>((ref) {
   return ParentRepository(
@@ -257,6 +258,13 @@ final parentCanteenProvider = FutureProvider.autoDispose
 final parentLibraryProvider = FutureProvider.autoDispose
     .family<ParentLibraryInfo, String>((ref, childId) {
       return ref.watch(parentRepositoryProvider).getLibraryForChild(childId);
+    });
+
+final parentServiceRequestsProvider = FutureProvider.autoDispose
+    .family<ParentServiceRequestList, String>((ref, childId) {
+      return ref
+          .watch(parentRepositoryProvider)
+          .getServiceRequestsForChild(childId);
     });
 
 class ParentState {

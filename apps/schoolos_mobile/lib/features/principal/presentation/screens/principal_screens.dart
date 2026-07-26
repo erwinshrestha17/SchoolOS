@@ -10,6 +10,10 @@ import '../../../../app/design_system/app_radius.dart';
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/auth/auth_provider.dart';
+import '../../../../core/errors/app_exception.dart';
+import '../../../../core/network/connectivity_provider.dart';
+import '../../../../core/platform/file_share_service.dart';
+import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../../../shared/widgets/app_access_state.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_exception_view.dart';
@@ -113,7 +117,20 @@ class _PrincipalAttentionScreenState
               onTap: () => setState(() => filter = 'assigned'),
             ),
             const SizedBox(height: AppSpacing.md),
-            _ItemList(items: _list(data['items'])),
+            _ItemList(
+              items: _list(data['items']),
+              actionBuilder: (item) {
+                final route = _string(item['route']);
+                if (!route.startsWith(AppRoutes.principalServiceRequests)) {
+                  return null;
+                }
+                return IconButton(
+                  tooltip: 'Review parent request',
+                  onPressed: () => context.go(route),
+                  icon: const Icon(Icons.chevron_right_rounded),
+                );
+              },
+            ),
             const SizedBox(height: AppSpacing.md),
             _ActionRow(
               icon: Icons.checklist_rounded,
@@ -208,6 +225,688 @@ class _PrincipalApprovalsScreenState
       ),
     );
   }
+}
+
+class PrincipalServiceRequestsScreen extends ConsumerStatefulWidget {
+  const PrincipalServiceRequestsScreen({super.key});
+
+  @override
+  ConsumerState<PrincipalServiceRequestsScreen> createState() =>
+      _PrincipalServiceRequestsScreenState();
+}
+
+class _PrincipalServiceRequestsScreenState
+    extends ConsumerState<PrincipalServiceRequestsScreen> {
+  String status = 'all';
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = principalServiceRequestsProvider(status);
+    final requests = ref.watch(provider);
+    return PrincipalShell(
+      selectedIndex: 1,
+      title: 'Parent Requests',
+      subtitle: 'School concerns and payment disputes',
+      showBack: true,
+      child: requests.when(
+        loading: () => const _PrincipalLoading(),
+        error: (error, _) => AppExceptionView(
+          error: error,
+          onRetry: () => ref.invalidate(provider),
+        ),
+        data: (data) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _CacheBanner(data: data),
+            _SegmentedFilters(
+              values: const ['all', 'OPEN', 'IN_PROGRESS', 'RESOLVED'],
+              active: status,
+              labels: const {
+                'all': 'All',
+                'OPEN': 'Open',
+                'IN_PROGRESS': 'In progress',
+                'RESOLVED': 'Resolved',
+              },
+              onChanged: (value) => setState(() => status = value),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _SummaryCards(
+              values: [
+                _SummaryValue(
+                  'Results',
+                  _num(data, 'total'),
+                  AppColors.info,
+                  Icons.support_agent_rounded,
+                ),
+                _SummaryValue(
+                  'Page',
+                  _num(data, 'page'),
+                  AppColors.primary,
+                  Icons.list_alt_rounded,
+                ),
+                _SummaryValue(
+                  'More',
+                  data['hasNextPage'] == true ? 'Yes' : 'No',
+                  AppColors.slate500,
+                  Icons.more_horiz_rounded,
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _ItemList(
+              items: _list(data['items']),
+              actionBuilder: (item) => OutlinedButton(
+                onPressed: () => context.go(
+                  AppRoutes.principalServiceRequestDetail(_string(item['id'])),
+                ),
+                child: const Text('Review'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class PrincipalServiceRequestDetailScreen extends ConsumerStatefulWidget {
+  const PrincipalServiceRequestDetailScreen({
+    super.key,
+    required this.requestId,
+  });
+
+  final String requestId;
+
+  @override
+  ConsumerState<PrincipalServiceRequestDetailScreen> createState() =>
+      _PrincipalServiceRequestDetailScreenState();
+}
+
+class _PrincipalServiceRequestDetailScreenState
+    extends ConsumerState<PrincipalServiceRequestDetailScreen> {
+  bool busy = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = principalServiceRequestProvider(widget.requestId);
+    final detail = ref.watch(provider);
+    return PrincipalShell(
+      selectedIndex: 1,
+      title: 'Parent Request',
+      subtitle: 'Protected request details and response',
+      showBack: true,
+      backRoute: AppRoutes.principalServiceRequests,
+      child: detail.when(
+        loading: () => const _PrincipalLoading(),
+        error: (error, _) => AppExceptionView(
+          error: error,
+          onRetry: () => ref.invalidate(provider),
+        ),
+        data: _detail,
+      ),
+    );
+  }
+
+  Widget _detail(Map<String, dynamic> data) {
+    final student = _record(data['student']);
+    final requester = _record(data['requestedBy']);
+    final assignedTo = _record(data['assignedTo']);
+    final invoice = _record(data['invoice']);
+    final status = _string(data['status']);
+    final active = const {
+      'OPEN',
+      'ASSIGNED',
+      'IN_PROGRESS',
+      'REOPENED',
+    }.contains(status);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _CacheBanner(data: data),
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _IconBubble(
+                    icon: _string(data['type']) == 'PAYMENT_DISPUTE'
+                        ? Icons.receipt_long_rounded
+                        : Icons.support_agent_rounded,
+                    color: data['isOverdue'] == true
+                        ? AppColors.danger
+                        : AppColors.info,
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _string(data['subject'], fallback: 'Parent request'),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
+                          ),
+                        ),
+                        Text(
+                          '${_serviceRequestType(data['type'])} • ${_label(status)}',
+                        ),
+                      ],
+                    ),
+                  ),
+                  StatusChip(
+                    status: _statusType(status),
+                    label: _label(status),
+                  ),
+                ],
+              ),
+              const Divider(height: 28),
+              Text(_string(data['description'])),
+              const SizedBox(height: AppSpacing.md),
+              _DetailLine(
+                label: 'Child',
+                value:
+                    '${_string(student['name'])} • ${_string(student['classSection'])}',
+              ),
+              _DetailLine(
+                label: 'Requested by',
+                value: _string(requester['name'], fallback: 'Linked guardian'),
+              ),
+              _DetailLine(
+                label: 'Assigned to',
+                value: assignedTo.isEmpty
+                    ? 'Unassigned'
+                    : _string(assignedTo['name'], fallback: 'School team'),
+              ),
+              _DetailLine(
+                label: 'Response deadline',
+                value: _bsDateTime(data['responseDeadline']),
+              ),
+              if (data['isOverdue'] == true)
+                const _Callout(
+                  icon: Icons.schedule_rounded,
+                  title: 'Response overdue',
+                  message:
+                      'Update the parent or revise the deadline through triage.',
+                  color: AppColors.danger,
+                ),
+              if (invoice.isNotEmpty) ...[
+                const Divider(height: 28),
+                const Text(
+                  'Linked invoice',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${_string(invoice['invoiceNumber'])} • ${_string(invoice['status'])}',
+                ),
+                Text('Due ${_bsDate(invoice['dueDate'])}'),
+              ],
+            ],
+          ),
+        ),
+        if (_string(data['resolutionSummary']).isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.md),
+          _PlainCard(
+            title: 'Resolution sent to parent',
+            body: _string(data['resolutionSummary']),
+          ),
+        ],
+        if (_list(data['notes']).isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.lg),
+          const SectionHeader(title: 'Parent-visible updates'),
+          const SizedBox(height: AppSpacing.sm),
+          _RequestNotes(items: _list(data['notes'])),
+        ],
+        if (_list(data['internalNotes']).isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.lg),
+          const SectionHeader(title: 'Internal notes'),
+          const SizedBox(height: AppSpacing.sm),
+          _RequestNotes(items: _list(data['internalNotes']), internal: true),
+        ],
+        if (_list(data['attachments']).isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.lg),
+          const SectionHeader(title: 'Protected evidence'),
+          const SizedBox(height: AppSpacing.sm),
+          AppCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                for (final attachment in _list(data['attachments']))
+                  ListTile(
+                    leading: const Icon(Icons.attachment_rounded),
+                    title: Text(
+                      _string(
+                        attachment['label'],
+                        fallback: _string(attachment['fileName']),
+                      ),
+                    ),
+                    subtitle: Text(_string(attachment['mimeType'])),
+                    trailing: IconButton(
+                      tooltip: 'Open protected evidence',
+                      onPressed: busy
+                          ? null
+                          : () => _downloadEvidence(attachment),
+                      icon: const Icon(Icons.download_rounded),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: AppSpacing.lg),
+        if (busy) const LinearProgressIndicator(),
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          children: [
+            if (active)
+              FilledButton.icon(
+                onPressed: busy ? null : () => _triage(data),
+                icon: const Icon(Icons.assignment_ind_rounded),
+                label: const Text('Assign to me'),
+              ),
+            if (active || status == 'RESOLVED')
+              OutlinedButton.icon(
+                onPressed: busy ? null : () => _addNote(data),
+                icon: const Icon(Icons.add_comment_rounded),
+                label: const Text('Add update'),
+              ),
+            if (active)
+              FilledButton.icon(
+                onPressed: busy ? null : () => _resolve(data),
+                icon: const Icon(Icons.check_circle_rounded),
+                label: const Text('Resolve'),
+              ),
+            if (active)
+              TextButton.icon(
+                onPressed: busy ? null : () => _escalate(data),
+                icon: const Icon(Icons.priority_high_rounded),
+                label: const Text('Escalate'),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _triage(Map<String, dynamic> data) async {
+    final response = await _triageDialog(context);
+    if (response == null) return;
+    await _run(
+      () => ref
+          .read(principalRepositoryProvider)
+          .triageServiceRequest(
+            requestId: widget.requestId,
+            priority: response.priority,
+            responseDeadline: DateTime.now()
+                .toUtc()
+                .add(Duration(hours: response.deadlineHours))
+                .toIso8601String(),
+            status: 'IN_PROGRESS',
+            reason: response.reason,
+          ),
+      'Request assigned and moved in progress.',
+    );
+  }
+
+  Future<void> _addNote(Map<String, dynamic> data) async {
+    final note = await _serviceRequestNoteDialog(context);
+    if (note == null) return;
+    await _run(
+      () => ref
+          .read(principalRepositoryProvider)
+          .addServiceRequestNote(
+            requestId: widget.requestId,
+            body: note.body,
+            visibility: note.visibility,
+          ),
+      note.visibility == 'PARENT'
+          ? 'Update shared with the parent.'
+          : 'Internal note saved.',
+    );
+  }
+
+  Future<void> _resolve(Map<String, dynamic> data) async {
+    final summary = await _principalPrompt(
+      context,
+      title: 'Resolve this request',
+      hint: 'Explain the outcome the parent should see.',
+      minLength: 8,
+      maxLength: 2000,
+    );
+    if (summary == null) return;
+    await _run(
+      () => ref
+          .read(principalRepositoryProvider)
+          .resolveServiceRequest(
+            requestId: widget.requestId,
+            resolutionSummary: summary,
+          ),
+      'Resolution sent to the parent.',
+    );
+  }
+
+  Future<void> _escalate(Map<String, dynamic> data) async {
+    final reason = await _principalPrompt(
+      context,
+      title: 'Escalate this request',
+      hint: 'Why does this need urgent follow-up?',
+      minLength: 8,
+      maxLength: 500,
+    );
+    if (reason == null) return;
+    await _run(
+      () => ref
+          .read(principalRepositoryProvider)
+          .escalateServiceRequest(requestId: widget.requestId, reason: reason),
+      'Request escalated with a 24-hour response target.',
+    );
+  }
+
+  Future<void> _downloadEvidence(Map<String, dynamic> attachment) async {
+    if (!ref.read(connectivityProvider)) {
+      _showPrincipalSnack(context, 'Reconnect to open protected evidence.');
+      return;
+    }
+    try {
+      final file = await ref
+          .read(principalRepositoryProvider)
+          .downloadServiceRequestEvidence(
+            requestId: widget.requestId,
+            attachmentId: _string(attachment['id']),
+            downloadPath: _string(attachment['downloadPath']),
+            fileName: _string(attachment['fileName'], fallback: 'evidence'),
+            mimeType: _string(attachment['mimeType']),
+          );
+      await const FileShareService().shareFile(
+        filePath: file.filePath,
+        mimeType: _string(attachment['mimeType']),
+        subject: 'Parent request evidence',
+      );
+    } catch (error) {
+      if (mounted) {
+        _showPrincipalSnack(context, _principalSafeError(error));
+      }
+    }
+  }
+
+  Future<void> _run(
+    Future<Map<String, dynamic>> Function() action,
+    String successMessage,
+  ) async {
+    if (!ref.read(connectivityProvider)) {
+      _showPrincipalSnack(context, 'This action needs internet. Reconnect.');
+      return;
+    }
+    if (busy) return;
+    setState(() => busy = true);
+    try {
+      await action();
+      ref.invalidate(principalServiceRequestProvider(widget.requestId));
+      ref.invalidate(principalServiceRequestsProvider('all'));
+      ref.invalidate(principalAttentionProvider('all'));
+      if (mounted) _showPrincipalSnack(context, successMessage);
+    } catch (error) {
+      if (mounted) {
+        _showPrincipalSnack(context, _principalSafeError(error));
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+}
+
+class _RequestNotes extends StatelessWidget {
+  const _RequestNotes({required this.items, this.internal = false});
+
+  final List<Map<String, dynamic>> items;
+  final bool internal;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          for (final note in items)
+            ListTile(
+              leading: Icon(
+                internal ? Icons.lock_outline_rounded : Icons.forum_outlined,
+              ),
+              title: Text(_string(note['body'])),
+              subtitle: Text(
+                '${_string(note['author'], fallback: 'School team')} • ${_bsDateTime(note['createdAt'])}',
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailLine extends StatelessWidget {
+  const _DetailLine({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 130,
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.slate500,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Expanded(child: Text(value)),
+      ],
+    ),
+  );
+}
+
+class _ServiceRequestTriage {
+  const _ServiceRequestTriage({
+    required this.priority,
+    required this.deadlineHours,
+    required this.reason,
+  });
+
+  final String priority;
+  final int deadlineHours;
+  final String reason;
+}
+
+Future<_ServiceRequestTriage?> _triageDialog(BuildContext context) async {
+  final reason = TextEditingController();
+  var priority = 'NORMAL';
+  var hours = 48;
+  final result = await showDialog<_ServiceRequestTriage>(
+    context: context,
+    builder: (dialogContext) => StatefulBuilder(
+      builder: (context, setState) => AlertDialog(
+        title: const Text('Assign request to me'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DropdownButtonFormField<String>(
+              initialValue: priority,
+              decoration: const InputDecoration(labelText: 'Priority'),
+              items: const [
+                DropdownMenuItem(value: 'NORMAL', child: Text('Normal')),
+                DropdownMenuItem(value: 'HIGH', child: Text('High')),
+              ],
+              onChanged: (value) =>
+                  setState(() => priority = value ?? 'NORMAL'),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<int>(
+              initialValue: hours,
+              decoration: const InputDecoration(labelText: 'Response target'),
+              items: const [
+                DropdownMenuItem(value: 24, child: Text('Within 24 hours')),
+                DropdownMenuItem(value: 48, child: Text('Within 48 hours')),
+                DropdownMenuItem(value: 120, child: Text('Within 5 days')),
+              ],
+              onChanged: (value) => setState(() => hours = value ?? 48),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reason,
+              minLines: 2,
+              maxLines: 4,
+              maxLength: 500,
+              decoration: const InputDecoration(
+                labelText: 'Triage note',
+                hintText: 'What will be reviewed?',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Back'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (reason.text.trim().length < 8) return;
+              Navigator.pop(
+                dialogContext,
+                _ServiceRequestTriage(
+                  priority: priority,
+                  deadlineHours: hours,
+                  reason: reason.text.trim(),
+                ),
+              );
+            },
+            child: const Text('Assign'),
+          ),
+        ],
+      ),
+    ),
+  );
+  reason.dispose();
+  return result;
+}
+
+class _ServiceRequestNote {
+  const _ServiceRequestNote({required this.body, required this.visibility});
+
+  final String body;
+  final String visibility;
+}
+
+Future<_ServiceRequestNote?> _serviceRequestNoteDialog(
+  BuildContext context,
+) async {
+  final body = TextEditingController();
+  var visibility = 'PARENT';
+  final result = await showDialog<_ServiceRequestNote>(
+    context: context,
+    builder: (dialogContext) => StatefulBuilder(
+      builder: (context, setState) => AlertDialog(
+        title: const Text('Add request update'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DropdownButtonFormField<String>(
+              initialValue: visibility,
+              decoration: const InputDecoration(labelText: 'Visibility'),
+              items: const [
+                DropdownMenuItem(
+                  value: 'PARENT',
+                  child: Text('Share with parent'),
+                ),
+                DropdownMenuItem(
+                  value: 'INTERNAL',
+                  child: Text('School team only'),
+                ),
+              ],
+              onChanged: (value) =>
+                  setState(() => visibility = value ?? 'PARENT'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: body,
+              minLines: 3,
+              maxLines: 6,
+              maxLength: 1000,
+              decoration: const InputDecoration(labelText: 'Update'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Back'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (body.text.trim().length < 2) return;
+              Navigator.pop(
+                dialogContext,
+                _ServiceRequestNote(
+                  body: body.text.trim(),
+                  visibility: visibility,
+                ),
+              );
+            },
+            child: const Text('Save update'),
+          ),
+        ],
+      ),
+    ),
+  );
+  body.dispose();
+  return result;
+}
+
+Future<String?> _principalPrompt(
+  BuildContext context, {
+  required String title,
+  required String hint,
+  required int minLength,
+  required int maxLength,
+}) async {
+  final controller = TextEditingController();
+  final result = await showDialog<String>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(title),
+      content: TextField(
+        controller: controller,
+        minLines: 3,
+        maxLines: 7,
+        maxLength: maxLength,
+        decoration: InputDecoration(hintText: hint),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text('Back'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final value = controller.text.trim();
+            if (value.length >= minLength) Navigator.pop(dialogContext, value);
+          },
+          child: const Text('Continue'),
+        ),
+      ],
+    ),
+  );
+  controller.dispose();
+  return result;
 }
 
 class PrincipalStudentsScreen extends ConsumerStatefulWidget {
@@ -384,6 +1083,7 @@ class PrincipalShell extends ConsumerWidget {
     required this.child,
     this.subtitle,
     this.showBack = false,
+    this.backRoute = AppRoutes.principalMore,
   });
 
   final int selectedIndex;
@@ -391,6 +1091,7 @@ class PrincipalShell extends ConsumerWidget {
   final String? subtitle;
   final Widget child;
   final bool showBack;
+  final String backRoute;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -405,7 +1106,7 @@ class PrincipalShell extends ConsumerWidget {
             _PrincipalHeader(
               schoolName: user?.tenantSlug ?? 'SchoolOS',
               showBack: showBack,
-              onBack: () => context.go(AppRoutes.principalMore),
+              onBack: () => context.go(backRoute),
             ),
             Expanded(
               child: ListView(
@@ -414,9 +1115,7 @@ class PrincipalShell extends ConsumerWidget {
                   Row(
                     children: [
                       if (showBack) ...[
-                        _BackButton(
-                          onTap: () => context.go(AppRoutes.principalMore),
-                        ),
+                        _BackButton(onTap: () => context.go(backRoute)),
                         const SizedBox(width: AppSpacing.md),
                       ],
                       Expanded(
@@ -668,6 +1367,12 @@ class _MoreBody extends StatelessWidget {
               AppColors.info,
               AppRoutes.principalReports,
               enabled: modules['reports'] == true,
+            ),
+            _MenuItem(
+              'Parent Requests',
+              Icons.support_agent_rounded,
+              AppColors.primary,
+              AppRoutes.principalServiceRequests,
             ),
           ],
         ),
@@ -1680,7 +2385,7 @@ class _ItemList extends StatelessWidget {
 
   final List<Map<String, dynamic>> items;
   final bool compact;
-  final Widget Function(Map<String, dynamic> item)? actionBuilder;
+  final Widget? Function(Map<String, dynamic> item)? actionBuilder;
 
   @override
   Widget build(BuildContext context) {
@@ -2817,6 +3522,35 @@ String _string(Object? value, {String fallback = ''}) {
   if (value == null) return fallback;
   final string = '$value';
   return string.isEmpty ? fallback : string;
+}
+
+Map<String, dynamic> _record(Object? value) {
+  if (value is Map) {
+    return value.map((key, value) => MapEntry('$key', value));
+  }
+  return const {};
+}
+
+String _serviceRequestType(Object? value) =>
+    _string(value) == 'PAYMENT_DISPUTE' ? 'Payment dispute' : 'School concern';
+
+String _bsDate(Object? value) {
+  final parsed = DateTime.tryParse(_string(value));
+  return parsed == null
+      ? 'Date unavailable'
+      : NepaliBsCalendar.formatBsDate(parsed);
+}
+
+String _bsDateTime(Object? value) {
+  final parsed = DateTime.tryParse(_string(value));
+  return parsed == null
+      ? 'Date unavailable'
+      : NepaliBsCalendar.formatBsDateTime(parsed);
+}
+
+String _principalSafeError(Object error) {
+  if (error is AppException) return error.message;
+  return 'This action could not be completed. Please try again.';
 }
 
 String _unsupportedActionMessage(Object? value, {required String fallback}) {

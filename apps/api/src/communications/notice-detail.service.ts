@@ -15,6 +15,8 @@ export interface NoticeDetail {
   bodyNe: string | null;
   category: CommunicationTemplateCategory;
   isPinned: boolean;
+  requiresAcknowledgement: boolean;
+  acknowledgedAt: string | null;
   templateId: string | null;
   priority: string;
   audienceType: string;
@@ -128,55 +130,66 @@ export class NoticeDetailService {
       }
     }
 
-    const [deliveryGroups, auditRows, approvalRequest] = await Promise.all([
-      this.prisma.notificationDelivery.groupBy({
-        by: ['status'],
-        where: {
-          tenantId: actor.tenantId,
-          noticeId: notice.id,
-        },
-        _count: {
-          status: true,
-        },
-      }),
-      canViewReports
-        ? this.prisma.auditLog.findMany({
-            where: {
-              tenantId: actor.tenantId,
-              resource: 'notice',
-              resourceId: notice.id,
-            },
-            orderBy: { createdAt: 'desc' },
-            take: 50,
-            select: {
-              id: true,
-              action: true,
-              createdAt: true,
-              user: { select: { email: true } },
-            },
-          })
-        : Promise.resolve([]),
-      canViewReports && notice.approvalRequestId
-        ? this.prisma.approvalRequest.findFirst({
-            where: {
-              id: notice.approvalRequestId,
-              tenantId: actor.tenantId,
-              targetId: notice.id,
-            },
-            select: {
-              decisions: {
-                orderBy: { createdAt: 'asc' },
-                select: {
-                  decision: true,
-                  reason: true,
-                  createdAt: true,
-                  decidedBy: { select: { email: true } },
+    const [deliveryGroups, auditRows, approvalRequest, acknowledgement] =
+      await Promise.all([
+        this.prisma.notificationDelivery.groupBy({
+          by: ['status'],
+          where: {
+            tenantId: actor.tenantId,
+            noticeId: notice.id,
+          },
+          _count: {
+            status: true,
+          },
+        }),
+        canViewReports
+          ? this.prisma.auditLog.findMany({
+              where: {
+                tenantId: actor.tenantId,
+                resource: 'notice',
+                resourceId: notice.id,
+              },
+              orderBy: { createdAt: 'desc' },
+              take: 50,
+              select: {
+                id: true,
+                action: true,
+                createdAt: true,
+                user: { select: { email: true } },
+              },
+            })
+          : Promise.resolve([]),
+        canViewReports && notice.approvalRequestId
+          ? this.prisma.approvalRequest.findFirst({
+              where: {
+                id: notice.approvalRequestId,
+                tenantId: actor.tenantId,
+                targetId: notice.id,
+              },
+              select: {
+                decisions: {
+                  orderBy: { createdAt: 'asc' },
+                  select: {
+                    decision: true,
+                    reason: true,
+                    createdAt: true,
+                    decidedBy: { select: { email: true } },
+                  },
                 },
               },
+            })
+          : Promise.resolve(null),
+        this.prisma.noticeAcknowledgement.findUnique({
+          where: {
+            tenantId_noticeId_recipientUserId: {
+              tenantId: actor.tenantId,
+              noticeId: notice.id,
+              recipientUserId: actor.userId,
             },
-          })
-        : Promise.resolve(null),
-    ]);
+          },
+          select: { firstAcknowledgedAt: true },
+        }),
+      ]);
 
     const deliveryCounts = new Map(
       deliveryGroups.map((group) => [group.status, group._count.status]),
@@ -192,6 +205,9 @@ export class NoticeDetailService {
       bodyNe: notice.bodyNe,
       category: notice.category,
       isPinned: notice.isPinned,
+      requiresAcknowledgement: notice.requiresAcknowledgement,
+      acknowledgedAt:
+        acknowledgement?.firstAcknowledgedAt.toISOString() ?? null,
       templateId: notice.templateId,
       priority: notice.priority,
       audienceType: notice.audienceType,

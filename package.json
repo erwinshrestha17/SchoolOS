@@ -37,6 +37,7 @@
     "smoke:pilot": "node scripts/smoke-runner-local.mjs pilot",
     "smoke:core": "node scripts/smoke-runner-local.mjs core",
     "smoke:platform": "node scripts/smoke-runner-local.mjs platform",
+    "smoke:service-requests": "node scripts/verify-service-requests-local.mjs",
     "smoke:learning": "node scripts/smoke-runner-local.mjs learning",
     "smoke:full": "node scripts/smoke-runner-local.mjs full",
     "smoke:phase1": "pnpm smoke:pilot"

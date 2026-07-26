@@ -8,6 +8,7 @@ import 'package:schoolos_mobile/core/network/api_client.dart';
 import 'package:schoolos_mobile/core/network/api_path_resolver.dart';
 import 'package:schoolos_mobile/features/parent/data/parent_repository.dart';
 import 'package:schoolos_mobile/features/parent/domain/parent_models.dart';
+import 'package:schoolos_mobile/features/parent/domain/parent_service_request_models.dart';
 
 class MockApiClient extends Mock implements ApiClient {}
 
@@ -569,5 +570,185 @@ void main() {
         );
       },
     );
+
+    test('maps the linked-child service-request lifecycle', () async {
+      when(
+        () =>
+            apiClient.get<dynamic>('/mobile/students/child-1/service-requests'),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: 'service-requests'),
+          data: {
+            'items': [
+              {
+                'id': 'request-1',
+                'student': {
+                  'id': 'child-1',
+                  'name': 'Asha Rai',
+                  'classSection': 'Grade 4 - A',
+                },
+                'type': 'PAYMENT_DISPUTE',
+                'category': 'FEES_AND_PAYMENTS',
+                'priority': 'HIGH',
+                'subject': 'Payment not reflected',
+                'description': 'The bank payment is not shown on the invoice.',
+                'status': 'IN_PROGRESS',
+                'invoice': {
+                  'id': 'invoice-1',
+                  'invoiceNumber': 'INV-001',
+                  'status': 'PARTIAL',
+                  'totalAmount': 1200,
+                  'dueDate': '2026-07-30T00:00:00.000Z',
+                },
+                'responder': {'name': 'School Accounts'},
+                'responseDeadline': '2026-07-28T00:00:00.000Z',
+                'isOverdue': false,
+                'resolutionSummary': null,
+                'notes': [
+                  {
+                    'id': 'note-1',
+                    'body': 'The accounts team is checking the statement.',
+                    'author': 'School Accounts',
+                    'createdAt': '2026-07-26T00:00:00.000Z',
+                  },
+                ],
+                'attachments': [
+                  {
+                    'id': 'attachment-1',
+                    'fileName': 'bank-slip.jpg',
+                    'mimeType': 'image/jpeg',
+                    'sizeBytes': 1200,
+                    'label': 'Parent evidence',
+                    'downloadPath':
+                        '/mobile/service-requests/request-1/attachments/attachment-1',
+                    'createdAt': '2026-07-26T00:00:00.000Z',
+                  },
+                ],
+                'actions': {
+                  'cancel': false,
+                  'confirmResolution': false,
+                  'reopen': false,
+                  'addEvidence': true,
+                },
+                'createdAt': '2026-07-26T00:00:00.000Z',
+                'updatedAt': '2026-07-26T00:00:00.000Z',
+              },
+            ],
+            'total': 1,
+          },
+        ),
+      );
+
+      final result = await repository.getServiceRequestsForChild('child-1');
+
+      expect(result.total, 1);
+      expect(result.items.single.isPaymentDispute, isTrue);
+      expect(result.items.single.invoice?.invoiceNumber, 'INV-001');
+      expect(result.items.single.notes.single.author, 'School Accounts');
+      expect(result.items.single.canAddEvidence, isTrue);
+    });
+
+    test('sends a payment dispute with a stable idempotency key', () async {
+      when(
+        () => apiClient.post<Map<String, dynamic>>(
+          '/mobile/students/child-1/service-requests',
+          data: any<dynamic>(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: 'service-requests'),
+          data: _serviceRequestJson(),
+        ),
+      );
+
+      final request = await repository.createServiceRequest(
+        childId: 'child-1',
+        type: 'PAYMENT_DISPUTE',
+        category: 'FEES_AND_PAYMENTS',
+        priority: 'NORMAL',
+        subject: 'Payment not reflected',
+        description: 'The bank payment is not shown on the invoice.',
+        invoiceId: 'invoice-1',
+        idempotencyKey: '41d743bb-9d72-4d0e-b2c4-a9ead27e1501',
+      );
+
+      expect(request.id, 'request-1');
+      verify(
+        () => apiClient.post<Map<String, dynamic>>(
+          '/mobile/students/child-1/service-requests',
+          data: {
+            'type': 'PAYMENT_DISPUTE',
+            'category': 'FEES_AND_PAYMENTS',
+            'priority': 'NORMAL',
+            'subject': 'Payment not reflected',
+            'description': 'The bank payment is not shown on the invoice.',
+            'idempotencyKey': '41d743bb-9d72-4d0e-b2c4-a9ead27e1501',
+            'invoiceId': 'invoice-1',
+          },
+        ),
+      ).called(1);
+    });
+
+    test(
+      'refuses a backend-supplied service-request attachment path that does not match its records',
+      () async {
+        final request = ParentServiceRequest.fromJson(_serviceRequestJson());
+        final attachment = ParentServiceRequestAttachment(
+          id: 'attachment-1',
+          fileName: 'evidence.jpg',
+          mimeType: 'image/jpeg',
+          sizeBytes: 1200,
+          downloadPath: 'https://untrusted.test/evidence.jpg',
+          createdAt: DateTime(2026),
+        );
+
+        await expectLater(
+          repository.downloadServiceRequestEvidence(
+            request: request,
+            attachment: attachment,
+          ),
+          throwsA(isA<Exception>()),
+        );
+        verifyNever(
+          () => apiClient.get<List<int>>(any(), options: any(named: 'options')),
+        );
+      },
+    );
   });
+}
+
+Map<String, dynamic> _serviceRequestJson() {
+  return {
+    'id': 'request-1',
+    'student': {
+      'id': 'child-1',
+      'name': 'Asha Rai',
+      'classSection': 'Grade 4 - A',
+    },
+    'type': 'PAYMENT_DISPUTE',
+    'category': 'FEES_AND_PAYMENTS',
+    'priority': 'NORMAL',
+    'subject': 'Payment not reflected',
+    'description': 'The bank payment is not shown on the invoice.',
+    'status': 'OPEN',
+    'invoice': {
+      'id': 'invoice-1',
+      'invoiceNumber': 'INV-001',
+      'status': 'PARTIAL',
+      'totalAmount': 1200,
+      'dueDate': '2026-07-30T00:00:00.000Z',
+    },
+    'responseDeadline': '2026-07-31T00:00:00.000Z',
+    'isOverdue': false,
+    'notes': <dynamic>[],
+    'attachments': <dynamic>[],
+    'actions': {
+      'cancel': true,
+      'confirmResolution': false,
+      'reopen': false,
+      'addEvidence': true,
+    },
+    'createdAt': '2026-07-26T00:00:00.000Z',
+    'updatedAt': '2026-07-26T00:00:00.000Z',
+  };
 }

@@ -124,6 +124,12 @@ class ParentPortalMoreTab extends ConsumerWidget {
             'Review school requests and approvals',
             AppRoutes.parentConsents,
           ),
+          _Menu(
+            Icons.support_agent_outlined,
+            'Help & Requests',
+            'School concerns, payment disputes, and responses',
+            AppRoutes.parentServiceRequests,
+          ),
         ]),
         const ParentSectionHeader(title: 'Account'),
         const SizedBox(height: 10),
@@ -154,14 +160,8 @@ class ParentPortalMoreTab extends ConsumerWidget {
               SettingsMenuItem(
                 icon: Icons.help_outline_rounded,
                 title: 'Help & Support',
-                subtitle: 'Contact your school administrator',
-                onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'For help, please contact your school administrator directly.',
-                    ),
-                  ),
-                ),
+                subtitle: 'Send and follow a request to the school',
+                onTap: () => context.push(AppRoutes.parentServiceRequests),
               ),
               const Divider(),
               SettingsMenuItem(

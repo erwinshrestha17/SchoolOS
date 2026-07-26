@@ -21,6 +21,8 @@ class Notice {
     required this.category,
     required this.isRead,
     this.noticeId,
+    this.requiresAcknowledgement = false,
+    this.acknowledgedAt,
     this.hasAttachment = false,
     this.attachment,
   });
@@ -43,10 +45,14 @@ class Notice {
   /// notification id there 404s. Null for entries that are not notices
   /// (events, activity posts), which therefore cannot be acknowledged.
   final String? noticeId;
+  final bool requiresAcknowledgement;
+  final DateTime? acknowledgedAt;
   final bool hasAttachment;
   final NoticeAttachment? attachment;
 
-  bool get canAcknowledge => (noticeId ?? '').isNotEmpty;
+  bool get canAcknowledge =>
+      (noticeId ?? '').isNotEmpty && requiresAcknowledgement;
+  bool get isAcknowledged => acknowledgedAt != null;
 
   bool get isEmergency => category == NoticeCategory.emergency;
   bool get isImportant => category == NoticeCategory.important || isEmergency;
@@ -63,6 +69,8 @@ class Notice {
       category: category,
       isRead: isRead ?? this.isRead,
       noticeId: noticeId,
+      requiresAcknowledgement: requiresAcknowledgement,
+      acknowledgedAt: acknowledgedAt,
       hasAttachment: hasAttachment,
       attachment: attachment,
     );
@@ -132,6 +140,8 @@ class ParentNotification {
     this.childId,
     this.sourceUpdateId,
     this.readAt,
+    this.requiresAcknowledgement = false,
+    this.acknowledgedAt,
     this.metadata,
     this.attachment,
     this.audience = const ParentNotificationAudience(),
@@ -148,6 +158,8 @@ class ParentNotification {
   final DateTime createdAt;
   final NoticeCategory category;
   final DateTime? readAt;
+  final bool requiresAcknowledgement;
+  final DateTime? acknowledgedAt;
   final Map<String, dynamic>? metadata;
   final NoticeAttachment? attachment;
   final ParentNotificationAudience audience;
@@ -182,6 +194,11 @@ class ParentNotification {
           (json['isRead'] == true
               ? DateTime.fromMillisecondsSinceEpoch(0)
               : null),
+      requiresAcknowledgement:
+          json['requiresAcknowledgement'] as bool? ?? false,
+      acknowledgedAt: DateTime.tryParse(
+        json['acknowledgedAt'] as String? ?? '',
+      ),
       metadata: Map<String, dynamic>.from(json),
       attachment: json['attachment'] is Map<String, dynamic>
           ? NoticeAttachment.fromJson(
@@ -209,6 +226,8 @@ class ParentNotification {
       createdAt: createdAt,
       category: category,
       readAt: clearReadAt ? null : readAt ?? this.readAt,
+      requiresAcknowledgement: requiresAcknowledgement,
+      acknowledgedAt: acknowledgedAt,
       metadata: metadata,
       attachment: attachment,
       audience: audience,

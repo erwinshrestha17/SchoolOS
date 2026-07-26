@@ -47,6 +47,10 @@ export class CreateNoticeDraftDto {
   isPinned?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  requiresAcknowledgement?: boolean;
+
+  @IsOptional()
   @IsString()
   templateId?: string;
 
@@ -140,6 +144,10 @@ export class UpdateNoticeDraftDto {
   @IsOptional()
   @IsBoolean()
   isPinned?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  requiresAcknowledgement?: boolean;
 
   @IsOptional()
   @IsString()

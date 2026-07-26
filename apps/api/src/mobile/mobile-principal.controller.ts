@@ -37,6 +37,13 @@ import {
   MobilePrincipalEscalationResolutionDto,
 } from './dto/mobile-principal-escalation.dto';
 import { MobilePrincipalService } from './mobile-principal.service';
+import {
+  AddSchoolServiceRequestNoteDto,
+  ListSchoolServiceRequestsDto,
+  ReasonedSchoolServiceRequestDto,
+  ResolveSchoolServiceRequestDto,
+} from '../service-requests/dto/service-request.dto';
+import { MobilePrincipalServiceRequestTriageDto } from './dto/mobile-principal-service-request.dto';
 
 @ApiTags('mobile-principal')
 @Controller('mobile/principal')
@@ -113,6 +120,64 @@ export class MobilePrincipalController {
     @Body() dto: MobilePrincipalApprovalDelegationDto,
   ) {
     return this.service.delegateApproval(auth, approvalRequestId, dto);
+  }
+
+  @Get('service-requests')
+  @Permissions('service_requests:read')
+  serviceRequests(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: ListSchoolServiceRequestsDto,
+  ) {
+    return this.service.getServiceRequests(auth, query);
+  }
+
+  @Get('service-requests/:requestId')
+  @Permissions('service_requests:read')
+  serviceRequestDetail(
+    @CurrentAuth() auth: AuthContext,
+    @Param('requestId', new ParseUUIDPipe()) requestId: string,
+  ) {
+    return this.service.getServiceRequest(auth, requestId);
+  }
+
+  @Post('service-requests/:requestId/triage-self')
+  @Permissions('service_requests:manage')
+  triageServiceRequest(
+    @CurrentAuth() auth: AuthContext,
+    @Param('requestId', new ParseUUIDPipe()) requestId: string,
+    @Body() dto: MobilePrincipalServiceRequestTriageDto,
+  ) {
+    return this.service.triageServiceRequest(auth, requestId, dto);
+  }
+
+  @Post('service-requests/:requestId/notes')
+  @Permissions('service_requests:manage')
+  addServiceRequestNote(
+    @CurrentAuth() auth: AuthContext,
+    @Param('requestId', new ParseUUIDPipe()) requestId: string,
+    @Body() dto: AddSchoolServiceRequestNoteDto,
+  ) {
+    return this.service.addServiceRequestNote(auth, requestId, dto);
+  }
+
+  @Post('service-requests/:requestId/resolve')
+  @Permissions('service_requests:manage')
+  resolveServiceRequest(
+    @CurrentAuth() auth: AuthContext,
+    @Param('requestId', new ParseUUIDPipe()) requestId: string,
+    @Body() dto: ResolveSchoolServiceRequestDto,
+  ) {
+    return this.service.resolveServiceRequest(auth, requestId, dto);
+  }
+
+  @Post('service-requests/:requestId/escalate')
+  @Permissions('service_requests:manage')
+  escalateServiceRequest(
+    @CurrentAuth() auth: AuthContext,
+    @Param('requestId', new ParseUUIDPipe()) requestId: string,
+    @Body() dto: ReasonedSchoolServiceRequestDto,
+  ) {
+    return this.service.escalateServiceRequest(auth, requestId, dto);
   }
 
   @Get('attendance-summary')

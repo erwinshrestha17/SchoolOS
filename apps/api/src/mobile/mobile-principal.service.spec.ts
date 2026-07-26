@@ -115,6 +115,14 @@ describe('MobilePrincipalService', () => {
   let fileRegistry: {
     listFilesByEntity: jest.Mock;
   };
+  let serviceRequests: {
+    listManagerRequests: jest.Mock;
+    getManagerRequest: jest.Mock;
+    triageRequest: jest.Mock;
+    addManagerNote: jest.Mock;
+    resolveRequest: jest.Mock;
+    escalateRequest: jest.Mock;
+  };
   let service: MobilePrincipalService;
 
   beforeEach(() => {
@@ -201,6 +209,14 @@ describe('MobilePrincipalService', () => {
     fileRegistry = {
       listFilesByEntity: jest.fn(),
     };
+    serviceRequests = {
+      listManagerRequests: jest.fn(),
+      getManagerRequest: jest.fn(),
+      triageRequest: jest.fn(),
+      addManagerNote: jest.fn(),
+      resolveRequest: jest.fn(),
+      escalateRequest: jest.fn(),
+    };
     service = new MobilePrincipalService(
       prisma as never,
       entitlements as never,
@@ -208,6 +224,81 @@ describe('MobilePrincipalService', () => {
       audit as never,
       communications as never,
       fileRegistry as never,
+      serviceRequests as never,
+    );
+  });
+
+  it('adds tenant-scoped parent requests to principal attention', async () => {
+    serviceRequests.listManagerRequests.mockResolvedValue({
+      items: [
+        {
+          id: 'request-1',
+          type: 'PAYMENT_DISPUTE',
+          priority: 'HIGH',
+          status: 'OPEN',
+          subject: 'Payment not reflected',
+          student: {
+            id: 'student-1',
+            name: 'Aarav Sharma',
+            classSection: 'Grade 5 - A',
+          },
+          assignedTo: null,
+          isOverdue: false,
+          createdAt: '2026-07-26T00:00:00.000Z',
+        },
+      ],
+    });
+
+    const result = await service.getAttention(
+      {
+        ...actor,
+        permissions: [...actor.permissions, 'service_requests:read'],
+      },
+      'all',
+    );
+
+    expect(result.items).toEqual([
+      expect.objectContaining({
+        id: 'request-1',
+        type: 'service_request',
+        title: 'Parent Payment Dispute',
+        severity: 'high',
+        route: '/principal/service-requests/request-1',
+      }),
+    ]);
+    expect(serviceRequests.listManagerRequests).toHaveBeenCalledWith(
+      { limit: 20 },
+      expect.objectContaining({ tenantId: 'tenant-1' }),
+    );
+  });
+
+  it('triages a parent request only to the authenticated principal', async () => {
+    serviceRequests.triageRequest.mockResolvedValue({
+      id: 'request-1',
+      status: 'IN_PROGRESS',
+    });
+    const principal = {
+      ...actor,
+      permissions: [...actor.permissions, 'service_requests:manage'],
+    };
+
+    await service.triageServiceRequest(principal, 'request-1', {
+      priority: 'HIGH',
+      responseDeadline: '2026-07-28T00:00:00.000Z',
+      status: 'IN_PROGRESS',
+      reason: 'Principal accepted the parent follow-up.',
+    } as never);
+
+    expect(serviceRequests.triageRequest).toHaveBeenCalledWith(
+      'request-1',
+      {
+        assignedToUserId: 'principal-user-1',
+        priority: 'HIGH',
+        responseDeadline: '2026-07-28T00:00:00.000Z',
+        status: 'IN_PROGRESS',
+        reason: 'Principal accepted the parent follow-up.',
+      },
+      principal,
     );
   });
 

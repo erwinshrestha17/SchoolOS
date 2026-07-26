@@ -46,6 +46,10 @@ export class CreateNoticeDto {
   isPinned?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  requiresAcknowledgement?: boolean;
+
+  @IsOptional()
   @IsString()
   templateId?: string;
 

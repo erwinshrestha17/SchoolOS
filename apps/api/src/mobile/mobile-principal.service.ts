@@ -17,6 +17,7 @@ import {
   NoticePriority,
   NotificationStatus,
   Prisma,
+  SchoolServiceRequestStatus,
   UserStatus,
 } from '@prisma/client';
 import { FEATURE_KEYS } from '@schoolos/core';
@@ -41,6 +42,14 @@ import {
   MobilePrincipalEmergencyNoticePreviewDto,
   MobilePrincipalEmergencyNoticeSubmitDto,
 } from './dto/mobile-principal-emergency-notice.dto';
+import { ServiceRequestsService } from '../service-requests/service-requests.service';
+import {
+  AddSchoolServiceRequestNoteDto,
+  ListSchoolServiceRequestsDto,
+  ReasonedSchoolServiceRequestDto,
+  ResolveSchoolServiceRequestDto,
+} from '../service-requests/dto/service-request.dto';
+import { MobilePrincipalServiceRequestTriageDto } from './dto/mobile-principal-service-request.dto';
 
 type Severity = 'critical' | 'high' | 'medium' | 'low';
 
@@ -128,6 +137,7 @@ export class MobilePrincipalService implements OnModuleInit {
     private readonly auditService: AuditService,
     private readonly communicationsService: CommunicationsService,
     private readonly fileRegistryService: FileRegistryService,
+    private readonly serviceRequestsService: ServiceRequestsService,
   ) {}
 
   onModuleInit() {
@@ -261,6 +271,7 @@ export class MobilePrincipalService implements OnModuleInit {
       feeItems,
       academicsItems,
       activityItems,
+      serviceRequestItems,
     ] = await Promise.all([
       modules.attendance ? this.attendanceAttention(actor) : [],
       modules.hr ? this.staffAttention(actor) : [],
@@ -269,6 +280,9 @@ export class MobilePrincipalService implements OnModuleInit {
       modules.fees ? this.feeAttention(actor) : [],
       modules.exams ? this.academicsAttention(actor) : [],
       modules.activity ? this.activityAttention(actor) : [],
+      actor.permissions.includes('service_requests:read')
+        ? this.serviceRequestAttention(actor)
+        : [],
     ]);
 
     let items = [
@@ -279,6 +293,7 @@ export class MobilePrincipalService implements OnModuleInit {
       ...feeItems,
       ...academicsItems,
       ...activityItems,
+      ...serviceRequestItems,
     ].sort(compareAttention);
 
     const normalizedFilter = filter.toLowerCase();
@@ -308,6 +323,68 @@ export class MobilePrincipalService implements OnModuleInit {
       modules,
       lastUpdated: nowIso(),
     };
+  }
+
+  async getServiceRequests(
+    actor: AuthContext,
+    query: ListSchoolServiceRequestsDto,
+  ) {
+    this.assertPrincipal(actor);
+    return this.serviceRequestsService.listManagerRequests(
+      { ...query, limit: query.limit ?? 50 },
+      actor,
+    );
+  }
+
+  async getServiceRequest(actor: AuthContext, requestId: string) {
+    this.assertPrincipal(actor);
+    return this.serviceRequestsService.getManagerRequest(requestId, actor);
+  }
+
+  async triageServiceRequest(
+    actor: AuthContext,
+    requestId: string,
+    dto: MobilePrincipalServiceRequestTriageDto,
+  ) {
+    this.assertPrincipal(actor);
+    return this.serviceRequestsService.triageRequest(
+      requestId,
+      {
+        assignedToUserId: actor.userId,
+        priority: dto.priority,
+        responseDeadline: dto.responseDeadline,
+        status: dto.status,
+        reason: dto.reason,
+      },
+      actor,
+    );
+  }
+
+  async addServiceRequestNote(
+    actor: AuthContext,
+    requestId: string,
+    dto: AddSchoolServiceRequestNoteDto,
+  ) {
+    this.assertPrincipal(actor);
+    return this.serviceRequestsService.addManagerNote(requestId, dto, actor);
+  }
+
+  async resolveServiceRequest(
+    actor: AuthContext,
+    requestId: string,
+    dto: ResolveSchoolServiceRequestDto,
+  ) {
+    this.assertPrincipal(actor);
+    return this.serviceRequestsService.resolveRequest(requestId, dto, actor);
+  }
+
+  async escalateServiceRequest(
+    actor: AuthContext,
+    requestId: string,
+    dto: ReasonedSchoolServiceRequestDto,
+  ) {
+    this.assertPrincipal(actor);
+    return this.serviceRequestsService.escalateRequest(requestId, dto, actor);
   }
 
   async getApprovals(actor: AuthContext, status = 'pending') {
@@ -592,11 +669,11 @@ export class MobilePrincipalService implements OnModuleInit {
       request.requestedById !== actor.userId &&
       Boolean(
         pendingStep &&
-          this.canActorDecideApprovalStep(
-            pendingStep,
-            actor,
-            request.delegatedToId,
-          ),
+        this.canActorDecideApprovalStep(
+          pendingStep,
+          actor,
+          request.delegatedToId,
+        ),
       );
     const approvalActionAvailable =
       actorCanDecide &&
@@ -792,11 +869,7 @@ export class MobilePrincipalService implements OnModuleInit {
         ),
       );
       if (
-        !this.canRoleSetDecideApprovalStep(
-          request.steps[0],
-          roles,
-          permissions,
-        )
+        !this.canRoleSetDecideApprovalStep(request.steps[0], roles, permissions)
       ) {
         return [];
       }
@@ -3064,6 +3137,46 @@ export class MobilePrincipalService implements OnModuleInit {
           ]
         : []),
     ];
+  }
+
+  private async serviceRequestAttention(
+    actor: AuthContext,
+  ): Promise<PrincipalItem[]> {
+    const activeStatuses: readonly SchoolServiceRequestStatus[] = [
+      SchoolServiceRequestStatus.OPEN,
+      SchoolServiceRequestStatus.ASSIGNED,
+      SchoolServiceRequestStatus.IN_PROGRESS,
+      SchoolServiceRequestStatus.REOPENED,
+    ];
+    const result = await this.serviceRequestsService.listManagerRequests(
+      { limit: 20 },
+      actor,
+    );
+    return result.items
+      .filter((request) => activeStatuses.includes(request.status))
+      .map((request) => ({
+        id: request.id,
+        type: 'service_request',
+        title:
+          request.type === 'PAYMENT_DISPUTE'
+            ? 'Parent Payment Dispute'
+            : 'Parent School Request',
+        subtitle: `${request.student.name} • ${request.student.classSection}`,
+        detail: request.subject,
+        severity: (request.isOverdue || request.priority === 'HIGH'
+          ? 'high'
+          : 'medium') as Severity,
+        status: request.status,
+        owner:
+          request.assignedTo?.id === actor.userId
+            ? 'Principal'
+            : (request.assignedTo?.name ?? 'Unassigned'),
+        nextAction: request.isOverdue
+          ? 'Respond to overdue request'
+          : 'Review parent request',
+        timestamp: request.createdAt,
+        route: `/principal/service-requests/${request.id}`,
+      }));
   }
 
   private async staffAttention(actor: AuthContext): Promise<PrincipalItem[]> {

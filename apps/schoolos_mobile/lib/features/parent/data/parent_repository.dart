@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
@@ -8,6 +9,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/storage/private_read_cache.dart';
 import '../domain/parent_models.dart';
+import '../domain/parent_service_request_models.dart';
 
 class ParentRepository {
   ParentRepository(this._client, {this.cache});
@@ -434,6 +436,144 @@ class ParentRepository {
   Future<ParentLibraryInfo> getLibraryForChild(String childId) async {
     final data = await _getMap('/mobile/students/$childId/library');
     return ParentLibraryInfo.fromJson(data);
+  }
+
+  Future<ParentServiceRequestList> getServiceRequestsForChild(
+    String childId,
+  ) async {
+    // Complaint descriptions and evidence are intentionally not cached on the
+    // device. The screen remains honest and read-only unavailable offline.
+    final data = await _getMap('/mobile/students/$childId/service-requests');
+    return ParentServiceRequestList.fromJson(data);
+  }
+
+  Future<ParentServiceRequest> createServiceRequest({
+    required String childId,
+    required String type,
+    required String category,
+    required String priority,
+    required String subject,
+    required String description,
+    required String idempotencyKey,
+    String? invoiceId,
+  }) async {
+    final response = await _client.post<Map<String, dynamic>>(
+      '/mobile/students/$childId/service-requests',
+      data: {
+        'type': type,
+        'category': category,
+        'priority': priority,
+        'subject': subject,
+        'description': description,
+        'idempotencyKey': idempotencyKey,
+        if (invoiceId != null && invoiceId.isNotEmpty) 'invoiceId': invoiceId,
+      },
+    );
+    return ParentServiceRequest.fromJson(response.data ?? const {});
+  }
+
+  Future<ParentServiceRequest> cancelServiceRequest({
+    required String requestId,
+    required String reason,
+  }) async {
+    return _postServiceRequestAction(
+      requestId,
+      'cancel',
+      data: {'reason': reason},
+    );
+  }
+
+  Future<ParentServiceRequest> confirmServiceRequestResolution(
+    String requestId,
+  ) async {
+    return _postServiceRequestAction(requestId, 'confirm-resolution');
+  }
+
+  Future<ParentServiceRequest> reopenServiceRequest({
+    required String requestId,
+    required String reason,
+  }) async {
+    return _postServiceRequestAction(
+      requestId,
+      'reopen',
+      data: {'reason': reason},
+    );
+  }
+
+  Future<ParentServiceRequest> uploadServiceRequestEvidence({
+    required String requestId,
+    required String fileName,
+    required String contentType,
+    required Uint8List content,
+    String? label,
+  }) async {
+    final response = await _client.post<Map<String, dynamic>>(
+      '/mobile/service-requests/$requestId/attachments',
+      data: {
+        'fileName': fileName,
+        'contentType': contentType,
+        'base64Content': base64Encode(content),
+        if (label != null && label.trim().isNotEmpty) 'label': label.trim(),
+      },
+    );
+    return ParentServiceRequest.fromJson(response.data ?? const {});
+  }
+
+  Future<ParentProtectedFileDownload> downloadServiceRequestEvidence({
+    required ParentServiceRequest request,
+    required ParentServiceRequestAttachment attachment,
+  }) {
+    return _singleFlightDownload(
+      'service-request:${request.id}:${attachment.id}',
+      () => _downloadServiceRequestEvidence(
+        request: request,
+        attachment: attachment,
+      ),
+    );
+  }
+
+  Future<ParentProtectedFileDownload> _downloadServiceRequestEvidence({
+    required ParentServiceRequest request,
+    required ParentServiceRequestAttachment attachment,
+  }) async {
+    final expectedPath =
+        '/mobile/service-requests/${request.id}/attachments/${attachment.id}';
+    if (attachment.downloadPath != expectedPath) {
+      throw const ValidationException(
+        message: 'This request evidence is unavailable.',
+      );
+    }
+    final response = await _client.get<List<int>>(
+      expectedPath,
+      options: Options(
+        responseType: ResponseType.bytes,
+        headers: {Headers.acceptHeader: attachment.mimeType},
+      ),
+    );
+    final bytes = response.data;
+    if (bytes == null || bytes.isEmpty) {
+      throw const NotFoundAppException('This request evidence is unavailable.');
+    }
+    final fileName = _safeFileName(attachment.fileName);
+    final file = await _protectedFile(
+      'service-request-evidence',
+      attachment.id,
+      fileName,
+    );
+    await file.writeAsBytes(bytes, flush: true);
+    return ParentProtectedFileDownload(fileName: fileName, filePath: file.path);
+  }
+
+  Future<ParentServiceRequest> _postServiceRequestAction(
+    String requestId,
+    String action, {
+    Map<String, dynamic>? data,
+  }) async {
+    final response = await _client.post<Map<String, dynamic>>(
+      '/mobile/service-requests/$requestId/$action',
+      data: data,
+    );
+    return ParentServiceRequest.fromJson(response.data ?? const {});
   }
 
   Future<ParentReceiptPdfDownload> downloadReceiptPdf({

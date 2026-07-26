@@ -48,6 +48,7 @@ type NoticeDraftForm = {
   bodyNe: string;
   category: (typeof CATEGORY_OPTIONS)[number];
   isPinned: boolean;
+  requiresAcknowledgement: boolean;
   priority: "NORMAL" | "URGENT" | "EMERGENCY";
   audienceType: ComposerAudienceType;
   classId: string;
@@ -65,6 +66,7 @@ const emptyDraft: NoticeDraftForm = {
   bodyNe: "",
   category: "GENERAL",
   isPinned: false,
+  requiresAcknowledgement: false,
   priority: "NORMAL",
   audienceType: "ALL",
   classId: "",
@@ -149,6 +151,7 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
       category: (notice.category ??
         "GENERAL") as NoticeDraftForm["category"],
       isPinned: notice.isPinned ?? false,
+      requiresAcknowledgement: notice.requiresAcknowledgement ?? false,
       priority: notice.priority as NoticeDraftForm["priority"],
       audienceType,
       classId: notice.classId ?? "",
@@ -333,7 +336,7 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
           />
         </Field>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
           <Field label="Priority">
             <select
               value={form.priority}
@@ -382,6 +385,22 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
               className="h-4 w-4"
             />
             Pin to top of notices list
+          </label>
+          <label className="flex items-center gap-2 self-end pb-2 text-sm font-semibold text-slate-700">
+            <input
+              type="checkbox"
+              checked={form.requiresAcknowledgement}
+              onChange={(event) =>
+                change(
+                  setForm,
+                  setDirty,
+                  "requiresAcknowledgement",
+                  event.target.checked,
+                )
+              }
+              className="h-4 w-4"
+            />
+            Require parent acknowledgement
           </label>
         </div>
 
@@ -634,6 +653,7 @@ function payload(form: NoticeDraftForm) {
     bodyNe: form.bodyNe.trim() || undefined,
     category: form.category,
     isPinned: form.isPinned,
+    requiresAcknowledgement: form.requiresAcknowledgement,
     priority: form.priority,
     audienceType,
     classId:

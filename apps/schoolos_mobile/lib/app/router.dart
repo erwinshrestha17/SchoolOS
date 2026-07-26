@@ -35,6 +35,7 @@ import '../features/parent/presentation/screens/parent_portal_detail_screens.dar
 import '../features/parent/presentation/screens/parent_report_cards_screen.dart';
 import '../features/parent/presentation/screens/parent_timetable_screen.dart';
 import '../features/parent/presentation/screens/parent_transport_screen.dart';
+import '../features/parent/presentation/screens/parent_service_requests_screen.dart';
 import '../features/principal/presentation/screens/principal_screens.dart';
 import '../features/profile/presentation/change_password_screen.dart';
 import '../features/profile/presentation/profile_screen.dart';
@@ -195,6 +196,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ParentLibraryScreen(),
       ),
       GoRoute(
+        path: AppRoutes.parentServiceRequests,
+        builder: (context, state) => const ParentServiceRequestsScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.parentMore,
         builder: (context, state) => const SchoolOsAppShell(initialIndex: 4),
       ),
@@ -312,6 +317,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.principalApprovals,
         builder: (context, state) => const PrincipalApprovalsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.principalServiceRequests,
+        builder: (context, state) => const PrincipalServiceRequestsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.principalServiceRequest,
+        builder: (context, state) => PrincipalServiceRequestDetailScreen(
+          requestId: state.pathParameters['requestId'] ?? '',
+        ),
       ),
       GoRoute(
         path: AppRoutes.principalNotices,
@@ -530,6 +545,7 @@ bool isPrincipalRoute(String location) {
   return location == AppRoutes.principalToday ||
       location == AppRoutes.principalAttention ||
       location == AppRoutes.principalApprovals ||
+      location.startsWith(AppRoutes.principalServiceRequests) ||
       location == AppRoutes.principalAdmissions ||
       location == AppRoutes.principalNotices ||
       location == AppRoutes.principalMore ||
@@ -591,5 +607,6 @@ bool isParentRoute(String location) {
       location == AppRoutes.parentCanteen ||
       location == AppRoutes.parentConsents ||
       location == AppRoutes.parentLibrary ||
+      location == AppRoutes.parentServiceRequests ||
       location == AppRoutes.parentMore;
 }

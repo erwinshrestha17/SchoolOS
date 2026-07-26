@@ -1,3 +1,9 @@
+import 'dart:io';
+
+import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
+
+import '../../../core/errors/app_exception.dart';
 import '../../../core/network/api_client.dart';
 
 class PrincipalRepository {
@@ -59,6 +65,109 @@ class PrincipalRepository {
     return _postJson(
       '/mobile/principal/approvals/$approvalRequestId/delegation',
       {'delegatedToUserId': delegatedToUserId, 'reason': reason.trim()},
+    );
+  }
+
+  Future<Map<String, dynamic>> getServiceRequests({
+    String? status,
+    int page = 1,
+  }) => _getCached(
+    'principal_service_requests_${status ?? 'all'}_$page',
+    '/mobile/principal/service-requests',
+    queryParameters: {
+      if (status != null && status.isNotEmpty) 'status': status,
+      'page': page,
+      'limit': 50,
+    },
+  );
+
+  Future<Map<String, dynamic>> getServiceRequest(String requestId) =>
+      _getCached(
+        'principal_service_request_$requestId',
+        '/mobile/principal/service-requests/$requestId',
+      );
+
+  Future<Map<String, dynamic>> triageServiceRequest({
+    required String requestId,
+    required String priority,
+    required String responseDeadline,
+    required String status,
+    required String reason,
+  }) {
+    return _postJson(
+      '/mobile/principal/service-requests/$requestId/triage-self',
+      {
+        'priority': priority,
+        'responseDeadline': responseDeadline,
+        'status': status,
+        'reason': reason.trim(),
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> addServiceRequestNote({
+    required String requestId,
+    required String body,
+    required String visibility,
+  }) {
+    return _postJson('/mobile/principal/service-requests/$requestId/notes', {
+      'body': body.trim(),
+      'visibility': visibility,
+    });
+  }
+
+  Future<Map<String, dynamic>> resolveServiceRequest({
+    required String requestId,
+    required String resolutionSummary,
+  }) {
+    return _postJson('/mobile/principal/service-requests/$requestId/resolve', {
+      'resolutionSummary': resolutionSummary.trim(),
+    });
+  }
+
+  Future<Map<String, dynamic>> escalateServiceRequest({
+    required String requestId,
+    required String reason,
+  }) {
+    return _postJson('/mobile/principal/service-requests/$requestId/escalate', {
+      'reason': reason.trim(),
+    });
+  }
+
+  Future<PrincipalProtectedFileDownload> downloadServiceRequestEvidence({
+    required String requestId,
+    required String attachmentId,
+    required String downloadPath,
+    required String fileName,
+    required String mimeType,
+  }) async {
+    final expected = '/service-requests/$requestId/attachments/$attachmentId';
+    if (downloadPath != expected) {
+      throw const ValidationException(
+        message: 'This request evidence is unavailable.',
+      );
+    }
+    final response = await _client.get<List<int>>(
+      expected,
+      options: Options(
+        responseType: ResponseType.bytes,
+        headers: {Headers.acceptHeader: mimeType},
+      ),
+    );
+    final bytes = response.data;
+    if (bytes == null || bytes.isEmpty) {
+      throw const NotFoundAppException('This request evidence is unavailable.');
+    }
+    final directory = Directory(
+      '${(await getTemporaryDirectory()).path}/schoolos/principal-request-evidence/$attachmentId',
+    );
+    if (!directory.existsSync()) await directory.create(recursive: true);
+    final safeName = _safeFileName(fileName);
+    final file = File('${directory.path}/$safeName');
+    await file.writeAsBytes(bytes, flush: true);
+    return PrincipalProtectedFileDownload(
+      fileName: safeName,
+      filePath: file.path,
     );
   }
 
@@ -199,4 +308,19 @@ class PrincipalRepository {
         ? response.data as Map<String, dynamic>
         : <String, dynamic>{};
   }
+}
+
+class PrincipalProtectedFileDownload {
+  const PrincipalProtectedFileDownload({
+    required this.fileName,
+    required this.filePath,
+  });
+
+  final String fileName;
+  final String filePath;
+}
+
+String _safeFileName(String value) {
+  final safe = value.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '-');
+  return safe.isEmpty ? 'evidence' : safe;
 }

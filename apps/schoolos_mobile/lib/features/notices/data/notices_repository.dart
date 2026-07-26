@@ -67,12 +67,6 @@ class NoticesRepository {
   /// no-op rather than a second record - safe to retry after an ambiguous
   /// failure without creating duplicates.
   ///
-  /// Known backend gaps (do not work around them client-side): `Notice` has
-  /// no `requiresAcknowledgement` field, so the app cannot tell which notices
-  /// are mandatory; and the parent-facing payloads do not return
-  /// acknowledgement state, so a prior acknowledgement cannot be shown after
-  /// a reload. Reading `notices/:id/acknowledgements` needs
-  /// `notices:read_reports`, which the parent role does not hold.
   Future<void> acknowledgeNotice(String noticeId) async {
     await _client.post('/notices/${Uri.encodeComponent(noticeId)}/acknowledge');
   }
@@ -283,6 +277,8 @@ class NoticesRepository {
       // The notification id and the notice id are different keys; notice-level
       // actions such as acknowledgement need the latter.
       noticeId: item.sourceUpdateId,
+      requiresAcknowledgement: item.requiresAcknowledgement,
+      acknowledgedAt: item.acknowledgedAt,
       hasAttachment: item.attachment != null,
       attachment: item.attachment,
     );
@@ -314,6 +310,8 @@ Map<String, dynamic> _safeNoticeFeedItem(Map<String, dynamic> item) {
     'createdAt',
     'readAt',
     'isRead',
+    'requiresAcknowledgement',
+    'acknowledgedAt',
   };
   return <String, dynamic>{
     for (final entry in item.entries)

@@ -10,6 +10,7 @@ model Notice {
   bodyNe             String?
   category           CommunicationTemplateCategory @default(GENERAL)
   isPinned           Boolean               @default(false)
+  requiresAcknowledgement Boolean           @default(false)
   templateId         String?
   priority           NoticePriority        @default(NORMAL)
   audienceType       AudienceType          @default(ALL)

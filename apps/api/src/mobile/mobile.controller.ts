@@ -55,6 +55,15 @@ export class MobileController {
     return this.mobileService.getDashboard(auth, studentId);
   }
 
+  @Get('me/action-centre')
+  @RequiredModule('students')
+  getParentActionCentre(
+    @CurrentAuth() auth: AuthContext,
+    @Query('studentId') studentId?: string,
+  ) {
+    return this.mobileService.getParentActionCentre(auth, studentId);
+  }
+
   @Get('me/notifications')
   listNotifications(
     @CurrentAuth() auth: AuthContext,

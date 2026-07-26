@@ -30,6 +30,7 @@ class AppRoutes {
   static const parentCanteen = '/parent/more/canteen-wallet';
   static const parentConsents = '/parent/more/consents';
   static const parentLibrary = '/parent/more/library';
+  static const parentServiceRequests = '/parent/more/help-requests';
   static const parentMore = '/parent/more';
   static const studentSession = '/student/session';
   static const studentHome = '/student/home';
@@ -59,6 +60,9 @@ class AppRoutes {
   static const principalToday = '/principal/today';
   static const principalAttention = '/principal/attention';
   static const principalApprovals = '/principal/approvals';
+  static const principalServiceRequests = '/principal/service-requests';
+  static const principalServiceRequest =
+      '/principal/service-requests/:requestId';
   static const principalAdmissions = '/principal/admissions';
   static const principalNotices = '/principal/notices';
   static const principalMore = '/principal/more';
@@ -82,6 +86,8 @@ class AppRoutes {
   static String noticeDetail(String id) => '/notices/$id';
   static String teacherClassDetail(String classSectionId) =>
       '/teacher/class/${Uri.encodeComponent(classSectionId)}';
+  static String principalServiceRequestDetail(String requestId) =>
+      '/principal/service-requests/${Uri.encodeComponent(requestId)}';
   static String teacherAttendanceFor(String classSectionId) =>
       '/teacher/attendance/${Uri.encodeComponent(classSectionId)}';
   static String teacherHomeworkForClass({

@@ -141,7 +141,10 @@ class NoticeDetailScreen extends ConsumerWidget {
               const SizedBox(height: 18),
               const ParentSectionHeader(title: 'Confirm you have read this'),
               const SizedBox(height: 8),
-              _NoticeAcknowledgementCard(noticeId: notice.noticeId!),
+              _NoticeAcknowledgementCard(
+                noticeId: notice.noticeId!,
+                alreadyAcknowledged: notice.isAcknowledged,
+              ),
             ],
             if (notice.hasAttachment) ...[
               const SizedBox(height: 18),
@@ -386,22 +389,23 @@ String _formatSize(int bytes) {
 /// Records the guardian's acknowledgement of a notice.
 ///
 /// The school's own record is `firstAcknowledgedAt`, so tapping again after a
-/// reload is harmless. It is shown for every notice because the backend has no
-/// `requiresAcknowledgement` flag to distinguish mandatory ones, and the
-/// confirmed state cannot survive a reload because parent-facing payloads do
-/// not return acknowledgement state. Both are backend gaps, recorded in
-/// `NoticesRepository.acknowledgeNotice`.
+/// reload is harmless. The server identifies mandatory notices and returns
+/// the guardian's durable acknowledgement state.
 class _NoticeAcknowledgementCard extends ConsumerWidget {
-  const _NoticeAcknowledgementCard({required this.noticeId});
+  const _NoticeAcknowledgementCard({
+    required this.noticeId,
+    required this.alreadyAcknowledged,
+  });
 
   final String noticeId;
+  final bool alreadyAcknowledged;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final provider = noticeAcknowledgementProvider(noticeId);
     final state = ref.watch(provider);
 
-    if (state.isAcknowledged) {
+    if (alreadyAcknowledged || state.isAcknowledged) {
       return PortalCard(
         color: ParentPortalColors.greenSoft,
         child: Row(

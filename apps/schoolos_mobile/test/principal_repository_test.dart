@@ -195,6 +195,85 @@ void main() {
     );
 
     test(
+      'loads and triages parent requests through principal mobile contracts',
+      () async {
+        when(
+          () => apiClient.get<dynamic>(
+            '/mobile/principal/service-requests',
+            queryParameters: any(named: 'queryParameters'),
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(path: 'service-requests'),
+            data: {
+              'items': [
+                {'id': 'request-1', 'status': 'OPEN'},
+              ],
+              'total': 1,
+              'page': 1,
+            },
+          ),
+        );
+        when(
+          () => apiClient.post<dynamic>(
+            '/mobile/principal/service-requests/request-1/triage-self',
+            data: any(named: 'data'),
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(path: 'triage-self'),
+            data: {'id': 'request-1', 'status': 'IN_PROGRESS'},
+          ),
+        );
+
+        final repository = PrincipalRepository(apiClient);
+        final queue = await repository.getServiceRequests(status: 'OPEN');
+        final result = await repository.triageServiceRequest(
+          requestId: 'request-1',
+          priority: 'HIGH',
+          responseDeadline: '2026-07-28T00:00:00.000Z',
+          status: 'IN_PROGRESS',
+          reason: 'Principal accepted the parent follow-up.',
+        );
+
+        expect(queue['total'], 1);
+        expect(result['status'], 'IN_PROGRESS');
+        verify(
+          () => apiClient.get<dynamic>(
+            '/mobile/principal/service-requests',
+            queryParameters: {'status': 'OPEN', 'page': 1, 'limit': 50},
+          ),
+        ).called(1);
+        verify(
+          () => apiClient.post<dynamic>(
+            '/mobile/principal/service-requests/request-1/triage-self',
+            data: {
+              'priority': 'HIGH',
+              'responseDeadline': '2026-07-28T00:00:00.000Z',
+              'status': 'IN_PROGRESS',
+              'reason': 'Principal accepted the parent follow-up.',
+            },
+          ),
+        ).called(1);
+      },
+    );
+
+    test('rejects an untrusted request-evidence download path', () async {
+      final repository = PrincipalRepository(apiClient);
+
+      await expectLater(
+        repository.downloadServiceRequestEvidence(
+          requestId: 'request-1',
+          attachmentId: 'attachment-1',
+          downloadPath: 'https://untrusted.test/evidence.jpg',
+          fileName: 'evidence.jpg',
+          mimeType: 'image/jpeg',
+        ),
+        throwsA(isA<ValidationException>()),
+      );
+    });
+
+    test(
       'previews and submits emergency notices through mobile contracts',
       () async {
         when(

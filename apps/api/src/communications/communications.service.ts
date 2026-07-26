@@ -114,6 +114,7 @@ export interface NoticeDraftInput {
   bodyNe?: string;
   category?: CommunicationTemplateCategory;
   isPinned?: boolean;
+  requiresAcknowledgement?: boolean;
   templateId?: string;
   priority: NoticePriority;
   audienceType: AudienceType;
@@ -359,6 +360,7 @@ export class CommunicationsService {
         bodyNe: dto.bodyNe ?? null,
         category: dto.category ?? undefined,
         isPinned: dto.isPinned ?? false,
+        requiresAcknowledgement: dto.requiresAcknowledgement ?? false,
         templateId: dto.templateId ?? null,
         priority,
         audienceType: dto.audienceType ?? AudienceType.ALL,
@@ -433,6 +435,7 @@ export class CommunicationsService {
           bodyNe: input.bodyNe?.trim() || null,
           category: input.category ?? undefined,
           isPinned: input.isPinned ?? false,
+          requiresAcknowledgement: input.requiresAcknowledgement ?? false,
           templateId: input.templateId ?? null,
           priority: input.priority,
           audienceType: input.audienceType,
@@ -527,6 +530,7 @@ export class CommunicationsService {
         bodyNe: dto.bodyNe?.trim(),
         category: dto.category,
         isPinned: dto.isPinned,
+        requiresAcknowledgement: dto.requiresAcknowledgement,
         templateId: dto.templateId,
         priority: dto.priority,
         audienceType: dto.audienceType,

@@ -1504,6 +1504,279 @@ describe('MobileService', () => {
     expect(prisma.homeworkAssignment.findMany).not.toHaveBeenCalled();
   });
 
+  it('returns backend-owned linked-child actions with honest source coverage', async () => {
+    const child = {
+      id: 'student-1',
+      name: 'Asha Rai',
+      classSection: 'Grade 4 - A',
+      classId: 'class-1',
+      sectionId: 'section-1',
+      rollNumber: '7',
+      academicYear: '2082',
+      academicYearStartsOn: '2025-04-14T00:00:00.000Z',
+      academicYearEndsOn: '2026-04-13T00:00:00.000Z',
+      relationship: 'Daughter',
+      guardianId: 'guardian-1',
+    };
+    jest.spyOn(service, 'listMyStudents').mockResolvedValue({ items: [child] });
+    entitlementsService.getEntitlements.mockResolvedValue({
+      modules: ['students', 'attendance', 'fees', 'homework', 'academics'],
+      features: [],
+      addOns: [],
+      tier: null,
+    });
+    jest.spyOn(service, 'listNotifications').mockResolvedValue({
+      unreadCount: 2,
+      nextCursor: null,
+      items: [
+        {
+          id: 'delivery-required',
+          title: 'Trip consent',
+          message: 'Please review.',
+          sourceType: 'notice',
+          sourceId: 'notice-1',
+          childId: 'student-1',
+          noticeId: 'notice-1',
+          eventId: null,
+          activityPostId: null,
+          route: '/notices/delivery-required',
+          channel: 'IN_APP',
+          status: 'SENT',
+          createdAt: '2026-07-26T00:00:00.000Z',
+          sentAt: '2026-07-26T00:00:00.000Z',
+          readAt: null,
+          isRead: false,
+          requiresAcknowledgement: true,
+          acknowledgedAt: null,
+          audience: {},
+        },
+        {
+          id: 'delivery-confirmed',
+          title: 'Already confirmed',
+          message: 'No action.',
+          sourceType: 'notice',
+          sourceId: 'notice-2',
+          childId: 'student-1',
+          noticeId: 'notice-2',
+          eventId: null,
+          activityPostId: null,
+          route: '/notices/delivery-confirmed',
+          channel: 'IN_APP',
+          status: 'SENT',
+          createdAt: '2026-07-26T00:00:00.000Z',
+          sentAt: '2026-07-26T00:00:00.000Z',
+          readAt: null,
+          isRead: false,
+          requiresAcknowledgement: true,
+          acknowledgedAt: '2026-07-26T01:00:00.000Z',
+          audience: {},
+        },
+      ],
+    } as never);
+    jest.spyOn(service, 'getStudentHomework').mockResolvedValue({
+      items: [
+        {
+          id: 'homework-1',
+          title: 'Fractions practice',
+          subject: { id: 'subject-1', name: 'Mathematics', code: 'MATH' },
+          status: 'ASSIGNED',
+          assignedDate: '2026-07-25T00:00:00.000Z',
+          dueDate: '2026-07-27T00:00:00.000Z',
+          dueAt: '2026-07-27T00:00:00.000Z',
+          submissionRequired: true,
+          submissionStatus: 'NOT_SUBMITTED',
+          submittedAt: null,
+          score: null,
+          feedback: null,
+          attachmentCount: 0,
+        },
+      ],
+    });
+    jest.spyOn(service, 'getStudentFeesSummary').mockResolvedValue({
+      status: 'DUE',
+      totalAmount: 1000,
+      paidAmount: 0,
+      totalOutstanding: 1000,
+      overdueCount: 1,
+      nextDueDate: '2026-07-20T00:00:00.000Z',
+      recentReceipts: [],
+      recentInvoices: [
+        {
+          id: 'invoice-1',
+          invoiceNumber: 'INV-1',
+          status: 'ISSUED',
+          dueDate: '2026-07-20T00:00:00.000Z',
+          issuedAt: '2026-07-01T00:00:00.000Z',
+          subtotal: 1000,
+          vatAmount: 0,
+          totalAmount: 1000,
+          paidAmount: 0,
+          outstandingAmount: 1000,
+          isOverdue: true,
+          lines: [],
+          receipts: [],
+        },
+      ],
+    });
+    jest
+      .spyOn(service, 'listStudentAttendanceCorrections')
+      .mockResolvedValue({
+        total: 1,
+        items: [
+          {
+            id: 'correction-1',
+            attendanceDate: '2026-07-20T00:00:00.000Z',
+            previousStatus: 'ABSENT',
+            requestedStatus: 'PRESENT',
+            reason: 'Present at school',
+            status: 'REJECTED',
+            requestedAt: '2026-07-21T00:00:00.000Z',
+            reviewedAt: '2026-07-22T00:00:00.000Z',
+            reviewReason: 'Please add more detail.',
+            canCancel: false,
+            canResubmit: true,
+          },
+        ],
+      } as never);
+    jest.spyOn(service, 'listStudentServiceRequests').mockResolvedValue({
+      total: 1,
+      items: [
+        {
+          id: 'request-1',
+          status: 'RESOLVED',
+          subject: 'Bus stop concern',
+          responseDeadline: '2026-07-25T00:00:00.000Z',
+          isOverdue: true,
+          actions: { confirmResolution: true },
+        },
+      ],
+    } as never);
+    jest.spyOn(service, 'getStudentExamSchedule').mockResolvedValue({
+      academicYear: { id: 'year-1', name: '2082' },
+      items: [
+        {
+          id: 'exam-1',
+          examTerm: { id: 'term-1', name: 'First Term' },
+          subject: { id: 'subject-1', name: 'Mathematics', code: 'MATH' },
+          startsAt: new Date(Date.now() + 2 * 86_400_000).toISOString(),
+          endsAt: new Date(Date.now() + 2 * 86_400_000 + 3_600_000).toISOString(),
+          room: '4A',
+          publishedAt: '2026-07-20T00:00:00.000Z',
+        },
+      ],
+    });
+
+    const result = await service.getParentActionCentre(actor, 'student-1');
+
+    expect(result.dataState).toBe('LIVE');
+    expect(result.summary.isPartial).toBe(false);
+    expect(result.items.map((item) => item.type)).toEqual(
+      expect.arrayContaining([
+        'NOTICE_ACKNOWLEDGEMENT',
+        'HOMEWORK_DUE',
+        'FEE_DUE',
+        'ATTENDANCE_CORRECTION_REJECTED',
+        'SERVICE_REQUEST_CONFIRMATION',
+        'UPCOMING_EXAM',
+      ]),
+    );
+    expect(
+      result.items.some((item) => item.id === 'notice-ack:notice-2'),
+    ).toBe(false);
+    expect(result.items[0]?.priority).toBe('URGENT');
+    expect(service.listNotifications).toHaveBeenCalledWith(
+      actor,
+      { limit: 100 },
+      ['student-1'],
+    );
+  });
+
+  it('keeps disabled parent action sources locked and never queries them', async () => {
+    jest.spyOn(service, 'listMyStudents').mockResolvedValue({
+      items: [
+        {
+          id: 'student-1',
+          name: 'Asha Rai',
+          classSection: 'Grade 4 - A',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          rollNumber: '7',
+          academicYear: '2082',
+          academicYearStartsOn: null,
+          academicYearEndsOn: null,
+          relationship: 'Daughter',
+          guardianId: 'guardian-1',
+        },
+      ],
+    });
+    entitlementsService.getEntitlements.mockResolvedValue({
+      modules: ['students'],
+      features: [],
+      addOns: [],
+      tier: null,
+    });
+    jest.spyOn(service, 'listNotifications').mockResolvedValue({
+      unreadCount: 0,
+      items: [],
+      nextCursor: null,
+    });
+    jest.spyOn(service, 'listStudentServiceRequests').mockResolvedValue({
+      total: 0,
+      items: [],
+    } as never);
+    const homework = jest.spyOn(service, 'getStudentHomework');
+    const fees = jest.spyOn(service, 'getStudentFeesSummary');
+    const corrections = jest.spyOn(
+      service,
+      'listStudentAttendanceCorrections',
+    );
+    const exams = jest.spyOn(service, 'getStudentExamSchedule');
+
+    const result = await service.getParentActionCentre(actor);
+
+    expect(result.summary.isPartial).toBe(true);
+    expect(result.sources).toEqual(
+      expect.objectContaining({
+        homework: expect.objectContaining({ status: 'locked' }),
+        fees: expect.objectContaining({ status: 'locked' }),
+        attendance: expect.objectContaining({ status: 'locked' }),
+        exams: expect.objectContaining({ status: 'locked' }),
+      }),
+    );
+    expect(homework).not.toHaveBeenCalled();
+    expect(fees).not.toHaveBeenCalled();
+    expect(corrections).not.toHaveBeenCalled();
+    expect(exams).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unlinked action-centre child before loading any source', async () => {
+    jest.spyOn(service, 'listMyStudents').mockResolvedValue({
+      items: [
+        {
+          id: 'student-allowed',
+          name: 'Asha Rai',
+          classSection: 'Grade 4 - A',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          rollNumber: '7',
+          academicYear: '2082',
+          academicYearStartsOn: null,
+          academicYearEndsOn: null,
+          relationship: 'Daughter',
+          guardianId: 'guardian-1',
+        },
+      ],
+    });
+    const notifications = jest.spyOn(service, 'listNotifications');
+
+    await expect(
+      service.getParentActionCentre(actor, 'student-other'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(entitlementsService.getEntitlements).not.toHaveBeenCalled();
+    expect(notifications).not.toHaveBeenCalled();
+  });
+
   it('returns protected activity preview paths without storage internals', async () => {
     prisma.student.findFirst
       .mockResolvedValueOnce({ id: 'student-1' })

@@ -110,7 +110,7 @@ test("M11 bank reconciliation previews and idempotently commits a statement befo
   await expect(preview).toBeVisible();
   await expect(preview.getByText(narration)).toBeVisible();
   await preview.getByRole("button", { name: "Commit 2 rows" }).click();
-  await expect(page.getByText("Bank statement imported successfully")).toBeVisible();
+  await expect(page.getByText("Bank statement imported", { exact: true })).toBeVisible();
 
   await uploadStatement(page, csv);
   await page
@@ -148,10 +148,10 @@ test("M11 bank reconciliation previews and idempotently commits a statement befo
 
   await page.getByTestId("bank-reconciliation-auto-match").click();
   const suggestions = page.getByTestId("bank-reconciliation-suggestions");
-  await expect(suggestions.getByText(narration)).toBeVisible();
-  const suggestion = suggestions.locator("div.rounded-xl", {
-    hasText: narration,
-  });
+  await expect(suggestions.getByText(narration).first()).toBeVisible();
+  const suggestion = suggestions
+    .locator("div.rounded-xl", { hasText: narration })
+    .filter({ hasText: "EXACT" });
   await suggestion.getByRole("button", { name: "Review" }).click();
   const confirmDialog = page.getByRole("dialog");
   await expect(confirmDialog.getByText("Confirm Reconciliation")).toBeVisible();

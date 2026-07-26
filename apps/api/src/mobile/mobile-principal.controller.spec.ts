@@ -18,6 +18,12 @@ describe('MobilePrincipalController', () => {
       | 'decideApproval'
       | 'getApprovalDelegationCandidates'
       | 'delegateApproval'
+      | 'getServiceRequests'
+      | 'getServiceRequest'
+      | 'triageServiceRequest'
+      | 'addServiceRequestNote'
+      | 'resolveServiceRequest'
+      | 'escalateServiceRequest'
       | 'getAttendanceSummary'
       | 'getStaffAbsence'
       | 'getFeesSummary'
@@ -52,6 +58,12 @@ describe('MobilePrincipalController', () => {
       decideApproval: jest.fn(),
       getApprovalDelegationCandidates: jest.fn(),
       delegateApproval: jest.fn(),
+      getServiceRequests: jest.fn(),
+      getServiceRequest: jest.fn(),
+      triageServiceRequest: jest.fn(),
+      addServiceRequestNote: jest.fn(),
+      resolveServiceRequest: jest.fn(),
+      escalateServiceRequest: jest.fn(),
       getAttendanceSummary: jest.fn(),
       getStaffAbsence: jest.fn(),
       getFeesSummary: jest.fn(),
@@ -92,8 +104,62 @@ describe('MobilePrincipalController', () => {
         'advanced:approvals:decide',
         'advanced:approvals:manage',
         'messaging:manage',
+        'service_requests:read',
+        'service_requests:manage',
       ],
     };
+  });
+
+  it('delegates principal service-request review and resolution', async () => {
+    service.getServiceRequests.mockResolvedValue({ items: [] } as never);
+    service.getServiceRequest.mockResolvedValue({
+      id: 'request-1',
+    } as never);
+    service.triageServiceRequest.mockResolvedValue({
+      status: 'IN_PROGRESS',
+    } as never);
+    service.addServiceRequestNote.mockResolvedValue({
+      status: 'IN_PROGRESS',
+    } as never);
+    service.resolveServiceRequest.mockResolvedValue({
+      status: 'RESOLVED',
+    } as never);
+    service.escalateServiceRequest.mockResolvedValue({
+      priority: 'HIGH',
+    } as never);
+
+    await controller.serviceRequests(actor, { limit: 20 });
+    await controller.serviceRequestDetail(actor, 'request-1');
+    await controller.triageServiceRequest(actor, 'request-1', {
+      priority: 'HIGH',
+      responseDeadline: '2026-07-28T00:00:00.000Z',
+      status: 'IN_PROGRESS',
+      reason: 'Principal accepted the parent follow-up.',
+    } as never);
+    await controller.addServiceRequestNote(actor, 'request-1', {
+      visibility: 'PARENT',
+      body: 'The school is reviewing the supporting evidence.',
+    } as never);
+    await controller.resolveServiceRequest(actor, 'request-1', {
+      resolutionSummary: 'The records were corrected after review.',
+    });
+    await controller.escalateServiceRequest(actor, 'request-1', {
+      reason: 'Accounts provider confirmation is still pending.',
+    });
+
+    expect(service.getServiceRequests).toHaveBeenCalledWith(actor, {
+      limit: 20,
+    });
+    expect(service.triageServiceRequest).toHaveBeenCalledWith(
+      actor,
+      'request-1',
+      expect.objectContaining({ status: 'IN_PROGRESS' }),
+    );
+    expect(service.resolveServiceRequest).toHaveBeenCalledWith(
+      actor,
+      'request-1',
+      expect.objectContaining({ resolutionSummary: expect.any(String) }),
+    );
   });
 
   it('delegates principal dashboard and attention snapshots', async () => {
@@ -196,14 +262,10 @@ describe('MobilePrincipalController', () => {
       actor,
       'approval-1',
     );
-    expect(service.delegateApproval).toHaveBeenCalledWith(
-      actor,
-      'approval-1',
-      {
-        delegatedToUserId: '22222222-2222-4222-8222-222222222222',
-        reason: 'Covering the school visit.',
-      },
-    );
+    expect(service.delegateApproval).toHaveBeenCalledWith(actor, 'approval-1', {
+      delegatedToUserId: '22222222-2222-4222-8222-222222222222',
+      reason: 'Covering the school visit.',
+    });
     expect(service.resolveEscalation).toHaveBeenCalledWith(
       actor,
       'escalation-1',
