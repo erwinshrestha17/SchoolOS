@@ -41,6 +41,12 @@ class AuthUser {
     final tenant = json['tenant'] is Map<String, dynamic>
         ? json['tenant'] as Map<String, dynamic>
         : null;
+    // `/auth/me` gained a guardian block; login still has none. Reading it
+    // where it exists is what stops a parent being greeted by their login
+    // handle, and its absence changes nothing for other roles.
+    final guardian = json['guardian'] is Map<String, dynamic>
+        ? json['guardian'] as Map<String, dynamic>
+        : null;
     final email = json['email'] as String? ?? '';
     final firstName =
         json['firstName'] as String? ??
@@ -55,17 +61,25 @@ class AuthUser {
         staff?['lastName'] as String? ??
         student?['lastNameEn'] as String?;
     final emailName = email.contains('@') ? email.split('@').first : email;
+    // A guardian's name lives on the guardian record, not on the user row, so
+    // it is the last real name to try before falling back to the local part.
+    final guardianName = (guardian?['fullName'] as String?)?.trim();
     final displayName =
         json['name'] as String? ??
         [firstName, lastName]
             .where((part) => part != null && part.trim().isNotEmpty)
             .join(' ')
             .trim();
+    final resolvedName = displayName.isNotEmpty
+        ? displayName
+        : (guardianName != null && guardianName.isNotEmpty)
+        ? guardianName
+        : '';
 
     return AuthUser(
       id: json['id'] as String? ?? json['userId'] as String? ?? '',
-      name: displayName.isNotEmpty
-          ? displayName
+      name: resolvedName.isNotEmpty
+          ? resolvedName
           : emailName.isNotEmpty
           ? emailName
           : 'SchoolOS User',

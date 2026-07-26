@@ -2,17 +2,43 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../shared/utils/money_format.dart';
 import '../../../../app/constants/app_routes.dart';
+import '../../../../app/design_system/app_spacing.dart';
 import '../../../../core/storage/app_preferences_service.dart';
+import '../../../../shared/utils/nepali_bs_calendar.dart';
+import '../../../../shared/utils/tap_guard.dart';
+import '../../application/parent_dashboard_view_model.dart';
 import '../../application/parent_portal_providers.dart';
 import '../../domain/parent_portal_models.dart';
+import '../widgets/parent_dashboard_cards.dart';
+import '../widgets/parent_dashboard_widgets.dart';
 import '../widgets/parent_portal_widgets.dart';
 
+/// Tab indices on [SchoolOsAppShell]. Switching tabs in place keeps the
+/// already-built screens alive; pushing their routes would rebuild the whole
+/// shell - and refetch the portal - on top of itself.
+class ParentShellTab {
+  const ParentShellTab._();
+
+  static const home = 0;
+  static const children = 1;
+  static const homework = 2;
+  static const updates = 3;
+}
+
+/// The parent "Today" dashboard.
+///
+/// Reads one already-loaded [ParentPortalData] and projects it through
+/// [ParentDashboardViewModel]; every decision about what a status means, which
+/// action is most urgent, and what is safe to print lives there, not here.
 class ParentPortalHomeTab extends ConsumerStatefulWidget {
-  const ParentPortalHomeTab({super.key, required this.data});
+  const ParentPortalHomeTab({super.key, required this.data, this.onOpenTab});
 
   final ParentPortalData data;
+
+  /// Switches the surrounding shell to another tab. Null in tests and in any
+  /// host that has no tab bar, where the equivalent route is pushed instead.
+  final ValueChanged<int>? onOpenTab;
 
   @override
   ConsumerState<ParentPortalHomeTab> createState() =>
@@ -20,471 +46,197 @@ class ParentPortalHomeTab extends ConsumerStatefulWidget {
 }
 
 class _ParentPortalHomeTabState extends ConsumerState<ParentPortalHomeTab>
-    with AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin, TapGuardMixin {
   @override
   bool get wantKeepAlive => true;
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final linkedCount = widget.data.children.length;
-    final activeChild = widget.data.activeChild;
-    final actions = activeChild == null
-        ? const <_ParentAction>[]
-        : _actionsFor(activeChild);
-    final visibleUpdates = activeChild == null
-        ? const <ParentPortalUpdate>[]
-        : widget.data.updates
-              .where(
-                (update) =>
-                    update.childId == null || update.childId == activeChild.id,
-              )
-              .toList();
+    final model = ParentDashboardViewModel.from(
+      widget.data,
+      now: DateTime.now(),
+    );
+    final child = model.child;
 
-    if (activeChild == null) {
-      return ListView(
-        key: const PageStorageKey('parent-home-no-child'),
-        padding: const EdgeInsets.fromLTRB(16, 24, 16, 28),
-        children: const [
-          PortalCard(
-            child: Column(
-              children: [
-                Icon(
-                  Icons.family_restroom_outlined,
-                  size: 44,
-                  color: ParentPortalColors.muted,
-                ),
-                SizedBox(height: 12),
-                Text(
-                  'No linked child',
-                  style: TextStyle(
-                    color: ParentPortalColors.navy,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                SizedBox(height: 6),
-                Text(
-                  'Ask the school office to confirm your guardian link. Child information stays hidden until access is active.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: ParentPortalColors.muted),
-                ),
-              ],
-            ),
-          ),
-        ],
-      );
+    if (child == null) {
+      return _NoLinkedChildView(guardianName: model.guardianName);
     }
 
     return RefreshIndicator(
-      onRefresh: () => ref.refresh(parentPortalDataProvider.future),
-      child: ListView(
+      onRefresh: _refresh,
+      child: CustomScrollView(
         key: const PageStorageKey('parent-home'),
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-        children: [
-          Text(
-            'Namaste, ${_firstName(widget.data.parentName)}',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              color: ParentPortalColors.navy,
-              fontWeight: FontWeight.w900,
+        slivers: [
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(
+              _horizontalPadding(context),
+              AppSpacing.sm,
+              _horizontalPadding(context),
+              AppSpacing.xl,
             ),
+            sliver: SliverList.list(children: _sections(context, model, child)),
           ),
-          const SizedBox(height: 5),
-          Row(
-            children: [
-              const Icon(
-                Icons.family_restroom_rounded,
-                size: 17,
-                color: ParentPortalColors.muted,
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  '${activeChild.name} • ${activeChild.classSection} • ${activeChild.attendanceTime}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: ParentPortalColors.muted,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          if (linkedCount > 1) ...[
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  for (final child in widget.data.children) ...[
-                    ChildSelectorChip(
-                      label: child.name.split(' ').first,
-                      selected: activeChild.id == child.id,
-                      onSelected: () => _selectChild(child.id),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-          ] else
-            const SizedBox(height: 8),
-          if (actions.isNotEmpty) ...[
-            PortalCard(
-              color: ParentPortalColors.orangeSoft,
-              borderColor: ParentPortalColors.orange.withValues(alpha: .35),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      AvatarInitials(
-                        name: activeChild.name,
-                        radius: 21,
-                        backgroundColor: Colors.white,
-                        foregroundColor: ParentPortalColors.orange,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          '${activeChild.name} needs your attention',
-                          style: const TextStyle(
-                            color: ParentPortalColors.navy,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  for (var index = 0; index < actions.length; index++) ...[
-                    if (index > 0) const SizedBox(height: 9),
-                    _AttentionLine(
-                      icon: actions[index].icon,
-                      text: actions[index].label,
-                      onTap: () => context.push(actions[index].route),
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: () => context.push(actions.first.route),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: ParentPortalColors.orange,
-                      ),
-                      child: const Text('Review now'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-          ],
-          ParentSectionHeader(
-            title: '${activeChild.name.split(' ').first}\'s school day',
-          ),
-          const SizedBox(height: 10),
-          ParentChildCard(
-            child: activeChild,
-            compact: true,
-            onTap: () =>
-                context.push(AppRoutes.parentChildDetail(activeChild.id)),
-          ),
-          const SizedBox(height: 12),
-          if (_upcomingFor(widget.data, activeChild.id) case final upcoming
-              when upcoming.isNotEmpty) ...[
-            const ParentSectionHeader(title: 'Coming up'),
-            const SizedBox(height: 10),
-            _UpcomingCard(items: upcoming),
-            const SizedBox(height: 12),
-          ],
-          const ParentSectionHeader(title: 'Quick actions'),
-          const SizedBox(height: 10),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              const spacing = 12.0;
-              final itemWidth = (constraints.maxWidth - spacing) / 2;
-              return Wrap(
-                spacing: spacing,
-                runSpacing: spacing,
-                children: [
-                  SizedBox(
-                    width: itemWidth,
-                    child: ActionTile(
-                      icon: Icons.fact_check_outlined,
-                      title: 'Attendance',
-                      color: ParentPortalColors.orange,
-                      onTap: () => context.push(AppRoutes.parentAttendance),
-                    ),
-                  ),
-                  SizedBox(
-                    width: itemWidth,
-                    child: ActionTile(
-                      icon: Icons.payments_outlined,
-                      title: 'Pay fees',
-                      color: ParentPortalColors.orange,
-                      onTap: () => context.push(AppRoutes.parentFees),
-                    ),
-                  ),
-                  SizedBox(
-                    width: itemWidth,
-                    child: ActionTile(
-                      icon: Icons.calendar_month_outlined,
-                      title: 'School calendar',
-                      color: ParentPortalColors.blue,
-                      onTap: () => context.push(AppRoutes.parentCalendar),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 24),
-          const ParentSectionHeader(title: 'Latest update'),
-          const SizedBox(height: 10),
-          if (visibleUpdates.isEmpty)
-            const PortalCard(child: Text('No updates from school yet.'))
-          else
-            PortalCard(
-              onTap: () => context.push(
-                visibleUpdates.first.route ?? AppRoutes.parentUpdates,
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: ParentPortalColors.blueSoft,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(
-                      Icons.event_outlined,
-                      color: ParentPortalColors.blue,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          visibleUpdates.first.title,
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(
-                                color: ParentPortalColors.navy,
-                                fontWeight: FontWeight.w800,
-                              ),
-                        ),
-                        Text(
-                          visibleUpdates.first.body,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                        Text(
-                          visibleUpdates.first.metadata,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: ParentPortalColors.muted),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const ListChevron(),
-                ],
-              ),
-            ),
         ],
       ),
     );
   }
 
+  List<Widget> _sections(
+    BuildContext context,
+    ParentDashboardViewModel model,
+    ParentDashboardChild child,
+  ) {
+    final priority = model.priority;
+    return [
+      ParentDashboardHeader(
+        guardianName: model.guardianName,
+        childName: child.name,
+        classSection: child.classSection,
+        updatedLabel: 'Updated ${_timeLabel(model.lastUpdated)}',
+        savedAtLabel: _timeLabel(model.lastUpdated),
+        isStale: model.isStale,
+      ),
+      if (model.linkedChildCount > 1) ...[
+        const SizedBox(height: AppSpacing.lg),
+        _ChildSwitcherRow(
+          children: widget.data.children,
+          activeChildId: child.id,
+          onSelect: _selectChild,
+        ),
+      ],
+      const SizedBox(height: AppSpacing.lgPlus),
+      if (priority != null) ...[
+        PriorityAttentionCard(
+          childName: child.name,
+          action: priority,
+          otherCount: model.otherPriorityCount,
+          onReview: guardTap(() => context.push(priority.route)),
+        ),
+        const SizedBox(height: AppSpacing.xl),
+      ],
+      DashboardSectionHeader(
+        title: '${child.firstName}\'s school day',
+        actionLabel: 'View all',
+        onAction: guardTap(
+          () => _openTab(ParentShellTab.children, AppRoutes.parentChildren),
+        ),
+      ),
+      const SizedBox(height: AppSpacing.md),
+      StudentDaySummaryCard(
+        child: child,
+        onOpenChild: guardTap(() => context.push(child.route)),
+        onOpenStatus: (row) {
+          if (acceptTap()) context.push(row.route);
+        },
+      ),
+      const SizedBox(height: AppSpacing.xl),
+      DashboardSectionHeader(
+        title: 'Coming up',
+        actionLabel: 'View all',
+        onAction: guardTap(
+          () => _openTab(ParentShellTab.homework, AppRoutes.parentHomework),
+        ),
+      ),
+      const SizedBox(height: AppSpacing.md),
+      if (model.upcoming.isEmpty)
+        const DashboardEmptyCard(
+          icon: Icons.event_available_outlined,
+          message: 'Nothing due right now.',
+        )
+      else
+        UpcomingListCard(
+          items: model.upcoming,
+          onOpenItem: (item) {
+            if (acceptTap()) context.push(item.route);
+          },
+        ),
+      const SizedBox(height: AppSpacing.xl),
+      const DashboardSectionHeader(title: 'Quick actions'),
+      const SizedBox(height: AppSpacing.md),
+      _QuickActionsRow(
+        onAttendance: guardTap(() => context.push(AppRoutes.parentAttendance)),
+        onFees: guardTap(() => context.push(AppRoutes.parentFees)),
+        onCalendar: guardTap(() => context.push(AppRoutes.parentCalendar)),
+      ),
+      const SizedBox(height: AppSpacing.xl),
+      DashboardSectionHeader(
+        title: 'Latest update',
+        actionLabel: 'View all',
+        onAction: guardTap(
+          () => _openTab(ParentShellTab.updates, AppRoutes.parentUpdates),
+        ),
+      ),
+      const SizedBox(height: AppSpacing.md),
+      if (model.latestUpdate == null)
+        const DashboardEmptyCard(
+          icon: Icons.notifications_none_rounded,
+          message: 'No updates from school yet.',
+        )
+      else
+        LatestUpdateCard(
+          update: model.latestUpdate!,
+          onTap: guardTap(() => context.push(model.latestUpdate!.route)),
+        ),
+    ];
+  }
+
+  Future<void> _refresh() => ref.refresh(parentPortalDataProvider.future);
+
+  /// Switches shell tabs when hosted by the shell, and falls back to the
+  /// equivalent route otherwise.
+  void _openTab(int shellIndex, String fallbackRoute) {
+    final onOpenTab = widget.onOpenTab;
+    if (onOpenTab != null) {
+      onOpenTab(shellIndex);
+      return;
+    }
+    context.push(fallbackRoute);
+  }
+
   Future<void> _selectChild(String childId) async {
+    if (!acceptTap()) return;
     if (widget.data.activeChild?.id == childId) return;
     ref.read(parentActiveChildIdProvider.notifier).state = childId;
     await ref.read(appPreferencesServiceProvider).saveSelectedChildId(childId);
   }
 }
 
-class _AttentionLine extends StatelessWidget {
-  const _AttentionLine({
-    required this.icon,
-    required this.text,
-    required this.onTap,
+/// Wider phones and small tablets get a little more breathing room; a 320dp
+/// device keeps the full 16dp gutter rather than losing content width.
+double _horizontalPadding(BuildContext context) {
+  final width = MediaQuery.sizeOf(context).width;
+  return width >= 600 ? AppSpacing.xl : AppSpacing.lg;
+}
+
+/// School time, not handset time - the same policy the rest of the app uses.
+String _timeLabel(DateTime value) => NepaliBsCalendar.formatNepalTime(value);
+
+class _ChildSwitcherRow extends StatelessWidget {
+  const _ChildSwitcherRow({
+    required this.children,
+    required this.activeChildId,
+    required this.onSelect,
   });
 
-  final IconData icon;
-  final String text;
-  final VoidCallback onTap;
+  final List<ParentPortalChild> children;
+  final String activeChildId;
+  final ValueChanged<String> onSelect;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Row(
-          children: [
-            Icon(icon, size: 19, color: ParentPortalColors.orange),
-            const SizedBox(width: 9),
-            Expanded(
-              child: Text(
-                text,
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-            ),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: ParentPortalColors.orange,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ParentAction {
-  const _ParentAction({
-    required this.icon,
-    required this.label,
-    required this.route,
-  });
-
-  final IconData icon;
-  final String label;
-  final String route;
-}
-
-List<_ParentAction> _actionsFor(ParentPortalChild child) {
-  final actions = <_ParentAction>[];
-  final transport = '${child.transport} ${child.transportDetail ?? ''}'
-      .toLowerCase();
-
-  if (transport.contains('stale') || transport.contains('delayed')) {
-    actions.add(
-      const _ParentAction(
-        icon: Icons.directions_bus_outlined,
-        label: 'Review the latest transport update',
-        route: AppRoutes.parentTransport,
-      ),
-    );
-  }
-  if (child.feesDue > 0) {
-    actions.add(
-      _ParentAction(
-        icon: Icons.account_balance_wallet_outlined,
-        label: '${formatMoney(child.feesDue)} fees due',
-        route: AppRoutes.parentFees,
-      ),
-    );
-  }
-  if (child.homeworkPending > 0) {
-    actions.add(
-      _ParentAction(
-        icon: Icons.menu_book_outlined,
-        label:
-            '${child.homeworkPending} homework item${child.homeworkPending == 1 ? '' : 's'} due',
-        route: Uri(
-          path: AppRoutes.parentHomework,
-          queryParameters: {'child': child.id},
-        ).toString(),
-      ),
-    );
-  }
-  if (child.unreadUpdates > 0) {
-    actions.add(
-      _ParentAction(
-        icon: Icons.notifications_none_rounded,
-        label:
-            '${child.unreadUpdates} unread update${child.unreadUpdates == 1 ? '' : 's'}',
-        route: AppRoutes.parentUpdates,
-      ),
-    );
-  }
-
-  return actions;
-}
-
-String _firstName(String value) {
-  final parts = value.trim().split(RegExp(r'\s+'));
-  return parts.isEmpty || parts.first.isEmpty ? 'Parent' : parts.first;
-}
-
-/// A dated thing the parent should know is coming, nearest deadline first.
-///
-/// Only homework carries real dates today. Exams and school events have
-/// working endpoints (`students/:id/exam-schedule`, `/events`) but no
-/// published records in any tenant seen so far, so they contribute nothing
-/// yet; this list is shaped so they slot in without reworking the card.
-class _UpcomingItem {
-  const _UpcomingItem({
-    required this.title,
-    required this.subtitle,
-    required this.dueAt,
-    required this.route,
-  });
-
-  final String title;
-  final String subtitle;
-  final DateTime dueAt;
-  final String route;
-
-  bool isOverdue(DateTime today) => _dayOf(dueAt).isBefore(today);
-  bool isToday(DateTime today) => _dayOf(dueAt) == today;
-}
-
-DateTime _dayOf(DateTime value) => DateTime(value.year, value.month, value.day);
-
-/// Pending, dated work for the selected child only.
-///
-/// Completed work is excluded - it is not "coming up" - and the list is capped
-/// so the card cannot grow without bound on a heavy homework week.
-List<_UpcomingItem> _upcomingFor(ParentPortalData data, String childId) {
-  final items =
-      data.homework
-          .where(
-            (item) =>
-                item.childId == childId &&
-                !item.isCompleted &&
-                item.dueAt != null,
-          )
-          .map(
-            (item) => _UpcomingItem(
-              title: item.title,
-              subtitle: item.subject,
-              dueAt: item.dueAt!,
-              route: AppRoutes.parentHomeworkDetail(item.id),
-            ),
-          )
-          .toList()
-        ..sort((a, b) => a.dueAt.compareTo(b.dueAt));
-
-  return items.take(4).toList();
-}
-
-class _UpcomingCard extends StatelessWidget {
-  const _UpcomingCard({required this.items});
-
-  final List<_UpcomingItem> items;
-
-  @override
-  Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-
-    return PortalCard(
-      padding: EdgeInsets.zero,
-      child: Column(
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
         children: [
-          for (var index = 0; index < items.length; index++) ...[
-            if (index > 0) const Divider(height: 1),
-            _UpcomingRow(item: items[index], today: today),
+          for (final child in children) ...[
+            ChildSelectorChip(
+              label: firstNameOf(child.name),
+              selected: child.id == activeChildId,
+              onSelected: () => onSelect(child.id),
+            ),
+            const SizedBox(width: AppSpacing.sm),
           ],
         ],
       ),
@@ -492,78 +244,132 @@ class _UpcomingCard extends StatelessWidget {
   }
 }
 
-class _UpcomingRow extends StatelessWidget {
-  const _UpcomingRow({required this.item, required this.today});
+/// Three shortcuts across the width when they fit, two per row when they do
+/// not - which is what a 320dp screen or a 1.5x text scale produces.
+class _QuickActionsRow extends StatelessWidget {
+  const _QuickActionsRow({
+    required this.onAttendance,
+    required this.onFees,
+    required this.onCalendar,
+  });
 
-  final _UpcomingItem item;
-  final DateTime today;
+  final VoidCallback? onAttendance;
+  final VoidCallback? onFees;
+  final VoidCallback? onCalendar;
 
   @override
   Widget build(BuildContext context) {
-    final overdue = item.isOverdue(today);
-    final dueToday = item.isToday(today);
-    // Status carries a word as well as a colour, so it survives a
-    // colour-blind reader and a greyscale screenshot.
-    final label = overdue
-        ? 'Overdue'
-        : dueToday
-        ? 'Due today'
-        : 'Due ${_shortDate(item.dueAt)}';
-    final colour = overdue
-        ? ParentPortalColors.red
-        : dueToday
-        ? ParentPortalColors.orange
-        : ParentPortalColors.muted;
+    final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
 
-    return InkWell(
-      onTap: () => context.push(item.route),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const spacing = AppSpacing.md;
+        // An icon block, its gap, the tile padding and a legible label. Below
+        // this a three-across row squeezes "School calendar" down to two
+        // broken syllables, which is worse than a shorter row of wider tiles.
+        final minTileWidth = 150.0 * scale;
+        final width = constraints.maxWidth;
+        final columns = width >= minTileWidth * 3 + spacing * 2
+            ? 3
+            : width >= minTileWidth * 2 + spacing
+            ? 2
+            : 1;
+        final tileWidth = (width - spacing * (columns - 1)) / columns;
+        // Three tiles into two columns leaves a hole; the last one takes the
+        // whole row instead so the block still reads as a deliberate grid.
+        final lastWidth = columns == 2 ? width : tileWidth;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
           children: [
-            Icon(
-              overdue ? Icons.error_outline_rounded : Icons.menu_book_outlined,
-              color: colour,
-              size: 22,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                  Text(
-                    item.subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: ParentPortalColors.muted,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
+            SizedBox(
+              width: tileWidth,
+              child: QuickActionTile(
+                icon: Icons.fact_check_outlined,
+                label: 'Attendance',
+                color: ParentPortalColors.green,
+                onTap: onAttendance,
               ),
             ),
-            const SizedBox(width: 10),
-            Text(
-              label,
-              style: TextStyle(
-                color: colour,
-                fontWeight: FontWeight.w800,
-                fontSize: 12,
+            SizedBox(
+              width: tileWidth,
+              child: QuickActionTile(
+                icon: Icons.payments_outlined,
+                label: 'Pay fees',
+                color: ParentPortalColors.orange,
+                onTap: onFees,
               ),
             ),
-            const ListChevron(),
+            SizedBox(
+              width: lastWidth,
+              child: QuickActionTile(
+                icon: Icons.calendar_month_outlined,
+                label: 'School calendar',
+                color: ParentPortalColors.blue,
+                onTap: onCalendar,
+              ),
+            ),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
 }
 
-String _shortDate(DateTime value) => '${value.day}/${value.month}';
+/// A guardian account with no linked child sees why, not an empty dashboard.
+class _NoLinkedChildView extends StatelessWidget {
+  const _NoLinkedChildView({required this.guardianName});
+
+  final String? guardianName;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      key: const PageStorageKey('parent-home-no-child'),
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.xl,
+      ),
+      children: [
+        ParentDashboardHeader(
+          guardianName: guardianName,
+          childName: null,
+          classSection: null,
+          updatedLabel: null,
+        ),
+        const SizedBox(height: AppSpacing.lgPlus),
+        const PortalCard(
+          padding: EdgeInsets.all(AppSpacing.xl),
+          child: Column(
+            children: [
+              Icon(
+                Icons.family_restroom_outlined,
+                size: 44,
+                color: ParentPortalColors.muted,
+              ),
+              SizedBox(height: AppSpacing.md),
+              Text(
+                'No linked child',
+                style: TextStyle(
+                  color: ParentPortalColors.navy,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              SizedBox(height: AppSpacing.sm),
+              Text(
+                'Ask the school office to confirm your guardian link. Child information stays hidden until access is active.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: ParentPortalColors.muted),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}

@@ -182,6 +182,35 @@ class PrivateReadCache {
     });
   }
 
+  /// Drops every record of the current scope whose resource key matches.
+  ///
+  /// For when the *subject* of a cached read stops being visible to this user
+  /// - a guardian link removed, say - which the record's own expiry would
+  /// otherwise take hours to catch up with. Scoped to the caller's own
+  /// namespace, so one user can never evict another's records.
+  Future<void> deleteWhere(bool Function(String resourceKey) test) {
+    return _synchronized(() async {
+      try {
+        final activeScope = scope;
+        if (activeScope == null || !activeScope.isValid) return;
+
+        final values = await _storage.readAll();
+        for (final entry in values.entries) {
+          if (!entry.key.startsWith(_recordPrefix)) continue;
+          final decoded = _decodeRecord(entry.value);
+          if (decoded == null || decoded.namespace != activeScope.namespace) {
+            continue;
+          }
+          if (test(decoded.resourceKey)) {
+            await _storage.delete(entry.key);
+          }
+        }
+      } catch (_) {
+        // Best effort: a failed prune must not break the caller's load.
+      }
+    });
+  }
+
   Future<void> clear() async {
     await _storage.deleteByPrefix(privateReadCacheStoragePrefix);
     await preferences?.purgeLegacyPrivateReadCache();
@@ -196,6 +225,27 @@ class PrivateReadCache {
     switch (activeScope.role) {
       case MobileRole.parent:
         if (resourceKey == 'parent_children') return const Duration(hours: 6);
+        // The whole Today dashboard for one child. Twelve hours is the
+        // freshness ceiling: a school day is six to eight hours, so a
+        // snapshot can carry this morning into this evening but can never
+        // present yesterday's attendance or fee balance as if it were today's
+        // - past the window the record is deleted and the parent gets the
+        // error state and a real fetch instead.
+        if (resourceKey.startsWith('parent_dashboard_v')) {
+          return const Duration(hours: 12);
+        }
+        // The fee and attendance figures behind that snapshot, on the same
+        // twelve-hour ceiling and for the same reason: they must never carry
+        // yesterday into today. The child *profile* stays off this list on
+        // purpose - see the note in `getChildProfileForChild`.
+        if (resourceKey.startsWith('parent_dashboard_summary_')) {
+          return const Duration(hours: 12);
+        }
+        // One record per notice, so a cached detail can only ever stand in
+        // for the notice it was fetched for.
+        if (resourceKey.startsWith('notice_detail_')) {
+          return const Duration(hours: 12);
+        }
         if (resourceKey.startsWith('parent_homework_') ||
             resourceKey.startsWith('parent_timetable_') ||
             resourceKey.startsWith('parent_exam_schedule_') ||

@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/constants/app_routes.dart';
+import '../../features/parent/application/parent_dashboard_view_model.dart';
 import '../../features/parent/application/parent_portal_providers.dart';
 import '../../features/parent/presentation/screens/parent_portal_children_tab.dart';
 import '../../features/parent/presentation/screens/parent_portal_home_tab.dart';
 import '../../features/parent/presentation/screens/parent_portal_homework_tab.dart';
 import '../../features/parent/presentation/screens/parent_portal_more_tab.dart';
 import '../../features/parent/presentation/screens/parent_portal_updates_tab.dart';
+import '../../features/parent/presentation/widgets/parent_dashboard_widgets.dart';
 import '../../features/parent/presentation/widgets/parent_portal_widgets.dart';
 import 'app_exception_view.dart';
 
@@ -34,38 +36,56 @@ class _SchoolOsAppShellState extends ConsumerState<SchoolOsAppShell> {
   @override
   Widget build(BuildContext context) {
     final data = ref.watch(parentPortalDataProvider);
-    return Scaffold(
-      backgroundColor: ParentPortalColors.page,
-      appBar: AppTopBar(title: titles[selectedIndex]),
-      body: SafeArea(
-        top: false,
-        child: data.when(
-          skipLoadingOnReload: false,
-          skipLoadingOnRefresh: false,
-          loading: () => const PortalLoadingState(),
-          error: (error, _) => AppExceptionView(
-            error: error,
-            onRetry: () => ref.invalidate(parentPortalDataProvider),
-            onSignIn: () => context.go(AppRoutes.login),
-          ),
-          data: (portal) => IndexedStack(
-            index: selectedIndex,
-            children: [
-              ParentPortalHomeTab(data: portal),
-              ParentPortalChildrenTab(data: portal),
-              ParentPortalHomeworkTab(
-                data: portal,
-                initialChildId: widget.initialChildId,
-              ),
-              ParentPortalUpdatesTab(data: portal),
-              ParentPortalMoreTab(data: portal),
-            ],
+    return PopScope(
+      // Android back from a secondary tab returns to Today rather than
+      // leaving the portal outright, which is what a tabbed app is expected
+      // to do. Back from Today itself falls through to the router.
+      canPop: selectedIndex == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && selectedIndex != 0) {
+          setState(() => selectedIndex = 0);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: ParentPortalColors.page,
+        appBar: AppTopBar(title: titles[selectedIndex]),
+        body: SafeArea(
+          top: false,
+          child: data.when(
+            skipLoadingOnReload: false,
+            skipLoadingOnRefresh: false,
+            // Today gets a skeleton in its own shape; the other tabs keep the
+            // shared spinner, whose layout they do not share.
+            loading: () => selectedIndex == 0
+                ? const ParentDashboardSkeleton()
+                : const PortalLoadingState(),
+            error: (error, _) => AppExceptionView(
+              error: error,
+              onRetry: () => ref.invalidate(parentPortalDataProvider),
+              onSignIn: () => context.go(AppRoutes.login),
+            ),
+            data: (portal) => IndexedStack(
+              index: selectedIndex,
+              children: [
+                ParentPortalHomeTab(
+                  data: portal,
+                  onOpenTab: (index) => setState(() => selectedIndex = index),
+                ),
+                ParentPortalChildrenTab(data: portal),
+                ParentPortalHomeworkTab(
+                  data: portal,
+                  initialChildId: widget.initialChildId,
+                ),
+                ParentPortalUpdatesTab(data: portal),
+                ParentPortalMoreTab(data: portal),
+              ],
+            ),
           ),
         ),
-      ),
-      bottomNavigationBar: SchoolOsBottomNavigation(
-        selectedIndex: _navIndexForShellIndex(selectedIndex),
-        onSelected: _handleNavigationSelection,
+        bottomNavigationBar: SchoolOsBottomNavigation(
+          selectedIndex: _navIndexForShellIndex(selectedIndex),
+          onSelected: _handleNavigationSelection,
+        ),
       ),
     );
   }
@@ -116,7 +136,12 @@ class AppTopBar extends ConsumerWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final portal = ref.watch(parentPortalDataProvider).valueOrNull;
-    final parentName = portal?.parentName ?? 'Parent';
+    // Never derive the avatar's initials from a login handle: "G" for
+    // guardian.c01a001 is the database talking, not the parent's name.
+    final parentName = portal == null
+        ? 'Parent'
+        : guardianDisplayName(portal.parentName) ?? 'Parent';
+    final unread = portal?.unreadUpdates ?? 0;
     return AppBar(
       leading: leading,
       title: Text(
@@ -130,9 +155,18 @@ class AppTopBar extends ConsumerWidget implements PreferredSizeWidget {
       surfaceTintColor: Colors.transparent,
       actions: [
         IconButton(
-          tooltip: 'Notifications',
+          tooltip: unread > 0
+              ? 'Notifications, $unread unread'
+              : 'Notifications',
           onPressed: () => context.push(AppRoutes.notifications),
-          icon: const Icon(Icons.notifications_none_rounded),
+          // The count is in the tooltip - and so in the screen-reader label -
+          // because a red dot alone tells a blind parent nothing.
+          icon: Badge.count(
+            count: unread,
+            isLabelVisible: unread > 0,
+            backgroundColor: ParentPortalColors.orange,
+            child: const Icon(Icons.notifications_none_rounded),
+          ),
         ),
         Padding(
           padding: const EdgeInsets.only(right: 10),
@@ -195,57 +229,86 @@ class SchoolOsBottomNavigation extends StatelessWidget {
           children: [
             for (var index = 0; index < items.length; index++)
               Expanded(
-                child: InkWell(
-                  onTap: () => onSelected(index),
-                  borderRadius: BorderRadius.circular(16),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 2,
-                      vertical: 3,
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 13,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: selectedIndex == index
-                                ? ParentPortalColors.greenSoft
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Icon(
-                            selectedIndex == index
-                                ? items[index].$2
-                                : items[index].$1,
-                            size: 22,
-                            color: selectedIndex == index
-                                ? ParentPortalColors.green
-                                : ParentPortalColors.muted,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            items[index].$3,
-                            maxLines: 1,
-                            style: TextStyle(
-                              fontSize: 11,
+                // A tab announces its name and whether it is the current one;
+                // the green pill behind the icon is not information a screen
+                // reader can reach.
+                child: Semantics(
+                  button: true,
+                  selected: selectedIndex == index,
+                  label: items[index].$3,
+                  excludeSemantics: true,
+                  child: InkWell(
+                    onTap: () => onSelected(index),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 2,
+                        vertical: 3,
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 13,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: selectedIndex == index
+                                  ? ParentPortalColors.greenSoft
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Icon(
+                              selectedIndex == index
+                                  ? items[index].$2
+                                  : items[index].$1,
+                              size: 22,
                               color: selectedIndex == index
                                   ? ParentPortalColors.green
                                   : ParentPortalColors.muted,
-                              fontWeight: selectedIndex == index
-                                  ? FontWeight.w800
-                                  : FontWeight.w600,
                             ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 2),
+                          // `FittedBox` alone let each label shrink by a
+                          // different amount to fit its own slot, so at a 2x
+                          // system font scale "Attendance" rendered visibly
+                          // smaller than "More" and neighbouring labels met
+                          // with no gap between them. Clamping the scale first
+                          // - the same 1.3 ceiling Material's own
+                          // NavigationBar uses - keeps the six labels within
+                          // one size of each other, and the padding guarantees
+                          // a gutter. `FittedBox` still does the last bit of
+                          // fitting, so "Attendance" shrinks slightly at 1x
+                          // instead of truncating to "Attenda...".
+                          MediaQuery.withClampedTextScaling(
+                            maxScaleFactor: 1.3,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 3,
+                              ),
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  items[index].$3,
+                                  maxLines: 1,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: selectedIndex == index
+                                        ? ParentPortalColors.green
+                                        : ParentPortalColors.muted,
+                                    fontWeight: selectedIndex == index
+                                        ? FontWeight.w800
+                                        : FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

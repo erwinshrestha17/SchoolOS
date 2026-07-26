@@ -128,3 +128,58 @@ jobs:
       - name: API server logs
         if: always() && steps.changes.outputs.web == 'true'
         run: cat api-server.log || true
+
+  # The Flutter app had no CI coverage at all: its suite ran only on whichever
+  # machine last touched it. Kept as a separate job rather than a step in
+  # `verify` because it needs no database, no Redis and no Node toolchain, and
+  # should not queue behind them.
+  mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/schoolos_mobile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect mobile-impacting changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            mobile:
+              - 'apps/schoolos_mobile/**'
+              - '.github/workflows/ci.yml'
+
+      - name: Setup Flutter
+        if: steps.changes.outputs.mobile == 'true'
+        uses: subosito/flutter-action@v2
+        with:
+          # Pin the toolchain: goldens are pixel comparisons, and a Flutter
+          # upgrade can reflow text without any source change.
+          flutter-version: 3.44.0
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        if: steps.changes.outputs.mobile == 'true'
+        run: flutter pub get
+
+      - name: Verify formatting
+        if: steps.changes.outputs.mobile == 'true'
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: Analyze
+        if: steps.changes.outputs.mobile == 'true'
+        run: flutter analyze
+
+      # Goldens are excluded, not skipped by accident. Measured on
+      # ghcr.io/cirruslabs/flutter:3.44.0: identical layout, 4.96% of pixels
+      # different from the macOS baselines - glyph anti-aliasing. Exact-pixel
+      # comparison across operating systems is not achievable, so the
+      # baselines stay pinned to the platform that generates them. See
+      # apps/schoolos_mobile/dart_test.yaml.
+      - name: Test
+        if: steps.changes.outputs.mobile == 'true'
+        run: flutter test --exclude-tags golden

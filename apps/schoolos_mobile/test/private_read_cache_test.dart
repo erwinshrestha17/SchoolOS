@@ -118,6 +118,28 @@ void main() {
     },
   );
 
+  test(
+    'allowlists the reads a cached dashboard needs to stay usable',
+    () async {
+      final parent = parentCache();
+
+      // Fees reads the dashboard summary; a notice opened from a cached
+      // dashboard reads its own detail. Both used to dead-end offline.
+      expect(
+        await parent.write('parent_dashboard_summary_child-1', {'fees': {}}),
+        isTrue,
+      );
+      expect(
+        await parent.write('notice_detail_notice-1', {'id': 'notice-1'}),
+        isTrue,
+      );
+      expect(
+        await parent.write('parent_dashboard_v1.child-1', {'dashboard': {}}),
+        isTrue,
+      );
+    },
+  );
+
   test('expires records using the current allowlist TTL', () async {
     final cache = parentCache();
     await cache.write('parent_children', {'items': []});

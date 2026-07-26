@@ -655,6 +655,77 @@ describe('AuthService', () => {
       }),
     );
   });
+  describe('getProfile', () => {
+    it('exposes a guardian name so parent clients need not read the email', async () => {
+      // Without this block a guardian account has no name anywhere in the
+      // session payload, and the mobile app greeted parents with their login
+      // handle ("guardian.c01a004").
+      prisma.user.findUnique.mockResolvedValue({
+        ...authUser,
+        tenant: { id: 'tenant-1', name: 'School', slug: 'default-school', plan: 'STANDARD' },
+        staff: null,
+        student: null,
+        guardian: {
+          id: 'guardian-1',
+          fullName: 'Narayan Lama',
+          relation: 'Guardian',
+        },
+      });
+
+      const profile: any = await service.getProfile({
+        userId: 'user-1',
+        tenantId: 'tenant-1',
+        tenantSlug: 'default-school',
+      } as any);
+
+      expect(profile.guardian).toEqual({
+        id: 'guardian-1',
+        fullName: 'Narayan Lama',
+        relation: 'Guardian',
+      });
+    });
+
+    it('leaves guardian null for non-guardian accounts', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        ...authUser,
+        tenant: { id: 'tenant-1', name: 'School', slug: 'default-school', plan: 'STANDARD' },
+        staff: null,
+        student: null,
+        guardian: null,
+      });
+
+      const profile: any = await service.getProfile({
+        userId: 'user-1',
+        tenantId: 'tenant-1',
+        tenantSlug: 'default-school',
+      } as any);
+
+      expect(profile.guardian).toBeNull();
+      // profileType keeps its existing values; nothing switching on it moves.
+      expect(profile.profileType).toBe('user');
+    });
+
+    it('never selects a guardian home address or phone number', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        ...authUser,
+        tenant: { id: 'tenant-1', name: 'School', slug: 'default-school', plan: 'STANDARD' },
+        staff: null,
+        student: null,
+        guardian: { id: 'g1', fullName: 'Narayan Lama', relation: 'Guardian' },
+      });
+
+      await service.getProfile({
+        userId: 'user-1',
+        tenantId: 'tenant-1',
+        tenantSlug: 'default-school',
+      } as any);
+
+      const include = prisma.user.findUnique.mock.calls.at(-1)[0].include;
+      expect(include.guardian).toEqual({
+        select: { id: true, fullName: true, relation: true },
+      });
+    });
+  });
 });
 
 function asSession(

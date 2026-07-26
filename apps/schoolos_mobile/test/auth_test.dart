@@ -193,6 +193,55 @@ void main() {
       expect(user.tenantSlug, 'default-school');
     });
 
+    test('names a guardian from the profile guardian block', () {
+      // `/auth/me` carries the guardian's real name; the user row has none,
+      // so without this the app fell back to the email local part and greeted
+      // a parent as "guardian.c01a004".
+      final user = AuthUser.fromJson({
+        'userId': 'user-1',
+        'email': 'guardian.c01a004@schoolos.test',
+        'roles': ['parent'],
+        'guardian': {
+          'id': 'guardian-1',
+          'fullName': 'Narayan Lama',
+          'relation': 'Guardian',
+        },
+      });
+
+      expect(user.name, 'Narayan Lama');
+    });
+
+    test('a guardian block never outranks a real user name', () {
+      final user = AuthUser.fromJson({
+        'userId': 'user-1',
+        'email': 'guardian.c01a004@schoolos.test',
+        'name': 'Sita Rai',
+        'guardian': {'fullName': 'Narayan Lama'},
+      });
+
+      expect(user.name, 'Sita Rai');
+    });
+
+    test('a missing or blank guardian name still falls back safely', () {
+      // Login responses carry no guardian block at all, and a guardian row
+      // can hold an empty name; neither may crash or print an empty greeting.
+      expect(
+        AuthUser.fromJson({
+          'userId': 'user-1',
+          'email': 'guardian.c01a004@schoolos.test',
+        }).name,
+        'guardian.c01a004',
+      );
+      expect(
+        AuthUser.fromJson({
+          'userId': 'user-1',
+          'email': 'guardian.c01a004@schoolos.test',
+          'guardian': {'fullName': '   '},
+        }).name,
+        'guardian.c01a004',
+      );
+    });
+
     test('changePassword posts authenticated password payload', () async {
       final mockResponse = Response(
         requestOptions: RequestOptions(path: '/auth/change-password'),

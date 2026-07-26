@@ -42,25 +42,28 @@ void main() {
   }
 
   group('month grouping', () {
-    test('groups by the Bikram Sambat month a bill falls due, newest first', () {
-      final groups = groupInvoicesByDueMonth([
-        _invoice(id: 'a', due: '2026-07-14T00:00:00.000Z'),
-        _invoice(id: 'b', due: '2026-09-12T00:00:00.000Z'),
-        _invoice(id: 'c', due: '2026-08-13T00:00:00.000Z'),
-      ]);
+    test(
+      'groups by the Bikram Sambat month a bill falls due, newest first',
+      () {
+        final groups = groupInvoicesByDueMonth([
+          _invoice(id: 'a', due: '2026-07-14T00:00:00.000Z'),
+          _invoice(id: 'b', due: '2026-09-12T00:00:00.000Z'),
+          _invoice(id: 'c', due: '2026-08-13T00:00:00.000Z'),
+        ]);
 
-      expect(groups.map((g) => g.label), [
-        'Due in Bhadra 2083',
-        'Due in Shrawan 2083',
-        'Due in Asar 2083',
-      ]);
-      expect(groups.map((g) => g.invoices.single.id), ['b', 'c', 'a']);
-    });
+        expect(groups.map((g) => g.label), [
+          'Due in Bhadra 2083',
+          'Due in Shrawan 2083',
+          'Due in Asar 2083',
+        ]);
+        expect(groups.map((g) => g.invoices.single.id), ['b', 'c', 'a']);
+      },
+    );
 
     test('bills due in the same month share one group', () {
       final groups = groupInvoicesByDueMonth([
-        _invoice(id: 'a', due: '2026-08-13T00:00:00.000Z'),
-        _invoice(id: 'b', due: '2026-08-20T00:00:00.000Z'),
+        _invoice(id: 'a', due: '2026-08-05T00:00:00.000Z'),
+        _invoice(id: 'b', due: '2026-08-13T00:00:00.000Z'),
       ]);
 
       expect(groups, hasLength(1));
@@ -84,8 +87,8 @@ void main() {
 
     test('the month total counts only what is still owed', () {
       final groups = groupInvoicesByDueMonth([
-        _invoice(id: 'a', due: '2026-08-13T00:00:00.000Z', outstanding: 2700),
-        _invoice(id: 'b', due: '2026-08-20T00:00:00.000Z', outstanding: 0),
+        _invoice(id: 'a', due: '2026-08-05T00:00:00.000Z', outstanding: 2700),
+        _invoice(id: 'b', due: '2026-08-13T00:00:00.000Z', outstanding: 0),
       ]);
 
       expect(groups.single.outstanding, 2700);

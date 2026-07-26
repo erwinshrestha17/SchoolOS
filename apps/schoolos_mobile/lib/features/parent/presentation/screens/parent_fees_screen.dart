@@ -411,24 +411,26 @@ class _FeesSummaryCard extends StatelessWidget {
               ],
             ),
           ),
-          StatusBadge(
-            label: hasDues
-                ? summary.feesStatus == 'PARTIAL'
-                      ? 'Partial'
-                      : '${summary.overdueFeesCount} overdue'
-                : nothingBilled
-                ? 'No invoices'
-                : 'Paid',
-            color: hasDues
-                ? ParentPortalColors.orange
-                : nothingBilled
-                ? ParentPortalColors.muted
-                : ParentPortalColors.green,
-            background: hasDues
-                ? ParentPortalColors.orangeSoft
-                : nothingBilled
-                ? ParentPortalColors.surfaceAlt
-                : ParentPortalColors.greenSoft,
+          Flexible(
+            child: StatusBadge(
+              label: hasDues
+                  ? summary.feesStatus == 'PARTIAL'
+                        ? 'Partial'
+                        : '${summary.overdueFeesCount} overdue'
+                  : nothingBilled
+                  ? 'No invoices'
+                  : 'Paid',
+              color: hasDues
+                  ? ParentPortalColors.orange
+                  : nothingBilled
+                  ? ParentPortalColors.muted
+                  : ParentPortalColors.green,
+              background: hasDues
+                  ? ParentPortalColors.orangeSoft
+                  : nothingBilled
+                  ? ParentPortalColors.surfaceAlt
+                  : ParentPortalColors.greenSoft,
+            ),
           ),
         ],
       ),
@@ -637,14 +639,16 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
                   ],
                 ),
               ),
-              StatusBadge(
-                label: _billStatusLabel(invoice),
-                color: invoice.outstandingAmount > 0
-                    ? ParentPortalColors.orange
-                    : ParentPortalColors.green,
-                background: invoice.outstandingAmount > 0
-                    ? ParentPortalColors.orangeSoft
-                    : ParentPortalColors.greenSoft,
+              Flexible(
+                child: StatusBadge(
+                  label: _billStatusLabel(invoice),
+                  color: invoice.outstandingAmount > 0
+                      ? ParentPortalColors.orange
+                      : ParentPortalColors.green,
+                  background: invoice.outstandingAmount > 0
+                      ? ParentPortalColors.orangeSoft
+                      : ParentPortalColors.greenSoft,
+                ),
               ),
             ],
           ),

@@ -403,10 +403,7 @@ void main() {
         expect(find.text('Last updated 18 minutes ago'), findsOneWidget);
       }
       if (screen is ParentFeesReceiptsScreen) {
-        expect(
-          find.textContaining('You need internet to pay'),
-          findsOneWidget,
-        );
+        expect(find.textContaining('You need internet to pay'), findsOneWidget);
         expect(
           find.textContaining('once the school confirms your payment'),
           findsOneWidget,

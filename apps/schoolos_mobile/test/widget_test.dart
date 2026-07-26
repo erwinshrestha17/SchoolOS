@@ -375,7 +375,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Namaste, Erwin'), findsOneWidget);
+    // The greeting uses the guardian's full display name, not just their given
+    // name: it is the only place the app confirms whose account this is.
+    expect(find.text('Namaste, Erwin Shrestha'), findsOneWidget);
     expect(find.text("Aarav's school day"), findsOneWidget);
     expect(find.text('Operational snapshot'), findsNothing);
     expect(tester.takeException(), isNull);

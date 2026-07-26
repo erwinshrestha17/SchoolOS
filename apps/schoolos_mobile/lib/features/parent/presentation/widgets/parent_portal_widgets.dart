@@ -135,11 +135,15 @@ class StatusBadge extends StatelessWidget {
             Icon(icon, size: 14, color: color),
             const SizedBox(width: 4),
           ],
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w800,
+          // Flexible so a long status at a large text scale wraps inside the
+          // badge rather than pushing the row past the card edge.
+          Flexible(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ],

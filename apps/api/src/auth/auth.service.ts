@@ -567,6 +567,7 @@ export class AuthService {
         tenant,
         session.refreshToken,
         isMobile,
+        existingSession.user.guardian?.fullName,
       );
     } catch (error) {
       if (error instanceof Error) {
@@ -661,6 +662,14 @@ export class AuthService {
       include: {
         tenant: true,
         staff: true,
+        // Guardians had no profile block at all, so a parent account resolved
+        // to a nameless `user` and every client fell back to the email local
+        // part - the mobile app greeted guardians as "guardian.c01a001".
+        // Selected, not `true`: a guardian row also carries phone numbers and
+        // a home address, none of which a session profile needs.
+        guardian: {
+          select: { id: true, fullName: true, relation: true },
+        },
         student: {
           include: {
             class: true,
@@ -719,6 +728,16 @@ export class AuthService {
             },
           }
         : null,
+      // Additive: existing clients that do not read it are unaffected, and
+      // `profileType` keeps its current values so nothing switching on it
+      // changes behaviour.
+      guardian: user.guardian
+        ? {
+            id: user.guardian.id,
+            fullName: user.guardian.fullName,
+            relation: user.guardian.relation,
+          }
+        : null,
     };
   }
 
@@ -769,6 +788,7 @@ export class AuthService {
       tenant,
       session.refreshToken,
       isMobile,
+      user.guardian?.fullName,
     );
   }
 
@@ -1098,6 +1118,9 @@ export class AuthService {
 
   private get userAuthInclude() {
     return {
+      // Only the display name. A guardian row also holds phone numbers and a
+      // home address, which a session payload has no business carrying.
+      guardian: { select: { fullName: true } },
       userRoles: {
         include: {
           role: {
@@ -1224,6 +1247,7 @@ export class AuthService {
     tenant: Tenant,
     refreshToken?: string,
     isMobile?: boolean,
+    displayName?: string | null,
   ) {
     const decoded: unknown =
       typeof this.jwtService.decode === 'function'
@@ -1262,6 +1286,12 @@ export class AuthService {
         mustChangePassword: authContext.mustChangePassword ?? false,
         roles: authContext.roles,
         permissions: authContext.permissions,
+        // Guardian accounts carry no name on the user row, so without this
+        // the login response has nothing for a client to greet them by and
+        // the mobile app fell back to the email local part
+        // ("guardian.c01a004"). Absent for every other role, and additive:
+        // clients that ignore it are unaffected.
+        ...(displayName ? { name: displayName } : {}),
       },
     };
   }

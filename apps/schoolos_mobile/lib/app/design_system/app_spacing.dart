@@ -13,6 +13,11 @@ class AppSpacing {
   /// 16.0 pixels
   static const double lg = 16.0;
 
+  /// 20.0 pixels. Sits between [lg] and [xl]; used where a 16pt gap reads too
+  /// tight and a 24pt one breaks the rhythm - card padding on the parent
+  /// dashboard, and the gap between its sections.
+  static const double lgPlus = 20.0;
+
   /// 24.0 pixels
   static const double xl = 24.0;
 

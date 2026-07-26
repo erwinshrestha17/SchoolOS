@@ -71,6 +71,12 @@ class ParentRepository {
   }
 
   Future<ChildProfile> getChildProfileForChild(GuardianChild child) async {
+    // Deliberately uncached. This payload carries a minor's date of birth,
+    // blood group, medical warnings and identity documents; the private-read
+    // allowlist rejects `parent_profile_*` for exactly that reason, and
+    // `private_read_cache_test.dart` pins it. Offline, the dashboard falls
+    // back to its snapshot instead, which persists only the class-teacher
+    // name out of all of this.
     final data = await _getMap('/mobile/students/${child.id}/profile');
     final profile = data['profile'] as Map<String, dynamic>? ?? const {};
     final emergencyContact =
@@ -150,6 +156,10 @@ class ParentRepository {
     final data = await _getMap(
       '/mobile/me/dashboard',
       queryParameters: {'studentId': child.id},
+      // Also what the Fees screen reads. Without a key it was the one call
+      // that could not answer offline, so a guardian reaching Fees from an
+      // otherwise-cached dashboard hit a connection error.
+      cacheKey: 'parent_dashboard_summary_${child.id}',
     );
 
     return ParentDashboardSummary.fromMobileDashboard(data, child);

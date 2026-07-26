@@ -47,9 +47,12 @@ class NoticesRepository {
   }
 
   Future<Notice> getNoticeDetail(String noticeId) async {
-    final response = await _client.get('/mobile/me/notifications/$noticeId');
-    final data = Map<String, dynamic>.from(
-      response.data as Map<String, dynamic>,
+    // A notice opened from a cached dashboard used to dead-end on a
+    // connection error. It goes through the same read-through cache as the
+    // feed, keyed per notice so one stale detail cannot stand in for another.
+    final data = await _getMap(
+      '/mobile/me/notifications/$noticeId',
+      cacheKey: 'notice_detail_$noticeId',
     );
     return _noticeFromNotification(ParentNotification.fromJson(data));
   }

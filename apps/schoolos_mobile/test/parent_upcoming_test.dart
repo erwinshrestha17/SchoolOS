@@ -65,14 +65,14 @@ void main() {
     );
   });
 
-  testWidgets('is absent entirely when nothing is pending', (tester) async {
+  testWidgets('says so plainly when nothing is pending', (tester) async {
     await pump(tester, _data(homework: const []));
 
-    expect(
-      find.text('Coming up'),
-      findsNothing,
-      reason: 'an empty deadline card is noise, not information',
-    );
+    // The section stays, with an empty state. Hiding it made "no deadlines"
+    // and "deadlines failed to load" look identical - a parent could not tell
+    // a quiet week from a broken screen.
+    expect(find.text('Coming up'), findsOneWidget);
+    expect(find.text('Nothing due right now.'), findsOneWidget);
   });
 }
 

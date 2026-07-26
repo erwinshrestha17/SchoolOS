@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/constants/app_routes.dart';
 import '../../../../core/auth/auth_provider.dart';
+import '../../application/parent_dashboard_view_model.dart';
 import '../../domain/parent_portal_models.dart';
 import '../widgets/parent_portal_widgets.dart';
 
@@ -14,6 +15,12 @@ class ParentPortalMoreTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // The same rule the Today header uses. Guardian accounts are routinely
+    // provisioned without a name, and this card was printing the raw login
+    // handle - "guardian.c01a001" - as the account holder's name, initials
+    // and all. Fall back to the role rather than to the database key.
+    final displayName = guardianDisplayName(data.parentName) ?? 'Parent';
+
     return ListView(
       key: const PageStorageKey('parent-more'),
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
@@ -21,14 +28,14 @@ class ParentPortalMoreTab extends ConsumerWidget {
         PortalCard(
           child: Row(
             children: [
-              AvatarInitials(name: data.parentName, radius: 31),
+              AvatarInitials(name: displayName, radius: 31),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      data.parentName,
+                      displayName,
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         color: ParentPortalColors.navy,
                         fontWeight: FontWeight.w900,
