@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/primitives/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { useTeacherAccess } from '@/lib/teacher-access';
 
 export interface TabItem {
   href?: string;
@@ -79,8 +80,8 @@ function resolveActiveHref(
 }
 
 export function WorkspaceTabs({
-  items,
-  overflowItems,
+  items: requestedItems,
+  overflowItems: requestedOverflowItems,
   overflowLabel = 'More',
   activeValue,
   onValueChange,
@@ -88,6 +89,18 @@ export function WorkspaceTabs({
   label = 'Workspace views',
 }: WorkspaceTabsProps) {
   const pathname = usePathname();
+  // Every module tab strip is filtered here, once, instead of each workspace
+  // re-deriving "may this teacher open that tab". A tab whose destination the
+  // teacher-persona route guard would bounce is never advertised — no
+  // lock icons, no tab that 403s on click (Teacher Persona spec 14, P0.3).
+  // Non-teacher personas are unaffected: restrictionFor() returns null.
+  const { restrictionFor } = useTeacherAccess();
+  const items = requestedItems.filter(
+    (item) => !item.href || !restrictionFor(item.href),
+  );
+  const overflowItems = requestedOverflowItems?.filter(
+    (item) => !item.href || !restrictionFor(item.href),
+  );
   const allItems = overflowItems?.length ? [...items, ...overflowItems] : items;
   const activeHref = resolveActiveHref(pathname, allItems);
 

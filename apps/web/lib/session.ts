@@ -1,4 +1,5 @@
 import type { AuthSession, PermissionKey } from "@schoolos/core";
+import { hasEffectivePermission } from "@schoolos/core";
 import {
   clearRecentlyViewed as clearRecentlyViewedEntries,
   readRecentlyViewed as readRecentlyViewedEntries,
@@ -249,11 +250,20 @@ export function createAttendanceDraftSubmissionId() {
   throw new Error("Secure attendance draft IDs are unavailable");
 }
 
+/**
+ * Permission check that evaluates the *same* rule the backend guard applies,
+ * aliases included (see PERMISSION_ALIASES in @schoolos/core).
+ *
+ * A raw `includes()` here is what made Notification Preferences render a
+ * full "no access" page for every teacher: the backend aliases
+ * `notifications:view_own` to the near-universal `notices:read` and would
+ * have served the request, but the UI refused to ask (P1.13).
+ */
 export function hasPermission(
   session: BrowserSession | null,
   permission: PermissionKey,
 ) {
-  return session?.user.permissions.includes(permission) ?? false;
+  return hasEffectivePermission(session?.user.permissions ?? [], permission);
 }
 
 export function hasAllPermissions(

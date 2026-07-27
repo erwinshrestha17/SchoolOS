@@ -146,12 +146,37 @@ export class AcademicsService {
   }
 
   async listTeacherAssignments(actor: AuthContext) {
+    // Two confirmed defects fixed here (Teacher Persona spec 3/B12):
+    //
+    // 1. `staff: true` returned every colleague's full Staff row -- including
+    //    citizenshipNo, panNumber, bankAccount, bankName, dateOfBirth,
+    //    address and emergency contacts -- to any caller holding the near
+    //    universal `academics:read`. The shared contract
+    //    (TeacherAssignmentSummary) only ever promised id/name/employeeId, so
+    //    this is an over-return, not a contract change.
+    //
+    // 2. A teacher without `academics:manage` received the whole school's
+    //    subject-teacher map. Teachers now see only their own assignments;
+    //    academic administrators still get the full list they need to staff
+    //    subjects.
+    const staffId = (await this.resolveTeacherOnlyStaffId(actor)) ?? undefined;
+
     return this.prisma.subjectTeacherAssignment.findMany({
-      where: { tenantId: actor.tenantId },
+      where: {
+        tenantId: actor.tenantId,
+        ...(staffId ? { staffId } : {}),
+      },
       include: {
         academicYear: true,
         subject: true,
-        staff: true,
+        staff: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            employeeId: true,
+          },
+        },
         class: true,
         section: true,
       },
@@ -162,6 +187,32 @@ export class AcademicsService {
       // accumulates.
       take: 2000,
     });
+  }
+
+  /**
+   * Staff id to scope a listing to, or null when the caller is an academic
+   * administrator who legitimately sees the whole school. A teacher-role
+   * actor without an active Staff row resolves to a staffId that matches
+   * nothing, so it fails closed rather than widening.
+   */
+  private async resolveTeacherOnlyStaffId(
+    actor: AuthContext,
+  ): Promise<string | null> {
+    const isAcademicAdministrator =
+      actor.permissions?.includes('academics:manage') ||
+      actor.permissions?.includes('academics:update');
+    if (isAcademicAdministrator) return null;
+
+    const isTeacherActor = actor.roles.some((role) =>
+      ['teacher', 'subject_teacher'].includes(role),
+    );
+    if (!isTeacherActor) return null;
+
+    const staff = await this.prisma.staff.findFirst({
+      where: { tenantId: actor.tenantId, userId: actor.userId },
+      select: { id: true },
+    });
+    return staff?.id ?? '__no_active_staff_record__';
   }
 
   async assignTeacher(dto: AssignTeacherDto, actor: AuthContext) {

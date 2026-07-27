@@ -1,5 +1,6 @@
 import { HomeworkAssignmentStatus } from '@prisma/client';
 import {
+  IsBoolean,
   IsEnum,
   IsIn,
   IsInt,
@@ -10,7 +11,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 
 export class HomeworkQueryDto {
   @IsOptional()
@@ -32,6 +33,17 @@ export class HomeworkQueryDto {
   @IsOptional()
   @IsString()
   teacherId?: string;
+
+  /**
+   * "My homework only". Resolved server-side to the caller's own Staff row,
+   * so it cannot be pointed at a colleague the way `teacherId` can -- and it
+   * lets a teacher reach their own drafts without the UI needing to know its
+   * own staff id (P1.6).
+   */
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
+  @IsBoolean()
+  mine?: boolean;
 
   @IsOptional()
   @IsString()

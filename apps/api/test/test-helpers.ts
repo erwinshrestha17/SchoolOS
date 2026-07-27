@@ -325,6 +325,9 @@ export function createPrismaMock() {
     attendanceCorrectionRequests: [] as Record<string, unknown>[],
     sections: [] as Record<string, unknown>[],
     subjectTeacherAssignments: [] as Record<string, unknown>[],
+    // Canonical assignment tables the TeacherScopeService resolver reads.
+    teacherAssignments: [] as Record<string, unknown>[],
+    teacherDelegations: [] as Record<string, unknown>[],
     attendanceSessions: [] as Record<string, unknown>[],
     attendanceRecords: [] as Record<string, unknown>[],
     schoolCalendarDays: [] as Record<string, unknown>[],
@@ -2393,6 +2396,8 @@ export function createPrismaMock() {
     'section',
     'subject',
     'subjectTeacherAssignment',
+    'teacherAssignment',
+    'teacherDelegation',
     'attendanceSession',
     'schoolCalendarDay',
     'transportRoute',
@@ -3058,4 +3063,103 @@ export function ensureTenantDefaultsWithState(
       });
     }
   }
+}
+
+/**
+ * A real `TeacherScopeService` backed by an in-memory assignment store.
+ *
+ * Authorization specs should use this rather than stubbing the resolver out:
+ * a jest.fn() that always resolves turns an authorization test into a no-op.
+ * The matching below mirrors the real Prisma query (tenant, staff, year,
+ * class, section, assignment type, effective window, ACTIVE status) so the
+ * service's own subject/ownership/lifecycle logic is what gets exercised.
+ */
+export function createTeacherScopeServiceForTests(options: {
+  assignments?: Array<Record<string, any>>;
+  delegations?: Array<Record<string, any>>;
+  staffId?: string | null;
+}) {
+  const assignments = options.assignments ?? [];
+  const delegations = options.delegations ?? [];
+
+  const matchesWindow = (row: any, where: any) => {
+    const on: Date = where.effectiveFrom?.lte ?? new Date();
+    if (row.effectiveFrom && new Date(row.effectiveFrom) > on) return false;
+    if (row.effectiveUntil && new Date(row.effectiveUntil) < on) return false;
+    return true;
+  };
+
+  const prisma = {
+    staff: {
+      findFirst: jest.fn().mockResolvedValue(
+        options.staffId === null ? null : { id: options.staffId ?? 'staff-1' },
+      ),
+    },
+    teacherAssignment: {
+      findMany: jest.fn(({ where }: any) =>
+        Promise.resolve(
+          assignments.filter((row) => {
+            if (where.tenantId && where.tenantId !== row.tenantId) return false;
+            if (where.staffId && where.staffId !== row.staffId) return false;
+            if (
+              where.academicYearId &&
+              where.academicYearId !== row.academicYearId
+            )
+              return false;
+            if (where.classId && where.classId !== row.classId) return false;
+            if (where.sectionId && where.sectionId !== row.sectionId)
+              return false;
+            if (where.status && where.status !== (row.status ?? 'ACTIVE'))
+              return false;
+            if (
+              where.assignmentType?.in &&
+              !where.assignmentType.in.includes(row.assignmentType)
+            )
+              return false;
+            return matchesWindow(row, where);
+          }),
+        ),
+      ),
+    },
+    teacherDelegation: {
+      findMany: jest.fn(({ where }: any) =>
+        Promise.resolve(
+          delegations.filter((row) => {
+            if (where.tenantId && where.tenantId !== row.tenantId) return false;
+            if (
+              where.recipientStaffId &&
+              where.recipientStaffId !== row.recipientStaffId
+            )
+              return false;
+            if (where.classId && where.classId !== row.classId) return false;
+            if (where.sectionId && where.sectionId !== row.sectionId)
+              return false;
+            return matchesWindow(row, where);
+          }),
+        ),
+      ),
+    },
+  };
+
+  return { prisma, audit: { record: jest.fn().mockResolvedValue(undefined) } };
+}
+
+/** Convenience builder for a canonical TeacherAssignment row in specs. */
+export function teacherAssignmentFixture(overrides: Record<string, any> = {}) {
+  return {
+    id: `assignment-${Math.random().toString(36).slice(2, 8)}`,
+    tenantId: 'tenant-a',
+    academicYearId: 'year-1',
+    staffId: 'teacher-1',
+    assignmentType: 'SUBJECT_TEACHER',
+    classId: 'class-1',
+    sectionId: 'section-1',
+    subjectId: 'sub-1',
+    componentScope: null,
+    isPrimary: true,
+    status: 'ACTIVE',
+    effectiveFrom: new Date('2020-01-01T00:00:00.000Z'),
+    effectiveUntil: null,
+    ...overrides,
+  };
 }

@@ -13,7 +13,9 @@ import {
 import { DashboardPageShell } from '../../../components/dashboard/dashboard-page-shell';
 import { WorkspaceTabs } from '../../../components/ui/module-tabs';
 import { LibraryWorkspace } from '../../../components/library/library-workspace';
+import { TeacherLibraryWorkspace } from '../../../components/library/teacher-library-workspace';
 import { ModuleHeader } from '../../../components/ui/module-header';
+import { TeacherCapability, useTeacherAccess } from '../../../lib/teacher-access';
 
 const libraryTabs = [
   { label: 'Overview', href: '/dashboard/library' },
@@ -29,6 +31,23 @@ const libraryTabs = [
 
 export default function LibraryPage() {
   const router = useRouter();
+  const { isRestricted } = useTeacherAccess();
+  // Ordinary teachers get the borrower workspace. A teacher-librarian holds
+  // LIBRARY_ADMIN and keeps the full circulation console (P0.9).
+  const showBorrowerWorkspace = isRestricted(TeacherCapability.LIBRARY_ADMIN);
+
+  if (showBorrowerWorkspace) {
+    return (
+      <DashboardPageShell>
+        <ModuleHeader
+          eyebrow="Resources"
+          title="Library"
+          description="Search the catalogue and track the books you have borrowed."
+        />
+        <TeacherLibraryWorkspace />
+      </DashboardPageShell>
+    );
+  }
 
   return (
     <DashboardPageShell>

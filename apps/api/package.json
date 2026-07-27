@@ -21,6 +21,8 @@
     "db:seed:e2e:stage3-learning-improvement": "tsx prisma/seed-stage3-learning-improvement-e2e.ts",
     "db:seed:e2e:m8-library": "tsx prisma/seed-m8-library-e2e.ts",
     "db:clean:e2e-notices": "tsx prisma/clean-e2e-notices.ts",
+    "db:clean:e2e-academics": "tsx prisma/clean-e2e-academics.ts",
+    "db:clean:e2e": "pnpm db:clean:e2e-notices && pnpm db:clean:e2e-academics",
     "db:seed:platform": "tsx prisma/platform-seed.ts",
     "db:seed:geography": "tsx prisma/seed-nepal-geography.ts",
     "db:backfill:teacher-assignments": "tsx prisma/seed-teacher-assignment-backfill.ts",

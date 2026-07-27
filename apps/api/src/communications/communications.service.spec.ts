@@ -1411,7 +1411,11 @@ describe('CommunicationsService', () => {
     process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE = 'mock';
 
     try {
+      // Call order: the two caller-scoped inbox counts resolve first, then
+      // the school-wide delivery-operations counts.
       prisma.notificationDelivery.count
+        .mockResolvedValueOnce(9)
+        .mockResolvedValueOnce(4)
         .mockResolvedValueOnce(5)
         .mockResolvedValueOnce(2)
         .mockResolvedValueOnce(7)
@@ -1423,6 +1427,8 @@ describe('CommunicationsService', () => {
 
       expect(summary).toEqual(
         expect.objectContaining({
+          myUnreadNotices: 9,
+          myUnreadHighImpactNotices: 4,
           sentToday: 5,
           scheduledNotices: 3,
           failedDeliveries: 2,
@@ -1430,6 +1436,16 @@ describe('CommunicationsService', () => {
           escalatedChatCount: 1,
           providerStatus: 'mock',
           providerHealth: 'unavailable',
+        }),
+      );
+      // The caller-scoped counts must be pinned to this user, never the
+      // whole tenant.
+      expect(prisma.notificationDelivery.count).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            tenantId: 'tenant-1',
+            recipientUserId: 'admin-1',
+          }),
         }),
       );
       expect(prisma.notice.count).toHaveBeenCalledWith({
@@ -1460,6 +1476,46 @@ describe('CommunicationsService', () => {
       } else {
         process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE = previousMode;
       }
+    }
+  });
+
+  it('withholds school-wide delivery operations from callers without delivery diagnostics', async () => {
+    // A teacher holds `notices:read` (which gates this endpoint) but not
+    // `notifications:view_delivery_diagnostics`. They must get their own
+    // inbox counts and an explicit null -- never a school-wide backlog and
+    // never provider health -- for the delivery-operations fields (P0.8).
+    const teacherActor: AuthContext = {
+      ...actor,
+      userId: 'teacher-1',
+      roles: ['teacher'],
+      permissions: ['notices:read', 'attendance:mark'],
+    };
+
+    prisma.notificationDelivery.count
+      .mockResolvedValueOnce(3)
+      .mockResolvedValueOnce(1)
+      .mockResolvedValue(999);
+
+    const summary = await service.getCommunicationsSummary(teacherActor);
+
+    expect(summary).toEqual(
+      expect.objectContaining({
+        myUnreadNotices: 3,
+        myUnreadHighImpactNotices: 1,
+        sentToday: null,
+        scheduledNotices: null,
+        failedDeliveries: null,
+        unreadHighImpactNotices: null,
+        escalatedChatCount: null,
+        providerStatus: null,
+        providerHealth: null,
+      }),
+    );
+    // Only the two caller-scoped counts ran; no tenant-wide delivery query.
+    expect(prisma.notificationDelivery.count).toHaveBeenCalledTimes(2);
+    expect(prisma.parentTeacherThread.count).not.toHaveBeenCalled();
+    for (const call of prisma.notificationDelivery.count.mock.calls) {
+      expect(call[0].where.recipientUserId).toBe('teacher-1');
     }
   });
 

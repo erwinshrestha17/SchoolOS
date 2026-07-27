@@ -586,16 +586,30 @@ export type CommunicationsProviderDiagnostics = {
   channels: CommunicationProviderDiagnosticChannel[];
 };
 
+/**
+ * Communications summary.
+ *
+ * The `delivery*` / `provider*` / school-wide counters describe the school's
+ * delivery infrastructure and are only populated for callers holding
+ * `notifications:view_delivery_diagnostics`. For everyone else -- teachers,
+ * students, support staff -- they are `null`, and the caller-scoped `my*`
+ * counters describe that person's own inbox instead. A `null` here means "not
+ * available to you", never "zero".
+ */
 export type CommunicationsSummary = {
   generatedAt: string;
   schoolDay: string;
-  sentToday: number;
-  scheduledNotices: number;
-  failedDeliveries: number;
-  unreadHighImpactNotices: number;
-  escalatedChatCount: number;
-  providerStatus: CommunicationProviderMode;
-  providerHealth: CommunicationProviderHealth;
+  /** Notices addressed to the caller that they have not read yet. */
+  myUnreadNotices: number;
+  /** Caller's own unread urgent/emergency notices. */
+  myUnreadHighImpactNotices: number;
+  sentToday: number | null;
+  scheduledNotices: number | null;
+  failedDeliveries: number | null;
+  unreadHighImpactNotices: number | null;
+  escalatedChatCount: number | null;
+  providerStatus: CommunicationProviderMode | null;
+  providerHealth: CommunicationProviderHealth | null;
 };
 
 export type CommunicationTemplateCategory =

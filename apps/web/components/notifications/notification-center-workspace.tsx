@@ -30,9 +30,10 @@ export function NotificationCenterWorkspace() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const { session } = useSession();
-  const permissions = new Set<PermissionKey>(session?.user.permissions ?? []);
-  const canView = permissions.has('notifications:view_own');
+  const { session, hasPermissions } = useSession();
+  // Alias-aware: `notifications:view_own` is satisfied by `notices:read`,
+  // so this now matches what the backend guard will allow (P1.13).
+  const canView = hasPermissions(['notifications:view_own']);
   const page = positiveNumber(searchParams.get('page'), 1);
   const readStatus = (searchParams.get('readStatus') ?? 'ALL') as
     | 'ALL'

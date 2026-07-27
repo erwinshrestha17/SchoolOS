@@ -26,6 +26,7 @@ import {
   ,RotateCcw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTeacherAssignmentScope } from '@/lib/hooks/use-teacher-assignment-scope';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
 import { ConfirmDialog } from '../../ui/confirm-dialog';
@@ -40,6 +41,11 @@ type Props = {
 
 export function MarksEntryTab({ academicYears, classes, allSections, exams }: Props) {
   const queryClient = useQueryClient();
+  // Class/section/subject options come from the shared assignment-scope
+  // resolver so a teacher never sees -- or can select -- a class, section or
+  // subject they are not assigned to (P0.4). The backend re-validates each id
+  // on save; this only stops the picker from offering them.
+  const assignmentScope = useTeacherAssignmentScope();
   const [filters, setFilters] = useState({ examTermId: '', classId: '', sectionId: '', subjectId: '', assessmentComponentId: '' });
   const [marks, setMarks] = useState<Record<string, string>>({});
   const [statuses, setStatuses] = useState<Record<string, string>>({});
@@ -96,6 +102,40 @@ export function MarksEntryTab({ academicYears, classes, allSections, exams }: Pr
         conflict: 'These marks changed on the server. Refresh and try again.',
       })
     : '';
+
+  // A teacher only ever picks from their own assignments; an administrator
+  // keeps the full school lists. `classes`/`allSections` remain the props the
+  // administrative workspace passes in.
+  const availableClasses = assignmentScope.isScoped
+    ? assignmentScope.classes
+    : classes;
+  const availableSections = useMemo(
+    () =>
+      filters.classId
+        ? assignmentScope.isScoped
+          ? assignmentScope.sectionsForClass(filters.classId)
+          : allSections.filter(
+              (section: any) =>
+                (section.classId ?? section.class?.id) === filters.classId,
+            )
+        : [],
+    [allSections, assignmentScope, filters.classId],
+  );
+  const availableSubjects = useMemo(() => {
+    const all = subjectsQuery.data ?? [];
+    const forClass = filters.classId
+      ? all.filter(
+          (subject: any) =>
+            !subject.classId || subject.classId === filters.classId,
+        )
+      : all;
+    if (!assignmentScope.isScoped || assignmentScope.assignedSubjectIds.size === 0) {
+      return forClass;
+    }
+    return forClass.filter((subject: any) =>
+      assignmentScope.assignedSubjectIds.has(subject.id),
+    );
+  }, [assignmentScope, filters.classId, subjectsQuery.data]);
 
   const selectedExam = exams.find((e) => e.id === filters.examTermId);
   const isLocked = selectedExam?.isLocked;
@@ -163,6 +203,26 @@ export function MarksEntryTab({ academicYears, classes, allSections, exams }: Pr
     { value: 'EXCUSED', label: 'E', color: 'text-blue-600 bg-blue-50' },
   ];
 
+  // "No active assignment means no data access" (Teacher Persona spec 3.1):
+  // an empty picker is a dead end, so say why instead.
+  if (assignmentScope.hasNoAssignments) {
+    return (
+      <div
+        role="status"
+        className="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/60 p-8 text-center"
+      >
+        <h3 className="text-lg font-black tracking-tight text-slate-900">
+          No assessments assigned to you
+        </h3>
+        <p className="mx-auto mt-1.5 max-w-md text-sm leading-6 text-slate-500">
+          Marks entry opens once you have an active Class Teacher or Subject
+          Teacher assignment for the current academic year. Ask the academic
+          coordinator if you expected one.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-10 animate-fade-in">
       {/* Quick Filter Bar */}
@@ -195,12 +255,28 @@ export function MarksEntryTab({ academicYears, classes, allSections, exams }: Pr
               className="premium-input bg-white"
             >
               <option value="">Select Class</option>
-              {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {availableClasses.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Section</label>
+            <select
+              data-testid="filter-section"
+              value={filters.sectionId}
+              disabled={!filters.classId}
+              onChange={(e) => {
+                const value = e.target.value;
+                requestFilterChange(() => setFilters(c => ({ ...c, sectionId: value })));
+              }}
+              className="premium-input bg-white"
+            >
+              <option value="">{assignmentScope.isScoped ? 'All my sections' : 'All sections'}</option>
+              {availableSections.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Subject</label>
-            <select 
+            <select
               data-testid="filter-subject"
               value={filters.subjectId}
               onChange={(e) => {
@@ -210,7 +286,7 @@ export function MarksEntryTab({ academicYears, classes, allSections, exams }: Pr
               className="premium-input bg-white"
             >
               <option value="">Select Subject</option>
-              {subjectsQuery.data?.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {availableSubjects.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
           <div className="space-y-2">

@@ -18,8 +18,32 @@ import { TimetableVersionsList } from '@/components/timetable/versions-list';
 import { WeeklyRequirementsList } from '@/components/timetable/weekly-requirements-list';
 import { ConflictsList } from '@/components/timetable/conflicts-list';
 import { SubstitutionsList } from '@/components/timetable/substitutions-list';
+import { TeacherScheduleWorkspace } from '@/components/timetable/teacher-schedule-workspace';
+import { TeacherCapability, useTeacherAccess } from '@/lib/teacher-access';
 
 export default function TimetablePage() {
+  const { isRestricted } = useTeacherAccess();
+  // An ordinary teacher gets My Schedule, not the school timetable console.
+  // A delegated timetable coordinator holds TIMETABLE_ADMIN and keeps the
+  // full builder/versions/conflicts workspace (P0.5).
+  const showTeacherSchedule = isRestricted(TeacherCapability.TIMETABLE_ADMIN);
+
+  if (showTeacherSchedule) {
+    return (
+      <DashboardPageShell>
+        <PageHeader
+          title="My Schedule"
+          description="Your published periods, rooms, and any substitutions assigned to you."
+        />
+        <TeacherScheduleWorkspace />
+      </DashboardPageShell>
+    );
+  }
+
+  return <SchoolTimetableConsole />;
+}
+
+function SchoolTimetableConsole() {
   const [activeTab, setActiveTab] = useState('grid');
   const [filters, setFilters] = useState({
     academicYearId: '',

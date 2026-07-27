@@ -6,6 +6,10 @@ export interface MyStudentsGroupStudent {
   fullNameEn: string;
   rollNumber: number | null;
   hasMedicalAlert: boolean;
+  /** Last 30 marked days. `null` means no marked data — never treat as 0. */
+  attendancePercent: number | null;
+  absencesInWindow: number;
+  needsAttendanceFollowUp: boolean;
 }
 
 export interface MyStudentsClassGroup {

@@ -5,7 +5,6 @@ import {
   NOTIFICATION_PREFERENCE_CATEGORIES,
   type NotificationChannel,
   type NotificationPreferenceCategory,
-  type PermissionKey,
 } from '@schoolos/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BellRing, Clock3, RotateCcw, Save } from 'lucide-react';
@@ -25,10 +24,13 @@ export function NotificationPreferencesWorkspace({
 }: {
   embedded?: boolean;
 } = {}) {
-  const { session } = useSession();
+  const { hasPermissions } = useSession();
   const queryClient = useQueryClient();
-  const permissions = new Set<PermissionKey>(session?.user.permissions ?? []);
-  const canView = permissions.has('notifications:view_own');
+  // Alias-aware, so this matches what the backend guard will actually allow:
+  // `notifications:view_own` is satisfied by `notices:read`, which every
+  // teacher holds. A raw key check rendered a full "no access" page over an
+  // endpoint that would have answered (P1.13).
+  const canView = hasPermissions(['notifications:view_own']);
   const [category, setCategory] =
     useState<NotificationPreferenceCategory>('NOTICE');
   const [channel, setChannel] = useState<NotificationChannel>('IN_APP');

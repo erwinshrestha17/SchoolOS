@@ -1,4 +1,6 @@
 export * from './permissions.js';
+export * from './permission-aliases.js';
+export * from './teacher-capabilities.js';
 export * from './types.js';
 export * from './validation.js';
 export * from './entitlements.js';

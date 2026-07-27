@@ -10,7 +10,9 @@ import {
   formatBsDateTime,
   getNepalNow,
   toBsDateFromGregorian,
+  ATTENDANCE_SESSION_STATE_LABELS,
   type AttendanceCorrectionRequest,
+  type AttendanceSessionState,
 } from "@schoolos/core";
 import {
   AlertTriangle,
@@ -40,6 +42,7 @@ import { AttendanceForm } from "@/components/forms/attendance-form";
 import { AttendanceConflictReview } from "./attendance-conflict-review";
 import { AttendanceCorrectionReview } from "./attendance-correction-review";
 import { useSession } from "@/components/session-provider";
+import { useTeacherAccess } from "@/lib/teacher-access";
 import { DashboardPageShell } from "@/components/dashboard/dashboard-page-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -313,11 +316,10 @@ export function AttendanceOverviewWorkspace() {
                       <TableCell>{session.totals.absent}</TableCell>
                       <TableCell>{session.totals.late}</TableCell>
                       <TableCell>
-                        <Badge
-                          variant={session.submittedAt ? "success" : "warning"}
-                        >
-                          {session.submittedAt ? "Submitted" : "Draft"}
-                        </Badge>
+                        {/* Backend-owned canonical state (P0.11). This used
+                            to read `session.submittedAt`, which the analytics
+                            payload never carried, so every row said "Draft". */}
+                        <AttendanceStateBadge state={session.state} />
                       </TableCell>
                     </TableRow>
                   ))}
@@ -435,10 +437,7 @@ export function AttendanceRegisterWorkspace({
     queryKey: ["sections"],
     queryFn: api.listSections,
   });
-  const isTeacherPersona = Boolean(
-    session?.user.roles.includes("teacher") &&
-    !session.user.roles.some((role) => ["admin", "principal"].includes(role)),
-  );
+  const { isTeacherPersona } = useTeacherAccess();
   const assignedSections = useMemo(
     () =>
       (sectionsQuery.data ?? []).filter(
@@ -1932,7 +1931,33 @@ function MonthlyMatrix({ register }: { register: AttendanceMonthlyRegister }) {
       noPadding
       className="attendance-register-print"
     >
-      <div className="overflow-auto">
+      {/* The grid is all two-letter codes; without a key it is unreadable,
+          and "H" vs "NM" is exactly the distinction teachers act on. */}
+      <dl className="flex flex-wrap gap-x-4 gap-y-1 border-b border-slate-100 px-4 py-2.5 text-xs text-slate-600">
+        {(
+          [
+            ["P", "Present"],
+            ["A", "Absent"],
+            ["L", "Late"],
+            ["LV", "Leave"],
+            ["H", "Holiday"],
+            ["NM", "Not marked"],
+          ] as const
+        ).map(([code, label]) => (
+          <div key={code} className="flex items-center gap-1.5">
+            <dt className="font-black text-slate-900">{code}</dt>
+            <dd>{label}</dd>
+          </div>
+        ))}
+      </dl>
+      {/* Horizontal-scroll affordance: a month of days never fits a laptop
+          viewport, and the sticky student column hides the overflow edge. */}
+      <div
+        className="overflow-auto"
+        tabIndex={0}
+        role="region"
+        aria-label="Monthly attendance register, scroll horizontally for later days"
+      >
         <table className="min-w-full border-separate border-spacing-0 text-sm">
           <thead>
             <tr>
@@ -1973,12 +1998,18 @@ function MonthlyMatrix({ register }: { register: AttendanceMonthlyRegister }) {
                 {student.attendance.map((entry) => (
                   <td
                     key={entry.day}
+                    // Title for pointer users, sr-only text for screen
+                    // readers: the two-letter code alone is not a label.
+                    title={`Day ${entry.day}: ${statusLabel(entry.status)}`}
                     className={cn(
                       "border-b p-2 text-center text-xs font-black",
                       statusColor(entry.status),
                     )}
                   >
-                    {statusShort(entry.status)}
+                    <span aria-hidden="true">{statusShort(entry.status)}</span>
+                    <span className="sr-only">
+                      {`Day ${entry.day}: ${statusLabel(entry.status)}`}
+                    </span>
                   </td>
                 ))}
                 <td className="border-b p-2 text-center font-bold text-success-700">
@@ -2362,6 +2393,34 @@ function ComparisonCard({
   );
 }
 
+/**
+ * Renders the one canonical, backend-owned attendance session state
+ * (`AttendanceSessionState`). Every attendance surface uses this rather than
+ * re-deriving a label from whichever timestamps it happened to fetch.
+ */
+function AttendanceStateBadge({
+  state,
+}: {
+  state: AttendanceSessionState | undefined;
+}) {
+  if (!state) {
+    return <Badge variant="neutral">Unavailable</Badge>;
+  }
+  const variant =
+    state === "LOCKED"
+      ? "info"
+      : state === "SUBMITTED"
+        ? "success"
+        : state === "CONFLICT"
+          ? "destructive"
+          : state === "DRAFT"
+            ? "warning"
+            : "neutral";
+  return (
+    <Badge variant={variant}>{ATTENDANCE_SESSION_STATE_LABELS[state]}</Badge>
+  );
+}
+
 function StatusBadge({ status }: { status: string }) {
   if (status === "PRESENT") return <Badge variant="success">Present</Badge>;
   if (status === "ABSENT") return <Badge variant="destructive">Absent</Badge>;
@@ -2417,13 +2476,38 @@ function correctionStudentName(correction: {
   return name || correction.student?.studentSystemId || "Student record";
 }
 
+/**
+ * Register cell code. Holiday and not-marked must never share a glyph: the
+ * Attendance Overview counts "Not marked days" as work outstanding, so a
+ * register that shows the same "-" for a holiday and for a day nobody marked
+ * disagrees with the very KPI that sent the teacher here (P0.11 / P1.5).
+ *
+ * The backend already distinguishes them (attendance.service.ts
+ * getMonthlyRegister emits HOLIDAY and NOT_MARKED); only the display
+ * collapsed them.
+ */
 function statusShort(status: string) {
   if (status === "PRESENT") return "P";
   if (status === "ABSENT") return "A";
   if (status === "LATE") return "L";
+  if (status === "HALF_DAY") return "½";
   if (status.includes("LEAVE")) return "LV";
-  if (status === "HOLIDAY") return "-";
-  return "-";
+  if (status === "HOLIDAY") return "H";
+  return "NM";
+}
+
+/** Full label for the cell tooltip and screen readers. */
+function statusLabel(status: string) {
+  if (status === "PRESENT") return "Present";
+  if (status === "ABSENT") return "Absent";
+  if (status === "LATE") return "Late";
+  if (status === "HALF_DAY") return "Half day";
+  if (status === "SICK_LEAVE") return "Sick leave";
+  if (status === "EXCUSED_LEAVE") return "Excused leave";
+  if (status === "UNEXCUSED_LEAVE") return "Unexcused leave";
+  if (status.includes("LEAVE")) return "Leave";
+  if (status === "HOLIDAY") return "Holiday";
+  return "Not marked";
 }
 
 function printAttendanceRegister() {
@@ -2438,7 +2522,12 @@ function printAttendanceRegister() {
 function statusColor(status: string) {
   if (status === "PRESENT") return "text-success-700 bg-success-50";
   if (status === "ABSENT") return "text-danger-700 bg-danger-50";
-  if (status === "LATE") return "text-warning-700 bg-warning-50";
+  if (status === "LATE" || status === "HALF_DAY")
+    return "text-warning-700 bg-warning-50";
   if (status.includes("LEAVE")) return "text-info-700 bg-info-50";
-  return "text-slate-300 bg-slate-50";
+  // Holiday is settled (nothing owed); not-marked is outstanding work. They
+  // must not look alike -- the code itself (H vs NM) carries the meaning so
+  // this never depends on colour alone.
+  if (status === "HOLIDAY") return "text-slate-400 bg-slate-100";
+  return "text-amber-700 bg-amber-50/70";
 }

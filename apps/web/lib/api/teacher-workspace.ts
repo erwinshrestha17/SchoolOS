@@ -67,7 +67,48 @@ export interface TeacherTodaySummary {
   marksDeadlines: TeacherTodayMarksDeadline[];
 }
 
+/**
+ * One period on the teacher's own schedule. There is deliberately no teacher,
+ * class or room selector on this contract: the backend resolves the caller's
+ * Staff row and returns only slots they teach (P0.5).
+ */
+export interface TeacherScheduleSlot {
+  id: string;
+  date: string;
+  dayOfWeek: number;
+  academicYearId: string;
+  classId: string;
+  sectionId: string | null;
+  subjectId: string;
+  className: string;
+  sectionName: string | null;
+  subjectName: string;
+  room: string | null;
+  startsAt: string;
+  endsAt: string;
+  status: 'SCHEDULED' | 'SUBSTITUTED' | 'CHANGED';
+  substitution: TeacherTodaySubstitution | null;
+}
+
+export interface TeacherSchedule {
+  range: { startsOn: string; endsOn: string };
+  items: TeacherScheduleSlot[];
+  substitutions: TeacherTodaySubstitution[];
+}
+
 export const teacherWorkspaceApi = {
   getTeacherToday: (date?: string) =>
     request<TeacherTodaySummary>(withQuery('/teacher-workspace/today', { date })),
+  getTeacherSchedule: (params: {
+    date?: string;
+    weekStart?: string;
+    days?: number;
+  } = {}) =>
+    request<TeacherSchedule>(
+      withQuery('/teacher-workspace/schedule', {
+        date: params.date,
+        weekStart: params.weekStart,
+        days: params.days,
+      }),
+    ),
 };

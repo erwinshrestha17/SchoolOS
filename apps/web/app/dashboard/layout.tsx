@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useSession } from "../../components/session-provider";
 import { useEntitlements } from "../../components/entitlements-provider";
+import { useTeacherAccess } from "../../lib/teacher-access";
 import { DashboardShell } from "../../components/layout/dashboard-shell";
 import { UpgradePrompt } from "../../components/layout/upgrade-prompt";
 import { PermissionDenied } from "../../components/ui/permission-denied";
@@ -413,6 +414,15 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     hasModule,
     loading: entitlementsLoading,
   } = useEntitlements();
+  const teacherAccess = useTeacherAccess();
+  // Teacher-persona route isolation (Teacher Persona spec 3/14, P0.3).
+  // An ordinary teacher must never *render* an administrator screen and then
+  // be shown a permission error on top of it -- they are moved to the nearest
+  // valid teacher page instead. Delegated teachers (exam coordinator,
+  // activity moderator, timetable coordinator, teacher-librarian) hold the
+  // matching capability, so this resolves to null for them and the route
+  // opens normally. The backend @Permissions guards remain the authority.
+  const teacherRestriction = teacherAccess.restrictionFor(pathname || "");
   const isParentOnlySession = Boolean(
     session?.user.roles.length &&
     session.user.roles.every((role) => role === "parent"),
@@ -441,6 +451,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       router.replace("/dashboard/settings/personal/security");
     }
   }, [isParentOnlySession, pathname, router, session?.user.mustChangePassword]);
+
+  useEffect(() => {
+    if (status === "authenticated" && teacherRestriction) {
+      router.replace(teacherRestriction.redirectTo);
+    }
+  }, [router, status, teacherRestriction]);
 
   useEffect(() => {
     if (status !== "loading") {
@@ -558,6 +574,27 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm font-semibold text-amber-950">
           Change your temporary password before opening other SchoolOS
           workspaces.
+        </div>
+      </DashboardShell>
+    );
+  }
+
+  // Restricted teacher routes never render their children, so the page's own
+  // queries never fire and no unauthorized request leaves the browser. The
+  // effect above is already navigating to the nearest valid teacher page.
+  if (teacherRestriction) {
+    return (
+      <DashboardShell>
+        <div
+          role="status"
+          className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm"
+        >
+          <h2 className="text-lg font-semibold text-slate-900">
+            {teacherRestriction.label} is managed by the school office
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Taking you back to your teaching workspace.
+          </p>
         </div>
       </DashboardShell>
     );

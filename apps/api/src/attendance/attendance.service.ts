@@ -14,6 +14,7 @@ import {
   formatBsDateForInput,
   formatBsDateOnly,
   getNepalSchoolDay,
+  resolveAttendanceSessionState,
   toBsDateFromGregorian,
   toGregorianDateFromBs,
   type StudentAttendanceMonthState,
@@ -4209,6 +4210,21 @@ export class AttendanceService {
         className: session.class.name,
         sectionName: session.section?.name ?? null,
         conflictStatus: session.conflictStatus,
+        // Confirmed defect (P0.11): this payload carried neither
+        // `submittedAt` nor `lockAt`, so the Attendance Overview's session
+        // table -- which reads `session.submittedAt` -- rendered *every*
+        // session as "Draft", including days the Monthly Register showed as
+        // fully marked and locked. Emitting the canonical state (plus the
+        // two timestamps it derives from) makes both screens read the same
+        // backend-owned value.
+        submittedAt: session.submittedAt,
+        lockAt: session.lockAt,
+        state: resolveAttendanceSessionState({
+          submittedAt: session.submittedAt,
+          lockAt: session.lockAt,
+          conflictStatus: session.conflictStatus,
+          hasRecords: session.records.length > 0,
+        }),
         calendarDay: calendarByDate.get(
           getDateKey(stripTime(session.attendanceDate)),
         ),
@@ -4351,14 +4367,19 @@ export class AttendanceService {
     const rows = data.matrix.map((student) => [
       student.rollNumber?.toString() ?? '',
       student.name,
+      // Matches the on-screen register codes exactly (P0.11): the export must
+      // not be the only place a teacher can tell a holiday from an unmarked
+      // day, and the leave variants (SICK_LEAVE / EXCUSED_LEAVE /
+      // UNEXCUSED_LEAVE / ON_LEAVE) previously fell through to "-" even
+      // though the LEAVE total counted them.
       ...student.attendance.map((a: { status: string }) => {
         if (a.status === 'PRESENT') return 'P';
         if (a.status === 'ABSENT') return 'A';
         if (a.status === 'LATE') return 'L';
         if (a.status === 'HOLIDAY') return 'H';
-        if (a.status === 'LEAVE') return 'Lv';
         if (a.status === 'HALF_DAY') return '0.5';
-        return '-';
+        if (a.status.includes('LEAVE')) return 'LV';
+        return 'NM';
       }),
       student.totals.PRESENT.toString(),
       student.totals.ABSENT.toString(),

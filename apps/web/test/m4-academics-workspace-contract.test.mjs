@@ -35,7 +35,28 @@ describe('M4 academics workspace contract', () => {
   it('keeps the primary module navigation within the seven-tab budget', () => {
     const tabs = read('components/academics/academics-tabs.tsx');
 
-    assert.equal((tabs.match(/href: '\/dashboard\/academics/g) ?? []).length, 7);
+    // The ≤7 budget is about the *visible* tab row. Low-frequency
+    // destinations live behind the "More" affordance
+    // (components/dashboard/module-tabs.tsx `overflowItems`) and are
+    // deliberately not counted against it -- the previous assertion counted
+    // the whole file, so adding a single overflow entry broke a rule it did
+    // not actually violate.
+    const [visibleBlock, overflowBlock] = tabs.split(
+      'academicsWorkspaceOverflowTabs',
+    );
+
+    const visibleHrefs = (
+      visibleBlock.match(/href: '\/dashboard\/academics/g) ?? []
+    ).length;
+    assert.ok(
+      visibleHrefs > 0 && visibleHrefs <= 7,
+      `academics must show between 1 and 7 primary tabs, found ${visibleHrefs}`,
+    );
+    assert.ok(
+      (overflowBlock?.match(/href: '\/dashboard\/academics/g) ?? []).length > 0,
+      'academics must keep low-frequency destinations in the overflow menu',
+    );
+
     assert.match(tabs, /label: 'Overview'/);
     assert.doesNotMatch(tabs, /label: 'Subjects'/);
     assert.doesNotMatch(tabs, /label: 'Retests'|label: 'Locks'|label: 'Promotion'/);

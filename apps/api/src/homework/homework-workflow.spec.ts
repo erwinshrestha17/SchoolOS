@@ -11,6 +11,8 @@ import {
   HomeworkSubmissionStatus,
 } from '@prisma/client';
 import { HomeworkService } from './homework.service';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
+import { createTeacherScopeServiceForTests } from '../../test/test-helpers';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CommunicationsService } from '../communications/communications.service';
@@ -157,6 +159,17 @@ describe('Homework Workflow', () => {
         {
           provide: getQueueToken('homework'),
           useValue: { add: jest.fn() },
+        },
+        {
+          // These specs cover workflow/reminder behaviour, not authorization.
+          provide: TeacherScopeService,
+          useFactory: () => {
+            const deps = createTeacherScopeServiceForTests({ assignments: [] });
+            return new TeacherScopeService(
+              deps.prisma as never,
+              deps.audit as never,
+            );
+          },
         },
       ],
     }).compile();

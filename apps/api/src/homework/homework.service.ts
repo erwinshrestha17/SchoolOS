@@ -21,6 +21,8 @@ import { CommunicationsService } from '../communications/communications.service'
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { FileRegistryService } from '../file-registry/file-registry.service';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
+import { TeacherCapability } from '../teacher-scope/teacher-capability';
 import {
   HomeworkReminderQueryDto,
   HomeworkReminderType,
@@ -72,6 +74,7 @@ export class HomeworkService {
     private readonly auditService: AuditService,
     private readonly fileRegistry: FileRegistryService,
     @InjectQueue('homework') private readonly homeworkQueue: Queue,
+    private readonly teacherScopeService: TeacherScopeService,
   ) {}
 
   async listAssignments(actor: AuthContext, query: HomeworkQueryDto) {
@@ -174,6 +177,17 @@ export class HomeworkService {
         return emptyPage(page, limit);
       }
       and.push({ OR: scope });
+    }
+
+    // "My homework only". Resolved from the caller's own Staff row rather
+    // than a client-supplied id, so it always narrows and can never be
+    // pointed at somebody else (P1.6).
+    if (query.mine) {
+      const ownStaffId = await this.resolveActorStaffId(actor);
+      if (!ownStaffId) {
+        return emptyPage(page, limit);
+      }
+      and.push({ assignedByStaffId: ownStaffId });
     }
 
     if (query.studentId) {
@@ -1577,6 +1591,31 @@ export class HomeworkService {
     }
   }
 
+  /**
+   * Single authorization gate for every homework mutation and scoped read
+   * (9 call sites).
+   *
+   * Migrated onto the canonical TeacherScopeService: it now resolves against
+   * the `TeacherAssignment` table (effective dates, ACTIVE status, exact
+   * class+section+subject) instead of reading `SubjectTeacherAssignment` and
+   * `Section.classTeacherId` directly. That closes three gaps the ad hoc
+   * version had:
+   *
+   *   - it ignored assignment effective dates entirely, so a teacher whose
+   *     assignment had ended kept full write access;
+   *   - it ignored assignment status, so a REVOKED assignment still passed;
+   *   - `sectionId: null` on the legacy table meant "every section of the
+   *     class", which quietly widened scope.
+   *
+   * Class Teacher fallback is deliberately retained. In Nepali primary
+   * classes the homeroom teacher genuinely delivers most subjects, and a
+   * previous fix established that requiring an explicit SubjectTeacher row
+   * locks them out of their own class. It is now expressed as the explicit
+   * `CLASS_TASK_CREATE` homeroom capability rather than a raw
+   * `Section.classTeacherId` lookup, and it does NOT confer the right to edit
+   * another teacher's homework — that is enforced separately by
+   * `recordOwnerStaffId` on update paths.
+   */
   private async ensureSubjectTeacherScope(
     actor: AuthContext,
     homework: {
@@ -1584,6 +1623,10 @@ export class HomeworkService {
       classId: string;
       sectionId: string | null;
       subjectId: string;
+      /** Staff who authored the record, when editing an existing one. */
+      ownerStaffId?: string | null;
+      /** Date the record applies to, so expired assignments fail closed. */
+      effectiveOn?: Date;
     },
     staffId: string | null,
   ) {
@@ -1599,45 +1642,65 @@ export class HomeworkService {
       throw new ForbiddenException('Only staff can access this resource');
     }
 
-    const assignment = await this.prisma.subjectTeacherAssignment.findFirst({
-      where: {
-        tenantId: actor.tenantId,
-        ...(homework.academicYearId
-          ? { academicYearId: homework.academicYearId }
-          : {}),
-        subjectId: homework.subjectId,
-        classId: homework.classId,
-        staffId,
-        OR: homework.sectionId
-          ? [{ sectionId: homework.sectionId }, { sectionId: null }]
-          : [{ sectionId: null }],
-      },
-    });
-
-    if (assignment) return;
-
-    // A teacher may also satisfy this as the section's homeroom class
-    // teacher (Section.classTeacherId), not just as the assigned subject
-    // teacher — matching the same dual check ensureHomeworkRegisterReadAccess
-    // and AttendanceService.getTeacherSectionIds already use. Checking only
-    // SubjectTeacherAssignment silently locked every homeroom class teacher
-    // out of creating/managing homework for their own class.
-    const isClassTeacher = homework.sectionId
-      ? await this.prisma.section.findFirst({
-          where: {
-            tenantId: actor.tenantId,
-            id: homework.sectionId,
-            classTeacherId: staffId,
-          },
-          select: { id: true },
-        })
-      : null;
-
-    if (!isClassTeacher) {
+    const academicYearId =
+      homework.academicYearId ?? (await this.resolveCurrentAcademicYearId(actor));
+    if (!academicYearId) {
       throw new ForbiddenException(
         'You are not assigned to review homework for this class and subject',
       );
     }
+
+    // A null sectionId on legacy rows meant "all sections of the class".
+    // Resolve it to the concrete sections so authorization is per-section.
+    const sectionIds = homework.sectionId
+      ? [homework.sectionId]
+      : (
+          await this.prisma.section.findMany({
+            where: { tenantId: actor.tenantId, classId: homework.classId },
+            select: { id: true },
+          })
+        ).map((section) => section.id);
+
+    for (const sectionId of sectionIds) {
+      const base = {
+        tenantId: actor.tenantId,
+        staffId,
+        academicYearId,
+        classId: homework.classId,
+        sectionId,
+        effectiveOn: homework.effectiveOn,
+      };
+
+      const asSubjectTeacher = await this.teacherScopeService.canAccess(
+        {
+          ...base,
+          subjectId: homework.subjectId,
+          capability: TeacherCapability.SUBJECT_HOMEWORK_CREATE,
+          recordOwnerStaffId: homework.ownerStaffId,
+        },
+        actor,
+      );
+      if (asSubjectTeacher) return;
+
+      const asClassTeacher = await this.teacherScopeService.canAccess(
+        { ...base, capability: TeacherCapability.CLASS_TASK_CREATE },
+        actor,
+      );
+      if (asClassTeacher) return;
+    }
+
+    throw new ForbiddenException(
+      'You are not assigned to review homework for this class and subject',
+    );
+  }
+
+  /** Current academic year for the tenant, or null when none is configured. */
+  private async resolveCurrentAcademicYearId(actor: AuthContext) {
+    const year = await this.prisma.academicYear.findFirst({
+      where: { tenantId: actor.tenantId, isCurrent: true },
+      select: { id: true },
+    });
+    return year?.id ?? null;
   }
 
   private async ensureSubjectTeacherScopeForRead(

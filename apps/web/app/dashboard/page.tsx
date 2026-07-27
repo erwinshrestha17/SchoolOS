@@ -9,7 +9,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { DashboardCommandCenter } from '../../components/dashboard/dashboard-command-center';
 import { TeacherTodayWorkspace } from '../../components/dashboard/teacher-today-workspace';
-import { useSession } from '../../components/session-provider';
+import { useTeacherAccess } from '../../lib/teacher-access';
 import { ModuleHeader } from '../../components/ui/module-header';
 import {
   OperationalSummaryError,
@@ -23,16 +23,11 @@ import { formatSchoolDate } from '../../lib/date-utils';
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { session } = useSession();
   // Class/Subject Teachers get a dedicated assignment-scoped Today view
   // instead of the school-wide operational summary (Teacher Persona spec
-  // 10.1/21.1) -- admins and principals keep the generic dashboard even if
-  // they also hold a teaching role, matching the same carve-out already used
-  // in attendance-m2-workspaces.tsx.
-  const isTeacherPersona = Boolean(
-    session?.user.roles.some((role) => ['teacher', 'subject_teacher'].includes(role)) &&
-      !session.user.roles.some((role) => ['admin', 'principal'].includes(role)),
-  );
+  // 10.1/21.1). Persona resolution is shared with the sidebar and route
+  // guards so all three can never disagree.
+  const { isTeacherPersona } = useTeacherAccess();
 
   const dashboardQuery = useQuery({
     queryKey: ['operational-dashboard-summary'],

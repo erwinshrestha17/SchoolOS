@@ -11,6 +11,7 @@ import { useSession } from '../session-provider';
 import { LoadingState } from '../ui/loading-state';
 import { ErrorBoundary } from '../ui/error-boundary';
 import { ModuleOperationalSummary } from '../ui/module-operational-summary';
+import { TeacherCapability, useTeacherAccess } from '../../lib/teacher-access';
 import { SupportOverrideBanner } from '../platform/SupportOverrideBanner';
 import { SchoolBreadcrumbs } from '../schoolos/navigation/school-breadcrumbs';
 import { NetworkStatusBanner } from '../ui/network-status-banner';
@@ -39,13 +40,40 @@ const MODULE_LANDING_SUMMARIES: Record<string, OperationalSummaryRouteModule> =
     '/dashboard/learning': 'learning',
   };
 
+/**
+ * The administrative capability each module-landing summary is really backed
+ * by. A teacher without it cannot read the summary, so it must not be
+ * rendered for them at all.
+ */
+const MODULE_SUMMARY_CAPABILITY: Partial<
+  Record<OperationalSummaryRouteModule, TeacherCapability>
+> = {
+  library: TeacherCapability.LIBRARY_ADMIN,
+  'hr-payroll': TeacherCapability.STAFF_ADMIN,
+};
+
 export function DashboardShell({ children }: { children: ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
   const { session, status } = useSession();
   const pathname = usePathname();
-  const summaryModule = MODULE_LANDING_SUMMARIES[pathname];
+  // The generic cross-module operational summary is an administrator
+  // artifact: it is backed by module *report* permissions a teacher does not
+  // hold, so on a teacher's own module landing it rendered nothing but "You
+  // do not have permission to view this operational summary" -- stacked above
+  // the purpose-built workspace that page already provides. Suppressed for
+  // teachers who lack the module's admin capability; they get their own
+  // workspace KPIs instead. Administrators are unaffected.
+  const { isRestricted } = useTeacherAccess();
+  const candidateSummary = MODULE_LANDING_SUMMARIES[pathname];
+  const gatingCapability = candidateSummary
+    ? MODULE_SUMMARY_CAPABILITY[candidateSummary]
+    : undefined;
+  const summaryModule =
+    gatingCapability && isRestricted(gatingCapability)
+      ? undefined
+      : candidateSummary;
 
   function closeMobileNavigation() {
     setMobileOpen(false);

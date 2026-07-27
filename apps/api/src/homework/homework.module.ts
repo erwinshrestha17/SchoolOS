@@ -5,6 +5,7 @@ import { CommunicationsModule } from '../communications/communications.module';
 import { FileRegistryModule } from '../file-registry/file-registry.module';
 import { HomeworkAttachmentAccessService } from './homework-attachment-access.service';
 import { HomeworkController } from './homework.controller';
+import { TeacherScopeModule } from '../teacher-scope/teacher-scope.module';
 import { HomeworkService } from './homework.service';
 
 import { BullModule } from '@nestjs/bullmq';
@@ -17,6 +18,7 @@ import { HomeworkCron } from './homework.cron';
     CommunicationsModule,
     AuditModule,
     FileRegistryModule,
+    TeacherScopeModule,
     BullModule.registerQueue({
       name: 'homework',
     }),

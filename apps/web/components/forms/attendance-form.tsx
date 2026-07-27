@@ -18,6 +18,8 @@ import {
   type AttendanceDraftStorageValue,
 } from "@/lib/session";
 import { useSession } from "@/components/session-provider";
+import { useTeacherAccess } from "@/lib/teacher-access";
+import { formatSchoolDate } from "@/lib/date-utils";
 import {
   canRestoreEditableAttendanceDraftAfterSyncError,
   shouldClearLocalAttendanceDraft,
@@ -94,6 +96,9 @@ export function AttendanceForm() {
   >({});
   const [remarks, setRemarks] = useState<Record<string, string>>({});
   const [submitMessage, setSubmitMessage] = useState("");
+  // Explicit acknowledgement for the one submission that is indistinguishable
+  // from an untouched form: zero exceptions on a default-present roster.
+  const [allPresentAcknowledged, setAllPresentAcknowledged] = useState(false);
   const [draftSyncState, setDraftSyncState] = useState<DraftSyncState>("idle");
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
   const [draftClientSubmissionId, setDraftClientSubmissionId] = useState<
@@ -124,12 +129,7 @@ export function AttendanceForm() {
     queryKey: ["sections"],
     queryFn: api.listSections,
   });
-  const isTeacherPersona = Boolean(
-    session?.user.roles.some((role) =>
-      ["teacher", "subject_teacher"].includes(role),
-    ) &&
-    !session?.user.roles.some((role) => ["admin", "principal"].includes(role)),
-  );
+  const { isTeacherPersona } = useTeacherAccess();
   const assignedSections = useMemo(
     () =>
       (sectionsQuery.data ?? []).filter(
@@ -548,6 +548,12 @@ export function AttendanceForm() {
 
   const presentPercent =
     totals.total > 0 ? Math.round((totals.present / totals.total) * 100) : 0;
+  // Zero exceptions on a default-present roster: the submission a teacher can
+  // make by never touching the form (P1.4).
+  const isAllPresentSubmission =
+    roster.length > 0 && Object.keys(exceptions).length === 0;
+  const className =
+    availableClasses.find((item) => item.id === classId)?.name ?? "this class";
   const attendanceState = rosterQuery.data?.attendanceState;
   const isLocked = attendanceState?.isLocked ?? false;
   const isSubmitted = attendanceState?.isSubmitted ?? false;
@@ -1202,7 +1208,10 @@ export function AttendanceForm() {
 
           <button
             type="button"
-            onClick={() => setIsConfirmOpen(true)}
+            onClick={() => {
+              setAllPresentAcknowledged(false);
+              setIsConfirmOpen(true);
+            }}
             disabled={
               mutation.isPending ||
               roster.length === 0 ||
@@ -1326,11 +1335,25 @@ export function AttendanceForm() {
 
       <ConfirmDialog
         isOpen={isConfirmOpen}
-        title="Confirm Attendance Submission"
-        description={`Are you sure you want to submit attendance for Class ${availableClasses.find((c) => c.id === classId)?.name ?? ""}? This will lock today's records.`}
+        title={
+          isAllPresentSubmission
+            ? "Submit everyone as present?"
+            : "Confirm Attendance Submission"
+        }
+        description={
+          isAllPresentSubmission
+            ? // The roster defaults every student to Present, so an
+              // untouched form and a genuinely full class are
+              // indistinguishable at submit time. This is the one case that
+              // needs the teacher to say they actually looked (P1.4).
+              `No exceptions were marked, so all ${roster.length} student${roster.length === 1 ? "" : "s"} in ${className} will be recorded present for ${formatSchoolDate(attendanceDate)}. This becomes the official record.`
+            : `Submitting attendance for ${className}: ${totals.absent} absent, ${totals.late} late, ${totals.leave} on leave, ${totals.present} present. This becomes the official record for ${formatSchoolDate(attendanceDate)}.`
+        }
         confirmLabel={mutation.isPending ? "Submitting..." : "Submit"}
-        cancelLabel="Review"
+        cancelLabel="Review roster"
+        variant={isAllPresentSubmission ? "warning" : "default"}
         isConfirming={mutation.isPending}
+        confirmDisabled={isAllPresentSubmission && !allPresentAcknowledged}
         onConfirm={() => {
           mutation.mutate({
             academicYearId,
@@ -1347,8 +1370,25 @@ export function AttendanceForm() {
           });
           setIsConfirmOpen(false);
         }}
-        onClose={() => setIsConfirmOpen(false)}
-      />
+        onClose={() => {
+          setIsConfirmOpen(false);
+          setAllPresentAcknowledged(false);
+        }}
+      >
+        {isAllPresentSubmission ? (
+          <label className="flex items-start gap-2.5 rounded-xl border border-warning-100 bg-warning-50 p-3 text-sm font-semibold text-warning-900">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-warning-300"
+              checked={allPresentAcknowledged}
+              onChange={(event) =>
+                setAllPresentAcknowledged(event.target.checked)
+              }
+            />
+            I have checked the roster and every student is present.
+          </label>
+        ) : null}
+      </ConfirmDialog>
     </div>
   );
 }

@@ -43,6 +43,7 @@ import { WorkspaceTabs } from "../../../components/dashboard/module-tabs";
 import { SectionCard } from "../../../components/ui/section-card";
 import { WorkSurface } from "../../../components/ui/work-surface";
 import { useUrlFilters } from "../../../lib/hooks/use-url-filters";
+import { useTeacherAssignmentScope } from "../../../lib/hooks/use-teacher-assignment-scope";
 import { TablePagination } from "../../../components/ui/table-pagination";
 import { Drawer } from "../../../components/ui/drawer";
 import { Toast, type ToastTone } from "../../../components/ui/toast";
@@ -149,6 +150,7 @@ function HomeworkWorkspace() {
     sectionId: "",
     subjectId: "",
     teacherId: "",
+    mine: "",
     status: "",
     search: "",
     date: "",
@@ -165,13 +167,21 @@ function HomeworkWorkspace() {
   });
   const summary = summaryQuery.data;
 
-  const classesQuery = useQuery({ queryKey: ["classes"], queryFn: api.listClasses });
-  const sectionsQuery = useQuery({ queryKey: ["sections"], queryFn: api.listSections });
   const subjectsQuery = useQuery({
     queryKey: ["subjects", filters.classId],
     queryFn: () => api.listSubjects({ classId: filters.classId || undefined }),
   });
-  const staffQuery = useQuery({ queryKey: ["staff"], queryFn: api.listStaff });
+  // Class / section / subject options come from the shared assignment-scope
+  // resolver so a teacher is only ever offered their own (P0.4 / P1.6).
+  const assignmentScope = useTeacherAssignmentScope();
+  // The school-wide staff roster is only needed to populate the "All
+  // Teachers" filter, which teachers no longer get -- so they no longer
+  // request it either.
+  const staffQuery = useQuery({
+    queryKey: ["staff"],
+    queryFn: api.listStaff,
+    enabled: !assignmentScope.isScoped,
+  });
   const academicYearsQuery = useQuery({
     queryKey: ["academic-years"],
     queryFn: api.listAcademicYears,
@@ -193,6 +203,7 @@ function HomeworkWorkspace() {
       filters.sectionId,
       filters.subjectId,
       filters.teacherId,
+      filters.mine,
       filters.status,
       filters.search,
       useClientDateFilter ? "client-paged" : filters.page,
@@ -203,6 +214,7 @@ function HomeworkWorkspace() {
         sectionId: filters.sectionId || undefined,
         subjectId: filters.subjectId || undefined,
         teacherId: filters.teacherId || undefined,
+        mine: filters.mine === "1" ? true : undefined,
         status: filters.status || undefined,
         search: filters.search.trim() || undefined,
         sortBy: "assignedDate",
@@ -300,6 +312,7 @@ function HomeworkWorkspace() {
       filters.sectionId ||
       filters.subjectId ||
       filters.teacherId ||
+      filters.mine ||
       filters.status ||
       filters.search.trim() ||
       (activeTab === "all" && filters.date),
@@ -329,6 +342,7 @@ function HomeworkWorkspace() {
         sectionId: "",
         subjectId: "",
         teacherId: "",
+        mine: "",
         status: "",
         search: "",
         date: "",
@@ -528,14 +542,21 @@ function HomeworkWorkspace() {
             tone={Number(summary?.incompleteStudents) > 0 ? "warning" : "module"}
             description="Students with incomplete or missing homework due."
           />
-          <SummaryCard
-            label="Classes Without Homework"
-            value={summary?.classesWithoutHomework ?? "Unavailable"}
-            loading={summaryQuery.isLoading}
-            icon={<Users size={20} />}
-            tone={Number(summary?.classesWithoutHomework) > 0 ? "warning" : "module"}
-            description="Sections with no homework assigned today."
-          />
+          {/* "Classes Without Homework" as a warning implies every class must
+              receive homework every day -- no school policy in SchoolOS says
+              that, so for a teacher it is a standing reprimand they cannot
+              act on. It stays for administrators (who do plan coverage), in a
+              neutral tone, and is stated as an observation not a fault. */}
+          {assignmentScope.isScoped ? null : (
+            <SummaryCard
+              label="Sections With No Homework Today"
+              value={summary?.classesWithoutHomework ?? "Unavailable"}
+              loading={summaryQuery.isLoading}
+              icon={<Users size={20} />}
+              tone="module"
+              description="Sections with nothing assigned today. Not every section needs daily homework."
+            />
+          )}
         </SummaryGrid>
       </ModuleHeader>
 
@@ -578,8 +599,10 @@ function HomeworkWorkspace() {
                 }
                 aria-label="Filter by class"
               >
-                <option value="">All Classes</option>
-                {classesQuery.data?.map((c) => (
+                <option value="">
+                  {assignmentScope.isScoped ? "My classes" : "All Classes"}
+                </option>
+                {assignmentScope.classes.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
                   </option>
@@ -594,16 +617,17 @@ function HomeworkWorkspace() {
                 disabled={!filters.classId}
                 aria-label="Filter by section"
               >
-                <option value="">All Sections</option>
-                {sectionsQuery.data
-                  ?.filter(
-                    (s) => !filters.classId || s.classId === filters.classId,
-                  )
-                  .map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
+                <option value="">
+                  {assignmentScope.isScoped ? "My sections" : "All Sections"}
+                </option>
+                {(filters.classId
+                  ? assignmentScope.sectionsForClass(filters.classId)
+                  : assignmentScope.sections
+                ).map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
               </Select>
 
               <Select
@@ -613,28 +637,57 @@ function HomeworkWorkspace() {
                 }
                 aria-label="Filter by subject"
               >
-                <option value="">All Subjects</option>
-                {subjectsQuery.data?.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
+                <option value="">
+                  {assignmentScope.isScoped ? "My subjects" : "All Subjects"}
+                </option>
+                {(subjectsQuery.data ?? [])
+                  .filter(
+                    (s) =>
+                      !assignmentScope.isScoped ||
+                      assignmentScope.assignedSubjectIds.size === 0 ||
+                      assignmentScope.assignedSubjectIds.has(s.id),
+                  )
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
               </Select>
 
-              <Select
-                value={filters.teacherId}
-                onChange={(e) =>
-                  setFilters({ teacherId: e.target.value }, { resetPage: true })
-                }
-                aria-label="Filter by teacher"
-              >
-                <option value="">All Teachers</option>
-                {staffQuery.data?.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.firstName} {s.lastName}
-                  </option>
-                ))}
-              </Select>
+              {/* "All Teachers" is a school-wide selector. A teacher works on
+                  their own homework, so it is replaced by a self-scope toggle
+                  the backend resolves from the caller's own staff row (P1.6). */}
+              {assignmentScope.isScoped ? (
+                <label className="flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-slate-300"
+                    checked={filters.mine === "1"}
+                    onChange={(event) =>
+                      setFilters(
+                        { mine: event.target.checked ? "1" : "" },
+                        { resetPage: true },
+                      )
+                    }
+                  />
+                  Only homework I set
+                </label>
+              ) : (
+                <Select
+                  value={filters.teacherId}
+                  onChange={(e) =>
+                    setFilters({ teacherId: e.target.value }, { resetPage: true })
+                  }
+                  aria-label="Filter by teacher"
+                >
+                  <option value="">All Teachers</option>
+                  {staffQuery.data?.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.firstName} {s.lastName}
+                    </option>
+                  ))}
+                </Select>
+              )}
 
               <Select
                 value={filters.status}

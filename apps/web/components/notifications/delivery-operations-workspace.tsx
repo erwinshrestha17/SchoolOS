@@ -26,10 +26,12 @@ export function DeliveryOperationsWorkspace({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const { session } = useSession();
-  const permissions = new Set<PermissionKey>(session?.user.permissions ?? []);
-  const canView = permissions.has("notifications:view_delivery_diagnostics");
-  const canRetry = permissions.has("notifications:retry_deliveries");
+  const { session, hasPermissions } = useSession();
+  // Alias-aware, matching the guard: delivery diagnostics is also satisfied
+  // by `communications:read_deliveries`, and retry by
+  // `communications:retry_deliveries`.
+  const canView = hasPermissions(["notifications:view_delivery_diagnostics"]);
+  const canRetry = hasPermissions(["notifications:retry_deliveries"]);
   const view = (searchParams.get("view") ?? initialView) as "logs" | "failures";
   const page = positiveNumber(searchParams.get("page"), 1);
   const status = searchParams.get("status") ?? "";

@@ -119,23 +119,29 @@ export class ActivityFeedService {
       });
     }
 
-    if (
-      filters.status &&
-      filters.status !== ActivityPostStatus.APPROVED &&
-      !canManageAllActivity(actor)
-    ) {
-      throw new ForbiddenException(
-        'You do not have permission to filter posts by status',
-      );
-    }
+    // Authors may inspect their own non-approved posts (drafts, awaiting
+    // review, returned for correction); only moderators may see anyone
+    // else's. Previously any non-approved status filter threw outright, so a
+    // teacher could not reach their own drafts or pending posts at all --
+    // that ForbiddenException is the "permission filtering error" the
+    // Activity workspace surfaced.
+    const isModerator = canModerateActivity(actor);
+    const wantsNonApprovedStatus = Boolean(
+      filters.status && filters.status !== ActivityPostStatus.APPROVED,
+    );
+    const restrictToOwnPosts = wantsNonApprovedStatus && !isModerator;
 
     const posts = await this.prisma.activityPost.findMany({
       where: {
         tenantId: actor.tenantId,
         softDeletedAt: null,
+        // Non-moderators asking for a non-approved status only ever see rows
+        // they authored. This is an additional narrowing on top of the
+        // assignment-scoped visibility filter, never a widening.
+        ...(restrictToOwnPosts ? { createdById: actor.userId } : {}),
         status: filters.status
           ? (filters.status as ActivityPostStatus)
-          : canManageAllActivity(actor)
+          : isModerator
             ? {
                 in: [
                   ActivityPostStatus.APPROVED,
@@ -378,10 +384,26 @@ export class ActivityFeedService {
         id: postId,
         tenantId: actor.tenantId,
         softDeletedAt: null,
-        ...(canManageAllActivity(actor)
-          ? {}
-          : { status: ActivityPostStatus.APPROVED }),
-        ...visibilityFilter,
+        // Composed through a top-level AND rather than spreading: both
+        // `visibilityFilter` and the status clause use `OR`/`AND` keys, and
+        // object spread would silently drop whichever came first.
+        //
+        // Moderators see any status. Everyone else sees approved posts plus
+        // their own drafts / pending / returned-for-correction posts -- an
+        // author has to be able to reopen a post the moderator sent back.
+        AND: [
+          visibilityFilter,
+          ...(canModerateActivity(actor)
+            ? []
+            : [
+                {
+                  OR: [
+                    { status: ActivityPostStatus.APPROVED },
+                    { createdById: actor.userId },
+                  ],
+                },
+              ]),
+        ],
       },
       include: {
         class: true,
@@ -2472,6 +2494,22 @@ function isDatabaseErrorCode(error: unknown, code: string) {
 function canManageAllActivity(actor: AuthContext) {
   return actor.roles.some((role) =>
     ['platform_super_admin', 'admin', 'principal'].includes(role),
+  );
+}
+
+/**
+ * Whether this actor may see and act on *other people's* activity posts.
+ *
+ * Role names alone were not enough: a teacher delegated the activity-moderator
+ * capability holds `activity_feed:moderate` (the same permission the
+ * moderation write endpoints already require) but keeps the `teacher` role, so
+ * a role-name check locked them out of the very queue they are responsible
+ * for. Permission first, roles as the legacy fallback.
+ */
+function canModerateActivity(actor: AuthContext) {
+  return (
+    actor.permissions?.includes('activity_feed:moderate') ||
+    canManageAllActivity(actor)
   );
 }
 

@@ -1423,5 +1423,46 @@ describe('ActivityFeedService', () => {
         }),
       );
     });
+
+    // Previously any non-approved status filter threw
+    // "You do not have permission to filter posts by status" for a
+    // non-admin, so a teacher could not reach their own drafts, their own
+    // pending posts, or a post the moderator returned to them. That
+    // ForbiddenException is what the Activity workspace surfaced as a
+    // permission-filtering error.
+    it('lets an author filter to their own non-approved posts', async () => {
+      prisma.activityPost.findMany.mockResolvedValue([]);
+
+      await service.listPosts(actor, { status: 'DRAFT' });
+
+      const where = prisma.activityPost.findMany.mock.calls.at(-1)[0].where;
+      expect(where.status).toBe('DRAFT');
+      // Narrowed to the caller's own rows -- never widened.
+      expect(where.createdById).toBe('teacher-1');
+    });
+
+    it('does not narrow to own posts when asking for approved posts', async () => {
+      prisma.activityPost.findMany.mockResolvedValue([]);
+
+      await service.listPosts(actor, { status: 'APPROVED' });
+
+      const where = prisma.activityPost.findMany.mock.calls.at(-1)[0].where;
+      expect(where.createdById).toBeUndefined();
+    });
+
+    it('lets a delegated moderator see everyone pending posts', async () => {
+      prisma.activityPost.findMany.mockResolvedValue([]);
+      const moderator: AuthContext = {
+        ...actor,
+        permissions: [...actor.permissions, 'activity_feed:moderate'],
+      };
+
+      await service.listPosts(moderator, { status: 'PENDING_APPROVAL' });
+
+      const where = prisma.activityPost.findMany.mock.calls.at(-1)[0].where;
+      expect(where.status).toBe('PENDING_APPROVAL');
+      // A moderator reviews other people's work, so no author narrowing.
+      expect(where.createdById).toBeUndefined();
+    });
   });
 });

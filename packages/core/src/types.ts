@@ -581,16 +581,30 @@ export type CommunicationsProviderDiagnostics = {
   channels: CommunicationProviderDiagnosticChannel[];
 };
 
+/**
+ * Communications summary.
+ *
+ * The `delivery*` / `provider*` / school-wide counters describe the school's
+ * delivery infrastructure and are only populated for callers holding
+ * `notifications:view_delivery_diagnostics`. For everyone else -- teachers,
+ * students, support staff -- they are `null`, and the caller-scoped `my*`
+ * counters describe that person's own inbox instead. A `null` here means "not
+ * available to you", never "zero".
+ */
 export type CommunicationsSummary = {
   generatedAt: string;
   schoolDay: string;
-  sentToday: number;
-  scheduledNotices: number;
-  failedDeliveries: number;
-  unreadHighImpactNotices: number;
-  escalatedChatCount: number;
-  providerStatus: CommunicationProviderMode;
-  providerHealth: CommunicationProviderHealth;
+  /** Notices addressed to the caller that they have not read yet. */
+  myUnreadNotices: number;
+  /** Caller's own unread urgent/emergency notices. */
+  myUnreadHighImpactNotices: number;
+  sentToday: number | null;
+  scheduledNotices: number | null;
+  failedDeliveries: number | null;
+  unreadHighImpactNotices: number | null;
+  escalatedChatCount: number | null;
+  providerStatus: CommunicationProviderMode | null;
+  providerHealth: CommunicationProviderHealth | null;
 };
 
 export type CommunicationTemplateCategory =
@@ -1863,6 +1877,63 @@ export type StudentAttendanceHistoryFilters = {
 
 // ─── Compiled from types/attendance.ts ───
 
+/**
+ * Canonical attendance-session lifecycle (P0.11).
+ *
+ * Every attendance surface -- Overview, session history, Monthly Register,
+ * offline drafts, the conflict queue -- must render from this one
+ * backend-owned value rather than each re-deriving state from whichever
+ * subset of `submittedAt` / `lockAt` / `conflictStatus` it happens to have
+ * fetched. That re-derivation is what let the Overview report every session as
+ * "Draft" (its payload carried no `submittedAt` at all) while the register
+ * showed the same days fully marked.
+ *
+ * Ordering is the real progression: NOT_STARTED -> DRAFT -> SUBMITTED ->
+ * LOCKED, with CONFLICT as an orthogonal flag that outranks the rest because
+ * it is the state that needs a human.
+ */
+export type AttendanceSessionState =
+  | "NOT_STARTED"
+  | "DRAFT"
+  | "SUBMITTED"
+  | "LOCKED"
+  | "CONFLICT";
+
+export const ATTENDANCE_SESSION_STATE_LABELS: Record<
+  AttendanceSessionState,
+  string
+> = {
+  NOT_STARTED: "Not marked",
+  DRAFT: "Draft",
+  SUBMITTED: "Submitted",
+  LOCKED: "Locked",
+  CONFLICT: "Needs review",
+};
+
+/**
+ * The single derivation. Backend services call this when building a session
+ * payload; the web renders `state` and never recomputes it.
+ */
+export function resolveAttendanceSessionState(
+  session: {
+    submittedAt?: string | Date | null;
+    lockAt?: string | Date | null;
+    conflictStatus?: string | null;
+    hasRecords?: boolean;
+  },
+  now: Date = new Date(),
+): AttendanceSessionState {
+  if (session.conflictStatus === "FLAGGED") return "CONFLICT";
+
+  const lockAt = session.lockAt ? new Date(session.lockAt).getTime() : null;
+  const isLocked =
+    lockAt !== null && Number.isFinite(lockAt) && lockAt <= now.getTime();
+
+  if (session.submittedAt) return isLocked ? "LOCKED" : "SUBMITTED";
+  if (session.hasRecords) return "DRAFT";
+  return "NOT_STARTED";
+}
+
 export type AttendanceSummary = {
   sessionId: string;
   attendanceDate: string;
@@ -1926,6 +1997,9 @@ export type AttendanceAnalytics = {
   latestSessions: Array<
     AttendanceSummary & {
       conflictStatus: string;
+      /** Canonical backend-owned lifecycle state -- render this, not a
+       *  locally re-derived label. */
+      state: AttendanceSessionState;
       calendarDay?: AttendanceCalendarDayView;
     }
   >;

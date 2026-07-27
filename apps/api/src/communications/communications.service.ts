@@ -1264,6 +1264,44 @@ export class CommunicationsService {
   async getCommunicationsSummary(actor: AuthContext) {
     const day = getNepalSchoolDay();
     const now = new Date();
+
+    // Confirmed defect (P0.8): this endpoint is gated on the near-universal
+    // `notices:read`, yet returned tenant-wide delivery-infrastructure
+    // counters *and* provider health -- the very data the sibling
+    // /communications/provider-diagnostics route protects behind
+    // `notifications:view_delivery_diagnostics`. In particular
+    // `unreadHighImpactNotices` counts every user's unread urgent rows, so a
+    // teacher's "Unread High-Impact" tile showed the whole school's backlog
+    // rather than their own inbox.
+    //
+    // Delivery-operations fields are now resolved only for callers holding
+    // that permission; everyone else gets `null` (an explicit "not available
+    // to you", never a misleading 0) plus their own caller-scoped counts.
+    const canReadDeliveryOperations =
+      actor.permissions?.includes('notifications:view_delivery_diagnostics') ||
+      actor.permissions?.includes('communications:read_deliveries');
+
+    const [myUnreadNotices, myUnreadHighImpactNotices] = await Promise.all([
+      this.countUnreadNoticesForActor(actor, false),
+      this.countUnreadNoticesForActor(actor, true),
+    ]);
+
+    if (!canReadDeliveryOperations) {
+      return {
+        generatedAt: now.toISOString(),
+        schoolDay: day.gregorianDate,
+        myUnreadNotices,
+        myUnreadHighImpactNotices,
+        sentToday: null,
+        scheduledNotices: null,
+        failedDeliveries: null,
+        unreadHighImpactNotices: null,
+        escalatedChatCount: null,
+        providerStatus: null,
+        providerHealth: null,
+      };
+    }
+
     const [
       sentToday,
       scheduledNotices,
@@ -1342,6 +1380,8 @@ export class CommunicationsService {
     return {
       generatedAt: now.toISOString(),
       schoolDay: day.gregorianDate,
+      myUnreadNotices,
+      myUnreadHighImpactNotices,
       sentToday,
       scheduledNotices,
       failedDeliveries,
@@ -1350,6 +1390,39 @@ export class CommunicationsService {
       providerStatus: providerDiagnostics.overallMode,
       providerHealth: providerDiagnostics.health,
     };
+  }
+
+  /**
+   * Unread notice deliveries addressed to *this* caller. Same shape as the
+   * school-wide `unreadHighImpactNotices` query, but pinned to
+   * `recipientUserId = actor.userId`, so a teacher's inbox tile can never
+   * report other people's backlog.
+   */
+  private countUnreadNoticesForActor(
+    actor: AuthContext,
+    highImpactOnly: boolean,
+  ) {
+    return this.prisma.notificationDelivery.count({
+      where: {
+        tenantId: actor.tenantId,
+        recipientUserId: actor.userId,
+        notice: {
+          tenantId: actor.tenantId,
+          publishedAt: { not: null },
+          ...(highImpactOnly
+            ? {
+                priority: {
+                  in: [NoticePriority.URGENT, NoticePriority.EMERGENCY],
+                },
+              }
+            : {}),
+        },
+        readReceipts: { none: {} },
+        status: {
+          notIn: [NotificationStatus.CANCELLED, NotificationStatus.SKIPPED],
+        },
+      },
+    });
   }
 
   async getCommunicationProviderDiagnostics(actor: AuthContext) {

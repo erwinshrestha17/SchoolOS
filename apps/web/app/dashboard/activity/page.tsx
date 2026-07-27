@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import { activityCategoryValues, formatBsDateTime } from '@schoolos/core';
 import { api } from '../../../lib/api';
+import { TeacherCapability, useTeacherAccess } from '../../../lib/teacher-access';
+import { useTeacherAssignmentScope } from '../../../lib/hooks/use-teacher-assignment-scope';
 import { DashboardPageShell } from '../../../components/dashboard/dashboard-page-shell';
 import { ModuleHeader } from '../../../components/ui/module-header';
 import { WorkspaceTabs } from '../../../components/ui/module-tabs';
@@ -50,17 +52,20 @@ const activityStatuses = [
 
 export default function ActivityPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const { can } = useTeacherAccess();
+  const canModerate = can(TeacherCapability.ACTIVITY_MODERATE);
+  const assignmentScope = useTeacherAssignmentScope();
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({
     classId: '',
     sectionId: '',
     category: '',
-    status: '',
+    // Lets "My posts awaiting review" drill straight into the caller's own
+    // pending posts instead of a moderation queue they cannot open.
+    status: searchParams.get('status') ?? '',
     month: '',
   });
-
-  const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
-  const sectionsQuery = useQuery({ queryKey: ['sections'], queryFn: api.listSections });
   const postsQuery = useQuery({
     queryKey: ['activity-posts', filters, page],
     queryFn: () =>
@@ -75,17 +80,14 @@ export default function ActivityPage() {
       }),
   });
 
-  const classes = useMemo(() => classesQuery.data ?? [], [classesQuery.data]);
-  const sections = useMemo(() => sectionsQuery.data ?? [], [sectionsQuery.data]);
+  // Class/section filter options come from the shared assignment scope, so a
+  // teacher is never offered a class outside their own assignments (P0.4).
+  const classes = assignmentScope.classes;
+  const sections = assignmentScope.sections;
   const filteredSections = useMemo(
     () =>
-      sections.filter((section) => {
-        const sectionClassId =
-          (section as { classId?: string; class?: { id: string } }).classId ??
-          (section as { class?: { id: string } }).class?.id;
-        return !filters.classId || sectionClassId === filters.classId;
-      }),
-    [sections, filters.classId],
+      filters.classId ? assignmentScope.sectionsForClass(filters.classId) : sections,
+    [assignmentScope, filters.classId, sections],
   );
 
   const classNameById = useMemo(
@@ -131,11 +133,15 @@ export default function ActivityPage() {
           </Link>
         }
         moreActionItems={[
-          {
-            label: 'Review moderation queue',
-            icon: <ShieldAlert size={16} />,
-            onClick: () => router.push('/dashboard/activity/moderation'),
-          },
+          ...(canModerate
+            ? [
+                {
+                  label: 'Review moderation queue',
+                  icon: <ShieldAlert size={16} />,
+                  onClick: () => router.push('/dashboard/activity/moderation'),
+                },
+              ]
+            : []),
           {
             label: 'Open protected gallery',
             icon: <Images size={16} />,
@@ -152,22 +158,30 @@ export default function ActivityPage() {
           module="activity"
           moduleName="Activity Feed"
           cards={[
-            {
-              key: 'pendingReview',
-              label: 'Pending review',
-              description: 'Activity posts waiting in the moderation queue.',
-              href: '/dashboard/activity/moderation',
-              icon: <ShieldAlert />,
-              tone: 'warning',
-            },
-            {
-              key: 'consentIssues',
-              label: 'Consent attention',
-              description: 'Photo-consent records needing staff attention.',
-              href: '/dashboard/activity',
-              icon: <AlertTriangle />,
-              tone: 'warning',
-            },
+            // School-wide moderation and consent metrics belong to moderators.
+            // For an ordinary teacher they are neither actionable nor
+            // drillable, and "Pending review" counts other people's posts
+            // (P0.7).
+            ...(canModerate
+              ? ([
+                  {
+                    key: 'pendingReview',
+                    label: 'Pending review',
+                    description: 'Activity posts waiting in the moderation queue.',
+                    href: '/dashboard/activity/moderation',
+                    icon: <ShieldAlert />,
+                    tone: 'warning',
+                  },
+                  {
+                    key: 'consentIssues',
+                    label: 'Consent attention',
+                    description: 'Photo-consent records needing staff attention.',
+                    href: '/dashboard/activity',
+                    icon: <AlertTriangle />,
+                    tone: 'warning',
+                  },
+                ] as const)
+              : []),
             {
               key: 'failedUploads',
               label: 'Media processing failed',
@@ -179,8 +193,10 @@ export default function ActivityPage() {
             {
               key: 'myPostsAwaitingModeration',
               label: 'My posts awaiting review',
+              // Drills into the caller's own pending posts in the feed, not
+              // the school-wide moderation queue they cannot open.
               description: 'Your activity posts waiting for moderation.',
-              href: '/dashboard/activity/moderation',
+              href: '/dashboard/activity?status=PENDING_APPROVAL',
               icon: <ShieldAlert />,
               tone: 'warning',
             },
@@ -236,7 +252,7 @@ export default function ActivityPage() {
           value={filters.classId}
           onChange={(event) => updateFilter('classId', event.target.value)}
         >
-          <option value="">All classes</option>
+          <option value="">{assignmentScope.isScoped ? 'All my classes' : 'All classes'}</option>
           {classes.map((classroom) => (
             <option key={classroom.id} value={classroom.id}>
               {classroom.name}
@@ -247,7 +263,7 @@ export default function ActivityPage() {
           value={filters.sectionId}
           onChange={(event) => updateFilter('sectionId', event.target.value)}
         >
-          <option value="">All sections</option>
+          <option value="">{assignmentScope.isScoped ? 'All my sections' : 'All sections'}</option>
           {filteredSections.map((section) => (
             <option key={section.id} value={section.id}>
               {section.name}

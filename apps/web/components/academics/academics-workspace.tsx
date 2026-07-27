@@ -32,13 +32,23 @@ const sectionMap: Record<string, WorkflowStep> = {
 
 export function AcademicsWorkspace({ initialSection }: AcademicsWorkspaceProps) {
   const step = sectionMap[initialSection ?? ''] ?? 'Setup';
+  // Only the Setup step needs the school-wide staff roster, the subject
+  // catalogue, and the teacher-assignment map. Fetching them on every step
+  // meant a teacher opening Marks Entry issued three requests they have no
+  // use for -- and, before the backend fix, pulled every colleague's staff
+  // record along with them.
+  const isSetupStep = step === 'Setup';
 
   const academicYearsQuery = useQuery({ queryKey: ['academic-years'], queryFn: api.listAcademicYears });
   const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
   const sectionsQuery = useQuery({ queryKey: ['sections'], queryFn: api.listSections });
-  const staffQuery = useQuery({ queryKey: ['staff'], queryFn: api.listStaff });
+  const staffQuery = useQuery({ queryKey: ['staff'], queryFn: api.listStaff, enabled: isSetupStep });
   const subjectsQuery = useQuery({ queryKey: ['subjects'], queryFn: () => api.listSubjects() });
-  const assignmentsQuery = useQuery({ queryKey: ['teacher-assignments'], queryFn: api.listTeacherAssignments });
+  const assignmentsQuery = useQuery({
+    queryKey: ['teacher-assignments'],
+    queryFn: api.listTeacherAssignments,
+    enabled: isSetupStep,
+  });
   const examsQuery = useQuery({ queryKey: ['exam-terms'], queryFn: api.listExamTerms });
 
   if (step === 'Setup') {

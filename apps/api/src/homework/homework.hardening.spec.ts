@@ -15,7 +15,13 @@ import { AuditService } from '../audit/audit.service';
 import { CommunicationsService } from '../communications/communications.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { AuthContext } from '../auth/auth.types';
-import { createPrismaMock, PrismaMock } from '../../test/test-helpers';
+import {
+  createPrismaMock,
+  createTeacherScopeServiceForTests,
+  PrismaMock,
+  teacherAssignmentFixture,
+} from '../../test/test-helpers';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 import { getQueueToken } from '@nestjs/bullmq';
 
 describe('Homework Hardening', () => {
@@ -43,13 +49,25 @@ describe('Homework Hardening', () => {
     },
   };
 
+  // Mutable between tests: each authorization case pushes the canonical
+  // TeacherAssignment rows it wants the resolver to see.
+  let teacherAssignments: Array<Record<string, any>>;
+
   beforeEach(async () => {
     prisma = createPrismaMock();
+    teacherAssignments = [];
     prisma.__state.staff.push({
       id: 'staff-1',
       tenantId: 'tenant-a',
       userId: 'user-1',
     });
+    const scopeDeps = createTeacherScopeServiceForTests({
+      // Read through a getter so rows pushed inside a test are visible.
+      get assignments() {
+        return teacherAssignments;
+      },
+      staffId: 'teacher-1',
+    } as never);
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         HomeworkService,
@@ -70,6 +88,16 @@ describe('Homework Hardening', () => {
         {
           provide: getQueueToken('homework'),
           useValue: { add: jest.fn() },
+        },
+        {
+          // A real resolver over an in-memory assignment store, so these stay
+          // genuine authorization tests rather than asserting against a stub.
+          provide: TeacherScopeService,
+          useFactory: () =>
+            new TeacherScopeService(
+              scopeDeps.prisma as never,
+              scopeDeps.audit as never,
+            ),
         },
       ],
     }).compile();
@@ -197,8 +225,8 @@ describe('Homework Hardening', () => {
         userId: 'user-1',
       });
 
-      // No assignment for this subject
-      p.subjectTeacherAssignment.findFirst.mockResolvedValue(null);
+      // No canonical assignment for this subject: `teacherAssignments` is
+      // left empty, so the resolver finds nothing.
 
       await expect(
         homeworkService.createAssignment(
@@ -215,16 +243,10 @@ describe('Homework Hardening', () => {
         ),
       ).rejects.toThrow(); // Should throw ForbiddenException
 
-      expect(p.subjectTeacherAssignment.findFirst).toHaveBeenCalledWith({
-        where: {
-          tenantId: 'tenant-a',
-          academicYearId: 'year-1',
-          subjectId: 'sub-1',
-          staffId: 'teacher-1',
-          classId: 'class-1',
-          OR: [{ sectionId: 'section-1' }, { sectionId: null }],
-        },
-      });
+      // Authorization now resolves against the canonical TeacherAssignment
+      // table rather than the legacy SubjectTeacherAssignment query, so the
+      // legacy call is no longer made at all.
+      expect(p.subjectTeacherAssignment.findFirst).not.toHaveBeenCalled();
     });
 
     it('should allow a properly assigned subject teacher to create homework', async () => {
@@ -253,16 +275,15 @@ describe('Homework Hardening', () => {
         userId: 'user-1',
       });
 
-      // A real assignment exists for this exact class/section/subject.
-      p.subjectTeacherAssignment.findFirst.mockResolvedValue({
-        id: 'assignment-1',
-        tenantId: 'tenant-a',
-        academicYearId: 'year-1',
-        classId: 'class-1',
-        sectionId: 'section-1',
-        subjectId: 'sub-1',
-        staffId: 'teacher-1',
-      });
+      // A real canonical assignment for this exact class/section/subject.
+      teacherAssignments.push(
+        teacherAssignmentFixture({
+          assignmentType: 'SUBJECT_TEACHER',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: 'sub-1',
+        }),
+      );
 
       const result = (await homeworkService.createAssignment(
         {
@@ -278,16 +299,10 @@ describe('Homework Hardening', () => {
       )) as any;
 
       expect(result.id).toBeDefined();
-      expect(p.subjectTeacherAssignment.findFirst).toHaveBeenCalledWith({
-        where: {
-          tenantId: 'tenant-a',
-          academicYearId: 'year-1',
-          subjectId: 'sub-1',
-          staffId: 'teacher-1',
-          classId: 'class-1',
-          OR: [{ sectionId: 'section-1' }, { sectionId: null }],
-        },
-      });
+      // Authorization now resolves against the canonical TeacherAssignment
+      // table rather than the legacy SubjectTeacherAssignment query, so the
+      // legacy call is no longer made at all.
+      expect(p.subjectTeacherAssignment.findFirst).not.toHaveBeenCalled();
     });
 
     it('allows a homeroom class teacher with no subject assignment to create homework for their own section', async () => {
@@ -322,12 +337,15 @@ describe('Homework Hardening', () => {
       });
 
       // No subject assignment for this teacher...
-      p.subjectTeacherAssignment.findFirst.mockResolvedValue(null);
-      // ...but they are the section's homeroom class teacher.
-      p.section.findFirst.mockResolvedValue({
-        id: 'section-1',
-        classTeacherId: 'teacher-1',
-      });
+      // ...but they hold the section's canonical CLASS_TEACHER assignment.
+      teacherAssignments.push(
+        teacherAssignmentFixture({
+          assignmentType: 'CLASS_TEACHER',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: null,
+        }),
+      );
 
       const result = (await homeworkService.createAssignment(
         {
@@ -343,14 +361,14 @@ describe('Homework Hardening', () => {
       )) as any;
 
       expect(result.id).toBeDefined();
-      expect(p.section.findFirst).toHaveBeenCalledWith({
-        where: {
-          tenantId: 'tenant-a',
-          id: 'section-1',
-          classTeacherId: 'teacher-1',
-        },
-        select: { id: true },
-      });
+      // Homeroom authority is now resolved from the canonical
+      // TeacherAssignment table, so the legacy Section.classTeacherId lookup
+      // is no longer performed.
+      expect(p.section.findFirst).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ classTeacherId: 'teacher-1' }),
+        }),
+      );
     });
 
     it('denies a class teacher of Section A from creating homework for Section B in the same class', async () => {
@@ -402,14 +420,13 @@ describe('Homework Hardening', () => {
         ),
       ).rejects.toThrow(ForbiddenException);
 
-      expect(p.section.findFirst).toHaveBeenCalledWith({
-        where: {
-          tenantId: 'tenant-a',
-          id: 'section-b',
-          classTeacherId: 'teacher-1',
-        },
-        select: { id: true },
-      });
+      // Section scoping is now enforced by the assignment row's own
+      // sectionId, not a Section.classTeacherId lookup.
+      expect(p.section.findFirst).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ classTeacherId: 'teacher-1' }),
+        }),
+      );
     });
 
     it('denies the class-teacher fallback across tenants even with a matching section id', async () => {
@@ -462,14 +479,12 @@ describe('Homework Hardening', () => {
         ),
       ).rejects.toThrow(ForbiddenException);
 
-      expect(p.section.findFirst).toHaveBeenCalledWith({
-        where: {
-          tenantId: 'tenant-a',
-          id: 'section-shared-id',
-          classTeacherId: 'teacher-1',
-        },
-        select: { id: true },
-      });
+      // Tenant scoping is enforced on the assignment query itself.
+      expect(p.section.findFirst).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ classTeacherId: 'teacher-1' }),
+        }),
+      );
     });
 
     it('should let an admin create homework for any class without an assignment check', async () => {
@@ -571,6 +586,49 @@ describe('Homework Hardening', () => {
         homeworkService.listTeacherMobileHomeworkScopes(actor),
       ).rejects.toThrow();
       expect(p.subjectTeacherAssignment.findMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Teacher "my homework only" self-scope', () => {
+    it('resolves `mine` from the caller own staff row, never a client id', async () => {
+      const p = prisma as any;
+      p.staff.findFirst.mockResolvedValue({
+        id: 'staff-me',
+        tenantId: 'tenant-a',
+        userId: 'user-1',
+      });
+      p.subjectTeacherAssignment.findMany.mockResolvedValue([
+        { classId: 'class-1', sectionId: 'section-1', subjectId: 'sub-1' },
+      ]);
+      p.section.findMany.mockResolvedValue([]);
+      p.homeworkAssignment.findMany.mockResolvedValue([]);
+      p.homeworkAssignment.count.mockResolvedValue(0);
+
+      // A teacher trying to point the filter at a colleague still only ever
+      // gets their own rows back, because `mine` is resolved server-side.
+      await homeworkService.listAssignments(actor, {
+        mine: true,
+        teacherId: 'staff-someone-else',
+      });
+
+      const where = p.homeworkAssignment.findMany.mock.calls.at(-1)[0].where;
+      expect(where.AND).toEqual(
+        expect.arrayContaining([{ assignedByStaffId: 'staff-me' }]),
+      );
+      // The client-supplied teacherId is an additional narrowing on top of
+      // the assignment scope, so it can never widen the result.
+      expect(where.assignedByStaffId).toBe('staff-someone-else');
+    });
+
+    it('returns nothing rather than everything when the caller has no staff row', async () => {
+      const p = prisma as any;
+      p.staff.findFirst.mockResolvedValue(null);
+
+      await expect(
+        homeworkService.listAssignments(actor, { mine: true }),
+      ).resolves.toEqual(emptyAssignmentPage);
+
+      expect(p.homeworkAssignment.findMany).not.toHaveBeenCalled();
     });
   });
 

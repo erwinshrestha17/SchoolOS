@@ -10,6 +10,7 @@ import { cn } from '../../lib/utils';
 import { schoolSettingsApi } from '../../lib/api/school-settings';
 import { useEntitlements } from '../entitlements-provider';
 import { useSession } from '../session-provider';
+import { TeacherCapability, useTeacherAccess } from '../../lib/teacher-access';
 import { Drawer } from '../ui/drawer';
 import { SearchInput } from '../ui/search-input';
 import { SettingsControlCenter } from './settings-control-center';
@@ -86,7 +87,15 @@ export function SettingsRouteFrame({ children }: { children: ReactNode }) {
     () => session?.user.permissions ?? [],
     [session?.user.permissions],
   );
-  const mayLoadSchoolSettings = canRequestSchoolSettings(permissions);
+  // A teacher holds settings:read, classes:read, attendance:read and
+  // academic_years:read, so canRequestSchoolSettings() alone would render the
+  // whole school-configuration navigation around their personal pages (P0.10).
+  // Personal-only teachers get a My Account frame instead, and never issue the
+  // school-settings navigation request at all.
+  const { isRestricted } = useTeacherAccess();
+  const personalOnly = isRestricted(TeacherCapability.SCHOOL_SETTINGS_ADMIN);
+  const mayLoadSchoolSettings =
+    !personalOnly && canRequestSchoolSettings(permissions);
 
   const navigationQuery = useQuery({
     queryKey: ['school-settings', 'navigation'],
@@ -103,6 +112,12 @@ export function SettingsRouteFrame({ children }: { children: ReactNode }) {
   const visibleItems = useMemo(() => {
     const grantedPermissions = new Set<string>(permissions);
     return SETTINGS_NAVIGATION.flatMap((definition) => {
+      // School and platform configuration is not a teacher's job. Filtering
+      // here (rather than only in the route guard) keeps the settings hub,
+      // its search, and its drawer consistent with what the guard allows.
+      if (personalOnly && definition.scope !== 'personal') {
+        return [];
+      }
       if (definition.requiredModule && !hasModule(definition.requiredModule)) {
         return [];
       }
@@ -120,7 +135,7 @@ export function SettingsRouteFrame({ children }: { children: ReactNode }) {
       }
       return [definition];
     });
-  }, [backendItemsById, hasModule, permissions]);
+  }, [backendItemsById, hasModule, permissions, personalOnly]);
 
   const filteredItems = useMemo(
     () =>
@@ -186,10 +201,12 @@ export function SettingsRouteFrame({ children }: { children: ReactNode }) {
         <div className="mx-auto flex max-w-[1560px] flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
-              Settings
+              {personalOnly ? 'My Account' : 'Settings'}
             </h1>
             <p className="mt-1 text-sm leading-6 text-slate-600">
-              Manage your personal preferences and school configuration.
+              {personalOnly
+                ? 'Manage your profile, sign-in security, and notification preferences.'
+                : 'Manage your personal preferences and school configuration.'}
             </p>
           </div>
           <div className="flex w-full items-center gap-2 lg:max-w-md">
@@ -251,7 +268,7 @@ export function SettingsRouteFrame({ children }: { children: ReactNode }) {
         isOpen={navigationOpen}
         onClose={() => setNavigationOpen(false)}
         title="Settings"
-        description="Choose a personal or school setting."
+        description={personalOnly ? 'Choose a personal setting.' : 'Choose a personal or school setting.'}
         width="sm"
         returnFocusRef={browseButtonRef}
       >

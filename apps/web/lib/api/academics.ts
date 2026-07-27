@@ -157,6 +157,8 @@ export type HomeworkListParams = {
   academicYearId?: string;
   subjectId?: string;
   teacherId?: string;
+  /** "My homework only" -- resolved to the caller's own staff row server-side. */
+  mine?: boolean;
   status?: string;
   search?: string;
   dueFrom?: string;

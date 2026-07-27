@@ -45,7 +45,9 @@ export function NoticesWorkspace({
     enabled: variant === 'overview',
   });
   const summary = summaryQuery.data;
-  const summaryValue = (value: number | undefined) =>
+  // `null` from the backend means "not available to you", so it reads as
+  // Unavailable rather than a misleading 0 -- same rule as an errored fetch.
+  const summaryValue = (value: number | null | undefined) =>
     summaryQuery.isError ? 'Unavailable' : (value ?? 'Unavailable');
 
   return (
@@ -96,42 +98,53 @@ export function NoticesWorkspace({
 
       {variant === 'overview' ? (
         <SummaryGrid>
+          {/* Always the caller's own inbox, never the school's backlog. */}
           <SummaryCard
-            label="Sent Today"
+            label="My Unread Notices"
             loading={summaryQuery.isLoading}
-            value={summaryValue(summary?.sentToday)}
-            icon={<Send size={20} />}
-            tone="module"
-            description="Notices sent in the current Nepal school day."
-          />
-          <SummaryCard
-            label="Scheduled"
-            loading={summaryQuery.isLoading}
-            value={summaryValue(summary?.scheduledNotices)}
-            icon={<Clock3 size={20} />}
-            tone={(summary?.scheduledNotices ?? 0) > 0 ? 'info' : 'module'}
-            description="Notices waiting for their scheduled send time."
-          />
-          <SummaryCard
-            label="Failed Deliveries"
-            loading={summaryQuery.isLoading}
-            value={summaryValue(summary?.failedDeliveries)}
-            icon={<AlertTriangle size={20} />}
-            tone={(summary?.failedDeliveries ?? 0) > 0 ? 'danger' : 'module'}
-            description="Failed or retry-pending delivery records."
-          />
-          <SummaryCard
-            label="Unread High-Impact"
-            loading={summaryQuery.isLoading}
-            value={summaryValue(summary?.unreadHighImpactNotices)}
+            value={summaryValue(summary?.myUnreadNotices)}
             icon={<Mail size={20} />}
+            tone={(summary?.myUnreadNotices ?? 0) > 0 ? 'info' : 'module'}
+            description="Published notices addressed to you that you have not opened."
+          />
+          <SummaryCard
+            label="My Urgent Unread"
+            loading={summaryQuery.isLoading}
+            value={summaryValue(summary?.myUnreadHighImpactNotices)}
+            icon={<AlertTriangle size={20} />}
             tone={
-              (summary?.unreadHighImpactNotices ?? 0) > 0
+              (summary?.myUnreadHighImpactNotices ?? 0) > 0
                 ? 'warning'
                 : 'module'
             }
-            description="Unread urgent or emergency delivery rows."
+            description="Your unread urgent or emergency notices."
           />
+          {/* School-wide delivery operations. The backend returns null for
+              these unless the caller holds delivery diagnostics, so an
+              ordinary teacher never sees the school's send/failure counters
+              (P0.8). Kept to the two actionable, drillable ones so the row
+              stays within the four-card KPI budget; the full send history
+              lives in Delivery Logs. */}
+          {canReadDeliveries ? (
+            <SummaryCard
+              label="Scheduled"
+              loading={summaryQuery.isLoading}
+              value={summaryValue(summary?.scheduledNotices)}
+              icon={<Clock3 size={20} />}
+              tone={(summary?.scheduledNotices ?? 0) > 0 ? 'info' : 'module'}
+              description="Notices waiting for their scheduled send time."
+            />
+          ) : null}
+          {canReadDeliveries ? (
+            <SummaryCard
+              label="Failed Deliveries"
+              loading={summaryQuery.isLoading}
+              value={summaryValue(summary?.failedDeliveries)}
+              icon={<Send size={20} />}
+              tone={(summary?.failedDeliveries ?? 0) > 0 ? 'danger' : 'module'}
+              description="Failed or retry-pending delivery records."
+            />
+          ) : null}
         </SummaryGrid>
       ) : null}
 

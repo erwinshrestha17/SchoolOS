@@ -7,10 +7,15 @@ import { TeacherTodayService } from './teacher-today.service';
 import { TeacherTodayController } from './teacher-today.controller';
 import { TeacherStudentsService } from './teacher-students.service';
 import { TeacherStudentsController } from './teacher-students.controller';
+import { TeacherScheduleController } from './teacher-schedule.controller';
 
 @Module({
   imports: [PrismaModule, AttendanceModule, HomeworkModule, TimetableModule],
-  controllers: [TeacherTodayController, TeacherStudentsController],
+  controllers: [
+    TeacherTodayController,
+    TeacherStudentsController,
+    TeacherScheduleController,
+  ],
   providers: [TeacherTodayService, TeacherStudentsService],
   exports: [TeacherTodayService, TeacherStudentsService],
 })

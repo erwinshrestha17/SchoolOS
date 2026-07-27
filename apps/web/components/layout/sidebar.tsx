@@ -39,6 +39,7 @@ import { api } from '../../lib/api';
 import { useEntitlements } from '../entitlements-provider';
 import { useSession } from '../session-provider';
 import { hasAnyPermission } from '../../lib/session';
+import { TeacherCapability, useTeacherAccess } from '../../lib/teacher-access';
 import { cn } from '../../lib/utils';
 
 export type NavItem = {
@@ -303,23 +304,32 @@ export const dashboardNavGroups: NavGroup[] = [
 ];
 
 /**
- * Teacher-persona navigation (Teacher Persona spec section 14). Every entry
- * points at a real, working destination -- no administrative labels
+ * Teacher-persona navigation (Teacher Persona spec section 14, P0.2). Every
+ * entry points at a real, working destination -- no administrative labels
  * ("Admissions", "HR & Payroll"), no selector that would load unrestricted
- * school-wide data, and nothing that 403s on click. A few items from the
- * spec's illustrative tree (My Homeroom, My Subjects as separate pages,
- * Class Reports, and per-tab deep links into My Workspace) don't have a
- * dedicated route yet and are intentionally left out rather than linked to a
- * page that doesn't back them -- see the Stage 3 report for what's deferred.
+ * school-wide data, and nothing that 403s on click.
+ *
+ * Delegated administrative entries are NOT listed here. They are appended by
+ * `buildTeacherNavGroups` from the capabilities the session actually holds,
+ * so an exam-coordinator or activity-moderator teacher gains exactly the
+ * extra entry their delegation covers and ordinary teachers gain none.
  */
 export const teacherNavGroups: NavGroup[] = [
   {
-    label: 'Home',
+    label: 'Today',
     icon: LayoutDashboard,
-    items: [{ href: '/dashboard', label: 'Home', icon: LayoutDashboard }],
+    items: [
+      { href: '/dashboard', label: 'Home', icon: LayoutDashboard },
+      {
+        href: '/dashboard/timetable',
+        label: 'My Schedule',
+        icon: CalendarDays,
+        permissions: ['timetable:read'],
+      },
+    ],
   },
   {
-    label: 'My Teaching',
+    label: 'Teaching',
     icon: GraduationCap,
     items: [
       {
@@ -328,18 +338,6 @@ export const teacherNavGroups: NavGroup[] = [
         icon: Users,
         permissions: ['students:read'],
       },
-      {
-        href: '/dashboard/timetable',
-        label: 'Timetable',
-        icon: CalendarDays,
-        permissions: ['timetable:read'],
-      },
-    ],
-  },
-  {
-    label: 'Teaching',
-    icon: CalendarCheck,
-    items: [
       {
         href: '/dashboard/attendance',
         label: 'Attendance',
@@ -353,10 +351,13 @@ export const teacherNavGroups: NavGroup[] = [
         permissions: ['homework:read'],
       },
       {
-        href: '/dashboard/academics/exams',
+        // Marks Entry, not the exam-term administration workspace: ordinary
+        // teachers must never land on Create Exam Term (P0.6).
+        href: '/dashboard/academics/marks',
         label: 'Assessments & Marks',
         icon: FileCheck2,
         permissions: ['academics:read', 'academics:enter_marks'],
+        activeWhen: ['/dashboard/academics'],
       },
       {
         href: '/dashboard/activity',
@@ -366,26 +367,37 @@ export const teacherNavGroups: NavGroup[] = [
       },
       {
         href: '/dashboard/notices',
-        label: 'Communication',
+        label: 'Messages & Announcements',
         icon: MessageSquare,
         permissions: ['notices:read'],
       },
     ],
   },
   {
-    label: 'My Workspace',
+    // Single-item groups render without a header by design (see
+    // SidebarContent below), so Library currently reads as the last Teaching
+    // entry. That is intentional -- the header appears on its own once a
+    // second resource destination (e.g. Teaching Resources) exists. Nothing
+    // is linked here that does not have a real route behind it.
+    label: 'Resources',
+    icon: BookOpen,
+    items: [
+      {
+        href: '/dashboard/library',
+        label: 'Library',
+        icon: BookOpen,
+        permissions: ['library:books:read', 'library:issues:read'],
+      },
+    ],
+  },
+  {
+    label: 'My Account',
     icon: BriefcaseBusiness,
     items: [
       {
         href: '/dashboard/my-workspace',
         label: 'My Workspace',
         icon: BriefcaseBusiness,
-      },
-      {
-        href: '/dashboard/library',
-        label: 'Library',
-        icon: BookOpen,
-        permissions: ['library:books:read', 'library:issues:read'],
       },
       {
         href: '/dashboard/settings/personal/profile',
@@ -405,6 +417,92 @@ export const teacherNavGroups: NavGroup[] = [
     ],
   },
 ];
+
+/**
+ * Extra navigation a teacher earns through a delegated capability, keyed by
+ * the capability that unlocks it. Nothing here is visible to an ordinary
+ * teacher, and each destination is additionally guarded by the same
+ * capability in the route layer -- the nav entry cannot be the only gate.
+ */
+const DELEGATED_TEACHER_NAV: Array<{
+  capability: TeacherCapability;
+  group: string;
+  item: NavItem;
+}> = [
+  {
+    capability: TeacherCapability.TIMETABLE_ADMIN,
+    group: 'Coordination',
+    item: {
+      href: '/dashboard/timetable/builder',
+      label: 'Timetable Builder',
+      icon: LayoutDashboard,
+      permissions: ['timetable:manage'],
+    },
+  },
+  {
+    capability: TeacherCapability.SUBSTITUTION_ADMIN,
+    group: 'Coordination',
+    item: {
+      href: '/dashboard/timetable/substitutions',
+      label: 'Substitutions',
+      icon: CalendarDays,
+      permissions: ['timetable:substitute'],
+    },
+  },
+  {
+    capability: TeacherCapability.EXAM_TERM_ADMIN,
+    group: 'Coordination',
+    item: {
+      href: '/dashboard/academics/exam-terms',
+      label: 'Exam Terms',
+      icon: FileCheck2,
+      permissions: ['exam-terms:manage'],
+    },
+  },
+  {
+    capability: TeacherCapability.ACTIVITY_MODERATE,
+    group: 'Coordination',
+    item: {
+      href: '/dashboard/activity/moderation',
+      label: 'Activity Moderation',
+      icon: ShieldCheck,
+      permissions: ['activity_feed:moderate'],
+    },
+  },
+  {
+    capability: TeacherCapability.LIBRARY_ADMIN,
+    group: 'Coordination',
+    item: {
+      href: '/dashboard/library/catalog',
+      label: 'Library Desk',
+      icon: BookOpen,
+      permissions: ['library:manage'],
+    },
+  },
+];
+
+/**
+ * Builds the teacher tree: the base persona nav plus exactly the delegated
+ * entries this session's capabilities unlock.
+ */
+export function buildTeacherNavGroups(
+  capabilities: ReadonlySet<TeacherCapability>,
+): NavGroup[] {
+  const delegated = DELEGATED_TEACHER_NAV.filter((entry) =>
+    capabilities.has(entry.capability),
+  );
+
+  if (delegated.length === 0) return teacherNavGroups;
+
+  return [
+    ...teacherNavGroups,
+    {
+      label: 'Coordination',
+      icon: ShieldCheck,
+      items: delegated.map((entry) => entry.item),
+    },
+  ];
+}
 
 export const settingsNavItem: NavItem = {
   href: '/dashboard/settings',
@@ -446,14 +544,10 @@ export function Sidebar({
   );
 
   // Class/Subject Teachers get the assignment-scoped nav tree in place of the
-  // administrative one, matching the same persona carve-out used for the
-  // Home/Today dashboard (app/dashboard/page.tsx) and attendance
-  // (attendance-m2-workspaces.tsx) -- admins/principals keep the full nav
-  // even if they also hold a teaching role.
-  const isTeacherPersona = Boolean(
-    session?.user.roles.some((role) => ['teacher', 'subject_teacher'].includes(role)) &&
-      !session.user.roles.some((role) => ['admin', 'principal'].includes(role)),
-  );
+  // administrative one. Persona and delegated capabilities both come from the
+  // one shared resolver so nav, route guards, and tab strips can never
+  // disagree about what this teacher may reach.
+  const { isTeacherPersona, capabilities } = useTeacherAccess();
 
   const visibleGroups = dashboardNavGroups
     .map((group) => ({
@@ -468,12 +562,16 @@ export function Sidebar({
     }))
     .filter((group) => group.items.length > 0);
 
-  const teacherVisibleGroups = teacherNavGroups
+  const teacherVisibleGroups = buildTeacherNavGroups(capabilities)
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) =>
-        canDisplayNavItem(item, session, hasModule),
-      ),
+      items: group.items
+        .filter((item) => canDisplayNavItem(item, session, hasModule))
+        .map((item) =>
+          item.href === '/dashboard/notices'
+            ? { ...item, badge: unreadNoticesBadge }
+            : item,
+        ),
     }))
     .filter((group) => group.items.length > 0);
 
