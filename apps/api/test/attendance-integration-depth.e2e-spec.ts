@@ -5,7 +5,10 @@ import { AttendanceService } from '../src/attendance/attendance.service';
 import { CommunicationsService } from '../src/communications/communications.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { SettingsService } from '../src/settings/settings.service';
-import { createAuthContextMock } from './test-helpers';
+import {
+  createAuthContextMock,
+  createPermissiveTeacherScope,
+} from './test-helpers';
 
 describe('Attendance report integration depth', () => {
   it('builds monthly register rows and CSV from backend records', async () => {
@@ -17,6 +20,7 @@ describe('Attendance report integration depth', () => {
       {
         getSetting: jest.fn().mockResolvedValue(true),
       } as unknown as SettingsService,
+      createPermissiveTeacherScope() as never,
     );
     const actor = createAuthContextMock({
       tenantId: 'tenant-attendance-depth',

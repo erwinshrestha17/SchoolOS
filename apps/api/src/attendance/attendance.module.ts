@@ -15,6 +15,7 @@ import { StaffLeaveQueueService } from './staff-leave-queue.service';
 import { StaffSelfServiceController } from './staff-self-service.controller';
 import { StaffSelfServiceService } from './staff-self-service.service';
 import { StaffTimeClockService } from './staff-time-clock.service';
+import { TeacherScopeModule } from '../teacher-scope/teacher-scope.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { StaffTimeClockService } from './staff-time-clock.service';
     CommunicationsModule,
     SettingsModule,
     FileRegistryModule,
+    TeacherScopeModule,
   ],
   controllers: [
     AttendanceController,

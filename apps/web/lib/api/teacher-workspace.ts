@@ -96,9 +96,107 @@ export interface TeacherSchedule {
   substitutions: TeacherTodaySubstitution[];
 }
 
+/**
+ * One entry in the teacher's own assignment context. Subject assignments
+ * carry academic write access; homerooms carry cross-subject read plus
+ * homeroom-record write.
+ */
+export interface TeacherAssignmentContextEntry {
+  assignmentId: string;
+  assignmentType:
+    | 'CLASS_TEACHER'
+    | 'SUBJECT_TEACHER'
+    | 'ASSISTANT_TEACHER'
+    | 'SUBSTITUTE_TEACHER'
+    | 'EXAM_INVIGILATOR'
+    | 'COORDINATOR';
+  academicYearId: string;
+  classId: string;
+  className: string;
+  sectionId: string;
+  sectionName: string | null;
+  subjectId: string | null;
+  subjectName: string | null;
+  isPrimary: boolean;
+  effectiveFrom: string;
+  effectiveUntil: string | null;
+  /** True for a time-bounded substitution. */
+  isTemporary: boolean;
+}
+
+export interface TeacherAssignmentContext {
+  hasAnyAssignment: boolean;
+  subjectAssignments: TeacherAssignmentContextEntry[];
+  homerooms: TeacherAssignmentContextEntry[];
+}
+
+export interface HomeroomSummarySubjectCoverage {
+  subjectId: string;
+  subjectName: string;
+  subjectCode: string;
+  reportedMarkCount: number;
+  expectedStudentCount: number;
+  hasAnyReportedMarks: boolean;
+}
+
+export interface HomeroomAcademicSummary {
+  generatedAt: string;
+  academicYearId: string;
+  classId: string;
+  sectionId: string;
+  studentCount: number;
+  subjectCoverage: HomeroomSummarySubjectCoverage[];
+  subjectsWithNoMarks: string[];
+  homework: Array<{
+    id: string;
+    title: string;
+    dueDate: string;
+    status: string;
+    subjectId: string;
+    subjectName: string | null;
+    setByStaffId: string | null;
+    setBy: string | null;
+    submissionCount: number;
+    /** Only homework the caller authored is theirs to edit. */
+    isMine: boolean;
+  }>;
+  students: Array<{
+    studentId: string;
+    studentSystemId: string;
+    fullNameEn: string;
+    rollNumber: number | null;
+    attendancePercent: number | null;
+    absencesInWindow: number;
+    needsAttendanceFollowUp: boolean;
+  }>;
+  studentsNeedingFollowUp: number;
+}
+
+export interface TeacherHomeroom {
+  assignmentId: string;
+  academicYearId: string;
+  classId: string;
+  sectionId: string;
+  className: string;
+  sectionName: string | null;
+  studentCount: number;
+}
+
 export const teacherWorkspaceApi = {
   getTeacherToday: (date?: string) =>
     request<TeacherTodaySummary>(withQuery('/teacher-workspace/today', { date })),
+  getMyAssignmentContext: () =>
+    request<TeacherAssignmentContext>('/teacher-workspace/assignments'),
+  getMyHomerooms: () =>
+    request<TeacherHomeroom[]>('/teacher-workspace/homeroom'),
+  getHomeroomAcademicSummary: (params: {
+    classId: string;
+    sectionId: string;
+    academicYearId?: string;
+  }) =>
+    request<HomeroomAcademicSummary>(
+      withQuery('/teacher-workspace/homeroom/academic-summary', params),
+    ),
   getTeacherSchedule: (params: {
     date?: string;
     weekStart?: string;

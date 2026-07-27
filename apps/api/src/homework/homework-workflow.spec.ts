@@ -12,7 +12,10 @@ import {
 } from '@prisma/client';
 import { HomeworkService } from './homework.service';
 import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
-import { createTeacherScopeServiceForTests } from '../../test/test-helpers';
+import {
+  createTeacherScopeServiceForTests,
+  teacherAssignmentFixture,
+} from '../../test/test-helpers';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CommunicationsService } from '../communications/communications.service';
@@ -161,10 +164,33 @@ describe('Homework Workflow', () => {
           useValue: { add: jest.fn() },
         },
         {
-          // These specs cover workflow/reminder behaviour, not authorization.
+          // These specs cover workflow/reminder behaviour, not authorization,
+          // so the actor is given the real subject assignment their fixtures
+          // assume. Authorization itself is covered exhaustively in
+          // teacher-scope.service.spec.ts and homework.hardening.spec.ts.
           provide: TeacherScopeService,
           useFactory: () => {
-            const deps = createTeacherScopeServiceForTests({ assignments: [] });
+            const deps = createTeacherScopeServiceForTests({
+              staffId: 'staff-1',
+              assignments: [
+                teacherAssignmentFixture({
+                  tenantId: 'tenant-1',
+                  staffId: 'staff-1',
+                  assignmentType: 'SUBJECT_TEACHER',
+                  classId: 'class-1',
+                  sectionId: 'section-1',
+                  subjectId: 'sub-1',
+                }),
+                teacherAssignmentFixture({
+                  tenantId: 'tenant-1',
+                  staffId: 'staff-1',
+                  assignmentType: 'CLASS_TEACHER',
+                  classId: 'class-1',
+                  sectionId: 'section-1',
+                  subjectId: null,
+                }),
+              ],
+            });
             return new TeacherScopeService(
               deps.prisma as never,
               deps.audit as never,

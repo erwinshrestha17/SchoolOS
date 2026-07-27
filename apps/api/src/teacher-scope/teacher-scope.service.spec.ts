@@ -94,10 +94,34 @@ function assignment(
 }
 
 const RAMESH_ASSIGNMENTS: FakeAssignment[] = [
-  assignment('a-ct-1a', TeacherAssignmentType.CLASS_TEACHER, CLASS_1, SECTION_1A, null),
-  assignment('a-mth-1a', TeacherAssignmentType.SUBJECT_TEACHER, CLASS_1, SECTION_1A, MATHS),
-  assignment('a-mth-2a', TeacherAssignmentType.SUBJECT_TEACHER, CLASS_2, SECTION_2A, MATHS),
-  assignment('a-sci-3b', TeacherAssignmentType.SUBJECT_TEACHER, CLASS_3, SECTION_3B, SCIENCE),
+  assignment(
+    'a-ct-1a',
+    TeacherAssignmentType.CLASS_TEACHER,
+    CLASS_1,
+    SECTION_1A,
+    null,
+  ),
+  assignment(
+    'a-mth-1a',
+    TeacherAssignmentType.SUBJECT_TEACHER,
+    CLASS_1,
+    SECTION_1A,
+    MATHS,
+  ),
+  assignment(
+    'a-mth-2a',
+    TeacherAssignmentType.SUBJECT_TEACHER,
+    CLASS_2,
+    SECTION_2A,
+    MATHS,
+  ),
+  assignment(
+    'a-sci-3b',
+    TeacherAssignmentType.SUBJECT_TEACHER,
+    CLASS_3,
+    SECTION_3B,
+    SCIENCE,
+  ),
 ];
 
 function buildService(
@@ -118,10 +142,14 @@ function buildService(
           assignments.filter((row) => {
             if (where.tenantId !== TENANT) return false;
             if (where.staffId !== row.staffId) return false;
-            if (where.academicYearId && where.academicYearId !== row.academicYearId)
+            if (
+              where.academicYearId &&
+              where.academicYearId !== row.academicYearId
+            )
               return false;
             if (where.classId && where.classId !== row.classId) return false;
-            if (where.sectionId && where.sectionId !== row.sectionId) return false;
+            if (where.sectionId && where.sectionId !== row.sectionId)
+              return false;
             if (
               where.assignmentType?.in &&
               !where.assignmentType.in.includes(row.assignmentType)
@@ -387,9 +415,15 @@ describe('TeacherScopeService — assignment-based authorization', () => {
       const { service } = buildService();
       await expect(
         service.requireAccess(
-          ask(TeacherCapability.SUBJECT_RECORD_WRITE, CLASS_1, SECTION_1A, MATHS, {
-            recordOwnerStaffId: OTHER_STAFF,
-          }),
+          ask(
+            TeacherCapability.SUBJECT_RECORD_WRITE,
+            CLASS_1,
+            SECTION_1A,
+            MATHS,
+            {
+              recordOwnerStaffId: OTHER_STAFF,
+            },
+          ),
           actor,
         ),
       ).rejects.toBeInstanceOf(ForbiddenException);
@@ -399,9 +433,15 @@ describe('TeacherScopeService — assignment-based authorization', () => {
       const { service } = buildService();
       await expect(
         service.requireAccess(
-          ask(TeacherCapability.SUBJECT_RECORD_WRITE, CLASS_1, SECTION_1A, MATHS, {
-            recordOwnerStaffId: STAFF,
-          }),
+          ask(
+            TeacherCapability.SUBJECT_RECORD_WRITE,
+            CLASS_1,
+            SECTION_1A,
+            MATHS,
+            {
+              recordOwnerStaffId: STAFF,
+            },
+          ),
           actor,
         ),
       ).resolves.toBeTruthy();
@@ -501,7 +541,12 @@ describe('TeacherScopeService — assignment-based authorization', () => {
       const { service } = buildService(RAMESH_ASSIGNMENTS, [substitution]);
       await expect(
         service.requireAccess(
-          ask(TeacherCapability.SUBJECT_HOMEWORK_CREATE, CLASS_2, SECTION_2A, ENGLISH),
+          ask(
+            TeacherCapability.SUBJECT_HOMEWORK_CREATE,
+            CLASS_2,
+            SECTION_2A,
+            ENGLISH,
+          ),
           actor,
         ),
       ).rejects.toBeInstanceOf(ForbiddenException);
@@ -568,9 +613,15 @@ describe('TeacherScopeService — assignment-based authorization', () => {
       const scope = await service.resolveReadableScope(actor);
 
       expect([...scope.homeroomSectionIds]).toEqual([SECTION_1A]);
-      expect([...scope.subjectsBySection.get(SECTION_1A) ?? []]).toEqual([MATHS]);
-      expect([...scope.subjectsBySection.get(SECTION_2A) ?? []]).toEqual([MATHS]);
-      expect([...scope.subjectsBySection.get(SECTION_3B) ?? []]).toEqual([SCIENCE]);
+      expect([...(scope.subjectsBySection.get(SECTION_1A) ?? [])]).toEqual([
+        MATHS,
+      ]);
+      expect([...(scope.subjectsBySection.get(SECTION_2A) ?? [])]).toEqual([
+        MATHS,
+      ]);
+      expect([...(scope.subjectsBySection.get(SECTION_3B) ?? [])]).toEqual([
+        SCIENCE,
+      ]);
       expect(scope.allSectionIds.size).toBe(3);
     });
 

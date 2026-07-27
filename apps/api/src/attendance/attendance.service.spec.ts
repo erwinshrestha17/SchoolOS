@@ -24,6 +24,11 @@ import sharp from 'sharp';
 import { toGregorianDateFromBs } from '@schoolos/core';
 import { AttendanceService } from './attendance.service';
 import { AttendanceConflictReviewDecision } from './dto/review-attendance-conflict.dto';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
+import {
+  createTeacherScopeServiceForTests,
+  teacherAssignmentFixture,
+} from '../../test/test-helpers';
 
 const adminActor = {
   tenantId: 'tenant-1',
@@ -541,11 +546,12 @@ describe('attendance production hardening', () => {
       classroom: { id: 'class-1', name: 'Grade 1' },
       section: scopeSection,
       staffFindFirst: { id: 'staff-1' },
+      // Real resolver with no assignments: this is a denial test.
+      canonicalAssignments: [],
     });
     prisma.section.findFirst
       .mockResolvedValueOnce(scopeSection)
       .mockResolvedValueOnce(null);
-    prisma.subjectTeacherAssignment.findFirst.mockResolvedValue(null);
 
     await expect(
       service.getRoster(
@@ -568,11 +574,12 @@ describe('attendance production hardening', () => {
       classroom: { id: 'class-1', name: 'Grade 1' },
       section: scopeSection,
       staffFindFirst: { id: 'staff-1' },
+      // Real resolver with no assignments: this is a denial test.
+      canonicalAssignments: [],
     });
     prisma.section.findFirst
       .mockResolvedValueOnce(scopeSection)
       .mockResolvedValueOnce(null);
-    prisma.subjectTeacherAssignment.findFirst.mockResolvedValue(null);
 
     await expect(
       service.submitAttendance(
@@ -624,8 +631,6 @@ describe('attendance production hardening', () => {
       classroom: { id: 'class-1', name: 'Grade 1' },
       staffFindFirst: { id: 'staff-1' },
     });
-    prisma.subjectTeacherAssignment.findFirst.mockResolvedValue(null);
-
     await expect(
       service.getRoster(
         teacherActor,
@@ -638,15 +643,9 @@ describe('attendance production hardening', () => {
       'You are not assigned as Class Teacher or Subject Teacher for this section',
     );
 
-    expect(prisma.subjectTeacherAssignment.findFirst).toHaveBeenCalledWith({
-      where: {
-        staffId: 'staff-1',
-        classId: 'class-1',
-        sectionId: null,
-        academicYearId: 'ay-1',
-        tenantId: teacherActor.tenantId,
-      },
-    });
+    // Authorization is resolved from the canonical TeacherAssignment table
+    // now, so the legacy SubjectTeacherAssignment query is not issued.
+    expect(prisma.subjectTeacherAssignment.findFirst).not.toHaveBeenCalled();
   });
 
   it('requires the requested academic year for section attendance assignments', async () => {
@@ -656,16 +655,24 @@ describe('attendance production hardening', () => {
       classroom: { id: 'class-1', name: 'Grade 1' },
       section: scopeSection,
       staffFindFirst: { id: 'staff-1' },
+      // The teacher holds a real assignment for this exact class/section --
+      // but for LAST year. A stale-year assignment must not authorize a
+      // write against the requested year.
+      canonicalAssignments: [
+        teacherAssignmentFixture({
+          tenantId: 'tenant-1',
+          staffId: 'staff-1',
+          academicYearId: 'ay-previous',
+          assignmentType: 'CLASS_TEACHER',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: null,
+        }),
+      ],
     });
     prisma.section.findFirst
       .mockResolvedValueOnce(scopeSection)
       .mockResolvedValueOnce(null);
-    prisma.subjectTeacherAssignment.findFirst.mockImplementation(
-      ({ where }: { where: { academicYearId?: string } }) =>
-        where.academicYearId === 'ay-requested'
-          ? null
-          : { id: 'stale-year-assignment' },
-    );
 
     await expect(
       service.submitAttendance(
@@ -682,15 +689,9 @@ describe('attendance production hardening', () => {
       'You are not assigned as Class Teacher or Subject Teacher for this section',
     );
 
-    expect(prisma.subjectTeacherAssignment.findFirst).toHaveBeenCalledWith({
-      where: {
-        staffId: 'staff-1',
-        classId: 'class-1',
-        OR: [{ sectionId: 'section-1' }, { sectionId: null }],
-        academicYearId: 'ay-requested',
-        tenantId: teacherActor.tenantId,
-      },
-    });
+    // Year scoping is enforced by the canonical assignment query, so the
+    // legacy SubjectTeacherAssignment lookup is no longer issued.
+    expect(prisma.subjectTeacherAssignment.findFirst).not.toHaveBeenCalled();
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
@@ -3205,6 +3206,14 @@ function bsTestDate(year: number, month: number, day: number) {
 }
 
 function buildService(options: {
+  /**
+   * Opt into the REAL TeacherScopeService resolver. `[]` means "this teacher
+   * has no assignments", i.e. a denial test. Distinct from the legacy
+   * `teacherAssignments` option below, which feeds the old
+   * SubjectTeacherAssignment mock.
+   */
+  canonicalAssignments?: Array<Record<string, unknown>>;
+  scopeStaffId?: string;
   academicYear?: unknown;
   classroom?: unknown;
   section?: unknown;
@@ -3453,6 +3462,40 @@ function buildService(options: {
   const eventEmitter = {
     emit: jest.fn(),
   };
+  // Real resolver over an in-memory assignment store; individual tests push
+  // the assignments they need via `options.teacherAssignments`.
+  // Authorization is covered exhaustively in teacher-scope.service.spec.ts.
+  // Most tests in this file exercise roster/register/sync behaviour that sits
+  // *after* the assignment gate, so by default they get a permissive resolver.
+  // A test that is actually about denial opts into the real resolver by
+  // passing `canonicalAssignments` (an empty array = no assignments = denied).
+  const teacherScope = options.canonicalAssignments
+    ? (() => {
+        const deps = createTeacherScopeServiceForTests({
+          assignments: options.canonicalAssignments,
+          staffId: options.scopeStaffId ?? 'staff-1',
+        });
+        return new TeacherScopeService(
+          deps.prisma as never,
+          deps.audit as never,
+        );
+      })()
+    : ({
+        resolveActiveStaffId: jest.fn().mockResolvedValue('staff-1'),
+        canAccess: jest.fn().mockResolvedValue({
+          source: 'ASSIGNMENT',
+          assignmentId: 'assignment-stub',
+          componentScope: null,
+          assignmentType: 'CLASS_TEACHER',
+        }),
+        canAccessAnySectionOfClass: jest.fn().mockResolvedValue(null),
+        requireAccess: jest.fn().mockResolvedValue({
+          source: 'ASSIGNMENT',
+          assignmentId: 'assignment-stub',
+          componentScope: null,
+          assignmentType: 'CLASS_TEACHER',
+        }),
+      } as unknown as TeacherScopeService);
 
   return {
     service: new AttendanceService(
@@ -3461,6 +3504,7 @@ function buildService(options: {
       auditService as never,
       eventEmitter as never,
       settingsService as never,
+      teacherScope as never,
       options.fileRegistryService as never,
     ),
     prisma,

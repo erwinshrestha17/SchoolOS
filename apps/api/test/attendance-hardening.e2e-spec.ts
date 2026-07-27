@@ -308,6 +308,7 @@ describe('Attendance Hardening (E2E)', () => {
 
     it('denies teacher from exporting a register for an unauthorized class/section', async () => {
       // Teacher is not assigned to class-1/section-1
+      prisma.__state.teacherAssignments = [];
       prisma.__state.subjectTeacherAssignments = [];
 
       await expect(
@@ -326,16 +327,21 @@ describe('Attendance Hardening (E2E)', () => {
     });
 
     it('allows teacher to export a register for their assigned class/section', async () => {
-      // Setup teacher assignment
-      prisma.__state.subjectTeacherAssignments = [
+      // Canonical TeacherAssignment row -- authorization now resolves from
+      // this table rather than the legacy SubjectTeacherAssignment one.
+      prisma.__state.teacherAssignments = [
         {
           id: 'assign-1',
           tenantId,
           staffId: 'staff-1',
           academicYearId: 'year-2081',
+          assignmentType: 'SUBJECT_TEACHER',
           classId: 'class-1',
           sectionId: 'section-1',
           subjectId: 'sub-1',
+          status: 'ACTIVE',
+          effectiveFrom: new Date('2020-01-01T00:00:00.000Z'),
+          effectiveUntil: null,
         },
       ];
 

@@ -305,12 +305,13 @@ describe('Homework Hardening', () => {
       expect(p.subjectTeacherAssignment.findFirst).not.toHaveBeenCalled();
     });
 
-    it('allows a homeroom class teacher with no subject assignment to create homework for their own section', async () => {
-      // Confirmed gap: this checkpoint (shared by create/update/review/bulk-
-      // complete/reminder paths) only checked SubjectTeacherAssignment,
-      // silently locking every homeroom class teacher out of managing
-      // homework for their own class/section — mirrors the same dual-check
-      // pattern TimetableService.exportClassTimetable already applies.
+    it('DENIES a homeroom class teacher with no subject assignment: homework is subject-owned', async () => {
+      // HomeworkAssignment.subjectId is non-null, so every homework row is a
+      // subject-owned record. Being the homeroom Class Teacher must not
+      // authorize writing one -- otherwise the Class Teacher of 1/A could set
+      // English homework for a class whose English another teacher owns.
+      // A homeroom teacher who genuinely teaches the subject needs a
+      // SUBJECT_TEACHER assignment; that is a data gap, not a permission one.
       const p = prisma as any;
       const teacherActor: AuthContext = {
         ...actor,
@@ -347,20 +348,20 @@ describe('Homework Hardening', () => {
         }),
       );
 
-      const result = (await homeworkService.createAssignment(
-        {
-          academicYearId: 'year-1',
-          classId: 'class-1',
-          sectionId: 'section-1',
-          subjectId: 'sub-1',
-          title: 'Homeroom homework',
-          instructions: 'Test',
-          dueDate: '2026-12-31',
-        },
-        teacherActor,
-      )) as any;
-
-      expect(result.id).toBeDefined();
+      await expect(
+        homeworkService.createAssignment(
+          {
+            academicYearId: 'year-1',
+            classId: 'class-1',
+            sectionId: 'section-1',
+            subjectId: 'sub-1',
+            title: 'Homeroom homework',
+            instructions: 'Test',
+            dueDate: '2026-12-31',
+          },
+          teacherActor,
+        ),
+      ).rejects.toThrow(ForbiddenException);
       // Homeroom authority is now resolved from the canonical
       // TeacherAssignment table, so the legacy Section.classTeacherId lookup
       // is no longer performed.

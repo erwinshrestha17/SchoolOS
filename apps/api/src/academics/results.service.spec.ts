@@ -4,6 +4,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { GradeCalculatorService } from './grade-calculator.service';
 import { ResultsService, StudentPreviewResult } from './results.service';
 import { AuthContext } from '../auth/auth.types';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
+import {
+  createTeacherScopeServiceForTests,
+  teacherAssignmentFixture,
+} from '../../test/test-helpers';
 
 describe('ResultsService', () => {
   let service: ResultsService;
@@ -22,11 +27,30 @@ describe('ResultsService', () => {
     roles: ['teacher'],
     permissions: ['results:read', 'academics:read'],
   } as unknown as AuthContext;
+  let teacherAssignments: Array<Record<string, any>>;
 
   beforeEach(async () => {
+    teacherAssignments = [];
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResultsService,
+        {
+          // Real resolver over an in-memory assignment store; tests that care
+          // about scoping push rows via `teacherAssignments`.
+          provide: TeacherScopeService,
+          useFactory: () => {
+            const deps = createTeacherScopeServiceForTests({
+              get assignments() {
+                return teacherAssignments;
+              },
+              staffId: 'staff-1',
+            } as never);
+            return new TeacherScopeService(
+              deps.prisma as never,
+              deps.audit as never,
+            );
+          },
+        },
         GradeCalculatorService,
         {
           provide: PrismaService,
@@ -235,9 +259,15 @@ describe('ResultsService', () => {
       (prisma.staff.findFirst as jest.Mock).mockResolvedValue({
         id: 'staff-1',
       });
-      (prisma.subjectTeacherAssignment.findMany as jest.Mock).mockResolvedValue(
-        [{ classId: 'class-1', sectionId: 'section-1' }],
-      );
+      teacherAssignments = [
+        teacherAssignmentFixture({
+          tenantId: 'tenant-1',
+          staffId: 'staff-1',
+          assignmentType: 'SUBJECT_TEACHER',
+          classId: 'class-1',
+          sectionId: 'section-1',
+        }),
+      ];
 
       await expect(
         service.previewStudentResult('s1', teacherActor, {
@@ -269,9 +299,15 @@ describe('ResultsService', () => {
       (prisma.staff.findFirst as jest.Mock).mockResolvedValue({
         id: 'staff-1',
       });
-      (prisma.subjectTeacherAssignment.findMany as jest.Mock).mockResolvedValue(
-        [{ classId: 'class-1', sectionId: 'section-1' }],
-      );
+      teacherAssignments = [
+        teacherAssignmentFixture({
+          tenantId: 'tenant-1',
+          staffId: 'staff-1',
+          assignmentType: 'SUBJECT_TEACHER',
+          classId: 'class-1',
+          sectionId: 'section-1',
+        }),
+      ];
 
       await expect(
         service.previewStudentResult('s1', teacherActor, {
@@ -284,9 +320,15 @@ describe('ResultsService', () => {
       (prisma.staff.findFirst as jest.Mock).mockResolvedValue({
         id: 'staff-1',
       });
-      (prisma.subjectTeacherAssignment.findMany as jest.Mock).mockResolvedValue(
-        [{ classId: 'class-1', sectionId: 'section-1' }],
-      );
+      teacherAssignments = [
+        teacherAssignmentFixture({
+          tenantId: 'tenant-1',
+          staffId: 'staff-1',
+          assignmentType: 'SUBJECT_TEACHER',
+          classId: 'class-1',
+          sectionId: 'section-1',
+        }),
+      ];
 
       await expect(
         service.previewClassResults(teacherActor, {
@@ -321,9 +363,15 @@ describe('ResultsService', () => {
       (prisma.staff.findFirst as jest.Mock).mockResolvedValue({
         id: 'staff-1',
       });
-      (prisma.subjectTeacherAssignment.findMany as jest.Mock).mockResolvedValue(
-        [{ classId: 'class-1', sectionId: 'section-1' }],
-      );
+      teacherAssignments = [
+        teacherAssignmentFixture({
+          tenantId: 'tenant-1',
+          staffId: 'staff-1',
+          assignmentType: 'SUBJECT_TEACHER',
+          classId: 'class-1',
+          sectionId: 'section-1',
+        }),
+      ];
 
       await expect(
         service.previewStudentResult('s1', teacherActor, {

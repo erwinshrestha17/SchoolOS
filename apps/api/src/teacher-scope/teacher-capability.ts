@@ -149,7 +149,9 @@ export const EDITABLE_STATUSES: readonly TeacherRecordStatus[] = [
   'CORRECTION_APPROVED',
 ];
 
-export function isEditableStatus(status: TeacherRecordStatus | null | undefined) {
+export function isEditableStatus(
+  status: TeacherRecordStatus | null | undefined,
+) {
   return status == null || EDITABLE_STATUSES.includes(status);
 }
 

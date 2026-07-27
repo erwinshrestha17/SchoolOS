@@ -41,6 +41,8 @@ import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
+import { TeacherCapability } from '../teacher-scope/teacher-capability';
 import { AdjustLeaveBalanceDto } from './dto/adjust-leave-balance.dto';
 import { CorrectStaffAttendanceDto } from './dto/correct-staff-attendance.dto';
 import { ReviewAttendanceConflictDto } from './dto/review-attendance-conflict.dto';
@@ -105,6 +107,7 @@ export class AttendanceService {
     private readonly auditService: AuditService,
     private readonly eventEmitter: EventEmitter2,
     private readonly settingsService: SettingsService,
+    private readonly teacherScopeService: TeacherScopeService,
     @Optional()
     private readonly fileRegistryService?: FileRegistryService,
   ) {}
@@ -2373,10 +2376,7 @@ export class AttendanceService {
     return request;
   }
 
-  async listParentCorrectionRequests(
-    studentId: string,
-    actor: AuthContext,
-  ) {
+  async listParentCorrectionRequests(studentId: string, actor: AuthContext) {
     if (!isParentOnly(actor)) {
       throw new ForbiddenException(
         'Parent attendance correction is not available for this account.',
@@ -4978,8 +4978,16 @@ export class AttendanceService {
     sectionId?: string | null,
     academicYearId?: string,
   ) {
-    // Admins and full-permission staff can access everything
+    // Admins and full-permission staff can access everything. The role check
+    // mirrors the one every other scoped service uses (see
+    // HomeworkService.ensureSubjectTeacherScope): school administrators and
+    // principals are not assignment-scoped, and relying on the three
+    // `*_all` permissions alone left them dependent on a grant they are not
+    // always given.
     if (
+      actor.roles.some((role) =>
+        ['admin', 'principal', 'platform_super_admin'].includes(role),
+      ) ||
       actor.permissions.includes('attendance:mark_all') ||
       actor.permissions.includes('attendance:override_lock') ||
       actor.permissions.includes('attendance:read_all')
@@ -4999,38 +5007,51 @@ export class AttendanceService {
       throw new ForbiddenException('Staff record not found in this tenant');
     }
 
-    // Check if class teacher of the section
-    if (sectionId) {
-      const section = await this.prisma.section.findFirst({
-        where: {
-          id: sectionId,
-          classTeacherId: staff.id,
-          tenantId: actor.tenantId,
-        },
-      });
-      if (section) return;
-    }
+    // Resolved through the canonical TeacherScopeService rather than reading
+    // Section.classTeacherId / SubjectTeacherAssignment directly. The ad hoc
+    // version honoured neither assignment effective dates nor assignment
+    // status, so a teacher whose assignment had ended or been REVOKED kept
+    // full attendance-marking access.
+    // Some call sites (e.g. a correction request resolved from a student
+    // record) legitimately carry no academic year. Passing undefined matches
+    // an active assignment in any year for this class/section rather than
+    // inventing one; it never widens past class+section.
+    const base = {
+      tenantId: actor.tenantId,
+      staffId: staff.id,
+      academicYearId,
+      classId,
+    };
 
-    // Check if subject teacher in this section/class
-    const assignment = await this.prisma.subjectTeacherAssignment.findFirst({
-      where: {
-        staffId: staff.id,
-        classId,
-        ...(sectionId
-          ? {
-              OR: [{ sectionId }, { sectionId: null }],
-            }
-          : { sectionId: null }),
-        ...(academicYearId ? { academicYearId } : {}),
-        tenantId: actor.tenantId,
-      },
-    });
-
-    if (!assignment) {
+    // An attendance request without a section means "the whole class". A
+    // teacher assigned to one section must not be widened to every section of
+    // it, and the canonical model has no section-less assignment to satisfy
+    // such a request -- so it is refused rather than resolved against an
+    // arbitrary section. Callers pass a concrete sectionId.
+    if (!sectionId) {
       throw new ForbiddenException(
         'You are not assigned as Class Teacher or Subject Teacher for this section',
       );
     }
+
+    // A homeroom Class Teacher marks daily attendance; a Subject Teacher
+    // marks the periods they teach. Either satisfies this gate, but each is
+    // resolved against its own assignment family rather than a shared
+    // "is a teacher here" shortcut.
+    for (const capability of [
+      TeacherCapability.HOMEROOM_ATTENDANCE_MARK,
+      TeacherCapability.CLASS_ROSTER_READ,
+    ]) {
+      const grant = await this.teacherScopeService.canAccess(
+        { ...base, sectionId, capability },
+        actor,
+      );
+      if (grant) return;
+    }
+
+    throw new ForbiddenException(
+      'You are not assigned as Class Teacher or Subject Teacher for this section',
+    );
   }
 
   private async ensureStudentInAttendanceScope(

@@ -1607,14 +1607,22 @@ export class HomeworkService {
    *   - `sectionId: null` on the legacy table meant "every section of the
    *     class", which quietly widened scope.
    *
-   * Class Teacher fallback is deliberately retained. In Nepali primary
-   * classes the homeroom teacher genuinely delivers most subjects, and a
-   * previous fix established that requiring an explicit SubjectTeacher row
-   * locks them out of their own class. It is now expressed as the explicit
-   * `CLASS_TASK_CREATE` homeroom capability rather than a raw
-   * `Section.classTeacherId` lookup, and it does NOT confer the right to edit
-   * another teacher's homework — that is enforced separately by
-   * `recordOwnerStaffId` on update paths.
+   * BEHAVIOUR CHANGE: the Class Teacher fallback has been removed.
+   *
+   * `HomeworkAssignment.subjectId` is non-null, so every homework row is a
+   * subject-owned record. Letting a homeroom assignment authorize one
+   * violated the core rule that being a Class Teacher alone never grants
+   * subject-record write access -- it let the Class Teacher of 1/A set
+   * English homework for a class whose English is taught by someone else.
+   *
+   * The fallback originally existed to unblock homeroom teachers who
+   * genuinely deliver most subjects in a primary class but had no
+   * SubjectTeacherAssignment row. That is a data gap, not a permission
+   * question: such a teacher needs SUBJECT_TEACHER assignments, which the
+   * backfill (seed-teacher-assignment-backfill.ts) creates from the legacy
+   * table and which staff/timetable flows now write going forward. Solving it
+   * with a permission hole made every homeroom teacher a writer for subjects
+   * they do not teach.
    */
   private async ensureSubjectTeacherScope(
     actor: AuthContext,
@@ -1643,51 +1651,52 @@ export class HomeworkService {
     }
 
     const academicYearId =
-      homework.academicYearId ?? (await this.resolveCurrentAcademicYearId(actor));
+      homework.academicYearId ??
+      (await this.resolveCurrentAcademicYearId(actor));
     if (!academicYearId) {
       throw new ForbiddenException(
         'You are not assigned to review homework for this class and subject',
       );
     }
 
-    // A null sectionId on legacy rows meant "all sections of the class".
-    // Resolve it to the concrete sections so authorization is per-section.
-    const sectionIds = homework.sectionId
-      ? [homework.sectionId]
-      : (
-          await this.prisma.section.findMany({
-            where: { tenantId: actor.tenantId, classId: homework.classId },
-            select: { id: true },
-          })
-        ).map((section) => section.id);
+    const base = {
+      tenantId: actor.tenantId,
+      staffId,
+      academicYearId,
+      classId: homework.classId,
+      effectiveOn: homework.effectiveOn,
+    };
 
-    for (const sectionId of sectionIds) {
-      const base = {
-        tenantId: actor.tenantId,
-        staffId,
-        academicYearId,
-        classId: homework.classId,
-        sectionId,
-        effectiveOn: homework.effectiveOn,
-      };
+    // A null sectionId on legacy homework meant "all sections of the class",
+    // so authorization is satisfied by an assignment covering any section of
+    // it. A concrete sectionId is matched exactly.
+    const check = (
+      capability: TeacherCapability,
+      extra: Record<string, unknown> = {},
+    ) =>
+      homework.sectionId
+        ? this.teacherScopeService.canAccess(
+            {
+              ...base,
+              sectionId: homework.sectionId,
+              capability,
+              ...extra,
+            } as never,
+            actor,
+          )
+        : this.teacherScopeService.canAccessAnySectionOfClass(
+            { ...base, capability, ...extra } as never,
+            actor,
+          );
 
-      const asSubjectTeacher = await this.teacherScopeService.canAccess(
-        {
-          ...base,
-          subjectId: homework.subjectId,
-          capability: TeacherCapability.SUBJECT_HOMEWORK_CREATE,
-          recordOwnerStaffId: homework.ownerStaffId,
-        },
-        actor,
-      );
-      if (asSubjectTeacher) return;
-
-      const asClassTeacher = await this.teacherScopeService.canAccess(
-        { ...base, capability: TeacherCapability.CLASS_TASK_CREATE },
-        actor,
-      );
-      if (asClassTeacher) return;
-    }
+    const asSubjectTeacher = await check(
+      TeacherCapability.SUBJECT_HOMEWORK_CREATE,
+      {
+        subjectId: homework.subjectId,
+        recordOwnerStaffId: homework.ownerStaffId,
+      },
+    );
+    if (asSubjectTeacher) return;
 
     throw new ForbiddenException(
       'You are not assigned to review homework for this class and subject',
@@ -1755,41 +1764,22 @@ export class HomeworkService {
     const staffId = await this.resolveActorStaffId(actor);
     if (!staffId) return [];
 
-    const assignments = await this.prisma.subjectTeacherAssignment.findMany({
-      where: { tenantId: actor.tenantId, staffId },
-      select: { classId: true, sectionId: true },
-    });
-
-    const explicitSectionIds = new Set(
-      assignments.filter((a) => a.sectionId).map((a) => a.sectionId as string),
-    );
-    const classIdsNeedingExpansion = [
-      ...new Set(assignments.filter((a) => !a.sectionId).map((a) => a.classId)),
-    ];
-
-    const expandedSections = classIdsNeedingExpansion.length
-      ? await this.prisma.section.findMany({
-          where: {
-            tenantId: actor.tenantId,
-            classId: { in: classIdsNeedingExpansion },
-          },
-          select: { id: true, classId: true },
-        })
-      : [];
-
-    const explicitSections = explicitSectionIds.size
-      ? await this.prisma.section.findMany({
-          where: {
-            tenantId: actor.tenantId,
-            id: { in: [...explicitSectionIds] },
-          },
-          select: { id: true, classId: true },
-        })
-      : [];
+    // Which homework a teacher may LIST is an authorization boundary, so it
+    // is resolved from the canonical assignment table rather than the legacy
+    // SubjectTeacherAssignment rows. The legacy version also had to expand
+    // `sectionId: null` ("every section of the class") by hand; canonical
+    // assignments are always section-precise, so no expansion is needed and
+    // the scope cannot accidentally widen.
+    const combos =
+      await this.teacherScopeService.listTeacherClassSectionCombos(actor);
 
     const merged = new Map<string, { id: string; classId: string }>();
-    for (const section of [...expandedSections, ...explicitSections]) {
-      merged.set(section.id, section);
+    for (const combo of combos) {
+      if (!combo.sectionId) continue;
+      merged.set(combo.sectionId, {
+        id: combo.sectionId,
+        classId: combo.classId,
+      });
     }
     return [...merged.values()];
   }

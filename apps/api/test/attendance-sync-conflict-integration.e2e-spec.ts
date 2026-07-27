@@ -12,7 +12,10 @@ import { AttendanceConflictReviewDecision } from '../src/attendance/dto/review-a
 import { CommunicationsService } from '../src/communications/communications.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { SettingsService } from '../src/settings/settings.service';
-import { createAuthContextMock } from './test-helpers';
+import {
+  createAuthContextMock,
+  createPermissiveTeacherScope,
+} from './test-helpers';
 
 describe('Attendance Sync + Conflict Integration (E2E)', () => {
   it('replays the same clientSubmissionId idempotently without submitting attendance again', async () => {
@@ -25,6 +28,7 @@ describe('Attendance Sync + Conflict Integration (E2E)', () => {
       {
         getSetting: jest.fn().mockResolvedValue(true),
       } as unknown as SettingsService,
+      createPermissiveTeacherScope() as never,
     );
     const actor = createAuthContextMock({
       tenantId: 'tenant-attendance-sync',
@@ -72,6 +76,7 @@ describe('Attendance Sync + Conflict Integration (E2E)', () => {
       {
         getSetting: jest.fn().mockResolvedValue(true),
       } as unknown as SettingsService,
+      createPermissiveTeacherScope() as never,
     );
     const actor = createAuthContextMock({
       tenantId: 'tenant-attendance-sync',
@@ -183,6 +188,7 @@ describe('Attendance Sync + Conflict Integration (E2E)', () => {
       {
         getSetting: jest.fn().mockResolvedValue(true),
       } as unknown as SettingsService,
+      createPermissiveTeacherScope() as never,
     );
     const actor = createAuthContextMock({
       tenantId: 'tenant-attendance-sync',

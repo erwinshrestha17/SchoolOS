@@ -13,6 +13,11 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SettingsService } from '../settings/settings.service';
 import { AuthContext } from '../auth/auth.types';
 import { permissionCatalog, systemRolePermissions } from '@schoolos/core';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
+import {
+  createTeacherScopeServiceForTests,
+  teacherAssignmentFixture,
+} from '../../test/test-helpers';
 
 function daysAgo(count: number): Date {
   const date = new Date();
@@ -48,11 +53,43 @@ describe('Attendance Hardening', () => {
       'attendance:override_lock',
     ],
   };
+  let teacherAssignments: Array<Record<string, any>>;
 
   beforeEach(async () => {
+    // Default scope for this suite: these tests exercise lock, conflict and
+    // ownership behaviour *after* the assignment gate, so the actor holds a
+    // real homeroom assignment for the class/section the fixtures use.
+    teacherAssignments = [
+      teacherAssignmentFixture({
+        tenantId: 'tenant-1',
+        staffId: 'staff-1',
+        academicYearId: 'year-1',
+        assignmentType: 'CLASS_TEACHER',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        subjectId: null,
+      }),
+    ];
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AttendanceService,
+        {
+          // Real resolver over an in-memory assignment store, so these remain
+          // genuine authorization tests.
+          provide: TeacherScopeService,
+          useFactory: () => {
+            const deps = createTeacherScopeServiceForTests({
+              get assignments() {
+                return teacherAssignments;
+              },
+              staffId: 'staff-1',
+            } as never);
+            return new TeacherScopeService(
+              deps.prisma as never,
+              deps.audit as never,
+            );
+          },
+        },
         {
           provide: PrismaService,
           useValue: {

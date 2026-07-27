@@ -2440,6 +2440,75 @@ export function createPrismaMock() {
     'libraryCopyHistory',
   ];
 
+  // The canonical assignment tables need a faithful matcher: the resolver's
+  // query uses `assignmentType: { in: [...] }`, `effectiveFrom: { lte }` and an
+  // OR over `effectiveUntil`, which the generic dummy-model handler below does
+  // not express. Specs seed rows via `prisma.__state.teacherAssignments`.
+  const matchesAssignmentWindow = (row: any, where: any) => {
+    const on: Date = where?.effectiveFrom?.lte ?? new Date();
+    if (row.effectiveFrom && new Date(row.effectiveFrom) > on) return false;
+    if (row.effectiveUntil && new Date(row.effectiveUntil) < on) return false;
+    return true;
+  };
+  prisma.teacherAssignment = {
+    findMany: jest.fn(({ where = {} }: any = {}) =>
+      Promise.resolve(
+        state.teacherAssignments.filter((row: any) => {
+          if (where.tenantId && where.tenantId !== row.tenantId) return false;
+          if (where.staffId && where.staffId !== row.staffId) return false;
+          if (
+            where.academicYearId &&
+            where.academicYearId !== row.academicYearId
+          )
+            return false;
+          if (where.classId && where.classId !== row.classId) return false;
+          if (where.sectionId && where.sectionId !== row.sectionId)
+            return false;
+          if (where.status && where.status !== (row.status ?? 'ACTIVE'))
+            return false;
+          if (
+            where.assignmentType?.in &&
+            !where.assignmentType.in.includes(row.assignmentType)
+          )
+            return false;
+          return matchesAssignmentWindow(row, where);
+        }),
+      ),
+    ),
+    findFirst: jest.fn(({ where = {} }: any = {}) =>
+      Promise.resolve(
+        state.teacherAssignments.find(
+          (row: any) =>
+            (!where.tenantId || where.tenantId === row.tenantId) &&
+            (!where.staffId || where.staffId === row.staffId),
+        ) ?? null,
+      ),
+    ),
+    create: jest.fn(({ data }: any) => {
+      state.teacherAssignments.push(data);
+      return Promise.resolve(data);
+    }),
+    count: jest.fn(() => Promise.resolve(state.teacherAssignments.length)),
+  } as any;
+  prisma.teacherDelegation = {
+    findMany: jest.fn(({ where = {} }: any = {}) =>
+      Promise.resolve(
+        state.teacherDelegations.filter((row: any) => {
+          if (where.tenantId && where.tenantId !== row.tenantId) return false;
+          if (
+            where.recipientStaffId &&
+            where.recipientStaffId !== row.recipientStaffId
+          )
+            return false;
+          if (where.classId && where.classId !== row.classId) return false;
+          if (where.sectionId && where.sectionId !== row.sectionId)
+            return false;
+          return matchesAssignmentWindow(row, where);
+        }),
+      ),
+    ),
+  } as any;
+
   for (const model of dummyModels) {
     if (!prisma[model]) {
       // Basic pluralization for state key
@@ -3079,8 +3148,11 @@ export function createTeacherScopeServiceForTests(options: {
   delegations?: Array<Record<string, any>>;
   staffId?: string | null;
 }) {
-  const assignments = options.assignments ?? [];
-  const delegations = options.delegations ?? [];
+  // Read lazily on every query, not captured once: specs both *push into*
+  // and *reassign* their assignment array, and destructuring here would pin
+  // whichever array instance existed at construction time.
+  const currentAssignments = () => options.assignments ?? [];
+  const currentDelegations = () => options.delegations ?? [];
 
   const matchesWindow = (row: any, where: any) => {
     const on: Date = where.effectiveFrom?.lte ?? new Date();
@@ -3091,14 +3163,18 @@ export function createTeacherScopeServiceForTests(options: {
 
   const prisma = {
     staff: {
-      findFirst: jest.fn().mockResolvedValue(
-        options.staffId === null ? null : { id: options.staffId ?? 'staff-1' },
-      ),
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(
+          options.staffId === null
+            ? null
+            : { id: options.staffId ?? 'staff-1' },
+        ),
     },
     teacherAssignment: {
       findMany: jest.fn(({ where }: any) =>
         Promise.resolve(
-          assignments.filter((row) => {
+          currentAssignments().filter((row) => {
             if (where.tenantId && where.tenantId !== row.tenantId) return false;
             if (where.staffId && where.staffId !== row.staffId) return false;
             if (
@@ -3124,7 +3200,7 @@ export function createTeacherScopeServiceForTests(options: {
     teacherDelegation: {
       findMany: jest.fn(({ where }: any) =>
         Promise.resolve(
-          delegations.filter((row) => {
+          currentDelegations().filter((row) => {
             if (where.tenantId && where.tenantId !== row.tenantId) return false;
             if (
               where.recipientStaffId &&
@@ -3161,5 +3237,33 @@ export function teacherAssignmentFixture(overrides: Record<string, any> = {}) {
     effectiveFrom: new Date('2020-01-01T00:00:00.000Z'),
     effectiveUntil: null,
     ...overrides,
+  };
+}
+
+/**
+ * A permissive TeacherScopeService for specs that exercise behaviour *after*
+ * the assignment gate. Authorization itself is covered by
+ * teacher-scope.service.spec.ts; use `createTeacherScopeServiceForTests` when
+ * the test is genuinely about who may do what.
+ */
+export function createPermissiveTeacherScope(staffId = 'staff-1') {
+  const grant = {
+    source: 'ASSIGNMENT' as const,
+    assignmentId: 'assignment-stub',
+    componentScope: null,
+    assignmentType: 'CLASS_TEACHER' as const,
+  };
+  return {
+    resolveActiveStaffId: jest.fn().mockResolvedValue(staffId),
+    canAccess: jest.fn().mockResolvedValue(grant),
+    canAccessAnySectionOfClass: jest.fn().mockResolvedValue(null),
+    requireAccess: jest.fn().mockResolvedValue(grant),
+    listActiveAssignments: jest.fn().mockResolvedValue([]),
+    resolveReadableScope: jest.fn().mockResolvedValue({
+      assignments: [],
+      homeroomSectionIds: new Set<string>(),
+      subjectsBySection: new Map<string, Set<string>>(),
+      allSectionIds: new Set<string>(),
+    }),
   };
 }

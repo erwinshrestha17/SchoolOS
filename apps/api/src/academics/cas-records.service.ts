@@ -8,6 +8,7 @@ import { Prisma, StaffStatus } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 import { isTeacherOnly } from '../common/security/parent-scope';
 import { BulkUpsertCasRecordsDto } from './dto/bulk-upsert-cas-records.dto';
 import { CreateCasRecordDto } from './dto/create-cas-record.dto';
@@ -19,6 +20,7 @@ export class CasRecordsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly teacherScopeService: TeacherScopeService,
   ) {}
 
   async list(actor: AuthContext, filters: ListCasRecordsDto) {
@@ -182,44 +184,10 @@ export class CasRecordsService {
   private async getTeacherAssignedClassSections(
     actor: AuthContext,
   ): Promise<Array<{ classId: string; sectionId: string | null }>> {
-    const staff = await this.prisma.staff.findFirst({
-      where: {
-        tenantId: actor.tenantId,
-        userId: actor.userId,
-        status: StaffStatus.ACTIVE,
-      },
-      select: { id: true },
-    });
-    if (!staff) return [];
-
-    const [assignments, classTeacherSections] = await Promise.all([
-      this.prisma.subjectTeacherAssignment.findMany({
-        where: { tenantId: actor.tenantId, staffId: staff.id },
-        select: { classId: true, sectionId: true },
-      }),
-      this.prisma.section.findMany({
-        where: { tenantId: actor.tenantId, classTeacherId: staff.id },
-        select: { id: true, classId: true },
-      }),
-    ]);
-
-    const combos = new Map<
-      string,
-      { classId: string; sectionId: string | null }
-    >();
-    for (const a of assignments) {
-      combos.set(`${a.classId}:${a.sectionId ?? 'none'}`, {
-        classId: a.classId,
-        sectionId: a.sectionId,
-      });
-    }
-    for (const s of classTeacherSections) {
-      combos.set(`${s.classId}:${s.id}`, {
-        classId: s.classId,
-        sectionId: s.id,
-      });
-    }
-    return Array.from(combos.values());
+    // Delegates to the canonical resolver: one implementation of "which
+    // class/section combinations does this teacher touch", honouring
+    // assignment effective dates and ACTIVE status.
+    return this.teacherScopeService.listTeacherClassSectionCombos(actor);
   }
 
   async create(dto: CreateCasRecordDto, actor: AuthContext) {

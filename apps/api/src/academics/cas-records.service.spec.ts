@@ -8,6 +8,11 @@ import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { CasRecordsService } from './cas-records.service';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
+import {
+  createTeacherScopeServiceForTests,
+  teacherAssignmentFixture,
+} from '../../test/test-helpers';
 
 describe('CasRecordsService', () => {
   let service: CasRecordsService;
@@ -28,11 +33,30 @@ describe('CasRecordsService', () => {
     roles: ['teacher'],
     permissions: ['cas-records:read', 'academics:read'],
   } as unknown as AuthContext;
+  let teacherAssignments: Array<Record<string, any>>;
 
   beforeEach(async () => {
+    teacherAssignments = [];
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CasRecordsService,
+        {
+          // Real resolver over an in-memory assignment store; tests that care
+          // about scoping push rows via `teacherAssignments`.
+          provide: TeacherScopeService,
+          useFactory: () => {
+            const deps = createTeacherScopeServiceForTests({
+              get assignments() {
+                return teacherAssignments;
+              },
+              staffId: 'staff-1',
+            } as never);
+            return new TeacherScopeService(
+              deps.prisma as never,
+              deps.audit as never,
+            );
+          },
+        },
         {
           provide: PrismaService,
           useValue: {
@@ -163,9 +187,15 @@ describe('CasRecordsService', () => {
       (prisma.staff.findFirst as jest.Mock).mockResolvedValue({
         id: 'staff-1',
       });
-      (prisma.subjectTeacherAssignment.findMany as jest.Mock).mockResolvedValue(
-        [{ classId: 'class-1', sectionId: 'section-1' }],
-      );
+      teacherAssignments = [
+        teacherAssignmentFixture({
+          tenantId: 'tenant-1',
+          staffId: 'staff-1',
+          assignmentType: 'SUBJECT_TEACHER',
+          classId: 'class-1',
+          sectionId: 'section-1',
+        }),
+      ];
       (prisma.casRecord.findMany as jest.Mock).mockResolvedValue([]);
       (prisma.casRecord.count as jest.Mock).mockResolvedValue(0);
 
@@ -188,9 +218,7 @@ describe('CasRecordsService', () => {
       (prisma.staff.findFirst as jest.Mock).mockResolvedValue({
         id: 'staff-1',
       });
-      (prisma.subjectTeacherAssignment.findMany as jest.Mock).mockResolvedValue(
-        [],
-      );
+      teacherAssignments = [];
 
       const result = await service.list(teacherActor, {});
 
@@ -207,9 +235,15 @@ describe('CasRecordsService', () => {
       (prisma.staff.findFirst as jest.Mock).mockResolvedValue({
         id: 'staff-1',
       });
-      (prisma.subjectTeacherAssignment.findMany as jest.Mock).mockResolvedValue(
-        [{ classId: 'class-1', sectionId: 'section-1' }],
-      );
+      teacherAssignments = [
+        teacherAssignmentFixture({
+          tenantId: 'tenant-1',
+          staffId: 'staff-1',
+          assignmentType: 'SUBJECT_TEACHER',
+          classId: 'class-1',
+          sectionId: 'section-1',
+        }),
+      ];
 
       await expect(service.findOne('cas-1', teacherActor)).rejects.toThrow(
         ForbiddenException,
@@ -225,9 +259,15 @@ describe('CasRecordsService', () => {
       (prisma.staff.findFirst as jest.Mock).mockResolvedValue({
         id: 'staff-1',
       });
-      (prisma.subjectTeacherAssignment.findMany as jest.Mock).mockResolvedValue(
-        [{ classId: 'class-1', sectionId: 'section-1' }],
-      );
+      teacherAssignments = [
+        teacherAssignmentFixture({
+          tenantId: 'tenant-1',
+          staffId: 'staff-1',
+          assignmentType: 'SUBJECT_TEACHER',
+          classId: 'class-1',
+          sectionId: 'section-1',
+        }),
+      ];
 
       await expect(
         service.findOne('cas-1', teacherActor),
@@ -243,9 +283,15 @@ describe('CasRecordsService', () => {
       (prisma.staff.findFirst as jest.Mock).mockResolvedValue({
         id: 'staff-1',
       });
-      (prisma.subjectTeacherAssignment.findMany as jest.Mock).mockResolvedValue(
-        [{ classId: 'class-1', sectionId: 'section-1' }],
-      );
+      teacherAssignments = [
+        teacherAssignmentFixture({
+          tenantId: 'tenant-1',
+          staffId: 'staff-1',
+          assignmentType: 'SUBJECT_TEACHER',
+          classId: 'class-1',
+          sectionId: 'section-1',
+        }),
+      ];
 
       await expect(
         service.findOne('cas-1', teacherActor),

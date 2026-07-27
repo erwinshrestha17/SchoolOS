@@ -1,4 +1,4 @@
-import { MyStudentsWorkspace } from '@/components/students/my-students-workspace';
+import { MyStudentsTabs } from '@/components/students/my-students-tabs';
 import { ModuleHeader } from '@/components/ui/module-header';
 
 export const metadata = {
@@ -12,9 +12,12 @@ export default function MyStudentsPage() {
       <ModuleHeader
         eyebrow="My Teaching"
         title="My Students"
-        description="Students in your assigned homeroom and subject sections."
+        description="Your subject classes and, if you are a Class Teacher, your homeroom."
       />
-      <MyStudentsWorkspace />
+      {/* Subject responsibilities and homeroom responsibilities are genuinely
+          different scopes with different rights, so they are separate views
+          rather than one merged list. */}
+      <MyStudentsTabs />
     </div>
   );
 }

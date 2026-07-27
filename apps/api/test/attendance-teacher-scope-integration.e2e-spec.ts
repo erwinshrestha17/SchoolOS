@@ -10,7 +10,10 @@ import { AttendanceService } from '../src/attendance/attendance.service';
 import { CommunicationsService } from '../src/communications/communications.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { SettingsService } from '../src/settings/settings.service';
-import { createAuthContextMock } from './test-helpers';
+import {
+  createAuthContextMock,
+  createPermissiveTeacherScope,
+} from './test-helpers';
 
 describe('Attendance teacher scope integration', () => {
   it('submits only assigned active roster records and blocks unassigned teacher accounts', async () => {
@@ -27,6 +30,7 @@ describe('Attendance teacher scope integration', () => {
       {
         getSetting: jest.fn().mockResolvedValue(24),
       } as unknown as SettingsService,
+      createPermissiveTeacherScope() as never,
     );
     const teacher = createAuthContextMock({
       tenantId: 'tenant-attendance-scope',

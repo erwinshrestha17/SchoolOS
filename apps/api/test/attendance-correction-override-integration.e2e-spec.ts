@@ -15,7 +15,10 @@ import {
 import { CommunicationsService } from '../src/communications/communications.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { SettingsService } from '../src/settings/settings.service';
-import { createAuthContextMock } from './test-helpers';
+import {
+  createAuthContextMock,
+  createPermissiveTeacherScope,
+} from './test-helpers';
 
 describe('Attendance Correction + Locked Session Override Integration (E2E)', () => {
   it('blocks duplicate pending correction requests for the same student and date', async () => {
@@ -28,6 +31,7 @@ describe('Attendance Correction + Locked Session Override Integration (E2E)', ()
       {
         getSetting: jest.fn().mockResolvedValue(true),
       } as unknown as SettingsService,
+      createPermissiveTeacherScope() as never,
     );
     jest
       .spyOn(
@@ -69,6 +73,7 @@ describe('Attendance Correction + Locked Session Override Integration (E2E)', ()
       {
         getSetting: jest.fn().mockResolvedValue(true),
       } as unknown as SettingsService,
+      createPermissiveTeacherScope() as never,
     );
     const admin = createAuthContextMock({
       tenantId: 'tenant-attendance-correction',

@@ -28,7 +28,13 @@ export interface TeacherScopeGrant {
 export interface RequireTeacherAccessParams {
   tenantId: string;
   staffId: string;
-  academicYearId: string;
+  /**
+   * Omit only when the calling path genuinely carries no year (e.g. a
+   * correction request resolved from a student record). Omitting matches
+   * assignments in any year for that class/section -- it never widens beyond
+   * tenant + staff + class + section.
+   */
+  academicYearId?: string;
   classId: string;
   sectionId: string;
   subjectId?: string;
@@ -191,7 +197,9 @@ export class TeacherScopeService {
       where: {
         tenantId: params.tenantId,
         staffId: params.staffId,
-        academicYearId: params.academicYearId,
+        ...(params.academicYearId
+          ? { academicYearId: params.academicYearId }
+          : {}),
         classId: params.classId,
         // Omitted entirely (rather than matched) when the caller asked about
         // the whole class -- see canAccessAnySectionOfClass.
@@ -381,6 +389,35 @@ export class TeacherScopeService {
         source: 'DELEGATION' as const,
       })),
     ];
+  }
+
+  /**
+   * Every class+section combination this teacher touches, from either an
+   * assignment or an active delegation.
+   *
+   * Replaces the hand-rolled "union of SubjectTeacherAssignment rows and
+   * Section.classTeacherId rows" that CAS, results and attendance each used
+   * to build for themselves. Going through here means all three now honour
+   * assignment effective dates and ACTIVE status, which none of the ad hoc
+   * versions did.
+   */
+  async listTeacherClassSectionCombos(
+    actor: AuthContext,
+    options: { academicYearId?: string } = {},
+  ): Promise<Array<{ classId: string; sectionId: string | null }>> {
+    const assignments = await this.listActiveAssignments(actor, options);
+
+    const combos = new Map<
+      string,
+      { classId: string; sectionId: string | null }
+    >();
+    for (const assignment of assignments) {
+      combos.set(`${assignment.classId}:${assignment.sectionId}`, {
+        classId: assignment.classId,
+        sectionId: assignment.sectionId,
+      });
+    }
+    return [...combos.values()];
   }
 
   /**

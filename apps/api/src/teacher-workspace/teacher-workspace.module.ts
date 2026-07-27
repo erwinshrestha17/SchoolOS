@@ -8,15 +8,39 @@ import { TeacherTodayController } from './teacher-today.controller';
 import { TeacherStudentsService } from './teacher-students.service';
 import { TeacherStudentsController } from './teacher-students.controller';
 import { TeacherScheduleController } from './teacher-schedule.controller';
+import { HomeroomSummaryController } from './homeroom-summary.controller';
+import { HomeroomSummaryService } from './homeroom-summary.service';
+import {
+  TeacherAssignmentsController,
+  TeacherAssignmentsService,
+} from './teacher-assignments.controller';
+import { TeacherScopeModule } from '../teacher-scope/teacher-scope.module';
 
 @Module({
-  imports: [PrismaModule, AttendanceModule, HomeworkModule, TimetableModule],
+  imports: [
+    PrismaModule,
+    AttendanceModule,
+    HomeworkModule,
+    TimetableModule,
+    TeacherScopeModule,
+  ],
   controllers: [
     TeacherTodayController,
     TeacherStudentsController,
     TeacherScheduleController,
+    HomeroomSummaryController,
+    TeacherAssignmentsController,
   ],
-  providers: [TeacherTodayService, TeacherStudentsService],
-  exports: [TeacherTodayService, TeacherStudentsService],
+  providers: [
+    TeacherTodayService,
+    TeacherStudentsService,
+    HomeroomSummaryService,
+    TeacherAssignmentsService,
+  ],
+  exports: [
+    TeacherTodayService,
+    TeacherStudentsService,
+    HomeroomSummaryService,
+  ],
 })
 export class TeacherWorkspaceModule {}
