@@ -39,15 +39,13 @@ function buildService(assignments: Array<Record<string, any>>) {
     scopeDeps.audit as never,
   );
 
-  const markGroupBy = jest
-    .fn()
-    .mockResolvedValue([
-      {
-        subjectId: 'sub-maths',
-        status: MarkEntryStatus.SUBMITTED,
-        _count: { _all: 3 },
-      },
-    ]);
+  const markGroupBy = jest.fn().mockResolvedValue([
+    {
+      subjectId: 'sub-maths',
+      status: MarkEntryStatus.SUBMITTED,
+      _count: { _all: 3 },
+    },
+  ]);
   const homeworkFindMany = jest.fn().mockResolvedValue([]);
 
   const prisma = {

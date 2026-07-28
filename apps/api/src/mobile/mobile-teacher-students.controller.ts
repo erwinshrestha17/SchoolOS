@@ -18,9 +18,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
-import {
-  LearningScopeQueryDto,
-} from '../learning-improvement/dto/learning-improvement.dto';
+import { LearningScopeQueryDto } from '../learning-improvement/dto/learning-improvement.dto';
 import { LearningImprovementService } from '../learning-improvement/learning-improvement.service';
 import {
   MobileTeacherFormativeAssessmentDto,

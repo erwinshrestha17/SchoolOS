@@ -218,7 +218,12 @@ const dashboardRouteGates: RouteGate[] = [
   {
     prefix: "/dashboard/reports",
     label: "Reports",
-    permissions: ["accounting:reports:read", "library:reports:read"],
+    permissions: [
+      "accounting:reports:read",
+      "library:reports:read",
+      "reports:read",
+      "settings:manage",
+    ],
   },
 ];
 

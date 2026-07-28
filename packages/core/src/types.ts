@@ -5280,9 +5280,6 @@ export type IemisExportResult = {
   validRecords: number;
   invalidRecords: number;
   issues: IemisValidationIssue[];
-  headers: Array<keyof IemisExportRow>;
-  rows: IemisExportRow[];
-  csv: string;
 };
 
 export type StudentDuplicateCandidate = {

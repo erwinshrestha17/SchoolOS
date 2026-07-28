@@ -1,8 +1,10 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import {
   AuthMethod,
   SchoolImprovementActionStatus,
   SchoolImprovementPlanStatus,
+  TeacherDevelopmentGoalStatus,
   TeacherObservationStatus,
 } from '@prisma/client';
 import type { AuditService } from '../audit/audit.service';
@@ -100,9 +102,7 @@ describe('InstitutionalImprovementService', () => {
         version: 2,
       }),
     );
-    expect(
-      prisma.teacherClassroomObservation.updateMany,
-    ).toHaveBeenCalledWith(
+    expect(prisma.teacherClassroomObservation.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
           id: 'observation-1',
@@ -117,6 +117,44 @@ describe('InstitutionalImprovementService', () => {
         tenantId: 'tenant-1',
       }),
     );
+  });
+
+  it('replays a concurrent teacher-goal create with the same idempotency data', async () => {
+    const { service, prisma, audit } = buildService();
+    const dto = {
+      teacherStaffId: 'staff-1',
+      academicYearId: 'year-1',
+      title: 'Increase formative assessment checks',
+      baseline: 'Understanding checks are used inconsistently.',
+      target: 'Use two checks in every observed lesson.',
+      actionPlan: 'Plan and review two techniques with the mentor.',
+      startsOn: '2026-07-26',
+      dueOn: '2026-09-30',
+      clientRequestId: '10000000-0000-4000-8000-000000000002',
+    };
+    const concurrent = goalRecord({
+      title: dto.title,
+      baseline: dto.baseline,
+      target: dto.target,
+      actionPlan: dto.actionPlan,
+      clientRequestId: dto.clientRequestId,
+      requestFingerprint: fingerprint(dto),
+    });
+    prisma.academicYear.findFirst.mockResolvedValue({ id: 'year-1' });
+    prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
+    prisma.teacherDevelopmentGoal.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(concurrent);
+    prisma.teacherDevelopmentGoal.create.mockRejectedValue({ code: 'P2002' });
+
+    await expect(service.createTeacherGoal(actor, dto)).resolves.toEqual(
+      expect.objectContaining({
+        id: 'goal-1',
+        replayed: true,
+        status: TeacherDevelopmentGoalStatus.DRAFT,
+      }),
+    );
+    expect(audit.record).not.toHaveBeenCalled();
   });
 
   it('returns explainable, non-predictive SEE readiness from backend-owned counts', async () => {
@@ -138,10 +176,7 @@ describe('InstitutionalImprovementService', () => {
     ]);
     prisma.markEntry.count.mockResolvedValue(3);
     prisma.reportCard.count.mockResolvedValue(1);
-    studentsService.getIemisValidationList.mockResolvedValue([
-      { studentId: 'student-1' },
-      { studentId: 'student-2' },
-    ]);
+    studentsService.countIemisReadyForClasses.mockResolvedValue(2);
 
     const result = await service.getBoardExamReadiness(actor, {
       track: 'SEE',
@@ -172,8 +207,8 @@ describe('InstitutionalImprovementService', () => {
         }),
       ]),
     );
-    expect(studentsService.getIemisValidationList).toHaveBeenCalledWith(
-      { classId: 'class-10', status: 'ready' },
+    expect(studentsService.countIemisReadyForClasses).toHaveBeenCalledWith(
+      ['class-10'],
       actor,
     );
   });
@@ -185,6 +220,24 @@ describe('InstitutionalImprovementService', () => {
     await expect(
       service.getTeacherDevelopmentOverview(actor, {}),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('does not reopen a completed school improvement action', async () => {
+    const { service, prisma } = buildService();
+    prisma.schoolImprovementAction.findFirst.mockResolvedValue(
+      actionRecord({ status: SchoolImprovementActionStatus.COMPLETED }),
+    );
+
+    await expect(
+      service.updateSchoolImprovementAction(actor, 'action-1', {
+        expectedVersion: 1,
+        status: SchoolImprovementActionStatus.IN_PROGRESS,
+        reason: 'Attempting to reopen a finished action.',
+      }),
+    ).rejects.toThrow(
+      'Improvement action cannot move from COMPLETED to IN_PROGRESS',
+    );
+    expect(prisma.schoolImprovementAction.updateMany).not.toHaveBeenCalled();
   });
 });
 
@@ -225,7 +278,7 @@ function buildService() {
     assertFileAccessForAuth: jest.fn(),
   };
   const studentsService = {
-    getIemisValidationList: jest.fn(),
+    countIemisReadyForClasses: jest.fn(),
   };
   const service = new InstitutionalImprovementService(
     prisma as PrismaService,
@@ -246,9 +299,7 @@ function staffRecord() {
   };
 }
 
-function observationRecord(
-  overrides: Record<string, unknown> = {},
-): any {
+function observationRecord(overrides: Record<string, unknown> = {}): any {
   return { ...observationRecordBase(), ...overrides };
 }
 
@@ -280,9 +331,51 @@ function observationRecordBase() {
   };
 }
 
-function actionRecord(
-  overrides: Record<string, unknown> = {},
-): any {
+function goalRecord(overrides: Record<string, unknown> = {}): any {
+  const now = new Date('2026-07-26T10:00:00.000Z');
+  return {
+    id: 'goal-1',
+    tenantId: 'tenant-1',
+    teacherStaffId: 'staff-1',
+    teacher: staffRecord(),
+    mentorStaffId: null,
+    mentor: null,
+    academicYearId: 'year-1',
+    createdByUserId: 'user-1',
+    title: 'Increase formative assessment checks',
+    baseline: 'Understanding checks are used inconsistently.',
+    target: 'Use two checks in every observed lesson.',
+    actionPlan: 'Plan and review two techniques with the mentor.',
+    startsOn: new Date('2026-07-26T00:00:00.000Z'),
+    dueOn: new Date('2026-09-30T00:00:00.000Z'),
+    status: TeacherDevelopmentGoalStatus.DRAFT,
+    progressNote: null,
+    completedOn: null,
+    version: 1,
+    clientRequestId: '10000000-0000-4000-8000-000000000002',
+    requestFingerprint: 'fingerprint',
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+function fingerprint(value: unknown) {
+  return createHash('sha256').update(stableJson(value)).digest('hex');
+}
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function actionRecord(overrides: Record<string, unknown> = {}): any {
   return { ...actionRecordBase(), ...overrides };
 }
 
@@ -305,9 +398,7 @@ function actionRecordBase() {
   };
 }
 
-function planRecord(
-  overrides: Record<string, unknown> = {},
-): any {
+function planRecord(overrides: Record<string, unknown> = {}): any {
   return { ...planRecordBase(), ...overrides };
 }
 

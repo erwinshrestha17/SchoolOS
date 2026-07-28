@@ -98,12 +98,8 @@ export class InstitutionalImprovementService {
     const { page, limit, skip } = pageOf(query);
     const where: Prisma.TeacherClassroomObservationWhereInput = {
       tenantId: actor.tenantId,
-      ...(query.academicYearId
-        ? { academicYearId: query.academicYearId }
-        : {}),
-      ...(query.teacherStaffId
-        ? { teacherStaffId: query.teacherStaffId }
-        : {}),
+      ...(query.academicYearId ? { academicYearId: query.academicYearId } : {}),
+      ...(query.teacherStaffId ? { teacherStaffId: query.teacherStaffId } : {}),
       ...(query.status ? { status: query.status } : {}),
     };
     const [total, items] = await Promise.all([
@@ -126,15 +122,14 @@ export class InstitutionalImprovementService {
     await this.assertObservationScope(actor, dto);
     assertDateOrder(dto.observedOn, dto.followUpOn, 'Follow-up date');
     const fingerprint = fingerprintOf(dto);
-    const replay =
-      await this.prisma.teacherClassroomObservation.findFirst({
-        where: {
-          tenantId: actor.tenantId,
-          observerUserId: actor.userId,
-          clientRequestId: dto.clientRequestId,
-        },
-        include: observationInclude,
-      });
+    const replay = await this.prisma.teacherClassroomObservation.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        observerUserId: actor.userId,
+        clientRequestId: dto.clientRequestId,
+      },
+      include: observationInclude,
+    });
     if (replay) {
       assertMatchingReplay(replay.requestFingerprint, fingerprint);
       return { ...mapObservation(replay), replayed: true };
@@ -234,15 +229,14 @@ export class InstitutionalImprovementService {
     dto: UpdateTeacherObservationDto,
   ) {
     const staff = await this.getCurrentStaff(actor);
-    const current =
-      await this.prisma.teacherClassroomObservation.findFirst({
-        where: {
-          id: observationId,
-          tenantId: actor.tenantId,
-          teacherStaffId: staff.id,
-        },
-        include: observationInclude,
-      });
+    const current = await this.prisma.teacherClassroomObservation.findFirst({
+      where: {
+        id: observationId,
+        tenantId: actor.tenantId,
+        teacherStaffId: staff.id,
+      },
+      include: observationInclude,
+    });
     if (!current) throw new NotFoundException('Observation was not found');
     if (dto.status !== TeacherObservationStatus.ACKNOWLEDGED) {
       throw new ForbiddenException(
@@ -256,12 +250,8 @@ export class InstitutionalImprovementService {
     const { page, limit, skip } = pageOf(query);
     const where: Prisma.TeacherDevelopmentGoalWhereInput = {
       tenantId: actor.tenantId,
-      ...(query.academicYearId
-        ? { academicYearId: query.academicYearId }
-        : {}),
-      ...(query.teacherStaffId
-        ? { teacherStaffId: query.teacherStaffId }
-        : {}),
+      ...(query.academicYearId ? { academicYearId: query.academicYearId } : {}),
+      ...(query.teacherStaffId ? { teacherStaffId: query.teacherStaffId } : {}),
       ...(query.status ? { status: query.status } : {}),
     };
     const [total, items] = await Promise.all([
@@ -295,29 +285,44 @@ export class InstitutionalImprovementService {
       assertMatchingReplay(replay.requestFingerprint, requestFingerprint);
       return { ...mapGoal(replay), replayed: true };
     }
-    const created = await this.prisma.teacherDevelopmentGoal.create({
-      data: {
-        tenantId: actor.tenantId,
+    try {
+      const created = await this.prisma.teacherDevelopmentGoal.create({
+        data: {
+          tenantId: actor.tenantId,
+          teacherStaffId: dto.teacherStaffId,
+          mentorStaffId: dto.mentorStaffId ?? null,
+          academicYearId: dto.academicYearId,
+          createdByUserId: actor.userId,
+          title: dto.title.trim(),
+          baseline: dto.baseline.trim(),
+          target: dto.target.trim(),
+          actionPlan: dto.actionPlan.trim(),
+          startsOn: dateOnly(dto.startsOn),
+          dueOn: dateOnly(dto.dueOn),
+          clientRequestId: dto.clientRequestId,
+          requestFingerprint,
+        },
+        include: goalInclude,
+      });
+      await this.record(actor, 'TEACHER_DEVELOPMENT_GOAL_CREATED', created.id, {
         teacherStaffId: dto.teacherStaffId,
         mentorStaffId: dto.mentorStaffId ?? null,
-        academicYearId: dto.academicYearId,
-        createdByUserId: actor.userId,
-        title: dto.title.trim(),
-        baseline: dto.baseline.trim(),
-        target: dto.target.trim(),
-        actionPlan: dto.actionPlan.trim(),
-        startsOn: dateOnly(dto.startsOn),
-        dueOn: dateOnly(dto.dueOn),
-        clientRequestId: dto.clientRequestId,
-        requestFingerprint,
-      },
-      include: goalInclude,
-    });
-    await this.record(actor, 'TEACHER_DEVELOPMENT_GOAL_CREATED', created.id, {
-      teacherStaffId: dto.teacherStaffId,
-      mentorStaffId: dto.mentorStaffId ?? null,
-    });
-    return { ...mapGoal(created), replayed: false };
+      });
+      return { ...mapGoal(created), replayed: false };
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+      const concurrent = await this.prisma.teacherDevelopmentGoal.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          createdByUserId: actor.userId,
+          clientRequestId: dto.clientRequestId,
+        },
+        include: goalInclude,
+      });
+      if (!concurrent) throw error;
+      assertMatchingReplay(concurrent.requestFingerprint, requestFingerprint);
+      return { ...mapGoal(concurrent), replayed: true };
+    }
   }
 
   async updateTeacherGoal(
@@ -366,16 +371,11 @@ export class InstitutionalImprovementService {
     return mapGoal(result);
   }
 
-  async listTeacherTraining(
-    actor: AuthContext,
-    query: ListTeacherTrainingDto,
-  ) {
+  async listTeacherTraining(actor: AuthContext, query: ListTeacherTrainingDto) {
     const { page, limit, skip } = pageOf(query);
     const where: Prisma.TeacherTrainingRecordWhereInput = {
       tenantId: actor.tenantId,
-      ...(query.teacherStaffId
-        ? { teacherStaffId: query.teacherStaffId }
-        : {}),
+      ...(query.teacherStaffId ? { teacherStaffId: query.teacherStaffId } : {}),
       ...(query.status ? { status: query.status } : {}),
     };
     const [total, items] = await Promise.all([
@@ -417,29 +417,44 @@ export class InstitutionalImprovementService {
       assertMatchingReplay(replay.requestFingerprint, requestFingerprint);
       return { ...mapTraining(replay), replayed: true };
     }
-    const created = await this.prisma.teacherTrainingRecord.create({
-      data: {
-        tenantId: actor.tenantId,
+    try {
+      const created = await this.prisma.teacherTrainingRecord.create({
+        data: {
+          tenantId: actor.tenantId,
+          teacherStaffId: dto.teacherStaffId,
+          createdByUserId: actor.userId,
+          title: dto.title.trim(),
+          providerName: cleanOptional(dto.providerName),
+          startsOn: dateOnly(dto.startsOn),
+          endsOn: dto.endsOn ? dateOnly(dto.endsOn) : null,
+          status: dto.status,
+          learningSummary: cleanOptional(dto.learningSummary),
+          certificateFileAssetId: dto.certificateFileAssetId ?? null,
+          clientRequestId: dto.clientRequestId,
+          requestFingerprint,
+        },
+        include: trainingInclude,
+      });
+      await this.record(actor, 'TEACHER_TRAINING_RECORDED', created.id, {
         teacherStaffId: dto.teacherStaffId,
-        createdByUserId: actor.userId,
-        title: dto.title.trim(),
-        providerName: cleanOptional(dto.providerName),
-        startsOn: dateOnly(dto.startsOn),
-        endsOn: dto.endsOn ? dateOnly(dto.endsOn) : null,
         status: dto.status,
-        learningSummary: cleanOptional(dto.learningSummary),
         certificateFileAssetId: dto.certificateFileAssetId ?? null,
-        clientRequestId: dto.clientRequestId,
-        requestFingerprint,
-      },
-      include: trainingInclude,
-    });
-    await this.record(actor, 'TEACHER_TRAINING_RECORDED', created.id, {
-      teacherStaffId: dto.teacherStaffId,
-      status: dto.status,
-      certificateFileAssetId: dto.certificateFileAssetId ?? null,
-    });
-    return { ...mapTraining(created), replayed: false };
+      });
+      return { ...mapTraining(created), replayed: false };
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+      const concurrent = await this.prisma.teacherTrainingRecord.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          createdByUserId: actor.userId,
+          clientRequestId: dto.clientRequestId,
+        },
+        include: trainingInclude,
+      });
+      if (!concurrent) throw error;
+      assertMatchingReplay(concurrent.requestFingerprint, requestFingerprint);
+      return { ...mapTraining(concurrent), replayed: true };
+    }
   }
 
   async getTeacherDevelopmentOverview(
@@ -539,11 +554,8 @@ export class InstitutionalImprovementService {
       },
       sourceStates: {
         observations:
-          observations.length > 0
-            ? ('available' as const)
-            : ('empty' as const),
-        goals:
-          goals.length > 0 ? ('available' as const) : ('empty' as const),
+          observations.length > 0 ? ('available' as const) : ('empty' as const),
+        goals: goals.length > 0 ? ('available' as const) : ('empty' as const),
         training:
           training.length > 0 ? ('available' as const) : ('empty' as const),
       },
@@ -588,9 +600,7 @@ export class InstitutionalImprovementService {
     const { page, limit, skip } = pageOf(query);
     const where: Prisma.SchoolImprovementPlanWhereInput = {
       tenantId: actor.tenantId,
-      ...(query.academicYearId
-        ? { academicYearId: query.academicYearId }
-        : {}),
+      ...(query.academicYearId ? { academicYearId: query.academicYearId } : {}),
       ...(query.status ? { status: query.status } : {}),
     };
     const [total, items] = await Promise.all([
@@ -648,49 +658,64 @@ export class InstitutionalImprovementService {
       assertMatchingReplay(replay.requestFingerprint, requestFingerprint);
       return { ...mapPlan(replay), replayed: true };
     }
-    const created = await this.prisma.schoolImprovementPlan.create({
-      data: {
-        tenantId: actor.tenantId,
+    try {
+      const created = await this.prisma.schoolImprovementPlan.create({
+        data: {
+          tenantId: actor.tenantId,
+          academicYearId: dto.academicYearId,
+          createdByUserId: actor.userId,
+          ownerUserId: dto.ownerUserId,
+          title: dto.title.trim(),
+          baselineSummary: dto.baselineSummary.trim(),
+          targetSummary: dto.targetSummary.trim(),
+          startsOn: dateOnly(dto.startsOn),
+          endsOn: dateOnly(dto.endsOn),
+          clientRequestId: dto.clientRequestId,
+          requestFingerprint,
+          kpis: {
+            create: dto.kpis.map((item) => ({
+              tenantId: actor.tenantId,
+              ownerUserId: item.ownerUserId,
+              name: item.name.trim(),
+              unit: item.unit.trim(),
+              baselineValue: new Prisma.Decimal(item.baselineValue),
+              targetValue: new Prisma.Decimal(item.targetValue),
+              dueOn: dateOnly(item.dueOn),
+            })),
+          },
+          actions: {
+            create: dto.actions.map((item) => ({
+              tenantId: actor.tenantId,
+              ownerUserId: item.ownerUserId,
+              title: item.title.trim(),
+              details: item.details.trim(),
+              dueOn: dateOnly(item.dueOn),
+            })),
+          },
+        },
+        include: planInclude,
+      });
+      await this.record(actor, 'SCHOOL_IMPROVEMENT_PLAN_CREATED', created.id, {
         academicYearId: dto.academicYearId,
-        createdByUserId: actor.userId,
         ownerUserId: dto.ownerUserId,
-        title: dto.title.trim(),
-        baselineSummary: dto.baselineSummary.trim(),
-        targetSummary: dto.targetSummary.trim(),
-        startsOn: dateOnly(dto.startsOn),
-        endsOn: dateOnly(dto.endsOn),
-        clientRequestId: dto.clientRequestId,
-        requestFingerprint,
-        kpis: {
-          create: dto.kpis.map((item) => ({
-            tenantId: actor.tenantId,
-            ownerUserId: item.ownerUserId,
-            name: item.name.trim(),
-            unit: item.unit.trim(),
-            baselineValue: new Prisma.Decimal(item.baselineValue),
-            targetValue: new Prisma.Decimal(item.targetValue),
-            dueOn: dateOnly(item.dueOn),
-          })),
+        kpiCount: dto.kpis.length,
+        actionCount: dto.actions.length,
+      });
+      return { ...mapPlan(created), replayed: false };
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+      const concurrent = await this.prisma.schoolImprovementPlan.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          createdByUserId: actor.userId,
+          clientRequestId: dto.clientRequestId,
         },
-        actions: {
-          create: dto.actions.map((item) => ({
-            tenantId: actor.tenantId,
-            ownerUserId: item.ownerUserId,
-            title: item.title.trim(),
-            details: item.details.trim(),
-            dueOn: dateOnly(item.dueOn),
-          })),
-        },
-      },
-      include: planInclude,
-    });
-    await this.record(actor, 'SCHOOL_IMPROVEMENT_PLAN_CREATED', created.id, {
-      academicYearId: dto.academicYearId,
-      ownerUserId: dto.ownerUserId,
-      kpiCount: dto.kpis.length,
-      actionCount: dto.actions.length,
-    });
-    return { ...mapPlan(created), replayed: false };
+        include: planInclude,
+      });
+      if (!concurrent) throw error;
+      assertMatchingReplay(concurrent.requestFingerprint, requestFingerprint);
+      return { ...mapPlan(concurrent), replayed: true };
+    }
   }
 
   async updateSchoolImprovementPlan(
@@ -742,6 +767,7 @@ export class InstitutionalImprovementService {
     if (!current) {
       throw new NotFoundException('School improvement action was not found');
     }
+    assertActionTransition(current.status, dto.status);
     if (dto.evidenceFileAssetId) {
       const asset = await this.fileRegistry.getFileMetadata(
         actor.tenantId,
@@ -815,38 +841,51 @@ export class InstitutionalImprovementService {
       assertMatchingReplay(replay.requestFingerprint, requestFingerprint);
       return { ...mapReview(replay), replayed: true };
     }
-    const created = await this.prisma.$transaction(async (tx) => {
-      for (const snapshot of dto.kpiSnapshot) {
-        await tx.schoolImprovementKpi.updateMany({
-          where: {
-            id: snapshot.kpiId,
+    try {
+      const created = await this.prisma.$transaction(async (tx) => {
+        for (const snapshot of dto.kpiSnapshot) {
+          await tx.schoolImprovementKpi.updateMany({
+            where: {
+              id: snapshot.kpiId,
+              tenantId: actor.tenantId,
+              planId,
+            },
+            data: { latestValue: new Prisma.Decimal(snapshot.value) },
+          });
+        }
+        return tx.schoolImprovementReview.create({
+          data: {
             tenantId: actor.tenantId,
             planId,
+            reviewedByUserId: actor.userId,
+            reviewedOn: dateOnly(dto.reviewedOn),
+            summary: dto.summary.trim(),
+            nextActions: dto.nextActions.trim(),
+            kpiSnapshot: dto.kpiSnapshot as unknown as Prisma.InputJsonValue,
+            clientRequestId: dto.clientRequestId,
+            requestFingerprint,
           },
-          data: { latestValue: new Prisma.Decimal(snapshot.value) },
         });
-      }
-      return tx.schoolImprovementReview.create({
-        data: {
+      });
+      await this.record(actor, 'SCHOOL_IMPROVEMENT_REVIEW_ADDED', created.id, {
+        planId,
+        reviewedOn: dto.reviewedOn,
+        kpiCount: dto.kpiSnapshot.length,
+      });
+      return { ...mapReview(created), replayed: false };
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+      const concurrent = await this.prisma.schoolImprovementReview.findFirst({
+        where: {
           tenantId: actor.tenantId,
-          planId,
           reviewedByUserId: actor.userId,
-          reviewedOn: dateOnly(dto.reviewedOn),
-          summary: dto.summary.trim(),
-          nextActions: dto.nextActions.trim(),
-          kpiSnapshot:
-            dto.kpiSnapshot as unknown as Prisma.InputJsonValue,
           clientRequestId: dto.clientRequestId,
-          requestFingerprint,
         },
       });
-    });
-    await this.record(actor, 'SCHOOL_IMPROVEMENT_REVIEW_ADDED', created.id, {
-      planId,
-      reviewedOn: dto.reviewedOn,
-      kpiCount: dto.kpiSnapshot.length,
-    });
-    return { ...mapReview(created), replayed: false };
+      if (!concurrent) throw error;
+      assertMatchingReplay(concurrent.requestFingerprint, requestFingerprint);
+      return { ...mapReview(concurrent), replayed: true };
+    }
   }
 
   async getBoardExamReadiness(
@@ -967,15 +1006,7 @@ export class InstitutionalImprovementService {
   }
 
   private async countIemisReady(actor: AuthContext, classIds: string[]) {
-    const lists = await Promise.all(
-      classIds.map((classId) =>
-        this.studentsService.getIemisValidationList(
-          { classId, status: 'ready' },
-          actor,
-        ),
-      ),
-    );
-    return lists.reduce((sum, items) => sum + items.length, 0);
+    return this.studentsService.countIemisReadyForClasses(classIds, actor);
   }
 
   private async assertObservationScope(
@@ -1031,10 +1062,7 @@ export class InstitutionalImprovementService {
     }
   }
 
-  private async assertAcademicYear(
-    actor: AuthContext,
-    academicYearId: string,
-  ) {
+  private async assertAcademicYear(actor: AuthContext, academicYearId: string) {
     const record = await this.prisma.academicYear.findFirst({
       where: { id: academicYearId, tenantId: actor.tenantId },
       select: { id: true },
@@ -1102,11 +1130,10 @@ export class InstitutionalImprovementService {
     actor: AuthContext,
     observationId: string,
   ) {
-    const record =
-      await this.prisma.teacherClassroomObservation.findFirst({
-        where: { id: observationId, tenantId: actor.tenantId },
-        include: observationInclude,
-      });
+    const record = await this.prisma.teacherClassroomObservation.findFirst({
+      where: { id: observationId, tenantId: actor.tenantId },
+      include: observationInclude,
+    });
     if (!record) throw new NotFoundException('Observation was not found');
     return record;
   }
@@ -1313,9 +1340,7 @@ function mapReview(record: {
     reviewedOn: formatDate(record.reviewedOn),
     summary: record.summary,
     nextActions: record.nextActions,
-    kpiSnapshot: Array.isArray(record.kpiSnapshot)
-      ? record.kpiSnapshot
-      : [],
+    kpiSnapshot: Array.isArray(record.kpiSnapshot) ? record.kpiSnapshot : [],
     createdAt: record.createdAt.toISOString(),
   };
 }
@@ -1417,9 +1442,7 @@ function buildBoardReadiness(input: {
     nonPredictive: true as const,
     sourceStates: {
       students:
-        input.studentCount > 0
-          ? ('available' as const)
-          : ('empty' as const),
+        input.studentCount > 0 ? ('available' as const) : ('empty' as const),
       examTerms: input.examTermName
         ? ('available' as const)
         : ('empty' as const),
@@ -1436,9 +1459,7 @@ function buildBoardReadiness(input: {
             ? ('available' as const)
             : ('empty' as const),
       iemis:
-        input.studentCount > 0
-          ? ('available' as const)
-          : ('empty' as const),
+        input.studentCount > 0 ? ('available' as const) : ('empty' as const),
     },
     indicators,
   };
@@ -1597,18 +1618,47 @@ function assertPlanTransition(
   }
 }
 
+function assertActionTransition(
+  current: SchoolImprovementActionStatus,
+  next: SchoolImprovementActionStatus,
+) {
+  if (current === next) return;
+  const allowed: Record<
+    SchoolImprovementActionStatus,
+    SchoolImprovementActionStatus[]
+  > = {
+    NOT_STARTED: [
+      SchoolImprovementActionStatus.IN_PROGRESS,
+      SchoolImprovementActionStatus.BLOCKED,
+      SchoolImprovementActionStatus.COMPLETED,
+      SchoolImprovementActionStatus.CANCELLED,
+    ],
+    IN_PROGRESS: [
+      SchoolImprovementActionStatus.BLOCKED,
+      SchoolImprovementActionStatus.COMPLETED,
+      SchoolImprovementActionStatus.CANCELLED,
+    ],
+    BLOCKED: [
+      SchoolImprovementActionStatus.IN_PROGRESS,
+      SchoolImprovementActionStatus.CANCELLED,
+    ],
+    COMPLETED: [],
+    CANCELLED: [],
+  };
+  if (!allowed[current].includes(next)) {
+    throw new ConflictException(
+      `Improvement action cannot move from ${current} to ${next}`,
+    );
+  }
+}
+
 function pageOf(query: InstitutionalPageDto) {
   const page = query.page ?? 1;
   const limit = query.limit ?? 25;
   return { page, limit, skip: (page - 1) * limit };
 }
 
-function pageResult<T>(
-  items: T[],
-  total: number,
-  page: number,
-  limit: number,
-) {
+function pageResult<T>(items: T[], total: number, page: number, limit: number) {
   return {
     items,
     total,

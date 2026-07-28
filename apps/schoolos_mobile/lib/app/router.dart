@@ -441,6 +441,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const PrincipalWalkthroughsScreen(),
       ),
       GoRoute(
+        path: AppRoutes.principalInstitutionalImprovement,
+        builder: (context, state) =>
+            const PrincipalInstitutionalImprovementScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.principalCanteen,
         builder: (context, state) => const PrincipalSnapshotScreen(
           snapshotKey: 'canteen',
@@ -591,6 +596,7 @@ bool isPrincipalRoute(String location) {
       location == AppRoutes.principalReports ||
       location == AppRoutes.principalTasks ||
       location == AppRoutes.principalWalkthroughs ||
+      location == AppRoutes.principalInstitutionalImprovement ||
       location == AppRoutes.principalCanteen ||
       location == AppRoutes.principalLibrary;
 }

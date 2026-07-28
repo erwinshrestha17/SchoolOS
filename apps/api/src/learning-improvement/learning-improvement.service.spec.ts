@@ -182,9 +182,7 @@ describe('LearningImprovementService', () => {
       where: { tenantId: 'tenant-1', isCurrent: true },
       select: { id: true },
     });
-    expect(
-      prisma.formativeAssessmentEvidence.groupBy,
-    ).toHaveBeenCalledWith(
+    expect(prisma.formativeAssessmentEvidence.groupBy).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           tenantId: 'tenant-1',
@@ -200,9 +198,7 @@ describe('LearningImprovementService', () => {
 
     await expect(
       service.getEarlyWarnings(adminActor, { page: 1, limit: 20 }),
-    ).rejects.toThrow(
-      'No current academic year is configured for this school',
-    );
+    ).rejects.toThrow('No current academic year is configured for this school');
   });
 
   it('returns an empty page for a teacher with no assigned class or subject scope', async () => {
@@ -240,9 +236,7 @@ describe('LearningImprovementService', () => {
     });
     await expect(
       service.getParentLearningSummary('student-1', parentActor),
-    ).rejects.toThrow(
-      'You can only view learning guidance for a linked child',
-    );
+    ).rejects.toThrow('You can only view learning guidance for a linked child');
     expect(prisma.student.findFirst).not.toHaveBeenCalled();
   });
 

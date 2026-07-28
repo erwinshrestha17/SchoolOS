@@ -7,6 +7,7 @@ import {
   AlertCircle,
   ArrowRight,
   BadgeCheck,
+  BookOpenCheck,
   Briefcase,
   CalendarDays,
   ClipboardCheck,
@@ -37,6 +38,11 @@ const moduleTabs = [
     href: "/dashboard/hr/attendance",
     label: "Attendance",
     icon: ClipboardCheck,
+  },
+  {
+    href: "/dashboard/hr/teacher-development",
+    label: "Teacher Development",
+    icon: BookOpenCheck,
   },
   { href: "/dashboard/payroll/runs", label: "Payroll", icon: History },
   {
@@ -127,6 +133,11 @@ export default function HRDashboardPage() {
             label: "Payslips",
             icon: <FileText className="h-4 w-4" />,
             onClick: () => router.push("/dashboard/payroll/payslips"),
+          },
+          {
+            label: "Teacher Development",
+            icon: <BookOpenCheck className="h-4 w-4" />,
+            onClick: () => router.push("/dashboard/hr/teacher-development"),
           },
           {
             label: "Payroll Reports",

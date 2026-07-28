@@ -126,7 +126,11 @@ export class LearningImprovementService {
 
   async listOutcomes(actor: AuthContext, query: ListLearningOutcomesDto) {
     const { page, limit, skip } = pageOf(query);
-    const teacherFilter = await this.buildTeacherScopeFilter(actor, true, false);
+    const teacherFilter = await this.buildTeacherScopeFilter(
+      actor,
+      true,
+      false,
+    );
     if (teacherFilter === 'NONE') return emptyPage(page, limit);
 
     const where: Prisma.LearningOutcomeWhereInput = {
@@ -269,9 +273,7 @@ export class LearningImprovementService {
       ...(query.subjectId ? { subjectId: query.subjectId } : {}),
       ...(query.studentId ? { studentId: query.studentId } : {}),
       ...(query.outcomeId ? { outcomeId: query.outcomeId } : {}),
-      ...(query.masteryStatus
-        ? { masteryStatus: query.masteryStatus }
-        : {}),
+      ...(query.masteryStatus ? { masteryStatus: query.masteryStatus } : {}),
       ...(query.from || query.to
         ? {
             assessedOn: {
@@ -347,16 +349,15 @@ export class LearningImprovementService {
       );
     }
     if (dto.reassessmentOfId) {
-      const previous =
-        await this.prisma.formativeAssessmentEvidence.findFirst({
-          where: {
-            id: dto.reassessmentOfId,
-            tenantId: actor.tenantId,
-            outcomeId: dto.outcomeId,
-            studentId: dto.studentId,
-          },
-          select: { id: true },
-        });
+      const previous = await this.prisma.formativeAssessmentEvidence.findFirst({
+        where: {
+          id: dto.reassessmentOfId,
+          tenantId: actor.tenantId,
+          outcomeId: dto.outcomeId,
+          studentId: dto.studentId,
+        },
+        select: { id: true },
+      });
       if (!previous) {
         throw new NotFoundException(
           'Earlier assessment evidence was not found for this student and outcome',
@@ -365,15 +366,14 @@ export class LearningImprovementService {
     }
 
     const fingerprint = requestFingerprint(dto);
-    const replay =
-      await this.prisma.formativeAssessmentEvidence.findFirst({
-        where: {
-          tenantId: actor.tenantId,
-          teacherStaffId: staff.id,
-          clientSubmissionId: dto.clientSubmissionId,
-        },
-        include: formativeInclude,
-      });
+    const replay = await this.prisma.formativeAssessmentEvidence.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        teacherStaffId: staff.id,
+        clientSubmissionId: dto.clientSubmissionId,
+      },
+      include: formativeInclude,
+    });
     if (replay) {
       assertMatchingReplay(replay.requestFingerprint, fingerprint);
       return { ...mapFormativeEvidence(replay), replayed: true };
@@ -545,11 +545,10 @@ export class LearningImprovementService {
     const academicYearId =
       query.academicYearId ??
       (await this.getCurrentAcademicYearId(actor.tenantId));
-    const attendanceEnabled =
-      await this.entitlementsService.checkModuleEnabled(
-        actor.tenantId,
-        'attendance',
-      );
+    const attendanceEnabled = await this.entitlementsService.checkModuleEnabled(
+      actor.tenantId,
+      'attendance',
+    );
     const homeworkEnabled = await this.entitlementsService.checkModuleEnabled(
       actor.tenantId,
       'homework',
@@ -688,77 +687,73 @@ export class LearningImprovementService {
       }),
     ]);
     const studentIds = students.map((student) => student.id);
-    const [
-      attendanceRows,
-      formativeRows,
-      homeworkRows,
-      interventionRows,
-    ] = await Promise.all([
-      attendanceEnabled && studentIds.length > 0
-        ? this.prisma.attendanceRecord.groupBy({
-            by: ['studentId', 'status'],
-            where: {
-              tenantId: actor.tenantId,
-              studentId: { in: studentIds },
-              attendanceSession: {
-                attendanceDate: { gte: thirtyDaysAgo, lte: generatedAt },
-                academicYearId,
+    const [attendanceRows, formativeRows, homeworkRows, interventionRows] =
+      await Promise.all([
+        attendanceEnabled && studentIds.length > 0
+          ? this.prisma.attendanceRecord.groupBy({
+              by: ['studentId', 'status'],
+              where: {
+                tenantId: actor.tenantId,
+                studentId: { in: studentIds },
+                attendanceSession: {
+                  attendanceDate: { gte: thirtyDaysAgo, lte: generatedAt },
+                  academicYearId,
+                },
               },
-            },
-            _count: { _all: true },
-          })
-        : Promise.resolve([]),
-      this.prisma.formativeAssessmentEvidence.findMany({
-        where: {
-          tenantId: actor.tenantId,
-          studentId: { in: studentIds },
-          academicYearId,
-          ...(query.subjectId ? { subjectId: query.subjectId } : {}),
-          assessedOn: { gte: sixtyDaysAgo, lte: generatedAt },
-        },
-        select: {
-          studentId: true,
-          masteryStatus: true,
-          score: true,
-          maxScore: true,
-          assessedOn: true,
-        },
-        orderBy: [{ assessedOn: 'desc' }, { createdAt: 'desc' }],
-        take: Math.max(studentIds.length * 20, 20),
-      }),
-      homeworkEnabled && studentIds.length > 0
-        ? this.prisma.homeworkSubmission.groupBy({
-            by: ['studentId', 'status'],
-            where: {
-              tenantId: actor.tenantId,
-              studentId: { in: studentIds },
-              homework: {
-                academicYearId,
-                ...(query.subjectId ? { subjectId: query.subjectId } : {}),
-                status: HomeworkAssignmentStatus.ASSIGNED,
-                submissionRequired: true,
-                dueAt: { lt: generatedAt, gte: sixtyDaysAgo },
-              },
-            },
-            _count: { _all: true },
-          })
-        : Promise.resolve([]),
-      this.prisma.studentInterventionCase.findMany({
-        where: {
-          tenantId: actor.tenantId,
-          studentId: { in: studentIds },
-          academicYearId,
-          status: {
-            in:
-              query.interventionStatus !== undefined
-                ? [query.interventionStatus]
-                : ACTIVE_INTERVENTION_STATUSES,
+              _count: { _all: true },
+            })
+          : Promise.resolve([]),
+        this.prisma.formativeAssessmentEvidence.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            studentId: { in: studentIds },
+            academicYearId,
+            ...(query.subjectId ? { subjectId: query.subjectId } : {}),
+            assessedOn: { gte: sixtyDaysAgo, lte: generatedAt },
           },
-        },
-        select: { id: true, studentId: true, createdAt: true },
-        orderBy: { createdAt: 'desc' },
-      }),
-    ]);
+          select: {
+            studentId: true,
+            masteryStatus: true,
+            score: true,
+            maxScore: true,
+            assessedOn: true,
+          },
+          orderBy: [{ assessedOn: 'desc' }, { createdAt: 'desc' }],
+          take: Math.max(studentIds.length * 20, 20),
+        }),
+        homeworkEnabled && studentIds.length > 0
+          ? this.prisma.homeworkSubmission.groupBy({
+              by: ['studentId', 'status'],
+              where: {
+                tenantId: actor.tenantId,
+                studentId: { in: studentIds },
+                homework: {
+                  academicYearId,
+                  ...(query.subjectId ? { subjectId: query.subjectId } : {}),
+                  status: HomeworkAssignmentStatus.ASSIGNED,
+                  submissionRequired: true,
+                  dueAt: { lt: generatedAt, gte: sixtyDaysAgo },
+                },
+              },
+              _count: { _all: true },
+            })
+          : Promise.resolve([]),
+        this.prisma.studentInterventionCase.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            studentId: { in: studentIds },
+            academicYearId,
+            status: {
+              in:
+                query.interventionStatus !== undefined
+                  ? [query.interventionStatus]
+                  : ACTIVE_INTERVENTION_STATUSES,
+            },
+          },
+          select: { id: true, studentId: true, createdAt: true },
+          orderBy: { createdAt: 'desc' },
+        }),
+      ]);
 
     const items = students
       .map((student) =>
@@ -787,7 +782,11 @@ export class LearningImprovementService {
     query: ListStudentInterventionsDto,
   ) {
     const { page, limit, skip } = pageOf(query);
-    const teacherFilter = await this.buildTeacherScopeFilter(actor, false, true);
+    const teacherFilter = await this.buildTeacherScopeFilter(
+      actor,
+      false,
+      true,
+    );
     if (teacherFilter === 'NONE') return emptyPage(page, limit);
     const where: Prisma.StudentInterventionCaseWhereInput = {
       tenantId: actor.tenantId,
@@ -949,9 +948,7 @@ export class LearningImprovementService {
             entryType: dto.entryType,
             body: dto.body.trim(),
             parentVisible: dto.parentVisible,
-            contactedAt: dto.contactedAt
-              ? new Date(dto.contactedAt)
-              : null,
+            contactedAt: dto.contactedAt ? new Date(dto.contactedAt) : null,
             nextFollowUpOn: dto.nextFollowUpOn
               ? dateOnly(dto.nextFollowUpOn)
               : null,
@@ -1121,10 +1118,7 @@ export class LearningImprovementService {
     return pageResult(items.map(mapRemedialGroup), total, page, limit);
   }
 
-  async createRemedialGroup(
-    actor: AuthContext,
-    dto: CreateRemedialGroupDto,
-  ) {
+  async createRemedialGroup(actor: AuthContext, dto: CreateRemedialGroupDto) {
     if (dto.endsOn && dateOnly(dto.endsOn) < dateOnly(dto.startsOn)) {
       throw new ConflictException('End date cannot be before start date');
     }
@@ -1438,10 +1432,7 @@ export class LearningImprovementService {
     return mapCurriculumProgress(updated);
   }
 
-  async listGuidance(
-    actor: AuthContext,
-    query: ListParentLearningGuidanceDto,
-  ) {
+  async listGuidance(actor: AuthContext, query: ListParentLearningGuidanceDto) {
     const { page, limit, skip } = pageOf(query);
     const teacherFilter = await this.buildTeacherScopeFilter(actor, true, true);
     if (teacherFilter === 'NONE') return emptyPage(page, limit);
@@ -1548,11 +1539,16 @@ export class LearningImprovementService {
         },
         include: guidanceInclude,
       });
-      await this.record(actor, 'PARENT_LEARNING_GUIDANCE_CREATED', guidance.id, {
-        studentId: dto.studentId,
-        subjectId: dto.subjectId,
-        outcomeId: dto.outcomeId ?? null,
-      });
+      await this.record(
+        actor,
+        'PARENT_LEARNING_GUIDANCE_CREATED',
+        guidance.id,
+        {
+          studentId: dto.studentId,
+          subjectId: dto.subjectId,
+          outcomeId: dto.outcomeId ?? null,
+        },
+      );
       return { ...mapGuidance(guidance), replayed: false };
     } catch (error) {
       if (!isUniqueViolation(error)) throw error;
@@ -1588,11 +1584,16 @@ export class LearningImprovementService {
       },
       include: guidanceInclude,
     });
-    await this.record(actor, 'PARENT_LEARNING_GUIDANCE_STATUS_CHANGED', guidanceId, {
-      fromStatus: current.status,
-      toStatus: dto.status,
-      reason: dto.reason.trim(),
-    });
+    await this.record(
+      actor,
+      'PARENT_LEARNING_GUIDANCE_STATUS_CHANGED',
+      guidanceId,
+      {
+        fromStatus: current.status,
+        toStatus: dto.status,
+        reason: dto.reason.trim(),
+      },
+    );
     return mapGuidance(updated);
   }
 
@@ -1647,7 +1648,9 @@ export class LearningImprovementService {
             academicYearId,
             status: ParentLearningGuidanceStatus.PUBLISHED,
             OR: [{ visibleFrom: null }, { visibleFrom: { lte: now } }],
-            AND: [{ OR: [{ visibleUntil: null }, { visibleUntil: { gte: now } }] }],
+            AND: [
+              { OR: [{ visibleUntil: null }, { visibleUntil: { gte: now } }] },
+            ],
           },
           include: guidanceInclude,
           orderBy: [{ publishedAt: 'desc' }, { updatedAt: 'desc' }],
@@ -1699,7 +1702,9 @@ export class LearningImprovementService {
       student: mapStudent(student),
       sourceStates: {
         outcomeProgress:
-          outcomeProgress.length > 0 ? ('available' as const) : ('empty' as const),
+          outcomeProgress.length > 0
+            ? ('available' as const)
+            : ('empty' as const),
         guidance:
           guidance.length > 0 ? ('available' as const) : ('empty' as const),
         remedialSupport:
@@ -1921,9 +1926,7 @@ export class LearningImprovementService {
                     tenantId: actor.tenantId,
                     academicYearId: scope.academicYearId,
                     classId: scope.classId,
-                    ...(scope.sectionId
-                      ? { sectionId: scope.sectionId }
-                      : {}),
+                    ...(scope.sectionId ? { sectionId: scope.sectionId } : {}),
                     status: EnrollmentStatus.ACTIVE,
                   },
                 },
@@ -1945,7 +1948,8 @@ export class LearningImprovementService {
             })
           : Promise.resolve(null),
       ]);
-    if (!academicYear) throw new NotFoundException('Academic year was not found');
+    if (!academicYear)
+      throw new NotFoundException('Academic year was not found');
     if (!classroom) throw new NotFoundException('Class was not found');
     if (!subject || subject.classId !== scope.classId) {
       throw new ConflictException(
@@ -2015,8 +2019,7 @@ export class LearningImprovementService {
       access.assignments.some(
         (assignment) =>
           assignment.classId === classId &&
-          (assignment.sectionId === null ||
-            assignment.sectionId === sectionId),
+          (assignment.sectionId === null || assignment.sectionId === sectionId),
       ) ||
       access.classTeacherSections.some(
         (section) =>
@@ -2074,10 +2077,7 @@ export class LearningImprovementService {
         ...(includeSubject ? { subjectId: assignment.subjectId } : {}),
         ...(includeSection && assignment.sectionId
           ? {
-              OR: [
-                { sectionId: assignment.sectionId },
-                { sectionId: null },
-              ],
+              OR: [{ sectionId: assignment.sectionId }, { sectionId: null }],
             }
           : {}),
       })),
@@ -2490,10 +2490,7 @@ function buildEarlyWarningItem(input: {
   interventionRows: Array<{ id: string; studentId: string; createdAt: Date }>;
 }) {
   const reasons: Array<{
-    code:
-      | 'ATTENDANCE_PATTERN'
-      | 'FORMATIVE_SUPPORT'
-      | 'HOMEWORK_FOLLOW_UP';
+    code: 'ATTENDANCE_PATTERN' | 'FORMATIVE_SUPPORT' | 'HOMEWORK_FOLLOW_UP';
     label: string;
     explanation: string;
     observedValue: number;
@@ -2502,10 +2499,7 @@ function buildEarlyWarningItem(input: {
   const attendance = input.attendanceRows.filter(
     (row) => row.studentId === input.student.id,
   );
-  const markedDays = attendance.reduce(
-    (sum, row) => sum + row._count._all,
-    0,
-  );
+  const markedDays = attendance.reduce((sum, row) => sum + row._count._all, 0);
   const absentDays = attendance
     .filter((row) => ABSENCE_STATUSES.includes(row.status))
     .reduce((sum, row) => sum + row._count._all, 0);
@@ -2570,9 +2564,7 @@ function buildEarlyWarningItem(input: {
       .slice(0, 10)}`,
     student: mapStudent(input.student),
     attentionLevel:
-      reasons.length >= 2 ||
-      absencePercent >= 40 ||
-      beginningCount >= 3
+      reasons.length >= 2 || absencePercent >= 40 || beginningCount >= 3
         ? ('NEEDS_ATTENTION' as const)
         : ('WATCH' as const),
     reasons,
@@ -2591,9 +2583,8 @@ function buildEarlyWarningItem(input: {
         : ('locked' as const),
     },
     activeInterventionCaseId:
-      input.interventionRows.find(
-        (row) => row.studentId === input.student.id,
-      )?.id ?? null,
+      input.interventionRows.find((row) => row.studentId === input.student.id)
+        ?.id ?? null,
     generatedAt: input.generatedAt.toISOString(),
   };
 }
@@ -2603,27 +2594,29 @@ function assertInterventionTransition(
   to: StudentInterventionStatus,
 ) {
   if (from === to) return;
-  const allowed: Record<StudentInterventionStatus, StudentInterventionStatus[]> =
-    {
-      OPEN: [
-        StudentInterventionStatus.IN_PROGRESS,
-        StudentInterventionStatus.MONITORING,
-        StudentInterventionStatus.RESOLVED,
-      ],
-      IN_PROGRESS: [
-        StudentInterventionStatus.MONITORING,
-        StudentInterventionStatus.RESOLVED,
-      ],
-      MONITORING: [
-        StudentInterventionStatus.IN_PROGRESS,
-        StudentInterventionStatus.RESOLVED,
-      ],
-      RESOLVED: [
-        StudentInterventionStatus.IN_PROGRESS,
-        StudentInterventionStatus.CLOSED,
-      ],
-      CLOSED: [],
-    };
+  const allowed: Record<
+    StudentInterventionStatus,
+    StudentInterventionStatus[]
+  > = {
+    OPEN: [
+      StudentInterventionStatus.IN_PROGRESS,
+      StudentInterventionStatus.MONITORING,
+      StudentInterventionStatus.RESOLVED,
+    ],
+    IN_PROGRESS: [
+      StudentInterventionStatus.MONITORING,
+      StudentInterventionStatus.RESOLVED,
+    ],
+    MONITORING: [
+      StudentInterventionStatus.IN_PROGRESS,
+      StudentInterventionStatus.RESOLVED,
+    ],
+    RESOLVED: [
+      StudentInterventionStatus.IN_PROGRESS,
+      StudentInterventionStatus.CLOSED,
+    ],
+    CLOSED: [],
+  };
   if (!allowed[from].includes(to)) {
     throw new ConflictException(
       `Intervention cannot move from ${from} to ${to}`,
@@ -2675,10 +2668,7 @@ function assertGuidanceTransition(
 function validateCurriculumState(
   dto: CreateCurriculumProgressDto | UpdateCurriculumProgressDto,
 ) {
-  if (
-    dto.status === CurriculumProgressStatus.COMPLETED &&
-    !dto.completedOn
-  ) {
+  if (dto.status === CurriculumProgressStatus.COMPLETED && !dto.completedOn) {
     throw new ConflictException(
       'Completed curriculum work requires a completion date',
     );

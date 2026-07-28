@@ -18,6 +18,7 @@ import '../../../../shared/widgets/app_access_state.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_exception_view.dart';
 import '../../../../shared/widgets/app_loading.dart';
+import '../../../../shared/widgets/bs_date_picker.dart';
 import '../../../../shared/widgets/dispose_scope.dart';
 import '../../../../shared/widgets/offline_banner.dart';
 import '../../../../shared/widgets/section_header.dart';
@@ -914,6 +915,507 @@ Future<String?> _principalPrompt(
   return result;
 }
 
+void _showCreateWalkthroughSheet(
+  BuildContext context,
+  WidgetRef ref,
+  Map<String, dynamic> data,
+) {
+  final parentContext = context;
+  final teachers = _list(data['teacherOptions']);
+  if (teachers.isEmpty) {
+    _showPrincipalSnack(
+      context,
+      'No active teacher is available for an observation.',
+    );
+    return;
+  }
+  var teacherStaffId = _string(teachers.first['id']);
+  var observedOn = DateTime.now();
+  DateTime? followUpOn;
+  var saving = false;
+  String? validation;
+  final strengths = TextEditingController();
+  final focus = TextEditingController();
+  final agreedAction = TextEditingController();
+  final clientRequestId = _newUuidV4();
+
+  showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    useSafeArea: true,
+    builder: (sheetContext) => DisposeScope(
+      onDispose: () {
+        strengths.dispose();
+        focus.dispose();
+        agreedAction.dispose();
+      },
+      child: StatefulBuilder(
+        builder: (context, setSheetState) {
+          Future<void> pickObservedOn() async {
+            final selected = await showSchoolBsDatePicker(
+              context: context,
+              initialDate: observedOn,
+              firstDate: DateTime(2020),
+              lastDate: DateTime.now().add(const Duration(days: 365)),
+            );
+            if (selected != null) {
+              setSheetState(() => observedOn = selected);
+            }
+          }
+
+          Future<void> pickFollowUp() async {
+            final selected = await showSchoolBsDatePicker(
+              context: context,
+              initialDate:
+                  followUpOn ?? observedOn.add(const Duration(days: 14)),
+              firstDate: observedOn,
+              lastDate: observedOn.add(const Duration(days: 730)),
+            );
+            if (selected != null) {
+              setSheetState(() => followUpOn = selected);
+            }
+          }
+
+          Future<void> submit() async {
+            if (teacherStaffId.isEmpty ||
+                strengths.text.trim().length < 4 ||
+                focus.text.trim().length < 4) {
+              setSheetState(
+                () => validation =
+                    'Choose a teacher and enter both strengths and development focus.',
+              );
+              return;
+            }
+            setSheetState(() {
+              saving = true;
+              validation = null;
+            });
+            try {
+              await ref
+                  .read(principalRepositoryProvider)
+                  .createClassroomWalkthrough(
+                    teacherStaffId: teacherStaffId,
+                    academicYearId: _string(data['academicYearId']),
+                    observedOn: _apiDate(observedOn),
+                    strengths: strengths.text,
+                    developmentFocus: focus.text,
+                    agreedAction: agreedAction.text,
+                    followUpOn: followUpOn == null
+                        ? null
+                        : _apiDate(followUpOn!),
+                    clientRequestId: clientRequestId,
+                  );
+              ref.invalidate(principalSnapshotProvider('walkthroughs'));
+              if (sheetContext.mounted) Navigator.pop(sheetContext);
+              if (parentContext.mounted) {
+                _showPrincipalSnack(
+                  parentContext,
+                  'Classroom observation recorded.',
+                );
+              }
+            } catch (error) {
+              if (!sheetContext.mounted) return;
+              setSheetState(() => saving = false);
+              if (parentContext.mounted) {
+                _showPrincipalSnack(parentContext, _principalSafeError(error));
+              }
+            }
+          }
+
+          return SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              0,
+              AppSpacing.lg,
+              MediaQuery.viewInsetsOf(context).bottom + AppSpacing.lg,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Record classroom observation',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                DropdownButtonFormField<String>(
+                  initialValue: teacherStaffId,
+                  decoration: const InputDecoration(labelText: 'Teacher'),
+                  items: [
+                    for (final teacher in teachers)
+                      DropdownMenuItem(
+                        value: _string(teacher['id']),
+                        child: Text(
+                          _string(teacher['fullName'], fallback: 'Teacher'),
+                        ),
+                      ),
+                  ],
+                  onChanged: saving
+                      ? null
+                      : (value) =>
+                            setSheetState(() => teacherStaffId = value ?? ''),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Observed on (BS)'),
+                  subtitle: Text(NepaliBsCalendar.formatBsDate(observedOn)),
+                  trailing: const Icon(Icons.calendar_month_rounded),
+                  onTap: saving ? null : pickObservedOn,
+                ),
+                TextField(
+                  controller: strengths,
+                  minLines: 2,
+                  maxLines: 5,
+                  maxLength: 2000,
+                  decoration: const InputDecoration(
+                    labelText: 'Observed strengths',
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                TextField(
+                  controller: focus,
+                  minLines: 2,
+                  maxLines: 5,
+                  maxLength: 2000,
+                  decoration: const InputDecoration(
+                    labelText: 'Development focus',
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                TextField(
+                  controller: agreedAction,
+                  minLines: 2,
+                  maxLines: 5,
+                  maxLength: 2000,
+                  decoration: const InputDecoration(
+                    labelText: 'Agreed action (optional)',
+                  ),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Follow-up date (BS, optional)'),
+                  subtitle: Text(
+                    followUpOn == null
+                        ? 'Not scheduled'
+                        : NepaliBsCalendar.formatBsDate(followUpOn!),
+                  ),
+                  trailing: const Icon(Icons.event_repeat_rounded),
+                  onTap: saving ? null : pickFollowUp,
+                ),
+                if (validation != null)
+                  Text(
+                    validation!,
+                    style: const TextStyle(
+                      color: AppColors.danger,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                const SizedBox(height: AppSpacing.md),
+                FilledButton.icon(
+                  onPressed: saving ? null : submit,
+                  icon: saving
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.save_rounded),
+                  label: Text(saving ? 'Saving…' : 'Save observation'),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    ),
+  );
+}
+
+void _showWalkthroughUpdateSheet(
+  BuildContext context,
+  WidgetRef ref,
+  Map<String, dynamic> observation,
+) {
+  final parentContext = context;
+  final currentStatus = _string(observation['status']);
+  final nextStatus = switch (currentStatus) {
+    'DRAFT' => 'COMPLETED',
+    'FOLLOW_UP_DUE' => 'CLOSED',
+    _ => 'FOLLOW_UP_DUE',
+  };
+  final reason = TextEditingController();
+  final action = TextEditingController(
+    text: _string(observation['agreedAction']),
+  );
+  var saving = false;
+  String? validation;
+  showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    useSafeArea: true,
+    builder: (sheetContext) => DisposeScope(
+      onDispose: () {
+        reason.dispose();
+        action.dispose();
+      },
+      child: StatefulBuilder(
+        builder: (context, setSheetState) {
+          Future<void> submit() async {
+            if (reason.text.trim().length < 4) {
+              setSheetState(
+                () =>
+                    validation = 'Enter a clear reason for this status change.',
+              );
+              return;
+            }
+            setSheetState(() {
+              saving = true;
+              validation = null;
+            });
+            try {
+              await ref
+                  .read(principalRepositoryProvider)
+                  .updateClassroomWalkthrough(
+                    observationId: _string(observation['id']),
+                    expectedVersion:
+                        int.tryParse(_string(observation['version'])) ?? 1,
+                    status: nextStatus,
+                    reason: reason.text,
+                    agreedAction: action.text,
+                  );
+              ref.invalidate(principalSnapshotProvider('walkthroughs'));
+              if (sheetContext.mounted) Navigator.pop(sheetContext);
+              if (parentContext.mounted) {
+                _showPrincipalSnack(
+                  parentContext,
+                  'Observation follow-up updated.',
+                );
+              }
+            } catch (error) {
+              if (!sheetContext.mounted) return;
+              setSheetState(() => saving = false);
+              if (parentContext.mounted) {
+                _showPrincipalSnack(parentContext, _principalSafeError(error));
+              }
+            }
+          }
+
+          return Padding(
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              0,
+              AppSpacing.lg,
+              MediaQuery.viewInsetsOf(context).bottom + AppSpacing.lg,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  nextStatus.replaceAll('_', ' '),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: reason,
+                  minLines: 2,
+                  maxLines: 5,
+                  maxLength: 500,
+                  decoration: const InputDecoration(
+                    labelText: 'Reason for change',
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                TextField(
+                  controller: action,
+                  minLines: 2,
+                  maxLines: 5,
+                  maxLength: 2000,
+                  decoration: const InputDecoration(
+                    labelText: 'Agreed action (optional)',
+                  ),
+                ),
+                if (validation != null)
+                  Text(
+                    validation!,
+                    style: const TextStyle(
+                      color: AppColors.danger,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                const SizedBox(height: AppSpacing.md),
+                FilledButton(
+                  onPressed: saving ? null : submit,
+                  child: Text(saving ? 'Saving…' : 'Save follow-up'),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    ),
+  );
+}
+
+void _showImprovementActionSheet(
+  BuildContext context,
+  WidgetRef ref,
+  Map<String, dynamic> action,
+) {
+  final parentContext = context;
+  var status = _string(action['status'], fallback: 'IN_PROGRESS');
+  final reason = TextEditingController();
+  final progress = TextEditingController(text: _string(action['progressNote']));
+  var saving = false;
+  String? validation;
+  showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    useSafeArea: true,
+    builder: (sheetContext) => DisposeScope(
+      onDispose: () {
+        reason.dispose();
+        progress.dispose();
+      },
+      child: StatefulBuilder(
+        builder: (context, setSheetState) {
+          Future<void> submit() async {
+            if (reason.text.trim().length < 4) {
+              setSheetState(
+                () =>
+                    validation = 'Enter a clear reason for this status change.',
+              );
+              return;
+            }
+            setSheetState(() {
+              saving = true;
+              validation = null;
+            });
+            try {
+              await ref
+                  .read(principalRepositoryProvider)
+                  .updateSchoolImprovementAction(
+                    actionId: _string(action['id']),
+                    expectedVersion:
+                        int.tryParse(_string(action['version'])) ?? 1,
+                    status: status,
+                    reason: reason.text,
+                    progressNote: progress.text,
+                  );
+              ref.invalidate(principalSchoolImprovementProvider);
+              if (sheetContext.mounted) Navigator.pop(sheetContext);
+              if (parentContext.mounted) {
+                _showPrincipalSnack(
+                  parentContext,
+                  'Improvement action updated.',
+                );
+              }
+            } catch (error) {
+              if (!sheetContext.mounted) return;
+              setSheetState(() => saving = false);
+              if (parentContext.mounted) {
+                _showPrincipalSnack(parentContext, _principalSafeError(error));
+              }
+            }
+          }
+
+          return Padding(
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              0,
+              AppSpacing.lg,
+              MediaQuery.viewInsetsOf(context).bottom + AppSpacing.lg,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  _string(action['title'], fallback: 'Update action'),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                DropdownButtonFormField<String>(
+                  initialValue: status,
+                  decoration: const InputDecoration(labelText: 'Status'),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'NOT_STARTED',
+                      child: Text('Not started'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'IN_PROGRESS',
+                      child: Text('In progress'),
+                    ),
+                    DropdownMenuItem(value: 'BLOCKED', child: Text('Blocked')),
+                    DropdownMenuItem(
+                      value: 'COMPLETED',
+                      child: Text('Completed'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'CANCELLED',
+                      child: Text('Cancelled'),
+                    ),
+                  ],
+                  onChanged: saving
+                      ? null
+                      : (value) =>
+                            setSheetState(() => status = value ?? status),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                TextField(
+                  controller: reason,
+                  minLines: 2,
+                  maxLines: 5,
+                  maxLength: 500,
+                  decoration: const InputDecoration(
+                    labelText: 'Reason for change',
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                TextField(
+                  controller: progress,
+                  minLines: 2,
+                  maxLines: 5,
+                  maxLength: 2000,
+                  decoration: const InputDecoration(
+                    labelText: 'Progress note (optional)',
+                  ),
+                ),
+                if (validation != null)
+                  Text(
+                    validation!,
+                    style: const TextStyle(
+                      color: AppColors.danger,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                const SizedBox(height: AppSpacing.md),
+                FilledButton(
+                  onPressed: saving ? null : submit,
+                  child: Text(saving ? 'Saving…' : 'Save action update'),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    ),
+  );
+}
+
 class PrincipalStudentsScreen extends ConsumerStatefulWidget {
   const PrincipalStudentsScreen({super.key});
 
@@ -1011,7 +1513,7 @@ class PrincipalWalkthroughsScreen extends ConsumerWidget {
     return PrincipalShell(
       selectedIndex: 4,
       title: 'Classroom Walkthroughs',
-      subtitle: 'Observation follow-ups and classroom visit status',
+      subtitle: 'Teacher observations, agreed development, and follow-up',
       showBack: true,
       child: asyncData.when(
         loading: () => const _PrincipalLoading(),
@@ -1020,6 +1522,60 @@ class PrincipalWalkthroughsScreen extends ConsumerWidget {
           onRetry: () => ref.invalidate(provider),
         ),
         data: (data) => _WalkthroughsBody(data: data),
+      ),
+    );
+  }
+}
+
+class PrincipalInstitutionalImprovementScreen extends ConsumerStatefulWidget {
+  const PrincipalInstitutionalImprovementScreen({super.key});
+
+  @override
+  ConsumerState<PrincipalInstitutionalImprovementScreen> createState() =>
+      _PrincipalInstitutionalImprovementScreenState();
+}
+
+class _PrincipalInstitutionalImprovementScreenState
+    extends ConsumerState<PrincipalInstitutionalImprovementScreen> {
+  String view = 'plans';
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = view == 'plans'
+        ? principalSchoolImprovementProvider
+        : principalBoardReadinessProvider(view);
+    final asyncData = ref.watch(provider);
+    return PrincipalShell(
+      selectedIndex: 4,
+      title: 'Institutional Improvement',
+      subtitle: 'School plans and board-examination readiness',
+      showBack: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SegmentedFilters(
+            values: const ['plans', 'GRADE_8', 'SEE', 'GRADE_12'],
+            active: view,
+            labels: const {
+              'plans': 'Plans',
+              'GRADE_8': 'Grade 8',
+              'SEE': 'SEE',
+              'GRADE_12': 'Grade 12',
+            },
+            onChanged: (value) => setState(() => view = value),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          asyncData.when(
+            loading: () => const _PrincipalLoading(),
+            error: (error, _) => AppExceptionView(
+              error: error,
+              onRetry: () => ref.invalidate(provider),
+            ),
+            data: (data) => view == 'plans'
+                ? _SchoolImprovementBody(data: data)
+                : _BoardReadinessBody(data: data),
+          ),
+        ],
       ),
     );
   }
@@ -1372,6 +1928,12 @@ class _MoreBody extends StatelessWidget {
               AppColors.warning,
               AppRoutes.principalWalkthroughs,
               enabled: modules['classroomWalkthroughs'] == true,
+            ),
+            _MenuItem(
+              'Institutional Improvement',
+              Icons.insights_rounded,
+              AppColors.teacherAccent,
+              AppRoutes.principalInstitutionalImprovement,
             ),
             _MenuItem(
               'Reports Snapshot',
@@ -1904,12 +2466,58 @@ class _TasksBody extends StatelessWidget {
   }
 }
 
-class _WalkthroughsBody extends StatelessWidget {
+class _WalkthroughsBody extends ConsumerWidget {
   const _WalkthroughsBody({required this.data});
   final Map<String, dynamic> data;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final observations = _list(data['observations'])
+        .map(
+          (item) => {
+            'id': item['id'],
+            'title': _string(
+              _record(item['teacher'])['fullName'],
+              fallback: 'Teacher',
+            ),
+            'subtitle':
+                '${_bsDate(item['observedOn'])} • ${_string(item['developmentFocus'])}',
+            'detail': item['followUpOn'] == null
+                ? _string(item['strengths'])
+                : 'Follow-up ${_bsDate(item['followUpOn'])}',
+            'status': item['status'],
+            'raw': item,
+          },
+        )
+        .toList();
+    final goals = _list(data['goals'])
+        .map(
+          (item) => {
+            'id': item['id'],
+            'title': _string(item['title']),
+            'subtitle':
+                '${_string(_record(item['teacher'])['fullName'])} • Due ${_bsDate(item['dueOn'])}',
+            'detail': _string(item['target']),
+            'status': item['status'],
+          },
+        )
+        .toList();
+    final training = _list(data['training'])
+        .map(
+          (item) => {
+            'id': item['id'],
+            'title': _string(item['title']),
+            'subtitle':
+                '${_string(_record(item['teacher'])['fullName'])} • ${_bsDate(item['startsOn'])}',
+            'detail': _string(
+              item['providerName'],
+              fallback: 'Provider not recorded',
+            ),
+            'status': item['status'],
+          },
+        )
+        .toList();
+    final online = ref.watch(connectivityProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1917,56 +2525,287 @@ class _WalkthroughsBody extends StatelessWidget {
         _SummaryCards(
           values: [
             _SummaryValue(
-              'Scheduled',
-              _num(data, 'metrics.scheduled'),
+              'Follow-ups due',
+              _num(data, 'metrics.observationsDue'),
               AppColors.info,
               Icons.assignment_rounded,
             ),
             _SummaryValue(
-              'Completed',
-              _num(data, 'metrics.completed'),
-              AppColors.success,
-              Icons.check_circle_rounded,
+              'Active goals',
+              _num(data, 'metrics.activeGoals'),
+              AppColors.info,
+              Icons.flag_rounded,
             ),
             _SummaryValue(
-              'Follow-up',
-              _num(data, 'metrics.followUp'),
+              'Overdue goals',
+              _num(data, 'metrics.overdueGoals'),
               AppColors.warning,
               Icons.schedule_rounded,
+            ),
+            _SummaryValue(
+              'Training complete',
+              _num(data, 'metrics.completedTraining'),
+              AppColors.success,
+              Icons.workspace_premium_rounded,
             ),
           ],
         ),
         const SizedBox(height: AppSpacing.lg),
-        const SectionHeader(title: "Today's Walkthroughs"),
-        const SizedBox(height: AppSpacing.sm),
-        _ItemList(items: _list(data['todaysWalkthroughs'])),
-        if (_list(data['recentObservations']).isNotEmpty) ...[
-          const SizedBox(height: AppSpacing.lg),
-          const SectionHeader(title: 'Recent Observations'),
-          const SizedBox(height: AppSpacing.sm),
-          _ItemList(items: _list(data['recentObservations'])),
-        ],
-        const SizedBox(height: AppSpacing.md),
-        _Callout(
+        _ActionRow(
           icon: Icons.add_rounded,
-          title: 'New observation',
-          message: _unsupportedActionMessage(
-            data['newObservation'],
-            fallback:
-                'Walkthrough observation capture is not enabled in the principal app yet. Scheduled visits are shown read-only.',
-          ),
+          title: 'Record classroom observation',
+          subtitle: online
+              ? 'Add strengths, development focus, and a BS follow-up date'
+              : 'Connect to the school service to record an observation',
+          onTap: online
+              ? () => _showCreateWalkthroughSheet(context, ref, data)
+              : null,
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        const SectionHeader(title: 'Classroom observations'),
+        const SizedBox(height: AppSpacing.sm),
+        _ItemList(
+          items: observations,
+          actionBuilder: (item) {
+            final raw = _record(item['raw']);
+            final status = _string(raw['status']);
+            if (!online || status == 'CLOSED') return null;
+            return IconButton(
+              tooltip: 'Update observation',
+              onPressed: () => _showWalkthroughUpdateSheet(context, ref, raw),
+              icon: const Icon(Icons.edit_note_rounded),
+            );
+          },
+        ),
+        if (goals.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.lg),
+          const SectionHeader(title: 'Development goals'),
+          const SizedBox(height: AppSpacing.sm),
+          _ItemList(items: goals),
+        ],
+        if (training.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.lg),
+          const SectionHeader(title: 'Training history'),
+          const SizedBox(height: AppSpacing.sm),
+          _ItemList(items: training),
+        ],
+      ],
+    );
+  }
+}
+
+class _SchoolImprovementBody extends ConsumerWidget {
+  const _SchoolImprovementBody({required this.data});
+  final Map<String, dynamic> data;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final plans = _list(data['items']);
+    final online = ref.watch(connectivityProvider);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _CacheBanner(data: data),
+        if (plans.isEmpty)
+          const AppAccessState(
+            title: 'No school improvement plan',
+            message:
+                'Create the first plan in the school leadership web workspace.',
+            icon: Icons.track_changes_rounded,
+          )
+        else
+          for (final plan in plans) ...[
+            AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const _IconBubble(
+                        icon: Icons.insights_rounded,
+                        color: AppColors.teacherAccent,
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _string(plan['title']),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.slate950,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                            Text(
+                              '${_bsDate(plan['startsOn'])} – ${_bsDate(plan['endsOn'])}',
+                              style: const TextStyle(
+                                color: AppColors.slate500,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      StatusChip(
+                        status: _statusType(_string(plan['status'])),
+                        label: _string(plan['status']),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    _string(plan['targetSummary']),
+                    style: const TextStyle(color: AppColors.slate700),
+                  ),
+                  if (_list(plan['kpis']).isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    const Text(
+                      'Indicators',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.slate950,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    for (final kpi in _list(plan['kpis']))
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                        child: Text(
+                          '${_string(kpi['name'])}: ${_string(kpi['latestValue'], fallback: 'not reviewed')} / ${_string(kpi['targetValue'])} ${_string(kpi['unit'])}',
+                          style: const TextStyle(color: AppColors.slate600),
+                        ),
+                      ),
+                  ],
+                  if (_list(plan['actions']).isNotEmpty) ...[
+                    const Divider(height: AppSpacing.xl),
+                    const Text(
+                      'Owned actions',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.slate950,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    for (final action in _list(plan['actions']))
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          _string(action['title']),
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        subtitle: Text(
+                          'Due ${_bsDate(action['dueOn'])}${_string(action['progressNote']).isEmpty ? '' : '\n${_string(action['progressNote'])}'}',
+                        ),
+                        trailing:
+                            online &&
+                                ![
+                                  'COMPLETED',
+                                  'CANCELLED',
+                                ].contains(_string(action['status']))
+                            ? IconButton(
+                                tooltip: 'Update action',
+                                onPressed: () => _showImprovementActionSheet(
+                                  context,
+                                  ref,
+                                  action,
+                                ),
+                                icon: const Icon(Icons.edit_rounded),
+                              )
+                            : StatusChip(
+                                status: _statusType(_string(action['status'])),
+                                label: _string(action['status']),
+                              ),
+                      ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
+      ],
+    );
+  }
+}
+
+class _BoardReadinessBody extends StatelessWidget {
+  const _BoardReadinessBody({required this.data});
+  final Map<String, dynamic> data;
+
+  @override
+  Widget build(BuildContext context) {
+    final indicators = _list(data['indicators']);
+    final ready = indicators
+        .where((item) => _string(item['state']) == 'READY')
+        .length;
+    final attention = indicators
+        .where((item) => _string(item['state']) == 'NEEDS_ATTENTION')
+        .length;
+    final blocked = indicators.length - ready - attention;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _CacheBanner(data: data),
+        _Callout(
+          icon: Icons.rule_rounded,
+          title: 'Operational checks only',
+          message:
+              'These current-year checks do not predict student results or rank learners.',
           color: AppColors.info,
         ),
         const SizedBox(height: AppSpacing.md),
-        _Callout(
-          icon: Icons.assignment_late_rounded,
-          title: 'Walkthrough follow-up',
-          message: _unsupportedActionMessage(
-            data['followUpCapture'],
-            fallback:
-                'Walkthrough follow-up capture is not enabled in the principal app yet. Follow-up status remains read-only here.',
+        _SummaryCards(
+          values: [
+            _SummaryValue(
+              'Ready',
+              ready,
+              AppColors.success,
+              Icons.check_circle_rounded,
+            ),
+            _SummaryValue(
+              'Attention',
+              attention,
+              AppColors.warning,
+              Icons.warning_rounded,
+            ),
+            _SummaryValue(
+              'Blocked',
+              blocked,
+              AppColors.danger,
+              Icons.block_rounded,
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        SectionHeader(
+          title:
+              '${_string(data['track']).replaceAll('_', ' ')} readiness checks',
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _ItemList(
+          items: indicators
+              .map(
+                (item) => {
+                  'id': item['code'],
+                  'title': item['label'],
+                  'subtitle': item['explanation'],
+                  'detail': item['observed'] == null || item['expected'] == null
+                      ? 'Count unavailable'
+                      : '${item['observed']} of ${item['expected']}',
+                  'status': item['state'],
+                },
+              )
+              .toList(),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Text(
+          'Updated ${_bsDateTime(data['generatedAt'])}',
+          style: const TextStyle(
+            color: AppColors.slate500,
+            fontWeight: FontWeight.w600,
           ),
-          color: AppColors.warning,
         ),
       ],
     );
@@ -3559,6 +4398,11 @@ String _bsDateTime(Object? value) {
       ? 'Date unavailable'
       : NepaliBsCalendar.formatBsDateTime(parsed);
 }
+
+String _apiDate(DateTime value) =>
+    '${value.year.toString().padLeft(4, '0')}-'
+    '${value.month.toString().padLeft(2, '0')}-'
+    '${value.day.toString().padLeft(2, '0')}';
 
 String _principalSafeError(Object error) {
   if (error is AppException) return error.message;

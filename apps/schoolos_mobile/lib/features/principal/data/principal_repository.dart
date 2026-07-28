@@ -294,6 +294,79 @@ class PrincipalRepository {
     '/mobile/principal/classroom-walkthroughs',
   );
 
+  Future<Map<String, dynamic>> createClassroomWalkthrough({
+    required String teacherStaffId,
+    required String academicYearId,
+    required String observedOn,
+    required String strengths,
+    required String developmentFocus,
+    required String clientRequestId,
+    String? agreedAction,
+    String? followUpOn,
+  }) => _postJson('/mobile/principal/classroom-walkthroughs', {
+    'teacherStaffId': teacherStaffId,
+    'academicYearId': academicYearId,
+    'observedOn': observedOn,
+    'strengths': strengths.trim(),
+    'developmentFocus': developmentFocus.trim(),
+    if (agreedAction != null && agreedAction.trim().isNotEmpty)
+      'agreedAction': agreedAction.trim(),
+    if (followUpOn != null && followUpOn.trim().isNotEmpty)
+      'followUpOn': followUpOn,
+    'clientRequestId': clientRequestId,
+  });
+
+  Future<Map<String, dynamic>> updateClassroomWalkthrough({
+    required String observationId,
+    required int expectedVersion,
+    required String status,
+    required String reason,
+    String? agreedAction,
+    String? teacherResponse,
+    String? followUpOn,
+  }) => _patchJson(
+    '/mobile/principal/classroom-walkthroughs/${Uri.encodeComponent(observationId)}',
+    {
+      'expectedVersion': expectedVersion,
+      'status': status,
+      'reason': reason.trim(),
+      if (agreedAction != null && agreedAction.trim().isNotEmpty)
+        'agreedAction': agreedAction.trim(),
+      if (teacherResponse != null && teacherResponse.trim().isNotEmpty)
+        'teacherResponse': teacherResponse.trim(),
+      if (followUpOn != null && followUpOn.trim().isNotEmpty)
+        'followUpOn': followUpOn,
+    },
+  );
+
+  Future<Map<String, dynamic>> getSchoolImprovementPlans() => _getCached(
+    'principal_school_improvement_plans',
+    '/mobile/principal/school-improvement-plans',
+  );
+
+  Future<Map<String, dynamic>> updateSchoolImprovementAction({
+    required String actionId,
+    required int expectedVersion,
+    required String status,
+    required String reason,
+    String? progressNote,
+  }) => _patchJson(
+    '/mobile/principal/school-improvement-actions/${Uri.encodeComponent(actionId)}',
+    {
+      'expectedVersion': expectedVersion,
+      'status': status,
+      'reason': reason.trim(),
+      if (progressNote != null && progressNote.trim().isNotEmpty)
+        'progressNote': progressNote.trim(),
+    },
+  );
+
+  Future<Map<String, dynamic>> getBoardExamReadiness(String track) =>
+      _getCached(
+        'principal_board_exam_readiness_$track',
+        '/mobile/principal/board-exam-readiness/${Uri.encodeComponent(track)}',
+      );
+
   Future<Map<String, dynamic>> getEmergencyNotice() => _getCached(
     'principal_emergency_notice',
     '/mobile/principal/emergency-notice',
@@ -379,6 +452,16 @@ class PrincipalRepository {
     Map<String, dynamic> data,
   ) async {
     final response = await _client.post<dynamic>(path, data: data);
+    return response.data is Map<String, dynamic>
+        ? response.data as Map<String, dynamic>
+        : <String, dynamic>{};
+  }
+
+  Future<Map<String, dynamic>> _patchJson(
+    String path,
+    Map<String, dynamic> data,
+  ) async {
+    final response = await _client.patch<dynamic>(path, data: data);
     return response.data is Map<String, dynamic>
         ? response.data as Map<String, dynamic>
         : <String, dynamic>{};

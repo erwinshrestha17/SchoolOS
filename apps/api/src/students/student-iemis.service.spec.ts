@@ -168,19 +168,6 @@ describe('StudentsService (iEMIS Export)', () => {
     expect(result.fileName).toMatch(
       /^iemis-students-school-1-\d{4}-\d{2}-\d{2}\.csv$/,
     );
-    expect(result.headers).toContain('iemisSchoolCode');
-    expect(result.headers).toContain('fatherName');
-    expect(result.headers).toContain('motherName');
-    expect(result.headers).toContain('stream');
-    expect(result.headers).toContain('dobBs');
-
-    const firstRow = result.rows[0];
-    expect(firstRow.iemisSchoolCode).toBe('school-code-123');
-    expect(firstRow.fatherName).toBe('James Doe');
-    expect(firstRow.motherName).toBe('');
-    expect(firstRow.stream).toBe('');
-    expect(firstRow.dobBs).toBe('');
-
     expect(storageService.saveBufferObject).toHaveBeenCalledWith(
       expect.objectContaining({
         tenantId: mockAuth.tenantId,
@@ -188,6 +175,18 @@ describe('StudentsService (iEMIS Export)', () => {
         contentType: 'text/csv',
       }),
     );
+    const csv = (
+      storageService.saveBufferObject.mock.calls[0][0].content as Buffer
+    ).toString('utf8');
+    expect(csv).toContain('iemisSchoolCode');
+    expect(csv).toContain('fatherName');
+    expect(csv).toContain('motherName');
+    expect(csv).toContain('stream');
+    expect(csv).toContain('dobBs');
+    expect(csv).toContain('school-code-123');
+    expect(csv).toContain('James Doe');
+    expect(result).not.toHaveProperty('rows');
+    expect(result).not.toHaveProperty('csv');
     expect(fileRegistryService.registerFile).toHaveBeenCalledWith(
       expect.objectContaining({
         tenantId: mockAuth.tenantId,
@@ -242,6 +241,8 @@ describe('StudentsService (iEMIS Export)', () => {
     expect(result.issues.length).toBeGreaterThanOrEqual(2);
     expect(result.issues.some((i) => i.field === 'fullNameNp')).toBe(true);
     expect(result.issues.some((i) => i.field === 'guardianContact')).toBe(true);
+    expect(result).not.toHaveProperty('rows');
+    expect(result).not.toHaveProperty('csv');
   });
 
   describe('getIemisReadiness', () => {
@@ -489,6 +490,28 @@ describe('StudentsService (iEMIS Export)', () => {
       );
       expect(issuesOnly).toHaveLength(1);
       expect(issuesOnly[0].studentId).toBe('student-invalid');
+    });
+
+    it('counts board-readiness records through bounded tenant batches', async () => {
+      (prisma.student.findMany as jest.Mock).mockResolvedValue(mockStudents);
+
+      const ready = await service.countIemisReadyForClasses(
+        ['class-8', 'class-10'],
+        mockAuth,
+      );
+
+      expect(ready).toBe(1);
+      expect(prisma.student.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            tenantId: 'tenant-1',
+            classId: { in: ['class-8', 'class-10'] },
+            lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+          },
+          orderBy: { id: 'asc' },
+          take: 250,
+        }),
+      );
     });
   });
 });

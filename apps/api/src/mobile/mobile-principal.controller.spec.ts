@@ -386,9 +386,11 @@ describe('MobilePrincipalController', () => {
     service.getTasks.mockResolvedValue({
       createTask: { supported: false },
     } as never);
-    institutionalImprovementService.getPrincipalTeacherDevelopment.mockResolvedValue({
-      createObservationSupported: true,
-    } as never);
+    institutionalImprovementService.getPrincipalTeacherDevelopment.mockResolvedValue(
+      {
+        createObservationSupported: true,
+      } as never,
+    );
     service.getEmergencyNotice.mockResolvedValue({
       actions: { approveAndSend: false },
     } as never);

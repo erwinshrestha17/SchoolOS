@@ -451,9 +451,7 @@ export class ApprovalWorkflowService {
       },
     });
     if (!delegate) {
-      throw new NotFoundException(
-        'Eligible delegate not found in this tenant',
-      );
+      throw new NotFoundException('Eligible delegate not found in this tenant');
     }
 
     const delegateRoles = delegate.userRoles.map((item) => item.role.name);
@@ -463,11 +461,7 @@ export class ApprovalWorkflowService {
       ),
     );
     if (
-      !this.canUserDecideStep(
-        pendingStep,
-        delegateRoles,
-        delegatePermissions,
-      )
+      !this.canUserDecideStep(pendingStep, delegateRoles, delegatePermissions)
     ) {
       throw new ForbiddenException(
         'Selected user cannot decide the current approval step',

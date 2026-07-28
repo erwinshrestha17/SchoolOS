@@ -1,5 +1,6 @@
 import {
   ClipboardList,
+  Gauge,
   Eye,
   FileText,
   LayoutDashboard,
@@ -28,4 +29,9 @@ export const academicsWorkspaceTabs: TabItem[] = [
 
 export const academicsWorkspaceOverflowTabs: TabItem[] = [
   { href: '/dashboard/academics/publishing', label: 'Publishing', icon: Megaphone },
+  {
+    href: '/dashboard/academics/board-readiness',
+    label: 'Board Readiness',
+    icon: Gauge,
+  },
 ];

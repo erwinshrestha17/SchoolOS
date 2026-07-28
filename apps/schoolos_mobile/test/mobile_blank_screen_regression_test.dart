@@ -1,3 +1,4 @@
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +10,7 @@ import 'package:schoolos_mobile/core/auth/auth_provider.dart';
 import 'package:schoolos_mobile/core/auth/data/auth_repository.dart';
 import 'package:schoolos_mobile/core/auth/models/auth_user.dart';
 import 'package:schoolos_mobile/core/network/api_client.dart';
+import 'package:schoolos_mobile/core/network/connectivity_provider.dart';
 import 'package:schoolos_mobile/core/storage/app_preferences_service.dart';
 import 'package:schoolos_mobile/core/storage/token_storage_service.dart';
 import 'package:schoolos_mobile/features/attendance/application/attendance_providers.dart';
@@ -34,6 +36,8 @@ import 'package:schoolos_mobile/features/teacher/presentation/widgets/teacher_ap
 import 'package:schoolos_mobile/shared/widgets/app_card.dart';
 
 class _MockAttendanceRepository extends Mock implements AttendanceRepository {}
+
+class _MockConnectivity extends Mock implements Connectivity {}
 
 class _FakeTokenStorage extends Fake implements TokenStorageService {
   @override
@@ -464,13 +468,23 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('principal walkthrough writes remain clearly unavailable', (
+  testWidgets('principal walkthrough capture is available online', (
     tester,
   ) async {
+    final connectivity = _MockConnectivity();
+    when(
+      () => connectivity.onConnectivityChanged,
+    ).thenAnswer((_) => const Stream.empty());
+    when(
+      () => connectivity.checkConnectivity(),
+    ).thenAnswer((_) async => [ConnectivityResult.wifi]);
     final sharedPrefs = await SharedPreferences.getInstance();
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          connectivityProvider.overrideWith(
+            (ref) => ConnectivityNotifier(connectivity)..setOnline(true),
+          ),
           appPreferencesServiceProvider.overrideWithValue(
             AppPreferencesService(sharedPrefs),
           ),
@@ -485,22 +499,29 @@ void main() {
           }),
           principalSnapshotProvider.overrideWith((ref, key) async {
             return {
-              'metrics': {'scheduled': 1, 'completed': 0, 'followUp': 0},
-              'todaysWalkthroughs': [
+              'academicYearId': 'year-1',
+              'metrics': {
+                'observationsDue': 1,
+                'activeGoals': 0,
+                'overdueGoals': 0,
+                'completedTraining': 0,
+              },
+              'teacherOptions': [
+                {'id': 'staff-1', 'fullName': 'Mina Shrestha'},
+              ],
+              'observations': [
                 {
-                  'id': 'slot-1',
-                  'title': 'Grade 3 - Mathematics',
-                  'subtitle': 'Mina Shrestha',
-                  'detail': 'Period 1',
-                  'status': 'Scheduled',
+                  'id': 'observation-1',
+                  'teacher': {'fullName': 'Mina Shrestha'},
+                  'observedOn': '2026-07-28',
+                  'developmentFocus': 'Questioning',
+                  'strengths': 'Clear examples',
+                  'status': 'OPEN',
+                  'version': 1,
                 },
               ],
-              'recentObservations': <Map<String, dynamic>>[],
-              'newObservation': {
-                'supported': false,
-                'message':
-                    'New classroom observations need an audited endpoint.',
-              },
+              'goals': <Map<String, dynamic>>[],
+              'training': <Map<String, dynamic>>[],
             };
           }),
         ],
@@ -509,22 +530,77 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Grade 3 - Mathematics'), findsOneWidget);
-    expect(find.text('New observation'), findsOneWidget);
-    expect(find.text('Walkthrough follow-up'), findsOneWidget);
-    expect(
-      find.text(
-        'Walkthrough observation capture is not enabled in the principal app yet. Scheduled visits are shown read-only.',
+    expect(find.text('Mina Shrestha'), findsOneWidget);
+    expect(find.text('Record classroom observation'), findsOneWidget);
+    expect(find.byTooltip('Update observation'), findsOneWidget);
+    await tester.tap(find.text('Record classroom observation'));
+    await tester.pumpAndSettle();
+    expect(find.text('Observed strengths'), findsOneWidget);
+    expect(find.text('Development focus'), findsOneWidget);
+    expect(find.text('Save observation'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('principal walkthrough writes fail closed offline', (
+    tester,
+  ) async {
+    final connectivity = _MockConnectivity();
+    when(
+      () => connectivity.onConnectivityChanged,
+    ).thenAnswer((_) => const Stream.empty());
+    when(
+      () => connectivity.checkConnectivity(),
+    ).thenAnswer((_) async => [ConnectivityResult.none]);
+    final sharedPrefs = await SharedPreferences.getInstance();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          connectivityProvider.overrideWith(
+            (ref) => ConnectivityNotifier(connectivity)..setOnline(false),
+          ),
+          appPreferencesServiceProvider.overrideWithValue(
+            AppPreferencesService(sharedPrefs),
+          ),
+          tokenStorageServiceProvider.overrideWithValue(_FakeTokenStorage()),
+          authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+          authProvider.overrideWith((ref) {
+            return _FakeAuthNotifier(
+              ref.watch(tokenStorageServiceProvider),
+              ref.watch(authRepositoryProvider),
+              ref.watch(appPreferencesServiceProvider),
+            );
+          }),
+          principalSnapshotProvider.overrideWith((ref, key) async {
+            return {
+              'academicYearId': 'year-1',
+              'metrics': {
+                'observationsDue': 0,
+                'activeGoals': 0,
+                'overdueGoals': 0,
+                'completedTraining': 0,
+              },
+              'teacherOptions': [
+                {'id': 'staff-1', 'fullName': 'Mina Shrestha'},
+              ],
+              'observations': <Map<String, dynamic>>[],
+              'goals': <Map<String, dynamic>>[],
+              'training': <Map<String, dynamic>>[],
+            };
+          }),
+        ],
+        child: const MaterialApp(home: PrincipalWalkthroughsScreen()),
       ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Record classroom observation'), findsOneWidget);
+    expect(
+      find.text('Connect to the school service to record an observation'),
       findsOneWidget,
     );
-    expect(
-      find.text(
-        'Walkthrough follow-up capture is not enabled in the principal app yet. Follow-up status remains read-only here.',
-      ),
-      findsOneWidget,
-    );
-    expect(find.textContaining('endpoint'), findsNothing);
+    await tester.tap(find.text('Record classroom observation'));
+    await tester.pumpAndSettle();
+    expect(find.text('Observed strengths'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

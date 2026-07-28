@@ -27,8 +27,6 @@ interface MockStateOwner {
 }
 
 interface ExportPayload {
-  rows?: Record<string, unknown>[];
-  csv?: string;
   issues?: Record<string, unknown>[];
 }
 
@@ -384,9 +382,14 @@ describe('Student Lifecycle Integration Depth (E2E)', () => {
 
     const iemis = (await studentsService.exportIemis(actor)) as ExportPayload;
 
-    expect(stringifyExport(iemis)).toContain(active.studentSystemId);
-    expect(iemis.csv ?? '').not.toContain(archived.studentSystemId);
-    expect(iemis.csv ?? '').not.toContain(deleted.studentSystemId);
+    expect(iemis.issues).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          studentSystemId: active.studentSystemId,
+          field: 'lifecycleStatus',
+        }),
+      ]),
+    );
     expect(iemis.issues).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

@@ -338,5 +338,156 @@ void main() {
         expect(submitBody['idempotencyKey'], isNotEmpty);
       },
     );
+
+    test(
+      'records and updates walkthroughs through the purpose-limited contract',
+      () async {
+        when(
+          () => apiClient.post<dynamic>(
+            '/mobile/principal/classroom-walkthroughs',
+            data: any(named: 'data'),
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(path: 'classroom-walkthroughs'),
+            data: {'id': 'observation-1', 'status': 'DRAFT'},
+          ),
+        );
+        when(
+          () => apiClient.patch<dynamic>(
+            '/mobile/principal/classroom-walkthroughs/observation-1',
+            data: any(named: 'data'),
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(path: 'observation-1'),
+            data: {'id': 'observation-1', 'status': 'COMPLETED'},
+          ),
+        );
+
+        final repository = PrincipalRepository(apiClient);
+        await repository.createClassroomWalkthrough(
+          teacherStaffId: 'staff-1',
+          academicYearId: 'year-1',
+          observedOn: '2026-07-28',
+          strengths: 'Learners explained their reasoning clearly.',
+          developmentFocus: 'Check every group before independent work.',
+          agreedAction: 'Use two planned understanding checks.',
+          followUpOn: '2026-08-12',
+          clientRequestId: '11111111-1111-4111-8111-111111111112',
+        );
+        final result = await repository.updateClassroomWalkthrough(
+          observationId: 'observation-1',
+          expectedVersion: 1,
+          status: 'COMPLETED',
+          reason: 'Feedback discussion completed with the teacher.',
+        );
+
+        expect(result['status'], 'COMPLETED');
+        final createBody =
+            verify(
+                  () => apiClient.post<dynamic>(
+                    '/mobile/principal/classroom-walkthroughs',
+                    data: captureAny(named: 'data'),
+                  ),
+                ).captured.single
+                as Map<String, dynamic>;
+        expect(createBody['clientRequestId'], isNotEmpty);
+        expect(createBody['teacherStaffId'], 'staff-1');
+        verify(
+          () => apiClient.patch<dynamic>(
+            '/mobile/principal/classroom-walkthroughs/observation-1',
+            data: {
+              'expectedVersion': 1,
+              'status': 'COMPLETED',
+              'reason': 'Feedback discussion completed with the teacher.',
+            },
+          ),
+        ).called(1);
+      },
+    );
+
+    test('loads school plans and updates owned actions online', () async {
+      when(
+        () => apiClient.get<dynamic>(
+          '/mobile/principal/school-improvement-plans',
+        ),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: 'school-improvement-plans'),
+          data: {
+            'items': [
+              {'id': 'plan-1', 'status': 'ACTIVE'},
+            ],
+            'total': 1,
+          },
+        ),
+      );
+      when(
+        () => apiClient.patch<dynamic>(
+          '/mobile/principal/school-improvement-actions/action-1',
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: 'action-1'),
+          data: {'id': 'action-1', 'status': 'IN_PROGRESS'},
+        ),
+      );
+
+      final repository = PrincipalRepository(apiClient);
+      final plans = await repository.getSchoolImprovementPlans();
+      final action = await repository.updateSchoolImprovementAction(
+        actionId: 'action-1',
+        expectedVersion: 2,
+        status: 'IN_PROGRESS',
+        reason: 'The assigned team has started the agreed work.',
+        progressNote: 'First review is scheduled.',
+      );
+
+      expect(plans['total'], 1);
+      expect(action['status'], 'IN_PROGRESS');
+      verify(
+        () => apiClient.patch<dynamic>(
+          '/mobile/principal/school-improvement-actions/action-1',
+          data: {
+            'expectedVersion': 2,
+            'status': 'IN_PROGRESS',
+            'reason': 'The assigned team has started the agreed work.',
+            'progressNote': 'First review is scheduled.',
+          },
+        ),
+      ).called(1);
+    });
+
+    test(
+      'loads each board readiness track without a predictive payload',
+      () async {
+        when(
+          () => apiClient.get<dynamic>(
+            '/mobile/principal/board-exam-readiness/SEE',
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(path: 'board-readiness'),
+            data: {
+              'track': 'SEE',
+              'nonPredictive': true,
+              'indicators': [
+                {'code': 'MARKS_COMPLETION', 'state': 'NEEDS_ATTENTION'},
+              ],
+            },
+          ),
+        );
+
+        final result = await PrincipalRepository(
+          apiClient,
+        ).getBoardExamReadiness('SEE');
+
+        expect(result['track'], 'SEE');
+        expect(result['nonPredictive'], isTrue);
+        expect(result.containsKey('predictedScore'), isFalse);
+      },
+    );
   });
 }

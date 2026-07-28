@@ -731,7 +731,7 @@ describe('students lifecycle hardening', () => {
     const prisma = buildPrisma({
       studentFindManyResult: [validStudent, invalidStudent],
     });
-    const { service } = buildService(prisma);
+    const { service, storageService } = buildService(prisma);
 
     const result = await service.exportIemis(actor);
 
@@ -739,10 +739,14 @@ describe('students lifecycle hardening', () => {
     expect(result.totalRecords).toBe(2);
     expect(result.validRecords).toBe(1);
     expect(result.invalidRecords).toBe(1);
-    expect(result.headers).toContain('studentSystemId');
-    expect(result.csv).toContain('SCH-2026-0001');
-    expect(result.rows).toHaveLength(1);
-    expect(result.rows[0].studentSystemId).toBe('SCH-2026-0001');
+    const csv = (
+      storageService.saveBufferObject.mock.calls[0][0].content as Buffer
+    ).toString('utf8');
+    expect(csv).toContain('studentSystemId');
+    expect(csv).toContain('SCH-2026-0001');
+    expect(csv).not.toContain('SCH-2026-0002');
+    expect(result).not.toHaveProperty('rows');
+    expect(result).not.toHaveProperty('csv');
     expect(result.issues).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -2379,12 +2383,14 @@ function buildService(prisma: ReturnType<typeof buildPrisma>) {
     record: jest.fn(),
   };
   const storageService = {
-    saveBufferObject: jest.fn(async (input: { prefix: string }) => ({
-      provider: 'LOCAL',
-      objectKey: `tenant-1/${input.prefix}/generated-doc.pdf`,
-      publicUrl: '/storage/generated-doc.pdf',
-      sizeBytes: 512,
-    })),
+    saveBufferObject: jest.fn(
+      async (input: { prefix: string; content?: Buffer }) => ({
+        provider: 'LOCAL',
+        objectKey: `tenant-1/${input.prefix}/generated-doc.pdf`,
+        publicUrl: '/storage/generated-doc.pdf',
+        sizeBytes: 512,
+      }),
+    ),
   };
   const fileRegistryService = {
     registerFile: jest.fn().mockResolvedValue({ id: 'generated-file-asset' }),

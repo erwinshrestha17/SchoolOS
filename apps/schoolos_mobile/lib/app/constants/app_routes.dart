@@ -81,6 +81,8 @@ class AppRoutes {
   static const principalReports = '/principal/reports-snapshot';
   static const principalTasks = '/principal/tasks';
   static const principalWalkthroughs = '/principal/classroom-walkthroughs';
+  static const principalInstitutionalImprovement =
+      '/principal/institutional-improvement';
   static const principalCanteen = '/principal/canteen-snapshot';
   static const principalLibrary = '/principal/library-snapshot';
   static const adminHome = '/admin/home';

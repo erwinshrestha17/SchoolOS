@@ -157,7 +157,9 @@ export class CreateFormativeAssessmentDto {
   @IsEnum(LearningMasteryStatus)
   masteryStatus!: LearningMasteryStatus;
 
-  @ValidateIf((value: CreateFormativeAssessmentDto) => value.score !== undefined)
+  @ValidateIf(
+    (value: CreateFormativeAssessmentDto) => value.score !== undefined,
+  )
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)

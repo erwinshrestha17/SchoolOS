@@ -119,6 +119,28 @@ final principalSnapshotProvider = FutureProvider.autoDispose
       return withConnectivityMeta(data, isOnline);
     });
 
+final principalSchoolImprovementProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+      final isOnline = ref.watch(connectivityProvider);
+      return withConnectivityMeta(
+        await ref
+            .watch(principalRepositoryProvider)
+            .getSchoolImprovementPlans(),
+        isOnline,
+      );
+    });
+
+final principalBoardReadinessProvider = FutureProvider.autoDispose
+    .family<Map<String, dynamic>, String>((ref, track) async {
+      final isOnline = ref.watch(connectivityProvider);
+      return withConnectivityMeta(
+        await ref
+            .watch(principalRepositoryProvider)
+            .getBoardExamReadiness(track),
+        isOnline,
+      );
+    });
+
 Map<String, dynamic> withConnectivityMeta(
   Map<String, dynamic> data,
   bool isOnline,

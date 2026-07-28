@@ -2847,9 +2847,6 @@ export class StudentsService {
               message: issue.message,
             })),
         ),
-      headers,
-      rows,
-      csv,
     };
   }
 
@@ -3449,6 +3446,55 @@ export class StudentsService {
     }
 
     return list;
+  }
+
+  async countIemisReadyForClasses(
+    classIds: string[],
+    actor: AuthContext,
+  ): Promise<number> {
+    if (classIds.length === 0) return 0;
+    const batchSize = 250;
+    let cursor: string | undefined;
+    let ready = 0;
+
+    while (true) {
+      const students = await this.prisma.student.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          classId: { in: classIds },
+          lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+        },
+        include: {
+          tenant: true,
+          class: true,
+          sectionRef: true,
+          guardianLinks: {
+            include: { guardian: true },
+          },
+          enrollments: {
+            where: { status: EnrollmentStatus.ACTIVE },
+            include: {
+              academicYear: true,
+              class: true,
+              section: true,
+            },
+            orderBy: [{ createdAt: 'desc' as const }],
+            take: 1,
+          },
+        },
+        orderBy: { id: 'asc' },
+        take: batchSize,
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      });
+
+      ready += students.filter((student) =>
+        validateIemisStudent(student).every((issue) => !issue.blocking),
+      ).length;
+      if (students.length < batchSize) break;
+      cursor = students.at(-1)!.id;
+    }
+
+    return ready;
   }
 
   async generateStudentDocumentPdf(

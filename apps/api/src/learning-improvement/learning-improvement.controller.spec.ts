@@ -22,15 +22,15 @@ describe('LearningImprovementController', () => {
     expect(
       Reflect.getMetadata(REQUIRED_MODULE_KEY, LearningImprovementController),
     ).toBe('academics');
-    expect(Reflect.getMetadata(ROLES_KEY, LearningImprovementController)).toEqual(
-      [
-        'admin',
-        'principal',
-        'teacher',
-        'subject_teacher',
-        'platform_super_admin',
-      ],
-    );
+    expect(
+      Reflect.getMetadata(ROLES_KEY, LearningImprovementController),
+    ).toEqual([
+      'admin',
+      'principal',
+      'teacher',
+      'subject_teacher',
+      'platform_super_admin',
+    ]);
     expect(
       Reflect.getMetadata(
         PERMISSIONS_KEY,
@@ -103,11 +103,9 @@ describe('LearningImprovementController', () => {
       checkDto,
     );
     expect(service.createIntervention).toHaveBeenCalledWith(actor, caseDto);
-    expect(service.addRemedialMembers).toHaveBeenCalledWith(
-      actor,
-      'group-1',
-      { studentIds: ['student-1'] },
-    );
+    expect(service.addRemedialMembers).toHaveBeenCalledWith(actor, 'group-1', {
+      studentIds: ['student-1'],
+    });
     expect(service.updateGuidanceStatus).toHaveBeenCalledWith(
       actor,
       'guidance-1',

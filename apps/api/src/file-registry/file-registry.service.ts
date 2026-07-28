@@ -1005,5 +1005,6 @@ const FILE_READ_PERMISSIONS: Record<string, string[]> = {
   finance: ['fees:manage', 'receipts:read', 'receipts:manage'],
   fees: ['fees:manage', 'receipts:read', 'receipts:manage'],
   admissions: ['students:read', 'student_documents:manage'],
+  'institutional-improvement': ['hr:read', 'reports:read'],
   settings: ['settings:read'],
 };
