@@ -1848,7 +1848,6 @@ export const systemRolePermissions: Record<string, string[]> = {
     "settings:read_public",
   ],
   parent: [
-    "students:read",
     "notices:read",
     "events:read",
     "activity_feed:read",

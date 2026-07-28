@@ -1,5 +1,6 @@
-import { AuthMethod } from '@prisma/client';
+import { AuthMethod, TeacherAssignmentType } from '@prisma/client';
 import { AcademicsService } from './academics.service';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 
 /**
  * `GET /teacher-assignments` is gated on `academics:read`, which every teacher
@@ -29,12 +30,14 @@ const SENSITIVE_STAFF_FIELDS = [
 
 function buildService() {
   const findMany = jest.fn().mockResolvedValue([]);
-  const staffFindFirst = jest.fn().mockResolvedValue({ id: 'staff-teacher-1' });
+  const staffFindFirst = jest.fn().mockResolvedValue('staff-teacher-1');
 
   const prisma = {
-    subjectTeacherAssignment: { findMany },
-    staff: { findFirst: staffFindFirst },
+    teacherAssignment: { findMany },
   } as never;
+  const teacherScope = {
+    resolveActiveStaffId: staffFindFirst,
+  } as unknown as TeacherScopeService;
 
   const service = new AcademicsService(
     prisma,
@@ -42,6 +45,7 @@ function buildService() {
     {} as never,
     {} as never,
     {} as never,
+    teacherScope,
   );
 
   return { service, findMany, staffFindFirst };
@@ -90,14 +94,14 @@ describe('AcademicsService.listTeacherAssignments', () => {
       actorFor(['teacher'], ['academics:read', 'academics:enter_marks']),
     );
 
-    expect(staffFindFirst).toHaveBeenCalledWith({
-      where: { tenantId: 'tenant-1', userId: 'user-teacher-1' },
-      select: { id: true },
-    });
-    expect(findMany.mock.calls[0][0].where).toEqual({
-      tenantId: 'tenant-1',
-      staffId: 'staff-teacher-1',
-    });
+    expect(staffFindFirst).toHaveBeenCalled();
+    expect(findMany.mock.calls[0][0].where).toEqual(
+      expect.objectContaining({
+        tenantId: 'tenant-1',
+        status: 'ACTIVE',
+        staffId: 'staff-teacher-1',
+      }),
+    );
   });
 
   it('fails closed when a teacher has no active staff record', async () => {
@@ -122,7 +126,9 @@ describe('AcademicsService.listTeacherAssignments', () => {
     );
 
     expect(staffFindFirst).not.toHaveBeenCalled();
-    expect(findMany.mock.calls[0][0].where).toEqual({ tenantId: 'tenant-1' });
+    expect(findMany.mock.calls[0][0].where).toEqual(
+      expect.objectContaining({ tenantId: 'tenant-1', status: 'ACTIVE' }),
+    );
   });
 
   it('gives a teacher who is also an academic administrator the full map', async () => {
@@ -132,6 +138,108 @@ describe('AcademicsService.listTeacherAssignments', () => {
       actorFor(['teacher'], ['academics:read', 'academics:update']),
     );
 
-    expect(findMany.mock.calls[0][0].where).toEqual({ tenantId: 'tenant-1' });
+    expect(findMany.mock.calls[0][0].where).toEqual(
+      expect.objectContaining({ tenantId: 'tenant-1', status: 'ACTIVE' }),
+    );
+  });
+});
+
+describe('AcademicsService.assignTeacher', () => {
+  it('dual-writes an exact-section canonical assignment and compatibility row', async () => {
+    const startsOn = new Date('2026-04-14T00:00:00.000Z');
+    const endsOn = new Date('2027-04-13T00:00:00.000Z');
+    const subjectTeacherCreate = jest.fn().mockResolvedValue({
+      id: 'legacy-assignment-1',
+    });
+    const teacherAssignmentCreate = jest.fn().mockResolvedValue({
+      id: 'assignment-1',
+      subjectId: 'subject-1',
+      staffId: 'staff-1',
+      classId: 'class-1',
+      sectionId: 'section-1',
+    });
+    const tx = {
+      subjectTeacherAssignment: { create: subjectTeacherCreate },
+      teacherAssignment: { create: teacherAssignmentCreate },
+    };
+    const prisma = {
+      academicYear: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'year-1',
+          startsOn,
+          endsOn,
+        }),
+      },
+      class: { findFirst: jest.fn().mockResolvedValue({ id: 'class-1' }) },
+      staff: { findFirst: jest.fn().mockResolvedValue({ id: 'staff-1' }) },
+      subject: { findFirst: jest.fn().mockResolvedValue({ id: 'subject-1' }) },
+      section: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'section-1' }),
+      },
+      $transaction: jest.fn(
+        async (callback: (transaction: typeof tx) => Promise<unknown>) =>
+          callback(tx),
+      ),
+    };
+    const audit = { record: jest.fn().mockResolvedValue(undefined) };
+    const service = new AcademicsService(
+      prisma as never,
+      {} as never,
+      audit as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+    const actor = actorFor(['admin'], ['academics:update']);
+
+    await service.assignTeacher(
+      {
+        academicYearId: 'year-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        subjectId: 'subject-1',
+        staffId: 'staff-1',
+      },
+      actor,
+    );
+
+    expect(subjectTeacherCreate).toHaveBeenCalledWith({
+      data: {
+        tenantId: 'tenant-1',
+        academicYearId: 'year-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        subjectId: 'subject-1',
+        staffId: 'staff-1',
+      },
+    });
+    expect(teacherAssignmentCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          tenantId: 'tenant-1',
+          academicYearId: 'year-1',
+          staffId: 'staff-1',
+          assignmentType: TeacherAssignmentType.SUBJECT_TEACHER,
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: 'subject-1',
+          componentScope: null,
+          isPrimary: true,
+          effectiveFrom: startsOn,
+          effectiveUntil: endsOn,
+          createdById: 'user-teacher-1',
+        },
+        include: expect.objectContaining({
+          staff: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              employeeId: true,
+            },
+          },
+        }),
+      }),
+    );
   });
 });

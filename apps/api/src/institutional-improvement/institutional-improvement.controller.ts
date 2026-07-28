@@ -12,9 +12,11 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
+import { RequiredModule } from '../auth/decorators/required-module.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import {
   AddSchoolImprovementReviewDto,
@@ -37,7 +39,10 @@ import { InstitutionalImprovementService } from './institutional-improvement.ser
 
 @ApiTags('institutional-improvement')
 @Controller('institutional-improvement')
-@UseGuards(JwtAuthGuard, RolesPermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
+// P2-03/P2-14 are outside the controlled-pilot boundary. The Learning module
+// entitlement is the existing disabled-by-default release-boundary switch.
+@RequiredModule('learning')
 @Roles(
   'admin',
   'principal',

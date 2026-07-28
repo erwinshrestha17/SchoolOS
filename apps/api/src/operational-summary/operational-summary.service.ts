@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { GuardianCapability } from '@prisma/client';
 import { getNepalSchoolDay } from '@schoolos/core';
 import type { AuthContext } from '../auth/auth.types';
 import { getParentStudentIds } from '../common/security/parent-scope';
@@ -12,6 +13,7 @@ import {
   type OperationalSummaryModule,
   type OperationalSummaryStatus,
 } from './operational-summary.types';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 
 type Day = ReturnType<typeof getNepalSchoolDay>;
 type SummaryModule = Exclude<OperationalSummaryModule, 'm11_intelligence'>;
@@ -144,6 +146,7 @@ export class OperationalSummaryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly entitlementsService: EntitlementsService,
+    private readonly teacherScopeService: TeacherScopeService,
   ) {}
 
   async getDashboardSummary(actor: AuthContext) {
@@ -1016,26 +1019,34 @@ export class OperationalSummaryService {
   private async getTeacherScope(
     actor: AuthContext,
   ): Promise<TeacherScope | null> {
-    const staff = await this.prisma.staff.findFirst({
-      where: { tenantId: actor.tenantId, userId: actor.userId },
-      select: { id: true },
-    });
-    if (!staff) return null;
+    const staffId = await this.teacherScopeService.resolveActiveStaffId(actor);
+    if (!staffId) return null;
 
-    const assignments = await this.prisma.subjectTeacherAssignment.findMany({
-      where: { tenantId: actor.tenantId, staffId: staff.id },
-      select: { classId: true, sectionId: true, subjectId: true },
-      take: 100,
-    });
-    return {
-      staffId: staff.id,
-      subjectIds: [
-        ...new Set(assignments.map((assignment) => assignment.subjectId)),
-      ],
-      classSectionScopes: assignments.map((assignment) => ({
+    const assignments =
+      await this.teacherScopeService.listActiveAssignments(actor);
+    if (assignments.length === 0) return null;
+
+    const classSectionScopes = new Map<
+      string,
+      { classId: string; sectionId: string | null }
+    >();
+    for (const assignment of assignments) {
+      classSectionScopes.set(`${assignment.classId}:${assignment.sectionId}`, {
         classId: assignment.classId,
-        sectionId: assignment.sectionId ?? null,
-      })),
+        sectionId: assignment.sectionId,
+      });
+    }
+
+    return {
+      staffId,
+      subjectIds: [
+        ...new Set(
+          assignments
+            .map((assignment) => assignment.subjectId)
+            .filter((subjectId): subjectId is string => Boolean(subjectId)),
+        ),
+      ],
+      classSectionScopes: [...classSectionScopes.values()],
     };
   }
 
@@ -1044,60 +1055,93 @@ export class OperationalSummaryService {
     day: Day,
     modules: Set<string>,
   ) {
-    const studentIds = (await getParentStudentIds(this.prisma, actor)) ?? [];
-    if (studentIds.length === 0)
+    const [
+      studentIds,
+      attendanceStudentIds,
+      feeStudentIds,
+      academicStudentIds,
+      communicationStudentIds,
+    ] = await Promise.all([
+      getParentStudentIds(this.prisma, actor),
+      getParentStudentIds(
+        this.prisma,
+        actor,
+        GuardianCapability.ATTENDANCE_VIEW,
+      ),
+      getParentStudentIds(this.prisma, actor, GuardianCapability.FEES_VIEW),
+      getParentStudentIds(
+        this.prisma,
+        actor,
+        GuardianCapability.ACADEMICS_VIEW,
+      ),
+      getParentStudentIds(
+        this.prisma,
+        actor,
+        GuardianCapability.SCHOOL_COMMUNICATE,
+      ),
+    ]);
+    const linkedStudentIds = studentIds ?? [];
+    const attendanceScope = attendanceStudentIds ?? [];
+    const feeScope = feeStudentIds ?? [];
+    const academicScope = academicStudentIds ?? [];
+    const communicationScope = communicationStudentIds ?? [];
+    if (linkedStudentIds.length === 0)
       return this.mobileSummary('parent', day, 'empty');
 
     const [attendance, invoices, reports, libraryLoans, notices] =
       await Promise.all([
-        modules.has('attendance')
+        modules.has('attendance') && attendanceScope.length > 0
           ? this.safeCount('attendanceRecord', {
               tenantId: actor.tenantId,
-              studentId: { in: studentIds },
+              studentId: { in: attendanceScope },
               attendanceSession: {
                 attendanceDate: { gte: day.startUtc, lt: day.endExclusiveUtc },
               },
             })
           : noMetric(),
-        modules.has('fees')
+        modules.has('fees') && feeScope.length > 0
           ? this.safeCount('invoice', {
               tenantId: actor.tenantId,
-              studentId: { in: studentIds },
+              studentId: { in: feeScope },
               status: { in: ['ISSUED', 'PARTIAL'] },
             })
           : noMetric(),
-        modules.has('exams')
+        modules.has('exams') && academicScope.length > 0
           ? this.safeCount('reportCard', {
               tenantId: actor.tenantId,
-              studentId: { in: studentIds },
+              studentId: { in: academicScope },
               publishedAt: { not: null },
             })
           : noMetric(),
-        modules.has('library')
+        modules.has('library') && academicScope.length > 0
           ? this.safeCount('libraryIssue', {
               tenantId: actor.tenantId,
-              borrowerStudentId: { in: studentIds },
+              borrowerStudentId: { in: academicScope },
               status: { in: ['ISSUED', 'OVERDUE'] },
             })
           : noMetric(),
-        modules.has('notices')
+        modules.has('notices') && communicationScope.length > 0
           ? this.safeCount('notificationDelivery', {
               tenantId: actor.tenantId,
               OR: [
                 { recipientUserId: actor.userId },
-                { studentId: { in: studentIds } },
+                { studentId: { in: communicationScope } },
               ],
               readReceipts: { none: { userId: actor.userId } },
             })
           : noMetric(),
       ]);
+    const metrics = [attendance, invoices, reports, libraryLoans, notices];
+    const hasCapabilityBackedMetric = metrics.some(
+      (metric) => metric.value !== null || metric.failed,
+    );
 
     return this.mobileSummary(
       'parent',
       day,
-      mobileStatus([attendance, invoices, reports, libraryLoans, notices]),
+      hasCapabilityBackedMetric ? mobileStatus(metrics) : 'locked',
       {
-        linkedChildren: studentIds.length,
+        linkedChildren: linkedStudentIds.length,
         attendanceRecordsToday: attendance.value,
         unpaidInvoices: invoices.value,
         publishedReportCards: reports.value,

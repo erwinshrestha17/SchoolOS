@@ -10,6 +10,7 @@ import { FileRegistryModule } from '../file-registry/file-registry.module';
 import { BullModule } from '@nestjs/bullmq';
 
 import { ReportsProcessor } from './reports.processor';
+import { TeacherScopeModule } from '../teacher-scope/teacher-scope.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { ReportsProcessor } from './reports.processor';
     AuditModule,
     FinanceModule,
     FileRegistryModule,
+    TeacherScopeModule,
     BullModule.registerQueue({
       name: 'reports',
     }),

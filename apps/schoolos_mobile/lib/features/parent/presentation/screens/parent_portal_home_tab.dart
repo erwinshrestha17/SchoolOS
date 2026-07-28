@@ -126,7 +126,9 @@ class _ParentPortalHomeTabState extends ConsumerState<ParentPortalHomeTab>
       const SizedBox(height: AppSpacing.md),
       StudentDaySummaryCard(
         child: child,
-        onOpenChild: guardTap(() => context.push(child.route)),
+        onOpenChild: child.canOpenProfile
+            ? guardTap(() => context.push(child.route))
+            : null,
         onOpenStatus: (row) {
           if (acceptTap()) context.push(row.route);
         },
@@ -156,9 +158,15 @@ class _ParentPortalHomeTabState extends ConsumerState<ParentPortalHomeTab>
       const DashboardSectionHeader(title: 'Quick actions'),
       const SizedBox(height: AppSpacing.md),
       _QuickActionsRow(
-        onAttendance: guardTap(() => context.push(AppRoutes.parentAttendance)),
-        onFees: guardTap(() => context.push(AppRoutes.parentFees)),
-        onCalendar: guardTap(() => context.push(AppRoutes.parentCalendar)),
+        onAttendance: child.canViewAttendance
+            ? guardTap(() => context.push(AppRoutes.parentAttendance))
+            : null,
+        onFees: child.canViewFees
+            ? guardTap(() => context.push(AppRoutes.parentFees))
+            : null,
+        onCalendar: child.canViewAcademics
+            ? guardTap(() => context.push(AppRoutes.parentCalendar))
+            : null,
       ),
       const SizedBox(height: AppSpacing.xl),
       DashboardSectionHeader(
@@ -296,7 +304,7 @@ class _QuickActionsRow extends StatelessWidget {
               width: tileWidth,
               child: QuickActionTile(
                 icon: Icons.payments_outlined,
-                label: 'Pay fees',
+                label: 'Fees & receipts',
                 color: ParentPortalColors.orange,
                 onTap: onFees,
               ),

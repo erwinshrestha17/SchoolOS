@@ -316,11 +316,8 @@ describe('Attendance Hardening', () => {
         sectionId: 'section-1',
       });
 
-      // Teacher is NOT assigned
-      (prisma.section.findFirst as jest.Mock).mockResolvedValue(null);
-      (
-        prisma.subjectTeacherAssignment.findFirst as jest.Mock
-      ).mockResolvedValue(null);
+      // Teacher is NOT assigned in the canonical authority table.
+      teacherAssignments = [];
 
       const dto = {
         studentId: 'student-1',

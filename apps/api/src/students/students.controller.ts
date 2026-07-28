@@ -14,6 +14,7 @@ import {
   ApiOkResponse,
   ApiOperation,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -45,10 +46,18 @@ import { UpdateStudentDto } from './dto/update-student.dto';
 import { UpdateStudentGuardianDto } from './dto/update-student-guardian.dto';
 import { AttendanceHistoryQueryDto } from './dto/attendance-history.dto';
 import { GeneratedStudentDocumentArtifactResponseDto } from './dto/generated-student-document-artifact.dto';
+import {
+  GuardianRecoveryActionDto,
+  ProvisionGuardianAccountDto,
+  RevokeGuardianSessionDto,
+} from './dto/guardian-access-administration.dto';
 import { StudentIemisReadinessResponseDto } from './dto/student-iemis-readiness.dto';
 import { sanitizeStudentProfileResponse } from './student-profile-sanitizer';
 import { StudentDuplicateReviewService } from './student-duplicate-review.service';
 import { StudentsService } from './students.service';
+
+const GUARDIAN_ADMIN_RATE_LIMIT = 10;
+const GUARDIAN_ADMIN_RATE_TTL_MS = 60_000;
 
 @Controller('students')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
@@ -142,6 +151,12 @@ export class StudentsController {
 
   @Patch(':id/guardians/:guardianId')
   @Permissions('guardians:update')
+  @Throttle({
+    default: {
+      limit: GUARDIAN_ADMIN_RATE_LIMIT,
+      ttl: GUARDIAN_ADMIN_RATE_TTL_MS,
+    },
+  })
   updateStudentGuardian(
     @Param('id') studentId: string,
     @Param('guardianId') guardianId: string,
@@ -158,12 +173,100 @@ export class StudentsController {
 
   @Post(':id/guardians')
   @Permissions('guardians:create')
+  @Throttle({
+    default: {
+      limit: GUARDIAN_ADMIN_RATE_LIMIT,
+      ttl: GUARDIAN_ADMIN_RATE_TTL_MS,
+    },
+  })
   addStudentGuardian(
     @Param('id') studentId: string,
     @Body() dto: CreateStudentGuardianDto,
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.studentsService.addStudentGuardian(studentId, dto, auth);
+  }
+
+  @Get(':id/guardians/:guardianId/access-administration')
+  @Permissions('guardians:read')
+  getGuardianAccessAdministration(
+    @Param('id') studentId: string,
+    @Param('guardianId') guardianId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.getGuardianAccessAdministration(
+      studentId,
+      guardianId,
+      auth,
+    );
+  }
+
+  @Post(':id/guardians/:guardianId/access-actions')
+  @Permissions('guardians:update', 'guardians:verify', 'users:reset_password')
+  @Throttle({
+    default: {
+      limit: GUARDIAN_ADMIN_RATE_LIMIT,
+      ttl: GUARDIAN_ADMIN_RATE_TTL_MS,
+    },
+  })
+  performGuardianRecoveryAction(
+    @Param('id') studentId: string,
+    @Param('guardianId') guardianId: string,
+    @Body() dto: GuardianRecoveryActionDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.performGuardianRecoveryAction(
+      studentId,
+      guardianId,
+      dto,
+      auth,
+    );
+  }
+
+  @Post(':id/guardians/:guardianId/account')
+  @Permissions('guardians:update', 'guardians:verify', 'users:create')
+  @Throttle({
+    default: {
+      limit: GUARDIAN_ADMIN_RATE_LIMIT,
+      ttl: GUARDIAN_ADMIN_RATE_TTL_MS,
+    },
+  })
+  provisionGuardianAccount(
+    @Param('id') studentId: string,
+    @Param('guardianId') guardianId: string,
+    @Body() dto: ProvisionGuardianAccountDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.provisionGuardianAccount(
+      studentId,
+      guardianId,
+      dto,
+      auth,
+    );
+  }
+
+  @Post(':id/guardians/:guardianId/sessions/:sessionId/revoke')
+  @Permissions('guardians:update', 'guardians:verify', 'users:reset_password')
+  @Throttle({
+    default: {
+      limit: GUARDIAN_ADMIN_RATE_LIMIT,
+      ttl: GUARDIAN_ADMIN_RATE_TTL_MS,
+    },
+  })
+  revokeGuardianSession(
+    @Param('id') studentId: string,
+    @Param('guardianId') guardianId: string,
+    @Param('sessionId') sessionId: string,
+    @Body() dto: RevokeGuardianSessionDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.revokeGuardianSession(
+      studentId,
+      guardianId,
+      sessionId,
+      dto,
+      auth,
+    );
   }
 
   @Get('iemis/validation')
@@ -284,6 +387,12 @@ export class StudentsController {
 
   @Post(':id/guardian-invitations')
   @Permissions('guardians:create')
+  @Throttle({
+    default: {
+      limit: GUARDIAN_ADMIN_RATE_LIMIT,
+      ttl: GUARDIAN_ADMIN_RATE_TTL_MS,
+    },
+  })
   inviteGuardians(
     @Param('id') studentId: string,
     @Body() dto: InviteGuardianDto,
@@ -306,6 +415,12 @@ export class StudentsController {
 
   @Post('guardians/:guardianId/identity-verifications')
   @Permissions('guardians:verify')
+  @Throttle({
+    default: {
+      limit: GUARDIAN_ADMIN_RATE_LIMIT,
+      ttl: GUARDIAN_ADMIN_RATE_TTL_MS,
+    },
+  })
   createGuardianIdentityVerification(
     @Param('guardianId') guardianId: string,
     @Body() dto: CreateGuardianIdentityVerificationDto,
@@ -320,6 +435,12 @@ export class StudentsController {
 
   @Post('guardians/:guardianId/identity-verifications/:verificationId/review')
   @Permissions('guardians:verify')
+  @Throttle({
+    default: {
+      limit: GUARDIAN_ADMIN_RATE_LIMIT,
+      ttl: GUARDIAN_ADMIN_RATE_TTL_MS,
+    },
+  })
   reviewGuardianIdentityVerification(
     @Param('guardianId') guardianId: string,
     @Param('verificationId') verificationId: string,

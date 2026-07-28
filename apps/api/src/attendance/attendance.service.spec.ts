@@ -17,14 +17,17 @@ import {
   FileStatus,
   NotificationChannel,
   Prisma,
-  StaffStatus,
   StudentLifecycleStatus,
+  TeacherAssignmentType,
 } from '@prisma/client';
 import sharp from 'sharp';
 import { toGregorianDateFromBs } from '@schoolos/core';
 import { AttendanceService } from './attendance.service';
 import { AttendanceConflictReviewDecision } from './dto/review-attendance-conflict.dto';
-import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
+import {
+  TEACHER_SCOPE_DENIED_CODE,
+  TeacherScopeService,
+} from '../teacher-scope/teacher-scope.service';
 import {
   createTeacherScopeServiceForTests,
   teacherAssignmentFixture,
@@ -301,6 +304,7 @@ describe('attendance production hardening', () => {
 
   it('returns no mobile teacher classes when the signed-in user is not tenant staff', async () => {
     const { service, prisma } = buildService({
+      canonicalAssignments: [],
       staffFindFirst: null,
       teacherAssignments: [
         {
@@ -322,10 +326,6 @@ describe('attendance production hardening', () => {
       service.listTeacherMobileClassSections(teacherActor),
     ).resolves.toEqual({ items: [] });
 
-    expect(prisma.staff.findFirst).toHaveBeenCalledWith({
-      where: { userId: teacherActor.userId, tenantId: teacherActor.tenantId },
-      select: { id: true },
-    });
     expect(prisma.subjectTeacherAssignment.findMany).not.toHaveBeenCalled();
     expect(prisma.section.findMany).not.toHaveBeenCalled();
   });
@@ -334,26 +334,30 @@ describe('attendance production hardening', () => {
     const { service, prisma } = buildService({
       staffFindFirst: { id: 'staff-1' },
       academicYear: { id: 'ay-current', name: '2082' },
+      classroom: { id: 'class-1', name: 'Grade 3', level: 3 },
+      section: { id: 'section-1', name: 'A', classId: 'class-1' },
       teacherAssignments: [
         {
           id: 'assign-1',
           academicYearId: 'ay-current',
           classId: 'class-1',
           sectionId: 'section-1',
+          subjectId: 'subject-math',
           academicYear: { id: 'ay-current', name: '2082' },
           class: { id: 'class-1', name: 'Grade 3' },
           section: { id: 'section-1', name: 'A' },
-          subject: { name: 'Math' },
+          subject: { id: 'subject-math', name: 'Math' },
         },
         {
           id: 'assign-2',
           academicYearId: 'ay-current',
           classId: 'class-1',
           sectionId: 'section-1',
+          subjectId: 'subject-science',
           academicYear: { id: 'ay-current', name: '2082' },
           class: { id: 'class-1', name: 'Grade 3' },
           section: { id: 'section-1', name: 'A' },
-          subject: { name: 'Science' },
+          subject: { id: 'subject-science', name: 'Science' },
         },
       ],
       classTeacherSections: [
@@ -382,20 +386,14 @@ describe('attendance production hardening', () => {
       ],
     });
 
-    expect(prisma.subjectTeacherAssignment.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          tenantId: teacherActor.tenantId,
-          staffId: 'staff-1',
-          academicYearId: 'ay-current',
-        },
-      }),
-    );
-    expect(prisma.section.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { tenantId: teacherActor.tenantId, classTeacherId: 'staff-1' },
-      }),
-    );
+    expect(prisma.subjectTeacherAssignment.findMany).not.toHaveBeenCalled();
+    expect(prisma.section.findMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: teacherActor.tenantId,
+        id: { in: ['section-1'] },
+      },
+      select: { id: true, name: true },
+    });
   });
 
   it('builds a tenant and teacher scoped today board from current assignments', async () => {
@@ -405,16 +403,19 @@ describe('attendance production hardening', () => {
     const { service, prisma } = buildService({
       staffFindFirst: { id: 'staff-1' },
       academicYear: { id: 'ay-current', name: '2082' },
+      classroom: { id: 'class-1', name: 'Grade 3', level: 3 },
+      section: { id: 'section-1', name: 'A', classId: 'class-1' },
       teacherAssignments: [
         {
           id: 'assign-1',
           academicYearId: 'ay-current',
           classId: 'class-1',
           sectionId: 'section-1',
+          subjectId: 'subject-math',
           academicYear: { id: 'ay-current', name: '2082' },
           class: { id: 'class-1', name: 'Grade 3' },
           section: { id: 'section-1', name: 'A' },
-          subject: { name: 'Math' },
+          subject: { id: 'subject-math', name: 'Math' },
         },
       ],
       attendanceSessions: [],
@@ -561,9 +562,9 @@ describe('attendance production hardening', () => {
         'section-1',
         '2026-04-28',
       ),
-    ).rejects.toThrow(
-      'You are not assigned as Class Teacher or Subject Teacher for this section',
-    );
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: TEACHER_SCOPE_DENIED_CODE }),
+    });
     expect(prisma.student.findMany).not.toHaveBeenCalled();
   });
 
@@ -592,9 +593,9 @@ describe('attendance production hardening', () => {
         },
         teacherActor,
       ),
-    ).rejects.toThrow(
-      'You are not assigned as Class Teacher or Subject Teacher for this section',
-    );
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: TEACHER_SCOPE_DENIED_CODE }),
+    });
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
@@ -602,7 +603,10 @@ describe('attendance production hardening', () => {
     const { service, prisma } = buildService({
       academicYear: { id: 'ay-1' },
       classroom: { id: 'class-1', name: 'Grade 1' },
+      section: { id: 'section-1', name: 'A', classId: 'class-1' },
       staffFindFirst: null,
+      canonicalAssignments: [],
+      scopeStaffId: null,
     });
 
     await expect(
@@ -610,17 +614,11 @@ describe('attendance production hardening', () => {
         teacherActor,
         'ay-1',
         'class-1',
-        undefined,
+        'section-1',
         '2026-04-28',
       ),
-    ).rejects.toThrow('Staff record not found in this tenant');
-
-    expect(prisma.staff.findFirst).toHaveBeenCalledWith({
-      where: {
-        userId: teacherActor.userId,
-        tenantId: teacherActor.tenantId,
-        status: StaffStatus.ACTIVE,
-      },
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: TEACHER_SCOPE_DENIED_CODE }),
     });
     expect(prisma.subjectTeacherAssignment.findFirst).not.toHaveBeenCalled();
   });
@@ -639,9 +637,7 @@ describe('attendance production hardening', () => {
         undefined,
         '2026-04-28',
       ),
-    ).rejects.toThrow(
-      'You are not assigned as Class Teacher or Subject Teacher for this section',
-    );
+    ).rejects.toThrow('Teacher scope denied');
 
     // Authorization is resolved from the canonical TeacherAssignment table
     // now, so the legacy SubjectTeacherAssignment query is not issued.
@@ -685,9 +681,9 @@ describe('attendance production hardening', () => {
         },
         teacherActor,
       ),
-    ).rejects.toThrow(
-      'You are not assigned as Class Teacher or Subject Teacher for this section',
-    );
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: TEACHER_SCOPE_DENIED_CODE }),
+    });
 
     // Year scoping is enforced by the canonical assignment query, so the
     // legacy SubjectTeacherAssignment lookup is no longer issued.
@@ -3213,7 +3209,7 @@ function buildService(options: {
    * SubjectTeacherAssignment mock.
    */
   canonicalAssignments?: Array<Record<string, unknown>>;
-  scopeStaffId?: string;
+  scopeStaffId?: string | null;
   academicYear?: unknown;
   classroom?: unknown;
   section?: unknown;
@@ -3303,7 +3299,30 @@ function buildService(options: {
     },
     section: {
       findFirst: jest.fn().mockResolvedValue(options.section ?? null),
-      findMany: jest.fn().mockResolvedValue(options.classTeacherSections ?? []),
+      findMany: jest
+        .fn()
+        .mockResolvedValue(
+          options.section
+            ? [options.section]
+            : (options.classTeacherSections ?? []),
+        ),
+    },
+    subject: {
+      findMany: jest.fn().mockResolvedValue(
+        (options.teacherAssignments ?? [])
+          .map(
+            (assignment) =>
+              (
+                assignment as {
+                  subject?: { id?: string; name?: string };
+                  subjectId?: string;
+                }
+              ).subject,
+          )
+          .filter((subject): subject is { id: string; name: string } =>
+            Boolean(subject?.id && subject.name),
+          ),
+      ),
     },
     schoolCalendarDay: {
       findFirst: jest.fn().mockResolvedValue(options.calendarDay ?? null),
@@ -3469,11 +3488,45 @@ function buildService(options: {
   // *after* the assignment gate, so by default they get a permissive resolver.
   // A test that is actually about denial opts into the real resolver by
   // passing `canonicalAssignments` (an empty array = no assignments = denied).
+  const stubTeacherAssignments = [
+    ...(options.teacherAssignments ?? []).map((assignment, index) => {
+      const row = assignment as {
+        id?: string;
+        academicYearId?: string;
+        classId?: string;
+        sectionId?: string;
+        subjectId?: string;
+        subject?: { id?: string };
+      };
+      return {
+        assignmentId: row.id ?? `subject-assignment-${index + 1}`,
+        assignmentType: TeacherAssignmentType.SUBJECT_TEACHER,
+        academicYearId: row.academicYearId ?? 'ay-current',
+        classId: row.classId ?? 'class-1',
+        sectionId: row.sectionId ?? 'section-1',
+        subjectId: row.subjectId ?? row.subject?.id ?? 'subject-1',
+      };
+    }),
+    ...(options.classTeacherSections ?? []).map((section, index) => {
+      const row = section as { id?: string; classId?: string };
+      return {
+        assignmentId: `class-assignment-${index + 1}`,
+        assignmentType: TeacherAssignmentType.CLASS_TEACHER,
+        academicYearId: 'ay-current',
+        classId: row.classId ?? 'class-1',
+        sectionId: row.id ?? 'section-1',
+        subjectId: null,
+      };
+    }),
+  ];
   const teacherScope = options.canonicalAssignments
     ? (() => {
         const deps = createTeacherScopeServiceForTests({
           assignments: options.canonicalAssignments,
-          staffId: options.scopeStaffId ?? 'staff-1',
+          staffId:
+            options.scopeStaffId === undefined
+              ? 'staff-1'
+              : options.scopeStaffId,
         });
         return new TeacherScopeService(
           deps.prisma as never,
@@ -3482,13 +3535,41 @@ function buildService(options: {
       })()
     : ({
         resolveActiveStaffId: jest.fn().mockResolvedValue('staff-1'),
+        listActiveAssignments: jest
+          .fn()
+          .mockResolvedValue(stubTeacherAssignments),
+        resolveReadableScope: jest.fn().mockResolvedValue({
+          assignments: stubTeacherAssignments,
+          homeroomSectionIds: new Set(
+            stubTeacherAssignments
+              .filter(
+                (assignment) =>
+                  assignment.assignmentType ===
+                  TeacherAssignmentType.CLASS_TEACHER,
+              )
+              .map((assignment) => assignment.sectionId),
+          ),
+          subjectsBySection: new Map(),
+          allSectionIds: new Set(
+            stubTeacherAssignments.map((assignment) => assignment.sectionId),
+          ),
+        }),
         canAccess: jest.fn().mockResolvedValue({
           source: 'ASSIGNMENT',
           assignmentId: 'assignment-stub',
           componentScope: null,
           assignmentType: 'CLASS_TEACHER',
         }),
+        canActorAccess: jest.fn().mockResolvedValue({
+          source: 'ASSIGNMENT',
+          assignmentId: 'assignment-stub',
+          componentScope: null,
+          assignmentType: 'CLASS_TEACHER',
+        }),
         canAccessAnySectionOfClass: jest.fn().mockResolvedValue(null),
+        denyActorAccess: jest
+          .fn()
+          .mockRejectedValue(new ForbiddenException('Teacher scope denied')),
         requireAccess: jest.fn().mockResolvedValue({
           source: 'ASSIGNMENT',
           assignmentId: 'assignment-stub',

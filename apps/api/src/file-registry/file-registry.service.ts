@@ -10,6 +10,7 @@ import { StorageService } from '../storage/storage.service';
 import {
   FileStatus,
   FileVisibility,
+  GuardianCapability,
   HomeworkAssignmentStatus,
   Prisma,
   StorageProvider,
@@ -19,12 +20,18 @@ import { UsageService } from '../usage/usage.service';
 import { PlansService } from '../plans/plans.service';
 import type { AuthContext } from '../auth/auth.types';
 import {
+  buildActiveGuardianRelationshipWhere,
   getParentStudentIds,
   getStudentOwnId,
   isParentOnly,
 } from '../common/security/parent-scope';
 import { MAX_SIGNED_URL_TTL_SECONDS } from '../storage/storage.types';
 import { buildObjectKey } from '../storage/storage.utils';
+import { TeacherCapability } from '../teacher-scope/teacher-capability';
+import {
+  createTeacherScopeDeniedException,
+  TeacherScopeService,
+} from '../teacher-scope/teacher-scope.service';
 
 const FAMILY_VISIBLE_HOMEWORK_STATUSES: readonly HomeworkAssignmentStatus[] = [
   HomeworkAssignmentStatus.ASSIGNED,
@@ -40,6 +47,7 @@ export class FileRegistryService {
     private readonly storageService: StorageService,
     private readonly usageService: UsageService,
     private readonly plansService: PlansService,
+    private readonly teacherScopeService: TeacherScopeService,
   ) {}
 
   async registerFile(input: {
@@ -695,7 +703,11 @@ export class FileRegistryService {
       throw new ForbiddenException('Student file is not linked to a student');
     }
 
-    const parentStudentIds = await getParentStudentIds(this.prisma, auth);
+    const parentStudentIds = await getParentStudentIds(
+      this.prisma,
+      auth,
+      GuardianCapability.ACADEMICS_VIEW,
+    );
     if (parentStudentIds !== null) {
       if (parentStudentIds.includes(studentId)) return;
       throw new ForbiddenException(
@@ -725,21 +737,18 @@ export class FileRegistryService {
         },
         select: { classId: true, sectionId: true },
       });
-      const assignment = student
-        ? await this.prisma.subjectTeacherAssignment.findFirst({
-            where: {
-              tenantId: auth.tenantId,
-              staff: { userId: auth.userId },
-              classId: student.classId,
-              OR: [{ sectionId: student.sectionId }, { sectionId: null }],
-            },
-            select: { id: true },
-          })
-        : null;
-      if (assignment) return;
-      throw new ForbiddenException(
-        'This student file is outside your teaching scope',
+      if (!student?.sectionId) {
+        throw createTeacherScopeDeniedException();
+      }
+      await this.teacherScopeService.requireActorAccess(
+        {
+          classId: student.classId,
+          sectionId: student.sectionId,
+          capability: TeacherCapability.CLASS_ROSTER_READ,
+        },
+        auth,
       );
+      return;
     }
 
     if (
@@ -815,29 +824,24 @@ export class FileRegistryService {
       auth.roles.includes('teacher') ||
       auth.roles.includes('subject_teacher')
     ) {
-      const staff = await this.prisma.staff.findFirst({
-        where: { tenantId: auth.tenantId, userId: auth.userId },
-        select: { id: true },
-      });
-      const teacherAssignment = staff
-        ? await this.prisma.subjectTeacherAssignment.findFirst({
-            where: {
-              tenantId: auth.tenantId,
-              staffId: staff.id,
-              academicYearId: homework.academicYearId,
-              classId: homework.classId,
-              subjectId: homework.subjectId,
-              OR: homework.sectionId
-                ? [{ sectionId: homework.sectionId }, { sectionId: null }]
-                : [{ sectionId: null }],
-            },
-            select: { id: true },
-          })
-        : null;
-      if (teacherAssignment) return;
-      throw new ForbiddenException(
-        'Homework file is outside your teaching scope',
-      );
+      const scope = {
+        academicYearId: homework.academicYearId,
+        classId: homework.classId,
+        subjectId: homework.subjectId,
+        capability: TeacherCapability.SUBJECT_RECORD_READ,
+      } as const;
+      if (homework.sectionId) {
+        await this.teacherScopeService.requireActorAccess(
+          { ...scope, sectionId: homework.sectionId },
+          auth,
+        );
+      } else {
+        await this.teacherScopeService.requireActorAccessAnySectionOfClass(
+          scope,
+          auth,
+        );
+      }
+      return;
     }
 
     if (!FAMILY_VISIBLE_HOMEWORK_STATUSES.includes(homework.status)) {
@@ -869,6 +873,10 @@ export class FileRegistryService {
       const link = await this.prisma.studentGuardian.findFirst({
         where: {
           tenantId: auth.tenantId,
+          ...buildActiveGuardianRelationshipWhere(
+            new Date(),
+            GuardianCapability.ACADEMICS_VIEW,
+          ),
           guardian: { userId: auth.userId },
           ...(attachment.submission?.studentId
             ? { studentId: attachment.submission.studentId }

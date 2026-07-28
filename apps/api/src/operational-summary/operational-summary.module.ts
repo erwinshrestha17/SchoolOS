@@ -8,9 +8,10 @@ import {
   OperationalMobileSummaryController,
 } from './operational-summary.controller';
 import { OperationalSummaryService } from './operational-summary.service';
+import { TeacherScopeModule } from '../teacher-scope/teacher-scope.module';
 
 @Module({
-  imports: [PrismaModule, PlansModule, PlatformModule],
+  imports: [PrismaModule, PlansModule, PlatformModule, TeacherScopeModule],
   controllers: [
     OperationalPlatformSummaryController,
     OperationalDashboardSummaryController,

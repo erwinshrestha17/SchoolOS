@@ -603,6 +603,7 @@ void main() {
             transport: 'Route A',
             homework: 'No pending homework',
             updates: 'No unread updates',
+            capabilities: {'ACADEMICS_VIEW', 'ATTENDANCE_VIEW', 'FEES_VIEW'},
           ),
         ],
         homework: const [],
@@ -622,12 +623,12 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.scrollUntilVisible(
-        find.text('Pay fees'),
+        find.text('Fees & receipts'),
         220,
         scrollable: find.byType(Scrollable).first,
       );
       expect(find.text('Quick actions'), findsOneWidget);
-      expect(find.text('Pay fees'), findsOneWidget);
+      expect(find.text('Fees & receipts'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );

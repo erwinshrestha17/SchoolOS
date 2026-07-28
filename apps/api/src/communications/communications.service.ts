@@ -27,7 +27,6 @@ import {
   ParentTeacherThreadStatus,
   Prisma,
   ProviderType,
-  StaffStatus,
   StudentLifecycleStatus,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
@@ -57,6 +56,7 @@ import {
 } from './notification-event.service';
 import { NOTICE_ADMINISTRATION_PERMISSIONS } from './notice-detail.service';
 import { isTeacherOnly } from '../common/security/parent-scope';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 
 const TEMPLATE_SELECT = {
   id: true,
@@ -160,6 +160,8 @@ export class CommunicationsService {
     private readonly notificationEventService?: NotificationEventService,
     @Optional()
     private readonly notificationPreferencePolicy?: NotificationPreferencePolicy,
+    @Optional()
+    private readonly teacherScopeService?: TeacherScopeService,
   ) {}
 
   async listNotices(
@@ -296,40 +298,20 @@ export class CommunicationsService {
   private async getTeacherAssignedClassSections(
     actor: AuthContext,
   ): Promise<{ classIds: string[]; sectionIds: string[] }> {
-    const staff = await this.prisma.staff.findFirst({
-      where: {
-        tenantId: actor.tenantId,
-        userId: actor.userId,
-        status: StaffStatus.ACTIVE,
-      },
-      select: { id: true },
-    });
-    if (!staff) return { classIds: [], sectionIds: [] };
-
-    const [assignments, classTeacherSections] = await Promise.all([
-      this.prisma.subjectTeacherAssignment.findMany({
-        where: { tenantId: actor.tenantId, staffId: staff.id },
-        select: { classId: true, sectionId: true },
-      }),
-      this.prisma.section.findMany({
-        where: { tenantId: actor.tenantId, classTeacherId: staff.id },
-        select: { id: true, classId: true },
-      }),
-    ]);
-
-    const classIds = new Set<string>();
-    const sectionIds = new Set<string>();
-    for (const assignment of assignments) {
-      classIds.add(assignment.classId);
-      if (assignment.sectionId) sectionIds.add(assignment.sectionId);
+    if (!this.teacherScopeService) {
+      return { classIds: [], sectionIds: [] };
     }
-    for (const section of classTeacherSections) {
-      classIds.add(section.classId);
-      sectionIds.add(section.id);
-    }
+
+    const scope = await this.teacherScopeService.resolveReadableScope(actor);
+    const classIds = new Set(
+      scope.assignments.map((assignment) => assignment.classId),
+    );
+    const sectionIds = new Set(
+      scope.assignments.map((assignment) => assignment.sectionId),
+    );
     return {
-      classIds: Array.from(classIds),
-      sectionIds: Array.from(sectionIds),
+      classIds: [...classIds],
+      sectionIds: [...sectionIds],
     };
   }
 

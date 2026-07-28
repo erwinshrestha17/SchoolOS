@@ -27,6 +27,7 @@ import {
   FinanceRequestType,
   FinanceRequestStatus,
   FinanceRequestHistoryAction,
+  GuardianCapability,
   ReceiptFileStatus,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
@@ -7275,7 +7276,11 @@ export class FinanceService {
     studentId: string,
     actor: AuthContext,
   ) {
-    const parentStudentIds = await getParentStudentIds(this.prisma, actor);
+    const parentStudentIds = await getParentStudentIds(
+      this.prisma,
+      actor,
+      GuardianCapability.FEES_VIEW,
+    );
     if (parentStudentIds !== null && !parentStudentIds.includes(studentId)) {
       throw new ForbiddenException(
         'You do not have access to this student receipt.',

@@ -1875,7 +1875,7 @@ class _MoreBody extends StatelessWidget {
               Icons.volunteer_activism_rounded,
               AppColors.teacherAccent,
               AppRoutes.principalLearningSupport,
-              enabled: modules['exams'] == true,
+              enabled: modules['learning'] == true,
             ),
             _MenuItem(
               'Fees Snapshot',
@@ -1921,19 +1921,6 @@ class _MoreBody extends StatelessWidget {
               AppColors.success,
               AppRoutes.principalTasks,
               enabled: modules['tasks'] == true,
-            ),
-            _MenuItem(
-              'Classroom Walkthroughs',
-              Icons.directions_walk_rounded,
-              AppColors.warning,
-              AppRoutes.principalWalkthroughs,
-              enabled: modules['classroomWalkthroughs'] == true,
-            ),
-            _MenuItem(
-              'Institutional Improvement',
-              Icons.insights_rounded,
-              AppColors.teacherAccent,
-              AppRoutes.principalInstitutionalImprovement,
             ),
             _MenuItem(
               'Reports Snapshot',

@@ -1,5 +1,10 @@
 import { ConflictException } from '@nestjs/common';
-import { TimetableVersionStatus } from '@prisma/client';
+import {
+  AuthMethod,
+  TeacherAssignmentType,
+  TimetableVersionStatus,
+} from '@prisma/client';
+import { TeacherCapability } from '../teacher-scope/teacher-capability';
 import {
   minutesBetween,
   TimetableService,
@@ -47,6 +52,7 @@ describe('TimetableService lifecycle behavior', () => {
       { record: jest.fn() } as never,
       lifecycleService as never,
       {} as never,
+      {} as never,
     );
 
     await expect(
@@ -62,5 +68,92 @@ describe('TimetableService lifecycle behavior', () => {
       TimetableVersionStatus.LOCKED,
     );
     expect(prisma.timetableVersion.update).not.toHaveBeenCalled();
+  });
+
+  it('uses canonical exact-section scope for a teacher class timetable read', async () => {
+    const teacherScope = {
+      requireActorAccess: jest.fn().mockResolvedValue({}),
+      requireActorAccessAnySectionOfClass: jest.fn().mockResolvedValue({}),
+    };
+    const service = new TimetableService(
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      teacherScope as never,
+    );
+    const actor = {
+      tenantId: 'tenant-1',
+      userId: 'teacher-user-1',
+      roles: ['teacher'],
+      permissions: ['timetable:read'],
+      authMethod: AuthMethod.PASSWORD,
+    } as never;
+
+    await (
+      service as unknown as {
+        ensureClassSectionReadableByTeacher(
+          actorInput: typeof actor,
+          classId: string,
+          sectionId: string | null,
+        ): Promise<void>;
+      }
+    ).ensureClassSectionReadableByTeacher(actor, 'class-1', 'section-1');
+
+    expect(teacherScope.requireActorAccess).toHaveBeenCalledWith(
+      {
+        classId: 'class-1',
+        sectionId: 'section-1',
+        capability: TeacherCapability.CLASS_ROSTER_READ,
+      },
+      actor,
+    );
+  });
+
+  it('builds weekly-requirement scope from active canonical subject assignments', async () => {
+    const teacherScope = {
+      listActiveAssignments: jest.fn().mockResolvedValue([
+        {
+          assignmentType: TeacherAssignmentType.CLASS_TEACHER,
+          academicYearId: 'year-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: null,
+        },
+        {
+          assignmentType: TeacherAssignmentType.SUBJECT_TEACHER,
+          academicYearId: 'year-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: 'subject-1',
+        },
+      ]),
+    };
+    const service = new TimetableService(
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      teacherScope as never,
+    );
+
+    await expect(
+      (
+        service as unknown as {
+          getTeacherTimetableScope(
+            actorInput: object,
+          ): Promise<Array<Record<string, string>>>;
+        }
+      ).getTeacherTimetableScope({} as never),
+    ).resolves.toEqual([
+      {
+        academicYearId: 'year-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        subjectId: 'subject-1',
+      },
+    ]);
   });
 });

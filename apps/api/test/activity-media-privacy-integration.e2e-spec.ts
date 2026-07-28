@@ -182,6 +182,10 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
       eventEmitter as unknown as EventEmitter2,
       fileRegistryService as unknown as FileRegistryService,
       { add: jest.fn() } as never,
+      {
+        requireActorAccess: jest.fn().mockResolvedValue({}),
+        requireActorAccessAnySectionOfClass: jest.fn().mockResolvedValue({}),
+      } as never,
     );
     lifecycleService = new ActivityPostLifecycleService(
       prisma as unknown as PrismaService,

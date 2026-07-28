@@ -46,7 +46,10 @@ import { LearningImprovementService } from './learning-improvement.service';
 @ApiTags('learning-improvement')
 @Controller('learning-improvement')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
-@RequiredModule('academics')
+// P2-14 is outside the controlled-pilot boundary. Reuse the already
+// disabled-by-default Learning entitlement so preserved routes fail closed
+// unless the owner explicitly re-approves that deferred surface.
+@RequiredModule('learning')
 @Roles(
   'admin',
   'principal',

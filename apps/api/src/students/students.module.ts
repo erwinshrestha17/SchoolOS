@@ -19,6 +19,7 @@ import { StudentsService } from './students.service';
 import { StudentsController } from './students.controller';
 import { StudentQrService } from './student-qr.service';
 import { StudentQrController } from './student-qr.controller';
+import { TeacherScopeModule } from '../teacher-scope/teacher-scope.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { StudentQrController } from './student-qr.controller';
     StorageModule,
     FileRegistryModule,
     UsageModule,
+    TeacherScopeModule,
   ],
   providers: [
     StudentsService,

@@ -103,6 +103,31 @@ describe('ConfigService production validation', () => {
     }).toThrow(/must use https in production/);
   });
 
+  it('rejects disabled rate limiting in production', () => {
+    setCompleteProductionEnvironment();
+    process.env.RATE_LIMIT_ENABLED = 'false';
+
+    expect(() => {
+      new ConfigService().validateForRuntime();
+    }).toThrow(/RATE_LIMIT_ENABLED=true is required in production/);
+  });
+
+  it.each([
+    ['AUTH_RATE_LIMIT_WINDOW', '0'],
+    ['AUTH_RATE_LIMIT_MAX', '-1'],
+    ['QR_RATE_LIMIT_WINDOW', 'not-a-number'],
+    ['QR_RATE_LIMIT_MAX', '0'],
+    ['API_KEY_RATE_LIMIT_WINDOW', '-10'],
+    ['API_KEY_RATE_LIMIT_MAX', 'not-a-number'],
+  ])('rejects an invalid %s value', (name, value) => {
+    process.env.NODE_ENV = 'development';
+    process.env[name] = value;
+
+    expect(() => {
+      new ConfigService().validateForRuntime();
+    }).toThrow(new RegExp(`${name} must be a positive number`));
+  });
+
   it('allows local HTTP origins outside production', () => {
     process.env.NODE_ENV = 'development';
     process.env.FRONTEND_ORIGINS =
@@ -182,3 +207,22 @@ describe('ConfigService production validation', () => {
     }).toThrow(/must use https in production/);
   });
 });
+
+function setCompleteProductionEnvironment() {
+  process.env.NODE_ENV = 'production';
+  process.env.ALLOW_PROD_BOOT = 'true';
+  process.env.DATABASE_URL =
+    'postgresql://schoolos:schoolos@db:5432/schoolos';
+  process.env.REDIS_HOST = 'redis';
+  process.env.REDIS_PORT = '6379';
+  process.env.JWT_SECRET = 'x'.repeat(40);
+  process.env.JWT_CHALLENGE_SECRET = 'y'.repeat(40);
+  process.env.MEDICAL_ENCRYPTION_KEY = 'z'.repeat(40);
+  process.env.TOKEN_HASH_PEPPER = 'w'.repeat(40);
+  process.env.JWT_ISSUER = 'non-default-issuer';
+  process.env.JWT_AUDIENCE_WEB = 'non-default-audience-web';
+  process.env.JWT_AUDIENCE_MOBILE = 'non-default-audience-mobile';
+  process.env.FRONTEND_ORIGIN = 'https://schoolos.example.com';
+  process.env.EMAIL_DELIVERY_MODE = 'log';
+  process.env.STORAGE_PROVIDER = 'local';
+}

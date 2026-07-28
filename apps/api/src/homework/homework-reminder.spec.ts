@@ -7,7 +7,10 @@ import {
   NotificationChannel,
 } from '@prisma/client';
 import { HomeworkService } from './homework.service';
-import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
+import {
+  TEACHER_SCOPE_DENIED_CODE,
+  TeacherScopeService,
+} from '../teacher-scope/teacher-scope.service';
 import {
   createTeacherScopeServiceForTests,
   teacherAssignmentFixture,
@@ -259,9 +262,11 @@ describe('Homework Reminders', () => {
 
       await expect(
         service.retryHomeworkReminderBatch('batch-1', mockActor),
-      ).rejects.toThrow(
-        'You are not assigned to review homework for this class and subject',
-      );
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: TEACHER_SCOPE_DENIED_CODE,
+        }),
+      });
     });
 
     it('blocks a teacher retrying another class batch even when PROCESSING', async () => {
@@ -281,9 +286,11 @@ describe('Homework Reminders', () => {
 
       await expect(
         service.retryHomeworkReminderBatch('batch-1', mockActor),
-      ).rejects.toThrow(
-        'You are not assigned to review homework for this class and subject',
-      );
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: TEACHER_SCOPE_DENIED_CODE,
+        }),
+      });
     });
 
     it('allows a properly assigned teacher to retry their own COMPLETED batch', async () => {

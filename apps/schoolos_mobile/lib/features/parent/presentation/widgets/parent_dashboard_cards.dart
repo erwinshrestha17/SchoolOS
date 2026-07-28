@@ -102,7 +102,10 @@ class StudentDaySummaryCard extends StatelessWidget {
           ),
           for (final row in child.statusRows) ...[
             const Divider(height: 1, indent: AppSpacing.lg, endIndent: 0),
-            StudentStatusRow(row: row, onTap: () => onOpenStatus(row)),
+            StudentStatusRow(
+              row: row,
+              onTap: row.canOpen ? () => onOpenStatus(row) : null,
+            ),
           ],
         ],
       ),

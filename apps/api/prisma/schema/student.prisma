@@ -175,14 +175,25 @@ model GuardianIdentityVerification {
 }
 
 model StudentGuardian {
-  id             String   @id @default(uuid())
-  tenantId       String
-  studentId      String
-  guardianId     String
-  relation       String
-  isPrimary      Boolean  @default(false)
-  appLoginLinked Boolean  @default(false)
-  createdAt      DateTime @default(now())
+  id                       String                                 @id @default(uuid())
+  tenantId                 String
+  studentId                String
+  guardianId               String
+  relation                 String
+  isPrimary                Boolean                                @default(false)
+  appLoginLinked           Boolean                                @default(false)
+  capabilities             GuardianCapability[]                   @default([])
+  verificationStatus       GuardianRelationshipVerificationStatus @default(UNVERIFIED)
+  status                   GuardianRelationshipStatus             @default(ACTIVE)
+  effectiveFrom            DateTime                               @default(now())
+  effectiveUntil           DateTime?
+  emergencyContactPriority Int?
+  approvalStatus           GuardianRelationshipApprovalStatus     @default(PENDING)
+  restrictionReasonRef     String?
+  approvedById             String?
+  approvedAt               DateTime?
+  createdAt                DateTime                               @default(now())
+  updatedAt                DateTime                               @updatedAt
 
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   student  Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -190,6 +201,8 @@ model StudentGuardian {
 
   @@unique([studentId, guardianId])
   @@index([tenantId, guardianId, studentId])
+  @@index([tenantId, guardianId, status, approvalStatus])
+  @@index([tenantId, studentId, status, effectiveUntil])
 }
 
 model Enrollment {

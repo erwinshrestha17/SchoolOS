@@ -18,6 +18,7 @@ import type {
   NoticeAcknowledgementFollowUpDto,
 } from './dto/notice-acknowledgement.dto';
 import { NotificationEventService } from './notification-event.service';
+import { buildActiveGuardianRelationshipWhere } from '../common/security/parent-scope';
 
 interface AcknowledgementRecipientRow {
   recipientUserId: string;
@@ -65,6 +66,7 @@ export class NoticeAcknowledgementService {
       const linkedChild = await this.prisma.studentGuardian.findFirst({
         where: {
           tenantId: actor.tenantId,
+          ...buildActiveGuardianRelationshipWhere(),
           guardianId: delivery.guardianId,
           studentId: delivery.studentId,
           guardian: { userId: actor.userId },

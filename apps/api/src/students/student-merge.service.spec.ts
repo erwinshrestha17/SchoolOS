@@ -20,6 +20,7 @@ import {
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 
 describe('StudentsService (Duplicate Merge)', () => {
   let service: StudentsService;
@@ -119,6 +120,7 @@ describe('StudentsService (Duplicate Merge)', () => {
           provide: StudentPhotoService,
           useValue: { getPhotoContent: jest.fn() },
         },
+        { provide: TeacherScopeService, useValue: {} },
       ],
     }).compile();
 

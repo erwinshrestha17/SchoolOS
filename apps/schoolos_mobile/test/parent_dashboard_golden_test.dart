@@ -218,6 +218,7 @@ ParentPortalData _fullData({bool fromCache = false}) {
         feesStatus: 'PAID',
         feesTotalAmount: 12000,
         feesPaidAmount: 12000,
+        capabilities: {'ACADEMICS_VIEW', 'ATTENDANCE_VIEW', 'FEES_VIEW'},
       ),
     ],
     homework: [
@@ -273,6 +274,7 @@ ParentPortalData _emptyData() {
         feesStatus: 'PAID',
         feesTotalAmount: 12000,
         feesPaidAmount: 12000,
+        capabilities: {'ACADEMICS_VIEW', 'ATTENDANCE_VIEW', 'FEES_VIEW'},
       ),
     ],
     homework: const [],

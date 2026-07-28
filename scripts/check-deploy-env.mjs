@@ -33,6 +33,7 @@ const requiredVars = [
   'DATABASE_URL',
   'REDIS_HOST',
   'REDIS_PORT',
+  'RATE_LIMIT_ENABLED',
   'JWT_SECRET',
   'JWT_CHALLENGE_SECRET',
   'MEDICAL_ENCRYPTION_KEY',
@@ -74,6 +75,12 @@ if ((process.env.ALLOW_PROD_BOOT ?? '').toLowerCase() !== 'true') {
 if ((process.env.TRUST_PROXY ?? '').toLowerCase() !== 'true') {
   errors.push(
     'TRUST_PROXY=true is required for staging/production deployments behind TLS proxy',
+  );
+}
+
+if ((process.env.RATE_LIMIT_ENABLED ?? '').toLowerCase() !== 'true') {
+  errors.push(
+    'RATE_LIMIT_ENABLED=true is required for staging/production deployments',
   );
 }
 

@@ -230,7 +230,7 @@ void main() {
     testWidgets('each tile reaches its screen', (tester) async {
       for (final entry in {
         'Attendance': '/parent/attendance',
-        'Pay fees': '/parent/fees',
+        'Fees & receipts': '/parent/fees',
         'School calendar': '/parent/more/calendar',
       }.entries) {
         // A fresh dashboard per tile: the first tap replaces the screen with
@@ -463,6 +463,42 @@ void main() {
 
       expect(find.text('Sita Rai'), findsOneWidget);
     });
+
+    testWidgets('capability-locked menu items explain and deny access', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(390, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: AppTheme.light,
+            home: Scaffold(
+              body: ParentPortalMoreTab(
+                data: _data(capabilities: const {'FEES_VIEW'}),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Not included in your access for this child'),
+        findsWidgets,
+      );
+      await tester.tap(find.text('Weekly Progress'));
+      await tester.pump();
+      expect(
+        find.text(
+          'The school has not granted this access for the selected child.',
+        ),
+        findsOneWidget,
+      );
+    });
   });
 
   group('loading state', () {
@@ -556,6 +592,11 @@ ParentPortalData _data({
   List<ParentPortalHomework> homework = const [],
   List<ParentPortalUpdate> updates = const [],
   bool fromCache = false,
+  Set<String> capabilities = const {
+    'ACADEMICS_VIEW',
+    'ATTENDANCE_VIEW',
+    'FEES_VIEW',
+  },
 }) {
   return ParentPortalData(
     parentName: parentName,
@@ -584,6 +625,7 @@ ParentPortalData _data({
             feesDue: feesDue,
             feesStatus: feesDue > 0 ? 'DUE' : 'PAID',
             feesTotalAmount: 12000,
+            capabilities: capabilities,
           ),
         ],
     homework: homework,

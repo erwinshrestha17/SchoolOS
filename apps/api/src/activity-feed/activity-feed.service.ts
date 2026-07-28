@@ -18,9 +18,10 @@ import {
   ActivityAttachment,
   ActivityPostStatus,
   EnrollmentStatus,
-  StaffStatus,
+  GuardianCapability,
   StudentLifecycleStatus,
   StorageProvider,
+  TeacherAssignmentType,
 } from '@prisma/client';
 import { Queue } from 'bullmq';
 import { OnEvent, EventEmitter2 } from '@nestjs/event-emitter';
@@ -41,6 +42,8 @@ import {
   getParentStudentIds,
   getStudentOwnId,
 } from '../common/security/parent-scope';
+import { TeacherCapability } from '../teacher-scope/teacher-capability';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 
 const MAX_ACTIVITY_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 const ACTIVITY_MEDIA_CONSENT_BLOCK_REASON = 'PHOTO_USAGE_CONSENT_REQUIRED';
@@ -74,6 +77,7 @@ export class ActivityFeedService {
     private readonly fileRegistryService: FileRegistryService,
     @InjectQueue('activity-media')
     private readonly mediaQueue: Queue,
+    private readonly teacherScopeService: TeacherScopeService,
   ) {}
 
   listMilestoneTemplates(filters: { stage?: string; domain?: string } = {}) {
@@ -89,7 +93,7 @@ export class ActivityFeedService {
         !normalizedDomain || template.domain.toLowerCase() === normalizedDomain;
 
       return matchesStage && matchesDomain;
-    }).map(({ stageAliases, ...template }) => template);
+    }).map(({ stageAliases: _stageAliases, ...template }) => template);
   }
 
   async listPosts(
@@ -635,31 +639,48 @@ export class ActivityFeedService {
   }
 
   async listTeacherMobileScopes(actor: AuthContext) {
-    const staff = await this.prisma.staff.findFirst({
-      where: { tenantId: actor.tenantId, userId: actor.userId },
-      select: { id: true },
-    });
-    if (!staff) {
-      throw new ForbiddenException('Active teacher profile is required');
-    }
+    const limit = 200;
+    const assignments = (
+      await this.teacherScopeService.listActiveAssignments(actor)
+    )
+      .filter(
+        (assignment) =>
+          assignment.assignmentType === TeacherAssignmentType.CLASS_TEACHER,
+      )
+      .slice(0, limit);
 
-    const assignments = await this.prisma.subjectTeacherAssignment.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        staffId: staff.id,
-        academicYear: { isCurrent: true },
-      },
-      select: {
-        academicYearId: true,
-        classId: true,
-        sectionId: true,
-        academicYear: { select: { name: true } },
-        class: { select: { name: true, level: true } },
-        section: { select: { name: true } },
-      },
-      orderBy: [{ class: { level: 'asc' } }, { section: { name: 'asc' } }],
-      take: 200,
-    });
+    const [academicYears, classes, sections] = await Promise.all([
+      this.prisma.academicYear.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          id: { in: uniqueStrings(assignments.map((a) => a.academicYearId)) },
+        },
+        select: { id: true, name: true },
+      }),
+      this.prisma.class.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          id: { in: uniqueStrings(assignments.map((a) => a.classId)) },
+        },
+        select: { id: true, name: true, level: true },
+      }),
+      this.prisma.section.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          id: { in: uniqueStrings(assignments.map((a) => a.sectionId)) },
+        },
+        select: { id: true, name: true },
+      }),
+    ]);
+    const academicYearById = new Map(
+      academicYears.map((year) => [year.id, year]),
+    );
+    const classById = new Map(
+      classes.map((classroom) => [classroom.id, classroom]),
+    );
+    const sectionById = new Map(
+      sections.map((section) => [section.id, section]),
+    );
 
     const scopes = new Map<
       string,
@@ -675,21 +696,32 @@ export class ActivityFeedService {
     >();
 
     for (const assignment of assignments) {
-      const id = `${assignment.academicYearId}:${assignment.classId}:${assignment.sectionId ?? 'none'}`;
+      const academicYear = academicYearById.get(assignment.academicYearId);
+      const classroom = classById.get(assignment.classId);
+      const section = sectionById.get(assignment.sectionId);
+      if (!academicYear || !classroom || !section) continue;
+
+      const id = `${assignment.academicYearId}:${assignment.classId}:${assignment.sectionId}`;
       if (!scopes.has(id)) {
         scopes.set(id, {
           id,
           academicYearId: assignment.academicYearId,
-          academicYearName: assignment.academicYear.name,
+          academicYearName: academicYear.name,
           classId: assignment.classId,
-          className: assignment.class.name,
+          className: classroom.name,
           sectionId: assignment.sectionId,
-          sectionName: assignment.section?.name ?? null,
+          sectionName: section.name,
         });
       }
     }
 
-    return { items: [...scopes.values()] };
+    return {
+      items: [...scopes.values()].sort((left, right) =>
+        left.className === right.className
+          ? (left.sectionName ?? '').localeCompare(right.sectionName ?? '')
+          : left.className.localeCompare(right.className),
+      ),
+    };
   }
 
   async listTeacherMobileStudents(
@@ -985,7 +1017,14 @@ export class ActivityFeedService {
       throw error;
     }
 
-    let post;
+    let post:
+      | Prisma.ActivityPostGetPayload<{
+          include: {
+            attachments: true;
+            studentTags: true;
+          };
+        }>
+      | undefined;
     try {
       const defaultAudienceType = dto.sectionId
         ? AudienceType.SECTION
@@ -999,7 +1038,7 @@ export class ActivityFeedService {
         category,
       );
 
-      post = await this.prisma.activityPost.create({
+      const createdPost = await this.prisma.activityPost.create({
         data: {
           tenantId: actor.tenantId,
           classId: dto.classId,
@@ -1047,8 +1086,9 @@ export class ActivityFeedService {
           studentTags: true,
         },
       });
+      post = createdPost;
 
-      for (const attachment of post.attachments) {
+      for (const attachment of createdPost.attachments) {
         await this.mediaQueue.add(
           'compress',
           {
@@ -1067,7 +1107,7 @@ export class ActivityFeedService {
       }
 
       await Promise.all(
-        post.attachments.map((attachment) =>
+        createdPost.attachments.map((attachment) =>
           (attachment as ActivityAttachment & { fileAssetId?: string })
             .fileAssetId
             ? this.prisma.fileAsset.update({
@@ -1076,7 +1116,7 @@ export class ActivityFeedService {
                     attachment as ActivityAttachment & { fileAssetId?: string }
                   ).fileAssetId,
                 },
-                data: { entityId: post.id },
+                data: { entityId: createdPost.id },
               })
             : Promise.resolve(),
         ),
@@ -1086,14 +1126,14 @@ export class ActivityFeedService {
         await this.communicationsService.recordDeliveryRecords({
           actor,
           sourceType: 'activity_post',
-          sourceId: post.id,
-          activityPostId: post.id,
+          sourceId: createdPost.id,
+          activityPostId: createdPost.id,
           audienceType,
-          classId: post.classId,
-          sectionId: post.sectionId,
+          classId: createdPost.classId,
+          sectionId: createdPost.sectionId,
           studentIds: dto.studentIds,
-          title: post.title,
-          body: post.caption,
+          title: createdPost.title,
+          body: createdPost.caption,
           channels: resolveActivityNotificationChannels(category),
           requiredConsentTypes: [ConsentType.PHOTO_USAGE],
           activeStudentsOnly: true,
@@ -1105,17 +1145,17 @@ export class ActivityFeedService {
         resource: 'activity_post',
         tenantId: actor.tenantId,
         userId: actor.userId,
-        resourceId: post.id,
+        resourceId: createdPost.id,
         after: {
-          classId: post.classId,
-          sectionId: post.sectionId,
+          classId: createdPost.classId,
+          sectionId: createdPost.sectionId,
           requiresApproval,
-          attachmentCount: post.attachments.length,
-          taggedStudentCount: post.studentTags.length,
+          attachmentCount: createdPost.attachments.length,
+          taggedStudentCount: createdPost.studentTags.length,
         },
       });
 
-      this.eventEmitter.emit('feed.post.created', post);
+      this.eventEmitter.emit('feed.post.created', createdPost);
     } catch (error) {
       if (post?.id) {
         try {
@@ -1898,61 +1938,25 @@ export class ActivityFeedService {
       return;
     }
 
-    const staff = await this.prisma.staff.findFirst({
-      where: {
-        tenantId: actor.tenantId,
-        userId: actor.userId,
-        status: StaffStatus.ACTIVE,
-      },
-      select: { id: true },
-    });
-
-    if (!staff) {
-      throw new ForbiddenException(
-        'Teacher is not assigned to this class/section',
-      );
-    }
-
-    // A teacher may post either as the assigned subject teacher for this
-    // class/section (Staff.teacherAssignments -> SubjectTeacherAssignment)
-    // or as the section's homeroom class teacher (Section.classTeacherId) —
-    // matching the same dual check AttendanceService.getTeacherSectionIds
-    // already uses. Checking only the former silently locked every homeroom
-    // class teacher out of posting for their own class.
-    const [subjectAssignment, classTeacherSection] = await Promise.all([
-      this.prisma.staff.findFirst({
-        where: {
-          id: staff.id,
-          teacherAssignments: {
-            some: {
-              classId: input.classId,
-              ...(input.sectionId
-                ? {
-                    OR: [{ sectionId: input.sectionId }, { sectionId: null }],
-                  }
-                : { sectionId: null }),
-              academicYear: { isCurrent: true },
-            },
-          },
-        },
-        select: { id: true },
-      }),
-      this.prisma.section.findFirst({
-        where: {
-          tenantId: actor.tenantId,
+    if (!input.sectionId) {
+      await this.teacherScopeService.requireActorAccessAnySectionOfClass(
+        {
           classId: input.classId,
-          classTeacherId: staff.id,
-          ...(input.sectionId ? { id: input.sectionId } : {}),
+          capability: TeacherCapability.HOMEROOM_RECORD_WRITE,
         },
-        select: { id: true },
-      }),
-    ]);
-
-    if (!subjectAssignment && !classTeacherSection) {
-      throw new ForbiddenException(
-        'Teacher is not assigned to this class/section',
+        actor,
       );
+      return;
     }
+
+    await this.teacherScopeService.requireActorAccess(
+      {
+        classId: input.classId,
+        sectionId: input.sectionId,
+        capability: TeacherCapability.HOMEROOM_RECORD_WRITE,
+      },
+      actor,
+    );
   }
 
   private validateActivityAttachment(attachment: {
@@ -2021,48 +2025,13 @@ export class ActivityFeedService {
   private async getTeacherAssignedClassSections(
     actor: AuthContext,
   ): Promise<Array<{ classId: string; sectionId: string | null }>> {
-    const staff = await this.prisma.staff.findFirst({
-      where: {
-        tenantId: actor.tenantId,
-        userId: actor.userId,
-        status: StaffStatus.ACTIVE,
-      },
-      select: { id: true },
-    });
-    if (!staff) return [];
-
-    const [assignments, classTeacherSections] = await Promise.all([
-      this.prisma.subjectTeacherAssignment.findMany({
-        where: {
-          tenantId: actor.tenantId,
-          staffId: staff.id,
-          academicYear: { isCurrent: true },
-        },
-        select: { classId: true, sectionId: true },
-      }),
-      this.prisma.section.findMany({
-        where: { tenantId: actor.tenantId, classTeacherId: staff.id },
-        select: { id: true, classId: true },
-      }),
-    ]);
-
-    const combos = new Map<
-      string,
-      { classId: string; sectionId: string | null }
-    >();
-    for (const a of assignments) {
-      combos.set(`${a.classId}:${a.sectionId ?? 'none'}`, {
-        classId: a.classId,
-        sectionId: a.sectionId,
-      });
-    }
-    for (const s of classTeacherSections) {
-      combos.set(`${s.classId}:${s.id}`, {
-        classId: s.classId,
-        sectionId: s.id,
-      });
-    }
-    return Array.from(combos.values());
+    const scope = await this.teacherScopeService.resolveReadableScope(actor);
+    return uniqueClassSections(
+      scope.assignments.map((assignment) => ({
+        classId: assignment.classId,
+        sectionId: assignment.sectionId,
+      })),
+    );
   }
 
   private buildClassSectionOrFilter(
@@ -2189,7 +2158,12 @@ export class ActivityFeedService {
     let studentIds: string[] | null = null;
 
     if (isParentOnly(actor)) {
-      studentIds = (await getParentStudentIds(this.prisma, actor)) ?? [];
+      studentIds =
+        (await getParentStudentIds(
+          this.prisma,
+          actor,
+          GuardianCapability.ACADEMICS_VIEW,
+        )) ?? [];
     } else if (isStudentOnly(actor)) {
       const studentOwnId = await getStudentOwnId(this.prisma, actor);
       studentIds = studentOwnId ? [studentOwnId] : [];
@@ -2367,6 +2341,25 @@ function normalizeStudentIds(studentIds?: string | string[]) {
         .filter(Boolean),
     ),
   );
+}
+
+function uniqueStrings(values: string[]) {
+  return [...new Set(values)];
+}
+
+function uniqueClassSections(
+  values: Array<{ classId: string; sectionId: string | null }>,
+) {
+  const classSections = new Map<
+    string,
+    { classId: string; sectionId: string | null }
+  >();
+
+  for (const value of values) {
+    classSections.set(`${value.classId}:${value.sectionId ?? ''}`, value);
+  }
+
+  return [...classSections.values()];
 }
 
 const CATEGORIES_REQUIRING_APPROVAL = new Set<ActivityCategory>([

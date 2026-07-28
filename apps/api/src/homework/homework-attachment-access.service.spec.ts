@@ -2,6 +2,12 @@ import { ForbiddenException } from '@nestjs/common';
 import { AuthMethod, StudentLifecycleStatus } from '@prisma/client';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { TeacherCapability } from '../teacher-scope/teacher-capability';
+import {
+  createTeacherScopeDeniedException,
+  TEACHER_SCOPE_DENIED_CODE,
+  TeacherScopeService,
+} from '../teacher-scope/teacher-scope.service';
 import { HomeworkAttachmentAccessService } from './homework-attachment-access.service';
 
 describe('HomeworkAttachmentAccessService', () => {
@@ -14,6 +20,12 @@ describe('HomeworkAttachmentAccessService', () => {
   let fileRegistry: {
     auditAccess: jest.Mock;
     getSignedUrl: jest.Mock;
+  };
+  let teacherScope: {
+    canActorAccess: jest.Mock;
+    canActorAccessAnySectionOfClass: jest.Mock;
+    requireActorAccess: jest.Mock;
+    requireActorAccessAnySectionOfClass: jest.Mock;
   };
 
   const studentActor = {
@@ -45,8 +57,11 @@ describe('HomeworkAttachmentAccessService', () => {
     },
     assignment: {
       id: 'hw-1',
+      academicYearId: 'year-1',
       classId: 'class-1',
       sectionId: 'section-1',
+      subjectId: 'subject-1',
+      status: 'ASSIGNED',
     },
     submission: null,
   };
@@ -61,10 +76,68 @@ describe('HomeworkAttachmentAccessService', () => {
       auditAccess: jest.fn().mockResolvedValue(undefined),
       getSignedUrl: jest.fn().mockResolvedValue('https://signed.example/file'),
     };
+    teacherScope = {
+      canActorAccess: jest.fn().mockResolvedValue(null),
+      canActorAccessAnySectionOfClass: jest.fn().mockResolvedValue(null),
+      requireActorAccess: jest.fn().mockResolvedValue({}),
+      requireActorAccessAnySectionOfClass: jest.fn().mockResolvedValue({}),
+    };
     service = new HomeworkAttachmentAccessService(
       prisma as unknown as PrismaService,
       fileRegistry as unknown as FileRegistryService,
+      teacherScope as unknown as TeacherScopeService,
     );
+  });
+
+  it('authorizes a subject teacher attachment through canonical exact-subject scope', async () => {
+    prisma.homeworkAttachment.findFirst.mockResolvedValue(baseAttachment);
+    teacherScope.canActorAccess.mockResolvedValue({
+      assignmentId: 'assignment-1',
+    });
+    const teacherActor = {
+      ...studentActor,
+      userId: 'teacher-user-1',
+      roles: ['teacher'],
+    };
+
+    await service.getAttachmentAccessUrl(
+      'attachment-1',
+      teacherActor,
+      'preview',
+    );
+
+    expect(teacherScope.canActorAccess).toHaveBeenCalledWith(
+      {
+        academicYearId: 'year-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        subjectId: 'subject-1',
+        capability: TeacherCapability.SUBJECT_RECORD_READ,
+      },
+      teacherActor,
+    );
+  });
+
+  it('denies another subject teacher with the stable canonical reason code', async () => {
+    prisma.homeworkAttachment.findFirst.mockResolvedValue(baseAttachment);
+    teacherScope.requireActorAccess.mockRejectedValue(
+      createTeacherScopeDeniedException(),
+    );
+
+    await expect(
+      service.getAttachmentAccessUrl(
+        'attachment-1',
+        {
+          ...studentActor,
+          userId: 'teacher-user-1',
+          roles: ['teacher'],
+        },
+        'download',
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: TEACHER_SCOPE_DENIED_CODE }),
+    });
+    expect(fileRegistry.getSignedUrl).not.toHaveBeenCalled();
   });
 
   it('denies student attachment access after the student leaves the class or active roster', async () => {

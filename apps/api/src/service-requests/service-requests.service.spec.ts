@@ -90,7 +90,7 @@ describe('ServiceRequestsService', () => {
   });
 
   it('creates a linked-child complaint with tenant-scoped idempotency and audit', async () => {
-    prisma.guardian.findFirst.mockResolvedValue({ id: 'guardian-1' });
+    prisma.guardian.findFirst.mockResolvedValue(guardianRelationshipFixture());
     prisma.schoolServiceRequest.findFirst
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(parentRequestFixture());
@@ -130,7 +130,7 @@ describe('ServiceRequestsService', () => {
   });
 
   it('rejects a payment dispute for an invoice outside the linked child scope', async () => {
-    prisma.guardian.findFirst.mockResolvedValue({ id: 'guardian-1' });
+    prisma.guardian.findFirst.mockResolvedValue(guardianRelationshipFixture());
     prisma.schoolServiceRequest.findFirst.mockResolvedValue(null);
     prisma.invoice.findFirst.mockResolvedValue(null);
 
@@ -160,7 +160,7 @@ describe('ServiceRequestsService', () => {
   });
 
   it('rejects an idempotency key replayed by another parent', async () => {
-    prisma.guardian.findFirst.mockResolvedValue({ id: 'guardian-1' });
+    prisma.guardian.findFirst.mockResolvedValue(guardianRelationshipFixture());
     prisma.schoolServiceRequest.findFirst.mockResolvedValue({
       id: 'existing-request',
       requestedById: 'parent-2',
@@ -185,7 +185,7 @@ describe('ServiceRequestsService', () => {
   });
 
   it('removes internal notes from the parent response as a second safety layer', async () => {
-    prisma.guardian.findFirst.mockResolvedValue({ id: 'guardian-1' });
+    prisma.guardian.findFirst.mockResolvedValue(guardianRelationshipFixture());
     prisma.schoolServiceRequest.findFirst.mockResolvedValue(
       parentRequestFixture({
         notes: [
@@ -206,7 +206,7 @@ describe('ServiceRequestsService', () => {
   });
 
   it('rejects attachment bytes that do not match the declared content type', async () => {
-    prisma.guardian.findFirst.mockResolvedValue({ id: 'guardian-1' });
+    prisma.guardian.findFirst.mockResolvedValue(guardianRelationshipFixture());
     prisma.schoolServiceRequest.findFirst.mockResolvedValue({
       id: 'request-1',
       tenantId: 'tenant-1',
@@ -291,7 +291,7 @@ describe('ServiceRequestsService', () => {
   });
 
   it('checks request ownership and tenant before serving a protected attachment', async () => {
-    prisma.guardian.findFirst.mockResolvedValue({ id: 'guardian-1' });
+    prisma.guardian.findFirst.mockResolvedValue(guardianRelationshipFixture());
     prisma.schoolServiceRequest.findFirst.mockResolvedValue({
       id: 'request-1',
       tenantId: 'tenant-1',
@@ -318,6 +318,27 @@ describe('ServiceRequestsService', () => {
     expect(fileRegistryService.downloadLinkedFile).not.toHaveBeenCalled();
   });
 });
+
+function guardianRelationshipFixture() {
+  return {
+    id: 'guardian-1',
+    studentLinks: [
+      {
+        id: 'student-guardian-1',
+        studentId: 'student-1',
+        guardianId: 'guardian-1',
+        relation: 'parent',
+        capabilities: [
+          'COMPLAINT_OR_CORRECTION_SUBMIT',
+          'FEES_VIEW',
+        ],
+        effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+        effectiveUntil: null,
+        emergencyContactPriority: 1,
+      },
+    ],
+  };
+}
 
 function parentRequestFixture(
   overrides: Record<string, unknown> = {},

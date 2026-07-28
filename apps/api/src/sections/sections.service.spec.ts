@@ -1,4 +1,4 @@
-import { AuthMethod } from '@prisma/client';
+import { AuthMethod, TeacherAssignmentType } from '@prisma/client';
 import { SectionsService } from './sections.service';
 
 const teacherActor = {
@@ -13,25 +13,30 @@ const teacherActor = {
 
 function buildService(options: {
   sections?: unknown[];
-  staff?: unknown;
-  subjectAssignments?: unknown[];
+  assignments?: unknown[];
 }) {
   const prisma = {
     section: {
       findMany: jest.fn().mockResolvedValue(options.sections ?? []),
     },
-    staff: {
-      findFirst: jest.fn().mockResolvedValue(options.staff ?? null),
-    },
-    subjectTeacherAssignment: {
-      findMany: jest.fn().mockResolvedValue(options.subjectAssignments ?? []),
-    },
   };
   const audit = { record: jest.fn() };
+  const teacherScope = {
+    resolveReadableScope: jest.fn().mockResolvedValue({
+      assignments: options.assignments ?? [],
+      homeroomSectionIds: new Set(),
+      subjectsBySection: new Map(),
+      allSectionIds: new Set(),
+    }),
+  };
 
-  const service = new SectionsService(prisma as never, audit as never);
+  const service = new SectionsService(
+    prisma as never,
+    audit as never,
+    teacherScope as never,
+  );
 
-  return { service, prisma };
+  return { service, prisma, teacherScope };
 }
 
 function buildSection(overrides: Record<string, unknown> = {}) {
@@ -50,11 +55,15 @@ function buildSection(overrides: Record<string, unknown> = {}) {
 describe('SectionsService.listSections', () => {
   it('flags the sections where the caller is the class teacher', async () => {
     const { service } = buildService({
-      sections: [
-        buildSection({ id: 'section-1', classTeacherId: 'staff-9' }),
-        buildSection({ id: 'section-2', classTeacherId: 'staff-other' }),
+      sections: [buildSection({ id: 'section-1', classTeacherId: 'staff-9' })],
+      assignments: [
+        {
+          assignmentType: TeacherAssignmentType.CLASS_TEACHER,
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: null,
+        },
       ],
-      staff: { id: 'staff-9' },
     });
 
     const sections = await service.listSections(teacherActor);
@@ -64,24 +73,29 @@ describe('SectionsService.listSections', () => {
         id: 'section-1',
         isAssignedClassTeacher: true,
       }),
-      expect.objectContaining({
-        id: 'section-2',
-        isAssignedClassTeacher: false,
-      }),
     ]);
   });
 
-  it('flags subject-teaching sections including class-wide assignments', async () => {
+  it('flags subject-teaching sections from canonical assignments', async () => {
     const { service } = buildService({
       sections: [
         buildSection({ id: 'section-1', classId: 'class-1' }),
         buildSection({ id: 'section-2', classId: 'class-2' }),
         buildSection({ id: 'section-3', classId: 'class-3' }),
       ],
-      staff: { id: 'staff-9' },
-      subjectAssignments: [
-        { classId: 'class-1', sectionId: 'section-1' },
-        { classId: 'class-2', sectionId: null },
+      assignments: [
+        {
+          assignmentType: TeacherAssignmentType.SUBJECT_TEACHER,
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: 'subject-1',
+        },
+        {
+          assignmentType: TeacherAssignmentType.SUBJECT_TEACHER,
+          classId: 'class-2',
+          sectionId: 'section-2',
+          subjectId: 'subject-1',
+        },
       ],
     });
 
@@ -94,19 +108,23 @@ describe('SectionsService.listSections', () => {
     ]);
   });
 
-  it('never flags sections for callers without a staff record', async () => {
+  it('returns no tenant-wide sections for a teacher without an active assignment', async () => {
     const { service, prisma } = buildService({
-      sections: [buildSection({ classTeacherId: 'staff-9' })],
-      staff: null,
+      sections: [],
+      assignments: [],
     });
 
     const sections = await service.listSections(teacherActor);
 
-    expect(prisma.staff.findFirst).toHaveBeenCalledWith({
-      where: { userId: teacherActor.userId, tenantId: teacherActor.tenantId },
-      select: { id: true },
+    expect(prisma.section.findMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: teacherActor.tenantId,
+        id: { in: ['__no_teacher_sections__'] },
+      },
+      include: expect.any(Object),
+      orderBy: [{ class: { level: 'asc' } }, { name: 'asc' }],
     });
-    expect(sections[0].isAssignedClassTeacher).toBe(false);
+    expect(sections).toEqual([]);
   });
 
   it('includes a flat classId alongside the nested class object', async () => {
@@ -117,7 +135,14 @@ describe('SectionsService.listSections', () => {
     // `classId` the shared SectionSummary type also declares.
     const { service } = buildService({
       sections: [buildSection({ id: 'section-1', classId: 'class-1' })],
-      staff: { id: 'staff-9' },
+      assignments: [
+        {
+          assignmentType: TeacherAssignmentType.CLASS_TEACHER,
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: null,
+        },
+      ],
     });
 
     const sections = await service.listSections(teacherActor);

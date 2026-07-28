@@ -5,9 +5,19 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { AuthContext } from '../auth/auth.types';
-import { Prisma, StudentLifecycleStatus } from '@prisma/client';
+import {
+  GuardianCapability,
+  Prisma,
+  StudentLifecycleStatus,
+} from '@prisma/client';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  TeacherCapability,
+  type TeacherRecordStatus,
+} from '../teacher-scope/teacher-capability';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
+import { buildActiveGuardianRelationshipWhere } from '../common/security/parent-scope';
 
 type FullAttachment = Prisma.HomeworkAttachmentGetPayload<{
   include: {
@@ -27,6 +37,7 @@ export class HomeworkAttachmentAccessService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly fileRegistryService: FileRegistryService,
+    private readonly teacherScopeService: TeacherScopeService,
   ) {}
 
   async getAttachmentAccessUrl(
@@ -165,30 +176,44 @@ export class HomeworkAttachmentAccessService {
       actor.roles.includes('teacher') ||
       actor.roles.includes('subject_teacher')
     ) {
-      const staff = await this.prisma.staff.findFirst({
-        where: { tenantId: actor.tenantId, userId: actor.userId },
-        select: { id: true },
-      });
-      if (!staff) {
-        throw new ForbiddenException('Active teacher profile is required');
-      }
-      const teacherAssignment =
-        await this.prisma.subjectTeacherAssignment.findFirst({
-          where: {
-            tenantId: actor.tenantId,
-            staffId: staff.id,
-            academicYearId: assignment.academicYearId,
-            classId: assignment.classId,
-            subjectId: assignment.subjectId,
-            OR: assignment.sectionId
-              ? [{ sectionId: assignment.sectionId }, { sectionId: null }]
-              : [{ sectionId: null }],
-          },
-          select: { id: true },
-        });
-      if (!teacherAssignment) {
-        throw new ForbiddenException(
-          'Homework attachment is outside your teaching scope',
+      const subjectGrant = assignment.sectionId
+        ? await this.teacherScopeService.canActorAccess(
+            {
+              academicYearId: assignment.academicYearId,
+              classId: assignment.classId,
+              sectionId: assignment.sectionId,
+              subjectId: assignment.subjectId,
+              capability: TeacherCapability.SUBJECT_RECORD_READ,
+            },
+            actor,
+          )
+        : await this.teacherScopeService.canActorAccessAnySectionOfClass(
+            {
+              academicYearId: assignment.academicYearId,
+              classId: assignment.classId,
+              subjectId: assignment.subjectId,
+              capability: TeacherCapability.SUBJECT_RECORD_READ,
+            },
+            actor,
+          );
+      if (subjectGrant) return;
+
+      const homeroomAccess = {
+        academicYearId: assignment.academicYearId,
+        classId: assignment.classId,
+        subjectId: assignment.subjectId,
+        capability: TeacherCapability.HOMEROOM_ACADEMIC_SUMMARY_READ,
+        recordStatus: normalizeHomeworkStatus(assignment.status),
+      };
+      if (assignment.sectionId) {
+        await this.teacherScopeService.requireActorAccess(
+          { ...homeroomAccess, sectionId: assignment.sectionId },
+          actor,
+        );
+      } else {
+        await this.teacherScopeService.requireActorAccessAnySectionOfClass(
+          homeroomAccess,
+          actor,
         );
       }
       return;
@@ -244,6 +269,10 @@ export class HomeworkAttachmentAccessService {
     const link = await this.prisma.studentGuardian.findFirst({
       where: {
         tenantId: actor.tenantId,
+        ...buildActiveGuardianRelationshipWhere(
+          new Date(),
+          GuardianCapability.ACADEMICS_VIEW,
+        ),
         guardian: { userId: actor.userId },
         ...(attachment.submission?.studentId
           ? { studentId: attachment.submission.studentId }
@@ -282,5 +311,18 @@ export class HomeworkAttachmentAccessService {
         'Homework attachment is outside your child class scope',
       );
     }
+  }
+}
+
+function normalizeHomeworkStatus(status: string): TeacherRecordStatus {
+  switch (status) {
+    case 'DRAFT':
+      return 'DRAFT';
+    case 'CANCELLED':
+      return 'CANCELLED';
+    case 'CLOSED':
+      return 'ARCHIVED';
+    default:
+      return 'PUBLISHED';
   }
 }

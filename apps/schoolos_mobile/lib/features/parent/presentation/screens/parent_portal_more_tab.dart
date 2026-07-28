@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/constants/app_routes.dart';
 import '../../../../core/auth/auth_provider.dart';
 import '../../application/parent_dashboard_view_model.dart';
+import '../../domain/parent_models.dart';
 import '../../domain/parent_portal_models.dart';
 import '../widgets/parent_portal_widgets.dart';
 
@@ -71,36 +72,28 @@ class ParentPortalMoreTab extends ConsumerWidget {
             'Weekly Progress',
             'Attendance, homework, feedback, results, and next actions',
             AppRoutes.parentWeeklyProgress,
+            capability: GuardianCapabilityKey.academicsView,
           ),
           _Menu(
             Icons.event_note_outlined,
             'Subject Timetable',
             'Subjects, periods, teachers, rooms, and class teacher',
             AppRoutes.parentTimetable,
+            capability: GuardianCapabilityKey.academicsView,
           ),
           _Menu(
             Icons.assessment_outlined,
             'Exams & Results',
             'Published exam schedule, results, and protected reports',
             AppRoutes.parentReportCards,
+            capability: GuardianCapabilityKey.academicsView,
           ),
           _Menu(
             Icons.calendar_month_outlined,
             'School Calendar',
             'Events, holidays, and important dates',
             AppRoutes.parentCalendar,
-          ),
-          _Menu(
-            Icons.school_outlined,
-            'Learning Summary',
-            'Supportive progress for linked children',
-            AppRoutes.parentLearning,
-          ),
-          _Menu(
-            Icons.volunteer_activism_outlined,
-            'Learning Support',
-            'Teacher guidance, classroom progress, and current support',
-            AppRoutes.parentLearningSupport,
+            capability: GuardianCapabilityKey.academicsView,
           ),
         ]),
         _group(context, 'Finance', [
@@ -109,12 +102,14 @@ class ParentPortalMoreTab extends ConsumerWidget {
             'Fees & Receipts',
             'Dues, invoices, and confirmed receipts',
             AppRoutes.parentFeesReceipts,
+            capability: GuardianCapabilityKey.feesView,
           ),
           _Menu(
             Icons.account_balance_wallet_outlined,
             'Canteen Wallet',
             'Balance and recent school purchases',
             AppRoutes.parentCanteen,
+            capability: GuardianCapabilityKey.feesView,
           ),
         ]),
         _group(context, 'Services', [
@@ -129,24 +124,28 @@ class ParentPortalMoreTab extends ConsumerWidget {
             'Transport',
             'Pickup, route, and trip information',
             AppRoutes.parentTransport,
+            capability: GuardianCapabilityKey.emergencyAlertReceive,
           ),
           _Menu(
             Icons.local_library_outlined,
             'Library',
             'Borrowed books and due dates',
             AppRoutes.parentLibrary,
+            capability: GuardianCapabilityKey.academicsView,
           ),
           _Menu(
             Icons.fact_check_outlined,
             'Consent & Permissions',
             'Review school requests and approvals',
             AppRoutes.parentConsents,
+            capability: GuardianCapabilityKey.specificConsentGive,
           ),
           _Menu(
             Icons.support_agent_outlined,
             'Help & Requests',
             'School concerns, payment disputes, and responses',
             AppRoutes.parentServiceRequests,
+            capability: GuardianCapabilityKey.complaintOrCorrectionSubmit,
           ),
         ]),
         const ParentSectionHeader(title: 'Account'),
@@ -178,8 +177,17 @@ class ParentPortalMoreTab extends ConsumerWidget {
               SettingsMenuItem(
                 icon: Icons.help_outline_rounded,
                 title: 'Help & Support',
-                subtitle: 'Send and follow a request to the school',
-                onTap: () => context.push(AppRoutes.parentServiceRequests),
+                subtitle:
+                    _hasCapability(
+                      GuardianCapabilityKey.complaintOrCorrectionSubmit,
+                    )
+                    ? 'Send and follow a request to the school'
+                    : 'Not included in your access for this child',
+                onTap: () => _openCapabilityRoute(
+                  context,
+                  AppRoutes.parentServiceRequests,
+                  GuardianCapabilityKey.complaintOrCorrectionSubmit,
+                ),
               ),
               const Divider(),
               SettingsMenuItem(
@@ -208,19 +216,7 @@ class ParentPortalMoreTab extends ConsumerWidget {
             child: Column(
               children: [
                 for (var index = 0; index < items.length; index++) ...[
-                  SettingsMenuItem(
-                    icon: items[index].icon,
-                    title: items[index].title,
-                    subtitle: items[index].subtitle,
-                    onTap: () {
-                      final route = items[index].route;
-                      if (route == null) {
-                        _soon(context, items[index].title);
-                      } else {
-                        context.push(route);
-                      }
-                    },
-                  ),
+                  _menuItem(context, items[index]),
                   if (index != items.length - 1) const Divider(),
                 ],
               ],
@@ -229,6 +225,42 @@ class ParentPortalMoreTab extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Widget _menuItem(BuildContext context, _Menu item) {
+    final allowed = item.capability == null || _hasCapability(item.capability!);
+    return SettingsMenuItem(
+      icon: item.icon,
+      title: item.title,
+      subtitle: allowed
+          ? item.subtitle
+          : 'Not included in your access for this child',
+      onTap: () {
+        final route = item.route;
+        if (route == null) {
+          _soon(context, item.title);
+        } else if (!allowed) {
+          _locked(context);
+        } else {
+          context.push(route);
+        }
+      },
+    );
+  }
+
+  bool _hasCapability(String capability) =>
+      data.activeChild?.hasCapability(capability) ?? false;
+
+  void _openCapabilityRoute(
+    BuildContext context,
+    String route,
+    String capability,
+  ) {
+    if (_hasCapability(capability)) {
+      context.push(route);
+      return;
+    }
+    _locked(context);
   }
 
   Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
@@ -259,16 +291,33 @@ class ParentPortalMoreTab extends ConsumerWidget {
 }
 
 class _Menu {
-  const _Menu(this.icon, this.title, this.subtitle, this.route);
+  const _Menu(
+    this.icon,
+    this.title,
+    this.subtitle,
+    this.route, {
+    this.capability,
+  });
 
   final IconData icon;
   final String title;
   final String subtitle;
   final String? route;
+  final String? capability;
 }
 
 void _soon(BuildContext context, String feature) {
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(content: Text('$feature is not available for this school yet.')),
+  );
+}
+
+void _locked(BuildContext context) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text(
+        'The school has not granted this access for the selected child.',
+      ),
+    ),
   );
 }

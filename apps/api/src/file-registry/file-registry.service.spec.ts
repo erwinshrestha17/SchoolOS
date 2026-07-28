@@ -7,6 +7,8 @@ import {
 } from '@prisma/client';
 import { FileRegistryService } from './file-registry.service';
 import { UsageService } from '../usage/usage.service';
+import { TeacherCapability } from '../teacher-scope/teacher-capability';
+import { TEACHER_SCOPE_DENIED_CODE } from '../teacher-scope/teacher-scope.service';
 
 describe('FileRegistryService tenant scoping', () => {
   let service: FileRegistryService;
@@ -23,6 +25,10 @@ describe('FileRegistryService tenant scoping', () => {
   };
   let plansService: {
     assertTenantActive: jest.Mock;
+  };
+  let teacherScopeService: {
+    requireActorAccess: jest.Mock;
+    requireActorAccessAnySectionOfClass: jest.Mock;
   };
 
   const asset = {
@@ -101,6 +107,16 @@ describe('FileRegistryService tenant scoping', () => {
     plansService = {
       assertTenantActive: jest.fn().mockResolvedValue(undefined),
     };
+    teacherScopeService = {
+      requireActorAccess: jest.fn().mockResolvedValue({
+        source: 'ASSIGNMENT',
+        assignmentId: 'assignment-1',
+      }),
+      requireActorAccessAnySectionOfClass: jest.fn().mockResolvedValue({
+        source: 'ASSIGNMENT',
+        assignmentId: 'assignment-1',
+      }),
+    };
 
     service = new FileRegistryService(
       prisma,
@@ -117,6 +133,7 @@ describe('FileRegistryService tenant scoping', () => {
       storageService as any,
       usageService as any,
       plansService as any,
+      teacherScopeService as any,
     );
   });
 
@@ -309,11 +326,6 @@ describe('FileRegistryService tenant scoping', () => {
         status: HomeworkAssignmentStatus.ASSIGNED,
       },
     });
-    prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
-    prisma.subjectTeacherAssignment.findFirst.mockResolvedValue({
-      id: 'subject-teacher-1',
-    });
-
     await expect(
       service.createSignedPreviewUrl(
         {
@@ -333,6 +345,16 @@ describe('FileRegistryService tenant scoping', () => {
       expiresAt: expect.any(Date),
       expiresInSeconds: 300,
     });
+    expect(teacherScopeService.requireActorAccess).toHaveBeenCalledWith(
+      {
+        academicYearId: 'year-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        subjectId: 'sub-1',
+        capability: TeacherCapability.SUBJECT_RECORD_READ,
+      },
+      expect.objectContaining({ userId: 'teacher-1' }),
+    );
 
     expect(storageService.createSignedReadUrl).toHaveBeenCalledWith({
       objectKey: 'tenant-1/students/student-photo.png',
@@ -580,10 +602,6 @@ describe('FileRegistryService tenant scoping', () => {
       classId: 'class-1',
       sectionId: 'section-1',
     });
-    prisma.subjectTeacherAssignment.findFirst.mockResolvedValue({
-      id: 'assignment-1',
-    });
-
     await expect(
       service.assertFileAccessForAuth(
         asset as any,
@@ -595,6 +613,14 @@ describe('FileRegistryService tenant scoping', () => {
         } as any,
       ),
     ).resolves.toBeUndefined();
+    expect(teacherScopeService.requireActorAccess).toHaveBeenCalledWith(
+      {
+        classId: 'class-1',
+        sectionId: 'section-1',
+        capability: TeacherCapability.CLASS_ROSTER_READ,
+      },
+      expect.objectContaining({ userId: 'teacher-user-1' }),
+    );
   });
 
   it('rejects protected student files outside teacher assignment scope', async () => {
@@ -602,7 +628,45 @@ describe('FileRegistryService tenant scoping', () => {
       classId: 'class-1',
       sectionId: 'section-1',
     });
-    prisma.subjectTeacherAssignment.findFirst.mockResolvedValue(null);
+    teacherScopeService.requireActorAccess.mockRejectedValueOnce(
+      new ForbiddenException({
+        statusCode: 403,
+        code: TEACHER_SCOPE_DENIED_CODE,
+        message: 'You are not authorized for this teaching scope',
+      }),
+    );
+
+    const denied = service.assertFileAccessForAuth(
+      asset as any,
+      {
+        tenantId: 'tenant-1',
+        userId: 'teacher-user-2',
+        roles: ['teacher'],
+        permissions: ['students:read', 'students:qr:read'],
+      } as any,
+    );
+
+    await expect(denied).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(denied).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: TEACHER_SCOPE_DENIED_CODE,
+      }),
+    });
+    expect(teacherScopeService.requireActorAccess).toHaveBeenCalledWith(
+      {
+        classId: 'class-1',
+        sectionId: 'section-1',
+        capability: TeacherCapability.CLASS_ROSTER_READ,
+      },
+      expect.objectContaining({ userId: 'teacher-user-2' }),
+    );
+  });
+
+  it('rejects teacher student-file access when the student has no section', async () => {
+    prisma.student.findFirst.mockResolvedValue({
+      classId: 'class-1',
+      sectionId: null,
+    });
 
     await expect(
       service.assertFileAccessForAuth(
@@ -614,7 +678,12 @@ describe('FileRegistryService tenant scoping', () => {
           permissions: ['students:read', 'students:qr:read'],
         } as any,
       ),
-    ).rejects.toThrow('This student file is outside your teaching scope');
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: TEACHER_SCOPE_DENIED_CODE,
+      }),
+    });
+    expect(teacherScopeService.requireActorAccess).not.toHaveBeenCalled();
   });
 
   it('allows guardian-owned parent-teacher chat attachment access only for the linked guardian', async () => {

@@ -313,6 +313,12 @@ export class ConfigService {
       ['OTP_LENGTH', this.otpLength],
       ['OTP_ISSUE_LIMIT', this.otpIssueLimit],
       ['OTP_ISSUE_WINDOW_MINUTES', this.otpIssueWindowMinutes],
+      ['AUTH_RATE_LIMIT_WINDOW', this.authRateLimitWindow],
+      ['AUTH_RATE_LIMIT_MAX', this.authRateLimitMax],
+      ['QR_RATE_LIMIT_WINDOW', this.qrRateLimitWindow],
+      ['QR_RATE_LIMIT_MAX', this.qrRateLimitMax],
+      ['API_KEY_RATE_LIMIT_WINDOW', this.apiKeyRateLimitWindow],
+      ['API_KEY_RATE_LIMIT_MAX', this.apiKeyRateLimitMax],
       ['LIBRARY_FINE_PER_DAY', this.libraryFinePerDay],
     ];
 
@@ -413,6 +419,10 @@ export class ConfigService {
 
     if (!process.env.REDIS_HOST) {
       errors.push('REDIS_HOST is required in production');
+    }
+
+    if (!this.rateLimitEnabled) {
+      errors.push('RATE_LIMIT_ENABLED=true is required in production');
     }
 
     if (this.cookieSameSite === 'none' && !this.trustProxy) {

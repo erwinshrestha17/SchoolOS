@@ -317,6 +317,11 @@ void main() {
                   transport: 'Pickup at 3:15 PM',
                   homework: 'No pending homework',
                   updates: 'No unread updates',
+                  capabilities: {
+                    'ACADEMICS_VIEW',
+                    'ATTENDANCE_VIEW',
+                    'FEES_VIEW',
+                  },
                 ),
                 ParentPortalChild(
                   id: 'aarohi',
@@ -331,6 +336,11 @@ void main() {
                   homeworkPending: 1,
                   unreadUpdates: 1,
                   feesDue: 4500,
+                  capabilities: {
+                    'ACADEMICS_VIEW',
+                    'ATTENDANCE_VIEW',
+                    'FEES_VIEW',
+                  },
                 ),
               ],
               homework: [

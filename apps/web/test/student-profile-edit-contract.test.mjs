@@ -33,22 +33,40 @@ describe('Student profile edit controls', () => {
     assert.doesNotMatch(edit, /type="radio"/);
   });
 
-  it('keeps guardian unlinking reasoned, primary-safe, and file-access reviewed', () => {
+  it('provides purpose-limited guardian authority, recovery, and revocation administration', () => {
     const detail = read('components/students/student-detail-page.tsx');
     const guardians = read('components/students/profile/tabs/guardians-tab.tsx');
+    const api = read('lib/api/students.ts');
 
-    assert.match(detail, /confirmFileAccessReview: true/);
-    assert.match(detail, /confirmFileAccessReview,/);
-    assert.match(detail, /newPrimaryGuardianId/);
-    assert.match(guardians, /Add guardian/);
+    assert.match(detail, /studentId=\{studentId\}/);
+    assert.doesNotMatch(detail, /guardianRemoveMutation/);
+    assert.match(guardians, /Link guardian/);
     assert.match(guardians, /forcePrimary=\{guardians\.length === 0\}/);
-    assert.match(guardians, /Primary Contact Guardian required for first guardian/);
-    assert.match(guardians, /New primary guardian/);
-    assert.match(guardians, /replacementGuardianId/);
-    assert.match(guardians, /confirmedAccessReview/);
-    assert.match(guardians, /I reviewed guardian portal and protected-file access/);
-    assert.match(guardians, /reason\.trim\(\)\.length < 5/);
+    assert.doesNotMatch(guardians, /Maximum 2 guardians|one or two active/);
+    assert.match(guardians, /Parent-app capabilities/);
+    assert.match(guardians, /Pilot-disabled actions/);
+    assert.match(guardians, /Start date \(BS\)/);
+    assert.match(guardians, /toGregorianDateFromBs/);
+    assert.match(guardians, /Access & recovery/);
+    assert.match(guardians, /Provision parent account/);
+    assert.match(guardians, /Recent sessions and devices/);
+    assert.match(guardians, /Recovery and relationship actions/);
+    assert.match(guardians, /Decision reason/);
+    assert.match(guardians, /Evidence reference/);
+    assert.match(guardians, /SCHOOL_IDENTITY_REVIEW/);
+    assert.match(guardians, /SUSPEND_COMPROMISED_ACCOUNT/);
+    assert.match(guardians, /REVOKE_RELATIONSHIP/);
+    assert.match(guardians, /MARK_DECEASED/);
+    assert.match(guardians, /formatBsDate/);
+    assert.doesNotMatch(guardians, /userAgent|ipAddress|tokenHash/);
     assert.doesNotMatch(guardians, /window\.confirm|confirm\(/);
+
+    assert.match(api, /getGuardianAccessAdministration/);
+    assert.match(api, /performGuardianRecoveryAction/);
+    assert.match(api, /provisionGuardianAccount/);
+    assert.match(api, /revokeGuardianSession/);
+    assert.match(api, /createGuardianIdentityVerification/);
+    assert.match(api, /reviewGuardianIdentityVerification/);
   });
 
   it('keeps generated document revocation reasoned and backend-backed', () => {

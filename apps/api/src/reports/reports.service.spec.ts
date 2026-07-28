@@ -9,6 +9,12 @@ import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PlansService } from '../plans/plans.service';
+import { TeacherCapability } from '../teacher-scope/teacher-capability';
+import {
+  createTeacherScopeDeniedException,
+  TEACHER_SCOPE_DENIED_CODE,
+  TeacherScopeService,
+} from '../teacher-scope/teacher-scope.service';
 import { SUSPENDED_TENANT_MESSAGE } from '../plans/tenant-access.constants';
 import sharp from 'sharp';
 
@@ -19,6 +25,10 @@ describe('ReportsService', () => {
   let fileRegistry: FileRegistryService;
   let plansService: jest.Mocked<PlansService>;
   let reportsQueue: { add: jest.Mock };
+  let teacherScopeService: {
+    requireActorAccess: jest.Mock;
+    denyActorAccess: jest.Mock;
+  };
 
   const actor: AuthContext = {
     tenantId: 'tenant-1',
@@ -225,6 +235,18 @@ describe('ReportsService', () => {
             assertTenantActive: jest.fn().mockResolvedValue(undefined),
           },
         },
+        {
+          provide: TeacherScopeService,
+          useValue: {
+            requireActorAccess: jest.fn().mockResolvedValue({
+              source: 'ASSIGNMENT',
+              assignmentId: 'assignment-1',
+            }),
+            denyActorAccess: jest
+              .fn()
+              .mockRejectedValue(createTeacherScopeDeniedException()),
+          },
+        },
       ],
     }).compile();
 
@@ -234,6 +256,7 @@ describe('ReportsService', () => {
     fileRegistry = module.get<FileRegistryService>(FileRegistryService);
     plansService = module.get(PlansService);
     reportsQueue = module.get(getQueueToken('reports'));
+    teacherScopeService = module.get(TeacherScopeService);
   });
 
   it('lists reports the user has permission to see', () => {
@@ -252,6 +275,65 @@ describe('ReportsService', () => {
     expect(
       reports.find((r) => r.key === 'monthly-attendance-register'),
     ).toBeUndefined();
+  });
+
+  it('fails closed with a stable denial when a teacher report omits exact class and section scope', async () => {
+    const teacherActor: AuthContext = {
+      ...actor,
+      roles: ['teacher'],
+      permissions: ['students:read'],
+    };
+
+    await expect(
+      service.exportReport(
+        'student-roster',
+        { format: 'json', filters: {} },
+        teacherActor,
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: TEACHER_SCOPE_DENIED_CODE }),
+    });
+
+    expect(teacherScopeService.denyActorAccess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        capability: TeacherCapability.CLASS_ROSTER_READ,
+        reason: 'missing_scope',
+      }),
+      teacherActor,
+    );
+  });
+
+  it('uses canonical homeroom scope for a teacher academic report', async () => {
+    const teacherActor: AuthContext = {
+      ...actor,
+      roles: ['teacher'],
+      permissions: ['academics:read', 'report_cards:read'],
+    };
+
+    await service.exportReport(
+      'academic-report-card-status',
+      {
+        format: 'json',
+        filters: {
+          academicYearId: 'ay1',
+          examTermId: 'term-1',
+          classId: 'c1',
+          sectionId: 'sec1',
+        },
+      },
+      teacherActor,
+    );
+
+    expect(teacherScopeService.requireActorAccess).toHaveBeenCalledWith(
+      {
+        academicYearId: 'ay1',
+        classId: 'c1',
+        sectionId: 'sec1',
+        capability: TeacherCapability.HOMEROOM_ACADEMIC_SUMMARY_READ,
+        recordStatus: 'PUBLISHED',
+      },
+      teacherActor,
+    );
   });
 
   it('blocks report exports for suspended tenants before queueing or generating files', async () => {

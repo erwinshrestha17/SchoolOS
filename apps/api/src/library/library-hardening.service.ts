@@ -10,6 +10,7 @@ import {
   LibraryCopyStatus,
   LibraryFineStatus,
   LibraryIssueStatus,
+  GuardianCapability,
   PaymentStatus,
   Prisma,
 } from '@prisma/client';
@@ -1521,7 +1522,11 @@ export class LibraryHardeningService {
         : {}),
     };
 
-    const parentStudentIds = await getParentStudentIds(this.prisma, actor);
+    const parentStudentIds = await getParentStudentIds(
+      this.prisma,
+      actor,
+      GuardianCapability.ACADEMICS_VIEW,
+    );
     if (parentStudentIds !== null) {
       if (options.staffId)
         throw new ForbiddenException(
@@ -1578,7 +1583,11 @@ export class LibraryHardeningService {
   }
 
   private async buildBorrowerScope(actor: AuthContext) {
-    const parentStudentIds = await getParentStudentIds(this.prisma, actor);
+    const parentStudentIds = await getParentStudentIds(
+      this.prisma,
+      actor,
+      GuardianCapability.ACADEMICS_VIEW,
+    );
     if (parentStudentIds !== null) {
       return { borrowerStudentId: { in: parentStudentIds } };
     }

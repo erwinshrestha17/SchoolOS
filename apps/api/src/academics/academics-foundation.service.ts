@@ -7,6 +7,8 @@ import { AssessmentType, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { TeacherCapability } from '../teacher-scope/teacher-capability';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 import { CreateExamTermDto } from './dto/create-exam-term.dto';
 import { CreateSubjectDto } from './dto/create-subject.dto';
 import { UpdateExamTermDto } from './dto/update-exam-term.dto';
@@ -21,11 +23,25 @@ interface SubjectFilters {
   classId?: string;
 }
 
+const SAFE_SUBJECT_ASSIGNMENT_INCLUDE = {
+  staff: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      employeeId: true,
+    },
+  },
+  section: true,
+  academicYear: true,
+} satisfies Prisma.SubjectTeacherAssignmentInclude;
+
 @Injectable()
 export class AcademicsFoundationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly teacherScopeService: TeacherScopeService,
   ) {}
 
   listAssessmentTemplates() {
@@ -436,19 +452,21 @@ export class AcademicsFoundationService {
       await this.ensureClass(actor, filters.classId);
     }
 
+    const teacherWhere = await this.resolveTeacherSubjectWhere(actor);
     return this.prisma.subject.findMany({
       where: {
         tenantId: actor.tenantId,
         ...(filters.classId ? { classId: filters.classId } : {}),
+        ...(teacherWhere ? { AND: [teacherWhere] } : {}),
       },
       include: {
         class: true,
         teacherAssignments: {
-          include: {
-            staff: true,
-            section: true,
-            academicYear: true,
-          },
+          // A teacher gets their canonical assignment map from
+          // /teacher-assignments. Do not expose the legacy school-wide
+          // staffing map through each subject row.
+          ...(teacherWhere ? { where: { id: { in: [] } } } : {}),
+          include: SAFE_SUBJECT_ASSIGNMENT_INCLUDE,
         },
       },
       orderBy: [{ class: { level: 'asc' } }, { code: 'asc' }],
@@ -468,11 +486,7 @@ export class AcademicsFoundationService {
       include: {
         class: true,
         teacherAssignments: {
-          include: {
-            staff: true,
-            section: true,
-            academicYear: true,
-          },
+          include: SAFE_SUBJECT_ASSIGNMENT_INCLUDE,
         },
       },
     });
@@ -537,11 +551,7 @@ export class AcademicsFoundationService {
       include: {
         class: true,
         teacherAssignments: {
-          include: {
-            staff: true,
-            section: true,
-            academicYear: true,
-          },
+          include: SAFE_SUBJECT_ASSIGNMENT_INCLUDE,
         },
       },
     });
@@ -567,6 +577,49 @@ export class AcademicsFoundationService {
     });
 
     return updated;
+  }
+
+  private async resolveTeacherSubjectWhere(
+    actor: AuthContext,
+  ): Promise<Prisma.SubjectWhereInput | null> {
+    const canManageAcademics = [
+      'academics:manage',
+      'academics:create',
+      'academics:update',
+      'academics:delete',
+    ].some((permission) => actor.permissions.includes(permission));
+    const isTeacher = actor.roles.some((role) =>
+      ['teacher', 'subject_teacher'].includes(role),
+    );
+    if (!isTeacher || canManageAcademics) return null;
+
+    const [subjectScopes, homeroomScopes] = await Promise.all([
+      this.teacherScopeService.listActiveAssignmentsForCapability(
+        actor,
+        TeacherCapability.SUBJECT_RECORD_READ,
+      ),
+      this.teacherScopeService.listActiveAssignmentsForCapability(
+        actor,
+        TeacherCapability.HOMEROOM_ACADEMIC_SUMMARY_READ,
+      ),
+    ]);
+    const subjectIds = [
+      ...new Set(
+        subjectScopes
+          .map((assignment) => assignment.subjectId)
+          .filter((subjectId): subjectId is string => Boolean(subjectId)),
+      ),
+    ];
+    const homeroomClassIds = [
+      ...new Set(homeroomScopes.map((assignment) => assignment.classId)),
+    ];
+    const scopes: Prisma.SubjectWhereInput[] = [];
+    if (subjectIds.length > 0) scopes.push({ id: { in: subjectIds } });
+    if (homeroomClassIds.length > 0) {
+      scopes.push({ classId: { in: homeroomClassIds } });
+    }
+
+    return scopes.length > 0 ? { OR: scopes } : { id: { in: [] } };
   }
 
   async deleteSubject(subjectId: string, actor: AuthContext) {

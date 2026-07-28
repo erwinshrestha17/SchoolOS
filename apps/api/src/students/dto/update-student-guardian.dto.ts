@@ -1,4 +1,23 @@
-import { IsBoolean, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import {
+  ArrayUnique,
+  IsArray,
+  IsBoolean,
+  IsDateString,
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
+import {
+  GuardianCapability,
+  GuardianRelationshipApprovalStatus,
+  GuardianRelationshipStatus,
+  GuardianRelationshipVerificationStatus,
+} from '@prisma/client';
 import {
   IsNepalPhone,
   IsPersonName,
@@ -54,4 +73,41 @@ export class UpdateStudentGuardianDto {
   @IsOptional()
   @IsBoolean()
   isPrimary?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsEnum(GuardianCapability, { each: true })
+  capabilities?: GuardianCapability[];
+
+  @IsOptional()
+  @IsEnum(GuardianRelationshipVerificationStatus)
+  verificationStatus?: GuardianRelationshipVerificationStatus;
+
+  @IsOptional()
+  @IsEnum(GuardianRelationshipStatus)
+  status?: GuardianRelationshipStatus;
+
+  @IsOptional()
+  @IsDateString()
+  effectiveFrom?: string;
+
+  @IsOptional()
+  @IsDateString()
+  effectiveUntil?: string | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  emergencyContactPriority?: number | null;
+
+  @IsOptional()
+  @IsEnum(GuardianRelationshipApprovalStatus)
+  approvalStatus?: GuardianRelationshipApprovalStatus;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  restrictionReasonRef?: string | null;
 }

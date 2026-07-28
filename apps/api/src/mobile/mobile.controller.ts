@@ -78,7 +78,7 @@ export class MobileController {
   }
 
   @Get('students/:id/learning-summary')
-  @RequiredModule('academics')
+  @RequiredModule('learning')
   getStudentLearningSummary(
     @Param('id') studentId: string,
     @CurrentAuth() auth: AuthContext,

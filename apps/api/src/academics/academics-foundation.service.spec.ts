@@ -1,5 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 import { AssessmentType, AuthMethod, Prisma } from '@prisma/client';
+import { TeacherCapability } from '../teacher-scope/teacher-capability';
 import { AcademicsFoundationService } from './academics-foundation.service';
 
 const actor = {
@@ -148,6 +149,76 @@ describe('AcademicsFoundationService assessment templates', () => {
       ),
     ).rejects.toThrow(NotFoundException);
   });
+
+  it('scopes a teacher subject catalog to canonical subject and homeroom assignments', async () => {
+    const { service, prisma, teacherScopeService } = buildService();
+    teacherScopeService.listActiveAssignmentsForCapability.mockImplementation(
+      (_actor, capability) => {
+        if (capability === TeacherCapability.SUBJECT_RECORD_READ) {
+          return Promise.resolve([
+            {
+              subjectId: 'subject-math',
+              classId: 'class-5',
+              sectionId: 'section-a',
+            },
+          ]);
+        }
+        return Promise.resolve([
+          {
+            subjectId: null,
+            classId: 'class-6',
+            sectionId: 'section-b',
+          },
+        ]);
+      },
+    );
+
+    await service.listSubjects({
+      ...actor,
+      userId: 'teacher-user',
+      roles: ['teacher'],
+      permissions: ['academics:read'],
+    });
+
+    expect(prisma.subject.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          tenantId: actor.tenantId,
+          AND: [
+            {
+              OR: [
+                { id: { in: ['subject-math'] } },
+                { classId: { in: ['class-6'] } },
+              ],
+            },
+          ],
+        },
+        include: expect.objectContaining({
+          teacherAssignments: expect.objectContaining({
+            where: { id: { in: [] } },
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('selects only public staff identity fields for subject assignments', async () => {
+    const { service, prisma } = buildService();
+
+    await service.listSubjects(actor);
+
+    expect(
+      prisma.subject.findMany.mock.calls[0][0].include.teacherAssignments
+        .include.staff,
+    ).toEqual({
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        employeeId: true,
+      },
+    });
+  });
 });
 
 function buildService(options: { subjects?: unknown[] } = {}) {
@@ -192,13 +263,18 @@ function buildService(options: { subjects?: unknown[] } = {}) {
   const auditService = {
     record: jest.fn(),
   };
+  const teacherScopeService = {
+    listActiveAssignmentsForCapability: jest.fn().mockResolvedValue([]),
+  };
 
   return {
     service: new AcademicsFoundationService(
       prisma as never,
       auditService as never,
+      teacherScopeService as never,
     ),
     prisma,
     auditService,
+    teacherScopeService,
   };
 }

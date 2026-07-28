@@ -7,14 +7,19 @@ import {
   ConsentType,
   DevelopmentalMilestoneStatus,
   EnrollmentStatus,
-  StaffStatus,
   StudentLifecycleStatus,
   StorageProvider,
+  TeacherAssignmentType,
 } from '@prisma/client';
 import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { StorageService } from '../storage/storage.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { AuthContext } from '../auth/auth.types.js';
+import { TeacherCapability } from '../teacher-scope/teacher-capability';
+import {
+  createTeacherScopeDeniedException,
+  TEACHER_SCOPE_DENIED_CODE,
+} from '../teacher-scope/teacher-scope.service';
 import { ActivityFeedService } from './activity-feed.service';
 
 describe('ActivityFeedService', () => {
@@ -24,6 +29,7 @@ describe('ActivityFeedService', () => {
   let auditService: any;
   let fileRegistry: any;
   let mediaQueue: any;
+  let teacherScopeService: any;
   let service: ActivityFeedService;
   let actor: AuthContext;
 
@@ -31,6 +37,10 @@ describe('ActivityFeedService', () => {
     prisma = {
       class: {
         findFirst: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      academicYear: {
+        findMany: jest.fn().mockResolvedValue([]),
       },
       section: {
         findFirst: jest.fn(),
@@ -40,9 +50,6 @@ describe('ActivityFeedService', () => {
         count: jest.fn(),
         findMany: jest.fn(),
         findFirst: jest.fn(),
-      },
-      subjectTeacherAssignment: {
-        findMany: jest.fn(),
       },
       staff: {
         findFirst: jest.fn(),
@@ -105,6 +112,41 @@ describe('ActivityFeedService', () => {
       auditAccess: jest.fn(),
     };
     mediaQueue = { add: jest.fn() };
+    teacherScopeService = {
+      listActiveAssignments: jest.fn().mockResolvedValue([]),
+      requireActorAccess: jest.fn().mockResolvedValue({
+        source: 'ASSIGNMENT',
+        assignmentId: 'assignment-1',
+        assignmentType: TeacherAssignmentType.CLASS_TEACHER,
+        componentScope: null,
+      }),
+      requireActorAccessAnySectionOfClass: jest.fn().mockResolvedValue({
+        source: 'ASSIGNMENT',
+        assignmentId: 'assignment-1',
+        assignmentType: TeacherAssignmentType.CLASS_TEACHER,
+        componentScope: null,
+      }),
+      resolveReadableScope: jest.fn().mockResolvedValue({
+        assignments: [
+          {
+            assignmentId: 'assignment-1',
+            assignmentType: TeacherAssignmentType.CLASS_TEACHER,
+            academicYearId: 'year-1',
+            classId: 'class-1',
+            sectionId: 'section-1',
+            subjectId: null,
+            componentScope: null,
+            isPrimary: true,
+            effectiveFrom: new Date('2026-04-01T00:00:00.000Z'),
+            effectiveUntil: null,
+            source: 'ASSIGNMENT',
+          },
+        ],
+        homeroomSectionIds: new Set(['section-1']),
+        subjectsBySection: new Map(),
+        allSectionIds: new Set(['section-1']),
+      }),
+    };
 
     service = new ActivityFeedService(
       prisma,
@@ -114,6 +156,7 @@ describe('ActivityFeedService', () => {
       { emit: jest.fn() } as any,
       fileRegistry,
       mediaQueue,
+      teacherScopeService,
     );
   });
 
@@ -487,6 +530,60 @@ describe('ActivityFeedService', () => {
       ],
       meta: { total: 1, page: 1, limit: 20, totalPages: 1 },
     });
+    expect(teacherScopeService.requireActorAccess).toHaveBeenCalledWith(
+      {
+        classId: 'class-1',
+        sectionId: 'section-1',
+        capability: TeacherCapability.HOMEROOM_RECORD_WRITE,
+      },
+      actor,
+    );
+  });
+
+  it('lists mobile class scopes from active canonical class-teacher assignments only', async () => {
+    teacherScopeService.listActiveAssignments.mockResolvedValue([
+      {
+        assignmentId: 'assignment-class',
+        assignmentType: TeacherAssignmentType.CLASS_TEACHER,
+        academicYearId: 'year-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        subjectId: null,
+      },
+      {
+        assignmentId: 'assignment-subject',
+        assignmentType: TeacherAssignmentType.SUBJECT_TEACHER,
+        academicYearId: 'year-1',
+        classId: 'class-2',
+        sectionId: 'section-2',
+        subjectId: 'subject-1',
+      },
+    ]);
+    prisma.academicYear.findMany.mockResolvedValue([
+      { id: 'year-1', name: '2083' },
+    ]);
+    prisma.class.findMany.mockResolvedValue([
+      { id: 'class-1', name: 'Grade 5', level: 5 },
+    ]);
+    prisma.section.findMany.mockResolvedValue([{ id: 'section-1', name: 'A' }]);
+
+    await expect(service.listTeacherMobileScopes(actor)).resolves.toEqual({
+      items: [
+        {
+          id: 'year-1:class-1:section-1',
+          academicYearId: 'year-1',
+          academicYearName: '2083',
+          classId: 'class-1',
+          className: 'Grade 5',
+          sectionId: 'section-1',
+          sectionName: 'A',
+        },
+      ],
+    });
+    expect(prisma.class.findMany).toHaveBeenCalledWith({
+      where: { tenantId: 'tenant-1', id: { in: ['class-1'] } },
+      select: { id: true, name: true, level: true },
+    });
   });
 
   it('previews class, section, and student-specific audience with media consent counts', async () => {
@@ -591,7 +688,9 @@ describe('ActivityFeedService', () => {
       id: 'section-1',
       classId: 'class-1',
     });
-    prisma.staff.findFirst.mockResolvedValue(null);
+    teacherScopeService.requireActorAccess.mockRejectedValueOnce(
+      createTeacherScopeDeniedException(),
+    );
 
     await expect(
       service.createPost(
@@ -614,7 +713,9 @@ describe('ActivityFeedService', () => {
         },
         actor,
       ),
-    ).rejects.toThrow('Teacher is not assigned to this class/section');
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: TEACHER_SCOPE_DENIED_CODE }),
+    });
   });
 
   it('rejects inactive tagged students before storing activity media', async () => {
@@ -821,27 +922,13 @@ describe('ActivityFeedService', () => {
         }),
       }),
     );
-    // A teacher may satisfy this either as the subject-assigned teacher
-    // (checked via Staff.teacherAssignments) or as the section's homeroom
-    // class teacher (checked separately via Section.classTeacherId) —
-    // ensureClassSectionAndWriteAccess queries both.
-    expect(prisma.staff.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          status: StaffStatus.ACTIVE,
-        }),
-      }),
-    );
-    expect(prisma.staff.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          teacherAssignments: {
-            some: expect.objectContaining({
-              academicYear: { isCurrent: true },
-            }),
-          },
-        }),
-      }),
+    expect(teacherScopeService.requireActorAccess).toHaveBeenCalledWith(
+      {
+        classId: 'class-1',
+        sectionId: 'section-1',
+        capability: TeacherCapability.HOMEROOM_RECORD_WRITE,
+      },
+      actor,
     );
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1347,11 +1434,17 @@ describe('ActivityFeedService', () => {
 
   describe('teacher scoping for mood logs, milestones, and posts (confirmed gap: previously tenant-wide)', () => {
     beforeEach(() => {
-      prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
-      prisma.subjectTeacherAssignment.findMany.mockResolvedValue([
-        { classId: 'class-1', sectionId: 'section-1' },
-      ]);
-      prisma.section.findMany.mockResolvedValue([]);
+      teacherScopeService.resolveReadableScope.mockResolvedValue({
+        assignments: [
+          {
+            classId: 'class-1',
+            sectionId: 'section-1',
+          },
+        ],
+        homeroomSectionIds: new Set(['section-1']),
+        subjectsBySection: new Map(),
+        allSectionIds: new Set(['section-1']),
+      });
     });
 
     it('scopes listMoodLogs to the teacher own assigned class/section', async () => {
@@ -1373,7 +1466,12 @@ describe('ActivityFeedService', () => {
     });
 
     it('returns no mood logs for a teacher with no active assignment', async () => {
-      prisma.subjectTeacherAssignment.findMany.mockResolvedValue([]);
+      teacherScopeService.resolveReadableScope.mockResolvedValue({
+        assignments: [],
+        homeroomSectionIds: new Set(),
+        subjectsBySection: new Map(),
+        allSectionIds: new Set(),
+      });
 
       const result = await service.listMoodLogs(actor);
 

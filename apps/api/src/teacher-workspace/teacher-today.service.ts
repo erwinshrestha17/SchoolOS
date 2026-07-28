@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AttendanceService } from '../attendance/attendance.service';
 import { HomeworkService } from '../homework/homework.service';
 import { TimetableService } from '../timetable/timetable.service';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 
 interface TodayPeriod {
   id: string;
@@ -39,6 +40,7 @@ export class TeacherTodayService {
     private readonly attendanceService: AttendanceService,
     private readonly homeworkService: HomeworkService,
     private readonly timetableService: TimetableService,
+    private readonly teacherScopeService: TeacherScopeService,
   ) {}
 
   async getToday(
@@ -90,12 +92,6 @@ export class TeacherTodayService {
   }
 
   private async getUpcomingMarksDeadlines(actor: AuthContext, now: Date) {
-    const staff = await this.prisma.staff.findFirst({
-      where: { tenantId: actor.tenantId, userId: actor.userId },
-      select: { id: true },
-    });
-    if (!staff) return [];
-
     const currentYear = await this.prisma.academicYear.findFirst({
       where: { tenantId: actor.tenantId, isCurrent: true },
       select: { id: true },
@@ -103,15 +99,16 @@ export class TeacherTodayService {
     if (!currentYear) return [];
 
     const subjectAssignments =
-      await this.prisma.subjectTeacherAssignment.findMany({
-        where: {
-          tenantId: actor.tenantId,
-          staffId: staff.id,
-          academicYearId: currentYear.id,
-        },
-        select: { subjectId: true },
+      await this.teacherScopeService.listActiveAssignments(actor, {
+        academicYearId: currentYear.id,
       });
-    const subjectIds = [...new Set(subjectAssignments.map((a) => a.subjectId))];
+    const subjectIds = [
+      ...new Set(
+        subjectAssignments
+          .map((assignment) => assignment.subjectId)
+          .filter((subjectId): subjectId is string => Boolean(subjectId)),
+      ),
+    ];
     if (subjectIds.length === 0) return [];
 
     const withinSevenDays = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);

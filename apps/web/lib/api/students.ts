@@ -9,6 +9,10 @@ import type {
   BulkAdmissionImportResult,
   CreateAdmissionApplicationPayload,
   CreateStudentGuardianPayload,
+  GuardianAccessAdministration,
+  GuardianAccountProvisionPayload,
+  GuardianRecoveryActionPayload,
+  GuardianSessionRevocationPayload,
   IemisExportResult,
   MarkDuplicateStudentPairNotDuplicatePayload,
   PaginatedResponse,
@@ -70,6 +74,11 @@ type ReopenDuplicateStudentReviewResult = {
   review: StudentDuplicateReviewMetadata;
 };
 
+type GuardianIdentityVerificationSummary =
+  GuardianAccessAdministration['identityVerifications'][number] & {
+    guardianId: string;
+  };
+
 export const studentsApi = {
   listStudents: (params?: {
     classId?: string;
@@ -110,6 +119,78 @@ export const studentsApi = {
   addStudentGuardian: (studentId: string, body: CreateStudentGuardianPayload) =>
     request<StudentProfileDetail>(
       `/students/${encodeURIComponent(studentId)}/guardians`,
+      { method: 'POST', json: body as JsonBody },
+    ),
+  getGuardianAccessAdministration: (studentId: string, guardianId: string) =>
+    request<GuardianAccessAdministration>(
+      `/students/${encodeURIComponent(studentId)}/guardians/${encodeURIComponent(guardianId)}/access-administration`,
+    ),
+  performGuardianRecoveryAction: (
+    studentId: string,
+    guardianId: string,
+    body: GuardianRecoveryActionPayload,
+  ) =>
+    request<{
+      success: true;
+      action: GuardianRecoveryActionPayload['action'];
+      sessionsRevoked: number;
+      relationshipsChanged: number;
+      relationshipStatus: string;
+      accountStatus: string | null;
+    }>(
+      `/students/${encodeURIComponent(studentId)}/guardians/${encodeURIComponent(guardianId)}/access-actions`,
+      { method: 'POST', json: body as JsonBody },
+    ),
+  provisionGuardianAccount: (
+    studentId: string,
+    guardianId: string,
+    body: GuardianAccountProvisionPayload,
+  ) =>
+    request<{
+      success: true;
+      account: {
+        linked: true;
+        status: string;
+        email: string;
+        mustChangePassword: true;
+      };
+    }>(
+      `/students/${encodeURIComponent(studentId)}/guardians/${encodeURIComponent(guardianId)}/account`,
+      { method: 'POST', json: body as JsonBody },
+    ),
+  revokeGuardianSession: (
+    studentId: string,
+    guardianId: string,
+    sessionId: string,
+    body: GuardianSessionRevocationPayload,
+  ) =>
+    request<{ success: true; sessionId: string }>(
+      `/students/${encodeURIComponent(studentId)}/guardians/${encodeURIComponent(guardianId)}/sessions/${encodeURIComponent(sessionId)}/revoke`,
+      { method: 'POST', json: body as JsonBody },
+    ),
+  createGuardianIdentityVerification: (
+    guardianId: string,
+    body: {
+      documentType: string;
+      documentNumber?: string;
+      evidenceDocumentId?: string;
+      notes?: string;
+    },
+  ) =>
+    request<GuardianIdentityVerificationSummary>(
+      `/students/guardians/${encodeURIComponent(guardianId)}/identity-verifications`,
+      { method: 'POST', json: body as JsonBody },
+    ),
+  reviewGuardianIdentityVerification: (
+    guardianId: string,
+    verificationId: string,
+    body: {
+      status: 'VERIFIED' | 'REJECTED' | 'REVOKED';
+      reviewNote?: string;
+    },
+  ) =>
+    request<GuardianIdentityVerificationSummary>(
+      `/students/guardians/${encodeURIComponent(guardianId)}/identity-verifications/${encodeURIComponent(verificationId)}/review`,
       { method: 'POST', json: body as JsonBody },
     ),
   getStudentFeeClearance: (studentId: string) =>

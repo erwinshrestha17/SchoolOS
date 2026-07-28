@@ -7,6 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  GuardianCapability,
   LibraryIssueStatus,
   Prisma,
   StudentLifecycleStatus,
@@ -30,6 +31,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '../config/config.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { buildIdCardPdf } from '../common/pdf/simple-pdf';
+import {
+  buildActiveGuardianRelationshipWhere,
+  requireGuardianCapability,
+} from '../common/security/parent-scope';
+import { TeacherCapability } from '../teacher-scope/teacher-capability';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 
 interface QrCredentialRecord {
   id: string;
@@ -117,6 +124,7 @@ export class StudentQrService {
     private readonly auditService: AuditService,
     private readonly configService: ConfigService,
     private readonly fileRegistryService: FileRegistryService,
+    private readonly teacherScopeService: TeacherScopeService,
   ) {}
 
   async getQrWorkspaceSummary(
@@ -692,11 +700,6 @@ export class StudentQrService {
           include: {
             class: true,
             sectionRef: true,
-            guardianLinks: {
-              include: {
-                guardian: true,
-              },
-            },
           },
         },
       },
@@ -750,30 +753,47 @@ export class StudentQrService {
     const student = credential.student;
 
     if (!this.hasPermission(auth, 'students:qr:resolve_all')) {
-      const isParent = auth.roles.includes('parent');
-      const isTeacher = auth.roles.includes('teacher');
+      const isParent =
+        auth.roles.includes('parent') || auth.roles.includes('guardian');
+      const isTeacher =
+        auth.roles.includes('teacher') ||
+        auth.roles.includes('subject_teacher');
 
       if (isParent || isTeacher) {
         let parentAllowed = false;
         let teacherAllowed = false;
+        let parentDenial: unknown;
 
         if (isParent) {
-          parentAllowed = student.guardianLinks.some(
-            (link) => link.guardian.userId === auth.userId,
-          );
+          try {
+            await requireGuardianCapability(
+              this.prisma,
+              auth,
+              student.id,
+              GuardianCapability.ACADEMICS_VIEW,
+            );
+            parentAllowed = true;
+          } catch (error) {
+            parentDenial = error;
+          }
         }
 
-        if (isTeacher) {
-          const isAssigned =
-            await this.prisma.subjectTeacherAssignment.findFirst({
-              where: {
-                tenantId,
-                staff: { userId: auth.userId },
+        if (
+          isTeacher &&
+          !parentAllowed &&
+          student.classId &&
+          student.sectionId
+        ) {
+          teacherAllowed = Boolean(
+            await this.teacherScopeService.canActorAccess(
+              {
                 classId: student.classId,
-                OR: [{ sectionId: student.sectionId }, { sectionId: null }],
+                sectionId: student.sectionId,
+                capability: TeacherCapability.CLASS_ROSTER_READ,
               },
-            });
-          teacherAllowed = !!isAssigned;
+              auth,
+            ),
+          );
         }
 
         const isAllowed =
@@ -786,10 +806,11 @@ export class StudentQrService {
               auth,
               student.id,
               purpose,
-              'unrelated_parent',
+              'guardian_capability_denied',
             );
-            throw new ForbiddenException(
-              'Parent cannot resolve unrelated child',
+            throw (
+              parentDenial ??
+              new ForbiddenException('Parent cannot resolve unrelated child')
             );
           } else {
             await this.recordResolveDenied(
@@ -799,8 +820,14 @@ export class StudentQrService {
               purpose,
               'unassigned_teacher',
             );
-            throw new ForbiddenException(
-              'Teacher not assigned to this student',
+            await this.teacherScopeService.denyActorAccess(
+              {
+                capability: TeacherCapability.CLASS_ROSTER_READ,
+                reason: student.sectionId ? 'no_assignment' : 'missing_scope',
+                classId: student.classId,
+                sectionId: student.sectionId ?? undefined,
+              },
+              auth,
             );
           }
         }
@@ -985,7 +1012,8 @@ export class StudentQrService {
     studentId: string,
     auth: AuthContext,
   ) {
-    const isParent = auth.roles.includes('parent');
+    const isParent =
+      auth.roles.includes('parent') || auth.roles.includes('guardian');
     const isTeacher =
       auth.roles.includes('teacher') || auth.roles.includes('subject_teacher');
     const isStudent = auth.roles.includes('student');
@@ -999,9 +1027,6 @@ export class StudentQrService {
         userId: true,
         classId: true,
         sectionId: true,
-        guardianLinks: {
-          select: { guardian: { select: { userId: true } } },
-        },
       },
     });
 
@@ -1010,23 +1035,40 @@ export class StudentQrService {
     }
 
     if (isStudent && student.userId === auth.userId) return;
-    if (
-      isParent &&
-      student.guardianLinks.some((link) => link.guardian.userId === auth.userId)
-    ) {
+    if (isParent) {
+      await requireGuardianCapability(
+        this.prisma,
+        auth,
+        studentId,
+        GuardianCapability.ACADEMICS_VIEW,
+      );
       return;
     }
     if (isTeacher) {
-      const assignment = await this.prisma.subjectTeacherAssignment.findFirst({
-        where: {
-          tenantId,
-          staff: { userId: auth.userId },
+      if (
+        student.classId &&
+        student.sectionId &&
+        (await this.teacherScopeService.canActorAccess(
+          {
+            classId: student.classId,
+            sectionId: student.sectionId,
+            capability: TeacherCapability.CLASS_ROSTER_READ,
+          },
+          auth,
+        ))
+      ) {
+        return;
+      }
+
+      await this.teacherScopeService.denyActorAccess(
+        {
+          capability: TeacherCapability.CLASS_ROSTER_READ,
+          reason: student.sectionId ? 'no_assignment' : 'missing_scope',
           classId: student.classId,
-          OR: [{ sectionId: student.sectionId }, { sectionId: null }],
+          sectionId: student.sectionId ?? undefined,
         },
-        select: { id: true },
-      });
-      if (assignment) return;
+        auth,
+      );
     }
 
     throw new ForbiddenException(
@@ -1076,6 +1118,7 @@ export class StudentQrService {
           class: { select: { name: true } },
           sectionRef: { select: { name: true } },
           guardianLinks: {
+            where: buildActiveGuardianRelationshipWhere(),
             include: { guardian: true },
             orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
             take: 1,

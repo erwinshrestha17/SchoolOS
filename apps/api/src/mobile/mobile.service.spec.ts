@@ -1,5 +1,9 @@
 import { ForbiddenException } from '@nestjs/common';
-import { AuthMethod, FileStatus } from '@prisma/client';
+import {
+  AuthMethod,
+  FileStatus,
+  GuardianCapability,
+} from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { MobileService } from './mobile.service';
 
@@ -221,14 +225,17 @@ describe('MobileService', () => {
       },
       select: {
         studentLinks: {
-          where: {
-            student: {
+          where: expect.objectContaining({
+            status: 'ACTIVE',
+            verificationStatus: 'VERIFIED',
+            approvalStatus: 'APPROVED',
+            student: expect.objectContaining({
               lifecycleStatus: 'ACTIVE',
               enrollments: {
                 some: { status: 'ACTIVE' },
               },
-            },
-          },
+            }),
+          }),
           select: { studentId: true },
         },
       },
@@ -251,7 +258,7 @@ describe('MobileService', () => {
     prisma.student.findFirst.mockResolvedValue({ id: 'student-other' });
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-allowed' }],
+      studentLinks: [],
     });
 
     await expect(
@@ -1439,6 +1446,8 @@ describe('MobileService', () => {
           academicYearEndsOn: '2026-04-13T00:00:00.000Z',
           relationship: 'Daughter',
           guardianId: 'guardian-1',
+          capabilities: [GuardianCapability.ACADEMICS_VIEW],
+          relationshipState: null,
         },
       ],
     });
@@ -1503,6 +1512,8 @@ describe('MobileService', () => {
           academicYearEndsOn: '2026-04-13T00:00:00.000Z',
           relationship: 'Daughter',
           guardianId: 'guardian-1',
+          capabilities: [GuardianCapability.ACADEMICS_VIEW],
+          relationshipState: null,
         },
       ],
     });
@@ -1531,6 +1542,13 @@ describe('MobileService', () => {
       academicYearEndsOn: '2026-04-13T00:00:00.000Z',
       relationship: 'Daughter',
       guardianId: 'guardian-1',
+      capabilities: [
+        GuardianCapability.ACADEMICS_VIEW,
+        GuardianCapability.ATTENDANCE_VIEW,
+        GuardianCapability.FEES_VIEW,
+        GuardianCapability.COMPLAINT_OR_CORRECTION_SUBMIT,
+      ],
+      relationshipState: null,
     };
     jest.spyOn(service, 'listMyStudents').mockResolvedValue({ items: [child] });
     entitlementsService.getEntitlements.mockResolvedValue({
@@ -1720,6 +1738,8 @@ describe('MobileService', () => {
           academicYearEndsOn: null,
           relationship: 'Daughter',
           guardianId: 'guardian-1',
+          capabilities: [GuardianCapability.ACADEMICS_VIEW],
+          relationshipState: null,
         },
       ],
     });
@@ -1760,6 +1780,71 @@ describe('MobileService', () => {
     expect(exams).not.toHaveBeenCalled();
   });
 
+  it('loads only capability-authorized action sources for a financial guardian', async () => {
+    jest.spyOn(service, 'listMyStudents').mockResolvedValue({
+      items: [
+        {
+          id: 'student-1',
+          name: 'Asha Rai',
+          classSection: 'Grade 4 - A',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          rollNumber: '7',
+          academicYear: '2082',
+          academicYearStartsOn: null,
+          academicYearEndsOn: null,
+          relationship: 'Financial sponsor',
+          guardianId: 'guardian-1',
+          capabilities: [GuardianCapability.FEES_VIEW],
+          relationshipState: null,
+        },
+      ],
+    });
+    entitlementsService.getEntitlements.mockResolvedValue({
+      modules: ['students', 'attendance', 'fees', 'homework', 'academics'],
+      features: [],
+      addOns: [],
+      tier: null,
+    });
+    jest.spyOn(service, 'listNotifications').mockResolvedValue({
+      unreadCount: 0,
+      items: [],
+      nextCursor: null,
+    });
+    const fees = jest
+      .spyOn(service, 'getStudentFeesSummary')
+      .mockResolvedValue({
+        status: 'PAID',
+        totalAmount: 0,
+        paidAmount: 0,
+        totalOutstanding: 0,
+        overdueCount: 0,
+        nextDueDate: null,
+        recentReceipts: [],
+        recentInvoices: [],
+      });
+    const homework = jest.spyOn(service, 'getStudentHomework');
+    const corrections = jest.spyOn(
+      service,
+      'listStudentAttendanceCorrections',
+    );
+    const requests = jest.spyOn(service, 'listStudentServiceRequests');
+    const exams = jest.spyOn(service, 'getStudentExamSchedule');
+
+    const result = await service.getParentActionCentre(actor, 'student-1');
+
+    expect(result.sources.fees.status).toBe('available');
+    expect(result.sources.homework.status).toBe('locked');
+    expect(result.sources.attendance.status).toBe('locked');
+    expect(result.sources.serviceRequests.status).toBe('locked');
+    expect(result.sources.exams.status).toBe('locked');
+    expect(fees).toHaveBeenCalledWith('student-1', actor);
+    expect(homework).not.toHaveBeenCalled();
+    expect(corrections).not.toHaveBeenCalled();
+    expect(requests).not.toHaveBeenCalled();
+    expect(exams).not.toHaveBeenCalled();
+  });
+
   it('rejects an unlinked action-centre child before loading any source', async () => {
     jest.spyOn(service, 'listMyStudents').mockResolvedValue({
       items: [
@@ -1775,6 +1860,8 @@ describe('MobileService', () => {
           academicYearEndsOn: null,
           relationship: 'Daughter',
           guardianId: 'guardian-1',
+          capabilities: [GuardianCapability.ACADEMICS_VIEW],
+          relationshipState: null,
         },
       ],
     });
@@ -1799,7 +1886,15 @@ describe('MobileService', () => {
         sectionId: 'section-1',
         class: { id: 'class-1', name: 'Grade 4' },
         sectionRef: { id: 'section-1', name: 'A' },
-        guardianLinks: [],
+        guardianLinks: [
+          {
+            guardian: { userId: actor.userId },
+            capabilities: [
+              GuardianCapability.ACADEMICS_VIEW,
+              GuardianCapability.ATTENDANCE_VIEW,
+            ],
+          },
+        ],
         enrollments: [],
       } as never);
       entitlementsService.getEntitlements.mockResolvedValue({
@@ -2499,7 +2594,10 @@ describe('MobileService', () => {
   });
 
   it('returns signed-in guardian consent status through the communications module', async () => {
-    prisma.guardian.findFirst.mockResolvedValue({ id: 'guardian-1' });
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [{ studentId: 'student-1' }],
+    });
     communicationsService.getGuardianConsentStatus.mockResolvedValue([
       {
         guardianId: 'guardian-1',

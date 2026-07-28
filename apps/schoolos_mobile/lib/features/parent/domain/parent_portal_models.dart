@@ -1,3 +1,5 @@
+import 'parent_models.dart';
+
 enum ParentUpdateCategory { notice, message, event, gallery }
 
 /// Where a piece of homework stands, from the parent's point of view.
@@ -95,6 +97,7 @@ class ParentPortalChild {
     this.academicYearStartsOn,
     this.academicYearEndsOn,
     this.academicYear = '',
+    this.capabilities = const <String>{},
   });
 
   final String id;
@@ -119,8 +122,16 @@ class ParentPortalChild {
   final String? academicYearStartsOn;
   final String? academicYearEndsOn;
   final String academicYear;
+  final Set<String> capabilities;
 
   bool get hasFeesDue => feesDue > 0;
+  bool hasCapability(String capability) => capabilities.contains(capability);
+  bool get canViewAcademics =>
+      hasCapability(GuardianCapabilityKey.academicsView);
+  bool get canViewAttendance =>
+      hasCapability(GuardianCapabilityKey.attendanceView);
+  bool get canViewFees => hasCapability(GuardianCapabilityKey.feesView);
+  bool get canPayFees => hasCapability(GuardianCapabilityKey.feesPay);
 
   /// The backend reports nothing outstanding both for a settled account and
   /// for a child the school has never invoiced. Only the first is "paid".

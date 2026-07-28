@@ -9,9 +9,16 @@ import { TimetableLifecycleService } from './timetable-lifecycle.service';
 import { TimetableService } from './timetable.service';
 
 import { TimetableSubstitutionService } from './timetable-substitution.service';
+import { TeacherScopeModule } from '../teacher-scope/teacher-scope.module';
 
 @Module({
-  imports: [AuthModule, CommunicationsModule, AuditModule, AttendanceModule],
+  imports: [
+    AuthModule,
+    CommunicationsModule,
+    AuditModule,
+    AttendanceModule,
+    TeacherScopeModule,
+  ],
   controllers: [TimetableController],
   providers: [
     TimetableService,

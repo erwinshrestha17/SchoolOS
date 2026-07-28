@@ -52,34 +52,43 @@ class _ParentPortalHomeworkTabState extends State<ParentPortalHomeworkTab>
     final completedCount = widget.data.homework
         .where((item) => item.isCompleted)
         .length;
+    final hasHomeworkAccess = selectedChild == 'all'
+        ? widget.data.children.any((child) => child.canViewAcademics)
+        : widget.data.children.any(
+            (child) => child.id == selectedChild && child.canViewAcademics,
+          );
+
+    if (!hasHomeworkAccess) {
+      return ListView(
+        key: const PageStorageKey('parent-homework-locked'),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+        children: [
+          _childSelector(),
+          const SizedBox(height: 14),
+          const PortalCard(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Column(
+                children: [
+                  Icon(Icons.lock_outline_rounded),
+                  SizedBox(height: 10),
+                  Text(
+                    'Homework is not included in your access for this child.',
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
 
     return ListView(
       key: const PageStorageKey('parent-homework'),
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
       children: [
-        PortalCard(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: selectedChild,
-              isExpanded: true,
-              icon: const Icon(Icons.keyboard_arrow_down_rounded),
-              items: [
-                const DropdownMenuItem(
-                  value: 'all',
-                  child: Text('All children'),
-                ),
-                for (final child in widget.data.children)
-                  DropdownMenuItem(
-                    value: child.id,
-                    child: Text('${child.name} • ${child.classSection}'),
-                  ),
-              ],
-              onChanged: (value) =>
-                  setState(() => selectedChild = value ?? 'all'),
-            ),
-          ),
-        ),
+        _childSelector(),
         const SizedBox(height: 14),
         SegmentedButton<_HomeworkFilter>(
           segments: const [
@@ -176,6 +185,28 @@ class _ParentPortalHomeworkTabState extends State<ParentPortalHomeworkTab>
             const SizedBox(height: 14),
           ],
       ],
+    );
+  }
+
+  Widget _childSelector() {
+    return PortalCard(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: selectedChild,
+          isExpanded: true,
+          icon: const Icon(Icons.keyboard_arrow_down_rounded),
+          items: [
+            const DropdownMenuItem(value: 'all', child: Text('All children')),
+            for (final child in widget.data.children)
+              DropdownMenuItem(
+                value: child.id,
+                child: Text('${child.name} • ${child.classSection}'),
+              ),
+          ],
+          onChanged: (value) => setState(() => selectedChild = value ?? 'all'),
+        ),
+      ),
     );
   }
 }

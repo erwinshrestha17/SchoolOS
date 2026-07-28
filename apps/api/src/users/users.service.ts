@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { SCHOOL_CONFIG_OWNER_ROLE } from '@schoolos/core';
 import { AuthMethod, UserStatus } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
@@ -54,13 +55,16 @@ export class UsersService {
     return this.toUserSummary(user);
   }
 
-  async createManagedUser(input: CreateManagedUserInput) {
+  async createManagedUser(
+    input: CreateManagedUserInput,
+    client: ManagedUserPrismaClient = this.prisma,
+  ) {
     const email = requireProfileEmail(input.email);
     const phone = optionalNepalPhone(input.phone);
     assertStrongPassword(input.password, [email]);
-    await this.ensureEmailIsAvailable(input.tenantId, email);
+    await this.ensureEmailIsAvailable(input.tenantId, email, client);
 
-    const roles = await this.prisma.role.findMany({
+    const roles = await client.role.findMany({
       where: {
         tenantId: input.tenantId,
         id: { in: input.roleIds },
@@ -78,7 +82,7 @@ export class UsersService {
       this.configService.bcryptRounds,
     );
 
-    return this.prisma.user.create({
+    return client.user.create({
       data: {
         tenantId: input.tenantId,
         email,
@@ -278,8 +282,12 @@ export class UsersService {
     } as const;
   }
 
-  private async ensureEmailIsAvailable(tenantId: string, email: string) {
-    const existingUser = await this.prisma.user.findUnique({
+  private async ensureEmailIsAvailable(
+    tenantId: string,
+    email: string,
+    client: ManagedUserPrismaClient = this.prisma,
+  ) {
+    const existingUser = await client.user.findUnique({
       where: {
         tenantId_email: {
           tenantId,
@@ -377,6 +385,10 @@ interface CreateManagedUserInput {
   status?: UserStatus;
   mustChangePassword?: boolean;
 }
+
+type ManagedUserPrismaClient =
+  | Pick<PrismaService, 'role' | 'user'>
+  | Prisma.TransactionClient;
 
 interface UserWithRelations {
   id: string;

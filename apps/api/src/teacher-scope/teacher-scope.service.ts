@@ -61,6 +61,20 @@ export interface RequireTeacherAccessParams {
   effectiveOn?: Date;
 }
 
+export type RequireTeacherActorAccessParams = Omit<
+  RequireTeacherAccessParams,
+  'tenantId' | 'staffId'
+>;
+
+export interface DenyTeacherActorAccessParams {
+  capability: TeacherCapability;
+  reason: 'missing_scope' | 'no_assignment' | 'unsupported_teacher_action';
+  classId?: string;
+  sectionId?: string;
+  subjectId?: string;
+  recordStatus?: TeacherRecordStatus | null;
+}
+
 /** A single active assignment, flattened for callers and the UI. */
 export interface TeacherAssignmentScope {
   assignmentId: string;
@@ -74,9 +88,24 @@ export interface TeacherAssignmentScope {
   effectiveFrom: Date;
   effectiveUntil: Date | null;
   source: 'ASSIGNMENT' | 'DELEGATION';
+  /**
+   * Permanent assignments derive capabilities from their assignment type.
+   * Delegations carry an explicit capability allow-list and must never be
+   * treated as granting every substitute-teacher capability.
+   */
+  allowedCapabilities?: readonly string[];
 }
 
 const DENIAL_MESSAGE = 'You are not authorized for this teaching scope';
+export const TEACHER_SCOPE_DENIED_CODE = 'TEACHER_SCOPE_DENIED';
+
+export function createTeacherScopeDeniedException() {
+  return new ForbiddenException({
+    statusCode: 403,
+    code: TEACHER_SCOPE_DENIED_CODE,
+    message: DENIAL_MESSAGE,
+  });
+}
 
 /**
  * Canonical Teacher authorization resolver (Teacher Persona spec sections
@@ -150,15 +179,150 @@ export class TeacherScopeService {
     );
   }
 
+  async requireAccessAnySectionOfClass(
+    params: Omit<RequireTeacherAccessParams, 'sectionId'>,
+    actor?: AuthContext,
+  ): Promise<TeacherScopeGrant> {
+    const grant = await this.resolveGrant(
+      { ...params, sectionId: undefined as unknown as string },
+      actor,
+      { audit: true },
+    );
+    if (!grant) {
+      throw createTeacherScopeDeniedException();
+    }
+    return grant;
+  }
+
   async requireAccess(
     params: RequireTeacherAccessParams,
     actor?: AuthContext,
   ): Promise<TeacherScopeGrant> {
     const grant = await this.resolveGrant(params, actor, { audit: true });
     if (!grant) {
-      throw new ForbiddenException(DENIAL_MESSAGE);
+      throw createTeacherScopeDeniedException();
     }
     return grant;
+  }
+
+  /**
+   * Actor-oriented entry point for controllers and feature services. Keeping
+   * active Staff resolution here prevents every consumer from reimplementing
+   * the same user -> staff lookup before applying the canonical assignment
+   * rules.
+   */
+  async requireActorAccess(
+    params: RequireTeacherActorAccessParams,
+    actor: AuthContext,
+  ): Promise<TeacherScopeGrant> {
+    const staffId = await this.resolveActiveStaffId(actor);
+    if (!staffId) {
+      await this.recordActorDenial(params, actor, 'no_active_staff');
+      throw createTeacherScopeDeniedException();
+    }
+
+    return this.requireAccess(
+      {
+        ...params,
+        tenantId: actor.tenantId,
+        staffId,
+      },
+      actor,
+    );
+  }
+
+  /**
+   * Non-throwing actor-oriented lookup for list filters and option rendering.
+   * Actual reads, writes and downloads must use `requireActorAccess`.
+   */
+  async canActorAccess(
+    params: RequireTeacherActorAccessParams,
+    actor: AuthContext,
+  ): Promise<TeacherScopeGrant | null> {
+    const staffId = await this.resolveActiveStaffId(actor);
+    if (!staffId) return null;
+
+    return this.canAccess(
+      {
+        ...params,
+        tenantId: actor.tenantId,
+        staffId,
+      },
+      actor,
+    );
+  }
+
+  async canActorAccessAnySectionOfClass(
+    params: Omit<RequireTeacherActorAccessParams, 'sectionId'>,
+    actor: AuthContext,
+  ): Promise<TeacherScopeGrant | null> {
+    const staffId = await this.resolveActiveStaffId(actor);
+    if (!staffId) return null;
+
+    return this.canAccessAnySectionOfClass(
+      {
+        ...params,
+        tenantId: actor.tenantId,
+        staffId,
+      },
+      actor,
+    );
+  }
+
+  /**
+   * Fail-closed entry point for a teacher action whose request does not carry
+   * enough scope to evaluate safely, or whose functional area is not
+   * available to teachers. This keeps the stable denial envelope and audit
+   * vocabulary inside the canonical resolver instead of reimplementing them
+   * in each feature module.
+   */
+  async denyActorAccess(
+    params: DenyTeacherActorAccessParams,
+    actor: AuthContext,
+  ): Promise<never> {
+    await this.auditService.record({
+      action: 'teacher_scope.denied',
+      resource: params.capability,
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: `${params.classId ?? ''}:${params.sectionId ?? ''}:${params.subjectId ?? ''}`,
+      after: {
+        capability: params.capability,
+        staffId: null,
+        reason: params.reason,
+        recordStatus: params.recordStatus ?? null,
+      },
+    });
+    throw createTeacherScopeDeniedException();
+  }
+
+  /**
+   * Compatibility bridge for a legacy class-wide record that has no section
+   * id. Canonical assignments remain section-precise; this succeeds only when
+   * at least one active assignment covers the requested class/subject/action.
+   */
+  async requireActorAccessAnySectionOfClass(
+    params: Omit<RequireTeacherActorAccessParams, 'sectionId'>,
+    actor: AuthContext,
+  ): Promise<TeacherScopeGrant> {
+    const staffId = await this.resolveActiveStaffId(actor);
+    if (!staffId) {
+      await this.recordActorDenial(
+        { ...params, sectionId: '' },
+        actor,
+        'no_active_staff',
+      );
+      throw createTeacherScopeDeniedException();
+    }
+
+    return this.requireAccessAnySectionOfClass(
+      {
+        ...params,
+        tenantId: actor.tenantId,
+        staffId,
+      },
+      actor,
+    );
   }
 
   private async resolveGrant(
@@ -186,7 +350,8 @@ export class TeacherScopeService {
     // sufficient.
     if (
       rule.requiresRecordOwnership &&
-      params.recordOwnerStaffId != null &&
+      params.recordOwnerStaffId !== null &&
+      params.recordOwnerStaffId !== undefined &&
       params.recordOwnerStaffId !== params.staffId
     ) {
       if (options.audit) await this.recordDenial(params, actor, 'ownership');
@@ -269,6 +434,26 @@ export class TeacherScopeService {
       after: {
         capability: params.capability,
         staffId: params.staffId,
+        reason,
+        recordStatus: params.recordStatus ?? null,
+      },
+    });
+  }
+
+  private async recordActorDenial(
+    params: RequireTeacherActorAccessParams,
+    actor: AuthContext,
+    reason: 'no_active_staff',
+  ) {
+    await this.auditService.record({
+      action: 'teacher_scope.denied',
+      resource: params.capability,
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: `${params.classId}:${params.sectionId}:${params.subjectId ?? ''}`,
+      after: {
+        capability: params.capability,
+        staffId: null,
         reason,
         recordStatus: params.recordStatus ?? null,
       },
@@ -387,8 +572,45 @@ export class TeacherScopeService {
         effectiveFrom: delegation.effectiveFrom,
         effectiveUntil: delegation.effectiveUntil,
         source: 'DELEGATION' as const,
+        allowedCapabilities: delegation.allowedCapabilities,
       })),
     ];
+  }
+
+  /**
+   * Active scopes that can satisfy one capability. List endpoints use this
+   * instead of treating every assignment/delegation as interchangeable.
+   */
+  async listActiveAssignmentsForCapability(
+    actor: AuthContext,
+    capability: TeacherCapability,
+    options: { academicYearId?: string; effectiveOn?: Date } = {},
+  ): Promise<TeacherAssignmentScope[]> {
+    const rule = CAPABILITY_RULES[capability];
+    const assignments = await this.listActiveAssignments(actor, options);
+
+    return assignments.filter((assignment) => {
+      if (assignment.source === 'DELEGATION') {
+        return (
+          assignment.allowedCapabilities?.includes(capability) === true &&
+          this.assignmentMatchesSubjectRule(assignment, rule.subjectMatch)
+        );
+      }
+
+      return (
+        rule.allowedAssignmentTypes.includes(assignment.assignmentType) &&
+        this.assignmentMatchesSubjectRule(assignment, rule.subjectMatch)
+      );
+    });
+  }
+
+  private assignmentMatchesSubjectRule(
+    assignment: TeacherAssignmentScope,
+    subjectMatch: 'EXACT' | 'ANY' | 'NONE',
+  ) {
+    if (subjectMatch === 'EXACT') return assignment.subjectId !== null;
+    if (subjectMatch === 'NONE') return assignment.subjectId === null;
+    return true;
   }
 
   /**

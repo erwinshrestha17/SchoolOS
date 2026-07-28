@@ -55,6 +55,16 @@ describe('Student Documents Registry Integration (E2E)', () => {
       {
         assertTenantActive: jest.fn().mockResolvedValue(undefined),
       } as any,
+      {
+        requireActorAccess: jest.fn().mockResolvedValue({
+          source: 'ASSIGNMENT',
+          assignmentId: 'assignment-1',
+        }),
+        requireActorAccessAnySectionOfClass: jest.fn().mockResolvedValue({
+          source: 'ASSIGNMENT',
+          assignmentId: 'assignment-1',
+        }),
+      } as any,
     );
     studentRecordsService = new StudentRecordsService(
       prisma as unknown as PrismaService,

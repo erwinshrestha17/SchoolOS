@@ -1,5 +1,5 @@
-import { BoardReadinessWorkspace } from '@/components/academics/board-readiness-workspace';
+import { notFound } from 'next/navigation';
 
 export default function BoardReadinessPage() {
-  return <BoardReadinessWorkspace />;
+  notFound();
 }

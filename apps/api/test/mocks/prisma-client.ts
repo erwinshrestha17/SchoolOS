@@ -208,6 +208,37 @@ export const EnrollmentStatus = {
   EXITED: 'EXITED',
 } as const;
 
+export const GuardianCapability = {
+  ACADEMICS_VIEW: 'ACADEMICS_VIEW',
+  ATTENDANCE_VIEW: 'ATTENDANCE_VIEW',
+  LEAVE_MANAGE: 'LEAVE_MANAGE',
+  FEES_VIEW: 'FEES_VIEW',
+  FEES_PAY: 'FEES_PAY',
+  EMERGENCY_ALERT_RECEIVE: 'EMERGENCY_ALERT_RECEIVE',
+  SCHOOL_COMMUNICATE: 'SCHOOL_COMMUNICATE',
+  SPECIFIC_CONSENT_GIVE: 'SPECIFIC_CONSENT_GIVE',
+  PICKUP_AUTHORIZE: 'PICKUP_AUTHORIZE',
+  COMPLAINT_OR_CORRECTION_SUBMIT: 'COMPLAINT_OR_CORRECTION_SUBMIT',
+} as const;
+
+export const GuardianRelationshipVerificationStatus = {
+  UNVERIFIED: 'UNVERIFIED',
+  VERIFIED: 'VERIFIED',
+} as const;
+
+export const GuardianRelationshipStatus = {
+  ACTIVE: 'ACTIVE',
+  SUSPENDED: 'SUSPENDED',
+  REVOKED: 'REVOKED',
+  EXPIRED: 'EXPIRED',
+} as const;
+
+export const GuardianRelationshipApprovalStatus = {
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+} as const;
+
 export const AttendanceStatus = {
   PRESENT: 'PRESENT',
   ABSENT: 'ABSENT',

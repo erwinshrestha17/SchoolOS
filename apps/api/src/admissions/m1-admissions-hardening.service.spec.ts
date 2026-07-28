@@ -216,13 +216,17 @@ describe('M1AdmissionsHardeningService', () => {
       service.removeGuardianAccess(
         'student-1',
         'guardian-1',
-        { confirmFileAccessReview: false },
+        {
+          confirmFileAccessReview: false,
+          reason: 'Guardian access review requested',
+          evidenceReference: 'support-case-100',
+        } as never,
         actor,
       ),
     ).rejects.toThrow(BadRequestException);
   });
 
-  it('removes guardian access with tenant-scoped mutation and records document history', async () => {
+  it('revokes guardian access with tenant-scoped mutation and records document history', async () => {
     const prisma = buildPrisma();
     const tx = buildTransaction();
     prisma.$transaction.mockImplementation(async (callback) => callback(tx));
@@ -234,6 +238,7 @@ describe('M1AdmissionsHardeningService', () => {
       {
         confirmFileAccessReview: true,
         reason: 'Guardian changed after admission review',
+        evidenceReference: 'front-office-register-12',
         newPrimaryGuardianId: 'guardian-2',
       },
       actor,
@@ -244,15 +249,23 @@ describe('M1AdmissionsHardeningService', () => {
         tenantId: actor.tenantId,
         studentId: 'student-1',
         guardianId: 'guardian-1',
+        status: 'ACTIVE',
       },
       include: { guardian: true, student: true },
     });
-    expect(tx.studentGuardian.deleteMany).toHaveBeenCalledWith({
+    expect(tx.studentGuardian.updateMany).toHaveBeenCalledWith({
       where: {
         id: 'student-guardian-1',
         tenantId: actor.tenantId,
         studentId: 'student-1',
         guardianId: 'guardian-1',
+        status: 'ACTIVE',
+      },
+      data: {
+        status: 'REVOKED',
+        isPrimary: false,
+        effectiveUntil: expect.any(Date),
+        restrictionReasonRef: 'front-office-register-12',
       },
     });
     expect(tx.studentGuardian.updateMany).toHaveBeenCalledWith({
@@ -274,6 +287,10 @@ describe('M1AdmissionsHardeningService', () => {
           documentId: 'document-1',
           action: 'GUARDIAN_ACCESS_REVIEW',
           reason: 'Guardian changed after admission review',
+          metadata: expect.objectContaining({
+            relationshipRevoked: true,
+            evidenceReference: 'front-office-register-12',
+          }),
         }),
       ],
     });
@@ -287,9 +304,13 @@ describe('M1AdmissionsHardeningService', () => {
     );
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
-        action: 'guardian_removed_file_access_review',
+        action: 'guardian_revoked_file_access_review',
         tenantId: actor.tenantId,
         resourceId: 'student-guardian-1',
+        after: expect.objectContaining({
+          reason: 'Guardian changed after admission review',
+          evidenceReference: 'front-office-register-12',
+        }),
       }),
     );
   });

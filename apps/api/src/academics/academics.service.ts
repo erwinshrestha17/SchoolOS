@@ -10,6 +10,7 @@ import {
   GradeLockStatus,
   NotificationChannel,
   Prisma,
+  TeacherAssignmentType,
 } from '@prisma/client';
 
 import { AuditService } from '../audit/audit.service';
@@ -29,6 +30,7 @@ import { RequestMarkLockDto } from './dto/request-mark-lock.dto';
 import { ReviewMarkLockDto } from './dto/review-mark-lock.dto';
 import { UnlockExamTermDto } from './dto/unlock-exam-term.dto';
 import { GradeCalculatorService } from './grade-calculator.service';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 
 interface ReportCardPdfComponent {
   max: number;
@@ -43,6 +45,13 @@ interface ReportCardPdfSubject {
   totalObtained: number;
   totalMax: number;
 }
+
+const SAFE_TEACHER_STAFF_SELECT = {
+  id: true,
+  firstName: true,
+  lastName: true,
+  employeeId: true,
+} satisfies Prisma.StaffSelect;
 
 export interface PromotionReadinessRow {
   studentId: string;
@@ -71,6 +80,7 @@ export class AcademicsService {
     private readonly auditService: AuditService,
     private readonly eventEmitter: EventEmitter2,
     private readonly gradeCalculator: GradeCalculatorService,
+    private readonly teacherScopeService: TeacherScopeService,
   ) {}
 
   async listSubjects(actor: AuthContext) {
@@ -80,7 +90,7 @@ export class AcademicsService {
         class: true,
         teacherAssignments: {
           include: {
-            staff: true,
+            staff: { select: SAFE_TEACHER_STAFF_SELECT },
             section: true,
             academicYear: true,
           },
@@ -98,7 +108,7 @@ export class AcademicsService {
         class: true,
         teacherAssignments: {
           include: {
-            staff: true,
+            staff: { select: SAFE_TEACHER_STAFF_SELECT },
             section: true,
             academicYear: true,
           },
@@ -161,21 +171,20 @@ export class AcademicsService {
     //    subjects.
     const staffId = (await this.resolveTeacherOnlyStaffId(actor)) ?? undefined;
 
-    return this.prisma.subjectTeacherAssignment.findMany({
+    const now = new Date();
+    return this.prisma.teacherAssignment.findMany({
       where: {
         tenantId: actor.tenantId,
+        status: 'ACTIVE',
+        effectiveFrom: { lte: now },
+        OR: [{ effectiveUntil: null }, { effectiveUntil: { gte: now } }],
         ...(staffId ? { staffId } : {}),
       },
       include: {
         academicYear: true,
         subject: true,
         staff: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            employeeId: true,
-          },
+          select: SAFE_TEACHER_STAFF_SELECT,
         },
         class: true,
         section: true,
@@ -208,15 +217,14 @@ export class AcademicsService {
     );
     if (!isTeacherActor) return null;
 
-    const staff = await this.prisma.staff.findFirst({
-      where: { tenantId: actor.tenantId, userId: actor.userId },
-      select: { id: true },
-    });
-    return staff?.id ?? '__no_active_staff_record__';
+    return (
+      (await this.teacherScopeService.resolveActiveStaffId(actor)) ??
+      '__no_active_staff_record__'
+    );
   }
 
   async assignTeacher(dto: AssignTeacherDto, actor: AuthContext) {
-    await Promise.all([
+    const [academicYear] = await Promise.all([
       this.ensureAcademicYear(actor, dto.academicYearId),
       this.ensureClass(actor, dto.classId),
       this.ensureStaff(actor, dto.staffId),
@@ -234,26 +242,43 @@ export class AcademicsService {
       throw new NotFoundException('Subject not found for this class');
     }
 
-    if (dto.sectionId) {
-      await this.ensureSection(actor, dto.sectionId, dto.classId);
-    }
+    await this.ensureSection(actor, dto.sectionId, dto.classId);
 
-    const assignment = await this.prisma.subjectTeacherAssignment.create({
-      data: {
-        tenantId: actor.tenantId,
-        academicYearId: dto.academicYearId,
-        subjectId: dto.subjectId,
-        staffId: dto.staffId,
-        classId: dto.classId,
-        sectionId: dto.sectionId ?? null,
-      },
-      include: {
-        academicYear: true,
-        subject: true,
-        staff: true,
-        class: true,
-        section: true,
-      },
+    const assignment = await this.prisma.$transaction(async (tx) => {
+      await tx.subjectTeacherAssignment.create({
+        data: {
+          tenantId: actor.tenantId,
+          academicYearId: dto.academicYearId,
+          subjectId: dto.subjectId,
+          staffId: dto.staffId,
+          classId: dto.classId,
+          sectionId: dto.sectionId,
+        },
+      });
+
+      return tx.teacherAssignment.create({
+        data: {
+          tenantId: actor.tenantId,
+          academicYearId: dto.academicYearId,
+          staffId: dto.staffId,
+          assignmentType: TeacherAssignmentType.SUBJECT_TEACHER,
+          classId: dto.classId,
+          sectionId: dto.sectionId,
+          subjectId: dto.subjectId,
+          componentScope: null,
+          isPrimary: true,
+          effectiveFrom: academicYear.startsOn,
+          effectiveUntil: academicYear.endsOn,
+          createdById: actor.userId,
+        },
+        include: {
+          academicYear: true,
+          subject: true,
+          staff: { select: SAFE_TEACHER_STAFF_SELECT },
+          class: true,
+          section: true,
+        },
+      });
     });
 
     await this.auditService.record({

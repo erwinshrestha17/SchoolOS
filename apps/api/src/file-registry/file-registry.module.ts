@@ -5,9 +5,16 @@ import { AuditModule } from '../audit/audit.module';
 import { FileRegistryController } from './file-registry.controller';
 import { StorageModule } from '../storage/storage.module';
 import { UsageModule } from '../usage/usage.module';
+import { TeacherScopeModule } from '../teacher-scope/teacher-scope.module';
 
 @Module({
-  imports: [PrismaModule, AuditModule, StorageModule, UsageModule],
+  imports: [
+    PrismaModule,
+    AuditModule,
+    StorageModule,
+    UsageModule,
+    TeacherScopeModule,
+  ],
   controllers: [FileRegistryController],
   providers: [FileRegistryService],
   exports: [FileRegistryService],

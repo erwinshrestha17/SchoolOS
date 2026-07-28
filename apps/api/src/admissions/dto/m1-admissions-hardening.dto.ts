@@ -1,13 +1,17 @@
 import { Type } from 'class-transformer';
 import {
+  Equals,
   IsArray,
   IsBoolean,
   IsDateString,
+  IsDefined,
   IsInt,
+  IsNotEmpty,
   IsObject,
   IsOptional,
   IsString,
   IsUUID,
+  Length,
   Max,
   MaxLength,
   Min,
@@ -157,14 +161,19 @@ export class ResolveAdmissionRelationshipsDto {
 }
 
 export class RemoveStudentGuardianAccessDto {
-  @IsOptional()
   @IsString()
-  @MaxLength(500)
-  reason?: string;
+  @IsNotEmpty()
+  @Length(5, 500)
+  reason!: string;
 
-  @IsOptional()
-  @IsBoolean()
-  confirmFileAccessReview?: boolean;
+  @IsString()
+  @IsNotEmpty()
+  @Length(3, 200)
+  evidenceReference!: string;
+
+  @IsDefined()
+  @Equals(true)
+  confirmFileAccessReview!: true;
 
   @IsOptional()
   @IsUUID()

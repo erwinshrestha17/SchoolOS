@@ -18,10 +18,10 @@ describe('LearningImprovementController', () => {
     permissions: ['academics:read', 'academics:enter_marks'],
   };
 
-  it('keeps the active M4 workspace entitlement- and role-gated', () => {
+  it('keeps the deferred P2 workspace behind the disabled Learning boundary', () => {
     expect(
       Reflect.getMetadata(REQUIRED_MODULE_KEY, LearningImprovementController),
-    ).toBe('academics');
+    ).toBe('learning');
     expect(
       Reflect.getMetadata(ROLES_KEY, LearningImprovementController),
     ).toEqual([

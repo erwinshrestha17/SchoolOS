@@ -242,7 +242,7 @@ export function SubjectsTab({ academicYears, classes, allSections, staff, subjec
                       >
                         <Users size={12} className="text-slate-400" />
                         {a.staff?.firstName} {a.staff?.lastName}
-                        {!a.sectionId && ' · entire grade'}
+                        {a.sectionId ? '' : ' · section required'}
                       </span>
                     ))}
                   </div>
@@ -252,13 +252,13 @@ export function SubjectsTab({ academicYears, classes, allSections, staff, subjec
               </div>
             )}
 
-            <FormField label="Section" description="Leave unset to assign across the entire grade level.">
+            <FormField label="Section" description="Assignments are section-specific so access can be removed precisely.">
               <Select
                 value={assign.sectionId}
                 disabled={!assign.classId}
                 onChange={(e) => setAssign((c) => ({ ...c, sectionId: e.target.value }))}
               >
-                <option value="">Entire grade level</option>
+                <option value="">Select section</option>
                 {sectionsForClass.map((s: SectionSummary) => (
                   <option key={s.id} value={s.id}>Section {s.name}</option>
                 ))}
@@ -276,8 +276,8 @@ export function SubjectsTab({ academicYears, classes, allSections, staff, subjec
 
             <Button
               className="w-full"
-              onClick={() => assignMut.mutate({ ...assign, academicYearId: assign.academicYearId || currentYear?.id, sectionId: assign.sectionId || null })}
-              disabled={!assign.subjectId || !assign.staffId || assignMut.isPending}
+              onClick={() => assignMut.mutate({ ...assign, academicYearId: assign.academicYearId || currentYear?.id })}
+              disabled={!assign.subjectId || !assign.sectionId || !assign.staffId || assignMut.isPending}
               isLoading={assignMut.isPending}
             >
               <Zap size={18} className="mr-1.5" />

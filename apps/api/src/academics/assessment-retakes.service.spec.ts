@@ -8,12 +8,22 @@ import {
 } from '@prisma/client';
 import { ConflictException, ForbiddenException } from '@nestjs/common';
 import type { AuthContext } from '../auth/auth.types';
+import { TeacherCapability } from '../teacher-scope/teacher-capability';
+import {
+  createTeacherScopeDeniedException,
+  TEACHER_SCOPE_DENIED_CODE,
+} from '../teacher-scope/teacher-scope.service';
 import { AssessmentRetakesService } from './assessment-retakes.service';
 
 describe('AssessmentRetakesService', () => {
   let prisma: any;
   let audit: { record: jest.Mock };
   let communications: { recordDeliveryRecords: jest.Mock };
+  let teacherScope: {
+    requireActorAccess: jest.Mock;
+    denyActorAccess: jest.Mock;
+    listActiveAssignmentsForCapability: jest.Mock;
+  };
   let service: AssessmentRetakesService;
 
   const teacher: AuthContext = {
@@ -97,11 +107,6 @@ describe('AssessmentRetakesService', () => {
         findFirst: jest.fn(),
         update: jest.fn(),
       },
-      staff: { findFirst: jest.fn() },
-      subjectTeacherAssignment: {
-        findFirst: jest.fn(),
-        findMany: jest.fn(),
-      },
       reportCardCorrectionRequest: { findFirst: jest.fn() },
       $transaction: jest.fn((operations: Promise<unknown>[]) =>
         Promise.all(operations),
@@ -111,19 +116,26 @@ describe('AssessmentRetakesService', () => {
     communications = {
       recordDeliveryRecords: jest.fn().mockResolvedValue(undefined),
     };
+    teacherScope = {
+      requireActorAccess: jest.fn().mockResolvedValue({
+        source: 'ASSIGNMENT',
+        assignmentId: 'assignment-1',
+      }),
+      denyActorAccess: jest
+        .fn()
+        .mockRejectedValue(createTeacherScopeDeniedException()),
+      listActiveAssignmentsForCapability: jest.fn().mockResolvedValue([]),
+    };
     service = new AssessmentRetakesService(
       prisma,
       audit as never,
       communications as never,
+      teacherScope as never,
     );
   });
 
   it('creates a tenant-scoped make-up lifecycle only for an assigned teacher', async () => {
     prisma.markEntry.findFirst.mockResolvedValue(originalMark);
-    prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
-    prisma.subjectTeacherAssignment.findFirst.mockResolvedValue({
-      id: 'assignment-1',
-    });
     prisma.assessmentRetake.findFirst.mockResolvedValue(null);
     prisma.assessmentRetake.create.mockResolvedValue(retake);
 
@@ -138,16 +150,16 @@ describe('AssessmentRetakesService', () => {
       ),
     ).resolves.toBe(retake);
 
-    expect(prisma.subjectTeacherAssignment.findFirst).toHaveBeenCalledWith({
-      where: expect.objectContaining({
-        tenantId: 'tenant-1',
-        staffId: 'staff-1',
+    expect(teacherScope.requireActorAccess).toHaveBeenCalledWith(
+      {
         academicYearId: 'year-1',
         classId: 'class-1',
+        sectionId: 'section-1',
         subjectId: 'subject-1',
-      }),
-      select: { id: true },
-    });
+        capability: TeacherCapability.MARKS_ENTER,
+      },
+      teacher,
+    );
     expect(prisma.assessmentRetake.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -171,28 +183,27 @@ describe('AssessmentRetakesService', () => {
 
   it('fails closed when a teacher is outside the subject assignment', async () => {
     prisma.markEntry.findFirst.mockResolvedValue(originalMark);
-    prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
-    prisma.subjectTeacherAssignment.findFirst.mockResolvedValue(null);
+    teacherScope.requireActorAccess.mockRejectedValue(
+      createTeacherScopeDeniedException(),
+    );
 
-    await expect(
-      service.create(
-        {
-          markEntryId: 'mark-1',
-          type: AssessmentRetakeType.RETEST,
-          reason: 'Retest requested after the failed terminal assessment.',
-        },
-        teacher,
-      ),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    const request = service.create(
+      {
+        markEntryId: 'mark-1',
+        type: AssessmentRetakeType.RETEST,
+        reason: 'Retest requested after the failed terminal assessment.',
+      },
+      teacher,
+    );
+    await expect(request).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(request).rejects.toMatchObject({
+      response: expect.objectContaining({ code: TEACHER_SCOPE_DENIED_CODE }),
+    });
     expect(prisma.assessmentRetake.create).not.toHaveBeenCalled();
   });
 
   it('prevents duplicate active lifecycles for the same original mark', async () => {
     prisma.markEntry.findFirst.mockResolvedValue(originalMark);
-    prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
-    prisma.subjectTeacherAssignment.findFirst.mockResolvedValue({
-      id: 'assignment-1',
-    });
     prisma.assessmentRetake.findFirst.mockResolvedValue({ id: 'retake-open' });
 
     await expect(

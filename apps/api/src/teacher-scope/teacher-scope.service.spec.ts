@@ -1,6 +1,9 @@
 import { ForbiddenException } from '@nestjs/common';
 import { AuthMethod, TeacherAssignmentType } from '@prisma/client';
-import { TeacherScopeService } from './teacher-scope.service';
+import {
+  TEACHER_SCOPE_DENIED_CODE,
+  TeacherScopeService,
+} from './teacher-scope.service';
 import { TeacherCapability } from './teacher-capability';
 import type { AuthContext } from '../auth/auth.types';
 
@@ -561,6 +564,34 @@ describe('TeacherScopeService — assignment-based authorization', () => {
         ),
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
+
+    it('filters list scopes by the delegation capability allow-list', async () => {
+      const { service } = buildService(RAMESH_ASSIGNMENTS, [substitution]);
+
+      const markScopes = await service.listActiveAssignmentsForCapability(
+        actor,
+        TeacherCapability.MARKS_ENTER,
+      );
+      expect(markScopes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            assignmentId: 'deleg-1',
+            source: 'DELEGATION',
+            subjectId: ENGLISH,
+          }),
+        ]),
+      );
+
+      const readScopes = await service.listActiveAssignmentsForCapability(
+        actor,
+        TeacherCapability.SUBJECT_RECORD_READ,
+      );
+      expect(readScopes).not.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ assignmentId: 'deleg-1' }),
+        ]),
+      );
+    });
   });
 
   describe('canAccess (non-throwing) mirrors requireAccess', () => {
@@ -595,14 +626,102 @@ describe('TeacherScopeService — assignment-based authorization', () => {
 
     it('DOES audit a denied real operation', async () => {
       const { service, auditRecord } = buildService();
-      await expect(
-        service.requireAccess(
-          ask(TeacherCapability.MARKS_ENTER, CLASS_1, SECTION_1A, ENGLISH),
-          actor,
-        ),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+      const denied = service.requireAccess(
+        ask(TeacherCapability.MARKS_ENTER, CLASS_1, SECTION_1A, ENGLISH),
+        actor,
+      );
+      await expect(denied).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(denied).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: TEACHER_SCOPE_DENIED_CODE,
+        }),
+      });
       expect(auditRecord).toHaveBeenCalledWith(
         expect.objectContaining({ action: 'teacher_scope.denied' }),
+      );
+    });
+
+    it('resolves the active staff row inside the actor-oriented contract', async () => {
+      const { service, prisma } = buildService();
+
+      await expect(
+        service.requireActorAccess(
+          {
+            academicYearId: YEAR,
+            classId: CLASS_1,
+            sectionId: SECTION_1A,
+            subjectId: MATHS,
+            capability: TeacherCapability.MARKS_ENTER,
+          },
+          actor,
+        ),
+      ).resolves.toMatchObject({ assignmentId: 'a-mth-1a' });
+
+      expect((prisma as any).staff.findFirst).toHaveBeenCalledWith({
+        where: {
+          tenantId: TENANT,
+          userId: actor.userId,
+          status: 'ACTIVE',
+        },
+        select: { id: true },
+      });
+    });
+
+    it('fails closed and audits when the actor has no active staff row', async () => {
+      const { service, prisma, auditRecord } = buildService();
+      (prisma as any).staff.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.requireActorAccess(
+          {
+            academicYearId: YEAR,
+            classId: CLASS_1,
+            sectionId: SECTION_1A,
+            subjectId: MATHS,
+            capability: TeacherCapability.MARKS_ENTER,
+          },
+          actor,
+        ),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: TEACHER_SCOPE_DENIED_CODE,
+        }),
+      });
+
+      expect(auditRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'teacher_scope.denied',
+          after: expect.objectContaining({
+            reason: 'no_active_staff',
+            staffId: null,
+          }),
+        }),
+      );
+    });
+
+    it('returns the stable denial contract and audits a request with missing scope', async () => {
+      const { service, auditRecord } = buildService();
+
+      await expect(
+        service.denyActorAccess(
+          {
+            capability: TeacherCapability.CLASS_ROSTER_READ,
+            reason: 'missing_scope',
+          },
+          actor,
+        ),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: TEACHER_SCOPE_DENIED_CODE,
+        }),
+      });
+
+      expect(auditRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'teacher_scope.denied',
+          resource: TeacherCapability.CLASS_ROSTER_READ,
+          after: expect.objectContaining({ reason: 'missing_scope' }),
+        }),
       );
     });
   });

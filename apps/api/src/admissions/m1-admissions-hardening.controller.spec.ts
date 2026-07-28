@@ -59,6 +59,8 @@ describe('M1AdmissionsHardeningController contracts', () => {
     ]);
     expect(getRoutePermissions('removeGuardianAccess')).toEqual([
       'guardians:update',
+      'guardians:verify',
+      'users:reset_password',
       'student_documents:manage',
     ]);
     expect(getRoutePermissions('generateIdCard')).toEqual([
@@ -145,8 +147,9 @@ describe('M1AdmissionsHardeningController contracts', () => {
   it('delegates guardian removal with explicit file-access review payload', () => {
     const { controller, service } = createController();
     const dto = {
-      confirmFileAccessReview: true,
+      confirmFileAccessReview: true as const,
       reason: 'Guardian changed after admission review',
+      evidenceReference: 'front-office-register-12',
     };
     service.removeGuardianAccess.mockReturnValue({
       accessReview: { canAccessStudentFiles: false },

@@ -1,6 +1,11 @@
 import { AuthMethod } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { ActivityMediaService } from './activity-media.service';
+import { TeacherCapability } from '../teacher-scope/teacher-capability';
+import {
+  createTeacherScopeDeniedException,
+  TEACHER_SCOPE_DENIED_CODE,
+} from '../teacher-scope/teacher-scope.service';
 
 describe('ActivityMediaService protected thumbnails', () => {
   const parent: AuthContext = {
@@ -60,6 +65,10 @@ describe('ActivityMediaService protected thumbnails', () => {
   let prisma: any;
   let storage: any;
   let audit: any;
+  let teacherScope: {
+    requireActorAccess: jest.Mock;
+    requireActorAccessAnySectionOfClass: jest.Mock;
+  };
   let service: ActivityMediaService;
 
   beforeEach(() => {
@@ -99,11 +108,22 @@ describe('ActivityMediaService protected thumbnails', () => {
       getObjectBuffer: jest.fn().mockResolvedValue(Buffer.from('thumbnail')),
     };
     audit = { record: jest.fn() };
+    teacherScope = {
+      requireActorAccess: jest.fn().mockResolvedValue({
+        source: 'ASSIGNMENT',
+        assignmentId: 'assignment-1',
+      }),
+      requireActorAccessAnySectionOfClass: jest.fn().mockResolvedValue({
+        source: 'ASSIGNMENT',
+        assignmentId: 'assignment-1',
+      }),
+    };
     service = new ActivityMediaService(
       prisma,
       { port: 4000 } as never,
       storage,
       audit,
+      teacherScope as never,
     );
   });
 
@@ -171,6 +191,49 @@ describe('ActivityMediaService protected thumbnails', () => {
     await expect(
       service.getAttachmentMedia(parent, 'attachment-1', 'thumbnail'),
     ).rejects.toThrow('Some media is hidden');
+    expect(storage.getObjectBuffer).not.toHaveBeenCalled();
+  });
+
+  it('authorizes teacher media reads through the canonical assignment scope', async () => {
+    const teacher: AuthContext = {
+      ...parent,
+      userId: 'teacher-1',
+      email: 'teacher@school.test',
+      roles: ['teacher'],
+      permissions: ['activity_feed:read'],
+    };
+
+    await service.getAttachmentMedia(teacher, 'attachment-1', 'preview');
+
+    expect(teacherScope.requireActorAccess).toHaveBeenCalledWith(
+      {
+        classId: 'class-1',
+        sectionId: 'section-1',
+        capability: TeacherCapability.CLASS_ROSTER_READ,
+      },
+      teacher,
+    );
+  });
+
+  it('returns the stable teacher-scope denial before reading media bytes', async () => {
+    const teacher: AuthContext = {
+      ...parent,
+      userId: 'teacher-2',
+      email: 'teacher2@school.test',
+      roles: ['teacher'],
+      permissions: ['activity_feed:read'],
+    };
+    teacherScope.requireActorAccess.mockRejectedValueOnce(
+      createTeacherScopeDeniedException(),
+    );
+
+    await expect(
+      service.getAttachmentMedia(teacher, 'attachment-1', 'preview'),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: TEACHER_SCOPE_DENIED_CODE,
+      }),
+    });
     expect(storage.getObjectBuffer).not.toHaveBeenCalled();
   });
 

@@ -27,6 +27,9 @@ import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PlansService } from '../plans/plans.service';
 import { buildTableReportPdf } from '../common/pdf/simple-pdf';
 import { loadSchoolLogoForPdf } from '../common/pdf/school-logo-loader';
+import { isTeacherOnly } from '../common/security/parent-scope';
+import { TeacherCapability } from '../teacher-scope/teacher-capability';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 
 export interface ReportExecutor {
   definition: ReportDefinition;
@@ -54,6 +57,7 @@ export class ReportsService {
     private readonly fileRegistryService: FileRegistryService,
     private readonly plansService: PlansService,
     @InjectQueue('reports') private readonly reportsQueue: Queue,
+    private readonly teacherScopeService: TeacherScopeService,
   ) {
     this.registerInternalReports();
   }
@@ -544,55 +548,6 @@ export class ReportsService {
           });
           if (!section) {
             throw new NotFoundException('Section not found in this school.');
-          }
-        }
-
-        const isTeacherOnly =
-          actor.roles.includes('teacher') &&
-          !actor.permissions.includes('attendance:read_all') &&
-          !actor.permissions.includes('reports:read_all') &&
-          !actor.permissions.includes('attendance:mark_all') &&
-          !actor.permissions.includes('attendance:override_lock');
-
-        if (isTeacherOnly) {
-          const staff = await this.prisma.staff.findFirst({
-            where: { userId: actor.userId, tenantId: actor.tenantId },
-          });
-          if (!staff) {
-            throw new ForbiddenException(
-              'Staff record not found in this tenant',
-            );
-          }
-
-          let isAssigned = false;
-          if (sectionId) {
-            const section = await this.prisma.section.findFirst({
-              where: {
-                id: sectionId,
-                classTeacherId: staff.id,
-                tenantId: actor.tenantId,
-              },
-            });
-            if (section) isAssigned = true;
-          }
-
-          if (!isAssigned) {
-            const assignment =
-              await this.prisma.subjectTeacherAssignment.findFirst({
-                where: {
-                  staffId: staff.id,
-                  classId,
-                  ...(sectionId ? { sectionId } : {}),
-                  tenantId: actor.tenantId,
-                },
-              });
-            if (assignment) isAssigned = true;
-          }
-
-          if (!isAssigned) {
-            throw new ForbiddenException(
-              'You are not assigned as Class Teacher or Subject Teacher for this section',
-            );
           }
         }
 
@@ -1932,6 +1887,12 @@ export class ReportsService {
       );
     }
 
+    await this.assertTeacherReportScope(
+      executor.definition,
+      request.filters,
+      actor,
+    );
+
     if (!request.async) {
       const data = await executor.execute(
         actor,
@@ -2055,6 +2016,12 @@ export class ReportsService {
       );
     }
 
+    await this.assertTeacherReportScope(
+      executor.definition,
+      input.filters,
+      input.actor,
+    );
+
     const data = await executor.execute(
       input.actor,
       input.filters,
@@ -2151,6 +2118,7 @@ export class ReportsService {
     }
 
     const filters = coerceReportFilters(exportRecord.filters);
+    await this.assertTeacherReportScope(executor.definition, filters, actor);
 
     await this.prisma.reportExport.update({
       where: { id: exportRecord.id },
@@ -2185,6 +2153,69 @@ export class ReportsService {
     });
 
     return { id: exportRecord.id, status: 'QUEUED', jobId: job.id };
+  }
+
+  private async assertTeacherReportScope(
+    definition: ReportDefinition,
+    filters: Record<string, unknown>,
+    actor: AuthContext,
+  ) {
+    if (!isTeacherOnly(actor)) return;
+
+    const classId =
+      typeof filters.classId === 'string' ? filters.classId.trim() : '';
+    const sectionId =
+      typeof filters.sectionId === 'string' ? filters.sectionId.trim() : '';
+    const academicYearId =
+      typeof filters.academicYearId === 'string'
+        ? filters.academicYearId.trim()
+        : undefined;
+    const isTeacherSupportedModule = [
+      'students',
+      'attendance',
+      'academics',
+    ].includes(definition.module);
+    const capability =
+      definition.module === 'academics'
+        ? TeacherCapability.HOMEROOM_ACADEMIC_SUMMARY_READ
+        : TeacherCapability.CLASS_ROSTER_READ;
+
+    if (!isTeacherSupportedModule) {
+      await this.teacherScopeService.denyActorAccess(
+        {
+          capability,
+          reason: 'unsupported_teacher_action',
+          classId: classId || undefined,
+          sectionId: sectionId || undefined,
+        },
+        actor,
+      );
+    }
+
+    if (!classId || !sectionId) {
+      await this.teacherScopeService.denyActorAccess(
+        {
+          capability,
+          reason: 'missing_scope',
+          classId: classId || undefined,
+          sectionId: sectionId || undefined,
+        },
+        actor,
+      );
+    }
+
+    await this.teacherScopeService.requireActorAccess(
+      {
+        academicYearId,
+        classId,
+        sectionId,
+        capability,
+        ...(definition.module === 'academics'
+          ? { recordStatus: 'PUBLISHED' as const }
+          : {}),
+      },
+      actor,
+    );
   }
 
   private convertToCsv(data: Array<Record<string, unknown>>): string {

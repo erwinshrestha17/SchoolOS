@@ -1,10 +1,5 @@
-import { DashboardPageShell } from '@/components/dashboard/dashboard-page-shell';
-import { TeacherDevelopmentWorkspace } from '@/components/hr/teacher-development-workspace';
+import { notFound } from 'next/navigation';
 
 export default function TeacherDevelopmentPage() {
-  return (
-    <DashboardPageShell>
-      <TeacherDevelopmentWorkspace />
-    </DashboardPageShell>
-  );
+  notFound();
 }

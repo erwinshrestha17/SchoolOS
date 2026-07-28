@@ -10,16 +10,25 @@ import {
   AttendanceStatus,
   AudienceType,
   EnrollmentStatus,
+  GuardianRelationshipApprovalStatus,
+  GuardianCapability,
+  GuardianRelationshipStatus,
+  GuardianRelationshipVerificationStatus,
   NotificationChannel,
+  OtpPurpose,
   Prisma,
   StudentDuplicateReviewStatus,
   StudentLifecycleStatus,
   StudentQrStatus,
+  UserStatus,
 } from '@prisma/client';
 import sharp from 'sharp';
 import {
   formatBsAcademicYear,
   formatBsDate,
+  GUARDIAN_RECOVERY_VERIFICATION_METHODS,
+  type GuardianAccessAdministration,
+  type GuardianRecoveryVerificationMethod,
   type StudentIemisReadiness,
   type StudentIemisReadinessIssue,
   StudentAttendanceHistory,
@@ -31,8 +40,9 @@ import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
 import {
+  buildActiveGuardianRelationshipWhere,
   getParentStudentIds,
-  getTeacherStaffOwnId,
+  isTeacherOnly,
 } from '../common/security/parent-scope';
 import { loadSchoolLogoForPdf } from '../common/pdf/school-logo-loader';
 import {
@@ -58,6 +68,11 @@ import { InviteGuardianDto } from './dto/invite-guardian.dto';
 import { MergeDuplicateStudentDto } from './dto/merge-duplicate-student.dto';
 import { MergeDuplicateStudentPreviewDto } from './dto/merge-duplicate-student-preview.dto';
 import { CreateGuardianIdentityVerificationDto } from './dto/create-guardian-identity-verification.dto';
+import {
+  GuardianRecoveryActionDto,
+  ProvisionGuardianAccountDto,
+  RevokeGuardianSessionDto,
+} from './dto/guardian-access-administration.dto';
 import { UpsertDocumentExpiryTemplateDto } from './dto/document-expiry-template.dto';
 import { RequestStudentTransferDto } from './dto/request-student-transfer.dto';
 import { RevokeGeneratedStudentDocumentDto } from './dto/revoke-generated-student-document.dto';
@@ -74,6 +89,21 @@ import {
   requireNepalPhone,
   requirePersonName,
 } from '../common/validation/contact-profile';
+import { TeacherCapability } from '../teacher-scope/teacher-capability';
+import {
+  createTeacherScopeDeniedException,
+  TeacherScopeService,
+} from '../teacher-scope/teacher-scope.service';
+
+type GuardianAdministrationRelationship = Prisma.StudentGuardianGetPayload<{
+  include: {
+    guardian: {
+      include: {
+        user: true;
+      };
+    };
+  };
+}>;
 
 @Injectable()
 export class StudentsService {
@@ -87,6 +117,7 @@ export class StudentsService {
     private readonly fileRegistryService: FileRegistryService,
     private readonly usageService: UsageService,
     private readonly studentPhotoService: StudentPhotoService,
+    private readonly teacherScopeService: TeacherScopeService,
   ) {}
 
   async createStudent(dto: CreateStudentDto, actor: AuthContext) {
@@ -308,6 +339,14 @@ export class StudentsService {
             link.guardian.privacyConsentAt?.toISOString?.() ??
             link.guardian.privacyConsentAt ??
             null,
+          capabilities: link.capabilities,
+          verificationStatus: link.verificationStatus,
+          status: link.status,
+          effectiveFrom: link.effectiveFrom.toISOString(),
+          effectiveUntil: link.effectiveUntil?.toISOString() ?? null,
+          emergencyContactPriority: link.emergencyContactPriority,
+          approvalStatus: link.approvalStatus,
+          restrictionReasonRef: link.restrictionReasonRef,
         })),
         documentCount: student._count.documents,
         email: student.user?.email ?? null,
@@ -506,7 +545,10 @@ export class StudentsService {
       { tenantId: actor.tenantId },
     ];
 
-    const actorScope = await this.buildActorStudentScope(actor);
+    const actorScope = await this.buildActorStudentScope(
+      actor,
+      filters.academicYearId,
+    );
     if (actorScope) conditions.push(actorScope);
 
     if (filters.status) conditions.push({ lifecycleStatus: filters.status });
@@ -541,42 +583,27 @@ export class StudentsService {
    */
   private async buildActorStudentScope(
     actor: AuthContext,
+    academicYearId?: string,
   ): Promise<Prisma.StudentWhereInput | null> {
-    const parentStudentIds = await getParentStudentIds(this.prisma, actor);
+    const parentStudentIds = await getParentStudentIds(
+      this.prisma,
+      actor,
+      GuardianCapability.ACADEMICS_VIEW,
+    );
     if (parentStudentIds !== null) {
       return { id: { in: parentStudentIds } };
     }
 
-    const teacherStaffId = await getTeacherStaffOwnId(this.prisma, actor);
-    if (teacherStaffId === null) {
+    if (!isTeacherOnly(actor)) {
       return null; // no restriction for admin/principal/accountant/etc.
     }
 
-    const [assignments, classTeacherSections] = await Promise.all([
-      this.prisma.subjectTeacherAssignment.findMany({
-        where: { tenantId: actor.tenantId, staffId: teacherStaffId },
-        select: { classId: true, sectionId: true },
-      }),
-      this.prisma.section.findMany({
-        where: { tenantId: actor.tenantId, classTeacherId: teacherStaffId },
-        select: { id: true, classId: true },
-      }),
-    ]);
-
-    const clauses: Prisma.StudentWhereInput[] = [
-      ...assignments.map(
-        (a): Prisma.StudentWhereInput =>
-          a.sectionId
-            ? { classId: a.classId, sectionId: a.sectionId }
-            : { classId: a.classId },
-      ),
-      ...classTeacherSections.map(
-        (s): Prisma.StudentWhereInput => ({
-          classId: s.classId,
-          sectionId: s.id,
-        }),
-      ),
-    ];
+    const scope = await this.teacherScopeService.resolveReadableScope(actor, {
+      academicYearId,
+    });
+    const clauses: Prisma.StudentWhereInput[] = [...scope.allSectionIds].map(
+      (sectionId): Prisma.StudentWhereInput => ({ sectionId }),
+    );
 
     if (clauses.length === 0) {
       return { id: { in: [] } }; // no active teaching assignment -> sees nobody
@@ -586,46 +613,33 @@ export class StudentsService {
   }
 
   /**
-   * Confirmed via live edge-case testing: getStudentProfile/getStudentIemisReadiness
-   * only checked SubjectTeacherAssignment, so a homeroom-only class teacher
-   * (tied to their class solely via Section.classTeacherId, no
-   * SubjectTeacherAssignment row of their own) was wrongly forbidden from
-   * viewing their own students -- while the student directory list
-   * (buildActorStudentScope above) already checked both sources correctly.
+   * Direct-object counterpart to the directory filter above. Both paths use
+   * the canonical effective-dated assignment resolver so an expired,
+   * delegated, homeroom, or subject assignment is interpreted consistently.
    */
-  private async isTeacherAssignedToClassSection(
+  private async requireTeacherAssignedToClassSection(
     actor: AuthContext,
     classId: string,
     sectionId: string | null,
-  ): Promise<boolean> {
-    const teacherStaffId = await getTeacherStaffOwnId(this.prisma, actor);
-    if (teacherStaffId === null) {
-      return true; // no restriction for admin/principal/etc.
+    academicYearId?: string,
+  ): Promise<void> {
+    if (!isTeacherOnly(actor)) {
+      return;
     }
 
-    const [assignment, classTeacherSection] = await Promise.all([
-      this.prisma.subjectTeacherAssignment.findFirst({
-        where: {
-          tenantId: actor.tenantId,
-          staffId: teacherStaffId,
-          classId,
-          OR: [{ sectionId }, { sectionId: null }],
-        },
-        select: { id: true },
-      }),
-      sectionId
-        ? this.prisma.section.findFirst({
-            where: {
-              tenantId: actor.tenantId,
-              id: sectionId,
-              classTeacherId: teacherStaffId,
-            },
-            select: { id: true },
-          })
-        : null,
-    ]);
+    if (!sectionId) {
+      throw createTeacherScopeDeniedException();
+    }
 
-    return Boolean(assignment) || Boolean(classTeacherSection);
+    await this.teacherScopeService.requireActorAccess(
+      {
+        academicYearId,
+        classId,
+        sectionId,
+        capability: TeacherCapability.CLASS_ROSTER_READ,
+      },
+      actor,
+    );
   }
 
   private async countDuplicateCandidatePairs(where: Prisma.StudentWhereInput) {
@@ -748,28 +762,19 @@ export class StudentsService {
       throw new NotFoundException('Student not found in this tenant');
     }
 
-    if (
-      actor.roles.some(
-        (role) => role === 'teacher' || role === 'subject_teacher',
-      ) &&
-      !actor.roles.some((role) => role === 'admin' || role === 'principal')
-    ) {
+    if (isTeacherOnly(actor)) {
       const activeEnrollment = student.enrollments.find(
         (enrollment) => enrollment.status === EnrollmentStatus.ACTIVE,
       );
-      const inScope =
-        activeEnrollment &&
-        (await this.isTeacherAssignedToClassSection(
-          actor,
-          activeEnrollment.classId,
-          activeEnrollment.sectionId,
-        ));
-
-      if (!inScope) {
-        throw new ForbiddenException(
-          'Student profile is outside your teaching scope',
-        );
+      if (!activeEnrollment) {
+        throw createTeacherScopeDeniedException();
       }
+      await this.requireTeacherAssignedToClassSection(
+        actor,
+        activeEnrollment.classId,
+        activeEnrollment.sectionId,
+        activeEnrollment.academicYearId,
+      );
     }
 
     const activityPosts = await this.prisma.activityPost.findMany({
@@ -846,6 +851,14 @@ export class StudentsService {
         link.guardian.privacyConsentAt?.toISOString() ??
         student.privacyConsentAt?.toISOString() ??
         null,
+      capabilities: link.capabilities,
+      verificationStatus: link.verificationStatus,
+      status: link.status,
+      effectiveFrom: link.effectiveFrom.toISOString(),
+      effectiveUntil: link.effectiveUntil?.toISOString() ?? null,
+      emergencyContactPriority: link.emergencyContactPriority,
+      approvalStatus: link.approvalStatus,
+      restrictionReasonRef: link.restrictionReasonRef,
     }));
 
     const identities = (student.identities || []).filter(
@@ -1439,6 +1452,17 @@ export class StudentsService {
       );
     }
 
+    this.assertGuardianAccessWriteAllowed(dto, actor);
+    if (
+      dto.primaryPhone !== undefined &&
+      dto.primaryPhone !== link.guardian.primaryPhone &&
+      (link.guardian.userId || link.appLoginLinked)
+    ) {
+      throw new BadRequestException(
+        'Use the guardian access recovery action to approve a phone-number change for an app-linked guardian.',
+      );
+    }
+
     const siblingLinks = await this.prisma.studentGuardian.findMany({
       where: {
         tenantId: actor.tenantId,
@@ -1451,6 +1475,17 @@ export class StudentsService {
     if (dto.isPrimary === false && link.isPrimary) {
       throw new BadRequestException(
         'Choose another primary guardian before removing this one.',
+      );
+    }
+
+    const relationshipData = buildGuardianRelationshipUpdate(dto, actor, link);
+    const nextRelationshipStatus = dto.status ?? link.status;
+    if (
+      link.isPrimary &&
+      nextRelationshipStatus !== GuardianRelationshipStatus.ACTIVE
+    ) {
+      throw new BadRequestException(
+        'Choose another primary guardian before suspending, revoking, or expiring this relationship.',
       );
     }
 
@@ -1502,6 +1537,7 @@ export class StudentsService {
           ...(dto.isPrimary !== undefined
             ? { isPrimary: dto.isPrimary || siblingLinks.length === 1 }
             : {}),
+          ...relationshipData,
         },
       });
     });
@@ -1518,6 +1554,14 @@ export class StudentsService {
         relation: link.relation || link.guardian.relation,
         primaryPhone: link.guardian.primaryPhone,
         isPrimary: link.isPrimary,
+        capabilities: link.capabilities,
+        verificationStatus: link.verificationStatus,
+        status: link.status,
+        effectiveFrom: link.effectiveFrom,
+        effectiveUntil: link.effectiveUntil,
+        emergencyContactPriority: link.emergencyContactPriority,
+        approvalStatus: link.approvalStatus,
+        restrictionReasonRef: link.restrictionReasonRef,
       },
       after: {
         guardianId,
@@ -1525,6 +1569,23 @@ export class StudentsService {
         relation: dto.relation ?? link.relation ?? link.guardian.relation,
         primaryPhone: dto.primaryPhone ?? link.guardian.primaryPhone,
         isPrimary: dto.isPrimary ?? link.isPrimary,
+        capabilities: dto.capabilities ?? link.capabilities,
+        verificationStatus: dto.verificationStatus ?? link.verificationStatus,
+        status: nextRelationshipStatus,
+        effectiveFrom: dto.effectiveFrom ?? link.effectiveFrom,
+        effectiveUntil:
+          dto.effectiveUntil === undefined
+            ? link.effectiveUntil
+            : dto.effectiveUntil,
+        emergencyContactPriority:
+          dto.emergencyContactPriority === undefined
+            ? link.emergencyContactPriority
+            : dto.emergencyContactPriority,
+        approvalStatus: dto.approvalStatus ?? link.approvalStatus,
+        restrictionReasonRef:
+          dto.restrictionReasonRef === undefined
+            ? link.restrictionReasonRef
+            : dto.restrictionReasonRef,
       },
     });
 
@@ -1536,6 +1597,7 @@ export class StudentsService {
     dto: CreateStudentGuardianDto,
     actor: AuthContext,
   ) {
+    this.assertGuardianAccessWriteAllowed(dto, actor);
     const student = await this.prisma.student.findFirst({
       where: { id: studentId, tenantId: actor.tenantId },
       select: { id: true },
@@ -1549,13 +1611,10 @@ export class StudentsService {
       select: { id: true, guardianId: true, isPrimary: true },
       orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
     });
-    if (existingLinks.length >= 2) {
-      throw new BadRequestException('This student already has two guardians.');
-    }
-
     const relation = assertNonEmpty(dto.relation, 'relation');
     const shouldBePrimary =
       existingLinks.length === 0 || dto.isPrimary === true;
+    const relationshipData = buildGuardianRelationshipCreate(dto, actor);
 
     const result = await this.prisma.$transaction(async (tx) => {
       let guardian: {
@@ -1627,6 +1686,7 @@ export class StudentsService {
           guardianId: guardian.id,
           relation,
           isPrimary: shouldBePrimary,
+          ...relationshipData,
         },
       });
 
@@ -1644,10 +1704,586 @@ export class StudentsService {
         guardianId: result.guardian.id,
         relation,
         isPrimary: result.link.isPrimary,
+        capabilities: result.link.capabilities,
+        verificationStatus: result.link.verificationStatus,
+        status: result.link.status,
+        effectiveFrom: result.link.effectiveFrom,
+        effectiveUntil: result.link.effectiveUntil,
+        emergencyContactPriority: result.link.emergencyContactPriority,
+        approvalStatus: result.link.approvalStatus,
+        restrictionReasonRef: result.link.restrictionReasonRef,
       },
     });
 
     return this.getStudentProfile(studentId, actor);
+  }
+
+  async getGuardianAccessAdministration(
+    studentId: string,
+    guardianId: string,
+    actor: AuthContext,
+  ): Promise<GuardianAccessAdministration> {
+    const link = await this.findGuardianAdministrationRelationship(
+      studentId,
+      guardianId,
+      actor,
+    );
+    const userId = link.guardian.user?.id ?? null;
+    const now = new Date();
+
+    const [
+      sessions,
+      identityVerifications,
+      approvedCoGuardians,
+      completedEmailProof,
+      history,
+    ] = await Promise.all([
+      userId
+        ? this.prisma.refreshToken.findMany({
+            where: { userId },
+            select: {
+              id: true,
+              deviceId: true,
+              expiresAt: true,
+              revokedAt: true,
+              createdAt: true,
+              revokedReason: true,
+              userAgent: true,
+              lastUsedAt: true,
+            },
+            orderBy: [{ lastUsedAt: 'desc' }, { createdAt: 'desc' }],
+            take: 20,
+          })
+        : Promise.resolve([]),
+      this.prisma.guardianIdentityVerification.findMany({
+        where: { tenantId: actor.tenantId, guardianId },
+        select: {
+          id: true,
+          status: true,
+          documentType: true,
+          documentNumber: true,
+          evidenceDocumentId: true,
+          createdAt: true,
+          reviewedAt: true,
+        },
+        orderBy: [{ createdAt: 'desc' }],
+        take: 20,
+      }),
+      this.prisma.studentGuardian.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          studentId,
+          guardianId: { not: guardianId },
+          ...buildActiveGuardianRelationshipWhere(now),
+        },
+        select: {
+          guardianId: true,
+          relation: true,
+          guardian: { select: { fullName: true } },
+        },
+        orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+        take: 20,
+      }),
+      userId
+        ? this.prisma.otpCode.findFirst({
+            where: {
+              userId,
+              purpose: { in: [OtpPurpose.RESET, OtpPurpose.VERIFY] },
+              usedAt: { not: null },
+            },
+            select: { id: true },
+            orderBy: { usedAt: 'desc' },
+          })
+        : Promise.resolve(null),
+      this.prisma.auditLog.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          resourceId: link.id,
+          resource: { in: ['student_guardian', 'guardian_access'] },
+        },
+        select: {
+          id: true,
+          action: true,
+          after: true,
+          createdAt: true,
+          user: { select: { email: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      }),
+    ]);
+
+    return {
+      studentId,
+      guardianId,
+      relationship: {
+        relation: link.relation,
+        isPrimary: link.isPrimary,
+        capabilities: link.capabilities,
+        verificationStatus: link.verificationStatus,
+        status: link.status,
+        effectiveFrom: link.effectiveFrom.toISOString(),
+        effectiveUntil: link.effectiveUntil?.toISOString() ?? null,
+        emergencyContactPriority: link.emergencyContactPriority,
+        approvalStatus: link.approvalStatus,
+        restrictionReasonRef: link.restrictionReasonRef,
+      },
+      account: {
+        linked: Boolean(link.guardian.user),
+        status: link.guardian.user?.status ?? null,
+        email: link.guardian.user?.email ?? link.guardian.email,
+        phone: link.guardian.user?.phone ?? link.guardian.primaryPhone,
+        lastLoginAt: link.guardian.user?.lastLoginAt?.toISOString() ?? null,
+      },
+      recoveryPaths: {
+        trustedSessionAvailable: sessions.some(
+          (session) =>
+            !session.revokedAt && session.expiresAt.getTime() > now.getTime(),
+        ),
+        verifiedEmailAvailable: Boolean(completedEmailProof),
+        schoolIdentityReviewAvailable: identityVerifications.some(
+          (verification) => verification.status === 'VERIFIED',
+        ),
+        approvedCoGuardians: approvedCoGuardians.map((coGuardian) => ({
+          id: coGuardian.guardianId,
+          fullName: coGuardian.guardian.fullName,
+          relation: coGuardian.relation,
+        })),
+      },
+      sessions: sessions.map((session) => {
+        const status: GuardianAccessAdministration['sessions'][number]['status'] =
+          session.revokedAt
+            ? 'REVOKED'
+            : session.expiresAt.getTime() <= now.getTime()
+              ? 'EXPIRED'
+              : 'ACTIVE';
+
+        return {
+          id: session.id,
+          deviceLabel: guardianDeviceLabel(
+            session.userAgent,
+            Boolean(session.deviceId),
+          ),
+          status,
+          createdAt: session.createdAt.toISOString(),
+          lastUsedAt: session.lastUsedAt?.toISOString() ?? null,
+          expiresAt: session.expiresAt.toISOString(),
+          revokedAt: session.revokedAt?.toISOString() ?? null,
+          revokedReason: session.revokedReason,
+        };
+      }),
+      identityVerifications: identityVerifications.map((verification) => ({
+        id: verification.id,
+        status: verification.status,
+        documentType: verification.documentType,
+        documentNumberRecorded: Boolean(verification.documentNumber),
+        evidenceDocumentRecorded: Boolean(verification.evidenceDocumentId),
+        createdAt: verification.createdAt.toISOString(),
+        reviewedAt: verification.reviewedAt?.toISOString() ?? null,
+      })),
+      history: history.map((entry) => ({
+        id: entry.id,
+        action: entry.action,
+        actorLabel: entry.user?.email ?? 'School administrator',
+        createdAt: entry.createdAt.toISOString(),
+        reason: auditString(entry.after, 'reason', 500),
+        evidenceReference: auditString(entry.after, 'evidenceReference', 200),
+        verificationMethod: auditVerificationMethod(entry.after),
+      })),
+    };
+  }
+
+  async performGuardianRecoveryAction(
+    studentId: string,
+    guardianId: string,
+    dto: GuardianRecoveryActionDto,
+    actor: AuthContext,
+  ) {
+    const link = await this.findGuardianAdministrationRelationship(
+      studentId,
+      guardianId,
+      actor,
+    );
+    await this.assertGuardianRecoveryMethod(link, dto, actor);
+    if (
+      dto.action === 'RESTORE_ACCOUNT' &&
+      link.status !== GuardianRelationshipStatus.SUSPENDED
+    ) {
+      throw new ConflictException(
+        'Only a suspended guardian relationship can be restored. Revoked and expired relationships require a new reviewed relationship.',
+      );
+    }
+
+    const reason = dto.reason.trim();
+    const evidenceReference = dto.evidenceReference.trim();
+    const now = new Date();
+    const userId = link.guardian.user?.id ?? null;
+    const nextPhone =
+      dto.action === 'APPROVE_PHONE_CHANGE'
+        ? requireNepalPhone(dto.newPrimaryPhone ?? '')
+        : null;
+
+    return this.prisma.$transaction(async (tx) => {
+      let sessionsRevoked = 0;
+      let relationshipsChanged = 0;
+      let relationshipStatus = link.status;
+      let accountStatus = link.guardian.user?.status ?? null;
+
+      const revokeSessions = async (revokedReason: string) => {
+        if (!userId) return 0;
+        const revoked = await tx.refreshToken.updateMany({
+          where: { userId, revokedAt: null },
+          data: { revokedAt: now, revokedReason },
+        });
+        return revoked.count;
+      };
+
+      switch (dto.action) {
+        case 'REVOKE_ALL_SESSIONS':
+          sessionsRevoked = await revokeSessions('guardian_admin_revocation');
+          break;
+        case 'SUSPEND_COMPROMISED_ACCOUNT': {
+          const changed = await tx.studentGuardian.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              guardianId,
+              status: GuardianRelationshipStatus.ACTIVE,
+            },
+            data: {
+              status: GuardianRelationshipStatus.SUSPENDED,
+              isPrimary: false,
+              restrictionReasonRef: evidenceReference,
+            },
+          });
+          relationshipsChanged = changed.count;
+          relationshipStatus = GuardianRelationshipStatus.SUSPENDED;
+          if (userId) {
+            await tx.user.update({
+              where: { id: userId },
+              data: { status: UserStatus.SUSPENDED },
+            });
+            accountStatus = UserStatus.SUSPENDED;
+          }
+          sessionsRevoked = await revokeSessions(
+            'guardian_account_compromise_hold',
+          );
+          break;
+        }
+        case 'RESTORE_ACCOUNT': {
+          const changed = await tx.studentGuardian.updateMany({
+            where: {
+              id: link.id,
+              tenantId: actor.tenantId,
+              studentId,
+              guardianId,
+            },
+            data: { status: GuardianRelationshipStatus.ACTIVE },
+          });
+          relationshipsChanged = changed.count;
+          relationshipStatus = GuardianRelationshipStatus.ACTIVE;
+          if (userId) {
+            await tx.user.update({
+              where: { id: userId },
+              data: { status: UserStatus.ACTIVE },
+            });
+            accountStatus = UserStatus.ACTIVE;
+          }
+          sessionsRevoked = await revokeSessions(
+            'guardian_account_recovery_complete',
+          );
+          break;
+        }
+        case 'APPROVE_PHONE_CHANGE':
+          await tx.guardian.update({
+            where: { id: guardianId },
+            data: { primaryPhone: nextPhone! },
+          });
+          if (userId) {
+            await tx.user.update({
+              where: { id: userId },
+              data: { phone: nextPhone! },
+            });
+          }
+          sessionsRevoked = await revokeSessions(
+            'guardian_phone_change_approved',
+          );
+          break;
+        case 'EXPIRE_RELATIONSHIP': {
+          const changed = await tx.studentGuardian.updateMany({
+            where: {
+              id: link.id,
+              tenantId: actor.tenantId,
+              studentId,
+              guardianId,
+            },
+            data: {
+              status: GuardianRelationshipStatus.EXPIRED,
+              isPrimary: false,
+              restrictionReasonRef: evidenceReference,
+              effectiveUntil:
+                link.effectiveUntil && link.effectiveUntil < now
+                  ? link.effectiveUntil
+                  : now,
+            },
+          });
+          relationshipsChanged = changed.count;
+          relationshipStatus = GuardianRelationshipStatus.EXPIRED;
+          sessionsRevoked = await revokeSessions(
+            'guardian_relationship_expired',
+          );
+          break;
+        }
+        case 'REVOKE_RELATIONSHIP': {
+          const changed = await tx.studentGuardian.updateMany({
+            where: {
+              id: link.id,
+              tenantId: actor.tenantId,
+              studentId,
+              guardianId,
+            },
+            data: {
+              status: GuardianRelationshipStatus.REVOKED,
+              isPrimary: false,
+              restrictionReasonRef: evidenceReference,
+            },
+          });
+          relationshipsChanged = changed.count;
+          relationshipStatus = GuardianRelationshipStatus.REVOKED;
+          sessionsRevoked = await revokeSessions(
+            'guardian_relationship_revoked',
+          );
+          break;
+        }
+        case 'MARK_DECEASED': {
+          const changed = await tx.studentGuardian.updateMany({
+            where: { tenantId: actor.tenantId, guardianId },
+            data: {
+              status: GuardianRelationshipStatus.REVOKED,
+              isPrimary: false,
+              restrictionReasonRef: evidenceReference,
+            },
+          });
+          relationshipsChanged = changed.count;
+          relationshipStatus = GuardianRelationshipStatus.REVOKED;
+          if (userId) {
+            await tx.user.update({
+              where: { id: userId },
+              data: { status: UserStatus.SUSPENDED },
+            });
+            accountStatus = UserStatus.SUSPENDED;
+          }
+          sessionsRevoked = await revokeSessions(
+            'guardian_relationship_ended_deceased',
+          );
+          break;
+        }
+      }
+
+      await this.auditService.record(
+        {
+          action: dto.action.toLowerCase(),
+          resource: 'guardian_access',
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          resourceId: link.id,
+          before: {
+            relationshipStatus: link.status,
+            accountStatus: link.guardian.user?.status ?? null,
+            phone: maskPhone(link.guardian.primaryPhone),
+          },
+          after: {
+            studentId,
+            guardianId,
+            action: dto.action,
+            verificationMethod: dto.verificationMethod,
+            reason,
+            evidenceReference,
+            coGuardianId: dto.coGuardianId ?? null,
+            phoneChanged: Boolean(nextPhone),
+            nextPhone: nextPhone ? maskPhone(nextPhone) : null,
+            sessionsRevoked,
+            relationshipsChanged,
+            relationshipStatus,
+            accountStatus,
+          },
+        },
+        tx,
+      );
+
+      return {
+        success: true as const,
+        action: dto.action,
+        sessionsRevoked,
+        relationshipsChanged,
+        relationshipStatus,
+        accountStatus,
+      };
+    });
+  }
+
+  async provisionGuardianAccount(
+    studentId: string,
+    guardianId: string,
+    dto: ProvisionGuardianAccountDto,
+    actor: AuthContext,
+  ) {
+    const link = await this.findGuardianAdministrationRelationship(
+      studentId,
+      guardianId,
+      actor,
+    );
+    if (link.guardian.user) {
+      throw new ConflictException(
+        'This guardian already has a linked app account.',
+      );
+    }
+    await this.assertGuardianRecoveryMethod(link, dto, actor);
+
+    const parentRole = await this.prisma.role.findUnique({
+      where: {
+        tenantId_name: {
+          tenantId: actor.tenantId,
+          name: 'parent',
+        },
+      },
+      select: { id: true },
+    });
+    if (!parentRole) {
+      throw new NotFoundException(
+        'The parent role is not configured for this school.',
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const user = await this.usersService.createManagedUser(
+        {
+          tenantId: actor.tenantId,
+          email: dto.email,
+          phone: link.guardian.primaryPhone,
+          password: dto.temporaryPassword,
+          roleIds: [parentRole.id],
+          assignedById: actor.userId,
+          mustChangePassword: true,
+        },
+        tx,
+      );
+      const linked = await tx.guardian.updateMany({
+        where: {
+          id: guardianId,
+          tenantId: actor.tenantId,
+          userId: null,
+        },
+        data: { userId: user.id },
+      });
+      if (linked.count !== 1) {
+        throw new ConflictException(
+          'Guardian account provisioning changed while this request was in progress.',
+        );
+      }
+      await tx.studentGuardian.updateMany({
+        where: {
+          tenantId: actor.tenantId,
+          guardianId,
+        },
+        data: { appLoginLinked: true },
+      });
+      await this.auditService.record(
+        {
+          action: 'provision_account',
+          resource: 'guardian_access',
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          resourceId: link.id,
+          before: {
+            accountLinked: false,
+          },
+          after: {
+            studentId,
+            guardianId,
+            accountLinked: true,
+            accountStatus: user.status,
+            email: user.email,
+            verificationMethod: dto.verificationMethod,
+            reason: dto.reason.trim(),
+            evidenceReference: dto.evidenceReference.trim(),
+            coGuardianId: dto.coGuardianId ?? null,
+            mustChangePassword: true,
+          },
+        },
+        tx,
+      );
+
+      return {
+        success: true as const,
+        account: {
+          linked: true as const,
+          status: user.status,
+          email: user.email,
+          mustChangePassword: true as const,
+        },
+      };
+    });
+  }
+
+  async revokeGuardianSession(
+    studentId: string,
+    guardianId: string,
+    sessionId: string,
+    dto: RevokeGuardianSessionDto,
+    actor: AuthContext,
+  ) {
+    const link = await this.findGuardianAdministrationRelationship(
+      studentId,
+      guardianId,
+      actor,
+    );
+    const userId = link.guardian.user?.id;
+    if (!userId) {
+      throw new BadRequestException(
+        'This guardian does not have a linked app account.',
+      );
+    }
+    const now = new Date();
+
+    return this.prisma.$transaction(async (tx) => {
+      const revoked = await tx.refreshToken.updateMany({
+        where: {
+          id: sessionId,
+          userId,
+          revokedAt: null,
+          expiresAt: { gt: now },
+        },
+        data: {
+          revokedAt: now,
+          revokedReason: 'guardian_admin_device_revocation',
+        },
+      });
+      if (revoked.count !== 1) {
+        throw new ConflictException(
+          'This guardian session is already revoked, expired, or unavailable.',
+        );
+      }
+
+      await this.auditService.record(
+        {
+          action: 'revoke_session',
+          resource: 'guardian_access',
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          resourceId: link.id,
+          after: {
+            studentId,
+            guardianId,
+            sessionId,
+            reason: dto.reason.trim(),
+            evidenceReference: dto.evidenceReference.trim(),
+          },
+        },
+        tx,
+      );
+
+      return { success: true as const, sessionId };
+    });
   }
 
   async getFeeClearance(studentId: string, actor: AuthContext) {
@@ -2570,14 +3206,27 @@ export class StudentsService {
   ) {
     await this.findTenantGuardian(guardianId, actor);
 
-    return this.prisma.guardianIdentityVerification.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        guardianId,
-      },
-      orderBy: [{ createdAt: 'desc' }],
-      take: 100,
-    });
+    const verifications =
+      await this.prisma.guardianIdentityVerification.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          guardianId,
+        },
+        select: {
+          id: true,
+          guardianId: true,
+          status: true,
+          documentType: true,
+          documentNumber: true,
+          evidenceDocumentId: true,
+          createdAt: true,
+          reviewedAt: true,
+        },
+        orderBy: [{ createdAt: 'desc' }],
+        take: 100,
+      });
+
+    return verifications.map(guardianIdentityVerificationSummary);
   }
 
   async createGuardianIdentityVerification(
@@ -2621,7 +3270,7 @@ export class StudentsService {
       },
     });
 
-    return verification;
+    return guardianIdentityVerificationSummary(verification);
   }
 
   async reviewGuardianIdentityVerification(
@@ -2700,7 +3349,7 @@ export class StudentsService {
       },
     });
 
-    return updated;
+    return guardianIdentityVerificationSummary(updated);
   }
 
   async exportIemis(actor: AuthContext) {
@@ -3345,26 +3994,17 @@ export class StudentsService {
       throw new NotFoundException('Student not found in this tenant');
     }
 
-    if (
-      actor.roles.some(
-        (role) => role === 'teacher' || role === 'subject_teacher',
-      ) &&
-      !actor.roles.some((role) => role === 'admin' || role === 'principal')
-    ) {
+    if (isTeacherOnly(actor)) {
       const activeEnrollment = student.enrollments[0] ?? null;
-      const inScope =
-        activeEnrollment &&
-        (await this.isTeacherAssignedToClassSection(
-          actor,
-          activeEnrollment.classId,
-          activeEnrollment.sectionId,
-        ));
-
-      if (!inScope) {
-        throw new ForbiddenException(
-          'Student reporting readiness is outside your teaching scope',
-        );
+      if (!activeEnrollment) {
+        throw createTeacherScopeDeniedException();
       }
+      await this.requireTeacherAssignedToClassSection(
+        actor,
+        activeEnrollment.classId,
+        activeEnrollment.sectionId,
+        activeEnrollment.academicYearId,
+      );
     }
 
     return buildStudentIemisReadiness(student, new Date());
@@ -3491,7 +4131,9 @@ export class StudentsService {
         validateIemisStudent(student).every((issue) => !issue.blocking),
       ).length;
       if (students.length < batchSize) break;
-      cursor = students.at(-1)!.id;
+      const lastStudent = students.at(-1);
+      if (!lastStudent) break;
+      cursor = lastStudent.id;
     }
 
     return ready;
@@ -4313,6 +4955,153 @@ export class StudentsService {
     return guardian;
   }
 
+  private assertGuardianAccessWriteAllowed(
+    dto: CreateStudentGuardianDto | UpdateStudentGuardianDto,
+    actor: AuthContext,
+  ) {
+    const changesRelationshipAuthority =
+      dto.capabilities !== undefined ||
+      dto.verificationStatus !== undefined ||
+      dto.status !== undefined ||
+      dto.effectiveFrom !== undefined ||
+      dto.effectiveUntil !== undefined ||
+      dto.emergencyContactPriority !== undefined ||
+      dto.approvalStatus !== undefined ||
+      dto.restrictionReasonRef !== undefined;
+
+    if (
+      changesRelationshipAuthority &&
+      !actor.roles.includes('platform_super_admin') &&
+      !actor.permissions.includes('guardians:verify')
+    ) {
+      throw new ForbiddenException(
+        'Guardian access settings require guardian verification permission.',
+      );
+    }
+  }
+
+  private async findGuardianAdministrationRelationship(
+    studentId: string,
+    guardianId: string,
+    actor: AuthContext,
+  ): Promise<GuardianAdministrationRelationship> {
+    const link = await this.prisma.studentGuardian.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        studentId,
+        guardianId,
+      },
+      include: {
+        guardian: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+
+    if (!link) {
+      throw new NotFoundException(
+        'Guardian relationship not found for this student in this tenant.',
+      );
+    }
+
+    return link;
+  }
+
+  private async assertGuardianRecoveryMethod(
+    link: GuardianAdministrationRelationship,
+    dto: Pick<GuardianRecoveryActionDto, 'verificationMethod' | 'coGuardianId'>,
+    actor: AuthContext,
+  ) {
+    const userId = link.guardian.user?.id ?? null;
+
+    switch (dto.verificationMethod) {
+      case 'TRUSTED_SESSION': {
+        if (!userId) {
+          throw new BadRequestException(
+            'No guardian app account is linked for trusted-session recovery.',
+          );
+        }
+        const trustedSession = await this.prisma.refreshToken.findFirst({
+          where: {
+            userId,
+            revokedAt: null,
+            expiresAt: { gt: new Date() },
+          },
+          select: { id: true },
+        });
+        if (!trustedSession) {
+          throw new BadRequestException(
+            'No active trusted guardian session is available.',
+          );
+        }
+        return;
+      }
+      case 'VERIFIED_EMAIL': {
+        if (!userId || !link.guardian.user?.email) {
+          throw new BadRequestException(
+            'No linked guardian account with an email address is available.',
+          );
+        }
+        const completedEmailProof = await this.prisma.otpCode.findFirst({
+          where: {
+            userId,
+            purpose: { in: [OtpPurpose.RESET, OtpPurpose.VERIFY] },
+            usedAt: { not: null },
+          },
+          select: { id: true },
+          orderBy: { usedAt: 'desc' },
+        });
+        if (!completedEmailProof) {
+          throw new BadRequestException(
+            'No completed email verification or password-recovery proof is recorded.',
+          );
+        }
+        return;
+      }
+      case 'APPROVED_CO_GUARDIAN': {
+        if (!dto.coGuardianId || dto.coGuardianId === link.guardianId) {
+          throw new BadRequestException(
+            'Choose another approved guardian for co-guardian verification.',
+          );
+        }
+        const coGuardian = await this.prisma.studentGuardian.findFirst({
+          where: {
+            tenantId: actor.tenantId,
+            studentId: link.studentId,
+            guardianId: dto.coGuardianId,
+            ...buildActiveGuardianRelationshipWhere(new Date()),
+          },
+          select: { id: true },
+        });
+        if (!coGuardian) {
+          throw new BadRequestException(
+            'The selected co-guardian is not active, verified, and approved for this student.',
+          );
+        }
+        return;
+      }
+      case 'SCHOOL_IDENTITY_REVIEW': {
+        const verification =
+          await this.prisma.guardianIdentityVerification.findFirst({
+            where: {
+              tenantId: actor.tenantId,
+              guardianId: link.guardianId,
+              status: 'VERIFIED',
+            },
+            select: { id: true },
+            orderBy: { reviewedAt: 'desc' },
+          });
+        if (!verification) {
+          throw new BadRequestException(
+            'Complete and approve a guardian identity review before using this recovery method.',
+          );
+        }
+      }
+    }
+  }
+
   private async ensureGuardianEvidenceDocument(
     evidenceDocumentId: string | undefined,
     actor: AuthContext,
@@ -4336,6 +5125,80 @@ export class StudentsService {
 
     return document;
   }
+}
+
+function guardianDeviceLabel(
+  userAgent: string | null,
+  hasRegisteredDeviceId: boolean,
+) {
+  const normalized = userAgent?.toLowerCase() ?? '';
+  if (normalized.includes('iphone') || normalized.includes('ios')) {
+    return 'iPhone or iPad';
+  }
+  if (normalized.includes('android')) {
+    return 'Android device';
+  }
+  if (normalized.includes('flutter') || normalized.includes('dart')) {
+    return 'SchoolOS mobile app';
+  }
+  if (normalized.includes('windows')) return 'Windows browser';
+  if (normalized.includes('macintosh') || normalized.includes('mac os')) {
+    return 'Mac browser';
+  }
+  if (hasRegisteredDeviceId) return 'Registered mobile device';
+  return 'Web or unknown device';
+}
+
+function guardianIdentityVerificationSummary(verification: {
+  id: string;
+  guardianId: string;
+  status: string;
+  documentType: string;
+  documentNumber: string | null;
+  evidenceDocumentId: string | null;
+  createdAt: Date;
+  reviewedAt: Date | null;
+}) {
+  return {
+    id: verification.id,
+    guardianId: verification.guardianId,
+    status: verification.status,
+    documentType: verification.documentType,
+    documentNumberRecorded: Boolean(verification.documentNumber),
+    evidenceDocumentRecorded: Boolean(verification.evidenceDocumentId),
+    createdAt: verification.createdAt.toISOString(),
+    reviewedAt: verification.reviewedAt?.toISOString() ?? null,
+  };
+}
+
+function auditString(
+  value: Prisma.JsonValue | null,
+  key: string,
+  maxLength = 200,
+) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const candidate = value[key];
+  return typeof candidate === 'string' ? candidate.slice(0, maxLength) : null;
+}
+
+function auditVerificationMethod(
+  value: Prisma.JsonValue | null,
+): GuardianRecoveryVerificationMethod | null {
+  const method = auditString(value, 'verificationMethod');
+  return method &&
+    GUARDIAN_RECOVERY_VERIFICATION_METHODS.includes(
+      method as GuardianRecoveryVerificationMethod,
+    )
+    ? (method as GuardianRecoveryVerificationMethod)
+    : null;
+}
+
+function maskPhone(value: string | null | undefined) {
+  if (!value) return null;
+  const compact = value.replace(/\s+/g, '');
+  return compact.length <= 4
+    ? compact
+    : `${'*'.repeat(Math.max(0, compact.length - 4))}${compact.slice(-4)}`;
 }
 
 function buildStudentDirectorySearchWhere(
@@ -4883,6 +5746,178 @@ function normalizeNullableString(value: string | null | undefined) {
   const trimmed = value?.trim();
 
   return trimmed ? trimmed : null;
+}
+
+type GuardianRelationshipWriteInput = Pick<
+  CreateStudentGuardianDto,
+  | 'capabilities'
+  | 'verificationStatus'
+  | 'status'
+  | 'effectiveFrom'
+  | 'effectiveUntil'
+  | 'emergencyContactPriority'
+  | 'approvalStatus'
+  | 'restrictionReasonRef'
+>;
+
+type CurrentGuardianRelationship = {
+  capabilities: GuardianRelationshipWriteInput['capabilities'];
+  verificationStatus: NonNullable<
+    GuardianRelationshipWriteInput['verificationStatus']
+  >;
+  status: GuardianRelationshipStatus;
+  effectiveFrom: Date;
+  effectiveUntil: Date | null;
+  emergencyContactPriority: number | null;
+  approvalStatus: GuardianRelationshipApprovalStatus;
+  restrictionReasonRef: string | null;
+};
+
+function buildGuardianRelationshipCreate(
+  input: GuardianRelationshipWriteInput,
+  actor: AuthContext,
+) {
+  const effectiveFrom = parseGuardianRelationshipStart(input.effectiveFrom);
+  const effectiveUntil = parseGuardianRelationshipEnd(input.effectiveUntil);
+  validateGuardianRelationshipWindow(effectiveFrom, effectiveUntil);
+  const status = input.status ?? GuardianRelationshipStatus.ACTIVE;
+  const approvalStatus =
+    input.approvalStatus ?? GuardianRelationshipApprovalStatus.PENDING;
+  const restrictionReasonRef = normalizeNullableString(
+    input.restrictionReasonRef,
+  );
+  requireGuardianRestrictionReference(
+    status,
+    approvalStatus,
+    restrictionReasonRef,
+  );
+
+  return {
+    capabilities: input.capabilities ?? [],
+    verificationStatus:
+      input.verificationStatus ??
+      GuardianRelationshipVerificationStatus.UNVERIFIED,
+    status,
+    effectiveFrom,
+    effectiveUntil,
+    emergencyContactPriority: input.emergencyContactPriority ?? null,
+    approvalStatus,
+    restrictionReasonRef,
+    approvedById:
+      approvalStatus === GuardianRelationshipApprovalStatus.APPROVED
+        ? actor.userId
+        : null,
+    approvedAt:
+      approvalStatus === GuardianRelationshipApprovalStatus.APPROVED
+        ? new Date()
+        : null,
+  };
+}
+
+function buildGuardianRelationshipUpdate(
+  input: UpdateStudentGuardianDto,
+  actor: AuthContext,
+  current: CurrentGuardianRelationship,
+) {
+  const effectiveFrom =
+    input.effectiveFrom === undefined
+      ? current.effectiveFrom
+      : parseGuardianRelationshipStart(input.effectiveFrom);
+  const effectiveUntil =
+    input.effectiveUntil === undefined
+      ? current.effectiveUntil
+      : parseGuardianRelationshipEnd(input.effectiveUntil);
+  validateGuardianRelationshipWindow(effectiveFrom, effectiveUntil);
+  const status = input.status ?? current.status;
+  const approvalStatus = input.approvalStatus ?? current.approvalStatus;
+  const restrictionReasonRef =
+    input.restrictionReasonRef === undefined
+      ? current.restrictionReasonRef
+      : normalizeNullableString(input.restrictionReasonRef);
+  requireGuardianRestrictionReference(
+    status,
+    approvalStatus,
+    restrictionReasonRef,
+  );
+
+  return {
+    ...(input.capabilities !== undefined
+      ? { capabilities: input.capabilities }
+      : {}),
+    ...(input.verificationStatus !== undefined
+      ? { verificationStatus: input.verificationStatus }
+      : {}),
+    ...(input.status !== undefined ? { status: input.status } : {}),
+    ...(input.effectiveFrom !== undefined ? { effectiveFrom } : {}),
+    ...(input.effectiveUntil !== undefined ? { effectiveUntil } : {}),
+    ...(input.emergencyContactPriority !== undefined
+      ? { emergencyContactPriority: input.emergencyContactPriority }
+      : {}),
+    ...(input.approvalStatus !== undefined
+      ? {
+          approvalStatus: input.approvalStatus,
+          approvedById:
+            input.approvalStatus === GuardianRelationshipApprovalStatus.APPROVED
+              ? actor.userId
+              : null,
+          approvedAt:
+            input.approvalStatus === GuardianRelationshipApprovalStatus.APPROVED
+              ? new Date()
+              : null,
+        }
+      : {}),
+    ...(input.restrictionReasonRef !== undefined
+      ? { restrictionReasonRef }
+      : {}),
+  };
+}
+
+function parseGuardianRelationshipStart(value: string | undefined): Date {
+  if (value === undefined) return new Date();
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new BadRequestException('effectiveFrom must be a valid date');
+  }
+  return parsed;
+}
+
+function parseGuardianRelationshipEnd(
+  value: string | null | undefined,
+): Date | null {
+  if (value === null || value === undefined) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new BadRequestException('effectiveUntil must be a valid date');
+  }
+  return parsed;
+}
+
+function validateGuardianRelationshipWindow(
+  effectiveFrom: Date,
+  effectiveUntil: Date | null,
+) {
+  if (effectiveUntil && effectiveUntil <= effectiveFrom) {
+    throw new BadRequestException(
+      'Guardian relationship end date must be after its start date.',
+    );
+  }
+}
+
+function requireGuardianRestrictionReference(
+  status: GuardianRelationshipStatus,
+  approvalStatus: GuardianRelationshipApprovalStatus,
+  restrictionReasonRef: string | null,
+) {
+  if (
+    (status === GuardianRelationshipStatus.SUSPENDED ||
+      status === GuardianRelationshipStatus.REVOKED ||
+      approvalStatus === GuardianRelationshipApprovalStatus.REJECTED) &&
+    !restrictionReasonRef
+  ) {
+    throw new BadRequestException(
+      'A restriction reason reference is required for a suspended, revoked, or rejected guardian relationship.',
+    );
+  }
 }
 
 function assertNonEmpty(value: string, field: string) {

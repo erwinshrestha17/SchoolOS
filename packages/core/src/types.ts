@@ -4726,6 +4726,150 @@ export type GuardianProfile = {
   wardNumber: string | null;
   isPrimary: boolean;
   consentedAt: string | null;
+  capabilities: GuardianCapability[];
+  verificationStatus: GuardianRelationshipVerificationStatus;
+  status: GuardianRelationshipStatus;
+  effectiveFrom: string;
+  effectiveUntil: string | null;
+  emergencyContactPriority: number | null;
+  approvalStatus: GuardianRelationshipApprovalStatus;
+  restrictionReasonRef: string | null;
+};
+
+export type GuardianCapability =
+  | "ACADEMICS_VIEW"
+  | "ATTENDANCE_VIEW"
+  | "LEAVE_MANAGE"
+  | "FEES_VIEW"
+  | "FEES_PAY"
+  | "EMERGENCY_ALERT_RECEIVE"
+  | "SCHOOL_COMMUNICATE"
+  | "SPECIFIC_CONSENT_GIVE"
+  | "PICKUP_AUTHORIZE"
+  | "COMPLAINT_OR_CORRECTION_SUBMIT";
+
+export type GuardianRelationshipVerificationStatus =
+  | "UNVERIFIED"
+  | "VERIFIED";
+
+export type GuardianRelationshipStatus =
+  | "ACTIVE"
+  | "SUSPENDED"
+  | "REVOKED"
+  | "EXPIRED";
+
+export type GuardianRelationshipApprovalStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "REJECTED";
+
+export const GUARDIAN_RECOVERY_ACTIONS = [
+  "REVOKE_ALL_SESSIONS",
+  "SUSPEND_COMPROMISED_ACCOUNT",
+  "RESTORE_ACCOUNT",
+  "APPROVE_PHONE_CHANGE",
+  "EXPIRE_RELATIONSHIP",
+  "REVOKE_RELATIONSHIP",
+  "MARK_DECEASED",
+] as const;
+
+export type GuardianRecoveryAction =
+  (typeof GUARDIAN_RECOVERY_ACTIONS)[number];
+
+export const GUARDIAN_RECOVERY_VERIFICATION_METHODS = [
+  "TRUSTED_SESSION",
+  "VERIFIED_EMAIL",
+  "APPROVED_CO_GUARDIAN",
+  "SCHOOL_IDENTITY_REVIEW",
+] as const;
+
+export type GuardianRecoveryVerificationMethod =
+  (typeof GUARDIAN_RECOVERY_VERIFICATION_METHODS)[number];
+
+export type GuardianRecoveryActionPayload = {
+  action: GuardianRecoveryAction;
+  verificationMethod: GuardianRecoveryVerificationMethod;
+  reason: string;
+  evidenceReference: string;
+  newPrimaryPhone?: string;
+  coGuardianId?: string;
+};
+
+export type GuardianSessionRevocationPayload = {
+  reason: string;
+  evidenceReference: string;
+};
+
+export type GuardianAccountProvisionPayload = {
+  email: string;
+  temporaryPassword: string;
+  verificationMethod: GuardianRecoveryVerificationMethod;
+  reason: string;
+  evidenceReference: string;
+  coGuardianId?: string;
+};
+
+export type GuardianAccessAdministration = {
+  studentId: string;
+  guardianId: string;
+  relationship: Pick<
+    GuardianProfile,
+    | "relation"
+    | "isPrimary"
+    | "capabilities"
+    | "verificationStatus"
+    | "status"
+    | "effectiveFrom"
+    | "effectiveUntil"
+    | "emergencyContactPriority"
+    | "approvalStatus"
+    | "restrictionReasonRef"
+  >;
+  account: {
+    linked: boolean;
+    status: "PENDING" | "ACTIVE" | "SUSPENDED" | null;
+    email: string | null;
+    phone: string | null;
+    lastLoginAt: string | null;
+  };
+  recoveryPaths: {
+    trustedSessionAvailable: boolean;
+    verifiedEmailAvailable: boolean;
+    schoolIdentityReviewAvailable: boolean;
+    approvedCoGuardians: Array<{
+      id: string;
+      fullName: string;
+      relation: string;
+    }>;
+  };
+  sessions: Array<{
+    id: string;
+    deviceLabel: string;
+    status: "ACTIVE" | "REVOKED" | "EXPIRED";
+    createdAt: string;
+    lastUsedAt: string | null;
+    expiresAt: string;
+    revokedAt: string | null;
+    revokedReason: string | null;
+  }>;
+  identityVerifications: Array<{
+    id: string;
+    status: "PENDING" | "VERIFIED" | "REJECTED" | "REVOKED";
+    documentType: string;
+    documentNumberRecorded: boolean;
+    evidenceDocumentRecorded: boolean;
+    createdAt: string;
+    reviewedAt: string | null;
+  }>;
+  history: Array<{
+    id: string;
+    action: string;
+    actorLabel: string;
+    createdAt: string;
+    reason: string | null;
+    evidenceReference: string | null;
+    verificationMethod: GuardianRecoveryVerificationMethod | null;
+  }>;
 };
 
 export type StudentClassTeacherSummary = {
@@ -4981,6 +5125,14 @@ export type UpdateStudentGuardianPayload = {
   homeAddress?: string | null;
   wardNumber?: string | null;
   isPrimary?: boolean;
+  capabilities?: GuardianCapability[];
+  verificationStatus?: GuardianRelationshipVerificationStatus;
+  status?: GuardianRelationshipStatus;
+  effectiveFrom?: string;
+  effectiveUntil?: string | null;
+  emergencyContactPriority?: number | null;
+  approvalStatus?: GuardianRelationshipApprovalStatus;
+  restrictionReasonRef?: string | null;
 };
 
 export type CreateStudentGuardianPayload = {
@@ -4994,10 +5146,19 @@ export type CreateStudentGuardianPayload = {
   homeAddress?: string | null;
   wardNumber?: string | null;
   isPrimary?: boolean;
+  capabilities?: GuardianCapability[];
+  verificationStatus?: GuardianRelationshipVerificationStatus;
+  status?: GuardianRelationshipStatus;
+  effectiveFrom?: string;
+  effectiveUntil?: string | null;
+  emergencyContactPriority?: number | null;
+  approvalStatus?: GuardianRelationshipApprovalStatus;
+  restrictionReasonRef?: string | null;
 };
 
 export type RemoveStudentGuardianPayload = {
   reason: string;
+  evidenceReference: string;
   confirmFileAccessReview: true;
   newPrimaryGuardianId?: string | null;
 };

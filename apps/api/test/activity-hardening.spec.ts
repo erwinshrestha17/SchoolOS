@@ -126,6 +126,10 @@ describe('Activity Hardening Verification', () => {
       eventEmitter,
       fileRegistry,
       mediaQueue,
+      {
+        requireActorAccess: jest.fn().mockResolvedValue({}),
+        requireActorAccessAnySectionOfClass: jest.fn().mockResolvedValue({}),
+      } as never,
     );
 
     lifecycleService = new ActivityPostLifecycleService(

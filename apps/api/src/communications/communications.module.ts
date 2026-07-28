@@ -14,6 +14,7 @@ import { NotificationEventService } from './notification-event.service';
 import { NoticeAcknowledgementService } from './notice-acknowledgement.service';
 
 import { RedisModule } from '../redis/redis.module';
+import { TeacherScopeModule } from '../teacher-scope/teacher-scope.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { RedisModule } from '../redis/redis.module';
     UsageModule,
     FileRegistryModule,
     RedisModule,
+    TeacherScopeModule,
   ],
   // Internal compatibility providers shared by the active M12 and M15
   // modules. No standalone Communication module is mounted in AppModule.

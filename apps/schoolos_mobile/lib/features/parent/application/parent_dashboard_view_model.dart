@@ -56,6 +56,7 @@ class ParentStatusRow {
     required this.subtitle,
     required this.route,
     this.isStale = false,
+    this.canOpen = true,
   });
 
   final ParentStatusKind kind;
@@ -63,6 +64,7 @@ class ParentStatusRow {
   final String title;
   final String? subtitle;
   final String route;
+  final bool canOpen;
 
   /// This row is being drawn from an offline snapshot. Only money carries it
   /// today: a fee balance a parent might act on - pay, or chase the school
@@ -150,6 +152,10 @@ class ParentDashboardChild {
     required this.teacher,
     required this.statusRows,
     required this.route,
+    required this.canOpenProfile,
+    required this.canViewAttendance,
+    required this.canViewFees,
+    required this.canViewAcademics,
   });
 
   final String id;
@@ -161,6 +167,10 @@ class ParentDashboardChild {
   final String? teacher;
   final List<ParentStatusRow> statusRows;
   final String route;
+  final bool canOpenProfile;
+  final bool canViewAttendance;
+  final bool canViewFees;
+  final bool canViewAcademics;
 
   String get firstName => firstNameOf(name);
 }
@@ -249,6 +259,10 @@ ParentDashboardChild _projectChild(
     classSection: child.classSection,
     teacher: _teacherOrNull(child.teacher),
     route: AppRoutes.parentChildDetail(child.id),
+    canOpenProfile: child.canViewAcademics,
+    canViewAttendance: child.canViewAttendance,
+    canViewFees: child.canViewFees,
+    canViewAcademics: child.canViewAcademics,
     statusRows: [
       attendanceRowFor(child),
       homeworkRowFor(child),
@@ -352,6 +366,7 @@ ParentStatusRow attendanceRowFor(ParentPortalChild child) {
         ? null
         : child.attendanceTime.trim(),
     route: AppRoutes.parentChildAttendanceDetail(child.id),
+    canOpen: child.canViewAttendance,
   );
 }
 
@@ -373,6 +388,7 @@ ParentStatusRow homeworkRowFor(ParentPortalChild child) {
       path: AppRoutes.parentHomework,
       queryParameters: {'child': child.id},
     ).toString(),
+    canOpen: child.canViewAcademics,
   );
 }
 
@@ -419,6 +435,7 @@ ParentStatusRow feesRowFor(ParentPortalChild child, {bool isStale = false}) {
     subtitle: subtitle,
     route: AppRoutes.parentFees,
     isStale: isStale,
+    canOpen: child.canViewFees,
   );
 }
 

@@ -7,11 +7,18 @@ import {
 import {
   ActivityCategory,
   FileStatus,
+  GuardianCapability,
   PaymentMethod,
   type Student,
 } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
-import { isParentOnly } from '../common/security/parent-scope';
+import {
+  buildActiveGuardianRelationshipWhere,
+  createGuardianCapabilityDeniedException,
+  getParentStudentIds,
+  isParentOnly,
+  requireGuardianCapability,
+} from '../common/security/parent-scope';
 import { PrismaService } from '../prisma/prisma.service';
 import { AttendanceService } from '../attendance/attendance.service';
 import { FinanceService } from '../finance/finance.service';
@@ -53,6 +60,13 @@ interface MobileStudentRow extends Student {
   guardianLinks: Array<{
     relation: string;
     isPrimary: boolean;
+    capabilities: GuardianCapability[];
+    verificationStatus: string;
+    status: string;
+    effectiveFrom: Date;
+    effectiveUntil: Date | null;
+    approvalStatus: string;
+    emergencyContactPriority: number | null;
     guardian: {
       id: string;
       userId: string | null;
@@ -148,6 +162,7 @@ export class MobileService {
         },
         guardianLinks: {
           where: {
+            ...buildActiveGuardianRelationshipWhere(),
             guardian: {
               userId: actor.userId,
             },
@@ -203,13 +218,27 @@ export class MobileService {
     );
     const modules = new Set(entitlements.modules);
     const enabled = (moduleName: string) => modules.has(moduleName);
+    const selectedChild = children.items.find(
+      (child) => child.id === selectedStudentId,
+    );
+    const guardianCapabilities = new Set(
+      selectedChild?.capabilities ?? [],
+    );
+    const can = (capability: GuardianCapability) =>
+      guardianCapabilities.has(capability);
     const moduleAvailability = {
-      attendance: enabled('attendance'),
-      fees: enabled('fees'),
-      homework: enabled('homework'),
-      activity: enabled('activity'),
-      transport: enabled('transport'),
-      canteen: enabled('canteen'),
+      attendance:
+        enabled('attendance') &&
+        can(GuardianCapability.ATTENDANCE_VIEW),
+      fees: enabled('fees') && can(GuardianCapability.FEES_VIEW),
+      homework:
+        enabled('homework') && can(GuardianCapability.ACADEMICS_VIEW),
+      activity:
+        enabled('activity') && can(GuardianCapability.ACADEMICS_VIEW),
+      transport:
+        enabled('transport') &&
+        can(GuardianCapability.EMERGENCY_ALERT_RECEIVE),
+      canteen: enabled('canteen') && can(GuardianCapability.FEES_VIEW),
     };
 
     if (!selectedStudentId) {
@@ -237,30 +266,32 @@ export class MobileService {
       canteen,
       activity,
     ] = await Promise.all([
-      this.getStudentProfile(selectedStudentId, actor),
-      enabled('attendance')
+      can(GuardianCapability.ACADEMICS_VIEW)
+        ? this.getStudentProfile(selectedStudentId, actor)
+        : Promise.resolve(null),
+      moduleAvailability.attendance
         ? this.getStudentAttendanceSummary(selectedStudentId, actor)
         : Promise.resolve(null),
-      enabled('fees')
+      moduleAvailability.fees
         ? this.getStudentFeesSummary(selectedStudentId, actor)
         : Promise.resolve(null),
-      enabled('homework')
+      moduleAvailability.homework
         ? this.getStudentHomework(selectedStudentId, actor, '5')
         : Promise.resolve(null),
       this.listNotifications(actor, {}, [selectedStudentId]),
-      enabled('transport')
+      moduleAvailability.transport
         ? this.getStudentTransport(selectedStudentId, actor)
         : Promise.resolve(null),
-      enabled('canteen')
+      moduleAvailability.canteen
         ? this.getStudentCanteen(selectedStudentId, actor)
         : Promise.resolve(null),
-      enabled('activity')
+      moduleAvailability.activity
         ? this.getStudentActivityFeed(selectedStudentId, actor, '1')
         : Promise.resolve(null),
     ]);
 
     return {
-      selectedStudent: student.child,
+      selectedStudent: student?.child ?? selectedChild ?? null,
       children: children.items,
       attendance,
       fees,
@@ -279,6 +310,7 @@ export class MobileService {
       canteen,
       latestActivity: activity?.items[0] ?? null,
       modules: moduleAvailability,
+      guardianCapabilities: [...guardianCapabilities],
     };
   }
 
@@ -306,6 +338,30 @@ export class MobileService {
     );
     const modules = new Set(entitlements.modules);
     const enabled = (moduleName: string) => modules.has(moduleName);
+    const capabilityState = (
+      capability: GuardianCapability,
+      label: string,
+    ): {
+      status: 'available' | 'partial' | 'locked';
+      reason: string | null;
+    } => {
+      const allowedCount = scopedChildren.filter((child) =>
+        child.capabilities.includes(capability),
+      ).length;
+      if (allowedCount === 0) {
+        return {
+          status: 'locked',
+          reason: `Your guardian access does not include ${label}.`,
+        };
+      }
+      if (allowedCount < scopedChildren.length) {
+        return {
+          status: 'partial',
+          reason: `${label} is available for some linked children only.`,
+        };
+      }
+      return { status: 'available', reason: null };
+    };
     const sourceStates: Record<
       ParentActionSource,
       {
@@ -315,23 +371,35 @@ export class MobileService {
     > = {
       notices: { status: 'available', reason: null },
       homework: enabled('homework')
-        ? { status: 'available', reason: null }
+        ? capabilityState(
+            GuardianCapability.ACADEMICS_VIEW,
+            'homework',
+          )
         : {
             status: 'locked',
             reason: 'Homework is not enabled for this school.',
           },
       fees: enabled('fees')
-        ? { status: 'available', reason: null }
+        ? capabilityState(GuardianCapability.FEES_VIEW, 'fee information')
         : { status: 'locked', reason: 'Fees are not enabled for this school.' },
       attendance: enabled('attendance')
-        ? { status: 'available', reason: null }
+        ? capabilityState(
+            GuardianCapability.COMPLAINT_OR_CORRECTION_SUBMIT,
+            'attendance correction requests',
+          )
         : {
             status: 'locked',
             reason: 'Attendance is not enabled for this school.',
           },
-      serviceRequests: { status: 'available', reason: null },
+      serviceRequests: capabilityState(
+        GuardianCapability.COMPLAINT_OR_CORRECTION_SUBMIT,
+        'school requests',
+      ),
       exams: enabled('academics')
-        ? { status: 'available', reason: null }
+        ? capabilityState(
+            GuardianCapability.ACADEMICS_VIEW,
+            'published examinations',
+          )
         : {
             status: 'locked',
             reason: 'Examinations are not enabled for this school.',
@@ -389,25 +457,32 @@ export class MobileService {
 
     await Promise.all(
       scopedChildren.map(async (child) => {
+        const can = (capability: GuardianCapability) =>
+          child.capabilities.includes(capability);
         const [homework, fees, corrections, requests, exams] =
           await Promise.all([
-            enabled('homework')
+            enabled('homework') &&
+            can(GuardianCapability.ACADEMICS_VIEW)
               ? load('homework', () =>
                   this.getStudentHomework(child.id, actor, '30'),
                 )
               : Promise.resolve(null),
-            enabled('fees')
+            enabled('fees') && can(GuardianCapability.FEES_VIEW)
               ? load('fees', () => this.getStudentFeesSummary(child.id, actor))
               : Promise.resolve(null),
-            enabled('attendance')
+            enabled('attendance') &&
+            can(GuardianCapability.COMPLAINT_OR_CORRECTION_SUBMIT)
               ? load('attendance', () =>
                   this.listStudentAttendanceCorrections(child.id, actor),
                 )
               : Promise.resolve(null),
-            load('serviceRequests', () =>
-              this.listStudentServiceRequests(child.id, actor),
-            ),
-            enabled('academics')
+            can(GuardianCapability.COMPLAINT_OR_CORRECTION_SUBMIT)
+              ? load('serviceRequests', () =>
+                  this.listStudentServiceRequests(child.id, actor),
+                )
+              : Promise.resolve(null),
+            enabled('academics') &&
+            can(GuardianCapability.ACADEMICS_VIEW)
               ? load('exams', () =>
                   this.getStudentExamSchedule(child.id, actor),
                 )
@@ -585,15 +660,24 @@ export class MobileService {
     );
     const modules = new Set(entitlements.modules);
     const enabled = (moduleName: string) => modules.has(moduleName);
+    const relationship = student.guardianLinks.find(
+      (link) => link.guardian.userId === actor.userId,
+    );
+    const can = (capability: GuardianCapability) =>
+      relationship?.capabilities.includes(capability) ?? false;
     const sources: Record<
       'attendance' | 'homework' | 'academics' | 'comments' | 'actions',
       ParentDigestSourceState
     > = {
-      attendance: enabled('attendance')
+      attendance:
+        enabled('attendance') &&
+        can(GuardianCapability.ATTENDANCE_VIEW)
         ? { status: 'available', reason: null }
         : {
             status: 'locked',
-            reason: 'Attendance is not enabled for this school.',
+            reason: enabled('attendance')
+              ? 'Your guardian access does not include attendance.'
+              : 'Attendance is not enabled for this school.',
           },
       homework: enabled('homework')
         ? { status: 'available', reason: null }
@@ -632,7 +716,8 @@ export class MobileService {
 
     const [attendance, homeworkRows, reportCards, actionCentre] =
       await Promise.all([
-        enabled('attendance')
+        enabled('attendance') &&
+        can(GuardianCapability.ATTENDANCE_VIEW)
           ? load('attendance', () =>
               this.getStudentAttendanceSummary(studentId, actor),
             )
@@ -1379,7 +1464,11 @@ export class MobileService {
     documentId: string,
     actor: AuthContext,
   ) {
-    await this.assertStudentAccess(studentId, actor);
+    await this.assertStudentAccess(
+      studentId,
+      actor,
+      GuardianCapability.ACADEMICS_VIEW,
+    );
     const document = await this.prisma.studentDocument.findFirst({
       where: {
         id: documentId,
@@ -1456,7 +1545,11 @@ export class MobileService {
     actor: AuthContext,
     query?: { month?: number; year?: number },
   ) {
-    await this.assertStudentAccess(studentId, actor);
+    await this.assertStudentAccess(
+      studentId,
+      actor,
+      GuardianCapability.ATTENDANCE_VIEW,
+    );
     return this.attendanceService.getParentSummary(studentId, actor, query);
   }
 
@@ -1464,7 +1557,11 @@ export class MobileService {
     studentId: string,
     actor: AuthContext,
   ) {
-    await this.assertStudentAccess(studentId, actor);
+    await this.assertStudentAccess(
+      studentId,
+      actor,
+      GuardianCapability.ATTENDANCE_VIEW,
+    );
     return this.attendanceService.listParentCorrectionRequests(
       studentId,
       actor,
@@ -1476,7 +1573,11 @@ export class MobileService {
     dto: MobileParentAttendanceCorrectionDto,
     actor: AuthContext,
   ) {
-    await this.assertStudentAccess(studentId, actor);
+    await this.assertStudentAccess(
+      studentId,
+      actor,
+      GuardianCapability.COMPLAINT_OR_CORRECTION_SUBMIT,
+    );
     return this.attendanceService.createParentCorrectionRequest(
       {
         studentId,
@@ -1494,7 +1595,11 @@ export class MobileService {
     dto: MobileParentAttendanceCorrectionCancelDto,
     actor: AuthContext,
   ) {
-    await this.assertStudentAccess(studentId, actor);
+    await this.assertStudentAccess(
+      studentId,
+      actor,
+      GuardianCapability.COMPLAINT_OR_CORRECTION_SUBMIT,
+    );
     return this.attendanceService.cancelParentCorrectionRequest(
       requestId,
       dto.reason,
@@ -1503,7 +1608,11 @@ export class MobileService {
   }
 
   async listStudentServiceRequests(studentId: string, actor: AuthContext) {
-    await this.assertStudentAccess(studentId, actor);
+    await this.assertStudentAccess(
+      studentId,
+      actor,
+      GuardianCapability.COMPLAINT_OR_CORRECTION_SUBMIT,
+    );
     return this.serviceRequestsService.listParentRequests(studentId, actor);
   }
 
@@ -1512,7 +1621,11 @@ export class MobileService {
     dto: CreateSchoolServiceRequestDto,
     actor: AuthContext,
   ) {
-    await this.assertStudentAccess(studentId, actor);
+    await this.assertStudentAccess(
+      studentId,
+      actor,
+      GuardianCapability.COMPLAINT_OR_CORRECTION_SUBMIT,
+    );
     return this.serviceRequestsService.createParentRequest(
       studentId,
       dto,
@@ -1583,7 +1696,11 @@ export class MobileService {
   }
 
   async getStudentFeesSummary(studentId: string, actor: AuthContext) {
-    await this.assertStudentAccess(studentId, actor);
+    await this.assertStudentAccess(
+      studentId,
+      actor,
+      GuardianCapability.FEES_VIEW,
+    );
     const invoices = await this.prisma.invoice.findMany({
       where: {
         tenantId: actor.tenantId,
@@ -1715,7 +1832,11 @@ export class MobileService {
     studentId: string,
     actor: AuthContext,
   ) {
-    await this.assertStudentAccess(studentId, actor);
+    await this.assertStudentAccess(
+      studentId,
+      actor,
+      GuardianCapability.FEES_PAY,
+    );
     return this.financeService.getParentPaymentGatewayReadiness();
   }
 
@@ -1724,7 +1845,11 @@ export class MobileService {
     dto: InitiateParentPaymentDto,
     actor: AuthContext,
   ) {
-    await this.assertStudentAccess(studentId, actor);
+    await this.assertStudentAccess(
+      studentId,
+      actor,
+      GuardianCapability.FEES_PAY,
+    );
     return this.financeService.initiateParentOnlinePayment(
       studentId,
       dto,
@@ -1737,7 +1862,11 @@ export class MobileService {
     dto: ParentSandboxFeePaymentDto,
     actor: AuthContext,
   ) {
-    await this.assertStudentAccess(studentId, actor);
+    await this.assertStudentAccess(
+      studentId,
+      actor,
+      GuardianCapability.FEES_PAY,
+    );
     return this.financeService.collectParentSandboxPayment(
       studentId,
       dto,
@@ -1750,7 +1879,11 @@ export class MobileService {
     dto: ParentSandboxCanteenTopUpDto,
     actor: AuthContext,
   ) {
-    await this.assertStudentAccess(studentId, actor);
+    await this.assertStudentAccess(
+      studentId,
+      actor,
+      GuardianCapability.FEES_PAY,
+    );
     const readiness =
       await this.financeService.getParentPaymentGatewayReadiness();
     if (!('sandbox' in readiness) || !readiness.sandbox) {
@@ -1784,7 +1917,11 @@ export class MobileService {
     receiptNumber: string,
     actor: AuthContext,
   ) {
-    await this.assertStudentAccess(studentId, actor);
+    await this.assertStudentAccess(
+      studentId,
+      actor,
+      GuardianCapability.FEES_VIEW,
+    );
     return this.financeService.getReceiptPdfForStudent(
       receiptNumber,
       studentId,
@@ -1793,6 +1930,16 @@ export class MobileService {
   }
 
   async getMyConsentStatus(actor: AuthContext) {
+    const authorizedStudentIds = await this.getAllowedStudentIds(
+      actor,
+      GuardianCapability.SPECIFIC_CONSENT_GIVE,
+    );
+    if (authorizedStudentIds.length === 0) {
+      throw createGuardianCapabilityDeniedException(
+        GuardianCapability.SPECIFIC_CONSENT_GIVE,
+      );
+    }
+
     const guardian = await this.prisma.guardian.findFirst({
       where: { tenantId: actor.tenantId, userId: actor.userId },
       select: { id: true },
@@ -1821,11 +1968,22 @@ export class MobileService {
     dto: MobileParentConsentDecisionDto,
     actor: AuthContext,
   ) {
+    const authorizedStudentIds = await this.getAllowedStudentIds(
+      actor,
+      GuardianCapability.SPECIFIC_CONSENT_GIVE,
+    );
+    if (authorizedStudentIds.length === 0) {
+      throw createGuardianCapabilityDeniedException(
+        GuardianCapability.SPECIFIC_CONSENT_GIVE,
+      );
+    }
+
     const guardian = await this.prisma.guardian.findFirst({
       where: { tenantId: actor.tenantId, userId: actor.userId },
       select: {
         id: true,
         studentLinks: {
+          where: { studentId: { in: authorizedStudentIds } },
           select: { studentId: true },
           take: 1,
         },
@@ -1872,7 +2030,15 @@ export class MobileService {
       where: {
         tenantId: actor.tenantId,
         userId: actor.userId,
-        studentLinks: { some: { studentId } },
+        studentLinks: {
+          some: {
+            studentId,
+            ...buildActiveGuardianRelationshipWhere(
+              new Date(),
+              GuardianCapability.ACADEMICS_VIEW,
+            ),
+          },
+        },
       },
       select: { id: true },
     });
@@ -2138,7 +2304,11 @@ export class MobileService {
   }
 
   async getStudentReportCards(studentId: string, actor: AuthContext) {
-    await this.assertStudentAccess(studentId, actor);
+    await this.assertStudentAccess(
+      studentId,
+      actor,
+      GuardianCapability.ACADEMICS_VIEW,
+    );
     const reportCards = await this.prisma.reportCard.findMany({
       where: {
         tenantId: actor.tenantId,
@@ -2233,7 +2403,11 @@ export class MobileService {
     reportCardId: string,
     actor: AuthContext,
   ) {
-    await this.assertStudentAccess(studentId, actor);
+    await this.assertStudentAccess(
+      studentId,
+      actor,
+      GuardianCapability.ACADEMICS_VIEW,
+    );
     const reportCard = await this.prisma.reportCard.findFirst({
       where: {
         id: reportCardId,
@@ -2253,7 +2427,11 @@ export class MobileService {
   }
 
   async getStudentCanteen(studentId: string, actor: AuthContext) {
-    await this.assertStudentAccess(studentId, actor);
+    await this.assertStudentAccess(
+      studentId,
+      actor,
+      GuardianCapability.FEES_VIEW,
+    );
     const [wallet, enrollments, recentTransactions, menuItems, recentServings] =
       await Promise.all([
         this.prisma.canteenWallet.findFirst({
@@ -2356,7 +2534,11 @@ export class MobileService {
   }
 
   async getStudentLibrary(studentId: string, actor: AuthContext) {
-    await this.assertStudentAccess(studentId, actor);
+    await this.assertStudentAccess(
+      studentId,
+      actor,
+      GuardianCapability.ACADEMICS_VIEW,
+    );
     const [issues, fines] = await Promise.all([
       this.prisma.libraryIssue.findMany({
         where: {
@@ -2427,7 +2609,11 @@ export class MobileService {
   }
 
   async getStudentTransport(studentId: string, actor: AuthContext) {
-    await this.assertStudentAccess(studentId, actor);
+    await this.assertStudentAccess(
+      studentId,
+      actor,
+      GuardianCapability.EMERGENCY_ALERT_RECEIVE,
+    );
     const [assignment, enrollment, activeStatus] = await Promise.all([
       this.prisma.transportStudentAssignment.findFirst({
         where: { tenantId: actor.tenantId, studentId, status: 'ACTIVE' },
@@ -2577,8 +2763,12 @@ export class MobileService {
     }));
   }
 
-  private async getAccessibleStudent(studentId: string, actor: AuthContext) {
-    await this.assertStudentAccess(studentId, actor);
+  private async getAccessibleStudent(
+    studentId: string,
+    actor: AuthContext,
+    capability = GuardianCapability.ACADEMICS_VIEW,
+  ) {
+    await this.assertStudentAccess(studentId, actor, capability);
     const student = await this.prisma.student.findFirst({
       where: {
         id: studentId,
@@ -2610,6 +2800,7 @@ export class MobileService {
         },
         guardianLinks: {
           where: {
+            ...buildActiveGuardianRelationshipWhere(),
             guardian: {
               userId: actor.userId,
             },
@@ -2688,7 +2879,11 @@ export class MobileService {
     return assignment;
   }
 
-  private async assertStudentAccess(studentId: string, actor: AuthContext) {
+  private async assertStudentAccess(
+    studentId: string,
+    actor: AuthContext,
+    capability?: GuardianCapability,
+  ) {
     const student = await this.prisma.student.findFirst({
       where: {
         id: studentId,
@@ -2703,6 +2898,16 @@ export class MobileService {
 
     if (!student) {
       throw new NotFoundException('Student not found in this school.');
+    }
+
+    if (capability) {
+      await requireGuardianCapability(
+        this.prisma,
+        actor,
+        studentId,
+        capability,
+      );
+      return;
     }
 
     const allowedStudentIds = await this.getAllowedStudentIds(actor);
@@ -2758,32 +2963,15 @@ export class MobileService {
     return this.getAllowedStudentIds(actor);
   }
 
-  private async getAllowedStudentIds(actor: AuthContext) {
+  private async getAllowedStudentIds(
+    actor: AuthContext,
+    capability?: GuardianCapability,
+  ) {
     if (!isParentOnly(actor)) {
       throw new ForbiddenException('Mobile student scope is not available');
     }
 
-    const guardian = await this.prisma.guardian.findFirst({
-      where: {
-        tenantId: actor.tenantId,
-        userId: actor.userId,
-      },
-      select: {
-        studentLinks: {
-          where: {
-            student: {
-              lifecycleStatus: 'ACTIVE',
-              enrollments: {
-                some: { status: 'ACTIVE' },
-              },
-            },
-          },
-          select: { studentId: true },
-        },
-      },
-    });
-
-    return guardian?.studentLinks.map((link) => link.studentId) ?? [];
+    return (await getParentStudentIds(this.prisma, actor, capability)) ?? [];
   }
 }
 
@@ -3172,5 +3360,16 @@ function toMobileStudent(student: MobileStudentRow) {
     academicYearEndsOn: toIso(student.enrollments[0]?.academicYear.endsOn),
     relationship: guardianLink?.relation ?? 'Self',
     guardianId: guardianLink?.guardian?.id ?? null,
+    capabilities: guardianLink?.capabilities ?? [],
+    relationshipState: guardianLink
+      ? {
+          verificationStatus: guardianLink.verificationStatus,
+          status: guardianLink.status,
+          effectiveFrom: toIso(guardianLink.effectiveFrom),
+          effectiveUntil: toIso(guardianLink.effectiveUntil),
+          approvalStatus: guardianLink.approvalStatus,
+          emergencyContactPriority: guardianLink.emergencyContactPriority,
+        }
+      : null,
   };
 }

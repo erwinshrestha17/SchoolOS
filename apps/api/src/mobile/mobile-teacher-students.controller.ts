@@ -55,7 +55,7 @@ export class MobileTeacherStudentsController {
 
   @Get(':studentId/learning-support')
   @Permissions('academics:read')
-  @RequiredModule('academics')
+  @RequiredModule('learning')
   getStudentLearningSupport(
     @Param('studentId') studentId: string,
     @Query() query: LearningScopeQueryDto,
@@ -70,7 +70,7 @@ export class MobileTeacherStudentsController {
 
   @Post(':studentId/formative-assessments')
   @Permissions('academics:enter_marks')
-  @RequiredModule('academics')
+  @RequiredModule('learning')
   createFormativeAssessment(
     @Param('studentId') studentId: string,
     @Body() dto: MobileTeacherFormativeAssessmentDto,
@@ -84,7 +84,7 @@ export class MobileTeacherStudentsController {
 
   @Post(':studentId/interventions')
   @Permissions('academics:enter_marks')
-  @RequiredModule('academics')
+  @RequiredModule('learning')
   createIntervention(
     @Param('studentId') studentId: string,
     @Body() dto: MobileTeacherInterventionDto,

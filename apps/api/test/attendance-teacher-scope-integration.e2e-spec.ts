@@ -20,6 +20,18 @@ describe('Attendance teacher scope integration', () => {
     const prisma = makePrisma();
     const auditService = { record: jest.fn() };
     const eventEmitter = { emit: jest.fn() };
+    const teacherScope = createPermissiveTeacherScope();
+    (teacherScope.canActorAccess as jest.Mock).mockImplementation(
+      async (_scope: unknown, actor: { userId: string }) =>
+        actor.userId === 'teacher-user'
+          ? {
+              source: 'ASSIGNMENT',
+              assignmentId: 'assignment-stub',
+              componentScope: null,
+              assignmentType: 'CLASS_TEACHER',
+            }
+          : null,
+    );
     const service = new AttendanceService(
       prisma as unknown as PrismaService,
       {
@@ -30,7 +42,7 @@ describe('Attendance teacher scope integration', () => {
       {
         getSetting: jest.fn().mockResolvedValue(24),
       } as unknown as SettingsService,
-      createPermissiveTeacherScope() as never,
+      teacherScope as never,
     );
     const teacher = createAuthContextMock({
       tenantId: 'tenant-attendance-scope',

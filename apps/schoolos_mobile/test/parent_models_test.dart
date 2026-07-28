@@ -2,6 +2,25 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:schoolos_mobile/features/parent/domain/parent_models.dart';
 
 void main() {
+  test('guardian child parses capability and relationship state metadata', () {
+    final child = GuardianChild.fromJson({
+      'id': 'child-1',
+      'name': 'Asha Rai',
+      'capabilities': ['FEES_VIEW', 'FEES_PAY'],
+      'relationshipState': {
+        'verificationStatus': 'VERIFIED',
+        'status': 'ACTIVE',
+        'approvalStatus': 'APPROVED',
+        'effectiveFrom': '2026-07-01T00:00:00.000Z',
+      },
+    });
+
+    expect(child.hasCapability(GuardianCapabilityKey.feesView), isTrue);
+    expect(child.hasCapability(GuardianCapabilityKey.attendanceView), isFalse);
+    expect(child.relationshipState?.verificationStatus, 'VERIFIED');
+    expect(child.relationshipState?.approvalStatus, 'APPROVED');
+  });
+
   group('ParentDashboardSummary', () {
     test('maps mobile dashboard data into parent-safe summary values', () {
       const child = GuardianChild(

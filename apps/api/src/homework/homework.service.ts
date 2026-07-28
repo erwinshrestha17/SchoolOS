@@ -7,6 +7,7 @@ import {
   NotificationChannel,
   Prisma,
   HomeworkAssignment,
+  GuardianCapability,
   StudentLifecycleStatus,
 } from '@prisma/client';
 import {
@@ -49,6 +50,7 @@ import {
 } from './dto/legacy-submit-homework.dto';
 import type { HomeworkRecurrenceDto } from './dto/create-homework.dto';
 import { randomUUID } from 'node:crypto';
+import { buildActiveGuardianRelationshipWhere } from '../common/security/parent-scope';
 
 const EDIT_BLOCKED_ASSIGNMENT_STATUSES: readonly HomeworkAssignmentStatus[] = [
   HomeworkAssignmentStatus.CLOSED,
@@ -268,47 +270,95 @@ export class HomeworkService {
   }
 
   async listTeacherMobileHomeworkScopes(actor: AuthContext) {
+    const limit = 200;
     const staffId = await this.resolveActorStaffId(actor);
     if (!staffId) {
       throw new ForbiddenException('Active teacher profile is required');
     }
 
-    const items = await this.prisma.subjectTeacherAssignment.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        staffId,
-        academicYear: { isCurrent: true },
-      },
-      select: {
-        academicYearId: true,
-        classId: true,
-        sectionId: true,
-        subjectId: true,
-        academicYear: { select: { name: true } },
-        class: { select: { name: true } },
-        section: { select: { name: true } },
-        subject: { select: { name: true } },
-      },
-      orderBy: [
-        { class: { level: 'asc' } },
-        { section: { name: 'asc' } },
-        { subject: { name: 'asc' } },
-      ],
-      take: 200,
-    });
+    const scopes = (
+      await this.teacherScopeService.listActiveAssignmentsForCapability(
+        actor,
+        TeacherCapability.SUBJECT_HOMEWORK_CREATE,
+      )
+    )
+      .filter(
+        (
+          scope,
+        ): scope is typeof scope & {
+          subjectId: string;
+        } => Boolean(scope.subjectId),
+      )
+      .slice(0, limit);
+
+    const [academicYears, classes, sections, subjects] = await Promise.all([
+      this.prisma.academicYear.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          id: { in: [...new Set(scopes.map((scope) => scope.academicYearId))] },
+        },
+        select: { id: true, name: true },
+      }),
+      this.prisma.class.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          id: { in: [...new Set(scopes.map((scope) => scope.classId))] },
+        },
+        select: { id: true, name: true },
+      }),
+      this.prisma.section.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          id: { in: [...new Set(scopes.map((scope) => scope.sectionId))] },
+        },
+        select: { id: true, name: true },
+      }),
+      this.prisma.subject.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          id: { in: [...new Set(scopes.map((scope) => scope.subjectId))] },
+        },
+        select: { id: true, name: true },
+      }),
+    ]);
+    const academicYearNames = new Map(
+      academicYears.map((item) => [item.id, item.name]),
+    );
+    const classNames = new Map(classes.map((item) => [item.id, item.name]));
+    const sectionNames = new Map(
+      sections.map((item) => [item.id, item.name]),
+    );
+    const subjectNames = new Map(
+      subjects.map((item) => [item.id, item.name]),
+    );
+    const items = scopes
+      .filter(
+        (scope) =>
+          academicYearNames.has(scope.academicYearId) &&
+          classNames.has(scope.classId) &&
+          sectionNames.has(scope.sectionId) &&
+          subjectNames.has(scope.subjectId),
+      )
+      .map((scope) => ({
+        id: `${scope.academicYearId}:${scope.classId}:${scope.sectionId}:${scope.subjectId}`,
+        academicYearId: scope.academicYearId,
+        academicYearName: academicYearNames.get(scope.academicYearId) ?? '',
+        classId: scope.classId,
+        className: classNames.get(scope.classId) ?? '',
+        sectionId: scope.sectionId,
+        sectionName: sectionNames.get(scope.sectionId) ?? '',
+        subjectId: scope.subjectId,
+        subjectName: subjectNames.get(scope.subjectId) ?? '',
+      }))
+      .sort(
+        (left, right) =>
+          left.className.localeCompare(right.className) ||
+          left.sectionName.localeCompare(right.sectionName) ||
+          left.subjectName.localeCompare(right.subjectName),
+      );
 
     return {
-      items: items.map((item) => ({
-        id: `${item.academicYearId}:${item.classId}:${item.sectionId ?? 'none'}:${item.subjectId}`,
-        academicYearId: item.academicYearId,
-        academicYearName: item.academicYear.name,
-        classId: item.classId,
-        className: item.class.name,
-        sectionId: item.sectionId,
-        sectionName: item.section?.name ?? null,
-        subjectId: item.subjectId,
-        subjectName: item.subject.name,
-      })),
+      items,
     };
   }
 
@@ -1632,11 +1682,11 @@ export class HomeworkService {
       sectionId: string | null;
       subjectId: string;
       /** Staff who authored the record, when editing an existing one. */
-      ownerStaffId?: string | null;
+      assignedByStaffId?: string | null;
       /** Date the record applies to, so expired assignments fail closed. */
       effectiveOn?: Date;
     },
-    staffId: string | null,
+    _staffId: string | null,
   ) {
     if (
       actor.roles.some((role) =>
@@ -1646,60 +1696,47 @@ export class HomeworkService {
       return;
     }
 
-    if (!staffId) {
-      throw new ForbiddenException('Only staff can access this resource');
-    }
-
     const academicYearId =
       homework.academicYearId ??
       (await this.resolveCurrentAcademicYearId(actor));
     if (!academicYearId) {
-      throw new ForbiddenException(
-        'You are not assigned to review homework for this class and subject',
+      return this.teacherScopeService.denyActorAccess(
+        {
+          capability: TeacherCapability.SUBJECT_HOMEWORK_CREATE,
+          reason: 'missing_scope',
+          classId: homework.classId,
+          sectionId: homework.sectionId ?? undefined,
+          subjectId: homework.subjectId,
+        },
+        actor,
       );
     }
 
     const base = {
-      tenantId: actor.tenantId,
-      staffId,
       academicYearId,
       classId: homework.classId,
       effectiveOn: homework.effectiveOn,
+      subjectId: homework.subjectId,
+      capability: homework.assignedByStaffId
+        ? TeacherCapability.SUBJECT_RECORD_WRITE
+        : TeacherCapability.SUBJECT_HOMEWORK_CREATE,
+      recordOwnerStaffId: homework.assignedByStaffId,
     };
 
     // A null sectionId on legacy homework meant "all sections of the class",
     // so authorization is satisfied by an assignment covering any section of
     // it. A concrete sectionId is matched exactly.
-    const check = (
-      capability: TeacherCapability,
-      extra: Record<string, unknown> = {},
-    ) =>
-      homework.sectionId
-        ? this.teacherScopeService.canAccess(
-            {
-              ...base,
-              sectionId: homework.sectionId,
-              capability,
-              ...extra,
-            } as never,
-            actor,
-          )
-        : this.teacherScopeService.canAccessAnySectionOfClass(
-            { ...base, capability, ...extra } as never,
-            actor,
-          );
+    if (homework.sectionId) {
+      await this.teacherScopeService.requireActorAccess(
+        { ...base, sectionId: homework.sectionId },
+        actor,
+      );
+      return;
+    }
 
-    const asSubjectTeacher = await check(
-      TeacherCapability.SUBJECT_HOMEWORK_CREATE,
-      {
-        subjectId: homework.subjectId,
-        recordOwnerStaffId: homework.ownerStaffId,
-      },
-    );
-    if (asSubjectTeacher) return;
-
-    throw new ForbiddenException(
-      'You are not assigned to review homework for this class and subject',
+    await this.teacherScopeService.requireActorAccessAnySectionOfClass(
+      base,
+      actor,
     );
   }
 
@@ -1789,17 +1826,26 @@ export class HomeworkService {
     sectionId: string | null,
   ): Promise<boolean> {
     if (!sectionId) return false;
-    const staffId = await this.resolveActorStaffId(actor);
-    if (!staffId) return false;
     const section = await this.prisma.section.findFirst({
       where: {
         tenantId: actor.tenantId,
         id: sectionId,
-        classTeacherId: staffId,
       },
-      select: { id: true },
+      select: { id: true, classId: true },
     });
-    return Boolean(section);
+    if (!section) return false;
+
+    return Boolean(
+      await this.teacherScopeService.canActorAccess(
+        {
+          classId: section.classId,
+          sectionId,
+          capability: TeacherCapability.HOMEROOM_ACADEMIC_SUMMARY_READ,
+          recordStatus: 'PUBLISHED',
+        },
+        actor,
+      ),
+    );
   }
 
   private async ensureHomeworkRegisterReadAccess(
@@ -2502,27 +2548,28 @@ export class HomeworkService {
 
   private async getTeacherHomeworkScopeWhere(
     actor: AuthContext,
-    staffId: string,
+    _staffId: string,
   ): Promise<Prisma.HomeworkAssignmentWhereInput[]> {
-    const assignments = await this.prisma.subjectTeacherAssignment.findMany({
-      where: { tenantId: actor.tenantId, staffId },
-      select: {
-        academicYearId: true,
-        classId: true,
-        sectionId: true,
-        subjectId: true,
-      },
-      take: 200,
-    });
+    const assignments =
+      await this.teacherScopeService.listActiveAssignmentsForCapability(
+        actor,
+        TeacherCapability.SUBJECT_RECORD_READ,
+      );
 
-    return assignments.map((assignment) => ({
-      academicYearId: assignment.academicYearId,
-      classId: assignment.classId,
-      subjectId: assignment.subjectId,
-      OR: assignment.sectionId
-        ? [{ sectionId: assignment.sectionId }, { sectionId: null }]
-        : [{ sectionId: null }],
-    }));
+    return assignments
+      .filter(
+        (
+          assignment,
+        ): assignment is typeof assignment & {
+          subjectId: string;
+        } => Boolean(assignment.subjectId),
+      )
+      .map((assignment) => ({
+        academicYearId: assignment.academicYearId,
+        classId: assignment.classId,
+        subjectId: assignment.subjectId,
+        OR: [{ sectionId: assignment.sectionId }, { sectionId: null }],
+      }));
   }
 
   private async getTeacherScopeForActor(actor: AuthContext) {
@@ -2634,6 +2681,10 @@ export class HomeworkService {
       const link = await this.prisma.studentGuardian.findFirst({
         where: {
           tenantId: actor.tenantId,
+          ...buildActiveGuardianRelationshipWhere(
+            new Date(),
+            GuardianCapability.ACADEMICS_VIEW,
+          ),
           guardian: { userId: actor.userId },
           ...(requestedStudentId ? { studentId: requestedStudentId } : {}),
           student: { lifecycleStatus: StudentLifecycleStatus.ACTIVE },
@@ -2678,6 +2729,10 @@ export class HomeworkService {
       const links = await this.prisma.studentGuardian.findMany({
         where: {
           tenantId: actor.tenantId,
+          ...buildActiveGuardianRelationshipWhere(
+            new Date(),
+            GuardianCapability.ACADEMICS_VIEW,
+          ),
           guardian: { userId: actor.userId },
           student: { lifecycleStatus: StudentLifecycleStatus.ACTIVE },
         },
@@ -2725,6 +2780,10 @@ export class HomeworkService {
       const link = await this.prisma.studentGuardian.findFirst({
         where: {
           tenantId: actor.tenantId,
+          ...buildActiveGuardianRelationshipWhere(
+            new Date(),
+            GuardianCapability.ACADEMICS_VIEW,
+          ),
           guardian: { userId: actor.userId },
           student: {
             lifecycleStatus: StudentLifecycleStatus.ACTIVE,

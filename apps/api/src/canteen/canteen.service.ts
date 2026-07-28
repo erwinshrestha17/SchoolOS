@@ -14,10 +14,12 @@ import {
   CanteenPosSaleStatus,
   CanteenWalletTransactionSource,
   CanteenWalletTransactionType,
+  GuardianCapability,
   Prisma,
   PaymentMethod,
   StudentLifecycleStatus,
 } from '@prisma/client';
+import { buildActiveGuardianRelationshipWhere } from '../common/security/parent-scope';
 import { AuditService } from '../audit/audit.service';
 import { AccountingPostingService } from '../accounting/accounting-posting.service';
 import type { AuthContext } from '../auth/auth.types';
@@ -1334,6 +1336,10 @@ export class CanteenService {
     const guardianLink = await this.prisma.studentGuardian.findFirst({
       where: {
         tenantId: actor.tenantId,
+        ...buildActiveGuardianRelationshipWhere(
+          new Date(),
+          GuardianCapability.FEES_VIEW,
+        ),
         studentId,
         guardian: { userId: actor.userId },
       },

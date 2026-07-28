@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import {
   EnrollmentStatus,
+  GuardianRelationshipStatus,
   Prisma,
   StudentLifecycleStatus,
 } from '@prisma/client';
@@ -470,7 +471,12 @@ export class M1AdmissionsHardeningService {
     }
 
     const link = await this.prisma.studentGuardian.findFirst({
-      where: { tenantId: actor.tenantId, studentId, guardianId },
+      where: {
+        tenantId: actor.tenantId,
+        studentId,
+        guardianId,
+        status: GuardianRelationshipStatus.ACTIVE,
+      },
       include: { guardian: true, student: true },
     });
     if (!link) {
@@ -478,7 +484,11 @@ export class M1AdmissionsHardeningService {
     }
 
     const activeLinks = await this.prisma.studentGuardian.findMany({
-      where: { tenantId: actor.tenantId, studentId },
+      where: {
+        tenantId: actor.tenantId,
+        studentId,
+        status: GuardianRelationshipStatus.ACTIVE,
+      },
       select: { id: true, guardianId: true, isPrimary: true },
       orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
     });
@@ -535,17 +545,24 @@ export class M1AdmissionsHardeningService {
           data: { isPrimary: true },
         });
       }
-      const removed = await tx.studentGuardian.deleteMany({
+      const revoked = await tx.studentGuardian.updateMany({
         where: {
           id: link.id,
           tenantId: actor.tenantId,
           studentId,
           guardianId,
+          status: GuardianRelationshipStatus.ACTIVE,
+        },
+        data: {
+          status: GuardianRelationshipStatus.REVOKED,
+          isPrimary: false,
+          effectiveUntil: new Date(),
+          restrictionReasonRef: dto.evidenceReference,
         },
       });
-      if (removed.count !== 1) {
+      if (revoked.count !== 1) {
         throw new NotFoundException(
-          'Guardian link was already removed or no longer belongs to this tenant',
+          'Guardian link was already revoked or no longer belongs to this tenant',
         );
       }
       if (documents.length > 0) {
@@ -557,13 +574,12 @@ export class M1AdmissionsHardeningService {
             documentTitle: document.title,
             documentKind: document.kind,
             performedBy: actor.userId,
-            reason:
-              dto.reason ??
-              'Guardian removed from student profile; file access must be re-evaluated.',
+            reason: dto.reason,
             metadata: {
               guardianId,
               studentId,
-              relationshipRemoved: true,
+              relationshipRevoked: true,
+              evidenceReference: dto.evidenceReference,
             },
           })),
         });
@@ -571,7 +587,7 @@ export class M1AdmissionsHardeningService {
     });
 
     await this.auditService.record({
-      action: 'guardian_removed_file_access_review',
+      action: 'guardian_revoked_file_access_review',
       resource: 'student_guardian',
       tenantId: actor.tenantId,
       userId: actor.userId,
@@ -582,6 +598,8 @@ export class M1AdmissionsHardeningService {
         guardianName: link.guardian.fullName,
       },
       after: {
+        reason: dto.reason,
+        evidenceReference: dto.evidenceReference,
         documentsReviewed: documents.length,
         generatedDocumentsReviewed: generatedDocuments,
         registryFilesReviewed: registryFiles,

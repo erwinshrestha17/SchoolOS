@@ -1,8 +1,9 @@
-import { AuthMethod } from '@prisma/client';
+import { AuthMethod, GuardianCapability } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { EntitlementsService } from '../plans/entitlements.service';
 import { OperationalSummaryService } from './operational-summary.service';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 
 describe('OperationalSummaryService', () => {
   const actor: AuthContext = {
@@ -48,12 +49,6 @@ describe('OperationalSummaryService', () => {
     },
     activityAttachment: { count: jest.fn().mockResolvedValue(0) },
     notificationDelivery: { count: jest.fn().mockResolvedValue(0) },
-    staff: {
-      findFirst: jest.fn().mockResolvedValue({ id: 'staff-1' }),
-    },
-    subjectTeacherAssignment: {
-      findMany: jest.fn().mockResolvedValue([]),
-    },
     homeworkAssignment: {
       count: homeworkCount,
       findMany: jest.fn().mockResolvedValue([]),
@@ -68,6 +63,10 @@ describe('OperationalSummaryService', () => {
   } as unknown as jest.Mocked<Pick<EntitlementsService, 'getEntitlements'>>;
 
   let service: OperationalSummaryService;
+  const teacherScopeService = {
+    resolveActiveStaffId: jest.fn().mockResolvedValue('staff-1'),
+    listActiveAssignments: jest.fn().mockResolvedValue([]),
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -80,6 +79,7 @@ describe('OperationalSummaryService', () => {
     service = new OperationalSummaryService(
       prisma,
       entitlements as unknown as EntitlementsService,
+      teacherScopeService as unknown as TeacherScopeService,
     );
   });
 
@@ -240,5 +240,82 @@ describe('OperationalSummaryService', () => {
         }),
       );
     }
+  });
+
+  it('loads parent summary metrics only for capability-authorized children', async () => {
+    const parentActor: AuthContext = {
+      ...actor,
+      userId: 'guardian-user-1',
+      email: 'guardian@school.test',
+      roles: ['parent'],
+      permissions: [],
+    };
+    const guardianFindFirst = jest.fn(
+      (query: {
+        select: {
+          studentLinks: {
+            where: { AND: Array<Record<string, unknown>> };
+          };
+        };
+      }) => {
+        const capabilityClause = query.select.studentLinks.where.AND.find(
+          (clause) => 'capabilities' in clause,
+        ) as { capabilities?: { has?: GuardianCapability } } | undefined;
+        const capability = capabilityClause?.capabilities?.has;
+        return Promise.resolve(
+          capability === undefined ||
+            capability === GuardianCapability.FEES_VIEW
+            ? { studentLinks: [{ studentId: 'student-fees' }] }
+            : { studentLinks: [] },
+        );
+      },
+    );
+    const invoiceCount = jest.fn().mockResolvedValue(0);
+    const attendanceCount = jest.fn().mockResolvedValue(0);
+    const reportCardCount = jest.fn().mockResolvedValue(0);
+    const libraryIssueCount = jest.fn().mockResolvedValue(0);
+    const notificationCount = jest.fn().mockResolvedValue(0);
+    const parentPrisma = {
+      guardian: { findFirst: guardianFindFirst },
+      invoice: { count: invoiceCount },
+      attendanceRecord: { count: attendanceCount },
+      reportCard: { count: reportCardCount },
+      libraryIssue: { count: libraryIssueCount },
+      notificationDelivery: { count: notificationCount },
+    } as unknown as PrismaService;
+    const parentEntitlements = {
+      getEntitlements: jest.fn().mockResolvedValue({
+        modules: ['attendance', 'fees', 'exams', 'library', 'notices'],
+      }),
+    } as unknown as EntitlementsService;
+    const parentService = new OperationalSummaryService(
+      parentPrisma,
+      parentEntitlements,
+      teacherScopeService as unknown as TeacherScopeService,
+    );
+
+    const summary = await parentService.getMobileSummary('parent', parentActor);
+
+    expect(summary.status).toBe('empty');
+    expect(summary.summary).toEqual(
+      expect.objectContaining({
+        linkedChildren: 1,
+        attendanceRecordsToday: null,
+        unpaidInvoices: 0,
+        publishedReportCards: null,
+        activeLibraryLoans: null,
+        unreadNotices: null,
+      }),
+    );
+    expect(invoiceCount).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        tenantId: parentActor.tenantId,
+        studentId: { in: ['student-fees'] },
+      }),
+    });
+    expect(attendanceCount).not.toHaveBeenCalled();
+    expect(reportCardCount).not.toHaveBeenCalled();
+    expect(libraryIssueCount).not.toHaveBeenCalled();
+    expect(notificationCount).not.toHaveBeenCalled();
   });
 });

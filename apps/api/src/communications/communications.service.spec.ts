@@ -23,6 +23,7 @@ describe('CommunicationsService', () => {
   let auditService: any;
   let fileRegistryService: any;
   let redisService: any;
+  let teacherScopeService: any;
   let service: CommunicationsService;
   let actor: AuthContext;
 
@@ -139,6 +140,14 @@ describe('CommunicationsService', () => {
         del: jest.fn().mockResolvedValue(1),
       }),
     };
+    teacherScopeService = {
+      resolveReadableScope: jest.fn().mockResolvedValue({
+        assignments: [],
+        homeroomSectionIds: new Set(),
+        subjectsBySection: new Map(),
+        allSectionIds: new Set(),
+      }),
+    };
     actor = {
       userId: 'admin-1',
       tenantId: 'tenant-1',
@@ -164,6 +173,10 @@ describe('CommunicationsService', () => {
       } as any,
       redisService,
       fileRegistryService,
+      undefined,
+      undefined,
+      undefined,
+      teacherScopeService,
     );
   });
 
@@ -1856,11 +1869,17 @@ describe('CommunicationsService', () => {
     };
 
     function mockTeacherAssignment() {
-      prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
-      prisma.subjectTeacherAssignment.findMany.mockResolvedValue([
-        { classId: 'class-1', sectionId: 'section-1' },
-      ]);
-      prisma.section.findMany.mockResolvedValue([]);
+      teacherScopeService.resolveReadableScope.mockResolvedValue({
+        assignments: [
+          {
+            classId: 'class-1',
+            sectionId: 'section-1',
+          },
+        ],
+        homeroomSectionIds: new Set(['section-1']),
+        subjectsBySection: new Map(),
+        allSectionIds: new Set(['section-1']),
+      });
     }
 
     it('scopes listNotices to ALL-audience, own-class/section, or actually-delivered published notices', async () => {
@@ -1988,7 +2007,12 @@ describe('CommunicationsService', () => {
     });
 
     it('returns no notices for a teacher with no active staff assignment beyond ALL/delivered', async () => {
-      prisma.staff.findFirst.mockResolvedValue(null);
+      teacherScopeService.resolveReadableScope.mockResolvedValue({
+        assignments: [],
+        homeroomSectionIds: new Set(),
+        subjectsBySection: new Map(),
+        allSectionIds: new Set(),
+      });
       prisma.notice.findMany.mockResolvedValue([]);
       prisma.notice.count.mockResolvedValue(0);
 

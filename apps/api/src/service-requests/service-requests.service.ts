@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  GuardianCapability,
   Prisma,
   SchoolServiceRequestNoteVisibility,
   SchoolServiceRequestPriority,
@@ -14,7 +15,10 @@ import {
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
-import { isParentOnly } from '../common/security/parent-scope';
+import {
+  isParentOnly,
+  requireGuardianCapability,
+} from '../common/security/parent-scope';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -641,6 +645,12 @@ export class ServiceRequestsService {
     actor: AuthContext,
   ) {
     if (dto.type === SchoolServiceRequestType.PAYMENT_DISPUTE) {
+      await requireGuardianCapability(
+        this.prisma,
+        actor,
+        studentId,
+        GuardianCapability.FEES_VIEW,
+      );
       if (!dto.invoiceId) {
         throw new BadRequestException(
           'Choose the invoice related to this payment dispute.',
@@ -684,28 +694,12 @@ export class ServiceRequestsService {
 
   private async assertParentStudent(studentId: string, actor: AuthContext) {
     this.assertParent(actor);
-    const guardian = await this.prisma.guardian.findFirst({
-      where: {
-        tenantId: actor.tenantId,
-        userId: actor.userId,
-        studentLinks: {
-          some: {
-            studentId,
-            student: {
-              tenantId: actor.tenantId,
-              lifecycleStatus: 'ACTIVE',
-              enrollments: { some: { status: 'ACTIVE' } },
-            },
-          },
-        },
-      },
-      select: { id: true },
-    });
-    if (!guardian) {
-      throw new ForbiddenException(
-        'This child is not linked to your guardian account.',
-      );
-    }
+    await requireGuardianCapability(
+      this.prisma,
+      actor,
+      studentId,
+      GuardianCapability.COMPLAINT_OR_CORRECTION_SUBMIT,
+    );
   }
 
   private async getParentOwnedRequest(requestId: string, actor: AuthContext) {

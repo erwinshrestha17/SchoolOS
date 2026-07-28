@@ -59,6 +59,7 @@ PORT=4000
 DATABASE_URL=postgresql://schoolos:strong-password@postgres:5432/schoolos_db?schema=public
 REDIS_HOST=redis
 REDIS_PORT=6379
+RATE_LIMIT_ENABLED=true
 JWT_SECRET=replace-with-32-plus-character-random-secret
 JWT_CHALLENGE_SECRET=replace-with-second-32-plus-character-random-secret
 TOKEN_HASH_PEPPER=replace-with-third-32-plus-character-random-secret
@@ -97,6 +98,7 @@ ALLOW_PROD_BOOT=true
 DATABASE_URL
 REDIS_HOST
 REDIS_PORT
+RATE_LIMIT_ENABLED=true
 JWT_SECRET
 JWT_CHALLENGE_SECRET
 MEDICAL_ENCRYPTION_KEY

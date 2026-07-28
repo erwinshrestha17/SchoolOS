@@ -541,17 +541,26 @@ describe('Homework Hardening', () => {
         tenantId: 'tenant-a',
         userId: 'user-1',
       });
-      p.subjectTeacherAssignment.findMany.mockResolvedValue([
-        {
+      teacherAssignments.push(
+        teacherAssignmentFixture({
           academicYearId: 'year-1',
           classId: 'class-1',
           sectionId: 'section-1',
           subjectId: 'sub-1',
-          academicYear: { name: '2026-2027' },
-          class: { name: 'Grade 3' },
-          section: { name: 'A' },
-          subject: { name: 'Mathematics' },
-        },
+          staffId: 'teacher-1',
+        }),
+      );
+      p.academicYear.findMany = jest
+        .fn()
+        .mockResolvedValue([{ id: 'year-1', name: '2026-2027' }]);
+      p.class.findMany.mockResolvedValue([
+        { id: 'class-1', name: 'Grade 3' },
+      ]);
+      p.section.findMany.mockResolvedValue([
+        { id: 'section-1', name: 'A' },
+      ]);
+      p.subject.findMany.mockResolvedValue([
+        { id: 'sub-1', name: 'Mathematics' },
       ]);
 
       const result =
@@ -566,17 +575,7 @@ describe('Homework Hardening', () => {
         subjectId: 'sub-1',
         subjectName: 'Mathematics',
       });
-      // Must query scoped to this exact teacher's staff record and tenant,
-      // never a tenant-wide or cross-teacher listing.
-      expect(p.subjectTeacherAssignment.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            tenantId: 'tenant-a',
-            staffId: 'teacher-1',
-            academicYear: { isCurrent: true },
-          }),
-        }),
-      );
+      expect(p.subjectTeacherAssignment.findMany).not.toHaveBeenCalled();
     });
 
     it('rejects when the actor has no active teacher/staff profile', async () => {
@@ -598,10 +597,14 @@ describe('Homework Hardening', () => {
         tenantId: 'tenant-a',
         userId: 'user-1',
       });
-      p.subjectTeacherAssignment.findMany.mockResolvedValue([
-        { classId: 'class-1', sectionId: 'section-1', subjectId: 'sub-1' },
-      ]);
-      p.section.findMany.mockResolvedValue([]);
+      teacherAssignments.push(
+        teacherAssignmentFixture({
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: 'sub-1',
+          staffId: 'teacher-1',
+        }),
+      );
       p.homeworkAssignment.findMany.mockResolvedValue([]);
       p.homeworkAssignment.count.mockResolvedValue(0);
 
@@ -674,6 +677,19 @@ describe('Homework Hardening', () => {
           guardian: { userId: 'parent-user-1' },
           studentId: 'other-student',
           student: { lifecycleStatus: 'ACTIVE' },
+          status: 'ACTIVE',
+          verificationStatus: 'VERIFIED',
+          approvalStatus: 'APPROVED',
+          effectiveFrom: { lte: expect.any(Date) },
+          AND: [
+            {
+              OR: [
+                { effectiveUntil: null },
+                { effectiveUntil: { gt: expect.any(Date) } },
+              ],
+            },
+            { capabilities: { has: 'ACADEMICS_VIEW' } },
+          ],
         },
         select: { studentId: true },
       });

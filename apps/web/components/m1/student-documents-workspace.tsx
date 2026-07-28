@@ -33,6 +33,7 @@ export function StudentDocumentsWorkspace() {
   const [toast, setToast] = useState<{ tone: 'success' | 'danger'; title: string; description: string } | null>(null);
   const [guardianToRemove, setGuardianToRemove] = useState<{ id: string; name: string; isPrimary: boolean } | null>(null);
   const [guardianRemovalReason, setGuardianRemovalReason] = useState('');
+  const [guardianRemovalEvidenceReference, setGuardianRemovalEvidenceReference] = useState('');
   const [guardianRemovalReplacementId, setGuardianRemovalReplacementId] = useState('');
   const [guardianRemovalAccessReviewed, setGuardianRemovalAccessReviewed] = useState(false);
   const [documentToArchive, setDocumentToArchive] = useState<StudentDocument | null>(null);
@@ -241,14 +242,16 @@ export function StudentDocumentsWorkspace() {
       if (guardianToRemove.isPrimary && !guardianRemovalReplacementId) throw new Error('Choose another primary guardian before removing this one.');
       return api.removeStudentGuardianAccess(selectedStudent.id, guardianToRemove.id, {
         reason: guardianRemovalReason,
+        evidenceReference: guardianRemovalEvidenceReference,
         confirmFileAccessReview: guardianRemovalAccessReviewed,
         newPrimaryGuardianId: guardianToRemove.isPrimary ? guardianRemovalReplacementId : null,
       });
     },
     onSuccess: () => {
-      setToast({ tone: 'success', title: 'Guardian access revoked', description: 'The relationship was removed and protected-file access review was recorded.' });
+      setToast({ tone: 'success', title: 'Guardian access revoked', description: 'The relationship was preserved as revoked history and the protected-file access review was recorded.' });
       setGuardianToRemove(null);
       setGuardianRemovalReason('');
+      setGuardianRemovalEvidenceReference('');
       setGuardianRemovalReplacementId('');
       setGuardianRemovalAccessReviewed(false);
       void queryClient.invalidateQueries({ queryKey: ['student-profile', selectedStudent?.id] });
@@ -337,7 +340,7 @@ export function StudentDocumentsWorkspace() {
                 <div className="flex items-center justify-between gap-3"><div><h2 className="text-base font-black text-slate-950">Linked Guardians</h2><p className="mt-1 text-xs text-slate-500">Removing a guardian immediately revokes the student relationship and triggers a protected-file access review.</p></div><StatusBadge status={`${profileQuery.data.guardians.length} LINKED`} tone="info" /></div>
                 {profileQuery.data.guardians.length === 0 ? <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No guardians are linked.</p> : <div className="mt-4 grid gap-3 md:grid-cols-2">{profileQuery.data.guardians.map((guardian) => {
                   const isOnlyGuardian = profileQuery.data.guardians.length <= 1;
-                  return <article key={guardian.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-4"><div className="flex items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h3 className="text-sm font-black text-slate-900">{guardian.fullName}</h3>{guardian.isPrimary ? <StatusBadge status="PRIMARY" tone="info" /> : null}</div><p className="mt-1 text-xs font-semibold text-slate-500">{guardian.relation} · {guardian.primaryPhone}</p><p className="mt-1 text-xs text-slate-500">{guardian.email ?? 'Email not recorded'}</p></div><Button type="button" size="sm" variant="outline" disabled={isOnlyGuardian} title={isOnlyGuardian ? 'A student must have at least one guardian.' : undefined} onClick={() => { setGuardianToRemove({ id: guardian.id, name: guardian.fullName, isPrimary: guardian.isPrimary }); setGuardianRemovalReplacementId(''); setGuardianRemovalAccessReviewed(false); }}>Revoke access</Button></div></article>;
+                  return <article key={guardian.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-4"><div className="flex items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h3 className="text-sm font-black text-slate-900">{guardian.fullName}</h3>{guardian.isPrimary ? <StatusBadge status="PRIMARY" tone="info" /> : null}</div><p className="mt-1 text-xs font-semibold text-slate-500">{guardian.relation} · {guardian.primaryPhone}</p><p className="mt-1 text-xs text-slate-500">{guardian.email ?? 'Email not recorded'}</p></div><Button type="button" size="sm" variant="outline" disabled={isOnlyGuardian} title={isOnlyGuardian ? 'A student must have at least one guardian.' : undefined} onClick={() => { setGuardianToRemove({ id: guardian.id, name: guardian.fullName, isPrimary: guardian.isPrimary }); setGuardianRemovalEvidenceReference(''); setGuardianRemovalReplacementId(''); setGuardianRemovalAccessReviewed(false); }}>Revoke access</Button></div></article>;
                 })}</div>}
               </section>
 
@@ -374,19 +377,20 @@ export function StudentDocumentsWorkspace() {
       <ConfirmDialog
         isOpen={Boolean(guardianToRemove)}
         title="Revoke guardian access?"
-        description={`Remove ${guardianToRemove?.name ?? 'this guardian'} from the selected student and record the required protected-file access review.`}
+        description={`Revoke ${guardianToRemove?.name ?? 'this guardian'} for the selected student, preserve the relationship history, and record the required protected-file access review.`}
         confirmLabel="Revoke guardian access"
         destructive
         isConfirming={removeGuardianMutation.isPending}
-        confirmDisabled={guardianRemovalReason.trim().length < 5 || !guardianRemovalAccessReviewed || Boolean(guardianToRemove?.isPrimary && !guardianRemovalReplacementId)}
-        onClose={() => { setGuardianToRemove(null); setGuardianRemovalReason(''); setGuardianRemovalReplacementId(''); setGuardianRemovalAccessReviewed(false); }}
+        confirmDisabled={guardianRemovalReason.trim().length < 5 || guardianRemovalEvidenceReference.trim().length < 3 || !guardianRemovalAccessReviewed || Boolean(guardianToRemove?.isPrimary && !guardianRemovalReplacementId)}
+        onClose={() => { setGuardianToRemove(null); setGuardianRemovalReason(''); setGuardianRemovalEvidenceReference(''); setGuardianRemovalReplacementId(''); setGuardianRemovalAccessReviewed(false); }}
         onConfirm={() => removeGuardianMutation.mutate()}
       >
         {guardianToRemove?.isPrimary ? (
           <label className="mb-4 block text-sm font-bold text-slate-700">New primary guardian<select value={guardianRemovalReplacementId} onChange={(event) => setGuardianRemovalReplacementId(event.target.value)} className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900"><option value="">Select replacement primary</option>{(profileQuery.data?.guardians ?? []).filter((guardian) => guardian.id !== guardianToRemove.id).map((guardian) => <option key={guardian.id} value={guardian.id}>{guardian.fullName} · {guardian.relation}</option>)}</select></label>
         ) : null}
         <label className="block text-sm font-bold text-slate-700">Audit reason<textarea rows={3} value={guardianRemovalReason} onChange={(event) => setGuardianRemovalReason(event.target.value)} placeholder="Why should this guardian relationship and access be removed?" className="mt-2 font-normal" /></label>
-        <label className="mt-4 flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs font-bold text-slate-700"><input type="checkbox" checked={guardianRemovalAccessReviewed} onChange={(event) => setGuardianRemovalAccessReviewed(event.target.checked)} className="mt-0.5 h-4 w-4 shrink-0" />I reviewed guardian portal and protected-file access before unlinking this guardian.</label>
+        <label className="mt-4 block text-sm font-bold text-slate-700">Evidence reference<input value={guardianRemovalEvidenceReference} onChange={(event) => setGuardianRemovalEvidenceReference(event.target.value)} placeholder="Safe case or register reference" className="mt-2 font-normal" /></label>
+        <label className="mt-4 flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs font-bold text-slate-700"><input type="checkbox" checked={guardianRemovalAccessReviewed} onChange={(event) => setGuardianRemovalAccessReviewed(event.target.checked)} className="mt-0.5 h-4 w-4 shrink-0" />I reviewed guardian portal and protected-file access before revoking this relationship.</label>
       </ConfirmDialog>
       <ConfirmDialog
         isOpen={Boolean(documentToArchive)}

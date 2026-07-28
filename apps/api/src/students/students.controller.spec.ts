@@ -41,6 +41,10 @@ function createController() {
     listGuardianIdentityVerifications: jest.fn(),
     createGuardianIdentityVerification: jest.fn(),
     reviewGuardianIdentityVerification: jest.fn(),
+    getGuardianAccessAdministration: jest.fn(),
+    performGuardianRecoveryAction: jest.fn(),
+    provisionGuardianAccount: jest.fn(),
+    revokeGuardianSession: jest.fn(),
     generateStudentDocumentPdf: jest.fn(),
     revokeGeneratedStudentDocument: jest.fn(),
     getAttendanceHistory: jest.fn(),
@@ -129,6 +133,118 @@ describe('StudentsController M1 contracts', () => {
 
     expect(readinessPermissions).toEqual(['students:read']);
     expect(correctionPermissions).toEqual(['students:update']);
+  });
+
+  it('keeps guardian recovery and device revocation behind high-risk permissions', () => {
+    expect(
+      Reflect.getMetadata(
+        PERMISSIONS_KEY,
+        StudentsController.prototype.getGuardianAccessAdministration,
+      ),
+    ).toEqual(['guardians:read']);
+    expect(
+      Reflect.getMetadata(
+        PERMISSIONS_KEY,
+        StudentsController.prototype.performGuardianRecoveryAction,
+      ),
+    ).toEqual(['guardians:update', 'guardians:verify', 'users:reset_password']);
+    expect(
+      Reflect.getMetadata(
+        PERMISSIONS_KEY,
+        StudentsController.prototype.provisionGuardianAccount,
+      ),
+    ).toEqual(['guardians:update', 'guardians:verify', 'users:create']);
+    expect(
+      Reflect.getMetadata(
+        PERMISSIONS_KEY,
+        StudentsController.prototype.revokeGuardianSession,
+      ),
+    ).toEqual(['guardians:update', 'guardians:verify', 'users:reset_password']);
+
+    for (const handler of [
+      StudentsController.prototype.updateStudentGuardian,
+      StudentsController.prototype.addStudentGuardian,
+      StudentsController.prototype.performGuardianRecoveryAction,
+      StudentsController.prototype.provisionGuardianAccount,
+      StudentsController.prototype.revokeGuardianSession,
+      StudentsController.prototype.inviteGuardians,
+      StudentsController.prototype.createGuardianIdentityVerification,
+      StudentsController.prototype.reviewGuardianIdentityVerification,
+    ]) {
+      expect(Reflect.getMetadata('THROTTLER:LIMITdefault', handler)).toBe(10);
+      expect(Reflect.getMetadata('THROTTLER:TTLdefault', handler)).toBe(60_000);
+    }
+  });
+
+  it('delegates guardian recovery and one-device revocation with tenant context', () => {
+    const { controller, service } = createController();
+    const action = {
+      action: 'SUSPEND_COMPROMISED_ACCOUNT',
+      verificationMethod: 'TRUSTED_SESSION',
+      reason: 'Guardian reported an unrecognized login',
+      evidenceReference: 'incident-guardian-7',
+    };
+    const revocation = {
+      reason: 'Guardian does not recognize this device',
+      evidenceReference: 'support-case-103',
+    };
+    service.performGuardianRecoveryAction.mockReturnValue({ success: true });
+    service.revokeGuardianSession.mockReturnValue({ success: true });
+
+    expect(
+      controller.performGuardianRecoveryAction(
+        'student-1',
+        'guardian-1',
+        action as never,
+        actor,
+      ),
+    ).toEqual({ success: true });
+    expect(service.performGuardianRecoveryAction).toHaveBeenCalledWith(
+      'student-1',
+      'guardian-1',
+      action,
+      actor,
+    );
+
+    const provision = {
+      email: 'maya@example.com',
+      temporaryPassword: 'Temporary!Parent2026',
+      verificationMethod: 'SCHOOL_IDENTITY_REVIEW',
+      reason: 'Guardian app access approved after in-person review',
+      evidenceReference: 'front-office-register-15',
+    };
+    service.provisionGuardianAccount.mockReturnValue({ success: true });
+    expect(
+      controller.provisionGuardianAccount(
+        'student-1',
+        'guardian-1',
+        provision as never,
+        actor,
+      ),
+    ).toEqual({ success: true });
+    expect(service.provisionGuardianAccount).toHaveBeenCalledWith(
+      'student-1',
+      'guardian-1',
+      provision,
+      actor,
+    );
+
+    expect(
+      controller.revokeGuardianSession(
+        'student-1',
+        'guardian-1',
+        'session-1',
+        revocation,
+        actor,
+      ),
+    ).toEqual({ success: true });
+    expect(service.revokeGuardianSession).toHaveBeenCalledWith(
+      'student-1',
+      'guardian-1',
+      'session-1',
+      revocation,
+      actor,
+    );
   });
 
   it('delegates student readiness with tenant-scoped actor context', () => {

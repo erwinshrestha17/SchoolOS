@@ -11,6 +11,12 @@ import { UsersService } from '../users/users.service';
 import { StudentPhotoService } from './student-photo.service';
 import { StudentLifecycleStatus, EnrollmentStatus } from '@prisma/client';
 import { AuthContext } from '../auth/auth.types';
+import { TeacherCapability } from '../teacher-scope/teacher-capability';
+import {
+  createTeacherScopeDeniedException,
+  TEACHER_SCOPE_DENIED_CODE,
+  TeacherScopeService,
+} from '../teacher-scope/teacher-scope.service';
 
 describe('StudentsService (iEMIS Export)', () => {
   let service: StudentsService;
@@ -19,6 +25,10 @@ describe('StudentsService (iEMIS Export)', () => {
   let fileRegistryService: {
     registerFile: jest.Mock;
     markUploaded: jest.Mock;
+  };
+  let teacherScopeService: {
+    requireActorAccess: jest.Mock;
+    resolveReadableScope: jest.Mock;
   };
 
   const mockAuth: AuthContext = {
@@ -32,6 +42,18 @@ describe('StudentsService (iEMIS Export)', () => {
   };
 
   beforeEach(async () => {
+    teacherScopeService = {
+      requireActorAccess: jest.fn().mockResolvedValue({
+        source: 'ASSIGNMENT',
+        assignmentId: 'assignment-1',
+      }),
+      resolveReadableScope: jest.fn().mockResolvedValue({
+        assignments: [],
+        homeroomSectionIds: new Set<string>(),
+        subjectsBySection: new Map<string, Set<string>>(),
+        allSectionIds: new Set<string>(),
+      }),
+    };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         StudentsService,
@@ -89,6 +111,7 @@ describe('StudentsService (iEMIS Export)', () => {
           provide: StudentPhotoService,
           useValue: { getPhotoContent: jest.fn() },
         },
+        { provide: TeacherScopeService, useValue: teacherScopeService },
       ],
     }).compile();
 
@@ -349,26 +372,19 @@ describe('StudentsService (iEMIS Export)', () => {
       (prisma.student.findFirst as jest.Mock).mockResolvedValue(
         buildReadinessStudent(),
       );
-      (prisma.staff.findFirst as jest.Mock).mockResolvedValue({
-        id: 'staff-1',
-      });
-      (
-        prisma.subjectTeacherAssignment.findFirst as jest.Mock
-      ).mockResolvedValue({ id: 'assignment-1' });
 
       const result = await service.getIemisReadiness(
         'student-assigned',
         teacherAuth,
       );
 
-      expect(prisma.subjectTeacherAssignment.findFirst).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            tenantId: teacherAuth.tenantId,
-            staffId: 'staff-1',
-            classId: 'class-12',
-          }),
-        }),
+      expect(teacherScopeService.requireActorAccess).toHaveBeenCalledWith(
+        {
+          classId: 'class-12',
+          sectionId: 'section-a',
+          capability: TeacherCapability.CLASS_ROSTER_READ,
+        },
+        teacherAuth,
       );
       expect(result.status).toBe('READY');
     });
@@ -382,19 +398,17 @@ describe('StudentsService (iEMIS Export)', () => {
       (prisma.student.findFirst as jest.Mock).mockResolvedValue(
         buildReadinessStudent(),
       );
-      (prisma.staff.findFirst as jest.Mock).mockResolvedValue({
-        id: 'staff-2',
-      });
-      (
-        prisma.subjectTeacherAssignment.findFirst as jest.Mock
-      ).mockResolvedValue(null);
-      (prisma.section.findFirst as jest.Mock).mockResolvedValue(null);
+      teacherScopeService.requireActorAccess.mockRejectedValue(
+        createTeacherScopeDeniedException(),
+      );
 
       await expect(
         service.getIemisReadiness('student-unassigned', teacherAuth),
-      ).rejects.toThrow(
-        'Student reporting readiness is outside your teaching scope',
-      );
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: TEACHER_SCOPE_DENIED_CODE,
+        }),
+      });
     });
   });
 

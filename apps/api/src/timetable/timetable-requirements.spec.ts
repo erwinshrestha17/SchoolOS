@@ -7,9 +7,14 @@ import { AuditService } from '../audit/audit.service';
 import { CommunicationsService } from '../communications/communications.service';
 import { AttendanceService } from '../attendance/attendance.service';
 import { AuthContext } from '../auth/auth.types';
-import { createPrismaMock, PrismaMock } from '../../test/test-helpers';
+import {
+  createPermissiveTeacherScope,
+  createPrismaMock,
+  PrismaMock,
+} from '../../test/test-helpers';
 import { TimetableLifecycleService } from './timetable-lifecycle.service';
 import { TimetableConflictService } from './timetable-conflict.service';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 
 describe('Timetable Requirements and Availability', () => {
   let service: TimetableService;
@@ -45,6 +50,10 @@ describe('Timetable Requirements and Availability', () => {
         { provide: TimetableLifecycleService, useValue: lifecycleService },
         { provide: TimetableConflictService, useValue: conflictService },
         { provide: AttendanceService, useValue: {} },
+        {
+          provide: TeacherScopeService,
+          useValue: createPermissiveTeacherScope(),
+        },
       ],
     }).compile();
 

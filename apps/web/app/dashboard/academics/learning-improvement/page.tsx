@@ -1,5 +1,7 @@
-import { LearningImprovementWorkspace } from '@/components/academics/learning-improvement/learning-improvement-workspace';
+import { notFound } from 'next/navigation';
 
 export default function LearningImprovementPage() {
-  return <LearningImprovementWorkspace />;
+  // P2-14 is outside the controlled-pilot boundary. Keep the preserved
+  // implementation unreachable until the project owner explicitly reopens it.
+  notFound();
 }

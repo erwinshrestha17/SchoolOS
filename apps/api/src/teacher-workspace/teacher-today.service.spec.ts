@@ -5,6 +5,7 @@ import { AttendanceService } from '../attendance/attendance.service';
 import { HomeworkService } from '../homework/homework.service';
 import { TimetableService } from '../timetable/timetable.service';
 import type { AuthContext } from '../auth/auth.types';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 
 const actor: AuthContext = {
   tenantId: 'tenant-1',
@@ -62,20 +63,25 @@ describe('TeacherTodayService', () => {
       }),
     };
     const prisma = {
-      staff: { findFirst: jest.fn().mockResolvedValue({ id: 'staff-1' }) },
       academicYear: {
         findFirst: jest.fn().mockResolvedValue({ id: 'year-1' }),
-      },
-      subjectTeacherAssignment: {
-        findMany: jest
-          .fn()
-          .mockResolvedValue(
-            overrides.subjectAssignments ?? [{ subjectId: 'subject-1' }],
-          ),
       },
       examTerm: {
         findMany: jest.fn().mockResolvedValue(overrides.examTerms ?? []),
       },
+    };
+    const teacherScopeService = {
+      listActiveAssignments: jest.fn().mockResolvedValue(
+        (overrides.subjectAssignments ?? [{ subjectId: 'subject-1' }]).map(
+          (assignment, index) => ({
+            assignmentId: `assignment-${index + 1}`,
+            academicYearId: 'year-1',
+            classId: 'class-1',
+            sectionId: 'section-1',
+            ...assignment,
+          }),
+        ),
+      ),
     };
 
     const service = new TeacherTodayService(
@@ -83,6 +89,7 @@ describe('TeacherTodayService', () => {
       attendanceService as unknown as AttendanceService,
       homeworkService as unknown as HomeworkService,
       timetableService as unknown as TimetableService,
+      teacherScopeService as unknown as TeacherScopeService,
     );
     return { service, prisma, homeworkService, timetableService };
   }

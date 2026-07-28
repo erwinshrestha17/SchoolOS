@@ -7,6 +7,7 @@ import {
 import {
   AudienceType,
   ConsentType,
+  GuardianCapability,
   NotificationChannel,
   TeacherAvailabilityType,
   TimetableSubstitutionStatus,
@@ -14,6 +15,7 @@ import {
   TeacherWorkloadLimit,
   Prisma,
 } from '@prisma/client';
+import { buildActiveGuardianRelationshipWhere } from '../common/security/parent-scope';
 import { ConflictSlotInput } from './timetable-conflict.service';
 import { TimetableLifecycleService } from './timetable-lifecycle.service';
 import { AuditService } from '../audit/audit.service';
@@ -49,6 +51,8 @@ import {
   UpdateSubjectWeeklyRequirementDto,
   UpdateTeacherAvailabilityDto,
 } from './dto/timetable-setup.dto';
+import { TeacherCapability } from '../teacher-scope/teacher-capability';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 
 const TEACHER_VISIBLE_TIMETABLE_VERSION_STATUSES: readonly TimetableVersionStatus[] =
   [TimetableVersionStatus.PUBLISHED, TimetableVersionStatus.LOCKED] as const;
@@ -61,6 +65,7 @@ export class TimetableService {
     private readonly auditService: AuditService,
     private readonly lifecycleService: TimetableLifecycleService,
     private readonly attendanceService: AttendanceService,
+    private readonly teacherScopeService: TeacherScopeService,
   ) {}
 
   async listTimetable(actor: AuthContext, query: TimetableQueryDto) {
@@ -115,6 +120,10 @@ export class TimetableService {
       const link = await this.prisma.studentGuardian.findFirst({
         where: {
           tenantId: actor.tenantId,
+          ...buildActiveGuardianRelationshipWhere(
+            new Date(),
+            GuardianCapability.ACADEMICS_VIEW,
+          ),
           guardian: { userId: actor.userId },
           ...(query.studentId ? { studentId: query.studentId } : {}),
           student: { lifecycleStatus: 'ACTIVE' },
@@ -1877,13 +1886,7 @@ export class TimetableService {
     return staff;
   }
 
-  /**
-   * Guards any class/section-scoped timetable read against the "no active
-   * assignment, no data" invariant. A non-privileged teacher actor must hold
-   * either a SubjectTeacherAssignment for this class(+section) or be the
-   * section's classTeacherId; a class-wide SubjectTeacherAssignment
-   * (sectionId null) covers every section of that class.
-   */
+  /** Guards class/section timetable reads through canonical assignment scope. */
   private async ensureClassSectionReadableByTeacher(
     actor: AuthContext,
     classId: string,
@@ -1893,62 +1896,44 @@ export class TimetableService {
       return;
     }
 
-    const staff = await this.resolveActorStaff(actor);
-    if (!staff) {
-      throw new NotFoundException('No active timetable found for this class');
-    }
-
-    const [subjectAssignment, classTeacherSection] = await Promise.all([
-      this.prisma.subjectTeacherAssignment.findFirst({
-        where: {
-          tenantId: actor.tenantId,
-          staffId: staff.id,
+    if (sectionId) {
+      await this.teacherScopeService.requireActorAccess(
+        {
           classId,
-          ...(sectionId ? { OR: [{ sectionId }, { sectionId: null }] } : {}),
+          sectionId,
+          capability: TeacherCapability.CLASS_ROSTER_READ,
         },
-        select: { id: true },
-      }),
-      sectionId
-        ? this.prisma.section.findFirst({
-            where: {
-              tenantId: actor.tenantId,
-              id: sectionId,
-              classId,
-              classTeacherId: staff.id,
-            },
-            select: { id: true },
-          })
-        : null,
-    ]);
-
-    if (!subjectAssignment && !classTeacherSection) {
-      throw new NotFoundException('No active timetable found for this class');
+        actor,
+      );
+      return;
     }
+
+    await this.teacherScopeService.requireActorAccessAnySectionOfClass(
+      {
+        classId,
+        capability: TeacherCapability.CLASS_ROSTER_READ,
+      },
+      actor,
+    );
   }
 
   private async getTeacherTimetableScope(
     actor: AuthContext,
   ): Promise<Prisma.SubjectWeeklyRequirementWhereInput[]> {
-    const staff = await this.resolveActorStaff(actor);
-    if (!staff) return [];
-    const assignments = await this.prisma.subjectTeacherAssignment.findMany({
-      where: { tenantId: actor.tenantId, staffId: staff.id },
-      select: {
-        academicYearId: true,
-        classId: true,
-        sectionId: true,
-        subjectId: true,
-      },
-      take: 200,
-    });
-    return assignments.map((assignment) => ({
-      academicYearId: assignment.academicYearId,
-      classId: assignment.classId,
-      subjectId: assignment.subjectId,
-      OR: assignment.sectionId
-        ? [{ sectionId: assignment.sectionId }, { sectionId: null }]
-        : [{ sectionId: null }],
-    }));
+    const assignments =
+      await this.teacherScopeService.listActiveAssignments(actor);
+    return assignments.flatMap((assignment) =>
+      assignment.subjectId
+        ? [
+            {
+              academicYearId: assignment.academicYearId,
+              classId: assignment.classId,
+              sectionId: assignment.sectionId,
+              subjectId: assignment.subjectId,
+            },
+          ]
+        : [],
+    );
   }
 
   private async ensureVersionRefs(

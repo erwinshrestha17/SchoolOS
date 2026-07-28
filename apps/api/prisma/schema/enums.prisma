@@ -653,6 +653,37 @@ enum GuardianIdentityVerificationStatus {
   REVOKED
 }
 
+enum GuardianCapability {
+  ACADEMICS_VIEW
+  ATTENDANCE_VIEW
+  LEAVE_MANAGE
+  FEES_VIEW
+  FEES_PAY
+  EMERGENCY_ALERT_RECEIVE
+  SCHOOL_COMMUNICATE
+  SPECIFIC_CONSENT_GIVE
+  PICKUP_AUTHORIZE
+  COMPLAINT_OR_CORRECTION_SUBMIT
+}
+
+enum GuardianRelationshipVerificationStatus {
+  UNVERIFIED
+  VERIFIED
+}
+
+enum GuardianRelationshipStatus {
+  ACTIVE
+  SUSPENDED
+  REVOKED
+  EXPIRED
+}
+
+enum GuardianRelationshipApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum ConversationType {
   DIRECT
   CLASS

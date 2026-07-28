@@ -31,10 +31,12 @@ import {
   AudienceType,
   ConsentType,
   EnrollmentStatus,
+  GuardianCapability,
   NotificationChannel,
   Prisma,
   StaffStatus,
   StudentLifecycleStatus,
+  TeacherAssignmentType,
   TimetableVersionStatus,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
@@ -67,6 +69,7 @@ import {
   getParentStudentIds,
   getStudentOwnId,
   isParentOnly,
+  requireGuardianCapability,
 } from '../common/security/parent-scope';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SettingsService } from '../settings/settings.service';
@@ -113,15 +116,7 @@ export class AttendanceService {
   ) {}
 
   async listTeacherMobileClassSections(actor: AuthContext) {
-    const staff = await this.prisma.staff.findFirst({
-      where: { userId: actor.userId, tenantId: actor.tenantId },
-      select: { id: true },
-    });
-
-    if (!staff) {
-      return { items: [] };
-    }
-
+    const limit = 200;
     const currentAcademicYear = await this.prisma.academicYear.findFirst({
       where: { tenantId: actor.tenantId, isCurrent: true },
       select: { id: true, name: true },
@@ -131,31 +126,47 @@ export class AttendanceService {
       return { items: [] };
     }
 
-    const [assignments, classTeacherSections] = await Promise.all([
-      this.prisma.subjectTeacherAssignment.findMany({
+    const assignments = (
+      await this.teacherScopeService.listActiveAssignments(actor, {
+        academicYearId: currentAcademicYear.id,
+      })
+    ).slice(0, limit);
+    if (assignments.length === 0) {
+      return { items: [] };
+    }
+
+    const [classes, sections, subjects] = await Promise.all([
+      this.prisma.class.findMany({
         where: {
           tenantId: actor.tenantId,
-          staffId: staff.id,
-          academicYearId: currentAcademicYear.id,
+          id: { in: uniqueValues(assignments.map((item) => item.classId)) },
         },
-        include: {
-          academicYear: { select: { id: true, name: true } },
-          class: { select: { id: true, name: true } },
-          section: { select: { id: true, name: true } },
-          subject: { select: { name: true } },
-        },
-        orderBy: [{ class: { level: 'asc' } }, { createdAt: 'asc' }],
-        take: 100,
+        select: { id: true, name: true, level: true },
       }),
       this.prisma.section.findMany({
-        where: { tenantId: actor.tenantId, classTeacherId: staff.id },
-        include: {
-          class: { select: { id: true, name: true, level: true } },
+        where: {
+          tenantId: actor.tenantId,
+          id: { in: uniqueValues(assignments.map((item) => item.sectionId)) },
         },
-        orderBy: [{ class: { level: 'asc' } }, { name: 'asc' }],
-        take: 100,
+        select: { id: true, name: true },
+      }),
+      this.prisma.subject.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          id: {
+            in: uniqueValues(
+              assignments
+                .map((item) => item.subjectId)
+                .filter((subjectId): subjectId is string => Boolean(subjectId)),
+            ),
+          },
+        },
+        select: { id: true, name: true },
       }),
     ]);
+    const classById = new Map(classes.map((item) => [item.id, item]));
+    const sectionById = new Map(sections.map((item) => [item.id, item]));
+    const subjectById = new Map(subjects.map((item) => [item.id, item]));
 
     const items = new Map<
       string,
@@ -200,26 +211,22 @@ export class AttendanceService {
     };
 
     assignments.forEach((assignment) => {
+      const classroom = classById.get(assignment.classId);
+      const section = sectionById.get(assignment.sectionId);
+      if (!classroom || !section) return;
       addItem({
         academicYearId: assignment.academicYearId,
-        academicYearName: assignment.academicYear.name,
-        classId: assignment.classId,
-        className: assignment.class.name,
-        sectionId: assignment.sectionId ?? null,
-        sectionName: assignment.section?.name,
-        subjectName: assignment.subject.name,
-      });
-    });
-
-    classTeacherSections.forEach((section) => {
-      addItem({
-        academicYearId: currentAcademicYear.id,
         academicYearName: currentAcademicYear.name,
-        classId: section.classId,
-        className: section.class.name,
-        sectionId: section.id,
+        classId: assignment.classId,
+        className: classroom.name,
+        sectionId: assignment.sectionId,
         sectionName: section.name,
-        subjectName: 'Class teacher',
+        subjectName:
+          assignment.assignmentType === TeacherAssignmentType.CLASS_TEACHER
+            ? 'Class teacher'
+            : ((assignment.subjectId
+                ? subjectById.get(assignment.subjectId)?.name
+                : null) ?? 'Assigned teacher'),
       });
     });
 
@@ -473,7 +480,11 @@ export class AttendanceService {
   }
 
   async listAttendance(actor: AuthContext) {
-    const studentScope = await buildStudentScopeFilter(this.prisma, actor);
+    const studentScope = await buildStudentScopeFilter(
+      this.prisma,
+      actor,
+      GuardianCapability.ATTENDANCE_VIEW,
+    );
 
     // Teacher filtering
     const teacherSectionIds = await this.getTeacherSectionIds(
@@ -2121,7 +2132,12 @@ export class AttendanceService {
         'Parent attendance correction is not available for this account.',
       );
     }
-    await this.ensureStudentAttendanceAccess(input.studentId, actor);
+    await this.ensureStudentAttendanceAccess(
+      input.studentId,
+      actor,
+      undefined,
+      GuardianCapability.COMPLAINT_OR_CORRECTION_SUBMIT,
+    );
     const attendanceDate = stripTime(new Date(input.attendanceDate));
     if (
       Number.isNaN(attendanceDate.getTime()) ||
@@ -2382,7 +2398,12 @@ export class AttendanceService {
         'Parent attendance correction is not available for this account.',
       );
     }
-    await this.ensureStudentAttendanceAccess(studentId, actor);
+    await this.ensureStudentAttendanceAccess(
+      studentId,
+      actor,
+      undefined,
+      GuardianCapability.COMPLAINT_OR_CORRECTION_SUBMIT,
+    );
     const items = await this.prisma.attendanceCorrectionRequest.findMany({
       where: {
         tenantId: actor.tenantId,
@@ -2436,7 +2457,12 @@ export class AttendanceService {
     if (!request) {
       throw new NotFoundException('Attendance correction request not found.');
     }
-    await this.ensureStudentAttendanceAccess(request.studentId, actor);
+    await this.ensureStudentAttendanceAccess(
+      request.studentId,
+      actor,
+      undefined,
+      GuardianCapability.COMPLAINT_OR_CORRECTION_SUBMIT,
+    );
     if (request.status === 'CANCELLED') {
       return request;
     }
@@ -4028,7 +4054,11 @@ export class AttendanceService {
   }
 
   async getAnalytics(actor: AuthContext) {
-    const studentScope = await buildStudentScopeFilter(this.prisma, actor);
+    const studentScope = await buildStudentScopeFilter(
+      this.prisma,
+      actor,
+      GuardianCapability.ATTENDANCE_VIEW,
+    );
     const teacherSectionIds = await this.getTeacherSectionIds(
       actor,
       studentScope,
@@ -4995,18 +5025,6 @@ export class AttendanceService {
       return;
     }
 
-    const staff = await this.prisma.staff.findFirst({
-      where: {
-        userId: actor.userId,
-        tenantId: actor.tenantId,
-        status: StaffStatus.ACTIVE,
-      },
-    });
-
-    if (!staff) {
-      throw new ForbiddenException('Staff record not found in this tenant');
-    }
-
     // Resolved through the canonical TeacherScopeService rather than reading
     // Section.classTeacherId / SubjectTeacherAssignment directly. The ad hoc
     // version honoured neither assignment effective dates nor assignment
@@ -5017,8 +5035,6 @@ export class AttendanceService {
     // an active assignment in any year for this class/section rather than
     // inventing one; it never widens past class+section.
     const base = {
-      tenantId: actor.tenantId,
-      staffId: staff.id,
       academicYearId,
       classId,
     };
@@ -5029,8 +5045,13 @@ export class AttendanceService {
     // such a request -- so it is refused rather than resolved against an
     // arbitrary section. Callers pass a concrete sectionId.
     if (!sectionId) {
-      throw new ForbiddenException(
-        'You are not assigned as Class Teacher or Subject Teacher for this section',
+      return this.teacherScopeService.denyActorAccess(
+        {
+          classId,
+          capability: TeacherCapability.CLASS_ROSTER_READ,
+          reason: 'missing_scope',
+        },
+        actor,
       );
     }
 
@@ -5042,15 +5063,21 @@ export class AttendanceService {
       TeacherCapability.HOMEROOM_ATTENDANCE_MARK,
       TeacherCapability.CLASS_ROSTER_READ,
     ]) {
-      const grant = await this.teacherScopeService.canAccess(
+      const grant = await this.teacherScopeService.canActorAccess(
         { ...base, sectionId, capability },
         actor,
       );
       if (grant) return;
     }
 
-    throw new ForbiddenException(
-      'You are not assigned as Class Teacher or Subject Teacher for this section',
+    await this.teacherScopeService.denyActorAccess(
+      {
+        classId,
+        sectionId,
+        capability: TeacherCapability.CLASS_ROSTER_READ,
+        reason: 'no_assignment',
+      },
+      actor,
     );
   }
 
@@ -5285,6 +5312,7 @@ export class AttendanceService {
       classId: string;
       sectionId?: string | null;
     },
+    guardianCapability: GuardianCapability = GuardianCapability.ATTENDANCE_VIEW,
   ) {
     const student = await this.prisma.student.findFirst({
       where: {
@@ -5303,23 +5331,12 @@ export class AttendanceService {
     }
 
     if (actor.roles.includes('parent')) {
-      const guardian = await this.prisma.guardian.findFirst({
-        where: {
-          tenantId: actor.tenantId,
-          userId: actor.userId,
-        },
-        include: {
-          studentLinks: true,
-        },
-      });
-      const allowedStudentIds = guardian
-        ? guardian.studentLinks.map((link) => link.studentId)
-        : [];
-      if (!allowedStudentIds.includes(studentId)) {
-        throw new ForbiddenException(
-          'Access denied to this student attendance.',
-        );
-      }
+      await requireGuardianCapability(
+        this.prisma,
+        actor,
+        studentId,
+        guardianCapability,
+      );
       return;
     }
 
@@ -5373,7 +5390,11 @@ export class AttendanceService {
     // including a base teacher -- unlike its siblings listAttendance/
     // getAnalytics in this same file, which already narrow to the teacher's
     // own sections via getTeacherSectionIds. Applying the same helper here.
-    const studentScope = await buildStudentScopeFilter(this.prisma, actor);
+    const studentScope = await buildStudentScopeFilter(
+      this.prisma,
+      actor,
+      GuardianCapability.ATTENDANCE_VIEW,
+    );
     const teacherSectionIds = await this.getTeacherSectionIds(
       actor,
       studentScope,
@@ -5987,34 +6008,13 @@ export class AttendanceService {
       return undefined;
     }
 
-    const staff = await this.prisma.staff.findFirst({
-      where: { userId: actor.userId, tenantId: actor.tenantId },
-    });
-
-    if (!staff) {
-      return [];
-    }
-
-    const [assignments, sections] = await Promise.all([
-      this.prisma.subjectTeacherAssignment.findMany({
-        where: { staffId: staff.id, tenantId: actor.tenantId },
-        select: { sectionId: true },
-      }),
-      this.prisma.section.findMany({
-        where: { classTeacherId: staff.id, tenantId: actor.tenantId },
-        select: { id: true },
-      }),
-    ]);
-
-    return Array.from(
-      new Set([
-        ...assignments
-          .map((a) => a.sectionId)
-          .filter((id): id is string => !!id),
-        ...sections.map((s) => s.id),
-      ]),
-    );
+    const scope = await this.teacherScopeService.resolveReadableScope(actor);
+    return [...scope.allSectionIds];
   }
+}
+
+function uniqueValues<T>(values: T[]): T[] {
+  return [...new Set(values)];
 }
 
 type StudentAttendanceSessionRow = {

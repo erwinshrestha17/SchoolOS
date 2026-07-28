@@ -286,6 +286,7 @@ Map<String, dynamic> _encodeChild(ParentPortalChild child) => {
   'academicYearStartsOn': child.academicYearStartsOn,
   'academicYearEndsOn': child.academicYearEndsOn,
   'academicYear': child.academicYear,
+  'capabilities': child.capabilities.toList()..sort(),
 };
 
 ParentPortalChild? _decodeChild(Map<String, dynamic> json) {
@@ -314,6 +315,9 @@ ParentPortalChild? _decodeChild(Map<String, dynamic> json) {
     academicYearStartsOn: _string(json['academicYearStartsOn']),
     academicYearEndsOn: _string(json['academicYearEndsOn']),
     academicYear: _string(json['academicYear']) ?? '',
+    capabilities: (json['capabilities'] as List<dynamic>? ?? const [])
+        .whereType<String>()
+        .toSet(),
   );
 }
 

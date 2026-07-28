@@ -347,35 +347,6 @@ Future<void> _showStudentSummary(
                       ],
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.md),
-                  AppCard(
-                    hasShadow: false,
-                    color: AppColors.info.withValues(alpha: 0.08),
-                    onTap: () {
-                      Navigator.pop(context);
-                      context.push(
-                        AppRoutes.teacherStudentLearningSupportDetail(
-                          studentId: entry.studentId,
-                          academicYearId: classSection.academicYearId,
-                          classId: classSection.classId,
-                          sectionId: classSection.sectionId,
-                        ),
-                      );
-                    },
-                    child: const Row(
-                      children: [
-                        Icon(Icons.volunteer_activism_outlined),
-                        SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: Text(
-                            'Open learning support',
-                            style: TextStyle(fontWeight: FontWeight.w800),
-                          ),
-                        ),
-                        Icon(Icons.chevron_right_rounded),
-                      ],
-                    ),
-                  ),
                 ],
               );
             },

@@ -234,7 +234,7 @@ export class MobilePrincipalController {
 
   @Get('learning-attention')
   @Permissions('academics:read')
-  @RequiredModule('academics')
+  @RequiredModule('learning')
   learningAttention(
     @CurrentAuth() auth: AuthContext,
     @Query() query: EarlyWarningQueryDto,
@@ -244,7 +244,7 @@ export class MobilePrincipalController {
 
   @Get('intervention-cases')
   @Permissions('academics:read')
-  @RequiredModule('academics')
+  @RequiredModule('learning')
   interventionCases(
     @CurrentAuth() auth: AuthContext,
     @Query() query: ListStudentInterventionsDto,
@@ -254,7 +254,7 @@ export class MobilePrincipalController {
 
   @Get('intervention-cases/:caseId')
   @Permissions('academics:read')
-  @RequiredModule('academics')
+  @RequiredModule('learning')
   interventionCase(
     @CurrentAuth() auth: AuthContext,
     @Param('caseId', new ParseUUIDPipe()) caseId: string,
@@ -264,7 +264,7 @@ export class MobilePrincipalController {
 
   @Post('intervention-cases/:caseId/entries')
   @Permissions('academics:enter_marks')
-  @RequiredModule('academics')
+  @RequiredModule('learning')
   addInterventionCaseEntry(
     @CurrentAuth() auth: AuthContext,
     @Param('caseId', new ParseUUIDPipe()) caseId: string,
@@ -279,7 +279,7 @@ export class MobilePrincipalController {
 
   @Patch('intervention-cases/:caseId')
   @Permissions('academics:enter_marks')
-  @RequiredModule('academics')
+  @RequiredModule('learning')
   updateInterventionCase(
     @CurrentAuth() auth: AuthContext,
     @Param('caseId', new ParseUUIDPipe()) caseId: string,
@@ -390,6 +390,7 @@ export class MobilePrincipalController {
 
   @Get('classroom-walkthroughs')
   @Permissions('hr:read')
+  @RequiredModule('learning')
   classroomWalkthroughs(@CurrentAuth() auth: AuthContext) {
     return this.institutionalImprovementService.getPrincipalTeacherDevelopment(
       auth,
@@ -398,6 +399,7 @@ export class MobilePrincipalController {
 
   @Post('classroom-walkthroughs')
   @Permissions('hr:manage')
+  @RequiredModule('learning')
   createClassroomWalkthrough(
     @CurrentAuth() auth: AuthContext,
     @Body() dto: CreateTeacherObservationDto,
@@ -410,6 +412,7 @@ export class MobilePrincipalController {
 
   @Patch('classroom-walkthroughs/:observationId')
   @Permissions('hr:manage')
+  @RequiredModule('learning')
   updateClassroomWalkthrough(
     @CurrentAuth() auth: AuthContext,
     @Param('observationId', new ParseUUIDPipe()) observationId: string,
@@ -424,6 +427,7 @@ export class MobilePrincipalController {
 
   @Get('school-improvement-plans')
   @Permissions('reports:read')
+  @RequiredModule('learning')
   schoolImprovementPlans(@CurrentAuth() auth: AuthContext) {
     return this.institutionalImprovementService.listSchoolImprovementPlans(
       auth,
@@ -433,6 +437,7 @@ export class MobilePrincipalController {
 
   @Patch('school-improvement-actions/:actionId')
   @Permissions('settings:manage')
+  @RequiredModule('learning')
   updateSchoolImprovementAction(
     @CurrentAuth() auth: AuthContext,
     @Param('actionId', new ParseUUIDPipe()) actionId: string,
@@ -447,6 +452,7 @@ export class MobilePrincipalController {
 
   @Get('board-exam-readiness/:track')
   @Permissions('academics:read')
+  @RequiredModule('learning')
   boardExamReadiness(
     @CurrentAuth() auth: AuthContext,
     @Param('track', new ParseEnumPipe(BoardReadinessTrackParam))

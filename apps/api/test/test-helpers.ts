@@ -1,3 +1,5 @@
+import { ForbiddenException } from '@nestjs/common';
+
 /**
  * Test helper types and utilities for SchoolOS E2E tests
  */
@@ -3257,8 +3259,18 @@ export function createPermissiveTeacherScope(staffId = 'staff-1') {
     resolveActiveStaffId: jest.fn().mockResolvedValue(staffId),
     canAccess: jest.fn().mockResolvedValue(grant),
     canAccessAnySectionOfClass: jest.fn().mockResolvedValue(null),
+    canActorAccess: jest.fn().mockResolvedValue(grant),
+    canActorAccessAnySectionOfClass: jest.fn().mockResolvedValue(null),
     requireAccess: jest.fn().mockResolvedValue(grant),
+    requireAccessAnySectionOfClass: jest.fn().mockResolvedValue(grant),
+    requireActorAccess: jest.fn().mockResolvedValue(grant),
+    requireActorAccessAnySectionOfClass: jest.fn().mockResolvedValue(grant),
+    denyActorAccess: jest
+      .fn()
+      .mockRejectedValue(new ForbiddenException('Teacher scope denied')),
     listActiveAssignments: jest.fn().mockResolvedValue([]),
+    listActiveAssignmentsForCapability: jest.fn().mockResolvedValue([]),
+    listTeacherClassSectionCombos: jest.fn().mockResolvedValue([]),
     resolveReadableScope: jest.fn().mockResolvedValue({
       assignments: [],
       homeroomSectionIds: new Set<string>(),

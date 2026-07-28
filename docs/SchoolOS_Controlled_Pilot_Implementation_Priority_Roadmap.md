@@ -1511,12 +1511,12 @@ The pilot must prove:
 
 ## P0 Core
 
-- [ ] P0-01 Shared Teacher Authorization and Scope Resolver
+- [x] P0-01 Shared Teacher Authorization and Scope Resolver
 - [ ] P0-02 Temporary Substitute, Replacement, and Handover
 - [ ] P0-03 Offline Revocation and Cache Purge
 - [ ] P0-04 Effective-Dated Student Rosters
-- [ ] P0-05 Guardian Capability Permission Model
-- [ ] P0-06 Guardian Administration, Recovery, and Revocation
+- [x] P0-05 Guardian Capability Permission Model
+- [x] P0-06 Guardian Administration, Recovery, and Revocation
 - [ ] P0-07 Wrong-Child Prevention
 - [ ] P0-08 Attendance State, Finalization, Conflict, and Correction
 - [ ] P0-09 Notification Severity, Acknowledgement, and Escalation
@@ -1725,3 +1725,409 @@ A controlled pilot may proceed only when SchoolOS can demonstrate:
 The product direction is therefore:
 
 > **Harden identity, assignment scope, guardian permissions, child context, attendance safety, notifications, financial correctness, and device privacy. Validate the existing product under realistic multi-user and offline conditions. Do not broaden SchoolOS until the controlled pilot proves these foundations.**
+
+---
+
+# 14. Implementation Progress Record
+
+This section is the in-repository progress record required by this roadmap. It
+records code and verification evidence only; it does not replace GitHub issue
+tracking, CI artifacts, staging records, device evidence, or release-owner
+approval.
+
+## 14.1 Baseline and change control
+
+| Field | Baseline |
+|---|---|
+| Inventory date | 2026-07-28 |
+| Checkout inspected | `main` at `6a1cd7603fb55dba864560604bf7745c72a8c4c2` |
+| Worktree before inventory | Clean |
+| Release stage | Internal QA / controlled-pilot preparation |
+| Active implementation wave | Wave 1 |
+| Priority rule | Complete or explicitly disable applicable P0 gates before P1; do not begin P2 |
+| Progress-document rule | Maintain this section in place; do not create a competing roadmap or progress Markdown file |
+| Frozen/deferred boundary | M13 remains disabled and frozen; M14 and P2 remain deferred |
+
+### Candidate enabled pilot boundary
+
+The implementation and verification boundary is a Grade 1-10 school using:
+
+- school administrator, principal/head teacher, teacher, parent/guardian, and
+  cashier/accountant personas;
+- admission and guardian linking;
+- enrollment, class/section, teacher assignment, and timetable;
+- attendance capture, finalization, correction, conflict review, and parent
+  alert;
+- homework and limited published academic/result visibility;
+- manual fee collection and backend-confirmed receipt access;
+- notices, notification delivery, structured parent requests, and Principal
+  Attention;
+- web operations plus purpose-limited Parent and Teacher mobile workflows.
+
+This is a candidate code/QA boundary, not a claim that a school pilot has been
+approved or validated.
+
+### Disabled or excluded for the first pilot
+
+| Capability | Decision | Re-enable condition |
+|---|---|---|
+| Real digital payments | Disabled | P0-12 and applicable P1-14 provider, reconciliation, duplicate, refund, and device evidence pass |
+| App-based medical emergency workflow | Manual school procedure only | P0-13, notification fallback, privacy, policy, and device evidence pass |
+| Digital pickup authorization | Not in active product scope | Explicit owner re-approval plus P0-13 and policy evidence |
+| Grade 11-12 / practical shared teaching | Disabled | P1-05 and P1-13 become applicable P0 and pass |
+| Multigrade pilot | Disabled | P1-19 passes for the selected school |
+| Very large classes | Excluded from initial pilot | P1-13 passes with representative 60-80 student evidence |
+| M13 Learning | Disabled and frozen | Separate owner re-approval; not part of this roadmap execution |
+| M14 Intelligence / AI | Deferred | Separate post-pilot approval |
+| P2 capabilities | Deferred | All applicable P0 gates pass and pilot findings are resolved |
+
+## 14.2 Wave 0 source inventory
+
+| Area | Current sources of truth | Baseline finding |
+|---|---|---|
+| Teacher authority | `TeacherAssignment`, `TeacherDelegation`, `TeacherScopeService` | Canonical resolver exists with effective dates, component scope, capability rules, audit, and negative tests |
+| Legacy teacher compatibility | `Section.classTeacherId`, `SubjectTeacherAssignment`, `TimetableSubstitution` | Enabled pilot teacher authorization now reads the canonical resolver; legacy rows remain only for compatibility writes, frozen M13, module-disabled improvement surfaces, and removed Chat compatibility/retention paths |
+| Guardian access | `Guardian`, `StudentGuardian`, `GuardianIdentityVerification` | Linked-child and identity foundations exist, but per-relationship capabilities, state, effective dates, recovery/session revocation, and restriction history are missing |
+| Student roster | `Enrollment` plus current student class/section fields | No complete effective-start/end roster history was verified |
+| Attendance | `AttendanceSession`, `AttendanceRecord`, `AttendanceDraft`, `AttendanceSyncSubmission`, `AttendanceConflict`, correction requests | Idempotency/conflict foundations exist; required state vocabulary, finalization/cutoff semantics, leave reconciliation, period/departure distinctions, and full multi-user evidence remain incomplete |
+| Notification delivery | `NotificationEvent`, `NotificationDelivery`, read receipts, mobile push tokens | Queued/sent/delivered/failed/read foundations exist; provider-accepted, acknowledged, expired, escalated, severity/fallback policy, and provider evidence are incomplete |
+| Structured requests | `SchoolServiceRequest`, notes, attachments | Child-linked, idempotent, assigned, deadline, escalation, resolution, close, and reopen foundations exist; capability enforcement and independent-review coverage remain incomplete |
+| Offline/private mobile data | `PrivateReadCache`, parent dashboard snapshot store, teacher attendance draft store | Safe-read and attendance-draft foundations exist; relationship/assignment-version invalidation and proven secure purge after revocation are incomplete |
+| Sessions/devices | Refresh-token/session handling, secure mobile storage, mobile push installations | Logout/session foundations exist; active-device management, remote revocation UX, re-authentication boundaries, and lost/shared-device evidence remain incomplete |
+| Conditional payments | Backend payment/idempotency/provider-readiness code | Keep disabled until P0-12 evidence passes |
+| Verification | Local schema/OpenAPI/unit/e2e gates and pilot smoke scripts | Local gates exist; seeded authenticated browser, real Android/iOS, provider, backup/restore, and incident-drill evidence are not established |
+
+## 14.3 P0 and conditional-P0 register
+
+Status values in this register are conservative. `Implemented-unverified` and
+`Partial` are not completion states.
+
+| ID | Previous status | Gap or root cause found | Current evidence and limitations | Release decision |
+|---|---|---|---|---|
+| P0-01 | Development complete; locally verified | Enabled pilot paths previously re-derived teacher authority from legacy assignment sources | Canonical resolver adoption, stable `TEACHER_SCOPE_DENIED`, direct-object/protected-file negative coverage, full API regression, typechecks, and mobile regression pass locally; seeded browser/device proof remains part of P0-15 | Proceed to P0-05; do not treat local evidence as pilot validation |
+| P0-02 | Partial | Effective assignments, delegations, and timetable substitution foundations exist without proven long-term replacement, pending-work handover, cache removal, and complete expiry tests | Needs end-to-end substitute and replacement evidence after P0-01 | Block |
+| P0-03 | Partial | Server attendance sync can reject unassigned teachers and mobile caches exist, but no shared scope-version invalidation and secure purge proof was verified | Needs offline-revocation, queued-write rejection, protected-file revocation, push-topic update, and cache-purge tests | Block |
+| P0-04 | Missing/partial | `Enrollment` has status and admission date but no verified effective end/history model for mid-term section changes | Needs schema/migration/backfill, uniqueness rules, assignment refresh, and historical attendance/marks tests | Block |
+| P0-05 | Development complete; locally verified | Linked-child checks previously treated every guardian as equally authorized and the parent system role retained a broad student-directory permission | Persisted capability/state/effective-date/approval/restriction/priority contract, audited relationship writes, stable `GUARDIAN_CAPABILITY_DENIED`, capability-scoped backend/mobile summaries and files, fail-closed Flutter navigation, migration backfill, full API/mobile regression, schema/OpenAPI/typechecks, and expiry/revocation-at-next-request tests pass locally; offline cache purge, admin/session revocation, browser/device, and staging evidence remain under P0-03, P0-06, and P0-15 | Proceed to P0-06; do not treat local evidence as pilot validation |
+| P0-06 | Development complete; locally verified | Guardian identity and link foundations previously lacked one evidence-backed recovery, account-provisioning, session-revocation, compromise-hold, and relationship-lifecycle workflow | Purpose-limited administration APIs and web UX now require verified recovery proof, reason, evidence reference, confirmation, and permission gates; parent-only provisioning is transactional with forced first password change; safe session metadata, selected/all-session revocation, phone recovery, suspend/restore/expire/revoke/deceased transitions, preserved history, cross-tenant denial, and full API regression pass locally; policy-controlled other-guardian notification, authenticated browser/device, and staging evidence remain | Proceed to P0-14; do not treat local evidence as pilot validation |
+| P0-07 | Partial | Linked-child checks and mobile child switching exist, but every high-impact action cannot revalidate a capability that does not yet exist | Needs backend confirmation-context and stale-child/idempotency tests after P0-05 | Block |
+| P0-08 | Partial | Attendance draft/sync/conflict/correction foundations exist, but required finalization/cutoff, leave reconciliation, daily/period/departure state, correction independence, and conflict evidence are incomplete | Existing schema is valid; full multi-user/offline scenario matrix remains | Block |
+| P0-09 | Partial | Delivery, read receipt, retries, push tokens, and notice acknowledgement foundations exist, but severity and delivery state chains are incomplete | Provider-accepted, acknowledged, expired, escalated, fallback, masked-content, and real-provider evidence remain | Block critical alerts |
+| P0-10 | Partial | Secure storage, logout handling, private read cache, and protected downloads exist | Active device list, remote revocation, re-auth, cache encryption/invalidation, screenshot policy, and shared/lost-device evidence remain | Block sensitive mobile workflows |
+| P0-11 | Partial | Structured service requests support idempotency, ownership, deadlines, notes, attachments, escalation, resolution, close, and reopen | Guardian capability checks, category routing, independent dispute review, deduplication/concurrency, and browser/device evidence remain | Block parent cases until verified |
+| P0-12 | Implemented-unverified conditional foundation | Payment and provider-readiness code exists, but provider reconciliation and release evidence are not established | Sandbox/local tests are not payment-provider proof | Keep real digital payments disabled |
+| P0-13 | Disabled conditional capability | Emergency contact data exists, but app-based medical escalation is not pilot-approved; digital pickup is outside active product scope | Manual school procedures still require approval and drill evidence | Keep app workflows disabled |
+| P0-14 | Partial | Tenant, RBAC, file, audit, idempotency, migration, and environment controls exist across modules | Cross-tenant/direct-object suite, restore drill, secrets/config, rate-limit, and full regression evidence remain | Block pilot release |
+| P0-15 | Not established | Local tests and smoke scripts do not establish seeded staging/browser/device/provider/restore/incident evidence | No current evidence proves the complete matrix or absence of severity-1/2 defects | Block pilot release |
+| P1-05 conditional P0 | Partial and disabled | Component scopes exist, but shared/practical authoring and concurrency evidence are incomplete | Not applicable while +2/practical pilot is disabled | Keep disabled |
+| P1-13 conditional P0 | Partial and excluded | Low-end UI patterns exist, but representative large-roster performance/device evidence is incomplete | Not applicable while 60-80 student classes/+2 are excluded | Keep excluded |
+| P1-19 conditional P0 | Missing and disabled | No verified multigrade roster/workload model | Not applicable to initial pilot boundary | Keep disabled |
+
+## 14.4 P1 register
+
+| ID | Previous status | Gap or root cause found | Current limitation | Release decision |
+|---|---|---|---|---|
+| P1-01 | Implemented-unverified | Parent home and prioritization code exists | Must be rechecked after guardian capability and notification severity contracts | Wait for applicable P0 |
+| P1-02 | Partial | English-first critical screens and shared UI foundations exist | Complete critical Nepali copy, accessibility, offline wording, and device evidence only after P0 contracts stabilize | Wait |
+| P1-03 | Partial | Attention-panel and purpose-limited principal foundations exist | Missing verified owning-module drill-through and complete roadmap queue coverage | Wait for Wave 3 |
+| P1-04 | Partial | Timetable substitution foundations exist | Leave/duty integration, eligible suggestion, temporary scope creation/expiry, and class-occurred evidence remain | Wait for P0-01/P0-02 |
+| P1-05 | Partial | Component scope data exists | Shared authorship, reviewer/publisher separation, concurrency, and practical/+2 evidence remain | Disabled for initial pilot |
+| P1-06 | Partial | Daily attendance presentation exists | Period, arrival/departure, leave, and parent-safe derived presentation are incomplete | Wait for P0-08 |
+| P1-07 | Unverified | Curriculum/lesson and institutional-improvement surfaces exist | Roadmap-specific diary, disruption, and closure-replanning behavior is not verified | Do not start before P0 |
+| P1-08 | Partial | Homework lifecycle and attachment checks exist | Cross-subject workload, publication-time safety, deadline correction, and version evidence remain | Wait for P0-01 |
+| P1-09 | Partial | Exam, marks, component, lock, and correction foundations exist | Duty separation and complete zero/absent/exempt/not-assessed/withheld/make-up vocabulary remain | Wait for P0-01 |
+| P1-10 | Partial | Homeroom summary/coordination foundations exist | Missing complete workload, follow-up, meeting, correction, and no-cross-subject-write evidence | Wait for P0-01 |
+| P1-11 | Unverified | Observation/milestone data exists | Visibility classes and accidental-publication prevention are not established | Do not start before P0 |
+| P1-12 | Partial | Structured requests have routing/deadlines/escalation foundations | Communication hours, category routing, SLA, abuse controls, and no-phone-exposure evidence remain | Wait for P0-11 |
+| P1-13 | Partial | Mobile low-bandwidth patterns and attendance shortcuts exist | Low-end Android and representative large-class performance evidence remain | Excluded until verified |
+| P1-14 | Partial conditional | Finance correction/request foundations exist | Payment dispute privacy, reminder pause, statement correction, and provider evidence remain | Keep digital payments disabled |
+| P1-15 | Partial | Published results/report-card and correction foundations exist | Plain explanation, distinction vocabulary, history presentation, and regeneration evidence remain | Wait for P0-01/P0-11 |
+| P1-16 | Partial | Guardian consent capture/revoke exists | Purpose-specific contract, re-authentication, child confirmation, and sensitive-consent evidence remain | Wait for P0-05/P0-10 |
+| P1-17 | Unverified | Meeting/calendar foundations may exist | Parent booking, alternate guardian, summary, owner, and follow-up evidence not verified | Do not start before P0 |
+| P1-18 | Unverified/partial | Notice lifecycle and acknowledgement exist | Explicit replacement/version relationship and significant-change acknowledgement are not established | Wait for P0-09 |
+| P1-19 | Missing conditional | No verified multigrade model | Not applicable to initial pilot | Keep disabled |
+| P1-20 | Partial | Service requests provide restricted notes and escalation foundations | Complaint/safeguarding separation, conflict-of-interest routing, protected evidence, and approved policy remain | Keep full investigation workflow disabled |
+
+## 14.5 P2 register
+
+Every P2 item is outside the implementation boundary while any applicable P0
+gate is incomplete or unverified.
+
+| ID | Previous status | Gap or root cause found | Current evidence | Release decision |
+|---|---|---|---|---|
+| P2-01 | Deferred | Post-pilot activity breadth | Not inventoried for pilot completion | Do not implement |
+| P2-02 | Deferred | Depends on consent/emergency policy and temporary duty scope | Not inventoried for pilot completion | Do not implement |
+| P2-03 | Deferred and disabled | Requires privacy-preserving mentoring design | Teacher-development and learning-improvement routes are hidden from active web/mobile navigation; backend improvement APIs fail closed behind the disabled `learning` entitlement; retained data/source is unchanged | Do not implement |
+| P2-04 | Deferred | Requires branch context and leakage controls | Not inventoried for pilot completion | Do not implement |
+| P2-05 | Deferred | Requires proven effective-dated core models first | Not inventoried for pilot completion | Do not implement |
+| P2-06 | Deferred | Requires validated export contract and external handoff evidence | Not inventoried for pilot completion | Do not implement |
+| P2-07 | Deferred | Requires hostel policy and restricted summary design | Not inventoried for pilot completion | Do not implement |
+| P2-08 | Deferred | Conflicts with current single-tenant family boundary | Not inventoried for pilot completion | Do not implement |
+| P2-09 | Deferred | Requires provider/load/privacy validation | Not inventoried for pilot completion | Do not implement |
+| P2-10 | Deferred | Requires restricted accommodation-plan design and policy | Not inventoried for pilot completion | Do not implement |
+| P2-11 | Deferred | Follows critical-screen bilingual/accessibility work | Not inventoried for pilot completion | Do not implement |
+| P2-12 | Deferred | Core request categories must stabilize first | Not inventoried for pilot completion | Do not implement |
+| P2-13 | Deferred | Would risk duplicating owning-module workflow truth | Not inventoried for pilot completion | Do not implement |
+| P2-14 | Deferred and disabled | Depends on post-pilot data quality and explicit scope approval | Institutional/learning-improvement routes fail closed behind the disabled `learning` entitlement; active web/mobile entry points are hidden; M13 data/source remains frozen and M14 remains deferred | Do not implement |
+
+## 14.6 Detailed evidence log
+
+### P0-01 — Wave 0 baseline
+
+- **Previous implementation status:** Partial.
+- **Problem or gap:** The canonical `TeacherScopeService` is not yet the only
+  assignment authority used by teacher-facing modules and protected files.
+- **Root cause:** The compatibility migration added canonical
+  `TeacherAssignment`/`TeacherDelegation` records while retaining legacy
+  assignment reads; module adoption was not completed across the full P0-01
+  surface.
+- **Implementation files changed:** None in the baseline batch.
+- **Migrations added:** None in the baseline batch.
+- **Tests added or updated:** None in the baseline batch.
+- **Commands executed:**
+  - `pnpm db:validate`
+  - `pnpm verify:openapi`
+  - `pnpm --filter @schoolos/api exec jest src/teacher-scope/teacher-scope.service.spec.ts --runInBand`
+  - `pnpm --filter @schoolos/api exec jest --config ./test/jest-e2e.json test/teacher-scope-authorization.e2e-spec.ts --runInBand`
+- **Browser/device scenarios tested:** None in the baseline batch.
+- **Result:** Prisma schema valid; OpenAPI gate passed; 29 focused unit tests
+  passed; 17 focused authorization E2E tests passed.
+- **Remaining limitations:** Legacy consumers, direct-object and protected-file
+  adoption, stable denial-code contract, browser/device evidence, and
+  cross-module negative coverage remain.
+- **Release decision:** P0-01 remains blocked; proceed next with the smallest
+  cross-module canonicalization batch.
+
+### P0-01 — Wave 1 canonicalization and local closure
+
+- **Previous implementation status:** Partial.
+- **Problem or gap:** Enabled teacher-facing services could reach the same
+  class, section, subject, component, student, or protected file through
+  different legacy authorization checks, with inconsistent denial behavior.
+- **Root cause:** The compatibility migration established
+  `TeacherAssignment`, `TeacherDelegation`, and `TeacherScopeService`, but did
+  not move every enabled consumer to that single authority.
+- **Implementation completed:**
+  - extended the canonical resolver with actor-level exact and any-section
+    checks, capability-filtered assignment listing, and the stable
+    `TEACHER_SCOPE_DENIED` contract;
+  - migrated enabled student directory/profile/IEMIS/QR, attendance, homework,
+    timetable, activity, notice/event visibility, reports, sections,
+    operational summary, teacher-today, assessment retake, academic subject
+    catalog, and protected student/homework file paths;
+  - required exact section scope for new academic teacher assignments and
+    dual-wrote the legacy row only as a compatibility bridge;
+  - preserved frozen M13 and removed Chat data/source while keeping both out of
+    active pilot authorization claims;
+  - failed closed module-disabled learning/institutional-improvement APIs
+    behind the disabled `learning` entitlement and hid their web/mobile entry
+    points.
+- **Implementation files changed:** Focused API services/modules/specs under
+  `teacher-scope`, `academics`, `students`, `attendance`, `homework`,
+  `timetable`, `activity-feed`, `communications`, `reports`, `sections`,
+  `file-registry`, `teacher-workspace`, and `operational-summary`; the existing
+  web/mobile navigation and academic assignment form; this roadmap.
+- **Migrations added:** None. Persisted legacy names and data remain intact.
+- **Tests added or updated:** Canonical resolver capability and delegation
+  coverage; module-level allowed/denied scope tests; protected-file and
+  direct-object E2E fixtures; stale legacy-authorization fixtures replaced
+  with the canonical contract.
+- **Commands executed:**
+  - `pnpm db:validate`
+  - `pnpm verify:openapi`
+  - `pnpm --filter @schoolos/api exec jest --runInBand`
+  - `pnpm --filter @schoolos/api exec jest --config ./test/jest-e2e.json test/teacher-scope-authorization.e2e-spec.ts test/activity-media-privacy-integration.e2e-spec.ts test/student-documents-registry.e2e-spec.ts test/activity-hardening.spec.ts --runInBand`
+  - `pnpm --filter @schoolos/api typecheck`
+  - `pnpm --filter @schoolos/web typecheck`
+  - `dart format` on the three touched Flutter files
+  - `flutter analyze`
+  - `flutter test`
+- **Browser/device scenarios tested:** Flutter widget/unit regression only; no
+  real Android, iOS, or authenticated browser scenario was executed in this
+  batch.
+- **Result:** Prisma and OpenAPI gates passed; 224 API suites / 2,153 tests
+  passed; selected authorization E2E passed 3 suites / 27 tests; API and web
+  typechecks passed; Flutter analysis reported zero issues and all 509 Flutter
+  tests passed.
+- **Remaining limitations:** Seeded authenticated browser, real-device,
+  multi-user, offline-revocation, and pilot evidence remain governed by P0-03
+  and P0-15. Legacy reads remain only in frozen M13, disabled
+  learning-improvement, and removed Chat compatibility/retention paths.
+- **Release decision:** P0-01 is development complete with reproducible local
+  evidence. Proceed to P0-05. This does not advance the release stage beyond
+  Internal QA / controlled-pilot preparation.
+
+### P0-05 — Guardian capability contract and local closure
+
+- **Previous implementation status:** Missing.
+- **Problem or gap:** Any active `StudentGuardian` link effectively granted the
+  same linked-child visibility, while the parent system role also retained a
+  broad student-directory permission. The persisted relationship had no
+  capability, verification, approval, lifecycle, effective-date, emergency
+  priority, or restriction contract.
+- **Root cause:** Guardian identity verification and child linking had been
+  implemented as separate foundations, but relationship-specific authority
+  was never made the single backend contract or propagated to the parent
+  client.
+- **Implementation completed:**
+  - added the ten roadmap capabilities plus relationship verification,
+    lifecycle, approval, effective start/end, emergency priority,
+    restriction-reference, approval evidence, and update metadata to
+    `StudentGuardian`;
+  - added one central active-relationship resolver with the stable
+    `GUARDIAN_CAPABILITY_DENIED` envelope and request-time tenant, user, child,
+    verification, approval, lifecycle, effective-date, and capability checks;
+  - removed `students:read` from the parent system role so parent access uses
+    purpose-limited APIs instead of the administrative student directory;
+  - applied capability scope to attendance, academics, homework, timetable,
+    activity/media, fees/payments/receipts, library, transport, consent,
+    complaints/corrections, student QR/files, parent action-centre and weekly
+    progress sources, and the aggregate operational summary;
+  - updated student-guardian writes to validate effective windows, require a
+    restriction reference when authority is restricted, retain primary-link
+    safety, record approval evidence, and audit before/after state;
+  - exposed relationship capability/state metadata to Flutter, preserved it
+    in the encrypted parent snapshot, skipped unauthorized reads, disabled
+    unavailable navigation, and used honest locked states instead of false
+    zeroes;
+  - kept digital pickup outside the active pilot and corrected fee copy from
+    `Pay fees` to `Fees & receipts` so `FEES_VIEW` does not imply `FEES_PAY`.
+- **Implementation files changed:** Focused Prisma schema/migration and core
+  student/permission contracts; the shared parent-scope resolver; enabled
+  parent-facing API services/specs under students, mobile, attendance,
+  activity, homework, timetable, finance, library, transport, consent,
+  service requests, files, communications, canteen, and operational summary;
+  focused Flutter parent models, repository/cache, dashboard/homework/more
+  presentation, tests, and goldens; this roadmap.
+- **Migrations added:**
+  `20260728130000_guardian_capability_contract`, including compatibility
+  backfill for existing links. Existing guardians retain their prior access
+  except pickup; new links default to no capabilities, unverified, and pending
+  approval.
+- **Tests added or updated:** Central capability differentiation and stable
+  denial tests; active/expired/suspended/revoked relationship filtering;
+  audited relationship-write, restriction, approval, effective-window, and
+  multi-guardian tests; capability-scoped module/file/QR/action-centre/weekly
+  progress/aggregate tests; parent client parsing, locked-navigation,
+  repository-concurrency, widget, layout, offline snapshot, and golden
+  coverage.
+- **Commands executed:**
+  - `pnpm compile:artifacts`
+  - `pnpm db:validate`
+  - `pnpm verify:openapi`
+  - `pnpm --filter @schoolos/api exec jest --runInBand src/operational-summary/operational-summary.service.spec.ts src/common/security/parent-scope.spec.ts src/mobile/mobile.service.spec.ts`
+  - `pnpm --filter @schoolos/api test --runInBand`
+  - `pnpm typecheck`
+  - `dart format` on the touched Flutter source and test files
+  - `flutter test test/parent_models_test.dart test/parent_dashboard_widget_test.dart test/parent_portal_repository_concurrency_test.dart`
+  - `flutter test --update-goldens test/parent_dashboard_golden_test.dart`
+  - `flutter analyze`
+  - `flutter test`
+- **Browser/device scenarios tested:** Flutter widget, layout, accessibility,
+  cache, and golden regressions only; no authenticated browser, physical
+  Android, or physical iOS scenario was executed in this batch.
+- **Result:** Prisma validation and OpenAPI verification passed; 225 API suites
+  / 2,162 tests passed; the final focused guardian/mobile/summary selection
+  passed 3 suites / 57 tests; repo-wide core/API/web typechecks passed;
+  Flutter analysis reported zero issues and all 511 Flutter tests passed.
+- **Remaining limitations:** P0-06 still owns administrator provisioning,
+  recovery, evidence/reason history presentation, device/session revocation,
+  compromise hold, and account-recovery proof. P0-03 still owns secure offline
+  cache and queued-write invalidation after relationship change. P0-15 still
+  owns seeded authenticated browser, real-device, multi-user, staging, and
+  pilot evidence. Real digital payments remain disabled under P0-12 and
+  digital pickup remains outside the active pilot boundary.
+- **Release decision:** P0-05 is development complete with reproducible local
+  request-time capability, expiry, and revocation evidence. Proceed to P0-06.
+  This does not advance the release stage beyond Internal QA /
+  controlled-pilot preparation.
+
+### P0-06 — Guardian administration, recovery, and revocation local closure
+
+- **Previous implementation status:** Partial.
+- **Problem or gap:** Administrators could link guardians and record identity
+  reviews, but there was no single purpose-limited workflow for parent-account
+  provisioning, evidence-backed recovery, high-risk phone changes, active
+  session review/revocation, suspected compromise, or relationship
+  suspension, restoration, expiry, revocation, and deceased-person handling.
+- **Root cause:** Guardian relationship administration, user administration,
+  identity evidence, refresh-token sessions, and audit history existed as
+  separate foundations. Their high-risk transitions were not composed behind
+  one guardian-specific contract with proof, reason, evidence reference,
+  confirmation, and fail-closed permissions.
+- **Implementation completed:**
+  - added a safe guardian-access administration summary with relationship and
+    parent-account state, recovery readiness, bounded decision history, and
+    recent session labels without raw token, device identifier, IP address,
+    user-agent, document number, or protected-file identifier exposure;
+  - added verified recovery paths for an active trusted session, a completed
+    email OTP, another approved co-guardian, or a completed school identity
+    review; mere possession of an email address is not accepted as proof;
+  - added audited recovery commands for high-risk phone change, selected or
+    all-session revocation, suspected-account-compromise hold, suspended
+    account restoration, temporary relationship expiry, relationship
+    revocation, and deceased-guardian handling;
+  - made parent-account provisioning transactional across parent-only user
+    creation and guardian-link activation, require forced password change, and
+    keep temporary passwords and session secrets out of audit and response
+    history;
+  - required guardian verification and user-administration permissions in
+    addition to relationship-update permission for recovery, provisioning,
+    and session commands, and added cross-tenant denial coverage;
+  - blocked direct phone mutation for an app-linked guardian so high-risk
+    number changes use the verified recovery command;
+  - replaced the legacy physical guardian-link delete with a confirmed,
+    reasoned, evidence-backed `REVOKED` lifecycle transition that preserves
+    relationship, identity-review, protected-file-review, and audit history;
+  - replaced the student-profile guardian editor with one permission-gated
+    administration workspace for capability, verification, approval,
+    effective-date, emergency-priority, restriction, identity-review,
+    provisioning, recovery, session-revocation, and decision-history tasks.
+- **Implementation files changed:** Focused core student contracts; student
+  administration DTOs, controller, service, user service, and their unit
+  tests; admission compatibility removal DTO/controller/service; the student
+  API client and student-profile guardian/document workspaces; focused web
+  contract tests; this roadmap.
+- **Migrations added:** None beyond the P0-05
+  `20260728130000_guardian_capability_contract`; P0-06 composes existing
+  guardian, user, refresh-token, identity-review, and audit persistence.
+- **Tests added or updated:** Safe-summary redaction, verified recovery-method
+  readiness, phone-change/session invalidation/audit transaction,
+  compromise/deceased/expire/revoke/restore state transitions, invalid restore
+  denial, selected-session revocation, verification-permission and
+  cross-tenant denial, app-linked direct-phone denial, transactional
+  parent-only provisioning, secret-free audit, identity-response redaction,
+  lifecycle-preserving compatibility removal, and guardian administration web
+  contracts.
+- **Commands executed:**
+  - `pnpm compile:artifacts`
+  - `pnpm db:validate`
+  - `pnpm verify:openapi`
+  - `pnpm --filter @schoolos/api test --runInBand src/users/users.service.spec.ts src/students/students.service.spec.ts src/students/students.controller.spec.ts src/admissions/m1-admissions-hardening.service.spec.ts src/admissions/m1-admissions-hardening.controller.spec.ts`
+  - `pnpm --filter @schoolos/api test --runInBand`
+  - `pnpm --filter @schoolos/api typecheck`
+  - `pnpm --filter @schoolos/web typecheck`
+  - `node --test test/student-profile-edit-contract.test.mjs test/m1-workspace-contract.test.mjs test/web-contracts.test.mjs`
+  - `node --test --test-reporter=dot test/*.test.mjs`
+- **Browser/device scenarios tested:** Contract tests only for this P0-06
+  administration surface; no authenticated browser, physical Android, or
+  physical iOS recovery scenario was executed in this batch.
+- **Result:** Prisma validation and OpenAPI verification passed; the focused
+  guardian administration selection passed 5 suites / 107 tests; the full API
+  regression passed 225 suites / 2,179 tests; API and web typechecks passed;
+  the focused web selection passed 111 tests. The full web contract run still
+  has four pre-existing implementation-contract failures: three
+  institutional-improvement pages intentionally fail closed with `notFound()`
+  instead of mounting their disabled workspaces, and the disabled M4
+  learning-improvement tab is absent. P0-06 introduced no focused web failure.
+- **Remaining limitations:** Automatic notification of other authorized
+  guardians remains disabled because no approved school policy and no safe
+  M12 guardian-security event contract currently authorize it. This
+  conditional feature is not claimed. P0-03 still owns secure offline cache
+  and queued-write invalidation; P0-10 owns complete device management,
+  re-authentication, and shared/lost-device proof; P0-15 owns authenticated
+  browser, supported real-device, multi-user, staging, and pilot evidence.
+- **Release decision:** P0-06 is development complete with reproducible local
+  recovery, provisioning, session-revocation, and lifecycle evidence. Proceed
+  to P0-14. This does not advance the release stage beyond Internal QA /
+  controlled-pilot preparation.

@@ -3,9 +3,15 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { TeacherAssignmentType } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
+import { isTeacherOnly } from '../common/security/parent-scope';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  type TeacherAssignmentScope,
+  TeacherScopeService,
+} from '../teacher-scope/teacher-scope.service';
 import { CreateSectionDto } from './dto/create-section.dto';
 
 @Injectable()
@@ -13,34 +19,44 @@ export class SectionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly teacherScopeService: TeacherScopeService,
   ) {}
 
   async listSections(actor: AuthContext) {
-    const [sections, staff] = await Promise.all([
-      this.prisma.section.findMany({
-        where: { tenantId: actor.tenantId },
-        include: {
-          class: true,
-          _count: {
-            select: {
-              students: true,
-            },
+    let teacherAssignments: TeacherAssignmentScope[] = [];
+    if (isTeacherOnly(actor)) {
+      teacherAssignments = (
+        await this.teacherScopeService.resolveReadableScope(actor)
+      ).assignments;
+    }
+    const assignedSectionIds = new Set(
+      teacherAssignments.map((assignment) => assignment.sectionId),
+    );
+
+    const sections = await this.prisma.section.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        ...(isTeacherOnly(actor)
+          ? {
+              id: {
+                in:
+                  assignedSectionIds.size > 0
+                    ? [...assignedSectionIds]
+                    : ['__no_teacher_sections__'],
+              },
+            }
+          : {}),
+      },
+      include: {
+        class: true,
+        _count: {
+          select: {
+            students: true,
           },
         },
-        orderBy: [{ class: { level: 'asc' } }, { name: 'asc' }],
-      }),
-      this.prisma.staff.findFirst({
-        where: { userId: actor.userId, tenantId: actor.tenantId },
-        select: { id: true },
-      }),
-    ]);
-
-    const subjectAssignments = staff
-      ? await this.prisma.subjectTeacherAssignment.findMany({
-          where: { tenantId: actor.tenantId, staffId: staff.id },
-          select: { classId: true, sectionId: true },
-        })
-      : [];
+      },
+      orderBy: [{ class: { level: 'asc' } }, { name: 'asc' }],
+    });
 
     return sections.map((section) => ({
       id: section.id,
@@ -54,11 +70,16 @@ export class SectionsService {
       studentCount: section._count.students,
       // Lets teacher-facing screens default to the caller's own section
       // without exposing staff ids to the browser.
-      isAssignedClassTeacher: Boolean(section.classTeacherId === staff?.id),
-      isAssignedSubjectTeacher: subjectAssignments.some(
+      isAssignedClassTeacher: teacherAssignments.some(
         (assignment) =>
-          assignment.sectionId === section.id ||
-          (!assignment.sectionId && assignment.classId === section.classId),
+          assignment.sectionId === section.id &&
+          assignment.assignmentType === TeacherAssignmentType.CLASS_TEACHER,
+      ),
+      isAssignedSubjectTeacher: teacherAssignments.some(
+        (assignment) =>
+          assignment.sectionId === section.id &&
+          assignment.subjectId !== null &&
+          assignment.assignmentType !== TeacherAssignmentType.CLASS_TEACHER,
       ),
     }));
   }

@@ -191,36 +191,6 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
     },
   });
 
-  const guardianRemoveMutation = useMutation({
-    mutationFn: ({
-      guardianId,
-      reason,
-      confirmFileAccessReview,
-      newPrimaryGuardianId,
-    }: {
-      guardianId: string;
-      reason: string;
-      confirmFileAccessReview: true;
-      newPrimaryGuardianId?: string | null;
-    }) =>
-      api.removeStudentGuardianAccess(studentId, guardianId, {
-        reason,
-        confirmFileAccessReview,
-        newPrimaryGuardianId,
-      }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: ["student-profile", studentId],
-      });
-      void queryClient.invalidateQueries({
-        queryKey: ["student-iemis-readiness", studentId],
-      });
-      void queryClient.invalidateQueries({
-        queryKey: ["student-iemis-readiness-list"],
-      });
-    },
-  });
-
   const lifecycleMutation = useMutation({
     mutationFn: ({ action, body }: LifecycleRequest) => {
       if (action === "transfer") return api.transferStudent(studentId, body);
@@ -421,18 +391,16 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
           </TabsContent>
           <TabsContent value="Guardians" className="mt-0">
             <ProfileTabs.GuardiansTab
+              studentId={studentId}
               guardians={profile.guardians}
               editingGuardianId={editingGuardianId}
               isAddingGuardian={isAddingGuardian}
               isSaving={
                 guardianUpdateMutation.isPending ||
-                guardianCreateMutation.isPending ||
-                guardianRemoveMutation.isPending
+                guardianCreateMutation.isPending
               }
               error={
-                guardianUpdateMutation.error ??
-                guardianCreateMutation.error ??
-                guardianRemoveMutation.error
+                guardianUpdateMutation.error ?? guardianCreateMutation.error
               }
               onCancelEdit={() => setEditingGuardianId(null)}
               onEditGuardian={setEditingGuardianId}
@@ -442,19 +410,6 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
               onAddGuardian={() => setIsAddingGuardian(true)}
               onCancelAdd={() => setIsAddingGuardian(false)}
               onCreateGuardian={(body) => guardianCreateMutation.mutate(body)}
-              onRemoveGuardian={(
-                guardianId,
-                reason,
-                confirmFileAccessReview,
-                newPrimaryGuardianId,
-              ) =>
-                guardianRemoveMutation.mutate({
-                  guardianId,
-                  reason,
-                  confirmFileAccessReview,
-                  newPrimaryGuardianId,
-                })
-              }
             />
           </TabsContent>
           <TabsContent value="Academics" className="mt-0">

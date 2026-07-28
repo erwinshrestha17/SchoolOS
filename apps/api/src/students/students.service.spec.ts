@@ -9,11 +9,20 @@ import {
   AuthMethod,
   EnrollmentStatus,
   FileStatus,
+  GuardianCapability,
+  GuardianRelationshipApprovalStatus,
+  GuardianRelationshipStatus,
+  GuardianRelationshipVerificationStatus,
   Prisma,
   StudentLifecycleStatus,
 } from '@prisma/client';
 import sharp from 'sharp';
 import { StudentsService } from './students.service';
+import { TeacherCapability } from '../teacher-scope/teacher-capability';
+import {
+  createTeacherScopeDeniedException,
+  TEACHER_SCOPE_DENIED_CODE,
+} from '../teacher-scope/teacher-scope.service';
 
 const actor = {
   tenantId: 'tenant-1',
@@ -51,6 +60,14 @@ describe('students lifecycle hardening', () => {
           },
           relation: 'mother',
           isPrimary: true,
+          capabilities: [GuardianCapability.ACADEMICS_VIEW],
+          verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
+          status: GuardianRelationshipStatus.ACTIVE,
+          effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+          effectiveUntil: null,
+          emergencyContactPriority: 1,
+          approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+          restrictionReasonRef: null,
         },
       ],
       qrCredentials: [
@@ -367,14 +384,18 @@ describe('students lifecycle hardening', () => {
           },
         ],
         studentCountQueue: [1],
-        staffFindFirstResult: { id: 'staff-1' },
-        subjectTeacherAssignmentFindManyResult: [
-          { classId: 'class-1', sectionId: 'section-1' },
-          { classId: 'class-2', sectionId: null },
-        ],
-        sectionFindManyResult: [{ id: 'section-9', classId: 'class-9' }],
       });
-      const { service } = buildService(prisma);
+      const { service } = buildService(prisma, {
+        resolveReadableScope: jest.fn().mockResolvedValue({
+          assignments: [],
+          homeroomSectionIds: new Set(['section-9']),
+          subjectsBySection: new Map([
+            ['section-1', new Set(['subject-1'])],
+            ['section-2', new Set(['subject-2'])],
+          ]),
+          allSectionIds: new Set(['section-1', 'section-2', 'section-9']),
+        }),
+      });
 
       await service.listStudents({}, teacherActor);
 
@@ -384,9 +405,9 @@ describe('students lifecycle hardening', () => {
             { tenantId: teacherActor.tenantId },
             {
               OR: [
-                { classId: 'class-1', sectionId: 'section-1' },
-                { classId: 'class-2' },
-                { classId: 'class-9', sectionId: 'section-9' },
+                { sectionId: 'section-1' },
+                { sectionId: 'section-2' },
+                { sectionId: 'section-9' },
               ],
             },
           ]),
@@ -394,19 +415,26 @@ describe('students lifecycle hardening', () => {
       });
     });
 
-    it('rejects a teacher-role actor with no active staff profile', async () => {
+    it('returns an empty directory scope for a teacher with no active assignment', async () => {
       const teacherActor = {
         ...actor,
         userId: 'teacher-user-2',
         roles: ['teacher'],
         permissions: ['students:read'],
       };
-      const prisma = buildPrisma({ staffFindFirstResult: null });
+      const prisma = buildPrisma({
+        studentFindManyResult: [],
+        studentCountQueue: [0],
+      });
       const { service } = buildService(prisma);
 
-      await expect(service.listStudents({}, teacherActor)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await service.listStudents({}, teacherActor);
+
+      expect(prisma.student.count).toHaveBeenCalledWith({
+        where: {
+          AND: [{ tenantId: teacherActor.tenantId }, { id: { in: [] } }],
+        },
+      });
     });
 
     it('leaves the student directory unrestricted for admin/principal actors', async () => {
@@ -944,6 +972,14 @@ describe('students lifecycle hardening', () => {
       guardianId: 'guardian-1',
       relation: 'mother',
       isPrimary: false,
+      capabilities: [GuardianCapability.ACADEMICS_VIEW],
+      verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
+      status: GuardianRelationshipStatus.ACTIVE,
+      effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+      effectiveUntil: null,
+      emergencyContactPriority: 1,
+      approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+      restrictionReasonRef: null,
       guardian: {
         id: 'guardian-1',
         fullName: 'Maya Shrestha',
@@ -974,6 +1010,15 @@ describe('students lifecycle hardening', () => {
               },
               relation: 'mother',
               isPrimary: true,
+              capabilities: [GuardianCapability.ACADEMICS_VIEW],
+              verificationStatus:
+                GuardianRelationshipVerificationStatus.VERIFIED,
+              status: GuardianRelationshipStatus.ACTIVE,
+              effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+              effectiveUntil: null,
+              emergencyContactPriority: 1,
+              approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+              restrictionReasonRef: null,
             },
           ],
         }),
@@ -1046,6 +1091,817 @@ describe('students lifecycle hardening', () => {
     ).rejects.toThrow(NotFoundException);
   });
 
+  it('updates per-child guardian capabilities, approval, and effective dates with audit evidence', async () => {
+    const link = {
+      id: 'student-guardian-1',
+      tenantId: actor.tenantId,
+      studentId: 'student-1',
+      guardianId: 'guardian-1',
+      relation: 'OVERSEAS_PARENT',
+      isPrimary: false,
+      capabilities: [GuardianCapability.ACADEMICS_VIEW],
+      verificationStatus: GuardianRelationshipVerificationStatus.UNVERIFIED,
+      status: GuardianRelationshipStatus.ACTIVE,
+      effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+      effectiveUntil: null,
+      emergencyContactPriority: null,
+      approvalStatus: GuardianRelationshipApprovalStatus.PENDING,
+      restrictionReasonRef: null,
+      guardian: {
+        id: 'guardian-1',
+        fullName: 'Maya Shrestha',
+        relation: 'OVERSEAS_PARENT',
+        primaryPhone: '+9779800000000',
+        secondaryPhone: null,
+        email: 'maya@example.com',
+        occupation: null,
+        homeAddress: null,
+        wardNumber: null,
+      },
+    };
+    const prisma = buildPrisma({
+      studentGuardianFindFirstResult: link,
+      studentGuardianFindManyResult: [
+        { id: link.id, guardianId: link.guardianId, isPrimary: false },
+      ],
+    });
+    const { service, auditService } = buildService(prisma);
+    jest.spyOn(service, 'getStudentProfile').mockResolvedValue({} as never);
+
+    await service.updateStudentGuardian(
+      'student-1',
+      'guardian-1',
+      {
+        capabilities: [
+          GuardianCapability.ATTENDANCE_VIEW,
+          GuardianCapability.EMERGENCY_ALERT_RECEIVE,
+        ],
+        verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
+        approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+        effectiveFrom: '2026-07-01T00:00:00.000Z',
+        effectiveUntil: '2026-12-31T00:00:00.000Z',
+        emergencyContactPriority: 2,
+        restrictionReasonRef: 'family-court-order-24',
+      },
+      actor,
+    );
+
+    expect(prisma.transaction.studentGuardian.update).toHaveBeenCalledWith({
+      where: { id: link.id },
+      data: expect.objectContaining({
+        capabilities: [
+          GuardianCapability.ATTENDANCE_VIEW,
+          GuardianCapability.EMERGENCY_ALERT_RECEIVE,
+        ],
+        verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
+        approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+        approvedById: actor.userId,
+        approvedAt: expect.any(Date),
+        effectiveFrom: new Date('2026-07-01T00:00:00.000Z'),
+        effectiveUntil: new Date('2026-12-31T00:00:00.000Z'),
+        emergencyContactPriority: 2,
+        restrictionReasonRef: 'family-court-order-24',
+      }),
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'update',
+        resource: 'student_guardian',
+        before: expect.objectContaining({
+          capabilities: [GuardianCapability.ACADEMICS_VIEW],
+          approvalStatus: GuardianRelationshipApprovalStatus.PENDING,
+        }),
+        after: expect.objectContaining({
+          capabilities: [
+            GuardianCapability.ATTENDANCE_VIEW,
+            GuardianCapability.EMERGENCY_ALERT_RECEIVE,
+          ],
+          approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+          restrictionReasonRef: 'family-court-order-24',
+        }),
+      }),
+    );
+  });
+
+  it('requires a restriction reference when suspending or revoking guardian authority', async () => {
+    const prisma = buildPrisma({
+      studentGuardianFindFirstResult: {
+        id: 'link-1',
+        tenantId: actor.tenantId,
+        studentId: 'student-1',
+        guardianId: 'guardian-1',
+        relation: 'FATHER',
+        isPrimary: false,
+        capabilities: [GuardianCapability.ACADEMICS_VIEW],
+        verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
+        status: GuardianRelationshipStatus.ACTIVE,
+        effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+        effectiveUntil: null,
+        emergencyContactPriority: null,
+        approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+        restrictionReasonRef: null,
+        guardian: {
+          id: 'guardian-1',
+          fullName: 'Ram Rai',
+          relation: 'FATHER',
+          primaryPhone: '+9779800000000',
+        },
+      },
+    });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.updateStudentGuardian(
+        'student-1',
+        'guardian-1',
+        { status: GuardianRelationshipStatus.SUSPENDED },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'A restriction reason reference is required for a suspended, revoked, or rejected guardian relationship.',
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('supports more than two realistic guardian relationships without implicit access', async () => {
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [{ id: 'student-1' }],
+      studentGuardianFindManyResult: [
+        { id: 'link-1', guardianId: 'guardian-1', isPrimary: true },
+        { id: 'link-2', guardianId: 'guardian-2', isPrimary: false },
+      ],
+    });
+    const { service } = buildService(prisma);
+    jest.spyOn(service, 'getStudentProfile').mockResolvedValue({} as never);
+
+    await service.addStudentGuardian(
+      'student-1',
+      {
+        guardianId: 'guardian-3',
+        relation: 'LOCAL_GUARDIAN',
+        capabilities: [GuardianCapability.ATTENDANCE_VIEW],
+        verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
+        approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+        effectiveFrom: '2026-07-28T00:00:00.000Z',
+        effectiveUntil: '2026-10-28T00:00:00.000Z',
+        emergencyContactPriority: 2,
+      },
+      actor,
+    );
+
+    expect(prisma.transaction.studentGuardian.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: actor.tenantId,
+        studentId: 'student-1',
+        guardianId: 'guardian-3',
+        relation: 'LOCAL_GUARDIAN',
+        isPrimary: false,
+        capabilities: [GuardianCapability.ATTENDANCE_VIEW],
+        verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
+        approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+        approvedById: actor.userId,
+      }),
+    });
+  });
+
+  it('returns a tenant-scoped guardian administration view without raw session secrets', async () => {
+    const link = buildGuardianAdministrationLink();
+    const prisma = buildPrisma({
+      studentGuardianFindFirstResult: link,
+      studentGuardianFindManyResult: [
+        {
+          guardianId: 'guardian-2',
+          relation: 'LOCAL_GUARDIAN',
+          guardian: { fullName: 'Sita Rai' },
+        },
+      ],
+      refreshTokenFindManyResult: [
+        {
+          id: 'session-1',
+          deviceId: 'private-device-id',
+          expiresAt: new Date('2099-01-01T00:00:00.000Z'),
+          revokedAt: null,
+          createdAt: new Date('2026-07-01T00:00:00.000Z'),
+          revokedReason: null,
+          userAgent: 'SchoolOS Android private-agent-detail',
+          lastUsedAt: new Date('2026-07-28T02:00:00.000Z'),
+          ipAddress: '192.0.2.1',
+          tokenHash: 'private-token-hash',
+        },
+      ],
+      guardianIdentityVerificationFindManyResult: [
+        {
+          id: 'verification-1',
+          status: 'VERIFIED',
+          documentType: 'citizenship',
+          documentNumber: 'private-document-number',
+          evidenceDocumentId: 'document-1',
+          notes: 'Identity reviewed at the school office',
+          reviewNote: 'Approved by authorized staff',
+          createdAt: new Date('2026-07-20T00:00:00.000Z'),
+          reviewedAt: new Date('2026-07-21T00:00:00.000Z'),
+        },
+      ],
+      auditLogFindManyResult: [
+        {
+          id: 'audit-1',
+          action: 'approve_phone_change',
+          after: {
+            reason: 'Lost phone reported',
+            evidenceReference: 'front-office-register-12',
+            verificationMethod: 'SCHOOL_IDENTITY_REVIEW',
+          },
+          createdAt: new Date('2026-07-28T03:00:00.000Z'),
+          user: { email: 'admin@schoolos.test' },
+        },
+      ],
+    });
+    const { service } = buildService(prisma);
+
+    const result = await service.getGuardianAccessAdministration(
+      link.studentId,
+      link.guardianId,
+      actor,
+    );
+
+    expect(prisma.studentGuardian.findFirst).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        studentId: link.studentId,
+        guardianId: link.guardianId,
+      },
+      include: {
+        guardian: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+    expect(result.recoveryPaths).toEqual({
+      trustedSessionAvailable: true,
+      verifiedEmailAvailable: false,
+      schoolIdentityReviewAvailable: true,
+      approvedCoGuardians: [
+        {
+          id: 'guardian-2',
+          fullName: 'Sita Rai',
+          relation: 'LOCAL_GUARDIAN',
+        },
+      ],
+    });
+    expect(result.sessions[0]).toEqual(
+      expect.objectContaining({
+        id: 'session-1',
+        deviceLabel: 'Android device',
+        status: 'ACTIVE',
+      }),
+    );
+    expect(result.sessions[0]).not.toHaveProperty('deviceId');
+    expect(result.sessions[0]).not.toHaveProperty('userAgent');
+    expect(result.sessions[0]).not.toHaveProperty('ipAddress');
+    expect(result.sessions[0]).not.toHaveProperty('tokenHash');
+    expect(result.identityVerifications[0]).toEqual(
+      expect.objectContaining({
+        documentNumberRecorded: true,
+        evidenceDocumentRecorded: true,
+      }),
+    );
+    expect(result.identityVerifications[0]).not.toHaveProperty(
+      'documentNumber',
+    );
+    expect(result.history[0]).toEqual(
+      expect.objectContaining({
+        reason: 'Lost phone reported',
+        evidenceReference: 'front-office-register-12',
+        verificationMethod: 'SCHOOL_IDENTITY_REVIEW',
+      }),
+    );
+  });
+
+  it('does not treat an email address as completed recovery proof', async () => {
+    const link = buildGuardianAdministrationLink();
+    const prisma = buildPrisma({
+      studentGuardianFindFirstResult: link,
+      otpCodeFindFirstResult: null,
+    });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.performGuardianRecoveryAction(
+        link.studentId,
+        link.guardianId,
+        {
+          action: 'REVOKE_ALL_SESSIONS',
+          verificationMethod: 'VERIFIED_EMAIL',
+          reason: 'Lost phone reported by the guardian',
+          evidenceReference: 'support-case-101',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'No completed email verification or password-recovery proof is recorded.',
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('approves a high-risk phone change, revokes old sessions, and audits the evidence transactionally', async () => {
+    const link = buildGuardianAdministrationLink();
+    const prisma = buildPrisma({
+      studentGuardianFindFirstResult: link,
+      otpCodeFindFirstResult: { id: 'otp-proof-1' },
+      transactionRefreshTokenUpdateManyCount: 2,
+    });
+    const { service, auditService } = buildService(prisma);
+
+    const result = await service.performGuardianRecoveryAction(
+      link.studentId,
+      link.guardianId,
+      {
+        action: 'APPROVE_PHONE_CHANGE',
+        verificationMethod: 'VERIFIED_EMAIL',
+        reason: 'Guardian changed SIM and completed email recovery',
+        evidenceReference: 'support-case-102',
+        newPrimaryPhone: '9811111111',
+      },
+      actor,
+    );
+
+    expect(prisma.transaction.guardian.update).toHaveBeenCalledWith({
+      where: { id: link.guardianId },
+      data: { primaryPhone: '+9779811111111' },
+    });
+    expect(prisma.transaction.user.update).toHaveBeenCalledWith({
+      where: { id: link.guardian.user.id },
+      data: { phone: '+9779811111111' },
+    });
+    expect(prisma.transaction.refreshToken.updateMany).toHaveBeenCalledWith({
+      where: { userId: link.guardian.user.id, revokedAt: null },
+      data: {
+        revokedAt: expect.any(Date),
+        revokedReason: 'guardian_phone_change_approved',
+      },
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'approve_phone_change',
+        resource: 'guardian_access',
+        after: expect.objectContaining({
+          reason: 'Guardian changed SIM and completed email recovery',
+          evidenceReference: 'support-case-102',
+          phoneChanged: true,
+          sessionsRevoked: 2,
+        }),
+      }),
+      prisma.transaction,
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: true,
+        action: 'APPROVE_PHONE_CHANGE',
+        sessionsRevoked: 2,
+      }),
+    );
+  });
+
+  it('places every active relationship and session on hold after account-compromise proof', async () => {
+    const link = buildGuardianAdministrationLink();
+    const prisma = buildPrisma({
+      studentGuardianFindFirstResult: link,
+      refreshTokenFindFirstResult: { id: 'trusted-session-1' },
+      transactionStudentGuardianUpdateManyCount: 3,
+      transactionRefreshTokenUpdateManyCount: 4,
+    });
+    const { service, auditService } = buildService(prisma);
+
+    const result = await service.performGuardianRecoveryAction(
+      link.studentId,
+      link.guardianId,
+      {
+        action: 'SUSPEND_COMPROMISED_ACCOUNT',
+        verificationMethod: 'TRUSTED_SESSION',
+        reason: 'Guardian reported an unrecognized login',
+        evidenceReference: 'incident-guardian-7',
+      },
+      actor,
+    );
+
+    expect(prisma.transaction.studentGuardian.updateMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        guardianId: link.guardianId,
+        status: GuardianRelationshipStatus.ACTIVE,
+      },
+      data: {
+        status: GuardianRelationshipStatus.SUSPENDED,
+        isPrimary: false,
+        restrictionReasonRef: 'incident-guardian-7',
+      },
+    });
+    expect(prisma.transaction.user.update).toHaveBeenCalledWith({
+      where: { id: link.guardian.user.id },
+      data: { status: 'SUSPENDED' },
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        after: expect.objectContaining({
+          relationshipsChanged: 3,
+          sessionsRevoked: 4,
+        }),
+      }),
+      prisma.transaction,
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        relationshipStatus: GuardianRelationshipStatus.SUSPENDED,
+        accountStatus: 'SUSPENDED',
+      }),
+    );
+  });
+
+  it.each([
+    {
+      action: 'EXPIRE_RELATIONSHIP' as const,
+      status: GuardianRelationshipStatus.EXPIRED,
+      revokedReason: 'guardian_relationship_expired',
+    },
+    {
+      action: 'REVOKE_RELATIONSHIP' as const,
+      status: GuardianRelationshipStatus.REVOKED,
+      revokedReason: 'guardian_relationship_revoked',
+    },
+  ])(
+    'finalizes a temporary or removed relationship with immediate session revocation: $action',
+    async ({ action, status, revokedReason }) => {
+      const link = buildGuardianAdministrationLink();
+      const prisma = buildPrisma({
+        studentGuardianFindFirstResult: link,
+        guardianIdentityVerificationFindFirstQueue: [
+          { id: 'identity-proof-1' },
+        ],
+      });
+      const { service } = buildService(prisma);
+
+      const result = await service.performGuardianRecoveryAction(
+        link.studentId,
+        link.guardianId,
+        {
+          action,
+          verificationMethod: 'SCHOOL_IDENTITY_REVIEW',
+          reason: 'Relationship authority ended after school review',
+          evidenceReference: 'relationship-case-44',
+        },
+        actor,
+      );
+
+      expect(
+        prisma.transaction.studentGuardian.updateMany,
+      ).toHaveBeenCalledWith({
+        where: {
+          id: link.id,
+          tenantId: actor.tenantId,
+          studentId: link.studentId,
+          guardianId: link.guardianId,
+        },
+        data: expect.objectContaining({
+          status,
+          isPrimary: false,
+        }),
+      });
+      expect(prisma.transaction.refreshToken.updateMany).toHaveBeenCalledWith({
+        where: { userId: link.guardian.user.id, revokedAt: null },
+        data: {
+          revokedAt: expect.any(Date),
+          revokedReason,
+        },
+      });
+      expect(result.relationshipStatus).toBe(status);
+    },
+  );
+
+  it('ends every relationship and suspends the account for a deceased guardian', async () => {
+    const link = buildGuardianAdministrationLink();
+    const prisma = buildPrisma({
+      studentGuardianFindFirstResult: link,
+      guardianIdentityVerificationFindFirstQueue: [{ id: 'identity-proof-1' }],
+      transactionStudentGuardianUpdateManyCount: 2,
+    });
+    const { service } = buildService(prisma);
+
+    await service.performGuardianRecoveryAction(
+      link.studentId,
+      link.guardianId,
+      {
+        action: 'MARK_DECEASED',
+        verificationMethod: 'SCHOOL_IDENTITY_REVIEW',
+        reason: 'School received and reviewed the family notice',
+        evidenceReference: 'relationship-case-45',
+      },
+      actor,
+    );
+
+    expect(prisma.transaction.studentGuardian.updateMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        guardianId: link.guardianId,
+      },
+      data: {
+        status: GuardianRelationshipStatus.REVOKED,
+        isPrimary: false,
+        restrictionReasonRef: 'relationship-case-45',
+      },
+    });
+    expect(prisma.transaction.user.update).toHaveBeenCalledWith({
+      where: { id: link.guardian.user.id },
+      data: { status: 'SUSPENDED' },
+    });
+  });
+
+  it('restores only the reviewed relationship and invalidates recovery sessions', async () => {
+    const baseLink = buildGuardianAdministrationLink();
+    const link = {
+      ...baseLink,
+      status: GuardianRelationshipStatus.SUSPENDED,
+      guardian: {
+        ...baseLink.guardian,
+        user: {
+          ...baseLink.guardian.user,
+          status: 'SUSPENDED',
+        },
+      },
+    };
+    const prisma = buildPrisma({
+      studentGuardianFindFirstResult: link,
+      guardianIdentityVerificationFindFirstQueue: [{ id: 'identity-proof-1' }],
+    });
+    const { service } = buildService(prisma);
+
+    const result = await service.performGuardianRecoveryAction(
+      link.studentId,
+      link.guardianId,
+      {
+        action: 'RESTORE_ACCOUNT',
+        verificationMethod: 'SCHOOL_IDENTITY_REVIEW',
+        reason: 'School completed account recovery review',
+        evidenceReference: 'recovery-case-46',
+      },
+      actor,
+    );
+
+    expect(prisma.transaction.studentGuardian.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: link.id,
+        tenantId: actor.tenantId,
+        studentId: link.studentId,
+        guardianId: link.guardianId,
+      },
+      data: { status: GuardianRelationshipStatus.ACTIVE },
+    });
+    expect(prisma.transaction.user.update).toHaveBeenCalledWith({
+      where: { id: link.guardian.user.id },
+      data: { status: 'ACTIVE' },
+    });
+    expect(prisma.transaction.refreshToken.updateMany).toHaveBeenCalledWith({
+      where: { userId: link.guardian.user.id, revokedAt: null },
+      data: {
+        revokedAt: expect.any(Date),
+        revokedReason: 'guardian_account_recovery_complete',
+      },
+    });
+    expect(result).toEqual(
+      expect.objectContaining({
+        relationshipStatus: GuardianRelationshipStatus.ACTIVE,
+        accountStatus: 'ACTIVE',
+      }),
+    );
+  });
+
+  it('does not restore a revoked or expired relationship as account recovery', async () => {
+    const baseLink = buildGuardianAdministrationLink();
+    const link = {
+      ...baseLink,
+      status: GuardianRelationshipStatus.REVOKED,
+    };
+    const prisma = buildPrisma({
+      studentGuardianFindFirstResult: link,
+      guardianIdentityVerificationFindFirstQueue: [{ id: 'identity-proof-1' }],
+    });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.performGuardianRecoveryAction(
+        link.studentId,
+        link.guardianId,
+        {
+          action: 'RESTORE_ACCOUNT',
+          verificationMethod: 'SCHOOL_IDENTITY_REVIEW',
+          reason: 'Attempted restore after relationship removal',
+          evidenceReference: 'recovery-case-47',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Revoked and expired relationships require a new reviewed relationship.',
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('provisions a parent-only guardian account transactionally after school identity review', async () => {
+    const baseLink = buildGuardianAdministrationLink();
+    const link = {
+      ...baseLink,
+      appLoginLinked: false,
+      guardian: {
+        ...baseLink.guardian,
+        userId: null,
+        user: null,
+      },
+    };
+    const prisma = buildPrisma({
+      studentGuardianFindFirstResult: link,
+      guardianIdentityVerificationFindFirstQueue: [{ id: 'identity-proof-1' }],
+    });
+    const { service, usersService, auditService } = buildService(prisma);
+
+    const result = await service.provisionGuardianAccount(
+      link.studentId,
+      link.guardianId,
+      {
+        email: 'maya@example.com',
+        temporaryPassword: 'Temporary!Parent2026',
+        verificationMethod: 'SCHOOL_IDENTITY_REVIEW',
+        reason: 'Guardian app access approved after in-person review',
+        evidenceReference: 'front-office-register-15',
+      },
+      actor,
+    );
+
+    expect(usersService.createManagedUser).toHaveBeenCalledWith(
+      {
+        tenantId: actor.tenantId,
+        email: 'maya@example.com',
+        phone: link.guardian.primaryPhone,
+        password: 'Temporary!Parent2026',
+        roleIds: ['parent-role-1'],
+        assignedById: actor.userId,
+        mustChangePassword: true,
+      },
+      prisma.transaction,
+    );
+    expect(prisma.transaction.guardian.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: link.guardianId,
+        tenantId: actor.tenantId,
+        userId: null,
+      },
+      data: { userId: 'guardian-user-provisioned' },
+    });
+    expect(prisma.transaction.studentGuardian.updateMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        guardianId: link.guardianId,
+      },
+      data: { appLoginLinked: true },
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'provision_account',
+        resource: 'guardian_access',
+        after: expect.objectContaining({
+          reason: 'Guardian app access approved after in-person review',
+          evidenceReference: 'front-office-register-15',
+          mustChangePassword: true,
+        }),
+      }),
+      prisma.transaction,
+    );
+    expect(JSON.stringify(auditService.record.mock.calls)).not.toContain(
+      'Temporary!Parent2026',
+    );
+    expect(result).toEqual({
+      success: true,
+      account: {
+        linked: true,
+        status: 'ACTIVE',
+        email: 'maya@example.com',
+        mustChangePassword: true,
+      },
+    });
+  });
+
+  it('revokes only the selected active guardian session and records the decision evidence', async () => {
+    const link = buildGuardianAdministrationLink();
+    const prisma = buildPrisma({
+      studentGuardianFindFirstResult: link,
+    });
+    const { service, auditService } = buildService(prisma);
+
+    await expect(
+      service.revokeGuardianSession(
+        link.studentId,
+        link.guardianId,
+        'session-2',
+        {
+          reason: 'Guardian no longer recognizes this device',
+          evidenceReference: 'support-case-103',
+        },
+        actor,
+      ),
+    ).resolves.toEqual({ success: true, sessionId: 'session-2' });
+
+    expect(prisma.transaction.refreshToken.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'session-2',
+        userId: link.guardian.user.id,
+        revokedAt: null,
+        expiresAt: { gt: expect.any(Date) },
+      },
+      data: {
+        revokedAt: expect.any(Date),
+        revokedReason: 'guardian_admin_device_revocation',
+      },
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'revoke_session',
+        resource: 'guardian_access',
+        after: expect.objectContaining({
+          reason: 'Guardian no longer recognizes this device',
+          evidenceReference: 'support-case-103',
+        }),
+      }),
+      prisma.transaction,
+    );
+  });
+
+  it('requires guardian-verification authority before changing relationship access', async () => {
+    const baseLink = buildGuardianAdministrationLink();
+    const link = {
+      ...baseLink,
+      guardian: {
+        ...baseLink.guardian,
+        userId: null,
+        user: null,
+      },
+    };
+    const prisma = buildPrisma({
+      studentGuardianFindFirstResult: link,
+    });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.updateStudentGuardian(
+        link.studentId,
+        link.guardianId,
+        {
+          capabilities: [GuardianCapability.ATTENDANCE_VIEW],
+        },
+        {
+          ...actor,
+          permissions: actor.permissions.filter(
+            (permission) => permission !== 'guardians:verify',
+          ),
+        },
+      ),
+    ).rejects.toThrow(ForbiddenException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('routes app-linked phone changes through the audited recovery workflow', async () => {
+    const link = buildGuardianAdministrationLink();
+    const prisma = buildPrisma({
+      studentGuardianFindFirstResult: link,
+    });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.updateStudentGuardian(
+        link.studentId,
+        link.guardianId,
+        { primaryPhone: '9811111111' },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Use the guardian access recovery action to approve a phone-number change for an app-linked guardian.',
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('does not expose guardian administration across tenant boundaries', async () => {
+    const prisma = buildPrisma({
+      studentGuardianFindFirstResult: null,
+    });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.getGuardianAccessAdministration(
+        'student-other-tenant',
+        'guardian-other-tenant',
+        actor,
+      ),
+    ).rejects.toThrow(NotFoundException);
+  });
+
   it('persists signed metadata when generating student documents', async () => {
     const student = buildStudent({
       guardianLinks: [
@@ -1058,6 +1914,14 @@ describe('students lifecycle hardening', () => {
           },
           relation: 'mother',
           isPrimary: true,
+          capabilities: [GuardianCapability.ACADEMICS_VIEW],
+          verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
+          status: GuardianRelationshipStatus.ACTIVE,
+          effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+          effectiveUntil: null,
+          emergencyContactPriority: 1,
+          approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+          restrictionReasonRef: null,
         },
       ],
       enrollments: [
@@ -1374,6 +2238,14 @@ describe('students lifecycle hardening', () => {
           },
           relation: 'mother',
           isPrimary: true,
+          capabilities: [GuardianCapability.ACADEMICS_VIEW],
+          verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
+          status: GuardianRelationshipStatus.ACTIVE,
+          effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+          effectiveUntil: null,
+          emergencyContactPriority: 1,
+          approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+          restrictionReasonRef: null,
         },
       ],
       documents: [
@@ -1876,6 +2748,8 @@ describe('students lifecycle hardening', () => {
       documentType: 'citizenship',
       documentNumber: '12-34-56',
       evidenceDocumentId: evidenceDocument.id,
+      createdAt: new Date('2026-04-27T00:00:00.000Z'),
+      reviewedAt: null,
     };
     const reviewedVerification = {
       ...createdVerification,
@@ -1913,6 +2787,14 @@ describe('students lifecycle hardening', () => {
     );
 
     expect(created.status).toBe('PENDING');
+    expect(created).toEqual(
+      expect.objectContaining({
+        documentNumberRecorded: true,
+        evidenceDocumentRecorded: true,
+      }),
+    );
+    expect(created).not.toHaveProperty('documentNumber');
+    expect(created).not.toHaveProperty('evidenceDocumentId');
     expect(prisma.guardianIdentityVerification.create).toHaveBeenCalledWith({
       data: {
         tenantId: actor.tenantId,
@@ -1940,6 +2822,8 @@ describe('students lifecycle hardening', () => {
       }),
     });
     expect(reviewed.status).toBe('VERIFIED');
+    expect(reviewed).not.toHaveProperty('documentNumber');
+    expect(reviewed).not.toHaveProperty('evidenceDocumentId');
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'review',
@@ -2129,6 +3013,7 @@ describe('Cross-Tenant Access Hardening', () => {
         {
           id: 'enrollment-1',
           status: EnrollmentStatus.ACTIVE,
+          academicYearId: 'academic-year-1',
           classId: 'class-1',
           sectionId: 'section-1',
           academicYear: { name: '2083' },
@@ -2145,24 +3030,34 @@ describe('Cross-Tenant Access Hardening', () => {
       subjectTeacherAssignmentFindFirstResult: null,
       sectionFindFirstResult: null,
     });
-    const { service } = buildService(prisma);
+    const { service } = buildService(prisma, {
+      requireActorAccess: jest
+        .fn()
+        .mockRejectedValue(createTeacherScopeDeniedException()),
+    });
 
-    await expect(
-      service.getStudentProfile(student.id, {
-        ...actor,
-        userId: 'teacher-user-1',
-        roles: ['teacher'],
-        permissions: ['students:read'],
+    const denied = service.getStudentProfile(student.id, {
+      ...actor,
+      userId: 'teacher-user-1',
+      roles: ['teacher'],
+      permissions: ['students:read'],
+    });
+
+    await expect(denied).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(denied).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: TEACHER_SCOPE_DENIED_CODE,
       }),
-    ).rejects.toThrow(ForbiddenException);
+    });
   });
 
-  it('allows getStudentProfile for a homeroom-only class teacher tied to the class solely via Section.classTeacherId -- regression for a bug found via live edge-case testing (list endpoint already checked both sources, this detail endpoint only checked SubjectTeacherAssignment)', async () => {
+  it('allows getStudentProfile through the canonical homeroom assignment scope', async () => {
     const student = buildStudent({
       enrollments: [
         {
           id: 'enrollment-1',
           status: EnrollmentStatus.ACTIVE,
+          academicYearId: 'academic-year-1',
           classId: 'class-1',
           sectionId: 'section-1',
           academicYear: { name: '2083' },
@@ -2179,7 +3074,7 @@ describe('Cross-Tenant Access Hardening', () => {
       subjectTeacherAssignmentFindFirstResult: null,
       sectionFindFirstResult: { id: 'section-1' },
     });
-    const { service } = buildService(prisma);
+    const { service, teacherScopeService } = buildService(prisma);
 
     await expect(
       service.getStudentProfile(student.id, {
@@ -2189,6 +3084,15 @@ describe('Cross-Tenant Access Hardening', () => {
         permissions: ['students:read'],
       }),
     ).resolves.toBeDefined();
+    expect(teacherScopeService.requireActorAccess).toHaveBeenCalledWith(
+      {
+        academicYearId: 'academic-year-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        capability: TeacherCapability.CLASS_ROSTER_READ,
+      },
+      expect.objectContaining({ userId: 'teacher-user-1' }),
+    );
   });
 
   it('rejects updateStudent for a student outside the actor tenant', async () => {
@@ -2260,6 +3164,58 @@ function configureSchoolLogo(
   fileRegistryService.getProtectedDownload.mockResolvedValue({ content });
 }
 
+function buildGuardianAdministrationLink() {
+  return {
+    id: 'student-guardian-1',
+    tenantId: actor.tenantId,
+    studentId: 'student-1',
+    guardianId: 'guardian-1',
+    relation: 'MOTHER',
+    isPrimary: true,
+    appLoginLinked: true,
+    capabilities: [
+      GuardianCapability.ACADEMICS_VIEW,
+      GuardianCapability.ATTENDANCE_VIEW,
+    ],
+    verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
+    status: GuardianRelationshipStatus.ACTIVE,
+    effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+    effectiveUntil: null,
+    emergencyContactPriority: 1,
+    approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+    restrictionReasonRef: null,
+    approvedById: actor.userId,
+    approvedAt: new Date('2026-01-01T00:00:00.000Z'),
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    guardian: {
+      id: 'guardian-1',
+      tenantId: actor.tenantId,
+      userId: 'guardian-user-1',
+      fullName: 'Maya Shrestha',
+      relation: 'MOTHER',
+      primaryPhone: '+9779800000000',
+      secondaryPhone: null,
+      email: 'maya@example.com',
+      occupation: null,
+      homeAddress: null,
+      wardNumber: null,
+      receivesAlerts: true,
+      privacyConsentAt: new Date('2026-01-01T00:00:00.000Z'),
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      user: {
+        id: 'guardian-user-1',
+        tenantId: actor.tenantId,
+        email: 'maya@example.com',
+        phone: '+9779800000000',
+        status: 'ACTIVE',
+        lastLoginAt: new Date('2026-07-28T01:00:00.000Z'),
+      },
+    },
+  };
+}
+
 function buildStudent(
   overrides: Partial<{
     id: string;
@@ -2295,6 +3251,14 @@ function buildStudent(
       relation: string;
       isPrimary: boolean;
       appLoginLinked?: boolean;
+      capabilities?: GuardianCapability[];
+      verificationStatus?: GuardianRelationshipVerificationStatus;
+      status?: GuardianRelationshipStatus;
+      effectiveFrom?: Date;
+      effectiveUntil?: Date | null;
+      emergencyContactPriority?: number | null;
+      approvalStatus?: GuardianRelationshipApprovalStatus;
+      restrictionReasonRef?: string | null;
     }[];
     enrollments: {
       id?: string;
@@ -2368,9 +3332,20 @@ function buildStudent(
   };
 }
 
-function buildService(prisma: ReturnType<typeof buildPrisma>) {
+function buildService(
+  prisma: ReturnType<typeof buildPrisma>,
+  teacherScopeOverrides: Partial<{
+    resolveReadableScope: jest.Mock;
+    requireActorAccess: jest.Mock;
+  }> = {},
+) {
   const usersService = {
-    createManagedUser: jest.fn(),
+    createManagedUser: jest.fn().mockResolvedValue({
+      id: 'guardian-user-provisioned',
+      email: 'maya@example.com',
+      phone: '+9779800000000',
+      status: 'ACTIVE',
+    }),
   };
   const communicationsService = {
     recordDeliveryRecords: jest.fn(),
@@ -2416,6 +3391,19 @@ function buildService(prisma: ReturnType<typeof buildPrisma>) {
       .fn()
       .mockRejectedValue(new Error('No student photo in this test')),
   };
+  const teacherScopeService = {
+    resolveReadableScope: jest.fn().mockResolvedValue({
+      assignments: [],
+      homeroomSectionIds: new Set<string>(),
+      subjectsBySection: new Map<string, Set<string>>(),
+      allSectionIds: new Set<string>(),
+    }),
+    requireActorAccess: jest.fn().mockResolvedValue({
+      source: 'ASSIGNMENT',
+      assignmentId: 'assignment-1',
+    }),
+    ...teacherScopeOverrides,
+  };
 
   return {
     service: new StudentsService(
@@ -2428,6 +3416,7 @@ function buildService(prisma: ReturnType<typeof buildPrisma>) {
       fileRegistryService as never,
       usageService as never,
       studentPhotoService as never,
+      teacherScopeService as never,
     ),
     prisma,
     auditService,
@@ -2435,6 +3424,8 @@ function buildService(prisma: ReturnType<typeof buildPrisma>) {
     storageService,
     fileRegistryService,
     studentPhotoService,
+    teacherScopeService,
+    usersService,
   };
 }
 
@@ -2447,6 +3438,10 @@ function buildPrisma(options: {
   studentQrCredentialCountResult?: number;
   studentDocumentFindManyResult?: unknown[];
   studentDocumentHistoryFindManyResult?: unknown[];
+  refreshTokenFindManyResult?: unknown[];
+  refreshTokenFindFirstResult?: unknown;
+  otpCodeFindFirstResult?: unknown;
+  auditLogFindManyResult?: unknown[];
   guardianFindFirstQueue?: unknown[];
   studentGuardianFindFirstResult?: unknown;
   studentGuardianFindManyResult?: unknown[];
@@ -2458,6 +3453,7 @@ function buildPrisma(options: {
   generatedStudentDocumentFindFirstQueue?: unknown[];
   generatedStudentDocumentFindManyResult?: unknown[];
   guardianIdentityVerificationCreateResult?: unknown;
+  guardianIdentityVerificationFindManyResult?: unknown[];
   guardianIdentityVerificationFindFirstQueue?: unknown[];
   activityPostFindManyResult?: unknown[];
   transactionGuardianIdentityVerificationUpdateResult?: unknown;
@@ -2469,6 +3465,8 @@ function buildPrisma(options: {
   staffFindFirstResult?: unknown;
   subjectTeacherAssignmentFindManyResult?: unknown[];
   sectionFindManyResult?: unknown[];
+  transactionRefreshTokenUpdateManyCount?: number;
+  transactionStudentGuardianUpdateManyCount?: number;
 }) {
   const transaction = {
     enrollment: {
@@ -2495,12 +3493,37 @@ function buildPrisma(options: {
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     studentGuardian: {
+      create: jest.fn().mockImplementation(async ({ data }) => ({
+        id: 'student-guardian-created',
+        ...data,
+      })),
       createMany: jest.fn().mockResolvedValue({ count: 1 }),
       update: jest.fn().mockResolvedValue({ id: 'student-guardian-updated' }),
-      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      updateMany: jest.fn().mockResolvedValue({
+        count: options.transactionStudentGuardianUpdateManyCount ?? 1,
+      }),
     },
     guardian: {
+      findFirst: jest.fn().mockResolvedValue({
+        id: 'guardian-3',
+        fullName: 'Sita Rai',
+        primaryPhone: '+9779800000003',
+        relation: 'LOCAL_GUARDIAN',
+      }),
+      create: jest.fn(),
       update: jest.fn().mockResolvedValue({ id: 'guardian-updated' }),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
+    user: {
+      update: jest.fn().mockImplementation(async ({ data }) => ({
+        id: 'guardian-user-1',
+        ...data,
+      })),
+    },
+    refreshToken: {
+      updateMany: jest.fn().mockResolvedValue({
+        count: options.transactionRefreshTokenUpdateManyCount ?? 1,
+      }),
     },
     studentDocument: {
       findMany: jest.fn().mockResolvedValue([]),
@@ -2653,6 +3676,9 @@ function buildPrisma(options: {
     tenant: {
       findUnique: jest.fn().mockResolvedValue({ name: 'Everest Academy' }),
     },
+    role: {
+      findUnique: jest.fn().mockResolvedValue({ id: 'parent-role-1' }),
+    },
     enrollment: {
       findFirst: jest
         .fn()
@@ -2752,7 +3778,11 @@ function buildPrisma(options: {
       create: jest
         .fn()
         .mockResolvedValue(options.guardianIdentityVerificationCreateResult),
-      findMany: jest.fn().mockResolvedValue([]),
+      findMany: jest
+        .fn()
+        .mockResolvedValue(
+          options.guardianIdentityVerificationFindManyResult ?? [],
+        ),
       findFirst: jest.fn().mockImplementation(async () => {
         const queue = options.guardianIdentityVerificationFindFirstQueue ?? [];
 
@@ -2766,6 +3796,24 @@ function buildPrisma(options: {
 
         return queue.shift();
       }),
+    },
+    refreshToken: {
+      findMany: jest
+        .fn()
+        .mockResolvedValue(options.refreshTokenFindManyResult ?? []),
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(options.refreshTokenFindFirstResult ?? null),
+    },
+    otpCode: {
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(options.otpCodeFindFirstResult ?? null),
+    },
+    auditLog: {
+      findMany: jest
+        .fn()
+        .mockResolvedValue(options.auditLogFindManyResult ?? []),
     },
     activityPost: {
       findMany: jest

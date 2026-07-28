@@ -7,13 +7,23 @@ import { AuditService } from '../audit/audit.service';
 import { CommunicationsService } from '../communications/communications.service';
 import { AttendanceService } from '../attendance/attendance.service';
 import { AuthContext } from '../auth/auth.types';
-import { createPrismaMock, PrismaMock } from '../../test/test-helpers';
+import {
+  createPermissiveTeacherScope,
+  createPrismaMock,
+  PrismaMock,
+} from '../../test/test-helpers';
 import { TimetableConflictService } from './timetable-conflict.service';
 import { TimetableLifecycleService } from './timetable-lifecycle.service';
+import {
+  createTeacherScopeDeniedException,
+  TEACHER_SCOPE_DENIED_CODE,
+  TeacherScopeService,
+} from '../teacher-scope/teacher-scope.service';
 
 describe('Timetable Hardening', () => {
   let timetableService: TimetableService;
   let prisma: PrismaMock;
+  let teacherScopeService: ReturnType<typeof createPermissiveTeacherScope>;
 
   const actor: AuthContext = {
     userId: 'user-1',
@@ -27,6 +37,7 @@ describe('Timetable Hardening', () => {
 
   beforeEach(async () => {
     prisma = createPrismaMock();
+    teacherScopeService = createPermissiveTeacherScope();
     const conflictService = new TimetableConflictService(prisma as never);
     const lifecycleService = new TimetableLifecycleService(
       prisma as never,
@@ -45,6 +56,10 @@ describe('Timetable Hardening', () => {
         { provide: TimetableConflictService, useValue: conflictService },
         { provide: TimetableLifecycleService, useValue: lifecycleService },
         { provide: AttendanceService, useValue: {} },
+        {
+          provide: TeacherScopeService,
+          useValue: teacherScopeService,
+        },
       ],
     }).compile();
 
@@ -309,11 +324,11 @@ describe('Timetable Hardening', () => {
       });
     }
 
-    it('blocks a teacher with no assignment for the class/section (confirmed gap: previously had no check at all)', async () => {
+    it('blocks a teacher when the canonical scope gate denies the class/section', async () => {
       const p = prisma as any;
-      p.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
-      p.subjectTeacherAssignment.findFirst.mockResolvedValue(null);
-      p.section.findFirst.mockResolvedValue(null);
+      teacherScopeService.requireActorAccess.mockRejectedValue(
+        createTeacherScopeDeniedException(),
+      );
       mockPublishedVersion(p);
 
       await expect(
@@ -323,61 +338,71 @@ describe('Timetable Hardening', () => {
           'year-1',
           teacherActor,
         ),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: TEACHER_SCOPE_DENIED_CODE,
+        }),
+      });
 
       // The version lookup must never even run for a denied request.
       expect(p.timetableVersion.findFirst).not.toHaveBeenCalled();
     });
 
-    it('allows a Subject Teacher with a matching assignment', async () => {
+    it('allows a Subject Teacher when the canonical scope gate grants access', async () => {
       const p = prisma as any;
-      p.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
-      p.subjectTeacherAssignment.findFirst.mockResolvedValue({
-        id: 'assignment-1',
+      mockPublishedVersion(p);
+
+      await expect(
+        timetableService.exportClassTimetable(
+          'class-1',
+          'section-1',
+          'year-1',
+          teacherActor,
+        ),
+      ).resolves.toBeDefined();
+      expect(teacherScopeService.requireActorAccess).toHaveBeenCalledWith(
+        expect.objectContaining({
+          classId: 'class-1',
+          sectionId: 'section-1',
+          capability: 'CLASS_ROSTER_READ',
+        }),
+        teacherActor,
+      );
+    });
+
+    it('allows a Class Teacher when the canonical scope gate grants access', async () => {
+      const p = prisma as any;
+      mockPublishedVersion(p);
+
+      await expect(
+        timetableService.exportClassTimetable(
+          'class-1',
+          'section-1',
+          'year-1',
+          teacherActor,
+        ),
+      ).resolves.toBeDefined();
+    });
+
+    it('denies a teacher when canonical scope resolution has no active staff profile', async () => {
+      const p = prisma as any;
+      teacherScopeService.requireActorAccess.mockRejectedValue(
+        createTeacherScopeDeniedException(),
+      );
+      mockPublishedVersion(p);
+
+      await expect(
+        timetableService.exportClassTimetable(
+          'class-1',
+          'section-1',
+          'year-1',
+          teacherActor,
+        ),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: TEACHER_SCOPE_DENIED_CODE,
+        }),
       });
-      p.section.findFirst.mockResolvedValue(null);
-      mockPublishedVersion(p);
-
-      await expect(
-        timetableService.exportClassTimetable(
-          'class-1',
-          'section-1',
-          'year-1',
-          teacherActor,
-        ),
-      ).resolves.toBeDefined();
-    });
-
-    it('allows a Class Teacher with no subject assignment via classTeacherId', async () => {
-      const p = prisma as any;
-      p.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
-      p.subjectTeacherAssignment.findFirst.mockResolvedValue(null);
-      p.section.findFirst.mockResolvedValue({ id: 'section-1' });
-      mockPublishedVersion(p);
-
-      await expect(
-        timetableService.exportClassTimetable(
-          'class-1',
-          'section-1',
-          'year-1',
-          teacherActor,
-        ),
-      ).resolves.toBeDefined();
-    });
-
-    it('denies a teacher with no active staff profile', async () => {
-      const p = prisma as any;
-      p.staff.findFirst.mockResolvedValue(null);
-      mockPublishedVersion(p);
-
-      await expect(
-        timetableService.exportClassTimetable(
-          'class-1',
-          'section-1',
-          'year-1',
-          teacherActor,
-        ),
-      ).rejects.toThrow(NotFoundException);
     });
 
     it('lets admins bypass the assignment check entirely', async () => {
@@ -392,7 +417,7 @@ describe('Timetable Hardening', () => {
           actor,
         ),
       ).resolves.toBeDefined();
-      expect(p.staff.findFirst).not.toHaveBeenCalled();
+      expect(teacherScopeService.requireActorAccess).not.toHaveBeenCalled();
     });
   });
 });

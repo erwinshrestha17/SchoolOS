@@ -617,6 +617,19 @@ describe('CanteenService Phase 3C hardening', () => {
         tenantId: actor.tenantId,
         studentId: 'student-1',
         guardian: { userId: actor.userId },
+        status: 'ACTIVE',
+        verificationStatus: 'VERIFIED',
+        approvalStatus: 'APPROVED',
+        effectiveFrom: { lte: expect.any(Date) },
+        AND: [
+          {
+            OR: [
+              { effectiveUntil: null },
+              { effectiveUntil: { gt: expect.any(Date) } },
+            ],
+          },
+          { capabilities: { has: 'FEES_VIEW' } },
+        ],
       },
       include: {
         student: {

@@ -80,7 +80,12 @@ export class M1AdmissionsHardeningController {
   }
 
   @Delete('students/:studentId/guardians/:guardianId')
-  @Permissions('guardians:update', 'student_documents:manage')
+  @Permissions(
+    'guardians:update',
+    'guardians:verify',
+    'users:reset_password',
+    'student_documents:manage',
+  )
   removeGuardianAccess(
     @Param('studentId') studentId: string,
     @Param('guardianId') guardianId: string,

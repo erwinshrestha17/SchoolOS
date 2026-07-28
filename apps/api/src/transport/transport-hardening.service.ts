@@ -4,7 +4,11 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
-import { TransportEnrollmentStatus, TransportTripStatus } from '@prisma/client';
+import {
+  GuardianCapability,
+  TransportEnrollmentStatus,
+  TransportTripStatus,
+} from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { FileRegistryService } from '../file-registry/file-registry.service';
@@ -12,6 +16,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { CancelTransportTripDto } from './dto/cancel-transport-trip.dto';
 import { TransportService } from './transport.service';
+import { buildActiveGuardianRelationshipWhere } from '../common/security/parent-scope';
 
 @Injectable()
 export class TransportHardeningService {
@@ -92,6 +97,10 @@ export class TransportHardeningService {
     const guardianLink = await this.prisma.studentGuardian.findFirst({
       where: {
         tenantId: actor.tenantId,
+        ...buildActiveGuardianRelationshipWhere(
+          new Date(),
+          GuardianCapability.EMERGENCY_ALERT_RECEIVE,
+        ),
         studentId,
         guardian: { userId: actor.userId },
       },

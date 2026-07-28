@@ -11,6 +11,48 @@ enum ParentDataStatus {
   timeout,
 }
 
+abstract final class GuardianCapabilityKey {
+  static const academicsView = 'ACADEMICS_VIEW';
+  static const attendanceView = 'ATTENDANCE_VIEW';
+  static const leaveManage = 'LEAVE_MANAGE';
+  static const feesView = 'FEES_VIEW';
+  static const feesPay = 'FEES_PAY';
+  static const emergencyAlertReceive = 'EMERGENCY_ALERT_RECEIVE';
+  static const schoolCommunicate = 'SCHOOL_COMMUNICATE';
+  static const specificConsentGive = 'SPECIFIC_CONSENT_GIVE';
+  static const pickupAuthorize = 'PICKUP_AUTHORIZE';
+  static const complaintOrCorrectionSubmit = 'COMPLAINT_OR_CORRECTION_SUBMIT';
+}
+
+class GuardianRelationshipState {
+  const GuardianRelationshipState({
+    required this.verificationStatus,
+    required this.status,
+    required this.approvalStatus,
+    this.effectiveFrom,
+    this.effectiveUntil,
+    this.emergencyContactPriority,
+  });
+
+  final String verificationStatus;
+  final String status;
+  final String approvalStatus;
+  final String? effectiveFrom;
+  final String? effectiveUntil;
+  final int? emergencyContactPriority;
+
+  factory GuardianRelationshipState.fromJson(Map<String, dynamic> json) {
+    return GuardianRelationshipState(
+      verificationStatus: json['verificationStatus'] as String? ?? 'UNVERIFIED',
+      status: json['status'] as String? ?? 'SUSPENDED',
+      approvalStatus: json['approvalStatus'] as String? ?? 'PENDING',
+      effectiveFrom: json['effectiveFrom'] as String?,
+      effectiveUntil: json['effectiveUntil'] as String?,
+      emergencyContactPriority: json['emergencyContactPriority'] as int?,
+    );
+  }
+}
+
 class GuardianChild {
   const GuardianChild({
     required this.id,
@@ -22,6 +64,8 @@ class GuardianChild {
     this.academicYearStartsOn,
     this.academicYearEndsOn,
     this.guardianId,
+    this.capabilities = const <String>{},
+    this.relationshipState,
   });
 
   final String id;
@@ -33,6 +77,10 @@ class GuardianChild {
   final String? academicYearStartsOn;
   final String? academicYearEndsOn;
   final String? guardianId;
+  final Set<String> capabilities;
+  final GuardianRelationshipState? relationshipState;
+
+  bool hasCapability(String capability) => capabilities.contains(capability);
 
   factory GuardianChild.fromJson(Map<String, dynamic> json) {
     return GuardianChild(
@@ -45,6 +93,14 @@ class GuardianChild {
       academicYearStartsOn: json['academicYearStartsOn'] as String?,
       academicYearEndsOn: json['academicYearEndsOn'] as String?,
       guardianId: json['guardianId'] as String?,
+      capabilities: (json['capabilities'] as List<dynamic>? ?? const [])
+          .whereType<String>()
+          .toSet(),
+      relationshipState: json['relationshipState'] is Map<String, dynamic>
+          ? GuardianRelationshipState.fromJson(
+              json['relationshipState'] as Map<String, dynamic>,
+            )
+          : null,
     );
   }
 }

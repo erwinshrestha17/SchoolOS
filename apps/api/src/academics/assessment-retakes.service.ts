@@ -1,6 +1,5 @@
 import {
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -18,6 +17,8 @@ import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { TeacherCapability } from '../teacher-scope/teacher-capability';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 import {
   ApplyAssessmentRetakeResultDto,
   ApproveAssessmentRetakeDto,
@@ -73,6 +74,7 @@ export class AssessmentRetakesService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly communicationsService: CommunicationsService,
+    private readonly teacherScopeService: TeacherScopeService,
   ) {}
 
   async list(actor: AuthContext, query: ListAssessmentRetakesDto) {
@@ -556,30 +558,28 @@ export class AssessmentRetakesService {
       return;
     }
 
-    const staff = await this.prisma.staff.findFirst({
-      where: { tenantId: actor.tenantId, userId: actor.userId },
-      select: { id: true },
-    });
-    if (!staff) {
-      throw new ForbiddenException('Staff record not found in this tenant');
-    }
-
-    const assignment = await this.prisma.subjectTeacherAssignment.findFirst({
-      where: {
-        tenantId: actor.tenantId,
-        staffId: staff.id,
-        academicYearId: scope.academicYearId,
-        classId: scope.classId,
-        subjectId: scope.subjectId,
-        OR: [{ sectionId: null }, { sectionId: scope.sectionId }],
-      },
-      select: { id: true },
-    });
-    if (!assignment) {
-      throw new ForbiddenException(
-        'Assessment retake access is limited to assigned subjects and classes',
+    if (!scope.sectionId) {
+      return this.teacherScopeService.denyActorAccess(
+        {
+          capability: TeacherCapability.MARKS_ENTER,
+          reason: 'missing_scope',
+          classId: scope.classId,
+          subjectId: scope.subjectId,
+        },
+        actor,
       );
     }
+
+    await this.teacherScopeService.requireActorAccess(
+      {
+        academicYearId: scope.academicYearId,
+        classId: scope.classId,
+        sectionId: scope.sectionId,
+        subjectId: scope.subjectId,
+        capability: TeacherCapability.MARKS_ENTER,
+      },
+      actor,
+    );
   }
 
   private async getReadScope(
@@ -589,24 +589,19 @@ export class AssessmentRetakesService {
       return {};
     }
 
-    const staff = await this.prisma.staff.findFirst({
-      where: { tenantId: actor.tenantId, userId: actor.userId },
-      select: { id: true },
-    });
-    if (!staff) {
-      return { id: { in: [] } };
-    }
-
-    const assignments = await this.prisma.subjectTeacherAssignment.findMany({
-      where: { tenantId: actor.tenantId, staffId: staff.id },
-      select: {
-        academicYearId: true,
-        classId: true,
-        sectionId: true,
-        subjectId: true,
-      },
-      take: 500,
-    });
+    const assignments =
+      (
+        await this.teacherScopeService.listActiveAssignmentsForCapability(
+          actor,
+          TeacherCapability.SUBJECT_RECORD_READ,
+        )
+      ).filter(
+        (
+          assignment,
+        ): assignment is typeof assignment & {
+          subjectId: string;
+        } => Boolean(assignment.subjectId),
+      );
     if (assignments.length === 0) {
       return { id: { in: [] } };
     }
@@ -616,7 +611,7 @@ export class AssessmentRetakesService {
         examTerm: { academicYearId: assignment.academicYearId },
         classId: assignment.classId,
         subjectId: assignment.subjectId,
-        ...(assignment.sectionId ? { sectionId: assignment.sectionId } : {}),
+        sectionId: assignment.sectionId,
       })),
     };
   }

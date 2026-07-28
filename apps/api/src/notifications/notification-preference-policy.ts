@@ -10,6 +10,7 @@ import {
 } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { buildActiveGuardianRelationshipWhere } from '../common/security/parent-scope';
 
 const NEPAL_OFFSET_MINUTES = 5 * 60 + 45;
 const DEFAULT_QUIET_START = '20:00';
@@ -135,6 +136,7 @@ export class NotificationPreferencePolicy {
       const currentLink = await this.prisma.studentGuardian.findFirst({
         where: {
           tenantId,
+          ...buildActiveGuardianRelationshipWhere(),
           guardianId: delivery.guardianId,
           studentId: delivery.studentId,
         },

@@ -11,6 +11,7 @@ import {
 } from '@prisma/client';
 import { StudentQrResolvePurpose } from '@schoolos/core';
 import { hashToken, hmacToken } from '../auth/auth.utils';
+import { createTeacherScopeDeniedException } from '../teacher-scope/teacher-scope.service';
 import { StudentQrService } from './student-qr.service';
 
 const issuedAt = new Date('2026-05-13T00:00:00.000Z');
@@ -19,6 +20,9 @@ function createService() {
   const prisma = {
     student: {
       findFirst: jest.fn(),
+    },
+    guardian: {
+      findFirst: jest.fn().mockResolvedValue(null),
     },
     studentQrCredential: {
       findUnique: jest.fn(),
@@ -30,9 +34,6 @@ function createService() {
       count: jest.fn(),
     },
     $transaction: jest.fn(async (callback) => callback(prisma)),
-    subjectTeacherAssignment: {
-      findFirst: jest.fn(),
-    },
     libraryIssue: {
       count: jest.fn(),
     },
@@ -63,15 +64,28 @@ function createService() {
     registerGeneratedFile: jest.fn().mockResolvedValue({ id: 'qr-file-1' }),
     softDeleteFile: jest.fn(),
   };
+  const teacherScopeService = {
+    canActorAccess: jest.fn().mockResolvedValue(null),
+    denyActorAccess: jest
+      .fn()
+      .mockRejectedValue(createTeacherScopeDeniedException()),
+  };
 
   const service = new StudentQrService(
     prisma as any,
     auditService as any,
     configService as any,
     fileRegistryService as any,
+    teacherScopeService as any,
   );
 
-  return { service, prisma, auditService, fileRegistryService };
+  return {
+    service,
+    prisma,
+    auditService,
+    fileRegistryService,
+    teacherScopeService,
+  };
 }
 
 const adminAuth = {
@@ -593,8 +607,6 @@ describe('StudentQrService', () => {
       ...baseCredential,
       student: activeStudent,
     });
-    prisma.subjectTeacherAssignment.findFirst.mockResolvedValue(null);
-
     await expect(
       service.resolveQr(
         'tenant-1',
@@ -627,8 +639,6 @@ describe('StudentQrService', () => {
   it('blocks an unassigned teacher from rotating a student credential', async () => {
     const { service, prisma } = createService();
     prisma.student.findFirst.mockResolvedValue(credentialArtifactStudent);
-    prisma.subjectTeacherAssignment.findFirst.mockResolvedValue(null);
-
     await expect(
       service.rotateQr(
         'tenant-1',
@@ -815,7 +825,7 @@ describe('StudentQrService', () => {
   });
 
   it('returns complete QR status/scan log including generation, rotation, and revocation events', async () => {
-    const { service, prisma } = createService();
+    const { service, prisma, teacherScopeService } = createService();
     prisma.student.findFirst.mockResolvedValue(credentialArtifactStudent);
     prisma.studentQrCredential.findMany.mockResolvedValue([baseCredential]);
     prisma.user.findMany.mockResolvedValue([
@@ -1150,16 +1160,32 @@ describe('StudentQrService', () => {
   });
 
   it('allows multi-role parent and teacher users to resolve QR codes if they pass either ownership check', async () => {
-    const { service, prisma } = createService();
+    const { service, prisma, teacherScopeService } = createService();
     prisma.studentQrCredential.findFirst.mockResolvedValue({
       ...baseCredential,
       student: activeStudent,
     });
     prisma.studentQrCredential.update.mockResolvedValue(baseCredential);
+    prisma.guardian.findFirst
+      .mockResolvedValueOnce({
+        id: 'guardian-1',
+        studentLinks: [
+          {
+            id: 'student-guardian-1',
+            studentId: 'student-1',
+            guardianId: 'guardian-1',
+            relation: 'parent',
+            capabilities: ['ACADEMICS_VIEW'],
+            effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+            effectiveUntil: null,
+            emergencyContactPriority: 1,
+          },
+        ],
+      })
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
 
     // Case A: User is parent of the child but not their teacher
-    prisma.subjectTeacherAssignment.findFirst.mockResolvedValue(null);
-
     const resultParentOnly = await service.resolveQr(
       'tenant-1',
       'qr-token',
@@ -1175,8 +1201,8 @@ describe('StudentQrService', () => {
     expect(resultParentOnly.studentId).toBe('student-1');
 
     // Case B: User is teacher of the child but not their parent
-    prisma.subjectTeacherAssignment.findFirst.mockResolvedValue({
-      id: 'assignment-1',
+    teacherScopeService.canActorAccess.mockResolvedValueOnce({
+      assignmentId: 'assignment-1',
     });
 
     const resultTeacherOnly = await service.resolveQr(
@@ -1194,7 +1220,7 @@ describe('StudentQrService', () => {
     expect(resultTeacherOnly.studentId).toBe('student-1');
 
     // Case C: User is neither parent nor teacher of the child
-    prisma.subjectTeacherAssignment.findFirst.mockResolvedValue(null);
+    teacherScopeService.canActorAccess.mockResolvedValueOnce(null);
 
     await expect(
       service.resolveQr(

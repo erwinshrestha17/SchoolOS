@@ -1,5 +1,5 @@
-import { SchoolImprovementWorkspace } from '@/components/reports/school-improvement-workspace';
+import { notFound } from 'next/navigation';
 
 export default function SchoolImprovementPage() {
-  return <SchoolImprovementWorkspace />;
+  notFound();
 }

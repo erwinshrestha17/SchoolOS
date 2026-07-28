@@ -121,7 +121,7 @@ class ParentPortalRepository {
     final dashboards = <String, ParentDashboardSummary>{
       for (final bundle in childBundles) bundle.child.id: bundle.dashboard,
     };
-    final profiles = <String, ChildProfile>{
+    final profiles = <String, ChildProfile?>{
       for (final bundle in childBundles) bundle.child.id: bundle.profile,
     };
     final homework = <ParentPortalHomework>[
@@ -166,12 +166,14 @@ class ParentPortalRepository {
   }
 
   Future<_ParentChildBundle> _loadChildBundle(GuardianChild child) async {
-    final results = await Future.wait<Object>([
+    final results = await Future.wait<Object?>([
       parentRepository.getParentDashboardSummaryForChild(child),
-      parentRepository.getChildProfileForChild(child),
+      child.hasCapability(GuardianCapabilityKey.academicsView)
+          ? parentRepository.getChildProfileForChild(child)
+          : Future<ChildProfile?>.value(),
     ]);
     final dashboard = results[0] as ParentDashboardSummary;
-    final profile = results[1] as ChildProfile;
+    final profile = results[1] as ChildProfile?;
 
     return _ParentChildBundle(
       child: child,
@@ -219,6 +221,7 @@ class ParentPortalRepository {
       academicYearStartsOn: child.academicYearStartsOn,
       academicYearEndsOn: child.academicYearEndsOn,
       academicYear: child.academicYear,
+      capabilities: child.capabilities,
     );
   }
 
@@ -285,7 +288,7 @@ class _ParentChildBundle {
 
   final GuardianChild child;
   final ParentDashboardSummary dashboard;
-  final ChildProfile profile;
+  final ChildProfile? profile;
   final List<ParentHomeworkItem> homework;
 }
 

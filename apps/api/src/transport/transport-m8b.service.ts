@@ -5,10 +5,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  GuardianCapability,
   Prisma,
   TransportEnrollmentStatus,
   TransportTripStatus,
 } from '@prisma/client';
+import { buildActiveGuardianRelationshipWhere } from '../common/security/parent-scope';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
@@ -555,6 +557,10 @@ export class TransportM8bService {
     const guardianLink = await this.prisma.studentGuardian.findFirst({
       where: {
         tenantId: actor.tenantId,
+        ...buildActiveGuardianRelationshipWhere(
+          new Date(),
+          GuardianCapability.EMERGENCY_ALERT_RECEIVE,
+        ),
         studentId,
         guardian: { userId: actor.userId },
       },

@@ -7,6 +7,7 @@ import {
   ActivityAttachment,
   ActivityPostStatus,
   ConsentType,
+  GuardianCapability,
 } from '@prisma/client';
 import { Readable } from 'stream';
 import { AuditService } from '../audit/audit.service';
@@ -20,6 +21,8 @@ import {
 import { ConfigService } from '../config/config.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
+import { TeacherCapability } from '../teacher-scope/teacher-capability';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 
 export interface ActivityMediaFile {
   stream?: NodeJS.ReadableStream;
@@ -49,6 +52,7 @@ export class ActivityMediaService {
     private readonly configService: ConfigService,
     private readonly storageService: StorageService,
     private readonly auditService: AuditService,
+    private readonly teacherScopeService: TeacherScopeService,
   ) {}
 
   async getAttachmentMedia(
@@ -230,30 +234,23 @@ export class ActivityMediaService {
       ) &&
       !actor.permissions.includes('activity_feed:moderate')
     ) {
-      const staff = await this.prisma.staff.findFirst({
-        where: { tenantId: actor.tenantId, userId: actor.userId },
-        select: { id: true },
-      });
-      const assignment = staff
-        ? await this.prisma.subjectTeacherAssignment.findFirst({
-            where: {
-              tenantId: actor.tenantId,
-              staffId: staff.id,
-              classId: attachment.activityPost.classId,
-              ...(attachment.activityPost.sectionId
-                ? {
-                    OR: [
-                      { sectionId: attachment.activityPost.sectionId },
-                      { sectionId: null },
-                    ],
-                  }
-                : {}),
-            },
-            select: { id: true },
-          })
-        : null;
-      if (!assignment) {
-        throw new ForbiddenException('Activity media is outside your scope');
+      const scope = {
+        classId: attachment.activityPost.classId,
+        capability: TeacherCapability.CLASS_ROSTER_READ,
+      } as const;
+      if (attachment.activityPost.sectionId) {
+        await this.teacherScopeService.requireActorAccess(
+          {
+            ...scope,
+            sectionId: attachment.activityPost.sectionId,
+          },
+          actor,
+        );
+      } else {
+        await this.teacherScopeService.requireActorAccessAnySectionOfClass(
+          scope,
+          actor,
+        );
       }
       return;
     }
@@ -271,7 +268,11 @@ export class ActivityMediaService {
     }
 
     const visibleStudentIds = isParentOnly(actor)
-      ? await getParentStudentIds(this.prisma, actor)
+      ? await getParentStudentIds(
+          this.prisma,
+          actor,
+          GuardianCapability.ACADEMICS_VIEW,
+        )
       : [await getStudentOwnId(this.prisma, actor)].filter(
           (studentId): studentId is string => Boolean(studentId),
         );

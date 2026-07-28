@@ -12,6 +12,7 @@ import { ActivityPostLifecycleService } from './activity-post-lifecycle.service'
 import { ActivityMediaProcessor } from './processors/activity-media.processor';
 import { FileRegistryModule } from '../file-registry/file-registry.module';
 import { MediaAccessController } from './media-access.controller';
+import { TeacherScopeModule } from '../teacher-scope/teacher-scope.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { MediaAccessController } from './media-access.controller';
     StorageModule,
     CommunicationsModule,
     FileRegistryModule,
+    TeacherScopeModule,
     BullModule.registerQueue({
       name: 'activity-media',
     }),

@@ -2,7 +2,7 @@
 
 import { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
-import { Users, LayoutDashboard, CalendarDays, ClipboardCheck, FileText, BookOpenCheck } from 'lucide-react';
+import { Users, LayoutDashboard, CalendarDays, ClipboardCheck, FileText } from 'lucide-react';
 import { useSession } from '../../../components/session-provider';
 import { DashboardPageShell } from '../../../components/dashboard/dashboard-page-shell';
 import { ModuleTabs } from '../../../components/dashboard/module-tabs';
@@ -18,11 +18,6 @@ export default function HRLayout({ children }: { children: ReactNode }) {
     { href: '/dashboard/hr/attendance', label: 'Staff Attendance', icon: ClipboardCheck },
     { href: '/dashboard/hr/leave', label: 'Leave Requests', icon: CalendarDays },
     { href: '/dashboard/hr/contracts', label: 'Contracts', icon: FileText },
-    {
-      href: '/dashboard/hr/teacher-development',
-      label: 'Teacher Development',
-      icon: BookOpenCheck,
-    },
   ];
 
   const tabs = <ModuleTabs items={navItems} accentColor="purple" variant="light" />;

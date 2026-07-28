@@ -127,6 +127,7 @@ const _childA = GuardianChild(
   rollNumber: '7',
   academicYear: '2083',
   relationship: 'Daughter',
+  capabilities: {'ACADEMICS_VIEW'},
 );
 const _childB = GuardianChild(
   id: 'child-b',
@@ -135,6 +136,7 @@ const _childB = GuardianChild(
   rollNumber: '11',
   academicYear: '2083',
   relationship: 'Son',
+  capabilities: {'ACADEMICS_VIEW'},
 );
 const _childC = GuardianChild(
   id: 'child-c',
@@ -143,6 +145,7 @@ const _childC = GuardianChild(
   rollNumber: '3',
   academicYear: '2083',
   relationship: 'Daughter',
+  capabilities: {'ACADEMICS_VIEW'},
 );
 
 ParentDashboardSummary _dashboardFor(GuardianChild child) {

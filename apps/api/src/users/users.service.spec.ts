@@ -140,6 +140,65 @@ describe('UsersService', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  it('creates a managed user through the supplied transaction client', async () => {
+    const transaction = {
+      user: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockImplementation(async ({ data }: any) => ({
+          id: 'guardian-user-1',
+          email: data.email,
+          phone: data.phone,
+          status: data.status ?? 'ACTIVE',
+          userRoles: [{ role: { id: 'parent-role-1', name: 'parent' } }],
+        })),
+      },
+      role: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([{ id: 'parent-role-1', name: 'parent' }]),
+      },
+    };
+
+    await service.createManagedUser(
+      {
+        tenantId: actor.tenantId,
+        email: 'guardian@school.com',
+        phone: '9800000000',
+        password: 'Temporary!Parent2026',
+        roleIds: ['parent-role-1'],
+        assignedById: actor.userId,
+        mustChangePassword: true,
+      },
+      transaction as never,
+    );
+
+    expect(transaction.user.findUnique).toHaveBeenCalledWith({
+      where: {
+        tenantId_email: {
+          tenantId: actor.tenantId,
+          email: 'guardian@school.com',
+        },
+      },
+    });
+    expect(transaction.role.findMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        id: { in: ['parent-role-1'] },
+      },
+    });
+    expect(transaction.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          tenantId: actor.tenantId,
+          email: 'guardian@school.com',
+          phone: '+9779800000000',
+          mustChangePassword: true,
+        }),
+      }),
+    );
+    expect(prisma.user.create).not.toHaveBeenCalled();
+  });
+
   it('resets password inside the actor tenant and requires change on next login', async () => {
     prisma.user.findFirst.mockResolvedValue({
       id: 'user-2',
