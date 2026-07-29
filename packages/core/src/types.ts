@@ -861,6 +861,12 @@ export type SectionSummary = {
   };
   capacity: number | null;
   studentCount?: number;
+  classTeacher?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    employeeId: string;
+  } | null;
   isAssignedClassTeacher?: boolean;
   isAssignedSubjectTeacher?: boolean;
 };

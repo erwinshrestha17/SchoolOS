@@ -1,9 +1,11 @@
 import { Controller, Get, Injectable, UseGuards } from '@nestjs/common';
 import { TeacherAssignmentType } from '@prisma/client';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
+import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { AuthContext } from '../auth/auth.types';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { TenantActiveGuard } from '../auth/guards/tenant-active.guard';
@@ -116,7 +118,13 @@ export class TeacherAssignmentsService {
 }
 
 @Controller('teacher-workspace/assignments')
-@UseGuards(JwtAuthGuard, TenantActiveGuard, RolesPermissionsGuard)
+@UseGuards(
+  JwtAuthGuard,
+  TenantActiveGuard,
+  RolesPermissionsGuard,
+  EntitlementGuard,
+)
+@Entitlement('module.students')
 @Roles('teacher', 'subject_teacher')
 export class TeacherAssignmentsController {
   constructor(private readonly service: TeacherAssignmentsService) {}

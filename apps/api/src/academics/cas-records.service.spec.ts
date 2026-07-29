@@ -159,6 +159,76 @@ describe('CasRecordsService', () => {
         NotFoundException,
       );
     });
+
+    it('denies create for a teacher without MARKS_ENTER assignment', async () => {
+      mockValidScope();
+      (prisma.section.findFirst as jest.Mock).mockResolvedValue({
+        id: 'section-1',
+      });
+      (prisma.student.findFirst as jest.Mock).mockResolvedValue({
+        id: 'student-1',
+        sectionId: 'section-1',
+      });
+      teacherAssignments = [
+        teacherAssignmentFixture({
+          tenantId: 'tenant-1',
+          staffId: 'staff-1',
+          assignmentType: 'SUBJECT_TEACHER',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: 'subject-other',
+        }),
+      ];
+
+      await expect(
+        service.create(
+          { ...validDto, sectionId: 'section-1' },
+          {
+            ...teacherActor,
+            permissions: ['academics:enter_marks'],
+          } as AuthContext,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('allows create for a teacher with matching MARKS_ENTER assignment', async () => {
+      mockValidScope();
+      (prisma.section.findFirst as jest.Mock).mockResolvedValue({
+        id: 'section-1',
+      });
+      (prisma.student.findFirst as jest.Mock).mockResolvedValue({
+        id: 'student-1',
+        sectionId: 'section-1',
+      });
+      teacherAssignments = [
+        teacherAssignmentFixture({
+          tenantId: 'tenant-1',
+          staffId: 'staff-1',
+          assignmentType: 'SUBJECT_TEACHER',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: 'subject-1',
+        }),
+      ];
+      (prisma.casRecord.create as jest.Mock).mockResolvedValue({
+        id: 'cas-new',
+        ...validDto,
+        tenantId: 'tenant-1',
+        sectionId: 'section-1',
+        observedOn: new Date('2026-05-11'),
+        note: null,
+      });
+
+      await expect(
+        service.create(
+          { ...validDto, sectionId: 'section-1' },
+          {
+            ...teacherActor,
+            permissions: ['academics:enter_marks'],
+          } as AuthContext,
+        ),
+      ).resolves.toBeDefined();
+    });
   });
 
   describe('list', () => {
@@ -323,6 +393,53 @@ describe('CasRecordsService', () => {
       await expect(service.bulkUpsert(dto, mockActor)).rejects.toThrow(
         ConflictException,
       );
+    });
+
+    it('denies bulkUpsert for a teacher without assignment scope', async () => {
+      (prisma.academicYear.findFirst as jest.Mock).mockResolvedValue({
+        id: 'year-1',
+      });
+      (prisma.class.findFirst as jest.Mock).mockResolvedValue({
+        id: 'class-1',
+      });
+      (prisma.subject.findFirst as jest.Mock).mockResolvedValue({
+        id: 'subject-1',
+      });
+      (prisma.section.findFirst as jest.Mock).mockResolvedValue({
+        id: 'section-1',
+      });
+      (prisma.student.findMany as jest.Mock).mockResolvedValue([
+        { id: 's1', sectionId: 'section-1' },
+      ]);
+      teacherAssignments = [
+        teacherAssignmentFixture({
+          tenantId: 'tenant-1',
+          staffId: 'staff-1',
+          assignmentType: 'SUBJECT_TEACHER',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: 'subject-other',
+        }),
+      ];
+
+      await expect(
+        service.bulkUpsert(
+          {
+            academicYearId: 'year-1',
+            classId: 'class-1',
+            sectionId: 'section-1',
+            subjectId: 'subject-1',
+            category: 'Sports',
+            maxScore: 10,
+            observedOn: '2026-05-11',
+            entries: [{ studentId: 's1', score: 5 }],
+          },
+          {
+            ...teacherActor,
+            permissions: ['academics:enter_marks'],
+          } as AuthContext,
+        ),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 });

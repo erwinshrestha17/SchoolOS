@@ -5,8 +5,10 @@ import {
 } from '@nestjs/common';
 import { Mode, Prisma } from '@prisma/client';
 import { SCHOOL_CONFIG_OWNER_ROLE } from '@schoolos/core';
+import { ClsService } from 'nestjs-cls';
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
+import { REQUEST_ID_KEY } from '../common/security/cls-keys';
 import {
   DEFAULT_CHART_ACCOUNTS,
   DEFAULT_FEE_HEADS,
@@ -16,7 +18,6 @@ import {
   PERMISSION_CATALOG,
   SYSTEM_ROLE_DEFINITIONS,
   SYSTEM_ROLE_PERMISSIONS,
-  buildPermissionKey,
 } from '../rbac/rbac.defaults';
 import { UsersService } from '../users/users.service';
 import { RegisterTenantDto } from './dto/register-tenant.dto';
@@ -27,9 +28,26 @@ export class TenantsService {
     private readonly prisma: PrismaService,
     private readonly usersService: UsersService,
     private readonly auditService: AuditService,
+    private readonly cls: ClsService,
   ) {}
 
-  async register(dto: RegisterTenantDto) {
+  async register(dto: RegisterTenantDto, actor: AuthContext) {
+    const requestId = this.cls.get<string | undefined>(REQUEST_ID_KEY);
+
+    // Provisioning reads and writes rows belonging to the tenant being
+    // created, while the authenticated platform operator's CLS tenantId
+    // points at the platform tenant. Run in a fresh CLS context so the
+    // Prisma tenant-scope extension does not inject the operator's tenantId
+    // into these cross-tenant queries; every query below carries an
+    // explicit tenantId.
+    return this.cls.run(() => this.provisionTenant(dto, actor, requestId));
+  }
+
+  private async provisionTenant(
+    dto: RegisterTenantDto,
+    actor: AuthContext,
+    requestId: string | undefined,
+  ) {
     const existingTenant = await this.prisma.tenant.findUnique({
       where: { slug: dto.slug },
     });
@@ -91,11 +109,13 @@ export class TenantsService {
       action: 'register',
       resource: 'tenant',
       tenantId: tenant.id,
-      userId: adminUser.id,
+      userId: actor.userId,
       resourceId: tenant.id,
+      requestId,
       after: {
         slug: tenant.slug,
         adminEmail: adminUser.email,
+        adminUserId: adminUser.id,
       },
     });
 

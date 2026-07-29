@@ -28,7 +28,17 @@ describe('CsrfGuard', () => {
     ).toBe(true);
   });
 
-  it('allows public auth and tenant registration routes without CSRF cookies', () => {
+  it('requires CSRF for cookie-authenticated tenant registration', () => {
+    const guard = createGuard({ isProduction: false });
+
+    expect(() =>
+      guard.canActivate(
+        createContext({ method: 'POST', path: '/api/v1/tenants/register' }),
+      ),
+    ).toThrow(new ForbiddenException('CSRF cookie missing'));
+  });
+
+  it('allows public auth routes without CSRF cookies', () => {
     const guard = createGuard({ isProduction: false });
 
     expect(
@@ -50,11 +60,6 @@ describe('CsrfGuard', () => {
           method: 'POST',
           path: '/api/v1/auth/reset-password',
         }),
-      ),
-    ).toBe(true);
-    expect(
-      guard.canActivate(
-        createContext({ method: 'POST', path: '/api/v1/tenants/register' }),
       ),
     ).toBe(true);
     expect(

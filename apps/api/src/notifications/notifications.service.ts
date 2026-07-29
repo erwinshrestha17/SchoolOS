@@ -27,6 +27,7 @@ interface ReleaseInAppNotificationInput {
 }
 
 interface SendAuthCodeEmailInput {
+  tenantId: string;
   to: string;
   tenantName: string;
   code: string;
@@ -75,6 +76,7 @@ export class NotificationsService {
       text: lines.join('\n'),
       html: `<p>Hello,</p><p>Your ${input.purpose.replaceAll('_', ' ')} code for <strong>${escapeHtml(input.tenantName)}</strong> is:</p><p style="font-size:24px;font-weight:bold;letter-spacing:4px;">${escapeHtml(input.code)}</p><p>This code expires soon. If you did not request it, you can ignore this email.</p>${input.resetUrl ? `<p>Reset page: <a href="${escapeHtml(input.resetUrl)}">${escapeHtml(input.resetUrl)}</a></p>` : ''}`,
       metadata: {
+        tenantId: input.tenantId,
         purpose: input.purpose,
       },
     });

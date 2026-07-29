@@ -228,16 +228,49 @@ pnpm smoke:pilot
 
 Release validation requires restorable data, not just backups that appear to exist. Treat this as the baseline operating procedure; it is not verified until a dated restore record exists.
 
+### Repository scripts (local and staging)
+
+Use the executable scripts in `scripts/` rather than ad hoc commands when possible:
+
+| Command | Purpose |
+| --- | --- |
+| `pnpm backup:local` | Postgres custom-format dump + local storage tar + manifest metrics |
+| `pnpm restore:local -- --manifest .backups/<timestamp>/manifest.json` | Restore into `RESTORE_DATABASE_URL` and isolated storage dir |
+| `pnpm rehearse:backup-restore:local` | End-to-end local drill (backup → restore DB `schoolos_db_restore` → verify counts → write evidence) |
+
+Environment variables:
+
+- `DATABASE_URL` — source database (defaults to local docker Postgres on `:5433`)
+- `RESTORE_DATABASE_URL` — restore target (defaults to `schoolos_db_restore` on the same instance)
+- `LOCAL_STORAGE_ROOT` — relative to `apps/api/` (default `storage`)
+- `BACKUP_OUTPUT_DIR` — artifact root (default `.backups/`, gitignored)
+- `RESTORE_STORAGE_ROOT` — isolated restore storage path (rehearsal never overwrites live storage)
+- `ALLOW_RESTORE_INPLACE=1` — required to restore into the same database name as `DATABASE_URL`
+
+Record evidence using [`docs/production/evidence/BACKUP_RESTORE_REHEARSAL_TEMPLATE.md`](evidence/BACKUP_RESTORE_REHEARSAL_TEMPLATE.md). Local rehearsal example: [`docs/production/evidence/backup-restore-rehearsal-2026-07-29-local.md`](evidence/backup-restore-rehearsal-2026-07-29-local.md).
+
+Local quick start:
+
+```bash
+docker compose up -d postgres
+pnpm db:migrate
+pnpm db:seed   # if source DB is empty
+pnpm rehearse:backup-restore:local
+```
+
+If `pg_dump` / `pg_restore` are not installed on the host, the scripts fall back to `docker exec schoolos_postgres` when that container is running.
+
 ### Backup Scope & Frequency
 - **Postgres:** full backup daily (and WAL archiving once live). Captures tenant records, accounting ledger, audit records, sessions, and module data.
-- **Redis:** append-only persistence or RDB snapshots to preserve BullMQ queue states.
-- **Storage:** daily incremental sync and weekly full verification of uploaded files and generated PDFs.
+- **Redis:** append-only persistence or RDB snapshots to preserve BullMQ queue states (deferred for first local evidence; queue state is recoverable).
+- **Storage:** daily incremental sync and weekly full verification of uploaded files and generated PDFs. Local pilot uses `STORAGE_PROVIDER=local`; S3/R2 backup is a staging/production follow-up.
 - **Configuration:** backup of `.env`, proxy config, Docker Compose files, and release SHA on every deployment/secret rotation.
 
-### Backup Commands
+### Production / VPS manual commands (override path)
+
 Postgres backup:
 ```bash
-pg_dump --format=custom --file=/backups/schoolos-before-$(date +%Y%m%d%H%M).dump "$DATABASE_URL"
+pg_dump --format=custom --no-owner --no-acl --file=/backups/schoolos-before-$(date +%Y%m%d%H%M).dump "$DATABASE_URL"
 ```
 Storage backup:
 ```bash
@@ -246,18 +279,47 @@ tar -czf /backups/schoolos-storage-before-$(date +%Y%m%d%H%M).tgz /var/lib/schoo
 Store backups outside the VPS as soon as possible.
 
 ### Restore Drill
-1. Provision a clean test database.
+1. Provision a clean test database (`RESTORE_DATABASE_URL` must differ from source unless `ALLOW_RESTORE_INPLACE=1`).
 2. Restore the Postgres backup:
    ```bash
-   pg_restore --clean --if-exists --dbname="$RESTORE_DATABASE_URL" /backups/latest.dump
+   pnpm restore:local -- --manifest /backups/<timestamp>/manifest.json
+   ```
+   Or manually:
+   ```bash
+   pg_restore --clean --if-exists --no-owner --no-acl --dbname="$RESTORE_DATABASE_URL" /backups/latest.dump
    ```
 3. Restore storage files to the test storage root.
 4. Start API with restore database/storage values.
 5. Verify `/api/v1/ready`.
 6. Verify login, tenant data, admission documents, receipts, ledger reports, and notification delivery records.
-7. Record restore duration and verify monthly.
+7. Record restore duration and verify monthly using the evidence template.
 
-### Database Rollback Options
+### Local staging simulation (development workstation)
+
+```bash
+pnpm staging:deploy:local          # postgres:5434, redis:6380, migrate, seed
+node scripts/start-staging-api-local.mjs   # API on :4000 against staging DB
+pnpm staging:verify:def            # automated DEF subset
+pnpm staging:health              # /health + /ready polling
+pnpm staging:verify:gates        # db:validate, smoke, backup (API must be running)
+```
+
+Full containerized stack:
+
+```bash
+docker compose -p schoolos-staging -f docker-compose.staging.yml --profile app up -d --build
+```
+
+Evidence templates: `docs/production/evidence/`.
+
+### Monitoring and alerts (minimum pilot)
+
+- Poll `GET /api/v1/health` for process liveness (expect 200).
+- Poll `GET /api/v1/ready` for dependency readiness (expect 200; **503 when degraded**).
+- Alert on: readiness 503 sustained > 2 minutes, error rate spike, queue depth growth, disk usage on Postgres/storage volumes.
+- Use `pnpm staging:health` in cron or CI until APM is configured.
+
+---
 1. Stop API and web traffic.
 2. Redeploy the previous known-good image or commit.
 3. Run `pnpm db:generate` after checkout if dependencies changed.

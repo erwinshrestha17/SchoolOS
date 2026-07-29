@@ -1,0 +1,90 @@
+# Local or VPS staging stack. Infrastructure defaults to non-conflicting host ports.
+# Usage:
+#   docker compose -f docker-compose.staging.yml up -d postgres redis
+#   pnpm staging:deploy:local
+# Full containerized app stack:
+#   docker compose -f docker-compose.staging.yml up -d --build
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: schoolos_staging_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: schoolos
+      POSTGRES_PASSWORD: ${STAGING_POSTGRES_PASSWORD:-password123}
+      POSTGRES_DB: schoolos_staging
+    ports:
+      - "${STAGING_POSTGRES_PORT:-5434}:5432"
+    volumes:
+      - staging_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U schoolos -d schoolos_staging"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: schoolos_staging_redis
+    restart: unless-stopped
+    ports:
+      - "${STAGING_REDIS_PORT:-6380}:6379"
+    volumes:
+      - staging_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: schoolos_staging_api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DEPLOY_ENV: staging
+      ALLOW_PROD_BOOT: "true"
+      PORT: 4000
+      DATABASE_URL: postgresql://schoolos:${STAGING_POSTGRES_PASSWORD:-password123}@postgres:5432/schoolos_staging?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      RATE_LIMIT_ENABLED: "true"
+      TRUST_PROXY: "true"
+      FRONTEND_ORIGIN: ${STAGING_FRONTEND_ORIGIN:-https://staging.schoolos.example}
+      PASSWORD_RESET_APP_URL: ${STAGING_PASSWORD_RESET_APP_URL:-https://staging.schoolos.example/reset-password}
+    env_file:
+      - path: deploy/env.staging.example
+        required: false
+    ports:
+      - "${STAGING_API_PORT:-4001}:4000"
+    profiles: ["app"]
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${STAGING_NEXT_PUBLIC_API_BASE_URL:-https://api-staging.schoolos.example/api/v1}
+    container_name: schoolos_staging_web
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+    ports:
+      - "${STAGING_WEB_PORT:-3001}:3000"
+    profiles: ["app"]
+
+volumes:
+  staging_pgdata:
+  staging_redisdata:

@@ -40,7 +40,6 @@ export class CsrfGuard implements CanActivate {
       '/api/v1/auth/forgot-password',
       '/api/v1/auth/reset-password',
       '/api/v1/auth/password-recovery/',
-      '/api/v1/tenants/register',
       '/api/v1/demo-requests',
       '/api/v1/payments/online/webhook/',
     ];

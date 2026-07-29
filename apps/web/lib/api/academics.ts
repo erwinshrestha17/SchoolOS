@@ -190,6 +190,25 @@ export const academicsApi = {
   listSections: () => request<SectionSummary[]>('/sections'),
   createSection: (body: JsonBody) =>
     request<SectionSummary>('/sections', { method: 'POST', json: body }),
+  assignSectionClassTeacher: (
+    sectionId: string,
+    body: { staffId: string; academicYearId?: string },
+  ) =>
+    request<SectionSummary>(
+      `/sections/${encodeURIComponent(sectionId)}/class-teacher`,
+      { method: 'PUT', json: body },
+    ),
+  removeSectionClassTeacher: (
+    sectionId: string,
+    academicYearId?: string,
+  ) =>
+    request<{ removed: true; sectionId: string }>(
+      withQuery(
+        `/sections/${encodeURIComponent(sectionId)}/class-teacher`,
+        academicYearId ? { academicYearId } : {},
+      ),
+      { method: 'DELETE' },
+    ),
   listSubjects: (params?: { classId?: string | null }) =>
     request<SubjectSummary[]>(withQuery('/subjects', params ?? {})),
   createSubject: (body: JsonBody) =>

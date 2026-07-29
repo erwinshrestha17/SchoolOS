@@ -9,11 +9,18 @@ import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
+import { TeacherCapability } from '../teacher-scope/teacher-capability';
 import { isTeacherOnly } from '../common/security/parent-scope';
 import { BulkUpsertCasRecordsDto } from './dto/bulk-upsert-cas-records.dto';
 import { CreateCasRecordDto } from './dto/create-cas-record.dto';
 import { ListCasRecordsDto } from './dto/list-cas-records.dto';
 import { UpdateCasRecordDto } from './dto/update-cas-record.dto';
+
+const CAS_WRITE_SCOPE_EXEMPT_ROLES = [
+  'admin',
+  'principal',
+  'platform_super_admin',
+];
 
 @Injectable()
 export class CasRecordsService {
@@ -199,6 +206,23 @@ export class CasRecordsService {
       studentId: dto.studentId,
     });
 
+    const student = await this.prisma.student.findFirst({
+      where: {
+        id: dto.studentId,
+        tenantId: actor.tenantId,
+        classId: dto.classId,
+      },
+      select: { sectionId: true },
+    });
+    const sectionId = dto.sectionId ?? student?.sectionId ?? null;
+
+    await this.assertCasWriteAccess(actor, {
+      academicYearId: dto.academicYearId,
+      classId: dto.classId,
+      sectionId,
+      subjectId: dto.subjectId ?? null,
+    });
+
     const score = dto.score ?? 0;
     const maxScore = dto.maxScore ?? 100;
     this.validateScore(score, maxScore);
@@ -337,6 +361,13 @@ export class CasRecordsService {
       );
     }
 
+    await this.assertCasWriteAccess(actor, {
+      academicYearId,
+      classId,
+      sectionId: sectionId ?? students[0]?.sectionId ?? null,
+      subjectId: subjectId ?? null,
+    });
+
     const date = new Date(observedOn);
     const notePrefix = category.trim();
 
@@ -430,6 +461,83 @@ export class CasRecordsService {
     }
 
     await Promise.all(checks);
+  }
+
+  private isCasWriteScopeExempt(actor: AuthContext) {
+    return actor.roles.some((role) =>
+      CAS_WRITE_SCOPE_EXEMPT_ROLES.includes(role),
+    );
+  }
+
+  private isCasPrivilegedActor(actor: AuthContext) {
+    return ['cas-records:manage', 'academics:manage', 'academics:update'].some(
+      (permission) => actor.permissions.includes(permission),
+    );
+  }
+
+  private async assertCasWriteAccess(
+    actor: AuthContext,
+    scope: {
+      academicYearId: string;
+      classId: string;
+      sectionId: string | null;
+      subjectId: string | null;
+    },
+  ) {
+    if (this.isCasWriteScopeExempt(actor) || this.isCasPrivilegedActor(actor)) {
+      return;
+    }
+
+    if (!isTeacherOnly(actor)) {
+      return;
+    }
+
+    if (scope.subjectId) {
+      if (!scope.sectionId) {
+        return this.teacherScopeService.denyActorAccess(
+          {
+            capability: TeacherCapability.MARKS_ENTER,
+            reason: 'missing_scope',
+            classId: scope.classId,
+            subjectId: scope.subjectId,
+          },
+          actor,
+        );
+      }
+
+      await this.teacherScopeService.requireActorAccess(
+        {
+          academicYearId: scope.academicYearId,
+          classId: scope.classId,
+          sectionId: scope.sectionId,
+          subjectId: scope.subjectId,
+          capability: TeacherCapability.MARKS_ENTER,
+        },
+        actor,
+      );
+      return;
+    }
+
+    if (!scope.sectionId) {
+      return this.teacherScopeService.denyActorAccess(
+        {
+          capability: TeacherCapability.HOMEROOM_RECORD_WRITE,
+          reason: 'missing_scope',
+          classId: scope.classId,
+        },
+        actor,
+      );
+    }
+
+    await this.teacherScopeService.requireActorAccess(
+      {
+        academicYearId: scope.academicYearId,
+        classId: scope.classId,
+        sectionId: scope.sectionId,
+        capability: TeacherCapability.HOMEROOM_RECORD_WRITE,
+      },
+      actor,
+    );
   }
 
   private async ensureAcademicYear(actor: AuthContext, id: string) {

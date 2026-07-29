@@ -29,7 +29,16 @@ const actor: AuthContext = {
   permissions: ['students:read'],
 };
 
-function buildService(assignments: Array<Record<string, any>>) {
+function buildService(
+  assignments: Array<Record<string, any>>,
+  enabledModules: string[] = [
+    'students',
+    'attendance',
+    'homework',
+    'exams',
+    'timetable',
+  ],
+) {
   const scopeDeps = createTeacherScopeServiceForTests({
     assignments,
     staffId: STAFF,
@@ -83,8 +92,19 @@ function buildService(assignments: Array<Record<string, any>>) {
     attendanceRecord: { groupBy: jest.fn().mockResolvedValue([]) },
   } as never;
 
-  const service = new HomeroomSummaryService(prisma, teacherScope);
-  return { service, markGroupBy, homeworkFindMany, prisma };
+  const moduleResolver = {
+    getEnabledModules: jest.fn().mockResolvedValue(new Set(enabledModules)),
+    unavailableModules: jest.fn((enabled: Set<string>, required: string[]) =>
+      required.filter((module) => !enabled.has(module)),
+    ),
+  };
+
+  const service = new HomeroomSummaryService(
+    prisma,
+    teacherScope,
+    moduleResolver as never,
+  );
+  return { service, markGroupBy, homeworkFindMany, prisma, moduleResolver };
 }
 
 const CLASS_TEACHER_1A = teacherAssignmentFixture({
@@ -202,13 +222,47 @@ describe('HomeroomSummaryService', () => {
         sectionId: 'section-1a',
       });
 
-      expect(summary.subjectCoverage.map((s) => s.subjectName)).toEqual([
+      expect(summary.subjectCoverage?.map((s) => s.subjectName)).toEqual([
         'Mathematics',
         'English',
       ]);
       // English has no reported marks in the fixture -- surfaced as a gap the
       // Class Teacher can chase, not as an editable record.
       expect(summary.subjectsWithNoMarks).toEqual(['English']);
+    });
+  });
+
+  describe('DEF-06 module degradation', () => {
+    it('returns null homework and unavailableModules when homework is disabled', async () => {
+      const { service, homeworkFindMany } = buildService(
+        [CLASS_TEACHER_1A],
+        ['students', 'attendance', 'exams'],
+      );
+
+      const summary = await service.getHomeroomAcademicSummary(actor, {
+        classId: 'class-1',
+        sectionId: 'section-1a',
+      });
+
+      expect(summary.homework).toBeNull();
+      expect(summary.unavailableModules).toContain('homework');
+      expect(homeworkFindMany).not.toHaveBeenCalled();
+    });
+
+    it('returns null subject coverage when exams is disabled', async () => {
+      const { service, markGroupBy } = buildService(
+        [CLASS_TEACHER_1A],
+        ['students', 'attendance', 'homework'],
+      );
+
+      const summary = await service.getHomeroomAcademicSummary(actor, {
+        classId: 'class-1',
+        sectionId: 'section-1a',
+      });
+
+      expect(summary.subjectCoverage).toBeNull();
+      expect(summary.subjectsWithNoMarks).toBeNull();
+      expect(markGroupBy).not.toHaveBeenCalled();
     });
   });
 

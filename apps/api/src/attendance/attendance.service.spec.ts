@@ -436,7 +436,7 @@ describe('attendance production hardening', () => {
 
     const result = await service.getTeacherMobileToday(teacherActor, dateInput);
 
-    expect(result.pendingAttendanceCount).toBe(1);
+    expect(result.pendingAttendanceCount).toBe(0);
     expect(result.periods).toEqual([
       expect.objectContaining({
         id: 'slot-1',
@@ -597,6 +597,255 @@ describe('attendance production hardening', () => {
       response: expect.objectContaining({ code: TEACHER_SCOPE_DENIED_CODE }),
     });
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  describe('DEF-02 homeroom-only attendance writes', () => {
+    const scopeSection = { id: 'section-1', name: 'A', classId: 'class-1' };
+    const submitDto = {
+      academicYearId: 'ay-1',
+      classId: 'class-1',
+      sectionId: 'section-1',
+      attendanceDate: '2026-04-28',
+      exceptions: [] as [],
+    };
+
+    it('rejects daily attendance submission from a subject teacher without homeroom assignment', async () => {
+      const { service, prisma } = buildService({
+        academicYear: { id: 'ay-1' },
+        classroom: { id: 'class-1', name: 'Grade 1' },
+        section: scopeSection,
+        staffFindFirst: { id: 'staff-1' },
+        canonicalAssignments: [
+          teacherAssignmentFixture({
+            tenantId: 'tenant-1',
+            staffId: 'staff-1',
+            academicYearId: 'ay-1',
+            assignmentType: 'SUBJECT_TEACHER',
+            classId: 'class-1',
+            sectionId: 'section-1',
+            subjectId: 'subject-math',
+          }),
+        ],
+      });
+      prisma.section.findFirst
+        .mockResolvedValueOnce(scopeSection)
+        .mockResolvedValueOnce(null);
+
+      await expect(
+        service.submitAttendance(submitDto, teacherActor),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: TEACHER_SCOPE_DENIED_CODE }),
+      });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('allows daily attendance submission from the homeroom class teacher', async () => {
+      const finalSession = buildAttendanceSession({ records: [] });
+      const { service, prisma } = buildService({
+        academicYear: { id: 'ay-1' },
+        classroom: { id: 'class-1', name: 'Grade 1' },
+        section: scopeSection,
+        staffFindFirst: { id: 'staff-1' },
+        students: [buildStudent({ id: 'student-1' })],
+        finalSession,
+        canonicalAssignments: [
+          teacherAssignmentFixture({
+            tenantId: 'tenant-1',
+            staffId: 'staff-1',
+            academicYearId: 'ay-1',
+            assignmentType: 'CLASS_TEACHER',
+            classId: 'class-1',
+            sectionId: 'section-1',
+            subjectId: null,
+          }),
+        ],
+      });
+      prisma.section.findFirst
+        .mockResolvedValueOnce(scopeSection)
+        .mockResolvedValueOnce(null);
+
+      await expect(
+        service.submitAttendance(submitDto, teacherActor),
+      ).resolves.toEqual(
+        expect.objectContaining({
+          sessionId: 'session-1',
+        }),
+      );
+    });
+
+    it('allows roster and monthly register reads for a subject teacher assigned to the section', async () => {
+      const subjectAssignment = teacherAssignmentFixture({
+        tenantId: 'tenant-1',
+        staffId: 'staff-1',
+        academicYearId: 'ay-1',
+        assignmentType: 'SUBJECT_TEACHER',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        subjectId: 'subject-math',
+      });
+      const { service, prisma } = buildService({
+        academicYear: { id: 'ay-1' },
+        classroom: { id: 'class-1', name: 'Grade 1' },
+        section: scopeSection,
+        staffFindFirst: { id: 'staff-1' },
+        students: [],
+        attendanceSessions: [],
+        canonicalAssignments: [subjectAssignment],
+      });
+      prisma.section.findFirst.mockResolvedValue(scopeSection);
+
+      await expect(
+        service.getRoster(
+          teacherActor,
+          'ay-1',
+          'class-1',
+          'section-1',
+          '2026-04-28',
+        ),
+      ).resolves.toEqual(
+        expect.objectContaining({
+          class: expect.objectContaining({ id: 'class-1' }),
+          section: expect.objectContaining({ id: 'section-1' }),
+          students: [],
+        }),
+      );
+
+      await expect(
+        service.getMonthlyRegister(
+          {
+            academicYearId: 'ay-1',
+            classId: 'class-1',
+            sectionId: 'section-1',
+            bsMonth: 1,
+            bsYear: 2081,
+          },
+          teacherActor,
+        ),
+      ).resolves.toEqual(
+        expect.objectContaining({
+          calendar: 'BS',
+          month: 1,
+          year: 2081,
+        }),
+      );
+    });
+
+    it('does not let attendance:read_all alone authorize attendance writes', async () => {
+      const readAllTeacher = {
+        ...teacherActor,
+        permissions: ['attendance:read', 'attendance:read_all'],
+      };
+      const { service, prisma } = buildService({
+        academicYear: { id: 'ay-1' },
+        classroom: { id: 'class-1', name: 'Grade 1' },
+        section: scopeSection,
+        staffFindFirst: { id: 'staff-1' },
+        canonicalAssignments: [
+          teacherAssignmentFixture({
+            tenantId: 'tenant-1',
+            staffId: 'staff-1',
+            academicYearId: 'ay-1',
+            assignmentType: 'SUBJECT_TEACHER',
+            classId: 'class-1',
+            sectionId: 'section-1',
+            subjectId: 'subject-math',
+          }),
+        ],
+      });
+      prisma.section.findFirst
+        .mockResolvedValueOnce(scopeSection)
+        .mockResolvedValueOnce(null);
+
+      await expect(
+        service.submitAttendance(submitDto, readAllTeacher),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: TEACHER_SCOPE_DENIED_CODE }),
+      });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('rejects staff correction requests from subject teachers and allows homeroom teachers', async () => {
+      const correctionRequest = {
+        id: 'correction-1',
+        previousStatus: AttendanceStatus.LATE,
+        requestedStatus: AttendanceStatus.PRESENT,
+        status: 'PENDING',
+      };
+      const sharedMocks = {
+        studentFindFirst: {
+          id: 'student-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+        },
+        attendanceSession: {
+          id: 'session-1',
+          attendanceDate: new Date('2026-04-27T18:15:00.000Z'),
+          classId: 'class-1',
+          sectionId: 'section-1',
+          submittedAt: new Date('2026-04-28T04:00:00.000Z'),
+        },
+        attendanceRecord: {
+          id: 'record-1',
+          attendanceSessionId: 'session-1',
+          status: AttendanceStatus.LATE,
+        },
+        correctionUpdated: correctionRequest,
+        staffFindFirst: { id: 'staff-1' },
+      };
+      const correctionDto = {
+        attendanceSessionId: 'session-1',
+        studentId: 'student-1',
+        attendanceDate: '2026-04-28',
+        requestedStatus: AttendanceStatus.PRESENT,
+        reason: 'Teacher selected late by mistake',
+      };
+
+      const subjectTeacherService = buildService({
+        ...sharedMocks,
+        canonicalAssignments: [
+          teacherAssignmentFixture({
+            tenantId: 'tenant-1',
+            staffId: 'staff-1',
+            academicYearId: 'ay-1',
+            assignmentType: 'SUBJECT_TEACHER',
+            classId: 'class-1',
+            sectionId: 'section-1',
+            subjectId: 'subject-math',
+          }),
+        ],
+      }).service;
+
+      await expect(
+        subjectTeacherService.createCorrectionRequest(
+          correctionDto,
+          teacherActor,
+        ),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: TEACHER_SCOPE_DENIED_CODE }),
+      });
+
+      const classTeacherService = buildService({
+        ...sharedMocks,
+        canonicalAssignments: [
+          teacherAssignmentFixture({
+            tenantId: 'tenant-1',
+            staffId: 'staff-1',
+            academicYearId: 'ay-1',
+            assignmentType: 'CLASS_TEACHER',
+            classId: 'class-1',
+            sectionId: 'section-1',
+            subjectId: null,
+          }),
+        ],
+      }).service;
+
+      await expect(
+        classTeacherService.createCorrectionRequest(
+          correctionDto,
+          teacherActor,
+        ),
+      ).resolves.toEqual(correctionRequest);
+    });
   });
 
   it('requires an active staff record before teacher attendance access', async () => {

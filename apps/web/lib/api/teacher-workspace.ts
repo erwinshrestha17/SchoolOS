@@ -62,9 +62,10 @@ export interface TeacherTodaySummary {
     givenToday: number;
     dueToday: number;
     awaitingReviewCount: number;
-  };
-  substitutions: TeacherTodaySubstitution[];
-  marksDeadlines: TeacherTodayMarksDeadline[];
+  } | null;
+  substitutions: TeacherTodaySubstitution[] | null;
+  marksDeadlines: TeacherTodayMarksDeadline[] | null;
+  unavailableModules?: string[];
 }
 
 /**
@@ -145,8 +146,9 @@ export interface HomeroomAcademicSummary {
   classId: string;
   sectionId: string;
   studentCount: number;
-  subjectCoverage: HomeroomSummarySubjectCoverage[];
-  subjectsWithNoMarks: string[];
+  unavailableModules?: string[];
+  subjectCoverage: HomeroomSummarySubjectCoverage[] | null;
+  subjectsWithNoMarks: string[] | null;
   homework: Array<{
     id: string;
     title: string;
@@ -159,17 +161,17 @@ export interface HomeroomAcademicSummary {
     submissionCount: number;
     /** Only homework the caller authored is theirs to edit. */
     isMine: boolean;
-  }>;
+  }> | null;
   students: Array<{
     studentId: string;
     studentSystemId: string;
     fullNameEn: string;
     rollNumber: number | null;
     attendancePercent: number | null;
-    absencesInWindow: number;
-    needsAttendanceFollowUp: boolean;
+    absencesInWindow: number | null;
+    needsAttendanceFollowUp: boolean | null;
   }>;
-  studentsNeedingFollowUp: number;
+  studentsNeedingFollowUp: number | null;
 }
 
 export interface TeacherHomeroom {

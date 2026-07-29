@@ -8,7 +8,10 @@ export async function skipSuspendedTenantJob(
   jobLabel: string,
 ): Promise<boolean> {
   if (!tenantId) {
-    return false;
+    logger.error(
+      `Skipping ${jobLabel}: tenantId is missing from job payload (fail-closed)`,
+    );
+    return true;
   }
 
   const allowed = await plansService.shouldProcessTenantJob(tenantId);

@@ -4,6 +4,7 @@ import { skipSuspendedTenantJob } from './processor-tenant.guard';
 describe('skipSuspendedTenantJob', () => {
   const logger = {
     warn: jest.fn(),
+    error: jest.fn(),
   } as unknown as Logger;
 
   beforeEach(() => {
@@ -42,5 +43,19 @@ describe('skipSuspendedTenantJob', () => {
     expect(logger.warn).toHaveBeenCalledWith(
       'Skipping test job for inactive or missing tenant tenant-suspended',
     );
+  });
+
+  it('returns true and logs an error when tenantId is missing', async () => {
+    const plansService = {
+      shouldProcessTenantJob: jest.fn(),
+    };
+
+    await expect(
+      skipSuspendedTenantJob(plansService as never, null, logger, 'test job'),
+    ).resolves.toBe(true);
+    expect(logger.error).toHaveBeenCalledWith(
+      'Skipping test job: tenantId is missing from job payload (fail-closed)',
+    );
+    expect(plansService.shouldProcessTenantJob).not.toHaveBeenCalled();
   });
 });

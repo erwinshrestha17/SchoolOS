@@ -79,6 +79,8 @@ export const authApi = {
       features: string[];
       addOns: string[];
     }>('/me/entitlements'),
+  // Platform-operator action: requires an authenticated platform session
+  // (backend enforces PlatformGuard + tenants:manage).
   registerTenant: (body: JsonBody) =>
-    request('/tenants/register', { method: 'POST', json: body, auth: false }),
+    request('/tenants/register', { method: 'POST', json: body }),
 };

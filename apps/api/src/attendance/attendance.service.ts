@@ -102,6 +102,8 @@ const DEFAULT_M2_ATTENDANCE_POLICY = {
     'Your child was marked late today. Please contact the school office if this needs review.',
 };
 
+type AttendanceTeacherAccess = 'READ' | 'WRITE';
+
 @Injectable()
 export class AttendanceService {
   constructor(
@@ -353,13 +355,8 @@ export class AttendanceService {
       classes,
       pendingAttendanceCount: classes.filter((item) => {
         const isClassTeacher = item.subject.includes('Class teacher');
-        const isScheduledToday = periods.some(
-          (period) =>
-            period.classId === item.classId &&
-            period.sectionId === item.sectionId,
-        );
         return (
-          (isClassTeacher || isScheduledToday) &&
+          isClassTeacher &&
           !item.attendance.isSubmitted &&
           !item.attendance.isLocked
         );
@@ -539,11 +536,15 @@ export class AttendanceService {
     actor: AuthContext,
     submissionContext?: AttendanceSubmissionContext,
   ) {
-    await this.validateAttendanceScope(actor, {
-      academicYearId: dto.academicYearId,
-      classId: dto.classId,
-      sectionId: dto.sectionId,
-    });
+    await this.validateAttendanceScope(
+      actor,
+      {
+        academicYearId: dto.academicYearId,
+        classId: dto.classId,
+        sectionId: dto.sectionId,
+      },
+      'WRITE',
+    );
     const attendanceDate = stripTime(new Date(dto.attendanceDate));
     const today = stripTime(new Date());
 
@@ -2258,6 +2259,8 @@ export class AttendanceService {
         actor,
         student.classId,
         student.sectionId,
+        undefined,
+        'WRITE',
       );
     }
 
@@ -4964,6 +4967,7 @@ export class AttendanceService {
       classId: string;
       sectionId?: string | null;
     },
+    access: AttendanceTeacherAccess = 'READ',
   ) {
     const [academicYear, classroom, section] = await Promise.all([
       this.prisma.academicYear.findFirst({
@@ -5003,6 +5007,7 @@ export class AttendanceService {
       scope.classId,
       scope.sectionId,
       scope.academicYearId,
+      access,
     );
 
     return { academicYear, classroom, section };
@@ -5013,7 +5018,10 @@ export class AttendanceService {
     classId: string,
     sectionId?: string | null,
     academicYearId?: string,
+    access: AttendanceTeacherAccess = 'READ',
   ) {
+    const isWrite = access === 'WRITE';
+
     // Admins and full-permission staff can access everything. The role check
     // mirrors the one every other scoped service uses (see
     // HomeworkService.ensureSubjectTeacherScope): school administrators and
@@ -5026,7 +5034,7 @@ export class AttendanceService {
       ) ||
       actor.permissions.includes('attendance:mark_all') ||
       actor.permissions.includes('attendance:override_lock') ||
-      actor.permissions.includes('attendance:read_all')
+      (!isWrite && actor.permissions.includes('attendance:read_all'))
     ) {
       return;
     }
@@ -5054,21 +5062,27 @@ export class AttendanceService {
       return this.teacherScopeService.denyActorAccess(
         {
           classId,
-          capability: TeacherCapability.CLASS_ROSTER_READ,
+          capability: isWrite
+            ? TeacherCapability.HOMEROOM_ATTENDANCE_MARK
+            : TeacherCapability.CLASS_ROSTER_READ,
           reason: 'missing_scope',
         },
         actor,
       );
     }
 
-    // A homeroom Class Teacher marks daily attendance; a Subject Teacher
-    // marks the periods they teach. Either satisfies this gate, but each is
-    // resolved against its own assignment family rather than a shared
-    // "is a teacher here" shortcut.
-    for (const capability of [
-      TeacherCapability.HOMEROOM_ATTENDANCE_MARK,
-      TeacherCapability.CLASS_ROSTER_READ,
-    ]) {
+    // Daily attendance writes belong to the homeroom Class Teacher.
+    // Subject/assistant/substitute teachers may read the roster and register
+    // for their assigned section, but must not mark or submit the daily
+    // register unless they also hold the CLASS_TEACHER assignment.
+    const capabilities = isWrite
+      ? [TeacherCapability.HOMEROOM_ATTENDANCE_MARK]
+      : [
+          TeacherCapability.HOMEROOM_ATTENDANCE_MARK,
+          TeacherCapability.CLASS_ROSTER_READ,
+        ];
+
+    for (const capability of capabilities) {
       const grant = await this.teacherScopeService.canActorAccess(
         { ...base, sectionId, capability },
         actor,
@@ -5080,7 +5094,9 @@ export class AttendanceService {
       {
         classId,
         sectionId,
-        capability: TeacherCapability.CLASS_ROSTER_READ,
+        capability: isWrite
+          ? TeacherCapability.HOMEROOM_ATTENDANCE_MARK
+          : TeacherCapability.CLASS_ROSTER_READ,
         reason: 'no_assignment',
       },
       actor,

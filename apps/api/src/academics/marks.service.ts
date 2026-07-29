@@ -384,6 +384,14 @@ export class MarksService {
     const limit = dto.limit ?? 100;
     const skip = (page - 1) * limit;
 
+    const teacherReadScope = await this.getMarkReadScope(actor);
+    if (teacherReadScope === 'NONE') {
+      return {
+        items: [],
+        meta: { total: 0, page, limit, totalPages: 0 },
+      };
+    }
+
     const where: Prisma.MarkEntryWhereInput = {
       tenantId: actor.tenantId,
       ...(dto.examTermId ? { examTermId: dto.examTermId } : {}),
@@ -392,6 +400,7 @@ export class MarksService {
         : {}),
       ...(dto.subjectId ? { subjectId: dto.subjectId } : {}),
       ...(dto.studentId ? { studentId: dto.studentId } : {}),
+      ...(teacherReadScope ? { AND: [teacherReadScope] } : {}),
     };
 
     if (dto.classId || dto.sectionId || dto.search) {
@@ -467,6 +476,18 @@ export class MarksService {
       throw new NotFoundException('Student not found in tenant');
     }
 
+    await this.assertStudentMarkReadAccess(actor, student, options.academicYearId);
+
+    const teacherReadScope = await this.getMarkReadScope(actor);
+    if (teacherReadScope === 'NONE') {
+      const page = options.page ?? 1;
+      const limit = options.limit ?? 100;
+      return {
+        items: [],
+        meta: { total: 0, page, limit, totalPages: 0 },
+      };
+    }
+
     const page = options.page ?? 1;
     const limit = options.limit ?? 100;
     const skip = (page - 1) * limit;
@@ -479,6 +500,7 @@ export class MarksService {
       ...(options.academicYearId
         ? { examTerm: { academicYearId: options.academicYearId } }
         : {}),
+      ...(teacherReadScope ? { AND: [teacherReadScope] } : {}),
     };
 
     const [items, total] = await Promise.all([
@@ -525,6 +547,31 @@ export class MarksService {
     if (!existingMark) {
       throw new NotFoundException('Mark entry not found');
     }
+
+    const [student, examTermForScope] = await Promise.all([
+      this.prisma.student.findFirst({
+        where: { id: existingMark.studentId, tenantId: actor.tenantId },
+        select: { id: true, classId: true, sectionId: true },
+      }),
+      this.prisma.examTerm.findFirst({
+        where: { id: existingMark.examTermId, tenantId: actor.tenantId },
+        select: { id: true, academicYearId: true },
+      }),
+    ]);
+    if (!student) {
+      throw new NotFoundException('Student not found in tenant');
+    }
+    if (!examTermForScope) {
+      throw new NotFoundException('Exam term not found in tenant');
+    }
+
+    await this.assertMarkWriteAccess(actor, {
+      academicYearId: examTermForScope.academicYearId,
+      classId: student.classId,
+      sectionId: student.sectionId,
+      subjectId: existingMark.subjectId,
+      componentType: existingMark.assessmentComponent.type,
+    });
 
     const activeRetake = await this.prisma.assessmentRetake.findFirst({
       where: {
@@ -671,5 +718,168 @@ export class MarksService {
     });
 
     return updated;
+  }
+
+  private isAssignmentScopeExempt(actor: AuthContext) {
+    return actor.roles.some((role) =>
+      ASSIGNMENT_SCOPE_EXEMPT_ROLES.includes(role),
+    );
+  }
+
+  private isPrivilegedActor(actor: AuthContext) {
+    return [
+      'academics:manage',
+      'academics:update',
+      'academics:manage_report_cards',
+      'marks:manage',
+    ].some((permission) => actor.permissions.includes(permission));
+  }
+
+  private isTeacherActor(actor: AuthContext) {
+    return (
+      actor.roles.includes('teacher') || actor.roles.includes('subject_teacher')
+    );
+  }
+
+  private async assertMarkWriteAccess(
+    actor: AuthContext,
+    scope: {
+      academicYearId: string;
+      classId: string;
+      sectionId: string | null;
+      subjectId: string;
+      componentType: AssessmentType;
+    },
+  ) {
+    if (this.isAssignmentScopeExempt(actor) || this.isPrivilegedActor(actor)) {
+      return;
+    }
+
+    if (!this.isTeacherActor(actor)) {
+      return;
+    }
+
+    if (!scope.sectionId) {
+      return this.teacherScopeService.denyActorAccess(
+        {
+          capability: TeacherCapability.MARKS_ENTER,
+          reason: 'missing_scope',
+          classId: scope.classId,
+          subjectId: scope.subjectId,
+        },
+        actor,
+      );
+    }
+
+    await this.teacherScopeService.requireActorAccess(
+      {
+        academicYearId: scope.academicYearId,
+        classId: scope.classId,
+        sectionId: scope.sectionId,
+        subjectId: scope.subjectId,
+        componentType: scope.componentType,
+        capability: TeacherCapability.MARKS_ENTER,
+      },
+      actor,
+    );
+  }
+
+  private async assertStudentMarkReadAccess(
+    actor: AuthContext,
+    student: { classId: string; sectionId: string | null },
+    academicYearId?: string,
+  ) {
+    if (this.isAssignmentScopeExempt(actor) || this.isPrivilegedActor(actor)) {
+      return;
+    }
+
+    if (!this.isTeacherActor(actor)) {
+      return;
+    }
+
+    const options = academicYearId ? { academicYearId } : {};
+    const [subjectAssignments, homeroomAssignments] = await Promise.all([
+      this.teacherScopeService.listActiveAssignmentsForCapability(
+        actor,
+        TeacherCapability.SUBJECT_RECORD_READ,
+        options,
+      ),
+      this.teacherScopeService.listActiveAssignmentsForCapability(
+        actor,
+        TeacherCapability.HOMEROOM_ACADEMIC_SUMMARY_READ,
+        options,
+      ),
+    ]);
+
+    const inScope = [...subjectAssignments, ...homeroomAssignments].some(
+      (assignment) =>
+        assignment.classId === student.classId &&
+        assignment.sectionId === student.sectionId,
+    );
+    if (!inScope) {
+      throw new ForbiddenException(
+        'Student marks are outside your teaching scope',
+      );
+    }
+  }
+
+  private async getMarkReadScope(
+    actor: AuthContext,
+  ): Promise<Prisma.MarkEntryWhereInput | 'NONE' | null> {
+    if (this.isAssignmentScopeExempt(actor) || this.isPrivilegedActor(actor)) {
+      return null;
+    }
+
+    if (!this.isTeacherActor(actor)) {
+      return null;
+    }
+
+    const subjectAssignments = (
+      await this.teacherScopeService.listActiveAssignmentsForCapability(
+        actor,
+        TeacherCapability.SUBJECT_RECORD_READ,
+      )
+    ).filter(
+      (
+        assignment,
+      ): assignment is typeof assignment & { subjectId: string } =>
+        Boolean(assignment.subjectId),
+    );
+
+    const homeroomAssignments =
+      await this.teacherScopeService.listActiveAssignmentsForCapability(
+        actor,
+        TeacherCapability.HOMEROOM_ACADEMIC_SUMMARY_READ,
+      );
+
+    if (subjectAssignments.length === 0 && homeroomAssignments.length === 0) {
+      return 'NONE';
+    }
+
+    const orConditions: Prisma.MarkEntryWhereInput[] = [];
+
+    for (const assignment of subjectAssignments) {
+      orConditions.push({
+        examTerm: { academicYearId: assignment.academicYearId },
+        subjectId: assignment.subjectId,
+        student: {
+          classId: assignment.classId,
+          sectionId: assignment.sectionId,
+        },
+      });
+    }
+
+    for (const assignment of homeroomAssignments) {
+      orConditions.push({
+        examTerm: { academicYearId: assignment.academicYearId },
+        student: {
+          classId: assignment.classId,
+          sectionId: assignment.sectionId,
+        },
+        status: { not: MarkEntryStatus.DRAFT },
+      });
+    }
+
+    return { OR: orConditions };
   }
 }

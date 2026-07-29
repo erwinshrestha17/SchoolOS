@@ -6,6 +6,7 @@ import { AttendanceService } from '../attendance/attendance.service';
 import { HomeworkService } from '../homework/homework.service';
 import { TimetableService } from '../timetable/timetable.service';
 import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
+import { TeacherWorkspaceModuleResolver } from './teacher-workspace-modules';
 
 interface TodayPeriod {
   id: string;
@@ -41,6 +42,7 @@ export class TeacherTodayService {
     private readonly homeworkService: HomeworkService,
     private readonly timetableService: TimetableService,
     private readonly teacherScopeService: TeacherScopeService,
+    private readonly moduleResolver: TeacherWorkspaceModuleResolver,
   ) {}
 
   async getToday(
@@ -48,17 +50,35 @@ export class TeacherTodayService {
     dateInput?: string,
     now: Date = new Date(),
   ) {
+    const enabledModules = await this.moduleResolver.getEnabledModules(
+      actor.tenantId,
+    );
+    const homeworkEnabled = enabledModules.has('homework');
+    const timetableEnabled = enabledModules.has('timetable');
+    const examsEnabled = enabledModules.has('exams');
+
+    const unavailableModules = this.moduleResolver.unavailableModules(
+      enabledModules,
+      ['homework', 'timetable', 'exams'],
+    );
+
     const [attendanceToday, homeworkSummary, timetableToday, marksDeadlines] =
       await Promise.all([
         this.attendanceService.getTeacherMobileToday(actor, dateInput),
-        this.homeworkService.getHomeworkSummaryToday(actor, {
-          date: dateInput,
-        }),
-        this.timetableService.getTeacherMobileTimetable(actor, {
-          date: dateInput,
-          days: 1,
-        }),
-        this.getUpcomingMarksDeadlines(actor, now),
+        homeworkEnabled
+          ? this.homeworkService.getHomeworkSummaryToday(actor, {
+              date: dateInput,
+            })
+          : Promise.resolve(null),
+        timetableEnabled
+          ? this.timetableService.getTeacherMobileTimetable(actor, {
+              date: dateInput,
+              days: 1,
+            })
+          : Promise.resolve(null),
+        examsEnabled
+          ? this.getUpcomingMarksDeadlines(actor, now)
+          : Promise.resolve(null),
       ]);
 
     const nowTimeOfDay = nepalTimeOfDay(now);
@@ -81,13 +101,16 @@ export class TeacherTodayService {
       todaysPeriods: periods,
       assignedClasses: attendanceToday.classes,
       pendingAttendanceCount: attendanceToday.pendingAttendanceCount,
-      homework: {
-        givenToday: homeworkSummary.givenToday,
-        dueToday: homeworkSummary.dueToday,
-        awaitingReviewCount: homeworkSummary.notChecked,
-      },
-      substitutions: timetableToday.substitutions,
+      homework: homeworkSummary
+        ? {
+            givenToday: homeworkSummary.givenToday,
+            dueToday: homeworkSummary.dueToday,
+            awaitingReviewCount: homeworkSummary.notChecked,
+          }
+        : null,
+      substitutions: timetableToday?.substitutions ?? null,
       marksDeadlines,
+      unavailableModules,
     };
   }
 

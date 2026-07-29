@@ -194,6 +194,7 @@ describe('AuthService', () => {
     expect(result.challengeToken).toBe('challenge-token');
     expect(notificationsService.sendAuthCodeEmail).toHaveBeenCalledWith(
       expect.objectContaining({
+        tenantId: 'tenant-1',
         to: authUser.email,
         purpose: 'login',
       }),

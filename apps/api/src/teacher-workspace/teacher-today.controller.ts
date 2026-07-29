@@ -1,8 +1,10 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
+import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { AuthContext } from '../auth/auth.types';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantActiveGuard } from '../auth/guards/tenant-active.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
@@ -10,7 +12,13 @@ import { TeacherTodayService } from './teacher-today.service';
 import { TeacherTodayQueryDto } from './dto/teacher-today-query.dto';
 
 @Controller('teacher-workspace')
-@UseGuards(JwtAuthGuard, TenantActiveGuard, RolesPermissionsGuard)
+@UseGuards(
+  JwtAuthGuard,
+  TenantActiveGuard,
+  RolesPermissionsGuard,
+  EntitlementGuard,
+)
+@Entitlement('module.attendance')
 @Roles('teacher', 'subject_teacher')
 export class TeacherTodayController {
   constructor(private readonly teacherTodayService: TeacherTodayService) {}

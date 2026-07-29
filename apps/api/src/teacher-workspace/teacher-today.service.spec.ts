@@ -39,8 +39,15 @@ describe('TeacherTodayService', () => {
       periods?: ReturnType<typeof makePeriod>[];
       subjectAssignments?: Array<{ subjectId: string }>;
       examTerms?: Array<{ id: string; name: string; endsOn: Date }>;
+      enabledModules?: string[];
     } = {},
   ) {
+    const enabledModules = overrides.enabledModules ?? [
+      'attendance',
+      'homework',
+      'timetable',
+      'exams',
+    ];
     const attendanceToday = {
       date: NOW_NPT_09_15.toISOString(),
       periods: overrides.periods ?? [],
@@ -83,6 +90,12 @@ describe('TeacherTodayService', () => {
         ),
       ),
     };
+    const moduleResolver = {
+      getEnabledModules: jest.fn().mockResolvedValue(new Set(enabledModules)),
+      unavailableModules: jest.fn((enabled: Set<string>, required: string[]) =>
+        required.filter((module) => !enabled.has(module)),
+      ),
+    };
 
     const service = new TeacherTodayService(
       prisma as unknown as PrismaService,
@@ -90,8 +103,15 @@ describe('TeacherTodayService', () => {
       homeworkService as unknown as HomeworkService,
       timetableService as unknown as TimetableService,
       teacherScopeService as unknown as TeacherScopeService,
+      moduleResolver as never,
     );
-    return { service, prisma, homeworkService, timetableService };
+    return {
+      service,
+      prisma,
+      homeworkService,
+      timetableService,
+      moduleResolver,
+    };
   }
 
   it('identifies the period covering the current Nepal-local time as currentPeriod', async () => {
@@ -181,5 +201,43 @@ describe('TeacherTodayService', () => {
 
     expect(result.marksDeadlines).toEqual([]);
     expect(prisma.examTerm.findMany).not.toHaveBeenCalled();
+  });
+
+  describe('DEF-06 module degradation', () => {
+    it('returns null homework and skips HomeworkService when homework is disabled', async () => {
+      const { service, homeworkService } = makeService({
+        enabledModules: ['attendance', 'timetable', 'exams'],
+      });
+
+      const result = await service.getToday(actor, undefined, NOW_NPT_09_15);
+
+      expect(result.homework).toBeNull();
+      expect(result.unavailableModules).toContain('homework');
+      expect(homeworkService.getHomeworkSummaryToday).not.toHaveBeenCalled();
+    });
+
+    it('returns null substitutions when timetable is disabled', async () => {
+      const { service, timetableService } = makeService({
+        enabledModules: ['attendance', 'homework', 'exams'],
+      });
+
+      const result = await service.getToday(actor, undefined, NOW_NPT_09_15);
+
+      expect(result.substitutions).toBeNull();
+      expect(result.unavailableModules).toContain('timetable');
+      expect(timetableService.getTeacherMobileTimetable).not.toHaveBeenCalled();
+    });
+
+    it('returns null marksDeadlines when exams is disabled', async () => {
+      const { service, prisma } = makeService({
+        enabledModules: ['attendance', 'homework', 'timetable'],
+      });
+
+      const result = await service.getToday(actor, undefined, NOW_NPT_09_15);
+
+      expect(result.marksDeadlines).toBeNull();
+      expect(result.unavailableModules).toContain('exams');
+      expect(prisma.examTerm.findMany).not.toHaveBeenCalled();
+    });
   });
 });

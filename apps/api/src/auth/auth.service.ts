@@ -937,6 +937,7 @@ export class AuthService {
     });
 
     await this.notificationsService.sendAuthCodeEmail({
+      tenantId: input.tenant.id,
       to: input.user.email,
       tenantName: input.tenant.name,
       code,

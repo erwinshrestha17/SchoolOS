@@ -18,6 +18,7 @@ node_modules/.cache
 apps/api/.env
 apps/api/dist
 apps/api/coverage
+apps/api/.env.staging-local
 apps/api/storage
 
 apps/web/.next
@@ -59,6 +60,7 @@ pnpm-debug.log*
 /output/
 /scratch/
 /temp-home/
+/.backups/
 /Library/
 
 # Apps debug files

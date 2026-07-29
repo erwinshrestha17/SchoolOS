@@ -9,8 +9,10 @@ import {
   GraduationCap,
   Plus,
   School,
+  UserRound,
 } from 'lucide-react';
 import { Button } from '../ui/button';
+import { ConfirmDialog } from '../ui/confirm-dialog';
 import { ErrorState } from '../ui/error-state';
 import { api } from '../../lib/api';
 import { useSession } from '../session-provider';
@@ -35,6 +37,7 @@ export function AcademicStructureWorkspace() {
   const canCreateSection = permissions.includes('sections:create');
   const canCreateStream = permissions.includes('streams:create');
   const canReadStreams = canCreateStream || permissions.includes('streams:read');
+  const canAssignClassTeacher = permissions.includes('academics:update');
   const canManageAny = canCreateClass || canCreateSection;
   const [classDraft, setClassDraft] = useState<ClassDraft>({
     name: '',
@@ -51,6 +54,12 @@ export function AcademicStructureWorkspace() {
   });
   const [notice, setNotice] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [staffDraftBySection, setStaffDraftBySection] = useState<
+    Record<string, string>
+  >({});
+  const [removeConfirmSectionId, setRemoveConfirmSectionId] = useState<
+    string | null
+  >(null);
 
   const classesQuery = useQuery({
     queryKey: ['classes'],
@@ -64,6 +73,16 @@ export function AcademicStructureWorkspace() {
     queryKey: ['streams'],
     queryFn: api.listStreams,
     enabled: canReadStreams,
+  });
+  const staffQuery = useQuery({
+    queryKey: ['staff'],
+    queryFn: api.listStaff,
+    enabled: canAssignClassTeacher,
+  });
+  const academicYearsQuery = useQuery({
+    queryKey: ['academic-years'],
+    queryFn: api.listAcademicYears,
+    enabled: canAssignClassTeacher,
   });
 
   useEffect(() => {
@@ -124,6 +143,44 @@ export function AcademicStructureWorkspace() {
     onError: () =>
       setFormError('Could not update the class stream. Try again.'),
   });
+  const assignClassTeacherMutation = useMutation({
+    mutationFn: ({
+      sectionId,
+      staffId,
+      academicYearId,
+    }: {
+      sectionId: string;
+      staffId: string;
+      academicYearId?: string;
+    }) =>
+      api.assignSectionClassTeacher(sectionId, { staffId, academicYearId }),
+    onSuccess: async () => {
+      setNotice('Class teacher assigned.');
+      setFormError(null);
+      await client.invalidateQueries({ queryKey: ['sections'] });
+    },
+    onError: () =>
+      setFormError(
+        'Could not assign the class teacher. Check the selected staff member and try again.',
+      ),
+  });
+  const removeClassTeacherMutation = useMutation({
+    mutationFn: ({
+      sectionId,
+      academicYearId,
+    }: {
+      sectionId: string;
+      academicYearId?: string;
+    }) => api.removeSectionClassTeacher(sectionId, academicYearId),
+    onSuccess: async () => {
+      setNotice('Class teacher removed.');
+      setFormError(null);
+      setRemoveConfirmSectionId(null);
+      await client.invalidateQueries({ queryKey: ['sections'] });
+    },
+    onError: () =>
+      setFormError('Could not remove the class teacher. Try again.'),
+  });
 
   const classes = useMemo(() => classesQuery.data ?? [], [classesQuery.data]);
   const sections = useMemo(
@@ -131,6 +188,11 @@ export function AcademicStructureWorkspace() {
     [sectionsQuery.data],
   );
   const streams = useMemo(() => streamsQuery.data ?? [], [streamsQuery.data]);
+  const staffMembers = useMemo(() => staffQuery.data ?? [], [staffQuery.data]);
+  const currentAcademicYear = useMemo(
+    () => academicYearsQuery.data?.find((year) => year.isCurrent) ?? null,
+    [academicYearsQuery.data],
+  );
   const sectionsByClass = useMemo(
     () =>
       new Map(
@@ -141,6 +203,16 @@ export function AcademicStructureWorkspace() {
       ),
     [classes, sections],
   );
+  const sortedSections = useMemo(
+    () =>
+      [...sections].sort((left, right) => {
+        const leftClass = left.class?.name ?? '';
+        const rightClass = right.class?.name ?? '';
+        if (leftClass !== rightClass) return leftClass.localeCompare(rightClass);
+        return left.name.localeCompare(right.name);
+      }),
+    [sections],
+  );
 
   if (classesQuery.isLoading || sectionsQuery.isLoading)
     return (
@@ -149,16 +221,29 @@ export function AcademicStructureWorkspace() {
         <div className="h-96 animate-pulse rounded-2xl bg-slate-100" />
       </div>
     );
-  if (classesQuery.isError || sectionsQuery.isError)
+  if (
+    classesQuery.isError ||
+    sectionsQuery.isError ||
+    (canAssignClassTeacher && (staffQuery.isError || academicYearsQuery.isError))
+  )
     return (
       <div className="p-6">
         <ErrorState
           title="Could not load academic structure"
           message="Please retry to load this school’s classes and sections."
-          error={classesQuery.error ?? sectionsQuery.error}
+          error={
+            classesQuery.error ??
+            sectionsQuery.error ??
+            staffQuery.error ??
+            academicYearsQuery.error
+          }
           onRetry={() => {
             void classesQuery.refetch();
             void sectionsQuery.refetch();
+            if (canAssignClassTeacher) {
+              void staffQuery.refetch();
+              void academicYearsQuery.refetch();
+            }
           }}
         />
       </div>
@@ -204,6 +289,25 @@ export function AcademicStructureWorkspace() {
     createStreamMutation.mutate({
       name: streamDraft.name.trim(),
       code: streamDraft.code.trim(),
+    });
+  };
+  const assignClassTeacher = (sectionId: string) => {
+    setFormError(null);
+    const staffId = staffDraftBySection[sectionId]?.trim();
+    if (!staffId) {
+      setFormError('Choose a staff member before assigning a class teacher.');
+      return;
+    }
+    if (!currentAcademicYear) {
+      setFormError(
+        'No current academic year is configured. Set one up in Calendar, Academic Year & Holidays first.',
+      );
+      return;
+    }
+    assignClassTeacherMutation.mutate({
+      sectionId,
+      staffId,
+      academicYearId: currentAcademicYear.id,
     });
   };
 
@@ -411,6 +515,171 @@ export function AcademicStructureWorkspace() {
           ) : null}
         </section>
       ) : null}
+
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-100 p-5">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white">
+              <UserRound className="h-5 w-5" />
+            </span>
+            <div>
+              <h2 className="font-bold text-slate-950">Class teachers</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Assign the homeroom teacher for each section. Class teachers can
+                mark daily attendance for their assigned section
+                {currentAcademicYear
+                  ? ` in ${currentAcademicYear.name}.`
+                  : '.'}
+              </p>
+            </div>
+          </div>
+        </div>
+        {!canAssignClassTeacher ? (
+          <div className="p-5">
+            <SettingsPermissionNotice access="view-only" />
+          </div>
+        ) : sections.length === 0 ? (
+          <div className="p-10 text-center">
+            <UserRound className="mx-auto h-7 w-7 text-slate-400" />
+            <p className="mt-3 font-semibold text-slate-900">
+              Create sections first
+            </p>
+            <p className="mt-1 text-sm text-slate-600">
+              Class teacher assignment becomes available once this school has at
+              least one section.
+            </p>
+          </div>
+        ) : !currentAcademicYear ? (
+          <div className="p-10 text-center">
+            <CircleAlert className="mx-auto h-7 w-7 text-amber-500" />
+            <p className="mt-3 font-semibold text-slate-900">
+              No current academic year
+            </p>
+            <p className="mt-1 text-sm text-slate-600">
+              Configure the current academic year in Calendar, Academic Year &
+              Holidays before assigning class teachers.
+            </p>
+          </div>
+        ) : staffQuery.isLoading || academicYearsQuery.isLoading ? (
+          <div className="p-5">
+            <div className="h-40 animate-pulse rounded-xl bg-slate-100" />
+          </div>
+        ) : staffMembers.length === 0 ? (
+          <div className="p-10 text-center">
+            <UserRound className="mx-auto h-7 w-7 text-slate-400" />
+            <p className="mt-3 font-semibold text-slate-900">
+              No staff members available
+            </p>
+            <p className="mt-1 text-sm text-slate-600">
+              Add staff records before assigning class teachers.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="border-b border-slate-100 bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-5 py-3">Class</th>
+                  <th className="px-5 py-3">Section</th>
+                  <th className="px-5 py-3">Students</th>
+                  <th className="px-5 py-3">Current class teacher</th>
+                  <th className="px-5 py-3">Assign</th>
+                  <th className="px-5 py-3" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {sortedSections.map((section) => {
+                  const currentTeacher = section.classTeacher;
+                  const draftStaffId =
+                    staffDraftBySection[section.id] ?? currentTeacher?.id ?? '';
+                  return (
+                    <tr key={section.id}>
+                      <td className="px-5 py-4 font-semibold text-slate-900">
+                        {section.class?.name ?? '—'}
+                      </td>
+                      <td className="px-5 py-4 text-slate-700">{section.name}</td>
+                      <td className="px-5 py-4 text-slate-600">
+                        {section.studentCount ?? 0}
+                      </td>
+                      <td className="px-5 py-4 text-slate-700">
+                        {currentTeacher
+                          ? `${currentTeacher.firstName} ${currentTeacher.lastName} (${currentTeacher.employeeId})`
+                          : 'Not assigned'}
+                      </td>
+                      <td className="px-5 py-4">
+                        <select
+                          value={draftStaffId}
+                          onChange={(event) =>
+                            setStaffDraftBySection((current) => ({
+                              ...current,
+                              [section.id]: event.target.value,
+                            }))
+                          }
+                          className="h-10 min-w-[220px] rounded-lg border border-slate-200 bg-white px-3 text-sm"
+                        >
+                          <option value="">Select staff member</option>
+                          {staffMembers.map((member) => (
+                            <option key={member.id} value={member.id}>
+                              {member.firstName} {member.lastName} (
+                              {member.employeeId})
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => assignClassTeacher(section.id)}
+                            disabled={
+                              assignClassTeacherMutation.isPending ||
+                              !draftStaffId ||
+                              draftStaffId === currentTeacher?.id
+                            }
+                          >
+                            {currentTeacher ? 'Change' : 'Assign'}
+                          </Button>
+                          {currentTeacher ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                setRemoveConfirmSectionId(section.id)
+                              }
+                              disabled={removeClassTeacherMutation.isPending}
+                            >
+                              Remove
+                            </Button>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <ConfirmDialog
+        isOpen={removeConfirmSectionId !== null}
+        title="Remove class teacher?"
+        description="This revokes the homeroom assignment for the current academic year. Daily attendance marking for this section will stop until a new class teacher is assigned."
+        confirmLabel="Remove class teacher"
+        destructive
+        isConfirming={removeClassTeacherMutation.isPending}
+        onClose={() => setRemoveConfirmSectionId(null)}
+        onConfirm={() => {
+          if (!removeConfirmSectionId || !currentAcademicYear) return;
+          removeClassTeacherMutation.mutate({
+            sectionId: removeConfirmSectionId,
+            academicYearId: currentAcademicYear.id,
+          });
+        }}
+      />
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 p-5">

@@ -14,6 +14,17 @@ import { SummaryCard, SummaryGrid } from '@/components/ui/summary-card';
 import { formatSchoolDate } from '@/lib/date-utils';
 import { cn } from '@/lib/utils';
 
+function ModuleUnavailableNotice({ moduleName }: { moduleName: string }) {
+  return (
+    <div className="flex items-start gap-2.5 rounded-xl border border-warning-100 bg-warning-50 px-3.5 py-2.5 text-sm text-warning-900">
+      <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+      <span>
+        {moduleName} is not enabled for your school, so this section is unavailable.
+      </span>
+    </div>
+  );
+}
+
 /**
  * Class Teacher cross-subject homeroom view.
  *
@@ -134,17 +145,43 @@ export function HomeroomAcademicSummary() {
             />
             <SummaryCard
               label="Subjects awaiting marks"
-              value={summary.subjectsWithNoMarks.length}
+              value={
+                summary.subjectsWithNoMarks
+                  ? summary.subjectsWithNoMarks.length
+                  : '—'
+              }
               icon={<BookOpen size={20} />}
-              tone={summary.subjectsWithNoMarks.length > 0 ? 'info' : 'module'}
-              description="Subjects with nothing reported yet this year."
+              tone={
+                summary.subjectsWithNoMarks &&
+                summary.subjectsWithNoMarks.length > 0
+                  ? 'info'
+                  : 'module'
+              }
+              description={
+                summary.subjectsWithNoMarks
+                  ? 'Subjects with nothing reported yet this year.'
+                  : 'Exams module is not enabled for your school.'
+              }
             />
             <SummaryCard
               label="Attendance follow-ups"
-              value={summary.studentsNeedingFollowUp}
+              value={
+                summary.studentsNeedingFollowUp !== null
+                  ? summary.studentsNeedingFollowUp
+                  : '—'
+              }
               icon={<AlertTriangle size={20} />}
-              tone={summary.studentsNeedingFollowUp > 0 ? 'warning' : 'module'}
-              description="Students below 80% over the last 30 days."
+              tone={
+                summary.studentsNeedingFollowUp !== null &&
+                summary.studentsNeedingFollowUp > 0
+                  ? 'warning'
+                  : 'module'
+              }
+              description={
+                summary.studentsNeedingFollowUp !== null
+                  ? 'Students below 80% over the last 30 days.'
+                  : 'Attendance module is not enabled for your school.'
+              }
             />
           </SummaryGrid>
 
@@ -152,53 +189,59 @@ export function HomeroomAcademicSummary() {
             title="Marks reported by subject"
             description="Submitted and published entries only. Draft marks stay private to the subject teacher."
           >
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <caption className="sr-only">
-                  Reported mark counts for each subject in this homeroom
-                </caption>
-                <thead>
-                  <tr className="border-b border-slate-100 text-xs font-bold uppercase tracking-wide text-slate-500">
-                    <th scope="col" className="py-2 pr-3">Subject</th>
-                    <th scope="col" className="py-2 pr-3">Reported entries</th>
-                    <th scope="col" className="py-2 pr-3">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {summary.subjectCoverage.map((subject) => (
-                    <tr
-                      key={subject.subjectId}
-                      className="border-b border-slate-50 last:border-0"
-                    >
-                      <td className="py-2 pr-3 font-bold text-slate-900">
-                        {subject.subjectName}
-                      </td>
-                      <td className="py-2 pr-3 tabular-nums text-slate-700">
-                        {subject.reportedMarkCount}
-                      </td>
-                      <td className="py-2 pr-3">
-                        {subject.hasAnyReportedMarks ? (
-                          <span className="text-success-700">Reporting</span>
-                        ) : (
-                          // Early in a term this is normal, so it is phrased
-                          // as a fact rather than a fault.
-                          <span className="text-slate-500">
-                            Nothing reported yet
-                          </span>
-                        )}
-                      </td>
+            {summary.subjectCoverage ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <caption className="sr-only">
+                    Reported mark counts for each subject in this homeroom
+                  </caption>
+                  <thead>
+                    <tr className="border-b border-slate-100 text-xs font-bold uppercase tracking-wide text-slate-500">
+                      <th scope="col" className="py-2 pr-3">Subject</th>
+                      <th scope="col" className="py-2 pr-3">Reported entries</th>
+                      <th scope="col" className="py-2 pr-3">Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {summary.subjectCoverage.map((subject) => (
+                      <tr
+                        key={subject.subjectId}
+                        className="border-b border-slate-50 last:border-0"
+                      >
+                        <td className="py-2 pr-3 font-bold text-slate-900">
+                          {subject.subjectName}
+                        </td>
+                        <td className="py-2 pr-3 tabular-nums text-slate-700">
+                          {subject.reportedMarkCount}
+                        </td>
+                        <td className="py-2 pr-3">
+                          {subject.hasAnyReportedMarks ? (
+                            <span className="text-success-700">Reporting</span>
+                          ) : (
+                            // Early in a term this is normal, so it is phrased
+                            // as a fact rather than a fault.
+                            <span className="text-slate-500">
+                              Nothing reported yet
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <ModuleUnavailableNotice moduleName="Exams" />
+            )}
           </SectionCard>
 
           <SectionCard
             title="Homework across all subjects"
             description="Published homework for this homeroom, newest first."
           >
-            {summary.homework.length === 0 ? (
+            {summary.homework === null ? (
+              <ModuleUnavailableNotice moduleName="Homework" />
+            ) : summary.homework.length === 0 ? (
               <p className="py-4 text-sm text-slate-500">
                 No published homework for this homeroom yet.
               </p>

@@ -15,6 +15,7 @@ import {
   TeacherAssignmentsService,
 } from './teacher-assignments.controller';
 import { TeacherScopeModule } from '../teacher-scope/teacher-scope.module';
+import { TeacherWorkspaceModuleResolver } from './teacher-workspace-modules';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { TeacherScopeModule } from '../teacher-scope/teacher-scope.module';
     TeacherStudentsService,
     HomeroomSummaryService,
     TeacherAssignmentsService,
+    TeacherWorkspaceModuleResolver,
   ],
   exports: [
     TeacherTodayService,

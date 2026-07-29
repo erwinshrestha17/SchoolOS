@@ -1,9 +1,11 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { IsOptional, IsString } from 'class-validator';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
+import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { AuthContext } from '../auth/auth.types';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { TenantActiveGuard } from '../auth/guards/tenant-active.guard';
@@ -34,7 +36,13 @@ export class HomeroomSummaryQueryDto {
  * homeroom.
  */
 @Controller('teacher-workspace/homeroom')
-@UseGuards(JwtAuthGuard, TenantActiveGuard, RolesPermissionsGuard)
+@UseGuards(
+  JwtAuthGuard,
+  TenantActiveGuard,
+  RolesPermissionsGuard,
+  EntitlementGuard,
+)
+@Entitlement('module.students')
 @Roles('teacher', 'subject_teacher')
 export class HomeroomSummaryController {
   constructor(

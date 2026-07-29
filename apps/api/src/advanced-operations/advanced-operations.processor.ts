@@ -1,6 +1,8 @@
 import { Logger } from '@nestjs/common';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
+import { PlansService } from '../plans/plans.service';
+import { skipSuspendedTenantJob } from '../plans/processor-tenant.guard';
 import { DataExportCenterService } from './data-export-center.service';
 
 interface AdvancedOperationsJob {
@@ -12,7 +14,10 @@ interface AdvancedOperationsJob {
 export class AdvancedOperationsProcessor extends WorkerHost {
   private readonly logger = new Logger(AdvancedOperationsProcessor.name);
 
-  constructor(private readonly exportsService: DataExportCenterService) {
+  constructor(
+    private readonly exportsService: DataExportCenterService,
+    private readonly plansService: PlansService,
+  ) {
     super();
   }
 
@@ -21,6 +26,18 @@ export class AdvancedOperationsProcessor extends WorkerHost {
       this.logger.warn(`Unknown advanced operations job: ${job.name}`);
       return;
     }
+
+    if (
+      await skipSuspendedTenantJob(
+        this.plansService,
+        job.data.tenantId,
+        this.logger,
+        `advanced operations export ${job.data.jobId}`,
+      )
+    ) {
+      return;
+    }
+
     await this.exportsService.completeJob(job.data);
   }
 }

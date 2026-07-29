@@ -1668,6 +1668,7 @@ export class AdmissionsService {
       subject: `${actor.tenantSlug}: admission invitation`,
       text: `You have been invited to join the parent portal.`,
       metadata: {
+        tenantId: actor.tenantId,
         purpose: 'guardian_invite_resend',
       },
     });

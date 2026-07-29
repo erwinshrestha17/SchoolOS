@@ -113,12 +113,15 @@ describe('School OS Auth + RBAC integration', () => {
   });
 
   it('supports secure multi-tenant school onboarding, recovery, and MFA flows', async () => {
-    const registration = await tenantsController.register({
-      name: 'Green Valley School',
-      slug: 'green-valley',
-      adminEmail: 'admin@greenvalley.com',
-      adminPassword: 'RootAccess1!',
-    });
+    const registration = await tenantsController.register(
+      {
+        name: 'Green Valley School',
+        slug: 'green-valley',
+        adminEmail: 'admin@greenvalley.com',
+        adminPassword: 'RootAccess1!',
+      },
+      createPlatformOperatorActor(),
+    );
 
     expect(registration.tenant.slug).toBe('green-valley');
 
@@ -463,12 +466,15 @@ describe('School OS Auth + RBAC integration', () => {
     );
     expect(studentUser).toBeDefined();
 
-    const secondTenant = await tenantsController.register({
-      name: 'Blue Ridge School',
-      slug: 'blue-ridge',
-      adminEmail: 'admin@blueridge.com',
-      adminPassword: 'RootAccess1!',
-    });
+    const secondTenant = await tenantsController.register(
+      {
+        name: 'Blue Ridge School',
+        slug: 'blue-ridge',
+        adminEmail: 'admin@blueridge.com',
+        adminPassword: 'RootAccess1!',
+      },
+      createPlatformOperatorActor(),
+    );
 
     const secondTenantResponse = createResponseMock();
     const secondTenantLogin = asSession(
@@ -586,6 +592,18 @@ function getLatestCode(
   }
 
   return match.code;
+}
+
+function createPlatformOperatorActor(): AuthContext {
+  return {
+    userId: 'platform-operator-user',
+    tenantId: 'platform-tenant',
+    tenantSlug: 'platform',
+    email: 'operator@schoolos.io',
+    authMethod: 'PASSWORD',
+    roles: ['platform_super_admin'],
+    permissions: ['tenants:manage'],
+  } as AuthContext;
 }
 
 function asSession(

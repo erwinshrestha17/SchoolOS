@@ -21,6 +21,17 @@ import type {
 import { LoadingState } from '@/components/ui/loading-state';
 import { SectionCard } from '@/components/ui/section-card';
 
+function ModuleUnavailableNotice({ moduleName }: { moduleName: string }) {
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-warning-100 bg-warning-50 p-3">
+      <BookOpen className="mt-0.5 h-4 w-4 shrink-0 text-warning-700" aria-hidden="true" />
+      <p className="text-sm leading-5 text-warning-900">
+        {moduleName} is not enabled for your school, so this section is unavailable.
+      </p>
+    </div>
+  );
+}
+
 /**
  * Teacher Home/Today (Teacher Persona spec 10.1 / 21.1). Every number here
  * comes straight from GET /teacher-workspace/today, which is itself only a
@@ -133,35 +144,48 @@ export function TeacherTodayWorkspace() {
               title="Homework"
               description="Assigned-subject homework awaiting your review."
               headerAction={
-                data.homework.awaitingReviewCount > 0 ? (
+                data.homework && data.homework.awaitingReviewCount > 0 ? (
                   <span className="inline-flex items-center rounded-full border border-warning-100 bg-warning-50 px-2.5 py-1 text-xs font-bold text-warning-700">
                     {data.homework.awaitingReviewCount} to review
                   </span>
-                ) : (
+                ) : data.homework ? (
                   <CheckCircle2 className="h-5 w-5 text-success-600" aria-hidden="true" />
-                )
+                ) : null
               }
               footer={
-                <Link
-                  href="/dashboard/homework"
-                  className="text-sm font-bold text-[var(--primary)] transition hover:text-[var(--primary-dark)]"
-                >
-                  Go to Homework
-                </Link>
+                data.homework ? (
+                  <Link
+                    href="/dashboard/homework"
+                    className="text-sm font-bold text-[var(--primary)] transition hover:text-[var(--primary-dark)]"
+                  >
+                    Go to Homework
+                  </Link>
+                ) : undefined
               }
             >
-              <div className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
-                <BookOpen className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
-                <p className="text-sm leading-5 text-slate-600">
-                  {data.homework.givenToday} assigned today, {data.homework.dueToday} due today,{' '}
-                  {data.homework.awaitingReviewCount} submission
-                  {data.homework.awaitingReviewCount === 1 ? '' : 's'} not yet checked.
-                </p>
-              </div>
+              {data.homework ? (
+                <div className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
+                  <BookOpen className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+                  <p className="text-sm leading-5 text-slate-600">
+                    {data.homework.givenToday} assigned today, {data.homework.dueToday} due today,{' '}
+                    {data.homework.awaitingReviewCount} submission
+                    {data.homework.awaitingReviewCount === 1 ? '' : 's'} not yet checked.
+                  </p>
+                </div>
+              ) : (
+                <ModuleUnavailableNotice moduleName="Homework" />
+              )}
             </SectionCard>
           </div>
 
-          {data.substitutions.length > 0 && (
+          {data.substitutions === null ? (
+            <SectionCard
+              title="Substitution Alerts"
+              description="Timetable changes affecting you today."
+            >
+              <ModuleUnavailableNotice moduleName="Timetable" />
+            </SectionCard>
+          ) : data.substitutions.length > 0 ? (
             <SectionCard
               title="Substitution Alerts"
               description="Timetable changes affecting you today."
@@ -189,9 +213,16 @@ export function TeacherTodayWorkspace() {
                 ))}
               </ul>
             </SectionCard>
-          )}
+          ) : null}
 
-          {data.marksDeadlines.length > 0 && (
+          {data.marksDeadlines === null ? (
+            <SectionCard
+              title="Marks Deadlines"
+              description="Upcoming exam terms for your assigned subjects."
+            >
+              <ModuleUnavailableNotice moduleName="Exams" />
+            </SectionCard>
+          ) : data.marksDeadlines.length > 0 ? (
             <SectionCard
               title="Marks Deadlines"
               description="Upcoming exam terms for your assigned subjects."
@@ -219,7 +250,7 @@ export function TeacherTodayWorkspace() {
                 ))}
               </ul>
             </SectionCard>
-          )}
+          ) : null}
         </>
       )}
     </div>

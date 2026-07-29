@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ENTITLEMENT_KEY } from '../decorators/entitlement.decorator';
+import { NO_MODULE_ENTITLEMENT_KEY } from '../decorators/no-module-entitlement.decorator';
 import { REQUIRED_MODULE_KEY } from '../decorators/required-module.decorator';
 import { REQUIRED_FEATURE_KEY } from '../decorators/required-feature.decorator';
 import { PlansService } from '../../plans/plans.service';
@@ -38,12 +39,13 @@ export class EntitlementGuard implements CanActivate {
       [context.getHandler(), context.getClass()],
     );
 
+    const noModuleEntitlement = this.reflector.getAllAndOverride<string>(
+      NO_MODULE_ENTITLEMENT_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const tenantId = request.auth?.tenantId;
-
-    if (!requiredModule && !requiredFeature && !featureKey) {
-      return true;
-    }
 
     if (!tenantId) {
       throw new ForbiddenException('Tenant identification missing');
@@ -54,7 +56,7 @@ export class EntitlementGuard implements CanActivate {
       return true;
     }
 
-    // Check if tenant is active/suspended
+    // Suspension check always runs for school tenants
     const tenantStatus = await this.plansService.getTenantStatus(tenantId);
     if (!tenantStatus) {
       throw new NotFoundException(`Tenant with ID ${tenantId} not found`);
@@ -62,6 +64,20 @@ export class EntitlementGuard implements CanActivate {
 
     if (!tenantStatus.isActive) {
       throw new ForbiddenException(SUSPENDED_TENANT_MESSAGE);
+    }
+
+    const hasModuleGate =
+      Boolean(requiredModule) ||
+      Boolean(requiredFeature) ||
+      Boolean(featureKey);
+
+    if (!hasModuleGate) {
+      if (noModuleEntitlement) {
+        return true;
+      }
+      throw new ForbiddenException(
+        'This route requires a module entitlement declaration.',
+      );
     }
 
     // 1. Check required module if present
@@ -99,7 +115,7 @@ export class EntitlementGuard implements CanActivate {
 
       if (!result.allowed) {
         throw new ForbiddenException(
-          result.message ||
+          result.message ??
             `Feature '${featureKey}' is not enabled for your tenant.`,
         );
       }

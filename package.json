@@ -48,6 +48,15 @@
     "smoke:stage4": "node scripts/verify-stage4-institutional-improvement-local.mjs",
     "smoke:learning": "node scripts/smoke-runner-local.mjs learning",
     "smoke:full": "node scripts/smoke-runner-local.mjs full",
-    "smoke:phase1": "pnpm smoke:pilot"
+    "smoke:phase1": "pnpm smoke:pilot",
+    "backup:local": "node scripts/backup-schoolos.mjs",
+    "restore:local": "node scripts/restore-schoolos.mjs",
+    "rehearse:backup-restore:local": "node scripts/rehearse-backup-restore-local.mjs",
+    "staging:deploy:local": "node scripts/staging-deploy-local.mjs",
+    "staging:verify:def": "node scripts/verify-def-staging.mjs",
+    "staging:verify:gates": "node scripts/verify-staging-gates.mjs",
+    "staging:health": "node scripts/check-staging-health.mjs",
+    "staging:wave:local": "node scripts/staging-deploy-local.mjs && node scripts/verify-staging-gates.mjs",
+    "staging:api:local": "node scripts/start-staging-api-local.mjs"
   }
 }

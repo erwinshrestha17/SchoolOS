@@ -106,8 +106,15 @@ export default function PlatformSchools() {
       setOnboardError('Slug must contain only lowercase letters, numbers, and hyphens');
       return;
     }
-    if (newSchoolAdminPassword.length < 8) {
-      setOnboardError('Password must be at least 8 characters long');
+    if (
+      newSchoolAdminPassword.length < 8 ||
+      !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$/.test(
+        newSchoolAdminPassword,
+      )
+    ) {
+      setOnboardError(
+        'Password must be at least 8 characters and include uppercase, lowercase, number, and symbol characters',
+      );
       return;
     }
 
