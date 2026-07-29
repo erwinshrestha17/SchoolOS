@@ -160,6 +160,50 @@ async function main() {
         tokens.platform,
       ),
     );
+    checks.push(
+      await checkAuthApiEndpoint(
+        'Platform Tenants (/platform/tenants)',
+        '/platform/tenants?page=1&limit=5',
+        tokens.platform,
+      ),
+    );
+    checks.push(
+      await checkAuthApiEndpoint(
+        'Platform Queues (/platform/queues)',
+        '/platform/queues',
+        tokens.platform,
+      ),
+    );
+    checks.push(
+      await checkAuthApiEndpoint(
+        'Platform Provider Readiness (/platform/providers/readiness)',
+        '/platform/providers/readiness',
+        tokens.platform,
+      ),
+    );
+
+    const pilotRehearsalTenantId = process.env.SMOKE_PILOT_REHEARSAL_TENANT_ID;
+    if (pilotRehearsalTenantId) {
+      checks.push(
+        await checkAuthApiEndpoint(
+          'Platform Onboarding Checklist',
+          `/platform/tenants/${pilotRehearsalTenantId}/onboarding`,
+          tokens.platform,
+        ),
+      );
+    }
+
+    const adminLogin = await checkSeededLogin(accounts.admin);
+    if (adminLogin.status === 'ok') {
+      checks.push(
+        await checkExpectedHttpFailure(
+          'School admin denied platform health',
+          '/platform/health',
+          adminLogin.token,
+          [403],
+        ),
+      );
+    }
   }
 
   if (['learning', 'full'].includes(target) && tokens.admin) {

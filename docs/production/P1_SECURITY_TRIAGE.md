@@ -4,9 +4,9 @@ Items below are **not** open P0 defects after DEF-01–DEF-06 remediation, but r
 
 | ID | Area | Risk | Recommended action | GA blocker? |
 | --- | --- | --- | --- | --- |
-| P1-01 | Auth | `mustChangePassword` not enforced server-side | Enforce on sensitive routes after temp credential issue | Yes for pilot admin onboarding |
+| P1-01 | Auth | `mustChangePassword` not enforced server-side | Enforce on sensitive routes after temp credential issue | Yes for pilot admin onboarding — **Remediated 2026-07-29 (M0 slice)**: `MustChangePasswordGuard` enforced from `JwtAuthGuard`; allowlisted `auth/me`, `auth/change-password`, `auth/logout` |
 | P1-02 | Tenancy | Prisma auto-scope excludes upsert/aggregate/raw; jobs without CLS | Audit hot paths; set CLS in processors | Yes if unscoped writes found |
-| P1-03 | Auth | Support override breaks `/auth/me` | Fix override + add regression test | Medium |
+| P1-03 | Auth | Support override breaks `/auth/me` | Fix override + add regression test | Medium — **Remediated 2026-07-29 (M0 slice)**: `AuthService.getProfile` validates home tenant during override and projects effective school tenant |
 | P1-04 | Guardians | Post-revoke guardian residual notification inbox access | Fail-closed inbox filter | Yes for parent trust |
 | P1-05 | Guardians | No DB constraint for single primary guardian | Migration + validation | Medium |
 | P1-06 | Ops | `/ready` returned 200 when degraded | **Remediated**: 503 when degraded | Closed |
@@ -16,7 +16,7 @@ Items below are **not** open P0 defects after DEF-01–DEF-06 remediation, but r
 | P1-10 | Mobile | Homework create not idempotent | Add idempotency key | Medium |
 | P1-11 | Web | Notice approvals page read-only | Add write UI or defer approvals from pilot | Pilot dependent |
 | P1-12 | Web | Homework date filter client-capped at 100 | Server pagination | Medium |
-| P1-13 | Entitlements | `service-requests` + `advanced-operations` controllers ungated | Assign module keys + gate | Medium (out of pilot nav) |
+| P1-13 | Entitlements | `service-requests` + `advanced-operations` controllers ungated | Assign module keys + gate | Medium (out of pilot nav) — **Closed 2026-07-29**: explicit `@NoModuleEntitlement` on all six controllers; entitlement coverage contract PASS |
 | P1-14 | Academics | CAS web pickers tenant-wide vs backend scope | Scope pickers with teacher assignment helper | Medium (exams disabled) |
 
 ## Triage rules

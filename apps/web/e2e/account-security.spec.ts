@@ -6,15 +6,31 @@ const API_BASE_URL =
   'http://localhost:4000/api/v1';
 
 const schoolCredentials = {
-  tenantSlug: process.env.SCHOOLOS_E2E_TENANT_SLUG,
-  email: process.env.SCHOOLOS_E2E_EMAIL,
-  password: process.env.SCHOOLOS_E2E_PASSWORD,
+  tenantSlug:
+    process.env.SCHOOLOS_E2E_TENANT_SLUG ??
+    process.env.SCHOOLOS_E2E_SECURITY_TENANT_SLUG ??
+    'default-school',
+  email:
+    process.env.SCHOOLOS_E2E_EMAIL ??
+    process.env.SCHOOLOS_E2E_SECURITY_EMAIL ??
+    'security-e2e-admin@schoolos.test',
+  password:
+    process.env.SCHOOLOS_E2E_PASSWORD ??
+    process.env.SCHOOLOS_E2E_SECURITY_PASSWORD ??
+    process.env.SCHOOLOS_E2E_M0_SECURITY_PASSWORD ??
+    'SecurityE2eAdmin1!',
 };
 
 const passwordTestAccount = {
-  email: process.env.SCHOOLOS_E2E_PASSWORD_TEST_EMAIL,
-  temporaryPassword: process.env.SCHOOLOS_E2E_PASSWORD_TEST_TEMP,
-  finalPassword: process.env.SCHOOLOS_E2E_PASSWORD_TEST_FINAL,
+  email:
+    process.env.SCHOOLOS_E2E_PASSWORD_TEST_EMAIL ??
+    'password-e2e-user@schoolos.test',
+  temporaryPassword:
+    process.env.SCHOOLOS_E2E_PASSWORD_TEST_TEMP ??
+    process.env.SCHOOLOS_E2E_M0_SECURITY_PASSWORD ??
+    'SecurityE2eAdmin1!',
+  finalPassword:
+    process.env.SCHOOLOS_E2E_PASSWORD_TEST_FINAL ?? 'SecurityE2eFinal1!',
 };
 
 type Credentials = {

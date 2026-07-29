@@ -741,6 +741,46 @@ describe('AuthService', () => {
         select: { id: true, fullName: true, relation: true },
       });
     });
+
+    it('returns the effective school tenant during platform support override', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        ...authUser,
+        tenantId: 'platform-tenant',
+        tenant: {
+          id: 'platform-tenant',
+          name: 'SchoolOS Platform',
+          slug: 'platform',
+          plan: 'PLATFORM',
+        },
+        staff: null,
+        student: null,
+        guardian: null,
+        userRoles: authUser.userRoles,
+      });
+      prisma.tenant.findUnique.mockResolvedValue({
+        id: 'school-tenant-2',
+        name: 'Pilot Rehearsal School',
+        slug: 'pilot-rehearsal-1',
+        plan: 'STANDARD',
+      });
+
+      const profile: any = await service.getProfile({
+        userId: 'user-1',
+        tenantId: 'school-tenant-2',
+        originalTenantId: 'platform-tenant',
+        isSupportOverride: true,
+        tenantSlug: 'pilot-rehearsal-1',
+      } as any);
+
+      expect(profile.isSupportOverride).toBe(true);
+      expect(profile.tenantId).toBe('school-tenant-2');
+      expect(profile.tenant).toEqual({
+        id: 'school-tenant-2',
+        name: 'Pilot Rehearsal School',
+        slug: 'pilot-rehearsal-1',
+        plan: 'STANDARD',
+      });
+    });
   });
 });
 

@@ -22,6 +22,7 @@ Canonical plan: `.cursor/plans/schoolos_full_ga_program_9f539c81.plan.md` (do no
 
 - [x] Doc sync, P0 cross-cutting, entitlement/CLS, smoke fixture scripts
 - [x] `pnpm smoke:pilot` green on local staging (5434/6380/4000)
+- [x] M0 Platform Core local verification slice — see `m0-platform-core-2026-07-29-local.md` (mustChangePassword guard, support override profile, DEF-06 closure, expanded `smoke:platform`)
 
 ## Wave 1 checklist
 
@@ -52,6 +53,7 @@ Canonical plan: `.cursor/plans/schoolos_full_ga_program_9f539c81.plan.md` (do no
 | GA Wave 0–6 verification | `docs/production/evidence/ga-wave{0-6}-2026-07-29-local.md` |
 | Staging browser E2E | `docs/production/evidence/staging-browser-e2e-2026-07-29-local.md` |
 | Controlled pilot rehearsal | `docs/production/evidence/controlled-pilot-pilot-rehearsal-1-2026-07-29.md` |
+| M0 platform core (local) | `docs/production/evidence/m0-platform-core-2026-07-29-local.md` |
 | Pilot entitlement verify | `docs/production/evidence/pilot-entitlements-pilot-rehearsal-1-*.md` |
 | Controlled pilot (placeholder) | `docs/production/evidence/controlled-pilot-2026-07-29-placeholder.md` |
 | Mobile QA | `docs/production/evidence/mobile-qa-2026-07-29-local.md` |

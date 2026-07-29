@@ -19,13 +19,20 @@ import { PrismaMock, createPrismaMock, createQueueMock } from './test-helpers';
 import { PlatformGuard } from '../src/auth/guards/platform.guard';
 import { AcademicsController } from '../src/academics/academics.controller';
 import { AdmissionsController } from '../src/admissions/admissions.controller';
+import { AuthController } from '../src/auth/auth.controller';
 import { FileRegistryController } from '../src/file-registry/file-registry.controller';
+import { StudentsController } from '../src/students/students.controller';
 import { RolesPermissionsGuard } from '../src/auth/guards/roles-permissions.guard';
 import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { StorageService } from '../src/storage/storage.service';
 import { PlatformQueuesService } from '../src/platform/platform-queues.service';
 import { PlatformReportExportsService } from '../src/platform/platform-report-exports.service';
+import { TenantsController } from '../src/tenants/tenants.controller';
+import { TenantActiveGuard } from '../src/auth/guards/tenant-active.guard';
+import { MustChangePasswordGuard } from '../src/auth/guards/must-change-password.guard';
+import { SKIP_MUST_CHANGE_PASSWORD_KEY } from '../src/auth/decorators/skip-must-change-password.decorator';
+import { SUSPENDED_TENANT_MESSAGE } from '../src/plans/tenant-access.constants';
 import {
   BadRequestException,
   NotFoundException,
@@ -1560,6 +1567,179 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
           requestId: 'req-1',
         }),
       );
+    });
+  });
+
+  describe('M0 tenant registration guard chain (DEF-01)', () => {
+    let tenantsController: TenantsController;
+    let platformGuard: PlatformGuard;
+
+    const platformActor = {
+      userId: 'platform-operator-user',
+      tenantId: 'platform',
+      tenantSlug: 'platform',
+      email: 'operator@schoolos.io',
+      authMethod: 'PASSWORD',
+      roles: ['platform_super_admin'],
+      permissions: ['tenants:manage'],
+    } as const;
+
+    beforeAll(() => {
+      tenantsController = app.get(TenantsController);
+      platformGuard = app.get(PlatformGuard);
+    });
+
+    it('platform operator can register a tenant with audit trail', async () => {
+      const slug = `m0-register-${Date.now()}`;
+
+      const result = await tenantsController.register(
+        {
+          name: 'M0 Register Test School',
+          slug,
+          adminEmail: `provision-${slug}@schoolos.test`,
+          adminPassword: 'RootAccess1!',
+        },
+        platformActor as any,
+      );
+
+      expect(result.tenant.slug).toBe(slug);
+      expect(result.admin.email).toBe(`provision-${slug}@schoolos.test`);
+
+      const registerLog = prisma.__state.auditLogs.find(
+        (log) =>
+          log.action === 'register' &&
+          log.resource === 'tenant' &&
+          log.resourceId === result.tenant.id,
+      );
+      expect(registerLog).toBeDefined();
+      expect(registerLog?.userId).toBe(platformActor.userId);
+    });
+
+    it('school admin is denied by PlatformGuard on register', () => {
+      const schoolUserCtx = {
+        switchToHttp: () => ({
+          getRequest: () => ({
+            auth: {
+              userId: 'school-admin',
+              tenantId: freeTenantId,
+              roles: ['admin'],
+              permissions: ['tenants:manage'],
+            },
+          }),
+        }),
+        getHandler: () => TenantsController.prototype.register,
+        getClass: () => TenantsController,
+      } as unknown as ExecutionContext;
+
+      expect(() => platformGuard.canActivate(schoolUserCtx)).toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('unauthenticated register is denied by JwtAuthGuard', async () => {
+      const unauthenticatedCtx = {
+        switchToHttp: () => ({
+          getRequest: () => ({ headers: {} }),
+        }),
+        getHandler: () => TenantsController.prototype.register,
+        getClass: () => TenantsController,
+      } as unknown as ExecutionContext;
+
+      await expect(
+        app.get(JwtAuthGuard).canActivate(unauthenticatedCtx),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('M0 suspended tenant write fail-closed', () => {
+    it('TenantActiveGuard blocks writes for suspended school tenants', async () => {
+      const tenantActiveGuard = app.get(TenantActiveGuard);
+
+      await platformService.updateTenantStatus(
+        freeTenantId,
+        false,
+        'platform-operator-user',
+        'M0 suspended tenant write test',
+      );
+
+      const context = {
+        switchToHttp: () => ({
+          getRequest: () => ({
+            auth: { tenantId: freeTenantId },
+          }),
+        }),
+        getHandler: () => ({}),
+        getClass: () => ({}),
+      } as unknown as ExecutionContext;
+
+      await expect(tenantActiveGuard.canActivate(context)).rejects.toThrow(
+        SUSPENDED_TENANT_MESSAGE,
+      );
+
+      await platformService.updateTenantStatus(
+        freeTenantId,
+        true,
+        'platform-operator-user',
+        'Restore after suspended tenant write test',
+      );
+    });
+  });
+
+  describe('M0 mustChangePassword enforcement (P1-01)', () => {
+    it('blocks sensitive routes when mustChangePassword is true', () => {
+      const mustChangePasswordGuard = app.get(MustChangePasswordGuard);
+
+      const blockedContext = {
+        switchToHttp: () => ({
+          getRequest: () => ({
+            auth: {
+              userId: 'temp-admin',
+              tenantId: freeTenantId,
+              mustChangePassword: true,
+            },
+          }),
+        }),
+        getHandler: () => StudentsController.prototype.listStudents,
+        getClass: () => StudentsController,
+      } as unknown as ExecutionContext;
+
+      jest.spyOn(reflector, 'getAllAndOverride').mockImplementation((key) => {
+        if (key === SKIP_MUST_CHANGE_PASSWORD_KEY) {
+          return false;
+        }
+        return undefined;
+      });
+
+      expect(() => mustChangePasswordGuard.canActivate(blockedContext)).toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('allows allowlisted auth routes when mustChangePassword is true', () => {
+      const mustChangePasswordGuard = app.get(MustChangePasswordGuard);
+
+      const allowedContext = {
+        switchToHttp: () => ({
+          getRequest: () => ({
+            auth: {
+              userId: 'temp-admin',
+              tenantId: freeTenantId,
+              mustChangePassword: true,
+            },
+          }),
+        }),
+        getHandler: () => AuthController.prototype.changePassword,
+        getClass: () => AuthController,
+      } as unknown as ExecutionContext;
+
+      jest.spyOn(reflector, 'getAllAndOverride').mockImplementation((key) => {
+        if (key === SKIP_MUST_CHANGE_PASSWORD_KEY) {
+          return true;
+        }
+        return undefined;
+      });
+
+      expect(mustChangePasswordGuard.canActivate(allowedContext)).toBe(true);
     });
   });
 });

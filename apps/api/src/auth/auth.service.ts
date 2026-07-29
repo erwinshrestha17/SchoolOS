@@ -707,6 +707,10 @@ export class AuthService {
   }
 
   async getProfile(auth: AuthContext) {
+    const homeTenantId = auth.isSupportOverride
+      ? auth.originalTenantId ?? auth.tenantId
+      : auth.tenantId;
+
     const user = await this.prisma.user.findUnique({
       where: { id: auth.userId },
       include: {
@@ -726,6 +730,9 @@ export class AuthService {
           },
         },
         userRoles: {
+          where: auth.isSupportOverride
+            ? { tenantId: homeTenantId }
+            : undefined,
           include: {
             role: {
               include: {
@@ -741,21 +748,32 @@ export class AuthService {
       },
     });
 
-    if (user?.tenantId !== auth.tenantId) {
+    if (!user || user.tenantId !== homeTenantId) {
       throw new NotFoundException('Authenticated user was not found');
+    }
+
+    const effectiveTenant = auth.isSupportOverride
+      ? await this.prisma.tenant.findUnique({
+          where: { id: auth.tenantId },
+        })
+      : user.tenant;
+
+    if (!effectiveTenant) {
+      throw new NotFoundException('Authenticated tenant was not found');
     }
 
     const currentAuth = this.buildAuthContext(user, auth.tenantSlug);
 
     return {
       ...currentAuth,
+      tenantId: auth.tenantId,
       originalTenantId: auth.originalTenantId,
       isSupportOverride: auth.isSupportOverride,
       tenant: {
-        id: user.tenant.id,
-        name: user.tenant.name,
-        slug: user.tenant.slug,
-        plan: user.tenant.plan,
+        id: effectiveTenant.id,
+        name: effectiveTenant.name,
+        slug: effectiveTenant.slug,
+        plan: effectiveTenant.plan,
       },
       profileType: user.staff ? 'staff' : user.student ? 'student' : 'user',
       staff: user.staff

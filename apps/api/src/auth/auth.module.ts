@@ -9,6 +9,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from './guards/roles-permissions.guard';
 import { EntitlementGuard } from './guards/entitlement.guard';
 import { ApiKeyAuthGuard } from './guards/api-key-auth.guard';
+import { MustChangePasswordGuard } from './guards/must-change-password.guard';
 import { TenantActiveGuard } from './guards/tenant-active.guard';
 import { PlansModule } from '../plans/plans.module';
 import { PlatformModule } from '../platform/platform.module';
@@ -31,6 +32,7 @@ import { PlatformModule } from '../platform/platform.module';
     EntitlementGuard,
     ApiKeyAuthGuard,
     TenantActiveGuard,
+    MustChangePasswordGuard,
   ],
   exports: [
     AuthService,
@@ -39,6 +41,7 @@ import { PlatformModule } from '../platform/platform.module';
     EntitlementGuard,
     ApiKeyAuthGuard,
     TenantActiveGuard,
+    MustChangePasswordGuard,
     JwtModule,
   ],
 })

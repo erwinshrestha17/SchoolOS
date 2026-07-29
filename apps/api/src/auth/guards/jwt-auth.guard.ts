@@ -13,6 +13,7 @@ import { PrismaService, TENANT_ID_KEY } from '../../prisma/prisma.service';
 import { AuthenticatedRequest } from '../auth-request.interface';
 import { JwtAccessPayload } from '../auth.types';
 import { parseCookie } from '../auth.utils';
+import { MustChangePasswordGuard } from './must-change-password.guard';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -22,6 +23,7 @@ export class JwtAuthGuard implements CanActivate {
     private readonly auditService: AuditService,
     private readonly prisma: PrismaService,
     private readonly cls: ClsService,
+    private readonly mustChangePasswordGuard: MustChangePasswordGuard,
   ) {}
 
   async canActivate(context: ExecutionContext) {
@@ -165,6 +167,8 @@ export class JwtAuthGuard implements CanActivate {
     if (hasActiveCls) {
       this.cls.set(TENANT_ID_KEY, effectiveTenantId);
     }
+
+    this.mustChangePasswordGuard.canActivate(context);
 
     return true;
   }

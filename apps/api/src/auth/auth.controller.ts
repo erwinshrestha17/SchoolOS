@@ -24,6 +24,7 @@ import { RefreshSessionDto } from './dto/refresh-session.dto';
 import { RequestOtpLoginDto } from './dto/request-otp-login.dto';
 import { RequestPasswordRecoveryDto } from './dto/request-password-recovery.dto';
 import { VerifyOtpLoginDto } from './dto/verify-otp-login.dto';
+import { SkipMustChangePassword } from './decorators/skip-must-change-password.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Controller('auth')
@@ -143,6 +144,7 @@ export class AuthController {
   }
 
   @Post('logout')
+  @SkipMustChangePassword()
   logout(
     @Body() dto: RefreshSessionDto,
     @Res({ passthrough: true }) response: Response,
@@ -158,6 +160,7 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
+  @SkipMustChangePassword()
   me(@CurrentAuth() auth: AuthContext) {
     return this.authService.getProfile(auth);
   }
@@ -179,6 +182,7 @@ export class AuthController {
 
   @Post('change-password')
   @UseGuards(JwtAuthGuard)
+  @SkipMustChangePassword()
   @Throttle({
     default: {
       limit: AUTH_RATE_LIMIT,

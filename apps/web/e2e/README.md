@@ -30,15 +30,45 @@ SCHOOLOS_E2E_PLATFORM_PASSWORD=<seeded-platform-password> \
 pnpm test:web:e2e
 ```
 
-Account & Security password-change smoke uses the school admin credentials for
-non-mutating checks. The full reset/force-change/success flow mutates a
-dedicated test account only when these values are supplied:
+Account & Security password-change smoke uses dedicated M0 fixture credentials
+by default (`security-e2e-admin@schoolos.test` on `default-school`). Seed them
+before running the spec:
+
+```bash
+SCHOOLOS_E2E_M0_ACCOUNT_SECURITY_FIXTURES=true \
+pnpm db:seed:e2e:m0-account-security
+
+pnpm --filter @schoolos/web exec playwright test e2e/account-security.spec.ts
+```
+
+Override credentials when needed:
+
+```bash
+SCHOOLOS_E2E_SECURITY_EMAIL=<seeded-school-admin-email> \
+SCHOOLOS_E2E_SECURITY_PASSWORD=<seeded-school-admin-password> \
+SCHOOLOS_E2E_TENANT_SLUG=<tenant-slug> \
+pnpm --filter @schoolos/web exec playwright test e2e/account-security.spec.ts
+```
+
+The full reset/force-change/success flow mutates a dedicated test account.
+Defaults to `password-e2e-user@schoolos.test` when the M0 fixture is seeded.
+Override with:
 
 ```bash
 SCHOOLOS_E2E_PASSWORD_TEST_EMAIL=<dedicated-test-user-email> \
 SCHOOLOS_E2E_PASSWORD_TEST_TEMP=<temporary-password> \
 SCHOOLOS_E2E_PASSWORD_TEST_FINAL=<final-password> \
-pnpm test:web:e2e
+pnpm --filter @schoolos/web exec playwright test e2e/account-security.spec.ts
+```
+
+M0 platform onboard smoke seeds a platform operator with
+`mustChangePassword=false`, then runs a state-changing school provisioning flow:
+
+```bash
+SCHOOLOS_E2E_M0_PLATFORM_ONBOARD_FIXTURES=true \
+pnpm db:seed:e2e:m0-platform
+
+pnpm --filter @schoolos/web exec playwright test e2e/m0-platform-onboard.spec.ts
 ```
 
 The state-changing M1 QR lifecycle smoke is disabled by default. Run it only

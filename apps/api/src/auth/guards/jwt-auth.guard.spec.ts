@@ -11,6 +11,7 @@ import { ConfigService } from '../../config/config.service';
 import { PrismaService, TENANT_ID_KEY } from '../../prisma/prisma.service';
 import { AuthContext, JwtAccessPayload } from '../auth.types';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { MustChangePasswordGuard } from './must-change-password.guard';
 
 describe('JwtAuthGuard', () => {
   let guard: JwtAuthGuard;
@@ -39,6 +40,7 @@ describe('JwtAuthGuard', () => {
     status: 'ACTIVE',
     email: 'admin@schoolos.com',
     tenantId: 'tenant-1',
+    mustChangePassword: false,
     tenant: { id: 'tenant-1', isActive: true },
     userRoles: [
       {
@@ -89,6 +91,7 @@ describe('JwtAuthGuard', () => {
       auditService as unknown as AuditService,
       prisma as unknown as PrismaService,
       cls as unknown as ClsService,
+      { canActivate: jest.fn().mockReturnValue(true) } as unknown as MustChangePasswordGuard,
     );
   });
 
@@ -105,6 +108,7 @@ describe('JwtAuthGuard', () => {
       tenantSlug: basePayload.tenantSlug,
       email: mockUser.email,
       authMethod: basePayload.authMethod,
+      mustChangePassword: false,
       roles: ['admin'],
       permissions: ['students:read'],
     });

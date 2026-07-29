@@ -282,6 +282,7 @@ export function createPrismaMock() {
     academicYears: [] as Record<string, unknown>[],
     chartAccounts: [] as Record<string, unknown>[],
     feeHeads: [] as Record<string, unknown>[],
+    accountingSourceMappings: [] as Record<string, unknown>[],
     otpCodes: [] as Record<string, unknown>[],
     refreshTokens: [] as Record<string, unknown>[],
     auditLogs: [] as Record<string, unknown>[],
@@ -1097,6 +1098,28 @@ export function createPrismaMock() {
         };
         state.feeHeads.push(feeHead as Record<string, unknown>);
         return Promise.resolve(feeHead);
+      }),
+    },
+    accountingSourceMapping: {
+      findFirst: jest.fn((q: PrismaQuery) => {
+        const where = q.where ?? {};
+        const match = state.accountingSourceMappings.find(
+          (mapping) =>
+            mapping.tenantId === where.tenantId &&
+            mapping.sourceModule === where.sourceModule &&
+            mapping.sourceType === where.sourceType &&
+            mapping.postingType === where.postingType &&
+            (where.isActive === undefined || mapping.isActive === where.isActive),
+        );
+        return Promise.resolve(match ?? null);
+      }),
+      create: jest.fn((q: PrismaQuery) => {
+        const mapping = {
+          id: nextId('accounting-source-mapping'),
+          ...q.data,
+        };
+        state.accountingSourceMappings.push(mapping as Record<string, unknown>);
+        return Promise.resolve(mapping);
       }),
     },
     student: (() => {

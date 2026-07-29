@@ -18,6 +18,8 @@
     "db:seed:e2e:m1-assessment": "tsx prisma/seed-m1-assessment-e2e.ts",
     "db:seed:e2e:m3-collection": "tsx prisma/seed-m3-collection-e2e.ts",
     "db:seed:e2e:m4-report-card": "tsx prisma/seed-m4-report-card-e2e.ts",
+    "db:seed:e2e:m0-account-security": "tsx prisma/seed-m0-account-security-e2e.ts",
+    "db:seed:e2e:m0-platform": "tsx prisma/seed-m0-platform-e2e.ts",
     "db:seed:e2e:stage3-learning-improvement": "tsx prisma/seed-stage3-learning-improvement-e2e.ts",
     "db:seed:e2e:stage4-institutional-improvement": "tsx prisma/seed-stage4-institutional-improvement-e2e.ts",
     "db:seed:e2e:m8-library": "tsx prisma/seed-m8-library-e2e.ts",
