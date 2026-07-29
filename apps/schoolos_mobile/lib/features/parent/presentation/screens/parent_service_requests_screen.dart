@@ -34,7 +34,7 @@ class _ParentServiceRequestsScreenState
     final isOnline = ref.watch(connectivityProvider);
 
     return ParentDetailScaffold(
-      title: 'Help & Requests',
+      title: 'Help & Support',
       selectedIndex: 5,
       body: child == null
           ? const Center(

@@ -15,25 +15,46 @@ class ParentDetailScaffold extends StatelessWidget {
     required this.selectedIndex,
     required this.body,
     this.onBack,
+    this.showGlobalActions = true,
   });
   final String title;
   final int selectedIndex;
   final Widget body;
   final VoidCallback? onBack;
+  final bool showGlobalActions;
 
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: ParentPortalColors.page,
-    appBar: AppTopBar(
-      title: title,
-      leading: onBack == null
-          ? null
-          : IconButton(
-              tooltip: 'Back',
-              onPressed: onBack,
-              icon: const Icon(Icons.arrow_back_rounded),
+    appBar: showGlobalActions
+        ? AppTopBar(
+            title: title,
+            leading: onBack == null
+                ? null
+                : IconButton(
+                    tooltip: 'Back',
+                    onPressed: onBack,
+                    icon: const Icon(Icons.arrow_back_rounded),
+                  ),
+          )
+        : AppBar(
+            leading: onBack == null
+                ? null
+                : IconButton(
+                    tooltip: 'Back',
+                    onPressed: onBack,
+                    icon: const Icon(Icons.arrow_back_rounded),
+                  ),
+            title: Text(
+              title,
+              style: const TextStyle(
+                color: ParentPortalColors.navy,
+                fontWeight: FontWeight.w900,
+              ),
             ),
-    ),
+            backgroundColor: ParentPortalColors.page,
+            surfaceTintColor: Colors.transparent,
+          ),
     body: SafeArea(top: false, child: body),
     bottomNavigationBar: SchoolOsBottomNavigation(
       selectedIndex: selectedIndex,
@@ -67,49 +88,103 @@ class ParentApiChildSelector extends StatelessWidget {
   final String? statusLabel;
 
   @override
-  Widget build(BuildContext context) => PortalCard(
-    padding: const EdgeInsets.symmetric(
-      horizontal: AppSpacing.md,
-      vertical: AppSpacing.sm,
-    ),
-    child: Row(
-      children: [
-        AvatarInitials(name: child.name, radius: 24),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
+  Widget build(BuildContext context) {
+    final selectable = children.length > 1;
+    return PortalCard(
+      onTap: selectable ? () => _showChildPicker(context) : null,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      child: Row(
+        children: [
+          AvatarInitials(name: child.name, radius: 24),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  child.name,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    color: ParentPortalColors.navy,
+                  ),
+                ),
+                Text(
+                  _compactClassSection(child.classSection),
+                  style: const TextStyle(color: ParentPortalColors.muted),
+                ),
+              ],
+            ),
+          ),
+          if (statusLabel != null) ...[
+            StatusBadge(label: statusLabel!),
+            const SizedBox(width: AppSpacing.xs),
+          ],
+          if (selectable)
+            const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: ParentPortalColors.muted,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showChildPicker(BuildContext context) async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md,
+            0,
+            AppSpacing.md,
+            AppSpacing.md,
+          ),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                child.name,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w900,
+                'Select child',
+                style: Theme.of(sheetContext).textTheme.titleLarge?.copyWith(
                   color: ParentPortalColors.navy,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
-              Text(
-                child.classSection,
-                style: const TextStyle(color: ParentPortalColors.muted),
-              ),
+              const SizedBox(height: AppSpacing.sm),
+              for (final item in children)
+                ListTile(
+                  leading: AvatarInitials(name: item.name, radius: 20),
+                  title: Text(
+                    item.name,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  subtitle: Text(_compactClassSection(item.classSection)),
+                  trailing: item.id == child.id
+                      ? const Icon(
+                          Icons.check_rounded,
+                          color: ParentPortalColors.green,
+                        )
+                      : null,
+                  onTap: () => Navigator.pop(sheetContext, item.id),
+                ),
             ],
           ),
         ),
-        if (statusLabel != null) StatusBadge(label: statusLabel!),
-        if (children.length > 1)
-          PopupMenuButton<String>(
-            tooltip: 'Select child',
-            icon: const Icon(Icons.keyboard_arrow_down_rounded),
-            onSelected: onChanged,
-            itemBuilder: (_) => [
-              for (final item in children)
-                PopupMenuItem(
-                  value: item.id,
-                  child: Text('${item.name} • ${item.classSection}'),
-                ),
-            ],
-          ),
-      ],
-    ),
+      ),
+    );
+    if (selected != null && selected != child.id) onChanged(selected);
+  }
+}
+
+String _compactClassSection(String value) {
+  return value.replaceFirstMapped(
+    RegExp(r'\s+-\s+([A-Za-z0-9]+)$'),
+    (match) => match.group(1)!,
   );
 }
 

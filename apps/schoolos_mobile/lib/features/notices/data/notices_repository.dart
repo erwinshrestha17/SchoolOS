@@ -310,6 +310,9 @@ Map<String, dynamic> _safeNoticeFeedItem(Map<String, dynamic> item) {
     'createdAt',
     'readAt',
     'isRead',
+    'noticeCategory',
+    'noticePriority',
+    'isPinned',
     'requiresAcknowledgement',
     'acknowledgedAt',
   };

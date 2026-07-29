@@ -58,17 +58,15 @@ void main() {
       ),
     );
 
-    expect(find.text('Not billed'), findsOneWidget);
+    expect(find.text('Outstanding balance'), findsOneWidget);
+    expect(find.text('Rs 0'), findsOneWidget);
     expect(
       find.text('Paid'),
       findsNothing,
       reason: 'nothing was ever billed, so nothing was ever paid',
     );
-    expect(find.text('No invoices'), findsOneWidget);
-    expect(
-      find.text('The school has not sent a bill for this child yet.'),
-      findsOneWidget,
-    );
+    expect(find.text('No fee invoice has been issued.'), findsOneWidget);
+    expect(find.text('Next payment: No upcoming invoice'), findsOneWidget);
   });
 
   testWidgets('a genuinely settled account still reads paid', (tester) async {
@@ -99,9 +97,14 @@ void main() {
       ),
     );
 
-    expect(find.text('Paid'), findsWidgets);
-    expect(find.text('Not billed'), findsNothing);
-    expect(find.text('No invoices'), findsNothing);
+    expect(find.text('All fees are paid.'), findsOneWidget);
+    expect(find.text('Paid'), findsNothing);
+
+    await tester.tap(find.text('History'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Paid'), findsOneWidget);
+    expect(find.text('No fee invoice has been issued.'), findsNothing);
   });
 
   testWidgets('an outstanding balance is untouched', (tester) async {
@@ -122,8 +125,8 @@ void main() {
     );
 
     expect(find.text('Rs 1,200'), findsWidgets);
-    expect(find.text('1 overdue'), findsOneWidget);
-    expect(find.text('Not billed'), findsNothing);
+    expect(find.text('1 overdue. Payment is still due.'), findsOneWidget);
+    expect(find.text('No fee invoice has been issued.'), findsNothing);
   });
 
   test('the portal child model separates never-billed from settled', () {

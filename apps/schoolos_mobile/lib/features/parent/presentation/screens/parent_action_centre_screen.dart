@@ -458,7 +458,7 @@ String _sourceLabel(String source) {
     'homework' => 'Homework',
     'fees' => 'Fees',
     'attendance' => 'Attendance',
-    'serviceRequests' => 'Help and requests',
+    'serviceRequests' => 'Help & Support',
     'exams' => 'Examinations',
     _ => 'School actions',
   };

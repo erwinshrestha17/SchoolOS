@@ -12,6 +12,7 @@ import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_scaffold.dart';
 import '../../../shared/widgets/role_badge.dart';
 import '../../../shared/widgets/user_avatar.dart';
+import 'widgets/sign_out_confirmation_sheet.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -147,7 +148,7 @@ class ProfileScreen extends ConsumerWidget {
           ),
           const SizedBox(height: AppSpacing.xl),
 
-          // Logout Action
+          // Sign-out action
           AppButton(
             label: 'Sign Out',
             icon: Icons.logout_rounded,
@@ -156,6 +157,11 @@ class ProfileScreen extends ConsumerWidget {
             ),
             foregroundColor: isDark ? AppColors.danger : AppColors.dangerDark,
             onPressed: () async {
+              final confirmed = await showSignOutConfirmationSheet(
+                context,
+                isParent: userRole.toUpperCase() == 'PARENT',
+              );
+              if (confirmed != true || !context.mounted) return;
               await ref.read(authProvider.notifier).logout();
               if (context.mounted) {
                 context.go(AppRoutes.login);
@@ -185,17 +191,24 @@ class ProfileScreen extends ConsumerWidget {
         children: [
           Icon(icon, color: AppColors.slate400, size: 20),
           const SizedBox(width: AppSpacing.md),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+            ),
           ),
-          const Spacer(),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: isDark ? Colors.white : AppColors.slate800,
+          const SizedBox(width: AppSpacing.sm),
+          Flexible(
+            child: Text(
+              value,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white : AppColors.slate800,
+              ),
             ),
           ),
         ],

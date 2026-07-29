@@ -82,11 +82,13 @@ void main() {
     await tester.tap(find.text('Filter'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Sort and filter'), findsOneWidget);
+    expect(find.text('Filter homework'), findsOneWidget);
+    expect(find.text('Status'), findsOneWidget);
     expect(find.text('Sort by'), findsOneWidget);
     expect(find.text('Subject'), findsOneWidget);
     expect(find.text('Teacher'), findsOneWidget);
-    expect(find.text('Due date range'), findsOneWidget);
+    expect(find.text('Due date'), findsOneWidget);
+    expect(find.text('Clear all'), findsOneWidget);
     expect(find.text('Apply filters'), findsOneWidget);
     expect(find.text('School or branch'), findsNothing);
     expect(tester.takeException(), isNull);

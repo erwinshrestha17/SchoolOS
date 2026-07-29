@@ -291,10 +291,19 @@ class ParentPortalRepository {
         _formatTime(item.createdAt),
       ].join(' - '),
       audience: item.audience.label,
+      childName: item.audience.childName ?? child?.name,
+      classSection: [item.audience.className, item.audience.sectionName]
+          .whereType<String>()
+          .where((value) => value.trim().isNotEmpty)
+          .join(' - '),
       createdAt: item.createdAt,
       route: item.route,
-      isPinned: !item.isRead && item.type == ParentNotificationType.notice,
-      isImportant: !item.isRead,
+      isPinned: item.isPinned,
+      isImportant: item.isImportant,
+      isEmergency: item.isEmergency,
+      requiresAcknowledgement:
+          item.requiresAcknowledgement && item.acknowledgedAt == null,
+      hasAttachment: item.attachment != null,
       unreadCount: item.isRead ? 0 : 1,
     );
   }

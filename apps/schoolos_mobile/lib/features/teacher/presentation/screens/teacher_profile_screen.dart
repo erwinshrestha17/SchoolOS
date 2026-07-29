@@ -12,6 +12,7 @@ import '../../../../shared/widgets/role_shell_scaffold.dart';
 import '../../../../shared/widgets/status_chip.dart';
 import '../../../../shared/widgets/user_avatar.dart';
 import '../../../attendance/application/attendance_providers.dart';
+import '../../../profile/presentation/widgets/sign_out_confirmation_sheet.dart';
 import '../../application/teacher_providers.dart';
 import '../widgets/teacher_app_widgets.dart';
 
@@ -163,11 +164,16 @@ class TeacherProfileScreen extends ConsumerWidget {
           ),
           const SizedBox(height: AppSpacing.xl),
           AppButton(
-            label: 'Secure Logout',
+            label: 'Sign Out',
             icon: Icons.logout_rounded,
             backgroundColor: AppColors.dangerLight,
             foregroundColor: AppColors.dangerDark,
             onPressed: () async {
+              final confirmed = await showSignOutConfirmationSheet(
+                context,
+                isParent: false,
+              );
+              if (confirmed != true || !context.mounted) return;
               await ref.read(authProvider.notifier).logout();
               if (context.mounted) context.go(AppRoutes.login);
             },

@@ -1,21 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/constants/app_routes.dart';
-import '../../../../core/auth/auth_provider.dart';
 import '../../application/parent_dashboard_view_model.dart';
 import '../../domain/parent_models.dart';
 import '../../domain/parent_portal_models.dart';
 import '../widgets/parent_portal_widgets.dart';
 
-class ParentPortalMoreTab extends ConsumerWidget {
+class ParentPortalMoreTab extends StatelessWidget {
   const ParentPortalMoreTab({super.key, required this.data});
 
   final ParentPortalData data;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     // The same rule the Today header uses. Guardian accounts are routinely
     // provisioned without a name, and this card was printing the raw login
     // handle - "guardian.c01a001" - as the account holder's name, initials
@@ -140,13 +138,6 @@ class ParentPortalMoreTab extends ConsumerWidget {
             AppRoutes.parentConsents,
             capability: GuardianCapabilityKey.specificConsentGive,
           ),
-          _Menu(
-            Icons.support_agent_outlined,
-            'Help & Requests',
-            'School concerns, payment disputes, and responses',
-            AppRoutes.parentServiceRequests,
-            capability: GuardianCapabilityKey.complaintOrCorrectionSubmit,
-          ),
         ]),
         const ParentSectionHeader(title: 'Account'),
         const SizedBox(height: 10),
@@ -181,21 +172,13 @@ class ParentPortalMoreTab extends ConsumerWidget {
                     _hasCapability(
                       GuardianCapabilityKey.complaintOrCorrectionSubmit,
                     )
-                    ? 'Send and follow a request to the school'
+                    ? 'Get help, report a concern, or follow school requests'
                     : 'Not included in your access for this child',
                 onTap: () => _openCapabilityRoute(
                   context,
                   AppRoutes.parentServiceRequests,
                   GuardianCapabilityKey.complaintOrCorrectionSubmit,
                 ),
-              ),
-              const Divider(),
-              SettingsMenuItem(
-                icon: Icons.logout_rounded,
-                title: 'Logout',
-                subtitle: 'Sign out of this device',
-                color: ParentPortalColors.red,
-                onTap: () => _confirmLogout(context, ref),
               ),
             ],
           ),
@@ -261,32 +244,6 @@ class ParentPortalMoreTab extends ConsumerWidget {
       return;
     }
     _locked(context);
-  }
-
-  Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Logout?'),
-        content: const Text(
-          'You will need to sign in again to view private school information.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: ParentPortalColors.red,
-            ),
-            child: const Text('Logout'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) await ref.read(authProvider.notifier).logout();
   }
 }
 

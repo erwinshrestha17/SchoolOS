@@ -147,7 +147,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                               setState(() => _logoutOtherDevices = value),
                     contentPadding: EdgeInsets.zero,
                     secondary: const Icon(Icons.devices_other_rounded),
-                    title: const Text('Logout from other devices'),
+                    title: const Text('Sign out of other devices'),
                     subtitle: const Text(
                       'Recommended. Mobile will ask you to sign in again after a successful change.',
                     ),

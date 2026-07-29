@@ -155,9 +155,7 @@ class AppTopBar extends ConsumerWidget implements PreferredSizeWidget {
       surfaceTintColor: Colors.transparent,
       actions: [
         IconButton(
-          tooltip: unread > 0
-              ? 'Notifications, $unread unread'
-              : 'Notifications',
+          tooltip: unread > 0 ? 'Alerts, $unread unread' : 'Alerts',
           onPressed: () => context.push(AppRoutes.notifications),
           // The count is in the tooltip - and so in the screen-reader label -
           // because a red dot alone tells a blind parent nothing.

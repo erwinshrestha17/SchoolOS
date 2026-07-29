@@ -45,7 +45,12 @@ void main() {
             path: '/mobile/students/child-1/attendance-summary',
           ),
           data: {
-            'today': {'status': 'ABSENT', 'label': 'Absent today'},
+            'today': {
+              'status': 'ABSENT',
+              'label': 'Absent today',
+              'remark': 'Parent follow-up requested',
+              'markedAt': '2026-05-03T03:42:00.000Z',
+            },
             'monthSummary': {
               'present': 18,
               'absent': 1,
@@ -77,6 +82,11 @@ void main() {
 
       expect(snapshot.summary.todayLabel, 'Absent today');
       expect(snapshot.summary.todayStatus, AttendanceStatus.absent);
+      expect(snapshot.summary.todayRemark, 'Parent follow-up requested');
+      expect(
+        snapshot.summary.markedAt,
+        DateTime.parse('2026-05-03T03:42:00.000Z'),
+      );
       expect(snapshot.summary.presentCount, 18);
       expect(snapshot.summary.absentCount, 1);
       expect(snapshot.summary.lateCount, 2);

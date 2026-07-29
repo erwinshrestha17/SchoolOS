@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/config/env_config.dart';
 import '../../../../core/errors/app_exception.dart';
-import '../widgets/parent_state_view.dart';
 import '../../../../core/platform/file_share_service.dart';
 import '../../../../shared/utils/money_format.dart';
 import '../../../../shared/utils/nepali_bs_calendar.dart';
@@ -13,6 +13,7 @@ import '../../application/parent_providers.dart';
 import '../../domain/parent_models.dart';
 import '../widgets/parent_detail_widgets.dart';
 import '../widgets/parent_portal_widgets.dart';
+import '../widgets/parent_state_view.dart';
 
 class ParentFeesScreen extends ConsumerWidget {
   const ParentFeesScreen({super.key, this.title = 'Fees & Payments'});
@@ -29,9 +30,7 @@ class ParentFeesScreen extends ConsumerWidget {
     return ParentDetailScaffold(
       title: title,
       selectedIndex: 5,
-      // Fees needs the dashboard summary, which is deliberately not cached for
-      // offline use. When it is missing because the device is offline, say so
-      // with the offline surface rather than a generic failure.
+      showGlobalActions: false,
       body: ParentStateView(
         status: child != null && summary == null && state.isOffline
             ? ParentDataStatus.offline
@@ -45,20 +44,14 @@ class ParentFeesScreen extends ConsumerWidget {
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
                   children: [
-                    if (state.children.length == 1) ...[
-                      ParentApiChildSelector(
-                        child: child,
-                        children: state.children,
-                        onChanged: controller.selectChild,
-                        statusLabel: state.isOffline ? 'Offline copy' : null,
-                      ),
-                      const SizedBox(height: 14),
-                      _FeesContent(child: child, summary: summary),
-                    ] else
-                      for (final linkedChild in state.children) ...[
-                        _ChildFeesSection(child: linkedChild),
-                        const SizedBox(height: 18),
-                      ],
+                    ParentApiChildSelector(
+                      child: child,
+                      children: state.children,
+                      onChanged: controller.selectChild,
+                      statusLabel: state.isOffline ? 'Offline copy' : null,
+                    ),
+                    const SizedBox(height: 14),
+                    _FeesContent(child: child, summary: summary),
                   ],
                 ),
               ),
@@ -67,69 +60,73 @@ class ParentFeesScreen extends ConsumerWidget {
   }
 }
 
-class _ChildFeesSection extends ConsumerWidget {
-  const _ChildFeesSection({required this.child});
+enum _FeeListTab { outstanding, history }
 
-  final GuardianChild child;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final summary = ref.watch(parentDashboardSummaryProvider(child.id));
-    return summary.when(
-      loading: () => const PortalLoadingState(),
-      error: (_, _) => PortalCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Could not load fees for ${child.name}.'),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: () =>
-                  ref.invalidate(parentDashboardSummaryProvider(child.id)),
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Try again'),
-            ),
-          ],
-        ),
-      ),
-      data: (summary) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ParentSectionHeader(title: child.name),
-          const SizedBox(height: 8),
-          _FeesContent(child: child, summary: summary),
-        ],
-      ),
-    );
-  }
-}
-
-class _FeesContent extends ConsumerWidget {
+class _FeesContent extends ConsumerStatefulWidget {
   const _FeesContent({required this.child, required this.summary});
 
   final GuardianChild child;
   final ParentDashboardSummary summary;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_FeesContent> createState() => _FeesContentState();
+}
+
+class _FeesContentState extends ConsumerState<_FeesContent> {
+  _FeeListTab _tab = _FeeListTab.outstanding;
+  bool _sandboxBannerDismissed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final child = widget.child;
+    final summary = widget.summary;
     final readiness = ref.watch(
       parentPaymentGatewayReadinessProvider(child.id),
     );
+    final outstandingInvoices = summary.recentInvoices
+        .where((invoice) => !invoice.isSettled)
+        .toList();
+    final historyInvoices = summary.recentInvoices
+        .where((invoice) => invoice.isSettled)
+        .toList();
+    final visibleInvoices = _tab == _FeeListTab.outstanding
+        ? outstandingInvoices
+        : historyInvoices;
+    final showSandboxBanner =
+        !EnvConfig.isProduction &&
+        !_sandboxBannerDismissed &&
+        readiness.valueOrNull?.sandbox == true;
+
     return Column(
       children: [
         _FeesSummaryCard(summary: summary),
-        const SizedBox(height: 12),
-        _PaymentReadinessCard(readiness: readiness),
-        const SizedBox(height: 20),
-        if (summary.recentInvoices.isEmpty) ...[
-          const ParentSectionHeader(title: 'Bills'),
-          const SizedBox(height: 8),
-          const PortalCard(child: Text('No bills for this child yet.')),
-        ] else
-          for (final group in groupInvoicesByDueMonth(
-            summary.recentInvoices,
-          )) ...[
-            _MonthHeader(group: group),
+        if (showSandboxBanner) ...[
+          const SizedBox(height: 10),
+          _SandboxPaymentBanner(
+            onDismiss: () => setState(() => _sandboxBannerDismissed = true),
+          ),
+        ],
+        const SizedBox(height: 16),
+        _FeeTabs(
+          selected: _tab,
+          outstandingCount: outstandingInvoices.length,
+          onSelected: (value) => setState(() => _tab = value),
+        ),
+        const SizedBox(height: 18),
+        ParentSectionHeader(
+          title: _tab == _FeeListTab.outstanding
+              ? 'Outstanding fees'
+              : 'Recent payment history',
+        ),
+        const SizedBox(height: 8),
+        if (visibleInvoices.isEmpty)
+          _EmptyFeeList(
+            tab: _tab,
+            hasAnyInvoices: summary.recentInvoices.isNotEmpty,
+          )
+        else
+          for (final group in groupInvoicesByDueMonth(visibleInvoices)) ...[
+            _MonthHeader(group: group, tab: _tab),
             const SizedBox(height: 8),
             for (final invoice in group.invoices) ...[
               _InvoiceCard(
@@ -142,21 +139,217 @@ class _FeesContent extends ConsumerWidget {
             ],
             const SizedBox(height: 8),
           ],
-        const SizedBox(height: 10),
-        const ParentSectionHeader(title: 'Your receipts'),
-        const SizedBox(height: 8),
-        if (summary.recentReceipts.isEmpty)
-          const PortalCard(
-            child: Text(
-              'No receipts yet. A receipt appears here once the school confirms your payment.',
-            ),
-          )
-        else
-          for (final receipt in summary.recentReceipts) ...[
-            _ReceiptCard(childId: child.id, receipt: receipt),
-            const SizedBox(height: 12),
-          ],
       ],
+    );
+  }
+}
+
+class _FeeTabs extends StatelessWidget {
+  const _FeeTabs({
+    required this.selected,
+    required this.outstandingCount,
+    required this.onSelected,
+  });
+
+  final _FeeListTab selected;
+  final int outstandingCount;
+  final ValueChanged<_FeeListTab> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget tabButton(_FeeListTab value, String label) {
+      final selectedTab = selected == value;
+      return Expanded(
+        child: Semantics(
+          selected: selectedTab,
+          button: true,
+          child: InkWell(
+            onTap: () => onSelected(value),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 44),
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              decoration: BoxDecoration(
+                color: selectedTab
+                    ? ParentPortalColors.greenSoft
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: selectedTab
+                      ? ParentPortalColors.green
+                      : ParentPortalColors.muted,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: ParentPortalColors.surfaceAlt,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          tabButton(
+            _FeeListTab.outstanding,
+            outstandingCount > 0
+                ? 'Outstanding $outstandingCount'
+                : 'Outstanding',
+          ),
+          tabButton(_FeeListTab.history, 'History'),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyFeeList extends StatelessWidget {
+  const _EmptyFeeList({required this.tab, required this.hasAnyInvoices});
+
+  final _FeeListTab tab;
+  final bool hasAnyInvoices;
+
+  @override
+  Widget build(BuildContext context) {
+    final outstanding = tab == _FeeListTab.outstanding;
+    return PortalCard(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          FeatureIcon(
+            outstanding
+                ? Icons.check_circle_outline_rounded
+                : Icons.receipt_long_outlined,
+            size: 40,
+            color: outstanding
+                ? ParentPortalColors.green
+                : ParentPortalColors.muted,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  outstanding
+                      ? 'No outstanding fees'
+                      : 'No payment history yet',
+                  style: const TextStyle(
+                    color: ParentPortalColors.navy,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  outstanding
+                      ? 'There is nothing to pay right now.'
+                      : hasAnyInvoices
+                      ? 'Confirmed payments and receipts will appear here.'
+                      : 'The school has not issued an invoice for this child.',
+                  style: const TextStyle(color: ParentPortalColors.muted),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SandboxPaymentBanner extends StatelessWidget {
+  const _SandboxPaymentBanner({required this.onDismiss});
+
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: ParentPortalColors.blueSoft,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: ParentPortalColors.border),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.science_outlined,
+                  size: 20,
+                  color: ParentPortalColors.blue,
+                ),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Sandbox payment mode',
+                        style: TextStyle(
+                          color: ParentPortalColors.navy,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        'No real money will be charged.',
+                        style: TextStyle(
+                          color: ParentPortalColors.muted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Dismiss sandbox notice',
+                  onPressed: onDismiss,
+                  icon: const Icon(Icons.close_rounded, size: 20),
+                ),
+              ],
+            ),
+            TextButton(
+              style: TextButton.styleFrom(
+                minimumSize: const Size(44, 36),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              onPressed: () => showDialog<void>(
+                context: context,
+                builder: (dialogContext) => AlertDialog(
+                  title: const Text('Sandbox payment mode'),
+                  content: const Text(
+                    'This build records practice payments for school testing. '
+                    'Payments are unavailable offline.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(dialogContext),
+                      child: const Text('Close'),
+                    ),
+                  ],
+                ),
+              ),
+              child: const Text('Learn more'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -179,14 +372,14 @@ class ParentFeeMonthGroup {
       invoices.fold<num>(0, (sum, item) => sum + item.outstandingAmount);
 }
 
-/// Groups bills by the BS month they fall due, newest month first.
+/// Groups bills by the BS month of their due date, newest month first.
 ///
 /// Deliberately keyed on `dueDate` rather than `FeeBillingRun.runMonth`: that
 /// field's calendar convention is unenforced (the DTO accepts any year over
 /// 2000, the finance spec uses AD 2026, seeded invoice numbers use BS 2083),
-/// so a month label taken from it could name the wrong month. A due date is a
-/// real timestamp and converts unambiguously. The label says "Due in ..." for
-/// the same reason - it is true whatever period the school billed for.
+/// so a fee-period label taken from it could name the wrong month. A due date
+/// is a real timestamp and converts unambiguously. The neutral month heading
+/// avoids describing a settled invoice as still due.
 List<ParentFeeMonthGroup> groupInvoicesByDueMonth(
   List<ParentFeeInvoice> invoices,
 ) {
@@ -203,7 +396,7 @@ List<ParentFeeMonthGroup> groupInvoicesByDueMonth(
     final bs = NepaliBsCalendar.fromAd(due);
     final key = bs.year * 12 + bs.month;
     buckets.putIfAbsent(key, () => []).add(invoice);
-    labels[key] = 'Due in ${NepaliBsCalendar.monthName(bs.month)} ${bs.year}';
+    labels[key] = '${NepaliBsCalendar.monthName(bs.month)} ${bs.year}';
   }
 
   final keys = buckets.keys.toList()..sort((a, b) => b.compareTo(a));
@@ -219,123 +412,19 @@ List<ParentFeeMonthGroup> groupInvoicesByDueMonth(
 }
 
 class _MonthHeader extends StatelessWidget {
-  const _MonthHeader({required this.group});
+  const _MonthHeader({required this.group, required this.tab});
 
   final ParentFeeMonthGroup group;
+  final _FeeListTab tab;
 
   @override
   Widget build(BuildContext context) {
-    final owing = group.outstanding > 0;
     return Padding(
       padding: const EdgeInsets.only(top: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(child: ParentSectionHeader(title: group.label)),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              owing ? '${_money(group.outstanding)} to pay' : 'All paid',
-              textAlign: TextAlign.end,
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 13,
-                color: owing
-                    ? ParentPortalColors.orange
-                    : ParentPortalColors.green,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PaymentReadinessCard extends StatelessWidget {
-  const _PaymentReadinessCard({required this.readiness});
-
-  final AsyncValue<ParentPaymentGatewayReadiness> readiness;
-
-  @override
-  Widget build(BuildContext context) {
-    return readiness.when(
-      loading: () => PortalCard(
-        child: Row(
-          children: [
-            const SizedBox.square(
-              dimension: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Checking if you can pay online…',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: ParentPortalColors.muted,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-      error: (_, _) => const PortalCard(
-        color: ParentPortalColors.orangeSoft,
-        child: Text(
-          'We cannot start a payment right now. Nothing has been charged.',
-          style: TextStyle(color: ParentPortalColors.muted),
-        ),
-      ),
-      data: (value) => PortalCard(
-        color: value.enabled
-            ? ParentPortalColors.greenSoft
-            : ParentPortalColors.orangeSoft,
-        child: Row(
-          children: [
-            Icon(
-              value.enabled
-                  ? Icons.verified_user_outlined
-                  : Icons.lock_outline_rounded,
-              color: value.enabled
-                  ? ParentPortalColors.green
-                  : ParentPortalColors.orange,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  StatusBadge(
-                    label: value.enabled
-                        ? value.sandbox
-                              ? 'Test mode'
-                              : 'You can pay online'
-                        : 'Not available',
-                    color: value.enabled
-                        ? ParentPortalColors.green
-                        : ParentPortalColors.orange,
-                    background: value.enabled
-                        ? ParentPortalColors.greenSoft
-                        : ParentPortalColors.orangeSoft,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    value.message,
-                    style: const TextStyle(color: ParentPortalColors.muted),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'You need internet to pay. Nothing is charged while you are offline.',
-                    style: TextStyle(
-                      color: ParentPortalColors.muted,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+      child: ParentSectionHeader(
+        title: tab == _FeeListTab.outstanding
+            ? 'Due in ${group.label}'
+            : group.label,
       ),
     );
   }
@@ -349,87 +438,67 @@ class _FeesSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasDues = summary.feesDue > 0;
-    // The backend reports status PAID whenever nothing is outstanding, which
-    // includes a child the school has never billed. Announcing "Paid" there
-    // claims a settlement that never happened, and would mask a school that
-    // simply has not issued this term's invoices yet.
     final nothingBilled = !hasDues && summary.feesTotalAmount <= 0;
     return PortalCard(
-      child: Row(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          FeatureIcon(
-            hasDues
-                ? Icons.warning_amber_rounded
-                : nothingBilled
-                ? Icons.receipt_long_rounded
-                : Icons.check_circle_rounded,
-            color: hasDues
-                ? ParentPortalColors.orange
-                : nothingBilled
-                ? ParentPortalColors.muted
-                : ParentPortalColors.green,
+          const Text(
+            'Outstanding balance',
+            style: TextStyle(color: ParentPortalColors.muted),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Fee status',
-                  style: TextStyle(color: ParentPortalColors.muted),
-                ),
-                Text(
-                  hasDues
-                      ? _money(summary.feesDue)
-                      : nothingBilled
-                      ? 'Not billed'
-                      : 'Paid',
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                    color: ParentPortalColors.navy,
-                  ),
-                ),
-                Text(
-                  hasDues
-                      ? 'Paid ${_money(summary.feesPaidAmount)} of ${_money(summary.feesTotalAmount)}'
-                      : nothingBilled
-                      ? 'The school has not sent a bill for this child yet.'
-                      : 'Nothing left to pay.',
-                  style: const TextStyle(color: ParentPortalColors.muted),
-                ),
-                Text(
-                  nothingBilled
-                      ? 'Nothing is payable right now.'
-                      : !hasDues
-                      ? 'Your payment receipts are saved below.'
-                      : summary.nextFeeDueDate == null
-                      ? 'The school has not set a due date.'
-                      : 'Next due ${_date(summary.nextFeeDueDate)}',
-                  style: const TextStyle(color: ParentPortalColors.muted),
-                ),
-              ],
+          const SizedBox(height: 2),
+          Text(
+            _money(summary.feesDue),
+            style: const TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w900,
+              color: ParentPortalColors.navy,
             ),
           ),
-          Flexible(
-            child: StatusBadge(
-              label: hasDues
-                  ? summary.feesStatus == 'PARTIAL'
-                        ? 'Partial'
-                        : '${summary.overdueFeesCount} overdue'
-                  : nothingBilled
-                  ? 'No invoices'
-                  : 'Paid',
-              color: hasDues
-                  ? ParentPortalColors.orange
-                  : nothingBilled
-                  ? ParentPortalColors.muted
-                  : ParentPortalColors.green,
-              background: hasDues
-                  ? ParentPortalColors.orangeSoft
-                  : nothingBilled
-                  ? ParentPortalColors.surfaceAlt
-                  : ParentPortalColors.greenSoft,
+          const SizedBox(height: 4),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                hasDues
+                    ? Icons.info_outline_rounded
+                    : nothingBilled
+                    ? Icons.receipt_long_outlined
+                    : Icons.check_circle_rounded,
+                size: 18,
+                color: hasDues
+                    ? ParentPortalColors.orange
+                    : nothingBilled
+                    ? ParentPortalColors.muted
+                    : ParentPortalColors.green,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  hasDues
+                      ? summary.feesStatus == 'PARTIAL'
+                            ? '${_money(summary.feesPaidAmount)} paid so far.'
+                            : '${summary.overdueFeesCount > 0 ? '${summary.overdueFeesCount} overdue. ' : ''}Payment is still due.'
+                      : nothingBilled
+                      ? 'No fee invoice has been issued.'
+                      : 'All fees are paid.',
+                  style: const TextStyle(color: ParentPortalColors.muted),
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 20),
+          Text(
+            hasDues
+                ? summary.nextFeeDueDate == null
+                      ? 'Next payment: Due date not set'
+                      : 'Next payment: ${_date(summary.nextFeeDueDate)}'
+                : 'Next payment: No upcoming invoice',
+            style: const TextStyle(
+              color: ParentPortalColors.navy,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -442,18 +511,15 @@ class _FeesSummaryCard extends StatelessWidget {
 /// this; until now the app showed only a total, so a parent could not tell
 /// tuition from transport without the paper copy.
 class _BillBreakdown extends StatelessWidget {
-  const _BillBreakdown({
-    required this.invoice,
-    required this.expanded,
-    required this.onToggle,
-  });
+  const _BillBreakdown({required this.invoice, required this.expanded});
 
   final ParentFeeInvoice invoice;
   final bool expanded;
-  final VoidCallback onToggle;
 
   @override
   Widget build(BuildContext context) {
+    if (!expanded) return const SizedBox.shrink();
+
     if (!invoice.isItemised) {
       return const Padding(
         padding: EdgeInsets.only(top: 8),
@@ -467,68 +533,38 @@ class _BillBreakdown extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // A plain button rather than ExpansionTile: the tile brings its own
-        // padding, divider and 56dp row height, which fights the card.
-        Semantics(
-          button: true,
-          expanded: expanded,
-          child: TextButton.icon(
-            onPressed: onToggle,
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              minimumSize: const Size(0, 44),
-              tapTargetSize: MaterialTapTargetSize.padded,
-              foregroundColor: ParentPortalColors.green,
-            ),
-            icon: Icon(
-              expanded
-                  ? Icons.keyboard_arrow_up_rounded
-                  : Icons.keyboard_arrow_down_rounded,
-              size: 20,
-            ),
-            label: Text(
-              expanded ? 'Hide details' : 'See what this covers',
-              style: const TextStyle(fontWeight: FontWeight.w800),
-            ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: ParentPortalColors.surfaceAlt,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            children: [
+              for (final line in invoice.lines)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _BreakdownRow(
+                    label: line.quantity > 1
+                        ? '${line.name} × ${line.quantity}'
+                        : line.name,
+                    amount: _money(line.totalAmount),
+                  ),
+                ),
+              if (invoice.vatAmount > 0) ...[
+                _BreakdownRow(label: 'VAT', amount: _money(invoice.vatAmount)),
+                const SizedBox(height: 8),
+              ],
+              const Divider(height: 12),
+              _BreakdownRow(
+                label: 'Total',
+                amount: _money(invoice.totalAmount),
+                emphasised: true,
+              ),
+            ],
           ),
         ),
-        if (expanded) ...[
-          const SizedBox(height: 4),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: ParentPortalColors.surfaceAlt,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              children: [
-                for (final line in invoice.lines)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _BreakdownRow(
-                      label: line.quantity > 1
-                          ? '${line.name} × ${line.quantity}'
-                          : line.name,
-                      amount: _money(line.totalAmount),
-                    ),
-                  ),
-                if (invoice.vatAmount > 0) ...[
-                  _BreakdownRow(
-                    label: 'VAT',
-                    amount: _money(invoice.vatAmount),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                const Divider(height: 12),
-                _BreakdownRow(
-                  label: 'Total',
-                  amount: _money(invoice.totalAmount),
-                  emphasised: true,
-                ),
-              ],
-            ),
-          ),
-        ],
       ],
     );
   }
@@ -568,8 +604,10 @@ String _billStatusLabel(ParentFeeInvoice invoice) {
   if (invoice.isSettled) return 'Paid';
   if (invoice.isOverdue) return 'Overdue';
   if (invoice.paidAmount > 0) return 'Part paid';
-  return 'To pay';
+  return 'Due';
 }
+
+enum _PaymentAttemptState { idle, processing, checkoutOpened, failed }
 
 class _InvoiceCard extends ConsumerStatefulWidget {
   const _InvoiceCard({
@@ -589,21 +627,64 @@ class _InvoiceCard extends ConsumerStatefulWidget {
 }
 
 class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
-  bool _startingPayment = false;
   bool _showBreakdown = false;
   String? _paymentRequestKey;
+  String? _paymentFailureMessage;
+  _PaymentAttemptState _paymentState = _PaymentAttemptState.idle;
 
   @override
   Widget build(BuildContext context) {
     final invoice = widget.invoice;
-    final canPay = widget.readiness?.enabled == true && !_startingPayment;
-    final paymentStatusMessage = widget.readinessLoading
+    final receipt = _latestReceipt(invoice.receipts);
+    final readinessProviders = widget.readiness?.providers.isNotEmpty == true
+        ? widget.readiness!.providers
+        : [
+            if (widget.readiness?.providerName != null)
+              widget.readiness!.providerName!,
+          ];
+    final sandboxAllowed =
+        !EnvConfig.isProduction || widget.readiness?.sandbox != true;
+    final canPay =
+        widget.readiness?.enabled == true &&
+        readinessProviders.isNotEmpty &&
+        sandboxAllowed &&
+        (_paymentState == _PaymentAttemptState.idle ||
+            _paymentState == _PaymentAttemptState.failed);
+    final paymentStatusMessage = !sandboxAllowed
+        ? 'Test payments are unavailable in this build.'
+        : widget.readinessLoading
         ? 'Checking if you can pay online…'
         : widget.readiness?.enabled == true
-        ? 'You can pay online. The school confirms every payment.'
+        ? 'Payments are unavailable offline.'
         : widget.readiness?.message ??
               'This school does not accept online payment right now.';
+    final statusLabel = switch (_paymentState) {
+      _PaymentAttemptState.processing => 'Processing',
+      _PaymentAttemptState.checkoutOpened => 'Processing',
+      _PaymentAttemptState.failed => 'Payment failed',
+      _ => _billStatusLabel(invoice),
+    };
+    final statusColor = switch (_paymentState) {
+      _PaymentAttemptState.processing ||
+      _PaymentAttemptState.checkoutOpened => ParentPortalColors.blue,
+      _PaymentAttemptState.failed => ParentPortalColors.red,
+      _ =>
+        invoice.isSettled
+            ? ParentPortalColors.green
+            : ParentPortalColors.orange,
+    };
+    final statusBackground = switch (_paymentState) {
+      _PaymentAttemptState.processing ||
+      _PaymentAttemptState.checkoutOpened => ParentPortalColors.blueSoft,
+      _PaymentAttemptState.failed => ParentPortalColors.redSoft,
+      _ =>
+        invoice.isSettled
+            ? ParentPortalColors.greenSoft
+            : ParentPortalColors.orangeSoft,
+    };
+
     return PortalCard(
+      padding: const EdgeInsets.all(16),
       borderColor: invoice.isOverdue
           ? ParentPortalColors.orange.withValues(alpha: .4)
           : ParentPortalColors.border,
@@ -611,29 +692,18 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const FeatureIcon(Icons.receipt_long_outlined),
-              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // The bill is the parent's; the invoice number is the
-                    // school's filing reference, so it reads underneath
-                    // rather than as the heading.
                     const Text(
                       'School fees',
-                      style: TextStyle(fontWeight: FontWeight.w900),
-                    ),
-                    Text(
-                      'Due ${_date(invoice.dueDate)}',
-                      style: const TextStyle(color: ParentPortalColors.muted),
-                    ),
-                    Text(
-                      invoice.invoiceNumber,
-                      style: const TextStyle(
-                        color: ParentPortalColors.muted,
-                        fontSize: 11,
+                      style: TextStyle(
+                        color: ParentPortalColors.navy,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
                   ],
@@ -641,74 +711,156 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
               ),
               Flexible(
                 child: StatusBadge(
-                  label: _billStatusLabel(invoice),
-                  color: invoice.outstandingAmount > 0
-                      ? ParentPortalColors.orange
-                      : ParentPortalColors.green,
-                  background: invoice.outstandingAmount > 0
-                      ? ParentPortalColors.orangeSoft
-                      : ParentPortalColors.greenSoft,
+                  label: statusLabel,
+                  color: statusColor,
+                  background: statusBackground,
                 ),
               ),
             ],
           ),
-          const Divider(height: 24),
-          // Wrap, not Row: a seven-figure fee at large text scale cannot
-          // share a phone width three ways, and "Rs 12,345,678" has no break
-          // point for a Text to wrap on. Wrap reflows to a second run instead
-          // of overflowing.
-          Wrap(
-            spacing: 20,
-            runSpacing: 12,
-            children: [
-              _FeeMetric('Total', _money(invoice.totalAmount)),
-              _FeeMetric('Paid', _money(invoice.paidAmount)),
-              _FeeMetric('Left to pay', _money(invoice.outstandingAmount)),
-            ],
+          const SizedBox(height: 8),
+          Text(
+            invoice.isSettled
+                ? _money(invoice.totalAmount)
+                : '${_money(invoice.outstandingAmount)} due',
+            style: const TextStyle(
+              color: ParentPortalColors.navy,
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+            ),
           ),
           const SizedBox(height: 4),
-          _BillBreakdown(
-            invoice: invoice,
-            expanded: _showBreakdown,
-            onToggle: () => setState(() => _showBreakdown = !_showBreakdown),
-          ),
-          if (invoice.outstandingAmount > 0) ...[
-            const SizedBox(height: 12),
+          if (invoice.isSettled)
             Text(
-              paymentStatusMessage,
-              style: const TextStyle(
-                color: ParentPortalColors.muted,
-                fontSize: 12,
+              receipt?.paidAt == null
+                  ? 'Payment confirmed'
+                  : 'Paid on ${_date(receipt!.paidAt)}',
+              style: const TextStyle(color: ParentPortalColors.muted),
+            )
+          else ...[
+            Text(
+              invoice.dueDate == null
+                  ? 'Due date not set'
+                  : 'Due ${_date(invoice.dueDate)}',
+              style: TextStyle(
+                color: invoice.isOverdue
+                    ? ParentPortalColors.orange
+                    : ParentPortalColors.muted,
+                fontWeight: invoice.isOverdue
+                    ? FontWeight.w700
+                    : FontWeight.w400,
               ),
             ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: canPay ? _confirmAndStartPayment : null,
-                icon: _startingPayment
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(
-                        widget.readinessLoading
-                            ? Icons.hourglass_top_rounded
-                            : canPay
-                            ? Icons.open_in_new_rounded
-                            : Icons.lock_outline_rounded,
-                      ),
+            if (invoice.paidAmount > 0)
+              Text(
+                '${_money(invoice.paidAmount)} paid so far',
+                style: const TextStyle(color: ParentPortalColors.muted),
+              ),
+          ],
+          Text(
+            'Invoice ${invoice.invoiceNumber}',
+            style: const TextStyle(
+              color: ParentPortalColors.muted,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (invoice.isSettled)
+                FilledButton.icon(
+                  onPressed: receipt == null
+                      ? null
+                      : () => _showReceiptDetails(context, receipt),
+                  icon: const Icon(Icons.receipt_long_rounded),
+                  label: Text(
+                    receipt == null ? 'Receipt unavailable' : 'View receipt',
+                  ),
+                )
+              else
+                FilledButton.icon(
+                  onPressed: canPay ? _confirmAndStartPayment : null,
+                  icon: _paymentState == _PaymentAttemptState.processing
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(
+                          widget.readinessLoading
+                              ? Icons.hourglass_top_rounded
+                              : canPay
+                              ? Icons.lock_open_rounded
+                              : Icons.lock_outline_rounded,
+                        ),
+                  label: Text(
+                    _paymentState == _PaymentAttemptState.processing
+                        ? 'Starting payment…'
+                        : widget.readinessLoading
+                        ? 'Checking…'
+                        : canPay
+                        ? invoice.paidAmount > 0
+                              ? 'Pay remaining'
+                              : 'Pay now'
+                        : 'Payment unavailable',
+                  ),
+                ),
+              if (!invoice.isSettled && receipt != null)
+                OutlinedButton.icon(
+                  onPressed: () => _showReceiptDetails(context, receipt),
+                  icon: const Icon(Icons.receipt_long_rounded),
+                  label: const Text('View receipt'),
+                ),
+              OutlinedButton.icon(
+                onPressed: invoice.isItemised
+                    ? () => setState(() => _showBreakdown = !_showBreakdown)
+                    : null,
+                icon: Icon(
+                  _showBreakdown
+                      ? Icons.keyboard_arrow_up_rounded
+                      : Icons.keyboard_arrow_down_rounded,
+                ),
                 label: Text(
-                  _startingPayment
-                      ? 'Opening payment…'
-                      : widget.readinessLoading
-                      ? 'Checking…'
-                      : canPay
-                      ? 'Pay ${_money(invoice.outstandingAmount)}'
-                      : 'Online payment not available',
+                  invoice.isItemised
+                      ? _showBreakdown
+                            ? 'Hide breakdown'
+                            : 'View fee breakdown'
+                      : 'Breakdown unavailable',
                 ),
               ),
-            ),
+            ],
+          ),
+          _BillBreakdown(invoice: invoice, expanded: _showBreakdown),
+          if (invoice.outstandingAmount > 0) ...[
+            const SizedBox(height: 8),
+            if (_paymentState == _PaymentAttemptState.checkoutOpened)
+              _PaymentAttemptNotice(
+                color: ParentPortalColors.blueSoft,
+                icon: Icons.hourglass_top_rounded,
+                message:
+                    'Payment is being checked. Do not start another payment.',
+                actionLabel: 'Refresh status',
+                onAction: _refreshPaymentStatus,
+              )
+            else if (_paymentState == _PaymentAttemptState.failed)
+              _PaymentAttemptNotice(
+                color: ParentPortalColors.redSoft,
+                icon: Icons.error_outline_rounded,
+                message:
+                    _paymentFailureMessage ??
+                    'The payment could not be started. Nothing was charged.',
+                actionLabel: canPay ? 'Try again' : null,
+                onAction: canPay ? _confirmAndStartPayment : null,
+              )
+            else
+              Text(
+                paymentStatusMessage,
+                style: const TextStyle(
+                  color: ParentPortalColors.muted,
+                  fontSize: 12,
+                ),
+              ),
           ],
         ],
       ),
@@ -717,7 +869,11 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
 
   Future<void> _confirmAndStartPayment() async {
     final readiness = widget.readiness;
-    if (readiness == null || !readiness.enabled) return;
+    if (readiness == null ||
+        !readiness.enabled ||
+        (EnvConfig.isProduction && readiness.sandbox)) {
+      return;
+    }
     final providers = readiness.providers.isNotEmpty
         ? readiness.providers
         : [if (readiness.providerName != null) readiness.providerName!];
@@ -747,7 +903,10 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
     );
     if (confirmed != true || !mounted) return;
 
-    setState(() => _startingPayment = true);
+    setState(() {
+      _paymentState = _PaymentAttemptState.processing;
+      _paymentFailureMessage = null;
+    });
     // Held across retries so an ambiguous failure replays the same attempt
     // instead of creating a second payment. It is cleared once an attempt is
     // confirmed settled, so a later payment is a genuinely new request.
@@ -773,6 +932,7 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
             .read(parentControllerProvider.notifier)
             .load(childId: widget.childId);
         if (!mounted) return;
+        setState(() => _paymentState = _PaymentAttemptState.idle);
         showFeatureSnack(
           context,
           'Test payment recorded${result.receiptNumber == null ? '' : ' • Receipt ${result.receiptNumber}'}.',
@@ -804,16 +964,32 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
         throw StateError('Secure checkout could not be opened.');
       }
       if (!mounted) return;
-      showFeatureSnack(
-        context,
-        'Payment page opened. Your receipt appears here once the school confirms it.',
-      );
+      setState(() => _paymentState = _PaymentAttemptState.checkoutOpened);
     } catch (error) {
       if (!mounted) return;
-      showFeatureSnack(context, _safePaymentFailureMessage(error));
-    } finally {
-      if (mounted) setState(() => _startingPayment = false);
+      setState(() {
+        _paymentState = _PaymentAttemptState.failed;
+        _paymentFailureMessage = _safePaymentFailureMessage(error);
+      });
     }
+  }
+
+  Future<void> _refreshPaymentStatus() async {
+    await ref
+        .read(parentControllerProvider.notifier)
+        .load(childId: widget.childId);
+    if (!mounted) return;
+    setState(() => _paymentState = _PaymentAttemptState.idle);
+  }
+
+  void _showReceiptDetails(BuildContext context, ParentFeeReceipt receipt) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) =>
+          _ReceiptDetailsSheet(childId: widget.childId, receipt: receipt),
+    );
   }
 
   Future<String?> _chooseProvider(
@@ -858,60 +1034,143 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
   }
 }
 
-class _ReceiptCard extends ConsumerStatefulWidget {
-  const _ReceiptCard({required this.childId, required this.receipt});
+class _PaymentAttemptNotice extends StatelessWidget {
+  const _PaymentAttemptNotice({
+    required this.color,
+    required this.icon,
+    required this.message,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final Color color;
+  final IconData icon;
+  final String message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: ParentPortalColors.navy),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(color: ParentPortalColors.navy),
+            ),
+          ),
+          if (actionLabel != null)
+            TextButton(onPressed: onAction, child: Text(actionLabel!)),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReceiptDetailsSheet extends ConsumerStatefulWidget {
+  const _ReceiptDetailsSheet({required this.childId, required this.receipt});
 
   final String childId;
   final ParentFeeReceipt receipt;
 
   @override
-  ConsumerState<_ReceiptCard> createState() => _ReceiptCardState();
+  ConsumerState<_ReceiptDetailsSheet> createState() =>
+      _ReceiptDetailsSheetState();
 }
 
-class _ReceiptCardState extends ConsumerState<_ReceiptCard> {
+class _ReceiptDetailsSheetState extends ConsumerState<_ReceiptDetailsSheet> {
   bool _downloading = false;
   bool _sharing = false;
 
   @override
   Widget build(BuildContext context) {
     final busy = _downloading || _sharing;
+    final paidAt = _receiptDate(widget.receipt.paidAt);
     final issuedAt = _receiptDate(widget.receipt.issuedAt);
-    return PortalCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const FeatureIcon(
-                Icons.verified_rounded,
-                color: ParentPortalColors.green,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.receipt.receiptNumber,
-                      style: const TextStyle(fontWeight: FontWeight.w900),
-                    ),
-                    Text(
-                      '${widget.receipt.invoiceNumber} - ${_money(widget.receipt.amount)}',
-                      style: const TextStyle(color: ParentPortalColors.muted),
-                    ),
-                    if (issuedAt != null)
+
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          0,
+          20,
+          20 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                FeatureIcon(
+                  Icons.verified_rounded,
+                  color: ParentPortalColors.green,
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        'Issued $issuedAt',
-                        style: const TextStyle(
-                          color: ParentPortalColors.muted,
-                          fontSize: 12,
+                        'Official receipt',
+                        style: TextStyle(
+                          color: ParentPortalColors.navy,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
-                  ],
+                      Text(
+                        'Protected and available only to authorised guardians.',
+                        style: TextStyle(color: ParentPortalColors.muted),
+                      ),
+                    ],
+                  ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Text(
+              _money(widget.receipt.amount),
+              style: const TextStyle(
+                color: ParentPortalColors.navy,
+                fontSize: 28,
+                fontWeight: FontWeight.w900,
               ),
-              IconButton(
-                tooltip: 'Save receipt',
+            ),
+            const SizedBox(height: 12),
+            _ReceiptDetailRow(
+              label: 'Receipt number',
+              value: widget.receipt.receiptNumber,
+            ),
+            _ReceiptDetailRow(
+              label: 'Invoice number',
+              value: widget.receipt.invoiceNumber,
+            ),
+            if (paidAt != null)
+              _ReceiptDetailRow(label: 'Payment date', value: paidAt),
+            _ReceiptDetailRow(
+              label: 'Payment method',
+              value: _paymentMethodLabel(widget.receipt.method),
+            ),
+            _ReceiptDetailRow(
+              label: 'Payment reference',
+              value: widget.receipt.paymentId,
+            ),
+            if (issuedAt != null)
+              _ReceiptDetailRow(label: 'Receipt issued', value: issuedAt),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
                 onPressed: busy ? null : () => _downloadReceipt(context),
                 icon: _downloading
                     ? const SizedBox.square(
@@ -919,9 +1178,13 @@ class _ReceiptCardState extends ConsumerState<_ReceiptCard> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.download_rounded),
+                label: const Text('Download receipt'),
               ),
-              IconButton(
-                tooltip: 'Share receipt',
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
                 onPressed: busy ? null : () => _shareReceipt(context),
                 icon: _sharing
                     ? const SizedBox.square(
@@ -929,15 +1192,11 @@ class _ReceiptCardState extends ConsumerState<_ReceiptCard> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.ios_share_rounded),
+                label: const Text('Share receipt'),
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Official receipt. Only you can open it.',
-            style: TextStyle(color: ParentPortalColors.muted, fontSize: 12),
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -982,6 +1241,42 @@ class _ReceiptCardState extends ConsumerState<_ReceiptCard> {
   }
 }
 
+class _ReceiptDetailRow extends StatelessWidget {
+  const _ReceiptDetailRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 124,
+            child: Text(
+              label,
+              style: const TextStyle(color: ParentPortalColors.muted),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: ParentPortalColors.navy,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 String _safePaymentFailureMessage(Object error) {
   if (error is NetworkException || error is TimeoutException) {
     return 'We could not start the payment. You need internet, and nothing was charged.';
@@ -1008,24 +1303,18 @@ String? _receiptDate(String? value) {
   return NepaliBsCalendar.formatBsDate(date);
 }
 
-class _FeeMetric extends StatelessWidget {
-  const _FeeMetric(this.label, this.value);
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(label, style: const TextStyle(color: ParentPortalColors.muted)),
-      Text(
-        value,
-        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
-      ),
-    ],
-  );
+ParentFeeReceipt? _latestReceipt(List<ParentFeeReceipt> receipts) {
+  if (receipts.isEmpty) return null;
+  final sorted = [...receipts]
+    ..sort((a, b) => _receiptTimestamp(b).compareTo(_receiptTimestamp(a)));
+  return sorted.first;
 }
+
+int _receiptTimestamp(ParentFeeReceipt receipt) =>
+    DateTime.tryParse(
+      receipt.paidAt ?? receipt.issuedAt ?? '',
+    )?.millisecondsSinceEpoch ??
+    0;
 
 String _money(num value) => formatMoney(value);
 
@@ -1049,4 +1338,19 @@ String _providerLabel(String value) => switch (value) {
   'KHALTI' => 'Khalti',
   'CONNECT_IPS' => 'connectIPS',
   _ => value,
+};
+
+String _paymentMethodLabel(String value) => switch (value) {
+  'CASH' => 'Cash',
+  'BANK' || 'BANK_TRANSFER' => 'Bank transfer',
+  'CARD' => 'Card',
+  'MOBILE' => 'Mobile payment',
+  'ESEWA' || 'KHALTI' || 'CONNECT_IPS' => _providerLabel(value),
+  _ =>
+    value
+        .toLowerCase()
+        .split('_')
+        .where((part) => part.isNotEmpty)
+        .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+        .join(' '),
 };

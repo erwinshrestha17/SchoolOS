@@ -402,13 +402,10 @@ void main() {
     expect(find.text('Holiday notice for Friday'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
-    final updateFilters = find.ancestor(
-      of: find.text('Events'),
-      matching: find.byType(SingleChildScrollView),
-    );
-    await tester.drag(updateFilters, const Offset(-220, 0));
+    await tester.tap(find.text('Filter'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Events'));
+    await tester.tap(find.text('Apply filters'));
     await tester.pumpAndSettle();
     expect(find.text('Parent-Teacher Meeting'), findsOneWidget);
     expect(tester.takeException(), isNull);

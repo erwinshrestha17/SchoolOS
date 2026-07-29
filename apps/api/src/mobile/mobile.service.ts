@@ -1065,6 +1065,9 @@ export class MobileService {
         notice: {
           select: {
             audienceType: true,
+            category: true,
+            priority: true,
+            isPinned: true,
             requiresAcknowledgement: true,
             acknowledgements: {
               where: {
@@ -1118,6 +1121,9 @@ export class MobileService {
       readAt: toIso(item.readReceipts[0]?.readAt),
       isRead: item.readReceipts.length > 0,
       requiresAcknowledgement: item.notice?.requiresAcknowledgement ?? false,
+      noticeCategory: item.notice?.category ?? null,
+      noticePriority: item.notice?.priority ?? null,
+      isPinned: item.notice?.isPinned ?? false,
       acknowledgedAt: toIso(
         item.notice?.acknowledgements[0]?.firstAcknowledgedAt,
       ),
@@ -1235,6 +1241,9 @@ export class MobileService {
       isRead: notification.readReceipts.length > 0,
       requiresAcknowledgement:
         notification.notice?.requiresAcknowledgement ?? false,
+      noticeCategory: notification.notice?.category ?? null,
+      noticePriority: notification.notice?.priority ?? null,
+      isPinned: notification.notice?.isPinned ?? false,
       acknowledgedAt: toIso(
         notification.notice?.acknowledgements[0]?.firstAcknowledgedAt,
       ),
@@ -1302,6 +1311,9 @@ export class MobileService {
         notice: {
           select: {
             audienceType: true,
+            category: true,
+            priority: true,
+            isPinned: true,
             requiresAcknowledgement: true,
             acknowledgements: {
               where: {

@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/design_system/app_radius.dart';
+import '../../../../core/network/connectivity_provider.dart';
 import '../../../../shared/utils/date_display_preference.dart';
 import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../../parent/presentation/widgets/parent_state_view.dart';
@@ -72,6 +75,7 @@ class _AttendanceBody extends ConsumerStatefulWidget {
 class _AttendanceBodyState extends ConsumerState<_AttendanceBody> {
   late DateTime _visibleMonth = _currentMonth();
   DateTime? _selectedDate;
+  Timer? _autoRefreshTimer;
 
   static DateTime _currentMonth() {
     final now = NepaliBsCalendar.getNepalNow();
@@ -79,6 +83,27 @@ class _AttendanceBodyState extends ConsumerState<_AttendanceBody> {
   }
 
   bool get _canGoNext => _visibleMonth.isBefore(_currentMonth());
+
+  @override
+  void initState() {
+    super.initState();
+    _autoRefreshTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (!mounted || !ref.read(connectivityProvider)) return;
+      ref.invalidate(parentAttendanceProvider(_query));
+    });
+  }
+
+  @override
+  void dispose() {
+    _autoRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  AttendanceMonthQuery get _query => (
+    studentId: widget.studentId,
+    year: _visibleMonth.year,
+    month: _visibleMonth.month,
+  );
 
   void _goToPreviousMonth() {
     setState(() {
@@ -97,11 +122,7 @@ class _AttendanceBodyState extends ConsumerState<_AttendanceBody> {
 
   @override
   Widget build(BuildContext context) {
-    final query = (
-      studentId: widget.studentId,
-      year: _visibleMonth.year,
-      month: _visibleMonth.month,
-    );
+    final query = _query;
     final attendance = ref.watch(parentAttendanceProvider(query));
     final datePreference = ref.watch(dateDisplayPreferenceProvider);
     return attendance.when(
@@ -120,10 +141,13 @@ class _AttendanceBodyState extends ConsumerState<_AttendanceBody> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _TodayCard(
+            _TodayStatusRow(
               summary: data.summary,
               isOffline: data.isOffline,
               onRefresh: () => ref.invalidate(parentAttendanceProvider(query)),
+              onReportIssue: data.summary.todayStatus == AttendanceStatus.absent
+                  ? () => _reportTodayIssue(datePreference)
+                  : null,
             ),
             const SizedBox(height: 14),
             _MonthlyAttendanceCard(
@@ -156,6 +180,51 @@ class _AttendanceBodyState extends ConsumerState<_AttendanceBody> {
         );
       },
     );
+  }
+
+  Future<void> _reportTodayIssue(DateDisplayPreference datePreference) async {
+    final currentMonth = _currentMonth();
+    final query = (
+      studentId: widget.studentId,
+      year: currentMonth.year,
+      month: currentMonth.month,
+    );
+
+    try {
+      final data = await ref.read(parentAttendanceProvider(query).future);
+      if (!mounted) return;
+      final now = NepaliBsCalendar.getNepalNow();
+      final today = DateTime(now.year, now.month, now.day);
+      final todayRecord = data.days
+          .where((day) => _sameCalendarDay(day.date, today))
+          .firstOrNull;
+      if (todayRecord == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Today’s attendance record is not available to report yet.',
+            ),
+          ),
+        );
+        return;
+      }
+      await _openCorrectionRequestSheet(
+        context,
+        studentId: widget.studentId,
+        days: data.days,
+        initialDate: todayRecord.date,
+        datePreference: datePreference,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'The latest attendance record could not be loaded. Refresh and try again.',
+          ),
+        ),
+      );
+    }
   }
 }
 
@@ -648,86 +717,104 @@ class _MonthNavHeader extends StatelessWidget {
   }
 }
 
-class _TodayCard extends StatelessWidget {
-  const _TodayCard({
+class _TodayStatusRow extends StatelessWidget {
+  const _TodayStatusRow({
     required this.summary,
     required this.isOffline,
     required this.onRefresh,
+    this.onReportIssue,
   });
 
   final AttendanceSummary summary;
   final bool isOffline;
   final VoidCallback onRefresh;
+  final VoidCallback? onReportIssue;
 
   @override
   Widget build(BuildContext context) {
-    final color = _statusColor(summary.todayStatus);
+    final status = summary.todayStatus;
+    final isUnknown = status == AttendanceStatus.unknown;
+    final color = _todayStatusColor(status);
+    final checkedLabel =
+        '${isOffline ? 'Last saved' : 'Last checked'} '
+        '${_compactNepalTime(summary.lastUpdated)}';
     return PortalCard(
-      padding: const EdgeInsets.all(14),
-      color: summary.todayStatus == AttendanceStatus.unknown
-          ? ParentPortalColors.blueSoft
-          : color.withValues(alpha: .10),
-      borderColor: summary.todayStatus == AttendanceStatus.unknown
-          ? ParentPortalColors.blue.withValues(alpha: .24)
-          : color.withValues(alpha: .18),
-      child: Column(
+      key: const ValueKey('parent-attendance-today-status'),
+      padding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
+      color: _todayStatusSoftColor(status),
+      borderColor: color.withValues(alpha: isUnknown ? .20 : .16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              FeatureIcon(_statusIcon(summary.todayStatus), color: color),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      summary.todayStatus == AttendanceStatus.unknown
-                          ? 'Today’s attendance is not available yet'
-                          : summary.todayLabel ??
-                                _statusLabel(summary.todayStatus),
-                      style: TextStyle(
-                        color: summary.todayStatus == AttendanceStatus.unknown
-                            ? ParentPortalColors.navy
-                            : color,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 16,
+          Icon(_todayStatusIcon(status), color: color, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: isUnknown
+                ? Text.rich(
+                    TextSpan(
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: ParentPortalColors.navy,
                       ),
+                      children: [
+                        const TextSpan(
+                          text: 'Today: ',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        const TextSpan(
+                          text: 'Attendance not submitted yet',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        TextSpan(
+                          text: ' · $checkedLabel',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: ParentPortalColors.muted),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      isOffline
-                          ? 'Showing the last saved attendance summary.'
-                          : summary.todayStatus == AttendanceStatus.unknown
-                          ? 'The school has not completed attendance for today. This page will update after attendance is submitted.'
-                          : 'Updated from the school attendance record.',
-                      style: const TextStyle(color: ParentPortalColors.muted),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '${isOffline ? 'Last saved' : 'Last checked'}: ${NepaliBsCalendar.formatNepalTime(summary.lastUpdated)}',
-                  style: const TextStyle(
-                    color: ParentPortalColors.muted,
-                    fontSize: 12,
+                  )
+                : Wrap(
+                    spacing: 7,
+                    runSpacing: 2,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        'Today:',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: ParentPortalColors.navy,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      StatusBadge(
+                        label: _todayStatusChipLabel(summary),
+                        color: color,
+                        backgroundColor: _todayStatusBadgeColor(status),
+                        icon: _todayStatusIcon(status),
+                      ),
+                      Text(
+                        '· $checkedLabel',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: ParentPortalColors.muted,
+                        ),
+                      ),
+                      if (status == AttendanceStatus.absent &&
+                          !isOffline &&
+                          onReportIssue != null)
+                        TextButton(
+                          onPressed: onReportIssue,
+                          child: const Text('Report an issue'),
+                        ),
+                    ],
                   ),
-                ),
-              ),
-              if (!isOffline)
-                TextButton.icon(
-                  onPressed: onRefresh,
-                  icon: const Icon(Icons.refresh_rounded, size: 18),
-                  label: const Text('Refresh'),
-                ),
-            ],
           ),
+          if (!isOffline)
+            IconButton(
+              tooltip: 'Refresh today’s attendance',
+              onPressed: onRefresh,
+              icon: const Icon(Icons.refresh_rounded, size: 19),
+              color: ParentPortalColors.blue,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints.tightFor(width: 44, height: 44),
+            ),
         ],
       ),
     );
@@ -1697,6 +1784,65 @@ Color _statusColor(AttendanceStatus status) {
     AttendanceStatus.holiday => ParentPortalColors.purple,
     AttendanceStatus.unknown => ParentPortalColors.muted,
   };
+}
+
+Color _todayStatusColor(AttendanceStatus status) {
+  return switch (status) {
+    AttendanceStatus.present => ParentPortalColors.green,
+    AttendanceStatus.late ||
+    AttendanceStatus.halfDay => ParentPortalColors.orange,
+    AttendanceStatus.absent => ParentPortalColors.red,
+    AttendanceStatus.leave ||
+    AttendanceStatus.festival ||
+    AttendanceStatus.holiday => ParentPortalColors.purple,
+    AttendanceStatus.unknown => ParentPortalColors.blue,
+  };
+}
+
+Color _todayStatusSoftColor(AttendanceStatus status) {
+  return switch (status) {
+    AttendanceStatus.present => ParentPortalColors.greenSoft,
+    AttendanceStatus.late ||
+    AttendanceStatus.halfDay => ParentPortalColors.orangeSoft,
+    AttendanceStatus.absent => ParentPortalColors.redSoft,
+    AttendanceStatus.leave ||
+    AttendanceStatus.festival ||
+    AttendanceStatus.holiday => ParentPortalColors.purpleSoft,
+    AttendanceStatus.unknown => ParentPortalColors.blueSoft,
+  };
+}
+
+Color _todayStatusBadgeColor(AttendanceStatus status) =>
+    _todayStatusColor(status).withValues(alpha: .10);
+
+IconData _todayStatusIcon(AttendanceStatus status) {
+  return switch (status) {
+    AttendanceStatus.unknown => Icons.schedule_rounded,
+    _ => _statusIcon(status),
+  };
+}
+
+String _todayStatusChipLabel(AttendanceSummary summary) {
+  final statusLabel = switch (summary.todayStatus) {
+    AttendanceStatus.leave => 'On leave',
+    _ => _statusLabel(summary.todayStatus),
+  };
+  final remark = summary.todayRemark?.trim();
+  if (summary.todayStatus == AttendanceStatus.leave &&
+      remark != null &&
+      remark.isNotEmpty) {
+    return '$statusLabel · $remark';
+  }
+  if (summary.markedAt != null) {
+    return '$statusLabel · Marked at ${_compactNepalTime(summary.markedAt!)}';
+  }
+  return statusLabel;
+}
+
+String _compactNepalTime(DateTime value) {
+  return NepaliBsCalendar.formatNepalTime(
+    value,
+  ).replaceFirst(RegExp(r'^0'), '').replaceFirst(' NPT', '');
 }
 
 IconData _statusIcon(AttendanceStatus status) {

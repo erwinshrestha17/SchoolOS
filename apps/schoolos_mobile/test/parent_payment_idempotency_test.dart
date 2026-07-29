@@ -13,6 +13,7 @@ import 'package:schoolos_mobile/features/parent/application/parent_providers.dar
 import 'package:schoolos_mobile/features/parent/data/parent_repository.dart';
 import 'package:schoolos_mobile/features/parent/domain/parent_models.dart';
 import 'package:schoolos_mobile/features/parent/presentation/screens/parent_canteen_screen.dart';
+import 'package:schoolos_mobile/features/parent/presentation/screens/parent_fees_screen.dart';
 
 /// The canteen wallet key must behave in both directions:
 ///
@@ -76,6 +77,39 @@ void main() {
           parentRepositoryProvider.overrideWithValue(repository),
         ],
         child: const MaterialApp(home: ParentCanteenScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> pumpFees(WidgetTester tester) async {
+    tester.view.physicalSize = const Size(420, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final sharedPrefs = await SharedPreferences.getInstance();
+    when(
+      () => repository.getParentDashboardSummaryForChild(any()),
+    ).thenAnswer((_) async => _feesDashboard());
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appPreferencesServiceProvider.overrideWithValue(
+            AppPreferencesService(sharedPrefs),
+          ),
+          tokenStorageServiceProvider.overrideWithValue(_FakeTokenStorage()),
+          authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+          authProvider.overrideWith((ref) {
+            return _FakeParentAuthNotifier(
+              ref.watch(tokenStorageServiceProvider),
+              ref.watch(authRepositoryProvider),
+              ref.watch(appPreferencesServiceProvider),
+            );
+          }),
+          parentRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: const MaterialApp(home: ParentFeesScreen()),
       ),
     );
     await tester.pumpAndSettle();
@@ -171,6 +205,92 @@ void main() {
           'wallet is credited once',
     );
   });
+
+  testWidgets('a confirmed fee payment releases the key for a later payment', (
+    tester,
+  ) async {
+    final keys = <String>[];
+    when(
+      () => repository.payInvoiceInSandbox(
+        childId: any(named: 'childId'),
+        invoiceId: any(named: 'invoiceId'),
+        amount: any(named: 'amount'),
+        provider: any(named: 'provider'),
+        idempotencyKey: any(named: 'idempotencyKey'),
+      ),
+    ).thenAnswer((invocation) async {
+      keys.add(invocation.namedArguments[#idempotencyKey] as String);
+      return const ParentSandboxPaymentResult(
+        status: 'SUCCEEDED',
+        provider: 'esewa',
+        amount: 1200,
+        receiptNumber: 'REC-001',
+      );
+    });
+
+    await pumpFees(tester);
+    await _payFee(tester);
+    await _payFee(tester);
+
+    expect(keys, hasLength(2));
+    expect(
+      keys.first,
+      isNot(keys.last),
+      reason: 'a later payment must be a new idempotent operation',
+    );
+  });
+
+  testWidgets(
+    'a failed fee payment stays retryable and reuses its idempotency key',
+    (tester) async {
+      final keys = <String>[];
+      var attempt = 0;
+      when(
+        () => repository.payInvoiceInSandbox(
+          childId: any(named: 'childId'),
+          invoiceId: any(named: 'invoiceId'),
+          amount: any(named: 'amount'),
+          provider: any(named: 'provider'),
+          idempotencyKey: any(named: 'idempotencyKey'),
+        ),
+      ).thenAnswer((invocation) async {
+        keys.add(invocation.namedArguments[#idempotencyKey] as String);
+        attempt++;
+        if (attempt == 1) throw const TimeoutException();
+        return const ParentSandboxPaymentResult(
+          status: 'SUCCEEDED',
+          provider: 'esewa',
+          amount: 1200,
+          receiptNumber: 'REC-001',
+        );
+      });
+
+      await pumpFees(tester);
+      await _payFee(tester);
+
+      expect(find.text('Payment failed'), findsOneWidget);
+      expect(find.text('Try again'), findsOneWidget);
+
+      await tester.tap(find.text('Try again'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+
+      expect(keys, hasLength(2));
+      expect(
+        keys.first,
+        keys.last,
+        reason: 'an ambiguous retry must replay the original payment request',
+      );
+    },
+  );
+}
+
+Future<void> _payFee(WidgetTester tester) async {
+  await tester.tap(find.text('Pay now'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Continue'));
+  await tester.pumpAndSettle();
 }
 
 const _child = GuardianChild(
@@ -193,6 +313,44 @@ ParentDashboardSummary _dashboard() {
     homeworkPending: 0,
     feesDue: 0,
     overdueFeesCount: 0,
+    unreadNotices: 0,
+    transportStatus: 'No active trip',
+    canteenBalance: 500,
+    canteenIsLowBalance: false,
+    latestActivity: 'No recent activity',
+    lastUpdated: DateTime(2026, 7, 25, 9),
+  );
+}
+
+ParentDashboardSummary _feesDashboard() {
+  return ParentDashboardSummary(
+    child: _child,
+    attendanceToday: 'Present',
+    homeworkPending: 0,
+    feesDue: 1200,
+    feesStatus: 'DUE',
+    feesTotalAmount: 1200,
+    overdueFeesCount: 0,
+    nextFeeDueDate: '2026-08-13T00:00:00.000Z',
+    recentInvoices: const [
+      ParentFeeInvoice(
+        id: 'invoice-1',
+        invoiceNumber: 'INV-001',
+        status: 'ISSUED',
+        dueDate: '2026-08-13T00:00:00.000Z',
+        totalAmount: 1200,
+        paidAmount: 0,
+        outstandingAmount: 1200,
+        isOverdue: false,
+        lines: [
+          ParentFeeInvoiceLine(
+            id: 'line-1',
+            name: 'Tuition fee',
+            totalAmount: 1200,
+          ),
+        ],
+      ),
+    ],
     unreadNotices: 0,
     transportStatus: 'No active trip',
     canteenBalance: 500,

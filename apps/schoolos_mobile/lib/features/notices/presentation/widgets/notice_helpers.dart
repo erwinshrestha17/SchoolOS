@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../application/notices_providers.dart';
 import '../../domain/notice_models.dart';
 
@@ -81,4 +82,46 @@ extension NoticeFilterUi on NoticeFilter {
         return 'Emergency';
     }
   }
+}
+
+String parentCommunicationTimestamp(DateTime value, {DateTime? now}) {
+  final reference = now ?? DateTime.now();
+  final time = NepaliBsCalendar.formatNepalTime(
+    value,
+  ).replaceFirst(' NPT', '').replaceFirst(RegExp(r'^0'), '');
+
+  if (NepaliBsCalendar.isSameNepalSchoolDay(value, reference)) {
+    return 'Today · $time';
+  }
+
+  final yesterday = NepaliBsCalendar.startOfNepalSchoolDayUtc(
+    reference,
+  ).subtract(const Duration(days: 1));
+  if (NepaliBsCalendar.isSameNepalSchoolDay(value, yesterday)) {
+    return 'Yesterday · $time';
+  }
+
+  final date = NepaliBsCalendar.formatBsDate(value);
+  return '$date · $time';
+}
+
+String parentCommunicationTimeGroup(DateTime value, {DateTime? now}) {
+  final reference = now ?? DateTime.now();
+  if (NepaliBsCalendar.isSameNepalSchoolDay(value, reference)) {
+    return 'Today';
+  }
+
+  final startOfToday = NepaliBsCalendar.startOfNepalSchoolDayUtc(reference);
+  final yesterday = startOfToday.subtract(const Duration(days: 1));
+  if (NepaliBsCalendar.isSameNepalSchoolDay(value, yesterday)) {
+    return 'Yesterday';
+  }
+
+  final local = NepaliBsCalendar.toNepalLocalDateTime(reference);
+  final weekday = DateTime.utc(local.year, local.month, local.day).weekday;
+  final startOfWeek = startOfToday.subtract(Duration(days: weekday % 7));
+  if (!value.toUtc().isBefore(startOfWeek)) {
+    return 'This week';
+  }
+  return 'Earlier';
 }

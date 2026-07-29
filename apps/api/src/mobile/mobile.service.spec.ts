@@ -1148,6 +1148,9 @@ describe('MobileService', () => {
         readReceipts: [],
         notice: {
           audienceType: 'ALL',
+          category: 'FEES',
+          priority: 'URGENT',
+          isPinned: true,
           requiresAcknowledgement: true,
           acknowledgements: [
             {
@@ -1203,6 +1206,9 @@ describe('MobileService', () => {
         id: 'notice-1',
         message: 'Term fee due.',
         isRead: false,
+        noticeCategory: 'FEES',
+        noticePriority: 'URGENT',
+        isPinned: true,
         requiresAcknowledgement: true,
         acknowledgedAt: '2026-05-01T08:30:00.000Z',
       }),
@@ -1885,7 +1891,10 @@ describe('MobileService', () => {
     } as never);
     const homework = jest.spyOn(service, 'getStudentHomework');
     const fees = jest.spyOn(service, 'getStudentFeesSummary');
-    const corrections = jest.spyOn(service, 'listStudentAttendanceCorrections');
+    const corrections = jest.spyOn(
+      service,
+      'listStudentAttendanceCorrections',
+    );
     const exams = jest.spyOn(service, 'getStudentExamSchedule');
 
     const result = await service.getParentActionCentre(actor);
@@ -1950,10 +1959,7 @@ describe('MobileService', () => {
         recentInvoices: [],
       });
     const homework = jest.spyOn(service, 'getStudentHomework');
-    const corrections = jest.spyOn(
-      service,
-      'listStudentAttendanceCorrections',
-    );
+    const corrections = jest.spyOn(service, 'listStudentAttendanceCorrections');
     const requests = jest.spyOn(service, 'listStudentServiceRequests');
     const exams = jest.spyOn(service, 'getStudentExamSchedule');
 

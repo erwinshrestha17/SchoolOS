@@ -242,7 +242,7 @@ class ParentPortalChildDetailScreen extends ConsumerWidget {
                           constraints: const BoxConstraints(minHeight: 112),
                           child: ActionTile(
                             icon: Icons.support_agent_outlined,
-                            label: 'Help & requests',
+                            label: 'Help & Support',
                             color: ParentPortalColors.orange,
                             onTap: () => _openAvailableRoute(
                               context,

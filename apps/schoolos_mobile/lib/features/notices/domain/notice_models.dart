@@ -127,6 +127,20 @@ enum ParentNotificationType {
   other,
 }
 
+enum ParentNotificationPriority {
+  normal,
+  urgent,
+  emergency;
+
+  factory ParentNotificationPriority.fromApi(String? value) {
+    return switch ((value ?? '').trim().toUpperCase()) {
+      'URGENT' => ParentNotificationPriority.urgent,
+      'EMERGENCY' => ParentNotificationPriority.emergency,
+      _ => ParentNotificationPriority.normal,
+    };
+  }
+}
+
 class ParentNotification {
   const ParentNotification({
     required this.id,
@@ -137,9 +151,11 @@ class ParentNotification {
     required this.route,
     required this.createdAt,
     this.category = NoticeCategory.important,
+    this.priority = ParentNotificationPriority.normal,
     this.childId,
     this.sourceUpdateId,
     this.readAt,
+    this.isPinned = false,
     this.requiresAcknowledgement = false,
     this.acknowledgedAt,
     this.metadata,
@@ -157,7 +173,9 @@ class ParentNotification {
   final String? sourceUpdateId;
   final DateTime createdAt;
   final NoticeCategory category;
+  final ParentNotificationPriority priority;
   final DateTime? readAt;
+  final bool isPinned;
   final bool requiresAcknowledgement;
   final DateTime? acknowledgedAt;
   final Map<String, dynamic>? metadata;
@@ -165,11 +183,18 @@ class ParentNotification {
   final ParentNotificationAudience audience;
 
   bool get isRead => readAt != null;
+  bool get isImportant =>
+      priority == ParentNotificationPriority.urgent ||
+      priority == ParentNotificationPriority.emergency;
+  bool get isEmergency => priority == ParentNotificationPriority.emergency;
   String get message => body;
 
   factory ParentNotification.fromJson(Map<String, dynamic> json) {
     final sourceType = json['sourceType'] as String? ?? '';
     final type = _notificationTypeFromSource(sourceType);
+    final priority = ParentNotificationPriority.fromApi(
+      json['noticePriority'] as String?,
+    );
     return ParentNotification(
       id: json['id'] as String? ?? '',
       type: type,
@@ -185,7 +210,12 @@ class ParentNotification {
       childId: json['childId'] as String?,
       sourceUpdateId:
           json['noticeId'] as String? ?? json['sourceId'] as String?,
-      category: _categoryFromSource(sourceType),
+      category: _categoryFromSource(
+        sourceType,
+        noticeCategory: json['noticeCategory'] as String?,
+        priority: priority,
+      ),
+      priority: priority,
       createdAt:
           DateTime.tryParse(json['createdAt'] as String? ?? '') ??
           DateTime.now(),
@@ -194,6 +224,7 @@ class ParentNotification {
           (json['isRead'] == true
               ? DateTime.fromMillisecondsSinceEpoch(0)
               : null),
+      isPinned: json['isPinned'] as bool? ?? false,
       requiresAcknowledgement:
           json['requiresAcknowledgement'] as bool? ?? false,
       acknowledgedAt: DateTime.tryParse(
@@ -225,7 +256,9 @@ class ParentNotification {
       sourceUpdateId: sourceUpdateId,
       createdAt: createdAt,
       category: category,
+      priority: priority,
       readAt: clearReadAt ? null : readAt ?? this.readAt,
+      isPinned: isPinned,
       requiresAcknowledgement: requiresAcknowledgement,
       acknowledgedAt: acknowledgedAt,
       metadata: metadata,
@@ -284,10 +317,36 @@ class NoticeFeed {
   final bool fromCache;
 }
 
-NoticeCategory _categoryFromSource(String? sourceType) {
+NoticeCategory _categoryFromSource(
+  String? sourceType, {
+  String? noticeCategory,
+  ParentNotificationPriority priority = ParentNotificationPriority.normal,
+}) {
+  if (priority == ParentNotificationPriority.emergency) {
+    return NoticeCategory.emergency;
+  }
+  if (priority == ParentNotificationPriority.urgent) {
+    return NoticeCategory.important;
+  }
+
+  switch ((noticeCategory ?? '').trim().toUpperCase()) {
+    case 'EMERGENCY':
+      return NoticeCategory.emergency;
+    case 'FEES':
+      return NoticeCategory.fee;
+    case 'EXAMS':
+      return NoticeCategory.academic;
+    case 'TRANSPORT_DELAY':
+      return NoticeCategory.transport;
+    case 'GENERAL':
+    case 'HOLIDAY':
+    case 'EVENT':
+      return NoticeCategory.general;
+  }
+
   final source = (sourceType ?? '').trim().toLowerCase();
   if (source.isEmpty || source == 'notice' || source == 'event') {
-    return NoticeCategory.important;
+    return NoticeCategory.general;
   }
   if (source.contains('emergency')) {
     return NoticeCategory.emergency;

@@ -13,6 +13,8 @@ import '../../../../shared/widgets/app_skeleton.dart';
 import '../../application/parent_providers.dart';
 import '../../domain/parent_models.dart';
 import '../widgets/parent_detail_widgets.dart';
+import '../widgets/parent_filter_sheet.dart';
+import '../widgets/parent_portal_widgets.dart';
 import '../widgets/parent_state_view.dart';
 
 const _activityCategories = <String>[
@@ -119,13 +121,25 @@ class _ActivityContentState extends ConsumerState<_ActivityContent> {
               ),
               sliver: SliverList.list(
                 children: [
-                  _FilterBar(
-                    category: _category,
-                    month: _month,
-                    onCategoryChanged: (value) =>
-                        setState(() => _category = value),
-                    onMonthChanged: (value) => setState(() => _month = value),
+                  ParentFilterToolbar(
+                    title: 'Activity updates · ${items.length}',
+                    activeFilterCount:
+                        (_category == null ? 0 : 1) + (_month == null ? 0 : 1),
+                    onFilter: _showFilters,
                   ),
+                  if (_category != null || _month != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: AppSpacing.xs),
+                      child: Text(
+                        [
+                          if (_category != null) _labelize(_category!),
+                          if (_month != null) _activityMonthLabel(_month!),
+                        ].join(' · '),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: ParentPortalColors.muted,
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: AppSpacing.md),
                   _MilestoneSummaryCard(milestonesAsync: milestones),
                   const SizedBox(height: AppSpacing.md),
@@ -170,73 +184,76 @@ class _ActivityContentState extends ConsumerState<_ActivityContent> {
       ),
     );
   }
+
+  Future<void> _showFilters() async {
+    var nextCategory = _category ?? 'all';
+    var nextMonth = _month ?? 'all';
+    final monthOptions = _activityMonthOptions(DateTime.now());
+
+    final selection = await showParentFilterSheet<_ActivityFilterSelection>(
+      context: context,
+      heightFactor: .64,
+      child: StatefulBuilder(
+        builder: (context, setSheetState) {
+          void clear() => setSheetState(() {
+            nextCategory = 'all';
+            nextMonth = 'all';
+          });
+
+          return ParentFilterSheet(
+            title: 'Filter activity',
+            onReset: clear,
+            onClearAll: clear,
+            onApply: () => Navigator.pop(
+              context,
+              _ActivityFilterSelection(
+                category: nextCategory == 'all' ? null : nextCategory,
+                month: nextMonth == 'all' ? null : nextMonth,
+              ),
+            ),
+            body: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ParentFilterSelectField<String>(
+                  label: 'Category',
+                  value: nextCategory,
+                  options: [
+                    const ParentFilterOption(
+                      value: 'all',
+                      label: 'All categories',
+                    ),
+                    for (final value in _activityCategories)
+                      ParentFilterOption(value: value, label: _labelize(value)),
+                  ],
+                  onChanged: (value) =>
+                      setSheetState(() => nextCategory = value),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                ParentFilterSelectField<String>(
+                  label: 'Month',
+                  value: nextMonth,
+                  options: monthOptions,
+                  onChanged: (value) => setSheetState(() => nextMonth = value),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+    if (selection == null || !mounted) return;
+    setState(() {
+      _category = selection.category;
+      _month = selection.month;
+    });
+  }
 }
 
-class _FilterBar extends StatelessWidget {
-  const _FilterBar({
-    required this.category,
-    required this.month,
-    required this.onCategoryChanged,
-    required this.onMonthChanged,
-  });
+class _ActivityFilterSelection {
+  const _ActivityFilterSelection({required this.category, required this.month});
 
   final String? category;
   final String? month;
-  final ValueChanged<String?> onCategoryChanged;
-  final ValueChanged<String?> onMonthChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      child: Wrap(
-        spacing: AppSpacing.sm,
-        runSpacing: AppSpacing.sm,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          DropdownButton<String?>(
-            value: category,
-            hint: const Text('All categories'),
-            underline: const SizedBox.shrink(),
-            onChanged: onCategoryChanged,
-            items: [
-              const DropdownMenuItem(
-                value: null,
-                child: Text('All categories'),
-              ),
-              for (final value in _activityCategories)
-                DropdownMenuItem(value: value, child: Text(_labelize(value))),
-            ],
-          ),
-          OutlinedButton.icon(
-            icon: const Icon(Icons.calendar_month_rounded, size: 18),
-            label: Text(month ?? 'Any month'),
-            onPressed: () async {
-              final now = DateTime.now();
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: now,
-                firstDate: DateTime(now.year - 3),
-                lastDate: now,
-              );
-              if (picked != null) {
-                onMonthChanged(
-                  '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}',
-                );
-              }
-            },
-          ),
-          if (category != null || month != null)
-            TextButton(
-              onPressed: () {
-                onCategoryChanged(null);
-                onMonthChanged(null);
-              },
-              child: const Text('Clear'),
-            ),
-        ],
-      ),
-    );
-  }
 }
 
 class _MilestoneSummaryCard extends StatelessWidget {
@@ -642,6 +659,36 @@ String _labelize(String value) {
       .where((part) => part.isNotEmpty)
       .map((part) => part[0].toUpperCase() + part.substring(1).toLowerCase())
       .join(' ');
+}
+
+List<ParentFilterOption<String>> _activityMonthOptions(DateTime now) {
+  return [
+    const ParentFilterOption(value: 'all', label: 'Any month'),
+    for (var offset = 0; offset < 36; offset++)
+      ParentFilterOption(
+        value: _activityMonthKey(DateTime.utc(now.year, now.month - offset, 1)),
+        label: _activityMonthLabel(
+          _activityMonthKey(DateTime.utc(now.year, now.month - offset, 1)),
+        ),
+      ),
+  ];
+}
+
+String _activityMonthKey(DateTime value) =>
+    '${value.year.toString().padLeft(4, '0')}-'
+    '${value.month.toString().padLeft(2, '0')}';
+
+String _activityMonthLabel(String value) {
+  final parts = value.split('-');
+  if (parts.length != 2) return 'Selected month';
+  final year = int.tryParse(parts.first);
+  final month = int.tryParse(parts.last);
+  if (year == null || month == null || month < 1 || month > 12) {
+    return 'Selected month';
+  }
+  final start = DateTime.utc(year, month, 1);
+  final end = DateTime.utc(year, month + 1, 0);
+  return '${NepaliBsCalendar.formatDateRange(NepaliBsCalendar.fromAd(start), NepaliBsCalendar.fromAd(end))} BS';
 }
 
 String? _date(String? isoDate) {

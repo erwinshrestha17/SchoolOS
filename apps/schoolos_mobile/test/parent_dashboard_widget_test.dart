@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:schoolos_mobile/app/theme/app_theme.dart';
+import 'package:schoolos_mobile/features/parent/domain/parent_models.dart';
 import 'package:schoolos_mobile/features/parent/domain/parent_portal_models.dart';
 import 'package:schoolos_mobile/features/parent/presentation/screens/parent_portal_home_tab.dart';
 import 'package:schoolos_mobile/features/parent/presentation/screens/parent_portal_more_tab.dart';
@@ -436,6 +437,48 @@ void main() {
   });
 
   group('account handle never reaches a parent', () {
+    testWidgets(
+      'the More tab has one help destination and no sign-out action',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 2200);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          ProviderScope(
+            child: MaterialApp(
+              theme: AppTheme.light,
+              home: Scaffold(
+                body: ParentPortalMoreTab(
+                  data: _data(
+                    capabilities: const {
+                      'ATTENDANCE_VIEW',
+                      'FEES_VIEW',
+                      GuardianCapabilityKey.complaintOrCorrectionSubmit,
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Help & Support'), findsOneWidget);
+        expect(
+          find.text('Get help, report a concern, or follow school requests'),
+          findsOneWidget,
+        );
+        expect(find.text('Help & Requests'), findsNothing);
+        expect(find.text('Logout'), findsNothing);
+        expect(find.text('Sign Out'), findsNothing);
+        expect(find.text('My Profile'), findsOneWidget);
+        expect(find.text('Notification Settings'), findsOneWidget);
+        expect(find.text('Language'), findsOneWidget);
+      },
+    );
+
     testWidgets('the More tab profile card falls back to the role', (
       tester,
     ) async {

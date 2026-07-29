@@ -52,9 +52,9 @@ void main() {
         ]);
 
         expect(groups.map((g) => g.label), [
-          'Due in Bhadra 2083',
-          'Due in Shrawan 2083',
-          'Due in Asar 2083',
+          'Bhadra 2083',
+          'Shrawan 2083',
+          'Asar 2083',
         ]);
         expect(groups.map((g) => g.invoices.single.id), ['b', 'c', 'a']);
       },
@@ -95,20 +95,27 @@ void main() {
     });
   });
 
-  testWidgets('a bill shows its month and stays collapsed until asked', (
+  testWidgets('outstanding and paid bills stay in separate records tabs', (
     tester,
   ) async {
     await pump(tester, _FeesApiClient(invoices: _threeMonths));
 
     expect(find.text('Due in Bhadra 2083'), findsOneWidget);
     expect(find.text('Due in Shrawan 2083'), findsOneWidget);
-    expect(find.text('Due in Asar 2083'), findsOneWidget);
+    expect(find.text('Asar 2083'), findsNothing);
+    expect(find.text('View fee breakdown'), findsNWidgets(2));
 
-    expect(find.text('See what this covers'), findsNWidgets(3));
+    await tester.tap(find.text('History'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Asar 2083'), findsOneWidget);
+    expect(find.text('Due in Asar 2083'), findsNothing);
+    expect(find.text('View receipt'), findsOneWidget);
+    expect(find.text('View fee breakdown'), findsOneWidget);
     expect(
       find.text('Tuition Fee'),
       findsNothing,
-      reason: 'the breakdown is opt-in, so three bills do not fill the screen',
+      reason: 'the breakdown is opt-in, so records stay compact',
     );
   });
 
@@ -117,14 +124,14 @@ void main() {
   ) async {
     await pump(tester, _FeesApiClient(invoices: _threeMonths));
 
-    await tester.tap(find.text('See what this covers').first);
+    await tester.tap(find.text('View fee breakdown').first);
     await tester.pumpAndSettle();
 
     expect(find.text('Tuition Fee'), findsOneWidget);
     expect(find.text('Transport Fee'), findsOneWidget);
     expect(find.text('Late Fee'), findsOneWidget);
     expect(find.text('Rs 3,000'), findsWidgets);
-    expect(find.text('Hide details'), findsOneWidget);
+    expect(find.text('Hide breakdown'), findsOneWidget);
   });
 
   testWidgets('a bill the school did not itemise says so', (tester) async {
@@ -148,11 +155,10 @@ void main() {
       ),
     );
 
-    expect(find.text('The school has not itemised this bill.'), findsOneWidget);
     expect(
-      find.text('See what this covers'),
-      findsNothing,
-      reason: 'an expander that opens on nothing is worse than a sentence',
+      find.text('Breakdown unavailable'),
+      findsOneWidget,
+      reason: 'an unavailable action is explicit and cannot open an empty area',
     );
   });
 
@@ -161,9 +167,12 @@ void main() {
   ) async {
     await pump(tester, _FeesApiClient(invoices: _threeMonths));
 
-    expect(find.text('Paid'), findsWidgets);
     expect(find.text('Part paid'), findsOneWidget);
-    expect(find.text('To pay'), findsOneWidget);
+    expect(find.text('Due'), findsOneWidget);
+
+    await tester.tap(find.text('History'));
+    await tester.pumpAndSettle();
+    expect(find.text('Paid'), findsOneWidget);
     for (final raw in ['ISSUED', 'PARTIAL', 'PAID']) {
       expect(
         find.text(raw),
@@ -200,10 +209,37 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('See what this covers').first);
+    await tester.tap(find.text('View fee breakdown').first);
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('paid records avoid repeated status and expose receipt details', (
+    tester,
+  ) async {
+    await pump(tester, _FeesApiClient(invoices: _threeMonths));
+
+    expect(find.text('Fee status'), findsNothing);
+    expect(find.text('Nothing left to pay.'), findsNothing);
+    expect(find.text('All paid'), findsNothing);
+    expect(find.text('Left to pay'), findsNothing);
+
+    await tester.tap(find.text('History'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Paid'), findsOneWidget);
+    expect(find.text('View receipt'), findsOneWidget);
+
+    await tester.tap(find.text('View receipt'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Official receipt'), findsOneWidget);
+    expect(find.text('Payment date'), findsOneWidget);
+    expect(find.text('Payment method'), findsOneWidget);
+    expect(find.text('Payment reference'), findsOneWidget);
+    expect(find.text('Download receipt'), findsOneWidget);
+    expect(find.text('Share receipt'), findsOneWidget);
   });
 
   test('no retired jargon survives on the money screens', () {
@@ -264,6 +300,17 @@ Map<String, dynamic> _bill({
   required num paid,
   required List<List<Object>> lines,
 }) {
+  final receipt = {
+    'id': 'receipt-$id',
+    'receiptNumber': 'REC-$number',
+    'invoiceId': id,
+    'invoiceNumber': number,
+    'paymentId': 'payment-$id',
+    'amount': paid,
+    'method': 'ESEWA',
+    'paidAt': '2026-07-15T00:00:00.000Z',
+    'issuedAt': '2026-07-15T00:01:00.000Z',
+  };
   return {
     'id': id,
     'invoiceNumber': number,
@@ -287,7 +334,7 @@ Map<String, dynamic> _bill({
           'totalAmount': line[1],
         },
     ],
-    'receipts': const [],
+    'receipts': status == 'PAID' ? [receipt] : const [],
   };
 }
 

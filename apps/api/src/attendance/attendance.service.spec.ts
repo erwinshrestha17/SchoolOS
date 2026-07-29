@@ -2122,6 +2122,48 @@ describe('attendance production hardening', () => {
     );
   });
 
+  it('returns the real submission time and parent-safe remark for today', async () => {
+    const parentActor = {
+      ...teacherActor,
+      userId: 'parent-1',
+      roles: ['parent'],
+      permissions: ['attendance:read'],
+    };
+    const attendanceDate = new Date('2026-07-29T00:00:00.000Z');
+    const markedAt = new Date('2026-07-29T03:27:00.000Z');
+    const { service } = buildService({
+      studentFindFirst: {
+        id: 'student-1',
+        classId: 'class-1',
+        sectionId: null,
+      },
+      guardianFindFirst: {
+        id: 'guardian-1',
+        studentLinks: [{ studentId: 'student-1' }],
+      },
+      attendanceRecord: {
+        status: AttendanceStatus.EXCUSED_LEAVE,
+        remark: 'Approved medical leave',
+        createdAt: new Date('2026-07-29T03:25:00.000Z'),
+        attendanceSession: {
+          attendanceDate,
+          submittedAt: markedAt,
+        },
+      },
+      attendanceRecords: [],
+    });
+
+    const result = await service.getParentSummary('student-1', parentActor);
+
+    expect(result.today).toEqual(
+      expect.objectContaining({
+        status: AttendanceStatus.EXCUSED_LEAVE,
+        remark: 'Approved medical leave',
+        markedAt,
+      }),
+    );
+  });
+
   it('keeps parent attendance percentages backend-derived when days exist', async () => {
     const parentActor = {
       ...teacherActor,

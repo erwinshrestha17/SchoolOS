@@ -48,6 +48,8 @@ class AttendanceRepository {
         studentName: 'Student',
         todayStatus: attendanceStatusFromApi(today?['status'] as String?),
         todayLabel: today?['label'] as String?,
+        todayRemark: today?['remark'] as String?,
+        markedAt: DateTime.tryParse(today?['markedAt'] as String? ?? ''),
         presentCount: _asInt(monthSummary?['present']),
         absentCount: _asInt(monthSummary?['absent']),
         lateCount: _asInt(monthSummary?['late']),

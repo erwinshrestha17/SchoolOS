@@ -125,7 +125,10 @@ test.describe('M5 Activity Post Moderation & Parent Visibility', () => {
   test('an approval-required post stays hidden from the linked parent until moderated, then becomes visible', async ({
     page,
   }) => {
-    const postTitle = `M5 E2E Achievement ${Date.now()}`;
+    const postTitle = `Student achievement spotlight · ${new Date().toLocaleTimeString(
+      'en-NP',
+      { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kathmandu' },
+    )}`;
 
     await login(page, m5TeacherCredentials);
     await page.goto('/dashboard/activity/new');
@@ -143,7 +146,7 @@ test.describe('M5 Activity Post Moderation & Parent Visibility', () => {
     await page.getByPlaceholder('Post title').fill(postTitle);
     await page
       .getByPlaceholder(/What happened in class today/i)
-      .fill('E2E moderation and parent-visibility smoke test post.');
+      .fill('Celebrating thoughtful participation in today’s class activity.');
     // At least one photo is required for the post to be considered complete.
     await page.locator('input[type="file"]').setInputFiles({
       name: 'm5-e2e-activity.png',

@@ -65,6 +65,8 @@ void main() {
                   'title': 'Homework due',
                   'message': 'Math worksheet is due tomorrow.',
                   'sourceType': 'homework_due_soon',
+                  'noticePriority': 'NORMAL',
+                  'isPinned': true,
                   'createdAt': '2026-06-01T08:00:00.000Z',
                   'isRead': false,
                 },
@@ -104,6 +106,8 @@ void main() {
                   'title': 'Homework due',
                   'message': 'Math worksheet is due tomorrow.',
                   'sourceType': 'homework_due_soon',
+                  'noticePriority': 'NORMAL',
+                  'isPinned': true,
                   'createdAt': '2026-06-01T08:00:00.000Z',
                   'isRead': false,
                 },
@@ -145,6 +149,9 @@ void main() {
 
         expect(items, hasLength(3));
         expect(items.first.category, NoticeCategory.homework);
+        expect(items.first.priority, ParentNotificationPriority.normal);
+        expect(items.first.isPinned, isTrue);
+        expect(items.first.isImportant, isFalse);
         expect(items[1].category, NoticeCategory.fee);
         expect(items[2].category, NoticeCategory.transport);
         expect(notices.first.id, 'delivery-1');

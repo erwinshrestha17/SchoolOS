@@ -393,8 +393,13 @@ class ParentPortalUpdate {
     required this.body,
     required this.metadata,
     this.createdAt,
+    this.childName,
+    this.classSection,
     this.isPinned = false,
     this.isImportant = false,
+    this.isEmergency = false,
+    this.requiresAcknowledgement = false,
+    this.hasAttachment = false,
     this.unreadCount = 0,
     this.route,
     this.audience = 'Whole school',
@@ -407,8 +412,13 @@ class ParentPortalUpdate {
   final String body;
   final String metadata;
   final DateTime? createdAt;
+  final String? childName;
+  final String? classSection;
   final bool isPinned;
   final bool isImportant;
+  final bool isEmergency;
+  final bool requiresAcknowledgement;
+  final bool hasAttachment;
   final int unreadCount;
   final String? route;
   final String audience;

@@ -5,6 +5,7 @@ import '../../../../app/constants/app_routes.dart';
 import '../../../../app/design_system/app_radius.dart';
 import '../../../../app/design_system/app_spacing.dart';
 import '../../domain/parent_portal_models.dart';
+import '../widgets/parent_filter_sheet.dart';
 import '../widgets/parent_portal_widgets.dart';
 
 enum _HomeworkFilter { all, overdue, dueSoon, completed }
@@ -276,29 +277,13 @@ class _ParentPortalHomeworkTabState extends State<ParentPortalHomeworkTab>
   }
 
   Widget _statusTabs() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          for (final value in _HomeworkFilter.values) ...[
-            ChoiceChip(
-              label: Text(_filterTabLabel(value)),
-              selected: filter == value,
-              showCheckmark: false,
-              onSelected: (_) => setState(() => filter = value),
-              selectedColor: ParentPortalColors.greenSoft,
-              labelStyle: TextStyle(
-                color: filter == value
-                    ? ParentPortalColors.green
-                    : ParentPortalColors.muted,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            if (value != _HomeworkFilter.values.last)
-              const SizedBox(width: AppSpacing.sm),
-          ],
-        ],
-      ),
+    return ParentFilterChoiceGroup<_HomeworkFilter>(
+      options: [
+        for (final value in _HomeworkFilter.values)
+          ParentFilterOption(value: value, label: _filterTabLabel(value)),
+      ],
+      selected: filter,
+      onSelected: (value) => setState(() => filter = value),
     );
   }
 
@@ -313,6 +298,7 @@ class _ParentPortalHomeworkTabState extends State<ParentPortalHomeworkTab>
     final teachers = availableItems.map((item) => item.teacher).toSet().toList()
       ..sort();
     var nextSort = sort;
+    var nextFilter = filter;
     var nextRange = dueRange;
     var nextSubject = subjects.contains(selectedSubject)
         ? selectedSubject
@@ -321,125 +307,114 @@ class _ParentPortalHomeworkTabState extends State<ParentPortalHomeworkTab>
         ? selectedTeacher
         : 'all';
 
-    final selection = await showModalBottomSheet<_HomeworkFilterSelection>(
+    final selection = await showParentFilterSheet<_HomeworkFilterSelection>(
       context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => StatefulBuilder(
+      child: StatefulBuilder(
         builder: (context, setSheetState) => SafeArea(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              0,
-              AppSpacing.lg,
-              MediaQuery.viewInsetsOf(context).bottom + AppSpacing.xl,
+          top: false,
+          child: ParentFilterSheet(
+            title: 'Filter homework',
+            onReset: () => setSheetState(() {
+              nextFilter = _HomeworkFilter.all;
+              nextSort = _HomeworkSort.urgency;
+              nextRange = _HomeworkDueRange.any;
+              nextSubject = 'all';
+              nextTeacher = 'all';
+            }),
+            onClearAll: () => setSheetState(() {
+              nextFilter = _HomeworkFilter.all;
+              nextSort = _HomeworkSort.urgency;
+              nextRange = _HomeworkDueRange.any;
+              nextSubject = 'all';
+              nextTeacher = 'all';
+            }),
+            onApply: () => Navigator.pop(
+              context,
+              _HomeworkFilterSelection(
+                filter: nextFilter,
+                sort: nextSort,
+                range: nextRange,
+                subject: nextSubject,
+                teacher: nextTeacher,
+              ),
             ),
-            child: Column(
+            body: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Sort and filter',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: ParentPortalColors.navy,
-                    fontWeight: FontWeight.w900,
+                ParentFilterSection(
+                  label: 'Status',
+                  child: ParentFilterChoiceGroup<_HomeworkFilter>(
+                    options: [
+                      for (final value in _HomeworkFilter.values)
+                        ParentFilterOption(
+                          value: value,
+                          label: _filterTabLabel(value),
+                        ),
+                    ],
+                    selected: nextFilter,
+                    onSelected: (value) =>
+                        setSheetState(() => nextFilter = value),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                DropdownButtonFormField<_HomeworkSort>(
-                  initialValue: nextSort,
-                  decoration: const InputDecoration(labelText: 'Sort by'),
-                  items: [
+                ParentFilterSelectField<_HomeworkSort>(
+                  label: 'Sort by',
+                  value: nextSort,
+                  options: [
                     for (final value in _HomeworkSort.values)
-                      DropdownMenuItem(
+                      ParentFilterOption(
                         value: value,
-                        child: Text(_sortLabel(value)),
+                        label: _sortLabel(value),
                       ),
                   ],
-                  onChanged: (value) =>
-                      setSheetState(() => nextSort = value ?? nextSort),
+                  onChanged: (value) => setSheetState(() => nextSort = value),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                DropdownButtonFormField<String>(
-                  initialValue: nextSubject,
-                  decoration: const InputDecoration(labelText: 'Subject'),
-                  items: [
-                    const DropdownMenuItem(
+                ParentFilterSelectField<String>(
+                  label: 'Subject',
+                  value: nextSubject,
+                  options: [
+                    const ParentFilterOption(
                       value: 'all',
-                      child: Text('All subjects'),
+                      label: 'All subjects',
                     ),
                     for (final subject in subjects)
-                      DropdownMenuItem(value: subject, child: Text(subject)),
+                      ParentFilterOption(value: subject, label: subject),
                   ],
                   onChanged: (value) =>
-                      setSheetState(() => nextSubject = value ?? 'all'),
+                      setSheetState(() => nextSubject = value),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                DropdownButtonFormField<String>(
-                  initialValue: nextTeacher,
-                  decoration: const InputDecoration(labelText: 'Teacher'),
-                  items: [
-                    const DropdownMenuItem(
+                ParentFilterSelectField<String>(
+                  label: 'Teacher',
+                  value: nextTeacher,
+                  options: [
+                    const ParentFilterOption(
                       value: 'all',
-                      child: Text('All teachers'),
+                      label: 'All teachers',
                     ),
                     for (final teacher in teachers)
-                      DropdownMenuItem(value: teacher, child: Text(teacher)),
+                      ParentFilterOption(value: teacher, label: teacher),
                   ],
                   onChanged: (value) =>
-                      setSheetState(() => nextTeacher = value ?? 'all'),
+                      setSheetState(() => nextTeacher = value),
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                Text(
-                  'Due date range',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: ParentPortalColors.navy,
-                    fontWeight: FontWeight.w800,
+                ParentFilterSection(
+                  label: 'Due date',
+                  child: ParentFilterChoiceGroup<_HomeworkDueRange>(
+                    maxColumns: 4,
+                    options: [
+                      for (final value in _HomeworkDueRange.values)
+                        ParentFilterOption(
+                          value: value,
+                          label: _dueRangeLabel(value),
+                        ),
+                    ],
+                    selected: nextRange,
+                    onSelected: (value) =>
+                        setSheetState(() => nextRange = value),
                   ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Wrap(
-                  spacing: AppSpacing.sm,
-                  runSpacing: AppSpacing.sm,
-                  children: [
-                    for (final value in _HomeworkDueRange.values)
-                      ChoiceChip(
-                        label: Text(_dueRangeLabel(value)),
-                        selected: nextRange == value,
-                        showCheckmark: false,
-                        onSelected: (_) =>
-                            setSheetState(() => nextRange = value),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.xl),
-                Row(
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(
-                        context,
-                        const _HomeworkFilterSelection(
-                          sort: _HomeworkSort.urgency,
-                          range: _HomeworkDueRange.any,
-                          subject: 'all',
-                          teacher: 'all',
-                        ),
-                      ),
-                      child: const Text('Reset'),
-                    ),
-                    const Spacer(),
-                    FilledButton(
-                      onPressed: () => Navigator.pop(
-                        context,
-                        _HomeworkFilterSelection(
-                          sort: nextSort,
-                          range: nextRange,
-                          subject: nextSubject,
-                          teacher: nextTeacher,
-                        ),
-                      ),
-                      child: const Text('Apply filters'),
-                    ),
-                  ],
                 ),
               ],
             ),
@@ -449,6 +424,7 @@ class _ParentPortalHomeworkTabState extends State<ParentPortalHomeworkTab>
     );
     if (selection == null || !mounted) return;
     setState(() {
+      filter = selection.filter;
       sort = selection.sort;
       dueRange = selection.range;
       selectedSubject = selection.subject;
@@ -716,12 +692,14 @@ class _HomeworkEmptyState extends StatelessWidget {
 
 class _HomeworkFilterSelection {
   const _HomeworkFilterSelection({
+    required this.filter,
     required this.sort,
     required this.range,
     required this.subject,
     required this.teacher,
   });
 
+  final _HomeworkFilter filter;
   final _HomeworkSort sort;
   final _HomeworkDueRange range;
   final String subject;

@@ -111,7 +111,7 @@ void main() {
       expect(find.text('Child actions'), findsOneWidget);
       expect(find.text('Results'), findsOneWidget);
       expect(find.text('Timetable'), findsOneWidget);
-      expect(find.text('Help & requests'), findsOneWidget);
+      expect(find.text('Help & Support'), findsOneWidget);
 
       await tester.scrollUntilVisible(find.text('School details'), 260);
       await tester.pumpAndSettle();

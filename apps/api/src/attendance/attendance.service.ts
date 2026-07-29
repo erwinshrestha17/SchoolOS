@@ -2851,9 +2851,11 @@ export class AttendanceService {
         select: {
           status: true,
           remark: true,
+          createdAt: true,
           attendanceSession: {
             select: {
               attendanceDate: true,
+              submittedAt: true,
             },
           },
         },
@@ -2917,11 +2919,15 @@ export class AttendanceService {
               todayRecord.attendanceSession.attendanceDate,
             ),
             remark: todayRecord.remark,
+            markedAt:
+              todayRecord.attendanceSession.submittedAt ??
+              todayRecord.createdAt,
           }
         : {
             status: null,
             label: 'Attendance not marked today',
             remark: null,
+            markedAt: null,
           },
       monthSummary: {
         ...totals,

@@ -64,6 +64,8 @@ class AttendanceSummary {
     required this.studentName,
     required this.todayStatus,
     this.todayLabel,
+    this.todayRemark,
+    this.markedAt,
     required this.presentCount,
     required this.absentCount,
     required this.lateCount,
@@ -77,6 +79,8 @@ class AttendanceSummary {
   final String studentName;
   final AttendanceStatus todayStatus;
   final String? todayLabel;
+  final String? todayRemark;
+  final DateTime? markedAt;
   final int presentCount;
   final int absentCount;
   final int lateCount;
