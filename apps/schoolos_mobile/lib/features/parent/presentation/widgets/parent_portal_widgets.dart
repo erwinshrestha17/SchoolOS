@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../../../shared/utils/money_format.dart';
+import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../../../app/design_system/app_radius.dart';
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../application/parent_dashboard_view_model.dart';
 import '../../domain/parent_portal_models.dart';
+import 'parent_dashboard_tokens.dart';
 
 class ParentPortalColors {
   const ParentPortalColors._();
@@ -349,16 +352,32 @@ class ParentChildCard extends StatelessWidget {
   const ParentChildCard({
     super.key,
     required this.child,
+    required this.schoolName,
     required this.onTap,
     this.compact = false,
+    this.actionCount = 0,
+    this.overdueHomeworkCount = 0,
+    this.nextHomeworkDueAt,
   });
 
   final ParentPortalChild child;
+  final String schoolName;
   final VoidCallback onTap;
   final bool compact;
+  final int actionCount;
+  final int overdueHomeworkCount;
+  final DateTime? nextHomeworkDueAt;
 
   @override
   Widget build(BuildContext context) {
+    final attendance = attendanceRowFor(child);
+    final attendanceColor = switch (attendance.tone) {
+      ParentStatusTone.positive => ParentPortalColors.green,
+      ParentStatusTone.attention => ParentPortalColors.orange,
+      ParentStatusTone.critical => ParentPortalColors.red,
+      ParentStatusTone.informational => ParentPortalColors.blue,
+      _ => ParentPortalColors.muted,
+    };
     return PortalCard(
       onTap: onTap,
       child: Column(
@@ -379,10 +398,37 @@ class ParentChildCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      '${child.classSection} • ${child.teacher}',
+                      '${child.classSection} • $schoolName',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: ParentPortalColors.muted,
                       ),
+                    ),
+                    if (child.teacher.trim().isNotEmpty &&
+                        !child.teacher.toLowerCase().contains('not assigned'))
+                      Text(
+                        'Class teacher: ${child.teacher}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: ParentPortalColors.muted,
+                        ),
+                      ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        StatusBadge(
+                          label: child.guardianContext,
+                          icon: Icons.verified_user_outlined,
+                        ),
+                        if (actionCount > 0)
+                          StatusBadge(
+                            label:
+                                '$actionCount ${actionCount == 1 ? 'action needs' : 'actions need'} review',
+                            icon: Icons.priority_high_rounded,
+                            color: ParentPortalColors.orange,
+                            backgroundColor: ParentPortalColors.orangeSoft,
+                          ),
+                      ],
                     ),
                   ],
                 ),
@@ -392,25 +438,41 @@ class ParentChildCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           _InfoLine(
-            icon: Icons.check_circle_outline_rounded,
-            color: ParentPortalColors.green,
-            title: child.attendance,
-            subtitle: child.attendanceTime,
+            icon: ParentDashboardTokens.statusIcon(
+              ParentStatusKind.attendance,
+              attendance.tone,
+            ),
+            color: attendanceColor,
+            title: attendance.title,
+            subtitle: attendance.subtitle,
           ),
-          if (!compact) ...[
+          if (!compact && child.showTransport) ...[
             const SizedBox(height: 12),
             _InfoLine(
               icon: Icons.directions_bus_outlined,
-              color: ParentPortalColors.orange,
+              color: child.transportNeedsAttention
+                  ? ParentPortalColors.orange
+                  : ParentPortalColors.blue,
               title: child.transport,
+              subtitle: child.transportDetail,
             ),
           ],
           const SizedBox(height: 12),
           _InfoLine(
             icon: Icons.menu_book_outlined,
             color: ParentPortalColors.purple,
-            title: child.homework,
-            subtitle: child.updates,
+            title: child.homework.toLowerCase().contains('locked')
+                ? 'Homework not available'
+                : child.homeworkPending == 1
+                ? '1 homework task pending'
+                : '${child.homeworkPending} homework tasks pending',
+            subtitle: child.homework.toLowerCase().contains('locked')
+                ? null
+                : homeworkStatusSubtitle(
+                    child,
+                    overdueCount: overdueHomeworkCount,
+                    nextDueAt: nextHomeworkDueAt,
+                  ),
           ),
           const SizedBox(height: 12),
           _InfoLine(
@@ -430,7 +492,11 @@ class ParentChildCard extends StatelessWidget {
                 ? 'No fee invoice issued'
                 : 'Fees paid',
             subtitle: child.nextFeeDueDate == null
-                ? 'School fee status'
+                ? child.hasFeesDue
+                      ? 'Open fees for payment details'
+                      : child.hasNoFeeInvoices
+                      ? 'Nothing to pay yet'
+                      : 'No outstanding balance'
                 : 'Next due ${_shortDate(child.nextFeeDueDate)}',
           ),
           if (!compact) ...[
@@ -456,146 +522,249 @@ class ParentChildCard extends StatelessWidget {
 }
 
 class HomeworkCard extends StatelessWidget {
-  const HomeworkCard({super.key, required this.item, required this.onOpen});
+  const HomeworkCard({
+    super.key,
+    required this.item,
+    required this.onOpen,
+    this.showChildIdentity = true,
+    this.now,
+  });
 
   final ParentPortalHomework item;
   final VoidCallback onOpen;
+  final bool showChildIdentity;
+  final DateTime? now;
 
   @override
   Widget build(BuildContext context) {
-    final completed = item.isCompleted;
+    final effectiveNow = now ?? DateTime.now();
+    final status = item.primaryStatusAt(effectiveNow);
+    final metadata = <Widget>[
+      if (item.scoreLabel != null)
+        _HomeworkMetadata(
+          icon: Icons.grade_outlined,
+          label: item.scoreLabel!,
+          emphasized: true,
+        ),
+      if (item.hasFeedback)
+        const _HomeworkMetadata(
+          icon: Icons.chat_bubble_outline_rounded,
+          label: 'Teacher feedback available',
+        ),
+      if (item.attachmentCount > 0)
+        _HomeworkMetadata(
+          icon: Icons.attach_file_rounded,
+          label:
+              '${item.attachmentCount} attachment${item.attachmentCount == 1 ? '' : 's'}',
+        ),
+      if (item.submittedAt == null && item.state.needsAttention)
+        const _HomeworkMetadata(
+          icon: Icons.remove_circle_outline_rounded,
+          label: 'No submission',
+        ),
+    ];
+
     return PortalCard(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      onTap: onOpen,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              AvatarInitials(name: item.childName, radius: 20),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  '${item.childName} • ${item.classSection}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: ParentPortalColors.muted,
-                    fontWeight: FontWeight.w700,
+          if (showChildIdentity)
+            Row(
+              children: [
+                AvatarInitials(name: item.childName, radius: 18),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    '${item.childName} • ${item.classSection}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: ParentPortalColors.muted,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-              ),
-              StatusBadge(
-                label: item.subject,
-                color: ParentPortalColors.purple,
-                backgroundColor: ParentPortalColors.purpleSoft,
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
+                _HomeworkSubjectBadge(label: item.subject),
+              ],
+            )
+          else
+            Align(
+              alignment: Alignment.centerRight,
+              child: _HomeworkSubjectBadge(label: item.subject),
+            ),
+          const SizedBox(height: AppSpacing.sm),
           Text(
-            item.title,
+            item.displayTitle,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: ParentPortalColors.navy,
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           Text(
-            item.dueLabel,
+            [
+              status.label,
+              _homeworkDueContext(item, effectiveNow),
+            ].where((value) => value.isNotEmpty).join(' · '),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: completed
-                  ? ParentPortalColors.green
-                  : ParentPortalColors.orange,
-              fontWeight: FontWeight.w700,
+              color: _homeworkStatusColor(status),
+              fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              StatusBadge(
-                label: item.statusLabel,
-                color: completed
-                    ? ParentPortalColors.green
-                    : ParentPortalColors.orange,
-                backgroundColor: completed
-                    ? ParentPortalColors.greenSoft
-                    : ParentPortalColors.orangeSoft,
-              ),
-              StatusBadge(
-                label:
-                    '${item.attachmentCount} attachment${item.attachmentCount == 1 ? '' : 's'}',
-                color: ParentPortalColors.blue,
-                backgroundColor: ParentPortalColors.blueSoft,
-                icon: Icons.attach_file_rounded,
-              ),
-              // What the child actually did. A parent cannot hand work in for
-              // them, so the useful signal is whether it went in and when.
-              if (item.submittedAt != null)
-                StatusBadge(
-                  label: 'Handed in ${_dayMonth(item.submittedAt!)}',
-                  color: ParentPortalColors.green,
-                  backgroundColor: ParentPortalColors.greenSoft,
-                  icon: Icons.check_circle_outline_rounded,
-                ),
-              if (item.hasMark)
-                StatusBadge(
-                  label: 'Scored ${_trimNumber(item.score!)}',
-                  color: ParentPortalColors.purple,
-                  backgroundColor: ParentPortalColors.purpleSoft,
-                  icon: Icons.grade_outlined,
-                ),
-            ],
-          ),
-          if ((item.feedback ?? '').trim().isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: ParentPortalColors.surfaceAlt,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Teacher feedback',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 12,
+          if (metadata.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.md,
+              runSpacing: AppSpacing.xs,
+              children: metadata,
+            ),
+          ],
+          const SizedBox(height: AppSpacing.sm),
+          SizedBox(
+            height: 44,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    item.teacher == 'Assigned by school'
+                        ? item.teacher
+                        : 'Assigned by ${item.teacher}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: ParentPortalColors.muted,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(item.feedback!.trim()),
-                ],
-              ),
-            ),
-          ],
-          const Divider(height: 28),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  item.teacher,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: ParentPortalColors.muted,
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Text(
+                  item.actionLabel,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: ParentPortalColors.green,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-              ),
-              FilledButton.tonal(
-                onPressed: onOpen,
-                style: FilledButton.styleFrom(
-                  foregroundColor: ParentPortalColors.green,
-                  backgroundColor: ParentPortalColors.greenSoft,
+                const SizedBox(width: AppSpacing.xs),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  size: 20,
+                  color: ParentPortalColors.green,
                 ),
-                child: const Text('Open'),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
     );
   }
+}
+
+class _HomeworkSubjectBadge extends StatelessWidget {
+  const _HomeworkSubjectBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return StatusBadge(
+      label: label,
+      color: ParentPortalColors.purple,
+      backgroundColor: ParentPortalColors.purpleSoft,
+    );
+  }
+}
+
+class _HomeworkMetadata extends StatelessWidget {
+  const _HomeworkMetadata({
+    required this.icon,
+    required this.label,
+    this.emphasized = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          icon,
+          size: 15,
+          color: emphasized
+              ? ParentPortalColors.purple
+              : ParentPortalColors.muted,
+        ),
+        const SizedBox(width: AppSpacing.xs),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: emphasized
+                ? ParentPortalColors.navy
+                : ParentPortalColors.muted,
+            fontWeight: emphasized ? FontWeight.w800 : FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+Color _homeworkStatusColor(ParentHomeworkPrimaryStatus status) {
+  return switch (status) {
+    ParentHomeworkPrimaryStatus.overdue ||
+    ParentHomeworkPrimaryStatus.needsCorrection ||
+    ParentHomeworkPrimaryStatus.incomplete ||
+    ParentHomeworkPrimaryStatus.partiallyCompleted => ParentPortalColors.red,
+    ParentHomeworkPrimaryStatus.dueSoon => ParentPortalColors.orange,
+    ParentHomeworkPrimaryStatus.submittedLate ||
+    ParentHomeworkPrimaryStatus.awaitingReview => ParentPortalColors.blue,
+    ParentHomeworkPrimaryStatus.marked => ParentPortalColors.purple,
+    ParentHomeworkPrimaryStatus.completedLate ||
+    ParentHomeworkPrimaryStatus.completed ||
+    ParentHomeworkPrimaryStatus.excused => ParentPortalColors.green,
+    _ => ParentPortalColors.muted,
+  };
+}
+
+String _homeworkDueContext(ParentPortalHomework item, DateTime now) {
+  final due = item.dueAt;
+  if (item.submittedAt != null &&
+      (item.isCompleted || item.state == ParentHomeworkState.late)) {
+    final submitted = _shortBsDate(item.submittedAt!);
+    return due == null
+        ? 'Submitted $submitted'
+        : 'Submitted $submitted · Due ${_shortBsDate(due)}';
+  }
+  if (due == null) return 'Due date unavailable';
+  if (item.isOverdueAt(now)) {
+    final dueDay = NepaliBsCalendar.startOfNepalSchoolDayUtc(due);
+    final today = NepaliBsCalendar.startOfNepalSchoolDayUtc(now);
+    final days = today.difference(dueDay).inDays;
+    return 'Due ${_shortBsDate(due)} · '
+        '${days <= 0 ? 'overdue today' : '$days day${days == 1 ? '' : 's'} overdue'}';
+  }
+  final dueDay = NepaliBsCalendar.startOfNepalSchoolDayUtc(due);
+  final today = NepaliBsCalendar.startOfNepalSchoolDayUtc(now);
+  final days = dueDay.difference(today).inDays;
+  if (days == 0) {
+    return 'Due today, ${NepaliBsCalendar.formatNepalTime(due)}';
+  }
+  if (days == 1) {
+    return 'Due tomorrow, ${NepaliBsCalendar.formatNepalTime(due)}';
+  }
+  return 'Due ${_shortBsDate(due)}';
+}
+
+String _shortBsDate(DateTime value) {
+  final bs = NepaliBsCalendar.fromAd(value);
+  return '${bs.monthName} ${bs.day} BS';
 }
 
 class SettingsMenuItem extends StatelessWidget {
@@ -748,14 +917,5 @@ String _shortDate(String? value) {
   if (date == null) {
     return 'date unavailable';
   }
-  return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-}
-
-String _dayMonth(DateTime value) => '${value.day}/${value.month}';
-
-/// Marks come back as decimals ("9.00"); parents read "9".
-String _trimNumber(num value) {
-  return value == value.roundToDouble()
-      ? value.round().toString()
-      : value.toString();
+  return NepaliBsCalendar.formatBsDate(date);
 }

@@ -8,6 +8,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/network/connectivity_provider.dart';
 import '../../../core/notifications/push_notification_controller.dart';
+import '../../../shared/utils/date_display_preference.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_scaffold.dart';
 import '../../../shared/widgets/status_chip.dart';
@@ -74,6 +75,32 @@ class SettingsScreen extends ConsumerWidget {
                   trailing: const StatusChip(
                     status: AppStatusType.draft,
                     label: 'Managed',
+                  ),
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.calendar_month_outlined),
+                  title: const Text('Date display'),
+                  subtitle: const Text(
+                    'Choose how school dates appear in the app.',
+                  ),
+                  trailing: DropdownButtonHideUnderline(
+                    child: DropdownButton<DateDisplayPreference>(
+                      value: ref.watch(dateDisplayPreferenceProvider),
+                      items: [
+                        for (final preference in DateDisplayPreference.values)
+                          DropdownMenuItem(
+                            value: preference,
+                            child: Text(preference.label),
+                          ),
+                      ],
+                      onChanged: (preference) {
+                        if (preference == null) return;
+                        ref
+                            .read(dateDisplayPreferenceProvider.notifier)
+                            .setPreference(preference);
+                      },
+                    ),
                   ),
                 ),
               ],

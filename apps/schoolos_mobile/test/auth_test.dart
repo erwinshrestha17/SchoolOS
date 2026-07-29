@@ -54,6 +54,11 @@ void main() {
             'accessToken': 'access_token_123',
             'refreshToken': 'refresh_token_123',
           },
+          'tenant': {
+            'id': 'tenant_123',
+            'name': 'Sunrise School, Butwal',
+            'slug': 'test',
+          },
           'user': {
             'id': 'user_id_123',
             'tenantId': 'tenant_123',
@@ -87,6 +92,7 @@ void main() {
       expect(result.user.name, 'Test User');
       expect(result.user.role, 'TEACHER');
       expect(result.user.tenantSlug, 'test');
+      expect(result.user.tenantName, 'Sunrise School, Butwal');
       expect(result.user.permissions, contains('attendance:read'));
       expect(result.user.mustChangePassword, isTrue);
       final loginPayload =
@@ -185,12 +191,17 @@ void main() {
         'userId': 'user-1',
         'email': 'principal@schoolos.com',
         'roles': ['principal'],
-        'tenant': {'id': 'tenant-1', 'slug': 'default-school'},
+        'tenant': {
+          'id': 'tenant-1',
+          'name': 'Everest Academy',
+          'slug': 'default-school',
+        },
       });
 
       expect(user.role, 'PRINCIPAL');
       expect(user.tenantId, 'tenant-1');
       expect(user.tenantSlug, 'default-school');
+      expect(user.tenantName, 'Everest Academy');
     });
 
     test('names a guardian from the profile guardian block', () {

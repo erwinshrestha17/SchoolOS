@@ -73,6 +73,40 @@ enum ParentHomeworkState {
   };
 }
 
+enum ParentHomeworkPrimaryStatus {
+  overdue,
+  dueSoon,
+  assigned,
+  submittedLate,
+  awaitingReview,
+  marked,
+  completedLate,
+  completed,
+  needsCorrection,
+  excused,
+  incomplete,
+  partiallyCompleted,
+  absent,
+  unavailable;
+
+  String get label => switch (this) {
+    ParentHomeworkPrimaryStatus.overdue => 'Overdue',
+    ParentHomeworkPrimaryStatus.dueSoon => 'Due soon',
+    ParentHomeworkPrimaryStatus.assigned => 'Assigned',
+    ParentHomeworkPrimaryStatus.submittedLate => 'Submitted late',
+    ParentHomeworkPrimaryStatus.awaitingReview => 'Awaiting review',
+    ParentHomeworkPrimaryStatus.marked => 'Marked',
+    ParentHomeworkPrimaryStatus.completedLate => 'Completed late',
+    ParentHomeworkPrimaryStatus.completed => 'Completed',
+    ParentHomeworkPrimaryStatus.needsCorrection => 'Needs correction',
+    ParentHomeworkPrimaryStatus.excused => 'Excused',
+    ParentHomeworkPrimaryStatus.incomplete => 'Incomplete',
+    ParentHomeworkPrimaryStatus.partiallyCompleted => 'Partly completed',
+    ParentHomeworkPrimaryStatus.absent => 'Absent',
+    ParentHomeworkPrimaryStatus.unavailable => 'Status unavailable',
+  };
+}
+
 class ParentPortalChild {
   const ParentPortalChild({
     required this.id,
@@ -84,19 +118,32 @@ class ParentPortalChild {
     required this.transport,
     required this.homework,
     required this.updates,
+    this.rollNumber = '',
     this.homeworkPending = 0,
+    this.homeworkDetail,
     this.unreadUpdates = 0,
     this.feesDue = 0,
     this.feesStatus = 'DUE',
     this.feesPaidAmount = 0,
     this.feesTotalAmount = 0,
     this.nextFeeDueDate,
+    this.nextHomeworkDueAt,
     this.transportDetail,
+    this.transportAssigned = false,
+    this.transportHasActiveTrip = false,
+    this.transportLatestLocationAt,
+    this.transportLocationConfidence = 'missing',
+    this.guardianRelationship = 'Guardian',
+    this.isPrimaryGuardian = false,
     this.latestActivity,
     this.latestActivityTitle,
     this.academicYearStartsOn,
     this.academicYearEndsOn,
     this.academicYear = '',
+    this.attendanceEnabled = true,
+    this.homeworkEnabled = true,
+    this.feesEnabled = true,
+    this.transportEnabled = true,
     this.capabilities = const <String>{},
   });
 
@@ -109,19 +156,32 @@ class ParentPortalChild {
   final String transport;
   final String homework;
   final String updates;
+  final String rollNumber;
   final int homeworkPending;
+  final String? homeworkDetail;
   final int unreadUpdates;
   final num feesDue;
   final String feesStatus;
   final num feesPaidAmount;
   final num feesTotalAmount;
   final String? nextFeeDueDate;
+  final String? nextHomeworkDueAt;
   final String? transportDetail;
+  final bool transportAssigned;
+  final bool transportHasActiveTrip;
+  final String? transportLatestLocationAt;
+  final String transportLocationConfidence;
+  final String guardianRelationship;
+  final bool isPrimaryGuardian;
   final String? latestActivity;
   final String? latestActivityTitle;
   final String? academicYearStartsOn;
   final String? academicYearEndsOn;
   final String academicYear;
+  final bool attendanceEnabled;
+  final bool homeworkEnabled;
+  final bool feesEnabled;
+  final bool transportEnabled;
   final Set<String> capabilities;
 
   bool get hasFeesDue => feesDue > 0;
@@ -136,6 +196,30 @@ class ParentPortalChild {
   /// The backend reports nothing outstanding both for a settled account and
   /// for a child the school has never invoiced. Only the first is "paid".
   bool get hasNoFeeInvoices => !hasFeesDue && feesTotalAmount <= 0;
+
+  bool get showTransport {
+    final status = transport.trim().toLowerCase();
+    return status.isNotEmpty &&
+        !status.contains('module locked') &&
+        !status.contains('not assigned') &&
+        status != 'no active trip';
+  }
+
+  bool get transportNeedsAttention {
+    final status = transport.trim().toLowerCase();
+    return status.contains('delayed') ||
+        status.contains('temporarily unavailable') ||
+        status.contains('stale');
+  }
+
+  String get guardianContext {
+    final relationship = guardianRelationship.trim().isEmpty
+        ? 'Guardian'
+        : guardianRelationship.trim();
+    return isPrimaryGuardian
+        ? '$relationship • Primary guardian'
+        : relationship;
+  }
 }
 
 class ParentPortalHomework {
@@ -148,11 +232,13 @@ class ParentPortalHomework {
     required this.title,
     required this.dueLabel,
     this.dueAt,
+    this.assignedAt,
     required this.rawStatus,
     required this.attachmentCount,
     required this.teacher,
     this.submittedAt,
     this.score,
+    this.maxScore,
     this.feedback,
   });
 
@@ -164,6 +250,7 @@ class ParentPortalHomework {
   final String title;
   final String dueLabel;
   final DateTime? dueAt;
+  final DateTime? assignedAt;
 
   /// The raw backend `HomeworkSubmissionStatus`. Read [state] or
   /// [statusLabel] rather than comparing this string.
@@ -178,6 +265,7 @@ class ParentPortalHomework {
   /// marked. The API returns all three; they were parsed and then dropped.
   final DateTime? submittedAt;
   final num? score;
+  final num? maxScore;
   final String? feedback;
 
   bool get hasResult => score != null || (feedback ?? '').trim().isNotEmpty;
@@ -192,7 +280,108 @@ class ParentPortalHomework {
   /// The API sends `score: 0` for never-submitted homework, which reads as a
   /// failing mark to a parent.
   bool get hasMark => submittedAt != null && score != null;
-  bool get isDueSoon => dueLabel.contains('tomorrow');
+  bool get hasFeedback => (feedback ?? '').trim().isNotEmpty;
+
+  bool get wasSubmittedLate =>
+      submittedAt != null && dueAt != null && submittedAt!.isAfter(dueAt!);
+
+  bool isOverdueAt(DateTime now) {
+    if (dueAt == null || !dueAt!.isBefore(now)) return false;
+    return switch (state) {
+      ParentHomeworkState.notSubmitted ||
+      ParentHomeworkState.incomplete ||
+      ParentHomeworkState.partiallyCompleted => true,
+      _ => false,
+    };
+  }
+
+  bool isDueSoonAt(DateTime now, {Duration window = const Duration(days: 3)}) {
+    final due = dueAt;
+    if (due == null || due.isBefore(now) || due.isAfter(now.add(window))) {
+      return false;
+    }
+    return state.needsAttention;
+  }
+
+  bool get isDueSoon => isDueSoonAt(DateTime.now());
+
+  ParentHomeworkPrimaryStatus primaryStatusAt(DateTime now) {
+    return switch (state) {
+      ParentHomeworkState.reviewed =>
+        wasSubmittedLate
+            ? ParentHomeworkPrimaryStatus.completedLate
+            : ParentHomeworkPrimaryStatus.marked,
+      ParentHomeworkState.completed =>
+        wasSubmittedLate
+            ? ParentHomeworkPrimaryStatus.completedLate
+            : ParentHomeworkPrimaryStatus.completed,
+      ParentHomeworkState.late => ParentHomeworkPrimaryStatus.submittedLate,
+      ParentHomeworkState.submitted =>
+        ParentHomeworkPrimaryStatus.awaitingReview,
+      ParentHomeworkState.notSubmitted when isOverdueAt(now) =>
+        ParentHomeworkPrimaryStatus.overdue,
+      ParentHomeworkState.notSubmitted when isDueSoonAt(now) =>
+        ParentHomeworkPrimaryStatus.dueSoon,
+      ParentHomeworkState.notSubmitted => ParentHomeworkPrimaryStatus.assigned,
+      ParentHomeworkState.needsCorrection =>
+        ParentHomeworkPrimaryStatus.needsCorrection,
+      ParentHomeworkState.excused => ParentHomeworkPrimaryStatus.excused,
+      ParentHomeworkState.incomplete when isOverdueAt(now) =>
+        ParentHomeworkPrimaryStatus.overdue,
+      ParentHomeworkState.incomplete => ParentHomeworkPrimaryStatus.incomplete,
+      ParentHomeworkState.partiallyCompleted when isOverdueAt(now) =>
+        ParentHomeworkPrimaryStatus.overdue,
+      ParentHomeworkState.partiallyCompleted =>
+        ParentHomeworkPrimaryStatus.partiallyCompleted,
+      ParentHomeworkState.absent => ParentHomeworkPrimaryStatus.absent,
+      ParentHomeworkState.unknown => ParentHomeworkPrimaryStatus.unavailable,
+    };
+  }
+
+  String get displayTitle {
+    var value = title.trim();
+    final section = classSection.trim();
+    if (section.isEmpty) return value;
+    final variants = <String>{
+      section,
+      section.replaceAll(RegExp(r'\s*-\s*'), '-'),
+      section.replaceAll(RegExp(r'\s*-\s*'), ' - '),
+    };
+    for (final prefix in variants) {
+      if (value.toLowerCase().startsWith('${prefix.toLowerCase()} ')) {
+        value = value.substring(prefix.length).trimLeft();
+        break;
+      }
+    }
+    return value;
+  }
+
+  String? get scoreLabel {
+    if (!hasMark) return null;
+    final value = _formatHomeworkNumber(score!);
+    if (maxScore == null) {
+      return 'Score $value · maximum not set';
+    }
+    return '$value/${_formatHomeworkNumber(maxScore!)}';
+  }
+
+  String get actionLabel => switch (state) {
+    ParentHomeworkState.reviewed || ParentHomeworkState.completed
+        when hasFeedback || hasMark =>
+      'View feedback',
+    ParentHomeworkState.reviewed ||
+    ParentHomeworkState.completed ||
+    ParentHomeworkState.excused => 'View details',
+    ParentHomeworkState.submitted ||
+    ParentHomeworkState.late => 'View submission',
+    _ => 'View homework',
+  };
+}
+
+String _formatHomeworkNumber(num value) {
+  return value == value.roundToDouble()
+      ? value.round().toString()
+      : value.toString();
 }
 
 class ParentPortalUpdate {

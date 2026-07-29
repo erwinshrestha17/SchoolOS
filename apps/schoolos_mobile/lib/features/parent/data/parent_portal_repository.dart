@@ -121,9 +121,6 @@ class ParentPortalRepository {
     final dashboards = <String, ParentDashboardSummary>{
       for (final bundle in childBundles) bundle.child.id: bundle.dashboard,
     };
-    final profiles = <String, ChildProfile?>{
-      for (final bundle in childBundles) bundle.child.id: bundle.profile,
-    };
     final homework = <ParentPortalHomework>[
       for (final bundle in childBundles)
         for (final item in bundle.homework)
@@ -145,8 +142,13 @@ class ParentPortalRepository {
       fromCache: fromCache,
       activeChildId: resolvedActiveChildId,
       children: [
-        for (final child in children)
-          _childFromApi(child, dashboards[child.id], profiles[child.id]),
+        for (final bundle in childBundles)
+          _childFromApi(
+            bundle.child,
+            bundle.dashboard,
+            bundle.profile,
+            bundle.homework,
+          ),
       ],
       homework: homework,
       updates: [
@@ -189,7 +191,9 @@ class ParentPortalRepository {
     GuardianChild child,
     ParentDashboardSummary? dashboard,
     ChildProfile? profile,
+    List<ParentHomeworkItem> homeworkItems,
   ) {
+    final homeworkDetail = _homeworkDetail(homeworkItems);
     return ParentPortalChild(
       id: child.id,
       name: child.name,
@@ -208,19 +212,33 @@ class ParentPortalRepository {
           ? 'Homework module locked'
           : _homeworkSummary(dashboard?.homeworkPending ?? 0),
       updates: _updatesSummary(dashboard?.unreadNotices ?? 0),
+      rollNumber: child.rollNumber,
       homeworkPending: dashboard?.homeworkPending ?? 0,
+      homeworkDetail: homeworkDetail,
       unreadUpdates: dashboard?.unreadNotices ?? 0,
       feesDue: dashboard?.feesDue ?? 0,
       feesStatus: dashboard?.feesStatus ?? 'DUE',
       feesPaidAmount: dashboard?.feesPaidAmount ?? 0,
       feesTotalAmount: dashboard?.feesTotalAmount ?? 0,
       nextFeeDueDate: dashboard?.nextFeeDueDate,
+      nextHomeworkDueAt: dashboard?.nextHomeworkDueAt,
       transportDetail: dashboard?.transportDetail,
+      transportAssigned: dashboard?.transportAssigned ?? false,
+      transportHasActiveTrip: dashboard?.transportHasActiveTrip ?? false,
+      transportLatestLocationAt: dashboard?.transportLatestLocationAt,
+      transportLocationConfidence:
+          dashboard?.transportLocationConfidence ?? 'missing',
+      guardianRelationship: child.relationship,
+      isPrimaryGuardian: child.isPrimaryGuardian,
       latestActivity: dashboard?.latestActivity,
       latestActivityTitle: dashboard?.latestActivityTitle,
       academicYearStartsOn: child.academicYearStartsOn,
       academicYearEndsOn: child.academicYearEndsOn,
       academicYear: child.academicYear,
+      attendanceEnabled: dashboard?.attendanceEnabled ?? false,
+      homeworkEnabled: dashboard?.homeworkEnabled ?? false,
+      feesEnabled: dashboard?.feesEnabled ?? false,
+      transportEnabled: dashboard?.transportEnabled ?? false,
       capabilities: child.capabilities,
     );
   }
@@ -238,11 +256,15 @@ class ParentPortalRepository {
       title: item.title,
       dueLabel: _dueLabel(item),
       dueAt: DateTime.tryParse(item.dueAt ?? item.dueDate ?? ''),
+      assignedAt: DateTime.tryParse(item.assignedAt ?? ''),
       rawStatus: item.submissionStatus,
       attachmentCount: item.attachmentCount,
-      teacher: 'Assigned by school',
+      teacher: (item.assignedByName ?? '').trim().isEmpty
+          ? 'Assigned by school'
+          : item.assignedByName!.trim(),
       submittedAt: DateTime.tryParse(item.submittedAt ?? ''),
       score: item.score,
+      maxScore: item.maxScore,
       feedback: item.feedback,
     );
   }
@@ -294,9 +316,44 @@ class _ParentChildBundle {
 
 String _homeworkSummary(int pending) {
   if (pending <= 0) {
-    return 'No pending homework';
+    return 'No homework due today';
   }
-  return '$pending homework pending';
+  return '$pending assignment${pending == 1 ? '' : 's'} due';
+}
+
+String? _homeworkDetail(List<ParentHomeworkItem> items) {
+  final needingAttention = items
+      .where(
+        (item) => const {
+          'NOT_SUBMITTED',
+          'NEEDS_CORRECTION',
+        }.contains(item.submissionStatus.toUpperCase()),
+      )
+      .toList();
+  if (needingAttention.isEmpty) return 'Nothing needs attention';
+
+  final now = NepaliBsCalendar.getNepalNow();
+  final today = DateTime.utc(now.year, now.month, now.day);
+  final endOfWeek = today.add(const Duration(days: 7));
+  var overdue = 0;
+  var dueThisWeek = 0;
+  for (final item in needingAttention) {
+    final due = DateTime.tryParse(item.dueAt ?? item.dueDate ?? '');
+    if (due == null) continue;
+    final localDue = NepaliBsCalendar.toNepalLocalDateTime(due);
+    final dueDate = DateTime.utc(localDue.year, localDue.month, localDue.day);
+    if (dueDate.isBefore(today)) {
+      overdue++;
+    } else if (!dueDate.isAfter(endOfWeek)) {
+      dueThisWeek++;
+    }
+  }
+
+  final parts = <String>[
+    if (overdue > 0) '$overdue overdue',
+    if (dueThisWeek > 0) '$dueThisWeek due this week',
+  ];
+  return parts.isEmpty ? 'Open Homework for due dates' : parts.join(' · ');
 }
 
 String _updatesSummary(int unread) {

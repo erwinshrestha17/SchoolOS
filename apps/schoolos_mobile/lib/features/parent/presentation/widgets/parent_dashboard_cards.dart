@@ -52,10 +52,10 @@ class StudentDaySummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final subtitle = [
+    final schoolContext = [
       child.classSection,
-      child.teacher,
-    ].where((part) => part != null && part.trim().isNotEmpty).join(' • ');
+      child.schoolName,
+    ].where((part) => part.trim().isNotEmpty).join(' • ');
 
     return DashboardCardShell(
       child: Column(
@@ -83,9 +83,16 @@ class StudentDaySummaryCard extends StatelessWidget {
                               fontWeight: FontWeight.w800,
                             ),
                           ),
-                          if (subtitle.isNotEmpty)
+                          if (schoolContext.isNotEmpty)
                             Text(
-                              subtitle,
+                              schoolContext,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: ParentPortalColors.muted,
+                              ),
+                            ),
+                          if (child.teacher != null)
+                            Text(
+                              'Class teacher: ${child.teacher}',
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: ParentPortalColors.muted,
                               ),

@@ -12,15 +12,13 @@ import 'parent_portal_widgets.dart';
 /// callbacks: none of them read a provider, call an API, or decide what a
 /// status means. Those decisions live in `parent_dashboard_view_model.dart`.
 
-/// The greeting block under the app bar: who the parent is, which child the
-/// dashboard is currently about, and when it last refreshed.
+/// The greeting block under the app bar: who the parent is and the current
+/// school-calendar date. Child context lives in the explicit selector below.
 class ParentDashboardHeader extends StatelessWidget {
   const ParentDashboardHeader({
     super.key,
     required this.guardianName,
-    required this.childName,
-    required this.classSection,
-    required this.updatedLabel,
+    required this.dateLabel,
     this.savedAtLabel,
     this.isStale = false,
   });
@@ -28,9 +26,7 @@ class ParentDashboardHeader extends StatelessWidget {
   /// Null when the account carries no usable human name; the greeting then
   /// stands alone rather than printing a login handle.
   final String? guardianName;
-  final String? childName;
-  final String? classSection;
-  final String? updatedLabel;
+  final String dateLabel;
 
   /// The bare time a cached snapshot was taken, e.g. `09:00 AM NPT`. Only
   /// read when [isStale]; the chip states it in full so a parent is never
@@ -44,14 +40,6 @@ class ParentDashboardHeader extends StatelessWidget {
     final greeting = guardianName == null
         ? 'Namaste'
         : 'Namaste, ${guardianName!}';
-    final context_ = [
-      childName,
-      classSection,
-      // When the data is stale the chip below carries the timestamp, with the
-      // caveat attached. Repeating a bare "Updated ..." up here would read as
-      // a live sync.
-      if (!isStale) updatedLabel,
-    ].where((part) => part != null && part.trim().isNotEmpty).join(' • ');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -63,20 +51,99 @@ class ParentDashboardHeader extends StatelessWidget {
             fontWeight: FontWeight.w800,
           ),
         ),
-        if (context_.isNotEmpty) ...[
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            context_,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: ParentPortalColors.muted,
-            ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          dateLabel,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: ParentPortalColors.muted,
           ),
-        ],
+        ),
         if (isStale) ...[
           const SizedBox(height: AppSpacing.sm),
           _StaleDataChip(savedAtLabel: savedAtLabel),
         ],
       ],
+    );
+  }
+}
+
+/// Always-visible active-child context. On multi-child accounts this is also
+/// the explicit switcher; the parent profile avatar remains a profile control.
+class ActiveChildContextCard extends StatelessWidget {
+  const ActiveChildContextCard({
+    super.key,
+    required this.child,
+    required this.canSwitch,
+    this.onTap,
+  });
+
+  final ParentDashboardChild child;
+  final bool canSwitch;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Semantics(
+      button: canSwitch,
+      label: canSwitch
+          ? 'Viewing ${child.name}. Double tap to switch child.'
+          : 'Viewing ${child.name}.',
+      excludeSemantics: true,
+      child: PortalCard(
+        onTap: canSwitch ? onTap : null,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg,
+          vertical: AppSpacing.md,
+        ),
+        child: Row(
+          children: [
+            AvatarInitials(name: child.name, radius: 20),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Viewing',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: ParentPortalColors.muted,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Text(
+                    child.name,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: ParentPortalColors.navy,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    '${child.classSection} • ${child.schoolName}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: ParentPortalColors.muted,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  StatusBadge(
+                    label: child.guardianContext,
+                    icon: Icons.verified_user_outlined,
+                  ),
+                ],
+              ),
+            ),
+            if (canSwitch) ...[
+              const SizedBox(width: AppSpacing.sm),
+              const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: ParentPortalColors.green,
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
@@ -185,14 +252,12 @@ class DashboardSectionHeader extends StatelessWidget {
 class PriorityAttentionCard extends StatelessWidget {
   const PriorityAttentionCard({
     super.key,
-    required this.childName,
     required this.action,
     required this.onReview,
     this.otherCount = 0,
     this.isBusy = false,
   });
 
-  final String childName;
   final ParentPriorityAction action;
 
   /// Null renders the call to action disabled - used while a route is not yet
@@ -220,55 +285,26 @@ class PriorityAttentionCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ExcludeSemantics(
-                  child: AvatarInitials(
-                    name: childName,
-                    radius: 22,
-                    backgroundColor: Colors.white,
-                    foregroundColor: ParentPortalColors.orange,
-                  ),
+                const Icon(
+                  Icons.error_outline_rounded,
+                  size: 17,
+                  color: ParentPortalColors.orange,
                 ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.error_outline_rounded,
-                            size: 15,
-                            color: ParentPortalColors.orange,
-                          ),
-                          const SizedBox(width: AppSpacing.xs),
-                          Flexible(
-                            child: Text(
-                              'ATTENTION NEEDED',
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: ParentPortalColors.orange,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: .6,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        '$childName needs your attention',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          color: ParentPortalColors.navy,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
+                const SizedBox(width: AppSpacing.xs),
+                Flexible(
+                  child: Text(
+                    'NEEDS YOUR ATTENTION',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: ParentPortalColors.orange,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: .6,
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.md),
             // Side by side is the reference layout and the one to keep while
             // it fits. It stops fitting on two counts, and both were seen on
             // a real device: scaled-up text, and a narrow handset - at 320dp
@@ -287,6 +323,7 @@ class PriorityAttentionCard extends StatelessWidget {
                       SizedBox(
                         width: double.infinity,
                         child: _ReviewButton(
+                          label: _reviewLabel(action.kind),
                           onPressed: onReview,
                           isBusy: isBusy,
                         ),
@@ -298,7 +335,11 @@ class PriorityAttentionCard extends StatelessWidget {
                   children: [
                     Expanded(child: _PrioritySummary(action: action)),
                     const SizedBox(width: AppSpacing.md),
-                    _ReviewButton(onPressed: onReview, isBusy: isBusy),
+                    _ReviewButton(
+                      label: _reviewLabel(action.kind),
+                      onPressed: onReview,
+                      isBusy: isBusy,
+                    ),
                   ],
                 );
               },
@@ -320,6 +361,13 @@ class PriorityAttentionCard extends StatelessWidget {
     );
   }
 }
+
+String _reviewLabel(ParentPriorityKind kind) => switch (kind) {
+  ParentPriorityKind.transport => 'Review transport',
+  ParentPriorityKind.fees => 'Review fees',
+  ParentPriorityKind.homework => 'Review homework',
+  ParentPriorityKind.updates => 'Review updates',
+};
 
 class _PrioritySummary extends StatelessWidget {
   const _PrioritySummary({required this.action});
@@ -351,8 +399,13 @@ class _PrioritySummary extends StatelessWidget {
 }
 
 class _ReviewButton extends StatelessWidget {
-  const _ReviewButton({required this.onPressed, required this.isBusy});
+  const _ReviewButton({
+    required this.label,
+    required this.onPressed,
+    required this.isBusy,
+  });
 
+  final String label;
   final VoidCallback? onPressed;
   final bool isBusy;
 
@@ -387,14 +440,12 @@ class _ReviewButton extends StatelessWidget {
           // scale rather than pushing the chevron off a 320dp screen. The
           // words stay whole - a truncated "Review no…" is worse than two
           // lines.
-          : const Row(
+          : Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Flexible(
-                  child: Text('Review now', textAlign: TextAlign.center),
-                ),
-                SizedBox(width: AppSpacing.xs),
-                Icon(Icons.chevron_right_rounded, size: 18),
+                Flexible(child: Text(label, textAlign: TextAlign.center)),
+                const SizedBox(width: AppSpacing.xs),
+                const Icon(Icons.chevron_right_rounded, size: 18),
               ],
             ),
     );
@@ -448,10 +499,10 @@ class QuickActionTile extends StatelessWidget {
           onTap: enabled ? onTap : null,
           child: Padding(
             padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
+              horizontal: AppSpacing.xs,
               vertical: AppSpacing.md,
             ),
-            child: Row(
+            child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
@@ -468,13 +519,14 @@ class QuickActionTile extends StatelessWidget {
                         )
                       : Icon(icon, size: 19, color: foreground),
                 ),
-                const SizedBox(width: AppSpacing.sm),
-                Flexible(
+                const SizedBox(height: AppSpacing.sm),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
                   child: Text(
                     label,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    maxLines: 1,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
                       color: enabled
                           ? ParentPortalColors.navy
                           : ParentPortalColors.muted,

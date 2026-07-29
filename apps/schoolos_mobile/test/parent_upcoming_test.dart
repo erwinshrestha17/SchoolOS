@@ -4,8 +4,8 @@ import 'package:schoolos_mobile/features/parent/domain/parent_portal_models.dart
 import 'package:schoolos_mobile/features/parent/presentation/screens/parent_portal_home_tab.dart';
 
 /// "Coming up" is the dashboard's dated-deadline surface. It must show the
-/// selected child's pending work only, order by urgency, and say *in words*
-/// whether something is overdue - a colour alone fails a colour-blind reader.
+/// selected child's future pending work only. Overdue work belongs in the
+/// attention card, where it is stated in words rather than through colour.
 void main() {
   Future<void> pump(WidgetTester tester, ParentPortalData data) async {
     tester.view.physicalSize = const Size(420, 1400);
@@ -37,31 +37,26 @@ void main() {
     );
   });
 
-  testWidgets('labels overdue work in words, not colour alone', (tester) async {
+  testWidgets('moves overdue work into the attention summary', (tester) async {
     await pump(tester, _data());
 
-    expect(
-      find.text('Overdue'),
-      findsOneWidget,
-      reason: 'status must be readable without perceiving colour',
-    );
+    expect(find.text('Overdue maths'), findsNothing);
+    expect(find.text('1 homework item is overdue'), findsOneWidget);
   });
 
-  testWidgets('orders by nearest deadline first', (tester) async {
+  testWidgets('future work leads Coming up', (tester) async {
     await pump(tester, _data());
 
     final titles = tester
         .widgetList<Text>(find.byType(Text))
         .map((text) => text.data)
-        .where(
-          (value) => value == 'Overdue maths' || value == 'Nepali Practice',
-        )
+        .where((value) => value == 'Nepali Practice')
         .toList();
 
     expect(
       titles.first,
-      'Overdue maths',
-      reason: 'the most urgent deadline leads',
+      'Nepali Practice',
+      reason: 'overdue work is summarized above, not repeated here',
     );
   });
 
@@ -72,7 +67,7 @@ void main() {
     // and "deadlines failed to load" look identical - a parent could not tell
     // a quiet week from a broken screen.
     expect(find.text('Coming up'), findsOneWidget);
-    expect(find.text('Nothing due right now.'), findsOneWidget);
+    expect(find.text('No upcoming deadlines.'), findsOneWidget);
   });
 }
 
@@ -94,6 +89,7 @@ ParentPortalData _data({List<ParentPortalHomework>? homework}) {
         transport: 'No active trip',
         homework: '2 homework pending',
         updates: 'No unread updates',
+        homeworkPending: 2,
       ),
     ],
     homework:

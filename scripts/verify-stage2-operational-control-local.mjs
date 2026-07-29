@@ -494,7 +494,7 @@ async function verifyParentAttendanceCorrection(
         attendanceDate: created.attendanceDate,
         requestedStatus: created.requestedStatus,
         reason:
-          "Resubmitted local Stage 2 check with the requested school context.",
+          "I have added the school context requested for this review.",
       }),
     },
     parent,
@@ -516,7 +516,7 @@ async function verifyParentAttendanceCorrection(
     {
       method: "POST",
       body: JSON.stringify({
-        reason: "Close the resubmitted local Stage 2 verification request.",
+        reason: "This correction request is no longer needed.",
       }),
     },
     parent,
@@ -554,7 +554,7 @@ async function createCorrectionFromHistory(studentId, history, token) {
         body: JSON.stringify({
           attendanceDate: record.date,
           requestedStatus,
-          reason: `Local Stage 2 correction check ${randomUUID().slice(0, 8)}.`,
+          reason: "I believe this recorded attendance status is incorrect.",
         }),
       },
       token,

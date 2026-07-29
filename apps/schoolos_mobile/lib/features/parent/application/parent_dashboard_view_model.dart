@@ -149,6 +149,8 @@ class ParentDashboardChild {
     required this.id,
     required this.name,
     required this.classSection,
+    required this.schoolName,
+    required this.guardianContext,
     required this.teacher,
     required this.statusRows,
     required this.route,
@@ -161,6 +163,8 @@ class ParentDashboardChild {
   final String id;
   final String name;
   final String classSection;
+  final String schoolName;
+  final String guardianContext;
 
   /// Null when the school has not assigned a class teacher; the card drops the
   /// line rather than printing a placeholder.
@@ -187,6 +191,8 @@ class ParentDashboardViewModel {
     required this.latestUpdate,
     required this.unreadUpdateCount,
     required this.lastUpdated,
+    required this.dateLabel,
+    required this.overdueHomeworkCount,
     required this.isStale,
   });
 
@@ -208,6 +214,8 @@ class ParentDashboardViewModel {
   final ParentLatestUpdate? latestUpdate;
   final int unreadUpdateCount;
   final DateTime lastUpdated;
+  final String dateLabel;
+  final int overdueHomeworkCount;
 
   /// The data came from the offline cache rather than the network.
   final bool isStale;
@@ -224,15 +232,18 @@ class ParentDashboardViewModel {
     required DateTime now,
   }) {
     final child = data.activeChild;
+    final overdueHomeworkCount = child == null
+        ? 0
+        : overdueHomeworkCountFor(data, childId: child.id, now: now);
     final actions = child == null
         ? const <ParentPriorityAction>[]
-        : priorityActionsFor(child);
+        : priorityActionsFor(child, overdueHomeworkCount: overdueHomeworkCount);
 
     return ParentDashboardViewModel(
       guardianName: guardianDisplayName(data.parentName),
       child: child == null
           ? null
-          : _projectChild(child, isStale: data.fromCache),
+          : _projectChild(child, data: data, now: now, isStale: data.fromCache),
       linkedChildCount: data.children.length,
       priority: actions.isEmpty ? null : actions.first,
       otherPriorityCount: actions.isEmpty ? 0 : actions.length - 1,
@@ -244,6 +255,8 @@ class ParentDashboardViewModel {
           : latestUpdateFor(data, childId: child.id),
       unreadUpdateCount: data.unreadUpdates,
       lastUpdated: data.lastUpdated,
+      dateLabel: NepaliBsCalendar.formatBsDate(now, long: true),
+      overdueHomeworkCount: overdueHomeworkCount,
       isStale: data.fromCache,
     );
   }
@@ -251,12 +264,22 @@ class ParentDashboardViewModel {
 
 ParentDashboardChild _projectChild(
   ParentPortalChild child, {
+  required ParentPortalData data,
+  required DateTime now,
   required bool isStale,
 }) {
+  final overdueCount = overdueHomeworkCountFor(
+    data,
+    childId: child.id,
+    now: now,
+  );
+  final nextDueAt = nextHomeworkDueAtFor(data, childId: child.id, now: now);
   return ParentDashboardChild(
     id: child.id,
     name: child.name,
     classSection: child.classSection,
+    schoolName: data.schoolName,
+    guardianContext: child.guardianContext,
     teacher: _teacherOrNull(child.teacher),
     route: AppRoutes.parentChildDetail(child.id),
     canOpenProfile: child.canViewAcademics,
@@ -265,7 +288,12 @@ ParentDashboardChild _projectChild(
     canViewAcademics: child.canViewAcademics,
     statusRows: [
       attendanceRowFor(child),
-      homeworkRowFor(child),
+      homeworkRowFor(
+        child,
+        overdueCount: overdueCount,
+        nextDueAt: nextDueAt,
+        now: now,
+      ),
       feesRowFor(child, isStale: isStale),
     ],
   );
@@ -355,14 +383,26 @@ ParentStatusTone attendanceToneFromLabel(String label) {
 
 ParentStatusRow attendanceRowFor(ParentPortalChild child) {
   final label = child.attendance.trim();
+  final tone = attendanceToneFromLabel(label);
+  final awaitingTeacher =
+      tone == ParentStatusTone.neutral &&
+      (label.toLowerCase().contains('not marked') ||
+          label.toLowerCase().contains('not recorded') ||
+          label.toLowerCase().contains('no record'));
   return ParentStatusRow(
     kind: ParentStatusKind.attendance,
     // Read the tone from what the school actually sent, not from the
     // stand-in wording below - an empty field means "unknown", and the
     // stand-in must not be re-parsed into something softer.
-    tone: attendanceToneFromLabel(label),
-    title: label.isEmpty ? 'Attendance not available' : label,
-    subtitle: child.attendanceTime.trim().isEmpty
+    tone: tone,
+    title: label.isEmpty
+        ? 'Attendance not available'
+        : awaitingTeacher
+        ? 'Attendance awaiting teacher update'
+        : label,
+    subtitle: awaitingTeacher
+        ? 'School has not marked attendance yet'
+        : child.attendanceTime.trim().isEmpty
         ? null
         : child.attendanceTime.trim(),
     route: AppRoutes.parentChildAttendanceDetail(child.id),
@@ -370,26 +410,65 @@ ParentStatusRow attendanceRowFor(ParentPortalChild child) {
   );
 }
 
-ParentStatusRow homeworkRowFor(ParentPortalChild child) {
+ParentStatusRow homeworkRowFor(
+  ParentPortalChild child, {
+  int overdueCount = 0,
+  DateTime? nextDueAt,
+  DateTime? now,
+}) {
   final locked = child.homework.toLowerCase().contains('locked');
-  final title = child.homework.trim().isEmpty
-      ? 'Homework not available'
-      : child.homework.trim();
+  final unavailable = child.homework.trim().isEmpty;
+  final subtitle = locked || unavailable
+      ? null
+      : homeworkStatusSubtitle(
+          child,
+          overdueCount: overdueCount,
+          nextDueAt: nextDueAt,
+          now: now,
+        );
   return ParentStatusRow(
     kind: ParentStatusKind.homework,
-    tone: locked
+    tone: locked || unavailable
         ? ParentStatusTone.unavailable
-        : child.homeworkPending > 0
+        : overdueCount > 0 || child.homeworkPending > 0
         ? ParentStatusTone.attention
         : ParentStatusTone.positive,
-    title: title,
-    subtitle: child.updates.trim().isEmpty ? null : child.updates.trim(),
+    title: locked || unavailable ? 'Homework not available' : 'Homework',
+    subtitle: subtitle,
     route: Uri(
       path: AppRoutes.parentHomework,
       queryParameters: {'child': child.id},
     ).toString(),
     canOpen: child.canViewAcademics,
   );
+}
+
+String homeworkStatusSubtitle(
+  ParentPortalChild child, {
+  int overdueCount = 0,
+  DateTime? nextDueAt,
+  DateTime? now,
+}) {
+  final pieces = <String>[];
+  if (overdueCount > 0) {
+    pieces.add('$overdueCount overdue');
+  } else if (child.homeworkPending > 0) {
+    pieces.add(
+      '${child.homeworkPending} active task${child.homeworkPending == 1 ? '' : 's'}',
+    );
+  } else {
+    pieces.add('No tasks need attention');
+  }
+  if (nextDueAt != null) {
+    final urgency = urgencyFor(nextDueAt, now ?? DateTime.now());
+    final due = switch (urgency) {
+      ParentUpcomingUrgency.dueToday => 'Next due today',
+      ParentUpcomingUrgency.dueTomorrow => 'Next due tomorrow',
+      _ => 'Next due ${NepaliBsCalendar.formatBsDate(nextDueAt)}',
+    };
+    pieces.add(due);
+  }
+  return pieces.join(' • ');
 }
 
 /// Fees, told apart properly.
@@ -425,7 +504,7 @@ ParentStatusRow feesRowFor(ParentPortalChild child, {bool isStale = false}) {
       'No fee invoice issued',
       'Nothing to pay yet',
     ),
-    _ => (ParentStatusTone.positive, 'Fees paid', 'School fee status'),
+    _ => (ParentStatusTone.positive, 'Fees paid', 'No outstanding balance'),
   };
 
   return ParentStatusRow(
@@ -442,10 +521,8 @@ ParentStatusRow feesRowFor(ParentPortalChild child, {bool isStale = false}) {
 String? _nextDueSubtitle(ParentPortalChild child) {
   final date = DateTime.tryParse(child.nextFeeDueDate ?? '');
   if (date == null) return 'School fee status';
-  return 'Next due ${date.year}-${_two(date.month)}-${_two(date.day)}';
+  return 'Next due ${NepaliBsCalendar.formatBsDate(date)}';
 }
-
-String _two(int value) => value.toString().padLeft(2, '0');
 
 // ---------------------------------------------------------------------------
 // Priority
@@ -456,7 +533,10 @@ String _two(int value) => value.toString().padLeft(2, '0');
 /// The order is the existing portal rule and is deliberately not "newest
 /// first": a stalled bus outranks money, money outranks homework, and an
 /// unread notice is the weakest signal of the four.
-List<ParentPriorityAction> priorityActionsFor(ParentPortalChild child) {
+List<ParentPriorityAction> priorityActionsFor(
+  ParentPortalChild child, {
+  int overdueHomeworkCount = 0,
+}) {
   final actions = <ParentPriorityAction>[];
   final transport = '${child.transport} ${child.transportDetail ?? ''}'
       .toLowerCase();
@@ -479,12 +559,13 @@ List<ParentPriorityAction> priorityActionsFor(ParentPortalChild child) {
       ),
     );
   }
-  if (child.homeworkPending > 0) {
+  if (overdueHomeworkCount > 0 || child.homeworkPending > 0) {
     actions.add(
       ParentPriorityAction(
         kind: ParentPriorityKind.homework,
-        summary:
-            '${child.homeworkPending} homework item${child.homeworkPending == 1 ? '' : 's'} due',
+        summary: overdueHomeworkCount > 0
+            ? '$overdueHomeworkCount homework item${overdueHomeworkCount == 1 ? ' is' : 's are'} overdue'
+            : '${child.homeworkPending} homework item${child.homeworkPending == 1 ? ' needs' : 's need'} review',
         route: Uri(
           path: AppRoutes.parentHomework,
           queryParameters: {'child': child.id},
@@ -537,6 +618,7 @@ List<ParentUpcomingItem> upcomingItemsFor(
               route: AppRoutes.parentHomeworkDetail(item.id),
             ),
           )
+          .where((item) => item.urgency != ParentUpcomingUrgency.overdue)
           .toList()
         // Nearest deadline first; ties break on title so the order is stable
         // across refreshes rather than following the API's arrival order.
@@ -546,6 +628,39 @@ List<ParentUpcomingItem> upcomingItemsFor(
         });
 
   return List.unmodifiable(items.take(ParentDashboardViewModel.upcomingLimit));
+}
+
+int overdueHomeworkCountFor(
+  ParentPortalData data, {
+  required String childId,
+  required DateTime now,
+}) {
+  return data.homework.where((item) {
+    return item.childId == childId &&
+        !item.isCompleted &&
+        item.dueAt != null &&
+        urgencyFor(item.dueAt!, now) == ParentUpcomingUrgency.overdue;
+  }).length;
+}
+
+DateTime? nextHomeworkDueAtFor(
+  ParentPortalData data, {
+  required String childId,
+  required DateTime now,
+}) {
+  final future =
+      data.homework
+          .where(
+            (item) =>
+                item.childId == childId &&
+                !item.isCompleted &&
+                item.dueAt != null &&
+                urgencyFor(item.dueAt!, now) != ParentUpcomingUrgency.overdue,
+          )
+          .map((item) => item.dueAt!)
+          .toList()
+        ..sort();
+  return future.isEmpty ? null : future.first;
 }
 
 /// How urgent a deadline is *on the school's calendar*.
@@ -581,6 +696,7 @@ ParentLatestUpdate? latestUpdateFor(
   if (visible.isEmpty) return null;
 
   for (final update in visible) {
+    if (isInternalVerificationUpdate(update)) continue;
     final title = displayUpdateTitle(update.title);
     if (title == null) continue;
     return ParentLatestUpdate(
@@ -592,6 +708,16 @@ ParentLatestUpdate? latestUpdateFor(
     );
   }
   return null;
+}
+
+bool isInternalVerificationUpdate(ParentPortalUpdate update) {
+  final title = update.title.trim();
+  final body = update.body.trim().toLowerCase();
+  return RegExp(
+        r'^Required parent action check [0-9a-f]{8}$',
+        caseSensitive: false,
+      ).hasMatch(title) &&
+      body == 'please review and confirm this local verification notice.';
 }
 
 /// A notice title as a parent should read it, or null when nothing readable

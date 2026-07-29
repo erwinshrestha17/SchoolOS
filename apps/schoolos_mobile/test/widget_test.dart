@@ -394,7 +394,7 @@ void main() {
 
     await tester.tap(find.text('Homework').last);
     await tester.pumpAndSettle();
-    expect(find.text('Homework summary'), findsOneWidget);
+    expect(find.textContaining('All assignments ·'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.text('Notices').last);

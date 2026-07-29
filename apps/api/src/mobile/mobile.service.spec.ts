@@ -254,6 +254,57 @@ describe('MobileService', () => {
     );
   });
 
+  it('returns the linked guardian relationship and primary status', async () => {
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [{ studentId: 'student-active' }],
+    });
+    prisma.student.findMany.mockResolvedValue([
+      {
+        id: 'student-active',
+        firstNameEn: 'Asha',
+        lastNameEn: 'Rai',
+        class: { id: 'class-1', name: 'Grade 4' },
+        sectionRef: { id: 'section-1', name: 'A' },
+        section: null,
+        sectionId: 'section-1',
+        rollNumber: 7,
+        guardianLinks: [
+          {
+            relation: 'Father',
+            isPrimary: true,
+            capabilities: [GuardianCapability.ACADEMICS_VIEW],
+            verificationStatus: 'VERIFIED',
+            status: 'ACTIVE',
+            effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+            effectiveUntil: null,
+            approvalStatus: 'APPROVED',
+            emergencyContactPriority: 1,
+            guardian: { id: 'guardian-1', userId: 'parent-1' },
+          },
+        ],
+        enrollments: [
+          {
+            academicYear: {
+              name: '2083',
+              startsOn: new Date('2026-04-14T00:00:00.000Z'),
+              endsOn: new Date('2027-04-13T00:00:00.000Z'),
+            },
+          },
+        ],
+      },
+    ]);
+
+    const result = await service.listMyStudents(actor);
+
+    expect(result.items[0]).toEqual(
+      expect.objectContaining({
+        relationship: 'Father',
+        isPrimaryGuardian: true,
+      }),
+    );
+  });
+
   it('denies parent access to students outside their guardian links', async () => {
     prisma.student.findFirst.mockResolvedValue({ id: 'student-other' });
     prisma.guardian.findFirst.mockResolvedValue({
@@ -1128,9 +1179,19 @@ describe('MobileService', () => {
       expect.objectContaining({
         where: {
           tenantId: 'tenant-1',
-          OR: [
-            { recipientUserId: 'parent-1' },
-            { studentId: { in: ['student-1'] } },
+          AND: [
+            {
+              OR: [
+                { recipientUserId: 'parent-1' },
+                { studentId: { in: ['student-1'] } },
+              ],
+            },
+            {
+              OR: [
+                { noticeId: null },
+                { notice: { is: { lifecycleStatus: 'PUBLISHED' } } },
+              ],
+            },
           ],
         },
       }),
@@ -1163,9 +1224,19 @@ describe('MobileService', () => {
       expect.objectContaining({
         where: expect.objectContaining({
           tenantId: 'tenant-1',
-          OR: [
-            { recipientUserId: 'parent-1', studentId: null },
-            { studentId: { in: ['student-1'] } },
+          AND: [
+            {
+              OR: [
+                { recipientUserId: 'parent-1', studentId: null },
+                { studentId: { in: ['student-1'] } },
+              ],
+            },
+            {
+              OR: [
+                { noticeId: null },
+                { notice: { is: { lifecycleStatus: 'PUBLISHED' } } },
+              ],
+            },
           ],
         }),
       }),
@@ -1173,9 +1244,19 @@ describe('MobileService', () => {
     expect(prisma.notificationDelivery.count).toHaveBeenCalledWith({
       where: expect.objectContaining({
         tenantId: 'tenant-1',
-        OR: [
-          { recipientUserId: 'parent-1', studentId: null },
-          { studentId: { in: ['student-1'] } },
+        AND: [
+          {
+            OR: [
+              { recipientUserId: 'parent-1', studentId: null },
+              { studentId: { in: ['student-1'] } },
+            ],
+          },
+          {
+            OR: [
+              { noticeId: null },
+              { notice: { is: { lifecycleStatus: 'PUBLISHED' } } },
+            ],
+          },
         ],
       }),
     });
@@ -1194,9 +1275,19 @@ describe('MobileService', () => {
     expect(prisma.notificationDelivery.count).toHaveBeenCalledWith({
       where: {
         tenantId: 'tenant-1',
-        OR: [
-          { recipientUserId: 'parent-1' },
-          { studentId: { in: ['student-1'] } },
+        AND: [
+          {
+            OR: [
+              { recipientUserId: 'parent-1' },
+              { studentId: { in: ['student-1'] } },
+            ],
+          },
+          {
+            OR: [
+              { noticeId: null },
+              { notice: { is: { lifecycleStatus: 'PUBLISHED' } } },
+            ],
+          },
         ],
         readReceipts: {
           none: { tenantId: 'tenant-1', userId: 'parent-1' },
@@ -1224,7 +1315,15 @@ describe('MobileService', () => {
     expect(prisma.notificationDelivery.count).toHaveBeenCalledWith({
       where: {
         tenantId: 'tenant-1',
-        OR: [{ recipientUserId: 'teacher-user' }],
+        AND: [
+          { OR: [{ recipientUserId: 'teacher-user' }] },
+          {
+            OR: [
+              { noticeId: null },
+              { notice: { is: { lifecycleStatus: 'PUBLISHED' } } },
+            ],
+          },
+        ],
         readReceipts: {
           none: { tenantId: 'tenant-1', userId: 'teacher-user' },
         },
@@ -1298,9 +1397,19 @@ describe('MobileService', () => {
       where: {
         id: 'delivery-1',
         tenantId: 'tenant-1',
-        OR: [
-          { recipientUserId: 'parent-1' },
-          { studentId: { in: ['student-1'] } },
+        AND: [
+          {
+            OR: [
+              { recipientUserId: 'parent-1' },
+              { studentId: { in: ['student-1'] } },
+            ],
+          },
+          {
+            OR: [
+              { noticeId: null },
+              { notice: { is: { lifecycleStatus: 'PUBLISHED' } } },
+            ],
+          },
         ],
       },
       select: { id: true },
@@ -1354,9 +1463,19 @@ describe('MobileService', () => {
         where: {
           id: 'delivery-1',
           tenantId: 'tenant-1',
-          OR: [
-            { recipientUserId: 'parent-1' },
-            { studentId: { in: ['student-1'] } },
+          AND: [
+            {
+              OR: [
+                { recipientUserId: 'parent-1' },
+                { studentId: { in: ['student-1'] } },
+              ],
+            },
+            {
+              OR: [
+                { noticeId: null },
+                { notice: { is: { lifecycleStatus: 'PUBLISHED' } } },
+              ],
+            },
           ],
         },
       }),
@@ -1445,6 +1564,7 @@ describe('MobileService', () => {
           academicYearStartsOn: '2025-04-14T00:00:00.000Z',
           academicYearEndsOn: '2026-04-13T00:00:00.000Z',
           relationship: 'Daughter',
+          isPrimaryGuardian: true,
           guardianId: 'guardian-1',
           capabilities: [GuardianCapability.ACADEMICS_VIEW],
           relationshipState: null,
@@ -1511,6 +1631,7 @@ describe('MobileService', () => {
           academicYearStartsOn: '2025-04-14T00:00:00.000Z',
           academicYearEndsOn: '2026-04-13T00:00:00.000Z',
           relationship: 'Daughter',
+          isPrimaryGuardian: true,
           guardianId: 'guardian-1',
           capabilities: [GuardianCapability.ACADEMICS_VIEW],
           relationshipState: null,
@@ -1541,6 +1662,7 @@ describe('MobileService', () => {
       academicYearStartsOn: '2025-04-14T00:00:00.000Z',
       academicYearEndsOn: '2026-04-13T00:00:00.000Z',
       relationship: 'Daughter',
+      isPrimaryGuardian: true,
       guardianId: 'guardian-1',
       capabilities: [
         GuardianCapability.ACADEMICS_VIEW,
@@ -1619,8 +1741,10 @@ describe('MobileService', () => {
           submissionStatus: 'NOT_SUBMITTED',
           submittedAt: null,
           score: null,
+          maxScore: null,
           feedback: null,
           attachmentCount: 0,
+          assignedBy: null,
         },
       ],
     });
@@ -1737,6 +1861,7 @@ describe('MobileService', () => {
           academicYearStartsOn: null,
           academicYearEndsOn: null,
           relationship: 'Daughter',
+          isPrimaryGuardian: true,
           guardianId: 'guardian-1',
           capabilities: [GuardianCapability.ACADEMICS_VIEW],
           relationshipState: null,
@@ -1794,6 +1919,7 @@ describe('MobileService', () => {
           academicYearStartsOn: null,
           academicYearEndsOn: null,
           relationship: 'Financial sponsor',
+          isPrimaryGuardian: false,
           guardianId: 'guardian-1',
           capabilities: [GuardianCapability.FEES_VIEW],
           relationshipState: null,
@@ -1859,6 +1985,7 @@ describe('MobileService', () => {
           academicYearStartsOn: null,
           academicYearEndsOn: null,
           relationship: 'Daughter',
+          isPrimaryGuardian: true,
           guardianId: 'guardian-1',
           capabilities: [GuardianCapability.ACADEMICS_VIEW],
           relationshipState: null,
@@ -2305,6 +2432,12 @@ describe('MobileService', () => {
         dueDate: new Date('2026-05-03T00:00:00.000Z'),
         dueAt: new Date('2026-05-03T18:00:00.000Z'),
         submissionRequired: true,
+        maxScore: 20,
+        assignedByStaff: {
+          id: 'staff-1',
+          firstName: 'Mina',
+          lastName: 'Shrestha',
+        },
         submissions: [
           {
             id: 'submission-1',
@@ -2336,7 +2469,12 @@ describe('MobileService', () => {
         id: 'homework-1',
         submissionStatus: 'SUBMITTED',
         score: 18.5,
+        maxScore: 20,
         attachmentCount: 2,
+        assignedBy: {
+          id: 'staff-1',
+          name: 'Mina Shrestha',
+        },
       }),
     ]);
   });

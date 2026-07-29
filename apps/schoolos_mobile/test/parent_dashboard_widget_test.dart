@@ -71,7 +71,9 @@ void main() {
       await pump(tester, _data(homeworkPending: 3));
 
       expect(find.text('Namaste, Sita Rai'), findsOneWidget);
-      expect(find.text('ATTENTION NEEDED'), findsOneWidget);
+      expect(find.text('NEEDS YOUR ATTENTION'), findsOneWidget);
+      expect(find.text('Viewing'), findsOneWidget);
+      expect(find.textContaining('Everest School'), findsWidgets);
       expect(find.text("Aarav's school day"), findsOneWidget);
       expect(find.text('Coming up'), findsOneWidget);
       expect(find.text('Quick actions'), findsOneWidget);
@@ -124,14 +126,14 @@ void main() {
     testWidgets('is absent when nothing needs the parent', (tester) async {
       await pump(tester, _data());
 
-      expect(find.text('ATTENTION NEEDED'), findsNothing);
-      expect(find.text('Review now'), findsNothing);
+      expect(find.text('NEEDS YOUR ATTENTION'), findsNothing);
+      expect(find.text('Review homework'), findsNothing);
     });
 
-    testWidgets('Review now opens the pending item', (tester) async {
+    testWidgets('Review homework opens the pending item', (tester) async {
       final visited = await pump(tester, _data(homeworkPending: 3));
 
-      await tester.tap(find.text('Review now'));
+      await tester.tap(find.text('Review homework'));
       await tester.pumpAndSettle();
 
       expect(visited, ['/parent/homework?child=child-a']);
@@ -140,9 +142,9 @@ void main() {
     testWidgets('a double tap opens the item once, not twice', (tester) async {
       final visited = await pump(tester, _data(homeworkPending: 3));
 
-      await tester.tap(find.text('Review now'));
+      await tester.tap(find.text('Review homework'));
       await tester.pump(const Duration(milliseconds: 30));
-      await tester.tap(find.text('Review now'), warnIfMissed: false);
+      await tester.tap(find.text('Review homework'), warnIfMissed: false);
       await tester.pumpAndSettle();
 
       expect(
@@ -181,7 +183,7 @@ void main() {
       await pump(tester, _data());
 
       expect(find.text('Coming up'), findsOneWidget);
-      expect(find.text('Nothing due right now.'), findsOneWidget);
+      expect(find.text('No upcoming deadlines.'), findsOneWidget);
     });
 
     testWidgets('says "Overdue" in words, not only in red', (tester) async {
@@ -198,7 +200,8 @@ void main() {
         ),
       );
 
-      expect(find.text('Overdue'), findsOneWidget);
+      expect(find.text('Overdue'), findsNothing);
+      expect(find.text('1 homework item is overdue'), findsOneWidget);
     });
   });
 
@@ -219,6 +222,24 @@ void main() {
       expect(find.text('E2E scheduled notice'), findsOneWidget);
     });
 
+    testWidgets('never prints the local parent-action fixture', (tester) async {
+      await pump(
+        tester,
+        _data(
+          updates: [
+            _update(
+              id: 'u1',
+              title: 'Required parent action check be5c7882',
+              body: 'Please review and confirm this local verification notice.',
+            ),
+          ],
+        ),
+      );
+
+      expect(find.textContaining('be5c7882'), findsNothing);
+      expect(find.text('No updates from school yet.'), findsOneWidget);
+    });
+
     testWidgets('says so when the school has sent nothing', (tester) async {
       await pump(tester, _data());
 
@@ -230,8 +251,8 @@ void main() {
     testWidgets('each tile reaches its screen', (tester) async {
       for (final entry in {
         'Attendance': '/parent/attendance',
-        'Fees & receipts': '/parent/fees',
-        'School calendar': '/parent/more/calendar',
+        'Fees': '/parent/fees',
+        'Calendar': '/parent/more/calendar',
       }.entries) {
         // A fresh dashboard per tile: the first tap replaces the screen with
         // its destination, so there is nothing left to scroll afterwards.
@@ -303,7 +324,7 @@ void main() {
       );
 
       expect(find.text('Attendance module locked'), findsOneWidget);
-      expect(find.text('Homework module locked'), findsOneWidget);
+      expect(find.text('Homework not available'), findsOneWidget);
     });
   });
 
@@ -653,12 +674,16 @@ ParentPortalHomework _homework({
   );
 }
 
-ParentPortalUpdate _update({required String id, required String title}) {
+ParentPortalUpdate _update({
+  required String id,
+  required String title,
+  String body = 'Scheduled lifecycle evidence.',
+}) {
   return ParentPortalUpdate(
     id: id,
     category: ParentUpdateCategory.notice,
     title: title,
-    body: 'Scheduled lifecycle evidence.',
+    body: body,
     metadata: 'Whole school - 5:32 AM',
     route: '/notices/$id',
   );

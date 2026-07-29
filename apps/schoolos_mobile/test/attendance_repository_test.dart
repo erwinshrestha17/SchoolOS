@@ -46,10 +46,25 @@ void main() {
           ),
           data: {
             'today': {'status': 'ABSENT', 'label': 'Absent today'},
-            'monthSummary': {'present': 18, 'absent': 1, 'late': 2, 'leave': 1},
+            'monthSummary': {
+              'present': 18,
+              'absent': 1,
+              'late': 2,
+              'leave': 1,
+              'totalMarked': 22,
+              'attendancePercentage': 81.82,
+            },
             'monthHistory': [
-              {'date': '2026-05-01T00:00:00.000Z', 'status': 'PRESENT'},
-              {'date': '2026-05-02T00:00:00.000Z', 'status': 'ABSENT'},
+              {
+                'date': '2026-05-01T00:00:00.000Z',
+                'status': 'PRESENT',
+                'label': 'Present on May 1',
+              },
+              {
+                'date': '2026-05-02T00:00:00.000Z',
+                'status': 'ABSENT',
+                'remark': 'Medical note requested',
+              },
             ],
           },
         ),
@@ -66,8 +81,12 @@ void main() {
       expect(snapshot.summary.absentCount, 1);
       expect(snapshot.summary.lateCount, 2);
       expect(snapshot.summary.leaveCount, 1);
+      expect(snapshot.summary.totalMarked, 22);
+      expect(snapshot.summary.attendancePercentage, 81.82);
       expect(snapshot.days, hasLength(2));
       expect(snapshot.days.last.status, AttendanceStatus.absent);
+      expect(snapshot.days.first.label, 'Present on May 1');
+      expect(snapshot.days.last.remark, 'Medical note requested');
 
       verify(
         () => apiClient.get<dynamic>(

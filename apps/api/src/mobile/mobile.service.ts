@@ -1175,11 +1175,7 @@ export class MobileService {
     const notification = await this.prisma.notificationDelivery.findFirst({
       where: {
         id: notificationId,
-        tenantId: actor.tenantId,
-        OR: [
-          { recipientUserId: actor.userId },
-          ...(studentIds.length > 0 ? [{ studentId: { in: studentIds } }] : []),
-        ],
+        ...this.parentNotificationVisibility(actor, studentIds),
       },
       select: { id: true },
     });
@@ -1287,11 +1283,7 @@ export class MobileService {
     const notification = await this.prisma.notificationDelivery.findFirst({
       where: {
         id: notificationId,
-        tenantId: actor.tenantId,
-        OR: [
-          { recipientUserId: actor.userId },
-          ...(studentIds.length > 0 ? [{ studentId: { in: studentIds } }] : []),
-        ],
+        ...this.parentNotificationVisibility(actor, studentIds),
       },
       include: {
         readReceipts: {
@@ -2152,6 +2144,13 @@ export class MobileService {
             code: true,
           },
         },
+        assignedByStaff: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
         submissions: {
           where: {
             tenantId: actor.tenantId,
@@ -2192,8 +2191,22 @@ export class MobileService {
           submissionStatus: submission?.status ?? 'NOT_SUBMITTED',
           submittedAt: toIso(submission?.submittedAt),
           score: submission?.score === null ? null : money(submission?.score),
+          maxScore:
+            assignment.maxScore === null ? null : money(assignment.maxScore),
           feedback: submission?.feedback ?? null,
           attachmentCount: assignment._count.attachments,
+          assignedBy: assignment.assignedByStaff
+            ? {
+                id: assignment.assignedByStaff.id,
+                name: [
+                  assignment.assignedByStaff.firstName,
+                  assignment.assignedByStaff.lastName,
+                ]
+                  .filter(Boolean)
+                  .join(' ')
+                  .trim(),
+              }
+            : null,
         };
       }),
     };
@@ -2923,11 +2936,23 @@ export class MobileService {
   ) {
     return {
       tenantId: actor.tenantId,
-      OR: [
-        childScoped
-          ? { recipientUserId: actor.userId, studentId: null }
-          : { recipientUserId: actor.userId },
-        ...(studentIds.length > 0 ? [{ studentId: { in: studentIds } }] : []),
+      AND: [
+        {
+          OR: [
+            childScoped
+              ? { recipientUserId: actor.userId, studentId: null }
+              : { recipientUserId: actor.userId },
+            ...(studentIds.length > 0
+              ? [{ studentId: { in: studentIds } }]
+              : []),
+          ],
+        },
+        {
+          OR: [
+            { noticeId: null },
+            { notice: { is: { lifecycleStatus: 'PUBLISHED' as const } } },
+          ],
+        },
       ],
     };
   }
@@ -3359,6 +3384,7 @@ function toMobileStudent(student: MobileStudentRow) {
     academicYearStartsOn: toIso(student.enrollments[0]?.academicYear.startsOn),
     academicYearEndsOn: toIso(student.enrollments[0]?.academicYear.endsOn),
     relationship: guardianLink?.relation ?? 'Self',
+    isPrimaryGuardian: guardianLink?.isPrimary ?? false,
     guardianId: guardianLink?.guardian?.id ?? null,
     capabilities: guardianLink?.capabilities ?? [],
     relationshipState: guardianLink

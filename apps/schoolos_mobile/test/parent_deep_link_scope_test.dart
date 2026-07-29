@@ -77,6 +77,57 @@ void main() {
     expect(find.text('Child not available'), findsNothing);
   });
 
+  testWidgets(
+    'child profile is a compact command centre with unambiguous statuses',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 900);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = 1.4;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+      await pump(
+        tester,
+        const ParentPortalChildDetailScreen(childId: 'child-a'),
+      );
+
+      expect(find.text('Attendance pending'), findsWidgets);
+      expect(find.text('Attendance not marked today'), findsNothing);
+      expect(
+        find.text('The school has not recorded attendance yet'),
+        findsWidgets,
+      );
+      expect(find.text('Live bus tracking unavailable'), findsOneWidget);
+      expect(find.text('No fees due'), findsOneWidget);
+      expect(find.text('All payments are up to date'), findsOneWidget);
+      expect(find.text('Rs 0'), findsNothing);
+      expect(find.textContaining('Roll 12'), findsWidgets);
+      expect(find.text('Everest School'), findsOneWidget);
+      expect(find.text('Academic Year 2083'), findsOneWidget);
+
+      await tester.scrollUntilVisible(find.text('Child actions'), 260);
+      await tester.pumpAndSettle();
+      expect(find.text('Child actions'), findsOneWidget);
+      expect(find.text('Results'), findsOneWidget);
+      expect(find.text('Timetable'), findsOneWidget);
+      expect(find.text('Help & requests'), findsOneWidget);
+
+      await tester.scrollUntilVisible(find.text('School details'), 260);
+      await tester.pumpAndSettle();
+      expect(find.text('School details'), findsOneWidget);
+
+      await tester.scrollUntilVisible(find.text('Recent activity'), 260);
+      await tester.pumpAndSettle();
+      expect(find.text('Recent activity'), findsOneWidget);
+      expect(find.text('Sports Day registration'), findsOneWidget);
+      expect(find.text('Today timeline'), findsNothing);
+      expect(find.text('Quick actions'), findsNothing);
+      expect(find.text('At school'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('an unknown homework id is denied, not swapped for another', (
     tester,
   ) async {
@@ -117,12 +168,29 @@ ParentPortalData _portal() {
         id: 'child-a',
         name: 'Asha Rai',
         classSection: 'Grade 4 - A',
-        teacher: 'Class teacher',
-        attendance: 'Present today',
+        teacher: 'Ramesh Gurung',
+        attendance: 'Attendance not marked today',
         attendanceTime: 'Updated now',
-        transport: 'No active trip',
-        homework: 'No pending homework',
+        transport: 'GPS unavailable',
+        homework: '3 assignments due',
         updates: 'No unread updates',
+        rollNumber: '12',
+        academicYear: '2083',
+        homeworkPending: 3,
+        homeworkDetail: '1 overdue · 2 due this week',
+        feesTotalAmount: 4500,
+        transportAssigned: true,
+        transportHasActiveTrip: true,
+        attendanceEnabled: true,
+        homeworkEnabled: true,
+        feesEnabled: true,
+        transportEnabled: true,
+        capabilities: {
+          'ACADEMICS_VIEW',
+          'ATTENDANCE_VIEW',
+          'FEES_VIEW',
+          'COMPLAINT_OR_CORRECTION_SUBMIT',
+        },
       ),
       ParentPortalChild(
         id: 'child-b',
@@ -150,7 +218,17 @@ ParentPortalData _portal() {
         teacher: 'Assigned by school',
       ),
     ],
-    updates: const [],
+    updates: [
+      ParentPortalUpdate(
+        id: 'notice-1',
+        childId: 'child-a',
+        category: ParentUpdateCategory.notice,
+        title: 'Sports Day registration',
+        body: 'Registration is now open.',
+        metadata: 'Asha Rai - 10:32 AM NPT',
+        createdAt: DateTime(2026, 7, 25, 10, 32),
+      ),
+    ],
   );
 }
 

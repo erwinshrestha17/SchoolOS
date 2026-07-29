@@ -16,6 +16,7 @@ class AppPreferencesService {
   static const String _languageKey = 'app_language_code';
   static const String _tenantKey = 'app_tenant_code';
   static const String _selectedChildIdKey = 'app_selected_child_id';
+  static const String _dateDisplayPreferenceKey = 'app_date_display_preference';
   static const String _biometricEnabledKey = 'app_biometric_enabled';
   static const String _cachedUserKey = 'app_cached_user';
   static const String _privateCachePrefix = 'app_private_read_cache_';
@@ -54,6 +55,14 @@ class AppPreferencesService {
 
   Future<void> removeSelectedChildId() async {
     await _prefs.remove(_selectedChildIdKey);
+  }
+
+  Future<void> saveDateDisplayPreference(String preference) async {
+    await _prefs.setString(_dateDisplayPreferenceKey, preference);
+  }
+
+  String? getDateDisplayPreference() {
+    return _prefs.getString(_dateDisplayPreferenceKey);
   }
 
   Future<void> saveBiometricEnabled(bool enabled) async {

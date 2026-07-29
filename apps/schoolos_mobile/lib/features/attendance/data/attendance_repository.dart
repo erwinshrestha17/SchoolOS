@@ -52,6 +52,8 @@ class AttendanceRepository {
         absentCount: _asInt(monthSummary?['absent']),
         lateCount: _asInt(monthSummary?['late']),
         leaveCount: _asInt(monthSummary?['leave']),
+        totalMarked: _asInt(monthSummary?['totalMarked']),
+        attendancePercentage: _asDouble(monthSummary?['attendancePercentage']),
         lastUpdated:
             DateTime.tryParse(data['_mobileLastUpdated'] as String? ?? '') ??
             DateTime.now(),
@@ -60,6 +62,8 @@ class AttendanceRepository {
         return AttendanceDay(
           date: DateTime.tryParse(item['date'] as String? ?? '') ?? month,
           status: attendanceStatusFromApi(item['status'] as String?),
+          label: item['label'] as String?,
+          remark: item['remark'] as String?,
         );
       }).toList(),
       fromCache: data['_mobileFromCache'] as bool? ?? false,
@@ -146,6 +150,13 @@ class AttendanceRepository {
       return value.toInt();
     }
     return 0;
+  }
+
+  double? _asDouble(Object? value) {
+    if (value is num) {
+      return value.toDouble();
+    }
+    return null;
   }
 
   Future<TeacherClassesSnapshot> getTeacherAssignedClasses() async {

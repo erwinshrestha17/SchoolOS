@@ -22,7 +22,7 @@ import '../domain/parent_portal_models.dart';
 /// A record written by an older build decodes to a different shape, so it is
 /// discarded rather than half-read - the parent gets the normal error state
 /// and a fresh fetch instead of a dashboard with silently missing fields.
-const parentDashboardSnapshotSchemaVersion = 1;
+const parentDashboardSnapshotSchemaVersion = 2;
 
 /// Who a snapshot belongs to. Empty values mean "not signed in properly", and
 /// the store then refuses to read or write anything.
@@ -273,19 +273,32 @@ Map<String, dynamic> _encodeChild(ParentPortalChild child) => {
   'transport': child.transport,
   'homework': child.homework,
   'updates': child.updates,
+  'rollNumber': child.rollNumber,
   'homeworkPending': child.homeworkPending,
+  'homeworkDetail': child.homeworkDetail,
   'unreadUpdates': child.unreadUpdates,
   'feesDue': child.feesDue,
   'feesStatus': child.feesStatus,
   'feesPaidAmount': child.feesPaidAmount,
   'feesTotalAmount': child.feesTotalAmount,
   'nextFeeDueDate': child.nextFeeDueDate,
+  'nextHomeworkDueAt': child.nextHomeworkDueAt,
   'transportDetail': child.transportDetail,
+  'transportAssigned': child.transportAssigned,
+  'transportHasActiveTrip': child.transportHasActiveTrip,
+  'transportLatestLocationAt': child.transportLatestLocationAt,
+  'transportLocationConfidence': child.transportLocationConfidence,
+  'guardianRelationship': child.guardianRelationship,
+  'isPrimaryGuardian': child.isPrimaryGuardian,
   'latestActivity': child.latestActivity,
   'latestActivityTitle': child.latestActivityTitle,
   'academicYearStartsOn': child.academicYearStartsOn,
   'academicYearEndsOn': child.academicYearEndsOn,
   'academicYear': child.academicYear,
+  'attendanceEnabled': child.attendanceEnabled,
+  'homeworkEnabled': child.homeworkEnabled,
+  'feesEnabled': child.feesEnabled,
+  'transportEnabled': child.transportEnabled,
   'capabilities': child.capabilities.toList()..sort(),
 };
 
@@ -302,19 +315,33 @@ ParentPortalChild? _decodeChild(Map<String, dynamic> json) {
     transport: _string(json['transport']) ?? '',
     homework: _string(json['homework']) ?? '',
     updates: _string(json['updates']) ?? '',
+    rollNumber: _string(json['rollNumber']) ?? '',
     homeworkPending: _int(json['homeworkPending']) ?? 0,
+    homeworkDetail: _string(json['homeworkDetail']),
     unreadUpdates: _int(json['unreadUpdates']) ?? 0,
     feesDue: _num(json['feesDue']) ?? 0,
     feesStatus: _string(json['feesStatus']) ?? 'DUE',
     feesPaidAmount: _num(json['feesPaidAmount']) ?? 0,
     feesTotalAmount: _num(json['feesTotalAmount']) ?? 0,
     nextFeeDueDate: _string(json['nextFeeDueDate']),
+    nextHomeworkDueAt: _string(json['nextHomeworkDueAt']),
     transportDetail: _string(json['transportDetail']),
+    transportAssigned: json['transportAssigned'] == true,
+    transportHasActiveTrip: json['transportHasActiveTrip'] == true,
+    transportLatestLocationAt: _string(json['transportLatestLocationAt']),
+    transportLocationConfidence:
+        _string(json['transportLocationConfidence']) ?? 'missing',
+    guardianRelationship: _string(json['guardianRelationship']) ?? 'Guardian',
+    isPrimaryGuardian: json['isPrimaryGuardian'] == true,
     latestActivity: _string(json['latestActivity']),
     latestActivityTitle: _string(json['latestActivityTitle']),
     academicYearStartsOn: _string(json['academicYearStartsOn']),
     academicYearEndsOn: _string(json['academicYearEndsOn']),
     academicYear: _string(json['academicYear']) ?? '',
+    attendanceEnabled: json['attendanceEnabled'] != false,
+    homeworkEnabled: json['homeworkEnabled'] != false,
+    feesEnabled: json['feesEnabled'] != false,
+    transportEnabled: json['transportEnabled'] != false,
     capabilities: (json['capabilities'] as List<dynamic>? ?? const [])
         .whereType<String>()
         .toSet(),
@@ -330,11 +357,13 @@ Map<String, dynamic> _encodeHomework(ParentPortalHomework item) => {
   'title': item.title,
   'dueLabel': item.dueLabel,
   'dueAt': item.dueAt?.toIso8601String(),
+  'assignedAt': item.assignedAt?.toIso8601String(),
   'rawStatus': item.rawStatus,
   'attachmentCount': item.attachmentCount,
   'teacher': item.teacher,
   'submittedAt': item.submittedAt?.toIso8601String(),
   'score': item.score,
+  'maxScore': item.maxScore,
   'feedback': item.feedback,
 };
 
@@ -351,11 +380,13 @@ ParentPortalHomework? _decodeHomework(Map<String, dynamic> json) {
     title: _string(json['title']) ?? '',
     dueLabel: _string(json['dueLabel']) ?? '',
     dueAt: _dateTime(json['dueAt']),
+    assignedAt: _dateTime(json['assignedAt']),
     rawStatus: _string(json['rawStatus']) ?? '',
     attachmentCount: _int(json['attachmentCount']) ?? 0,
     teacher: _string(json['teacher']) ?? '',
     submittedAt: _dateTime(json['submittedAt']),
     score: _num(json['score']),
+    maxScore: _num(json['maxScore']),
     feedback: _string(json['feedback']),
   );
 }

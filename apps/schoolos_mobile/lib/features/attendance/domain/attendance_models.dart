@@ -68,6 +68,8 @@ class AttendanceSummary {
     required this.absentCount,
     required this.lateCount,
     required this.leaveCount,
+    required this.totalMarked,
+    required this.attendancePercentage,
     required this.lastUpdated,
   });
 
@@ -79,14 +81,23 @@ class AttendanceSummary {
   final int absentCount;
   final int lateCount;
   final int leaveCount;
+  final int totalMarked;
+  final double? attendancePercentage;
   final DateTime lastUpdated;
 }
 
 class AttendanceDay {
-  const AttendanceDay({required this.date, required this.status});
+  const AttendanceDay({
+    required this.date,
+    required this.status,
+    this.label,
+    this.remark,
+  });
 
   final DateTime date;
   final AttendanceStatus status;
+  final String? label;
+  final String? remark;
 }
 
 class AttendanceSnapshot {

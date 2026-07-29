@@ -67,6 +67,15 @@ void main() {
       }
     });
 
+    test('an unmarked day uses neutral parent-facing wording', () {
+      final row = attendanceRowFor(
+        _child(attendance: 'Attendance not marked today'),
+      );
+      expect(row.title, 'Attendance awaiting teacher update');
+      expect(row.subtitle, 'School has not marked attendance yet');
+      expect(row.tone, ParentStatusTone.neutral);
+    });
+
     test('the states the backend can report each get their own tone', () {
       expect(
         attendanceToneFromLabel('Present today'),
@@ -186,11 +195,18 @@ void main() {
     test('homework is counted in words a parent reads, and pluralised', () {
       expect(
         priorityActionsFor(_child(homeworkPending: 3)).single.summary,
-        '3 homework items due',
+        '3 homework items need review',
       );
       expect(
         priorityActionsFor(_child(homeworkPending: 1)).single.summary,
-        '1 homework item due',
+        '1 homework item needs review',
+      );
+      expect(
+        priorityActionsFor(
+          _child(homeworkPending: 3),
+          overdueHomeworkCount: 3,
+        ).single.summary,
+        '3 homework items are overdue',
       );
     });
   });
@@ -211,14 +227,21 @@ void main() {
       expect(titles, isNot(contains('Undated work')));
     });
 
-    test('orders by nearest deadline first', () {
+    test('keeps overdue work out of Coming up', () {
       final items = upcomingItemsFor(
         _data(homework: _mixedHomework(now)),
         childId: 'child-a',
         now: now,
       );
-      expect(items.first.title, 'Overdue maths');
-      expect(items.first.urgency, ParentUpcomingUrgency.overdue);
+      expect(items.map((item) => item.title), isNot(contains('Overdue maths')));
+      expect(
+        overdueHomeworkCountFor(
+          _data(homework: _mixedHomework(now)),
+          childId: 'child-a',
+          now: now,
+        ),
+        1,
+      );
     });
 
     test('never shows more than three, however heavy the week', () {
@@ -373,6 +396,24 @@ void main() {
         ),
         childId: 'child-a',
       );
+      expect(update!.title, 'Parent-teacher meeting');
+    });
+
+    test('the local parent-action verification fixture is skipped', () {
+      final update = latestUpdateFor(
+        _data(
+          updates: [
+            _update(
+              id: 'u1',
+              title: 'Required parent action check be5c7882',
+              body: 'Please review and confirm this local verification notice.',
+            ),
+            _update(id: 'u2', title: 'Parent-teacher meeting'),
+          ],
+        ),
+        childId: 'child-a',
+      );
+
       expect(update!.title, 'Parent-teacher meeting');
     });
 
@@ -570,13 +611,14 @@ ParentPortalUpdate _update({
   required String id,
   required String title,
   String? childId,
+  String body = 'Details',
 }) {
   return ParentPortalUpdate(
     id: id,
     childId: childId,
     category: ParentUpdateCategory.notice,
     title: title,
-    body: 'Details',
+    body: body,
     metadata: 'Whole school - 5:32 AM',
   );
 }

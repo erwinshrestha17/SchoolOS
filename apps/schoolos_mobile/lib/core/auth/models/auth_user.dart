@@ -8,6 +8,7 @@ class AuthUser {
     required this.role,
     this.tenantId,
     this.tenantSlug,
+    this.tenantName,
     this.roles = const [],
     this.permissions = const [],
     this.avatarUrl,
@@ -20,6 +21,7 @@ class AuthUser {
   final String role; // e.g. PARENT, STUDENT, TEACHER, DRIVER, STAFF, ADMIN
   final String? tenantId;
   final String? tenantSlug;
+  final String? tenantName;
   final List<String> roles;
   final List<String> permissions;
   final String? avatarUrl;
@@ -93,6 +95,10 @@ class AuthUser {
           json['tenantSlug'] as String? ??
           json['tenant_slug'] as String? ??
           tenant?['slug'] as String?,
+      tenantName:
+          json['tenantName'] as String? ??
+          json['tenant_name'] as String? ??
+          tenant?['name'] as String?,
       roles: roles,
       permissions: permissions,
       avatarUrl: json['avatarUrl'] as String? ?? json['avatar_url'] as String?,
@@ -108,6 +114,7 @@ class AuthUser {
       'role': role,
       'tenantId': tenantId,
       'tenantSlug': tenantSlug,
+      'tenantName': tenantName,
       'roles': roles,
       'permissions': permissions,
       'avatarUrl': avatarUrl,

@@ -555,7 +555,7 @@ void main() {
       // rejection under test is the store's and not PrivateReadCache's.
       final key = storage.values.keys.single;
       final tampered = storage.values[key]!.replaceFirst(
-        '"data":{"schemaVersion":1',
+        '"data":{"schemaVersion":2',
         '"data":{"schemaVersion":0',
       );
       expect(tampered, isNot(storage.values[key]), reason: 'tamper must apply');

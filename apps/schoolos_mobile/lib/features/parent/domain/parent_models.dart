@@ -64,6 +64,7 @@ class GuardianChild {
     this.academicYearStartsOn,
     this.academicYearEndsOn,
     this.guardianId,
+    this.isPrimaryGuardian = false,
     this.capabilities = const <String>{},
     this.relationshipState,
   });
@@ -77,6 +78,7 @@ class GuardianChild {
   final String? academicYearStartsOn;
   final String? academicYearEndsOn;
   final String? guardianId;
+  final bool isPrimaryGuardian;
   final Set<String> capabilities;
   final GuardianRelationshipState? relationshipState;
 
@@ -93,6 +95,7 @@ class GuardianChild {
       academicYearStartsOn: json['academicYearStartsOn'] as String?,
       academicYearEndsOn: json['academicYearEndsOn'] as String?,
       guardianId: json['guardianId'] as String?,
+      isPrimaryGuardian: json['isPrimaryGuardian'] == true,
       capabilities: (json['capabilities'] as List<dynamic>? ?? const [])
           .whereType<String>()
           .toSet(),
@@ -254,6 +257,10 @@ class ParentDashboardSummary {
     required this.unreadNotices,
     required this.transportStatus,
     this.transportDetail,
+    this.transportAssigned = false,
+    this.transportHasActiveTrip = false,
+    this.transportLatestLocationAt,
+    this.transportLocationConfidence = 'missing',
     required this.canteenBalance,
     required this.canteenIsLowBalance,
     required this.latestActivity,
@@ -283,6 +290,10 @@ class ParentDashboardSummary {
   final int unreadNotices;
   final String transportStatus;
   final String? transportDetail;
+  final bool transportAssigned;
+  final bool transportHasActiveTrip;
+  final String? transportLatestLocationAt;
+  final String transportLocationConfidence;
   final num canteenBalance;
   final bool canteenIsLowBalance;
   final String latestActivity;
@@ -312,6 +323,7 @@ class ParentDashboardSummary {
     final fees = _asMap(json['fees']);
     final notices = _asMap(json['notices']);
     final transport = _asMap(json['transport']);
+    final transportInfo = ParentTransportInfo.fromJson(transport ?? const {});
     final canteen = _asMap(json['canteen']);
     final wallet = _asMap(canteen?['wallet']);
     final latestActivity = _asMap(json['latestActivity']);
@@ -341,6 +353,10 @@ class ParentDashboardSummary {
       unreadNotices: _asInt(notices?['unreadCount']),
       transportStatus: _formatTransportStatus(transport),
       transportDetail: _formatTransportDetail(transport),
+      transportAssigned: transportInfo.hasRoute,
+      transportHasActiveTrip: transportInfo.hasActiveTrip,
+      transportLatestLocationAt: transportInfo.latestLocationAt,
+      transportLocationConfidence: transportInfo.locationConfidence,
       canteenBalance: _asNum(wallet?['balance']),
       canteenIsLowBalance: wallet?['isLowBalance'] as bool? ?? false,
       latestActivity:
@@ -620,9 +636,12 @@ class ParentHomeworkItem {
     this.status,
     this.dueAt,
     this.dueDate,
+    this.assignedAt,
     this.submittedAt,
     this.feedback,
     this.score,
+    this.maxScore,
+    this.assignedByName,
     required this.attachmentCount,
   });
 
@@ -633,9 +652,12 @@ class ParentHomeworkItem {
   final String? status;
   final String? dueAt;
   final String? dueDate;
+  final String? assignedAt;
   final String? submittedAt;
   final String? feedback;
   final num? score;
+  final num? maxScore;
+  final String? assignedByName;
   final int attachmentCount;
 
   bool get isPending {
@@ -653,9 +675,12 @@ class ParentHomeworkItem {
       status: json['status'] as String?,
       dueAt: json['dueAt'] as String?,
       dueDate: json['dueDate'] as String?,
+      assignedAt: json['assignedDate'] as String?,
       submittedAt: json['submittedAt'] as String?,
       feedback: json['feedback'] as String?,
       score: json['score'] as num?,
+      maxScore: json['maxScore'] as num?,
+      assignedByName: _asMap(json['assignedBy'])?['name'] as String?,
       attachmentCount: _asInt(json['attachmentCount']),
     );
   }
@@ -1496,9 +1521,10 @@ String _formatTransportStatus(Map<String, dynamic>? transport) {
   if (activeTrip != null) {
     final latestLocation = _asMap(activeTrip['latestLocation']);
     final confidence = latestLocation?['confidence'] as String?;
-    if (latestLocation == null) return 'GPS unavailable';
-    if (confidence == 'stale') return 'GPS stale';
-    if (confidence == 'delayed') return 'GPS delayed';
+    if (latestLocation == null) return 'Location temporarily unavailable';
+    if (confidence == 'stale' || confidence == 'delayed') {
+      return 'Location update delayed';
+    }
     final studentStatus = activeTrip['studentStatus'] as String? ?? 'ON_ROUTE';
     return _labelize(studentStatus);
   }
@@ -1506,17 +1532,29 @@ String _formatTransportStatus(Map<String, dynamic>? transport) {
   final assignment = _asMap(transport?['assignment']);
   final enrollment = _asMap(transport?['enrollment']);
   if (assignment != null || enrollment != null) {
-    return 'Route assigned';
+    return 'Bus not running now';
   }
 
-  return 'No active trip';
+  return 'Transport not assigned';
 }
 
 String? _formatTransportDetail(Map<String, dynamic>? transport) {
   final activeTrip = _asMap(transport?['activeTrip']);
   final tripRoute = _asMap(activeTrip?['route']);
-  if (tripRoute != null) {
-    return tripRoute['name'] as String?;
+  final routeName = tripRoute?['name'] as String?;
+  final latestLocation = _asMap(activeTrip?['latestLocation']);
+  final confidence = latestLocation?['confidence'] as String?;
+  final ageSeconds = latestLocation?['ageSeconds'] as num?;
+  if ((confidence == 'stale' || confidence == 'delayed') &&
+      ageSeconds != null) {
+    final minutes = (ageSeconds / 60).ceil();
+    return [
+      if (routeName != null && routeName.trim().isNotEmpty) routeName,
+      'Last seen $minutes minute${minutes == 1 ? '' : 's'} ago',
+    ].join(' • ');
+  }
+  if (routeName != null && routeName.trim().isNotEmpty) {
+    return routeName;
   }
 
   final assignment = _asMap(transport?['assignment']);

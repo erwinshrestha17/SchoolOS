@@ -6,6 +6,8 @@ void main() {
     final child = GuardianChild.fromJson({
       'id': 'child-1',
       'name': 'Asha Rai',
+      'relationship': 'Father',
+      'isPrimaryGuardian': true,
       'capabilities': ['FEES_VIEW', 'FEES_PAY'],
       'relationshipState': {
         'verificationStatus': 'VERIFIED',
@@ -19,6 +21,8 @@ void main() {
     expect(child.hasCapability(GuardianCapabilityKey.attendanceView), isFalse);
     expect(child.relationshipState?.verificationStatus, 'VERIFIED');
     expect(child.relationshipState?.approvalStatus, 'APPROVED');
+    expect(child.relationship, 'Father');
+    expect(child.isPrimaryGuardian, isTrue);
   });
 
   group('ParentDashboardSummary', () {
@@ -92,6 +96,7 @@ void main() {
         'notices': {'unreadCount': 3},
         'transport': {
           'activeTrip': {
+            'status': 'ACTIVE',
             'studentStatus': 'BOARDED',
             'route': {'name': 'Route A'},
             'latestLocation': {
@@ -133,6 +138,10 @@ void main() {
       expect(summary.unreadNotices, 3);
       expect(summary.transportStatus, 'Boarded');
       expect(summary.transportDetail, 'Route A');
+      expect(summary.transportAssigned, isTrue);
+      expect(summary.transportHasActiveTrip, isTrue);
+      expect(summary.transportLatestLocationAt, '2026-06-30T00:00:00.000Z');
+      expect(summary.transportLocationConfidence, 'fresh');
       expect(summary.canteenBalance, 450);
       expect(summary.latestActivityTitle, 'Sports day');
       expect(summary.feesEnabled, isFalse);
@@ -147,12 +156,18 @@ void main() {
         'title': 'Fractions worksheet',
         'subject': {'name': 'Math'},
         'submissionStatus': 'NOT_SUBMITTED',
+        'assignedDate': '2026-07-20T06:00:00.000Z',
+        'maxScore': 20,
+        'assignedBy': {'id': 'staff-1', 'name': 'Mina Shrestha'},
         'attachmentCount': 2,
       });
 
       expect(item.title, 'Fractions worksheet');
       expect(item.subjectName, 'Math');
       expect(item.isPending, isTrue);
+      expect(item.assignedAt, '2026-07-20T06:00:00.000Z');
+      expect(item.maxScore, 20);
+      expect(item.assignedByName, 'Mina Shrestha');
       expect(item.attachmentCount, 2);
     });
   });

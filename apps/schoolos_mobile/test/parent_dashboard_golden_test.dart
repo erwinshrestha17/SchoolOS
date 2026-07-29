@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:schoolos_mobile/app/theme/app_theme.dart';
 import 'package:schoolos_mobile/features/parent/domain/parent_portal_models.dart';
+import 'package:schoolos_mobile/features/parent/presentation/screens/parent_portal_children_tab.dart';
 import 'package:schoolos_mobile/features/parent/presentation/screens/parent_portal_home_tab.dart';
 import 'package:schoolos_mobile/features/parent/presentation/widgets/parent_portal_widgets.dart';
 import 'package:schoolos_mobile/shared/widgets/app_exception_view.dart';
@@ -90,7 +91,10 @@ void main() {
               ),
               body: SafeArea(
                 top: false,
-                child: ParentPortalHomeTab(data: data),
+                child: ParentPortalHomeTab(
+                  data: data,
+                  now: DateTime.utc(2026, 7, 29, 4),
+                ),
               ),
               bottomNavigationBar: SchoolOsBottomNavigation(
                 selectedIndex: 0,
@@ -109,6 +113,52 @@ void main() {
     await expectLater(
       find.byType(Scaffold).first,
       matchesGoldenFile('goldens/parent_dashboard_standard_phone.png'),
+    );
+  });
+
+  testWidgets('children standard phone', (tester) async {
+    tester.view.physicalSize = const Size(390, 1500);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: _goldenTheme,
+          home: Scaffold(
+            backgroundColor: ParentPortalColors.page,
+            appBar: AppBar(
+              backgroundColor: ParentPortalColors.page,
+              title: const Text(
+                'Children',
+                style: TextStyle(
+                  color: ParentPortalColors.navy,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            body: SafeArea(
+              top: false,
+              child: ParentPortalChildrenTab(
+                data: _fullData(),
+                now: DateTime.utc(2026, 7, 29, 4),
+              ),
+            ),
+            bottomNavigationBar: SchoolOsBottomNavigation(
+              selectedIndex: 1,
+              onSelected: (_) {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await expectLater(
+      find.byType(Scaffold).first,
+      matchesGoldenFile('goldens/parent_children_standard_phone.png'),
     );
   });
 
@@ -193,10 +243,9 @@ void main() {
 ThemeData get _goldenTheme => AppTheme.light;
 
 ParentPortalData _fullData({bool fromCache = false}) {
-  // Far-future deadlines on purpose: the dashboard compares them against the
-  // real clock, so a nearer date would flip these tiles to "Due today" and
-  // then "Overdue" as the calendar moves, and the goldens would rot.
-  final due = DateTime.utc(2099, 7, 28, 4);
+  // Fixed alongside the injected dashboard clock so the overdue/future split
+  // stays stable and the golden cannot rot as the real calendar advances.
+  final overdue = DateTime.utc(2026, 7, 27, 4);
   return ParentPortalData(
     parentName: 'Sita Rai',
     schoolName: 'Everest School',
@@ -215,6 +264,8 @@ ParentPortalData _fullData({bool fromCache = false}) {
         homework: '3 homework pending',
         updates: 'No unread updates',
         homeworkPending: 3,
+        guardianRelationship: 'Father',
+        isPrimaryGuardian: true,
         feesStatus: 'PAID',
         feesTotalAmount: 12000,
         feesPaidAmount: 12000,
@@ -226,19 +277,19 @@ ParentPortalData _fullData({bool fromCache = false}) {
         id: 'hw-1',
         title: 'Algebra Worksheet #1',
         subject: 'Mathematics',
-        dueAt: due,
+        dueAt: overdue,
       ),
       _homework(
         id: 'hw-2',
         title: 'Class 1-A Nepali Practice 1',
         subject: 'Nepali',
-        dueAt: due.add(const Duration(days: 1)),
+        dueAt: overdue.add(const Duration(days: 4)),
       ),
       _homework(
         id: 'hw-3',
         title: 'Class 1-A English Practice 2',
         subject: 'English',
-        dueAt: due.add(const Duration(days: 2)),
+        dueAt: overdue.add(const Duration(days: 5)),
       ),
     ],
     updates: const [

@@ -36,7 +36,7 @@ final parentPortalRepositoryProvider = Provider<ParentPortalRepository>((ref) {
     parentRepository: ref.watch(parentRepositoryProvider),
     noticesRepository: ref.watch(noticesRepositoryProvider),
     parentName: user?.name ?? 'Parent',
-    schoolName: user?.tenantSlug ?? 'Your school',
+    schoolName: user?.tenantName ?? user?.tenantSlug ?? 'Your school',
     snapshots: ref.watch(parentDashboardSnapshotStoreProvider),
   );
 });

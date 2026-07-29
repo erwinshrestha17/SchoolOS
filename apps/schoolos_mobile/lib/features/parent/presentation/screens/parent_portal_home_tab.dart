@@ -32,9 +32,15 @@ class ParentShellTab {
 /// [ParentDashboardViewModel]; every decision about what a status means, which
 /// action is most urgent, and what is safe to print lives there, not here.
 class ParentPortalHomeTab extends ConsumerStatefulWidget {
-  const ParentPortalHomeTab({super.key, required this.data, this.onOpenTab});
+  const ParentPortalHomeTab({
+    super.key,
+    required this.data,
+    this.onOpenTab,
+    this.now,
+  });
 
   final ParentPortalData data;
+  final DateTime? now;
 
   /// Switches the surrounding shell to another tab. Null in tests and in any
   /// host that has no tab bar, where the equivalent route is pushed instead.
@@ -55,12 +61,15 @@ class _ParentPortalHomeTabState extends ConsumerState<ParentPortalHomeTab>
     super.build(context);
     final model = ParentDashboardViewModel.from(
       widget.data,
-      now: DateTime.now(),
+      now: widget.now ?? DateTime.now(),
     );
     final child = model.child;
 
     if (child == null) {
-      return _NoLinkedChildView(guardianName: model.guardianName);
+      return _NoLinkedChildView(
+        guardianName: model.guardianName,
+        dateLabel: model.dateLabel,
+      );
     }
 
     return RefreshIndicator(
@@ -92,29 +101,24 @@ class _ParentPortalHomeTabState extends ConsumerState<ParentPortalHomeTab>
     return [
       ParentDashboardHeader(
         guardianName: model.guardianName,
-        childName: child.name,
-        classSection: child.classSection,
-        updatedLabel: 'Updated ${_timeLabel(model.lastUpdated)}',
+        dateLabel: model.dateLabel,
         savedAtLabel: _timeLabel(model.lastUpdated),
         isStale: model.isStale,
       ),
-      if (model.linkedChildCount > 1) ...[
-        const SizedBox(height: AppSpacing.lg),
-        _ChildSwitcherRow(
-          children: widget.data.children,
-          activeChildId: child.id,
-          onSelect: _selectChild,
-        ),
-      ],
-      const SizedBox(height: AppSpacing.lgPlus),
+      const SizedBox(height: AppSpacing.lg),
+      ActiveChildContextCard(
+        child: child,
+        canSwitch: model.linkedChildCount > 1,
+        onTap: model.linkedChildCount > 1 ? _showChildPicker : null,
+      ),
+      const SizedBox(height: AppSpacing.lg),
       if (priority != null) ...[
         PriorityAttentionCard(
-          childName: child.name,
           action: priority,
           otherCount: model.otherPriorityCount,
           onReview: guardTap(() => context.push(priority.route)),
         ),
-        const SizedBox(height: AppSpacing.xl),
+        const SizedBox(height: AppSpacing.lgPlus),
       ],
       DashboardSectionHeader(
         title: '${child.firstName}\'s school day',
@@ -133,7 +137,7 @@ class _ParentPortalHomeTabState extends ConsumerState<ParentPortalHomeTab>
           if (acceptTap()) context.push(row.route);
         },
       ),
-      const SizedBox(height: AppSpacing.xl),
+      const SizedBox(height: AppSpacing.lgPlus),
       DashboardSectionHeader(
         title: 'Coming up',
         actionLabel: 'View all',
@@ -145,7 +149,7 @@ class _ParentPortalHomeTabState extends ConsumerState<ParentPortalHomeTab>
       if (model.upcoming.isEmpty)
         const DashboardEmptyCard(
           icon: Icons.event_available_outlined,
-          message: 'Nothing due right now.',
+          message: 'No upcoming deadlines.',
         )
       else
         UpcomingListCard(
@@ -154,7 +158,7 @@ class _ParentPortalHomeTabState extends ConsumerState<ParentPortalHomeTab>
             if (acceptTap()) context.push(item.route);
           },
         ),
-      const SizedBox(height: AppSpacing.xl),
+      const SizedBox(height: AppSpacing.lgPlus),
       const DashboardSectionHeader(title: 'Quick actions'),
       const SizedBox(height: AppSpacing.md),
       _QuickActionsRow(
@@ -168,7 +172,7 @@ class _ParentPortalHomeTabState extends ConsumerState<ParentPortalHomeTab>
             ? guardTap(() => context.push(AppRoutes.parentCalendar))
             : null,
       ),
-      const SizedBox(height: AppSpacing.xl),
+      const SizedBox(height: AppSpacing.lgPlus),
       DashboardSectionHeader(
         title: 'Latest update',
         actionLabel: 'View all',
@@ -209,6 +213,54 @@ class _ParentPortalHomeTabState extends ConsumerState<ParentPortalHomeTab>
     ref.read(parentActiveChildIdProvider.notifier).state = childId;
     await ref.read(appPreferencesServiceProvider).saveSelectedChildId(childId);
   }
+
+  Future<void> _showChildPicker() async {
+    if (!acceptTap()) return;
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                0,
+                AppSpacing.lg,
+                AppSpacing.sm,
+              ),
+              child: Text(
+                'Choose a child',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: ParentPortalColors.navy,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            for (final child in widget.data.children)
+              ListTile(
+                onTap: () => Navigator.of(context).pop(child.id),
+                leading: AvatarInitials(name: child.name, radius: 18),
+                title: Text(child.name),
+                subtitle: Text(child.classSection),
+                trailing: child.id == widget.data.activeChild?.id
+                    ? const Icon(
+                        Icons.check_circle_rounded,
+                        color: ParentPortalColors.green,
+                      )
+                    : null,
+              ),
+            const SizedBox(height: AppSpacing.sm),
+          ],
+        ),
+      ),
+    );
+    if (selected != null && mounted) {
+      await _selectChild(selected);
+    }
+  }
 }
 
 /// Wider phones and small tablets get a little more breathing room; a 320dp
@@ -221,39 +273,8 @@ double _horizontalPadding(BuildContext context) {
 /// School time, not handset time - the same policy the rest of the app uses.
 String _timeLabel(DateTime value) => NepaliBsCalendar.formatNepalTime(value);
 
-class _ChildSwitcherRow extends StatelessWidget {
-  const _ChildSwitcherRow({
-    required this.children,
-    required this.activeChildId,
-    required this.onSelect,
-  });
-
-  final List<ParentPortalChild> children;
-  final String activeChildId;
-  final ValueChanged<String> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          for (final child in children) ...[
-            ChildSelectorChip(
-              label: firstNameOf(child.name),
-              selected: child.id == activeChildId,
-              onSelected: () => onSelect(child.id),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-/// Three shortcuts across the width when they fit, two per row when they do
-/// not - which is what a 320dp screen or a 1.5x text scale produces.
+/// Three equal shortcuts at ordinary text sizes. At large text they stack so
+/// labels remain readable without truncation or undersized targets.
 class _QuickActionsRow extends StatelessWidget {
   const _QuickActionsRow({
     required this.onAttendance,
@@ -268,68 +289,57 @@ class _QuickActionsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        const spacing = AppSpacing.md;
-        // An icon block, its gap, the tile padding and a legible label. Below
-        // this a three-across row squeezes "School calendar" down to two
-        // broken syllables, which is worse than a shorter row of wider tiles.
-        final minTileWidth = 150.0 * scale;
-        final width = constraints.maxWidth;
-        final columns = width >= minTileWidth * 3 + spacing * 2
-            ? 3
-            : width >= minTileWidth * 2 + spacing
-            ? 2
-            : 1;
-        final tileWidth = (width - spacing * (columns - 1)) / columns;
-        // Three tiles into two columns leaves a hole; the last one takes the
-        // whole row instead so the block still reads as a deliberate grid.
-        final lastWidth = columns == 2 ? width : tileWidth;
-
-        return Wrap(
-          spacing: spacing,
-          runSpacing: spacing,
-          children: [
-            SizedBox(
-              width: tileWidth,
-              child: QuickActionTile(
-                icon: Icons.fact_check_outlined,
-                label: 'Attendance',
-                color: ParentPortalColors.green,
-                onTap: onAttendance,
-              ),
-            ),
-            SizedBox(
-              width: tileWidth,
-              child: QuickActionTile(
-                icon: Icons.payments_outlined,
-                label: 'Fees & receipts',
-                color: ParentPortalColors.orange,
-                onTap: onFees,
-              ),
-            ),
-            SizedBox(
-              width: lastWidth,
-              child: QuickActionTile(
-                icon: Icons.calendar_month_outlined,
-                label: 'School calendar',
-                color: ParentPortalColors.blue,
-                onTap: onCalendar,
-              ),
-            ),
+    final tiles = [
+      QuickActionTile(
+        icon: Icons.fact_check_outlined,
+        label: 'Attendance',
+        color: ParentPortalColors.green,
+        onTap: onAttendance,
+      ),
+      QuickActionTile(
+        icon: Icons.payments_outlined,
+        label: 'Fees',
+        color: ParentPortalColors.orange,
+        onTap: onFees,
+      ),
+      QuickActionTile(
+        icon: Icons.calendar_month_outlined,
+        label: 'Calendar',
+        color: ParentPortalColors.blue,
+        onTap: onCalendar,
+      ),
+    ];
+    if (scale > 1.3) {
+      return Column(
+        children: [
+          for (var index = 0; index < tiles.length; index++) ...[
+            SizedBox(width: double.infinity, child: tiles[index]),
+            if (index < tiles.length - 1) const SizedBox(height: AppSpacing.sm),
           ],
-        );
-      },
+        ],
+      );
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var index = 0; index < tiles.length; index++) ...[
+          Expanded(child: tiles[index]),
+          if (index < tiles.length - 1) const SizedBox(width: AppSpacing.sm),
+        ],
+      ],
     );
   }
 }
 
 /// A guardian account with no linked child sees why, not an empty dashboard.
 class _NoLinkedChildView extends StatelessWidget {
-  const _NoLinkedChildView({required this.guardianName});
+  const _NoLinkedChildView({
+    required this.guardianName,
+    required this.dateLabel,
+  });
 
   final String? guardianName;
+  final String dateLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -343,12 +353,7 @@ class _NoLinkedChildView extends StatelessWidget {
         AppSpacing.xl,
       ),
       children: [
-        ParentDashboardHeader(
-          guardianName: guardianName,
-          childName: null,
-          classSection: null,
-          updatedLabel: null,
-        ),
+        ParentDashboardHeader(guardianName: guardianName, dateLabel: dateLabel),
         const SizedBox(height: AppSpacing.lgPlus),
         const PortalCard(
           padding: EdgeInsets.all(AppSpacing.xl),
