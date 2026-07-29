@@ -190,7 +190,7 @@ External wording must avoid unsupported claims of legal compliance, regulator ap
 3. Establish a trusted operational record for student, attendance, fees, receipts, academics, notifications, notices, files, and audit.
 4. Support modular packaging without weakening tenant, role, entitlement, or data boundaries.
 5. Differentiate through Nepal-first usability, fee transparency, parent trust, protected records, and practical school operations.
-6. Create a scalable foundation for School (Grade 1-10) and +2 (Grade 11-12) without parallel systems while preserving the frozen M13 Learning implementation for possible future re-approval.
+6. Create a scalable foundation for School (Grade 1-10) and +2 (Grade 11-12) without parallel systems, with M13 Learning entitlement-gated for Wave 5.
 7. Move from the current Internal QA / controlled-pilot preparation posture through the defined release stages only with recorded evidence.
 
 ### 5.2 Product goals
@@ -204,7 +204,7 @@ External wording must avoid unsupported claims of legal compliance, regulator ap
 7. Make financial records idempotent, auditable, explainable, and backend-owned.
 8. Make protected files accessible only through authenticated, scoped File Registry flows.
 9. Make notification delivery status honest across in-app, push, SMS, and email modes.
-10. Keep M13 Learning deferred and frozen: preserve existing teacher-led, school-controlled, session-scoped, non-comparative implementation without new feature work or current release claims.
+10. Keep M13 Learning in Wave 5 GA scope: entitlement-gated, disabled by default until Wave 5 exit evidence, teacher-led and school-controlled, with no M14 behavior.
 11. Keep M14 Intelligence / AI deferred until explicitly approved with production data, privacy, human review, cost, and safety controls.
 
 ---
@@ -296,7 +296,7 @@ No hard-coded streams or parallel +2 platform may be introduced.
 | Accountant / finance officer | Manage invoices, receipts, reversals, reports, reconciliation, and accounting handoff | Backend-owned totals, idempotency, controlled corrections, audit, protected artifacts |
 | Cashier | Collect fees quickly and close the counter accurately | Fast student search, payment, receipt, reprint, method totals, and day-end close |
 | Academic coordinator / exam head | Configure academics, timetable, exams, marks, CAS, report cards, and promotion | Dense, task-first web workspaces with locks, readiness, corrections, and publishing controls |
-| Teacher | Run assigned daily classroom work | Assigned-scope attendance, homework, timetable, notices, and marks; preserved Learning sessions remain outside the current pilot |
+| Teacher | Run assigned daily classroom work | Assigned-scope attendance, homework, timetable, notices, and marks; Learning when Wave 5 entitlement is enabled |
 | HR / payroll officer | Manage staff, contracts, leave, attendance, payroll, and payslips | Protected staff records, controlled payroll lifecycle, reasoned corrections, and audit |
 | Librarian | Run circulation and catalogue workflows | Search, scan, issue/return, reservation, fine/lost/damaged handling, and reports |
 | Transport manager | Manage routes, vehicles, assignments, trips, and safety exceptions | Assignment conflict checks, stale-status labels, protected documents, and parent-safe status |
@@ -304,8 +304,10 @@ No hard-coded streams or parallel +2 platform may be introduced.
 | Canteen manager / staff | Run menu, POS, QR serve, wallet, safety, and stock workflows | Fast, idempotent counter/serve flow with allergy/medical warnings and backend wallet truth |
 | Parent / guardian | Understand and act on matters for linked children | Child-scoped attendance, dues, receipts, homework, notices, activity, reports, transport, and enabled services |
 | Staff self-service user | Manage own attendance, leave, profile, payslips, and notices | Own-record-only mobile experience with protected files |
-| Student, Grade 1 through +2 | No broad Student App; preserve controlled-session compatibility only | Existing expiring session/QR, own activity, autosave/submit, and own-result boundaries remain frozen and disabled by default for pilots |
+| Student, Grade 1 through +2 | No broad Student App; controlled-session Learning only | Expiring session/QR, own activity, autosave/submit, and own-result boundaries; Learning entitlement-gated for Wave 5 |
 | SchoolOS platform operator/support | Manage tenants, plans, providers, queues, SaaS billing, and support access | Separate `/platform/*` control plane, masked secrets, reasoned support override, audit, and expiry |
+
+Target web-vs-mobile feature allocation by persona is documented in `docs/Persona/SchoolOS_Module_Features_and_Persona_Platform_Mapping.md`. Teacher-specific access detail remains in `docs/Persona/SchoolOS_Teacher_Persona_Access_Spec.md`.
 
 ---
 
@@ -443,7 +445,7 @@ Mobile must provide:
 | M10 | Canteen | Manage menus, meal plans, POS, wallets, QR serving, allergy/medical safety, receipts, stock, vendors, and finance handoff |
 | M11 | Accounting and Finance | Maintain chart of accounts, vouchers, journals, fiscal periods, source mappings, reconciliation, financial statements, snapshots, and audit |
 | M12 | Notifications and Delivery | Own normalized event intake, recipient resolution, personal inbox/read state, templates, preferences, channels, provider delivery, retries, callbacks, diagnostics, and delivery audit |
-| M13 | Learning Layer | Deferred and frozen; preserve the existing teacher-created, school-controlled activity/session implementation without pilot availability, feature expansion, or current release claims |
+| M13 | Learning Layer | GA-in-scope Wave 5 (owner-approved 2026-07-29); teacher-created, school-controlled activity/session learning; disabled by default until Wave 5 exit evidence; no M14 behavior |
 | M14 | Intelligence / AI | Deferred teacher-reviewed analytics and safe AI after production data, privacy, audit, human review, safety, and cost controls are approved |
 | M15 | Notices and Announcements | Own school-authored notice drafts, audiences, preview, approval, scheduling, publication, protected attachments, acknowledgements, read follow-up, archive, and publication audit |
 
@@ -634,9 +636,9 @@ Critical boundary: feature modules emit events and never call SMS/email/push pro
 
 ### 11.14 M13 Learning Layer
 
-Status: deferred and frozen. The existing implementation is preserved as-is, disabled by default for pilot tenants, hidden when the module entitlement is disabled, and excluded from current pilot acceptance and production-readiness claims.
+Status: GA-in-scope for Wave 5 (owner-approved 2026-07-29). Keep disabled by default for new tenants and hidden when the module entitlement is disabled until Wave 5 exit evidence is recorded. Before Wave 5 unfreeze evidence, only security, tenancy, suspended-tenant, protected-file, build, migration, OpenAPI, or repository-regression fixes may change M13. After Wave 5 unfreeze, feature work must stay within this section and pass `pnpm smoke:learning` as a GA gate.
 
-Preserved implementation boundary:
+Implementation boundary:
 
 - Teacher-created activities for assigned class/section/subject.
 - Draft, publish, schedule/archive where supported.
@@ -647,9 +649,9 @@ Preserved implementation boundary:
 - Parent linked-child summaries that are non-comparative and supportive.
 - Protected learning resources through File Registry.
 
-Critical boundary: no public leaderboard, unrestricted home learning, AI tutor, adaptive recommendation, open student chat, or broad student app without approval.
+Critical boundary: no public leaderboard, unrestricted home learning, AI tutor, adaptive recommendation, open student chat, M14 behavior, or broad student app without approval.
 
-No new activities, questions, session modes, reports, analytics, seed expansion, populated visual fixtures, mobile expansion, AI, adaptive behavior, or public/student-home learning may be added while M13 is frozen. A focused change is allowed only to fix tenant isolation, RBAC/ownership, suspended-tenant failure, protected-file security, build/typecheck failure, Prisma migration failure, OpenAPI verification failure, or a repository-wide test regression. Existing Learning records must not be deleted and destructive Learning migrations are prohibited.
+Existing Learning records must not be deleted and destructive Learning migrations are prohibited. Persona/platform allocation for M13 surfaces is documented in `docs/Persona/SchoolOS_Module_Features_and_Persona_Platform_Mapping.md`.
 
 ### 11.15 M14 Intelligence / AI
 
@@ -997,7 +999,7 @@ Metrics must be measured from backend-owned data and interpreted within the curr
 ### Deferred
 
 - Broad Student App.
-- M13 Learning feature work, pilot acceptance, and production-readiness claims.
+- M13 Learning production enablement on school #1 before Wave 5 exit evidence and security review.
 - M14 Intelligence / AI.
 - Unverified live transport map/ETA/geofence expansion.
 - Biometric attendance.

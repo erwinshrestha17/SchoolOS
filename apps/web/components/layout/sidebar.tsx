@@ -40,7 +40,9 @@ import { useEntitlements } from '../entitlements-provider';
 import { useSession } from '../session-provider';
 import { hasAnyPermission } from '../../lib/session';
 import { TeacherCapability, useTeacherAccess } from '../../lib/teacher-access';
+import { useSchoolWebPersona } from '../../lib/school-web-persona';
 import { cn } from '../../lib/utils';
+import type { SchoolWebPersona } from '@schoolos/core';
 
 export type NavItem = {
   href: string;
@@ -509,6 +511,516 @@ export function buildTeacherNavGroups(
   ];
 }
 
+/**
+ * Principal oversight nav (target persona mapping §4). Links only to existing
+ * workspaces; permission + entitlement filters still apply per item.
+ */
+export const principalNavGroups: NavGroup[] = [
+  {
+    label: 'Leadership',
+    icon: LayoutDashboard,
+    items: [
+      { href: '/dashboard', label: 'Executive Dashboard', icon: LayoutDashboard },
+      {
+        href: '/dashboard#needs-attention',
+        label: 'Attention Items',
+        icon: ClipboardList,
+        activeWhen: ['/dashboard'],
+      },
+      {
+        href: '/dashboard/notices/approvals',
+        label: 'Approvals',
+        icon: ShieldCheck,
+        permissions: noticesPermissions,
+      },
+    ],
+  },
+  {
+    label: 'Students and Admissions',
+    icon: Users,
+    items: [
+      {
+        href: '/dashboard/students',
+        label: 'Students',
+        icon: Users,
+        permissions: ['students:read', 'students:create'],
+      },
+      {
+        href: '/dashboard/admissions',
+        label: 'Admissions',
+        icon: UserPlus,
+        permissions: ['students:read', 'students:create'],
+      },
+    ],
+  },
+  {
+    label: 'Operations Oversight',
+    icon: School,
+    items: [
+      {
+        href: '/dashboard/attendance',
+        label: 'Attendance',
+        icon: CalendarCheck,
+        permissions: ['attendance:read', 'attendance:mark'],
+      },
+      {
+        href: '/dashboard/fees',
+        label: 'Finance Overview',
+        icon: Wallet,
+        permissions: [
+          'fees:manage',
+          'fees:bill',
+          'payments:collect',
+          'receipts:read',
+          'ledger:read',
+        ],
+        activeWhen: ['/dashboard/fees', '/dashboard/finance'],
+      },
+      {
+        href: '/dashboard/academics',
+        label: 'Academic Readiness',
+        icon: GraduationCap,
+        permissions: academicPermissions,
+      },
+      {
+        href: '/dashboard/hr',
+        label: 'Staff Overview',
+        icon: UserCog,
+        permissions: ['hr:read', 'payroll:read'],
+      },
+      {
+        href: '/dashboard/library',
+        label: 'Library',
+        icon: BookOpen,
+        permissions: ['library:read', 'library:manage'],
+      },
+      {
+        href: '/dashboard/transport',
+        label: 'Transport',
+        icon: Bus,
+        permissions: ['transport:read', 'transport:manage', 'transport:operate'],
+      },
+      {
+        href: '/dashboard/canteen',
+        label: 'Canteen',
+        icon: Utensils,
+        permissions: [
+          'canteen:menu:read',
+          'canteen:plans:read',
+          'canteen:enrollments:read',
+        ],
+      },
+    ],
+  },
+  {
+    label: 'Communication',
+    icon: MessageSquare,
+    items: [
+      {
+        href: '/dashboard/notices',
+        label: 'Notices',
+        icon: MessageSquare,
+        permissions: noticesPermissions,
+        activeWhen: ['/dashboard/communications', '/dashboard/notices'],
+      },
+      {
+        href: '/dashboard/activity',
+        label: 'Activity Feed',
+        icon: Images,
+        permissions: ['activity_feed:read', 'activity_feed:create'],
+      },
+    ],
+  },
+  {
+    label: 'Reports and Audit',
+    icon: FileCheck2,
+    items: [
+      {
+        href: '/dashboard/reports',
+        label: 'Reports',
+        icon: FileCheck2,
+        permissions: [
+          'accounting:reports:read',
+          'library:reports:read',
+          'reports:read',
+          'settings:manage',
+        ],
+      },
+      {
+        href: '/dashboard/settings/system/audit-log',
+        label: 'Audit',
+        icon: ShieldCheck,
+        permissions: ['settings:manage', 'settings:read'],
+      },
+    ],
+  },
+];
+
+/** HR-first nav (target persona mapping §4). */
+export const hrNavGroups: NavGroup[] = [
+  {
+    label: 'HR',
+    icon: UserCog,
+    items: [
+      {
+        href: '/dashboard/hr',
+        label: 'HR Dashboard',
+        icon: LayoutDashboard,
+        permissions: ['hr:read', 'payroll:read', 'payroll:manage'],
+      },
+      {
+        href: '/dashboard/hr/staff',
+        label: 'Staff',
+        icon: Users,
+        permissions: ['hr:read', 'staff:read'],
+      },
+      {
+        href: '/dashboard/hr/contracts',
+        label: 'Contracts',
+        icon: BriefcaseBusiness,
+        permissions: ['hr:read', 'hr:manage'],
+      },
+      {
+        href: '/dashboard/hr/attendance',
+        label: 'Attendance',
+        icon: CalendarCheck,
+        permissions: ['hr:read', 'attendance:read'],
+      },
+      {
+        href: '/dashboard/hr/leave',
+        label: 'Leave',
+        icon: CalendarDays,
+        permissions: ['hr:read', 'hr:manage'],
+      },
+    ],
+  },
+  {
+    label: 'Payroll',
+    icon: Wallet,
+    items: [
+      {
+        href: '/dashboard/payroll',
+        label: 'Payroll',
+        icon: Wallet,
+        permissions: ['payroll:read', 'payroll:manage'],
+      },
+      {
+        href: '/dashboard/payroll/payslips',
+        label: 'Payslips',
+        icon: FileCheck2,
+        permissions: ['payroll:read', 'payroll:payslip:read'],
+      },
+    ],
+  },
+  {
+    label: 'Communication',
+    icon: MessageSquare,
+    items: [
+      {
+        href: '/dashboard/notices',
+        label: 'HR Notices',
+        icon: MessageSquare,
+        permissions: noticesPermissions,
+        activeWhen: ['/dashboard/communications', '/dashboard/notices'],
+      },
+      {
+        href: '/dashboard/reports',
+        label: 'Reports',
+        icon: FileCheck2,
+        permissions: ['reports:read', 'payroll:reports:read', 'hr:read'],
+      },
+    ],
+  },
+];
+
+/** Accountant-first nav (target persona mapping §4). */
+export const accountantNavGroups: NavGroup[] = [
+  {
+    label: 'Finance',
+    icon: Wallet,
+    items: [
+      {
+        href: '/dashboard/fees',
+        label: 'Fees and Receipts',
+        icon: Wallet,
+        permissions: [
+          'fees:manage',
+          'fees:bill',
+          'payments:collect',
+          'receipts:read',
+          'ledger:read',
+        ],
+        activeWhen: ['/dashboard/fees', '/dashboard/finance'],
+      },
+      {
+        href: '/dashboard/fees/cashier-close',
+        label: 'Cashier Close',
+        icon: ClipboardList,
+        permissions: ['payments:close', 'payments:collect'],
+      },
+      {
+        href: '/dashboard/accounting/reconciliation',
+        label: 'Reconciliation',
+        icon: FileCheck2,
+        permissions: ['accounting:read', 'accounting:journals:read'],
+      },
+      {
+        href: '/dashboard/accounting',
+        label: 'Accounting',
+        icon: Calculator,
+        permissions: ['accounting:read', 'accounting:journals:read'],
+      },
+    ],
+  },
+  {
+    label: 'Postings',
+    icon: Calculator,
+    items: [
+      {
+        href: '/dashboard/accounting/source-mappings',
+        label: 'Source Mappings',
+        icon: ClipboardList,
+        permissions: ['accounting:read', 'accounting:settings:read'],
+      },
+      {
+        href: '/dashboard/payroll',
+        label: 'Payroll Posting',
+        icon: Wallet,
+        permissions: ['payroll:read', 'payroll:manage'],
+      },
+      {
+        href: '/dashboard/canteen',
+        label: 'Canteen Posting',
+        icon: Utensils,
+        permissions: ['canteen:menu:read', 'canteen:pos:read'],
+      },
+      {
+        href: '/dashboard/transport',
+        label: 'Transport Posting',
+        icon: Bus,
+        permissions: ['transport:read'],
+      },
+      {
+        href: '/dashboard/library',
+        label: 'Library Posting',
+        icon: BookOpen,
+        permissions: ['library:read', 'library:fines:read'],
+      },
+    ],
+  },
+  {
+    label: 'Reports and Audit',
+    icon: FileCheck2,
+    items: [
+      {
+        href: '/dashboard/accounting/reports',
+        label: 'Reports',
+        icon: FileCheck2,
+        permissions: ['accounting:reports:read', 'reports:read'],
+      },
+      {
+        href: '/dashboard/notices',
+        label: 'Finance Notices',
+        icon: MessageSquare,
+        permissions: noticesPermissions,
+      },
+      {
+        href: '/dashboard/accounting/audit',
+        label: 'Audit',
+        icon: ShieldCheck,
+        permissions: ['accounting:read', 'accounting:journals:read'],
+      },
+    ],
+  },
+];
+
+/** Librarian-first operational shell (target §5). */
+export const librarianNavGroups: NavGroup[] = [
+  {
+    label: 'Library',
+    icon: BookOpen,
+    items: [
+      {
+        href: '/dashboard/library',
+        label: 'Library Overview',
+        icon: LayoutDashboard,
+        permissions: ['library:read', 'library:manage'],
+      },
+      {
+        href: '/dashboard/library/catalog',
+        label: 'Catalog',
+        icon: BookOpen,
+        permissions: ['library:read', 'library:manage', 'library:books:read'],
+      },
+      {
+        href: '/dashboard/library/issues',
+        label: 'Issues and Returns',
+        icon: ClipboardList,
+        permissions: ['library:read', 'library:manage', 'library:issues:read'],
+      },
+      {
+        href: '/dashboard/library/overdue',
+        label: 'Overdue',
+        icon: CalendarDays,
+        permissions: ['library:read', 'library:manage'],
+      },
+      {
+        href: '/dashboard/library/fines',
+        label: 'Fines',
+        icon: Wallet,
+        permissions: ['library:read', 'library:fines:read'],
+      },
+      {
+        href: '/dashboard/library/borrowers',
+        label: 'Borrowers',
+        icon: Users,
+        permissions: ['library:read', 'students:read'],
+      },
+    ],
+  },
+  {
+    label: 'Account',
+    icon: CircleUserRound,
+    items: [
+      {
+        href: '/dashboard/notices',
+        label: 'Notices',
+        icon: MessageSquare,
+        permissions: noticesPermissions,
+      },
+      {
+        href: '/dashboard/my-workspace',
+        label: 'My Workspace',
+        icon: BriefcaseBusiness,
+      },
+    ],
+  },
+];
+
+/** Cashier-first fees counter shell (target §5). */
+export const cashierNavGroups: NavGroup[] = [
+  {
+    label: 'Cashier',
+    icon: Wallet,
+    items: [
+      {
+        href: '/dashboard/fees/collect',
+        label: 'Collect Payment',
+        icon: Wallet,
+        permissions: ['payments:collect'],
+      },
+      {
+        href: '/dashboard/fees/receipts',
+        label: 'Receipts',
+        icon: FileCheck2,
+        permissions: ['receipts:read'],
+      },
+      {
+        href: '/dashboard/fees/cashier-close',
+        label: 'Cashier Close',
+        icon: ClipboardList,
+        permissions: ['payments:close', 'payments:collect'],
+      },
+      {
+        href: '/dashboard/fees/invoices',
+        label: 'Invoices',
+        icon: FileCheck2,
+        permissions: ['fees:bill', 'fees:manage', 'ledger:read'],
+      },
+      {
+        href: '/dashboard/fees',
+        label: 'Fees Overview',
+        icon: LayoutDashboard,
+        permissions: ['fees:manage', 'payments:collect', 'receipts:read'],
+      },
+    ],
+  },
+];
+
+/** Transport operator shell (target §5). */
+export const transportOperatorNavGroups: NavGroup[] = [
+  {
+    label: 'Transport',
+    icon: Bus,
+    items: [
+      {
+        href: '/dashboard/transport',
+        label: 'Transport Overview',
+        icon: LayoutDashboard,
+        permissions: ['transport:read', 'transport:operate'],
+      },
+      {
+        href: '/dashboard/transport/students',
+        label: 'Students',
+        icon: Users,
+        permissions: ['transport:read', 'transport:operate'],
+      },
+    ],
+  },
+];
+
+/** Canteen operator shell (target §5). */
+export const canteenOperatorNavGroups: NavGroup[] = [
+  {
+    label: 'Canteen',
+    icon: Utensils,
+    items: [
+      {
+        href: '/dashboard/canteen',
+        label: 'Canteen Overview',
+        icon: LayoutDashboard,
+        permissions: ['canteen:menu:read', 'canteen:pos:read'],
+      },
+      {
+        href: '/dashboard/canteen/pos',
+        label: 'POS',
+        icon: Wallet,
+        permissions: ['canteen:pos:create', 'canteen:pos:read'],
+      },
+      {
+        href: '/dashboard/canteen/serving',
+        label: 'Serving',
+        icon: Utensils,
+        permissions: ['canteen:serving:create', 'canteen:serving:read'],
+      },
+      {
+        href: '/dashboard/canteen/wallets',
+        label: 'Wallets',
+        icon: Wallet,
+        permissions: ['canteen:wallets:read', 'canteen:wallets:update'],
+      },
+    ],
+  },
+];
+
+/** Picks the persona nav tree before permission/entitlement filtering. */
+export function navGroupsForPersona(
+  persona: SchoolWebPersona,
+  teacherCapabilities: ReadonlySet<TeacherCapability>,
+): NavGroup[] {
+  switch (persona) {
+    case 'teacher':
+      return buildTeacherNavGroups(teacherCapabilities);
+    case 'principal':
+      return principalNavGroups;
+    case 'hr':
+      return hrNavGroups;
+    case 'accountant':
+      return accountantNavGroups;
+    case 'librarian':
+      return librarianNavGroups;
+    case 'cashier':
+      return cashierNavGroups;
+    case 'transport_operator':
+      return transportOperatorNavGroups;
+    case 'canteen_operator':
+      return canteenOperatorNavGroups;
+    case 'admin':
+    default:
+      return dashboardNavGroups;
+  }
+}
+
 export const settingsNavItem: NavItem = {
   href: '/dashboard/settings',
   label: 'Settings',
@@ -548,45 +1060,46 @@ export function Sidebar({
     notificationCenterQuery.data?.unreadCount ?? 0,
   );
 
-  // Class/Subject Teachers get the assignment-scoped nav tree in place of the
-  // administrative one. Persona and delegated capabilities both come from the
-  // one shared resolver so nav, route guards, and tab strips can never
-  // disagree about what this teacher may reach.
+  // Class/Subject Teachers get the assignment-scoped nav tree; Principal, HR,
+  // Accountant, and operational personas get purpose-limited trees. Admin and
+  // school_config_owner keep the full ops tree. Permission + entitlement
+  // filters still apply to every item.
   const { isTeacherPersona, capabilities } = useTeacherAccess();
+  const schoolWebPersona = useSchoolWebPersona();
 
-  const visibleGroups = dashboardNavGroups
+  const groupsToRender = navGroupsForPersona(schoolWebPersona, capabilities)
     .map((group) => ({
       ...group,
       items: group.items
         .filter((item) => canDisplayNavItem(item, session, hasModule))
         .map((item) =>
-          item.href === '/dashboard/notices'
-            ? { ...item, badge: unreadNoticesBadge }
+          item.href === '/dashboard/notices' ||
+          item.href === '/dashboard/notices/approvals'
+            ? {
+                ...item,
+                badge:
+                  item.href === '/dashboard/notices'
+                    ? unreadNoticesBadge
+                    : item.badge,
+              }
             : item,
         ),
     }))
     .filter((group) => group.items.length > 0);
-
-  const teacherVisibleGroups = buildTeacherNavGroups(capabilities)
-    .map((group) => ({
-      ...group,
-      items: group.items
-        .filter((item) => canDisplayNavItem(item, session, hasModule))
-        .map((item) =>
-          item.href === '/dashboard/notices'
-            ? { ...item, badge: unreadNoticesBadge }
-            : item,
-        ),
-    }))
-    .filter((group) => group.items.length > 0);
-
-  const groupsToRender = isTeacherPersona ? teacherVisibleGroups : visibleGroups;
 
   // Teachers reach Profile/Preferences/Security directly from the "My
   // Workspace" group above; the generic administrative Settings hub link is
   // redundant (and would surface tenant-wide settings sections) for them.
+  // Operational shells also keep Settings only when the persona is admin /
+  // principal / hr (configuration or limited review).
+  const showSettingsHub =
+    !isTeacherPersona &&
+    (schoolWebPersona === 'admin' ||
+      schoolWebPersona === 'principal' ||
+      schoolWebPersona === 'hr' ||
+      schoolWebPersona === 'accountant');
   const visibleSettings =
-    !isTeacherPersona && canDisplayNavItem(settingsNavItem, session, hasModule)
+    showSettingsHub && canDisplayNavItem(settingsNavItem, session, hasModule)
       ? settingsNavItem
       : null;
 

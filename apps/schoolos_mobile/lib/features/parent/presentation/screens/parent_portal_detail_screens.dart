@@ -52,6 +52,9 @@ class ParentPortalChildDetailScreen extends ConsumerWidget {
           }
           final portalChild = matches.first;
           final attendance = _attendanceStatus(portalChild);
+          final profileAsync = ref.watch(
+            parentChildProfileProvider(portalChild.id),
+          );
           final recentActivity =
               data.updates
                   .where(
@@ -76,6 +79,11 @@ class ParentPortalChildDetailScreen extends ConsumerWidget {
                 children: data.children,
                 onSelectChild: (selectedChildId) =>
                     _selectChild(context, ref, selectedChildId),
+              ),
+              profileAsync.when(
+                loading: () => const SizedBox.shrink(),
+                error: (_, _) => const SizedBox.shrink(),
+                data: (profile) => _EnrollmentStatusCard(profile: profile),
               ),
               if (attendance.showAlert) ...[
                 const SizedBox(height: 16),
@@ -468,6 +476,80 @@ class _ChildIdentityCard extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _EnrollmentStatusCard extends StatelessWidget {
+  const _EnrollmentStatusCard({required this.profile});
+
+  final ChildProfile profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <MapEntry<String, String>>[
+      if ((profile.lifecycleStatus ?? '').trim().isNotEmpty)
+        MapEntry('Enrollment', _label(profile.lifecycleStatus!)),
+      if ((profile.admissionNumber ?? '').trim().isNotEmpty)
+        MapEntry('Admission no.', profile.admissionNumber!.trim()),
+      if ((profile.admissionDate ?? '').trim().isNotEmpty)
+        MapEntry('Admission date', profile.admissionDate!.trim()),
+      if ((profile.studentSystemId ?? '').trim().isNotEmpty)
+        MapEntry('Student ID', profile.studentSystemId!.trim()),
+      if (profile.child.classSection.trim().isNotEmpty)
+        MapEntry('Class / section', profile.child.classSection.trim()),
+    ];
+    if (rows.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const ParentSectionHeader(title: 'Enrollment and admission'),
+          const SizedBox(height: 12),
+          PortalCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                for (var i = 0; i < rows.length; i++) ...[
+                  if (i > 0) const Divider(height: 1),
+                  ListTile(
+                    dense: true,
+                    title: Text(rows[i].key),
+                    trailing: Text(
+                      rows[i].value,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.report_gmailerrorred_outlined),
+                  title: const Text('Report incorrect information'),
+                  subtitle: const Text(
+                    'Opens Help & Support so the school can review a correction request.',
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () =>
+                      GoRouter.of(context).push(AppRoutes.parentServiceRequests),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _label(String value) {
+    return value
+        .split('_')
+        .map(
+          (part) => part.isEmpty
+              ? part
+              : '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}',
+        )
+        .join(' ');
   }
 }
 

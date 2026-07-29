@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/constants/app_routes.dart';
 import '../../../app/design_system/app_spacing.dart';
 import '../../../app/theme/app_colors.dart';
+import '../../../core/auth/auth_provider.dart';
 import '../../../core/network/connectivity_provider.dart';
 import '../../../core/notifications/push_notification_controller.dart';
 import '../../../shared/utils/date_display_preference.dart';
@@ -22,6 +23,9 @@ class SettingsScreen extends ConsumerWidget {
 
     final isOnline = ref.watch(connectivityProvider);
     final pushState = ref.watch(pushNotificationControllerProvider);
+    final user = ref.watch(authProvider).user;
+    final schoolLabel =
+        (user?.tenantName ?? user?.tenantSlug ?? 'Current school').trim();
 
     return AppScaffold(
       appBar: AppBar(
@@ -41,6 +45,39 @@ class SettingsScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.lg),
         children: [
+          Text(
+            'School session',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: AppColors.slate500,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          AppCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.school_outlined),
+                  title: const Text('Signed-in school'),
+                  subtitle: Text(schoolLabel),
+                  trailing: const StatusChip(
+                    status: AppStatusType.approved,
+                    label: 'Active',
+                  ),
+                ),
+                const Divider(),
+                const ListTile(
+                  leading: Icon(Icons.swap_horiz_rounded),
+                  title: Text('Switch school'),
+                  subtitle: Text(
+                    'This login is for one school at a time. To open another linked school, sign out and sign in with that school’s parent credentials.',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xl),
           Text(
             'Preferences',
             style: theme.textTheme.titleSmall?.copyWith(

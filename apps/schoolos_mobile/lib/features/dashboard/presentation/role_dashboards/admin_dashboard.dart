@@ -47,8 +47,8 @@ class AdminDashboard extends ConsumerWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Admin mobile companion - $email',
-                      maxLines: 1,
+                      'Admin is web-only for school operations. Use the SchoolOS web dashboard for configuration, fees, HR, and reports. — $email',
+                      maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppColors.slate500,

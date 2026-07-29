@@ -15,15 +15,22 @@ import '../../application/staff_providers.dart';
 import '../../domain/staff_models.dart';
 
 class StaffLeaveScreen extends ConsumerWidget {
-  const StaffLeaveScreen({super.key});
+  const StaffLeaveScreen({
+    super.key,
+    this.shellRole = 'STAFF',
+    this.selectedIndex = 2,
+  });
+
+  final String shellRole;
+  final int selectedIndex;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final leaveRequests = ref.watch(staffLeaveRequestsProvider);
 
     return RoleShellScaffold(
-      role: 'STAFF',
-      selectedIndex: 2,
+      role: shellRole,
+      selectedIndex: selectedIndex,
       title: 'My Leave',
       body: leaveRequests.when(
         loading: () => const AppLoading(message: 'Loading leave requests...'),

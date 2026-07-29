@@ -54,6 +54,8 @@ class AppRoutes {
   static const teacherProfile = '/teacher/profile';
   static const teacherLeave = '/teacher/leave';
   static const teacherPayslips = '/teacher/payslips';
+  static const teacherMarks = '/teacher/marks';
+  static const teacherMarksEntry = '/teacher/marks/:componentId';
   static const driverHome = '/driver/home';
   static const driverRoute = '/driver/route';
   static const driverStudents = '/driver/students';

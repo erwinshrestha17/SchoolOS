@@ -140,17 +140,25 @@ class TeacherProfileScreen extends ConsumerWidget {
                   onTap: () => context.go(AppRoutes.notices),
                 ),
                 const Divider(height: 1),
-                const _MenuTile(
-                  icon: Icons.event_busy_outlined,
-                  label: 'Leave Requests',
-                  subtitle: 'Needs own-staff teacher route confirmation',
+                _MenuTile(
+                  icon: Icons.fact_check_outlined,
+                  label: 'Marks Entry',
+                  subtitle: 'Limited assigned assessment marks',
+                  onTap: () => context.go(AppRoutes.teacherMarks),
                 ),
                 const Divider(height: 1),
-                const _MenuTile(
+                _MenuTile(
+                  icon: Icons.event_busy_outlined,
+                  label: 'Leave Requests',
+                  subtitle: 'Own leave requests only',
+                  onTap: () => context.go(AppRoutes.teacherLeave),
+                ),
+                const Divider(height: 1),
+                _MenuTile(
                   icon: Icons.receipt_long_outlined,
                   label: 'Payslips',
-                  subtitle: 'Available when enabled and teacher-safe',
-                  locked: true,
+                  subtitle: 'Own payslips when issued',
+                  onTap: () => context.go(AppRoutes.teacherPayslips),
                 ),
                 const Divider(height: 1),
                 _MenuTile(
@@ -190,32 +198,30 @@ class _MenuTile extends StatelessWidget {
     required this.label,
     required this.subtitle,
     this.onTap,
-    this.locked = false,
   });
 
   final IconData icon;
   final String label;
   final String subtitle;
   final VoidCallback? onTap;
-  final bool locked;
 
   @override
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
       child: ListTile(
-        enabled: !locked,
+        enabled: onTap != null,
         minVerticalPadding: AppSpacing.md,
         leading: Icon(
           icon,
-          color: locked ? AppColors.slate400 : AppColors.primary,
+          color: onTap == null ? AppColors.slate400 : AppColors.primary,
         ),
         title: Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
         subtitle: Text(subtitle),
-        trailing: locked
-            ? const Icon(Icons.lock_outline_rounded, size: 18)
+        trailing: onTap == null
+            ? null
             : const Icon(Icons.chevron_right_rounded),
-        onTap: locked ? null : onTap,
+        onTap: onTap,
       ),
     );
   }

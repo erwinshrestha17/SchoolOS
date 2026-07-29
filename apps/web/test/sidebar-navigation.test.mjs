@@ -38,6 +38,12 @@ describe('school operations sidebar', () => {
     }
 
     assert.match(sidebar, /function NavGroupSection/);
+    assert.match(sidebar, /principalNavGroups/);
+    assert.match(sidebar, /hrNavGroups/);
+    assert.match(sidebar, /accountantNavGroups/);
+    assert.match(sidebar, /librarianNavGroups/);
+    assert.match(sidebar, /cashierNavGroups/);
+    assert.match(sidebar, /function navGroupsForPersona/);
     assert.doesNotMatch(sidebar, /label: 'Overview'/);
     assert.doesNotMatch(sidebar, /label: 'People'/);
     assert.doesNotMatch(sidebar, /label: 'Campus Services'/);

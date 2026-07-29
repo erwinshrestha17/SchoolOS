@@ -19,6 +19,9 @@ import '../features/teacher/presentation/screens/teacher_activity_screen.dart';
 import '../features/teacher/presentation/screens/teacher_homework_screen.dart';
 import '../features/teacher/presentation/screens/teacher_profile_screen.dart';
 import '../features/teacher/presentation/screens/teacher_timetable_screen.dart';
+import '../features/teacher/presentation/screens/teacher_marks_screen.dart';
+import '../features/teacher/presentation/screens/teacher_self_service_screens.dart';
+import '../features/teacher/data/teacher_marks_repository.dart';
 import '../features/learning/presentation/screens/learning_summary_screen.dart';
 import '../features/learning/presentation/screens/student_learning_session_screen.dart';
 import '../features/learning_support/presentation/parent_learning_support_screen.dart';
@@ -301,6 +304,28 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.teacherProfile,
         builder: (context, state) => const TeacherProfileScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.teacherLeave,
+        builder: (context, state) => const TeacherLeaveScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.teacherPayslips,
+        builder: (context, state) => const TeacherPayslipsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.teacherMarks,
+        builder: (context, state) => const TeacherMarksScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.teacherMarksEntry,
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is TeacherAssessmentComponent) {
+            return TeacherMarksEntryScreen(component: extra);
+          }
+          return const TeacherMarksScreen();
+        },
       ),
       GoRoute(
         path: AppRoutes.driverHome,
@@ -623,7 +648,9 @@ bool isTeacherRoute(String location) {
       location == AppRoutes.teacherTimetable ||
       location == AppRoutes.teacherProfile ||
       location == AppRoutes.teacherLeave ||
-      location == AppRoutes.teacherPayslips;
+      location == AppRoutes.teacherPayslips ||
+      location == AppRoutes.teacherMarks ||
+      location.startsWith('${AppRoutes.teacherMarks}/');
 }
 
 @visibleForTesting

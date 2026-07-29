@@ -15,15 +15,22 @@ import '../../application/staff_providers.dart';
 import '../../domain/staff_models.dart';
 
 class StaffPayslipsScreen extends ConsumerWidget {
-  const StaffPayslipsScreen({super.key});
+  const StaffPayslipsScreen({
+    super.key,
+    this.shellRole = 'STAFF',
+    this.selectedIndex = 3,
+  });
+
+  final String shellRole;
+  final int selectedIndex;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final payslips = ref.watch(staffPayslipsProvider);
 
     return RoleShellScaffold(
-      role: 'STAFF',
-      selectedIndex: 3,
+      role: shellRole,
+      selectedIndex: selectedIndex,
       title: 'My Payslips',
       body: payslips.when(
         loading: () => const AppLoading(message: 'Loading payslips...'),

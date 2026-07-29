@@ -10,10 +10,12 @@ import type { RecentlyViewedKind } from '../../lib/recently-viewed';
 import { useSession } from '../session-provider';
 import {
   canDisplayNavItem,
-  dashboardNavGroups,
+  navGroupsForPersona,
   settingsNavItem,
   type NavItem,
 } from './sidebar';
+import { useSchoolWebPersona } from '../../lib/school-web-persona';
+import { useTeacherAccess } from '../../lib/teacher-access';
 
 const RECENT_KIND_ICON: Record<RecentlyViewedKind, LucideIcon> = {
   student: UserRound,
@@ -46,6 +48,8 @@ export function CommandPalette() {
   const { session } = useSession();
   const { hasModule } = useEntitlements();
   const { entries: recentlyViewed } = useRecentlyViewed();
+  const schoolWebPersona = useSchoolWebPersona();
+  const { capabilities } = useTeacherAccess();
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
@@ -53,11 +57,13 @@ export function CommandPalette() {
 
   const navItems = useMemo(() => {
     const flattened: NavItem[] = [
-      ...dashboardNavGroups.flatMap((group) => group.items),
+      ...navGroupsForPersona(schoolWebPersona, capabilities).flatMap(
+        (group) => group.items,
+      ),
       settingsNavItem,
     ];
     return flattened.filter((item) => canDisplayNavItem(item, session, hasModule));
-  }, [session, hasModule]);
+  }, [session, hasModule, schoolWebPersona, capabilities]);
 
   const results = useMemo(() => {
     const normalized = query.trim().toLowerCase();

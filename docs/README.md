@@ -13,6 +13,13 @@ SchoolOS is currently in **Internal QA / controlled-pilot preparation**. Documen
 | [Production / GA Release Policy](production/SCHOOLOS_GA_RELEASE_POLICY.md) | Release terminology, stages, evidence requirements, GA blockers, acceptance gates, and prohibited readiness claims. |
 | [Production Runbook](production/SCHOOLOS_PRODUCTION_RUNBOOK.md) | Environment configuration, deployment, migrations, health checks, backup, restore, rollback, incidents, pilot operations, and verification commands. |
 
+## Supporting persona allocation
+
+| Document | Single responsibility |
+|---|---|
+| [Module Features and Persona Platform Mapping](Persona/SchoolOS_Module_Features_and_Persona_Platform_Mapping.md) | Target web vs mobile feature allocation by persona (not implementation evidence). |
+| [Teacher Persona Access Spec](Persona/SchoolOS_Teacher_Persona_Access_Spec.md) | Teacher-specific access, assignments, web/mobile workflows, and offline rules. |
+
 Current work, blockers, and sequencing belong in GitHub Issues, Milestones, or Projects. Current verification evidence belongs in CI runs, smoke outputs, staging records, and release artifacts.
 
 Do not add a new Markdown file when the content belongs in one of these canonical documents. Keep cross-document context brief and link to the canonical owner instead of duplicating its sections.
