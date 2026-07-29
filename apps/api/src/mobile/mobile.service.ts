@@ -2954,14 +2954,13 @@ export class MobileService {
     studentIds: string[],
     childScoped = false,
   ) {
+    void childScoped;
     return {
       tenantId: actor.tenantId,
       AND: [
         {
           OR: [
-            childScoped
-              ? { recipientUserId: actor.userId, studentId: null }
-              : { recipientUserId: actor.userId },
+            { recipientUserId: actor.userId, studentId: null },
             ...(studentIds.length > 0
               ? [{ studentId: { in: studentIds } }]
               : []),

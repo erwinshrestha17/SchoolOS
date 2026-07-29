@@ -1,7 +1,7 @@
 # Pilot Rehearsal Provision Log
 
-- Started: 2026-07-29T12:49:45.602Z
-- Finished: 2026-07-29T12:49:48.185Z
+- Started: 2026-07-29T13:32:48.338Z
+- Finished: 2026-07-29T13:32:51.037Z
 - Result: **PASS**
 
 ## Commands
@@ -17,7 +17,7 @@ pnpm --filter @schoolos/api db:seed:pilot-rehearsal
 > @schoolos/api@0.0.1 db:seed:pilot-rehearsal /Users/erwin/Projects/SchoolOS/apps/api
 > tsx prisma/seed-pilot-rehearsal-tenant.ts
 
-Created pilot rehearsal tenant "pilot-rehearsal-1".
+Refreshed pilot rehearsal tenant "pilot-rehearsal-1".
 
 --- Pilot Rehearsal Tenant Ready ---
 Tenant ID:   7de9c32a-16b5-46b9-bb8b-f5dbaa454a0f
@@ -39,18 +39,6 @@ Next: complete Day-0 setup at /dashboard/settings/onboarding
 ## Next steps
 
 1. `pnpm staging:api:local`
-2. `pnpm verify:pilot-entitlements`
-3. `pnpm smoke:pilot:rehearsal` (after Day-0 academic setup for full persona smoke)
-
-## Verification (2026-07-29)
-
-- `pnpm verify:pilot-entitlements`: **PASS** (8/8)
-- `pnpm smoke:pilot:rehearsal`: **PASS** (41/41, Wave 1 mode)
-- `pnpm seed:pilot-rehearsal-personas`: **PASS**
-- Onboarding API: **79%** (11/14); branding upload pending
-
-## Next steps
-
-1. Upload branding at `/dashboard/settings/school/branding`
-2. Optional: `pnpm smoke:pilot:rehearsal` after any structural changes
-3. Begin Day-1 operations runbook §5 (Wave 1 steps only)
+2. `pnpm seed:pilot-rehearsal-personas`
+3. `pnpm verify:pilot-entitlements`
+4. `pnpm smoke:pilot:rehearsal` (Wave 1 mode — after persona seed)

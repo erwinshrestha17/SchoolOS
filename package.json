@@ -33,6 +33,7 @@
     "provision:pilot-rehearsal": "node scripts/provision-pilot-rehearsal.mjs",
     "seed:pilot-rehearsal-personas": "pnpm --filter @schoolos/api db:seed:pilot-rehearsal-personas",
     "verify:pilot-entitlements": "node scripts/verify-pilot-entitlements.mjs",
+    "verify:m1-admissions": "node scripts/verify-m1-admissions-local.mjs",
     "smoke:pilot:rehearsal": "node scripts/smoke-pilot-rehearsal.mjs",
     "db:seed:geography": "pnpm --filter @schoolos/api db:seed:geography",
     "test:web:e2e": "pnpm --filter @schoolos/web test:e2e; status=$?; pnpm db:clean:e2e || true; exit $status",

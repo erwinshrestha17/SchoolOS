@@ -7,7 +7,7 @@ Items below are **not** open P0 defects after DEF-01–DEF-06 remediation, but r
 | P1-01 | Auth | `mustChangePassword` not enforced server-side | Enforce on sensitive routes after temp credential issue | Yes for pilot admin onboarding — **Remediated 2026-07-29 (M0 slice)**: `MustChangePasswordGuard` enforced from `JwtAuthGuard`; allowlisted `auth/me`, `auth/change-password`, `auth/logout` |
 | P1-02 | Tenancy | Prisma auto-scope excludes upsert/aggregate/raw; jobs without CLS | Audit hot paths; set CLS in processors | Yes if unscoped writes found |
 | P1-03 | Auth | Support override breaks `/auth/me` | Fix override + add regression test | Medium — **Remediated 2026-07-29 (M0 slice)**: `AuthService.getProfile` validates home tenant during override and projects effective school tenant |
-| P1-04 | Guardians | Post-revoke guardian residual notification inbox access | Fail-closed inbox filter | Yes for parent trust |
+| P1-04 | Guardians | Post-revoke guardian residual notification inbox access | Fail-closed inbox filter | Yes for parent trust — **Remediated 2026-07-29 (M1 slice)**: parent notification visibility now requires `studentId: null` for direct recipient matches; child-linked deliveries drop after link revoke |
 | P1-05 | Guardians | No DB constraint for single primary guardian | Migration + validation | Medium |
 | P1-06 | Ops | `/ready` returned 200 when degraded | **Remediated**: 503 when degraded | Closed |
 | P1-07 | Ops | No monitoring/alerts | Add health polling + alert webhook | Yes for production |

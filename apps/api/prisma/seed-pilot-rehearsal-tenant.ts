@@ -102,7 +102,11 @@ async function provisionTenantDefaults(
     await tx.rolePermission.deleteMany({ where: { roleId: role.id } });
 
     for (const permissionKey of permissionKeys) {
-      const [resource, action] = permissionKey.split(':');
+      const parts = permissionKey.split(':');
+      const action = parts.pop();
+      const resource = parts.join(':');
+      if (!resource || !action) continue;
+
       const permission = await tx.permission.findUnique({
         where: { resource_action: { resource, action } },
       });

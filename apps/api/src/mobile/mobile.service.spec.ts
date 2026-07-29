@@ -1192,7 +1192,7 @@ describe('MobileService', () => {
           AND: [
             {
               OR: [
-                { recipientUserId: 'parent-1' },
+                { recipientUserId: 'parent-1', studentId: null },
                 { studentId: { in: ['student-1'] } },
               ],
             },
@@ -1225,6 +1225,36 @@ describe('MobileService', () => {
         isRead: true,
       }),
     ]);
+  });
+
+  it('hides child-linked notifications after guardian access is revoked', async () => {
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [],
+    });
+    prisma.notificationDelivery.findMany.mockResolvedValue([]);
+    prisma.notificationDelivery.count.mockResolvedValue(0);
+
+    await service.listNotifications(actor);
+
+    expect(prisma.notificationDelivery.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: 'tenant-1',
+          AND: [
+            {
+              OR: [{ recipientUserId: 'parent-1', studentId: null }],
+            },
+            {
+              OR: [
+                { noticeId: null },
+                { notice: { is: { lifecycleStatus: 'PUBLISHED' } } },
+              ],
+            },
+          ],
+        }),
+      }),
+    );
   });
 
   it('scopes parent dashboard notifications to the active child and global parent items', async () => {
@@ -1291,7 +1321,7 @@ describe('MobileService', () => {
         AND: [
           {
             OR: [
-              { recipientUserId: 'parent-1' },
+              { recipientUserId: 'parent-1', studentId: null },
               { studentId: { in: ['student-1'] } },
             ],
           },
@@ -1329,7 +1359,7 @@ describe('MobileService', () => {
       where: {
         tenantId: 'tenant-1',
         AND: [
-          { OR: [{ recipientUserId: 'teacher-user' }] },
+          { OR: [{ recipientUserId: 'teacher-user', studentId: null }] },
           {
             OR: [
               { noticeId: null },
@@ -1413,7 +1443,7 @@ describe('MobileService', () => {
         AND: [
           {
             OR: [
-              { recipientUserId: 'parent-1' },
+              { recipientUserId: 'parent-1', studentId: null },
               { studentId: { in: ['student-1'] } },
             ],
           },
@@ -1479,7 +1509,7 @@ describe('MobileService', () => {
           AND: [
             {
               OR: [
-                { recipientUserId: 'parent-1' },
+                { recipientUserId: 'parent-1', studentId: null },
                 { studentId: { in: ['student-1'] } },
               ],
             },

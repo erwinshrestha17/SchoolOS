@@ -54,6 +54,9 @@ if (wave === 'wave0' || wave === 'wave1') {
 
 if (wave === 'wave1') {
   checks.push(
+    run('verify:m1-admissions (staging env)', 'pnpm', ['verify:m1-admissions'], true),
+  );
+  checks.push(
     run('M15 notice workflows spec', 'pnpm', [
       '--filter',
       '@schoolos/web',

@@ -262,6 +262,24 @@ async function runPilotRoleChecks(tokens) {
   );
   checks.push(adminStudents.check);
   const seededStudents = getItems(adminStudents.body);
+  const adminAdmissionCases = await fetchOk(
+    'Admin can list admission cases',
+    '/admissions/cases?page=1&limit=5',
+    tokens.admin,
+  );
+  checks.push(adminAdmissionCases.check);
+  const adminAdmissionPolicies = await fetchOk(
+    'Admin can list admission policies',
+    '/admissions/policies?page=1&limit=5',
+    tokens.admin,
+  );
+  checks.push(adminAdmissionPolicies.check);
+  const adminQrSummary = await fetchOk(
+    'Admin can read QR credential summary',
+    '/students/qr/summary',
+    tokens.admin,
+  );
+  checks.push(adminQrSummary.check);
   const adminSections = await fetchOk(
     'Admin can list seeded sections',
     '/sections',
