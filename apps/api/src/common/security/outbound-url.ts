@@ -21,6 +21,43 @@ export class UnsafeOutboundUrlError extends Error {
   }
 }
 
+export function isNonProductionRuntime() {
+  return (
+    process.env.NODE_ENV !== 'production' &&
+    process.env.DEPLOY_ENV !== 'production'
+  );
+}
+
+/**
+ * Allows loopback HTTP(S) payment-provider URLs in non-production so local
+ * mock gateways (verify:m3-fees) can exercise generic_json_v1 without TLS.
+ */
+export function parsePaymentProviderOutboundUrl(
+  value: string,
+  label = 'Payment provider URL',
+): URL {
+  if (isNonProductionRuntime()) {
+    let parsed: URL;
+    try {
+      parsed = new URL(value);
+    } catch {
+      throw new UnsafeOutboundUrlError(label);
+    }
+
+    const hostname = parsed.hostname.toLowerCase();
+    if (
+      (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
+      parsed.username.length === 0 &&
+      parsed.password.length === 0 &&
+      (hostname === 'localhost' || hostname === '127.0.0.1')
+    ) {
+      return parsed;
+    }
+  }
+
+  return parseSafeExternalHttpsUrl(value, label);
+}
+
 export function parseSafeExternalHttpsUrl(
   value: string,
   label = 'Outbound URL',

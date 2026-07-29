@@ -11,7 +11,7 @@
  * Idempotent: fixed ids, upserts throughout, and prior payments are cleared so
  * it can be replayed.
  */
-import { InvoiceStatus, PaymentMethod, PrismaClient } from '@prisma/client';
+import { InvoiceStatus, PaymentMethod, PrismaClient, GuardianCapability } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import 'dotenv/config';
 
@@ -122,6 +122,26 @@ async function main() {
     );
   }
   const studentId = guardian.studentLinks[0].studentId;
+
+  await prisma.studentGuardian.updateMany({
+    where: {
+      tenantId: tenant.id,
+      guardianId: guardian.id,
+      studentId,
+      status: 'ACTIVE',
+    },
+    data: {
+      capabilities: [
+        GuardianCapability.ACADEMICS_VIEW,
+        GuardianCapability.ATTENDANCE_VIEW,
+        GuardianCapability.FEES_VIEW,
+        GuardianCapability.FEES_PAY,
+        GuardianCapability.SCHOOL_COMMUNICATE,
+        GuardianCapability.COMPLAINT_OR_CORRECTION_SUBMIT,
+        GuardianCapability.EMERGENCY_ALERT_RECEIVE,
+      ],
+    },
+  });
 
   const student = await prisma.student.findUniqueOrThrow({
     where: { id: studentId },

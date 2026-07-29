@@ -18,6 +18,7 @@ Items below are **not** open P0 defects after DEF-01–DEF-06 remediation, but r
 | P1-12 | Web | Homework date filter client-capped at 100 | Server pagination | Medium |
 | P1-13 | Entitlements | `service-requests` + `advanced-operations` controllers ungated | Assign module keys + gate | Medium (out of pilot nav) — **Closed 2026-07-29**: explicit `@NoModuleEntitlement` on all six controllers; entitlement coverage contract PASS |
 | P1-14 | Academics | CAS web pickers tenant-wide vs backend scope | Scope pickers with teacher assignment helper | Medium (exams disabled) |
+| P1-15 | Payments | P0-12 real provider reconciliation not proven | Local `verify:m3-fees` proves generic_json_v1 + HMAC webhook idempotency only (2026-07-29) | Yes for production eSewa/Khalti — **Partial local evidence**: mock gateway + `db:seed:e2e:m3-payment-gateway`; TLS provider sandbox remains ops track |
 
 ## Triage rules
 

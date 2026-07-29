@@ -56,7 +56,7 @@ import {
   decryptSensitiveField,
   isEncryptedSensitiveField,
 } from '../common/security/field-encryption';
-import { parseSafeExternalHttpsUrl } from '../common/security/outbound-url';
+import { parsePaymentProviderOutboundUrl } from '../common/security/outbound-url';
 import { CashierCloseWindowDto } from './dto/cashier-close-window.dto';
 import { CollectPaymentDto } from './dto/collect-payment.dto';
 import { InitiateOnlinePaymentDto } from './dto/initiate-online-payment.dto';
@@ -6534,7 +6534,7 @@ export class FinanceService {
     }
     let parsedUrl: URL;
     try {
-      parsedUrl = parseSafeExternalHttpsUrl(intentUrl, 'Payment intent URL');
+      parsedUrl = parsePaymentProviderOutboundUrl(intentUrl, 'Payment intent URL');
     } catch {
       throw new BadRequestException('Payment intent URL is invalid.');
     }
@@ -6596,7 +6596,10 @@ export class FinanceService {
     }
     let checkout: URL;
     try {
-      checkout = parseSafeExternalHttpsUrl(checkoutUrl, 'Payment checkout URL');
+      checkout = parsePaymentProviderOutboundUrl(
+        checkoutUrl,
+        'Payment checkout URL',
+      );
     } catch {
       throw new BadRequestException(
         'The payment provider returned an unsafe checkout URL.',

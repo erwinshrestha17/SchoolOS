@@ -80,7 +80,54 @@ if (wave === 'wave1') {
   );
 }
 
+if (wave === 'wave2') {
+  checks.push(
+    run('verify:m3-fees (staging env)', 'pnpm', ['verify:m3-fees'], true),
+  );
+  checks.push(
+    run('M3 fees smoke spec', 'pnpm', [
+      '--filter',
+      '@schoolos/web',
+      'exec',
+      'playwright',
+      'test',
+      'attendance-fees-smoke.spec.ts',
+    ], true),
+  );
+}
+
+if (wave === 'wave3') {
+  checks.push(
+    run('verify:m4-academics (staging env)', 'pnpm', ['verify:m4-academics'], true),
+  );
+  checks.push(
+    run('M4 academics smoke spec', 'pnpm', [
+      '--filter',
+      '@schoolos/web',
+      'exec',
+      'playwright',
+      'test',
+      'academics-phase2a-smoke.spec.ts',
+    ], true),
+  );
+}
+
 if (wave === 'wave4') {
+  checks.push(
+    run('verify:m7-hr (staging env)', 'pnpm', ['verify:m7-hr'], true),
+  );
+  checks.push(
+    run('verify:m8-library (staging env)', 'pnpm', ['verify:m8-library'], true),
+  );
+  checks.push(
+    run('verify:m9-transport (staging env)', 'pnpm', ['verify:m9-transport'], true),
+  );
+  checks.push(
+    run('verify:m10-canteen (staging env)', 'pnpm', ['verify:m10-canteen'], true),
+  );
+  checks.push(
+    run('verify:m11-accounting (staging env)', 'pnpm', ['verify:m11-accounting'], true),
+  );
   checks.push(
     run('M7-M11 role boundaries spec', 'pnpm', [
       '--filter',
@@ -109,32 +156,6 @@ if (wave === 'wave1' || wave === 'wave0') {
     run('flutter analyze', 'bash', [
       '-lc',
       'cd apps/schoolos_mobile && flutter analyze',
-    ], true),
-  );
-}
-
-if (wave === 'wave2') {
-  checks.push(
-    run('M3 fees smoke spec', 'pnpm', [
-      '--filter',
-      '@schoolos/web',
-      'exec',
-      'playwright',
-      'test',
-      'attendance-fees-smoke.spec.ts',
-    ], true),
-  );
-}
-
-if (wave === 'wave3') {
-  checks.push(
-    run('M4 academics smoke spec', 'pnpm', [
-      '--filter',
-      '@schoolos/web',
-      'exec',
-      'playwright',
-      'test',
-      'academics-phase2a-smoke.spec.ts',
     ], true),
   );
 }

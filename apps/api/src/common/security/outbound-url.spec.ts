@@ -1,7 +1,26 @@
 import {
+  parsePaymentProviderOutboundUrl,
   parseSafeExternalHttpsUrl,
   UnsafeOutboundUrlError,
 } from './outbound-url';
+
+describe('parsePaymentProviderOutboundUrl', () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+  const originalDeployEnv = process.env.DEPLOY_ENV;
+
+  afterEach(() => {
+    process.env.NODE_ENV = originalNodeEnv;
+    process.env.DEPLOY_ENV = originalDeployEnv;
+  });
+
+  it('allows loopback HTTP payment-provider URLs in non-production', () => {
+    process.env.NODE_ENV = 'development';
+    process.env.DEPLOY_ENV = 'local-staging';
+    expect(
+      parsePaymentProviderOutboundUrl('http://127.0.0.1:4010/intents').toString(),
+    ).toBe('http://127.0.0.1:4010/intents');
+  });
+});
 
 describe('parseSafeExternalHttpsUrl', () => {
   it.each([

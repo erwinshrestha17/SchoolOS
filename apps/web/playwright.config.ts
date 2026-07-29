@@ -27,7 +27,7 @@ export default defineConfig({
   webServer: {
     command: webServerCommand,
     url: baseURL,
-    reuseExistingServer: false,
+    reuseExistingServer: Boolean(process.env.PLAYWRIGHT_BASE_URL),
     timeout: 120_000,
   },
   projects: [

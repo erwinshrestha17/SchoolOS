@@ -17,6 +17,7 @@
     "db:seed:e2e:m1-waitlist": "tsx prisma/seed-m1-waitlist-e2e.ts",
     "db:seed:e2e:m1-assessment": "tsx prisma/seed-m1-assessment-e2e.ts",
     "db:seed:e2e:m3-collection": "tsx prisma/seed-m3-collection-e2e.ts",
+    "db:seed:e2e:m3-payment-gateway": "tsx prisma/seed-m3-payment-gateway-e2e.ts",
     "db:seed:e2e:m4-report-card": "tsx prisma/seed-m4-report-card-e2e.ts",
     "db:seed:e2e:m0-account-security": "tsx prisma/seed-m0-account-security-e2e.ts",
     "db:seed:e2e:m0-platform": "tsx prisma/seed-m0-platform-e2e.ts",
