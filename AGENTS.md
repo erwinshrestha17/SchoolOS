@@ -1,22 +1,36 @@
 # SchoolOS Agent Instructions
 
-Token-light global rules for agents. Detailed behavior lives in the active docs and existing code/contracts.
+Token-conscious, repository-wide rules for human and AI contributors.
 
-## Read only what is relevant
+**Current posture:** Internal QA / controlled-pilot preparation. Make existing pilot-critical workflows reliable, secure, testable, and operationally usable. Do not expand scope unless the project owner explicitly approves it.
 
-Start with `README.md`, `docs/README.md`, and `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`. Then read the focused source for the touched area:
+## 1. Instruction precedence
 
-- Product/function: `docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md`
-- Software/API/database/web/mobile requirements: `docs/requirements/SCHOOLOS_SRS.md`
-- Architecture/security/platform: `docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md`
-- Module ownership and gaps: `docs/architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md`
-- Web: `apps/web/AGENTS.md`, `apps/web/e2e/README.md`
-- Mobile: `apps/schoolos_mobile/AGENTS.md`, `apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md`
-- Deploy/staging: `docs/production/SCHOOLOS_PRODUCTION_RUNBOOK.md`
+Apply instructions in this order:
 
-Do not recreate old split plans or duplicate docs. Update the smallest active source of truth only when docs truly need changes.
+1. Explicit project-owner instruction for the current task.
+2. This root `AGENTS.md`.
+3. Scoped `AGENTS.md` files in the touched app/package.
+4. Canonical product, requirements, architecture, and release documents.
+5. Existing contracts, migrations, tests, and established code conventions.
 
-Formal ownership is fixed:
+Do not use archived plans, generated summaries, or inferred behavior when a canonical source exists.
+
+## 2. Read only what is relevant
+
+Start with `README.md`, `docs/README.md`, and `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`. Then read only the focused source for the touched area:
+
+| Area | Canonical source |
+|---|---|
+| Product/function | `docs/product/SCHOOLOS_PRODUCT_REQUIREMENTS.md` |
+| Software/API/database/web/mobile requirements | `docs/requirements/SCHOOLOS_SRS.md` |
+| Architecture/security/platform | `docs/architecture/SCHOOLOS_ARCHITECTURE_AND_SECURITY.md` |
+| Module ownership and gaps | `docs/architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md` |
+| Web | `apps/web/AGENTS.md`, `apps/web/e2e/README.md` |
+| Mobile | `apps/schoolos_mobile/AGENTS.md`, `apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md` |
+| Deploy/staging/operations | `docs/production/SCHOOLOS_PRODUCTION_RUNBOOK.md` |
+
+Formal document ownership is fixed:
 
 | Artifact | Canonical path |
 |---|---|
@@ -27,11 +41,11 @@ Formal ownership is fixed:
 | Release policy | `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md` |
 | Production runbook | `docs/production/SCHOOLOS_PRODUCTION_RUNBOOK.md` |
 
-Do not add Markdown when the content belongs in an existing canonical document. Track current work and blockers in GitHub Issues, Milestones, or Projects.
+Do not create duplicate plans or ad hoc Markdown when content belongs in a canonical document. Track active work and blockers in GitHub Issues, Milestones, or Projects.
 
-## Active module taxonomy
+## 3. Active module taxonomy
 
-Use this numbering in new docs, UI copy, comments, tickets, and implementation notes:
+Use these identifiers in docs, UI copy, comments, tickets, tests, and implementation notes:
 
 | Module | Name |
 |---|---|
@@ -52,15 +66,25 @@ Use this numbering in new docs, UI copy, comments, tickets, and implementation n
 | M14 | Intelligence / AI |
 | M15 | Notices and Announcements |
 
-`M8A`, `M8B`, and `M8C` are obsolete. Library, Transport, and Canteen are independent modules.
+- `M8A`, `M8B`, and `M8C` are obsolete.
+- Inventory and Asset Management is removed from active scope. Do not add related docs, APIs, routes, migrations, entitlements, seed data, or UI unless explicitly re-approved.
+- Chat/conversations are removed from the active product. Preserve historical data and authorization for compatibility/retention only; add no navigation, new writes, or replacement module identifier.
 
-Inventory & Asset Management is scrapped from the active module plan. Do not add Inventory docs, APIs, routes, migrations, entitlements, seed data, or UI unless explicitly re-approved by the project owner.
+## 4. Product boundary and release target
 
-## Product stance and release target
+SchoolOS is a Nepal-first multi-tenant education operating SaaS for:
 
-SchoolOS is a Nepal-first multi-tenant education operating SaaS for `SCHOOL` (Grade 1-10) and `HIGHER_SECONDARY` (Grade 11-12 / +2), not a CRUD dashboard and not an MVP delivery exercise. Preschool is permanently out of product scope (owner decision, 2026-07-18). Bachelor and Master's institution-management features are not active scope. Every change must move the supported release boundary toward **Production / General Availability (GA)**.
+- `SCHOOL`: Grades 1–10.
+- `HIGHER_SECONDARY`: Grades 11–12 / +2.
 
-Use the release stages defined in `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`:
+Out of scope:
+
+- Preschool, permanently removed by owner decision on 2026-07-18.
+- Bachelor’s and Master’s institution-management features.
+- Generic CRUD-dashboard positioning.
+- Treating scope expansion as pilot readiness.
+
+Every approved change must move the supported boundary toward Production / GA.
 
 ```text
 Development complete
@@ -71,88 +95,210 @@ Release candidate
 GA / Production release
 ```
 
-Report readiness honestly. The current posture is Internal QA / controlled-pilot preparation; SchoolOS is not GA until staging migration and provider checks, authenticated browser E2E, device QA, backup/restore proof, controlled-pilot workflows, monitoring, rollback, and release evidence pass. Passing local tests, showing a demo, or completing backend code does not establish production or GA readiness.
+The current posture is Internal QA / controlled-pilot preparation. Do not claim staging, pilot, release-candidate, production, or GA readiness without the applicable evidence in the GA release policy. Local tests, a build, a demo, or backend completion are not release evidence.
 
-Current priorities: security/RBAC/tenant-isolation evidence; staging deployment and operational proof; browser E2E; real-API web workspaces; pilot workflows; mobile device QA; performance/backup/observability/release automation. M14 AI remains roadmap only unless explicitly approved.
+## 5. Delivery priorities
 
-M13 Learning Layer is deferred and frozen. Preserve its backend, Prisma schema and migrations, OpenAPI/shared contracts, web and Flutter surfaces, tests, files, permissions, entitlements, and existing records. Keep it disabled by default for pilot tenants, hidden from navigation when disabled, and outside pilot acceptance criteria and production-readiness claims. Do not add M13 features, seed expansion, populated visual fixtures, mobile expansion, activity/question types, session modes, reports, analytics, AI, adaptive behavior, or public/student-home learning. Only make a focused M13 change to fix tenant isolation, RBAC/ownership, suspended-tenant failure, protected-file security, build/typecheck failure, Prisma migration failure, OpenAPI verification failure, or a repository-wide test regression. Do not delete Learning data or run destructive Learning migrations.
+### P0 — Pilot-blocking safety and correctness
 
-## Architecture: never break
+- Tenant isolation.
+- Teacher assignment authorization.
+- Guardian-child authorization.
+- Attendance correctness.
+- Fee and receipt correctness.
+- Examination/mark-entry authorization.
+- Sensitive-action audit logging.
+- Backup and restore readiness.
+- Suspended-tenant and disabled-module fail-closed behavior.
 
-- Keep NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js App Router, Flutter companion app, `packages/core` where available.
-- No Angular migration, microservices, new DB/search cluster/GPU/Kubernetes, or separate deployment units unless approved.
-- Do not rename `tenantId`.
-- Keep planes separate: `/platform/*` operator SaaS, `/dashboard/settings/*` school config, `/dashboard/*` school operations.
-- Do not mix SaaS billing with school fee collection/accounting.
-- Keep the frozen M13 Learning domain separate and preserve its reuse of core students/staff/classes/subjects/timetable/files/RBAC/audit/notifications; do not extend it.
-- Keep M12 notification delivery separate from feature modules. Source modules emit events; M12 owns recipient resolution, templates, channel routing, delivery jobs, retries, read state, provider diagnostics, and audit.
-- Keep M15 notice authoring separate from M12 delivery. M15 previews and publishes notices, then emits a normalized event to M12. Chat/conversations are removed from the active product; preserve historical data and authorization for compatibility/retention without active navigation or new writes. Do not treat Chat as a deferred module or reuse its former identifier.
+### P1 — Pilot operability
 
-## Naming and contract rules
+- Data migration and validation.
+- Staff and parent onboarding.
+- Essential reports and exports.
+- Real-API web workspaces.
+- Authenticated browser E2E.
+- Mobile device QA.
+- Performance, observability, provider, staging, and operational evidence.
 
-- Follow the naming and contract rules in this file and the existing touched-area conventions before adding or renaming files, folders, routes, DTOs, schema values, API clients, or web/mobile surfaces.
-- New TypeScript/web paths use kebab-case; Flutter/Dart paths use lower_snake_case; framework-required filenames remain exceptions.
-- New API paths use lowercase kebab-case resource nouns, explicit route parameters such as `:studentId`, and documented domain-command routes only when CRUD is insufficient.
-- Use one canonical business term per concept. `tenantId` is the only tenancy boundary name.
-- Persisted/API lifecycle values must follow one chain: Prisma/domain value -> DTO validation -> service -> OpenAPI -> shared contract -> web/mobile. Do not duplicate raw status strings or invent UI-only statuses.
-- Preserve stable legacy names unless a documented compatibility and migration plan protects API, database, web, mobile, integration, job, cache, and test consumers.
+### P2 — Post-pilot refinement
 
-## Security and data rules
+- UI refinement beyond validated usability problems.
+- Optional modules.
+- Advanced analytics.
+- AI functionality.
 
-- `tenantId` is the strict boundary for API, jobs, files, cache, exports, reports, web, mobile, learning, notifications, and school operations.
-- Backend authorization is truth; frontend hiding is UX only.
+P2 must not delay unresolved P0 or P1 work.
+
+## 6. Frozen domains
+
+### M13 Learning Layer
+
+M13 is deferred and frozen. Preserve its backend, Prisma schema/migrations, OpenAPI/shared contracts, web/Flutter surfaces, tests, files, permissions, entitlements, and existing records.
+
+Keep it disabled by default for pilot tenants, hidden when disabled, and outside pilot acceptance criteria and production-readiness claims.
+
+Do not add M13 features, seed expansion, populated fixtures, mobile expansion, activity/question types, session modes, reports, analytics, AI, adaptive behavior, or broad student-home learning.
+
+Only make a focused M13 change to fix tenant isolation, RBAC/ownership, suspended-tenant failure, protected-file security, build/typecheck failure, Prisma migration failure, OpenAPI verification failure, or repository-wide regression. Do not delete Learning data or run destructive Learning migrations.
+
+### M14 Intelligence / AI
+
+M14 remains roadmap-only unless explicitly approved.
+
+## 7. Architecture: never break
+
+Keep:
+
+- NestJS modular monolith.
+- PostgreSQL/Prisma.
+- Redis/BullMQ.
+- Next.js App Router.
+- Flutter companion app.
+- `packages/core` where available.
+
+Do not introduce Angular migration, microservices, another database/search cluster, GPU infrastructure, Kubernetes, or separate deployment units without approval.
+
+Mandatory boundaries:
+
+- `tenantId` is the only tenancy boundary name; never rename it.
+- `/platform/*` = operator SaaS plane.
+- `/dashboard/settings/*` = school configuration plane.
+- `/dashboard/*` = school operations plane.
+- Keep SaaS billing separate from school fee collection/accounting.
+- Keep M13 separate while preserving approved reuse of core entities/services.
+- Source modules emit normalized events; M12 owns notification delivery.
+- M15 owns notice authoring/publishing and emits normalized events to M12.
+
+## 8. Naming and contract rules
+
+- Inspect touched-area conventions before adding or renaming files, routes, DTOs, schema values, API clients, contracts, or UI surfaces.
+- New TypeScript/web paths use kebab-case; Flutter/Dart paths use lower_snake_case; framework filenames are exceptions.
+- New API paths use lowercase kebab-case resource nouns, explicit parameters such as `:studentId`, and documented command routes only when CRUD is insufficient.
+- Use one canonical business term per concept.
+- Persisted/API lifecycle values must follow: `Prisma/domain -> DTO -> service -> OpenAPI -> shared contract -> web/mobile`.
+- Do not duplicate raw status strings or invent UI-only lifecycle values.
+- Preserve stable legacy names unless a documented migration/compatibility plan protects database, API, web, mobile, integrations, jobs, cache, and tests.
+
+## 9. Security and data rules
+
+Backend authorization is truth; frontend hiding is UX only.
+
+`tenantId` must scope APIs, jobs, files, caches, exports, reports, web, mobile, Learning, notifications, and all school operations.
+
+Persona scopes fail closed:
+
+- Parent: linked children only.
+- Student: own/session-scoped records only.
+- Teacher: assigned class/section/subject only unless explicitly permitted.
+- Class teacher: view access does not grant write access to another teacher’s subject.
+- Driver: assigned trip only.
+- Staff self-service: own data only.
+
+Also:
+
 - Disabled modules and suspended tenants fail closed everywhere.
-- Parent = linked children only. Student = own/session-scoped only. Teacher = assigned class/section/subject only unless permitted. Driver = assigned trip only. Staff self-service = own data only.
-- Platform support override needs reason, audit, and expiry where supported.
-- Never expose unsafe internals, private payloads, provider/storage internals, raw stack traces, or private staff/finance data.
-- Notifications must not leak private message bodies, provider credentials, callback secrets, raw object keys, private URLs, salary/bank data, or unrelated student details.
+- Platform support override requires reason, audit, and expiry where supported.
+- Sensitive writes must be audited.
+- Never expose secrets, raw stack traces, Prisma/provider/storage internals, callback secrets, object keys, private URLs, salary/bank data, private staff/finance data, or unrelated student details.
+- Never put production credentials, student data, or database backups in prompts, logs, fixtures, screenshots, or commits.
 
-## Files, money, notifications, web, mobile
+## 10. Cross-cutting implementation rules
 
-Files: always use `Feature module -> FileRegistryService -> StorageService -> StorageAdapter`. No provider SDKs in feature modules, no base64 files in DB, no raw private-file browser opens. Web/mobile use protected authenticated helpers.
+### Files
 
-Money: backend/database totals only. Money writes are idempotent and audited. Confirmed finance/accounting/payroll records use reversal/correction, not silent mutation. No offline financial writes unless explicitly approved with backend reconciliation.
+Use `Feature module -> FileRegistryService -> StorageService -> StorageAdapter`.
 
-Notifications: source modules emit normalized events and never call SMS/email/push providers directly. M12 owns recipient resolution, templates, preferences, channel routing, delivery attempts, retries, provider callbacks, read state, and notification-center behavior.
+No provider SDKs in feature modules, base64 files in DB, raw private-file browser opens, or exposed storage keys/private URLs. Web/mobile use authenticated protected-file helpers.
 
-Web: one screen = one main job; real APIs only; no fake production data; server-side pagination for growing lists; states for loading/empty/error/success/permission/module locked/validation/file unavailable/queued/partial failure; high-risk actions need confirmation and reason where required. KPIs only where backend-owned, time-bound, actionable (real drill-through), and honest (never fake `0` for unavailable/locked) — see `apps/web/AGENTS.md` KPI design rule; mobile never copies web KPI grids (`apps/schoolos_mobile/AGENTS.md`).
+### Money
 
-Mobile: companion app only; persona-first; purpose-limited APIs only; no admin-shaped mobile payloads; safe offline reads only; visible sync states for approved idempotent writes. Students use controlled school learning/session access only; a broad Student App is not active scope.
+Backend/database totals are authoritative. Money writes are idempotent and audited. Confirmed fee, finance, accounting, and payroll records use reversal/correction, not silent mutation or deletion. No offline financial writes without explicit approval and backend reconciliation. Never calculate official totals in web/mobile.
 
-Learning: frozen existing behavior remains school-controlled, teacher-led, lab/session or controlled-device student access; expiring session codes/QR and child-scoped, non-comparative parent summaries are preserved. Do not expand it or add leaderboard, open student chat, harsh labels, AI tutor, adaptive runtime, broad home learning, or M14 behavior.
+### Notifications
 
-## Missing API decision rule
+Source modules emit normalized events and never call providers directly. M12 owns recipient resolution, templates, preferences, channel routing, jobs, retries, callbacks, read state, diagnostics, and delivery audit.
 
-If any web/mobile/platform surface needs data and no safe backend API exists, make a proper decision instead of faking it. First inspect existing code, OpenAPI/contracts, permissions, DTOs, and tests. If the need is real, repeatable, module-owned, tenant-scopable, RBAC/entitlement-gatable, and useful for a production workflow, implement a module-owned purpose-limited backend API and connect the surface. If not, keep a friendly unavailable/locked/permission state and mark the gap clearly. Never derive official totals from list APIs or browser/mobile calculations.
+### Web
 
-## Compact implementation guardrails
+- One screen = one primary job.
+- Real APIs only; no fake production data.
+- Growing lists use server-side pagination.
+- Handle applicable loading, empty, error, success, permission, module-locked, validation, file-unavailable, queued, and partial-failure states.
+- High-risk actions require confirmation and reason where required.
+- KPIs must be backend-owned, time-bound, actionable, and honest; never show fake `0` for unavailable or locked data.
 
-- Contract first: confirm backend/OpenAPI/`packages/core` shape before frontend/mobile integration; update the contract first if missing; never guess response shape.
-- Summary ownership: dashboard summaries are module-owned first; main dashboard may compose module summaries but must not duplicate module business logic.
-- Placeholder removal: developer-facing `Needs backend API` copy is internal only; pilot-facing UI keeps friendly unavailable/error/locked/permission states.
-- Seed and smoke: any new visible workflow/card/screen needs supporting seed data and focused browser/mobile smoke where practical, or a clear pending note.
-- Query performance: new list/summary APIs use aggregate/select queries, pagination where needed, no unbounded `findMany`, and tenant-scoped index review for common filters.
-- Error shape: backend returns safe bounded error envelopes; web/mobile parse shared errors and never show raw technical/provider/storage/Prisma messages.
-- Stop on unknowns: do not guess contracts, permissions, DTOs, idempotency, file access, or offline behavior; mark the exact `needs ... confirmation` item.
+### Mobile
 
-## Before coding
+- Companion app only; persona-first and purpose-limited APIs.
+- No admin-shaped payloads.
+- Safe offline reads only, plus explicitly approved idempotent writes.
+- Show sync, queued, conflict, and failure states where applicable.
+- A broad standalone Student App is not active scope.
 
-1. Read focused docs and existing code first.
-2. Inspect contracts/OpenAPI, Prisma schema, DTOs, permissions, audit, API clients, and tests for the touched area.
-3. Implement missing production pieces only; do not rewrite working modules.
-4. Do not invent endpoint contracts. Mark unknowns as `needs backend verification`, `needs OpenAPI confirmation`, `needs mobile DTO`, `needs idempotency confirmation`, or `needs offline sync confirmation`.
-5. Add/update focused tests where appropriate.
-6. Run relevant checks and report only what actually ran.
+### Learning
 
-## Done means
+Preserve school-controlled, teacher-led, lab/session or controlled-device access. Do not add leaderboards, open student chat, harsh labels, AI tutors, adaptive runtime, broad home learning, or M14 behavior.
 
-Development complete means real persistence; no fake production data; tenant/RBAC/entitlement enforced; persona scopes fail closed; sensitive writes audited; money idempotent; notification delivery state honest; files through File Registry/StorageService; paginated growing lists; complete UI states; protected downloads; and focused regression updated where appropriate.
+## 11. Missing API decision rule
 
-A staging, release-candidate, production, or GA claim additionally requires the exact applicable evidence in `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`: staging migration and configuration validation, provider/storage checks, seeded authenticated browser E2E, device QA, backup/restore proof, monitoring/alerts, rollback readiness, and controlled-pilot workflow evidence. Do not substitute local checks for these gates.
+If a web/mobile/platform surface needs data and no safe backend API exists:
 
-## Verification
+1. Inspect existing code, OpenAPI/contracts, permissions, DTOs, Prisma, and tests.
+2. Decide whether the need is real, repeatable, module-owned, tenant-scopable, RBAC/entitlement-gatable, and required for a production workflow.
+3. If yes, implement a purpose-limited module-owned API and connect the surface.
+4. If no, show a friendly unavailable/locked/permission state and record the exact gap.
 
-Run relevant gates only, then report honestly:
+Never invent endpoint contracts, guess response shapes, derive official totals from list APIs, or show developer-facing “Needs backend API” copy in pilot UI.
+
+Use explicit uncertainty labels when needed: `needs backend verification`, `needs OpenAPI confirmation`, `needs mobile DTO`, `needs idempotency confirmation`, or `needs offline sync confirmation`.
+
+## 12. Before coding
+
+1. Read focused instructions, canonical docs, and existing implementation.
+2. Inspect contracts/OpenAPI, Prisma, DTOs, permissions, audit, API clients, migrations, and focused tests.
+3. Identify the smallest safe production change.
+4. Reuse existing architecture; do not create duplicate services, endpoints, DTOs, models, components, or docs.
+5. Do not rewrite working modules without a verified defect or approved architectural reason.
+6. Do not modify unrelated files or weaken validation/tests to make checks pass.
+7. Update focused tests for behavior changes.
+8. Run relevant checks and report exactly what ran.
+
+Guardrails:
+
+- Contract first; never guess shapes.
+- New visible workflows need appropriate seed data and focused smoke coverage where practical, or an explicit pending note.
+- Use selective/aggregate queries, paginate growing lists, avoid unbounded `findMany`, and review tenant-scoped indexes.
+- Return safe error envelopes; web/mobile never show raw technical errors.
+- Stop on unknown permissions, contracts, idempotency, file access, financial behavior, or offline behavior.
+
+## 13. Definition of done
+
+### Development complete
+
+All applicable conditions must hold:
+
+- Real persistence; no fake production data.
+- Tenant/RBAC/entitlement/persona scope enforced server-side.
+- Disabled modules and suspended tenants fail closed.
+- Sensitive writes audited; money writes idempotent.
+- Confirmed financial records use correction/reversal.
+- Notification delivery state is honest.
+- Files use File Registry/StorageService boundaries.
+- Growing lists are paginated.
+- UI states and protected downloads are complete.
+- Focused regression coverage is updated.
+- Relevant checks pass, or unresolved failures are reported honestly.
+
+### Staging, pilot, release candidate, production, or GA
+
+These claims additionally require the exact applicable evidence in `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`: staging migrations/configuration, provider/storage checks, authenticated browser E2E, device QA, backup/restore proof, monitoring/alerts, rollback readiness, and controlled-pilot workflow evidence.
+
+Never substitute local checks for release-stage evidence.
+
+## 14. Verification
+
+Run relevant gates only and report exact commands/results:
 
 ```bash
 pnpm db:generate
@@ -171,11 +317,11 @@ pnpm test:web:e2e
 cd apps/schoolos_mobile && flutter pub get && dart format . && flutter analyze && flutter test
 ```
 
-`pnpm smoke:learning` remains available as an optional compatibility check when a permitted M13 fix or a repository-wide regression requires it. It is not a mandatory pilot, release-candidate, production, or GA gate while M13 is deferred.
+`pnpm smoke:learning` is optional only for an allowed M13 fix or repository-wide M13 regression. It is not a pilot, release-candidate, production, or GA gate while M13 is deferred.
 
-Docs-only changes need no runtime checks.
+Docs-only changes need no runtime checks unless they alter executable examples, commands, configuration, contracts, or release procedures.
 
-## Progress format
+## 15. Progress format
 
 ```text
 Release stage:
@@ -188,3 +334,5 @@ Verification result:
 Staging/pilot evidence:
 Next release action:
 ```
+
+Report verified facts only. Distinguish implementation completion, local verification, staging evidence, pilot evidence, and unresolved blockers.
