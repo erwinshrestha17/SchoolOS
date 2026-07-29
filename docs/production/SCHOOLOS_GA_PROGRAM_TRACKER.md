@@ -23,7 +23,11 @@ Canonical plan: `.cursor/plans/schoolos_full_ga_program_9f539c81.plan.md` (do no
 - [x] Doc sync, P0 cross-cutting, entitlement/CLS, smoke fixture scripts
 - [x] `pnpm smoke:pilot` green on local staging (5434/6380/4000)
 - [x] M0 Platform Core local verification slice — see `m0-platform-core-2026-07-29-local.md` (mustChangePassword guard, support override profile, DEF-06 closure, expanded `smoke:platform`)
-- [x] M1 Admissions local verification slice — see `m1-admissions-core-2026-07-29-local.md` (P1-04 inbox fail-closed, admissions HTTP E2E, `verify:m1-admissions`, pilot-rehearsal smoke)
+- [x] M1 Admissions local verification slice — see `m1-admissions-core-2026-07-29-local.md` (P1-04 inbox fail-closed, P1-05 primary guardian index, CSV template, `verify:m1-admissions`)
+- [x] M2 Attendance local verification slice — see `m2-attendance-core-2026-07-29-local.md` (DEF-02/DEF-04 HTTP proof, homeroom-only mark UX, `verify:m2-attendance`)
+- [x] M15+M12 notices local verification slice — see `m15-notices-core-2026-07-29-local.md` (`verify:m15-notices`, M12 delivery + ack)
+- [x] M6 homework local verification slice — see `m6-homework-core-2026-07-29-local.md` (`verify:m6-homework`)
+- [x] M5 activity local verification slice — see `m5-activity-core-2026-07-29-local.md` (`verify:m5-activity`)
 
 ## Wave 1 checklist
 
@@ -56,6 +60,10 @@ Canonical plan: `.cursor/plans/schoolos_full_ga_program_9f539c81.plan.md` (do no
 | Controlled pilot rehearsal | `docs/production/evidence/controlled-pilot-pilot-rehearsal-1-2026-07-29.md` |
 | M0 platform core (local) | `docs/production/evidence/m0-platform-core-2026-07-29-local.md` |
 | M1 admissions core (local) | `docs/production/evidence/m1-admissions-core-2026-07-29-local.md` |
+| M2 attendance core (local) | `docs/production/evidence/m2-attendance-core-2026-07-29-local.md` |
+| M15 notices core (local) | `docs/production/evidence/m15-notices-core-2026-07-29-local.md` |
+| M6 homework core (local) | `docs/production/evidence/m6-homework-core-2026-07-29-local.md` |
+| M5 activity core (local) | `docs/production/evidence/m5-activity-core-2026-07-29-local.md` |
 | Pilot entitlement verify | `docs/production/evidence/pilot-entitlements-pilot-rehearsal-1-*.md` |
 | Controlled pilot (placeholder) | `docs/production/evidence/controlled-pilot-2026-07-29-placeholder.md` |
 | Mobile QA | `docs/production/evidence/mobile-qa-2026-07-29-local.md` |

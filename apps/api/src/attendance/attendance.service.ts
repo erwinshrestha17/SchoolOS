@@ -133,7 +133,11 @@ export class AttendanceService {
         academicYearId: currentAcademicYear.id,
       })
     ).slice(0, limit);
-    if (assignments.length === 0) {
+    const homeroomAssignments = assignments.filter(
+      (assignment) =>
+        assignment.assignmentType === TeacherAssignmentType.CLASS_TEACHER,
+    );
+    if (homeroomAssignments.length === 0) {
       return { items: [] };
     }
 
@@ -141,14 +145,18 @@ export class AttendanceService {
       this.prisma.class.findMany({
         where: {
           tenantId: actor.tenantId,
-          id: { in: uniqueValues(assignments.map((item) => item.classId)) },
+          id: {
+            in: uniqueValues(homeroomAssignments.map((item) => item.classId)),
+          },
         },
         select: { id: true, name: true, level: true },
       }),
       this.prisma.section.findMany({
         where: {
           tenantId: actor.tenantId,
-          id: { in: uniqueValues(assignments.map((item) => item.sectionId)) },
+          id: {
+            in: uniqueValues(homeroomAssignments.map((item) => item.sectionId)),
+          },
         },
         select: { id: true, name: true },
       }),
@@ -157,7 +165,7 @@ export class AttendanceService {
           tenantId: actor.tenantId,
           id: {
             in: uniqueValues(
-              assignments
+              homeroomAssignments
                 .map((item) => item.subjectId)
                 .filter((subjectId): subjectId is string => Boolean(subjectId)),
             ),
@@ -212,7 +220,7 @@ export class AttendanceService {
       });
     };
 
-    assignments.forEach((assignment) => {
+    homeroomAssignments.forEach((assignment) => {
       const classroom = classById.get(assignment.classId);
       const section = sectionById.get(assignment.sectionId);
       if (!classroom || !section) return;

@@ -98,12 +98,12 @@ Complete at `/dashboard/settings/onboarding`:
 
 Runbook steps 1–11 from [SCHOOLOS_PRODUCTION_RUNBOOK.md](../SCHOOLOS_PRODUCTION_RUNBOOK.md) §5 (skip steps 12–15).
 
-- [ ] Homeroom teacher marks attendance
+- [ ] Homeroom teacher marks attendance — HTTP verify PASS (`verify:m2-attendance` homeroom sync 201); browser E2E gated (`SCHOOLOS_E2E_M2_OFFLINE_MUTATIONS`) not re-run this slice (requires dedicated fixture + tenant login)
 - [ ] Attendance correction workflow tested
-- [ ] Homework assigned (teacher + parent surfaces)
-- [ ] Notice published (M15→M12 honest delivery state)
-- [ ] Timetable visible where entitled
-- [ ] Activity post with media consent check (M5)
+- [ ] Homework assigned (teacher + parent surfaces) — HTTP verify PASS (`verify:m6-homework`); browser mutation E2E deferred
+- [x] Notice published (M15→M12 honest delivery state) — `verify:m15-notices` PASS (2026-07-29 local)
+- [ ] Timetable visible where entitled — HTTP verify PASS (`verify:m6-homework` timetable read)
+- [ ] Activity post with media consent check (M5) — HTTP verify PASS (`verify:m5-activity` scopes + parent feed); consent mutation E2E deferred
 
 ## Security spot checks
 

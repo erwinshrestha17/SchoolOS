@@ -582,6 +582,14 @@ export function IemisReadinessWorkspace() {
               <Button
                 type="button"
                 variant="outline"
+                disabled={!canImportAdmissions}
+                onClick={() => void api.downloadAdmissionImportTemplate()}
+              >
+                <Download className="h-4 w-4" /> Download import template
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={
                   !canImportAdmissions ||

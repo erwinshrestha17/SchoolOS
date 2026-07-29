@@ -4,7 +4,7 @@ process.env.SMOKE_WAVE1_PILOT = 'true';
 process.env.SMOKE_TENANT_SLUG =
   process.env.SMOKE_TENANT_SLUG ?? 'pilot-rehearsal-1';
 process.env.SMOKE_EMAIL =
-  process.env.SMOKE_EMAIL ?? 'admin@pilot-rehearsal.schoolos.test';
+  process.env.SMOKE_EMAIL ?? 'principal@schoolos.com';
 
 const personaPassword =
   process.env.PILOT_REHEARSAL_PERSONA_PASSWORD ??

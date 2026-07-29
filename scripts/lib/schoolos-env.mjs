@@ -70,3 +70,105 @@ export function buildAdminDatabaseUrl(connectionString) {
   url.pathname = '/postgres';
   return url.toString();
 }
+
+/**
+ * Login and, when the account still has mustChangePassword=true, perform the
+ * allowlisted password-change flow so verify scripts can reach protected routes.
+ * Idempotent across repeated runs (tries the derived password on re-login).
+ */
+export async function loginWithMustChangePasswordCleared({
+  apiBaseUrl,
+  tenantSlug,
+  email,
+  password,
+  userAgent = 'flutter',
+}) {
+  const derivedPassword = password.endsWith('!')
+    ? `${password.slice(0, -1)}2!`
+    : `${password}!`;
+
+  for (const candidatePassword of [password, derivedPassword]) {
+    const loginResponse = await fetch(`${apiBaseUrl}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': userAgent,
+      },
+      body: JSON.stringify({ tenantSlug, email, password: candidatePassword }),
+    });
+    const loginBody = await loginResponse.json().catch(() => null);
+    const token =
+      loginBody?.data?.accessToken ??
+      loginBody?.accessToken ??
+      loginBody?.data?.user?.accessToken;
+    const mustChange =
+      loginBody?.data?.user?.mustChangePassword ??
+      loginBody?.data?.mustChangePassword ??
+      false;
+
+    if (!token) {
+      continue;
+    }
+
+    if (!mustChange) {
+      return {
+        status: loginResponse.status,
+        token,
+        password: candidatePassword,
+        body: loginBody,
+        ok: loginResponse.status === 200 || loginResponse.status === 201,
+      };
+    }
+
+    if (candidatePassword === derivedPassword) {
+      continue;
+    }
+
+    const changeResponse = await fetch(`${apiBaseUrl}/auth/change-password`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'User-Agent': userAgent,
+      },
+      body: JSON.stringify({
+        currentPassword: candidatePassword,
+        newPassword: derivedPassword,
+        confirmNewPassword: derivedPassword,
+        logoutOtherDevices: false,
+      }),
+    });
+
+    if (!changeResponse.ok) {
+      continue;
+    }
+
+    const reloginResponse = await fetch(`${apiBaseUrl}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': userAgent,
+      },
+      body: JSON.stringify({
+        tenantSlug,
+        email,
+        password: derivedPassword,
+      }),
+    });
+    const reloginBody = await reloginResponse.json().catch(() => null);
+    const reloginToken =
+      reloginBody?.data?.accessToken ?? reloginBody?.accessToken;
+
+    if (reloginToken) {
+      return {
+        status: reloginResponse.status,
+        token: reloginToken,
+        password: derivedPassword,
+        body: reloginBody,
+        ok: reloginResponse.status === 200 || reloginResponse.status === 201,
+      };
+    }
+  }
+
+  return { status: 401, token: null, password, body: null, ok: false };
+}

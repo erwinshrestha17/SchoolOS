@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DEF-02/DEF-04 attendance homeroom scope: use `pnpm verify:m2-attendance`.
 
 import { join } from 'node:path';
 import { repoRoot, loadEnvFile } from './lib/schoolos-env.mjs';

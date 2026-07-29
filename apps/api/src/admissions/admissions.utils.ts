@@ -6,6 +6,79 @@ export interface ParsedAdmissionRow {
   raw: Record<string, string>;
 }
 
+export const ADMISSION_IMPORT_REQUIRED_HEADERS = [
+  'firstNameEn',
+  'lastNameEn',
+  'dateOfBirth',
+  'gender',
+  'admissionDate',
+  'academicYearId',
+  'classId',
+  'guardianFullName',
+  'guardianRelation',
+  'guardianPhone',
+] as const;
+
+export const ADMISSION_IMPORT_OPTIONAL_HEADERS = [
+  'firstNameNp',
+  'lastNameNp',
+  'sectionId',
+  'rollNumber',
+  'admissionNumber',
+  'nationality',
+  'motherTongue',
+  'disabilityFlag',
+  'confirmNoDisability',
+  'mediumOfInstruction',
+  'emergencyName',
+  'emergencyPhone',
+  'medicalConditions',
+  'severeAllergies',
+  'medications',
+  'specialNeeds',
+  'doctorName',
+  'doctorPhone',
+  'guardianEmail',
+] as const;
+
+export function buildAdmissionImportTemplateCsv() {
+  const headers = [
+    ...ADMISSION_IMPORT_REQUIRED_HEADERS,
+    ...ADMISSION_IMPORT_OPTIONAL_HEADERS,
+  ];
+  const exampleRow = [
+    'Asha',
+    'Tamang',
+    '2020-01-02',
+    'FEMALE',
+    '2026-04-26',
+    '<academicYearId>',
+    '<classId>',
+    'Maya Tamang',
+    'mother',
+    '9800000000',
+    '',
+    '',
+    '<sectionId>',
+    '1',
+    '',
+    '',
+    '',
+    '',
+    'true',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+  ];
+  return `${headers.join(',')}\n${exampleRow.join(',')}\n`;
+}
+
 export function normalizeAdmissionName(value: string) {
   return value.trim().replace(/\s+/g, ' ').toLowerCase();
 }
@@ -52,18 +125,7 @@ export function buildAdmissionDtoFromCsvRow(
 ): { dto?: CreateAdmissionDto; errors: string[] } {
   const raw = row.raw;
   const errors: string[] = [];
-  const requiredHeaders = [
-    'firstNameEn',
-    'lastNameEn',
-    'dateOfBirth',
-    'gender',
-    'admissionDate',
-    'academicYearId',
-    'classId',
-    'guardianFullName',
-    'guardianRelation',
-    'guardianPhone',
-  ];
+  const requiredHeaders = [...ADMISSION_IMPORT_REQUIRED_HEADERS];
 
   for (const header of requiredHeaders) {
     if (!raw[header]) {

@@ -1075,6 +1075,63 @@ describe('students lifecycle hardening', () => {
     );
   });
 
+  it('clears existing primary guardians before promoting another link (P1-05)', async () => {
+    const link = {
+      id: 'student-guardian-2',
+      tenantId: actor.tenantId,
+      studentId: 'student-1',
+      guardianId: 'guardian-2',
+      relation: 'father',
+      isPrimary: false,
+      capabilities: [GuardianCapability.ACADEMICS_VIEW],
+      verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
+      status: GuardianRelationshipStatus.ACTIVE,
+      effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+      effectiveUntil: null,
+      emergencyContactPriority: null,
+      approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+      restrictionReasonRef: null,
+      guardian: {
+        id: 'guardian-2',
+        fullName: 'Ram Shrestha',
+        relation: 'father',
+        primaryPhone: '9800000001',
+        secondaryPhone: null,
+        email: null,
+        occupation: null,
+        homeAddress: null,
+        wardNumber: null,
+      },
+    };
+    const prisma = buildPrisma({
+      studentGuardianFindFirstResult: link,
+      guardianFindFirstQueue: [null],
+      studentGuardianFindManyResult: [
+        { id: 'link-1', guardianId: 'guardian-1', isPrimary: true },
+        { id: link.id, guardianId: 'guardian-2', isPrimary: false },
+      ],
+      studentFindFirstQueue: [buildStudent({ id: 'student-1' })],
+      activityPostFindManyResult: [],
+    });
+    const { service } = buildService(prisma);
+
+    await service.updateStudentGuardian(
+      'student-1',
+      'guardian-2',
+      { isPrimary: true },
+      actor,
+    );
+
+    expect(prisma.transaction.studentGuardian.updateMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        studentId: 'student-1',
+        id: { not: link.id },
+      },
+      data: { isPrimary: false },
+    });
+  });
+
   it('rejects guardian updates that are not linked to the tenant-scoped student', async () => {
     const prisma = buildPrisma({
       studentGuardianFindFirstResult: null,

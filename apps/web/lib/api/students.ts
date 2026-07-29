@@ -47,6 +47,7 @@ import type {
 import {
   ApiRequestError,
   API_BASE_URL,
+  downloadCsv,
   JsonBody,
   openProtectedFile,
   parseApiErrorMessage,
@@ -320,6 +321,11 @@ export const studentsApi = {
       method: 'POST',
       json: body,
     }),
+  downloadAdmissionImportTemplate: () =>
+    downloadCsv(
+      '/admissions/bulk-import/template',
+      'admission-import-template.csv',
+    ),
   listStudentDocuments: (studentId: string) =>
     request<any[]>(withQuery('/student-documents', { studentId })),
   listStudentDocumentHistory: (studentId: string) =>

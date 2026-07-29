@@ -16,6 +16,9 @@ export interface TeacherAssignmentScope {
   sectionsForClass: (classId: string) => SectionSummary[];
   /** Every section the caller may work in, across all their classes. */
   sections: SectionSummary[];
+  homeroomSections: SectionSummary[];
+  /** Classes derived from homeroom (class-teacher) sections only. */
+  homeroomClasses: ClassSummary[];
   /** Subject ids the caller is assigned to teach; empty means "no filter". */
   assignedSubjectIds: ReadonlySet<string>;
   /**
@@ -81,12 +84,24 @@ export function useTeacherAssignmentScope(): TeacherAssignmentScope {
         sections: allSections,
         assignedSubjectIds: new Set<string>(),
         hasNoAssignments: false,
+        homeroomSections: allSections.filter(
+          (section) => section.isAssignedClassTeacher,
+        ),
+        homeroomClasses: allClasses,
       };
     }
 
+    const homeroomSections = allSections.filter(
+      (section) => section.isAssignedClassTeacher,
+    );
     const assignedSections = allSections.filter(
       (section) =>
         section.isAssignedClassTeacher || section.isAssignedSubjectTeacher,
+    );
+    const homeroomClassIds = new Set(
+      homeroomSections
+        .map((section) => section.classId ?? section.class?.id)
+        .filter((id): id is string => Boolean(id)),
     );
     const assignedClassIds = new Set(
       assignedSections
@@ -110,6 +125,8 @@ export function useTeacherAssignmentScope(): TeacherAssignmentScope {
       sections: assignedSections,
       assignedSubjectIds,
       hasNoAssignments: !loading && assignedSections.length === 0,
+      homeroomSections,
+      homeroomClasses: allClasses.filter((item) => homeroomClassIds.has(item.id)),
     };
   }, [
     assignmentsQuery.data,

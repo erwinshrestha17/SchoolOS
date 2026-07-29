@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   Param,
   Post,
   Query,
@@ -101,6 +102,17 @@ export class AdmissionsController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.admissionsService.checkDuplicateAdmissions(dto, auth);
+  }
+
+  @Get('bulk-import/template')
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  @Header(
+    'Content-Disposition',
+    'attachment; filename="admission-import-template.csv"',
+  )
+  @Permissions('enrollments:create', 'students:create', 'guardians:create')
+  getBulkImportTemplate() {
+    return this.admissionsService.getBulkImportTemplate();
   }
 
   @Post('bulk-import')

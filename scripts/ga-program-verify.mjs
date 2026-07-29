@@ -57,6 +57,18 @@ if (wave === 'wave1') {
     run('verify:m1-admissions (staging env)', 'pnpm', ['verify:m1-admissions'], true),
   );
   checks.push(
+    run('verify:m2-attendance (staging env)', 'pnpm', ['verify:m2-attendance'], true),
+  );
+  checks.push(
+    run('verify:m15-notices (staging env)', 'pnpm', ['verify:m15-notices'], true),
+  );
+  checks.push(
+    run('verify:m6-homework (staging env)', 'pnpm', ['verify:m6-homework'], true),
+  );
+  checks.push(
+    run('verify:m5-activity (staging env)', 'pnpm', ['verify:m5-activity'], true),
+  );
+  checks.push(
     run('M15 notice workflows spec', 'pnpm', [
       '--filter',
       '@schoolos/web',

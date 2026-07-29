@@ -27,6 +27,7 @@ import { UsageService } from '../usage/usage.service';
 import { UsersService } from '../users/users.service';
 import {
   buildAdmissionDtoFromCsvRow,
+  buildAdmissionImportTemplateCsv,
   normalizeAdmissionName,
   parseAdmissionCsv,
 } from './admissions.utils';
@@ -730,6 +731,10 @@ export class AdmissionsService {
       application: formatAdmissionApplication(updated),
       admission,
     };
+  }
+
+  getBulkImportTemplate() {
+    return buildAdmissionImportTemplateCsv();
   }
 
   async bulkImport(dto: BulkAdmissionImportDto, actor: AuthContext) {

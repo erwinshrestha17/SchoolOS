@@ -133,8 +133,7 @@ export function AttendanceForm() {
   const assignedSections = useMemo(
     () =>
       (sectionsQuery.data ?? []).filter(
-        (section) =>
-          section.isAssignedClassTeacher || section.isAssignedSubjectTeacher,
+        (section) => section.isAssignedClassTeacher,
       ),
     [sectionsQuery.data],
   );

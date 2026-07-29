@@ -330,7 +330,7 @@ describe('attendance production hardening', () => {
     expect(prisma.section.findMany).not.toHaveBeenCalled();
   });
 
-  it('lists deduped tenant-scoped mobile teacher classes from subject and class-teacher assignments', async () => {
+  it('lists homeroom-only mobile teacher classes for attendance marking', async () => {
     const { service, prisma } = buildService({
       staffFindFirst: { id: 'staff-1' },
       academicYear: { id: 'ay-current', name: '2082' },
@@ -381,7 +381,7 @@ describe('attendance production hardening', () => {
           classId: 'class-1',
           sectionId: 'section-1',
           name: 'Grade 3 - A',
-          subject: 'Math, Science, Class teacher',
+          subject: 'Class teacher',
         },
       ],
     });
@@ -418,7 +418,23 @@ describe('attendance production hardening', () => {
           subject: { id: 'subject-math', name: 'Math' },
         },
       ],
-      attendanceSessions: [],
+      classTeacherSections: [
+        {
+          id: 'section-1',
+          classId: 'class-1',
+          name: 'A',
+          class: { id: 'class-1', name: 'Grade 3', level: 3 },
+        },
+      ],
+      attendanceSessions: [
+        {
+          classId: 'class-1',
+          sectionId: 'section-1',
+          submittedAt: new Date(),
+          lockAt: new Date(Date.now() + 86_400_000),
+          conflictStatus: 'NONE',
+        },
+      ],
       timetableSlots: [
         {
           id: 'slot-1',

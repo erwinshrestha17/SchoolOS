@@ -120,11 +120,27 @@ async function main() {
       path: '/admissions/document-requests?page=1&limit=5',
       expect: 200,
     },
+    {
+      name: 'Admission import CSV template',
+      path: '/admissions/bulk-import/template',
+      expect: 200,
+      expectCsv: true,
+    },
   ];
 
   for (const route of adminRoutes) {
     const result = await request(route.path, { headers: adminAuth });
-    record(route.name, result.status === route.expect, `HTTP ${result.status}`);
+    const csvOk =
+      !route.expectCsv ||
+      (result.text?.includes('firstNameEn') &&
+        result.text?.includes('guardianPhone'));
+    record(
+      route.name,
+      result.status === route.expect && csvOk,
+      route.expectCsv
+        ? `HTTP ${result.status}, csv=${csvOk ? 'ok' : 'missing headers'}`
+        : `HTTP ${result.status}`,
+    );
   }
 
   const parentLogin = await login({
