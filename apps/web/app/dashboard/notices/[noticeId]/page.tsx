@@ -16,6 +16,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ProtectedFileButton } from "@/components/ui/protected-file";
 import { useSession } from "@/components/session-provider";
 import { NoticeAcknowledgementPanel } from "@/components/notices/notice-acknowledgement-panel";
+import { NoticeApprovalDecisionPanel } from "@/components/notices/notice-approval-decision-panel";
 import { TablePagination } from "@/components/ui/table-pagination";
 import {
   ArrowLeft,
@@ -165,6 +166,10 @@ export default function NoticeDetailPage() {
   const canSchedule =
     granted.has("notices:schedule") &&
     ["DRAFT", "APPROVED", "SCHEDULED"].includes(notice.lifecycleStatus);
+  const canDecideApproval =
+    granted.has("advanced:approvals:decide") &&
+    notice.lifecycleStatus === "APPROVAL_PENDING" &&
+    Boolean(notice.approvalRequestId);
   const isDraft = notice.lifecycleStatus === "DRAFT";
   const showPublicationReporting = hasPublicationReporting(notice);
   const canReview =
@@ -246,6 +251,13 @@ export default function NoticeDetailPage() {
           The notice action could not be completed. Refresh the notice and try
           again.
         </div>
+      ) : null}
+
+      {canDecideApproval && notice.approvalRequestId ? (
+        <NoticeApprovalDecisionPanel
+          noticeId={noticeId}
+          approvalRequestId={notice.approvalRequestId}
+        />
       ) : null}
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">

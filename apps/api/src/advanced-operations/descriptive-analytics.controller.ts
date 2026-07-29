@@ -1,8 +1,10 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { NoModuleEntitlement } from '../auth/decorators/no-module-entitlement.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantActiveGuard } from '../auth/guards/tenant-active.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import type { AuthContext } from '../auth/auth.types';
@@ -14,7 +16,15 @@ import {
 
 @ApiTags('advanced-analytics')
 @Controller('advanced/analytics')
-@UseGuards(JwtAuthGuard, TenantActiveGuard, RolesPermissionsGuard)
+@UseGuards(
+  JwtAuthGuard,
+  TenantActiveGuard,
+  RolesPermissionsGuard,
+  EntitlementGuard,
+)
+@NoModuleEntitlement(
+  'Cross-cutting descriptive analytics; RBAC via advanced:analytics permissions',
+)
 export class DescriptiveAnalyticsController {
   constructor(private readonly service: DescriptiveAnalyticsService) {}
 

@@ -19,6 +19,7 @@ import {
   isParentOnly,
   requireGuardianCapability,
 } from '../common/security/parent-scope';
+import { assertConfirmStudentId, assertConfirmStudentIdAllowed } from '../common/security/confirm-student-action';
 import { PrismaService } from '../prisma/prisma.service';
 import { AttendanceService } from '../attendance/attendance.service';
 import { FinanceService } from '../finance/finance.service';
@@ -1577,6 +1578,7 @@ export class MobileService {
     dto: MobileParentAttendanceCorrectionDto,
     actor: AuthContext,
   ) {
+    assertConfirmStudentId(studentId, dto.confirmStudentId);
     await this.assertStudentAccess(
       studentId,
       actor,
@@ -1599,6 +1601,7 @@ export class MobileService {
     dto: MobileParentAttendanceCorrectionCancelDto,
     actor: AuthContext,
   ) {
+    assertConfirmStudentId(studentId, dto.confirmStudentId);
     await this.assertStudentAccess(
       studentId,
       actor,
@@ -1625,6 +1628,7 @@ export class MobileService {
     dto: CreateSchoolServiceRequestDto,
     actor: AuthContext,
   ) {
+    assertConfirmStudentId(studentId, dto.confirmStudentId);
     await this.assertStudentAccess(
       studentId,
       actor,
@@ -1849,6 +1853,7 @@ export class MobileService {
     dto: InitiateParentPaymentDto,
     actor: AuthContext,
   ) {
+    assertConfirmStudentId(studentId, dto.confirmStudentId);
     await this.assertStudentAccess(
       studentId,
       actor,
@@ -1866,6 +1871,7 @@ export class MobileService {
     dto: ParentSandboxFeePaymentDto,
     actor: AuthContext,
   ) {
+    assertConfirmStudentId(studentId, dto.confirmStudentId);
     await this.assertStudentAccess(
       studentId,
       actor,
@@ -1883,6 +1889,7 @@ export class MobileService {
     dto: ParentSandboxCanteenTopUpDto,
     actor: AuthContext,
   ) {
+    assertConfirmStudentId(studentId, dto.confirmStudentId);
     await this.assertStudentAccess(
       studentId,
       actor,
@@ -1981,6 +1988,7 @@ export class MobileService {
         GuardianCapability.SPECIFIC_CONSENT_GIVE,
       );
     }
+    assertConfirmStudentIdAllowed(dto.confirmStudentId, authorizedStudentIds);
 
     const guardian = await this.prisma.guardian.findFirst({
       where: { tenantId: actor.tenantId, userId: actor.userId },

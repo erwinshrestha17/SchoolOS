@@ -1742,44 +1742,53 @@ approval.
 | Inventory date | 2026-07-28 |
 | Checkout inspected | `main` at `6a1cd7603fb55dba864560604bf7745c72a8c4c2` |
 | Worktree before inventory | Clean |
-| Release stage | Internal QA / controlled-pilot preparation |
-| Active implementation wave | Wave 1 |
+| Release stage | GA program Wave 0 — Internal QA ready (local); staging validation in progress |
+| Active implementation wave | Wave 0 (foundation + cross-cutting P0) |
 | Priority rule | Complete or explicitly disable applicable P0 gates before P1; do not begin P2 |
 | Progress-document rule | Maintain this section in place; do not create a competing roadmap or progress Markdown file |
-| Frozen/deferred boundary | M13 remains disabled and frozen; M14 and P2 remain deferred |
+| GA scope (owner 2026-07-29) | M0–M12 + M15 + M13 (Wave 5); M14 deferred; first production target = one school (Wave 1) |
 
-### Candidate enabled pilot boundary
+### GA wave module enablement matrix
 
-The implementation and verification boundary is a Grade 1-10 school using:
+Modules ship in waves. Do not enable entitlements on production school #1 until that wave's exit gate passes.
 
-- school administrator, principal/head teacher, teacher, parent/guardian, and
-  cashier/accountant personas;
+| Wave | Modules | Production enablement |
+|---|---|---|
+| Wave 0 | Platform P0, staging, ops | Infrastructure only |
+| Wave 1 | M0, M1, M2, M5, M6, M12, M15 | Core daily workflows for school #1 |
+| Wave 2 | M3 full fees + digital payments | After financial integrity evidence |
+| Wave 3 | M4 exams, CAS, report cards, promotion | After academic cycle evidence |
+| Wave 4 | M7, M8, M9, M10, M11 | Per-module staging/device evidence; M7 payroll blocked until Nepal statutory verification |
+| Wave 5 | M13 Learning | After security review + `smoke:learning` |
+| Wave 6 | Multi-school platform onboarding | Full GA sign-off |
+
+### Wave 1 core GA boundary (first production school)
+
+The first production school (Wave 1) uses Grade 1–10 or Grade 1–12 personas:
+
+- school administrator, principal/head teacher, teacher, parent/guardian;
 - admission and guardian linking;
 - enrollment, class/section, teacher assignment, and timetable;
-- attendance capture, finalization, correction, conflict review, and parent
-  alert;
-- homework and limited published academic/result visibility;
-- manual fee collection and backend-confirmed receipt access;
-- notices, notification delivery, structured parent requests, and Principal
-  Attention;
+- attendance capture, finalization, correction, conflict review, and parent alert;
+- homework and published notices;
+- structured parent requests and Principal Attention;
 - web operations plus purpose-limited Parent and Teacher mobile workflows.
 
-This is a candidate code/QA boundary, not a claim that a school pilot has been
-approved or validated.
+Wave 2–5 modules remain **disabled** on school #1 until each wave's exit gate passes.
 
-### Disabled or excluded for the first pilot
+### Deferred or wave-gated capabilities
 
 | Capability | Decision | Re-enable condition |
 |---|---|---|
-| Real digital payments | Disabled | P0-12 and applicable P1-14 provider, reconciliation, duplicate, refund, and device evidence pass |
-| App-based medical emergency workflow | Manual school procedure only | P0-13, notification fallback, privacy, policy, and device evidence pass |
-| Digital pickup authorization | Not in active product scope | Explicit owner re-approval plus P0-13 and policy evidence |
-| Grade 11-12 / practical shared teaching | Disabled | P1-05 and P1-13 become applicable P0 and pass |
-| Multigrade pilot | Disabled | P1-19 passes for the selected school |
-| Very large classes | Excluded from initial pilot | P1-13 passes with representative 60-80 student evidence |
-| M13 Learning | Disabled and frozen | Separate owner re-approval; not part of this roadmap execution |
-| M14 Intelligence / AI | Deferred | Separate post-pilot approval |
-| P2 capabilities | Deferred | All applicable P0 gates pass and pilot findings are resolved |
+| Real digital payments | Wave 2 (M3) | P0-12 and provider/reconciliation evidence pass |
+| Full exams/report cards/promotion | Wave 3 (M4) | DEF-03 staging verification + academic E2E |
+| HR/payroll/library/transport/canteen/accounting | Wave 4 | Per-module staging + device evidence; M7 payroll needs CA sign-off |
+| M13 Learning | Wave 5 | Owner unfreeze + security review + `smoke:learning` |
+| M14 Intelligence / AI | Deferred | Separate post-GA approval |
+| App-based medical emergency workflow | Manual until P0-13 | P0-13 + notification fallback + device evidence |
+| Digital pickup authorization | Not in active product scope | Explicit owner re-approval |
+| Multigrade / very large classes | Wave 1+ evidence | P1-13/P1-19 when applicable school selected |
+| P2 capabilities | After Wave 1 GA | All applicable P0 gates pass for enabled modules |
 
 ## 14.2 Wave 0 source inventory
 

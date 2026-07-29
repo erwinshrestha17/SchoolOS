@@ -32,9 +32,9 @@ export default function SchoolOnboardingPage() {
         <Badge variant={checklist.progressPercent === 100 ? 'success' : 'neutral'} className="mb-3">
           {checklist.progressPercent}% ready
         </Badge>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-950">Pilot Onboarding Checklist</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-950">Day-1 Onboarding Checklist</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-          Finish the school setup items that make daily operations reliable for real staff, students, and families.
+          Finish the school setup items that make daily operations reliable for real staff, students, and families on the Wave 1 core module boundary.
         </p>
       </header>
 

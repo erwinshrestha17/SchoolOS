@@ -1,6 +1,7 @@
 import { AuthMethod } from '@prisma/client';
 import { AttendanceService } from '../attendance/attendance.service';
 import type { AuthContext } from '../auth/auth.types';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 import { MobileTeacherAttendanceController } from './mobile-teacher-attendance.controller';
 
 describe('MobileTeacherAttendanceController', () => {
@@ -13,6 +14,9 @@ describe('MobileTeacherAttendanceController', () => {
       | 'syncAttendance'
     >
   >;
+  let teacherScopeService: jest.Mocked<
+    Pick<TeacherScopeService, 'getScopeVersion'>
+  >;
   let controller: MobileTeacherAttendanceController;
   let actor: AuthContext;
 
@@ -23,8 +27,12 @@ describe('MobileTeacherAttendanceController', () => {
       getRoster: jest.fn(),
       syncAttendance: jest.fn(),
     };
+    teacherScopeService = {
+      getScopeVersion: jest.fn(),
+    };
     controller = new MobileTeacherAttendanceController(
       attendanceService as unknown as AttendanceService,
+      teacherScopeService as unknown as TeacherScopeService,
     );
     actor = {
       userId: 'teacher-1',

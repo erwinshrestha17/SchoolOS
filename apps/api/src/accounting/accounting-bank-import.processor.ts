@@ -1,8 +1,9 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
+import { ClsService } from 'nestjs-cls';
 import { PlansService } from '../plans/plans.service';
-import { skipSuspendedTenantJob } from '../plans/processor-tenant.guard';
+import { runTenantScopedJob } from '../plans/processor-tenant.context';
 import { SUSPENDED_TENANT_MESSAGE } from '../plans/tenant-access.constants';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -18,6 +19,7 @@ export class AccountingBankImportProcessor extends WorkerHost {
     private readonly prisma: PrismaService,
     private readonly bankImportJobsService: AccountingBankImportJobsService,
     private readonly plansService: PlansService,
+    private readonly cls: ClsService,
   ) {
     super();
   }
@@ -34,32 +36,38 @@ export class AccountingBankImportProcessor extends WorkerHost {
   private async handleImportBankStatementChunked(
     input: AccountingBankImportJob,
   ) {
-    if (
-      await skipSuspendedTenantJob(
-        this.plansService,
-        input.actor.tenantId,
-        this.logger,
-        `bank statement import ${input.jobRecordId}`,
-      )
-    ) {
-      await this.markFailed(input.jobRecordId, SUSPENDED_TENANT_MESSAGE);
-      return;
-    }
+    const completed = await runTenantScopedJob(
+      this.cls,
+      this.plansService,
+      input.actor.tenantId,
+      this.logger,
+      `bank statement import ${input.jobRecordId}`,
+      async () => {
+        try {
+          await this.prisma.bankStatementImportJob.update({
+            where: { id: input.jobRecordId },
+            data: { status: 'RUNNING' },
+          });
+          await this.bankImportJobsService.completeQueuedBankStatementImport(
+            input,
+          );
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          const stack = error instanceof Error ? error.stack : undefined;
+          this.logger.error(
+            `Failed to process bank statement import job ${input.jobRecordId}: ${message}`,
+            stack,
+          );
+          await this.markFailed(input.jobRecordId, message);
+        }
 
-    try {
-      await this.prisma.bankStatementImportJob.update({
-        where: { id: input.jobRecordId },
-        data: { status: 'RUNNING' },
-      });
-      await this.bankImportJobsService.completeQueuedBankStatementImport(input);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const stack = error instanceof Error ? error.stack : undefined;
-      this.logger.error(
-        `Failed to process bank statement import job ${input.jobRecordId}: ${message}`,
-        stack,
-      );
-      await this.markFailed(input.jobRecordId, message);
+        return true;
+      },
+    );
+
+    if (!completed) {
+      await this.markFailed(input.jobRecordId, SUSPENDED_TENANT_MESSAGE);
     }
   }
 

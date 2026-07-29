@@ -5,8 +5,9 @@ import {
   IsString,
   Length,
 } from 'class-validator';
+import { ConfirmStudentActionFields } from '../../common/security/confirm-student-action';
 
-export class InitiateParentPaymentDto {
+export class InitiateParentPaymentDto extends ConfirmStudentActionFields {
   @IsString()
   @IsNotEmpty()
   invoiceId!: string;

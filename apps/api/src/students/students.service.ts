@@ -1400,6 +1400,28 @@ export class StudentsService {
           },
         });
       }
+
+      if (
+        'sectionId' in dto &&
+        nextSectionId !== student.sectionId
+      ) {
+        await tx.studentLifecycleTransition.create({
+          data: {
+            tenantId: actor.tenantId,
+            studentId: student.id,
+            fromStatus: student.lifecycleStatus,
+            toStatus: student.lifecycleStatus,
+            reason: 'Section placement updated',
+            changedById: actor.userId,
+            metadata: {
+              sectionChange: true,
+              fromSectionId: student.sectionId,
+              toSectionId: nextSectionId,
+              effectiveAt: new Date().toISOString(),
+            },
+          },
+        });
+      }
     });
 
     await this.auditService.record({

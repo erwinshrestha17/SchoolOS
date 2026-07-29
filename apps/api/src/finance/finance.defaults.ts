@@ -144,6 +144,24 @@ export const DEFAULT_FEE_HEADS: Array<{
   },
 ];
 
+export const DEFAULT_ACCOUNTING_SOURCE_MAPPINGS: Array<{
+  sourceModule: string;
+  sourceType: string;
+  postingType: string;
+  debitCode: string;
+  creditCode: string;
+  description: string;
+}> = [
+  {
+    sourceModule: 'FINANCE',
+    sourceType: 'FEE_PAYMENT',
+    postingType: 'RECEIPT',
+    debitCode: '1010',
+    creditCode: '1200',
+    description: 'Default fee receipt posting (cash/bank to student receivable)',
+  },
+];
+
 export function resolveCashAccountCode(method: PaymentMethod) {
   return method === PaymentMethod.CASH ? '1000' : '1010';
 }

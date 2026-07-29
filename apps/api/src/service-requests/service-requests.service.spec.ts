@@ -99,6 +99,7 @@ describe('ServiceRequestsService', () => {
     const result = await service.createParentRequest(
       'student-1',
       {
+        confirmStudentId: 'student-1',
         type: SchoolServiceRequestType.GENERAL_COMPLAINT,
         category: SchoolServiceRequestCategory.ATTENDANCE,
         subject: 'Attendance concern',
@@ -114,6 +115,7 @@ describe('ServiceRequestsService', () => {
         tenantId: 'tenant-1',
         studentId: 'student-1',
         requestedById: 'parent-1',
+        confirmStudentId: 'student-1',
         type: SchoolServiceRequestType.GENERAL_COMPLAINT,
         idempotencyKey: '0fdace11-23ef-4ea5-982e-7c81831d80da',
       }),
@@ -138,6 +140,7 @@ describe('ServiceRequestsService', () => {
       service.createParentRequest(
         'student-1',
         {
+          confirmStudentId: 'student-1',
           type: SchoolServiceRequestType.PAYMENT_DISPUTE,
           category: SchoolServiceRequestCategory.FEES_AND_PAYMENTS,
           subject: 'Payment is missing',
@@ -172,7 +175,8 @@ describe('ServiceRequestsService', () => {
       service.createParentRequest(
         'student-1',
         {
-          type: SchoolServiceRequestType.GENERAL_COMPLAINT,
+          confirmStudentId: 'student-1',
+        type: SchoolServiceRequestType.GENERAL_COMPLAINT,
           category: SchoolServiceRequestCategory.OTHER,
           subject: 'Existing key',
           description: 'This should not reuse another family request key.',

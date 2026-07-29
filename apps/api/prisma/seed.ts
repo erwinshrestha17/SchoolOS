@@ -34,6 +34,10 @@ import {
   TransportTripStatus,
   UserStatus,
   EnrollmentStatus,
+  GuardianRelationshipApprovalStatus,
+  GuardianRelationshipStatus,
+  GuardianRelationshipVerificationStatus,
+  GuardianCapability,
   TenantSubscriptionStatus,
   UsagePeriod,
   PlatformPlanStatus,
@@ -299,6 +303,15 @@ const lastNames = [
   'Shakya',
 ];
 
+const demoGuardianCapabilities: GuardianCapability[] = [
+  GuardianCapability.ACADEMICS_VIEW,
+  GuardianCapability.ATTENDANCE_VIEW,
+  GuardianCapability.FEES_VIEW,
+  GuardianCapability.SCHOOL_COMMUNICATE,
+  GuardianCapability.COMPLAINT_OR_CORRECTION_SUBMIT,
+  GuardianCapability.EMERGENCY_ALERT_RECEIVE,
+];
+
 function date(value: string) {
   return new Date(`${value}T00:00:00.000Z`);
 }
@@ -337,6 +350,15 @@ async function main() {
   await seedCanteenData(tenant.id);
   await seedPlatformInfrastructure();
   await seedM7M11E2eIdentities(tenant.id);
+
+  console.log('Backfilling canonical TeacherAssignment rows for smoke fixtures...');
+  const { execSync } = await import('node:child_process');
+  const { join } = await import('node:path');
+  execSync('pnpm exec tsx prisma/seed-teacher-assignment-backfill.ts', {
+    cwd: join(__dirname),
+    stdio: 'inherit',
+    env: process.env,
+  });
 
   console.log('');
   console.log('✅ SchoolOS seed completed successfully.');
@@ -2078,6 +2100,11 @@ async function seedCanonicalStudents(
             relation: 'Guardian',
             isPrimary: true,
             appLoginLinked: true,
+            status: GuardianRelationshipStatus.ACTIVE,
+            verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
+            approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+            effectiveFrom: date('2026-04-10'),
+            capabilities: demoGuardianCapabilities,
           },
           create: {
             tenantId,
@@ -2086,6 +2113,11 @@ async function seedCanonicalStudents(
             relation: 'Guardian',
             isPrimary: true,
             appLoginLinked: true,
+            status: GuardianRelationshipStatus.ACTIVE,
+            verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
+            approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+            effectiveFrom: date('2026-04-10'),
+            capabilities: demoGuardianCapabilities,
           },
         });
 

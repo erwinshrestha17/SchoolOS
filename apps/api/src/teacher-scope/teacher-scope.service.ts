@@ -679,4 +679,43 @@ export class TeacherScopeService {
       ]),
     };
   }
+
+  /**
+   * Monotonic scope version for mobile offline cache invalidation (P0-03).
+   * Bumps when assignments or active delegations change for the caller.
+   */
+  async getScopeVersion(actor: AuthContext): Promise<{ scopeVersion: string }> {
+    const staffId = await this.resolveActiveStaffId(actor);
+    if (!staffId) {
+      return { scopeVersion: '0' };
+    }
+
+    const now = new Date();
+    const [assignmentMax, delegationMax] = await Promise.all([
+      this.prisma.teacherAssignment.aggregate({
+        where: {
+          tenantId: actor.tenantId,
+          staffId,
+          status: 'ACTIVE',
+        },
+        _max: { updatedAt: true },
+      }),
+      this.prisma.teacherDelegation.aggregate({
+        where: {
+          tenantId: actor.tenantId,
+          recipientStaffId: staffId,
+          status: 'ACTIVE',
+          effectiveUntil: { gte: now },
+        },
+        _max: { updatedAt: true },
+      }),
+    ]);
+
+    const version = Math.max(
+      assignmentMax._max.updatedAt?.getTime() ?? 0,
+      delegationMax._max.updatedAt?.getTime() ?? 0,
+    );
+
+    return { scopeVersion: String(version) };
+  }
 }

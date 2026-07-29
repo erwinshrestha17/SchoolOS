@@ -15,6 +15,12 @@ describe('TenantsService.register (platform-operator provisioning)', () => {
 
   function createMocks() {
     const prisma = {
+      $transaction: jest.fn(async (callback: (tx: unknown) => unknown) =>
+        callback(prisma),
+      ),
+      user: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
       tenant: {
         findUnique: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue({
@@ -47,9 +53,20 @@ describe('TenantsService.register (platform-operator provisioning)', () => {
       },
       chartAccount: {
         upsert: jest.fn().mockResolvedValue(undefined),
+        findUnique: jest.fn(
+          ({ where }: { where: { tenantId_code: { code: string } } }) =>
+            Promise.resolve({
+              id: `account-${where.tenantId_code.code}`,
+              code: where.tenantId_code.code,
+            }),
+        ),
       },
       feeHead: {
         upsert: jest.fn().mockResolvedValue(undefined),
+      },
+      accountingSourceMapping: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue(undefined),
       },
     };
 
@@ -112,7 +129,7 @@ describe('TenantsService.register (platform-operator provisioning)', () => {
     });
     expect(usersService.createManagedUser).toHaveBeenCalledWith({
       tenantId: 'tenant-new',
-      email: dto.adminEmail,
+      email: dto.adminEmail.toLowerCase(),
       password: dto.adminPassword,
       roleIds: ['role-admin', 'role-school_config_owner'],
       assignedById: null,

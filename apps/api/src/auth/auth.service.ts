@@ -656,6 +656,56 @@ export class AuthService {
     return { success: true };
   }
 
+  async listSessions(auth: AuthContext) {
+    const sessions = await this.prisma.refreshToken.findMany({
+      where: {
+        userId: auth.userId,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      select: {
+        id: true,
+        deviceId: true,
+        userAgent: true,
+        createdAt: true,
+        lastUsedAt: true,
+        expiresAt: true,
+      },
+      orderBy: [{ lastUsedAt: 'desc' }, { createdAt: 'desc' }],
+      take: 20,
+    });
+
+    return { items: sessions };
+  }
+
+  async revokeSession(sessionId: string, auth: AuthContext) {
+    const result = await this.prisma.refreshToken.updateMany({
+      where: {
+        id: sessionId,
+        userId: auth.userId,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+        revokedReason: 'user_revoked_session',
+      },
+    });
+
+    if (result.count === 0) {
+      throw new NotFoundException('Active session was not found');
+    }
+
+    await this.auditService.record({
+      action: 'revoke_session',
+      resource: 'auth',
+      tenantId: auth.tenantId,
+      userId: auth.userId,
+      resourceId: sessionId,
+    });
+
+    return { success: true as const };
+  }
+
   async getProfile(auth: AuthContext) {
     const user = await this.prisma.user.findUnique({
       where: { id: auth.userId },

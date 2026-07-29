@@ -22,6 +22,7 @@ import { CommunicationsService } from '../src/communications/communications.serv
 import { FileRegistryService } from '../src/file-registry/file-registry.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { StorageService } from '../src/storage/storage.service';
+import { createProcessorClsMock } from '../src/plans/processor-cls.mock';
 
 interface ActivityPostRecord {
   id: string;
@@ -200,6 +201,7 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
         shouldProcessTenantJob: jest.fn().mockResolvedValue(true),
       } as never,
       fileRegistryService as unknown as FileRegistryService,
+      createProcessorClsMock() as never,
     );
   });
 

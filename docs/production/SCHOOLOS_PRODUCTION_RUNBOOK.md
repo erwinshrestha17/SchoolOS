@@ -373,37 +373,45 @@ Expected URLs:
 - Run browser smoke with PDF checks.
 
 ### Staff Training Checklist
-Train in this order:
+
+Train in this order. **Wave-gated modules** (M3 full collection, M7, M8, M11) apply only after the school has that module entitled per the GA wave matrix in `SchoolOS_Controlled_Pilot_Implementation_Priority_Roadmap.md` §14.1.
+
 1. **Admin Command Center:** KPIs, setup alerts, quick actions, and delivery health.
 2. **Settings:** academic year, class, and section setup.
-3. **Student Directory/Profile:** filter roster, search by name/SCH ID, open profile, open ID card PDF, jump to fee collection.
+3. **Student Directory/Profile:** filter roster, search by name/SCH ID, open profile, open ID card PDF.
 4. **New Enrollment:** multi-step admission, guardian phone, iEMIS disability confirmation, duplicate warning, document upload, success actions.
 5. **Attendance:** class/section/date register, present-by-default support, absent/late/leave exceptions, draft/submit result, lock/conflict state.
-6. **Fee Collection:** invoice search, outstanding amount, overpayment block, partial/full payment, receipt PDF, ledger preview.
-7. **Activity Feed:** audience targeting, 1-5 image rule, private media object-key behavior, feed preview, delivery records.
-8. **M12 Notifications and M15 Notices:** normal/urgent/emergency notice with optional Nepali bilingual title/body, category, and pin-to-top; recipient preview using the exact same resolver as publication; whole-school/class/section/role/staff/specific-student/specific-guardian/specific-recipient audience targeting; normalized publication event; in-app/delivery records and notification inbox/preferences; guardian consent capture/revoke and consent-template management (restricted to admin/school-configuration-owner tier, not general staff); and chat-write denial across every legacy messaging route.
-9. **HR & Payroll (M7):** staff directory/profile, staff attendance register, leave request/approval, salary structure activation, payroll run generate -> readiness/exception resolution -> submit for review -> approve -> post to accounting, payslip issue and PDF download, staff self-service own-record boundary.
-10. **Library (M8):** book catalogue and copy management, barcode/QR scanner-assisted issue and return, reservations, fine calculation/manual fine/waive/post-to-fees, overdue reports and reminders, parent linked-child library status.
-11. **Accounting & Finance (M11):** chart of accounts and Nepal chart template import, manual journal and voucher (expense/payment/receipt/contra) entry, submit -> approve (a different staff member) -> post workflow, fiscal year/period lock/close/reopen with reasoned exceptions, bank statement import and reconciliation, Trial Balance/General Ledger/Cash Book/Income Statement/Balance Sheet/Tax Summary reports and exports, principal read-only financial summary boundary.
-12. **Logout/session behavior:** avatar menu logout.
+6. **Homework and Timetable (M6):** assign homework, review submissions, read teacher timetable.
+7. **M12 Notifications and M15 Notices:** normal/urgent/emergency notice with optional Nepali bilingual title/body, category, and pin-to-top; recipient preview; guardian consent capture/revoke; chat-write denial on legacy routes.
+8. **Fee Collection (M3 — Wave 2+ only):** invoice search, partial/full payment, receipt PDF, ledger preview. Skip until Wave 2 exit gate.
+9. **Activity Feed (M5):** audience targeting, image rule, feed preview, delivery records.
+10. **HR & Payroll (M7 — Wave 4+ only):** staff directory, leave, payroll run workflow, payslip PDF. Skip until Wave 4 exit gate and Nepal statutory verification for payroll.
+11. **Library (M8 — Wave 4+ only):** catalogue, issue/return, fines. Skip until Wave 4 exit gate.
+12. **Accounting & Finance (M11 — Wave 4+ only):** chart of accounts, journals, fiscal periods, reports. Skip until Wave 4 exit gate.
+13. **Logout/session behavior:** avatar menu logout.
 
-### Day-1 Pilot Script
+### Day-1 Production School Script (Wave 1 core)
+
+Execute steps 1–11 for the first production school. Steps 12–15 require Wave 2–4 module entitlements.
+
 1. Log in as admin.
-2. Confirm academic year, class, section, fee head, and fee plan exist.
-3. Admit 2-5 test students with guardian phone numbers. Verify `SCH-YYYY-NNNN` IDs.
+2. Confirm academic year, class, and section exist.
+3. Admit 2–5 students with guardian phone numbers. Verify `SCH-YYYY-NNNN` IDs.
 4. Open one Student ID Card PDF.
-5. Confirm first invoice exists.
-6. Collect one partial fee payment. Open generated receipt PDF.
-7. Mark one student absent, one late, and one leave in class Attendance. Submit and verify notifications queued.
-8. Publish one normal notice and one event. Publish a second notice targeted at a specific staff role and confirm the recipient preview count matches actual role membership.
-9. Capture and revoke one guardian consent record.
-10. Create one activity post with one image.
-11. Confirm delivery records appear for notice/activity/attendance/fee events.
-12. Create one staff member with an active salary structure. Submit one staff leave request and approve it.
-13. Generate one payroll run for the current period. Resolve any blocking readiness exceptions, submit for review, approve, and post to accounting. Open one generated payslip PDF.
-14. Add one library book with a physical copy. Issue the copy to a student, then return it and confirm the copy is available again.
-15. Create one manual journal entry and submit it for approval. Have a second staff member approve and post it to the ledger. Generate one Trial Balance report and export it.
-16. Log out and confirm dashboard redirect.
+5. Mark one student absent, one late, and one leave in class Attendance. Submit and verify notifications queued.
+6. Publish one normal notice. Confirm recipient preview matches publication.
+7. Capture and revoke one guardian consent record.
+8. Create one activity post with one image (if M5 entitled).
+9. Assign one homework item (M6).
+10. Confirm delivery records appear for notice/activity/attendance events.
+11. Log out and confirm dashboard redirect.
+
+**Wave 2+ extensions (when entitled):**
+
+12. Confirm first invoice exists; collect one partial fee payment; open receipt PDF (M3).
+13. Create staff member, leave request, payroll run, payslip PDF (M7 — after statutory verification).
+14. Issue and return one library copy (M8).
+15. Create one manual journal entry, approve, post, export Trial Balance (M11).
 
 ### Browser QA Checklist
 - **Authentication:** Login works with cookie-first auth. No raw tokens in browser storage. Logout clears local session metadata. Unauthenticated access redirects to login.
@@ -417,12 +425,14 @@ Train in this order:
 - **Library (M8):** Book/copy catalogue loads and archive requires an audit reason. Scanner-assisted issue blocks a copy that is already checked out; return clears it back to available and calculates any overdue fine. Reservations block issuing a reserved copy to a different borrower. A teacher's issue/reservation history and borrowed-students roster stay scoped to their own records, never school-wide. Fines can be waived or posted to the M3 Fees counter with a mandatory audit reason. Parent linked-child library status is read-only and limited to the linked child.
 - **Accounting & Finance (M11):** Chart of accounts and Nepal chart template import work. Manual journal and voucher entry require a balanced double-entry before submission, and posting is blocked outside an open, unlocked fiscal period. A journal cannot be approved by the same user who created it. Bank statement import and reconciliation match statement lines to journal lines. Trial Balance, General Ledger, Cash Book, Income Statement, Balance Sheet, and Tax Summary reports load and export. The principal role sees financial reports and summaries read-only, with no journal approve/post/reverse, fiscal management, or accounting settings-update actions available.
 
-### Controlled-Pilot Boundaries
-- The supported workflow slice must be recorded for each pilot; module presence in the repository does not prove that a workflow is pilot validated.
-- Parent mobile workflows exist in the repository, but supported-persona device QA and tenant/child-scope evidence are still required before a pilot-validation claim.
-- Real SMS, FCM, external email, payment, and object-storage modes remain unavailable unless explicitly configured and verified in a safe staging or sandbox environment.
+### Controlled-Pilot / Wave 1 Production Boundaries
+
+- The supported workflow slice must match the GA wave matrix in `SchoolOS_Controlled_Pilot_Implementation_Priority_Roadmap.md` §14.1.
+- Wave 1 production school #1 enables M0, M1, M2, M5, M6, M12, M15 only until later wave exit gates pass.
+- Parent mobile workflows require device QA and tenant/child-scope evidence before production claims.
+- Real SMS, FCM, external email, payment, and object-storage modes require safe staging/sandbox verification.
 - M14 Intelligence / AI runtime and a broad Student App remain out of active scope.
-- Local storage is acceptable for a controlled pilot only when protected access, backup, and restore procedures are configured and evidenced.
+- M13 Learning ships in Wave 5; keep disabled until that wave's evidence is recorded.
 
 ### Support Process & Severity Levels
 - **S0 (Critical):** Data loss, cross-tenant data exposure, login unavailable, or financial corruption. Stop pilot writes and escalate immediately.

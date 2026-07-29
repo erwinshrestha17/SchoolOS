@@ -102,6 +102,17 @@ export const SETTINGS_NAVIGATION: SettingsNavigationDefinition[] = [
     legacyHrefs: ['/dashboard/notifications/preferences'],
   },
   {
+    id: 'school-onboarding',
+    groupId: 'school',
+    label: 'Day-1 onboarding',
+    description: 'Core setup checklist before the first school day.',
+    href: '/dashboard/settings/onboarding',
+    icon: ClipboardList,
+    scope: 'school',
+    backendItemId: 'school-profile',
+    searchKeywords: ['checklist', 'onboarding', 'day 1', 'setup', 'go-live'],
+  },
+  {
     id: 'school-identity',
     groupId: 'school',
     label: 'Identity & general',

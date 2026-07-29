@@ -762,53 +762,59 @@ export class AttendanceService {
         : [];
 
       if (notifyRecords.length > 0) {
-        for (const record of notifyRecords) {
-          const eventType =
-            record.status === AttendanceStatus.ABSENT
-              ? 'attendance.student.absent'
-              : record.status === AttendanceStatus.LATE
-                ? 'attendance.student.late'
-                : 'attendance.student.leave';
+        const notificationsFinalized = session.lockAt <= new Date();
+        if (notificationsFinalized) {
+          for (const record of notifyRecords) {
+            const eventType =
+              record.status === AttendanceStatus.ABSENT
+                ? 'attendance.student.absent'
+                : record.status === AttendanceStatus.LATE
+                  ? 'attendance.student.late'
+                  : 'attendance.student.leave';
 
-          this.eventEmitter.emit(eventType, {
-            tenantId: actor.tenantId,
-            actor,
-            attendanceSessionId: session.id,
-            attendanceDate: session.attendanceDate,
-            classId: session.classId,
-            sectionId: session.sectionId,
-            studentId: record.studentId,
-            status: record.status,
-          });
+            this.eventEmitter.emit(eventType, {
+              tenantId: actor.tenantId,
+              actor,
+              attendanceSessionId: session.id,
+              attendanceDate: session.attendanceDate,
+              classId: session.classId,
+              sectionId: session.sectionId,
+              studentId: record.studentId,
+              status: record.status,
+            });
 
-          if (record.status === AttendanceStatus.ABSENT) {
-            const consecutiveAbsences =
-              await this.countConsecutiveAbsencesForStudent(
-                actor.tenantId,
-                record.studentId,
-                session.attendanceDate,
-              );
+            if (record.status === AttendanceStatus.ABSENT) {
+              const consecutiveAbsences =
+                await this.countConsecutiveAbsencesForStudent(
+                  actor.tenantId,
+                  record.studentId,
+                  session.attendanceDate,
+                );
 
-            if (consecutiveAbsences >= 3) {
-              this.eventEmitter.emit('attendance.student.consecutive_absence', {
-                tenantId: actor.tenantId,
-                actor,
-                attendanceSessionId: session.id,
-                attendanceDate: session.attendanceDate,
-                classId: session.classId,
-                sectionId: session.sectionId,
-                studentId: record.studentId,
-                consecutiveAbsences,
-              });
+              if (consecutiveAbsences >= 3) {
+                this.eventEmitter.emit(
+                  'attendance.student.consecutive_absence',
+                  {
+                    tenantId: actor.tenantId,
+                    actor,
+                    attendanceSessionId: session.id,
+                    attendanceDate: session.attendanceDate,
+                    classId: session.classId,
+                    sectionId: session.sectionId,
+                    studentId: record.studentId,
+                    consecutiveAbsences,
+                  },
+                );
+              }
             }
           }
-        }
 
-        await this.recordParentStatusNotifications(
-          session,
-          notifyRecords,
-          actor,
-        );
+          await this.recordParentStatusNotifications(
+            session,
+            notifyRecords,
+            actor,
+          );
+        }
       }
 
       return {
@@ -6791,6 +6797,17 @@ function classifyAttendanceSyncRejection(error: unknown) {
 
   if (error instanceof ForbiddenException) {
     const message = String(error.message ?? '');
+    const exceptionResponse = error.getResponse();
+    const code =
+      typeof exceptionResponse === 'object' &&
+      exceptionResponse !== null &&
+      'code' in exceptionResponse
+        ? String((exceptionResponse as { code?: unknown }).code ?? '')
+        : '';
+
+    if (code === 'TEACHER_SCOPE_DENIED' || message.includes('TEACHER_SCOPE')) {
+      return AttendanceSyncRejectionReason.UNASSIGNED_TEACHER;
+    }
 
     if (message.includes('locked')) {
       return AttendanceSyncRejectionReason.LOCKED_SESSION;

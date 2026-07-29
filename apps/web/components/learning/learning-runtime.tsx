@@ -35,7 +35,7 @@ import { LoadingState } from "../ui/loading-state";
 import { PermissionDenied } from "../ui/permission-denied";
 import { StatusBadge } from "../ui/status-badge";
 
-function LearningRouteGuard({
+export function LearningRouteGuard({
   children,
   permissions,
   title,

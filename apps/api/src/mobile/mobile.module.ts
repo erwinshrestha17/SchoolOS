@@ -25,11 +25,13 @@ import { MobilePushTokensController } from './mobile-push-tokens.controller';
 import { ServiceRequestsModule } from '../service-requests/service-requests.module';
 import { LearningImprovementModule } from '../learning-improvement/learning-improvement.module';
 import { InstitutionalImprovementModule } from '../institutional-improvement/institutional-improvement.module';
+import { TeacherScopeModule } from '../teacher-scope/teacher-scope.module';
 
 @Module({
   imports: [
     PrismaModule,
     AttendanceModule,
+    TeacherScopeModule,
     FinanceModule,
     AcademicsModule,
     CommunicationsModule,

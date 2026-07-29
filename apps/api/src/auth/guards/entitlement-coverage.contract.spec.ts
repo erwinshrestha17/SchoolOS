@@ -28,15 +28,6 @@ describe('Entitlement coverage contract (DEF-06)', () => {
     'FileRegistryController',
   ]);
 
-  const DEFERRED_GAPS = new Set([
-    'ServiceRequestsController',
-    'ApprovalWorkflowController',
-    'AutomationEngineController',
-    'DataExportCenterController',
-    'DescriptiveAnalyticsController',
-    'DocumentTemplateController',
-  ]);
-
   function listControllerFiles(dir: string): string[] {
     const entries = readdirSync(dir);
     const files: string[] = [];
@@ -108,7 +99,7 @@ describe('Entitlement coverage contract (DEF-06)', () => {
       const classes = extractControllerClasses(source);
 
       for (const className of classes) {
-        if (PERMANENTLY_EXEMPT.has(className) || DEFERRED_GAPS.has(className)) {
+        if (PERMANENTLY_EXEMPT.has(className)) {
           continue;
         }
         if (!hasEntitlementGuard(source)) {
@@ -120,16 +111,5 @@ describe('Entitlement coverage contract (DEF-06)', () => {
     it('requires EntitlementGuard on all non-exempt school-operations controllers', () => {
       expect(violations).toEqual([]);
     });
-  });
-
-  it('documents the deferred entitlement gaps that remain out of scope for DEF-06', () => {
-    expect([...DEFERRED_GAPS].sort()).toEqual([
-      'ApprovalWorkflowController',
-      'AutomationEngineController',
-      'DataExportCenterController',
-      'DescriptiveAnalyticsController',
-      'DocumentTemplateController',
-      'ServiceRequestsController',
-    ]);
   });
 });

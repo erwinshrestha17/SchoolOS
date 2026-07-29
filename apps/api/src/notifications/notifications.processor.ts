@@ -2,11 +2,12 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger, Optional } from '@nestjs/common';
 import { NotificationStatus } from '@prisma/client';
 import { DelayedError, Job } from 'bullmq';
+import { ClsService } from 'nestjs-cls';
 import { decryptSensitiveField } from '../common/security/field-encryption';
 import { parseSafeExternalHttpsUrl } from '../common/security/outbound-url';
 import { ConfigService } from '../config/config.service';
 import { PlansService } from '../plans/plans.service';
-import { skipSuspendedTenantJob } from '../plans/processor-tenant.guard';
+import { runTenantScopedJob } from '../plans/processor-tenant.context';
 import { PrismaService } from '../prisma/prisma.service';
 import { DevicePushTokensService } from './device-push-tokens.service';
 import { resolveMobilePushDeepLink } from './mobile-push-deep-link';
@@ -66,6 +67,7 @@ export class NotificationsProcessor extends WorkerHost {
   constructor(
     private readonly prisma: PrismaService,
     private readonly plansService: PlansService,
+    private readonly cls: ClsService,
     private readonly configService?: ConfigService,
     @Optional()
     private readonly devicePushTokensService?: DevicePushTokensService,
@@ -77,18 +79,22 @@ export class NotificationsProcessor extends WorkerHost {
 
   async process(job: Job<NotificationJobData, void>): Promise<void> {
     const tenantId = this.extractTenantId(job.data);
-    if (
-      await skipSuspendedTenantJob(
-        this.plansService,
-        tenantId,
-        this.logger,
-        `notification job ${job.name}`,
-      )
-    ) {
-      return;
-    }
 
+    await runTenantScopedJob(
+      this.cls,
+      this.plansService,
+      tenantId,
+      this.logger,
+      `notification job ${job.name}`,
+      async () => this.processNotificationJob(job),
+    );
+  }
+
+  private async processNotificationJob(
+    job: Job<NotificationJobData, void>,
+  ): Promise<void> {
     const deliveryId = job.data.metadata?.notificationDeliveryId;
+    const tenantId = this.extractTenantId(job.data);
     if (
       this.notificationPreferencePolicy &&
       typeof tenantId === 'string' &&

@@ -4,6 +4,7 @@ import sharp from 'sharp';
 import { PrismaService } from '../../prisma/prisma.service';
 import { FileRegistryService } from '../../file-registry/file-registry.service';
 import { StorageService } from '../../storage/storage.service';
+import { createProcessorClsMock } from '../../plans/processor-cls.mock';
 import {
   ActivityMediaCompressionJob,
   ActivityMediaProcessor,
@@ -104,6 +105,7 @@ describe('ActivityMediaProcessor', () => {
         shouldProcessTenantJob: jest.fn().mockResolvedValue(true),
       } as never,
       fileRegistryService as unknown as FileRegistryService,
+      createProcessorClsMock() as never,
     );
   });
 

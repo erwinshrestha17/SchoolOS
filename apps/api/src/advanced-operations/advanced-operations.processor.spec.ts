@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import { createProcessorClsMock } from '../plans/processor-cls.mock';
 import { AdvancedOperationsProcessor } from './advanced-operations.processor';
 
 describe('AdvancedOperationsProcessor (DEF-06)', () => {
@@ -27,6 +28,7 @@ describe('AdvancedOperationsProcessor (DEF-06)', () => {
     const processor = new AdvancedOperationsProcessor(
       exportsService as never,
       plansService as never,
+      createProcessorClsMock() as never,
     );
 
     await processor.process({
@@ -50,6 +52,7 @@ describe('AdvancedOperationsProcessor (DEF-06)', () => {
     const processor = new AdvancedOperationsProcessor(
       exportsService as never,
       plansService as never,
+      createProcessorClsMock() as never,
     );
 
     await processor.process({

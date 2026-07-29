@@ -1,4 +1,5 @@
 import { SUSPENDED_TENANT_MESSAGE } from '../plans/tenant-access.constants';
+import { createProcessorClsMock } from '../plans/processor-cls.mock';
 import { AccountingReportsProcessor } from './accounting-reports.processor';
 
 describe('AccountingReportsProcessor', () => {
@@ -30,6 +31,7 @@ describe('AccountingReportsProcessor', () => {
       prisma as any,
       exportsService as any,
       plansService as any,
+      createProcessorClsMock() as any,
     );
   });
 

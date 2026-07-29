@@ -74,6 +74,15 @@ async function main() {
   run('pnpm', ['db:seed'], {
     env: { ...process.env, NODE_ENV: 'development' },
   });
+  run('pnpm', ['--filter', '@schoolos/api', 'db:backfill:teacher-assignments'], {
+    env: process.env,
+  });
+  run('pnpm', ['--filter', '@schoolos/api', 'db:backfill:guardian-capabilities'], {
+    env: process.env,
+  });
+  run('pnpm', ['--filter', '@schoolos/api', 'db:enable:staging-learning'], {
+    env: process.env,
+  });
 
   const finishedAt = new Date().toISOString();
   mkdirSync(evidenceDir, { recursive: true });

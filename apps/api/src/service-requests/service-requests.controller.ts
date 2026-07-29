@@ -11,8 +11,10 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
+import { NoModuleEntitlement } from '../auth/decorators/no-module-entitlement.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { TenantActiveGuard } from '../auth/guards/tenant-active.guard';
@@ -27,7 +29,15 @@ import { ServiceRequestsService } from './service-requests.service';
 
 @ApiTags('service-requests')
 @Controller('service-requests')
-@UseGuards(JwtAuthGuard, TenantActiveGuard, RolesPermissionsGuard)
+@UseGuards(
+  JwtAuthGuard,
+  TenantActiveGuard,
+  RolesPermissionsGuard,
+  EntitlementGuard,
+)
+@NoModuleEntitlement(
+  'Cross-module structured parent/school requests (P0-11); RBAC via service_requests permissions',
+)
 export class ServiceRequestsController {
   constructor(private readonly service: ServiceRequestsService) {}
 

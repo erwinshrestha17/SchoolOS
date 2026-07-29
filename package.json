@@ -57,6 +57,13 @@
     "staging:verify:gates": "node scripts/verify-staging-gates.mjs",
     "staging:health": "node scripts/check-staging-health.mjs",
     "staging:wave:local": "node scripts/staging-deploy-local.mjs && node scripts/verify-staging-gates.mjs",
-    "staging:api:local": "node scripts/start-staging-api-local.mjs"
+    "staging:api:local": "node scripts/start-staging-api-local.mjs",
+    "ga:verify:wave0": "node scripts/ga-program-verify.mjs wave0",
+    "ga:verify:wave1": "node scripts/ga-program-verify.mjs wave1",
+    "ga:verify:wave2": "node scripts/ga-program-verify.mjs wave2",
+    "ga:verify:wave3": "node scripts/ga-program-verify.mjs wave3",
+    "ga:verify:wave4": "node scripts/ga-program-verify.mjs wave4",
+    "ga:verify:wave5": "node scripts/ga-program-verify.mjs wave5",
+    "ga:verify:wave6": "node scripts/ga-program-verify.mjs wave6"
   }
 }

@@ -7,8 +7,9 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { ConfirmStudentActionFields } from '../../common/security/confirm-student-action';
 
-export class MobileParentAttendanceCorrectionDto {
+export class MobileParentAttendanceCorrectionDto extends ConfirmStudentActionFields {
   @IsDateString()
   attendanceDate!: string;
 
@@ -22,7 +23,7 @@ export class MobileParentAttendanceCorrectionDto {
   reason!: string;
 }
 
-export class MobileParentAttendanceCorrectionCancelDto {
+export class MobileParentAttendanceCorrectionCancelDto extends ConfirmStudentActionFields {
   @IsString()
   @IsNotEmpty()
   @MinLength(8)

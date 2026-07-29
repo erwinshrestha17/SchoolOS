@@ -1,5 +1,6 @@
 import { AcademicsProcessor } from './academics.processor';
 import type { AuthContext } from '../auth/auth.types';
+import { createProcessorClsMock } from '../plans/processor-cls.mock';
 
 describe('AcademicsProcessor', () => {
   let processor: AcademicsProcessor;
@@ -27,6 +28,7 @@ describe('AcademicsProcessor', () => {
     processor = new AcademicsProcessor(
       reportCardsService as any,
       plansService as any,
+      createProcessorClsMock() as any,
     );
   });
 

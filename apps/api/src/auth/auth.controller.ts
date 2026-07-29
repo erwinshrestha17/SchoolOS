@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Headers,
+  Param,
   Post,
   Req,
   Res,
@@ -159,6 +160,21 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   me(@CurrentAuth() auth: AuthContext) {
     return this.authService.getProfile(auth);
+  }
+
+  @Get('sessions')
+  @UseGuards(JwtAuthGuard)
+  listSessions(@CurrentAuth() auth: AuthContext) {
+    return this.authService.listSessions(auth);
+  }
+
+  @Post('sessions/:sessionId/revoke')
+  @UseGuards(JwtAuthGuard)
+  revokeSession(
+    @Param('sessionId') sessionId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.authService.revokeSession(sessionId, auth);
   }
 
   @Post('change-password')

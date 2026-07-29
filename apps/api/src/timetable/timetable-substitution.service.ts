@@ -12,6 +12,7 @@ import {
   NotificationChannel,
   TimetableSubstitutionStatus,
   TimetableVersionStatus,
+  TeacherDelegationStatus,
   Prisma,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
@@ -19,6 +20,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AttendanceService } from '../attendance/attendance.service';
+import { TeacherCapability } from '../teacher-scope/teacher-capability';
 import { TimetableLifecycleService } from './timetable-lifecycle.service';
 import {
   AssignSubstitutionDto,
@@ -440,15 +442,52 @@ export class TimetableSubstitutionService {
       substitution.id,
     );
 
-    const updated = await this.prisma.timetableSubstitution.update({
-      where: { id },
-      data: {
-        substituteTeacherId: dto.substituteTeacherId,
-        status: TimetableSubstitutionStatus.ASSIGNED,
-        assignedAt: new Date(),
-        approvedById: actor.userId,
-      },
-      include: substitutionInclude(),
+    const slot = substitution.timetableSlot;
+    if (!slot.sectionId) {
+      throw new ConflictException(
+        'Substitutions require a section-scoped timetable slot',
+      );
+    }
+    const sectionId = slot.sectionId;
+
+    const effectiveFrom = stripTime(substitution.date);
+    const effectiveUntil = new Date(effectiveFrom);
+    effectiveUntil.setHours(23, 59, 59, 999);
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const assigned = await tx.timetableSubstitution.update({
+        where: { id },
+        data: {
+          substituteTeacherId: dto.substituteTeacherId,
+          status: TimetableSubstitutionStatus.ASSIGNED,
+          assignedAt: new Date(),
+          approvedById: actor.userId,
+        },
+        include: substitutionInclude(),
+      });
+
+      await tx.teacherDelegation.create({
+        data: {
+          tenantId: actor.tenantId,
+          academicYearId: slot.academicYearId,
+          grantorStaffId: substitution.absentTeacherId,
+          recipientStaffId: dto.substituteTeacherId,
+          classId: slot.classId,
+          sectionId,
+          subjectId: slot.subjectId,
+          allowedCapabilities: [
+            TeacherCapability.PERIOD_ATTENDANCE_MARK,
+            TeacherCapability.SUBJECT_HOMEWORK_CREATE,
+          ],
+          reason: `Timetable substitution ${id}: ${substitution.reason}`,
+          effectiveFrom,
+          effectiveUntil,
+          status: TeacherDelegationStatus.ACTIVE,
+          createdById: actor.userId,
+        },
+      });
+
+      return assigned;
     });
 
     await this.audit('assign', 'timetable_substitution', id, actor, updated);
@@ -470,14 +509,38 @@ export class TimetableSubstitutionService {
       return substitution;
     }
 
-    const updated = await this.prisma.timetableSubstitution.update({
-      where: { id },
-      data: {
-        status: TimetableSubstitutionStatus.CANCELLED,
-        cancelledAt: new Date(),
-        cancellationReason: dto.reason,
-      },
-      include: substitutionInclude(),
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const cancelled = await tx.timetableSubstitution.update({
+        where: { id },
+        data: {
+          status: TimetableSubstitutionStatus.CANCELLED,
+          cancelledAt: new Date(),
+          cancellationReason: dto.reason,
+        },
+        include: substitutionInclude(),
+      });
+
+      if (substitution.substituteTeacherId && substitution.timetableSlot.sectionId) {
+        await tx.teacherDelegation.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            recipientStaffId: substitution.substituteTeacherId,
+            classId: substitution.timetableSlot.classId,
+            sectionId: substitution.timetableSlot.sectionId,
+            subjectId: substitution.timetableSlot.subjectId,
+            status: TeacherDelegationStatus.ACTIVE,
+            effectiveFrom: { lte: stripTime(substitution.date) },
+            effectiveUntil: { gte: stripTime(substitution.date) },
+          },
+          data: {
+            status: TeacherDelegationStatus.REVOKED,
+            revokedAt: new Date(),
+            revokedById: actor.userId,
+          },
+        });
+      }
+
+      return cancelled;
     });
     await this.audit('cancel', 'timetable_substitution', id, actor, {
       ...updated,

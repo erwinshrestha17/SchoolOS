@@ -1,8 +1,9 @@
 import { Logger } from '@nestjs/common';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
+import { ClsService } from 'nestjs-cls';
 import { PlansService } from '../plans/plans.service';
-import { skipSuspendedTenantJob } from '../plans/processor-tenant.guard';
+import { runTenantScopedJob } from '../plans/processor-tenant.context';
 import { DataExportCenterService } from './data-export-center.service';
 
 interface AdvancedOperationsJob {
@@ -17,6 +18,7 @@ export class AdvancedOperationsProcessor extends WorkerHost {
   constructor(
     private readonly exportsService: DataExportCenterService,
     private readonly plansService: PlansService,
+    private readonly cls: ClsService,
   ) {
     super();
   }
@@ -27,17 +29,15 @@ export class AdvancedOperationsProcessor extends WorkerHost {
       return;
     }
 
-    if (
-      await skipSuspendedTenantJob(
-        this.plansService,
-        job.data.tenantId,
-        this.logger,
-        `advanced operations export ${job.data.jobId}`,
-      )
-    ) {
-      return;
-    }
-
-    await this.exportsService.completeJob(job.data);
+    await runTenantScopedJob(
+      this.cls,
+      this.plansService,
+      job.data.tenantId,
+      this.logger,
+      `advanced operations export ${job.data.jobId}`,
+      async () => {
+        await this.exportsService.completeJob(job.data);
+      },
+    );
   }
 }

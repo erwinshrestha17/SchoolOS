@@ -55,8 +55,9 @@ SchoolOS remains a Nepal-first, multi-tenant education operating SaaS for `SCHOO
 - Keep backend authorization, RBAC, tenant scope, and module entitlement as the source of truth.
 - Keep M12 Notifications and Delivery separate from M15 Notices and Announcements. Feature modules and M15 emit normalized events; only M12 owns provider routing, delivery state, retries, callbacks, inbox/read state, diagnostics, and delivery audit.
 - Keep chat/conversations removed from the active product and release boundary. New writes and navigation remain disabled while historical records, migrations, authorization, moderation evidence, and retention obligations are preserved. Chat is not a deferred module and its former identifier must not be reused.
-- Keep M13 Learning preserved as a separate but deferred/frozen domain that reuses core student, staff, class, subject, timetable, notification, file, RBAC, and audit systems. Do not remove or rewrite its implementation, data, migrations, contracts, clients, tests, permissions, or entitlements.
-- Keep M13 disabled by default for pilot tenants and hidden from navigation when disabled. Exclude it from pilot acceptance criteria, supported release claims, and mandatory release gates. Only security, tenancy, suspended-tenant, protected-file, build, migration, OpenAPI, or repository-regression fixes may change M13 while frozen.
+- Keep M13 Learning as a separate domain that reuses core student, staff, class, subject, timetable, notification, file, RBAC, and audit systems. Do not remove or rewrite its implementation, data, migrations, contracts, clients, tests, permissions, or entitlements.
+- **Owner-approved GA scope (2026-07-29):** M13 is included in the GA program (Wave 5). Until Wave 5 exit evidence is recorded, keep M13 disabled by default for new tenants and hidden when not entitled. Only security, tenancy, suspended-tenant, protected-file, build, migration, OpenAPI, or repository-regression fixes may change M13 before Wave 5 unfreeze.
+- **Owner-approved GA scope (2026-07-29):** M3 (full fees), M4 (exams/report cards), and M7–M11 are in scope for Waves 2–4. Do not enable these module entitlements on production tenants until the applicable wave exit gate passes.
 - Keep M14 Intelligence / AI as roadmap-only until explicitly approved after the required data, review, safety, and cost controls exist.
 - Keep student access backend-authorized and limited to controlled learning/session use; do not add a broad Student App.
 - Do not introduce microservices, Angular migration, broad public student mobile, unsafe offline financial operations, or unverified live-map/provider scope as a shortcut to release.
@@ -139,7 +140,7 @@ pnpm smoke:pilot
 pnpm smoke:full
 ```
 
-`pnpm smoke:learning` remains an optional compatibility check for a permitted M13 fix or a repository-wide regression. It is not required for pilot acceptance, release-candidate, production, or GA evidence while M13 is deferred.
+`pnpm smoke:learning` is required for M13 Wave 5 GA evidence and release-candidate claims that include M13. Before Wave 5, it remains an optional compatibility check for M13 security/regression fixes.
 
 For mobile changes:
 
@@ -200,8 +201,8 @@ Local verification is necessary but insufficient for GA. GA also requires the st
 ## 8. Explicit non-goals until release gates permit them
 
 ```text
-AI/ML/LLM runtime or open student AI chat
-New M13 Learning functionality, pilot acceptance, or production-readiness claims
+AI/ML/LLM runtime or open student AI chat (M14)
+M13 feature expansion before Wave 5 unfreeze evidence
 Angular migration
 Microservice migration
 Broad public student mobile application

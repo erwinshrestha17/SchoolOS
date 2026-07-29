@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiCreatedResponse } from '@nestjs/swagger';
 import { AttendanceService } from '../attendance/attendance.service';
+import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 import { SyncAttendanceDto } from '../attendance/dto/sync-attendance.dto';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
@@ -21,7 +22,16 @@ import { MobileTeacherAttendanceSyncReceiptDto } from './dto/mobile-teacher-atte
 @Entitlement('module.attendance')
 @Roles('teacher')
 export class MobileTeacherAttendanceController {
-  constructor(private readonly attendanceService: AttendanceService) {}
+  constructor(
+    private readonly attendanceService: AttendanceService,
+    private readonly teacherScopeService: TeacherScopeService,
+  ) {}
+
+  @Get('scope-version')
+  @Permissions('attendance:read')
+  getScopeVersion(@CurrentAuth() auth: AuthContext) {
+    return this.teacherScopeService.getScopeVersion(auth);
+  }
 
   @Get('classes')
   @Permissions('attendance:read')

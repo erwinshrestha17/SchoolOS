@@ -12,6 +12,7 @@ import { REQUEST_ID_KEY } from '../common/security/cls-keys';
 import {
   DEFAULT_CHART_ACCOUNTS,
   DEFAULT_FEE_HEADS,
+  DEFAULT_ACCOUNTING_SOURCE_MAPPINGS,
 } from '../finance/finance.defaults';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -48,6 +49,8 @@ export class TenantsService {
     actor: AuthContext,
     requestId: string | undefined,
   ) {
+    const normalizedEmail = dto.adminEmail.trim().toLowerCase();
+
     const existingTenant = await this.prisma.tenant.findUnique({
       where: { slug: dto.slug },
     });
@@ -56,81 +59,92 @@ export class TenantsService {
       throw new ConflictException('Tenant slug is already in use');
     }
 
-    const tenant = await this.prisma.tenant.create({
-      data: {
-        name: dto.name,
-        slug: dto.slug,
-        mode: Mode.MULTI,
-        plan: dto.plan ?? 'standard',
-      },
+    const existingAdmin = await this.prisma.user.findFirst({
+      where: { email: normalizedEmail },
+      select: { id: true },
     });
 
-    await this.provisionTenantDefaults(tenant.id);
-
-    const adminRole = await this.prisma.role.findUnique({
-      where: {
-        tenantId_name: {
-          tenantId: tenant.id,
-          name: 'admin',
-        },
-      },
-    });
-
-    if (!adminRole) {
-      throw new NotFoundException('Default admin role was not provisioned');
-    }
-
-    const configOwnerRole = await this.prisma.role.findUnique({
-      where: {
-        tenantId_name: {
-          tenantId: tenant.id,
-          name: SCHOOL_CONFIG_OWNER_ROLE,
-        },
-      },
-    });
-
-    if (!configOwnerRole) {
-      throw new NotFoundException(
-        'School Configuration Owner role was not provisioned',
+    if (existingAdmin) {
+      throw new ConflictException(
+        'Admin email is already registered in SchoolOS',
       );
     }
 
-    // The first tenant user is the school's first authorized Configuration
-    // Owner. Owner-role safeguards keep at least one active owner from then on.
-    const adminUser = await this.usersService.createManagedUser({
-      tenantId: tenant.id,
-      email: dto.adminEmail,
-      password: dto.adminPassword,
-      roleIds: [adminRole.id, configOwnerRole.id],
-      assignedById: null,
-    });
+    return this.prisma.$transaction(async (tx) => {
+      const tenant = await tx.tenant.create({
+        data: {
+          name: dto.name,
+          slug: dto.slug,
+          mode: Mode.MULTI,
+          plan: dto.plan ?? 'standard',
+        },
+      });
 
-    await this.auditService.record({
-      action: 'register',
-      resource: 'tenant',
-      tenantId: tenant.id,
-      userId: actor.userId,
-      resourceId: tenant.id,
-      requestId,
-      after: {
-        slug: tenant.slug,
-        adminEmail: adminUser.email,
-        adminUserId: adminUser.id,
-      },
-    });
+      await this.provisionTenantDefaults(tenant.id, tx);
 
-    return {
-      tenant: {
-        id: tenant.id,
-        name: tenant.name,
-        slug: tenant.slug,
-        plan: tenant.plan,
-      },
-      admin: {
-        id: adminUser.id,
-        email: adminUser.email,
-      },
-    };
+      const adminRole = await tx.role.findUnique({
+        where: {
+          tenantId_name: {
+            tenantId: tenant.id,
+            name: 'admin',
+          },
+        },
+      });
+
+      if (!adminRole) {
+        throw new NotFoundException('Default admin role was not provisioned');
+      }
+
+      const configOwnerRole = await tx.role.findUnique({
+        where: {
+          tenantId_name: {
+            tenantId: tenant.id,
+            name: SCHOOL_CONFIG_OWNER_ROLE,
+          },
+        },
+      });
+
+      if (!configOwnerRole) {
+        throw new NotFoundException(
+          'School Configuration Owner role was not provisioned',
+        );
+      }
+
+      const adminUser = await this.usersService.createManagedUser({
+        tenantId: tenant.id,
+        email: normalizedEmail,
+        password: dto.adminPassword,
+        roleIds: [adminRole.id, configOwnerRole.id],
+        assignedById: null,
+      });
+
+      await this.auditService.record({
+        action: 'register',
+        resource: 'tenant',
+        tenantId: tenant.id,
+        userId: actor.userId,
+        resourceId: tenant.id,
+        requestId,
+        after: {
+          slug: tenant.slug,
+          adminEmail: adminUser.email,
+          adminUserId: adminUser.id,
+        },
+      });
+
+      return {
+        tenant: {
+          id: tenant.id,
+          name: tenant.name,
+          slug: tenant.slug,
+          plan: tenant.plan,
+        },
+        admin: {
+          id: adminUser.id,
+          email: adminUser.email,
+        },
+      };
+    });
   }
 
   async getCurrentTenant(actor: AuthContext) {
@@ -167,9 +181,12 @@ export class TenantsService {
     };
   }
 
-  async provisionTenantDefaults(tenantId: string) {
+  async provisionTenantDefaults(
+    tenantId: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
     for (const permission of PERMISSION_CATALOG) {
-      await this.prisma.permission.upsert({
+      await tx.permission.upsert({
         where: {
           resource_action: {
             resource: permission.resource,
@@ -184,7 +201,7 @@ export class TenantsService {
     }
 
     for (const role of SYSTEM_ROLE_DEFINITIONS) {
-      await this.prisma.role.upsert({
+      await tx.role.upsert({
         where: {
           tenantId_name: {
             tenantId,
@@ -207,7 +224,7 @@ export class TenantsService {
     for (const [roleName, permissionKeys] of Object.entries(
       SYSTEM_ROLE_PERMISSIONS,
     )) {
-      const role = await this.prisma.role.findUnique({
+      const role = await tx.role.findUnique({
         where: {
           tenantId_name: {
             tenantId,
@@ -220,7 +237,7 @@ export class TenantsService {
         continue;
       }
 
-      await this.prisma.rolePermission.deleteMany({
+      await tx.rolePermission.deleteMany({
         where: {
           roleId: role.id,
         },
@@ -228,7 +245,7 @@ export class TenantsService {
 
       for (const permissionKey of permissionKeys) {
         const [resource, action] = permissionKey.split(':');
-        const permission = await this.prisma.permission.findUnique({
+        const permission = await tx.permission.findUnique({
           where: {
             resource_action: {
               resource,
@@ -241,7 +258,7 @@ export class TenantsService {
           continue;
         }
 
-        await this.prisma.rolePermission.create({
+        await tx.rolePermission.create({
           data: {
             roleId: role.id,
             permissionId: permission.id,
@@ -250,11 +267,14 @@ export class TenantsService {
       }
     }
 
-    await this.ensureAcademicYearDefaults(tenantId);
-    await this.ensureFinanceDefaults(tenantId);
+    await this.ensureAcademicYearDefaults(tenantId, tx);
+    await this.ensureFinanceDefaults(tenantId, tx);
   }
 
-  private async ensureAcademicYearDefaults(tenantId: string) {
+  private async ensureAcademicYearDefaults(
+    tenantId: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
     const yearStart = new Date(
       `${new Date().getFullYear()}-04-01T00:00:00.000Z`,
     );
@@ -262,7 +282,7 @@ export class TenantsService {
       `${new Date().getFullYear() + 1}-03-31T23:59:59.999Z`,
     );
 
-    await this.prisma.academicYear.upsert({
+    await tx.academicYear.upsert({
       where: {
         tenantId_name: {
           tenantId,
@@ -284,9 +304,12 @@ export class TenantsService {
     });
   }
 
-  private async ensureFinanceDefaults(tenantId: string) {
+  private async ensureFinanceDefaults(
+    tenantId: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
     for (const account of DEFAULT_CHART_ACCOUNTS) {
-      await this.prisma.chartAccount.upsert({
+      await tx.chartAccount.upsert({
         where: {
           tenantId_code: {
             tenantId,
@@ -309,7 +332,7 @@ export class TenantsService {
     }
 
     for (const feeHead of DEFAULT_FEE_HEADS) {
-      await this.prisma.feeHead.upsert({
+      await tx.feeHead.upsert({
         where: {
           tenantId_code: {
             tenantId,
@@ -329,6 +352,49 @@ export class TenantsService {
           frequency: feeHead.frequency,
           defaultAmount: new Prisma.Decimal(feeHead.defaultAmount),
           vatApplicable: feeHead.vatApplicable,
+        },
+      });
+    }
+
+    for (const mapping of DEFAULT_ACCOUNTING_SOURCE_MAPPINGS) {
+      const debitAccount = await tx.chartAccount.findUnique({
+        where: {
+          tenantId_code: { tenantId, code: mapping.debitCode },
+        },
+      });
+      const creditAccount = await tx.chartAccount.findUnique({
+        where: {
+          tenantId_code: { tenantId, code: mapping.creditCode },
+        },
+      });
+
+      if (!debitAccount || !creditAccount) {
+        continue;
+      }
+
+      const existing = await tx.accountingSourceMapping.findFirst({
+        where: {
+          tenantId,
+          sourceModule: mapping.sourceModule,
+          sourceType: mapping.sourceType,
+          postingType: mapping.postingType,
+          isActive: true,
+        },
+      });
+
+      if (existing) {
+        continue;
+      }
+
+      await tx.accountingSourceMapping.create({
+        data: {
+          tenantId,
+          sourceModule: mapping.sourceModule,
+          sourceType: mapping.sourceType,
+          postingType: mapping.postingType,
+          debitAccountId: debitAccount.id,
+          creditAccountId: creditAccount.id,
+          description: mapping.description,
         },
       });
     }

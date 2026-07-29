@@ -10,6 +10,7 @@ const { Client: PgClient } = requireApiDependency('pg');
 const Redis = requireApiDependency('ioredis');
 
 loadEnvFile(resolve(root, 'apps/api/.env'));
+loadEnvFile(resolve(root, 'apps/api/.env.staging-local'), { override: true });
 
 const databaseUrl =
   process.env.DATABASE_URL ??
@@ -203,6 +204,7 @@ async function runPilotRoleChecks(tokens) {
     'accountant',
     'driver',
   ]) {
+    await sleep(1200);
     const loginCheck = await checkSeededLogin(accounts[key]);
     checks.push(loginCheck);
     if (loginCheck.status === 'ok') roleTokens[key] = loginCheck.token;
@@ -777,7 +779,11 @@ function trimBody(value) {
   return String(value ?? '').slice(0, 500);
 }
 
-function loadEnvFile(path) {
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function loadEnvFile(path, options = {}) {
   if (!existsSync(path)) {
     return;
   }
@@ -800,7 +806,7 @@ function loadEnvFile(path) {
     const key = trimmed.slice(0, separatorIndex);
     const value = trimmed.slice(separatorIndex + 1);
 
-    if (!process.env[key]) {
+    if (options.override || !process.env[key]) {
       process.env[key] = value;
     }
   }

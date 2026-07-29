@@ -2,7 +2,7 @@
 
 Token-conscious, repository-wide rules for human and AI contributors.
 
-**Current posture:** Internal QA / controlled-pilot preparation. Make existing pilot-critical workflows reliable, secure, testable, and operationally usable. Do not expand scope unless the project owner explicitly approves it.
+**Current posture:** GA program execution — Wave 0 foundation. Target is General Availability for M0–M12 + M15 + M13 (owner-approved 2026-07-29), excluding M14. First production milestone: one real school (Wave 1); multi-school self-serve follows in Wave 6.
 
 ## 1. Instruction precedence
 
@@ -95,7 +95,9 @@ Release candidate
 GA / Production release
 ```
 
-The current posture is Internal QA / controlled-pilot preparation. Do not claim staging, pilot, release-candidate, production, or GA readiness without the applicable evidence in the GA release policy. Local tests, a build, a demo, or backend completion are not release evidence.
+The current posture is **GA program Wave 0** (Internal QA ready locally for focused slices; staging validation in progress). Do not claim staging, pilot, release-candidate, production, or GA readiness without the applicable evidence in the GA release policy. Local tests, a build, a demo, or backend completion are not release evidence.
+
+**Owner-approved GA module set (2026-07-29):** M0–M12, M15, and M13 Learning (unfrozen for Wave 5). M14 remains roadmap-only. Modules ship wave-by-wave; enabling entitlements on production school #1 requires that wave's exit gate.
 
 ## 5. Delivery priorities
 
@@ -130,21 +132,23 @@ The current posture is Internal QA / controlled-pilot preparation. Do not claim 
 
 P2 must not delay unresolved P0 or P1 work.
 
-## 6. Frozen domains
+## 6. Deferred and GA-scheduled domains
 
 ### M13 Learning Layer
 
-M13 is deferred and frozen. Preserve its backend, Prisma schema/migrations, OpenAPI/shared contracts, web/Flutter surfaces, tests, files, permissions, entitlements, and existing records.
+M13 is **GA-in-scope (Wave 5)** per owner override 2026-07-29. Preserve its backend, Prisma schema/migrations, OpenAPI/shared contracts, web/Flutter surfaces, tests, files, permissions, entitlements, and existing records.
 
-Keep it disabled by default for pilot tenants, hidden when disabled, and outside pilot acceptance criteria and production-readiness claims.
+Keep it **disabled by default** for new tenants, hidden from navigation when disabled, and entitlement-gated until Wave 5 exit evidence is recorded.
 
-Do not add M13 features, seed expansion, populated fixtures, mobile expansion, activity/question types, session modes, reports, analytics, AI, adaptive behavior, or broad student-home learning.
+Teacher-led, school-controlled constraints remain mandatory: no leaderboards, open student chat, AI tutors, adaptive runtime, broad home learning, or M14 behavior.
 
-Only make a focused M13 change to fix tenant isolation, RBAC/ownership, suspended-tenant failure, protected-file security, build/typecheck failure, Prisma migration failure, OpenAPI verification failure, or repository-wide regression. Do not delete Learning data or run destructive Learning migrations.
+Until Wave 5: only security, tenancy, suspended-tenant, protected-file, build, migration, OpenAPI, or repository-regression fixes may change M13. After Wave 5 unfreeze: feature work must stay within PRD M13 boundaries and pass `pnpm smoke:learning` as a GA gate.
+
+Do not delete Learning data or run destructive Learning migrations.
 
 ### M14 Intelligence / AI
 
-M14 remains roadmap-only unless explicitly approved.
+M14 remains roadmap-only unless explicitly approved. Do not implement M14 runtime in any GA wave.
 
 ## 7. Architecture: never break
 

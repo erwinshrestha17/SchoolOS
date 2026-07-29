@@ -14,7 +14,7 @@ export type SchoolSettingsPolicyField = {
   key: TenantSettingKey;
   label: string;
   description?: string;
-  type: 'text' | 'number' | 'select' | 'checkbox' | 'multi-check' | 'time';
+  type: 'text' | 'number' | 'select' | 'checkbox' | 'multi-check' | 'time' | 'json';
   placeholder?: string;
   defaultValue?: unknown;
   options?: Array<{ label: string; value: string }>;
@@ -42,6 +42,23 @@ export const SCHOOL_SETTINGS_POLICIES: SchoolSettingsPolicy[] = [
       { key: 'active_academic_year_label', label: 'Active academic year label', type: 'text', placeholder: '2083/84' },
       { key: 'default_calendar', label: 'Default calendar', type: 'select', defaultValue: 'BS', options: [{ label: 'Bikram Sambat (BS)', value: 'BS' }, { label: 'Anno Domini (AD)', value: 'AD' }] },
       { key: 'grading_scheme_label', label: 'Grading scheme label', type: 'text', placeholder: 'Letter Grade 2078' },
+      {
+        key: 'grading_scale',
+        label: 'Grading scale bands',
+        description:
+          'JSON array of grade bands (grade, minPercentage, maxPercentage, gradePoint, label, passed). Backend validates sort order and failing band.',
+        type: 'json',
+        defaultValue: [
+          { grade: 'A+', minPercentage: 90, maxPercentage: 100, gradePoint: 4, label: 'Outstanding', passed: true },
+          { grade: 'A', minPercentage: 80, maxPercentage: 89.99, gradePoint: 3.6, label: 'Excellent', passed: true },
+          { grade: 'B+', minPercentage: 70, maxPercentage: 79.99, gradePoint: 3.2, label: 'Very Good', passed: true },
+          { grade: 'B', minPercentage: 60, maxPercentage: 69.99, gradePoint: 2.8, label: 'Good', passed: true },
+          { grade: 'C+', minPercentage: 50, maxPercentage: 59.99, gradePoint: 2.4, label: 'Satisfactory', passed: true },
+          { grade: 'C', minPercentage: 40, maxPercentage: 49.99, gradePoint: 2, label: 'Acceptable', passed: true },
+          { grade: 'D', minPercentage: 35, maxPercentage: 39.99, gradePoint: 1.6, label: 'Basic', passed: true },
+          { grade: 'F', minPercentage: 0, maxPercentage: 34.99, gradePoint: 0, label: 'Fail', passed: false },
+        ],
+      },
       { key: 'promotion_rule_mode', label: 'Promotion mode', type: 'select', defaultValue: 'MANUAL', options: [{ label: 'Manual approval', value: 'MANUAL' }, { label: 'Auto-promote on pass', value: 'AUTOMATIC' }] },
       { key: 'attendance_working_days', label: 'Normal working days', description: 'Calendar closures and exception days belong in the academic calendar.', type: 'multi-check', defaultValue: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], options: workingDays },
     ],

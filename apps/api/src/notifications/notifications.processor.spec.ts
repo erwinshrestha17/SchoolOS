@@ -1,4 +1,5 @@
 import { NotificationStatus } from '@prisma/client';
+import { createProcessorClsMock } from '../plans/processor-cls.mock';
 import { NotificationsProcessor } from './notifications.processor';
 
 describe('NotificationsProcessor', () => {
@@ -38,7 +39,7 @@ describe('NotificationsProcessor', () => {
   });
 
   it('keeps dev-log delivery metadata-only for email, SMS, and push', async () => {
-    const processor = new NotificationsProcessor({} as never, {} as never);
+    const processor = new NotificationsProcessor({} as never, {} as never, createProcessorClsMock() as never);
     const log = jest.fn();
     (processor as any).logger.log = log;
     const deliveryId = 'delivery-safe-log';
@@ -114,6 +115,7 @@ describe('NotificationsProcessor', () => {
     const processor = new NotificationsProcessor(
       prisma as never,
       { shouldProcessTenantJob: jest.fn().mockResolvedValue(true) } as never,
+      createProcessorClsMock() as never,
       undefined,
       undefined,
       policy as never,
@@ -159,6 +161,7 @@ describe('NotificationsProcessor', () => {
     const processor = new NotificationsProcessor(
       prisma as never,
       { shouldProcessTenantJob: jest.fn().mockResolvedValue(true) } as never,
+      createProcessorClsMock() as never,
       undefined,
       undefined,
       policy as never,
@@ -234,6 +237,7 @@ describe('NotificationsProcessor', () => {
       {
         shouldProcessTenantJob: jest.fn().mockResolvedValue(true),
       } as never,
+      createProcessorClsMock() as never,
       undefined,
       {
         listActiveTokens: jest
@@ -322,6 +326,7 @@ describe('NotificationsProcessor', () => {
       {
         shouldProcessTenantJob: jest.fn().mockResolvedValue(true),
       } as never,
+      createProcessorClsMock() as never,
       undefined,
       {
         listActiveTokens: jest
@@ -382,6 +387,7 @@ describe('NotificationsProcessor', () => {
       {
         shouldProcessTenantJob: jest.fn().mockResolvedValue(true),
       } as never,
+      createProcessorClsMock() as never,
     );
 
     await expect(
@@ -442,6 +448,7 @@ describe('NotificationsProcessor', () => {
       {
         shouldProcessTenantJob: jest.fn().mockResolvedValue(true),
       } as never,
+      createProcessorClsMock() as never,
     );
 
     await expect(
@@ -489,6 +496,7 @@ describe('NotificationsProcessor', () => {
       {
         shouldProcessTenantJob: jest.fn().mockResolvedValue(true),
       } as never,
+      createProcessorClsMock() as never,
     );
 
     await processor.process({
@@ -551,6 +559,7 @@ describe('NotificationsProcessor', () => {
       {
         shouldProcessTenantJob: jest.fn().mockResolvedValue(true),
       } as never,
+      createProcessorClsMock() as never,
     );
 
     await processor.process({
@@ -605,6 +614,7 @@ describe('NotificationsProcessor', () => {
     const processor = new NotificationsProcessor(
       prisma as never,
       plansService as never,
+      createProcessorClsMock() as never,
     );
 
     await processor.process({

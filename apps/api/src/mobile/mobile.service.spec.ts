@@ -341,6 +341,7 @@ describe('MobileService', () => {
     await service.createStudentAttendanceCorrection(
       'student-1',
       {
+        confirmStudentId: 'student-1',
         attendanceDate: '2026-07-24',
         requestedStatus: 'PRESENT',
         reason: 'The child attended the full school day.',
@@ -350,7 +351,10 @@ describe('MobileService', () => {
     await service.cancelStudentAttendanceCorrection(
       'student-1',
       'correction-1',
-      { reason: 'The original request was submitted by mistake.' },
+      {
+        confirmStudentId: 'student-1',
+        reason: 'The original request was submitted by mistake.',
+      },
       actor,
     );
 
@@ -460,6 +464,7 @@ describe('MobileService', () => {
       status: 'READY',
     });
     const dto = {
+      confirmStudentId: 'student-1',
       invoiceId: 'invoice-1',
       amount: 500,
       provider: 'NEPAL_GATEWAY',
@@ -489,6 +494,7 @@ describe('MobileService', () => {
       receipt: { receiptNumber: 'REC-001' },
     });
     const dto = {
+      confirmStudentId: 'student-1',
       invoiceId: 'invoice-1',
       amount: 500,
       provider: 'ESEWA' as const,
@@ -523,6 +529,7 @@ describe('MobileService', () => {
       transaction: { id: 'transaction-1' },
     });
     const dto = {
+      confirmStudentId: 'student-1',
       amount: 1000,
       provider: 'KHALTI' as const,
       idempotencyKey: 'parent-sandbox-canteen-0001',
@@ -2790,6 +2797,7 @@ describe('MobileService', () => {
     await expect(
       service.decideMyConsent(
         {
+          confirmStudentId: 'student-1',
           consentType: 'MESSAGING',
           version: 'policy-v2',
           granted: true,
@@ -2827,6 +2835,7 @@ describe('MobileService', () => {
     await expect(
       service.decideMyConsent(
         {
+          confirmStudentId: 'student-1',
           consentType: 'MESSAGING',
           version: 'policy-v2',
           granted: false,

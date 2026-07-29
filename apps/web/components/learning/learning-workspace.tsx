@@ -36,6 +36,7 @@ import { TablePagination } from "../ui/table-pagination";
 import { WorkSurface } from "../ui/work-surface";
 import { LearningResourcesPanel } from "./learning-resources-panel";
 import { LearningSessionsPanel } from "./learning-sessions-panel";
+import { LearningRouteGuard } from "./learning-runtime";
 
 type LearningTab =
   | "overview"
@@ -103,6 +104,17 @@ const emptyActivityForm: LearningActivityPayload = {
 };
 
 export function LearningWorkspace({
+  initialTab = "overview",
+  activityId,
+}: LearningWorkspaceProps) {
+  return (
+    <LearningRouteGuard permissions={["learning:read"]} title="Learning">
+      <LearningWorkspaceContent initialTab={initialTab} activityId={activityId} />
+    </LearningRouteGuard>
+  );
+}
+
+function LearningWorkspaceContent({
   initialTab = "overview",
   activityId,
 }: LearningWorkspaceProps) {

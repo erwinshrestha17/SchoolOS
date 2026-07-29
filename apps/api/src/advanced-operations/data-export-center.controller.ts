@@ -1,8 +1,10 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { NoModuleEntitlement } from '../auth/decorators/no-module-entitlement.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantActiveGuard } from '../auth/guards/tenant-active.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import type { AuthContext } from '../auth/auth.types';
@@ -11,7 +13,15 @@ import { CreateDataExportJobDto } from './dto/export-center.dto';
 
 @ApiTags('advanced-exports')
 @Controller('advanced/exports')
-@UseGuards(JwtAuthGuard, TenantActiveGuard, RolesPermissionsGuard)
+@UseGuards(
+  JwtAuthGuard,
+  TenantActiveGuard,
+  RolesPermissionsGuard,
+  EntitlementGuard,
+)
+@NoModuleEntitlement(
+  'Cross-cutting export jobs; RBAC via advanced:exports permissions',
+)
 export class DataExportCenterController {
   constructor(private readonly service: DataExportCenterService) {}
 

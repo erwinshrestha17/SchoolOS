@@ -5,9 +5,12 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  IsUUID,
 } from 'class-validator';
 
 export class MobileParentConsentDecisionDto {
+  @IsUUID()
+  confirmStudentId!: string;
   @IsEnum(ConsentType)
   consentType!: ConsentType;
 

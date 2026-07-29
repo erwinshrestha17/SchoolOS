@@ -1,10 +1,11 @@
 import { IsIn, IsNumber, IsPositive, IsString, Length } from 'class-validator';
+import { ConfirmStudentActionFields } from '../../common/security/confirm-student-action';
 import {
   PARENT_SANDBOX_PAYMENT_PROVIDERS,
   type ParentSandboxPaymentProvider,
 } from '../../finance/sandbox-payment-provider';
 
-export class ParentSandboxFeePaymentDto {
+export class ParentSandboxFeePaymentDto extends ConfirmStudentActionFields {
   @IsString()
   invoiceId!: string;
 
@@ -21,7 +22,7 @@ export class ParentSandboxFeePaymentDto {
   idempotencyKey!: string;
 }
 
-export class ParentSandboxCanteenTopUpDto {
+export class ParentSandboxCanteenTopUpDto extends ConfirmStudentActionFields {
   @IsNumber()
   @IsPositive()
   amount!: number;

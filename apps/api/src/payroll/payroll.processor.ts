@@ -1,8 +1,9 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
+import { ClsService } from 'nestjs-cls';
 import { PlansService } from '../plans/plans.service';
-import { skipSuspendedTenantJob } from '../plans/processor-tenant.guard';
+import { runTenantScopedJob } from '../plans/processor-tenant.context';
 import {
   PayrollService,
   type PayslipGenerationJobData,
@@ -16,6 +17,7 @@ export class PayrollProcessor extends WorkerHost {
   constructor(
     private readonly payrollService: PayrollService,
     private readonly plansService: PlansService,
+    private readonly cls: ClsService,
   ) {
     super();
   }
@@ -34,24 +36,29 @@ export class PayrollProcessor extends WorkerHost {
   }
 
   private async handleGeneratePayslips(input: PayslipGenerationJobData) {
-    if (
-      await skipSuspendedTenantJob(
-        this.plansService,
-        input.tenantId,
-        this.logger,
-        'payslip generation',
-      )
-    ) {
+    const result = await runTenantScopedJob(
+      this.cls,
+      this.plansService,
+      input.tenantId,
+      this.logger,
+      'payslip generation',
+      async () => {
+        this.logger.log(
+          `Generating payslip PDFs for tenant ${input.tenantId}, run ${input.payrollRunId}...`,
+        );
+        const batchResult =
+          await this.payrollService.generatePayslipPdfBatch(input);
+        this.logger.log(
+          `Completed payslip generation for tenant ${input.tenantId}: generated=${batchResult.generated}, skipped=${batchResult.skipped}, payrollRunId=${batchResult.payrollRunId}.`,
+        );
+        return batchResult;
+      },
+    );
+
+    if (!result) {
       throw new Error('Payroll generation skipped for unavailable tenant');
     }
 
-    this.logger.log(
-      `Generating payslip PDFs for tenant ${input.tenantId}, run ${input.payrollRunId}...`,
-    );
-    const result = await this.payrollService.generatePayslipPdfBatch(input);
-    this.logger.log(
-      `Completed payslip generation for tenant ${input.tenantId}: generated=${result.generated}, skipped=${result.skipped}, payrollRunId=${result.payrollRunId}.`,
-    );
     return result;
   }
 }

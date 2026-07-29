@@ -153,25 +153,25 @@ const ONBOARDING_ITEMS = [
   {
     key: 'school_profile',
     label: 'School profile complete',
-    href: '/dashboard/settings',
+    href: '/dashboard/settings/school/identity',
     required: true,
   },
   {
     key: 'branding_files',
     label: 'Logo, seal, and signature uploaded',
-    href: '/dashboard/settings',
+    href: '/dashboard/settings/school/branding',
     required: true,
   },
   {
     key: 'academic_year',
     label: 'Academic year set',
-    href: '/dashboard/settings',
+    href: '/dashboard/settings/school/academic-year',
     required: true,
   },
   {
     key: 'classes_sections',
     label: 'Classes and sections configured',
-    href: '/dashboard/settings',
+    href: '/dashboard/settings/school/academic-structure',
     required: true,
   },
   {
@@ -181,10 +181,22 @@ const ONBOARDING_ITEMS = [
     required: true,
   },
   {
+    key: 'class_teachers',
+    label: 'Class teachers assigned to sections',
+    href: '/dashboard/settings/school/academic-structure',
+    required: true,
+  },
+  {
+    key: 'teacher_assignments',
+    label: 'Subject teachers assigned',
+    href: '/dashboard/settings/school/academic-structure',
+    required: true,
+  },
+  {
     key: 'fee_heads',
     label: 'Fee heads configured',
-    href: '/dashboard/settings',
-    required: true,
+    href: '/dashboard/settings/policies/fees',
+    required: false,
   },
   {
     key: 'users_staff',
@@ -202,24 +214,24 @@ const ONBOARDING_ITEMS = [
     key: 'accounting_fiscal_year',
     label: 'Accounting fiscal year configured',
     href: '/dashboard/accounting/management',
-    required: true,
+    required: false,
   },
   {
     key: 'chart_of_accounts',
     label: 'Chart of accounts ready',
     href: '/dashboard/accounting/accounts',
-    required: true,
+    required: false,
   },
   {
     key: 'communication_settings',
     label: 'Communication settings configured',
-    href: '/dashboard/settings',
+    href: '/dashboard/settings/policies/communication',
     required: false,
   },
   {
     key: 'file_storage',
     label: 'File storage configured',
-    href: '/platform/settings',
+    href: '/dashboard/settings/school/branding',
     required: true,
   },
 ] as const;
@@ -2747,6 +2759,8 @@ export class PlatformService {
       studentCount,
       fiscalYearCount,
       chartAccountCount,
+      classTeacherSectionCount,
+      teacherAssignmentCount,
       overrides,
     ] = await Promise.all([
       this.prisma.tenantSetting.findMany({ where: { tenantId } }),
@@ -2758,6 +2772,10 @@ export class PlatformService {
       this.count('student', { tenantId }),
       this.count('fiscalYear', { tenantId }),
       this.count('chartAccount', { tenantId }),
+      this.count('section', {
+        where: { tenantId, classTeacherId: { not: null } },
+      }),
+      this.count('teacherAssignment', { tenantId }),
       this.delegate('tenantOnboardingChecklistOverride')?.findMany({
         where: { tenantId },
       }) ?? Promise.resolve([]),
@@ -2774,6 +2792,8 @@ export class PlatformService {
       ].some((key) => settingKeys.has(key)),
       academic_year: (await this.count('academicYear', { tenantId })) > 0,
       classes_sections: classCount > 0 && sectionCount > 0,
+      class_teachers: classTeacherSectionCount > 0,
+      teacher_assignments: teacherAssignmentCount > 0,
       subjects: subjectCount > 0,
       fee_heads: feeHeadCount > 0,
       users_staff: staffCount > 0,

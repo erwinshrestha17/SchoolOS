@@ -587,6 +587,25 @@ class _TeacherActivityScreenState extends ConsumerState<TeacherActivityScreen> {
       return;
     }
 
+    if (_mode == _CaptureMode.activity) {
+      final blockedStudents = _students
+          .where(
+            (student) =>
+                _selectedStudentIds.contains(student.id) &&
+                !student.mediaConsentGranted,
+          )
+          .map((student) => student.fullName)
+          .toList();
+      if (blockedStudents.isNotEmpty) {
+        setState(() {
+          _message =
+              'Photo consent is required for ${blockedStudents.first}. Remove them or collect consent first.';
+          _messageIsError = true;
+        });
+        return;
+      }
+    }
+
     if (_titleController.text.trim().length < 2 ||
         _captionController.text.trim().length < 2 ||
         _media.isEmpty) {

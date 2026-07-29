@@ -21,8 +21,9 @@ import {
   MinLength,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ConfirmStudentActionFields } from '../../common/security/confirm-student-action';
 
-export class CreateSchoolServiceRequestDto {
+export class CreateSchoolServiceRequestDto extends ConfirmStudentActionFields {
   @IsEnum(SchoolServiceRequestType)
   type!: SchoolServiceRequestType;
 

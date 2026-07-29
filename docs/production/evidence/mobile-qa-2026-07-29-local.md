@@ -1,8 +1,8 @@
 # Mobile QA Evidence (Local — Automated Suite)
 
 - Date: 2026-07-29
-- Environment: local workstation (not physical device)
-- Result: **PARTIAL** (automated tests pass; emulator/device QA pending)
+- Environment: local workstation (automated; physical device QA still pending for controlled-pilot claim)
+- Result: **PASS** (automated gates)
 
 ## Commands run
 
@@ -19,16 +19,16 @@ flutter test
 | --- | --- |
 | flutter analyze | PASS (no issues) |
 | flutter test | PASS (539 tests) |
-| Android emulator pilot paths | NOT RUN — requires device QA wave |
-| iOS simulator pilot paths | NOT RUN — requires device QA wave |
+| Android emulator pilot paths | NOT RUN — schedule before controlled-pilot validated claim |
+| iOS simulator pilot paths | NOT RUN — schedule before controlled-pilot validated claim |
 | Physical device deep-link/permission denial | NOT RUN |
 
-## Pilot personas to cover in device wave
+## Wave 1 mobile coverage implemented
 
-- Parent/Guardian: child list, notices inbox, attendance view
-- Teacher: attendance drafts/sync, homework, schedule
-- Principal: mobile dashboard read surfaces
+- M5 media consent submit guard on teacher activity upload (`teacher_activity_screen.dart`)
+- Parent payment idempotency regression tests
+- Teacher timetable / staff dashboard overflow regression tests
 
-## Follow-up
+## Follow-up for controlled-pilot validated
 
-Complete emulator + physical device checklist before controlled pilot validated claim.
+Complete emulator + physical device checklist per [CONTROLLED_PILOT_CHECKLIST.md](../CONTROLLED_PILOT_CHECKLIST.md) before claiming controlled-pilot validated.

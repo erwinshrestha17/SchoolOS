@@ -10,6 +10,7 @@ import { ActivityFeedService } from '../src/activity-feed/activity-feed.service'
 import { ActivityPostLifecycleService } from '../src/activity-feed/activity-post-lifecycle.service';
 import { ActivityMediaProcessor } from '../src/activity-feed/processors/activity-media.processor';
 import { AuthContext } from '../src/auth/auth.types';
+import { createProcessorClsMock } from '../src/plans/processor-cls.mock';
 
 describe('Activity Hardening Verification', () => {
   const tenantId = 'tenant-hardening';
@@ -146,6 +147,7 @@ describe('Activity Hardening Verification', () => {
         shouldProcessTenantJob: jest.fn().mockResolvedValue(true),
       } as never,
       fileRegistry,
+      createProcessorClsMock() as never,
     );
   });
 

@@ -26,6 +26,8 @@
     "db:clean:e2e": "pnpm db:clean:e2e-notices && pnpm db:clean:e2e-academics",
     "db:seed:teacher-scenarios": "tsx prisma/seed-teacher-assignment-scenarios.ts",
     "db:backfill:teacher-assignments": "tsx prisma/seed-teacher-assignment-backfill.ts",
+    "db:backfill:guardian-capabilities": "tsx prisma/seed-guardian-capabilities-backfill.ts",
+    "db:enable:staging-learning": "tsx prisma/seed-staging-learning-enable.ts",
     "db:seed:platform": "tsx prisma/platform-seed.ts",
     "db:seed:geography": "tsx prisma/seed-nepal-geography.ts",
     "start": "node dist/apps/api/src/main.js",

@@ -28,15 +28,29 @@ Rules applied:
 - Test files that exist but were not executed in this wave are recorded as "tests exist" with evidence `Manually Unverified`.
 - A confirmed P0 defect or a missing mandatory setup path marks the feature `Blocked`.
 
-## 3. Verified pilot boundary
+Status document for the SchoolOS GA program (Nepal, Grade 1–12).
+Updated for owner-approved GA scope, 2026-07-29.
 
-Supported personas (web): School Administrator/Principal, Teacher; Cashier/Accountant only if manual fees are enabled later. Parent web routes intentionally redirect to mobile.
+This document tracks GA program progress. It is subordinate to root `AGENTS.md`,
+`docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`, and
+`docs/SchoolOS_Controlled_Pilot_Implementation_Priority_Roadmap.md` §14.1.
+It is a readiness tracker, not a new canonical requirements document.
+
+## 3. Verified GA scope (owner 2026-07-29)
+
+**Program target:** M0–M12 + M15 + M13 (Wave 5); M14 excluded.
+
+**First production milestone:** one real school (Wave 1 core modules).
+
+**Wave 1 enabled modules:** M0, M1, M2, M5, M6, M12, M15.
+
+**Wave-gated (disabled until wave exit):** M3 full (Wave 2), M4 exams (Wave 3), M7–M11 (Wave 4), M13 (Wave 5).
+
+Supported personas (web): School Administrator/Principal, Teacher.
 Supported personas (mobile): Principal, Teacher, Parent/Guardian.
-No standalone student application (mobile student surface is session-join only and stays out of pilot scope).
+No standalone student application.
 
-Enabled pilot workflows (target): school setup, admin creation, staff/teacher onboarding, teacher assignments, student and guardian onboarding (manual + CSV), attendance, homework, notices/announcements, timetable, parent mobile access.
-Conditionally enabled: manual fee collection and receipts (per controlled-pilot roadmap 14.1; requires M3 verification wave — not audited for enablement here).
-Disabled for pilot: chat (removed), M13 Learning (frozen), M14 AI, exams/marks/results/report cards (P2 in pilot), digital payments, library, transport, canteen, accounting (M11), payroll/HR beyond staff records, inventory (removed), public self-registration, public portals, nonessential analytics.
+**Permanently excluded:** preschool, chat (retention-only), inventory, M14 AI, broad Student App.
 
 ## 4. Readiness matrix
 

@@ -1,4 +1,5 @@
 import { PayrollProcessor } from './payroll.processor';
+import { createProcessorClsMock } from '../plans/processor-cls.mock';
 
 describe('PayrollProcessor payslip generation jobs', () => {
   const jobData = {
@@ -29,6 +30,7 @@ describe('PayrollProcessor payslip generation jobs', () => {
     processor = new PayrollProcessor(
       payrollService as never,
       plansService as never,
+      createProcessorClsMock() as never,
     );
   });
 

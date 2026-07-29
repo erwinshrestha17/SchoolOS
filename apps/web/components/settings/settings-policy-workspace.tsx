@@ -278,6 +278,8 @@ function PolicyField({
   onChange: (value: unknown) => void;
   disabled: boolean;
 }) {
+  const inputId = `setting-${field.key}`;
+
   if (field.type === 'checkbox') {
     return (
       <label className="flex gap-3 rounded-xl border border-slate-200 p-4 transition hover:border-slate-300">
@@ -340,7 +342,37 @@ function PolicyField({
     );
   }
 
-  const inputId = `setting-${field.key}`;
+  if (field.type === 'json') {
+    const textValue =
+      typeof value === 'string'
+        ? value
+        : JSON.stringify(value ?? field.defaultValue ?? [], null, 2);
+    return (
+      <label className="block lg:col-span-2" htmlFor={inputId}>
+        <span className="text-sm font-bold text-slate-900">{field.label}</span>
+        {field.description ? (
+          <span className="mt-1 block text-sm leading-5 text-slate-600">
+            {field.description}
+          </span>
+        ) : null}
+        <textarea
+          id={inputId}
+          rows={12}
+          disabled={disabled}
+          value={textValue}
+          onChange={(event) => {
+            try {
+              onChange(JSON.parse(event.target.value));
+            } catch {
+              onChange(event.target.value);
+            }
+          }}
+          className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs text-slate-900 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-900/5 disabled:bg-slate-100"
+        />
+      </label>
+    );
+  }
+
   return (
     <label className="block" htmlFor={inputId}>
       <span className="text-sm font-bold text-slate-900">{field.label}</span>

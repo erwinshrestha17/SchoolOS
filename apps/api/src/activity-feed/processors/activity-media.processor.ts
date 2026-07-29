@@ -2,9 +2,10 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import sharp from 'sharp';
+import { ClsService } from 'nestjs-cls';
 import { FileRegistryService } from '../../file-registry/file-registry.service';
 import { PlansService } from '../../plans/plans.service';
-import { skipSuspendedTenantJob } from '../../plans/processor-tenant.guard';
+import { runTenantScopedJob } from '../../plans/processor-tenant.context';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../storage/storage.service';
 
@@ -31,24 +32,36 @@ export class ActivityMediaProcessor extends WorkerHost {
     private readonly storageService: StorageService,
     private readonly plansService: PlansService,
     private readonly fileRegistryService: FileRegistryService,
+    private readonly cls: ClsService,
   ) {
     super();
   }
 
   async process(job: Job<ActivityMediaCompressionJob>) {
-    const { tenantId, attachmentId, fileAssetId } = job.data;
+    const { tenantId, attachmentId, fileAssetId, requestedById } = job.data;
 
-    if (
-      await skipSuspendedTenantJob(
-        this.plansService,
-        tenantId,
-        this.logger,
-        'activity media compression',
-      )
-    ) {
-      return;
-    }
+    return runTenantScopedJob(
+      this.cls,
+      this.plansService,
+      tenantId,
+      this.logger,
+      'activity media compression',
+      async () =>
+        this.processCompression(
+          tenantId,
+          attachmentId,
+          fileAssetId,
+          requestedById,
+        ),
+    );
+  }
 
+  private async processCompression(
+    tenantId: string,
+    attachmentId: string,
+    fileAssetId: string,
+    requestedById: string,
+  ) {
     const attachment = await this.prisma.activityAttachment.findFirst({
       where: { id: attachmentId, tenantId },
       include: { fileAsset: true, thumbnailFileAsset: true },
@@ -114,7 +127,7 @@ export class ActivityMediaProcessor extends WorkerHost {
         tenantId,
         attachmentId,
         fileAssetId,
-        requestedById: job.data.requestedById,
+        requestedById: requestedById,
         originalFileName: attachment.fileName,
         content: thumbnailBuffer,
       });

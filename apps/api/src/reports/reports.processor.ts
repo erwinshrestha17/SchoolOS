@@ -1,8 +1,9 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
+import { ClsService } from 'nestjs-cls';
 import { PlansService } from '../plans/plans.service';
-import { skipSuspendedTenantJob } from '../plans/processor-tenant.guard';
+import { runTenantScopedJob } from '../plans/processor-tenant.context';
 import { SUSPENDED_TENANT_MESSAGE } from '../plans/tenant-access.constants';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReportsService } from './reports.service';
@@ -17,6 +18,7 @@ export class ReportsProcessor extends WorkerHost {
     private readonly prisma: PrismaService,
     private readonly reportsService: ReportsService,
     private readonly plansService: PlansService,
+    private readonly cls: ClsService,
   ) {
     super();
   }
@@ -35,52 +37,56 @@ export class ReportsProcessor extends WorkerHost {
   ): Promise<void> {
     const { exportId, reportKey, filters, format, actor } = job.data;
 
-    if (
-      await skipSuspendedTenantJob(
-        this.plansService,
-        actor.tenantId,
-        this.logger,
-        `report export ${reportKey}`,
-      )
-    ) {
+    const completed = await runTenantScopedJob(
+      this.cls,
+      this.plansService,
+      actor.tenantId,
+      this.logger,
+      `report export ${reportKey}`,
+      async () => {
+        this.logger.log(`Processing report ${reportKey} for export ${exportId}`);
+
+        try {
+          await this.prisma.reportExport.update({
+            where: { id: exportId },
+            data: { status: 'RUNNING' },
+          });
+
+          await this.reportsService.completeQueuedExport({
+            exportId,
+            reportKey,
+            filters,
+            format,
+            actor,
+          });
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          const stack = error instanceof Error ? error.stack : undefined;
+          this.logger.error(
+            `Failed to process report ${reportKey}: ${message}`,
+            stack,
+          );
+          await this.prisma.reportExport.update({
+            where: { id: exportId },
+            data: {
+              status: 'FAILED',
+              errorSummary: message,
+              completedAt: new Date(),
+            },
+          });
+        }
+
+        return true;
+      },
+    );
+
+    if (!completed) {
       await this.prisma.reportExport.update({
         where: { id: exportId },
         data: {
           status: 'FAILED',
           errorSummary: SUSPENDED_TENANT_MESSAGE,
-          completedAt: new Date(),
-        },
-      });
-      return;
-    }
-
-    this.logger.log(`Processing report ${reportKey} for export ${exportId}`);
-
-    try {
-      await this.prisma.reportExport.update({
-        where: { id: exportId },
-        data: { status: 'RUNNING' },
-      });
-
-      await this.reportsService.completeQueuedExport({
-        exportId,
-        reportKey,
-        filters,
-        format,
-        actor,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const stack = error instanceof Error ? error.stack : undefined;
-      this.logger.error(
-        `Failed to process report ${reportKey}: ${message}`,
-        stack,
-      );
-      await this.prisma.reportExport.update({
-        where: { id: exportId },
-        data: {
-          status: 'FAILED',
-          errorSummary: message,
           completedAt: new Date(),
         },
       });
