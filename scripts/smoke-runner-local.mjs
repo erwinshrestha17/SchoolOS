@@ -33,6 +33,7 @@ if (!validTargets.includes(target)) {
 }
 
 const schoolTenant = process.env.SMOKE_TENANT_SLUG ?? 'default-school';
+const wave1Pilot = process.env.SMOKE_WAVE1_PILOT === 'true';
 const checks = [];
 
 const accounts = {
@@ -278,9 +279,20 @@ async function checkParentScope(parentToken, seededStudents) {
   checks.push(
     (await fetchOk('Parent can read linked child attendance summary', `/mobile/students/${childId}/attendance-summary`, parentToken)).check,
   );
-  checks.push(
-    (await fetchOk('Parent can read linked child fees summary', `/mobile/students/${childId}/fees-summary`, parentToken)).check,
-  );
+  if (wave1Pilot) {
+    checks.push(
+      await checkExpectedHttpFailure(
+        'Parent fees summary denied on Wave 1 pilot',
+        `/mobile/students/${childId}/fees-summary`,
+        parentToken,
+        [403],
+      ),
+    );
+  } else {
+    checks.push(
+      (await fetchOk('Parent can read linked child fees summary', `/mobile/students/${childId}/fees-summary`, parentToken)).check,
+    );
+  }
 
   const otherStudent = seededStudents.find((student) => student.id && student.id !== childId);
   if (otherStudent?.id) {
@@ -411,6 +423,42 @@ async function checkSubjectTeacherScope(subjectTeacherToken) {
 }
 
 async function checkPrincipalScope(principalToken) {
+  if (wave1Pilot) {
+    checks.push(
+      await checkExpectedHttpFailure(
+        'Principal mobile dashboard denied on Wave 1 pilot',
+        '/mobile/principal/dashboard',
+        principalToken,
+        [403],
+      ),
+    );
+    checks.push(
+      await checkExpectedHttpFailure(
+        'Principal attendance summary denied on Wave 1 pilot',
+        '/mobile/principal/attendance-summary',
+        principalToken,
+        [403],
+      ),
+    );
+    checks.push(
+      await checkExpectedHttpFailure(
+        'Principal transport alerts denied on Wave 1 pilot',
+        '/mobile/principal/transport-alerts',
+        principalToken,
+        [403],
+      ),
+    );
+    checks.push(
+      await checkExpectedHttpFailure(
+        'Principal cannot access platform health',
+        '/platform/health',
+        principalToken,
+        [403],
+      ),
+    );
+    return;
+  }
+
   const dashboard = await fetchOk(
     'Principal can read mobile dashboard',
     '/mobile/principal/dashboard',
@@ -420,9 +468,20 @@ async function checkPrincipalScope(principalToken) {
   checks.push(
     (await fetchOk('Principal can read attendance summary', '/mobile/principal/attendance-summary', principalToken)).check,
   );
-  checks.push(
-    (await fetchOk('Principal can read transport alerts', '/mobile/principal/transport-alerts', principalToken)).check,
-  );
+  if (wave1Pilot) {
+    checks.push(
+      await checkExpectedHttpFailure(
+        'Principal transport alerts denied on Wave 1 pilot',
+        '/mobile/principal/transport-alerts',
+        principalToken,
+        [403],
+      ),
+    );
+  } else {
+    checks.push(
+      (await fetchOk('Principal can read transport alerts', '/mobile/principal/transport-alerts', principalToken)).check,
+    );
+  }
 
   const dashboardText = JSON.stringify(dashboard.body ?? {});
   const sensitiveTerms = ['bankAccount', 'tokenHash', 'passwordHash', 'rawObjectKey'];
@@ -443,6 +502,34 @@ async function checkPrincipalScope(principalToken) {
 }
 
 async function checkStaffScope(staffToken) {
+  if (wave1Pilot) {
+    checks.push(
+      await checkExpectedHttpFailure(
+        'Staff HR self-service denied on Wave 1 pilot',
+        '/hr/me/attendance',
+        staffToken,
+        [403],
+      ),
+    );
+    checks.push(
+      await checkExpectedHttpFailure(
+        'Staff leave requests denied on Wave 1 pilot',
+        '/hr/me/leave-requests',
+        staffToken,
+        [403],
+      ),
+    );
+    checks.push(
+      await checkExpectedHttpFailure(
+        'Staff payslips denied on Wave 1 pilot',
+        '/payroll/me/payslips',
+        staffToken,
+        [403],
+      ),
+    );
+    return;
+  }
+
   checks.push(
     (await fetchOk('Staff can read own attendance', '/hr/me/attendance', staffToken)).check,
   );
@@ -466,6 +553,34 @@ async function checkStaffScope(staffToken) {
 }
 
 async function checkAccountantScope(accountantToken) {
+  if (wave1Pilot) {
+    checks.push(
+      await checkExpectedHttpFailure(
+        'Accountant fee invoices denied on Wave 1 pilot',
+        '/fees/invoices',
+        accountantToken,
+        [403],
+      ),
+    );
+    checks.push(
+      await checkExpectedHttpFailure(
+        'Accountant finance dues denied on Wave 1 pilot',
+        '/finance/dues?limit=10',
+        accountantToken,
+        [403],
+      ),
+    );
+    checks.push(
+      await checkExpectedHttpFailure(
+        'Accountant collection report denied on Wave 1 pilot',
+        '/finance/reports/collections',
+        accountantToken,
+        [403],
+      ),
+    );
+    return;
+  }
+
   checks.push(
     (await fetchOk('Accountant can list fee invoices', '/fees/invoices', accountantToken)).check,
   );
@@ -487,6 +602,18 @@ async function checkAccountantScope(accountantToken) {
 }
 
 async function checkDriverScope(driverToken, adminToken) {
+  if (wave1Pilot) {
+    checks.push(
+      await checkExpectedHttpFailure(
+        'Driver transport trips denied on Wave 1 pilot',
+        '/transport/driver/trips/active',
+        driverToken,
+        [403],
+      ),
+    );
+    return;
+  }
+
   const ownTripsResult = await fetchOk(
     'Driver can list assigned active trips',
     '/transport/driver/trips/active',

@@ -60,7 +60,7 @@ export function NoticeApprovalDecisionPanel({
       </div>
 
       <ConfirmDialog
-        open={pendingDecision !== null}
+        isOpen={pendingDecision !== null}
         title={
           pendingDecision === 'APPROVE'
             ? 'Approve this notice?'
@@ -69,8 +69,9 @@ export function NoticeApprovalDecisionPanel({
         description="Your decision is recorded in the approval workflow and updates the notice lifecycle."
         confirmLabel={pendingDecision === 'APPROVE' ? 'Approve' : 'Reject'}
         destructive={pendingDecision === 'REJECT'}
+        isConfirming={decisionMutation.isPending}
         confirmDisabled={decisionMutation.isPending}
-        onCancel={() => {
+        onClose={() => {
           setPendingDecision(null);
           setReason('');
         }}

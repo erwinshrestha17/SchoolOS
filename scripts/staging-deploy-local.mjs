@@ -114,6 +114,7 @@ pnpm db:seed
 
 - Full TLS staging preflight (\`pnpm verify:env:staging\`) requires HTTPS origins on the target host.
 - Containerized API/web deploy: \`docker compose -f docker-compose.staging.yml --profile app up -d --build\`
+- Optional controlled-pilot rehearsal tenant: \`pnpm provision:pilot-rehearsal\` (separate from \`default-school\` smoke tenant)
 - Rehearsal started: ${startedAt}
 - Rehearsal finished: ${finishedAt}
 `,

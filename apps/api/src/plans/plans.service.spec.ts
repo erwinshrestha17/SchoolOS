@@ -163,6 +163,30 @@ describe('PlansService entitlement and usage enforcement', () => {
     );
   });
 
+  it('maps legacy plan feature keys to modules and honors module overrides', async () => {
+    prisma.tenant.findUnique.mockResolvedValue({ isActive: true });
+    prisma.tenantFeatureOverride.findMany.mockResolvedValue([
+      { featureKey: 'module.library', enabled: false },
+    ]);
+    prisma.tenantSubscription.findFirst.mockResolvedValue({
+      status: 'ACTIVE',
+      plan: {
+        key: 'standard',
+        features: [{ featureKey: 'library', enabled: true }],
+      },
+    });
+
+    await expect(
+      service.checkFeatureEnabled('tenant-1', 'module.library'),
+    ).resolves.toEqual(
+      expect.objectContaining({ allowed: false, reason: 'feature_locked' }),
+    );
+
+    const entitlements = await entitlementsService.getEntitlements('tenant-1');
+    expect(entitlements.modules).not.toContain('library');
+    expect(entitlements.features).not.toContain('library');
+  });
+
   it('rejects usage when there is no active subscription', async () => {
     prisma.tenantSubscription.findFirst.mockResolvedValue(null);
 

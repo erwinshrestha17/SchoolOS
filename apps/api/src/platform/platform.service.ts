@@ -68,10 +68,14 @@ const ACTIVE_SUBSCRIPTION_STATUSES = new Set(['TRIAL', 'ACTIVE', 'GRACE']);
 const FEATURE_KEYS = [
   'module.students',
   'module.attendance',
+  'module.activity',
   'module.fees',
   'module.exams',
   'module.homework',
   'module.timetable',
+  'module.notifications',
+  'module.notices',
+  'module.learning',
   'module.hr',
   'module.payroll',
   'module.accounting',
@@ -2773,7 +2777,8 @@ export class PlatformService {
       this.count('fiscalYear', { tenantId }),
       this.count('chartAccount', { tenantId }),
       this.count('section', {
-        where: { tenantId, classTeacherId: { not: null } },
+        tenantId,
+        classTeacherId: { not: null },
       }),
       this.count('teacherAssignment', { tenantId }),
       this.delegate('tenantOnboardingChecklistOverride')?.findMany({

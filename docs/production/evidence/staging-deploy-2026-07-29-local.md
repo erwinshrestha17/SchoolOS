@@ -1,6 +1,6 @@
 # Staging Deploy Evidence (Local Simulation)
 
-- Date: 2026-07-29T12:32:28.484Z
+- Date: 2026-07-29T12:49:37.810Z
 - Environment: local-staging (docker-compose.staging.yml postgres/redis on ports 5434/6380)
 - Result: **PASS**
 
@@ -23,5 +23,6 @@ pnpm db:seed
 
 - Full TLS staging preflight (`pnpm verify:env:staging`) requires HTTPS origins on the target host.
 - Containerized API/web deploy: `docker compose -f docker-compose.staging.yml --profile app up -d --build`
-- Rehearsal started: 2026-07-29T12:32:06.946Z
-- Rehearsal finished: 2026-07-29T12:32:28.484Z
+- Optional controlled-pilot rehearsal tenant: `pnpm provision:pilot-rehearsal` (separate from `default-school` smoke tenant)
+- Rehearsal started: 2026-07-29T12:49:19.248Z
+- Rehearsal finished: 2026-07-29T12:49:37.810Z

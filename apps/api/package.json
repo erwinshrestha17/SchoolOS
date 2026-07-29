@@ -29,6 +29,8 @@
     "db:backfill:guardian-capabilities": "tsx prisma/seed-guardian-capabilities-backfill.ts",
     "db:enable:staging-learning": "tsx prisma/seed-staging-learning-enable.ts",
     "db:seed:platform": "tsx prisma/platform-seed.ts",
+    "db:seed:pilot-rehearsal": "tsx prisma/seed-pilot-rehearsal-tenant.ts",
+    "db:seed:pilot-rehearsal-personas": "tsx prisma/seed-pilot-rehearsal-personas.ts",
     "db:seed:geography": "tsx prisma/seed-nepal-geography.ts",
     "start": "node dist/apps/api/src/main.js",
     "start:dev": "pnpm run dev",

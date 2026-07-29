@@ -9,6 +9,7 @@ import {
   ENTITLEMENT_MATRIX,
   FEATURE_KEYS,
   STANDARD_ALLOWED_ADDONS,
+  CUSTOMER_MODULES,
 } from '@schoolos/core';
 
 export interface EntitlementsResponse {
@@ -139,26 +140,23 @@ export class EntitlementsService {
     // Add database-defined plan features
     if (subscription.plan?.features) {
       for (const f of subscription.plan.features) {
+        const resolved = resolvePlanFeatureKey(f.featureKey);
+        if (resolved.type === 'module') {
+          applyModuleCompatibility(
+            modulesSet,
+            resolved.moduleName,
+            f.enabled,
+          );
+          if (!f.enabled) {
+            purgeLegacyModuleFeatureKeys(featuresSet, resolved.moduleName);
+          }
+          continue;
+        }
+
         if (f.enabled) {
-          if (f.featureKey.startsWith('module.')) {
-            applyModuleCompatibility(
-              modulesSet,
-              f.featureKey.replace('module.', ''),
-              true,
-            );
-          } else {
-            featuresSet.add(f.featureKey);
-          }
+          featuresSet.add(resolved.featureKey);
         } else {
-          if (f.featureKey.startsWith('module.')) {
-            applyModuleCompatibility(
-              modulesSet,
-              f.featureKey.replace('module.', ''),
-              false,
-            );
-          } else {
-            featuresSet.delete(f.featureKey);
-          }
+          featuresSet.delete(resolved.featureKey);
         }
       }
     }
@@ -198,11 +196,9 @@ export class EntitlementsService {
         }
       } else {
         if (key.startsWith('module.')) {
-          applyModuleCompatibility(
-            modulesSet,
-            key.replace('module.', ''),
-            false,
-          );
+          const moduleName = key.replace('module.', '');
+          applyModuleCompatibility(modulesSet, moduleName, false);
+          purgeLegacyModuleFeatureKeys(featuresSet, moduleName);
         } else {
           featuresSet.delete(key);
         }
@@ -342,4 +338,53 @@ function applyModuleCompatibility(
   if (enabled) modules.add(moduleName);
   else modules.delete(moduleName);
 }
-// Trigger build
+
+const LEGACY_MODULE_FEATURE_ALIASES: Record<string, string[]> = {
+  exams: ['academics'],
+  fees: ['finance'],
+  notifications: ['communications'],
+  notices: ['communications'],
+};
+
+function resolvePlanFeatureKey(
+  featureKey: string,
+):
+  | { type: 'module'; moduleName: string }
+  | { type: 'feature'; featureKey: string } {
+  if (featureKey.startsWith('module.')) {
+    return {
+      type: 'module',
+      moduleName: featureKey.replace('module.', ''),
+    };
+  }
+
+  if (featureKey.startsWith('feature.')) {
+    return { type: 'feature', featureKey };
+  }
+
+  const legacyModuleAliases: Record<string, string> = {
+    academics: 'exams',
+    finance: 'fees',
+    communications: 'communications',
+  };
+
+  const moduleName = legacyModuleAliases[featureKey] ?? featureKey;
+  if (
+    moduleName === 'communications' ||
+    (CUSTOMER_MODULES as readonly string[]).includes(moduleName)
+  ) {
+    return { type: 'module', moduleName };
+  }
+
+  return { type: 'feature', featureKey };
+}
+
+function purgeLegacyModuleFeatureKeys(
+  features: Set<string>,
+  moduleName: string,
+) {
+  features.delete(moduleName);
+  for (const alias of LEGACY_MODULE_FEATURE_ALIASES[moduleName] ?? []) {
+    features.delete(alias);
+  }
+}

@@ -55,6 +55,23 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 type InvoiceDialogMode = 'view' | 'payment' | 'cancel';
 
+const PLATFORM_MODULE_ENTITLEMENTS = [
+  { key: 'module.students', label: 'Students (M1)' },
+  { key: 'module.attendance', label: 'Attendance (M2)' },
+  { key: 'module.fees', label: 'Fees (M3)' },
+  { key: 'module.exams', label: 'Exams (M4)' },
+  { key: 'module.activity', label: 'Activity (M5)' },
+  { key: 'module.homework', label: 'Homework (M6)' },
+  { key: 'module.hr', label: 'HR (M7)' },
+  { key: 'module.library', label: 'Library (M8)' },
+  { key: 'module.transport', label: 'Transport (M9)' },
+  { key: 'module.canteen', label: 'Canteen (M10)' },
+  { key: 'module.accounting', label: 'Accounting (M11)' },
+  { key: 'module.notifications', label: 'Notifications (M12)' },
+  { key: 'module.learning', label: 'Learning (M13)' },
+  { key: 'module.notices', label: 'Notices (M15)' },
+] as const;
+
 export default function PlatformSchoolDetail() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const router = useRouter();
@@ -989,24 +1006,26 @@ export default function PlatformSchoolDetail() {
             </CardHeader>
             <CardContent>
                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {['academics', 'finance', 'hr', 'communications', 'library', 'transport', 'canteen', 'intelligence'].map(key => {
-                    const override = (tenant.overrides || []).find(o => o.featureKey === key);
-                    const planFeature = (tenant.subscription?.planKey === 'free' && key !== 'academics') ? false : true; // Simplified for UI
-                    const isEnabled = override ? override.enabled : planFeature;
-                    const isOverridden = !!override;
-                    
+                  {PLATFORM_MODULE_ENTITLEMENTS.map(({ key, label }) => {
+                    const override = (tenant.overrides || []).find(
+                      (o) => o.featureKey === key,
+                    );
+                    const isEnabled = (tenant.enabledFeatures ?? []).includes(key);
+                    const isOverridden = Boolean(override);
+
                     return (
                       <div key={key} className={`flex items-center justify-between rounded-2xl border p-4 transition-all ${isEnabled ? 'bg-white border-slate-100 shadow-sm' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
                         <div className="flex flex-col">
-                          <span className="text-sm font-bold text-slate-900 capitalize">{key.replace('_', ' ')}</span>
+                          <span className="text-sm font-bold text-slate-900">{label}</span>
+                          <span className="text-[10px] font-mono text-slate-400">{key}</span>
                           {isOverridden && (
                             <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest mt-0.5">Manual Override</span>
                           )}
                         </div>
                         <div className="flex items-center gap-2">
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             className={`h-8 rounded-lg font-bold text-[10px] ${isEnabled ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}
                             onClick={() => setOverrideTarget({ key, enabled: !isEnabled })}
                           >
