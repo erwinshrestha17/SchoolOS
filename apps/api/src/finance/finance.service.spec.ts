@@ -1959,8 +1959,8 @@ describe('finance production controls', () => {
         lastValidatedAt: new Date('2026-05-01T00:00:00.000Z'),
         configEncrypted: {
           webhookPath: '/payments/webhooks/nepal-gateway',
-          intentUrl: 'https://gateway.test/intent',
-          settlementStatusUrl: 'https://gateway.test/settlement',
+          intentUrl: 'https://gateway.example.com/intent',
+          settlementStatusUrl: 'https://gateway.example.com/settlement',
         },
       },
     });
@@ -1995,7 +1995,7 @@ describe('finance production controls', () => {
         lastValidatedAt: new Date('2026-05-01T00:00:00.000Z'),
         configEncrypted: {
           webhookPath: '/payments/webhooks/nepal-gateway',
-          intentUrl: 'https://gateway.test/intent',
+          intentUrl: 'https://gateway.example.com/intent',
         },
       },
     });
@@ -2025,9 +2025,9 @@ describe('finance production controls', () => {
       configEncrypted: {
         adapter: 'generic_json_v1',
         merchantId: 'school-merchant',
-        webhookUrl: 'https://school.test/payments/webhook',
-        intentUrl: 'https://gateway.test/intents',
-        settlementStatusUrl: 'https://gateway.test/settlements',
+        webhookUrl: 'https://school.example.com/payments/webhook',
+        intentUrl: 'https://gateway.example.com/intents',
+        settlementStatusUrl: 'https://gateway.example.com/settlements',
       },
     };
     const createdPaymentIntent = {
@@ -2065,7 +2065,7 @@ describe('finance production controls', () => {
       ok: true,
       json: async () => ({
         providerReference: 'gateway-123',
-        checkoutUrl: 'https://gateway.test/checkout/gateway-123',
+        checkoutUrl: 'https://gateway.example.com/checkout/gateway-123',
         expiresAt: '2026-06-19T01:00:00.000Z',
       }),
     } as Response);
@@ -2084,7 +2084,7 @@ describe('finance production controls', () => {
       expect.objectContaining({
         id: 'intent-1',
         status: 'READY',
-        checkoutUrl: 'https://gateway.test/checkout/gateway-123',
+        checkoutUrl: 'https://gateway.example.com/checkout/gateway-123',
       }),
     );
     expect(prisma.onlinePaymentIntent.create).toHaveBeenCalledWith(
@@ -2096,7 +2096,7 @@ describe('finance production controls', () => {
       }),
     );
     expect(fetchSpy).toHaveBeenCalledWith(
-      new URL('https://gateway.test/intents'),
+      new URL('https://gateway.example.com/intents'),
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({

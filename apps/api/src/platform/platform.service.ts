@@ -56,6 +56,7 @@ import {
   encryptSensitiveField,
   isEncryptedSensitiveField,
 } from '../common/security/field-encryption';
+import { parseSafeExternalHttpsUrl } from '../common/security/outbound-url';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PlansService } from '../plans/plans.service';
@@ -3193,6 +3194,15 @@ export class PlatformService {
         throw new BadRequestException(`${key} is required for ${dto.type}`);
       }
     }
+    for (const key of getOutboundProviderUrlKeys(dto.type)) {
+      const value = dto.config[key];
+      if (typeof value !== 'string' || value.trim().length === 0) continue;
+      try {
+        parseSafeExternalHttpsUrl(value, key);
+      } catch {
+        throw new BadRequestException(`${key} must be a public HTTPS URL`);
+      }
+    }
   }
 
   private getProviderRequiredKeys(type: string) {
@@ -3348,7 +3358,10 @@ export class PlatformService {
 
     let healthUrl: URL;
     try {
-      healthUrl = new URL(String(config.sandboxHealthUrl));
+      healthUrl = parseSafeExternalHttpsUrl(
+        String(config.sandboxHealthUrl),
+        'Payment gateway sandbox health URL',
+      );
     } catch {
       return {
         ...base,
@@ -3358,20 +3371,11 @@ export class PlatformService {
         missingKeys: ['sandboxHealthUrl'],
       };
     }
-    if (healthUrl.protocol !== 'https:') {
-      return {
-        ...base,
-        status: 'failed',
-        mode: 'sandbox_probe',
-        message: 'Payment gateway sandbox health URL must use HTTPS.',
-        missingKeys: ['sandboxHealthUrl'],
-      };
-    }
-
     try {
       const apiToken = nullableString(config.apiToken ?? config.accessToken);
       const response = await fetch(healthUrl, {
         method: 'GET',
+        redirect: 'error',
         headers: {
           Accept: 'application/json',
           ...(apiToken ? { Authorization: `Bearer ${apiToken}` } : {}),
@@ -3477,6 +3481,24 @@ export class PlatformService {
         .length,
     };
   }
+}
+
+function getOutboundProviderUrlKeys(type: UpsertProviderConfigDto['type']) {
+  if (type === 'SMS' || type === 'EMAIL' || type === 'FCM') {
+    return ['webhookUrl'];
+  }
+  if (type === 'PAYMENT_GATEWAY') {
+    return [
+      'initiateUrl',
+      'intentUrl',
+      'settlementStatusUrl',
+      'sandboxHealthUrl',
+      'webhookUrl',
+      'callbackUrl',
+      'returnUrl',
+    ];
+  }
+  return [];
 }
 
 function asRecord(value: unknown): DynamicRecord {

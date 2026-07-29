@@ -1817,7 +1817,7 @@ Status values in this register are conservative. `Implemented-unverified` and
 | P0-11 | Partial | Structured service requests support idempotency, ownership, deadlines, notes, attachments, escalation, resolution, close, and reopen | Guardian capability checks, category routing, independent dispute review, deduplication/concurrency, and browser/device evidence remain | Block parent cases until verified |
 | P0-12 | Implemented-unverified conditional foundation | Payment and provider-readiness code exists, but provider reconciliation and release evidence are not established | Sandbox/local tests are not payment-provider proof | Keep real digital payments disabled |
 | P0-13 | Disabled conditional capability | Emergency contact data exists, but app-based medical escalation is not pilot-approved; digital pickup is outside active product scope | Manual school procedures still require approval and drill evidence | Keep app workflows disabled |
-| P0-14 | Partial | Tenant, RBAC, file, audit, idempotency, migration, and environment controls exist across modules | Cross-tenant/direct-object suite, restore drill, secrets/config, rate-limit, and full regression evidence remain | Block pilot release |
+| P0-14 | Partial; local hardening verified | Production rate limiting was not fail-closed, sensitive guardian commands lacked route-specific throttles, revoked guardian links remained visible as file-capable in the M1 ownership audit, notification dev-log mode exposed message payloads, configured outbound provider URLs allowed private-network targets, and one platform export path opened a signed storage URL directly | Production configuration now requires rate limiting, sensitive guardian routes carry explicit throttles, the ownership audit uses only active verified approved in-window relationships, notification dev logs retain delivery metadata only, outbound provider URLs reject non-public HTTPS literals and redirects, platform exports use the authenticated protected-file download, and API unit/E2E plus focused web regression pass locally; the repository security scan, clean migration replay, staging secrets/provider checks, and backup/restore drill remain incomplete | Block pilot release; do not advance beyond Wave 1 |
 | P0-15 | Not established | Local tests and smoke scripts do not establish seeded staging/browser/device/provider/restore/incident evidence | No current evidence proves the complete matrix or absence of severity-1/2 defects | Block pilot release |
 | P1-05 conditional P0 | Partial and disabled | Component scopes exist, but shared/practical authoring and concurrency evidence are incomplete | Not applicable while +2/practical pilot is disabled | Keep disabled |
 | P1-13 conditional P0 | Partial and excluded | Low-end UI patterns exist, but representative large-roster performance/device evidence is incomplete | Not applicable while 60-80 student classes/+2 are excluded | Keep excluded |
@@ -2131,3 +2131,108 @@ gate is incomplete or unverified.
   recovery, provisioning, session-revocation, and lifecycle evidence. Proceed
   to P0-14. This does not advance the release stage beyond Internal QA /
   controlled-pilot preparation.
+
+### P0-14 — Core security and data-integrity local hardening
+
+- **Previous implementation status:** Partial.
+- **Problem or gap:** Strong tenant, RBAC, money, protected-file, audit,
+  idempotency, migration, token, and configuration foundations existed, but
+  the controlled-pilot security gate still lacked one reproducible
+  cross-module regression result. Production could explicitly disable rate
+  limiting, high-risk guardian administration routes had no narrower throttle,
+  revoked guardian links remained visible as file-capable in the M1 ownership
+  audit, notification dev-log mode logged recipient/content payloads,
+  configurable notification/payment URLs allowed private-network targets, and
+  the platform export workspace opened a signed storage URL directly.
+- **Root cause:** The controls were implemented in separate module-specific
+  paths. The deployment preflight did not fail closed on rate limiting, the
+  admissions compatibility audit had not adopted the active relationship
+  predicate, provider URLs were checked only for HTTPS, safe notification
+  behavior covered delivery but not development-log redaction, and the
+  platform export page predated the shared authenticated protected-file
+  helper.
+- **Implementation completed:**
+  - required `RATE_LIMIT_ENABLED=true` for staging and production deployment
+    preflight, rejected a disabled production runtime, validated every
+    auth/QR/API-key rate-limit window and maximum, and added guard metadata
+    coverage for default, authentication, guardian, QR, and API-key classes;
+  - applied a ten-request-per-minute route throttle to guardian relationship,
+    recovery, provisioning, session-revocation, invitation, and identity-review
+    commands without weakening permission or tenant checks;
+  - constrained the M1 ownership audit to active, verified, approved,
+    effective guardian-child relationships so a revoked relationship is
+    preserved for history without retaining protected-file access;
+  - upgraded the shared Prisma test harness to faithfully evaluate relationship
+    capability arrays, effective-date comparisons, nested guardian ownership,
+    and active enrollment, then refreshed only the stale P0-05/P0-06 and frozen
+    M13 compatibility fixtures that the production contract invalidated;
+  - reduced notification dev-log output to provider/channel, recipient or
+    token count, and notification-delivery identifier; email addresses, phone
+    numbers, subject/body/HTML, device tokens, child identifiers, and routes
+    are no longer logged;
+  - added one shared outbound URL guard for notification and payment-provider
+    configuration and runtime calls. It requires HTTPS without user
+    information, rejects local/private/reserved IP literals and local host
+    names, and disables redirect following for outbound provider requests;
+  - replaced the platform report-export signed-URL browser open with the shared
+    authenticated protected-file download helper and added a contract guard
+    against reintroducing `getFileView` or `window.open` on that page;
+  - started a fresh repository-wide Codex Security workbench scan after the
+    first scan's temporary checkout was replaced. Its preflight, threat model,
+    and deterministic 2,486-row review worklist are recorded; discovery remains
+    at 0/2,486 and no finding result is claimed. Because the scan snapshot
+    predates the final outbound-URL edits, a final-snapshot refresh is required
+    before P0-14 can close.
+- **Implementation files changed:** M1 admission ownership audit; notification,
+  finance, and platform provider outbound handling and focused tests; shared
+  outbound URL guard and tests; shared API E2E Prisma harness and affected
+  guardian/attendance/transport/M13 fixtures; platform settings export
+  download and focused web contract; this roadmap. Rate-limit runtime,
+  deployment preflight, guardian throttle metadata/tests, and the production
+  runbook were completed earlier in this P0-14 slice.
+- **Migrations added:** None. The P0-14 changes use the already-compiled P0-05
+  guardian relationship schema and preserve existing lifecycle history.
+- **Tests added or updated:** Production rate-limit enablement and numeric
+  validation, app-throttler policy, sensitive guardian route metadata,
+  lifecycle-preserving admissions HTTP behavior, capability/effective-window
+  parent scope in attendance/transport/frozen-learning compatibility,
+  metadata-only notification dev logging, private/reserved outbound target
+  rejection, redirect denial, and authenticated platform export download.
+- **Commands executed:**
+  - `pnpm verify:tracked-artifacts`
+  - `pnpm db:validate`
+  - `pnpm verify:openapi`
+  - focused rate-limit/security unit selection: 14 suites / 253 tests
+  - focused non-network security E2E selection: 8 suites / 50 tests
+  - focused M3 finance HTTP E2E: 1 suite / 3 tests
+  - focused outbound/provider unit selection: 4 suites / 98 tests
+  - `pnpm --filter @schoolos/api typecheck`
+  - `pnpm --filter @schoolos/api test --runInBand`
+  - `pnpm --filter @schoolos/api test:e2e --runInBand`
+  - `pnpm --filter @schoolos/web typecheck`
+  - `node --test test/platform-change-plan-contract.test.mjs`
+- **Browser/device scenarios tested:** API HTTP and focused web contract tests
+  only. No authenticated browser, physical Android, or physical iOS security
+  scenario was executed in this batch.
+- **Result:** Tracked-artifact, Prisma validation, OpenAPI, API typecheck, and
+  web typecheck gates passed. The final API unit regression passed 227 suites /
+  2,219 tests, and the complete API E2E regression passed 43 suites / 277
+  tests. The focused platform web contract passed 14 tests. The repository
+  security scan remains in discovery and is not a completed
+  security-regression report.
+- **Remaining limitations:** The static outbound URL guard does not by itself
+  prove DNS resolution or network-egress enforcement; production allowlisting
+  or egress controls and staging provider tests remain required. A clean
+  migration replay and migration-status check against PostgreSQL, staging
+  secrets/provider verification, and the required backup/restore drill could
+  not be established from the available local services. The security
+  workbench must be refreshed against the final working snapshot and then
+  review and close every worklist file and candidate before its report can be
+  sealed. P0-03 still owns offline revocation and stale-write proof; P0-10 owns
+  complete shared/lost-device and remote-session proof; P0-15 owns
+  authenticated browser, real-device, multi-user, staging, provider,
+  operations, and pilot evidence.
+- **Release decision:** P0-14 remains partial despite the reproducible local
+  hardening and green regression gates. Keep the pilot release blocked and do
+  not advance beyond Wave 1 until the repository security scan, clean migration
+  replay, staging configuration/provider checks, and backup/restore drill pass.

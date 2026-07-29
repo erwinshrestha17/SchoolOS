@@ -454,6 +454,29 @@ describe('PlatformService provider config hardening', () => {
     expect(auditService.record).not.toHaveBeenCalled();
   });
 
+  it('rejects private-network provider webhook URLs before persistence', async () => {
+    await expect(
+      service.upsertProvider(
+        {
+          type: 'SMS',
+          name: 'unsafe-sms',
+          enabled: true,
+          environment: 'TEST',
+          config: {
+            apiToken: 'provider-token',
+            senderId: 'SchoolOS',
+            webhookUrl: 'https://169.254.169.254/latest/meta-data',
+          },
+        },
+        'platform-user-1',
+      ),
+    ).rejects.toThrow('webhookUrl must be a public HTTPS URL');
+
+    expect(prisma.providerConfig.findUnique).not.toHaveBeenCalled();
+    expect(prisma.providerConfig.upsert).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
   it('dry-runs object storage readiness without paid or unsafe external calls', async () => {
     const provider = {
       id: 'storage-provider-1',
@@ -794,10 +817,10 @@ describe('PlatformService provider config hardening', () => {
       configEncrypted: {
         merchantId: 'test-merchant',
         adapter: 'generic_json_v1',
-        intentUrl: 'https://gateway.test/intents',
-        webhookUrl: 'https://school.test/payments/webhook',
-        settlementStatusUrl: 'https://gateway.test/settlements',
-        sandboxHealthUrl: 'https://gateway.test/health',
+        intentUrl: 'https://gateway.example.com/intents',
+        webhookUrl: 'https://school.example.com/payments/webhook',
+        settlementStatusUrl: 'https://gateway.example.com/settlements',
+        sandboxHealthUrl: 'https://gateway.example.com/health',
       },
       secretKeys: [],
       updatedAt: new Date(),
@@ -827,7 +850,7 @@ describe('PlatformService provider config hardening', () => {
       }),
     );
     expect(fetchSpy).toHaveBeenCalledWith(
-      new URL('https://gateway.test/health'),
+      new URL('https://gateway.example.com/health'),
       expect.objectContaining({ method: 'GET' }),
     );
     expect(prisma.providerConfig.update).toHaveBeenCalledWith({

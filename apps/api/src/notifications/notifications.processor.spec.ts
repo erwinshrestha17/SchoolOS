@@ -37,6 +37,69 @@ describe('NotificationsProcessor', () => {
     global.fetch = originalFetch;
   });
 
+  it('keeps dev-log delivery metadata-only for email, SMS, and push', async () => {
+    const processor = new NotificationsProcessor({} as never, {} as never);
+    const log = jest.fn();
+    (processor as any).logger.log = log;
+    const deliveryId = 'delivery-safe-log';
+
+    await (processor as any).deliverWithProvider(
+      {
+        mode: 'dev-log',
+        channel: 'email',
+        providerName: null,
+        webhookUrl: null,
+        headers: {},
+      },
+      {
+        to: 'guardian.private@school.test',
+        subject: 'Private fee subject',
+        text: 'Private receipt and student details',
+        html: '<p>Private receipt and student details</p>',
+        metadata: { notificationDeliveryId: deliveryId },
+      },
+    );
+    await (processor as any).deliverWithProvider(
+      {
+        mode: 'dev-log',
+        channel: 'sms',
+        providerName: null,
+        webhookUrl: null,
+        headers: {},
+      },
+      {
+        to: '+9779800000000',
+        message: 'Private attendance details',
+        metadata: { notificationDeliveryId: deliveryId },
+      },
+    );
+    await (processor as any).deliverWithProvider(
+      {
+        mode: 'dev-log',
+        channel: 'push',
+        providerName: null,
+        webhookUrl: null,
+        headers: {},
+      },
+      {
+        tokens: ['private-device-token'],
+        data: {
+          notificationId: deliveryId,
+          childId: 'student-private',
+          route: '/parent/children/student-private/attendance',
+        },
+      },
+    );
+
+    const output = log.mock.calls.flat().join('\n');
+    expect(output).toContain(deliveryId);
+    expect(output).toContain('"recipientCount":1');
+    expect(output).toContain('"tokenCount":1');
+    expect(output).not.toMatch(
+      /guardian\.private|9800000000|Private fee|Private receipt|Private attendance|private-device-token|student-private|\/parent\/children/,
+    );
+  });
+
   it('re-evaluates preferences at execution and skips an inactive recipient', async () => {
     const prisma = {
       notificationDelivery: { update: jest.fn() },
@@ -147,7 +210,7 @@ describe('NotificationsProcessor', () => {
           name: 'fcm-webhook',
           enabled: true,
           configEncrypted: {
-            webhookUrl: 'https://provider.test/push',
+            webhookUrl: 'https://provider.example.com/push',
           },
           secretKeys: [],
         }),
@@ -195,7 +258,7 @@ describe('NotificationsProcessor', () => {
     } as never);
 
     expect(global.fetch).toHaveBeenCalledWith(
-      'https://provider.test/push',
+      'https://provider.example.com/push',
       expect.objectContaining({
         body: expect.not.stringContaining(
           'Your child was marked absent today.',
@@ -354,6 +417,62 @@ describe('NotificationsProcessor', () => {
     });
   });
 
+  it('rejects an existing provider record that targets a private network', async () => {
+    process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE = 'configured-provider';
+    global.fetch = jest.fn();
+    const prisma = {
+      providerConfig: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'provider-private',
+          type: 'EMAIL',
+          name: 'unsafe-email',
+          enabled: true,
+          configEncrypted: {
+            webhookUrl: 'https://127.0.0.1/internal-provider',
+          },
+          secretKeys: [],
+        }),
+      },
+      notificationDelivery: {
+        update: jest.fn(),
+      },
+    };
+    const processor = new NotificationsProcessor(
+      prisma as never,
+      {
+        shouldProcessTenantJob: jest.fn().mockResolvedValue(true),
+      } as never,
+    );
+
+    await expect(
+      processor.process({
+        name: 'sendEmail',
+        data: {
+          to: 'guardian@school.test',
+          subject: 'Notice',
+          text: 'Open SchoolOS.',
+          metadata: {
+            tenantId: 'tenant-1',
+            notificationDeliveryId: 'delivery-private-provider',
+          },
+        },
+      } as never),
+    ).rejects.toThrow('email provider webhook URL must be a public HTTPS URL');
+
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(prisma.notificationDelivery.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: 'delivery-private-provider',
+          tenantId: 'tenant-1',
+        },
+        data: expect.objectContaining({
+          status: NotificationStatus.FAILED,
+        }),
+      }),
+    );
+  });
+
   it('marks delivery rows as skipped in disabled provider mode', async () => {
     process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE = 'disabled';
 
@@ -417,7 +536,7 @@ describe('NotificationsProcessor', () => {
           name: 'generic-email',
           enabled: true,
           configEncrypted: {
-            webhookUrl: 'https://provider.test/email',
+            webhookUrl: 'https://provider.example.com/email',
             apiToken: 'test-token',
           },
           secretKeys: ['apiToken'],
@@ -450,7 +569,7 @@ describe('NotificationsProcessor', () => {
     } as never);
 
     expect(global.fetch).toHaveBeenCalledWith(
-      'https://provider.test/email',
+      'https://provider.example.com/email',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({

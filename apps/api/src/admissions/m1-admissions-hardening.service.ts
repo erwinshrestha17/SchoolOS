@@ -25,6 +25,7 @@ import {
   ResolveAdmissionRelationshipsDto,
 } from './dto/m1-admissions-hardening.dto';
 import { normalizeAdmissionName } from './admissions.utils';
+import { buildActiveGuardianRelationshipWhere } from '../common/security/parent-scope';
 import {
   optionalNepalPhone,
   optionalPersonName,
@@ -117,7 +118,11 @@ export class M1AdmissionsHardeningService {
         },
       }),
       this.prisma.studentGuardian.findMany({
-        where: { tenantId: actor.tenantId, studentId: student.id },
+        where: {
+          tenantId: actor.tenantId,
+          studentId: student.id,
+          ...buildActiveGuardianRelationshipWhere(new Date()),
+        },
         include: { guardian: true },
       }),
     ]);

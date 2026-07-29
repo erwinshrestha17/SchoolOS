@@ -1,5 +1,9 @@
 import {
   AuthMethod,
+  EnrollmentStatus,
+  GuardianRelationshipApprovalStatus,
+  GuardianRelationshipStatus,
+  GuardianRelationshipVerificationStatus,
   LearningAccessType,
   LearningActivityStatus,
   LearningActivityType,
@@ -180,6 +184,21 @@ export function seedLearningBase(prisma: PrismaMock) {
     studentId: 'student-a',
     guardianId: 'guardian-a',
     relation: 'Parent',
+    status: GuardianRelationshipStatus.ACTIVE,
+    verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
+    approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+    effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+    effectiveUntil: null,
+    capabilities: [],
+  });
+  prisma.__state.enrollments.push({
+    id: 'enrollment-a',
+    tenantId: 'tenant-a',
+    studentId: 'student-a',
+    academicYearId: 'year-a',
+    classId: 'class-a',
+    sectionId: 'section-a',
+    status: EnrollmentStatus.ACTIVE,
   });
 }
 

@@ -56,6 +56,7 @@ import {
   decryptSensitiveField,
   isEncryptedSensitiveField,
 } from '../common/security/field-encryption';
+import { parseSafeExternalHttpsUrl } from '../common/security/outbound-url';
 import { CashierCloseWindowDto } from './dto/cashier-close-window.dto';
 import { CollectPaymentDto } from './dto/collect-payment.dto';
 import { InitiateOnlinePaymentDto } from './dto/initiate-online-payment.dto';
@@ -6533,14 +6534,10 @@ export class FinanceService {
     }
     let parsedUrl: URL;
     try {
-      parsedUrl = new URL(intentUrl);
+      parsedUrl = parseSafeExternalHttpsUrl(intentUrl, 'Payment intent URL');
     } catch {
       throw new BadRequestException('Payment intent URL is invalid.');
     }
-    if (parsedUrl.protocol !== 'https:') {
-      throw new BadRequestException('Payment intent URL must use HTTPS.');
-    }
-
     const callbackUrl = firstStringValue(input.config, [
       'webhookUrl',
       'callbackUrl',
@@ -6553,6 +6550,7 @@ export class FinanceService {
     ]);
     const response = await fetch(parsedUrl, {
       method: 'POST',
+      redirect: 'error',
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
@@ -6596,8 +6594,10 @@ export class FinanceService {
         'The payment provider returned an incomplete payment intent.',
       );
     }
-    const checkout = new URL(checkoutUrl);
-    if (checkout.protocol !== 'https:') {
+    let checkout: URL;
+    try {
+      checkout = parseSafeExternalHttpsUrl(checkoutUrl, 'Payment checkout URL');
+    } catch {
       throw new BadRequestException(
         'The payment provider returned an unsafe checkout URL.',
       );

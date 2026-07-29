@@ -3,6 +3,7 @@ import { Logger, Optional } from '@nestjs/common';
 import { NotificationStatus } from '@prisma/client';
 import { DelayedError, Job } from 'bullmq';
 import { decryptSensitiveField } from '../common/security/field-encryption';
+import { parseSafeExternalHttpsUrl } from '../common/security/outbound-url';
 import { ConfigService } from '../config/config.service';
 import { PlansService } from '../plans/plans.service';
 import { skipSuspendedTenantJob } from '../plans/processor-tenant.guard';
@@ -306,6 +307,21 @@ export class NotificationsProcessor extends WorkerHost {
     }
 
     if (provider.mode === 'dev-log') {
+      const metadata =
+        payload.metadata && typeof payload.metadata === 'object'
+          ? (payload.metadata as Record<string, unknown>)
+          : {};
+      const pushData =
+        payload.data && typeof payload.data === 'object'
+          ? (payload.data as Record<string, unknown>)
+          : {};
+      const notificationDeliveryId =
+        typeof metadata.notificationDeliveryId === 'string'
+          ? metadata.notificationDeliveryId
+          : typeof pushData.notificationId === 'string'
+            ? pushData.notificationId
+            : undefined;
+
       if (provider.channel === 'push') {
         const tokens = Array.isArray(payload.tokens) ? payload.tokens : [];
         this.logger.log(
@@ -314,7 +330,7 @@ export class NotificationsProcessor extends WorkerHost {
             channel: provider.channel,
             provider: provider.providerName,
             tokenCount: tokens.length,
-            data: payload.data,
+            notificationDeliveryId,
           }),
         );
         return {
@@ -329,7 +345,12 @@ export class NotificationsProcessor extends WorkerHost {
           mode: 'dev-log',
           channel: provider.channel,
           provider: provider.providerName,
-          ...payload,
+          recipientCount: Array.isArray(payload.to)
+            ? payload.to.length
+            : typeof payload.to === 'string'
+              ? 1
+              : 0,
+          notificationDeliveryId,
         }),
       );
       return { status: NotificationStatus.SENT };
@@ -341,18 +362,26 @@ export class NotificationsProcessor extends WorkerHost {
       );
     }
 
-    const response = await fetch(provider.webhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...provider.headers,
+    const response = await fetch(
+      parseSafeExternalHttpsUrl(
+        provider.webhookUrl,
+        `${provider.channel} provider webhook URL`,
+      ).toString(),
+      {
+        method: 'POST',
+        redirect: 'error',
+        headers: {
+          'Content-Type': 'application/json',
+          ...provider.headers,
+        },
+        body: JSON.stringify({
+          channel: provider.channel,
+          provider: provider.providerName,
+          payload,
+        }),
+        signal: AbortSignal.timeout(10_000),
       },
-      body: JSON.stringify({
-        channel: provider.channel,
-        provider: provider.providerName,
-        payload,
-      }),
-    });
+    );
 
     if (!response.ok) {
       throw new Error(

@@ -434,6 +434,48 @@ export function createPrismaMock() {
           return target === val;
         });
       }
+      if (value && typeof value === 'object' && 'has' in value) {
+        const target = item?.[key];
+        return Array.isArray(target) && target.includes(value.has);
+      }
+      if (
+        value &&
+        typeof value === 'object' &&
+        ('lte' in value || 'lt' in value || 'gte' in value || 'gt' in value)
+      ) {
+        const target = item?.[key];
+        if (target === undefined || target === null) return false;
+        const toComparable = (candidate: unknown): number => {
+          if (candidate instanceof Date) return candidate.getTime();
+          if (typeof candidate === 'number') return candidate;
+          const numeric = Number(candidate);
+          return Number.isFinite(numeric)
+            ? numeric
+            : new Date(String(candidate)).getTime();
+        };
+        const comparableTarget = toComparable(target);
+        if (
+          'lte' in value &&
+          comparableTarget > toComparable(value.lte as unknown)
+        )
+          return false;
+        if (
+          'lt' in value &&
+          comparableTarget >= toComparable(value.lt as unknown)
+        )
+          return false;
+        if (
+          'gte' in value &&
+          comparableTarget < toComparable(value.gte as unknown)
+        )
+          return false;
+        if (
+          'gt' in value &&
+          comparableTarget <= toComparable(value.gt as unknown)
+        )
+          return false;
+        return true;
+      }
       if (value && typeof value === 'object' && 'not' in value) {
         const notVal = value.not;
         const target = item?.[key];
@@ -2581,9 +2623,39 @@ export function createPrismaMock() {
         }
         if (model === 'guardian') {
           if (qInclude.studentLinks) {
-            enriched.studentLinks = state.studentGuardians.filter(
-              (link) => link.guardianId === enriched.id,
-            );
+            let links = state.studentGuardians
+              .filter((link) => link.guardianId === enriched.id)
+              .map((link) => ({
+                ...link,
+                student: (() => {
+                  const student = state.students.find(
+                    (candidate) => candidate.id === link.studentId,
+                  );
+                  return student
+                    ? {
+                        ...student,
+                        enrollments: state.enrollments.filter(
+                          (enrollment) => enrollment.studentId === student.id,
+                        ),
+                      }
+                    : null;
+                })(),
+              }));
+            if (
+              typeof qInclude.studentLinks === 'object' &&
+              qInclude.studentLinks.where
+            ) {
+              links = links.filter((link) =>
+                matchesWhere(link, qInclude.studentLinks.where),
+              );
+            }
+            if (
+              typeof qInclude.studentLinks === 'object' &&
+              qInclude.studentLinks.take
+            ) {
+              links = links.slice(0, qInclude.studentLinks.take);
+            }
+            enriched.studentLinks = links;
           }
         }
         if (model === 'learningActivity') {
@@ -2868,7 +2940,15 @@ export function createPrismaMock() {
         }),
         findFirst: jest.fn((q: any) => {
           const items = (state as any)[actualStateKey] || [];
-          let found = items.find((item: any) => matchesWhere(item, q?.where));
+          const matchableItems =
+            model === 'guardian'
+              ? items.map((item: any) =>
+                  applyIncludes(item, { studentLinks: true }),
+                )
+              : items;
+          let found = matchableItems.find((item: any) =>
+            matchesWhere(item, q?.where),
+          );
           if (found && (q.include || q.select)) {
             found = applyIncludes(found, q.include || q.select);
           }

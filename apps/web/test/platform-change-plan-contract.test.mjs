@@ -177,6 +177,7 @@ describe('Platform tenant subscription change workflow contracts', () => {
       'Resource ID not recorded',
       'Failure reason not recorded',
       'Export file unavailable',
+      'downloadProtectedFile',
     ]) {
       assert.match(
         settings,
@@ -187,6 +188,8 @@ describe('Platform tenant subscription change workflow contracts', () => {
     assert.doesNotMatch(settings, /failedJobs\.filter/);
     assert.doesNotMatch(settings, /Retry All/);
     assert.doesNotMatch(settings, /Promise\.all\(\s*failedInQueue\.map/);
+    assert.doesNotMatch(settings, /api\.getFileView/);
+    assert.doesNotMatch(settings, /window\.open/);
     assert.match(apiClient, /removePlatformJob: \(queueName: string, jobId: string, reason: string\)/);
     assert.match(apiClient, /json: \{ reason \}/);
     assert.doesNotMatch(

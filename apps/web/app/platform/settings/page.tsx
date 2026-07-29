@@ -25,7 +25,7 @@ import {
   Webhook,
   Loader2,
 } from 'lucide-react';
-import { api } from '../../../lib/api';
+import { api, downloadProtectedFile } from '../../../lib/api';
 import type {
   PlatformHealthSummary,
   PlatformPlanSummary,
@@ -109,12 +109,9 @@ export default function PlatformSettings() {
     }
   }, [exportTenantFilter, exportModuleFilter, exportStatusFilter]);
 
-  const downloadExport = async (fileAssetId: string) => {
+  const downloadExport = async (fileAssetId: string, fileName: string) => {
     try {
-      const fileData = await api.getFileView(fileAssetId);
-      if (fileData.url) {
-        window.open(fileData.url, '_blank');
-      }
+      await downloadProtectedFile(fileAssetId, fileName);
     } catch (err: any) {
       setError(err.message || 'Failed to download file');
     }
@@ -1659,7 +1656,12 @@ export default function PlatformSettings() {
                               <button
                                 type="button"
                                 className="text-xs font-black text-[var(--color-mod-platform-accent)] hover:text-[var(--color-mod-platform-text)] uppercase tracking-widest transition-colors"
-                                onClick={() => downloadExport(exp.fileAssetId)}
+                                onClick={() =>
+                                  downloadExport(
+                                    exp.fileAssetId,
+                                    `${exp.reportKey || 'platform-report'}.${exp.format || 'bin'}`,
+                                  )
+                                }
                               >
                                 Download
                               </button>

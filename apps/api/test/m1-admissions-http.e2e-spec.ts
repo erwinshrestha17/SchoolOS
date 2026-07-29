@@ -1,7 +1,13 @@
 import { INestApplication } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import { Test, TestingModule } from '@nestjs/testing';
-import { AuthMethod, StorageProvider } from '@prisma/client';
+import {
+  AuthMethod,
+  GuardianRelationshipApprovalStatus,
+  GuardianRelationshipStatus,
+  GuardianRelationshipVerificationStatus,
+  StorageProvider,
+} from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import type { AuthContext } from '../src/auth/auth.types';
@@ -167,6 +173,7 @@ describe('M1 Admissions HTTP ownership hardening (E2E)', () => {
       .send({
         confirmFileAccessReview: true,
         reason: 'Guardian changed after admission review',
+        evidenceReference: 'guardian-review-case-001',
         newPrimaryGuardianId: replacementGuardianId,
       })
       .expect(200);
@@ -180,9 +187,14 @@ describe('M1 Admissions HTTP ownership hardening (E2E)', () => {
         registryFilesReviewed: 1,
       }),
     );
-    expect(
-      prisma.__state.studentGuardians.some((link) => link.id === 'link-a'),
-    ).toBe(false);
+    expect(prisma.__state.studentGuardians).toContainEqual(
+      expect.objectContaining({
+        id: 'link-a',
+        status: GuardianRelationshipStatus.REVOKED,
+        isPrimary: false,
+        restrictionReasonRef: 'guardian-review-case-001',
+      }),
+    );
     expect(prisma.__state.studentDocumentHistory).toContainEqual(
       expect.objectContaining({
         tenantId: tenantAId,
@@ -200,6 +212,7 @@ describe('M1 Admissions HTTP ownership hardening (E2E)', () => {
       .send({
         confirmFileAccessReview: true,
         reason: 'Cross-tenant attempt',
+        evidenceReference: 'cross-tenant-attempt-001',
       })
       .expect(404);
 
@@ -583,6 +596,7 @@ describe('M1 Admissions HTTP ownership hardening (E2E)', () => {
       .send({
         confirmFileAccessReview: true,
         reason: 'Guardian access revoked before document handover',
+        evidenceReference: 'guardian-review-case-002',
         newPrimaryGuardianId: replacementGuardianId,
       })
       .expect(200);
@@ -620,6 +634,8 @@ function buildActor(tenantId: string, userId: string): AuthContext {
       'guardians:create',
       'guardians:read',
       'guardians:update',
+      'guardians:verify',
+      'users:reset_password',
       'students:manage_lifecycle',
       'students:qr:read',
     ],
@@ -772,6 +788,12 @@ function seedM1Data(prisma: PrismaMock) {
     guardianId: 'guardian-a',
     relation: 'mother',
     isPrimary: true,
+    status: GuardianRelationshipStatus.ACTIVE,
+    verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
+    approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+    effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+    effectiveUntil: null,
+    capabilities: [],
   });
   prisma.__state.studentGuardians.push({
     id: 'link-b',
@@ -780,6 +802,12 @@ function seedM1Data(prisma: PrismaMock) {
     guardianId: replacementGuardianId,
     relation: 'father',
     isPrimary: false,
+    status: GuardianRelationshipStatus.ACTIVE,
+    verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
+    approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+    effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+    effectiveUntil: null,
+    capabilities: [],
   });
   prisma.__state.studentDocuments.push({
     id: 'doc-a',
@@ -1064,7 +1092,12 @@ function overrideStudentGuardianReads(prisma: PrismaMock) {
               (!query.where?.studentId ||
                 link.studentId === query.where.studentId) &&
               (!query.where?.guardianId ||
-                link.guardianId === query.where.guardianId),
+                link.guardianId === query.where.guardianId) &&
+              (!query.where?.status || link.status === query.where.status) &&
+              (!query.where?.verificationStatus ||
+                link.verificationStatus === query.where.verificationStatus) &&
+              (!query.where?.approvalStatus ||
+                link.approvalStatus === query.where.approvalStatus),
           )
           .map((link) => ({
             ...link,
@@ -1085,7 +1118,12 @@ function overrideStudentGuardianReads(prisma: PrismaMock) {
               (!query.where?.studentId ||
                 link.studentId === query.where.studentId) &&
               (!query.where?.guardianId ||
-                link.guardianId === query.where.guardianId),
+                link.guardianId === query.where.guardianId) &&
+              (!query.where?.status || link.status === query.where.status) &&
+              (!query.where?.verificationStatus ||
+                link.verificationStatus === query.where.verificationStatus) &&
+              (!query.where?.approvalStatus ||
+                link.approvalStatus === query.where.approvalStatus),
           )
           .map((link) => ({
             ...link,

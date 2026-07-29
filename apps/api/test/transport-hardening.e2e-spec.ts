@@ -11,6 +11,10 @@ import { RedisService } from '../src/redis/redis.service';
 import { TransportController } from '../src/transport/transport.controller';
 import { PrismaMock, createPrismaMock } from './test-helpers';
 import {
+  GuardianCapability,
+  GuardianRelationshipApprovalStatus,
+  GuardianRelationshipStatus,
+  GuardianRelationshipVerificationStatus,
   TransportTripStatus,
   TransportStudentTripStatus,
 } from '@prisma/client';
@@ -274,8 +278,16 @@ describe('Transport Hardening (E2E)', () => {
       prisma.__state.students = [student];
       prisma.__state.studentGuardians = [
         {
+          id: 'sg-1',
           tenantId,
           studentId: 'stu-1',
+          guardianId: 'guardian-1',
+          capabilities: [GuardianCapability.EMERGENCY_ALERT_RECEIVE],
+          verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
+          status: GuardianRelationshipStatus.ACTIVE,
+          approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+          effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+          effectiveUntil: null,
           guardian: { userId: 'parent-1' },
           student,
         },

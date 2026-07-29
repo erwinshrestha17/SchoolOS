@@ -16,6 +16,10 @@ import { PrismaMock, createPrismaMock, createQueueMock } from './test-helpers';
 import {
   AttendanceStatus,
   EnrollmentStatus,
+  GuardianCapability,
+  GuardianRelationshipApprovalStatus,
+  GuardianRelationshipStatus,
+  GuardianRelationshipVerificationStatus,
   StaffStatus,
 } from '@prisma/client';
 
@@ -250,6 +254,12 @@ describe('Attendance Hardening (E2E)', () => {
         guardianId: 'guardian-1',
         relation: 'Father',
         isPrimary: true,
+        capabilities: [GuardianCapability.ATTENDANCE_VIEW],
+        verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
+        status: GuardianRelationshipStatus.ACTIVE,
+        approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+        effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+        effectiveUntil: null,
       },
       {
         id: 'sg-2',
@@ -258,6 +268,12 @@ describe('Attendance Hardening (E2E)', () => {
         guardianId: 'guardian-2',
         relation: 'Mother',
         isPrimary: true,
+        capabilities: [GuardianCapability.ATTENDANCE_VIEW],
+        verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
+        status: GuardianRelationshipStatus.ACTIVE,
+        approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+        effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+        effectiveUntil: null,
       },
     ];
   });
