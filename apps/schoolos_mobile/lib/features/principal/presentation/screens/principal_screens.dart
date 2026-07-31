@@ -600,18 +600,20 @@ class _PrincipalServiceRequestDetailScreenState
   }
 
   Future<void> _escalate(Map<String, dynamic> data) async {
-    final reason = await _principalPrompt(
+    final response = await _serviceRequestEscalationDialog(
       context,
-      title: 'Escalate this request',
-      hint: 'Why does this need urgent follow-up?',
-      minLength: 8,
-      maxLength: 500,
+      ref,
+      widget.requestId,
     );
-    if (reason == null) return;
+    if (response == null) return;
     await _run(
       () => ref
           .read(principalRepositoryProvider)
-          .escalateServiceRequest(requestId: widget.requestId, reason: reason),
+          .escalateServiceRequest(
+            requestId: widget.requestId,
+            reason: response.reason,
+            assignedToUserId: response.assignedToUserId,
+          ),
       'Request escalated with a 24-hour response target.',
     );
   }
@@ -735,6 +737,135 @@ class _ServiceRequestTriage {
   final String priority;
   final int deadlineHours;
   final String reason;
+}
+
+class _ServiceRequestEscalation {
+  const _ServiceRequestEscalation({
+    required this.assignedToUserId,
+    required this.reason,
+  });
+
+  final String assignedToUserId;
+  final String reason;
+}
+
+Future<_ServiceRequestEscalation?> _serviceRequestEscalationDialog(
+  BuildContext context,
+  WidgetRef ref,
+  String requestId,
+) async {
+  Map<String, dynamic> response;
+  try {
+    response = await ref
+        .read(principalRepositoryProvider)
+        .getServiceRequestEscalationCandidates(requestId);
+  } catch (_) {
+    if (context.mounted) {
+      _showPrincipalSnack(
+        context,
+        'Eligible managers could not be loaded. Please retry.',
+      );
+    }
+    return null;
+  }
+  if (!context.mounted) return null;
+
+  final candidates = _list(response['items']);
+  if (candidates.isEmpty) {
+    _showPrincipalSnack(
+      context,
+      'No other eligible manager is available to escalate this request.',
+    );
+    return null;
+  }
+
+  final reasonController = TextEditingController();
+  String? selectedUserId;
+  String? validationMessage;
+
+  final result = await showDialog<_ServiceRequestEscalation>(
+    context: context,
+    builder: (dialogContext) => DisposeScope(
+      onDispose: reasonController.dispose,
+      child: StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Escalate this request'),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Escalation sets high priority and reassigns the case to another manager.',
+                ),
+                const SizedBox(height: AppSpacing.md),
+                DropdownButtonFormField<String>(
+                  initialValue: selectedUserId,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Reassign to'),
+                  items: candidates
+                      .map(
+                        (candidate) => DropdownMenuItem<String>(
+                          value: _string(candidate['id']),
+                          child: Text(
+                            _string(
+                              candidate['name'],
+                              fallback: 'School manager',
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) =>
+                      setDialogState(() => selectedUserId = value),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: reasonController,
+                  minLines: 2,
+                  maxLines: 4,
+                  maxLength: 500,
+                  decoration: InputDecoration(
+                    labelText: 'Escalation reason',
+                    hintText: 'Why does this need urgent follow-up?',
+                    errorText: validationMessage,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Back'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final reason = reasonController.text.trim();
+                if (selectedUserId == null || reason.length < 8) {
+                  setDialogState(
+                    () => validationMessage =
+                        'Choose a manager and explain why this needs escalation.',
+                  );
+                  return;
+                }
+                Navigator.pop(
+                  dialogContext,
+                  _ServiceRequestEscalation(
+                    assignedToUserId: selectedUserId!,
+                    reason: reason,
+                  ),
+                );
+              },
+              child: const Text('Escalate'),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+  return result;
 }
 
 Future<_ServiceRequestTriage?> _triageDialog(BuildContext context) async {

@@ -11,7 +11,7 @@
 | M3 accountant login | PASS | token received |
 | Fees dashboard summary | PASS | HTTP 200 |
 | Invoice list | PASS | HTTP 200 |
-| Idempotent cash collection probe | FAIL | first HTTP 409, replay HTTP 409, paymentId=missing |
+| Idempotent cash collection probe | PASS | first HTTP 201, replay HTTP 201, paymentId=d3f33353-ea64-4939-a64b-c38204a101c3 |
 | Receipt list | PASS | HTTP 200 |
 | Cashier-close preview | PASS | HTTP 200 |
 | M3 parent login | PASS | token received |
@@ -20,6 +20,6 @@
 | Parent payment gateway readiness (sandbox) | PASS | HTTP 200, sandbox=true |
 | Parent sandbox fee payment idempotent | FAIL | skipped — no payable invoice in parent fee summary |
 | Module gate — teacher denied fees invoices | PASS | HTTP 403 |
-| Online gateway readiness | PASS | skipped — mock gateway not running (start scripts/mock-payment-gateway-local.mjs) |
-| Online payment initiate | PASS | skipped — mock gateway not running |
-| Online webhook settlement idempotent | PASS | skipped — mock gateway not running |
+| Online gateway readiness | PASS | HTTP 200, enabled=true, status=ready |
+| Online payment initiate | PASS | HTTP 201, status=READY (restart staging API after build if provider URL blocked) |
+| Online webhook settlement idempotent | FAIL | first HTTP 500, replay HTTP 500 |

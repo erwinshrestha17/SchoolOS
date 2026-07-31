@@ -195,6 +195,15 @@ export class MobilePrincipalController {
     return this.service.resolveServiceRequest(auth, requestId, dto);
   }
 
+  @Get('service-requests/:requestId/escalation-candidates')
+  @Permissions('service_requests:manage')
+  serviceRequestEscalationCandidates(
+    @CurrentAuth() auth: AuthContext,
+    @Param('requestId', new ParseUUIDPipe()) requestId: string,
+  ) {
+    return this.service.getServiceRequestEscalationCandidates(auth, requestId);
+  }
+
   @Post('service-requests/:requestId/escalate')
   @Permissions('service_requests:manage')
   escalateServiceRequest(

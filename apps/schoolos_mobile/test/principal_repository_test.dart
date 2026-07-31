@@ -258,6 +258,56 @@ void main() {
       },
     );
 
+    test('escalates parent requests with required assignee id', () async {
+      when(
+        () => apiClient.get<dynamic>(
+          '/mobile/principal/service-requests/request-1/escalation-candidates',
+        ),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: 'escalation-candidates'),
+          data: {
+            'items': [
+              {'id': 'manager-2', 'name': 'Coordinator One'},
+            ],
+            'total': 1,
+          },
+        ),
+      );
+      when(
+        () => apiClient.post<dynamic>(
+          '/mobile/principal/service-requests/request-1/escalate',
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: 'escalate'),
+          data: {'id': 'request-1', 'status': 'ASSIGNED', 'priority': 'HIGH'},
+        ),
+      );
+
+      final repository = PrincipalRepository(apiClient);
+      final result = await repository.escalateServiceRequest(
+        requestId: 'request-1',
+        reason: 'Needs coordinator review after fee office reply.',
+        assignedToUserId: 'manager-2',
+      );
+
+      expect(result['priority'], 'HIGH');
+      final captured =
+          verify(
+                () => apiClient.post<dynamic>(
+                  '/mobile/principal/service-requests/request-1/escalate',
+                  data: captureAny(named: 'data'),
+                ),
+              ).captured.single
+              as Map<String, dynamic>;
+      expect(captured, {
+        'reason': 'Needs coordinator review after fee office reply.',
+        'assignedToUserId': 'manager-2',
+      });
+    });
+
     test('rejects an untrusted request-evidence download path', () async {
       final repository = PrincipalRepository(apiClient);
 

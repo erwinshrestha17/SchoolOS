@@ -200,12 +200,21 @@ class PrincipalRepository {
     });
   }
 
+  Future<Map<String, dynamic>> getServiceRequestEscalationCandidates(
+    String requestId,
+  ) => _getCached(
+    'principal_service_request_escalation_candidates_$requestId',
+    '/mobile/principal/service-requests/$requestId/escalation-candidates',
+  );
+
   Future<Map<String, dynamic>> escalateServiceRequest({
     required String requestId,
     required String reason,
+    required String assignedToUserId,
   }) {
     return _postJson('/mobile/principal/service-requests/$requestId/escalate', {
       'reason': reason.trim(),
+      'assignedToUserId': assignedToUserId,
     });
   }
 

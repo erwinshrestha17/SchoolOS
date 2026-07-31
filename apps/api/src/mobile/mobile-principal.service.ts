@@ -387,6 +387,62 @@ export class MobilePrincipalService implements OnModuleInit {
     return this.serviceRequestsService.escalateRequest(requestId, dto, actor);
   }
 
+  async getServiceRequestEscalationCandidates(
+    actor: AuthContext,
+    requestId: string,
+  ) {
+    this.assertPrincipal(actor);
+    const request = await this.prisma.schoolServiceRequest.findFirst({
+      where: { id: requestId, tenantId: actor.tenantId },
+      select: { id: true, assignedToId: true },
+    });
+    if (!request) {
+      throw new NotFoundException(
+        'Service request not found or is not available on mobile.',
+      );
+    }
+
+    const users = await this.prisma.user.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        status: UserStatus.ACTIVE,
+        ...(request.assignedToId ? { id: { not: request.assignedToId } } : {}),
+        userRoles: {
+          some: {
+            tenantId: actor.tenantId,
+            role: {
+              rolePermissions: {
+                some: {
+                  permission: {
+                    resource: 'service_requests',
+                    action: 'manage',
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+        staff: { select: safeStaffSelect },
+      },
+      orderBy: { createdAt: 'asc' },
+      take: 100,
+    });
+
+    const items = users.map((user) => ({
+      id: user.id,
+      name: user.staff ? staffName(user.staff) : 'School manager',
+    }));
+
+    return {
+      requestId: request.id,
+      items,
+      total: items.length,
+    };
+  }
+
   async getApprovals(actor: AuthContext, status = 'pending') {
     this.assertPrincipal(actor);
     const statusKey = status.toUpperCase();

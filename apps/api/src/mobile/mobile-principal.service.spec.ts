@@ -76,6 +76,10 @@ describe('MobilePrincipalService', () => {
     };
     user: {
       findFirst: jest.Mock;
+      findMany: jest.Mock;
+    };
+    schoolServiceRequest: {
+      findFirst: jest.Mock;
     };
     auditLog: {
       findMany: jest.Mock;
@@ -176,6 +180,10 @@ describe('MobilePrincipalService', () => {
         updateMany: jest.fn(),
       },
       user: {
+        findFirst: jest.fn(),
+        findMany: jest.fn(),
+      },
+      schoolServiceRequest: {
         findFirst: jest.fn(),
       },
       auditLog: {
@@ -356,6 +364,60 @@ describe('MobilePrincipalService', () => {
     expect(prisma.staffLeaveRequest.count).toHaveBeenCalledWith({
       where: { tenantId: 'tenant-1', status: 'PENDING' },
     });
+  });
+
+
+  it('returns tenant-scoped escalation candidates excluding the current assignee', async () => {
+    prisma.schoolServiceRequest.findFirst.mockResolvedValue({
+      id: 'request-1',
+      assignedToId: 'assignee-1',
+    });
+    prisma.user.findMany.mockResolvedValue([
+      {
+        id: 'manager-1',
+        staff: { firstName: 'Rita', lastName: 'Karki' },
+      },
+      {
+        id: 'manager-2',
+        staff: null,
+      },
+    ]);
+
+    const result = await service.getServiceRequestEscalationCandidates(
+      actor,
+      'request-1',
+    );
+
+    expect(prisma.schoolServiceRequest.findFirst).toHaveBeenCalledWith({
+      where: { id: 'request-1', tenantId: 'tenant-1' },
+      select: { id: true, assignedToId: true },
+    });
+    expect(prisma.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: 'tenant-1',
+          id: { not: 'assignee-1' },
+        }),
+        take: 100,
+      }),
+    );
+    expect(result).toEqual({
+      requestId: 'request-1',
+      items: [
+        { id: 'manager-1', name: 'Rita Karki' },
+        { id: 'manager-2', name: 'School manager' },
+      ],
+      total: 2,
+    });
+  });
+
+  it('fails closed when a service request is outside the actor tenant', async () => {
+    prisma.schoolServiceRequest.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.getServiceRequestEscalationCandidates(actor, 'missing-request'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.user.findMany).not.toHaveBeenCalled();
   });
 
   it('triages a parent request only to the authenticated principal', async () => {
