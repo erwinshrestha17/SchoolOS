@@ -122,6 +122,52 @@ choosing real per-tenant scoping over a blanket bypass wherever a tenant id was 
 Net effect: 5 of the 8 crons now run their actual work **more** tightly scoped than before, rather
 than merely preserving the old unscoped behaviour.
 
+### Runtime validation caught two breaks the test suites could not
+
+Tests alone passed the fail-closed change, but running the actual API against the local stack showed
+**login returning HTTP 500**. Two authentication-path breaks were only observable at runtime, because
+every mocked suite replaces `@prisma/client` and so never executes the extension:
+
+| Break | Detail |
+|---|---|
+| `User.findUnique` refused | `User` is **not** in `TENANT_SCOPE_EXCLUDED_MODELS`, yet authentication must resolve the user *before* any tenant is known. This broke `/auth/login` **and every authenticated request**, since `JwtAuthGuard` reads the user at line 59 but only sets CLS at line 168 |
+| `AuditLog.create` refused | Audit rows carry an explicit caller-supplied `tenantId`, but login/failed-login/password-recovery events are written with no CLS tenant |
+
+Both are inherent to the authentication boundary, not defects in the fail-closed design — and
+notably `Tenant`, `RefreshToken` and `OtpCode` were *already* tenant-scope-excluded for exactly this
+reason. `User` was simply the omission that fail-open had been hiding.
+
+Fixed by declaring the pre-authentication region explicitly rather than excluding `User` globally
+(which would have removed tenant scoping from every legitimate authenticated user query):
+
+- `JwtAuthGuard` token-subject lookup → `runWithoutTenantScope`, with the existing
+  `user.tenantId !== payload.tenantId` check still enforcing the boundary immediately after.
+- `AuthService.preAuth()` helper wraps the 6 pre-authentication user reads/writes
+  (`resolveTenantAndUser`, `resolveTenantAndUserById`, password recovery request + confirm,
+  `completeAuthenticatedSession`, `recordFailedPasswordLogin`, `getPasswordIdentityHints`).
+- `AuditService.record` → wrapped, since it always supplies `tenantId` itself.
+
+Because the bypass only takes effect when a tenant context is genuinely absent, the authenticated
+paths through these same helpers remain fully tenant-scoped.
+
+**Runtime evidence after the fix** — `pnpm smoke:pilot` against the running API:
+
+```
+OK   Seeded school admin login
+OK   Subject teacher cannot use class-teacher attendance route
+OK   Principal can read mobile dashboard / attendance summary / transport alerts
+OK   Principal dashboard omits sensitive internals
+OK   Staff can read own attendance / leave / payslips ... Staff cannot list all payslips
+OK   Accountant can list fee invoices / dues / collection report
+OK   Driver can read own dashboard / assignments / manifest
+OK   Driver cannot read another driver manifest
+OK   Non-parent mobile child list fails closed
+```
+
+Zero `MissingTenantScopeError` occurrences during the full pilot run across teacher, principal,
+parent, staff, accountant and driver personas. (The suite's 2 remaining failures are its own direct
+Postgres/Redis connections, which bypass the API entirely and were failing before this work.)
+
 **Regression result:** the change surfaced 3 test suites that had encoded the old contract
 (`prisma.service.spec.ts` explicitly asserted *"delegate queries without injecting tenantId if
 tenantId is not set in CLS"*, plus two cron specs whose local mocks lacked the helpers). All were

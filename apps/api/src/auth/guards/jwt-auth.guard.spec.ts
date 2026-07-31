@@ -18,6 +18,8 @@ describe('JwtAuthGuard', () => {
   let jwtService: { verifyAsync: jest.Mock };
   let auditService: { record: jest.Mock };
   let prisma: {
+    runWithoutTenantScope: jest.Mock;
+    runWithTenantScope: jest.Mock;
     tenant: { findUnique: jest.Mock };
     user: { findUnique: jest.Mock };
     supportOverride: { findFirst: jest.Mock };
@@ -64,6 +66,14 @@ describe('JwtAuthGuard', () => {
       record: jest.fn(),
     };
     prisma = {
+      // Pass-throughs: the mock has no CLS/extension, so tenant-scope regions
+      // just execute. Real enforcement is proven in tenant-isolation.int-spec.ts.
+      runWithoutTenantScope: jest.fn(
+        async (_reason: string, fn: () => Promise<unknown>) => fn(),
+      ),
+      runWithTenantScope: jest.fn(
+        async (_tenantId: string, fn: () => Promise<unknown>) => fn(),
+      ),
       tenant: {
         findUnique: jest.fn(),
       },

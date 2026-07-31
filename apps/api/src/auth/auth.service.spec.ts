@@ -38,6 +38,14 @@ describe('AuthService', () => {
   beforeEach(async () => {
     authUser.passwordHash = await bcrypt.hash('password123', 4);
     prisma = {
+      // Pass-throughs: the mock has no CLS/extension, so tenant-scope regions
+      // just execute. Real enforcement is proven in tenant-isolation.int-spec.ts.
+      runWithoutTenantScope: jest.fn(
+        async (_reason: string, fn: () => Promise<unknown>) => fn(),
+      ),
+      runWithTenantScope: jest.fn(
+        async (_tenantId: string, fn: () => Promise<unknown>) => fn(),
+      ),
       tenant: {
         findUnique: jest.fn(),
       },

@@ -196,14 +196,16 @@ export class AuthService {
       return { success: true };
     }
 
-    const user = await this.prisma.user.findUnique({
-      where: {
-        tenantId_email: {
-          tenantId: tenant.id,
-          email: dto.email,
+    const user = await this.preAuth(() =>
+      this.prisma.user.findUnique({
+        where: {
+          tenantId_email: {
+            tenantId: tenant.id,
+            email: dto.email,
+          },
         },
-      },
-    });
+      }),
+    );
 
     if (
       user?.status !== UserStatus.ACTIVE ||
@@ -263,16 +265,20 @@ export class AuthService {
       await this.getPasswordIdentityHints(user.id, user.email),
     );
 
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        passwordHash: await bcrypt.hash(
-          dto.newPassword,
-          this.configService.bcryptRounds,
-        ),
-        mustChangePassword: false,
-      },
-    });
+    const recoveredPasswordHash = await bcrypt.hash(
+      dto.newPassword,
+      this.configService.bcryptRounds,
+    );
+
+    await this.preAuth(() =>
+      this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          passwordHash: recoveredPasswordHash,
+          mustChangePassword: false,
+        },
+      }),
+    );
 
     await this.revokeUserSessions(user.id);
 
@@ -881,14 +887,16 @@ export class AuthService {
     requestMeta?: RequestMeta,
     audit?: { action: string },
   ) {
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        lastLoginAt: new Date(),
-        failedLoginCount: 0,
-        lockedUntil: null,
-      },
-    });
+    await this.preAuth(() =>
+      this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          lastLoginAt: new Date(),
+          failedLoginCount: 0,
+          lockedUntil: null,
+        },
+      }),
+    );
 
     const authContext = this.buildAuthContext(user, tenant.slug);
     const session = await this.issueSession(authContext, requestMeta);
@@ -925,6 +933,20 @@ export class AuthService {
     );
   }
 
+  /**
+   * Authentication runs before any tenant context exists -- the tenant is only
+   * established once credentials are resolved. `Tenant`, `RefreshToken` and
+   * `OtpCode` are already tenant-scope-excluded for exactly this reason; `User`
+   * is not, so pre-authentication user access declares the region explicitly
+   * instead of depending on an absent tenant context.
+   */
+  private preAuth<T>(fn: () => Promise<T>): Promise<T> {
+    return this.prisma.runWithoutTenantScope(
+      'authentication: user lookup before tenant context is established',
+      fn,
+    );
+  }
+
   private async resolveTenantAndUser(tenantSlug: string, email: string) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { slug: tenantSlug },
@@ -934,15 +956,17 @@ export class AuthService {
       throw new UnauthorizedException('Invalid tenant or credentials');
     }
 
-    const user = await this.prisma.user.findUnique({
-      where: {
-        tenantId_email: {
-          tenantId: tenant.id,
-          email,
+    const user = await this.preAuth(() =>
+      this.prisma.user.findUnique({
+        where: {
+          tenantId_email: {
+            tenantId: tenant.id,
+            email,
+          },
         },
-      },
-      include: this.userAuthInclude,
-    });
+        include: this.userAuthInclude,
+      }),
+    );
 
     if (!user) {
       throw new UnauthorizedException('Invalid tenant or credentials');
@@ -958,13 +982,15 @@ export class AuthService {
       this.prisma.tenant.findUnique({
         where: { id: tenantId },
       }),
-      this.prisma.user.findFirst({
-        where: {
-          id: userId,
-          tenantId,
-        },
-        include: this.userAuthInclude,
-      }),
+      this.preAuth(() =>
+        this.prisma.user.findFirst({
+          where: {
+            id: userId,
+            tenantId,
+          },
+          include: this.userAuthInclude,
+        }),
+      ),
     ]);
 
     if (!tenant?.isActive || !user) {
@@ -999,13 +1025,15 @@ export class AuthService {
         ? new Date(Date.now() + LOGIN_LOCK_MINUTES * 60 * 1000)
         : null;
 
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        failedLoginCount,
-        lockedUntil,
-      },
-    });
+    await this.preAuth(() =>
+      this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          failedLoginCount,
+          lockedUntil,
+        },
+      }),
+    );
 
     if (lockedUntil) {
       await this.revokeUserSessions(user.id);
@@ -1220,29 +1248,34 @@ export class AuthService {
   }
 
   private async getPasswordIdentityHints(userId: string, email: string | null) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        email: true,
-        staff: {
-          select: {
-            firstName: true,
-            lastName: true,
+    // Reached from both the unauthenticated recovery flow and authenticated
+    // password change; the bypass only takes effect when no tenant context
+    // exists, so the authenticated path stays tenant-scoped.
+    const user = await this.preAuth(() =>
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          email: true,
+          staff: {
+            select: {
+              firstName: true,
+              lastName: true,
+            },
+          },
+          student: {
+            select: {
+              firstNameEn: true,
+              lastNameEn: true,
+            },
+          },
+          guardian: {
+            select: {
+              fullName: true,
+            },
           },
         },
-        student: {
-          select: {
-            firstNameEn: true,
-            lastNameEn: true,
-          },
-        },
-        guardian: {
-          select: {
-            fullName: true,
-          },
-        },
-      },
-    });
+      }),
+    );
 
     return [
       email,

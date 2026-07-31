@@ -56,28 +56,36 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Invalid token audience');
     }
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: payload.sub },
-      include: {
-        tenant: true,
-        userRoles: {
-          where: {
-            tenantId: payload.tenantId, // Use the user's home tenant for role lookup
-          },
+    // Authentication necessarily precedes tenant context: the tenant is only
+    // trusted once this user is resolved and checked against the token below.
+    // (RefreshToken/OtpCode/Tenant are tenant-scope-excluded for the same
+    // reason; User is not, so the region is declared explicitly here.)
+    const user = await this.prisma.runWithoutTenantScope(
+      'authenticate: resolve token subject before tenant context exists',
+      () =>
+        this.prisma.user.findUnique({
+          where: { id: payload.sub },
           include: {
-            role: {
+            tenant: true,
+            userRoles: {
+              where: {
+                tenantId: payload.tenantId, // Use the user's home tenant for role lookup
+              },
               include: {
-                rolePermissions: {
+                role: {
                   include: {
-                    permission: true,
+                    rolePermissions: {
+                      include: {
+                        permission: true,
+                      },
+                    },
                   },
                 },
               },
             },
           },
-        },
-      },
-    });
+        }),
+    );
 
     if (user?.status !== 'ACTIVE' || !user.tenant.isActive) {
       throw new UnauthorizedException('User or tenant is inactive');

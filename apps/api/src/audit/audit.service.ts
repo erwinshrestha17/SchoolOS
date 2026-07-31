@@ -31,20 +31,29 @@ export class AuditService {
   async record(input: AuditLogInput, client: AuditPrismaClient = this.prisma) {
     const requestId = input.requestId ?? this.cls.get(REQUEST_ID_KEY);
 
-    await client.auditLog.create({
-      data: {
-        action: input.action,
-        resource: input.resource,
-        tenantId: input.tenantId,
-        userId: input.userId ?? null,
-        resourceId: input.resourceId ?? null,
-        before: input.before as Prisma.InputJsonValue | undefined,
-        after: input.after as Prisma.InputJsonValue | undefined,
-        ipAddress: input.ipAddress ?? null,
-        userAgent: input.userAgent ?? null,
-        requestId: requestId ?? null,
-      },
-    });
+    // Audit rows always carry an explicit tenantId from the caller, and audit
+    // writes must succeed on unauthenticated paths too (failed logins, password
+    // recovery) where no CLS tenant exists yet. When a tenant context IS
+    // present the extension still scopes the write, so this only relaxes the
+    // pre-authentication case.
+    await this.prisma.runWithoutTenantScope(
+      'audit: append with caller-supplied tenantId, including pre-authentication events',
+      () =>
+        client.auditLog.create({
+          data: {
+            action: input.action,
+            resource: input.resource,
+            tenantId: input.tenantId,
+            userId: input.userId ?? null,
+            resourceId: input.resourceId ?? null,
+            before: input.before as Prisma.InputJsonValue | undefined,
+            after: input.after as Prisma.InputJsonValue | undefined,
+            ipAddress: input.ipAddress ?? null,
+            userAgent: input.userAgent ?? null,
+            requestId: requestId ?? null,
+          },
+        }),
+    );
   }
 
   /**

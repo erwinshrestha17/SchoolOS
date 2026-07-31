@@ -562,6 +562,15 @@ export function createPrismaMock() {
 
   const prisma: any = {
     __state: state,
+    // Tenant-scope helpers from PrismaService. The mock has no CLS/extension,
+    // so both are pass-throughs here; real enforcement is proven against a live
+    // database in test/tenant-isolation.int-spec.ts.
+    runWithoutTenantScope: jest.fn(
+      async (_reason: string, fn: () => Promise<unknown>) => fn(),
+    ),
+    runWithTenantScope: jest.fn(
+      async (_tenantId: string, fn: () => Promise<unknown>) => fn(),
+    ),
     $connect: jest.fn(() => Promise.resolve()),
     $disconnect: jest.fn(() => Promise.resolve()),
     onModuleInit: jest.fn(() => Promise.resolve()),
