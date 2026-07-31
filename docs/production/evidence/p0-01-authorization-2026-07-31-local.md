@@ -1,7 +1,7 @@
 # P0-01 Authorization, Tenant Isolation and Scope Enforcement (2026-07-31, local)
 
-Status: **PARTIAL — 11 of 12 completion-gate criteria PASS; protected-file/export scoping remains
-mock-only. Local + real-database validated; not staging / controlled-pilot validated.**
+Status: **PASS (local + real-database) — all 12 completion-gate criteria met.
+Not staging / controlled-pilot validated; P0-15 device/browser matrix remains external.**
 
 Scope: Close remaining P0-01 gaps around capability contract completeness, `RESULT_REVIEW` assignment enforcement, authorization denial audit vocabulary, background-job missing-tenant fail-closed proof, mobile access-changed cache invalidation, and a static authorization matrix contract.
 
@@ -341,13 +341,19 @@ Two further suites join the tenant-isolation one, all with no Prisma mock:
 |---|---|---|
 | `tenant-isolation.int-spec.ts` | 15 | read/write refusal, create tenant-overwrite, excluded models, bypass region |
 | `guardian-scope.int-spec.ts` | **19** | valid linked-child access; capability filtering; SUSPENDED / REVOKED / EXPIRED / UNVERIFIED / PENDING / REJECTED denial; effective-date windows on both ends; unrelated-student and cross-tenant student-id tampering; foreign parent claiming this tenant; parent with no guardian row; staff actor denied the guardian path; admin unrestricted |
+| `protected-file-scope.int-spec.ts` | **7** | own-tenant asset resolves; foreign asset denied without confirming existence; caller claiming a tenant that does not own the asset; soft-deleted; hard-deleted; unknown id; and **refusal to resolve any asset with no tenant context** |
 | `teacher-assignment-scope.int-spec.ts` | **12** | exact class+section+subject grant; wrong subject / wrong section / wrong class denial; REVOKED and EXPIRED status; not-yet-started and already-ended assignments; immediate revocation; foreign-tenant actor; actor with no staff row; inactive staff with a live assignment |
 
 ```bash
 pnpm test:integration
-# Test Suites: 3 passed, 3 total
-# Tests:       46 passed, 46 total
+# Test Suites: 4 passed, 4 total
+# Tests:       53 passed, 53 total
 ```
+
+`getFileMetadata` is the choke point for every protected download (report cards, receipts, student
+documents, payslips, government exports) and is defended twice — the tenant-scope extension filters
+the row out, and an explicit `asset.tenantId !== tenantId` check catches a caller who claims the
+wrong tenant. Both were proven independently.
 
 Fixtures use timestamped `p0-01-*` prefixes and are torn down in `afterAll`; verified 0 leftover
 tenants/students/guardians/classes/users after the run.
@@ -390,7 +396,7 @@ authorization defects; they belong to P0-02/P0-06/localization scope.
 | Cross-tenant tests pass | PASS (real DB, 15 assertions) |
 | Teacher assignment tests pass | PASS (real DB, 12 assertions + 17 existing) |
 | Guardian relationship tests pass | PASS (real DB, 19 assertions) |
-| Protected files and exports are scoped | **PARTIAL** — file-registry authorization exists and roster export was hardened, but there is no dedicated real-DB protected-file matrix yet |
+| Protected files and exports are scoped | PASS (real DB, 7 assertions) |
 | Mobile stale-access caches are invalidated | PASS (analyze clean; `parent_controller` / `private_data_cleanup_service` suites green) |
 | Clean database migration succeeds | PASS |
 | API, web and mobile type checks pass | PASS (typecheck exit 0; flutter analyze error-free) |
