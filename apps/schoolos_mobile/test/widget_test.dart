@@ -184,7 +184,7 @@ void main() {
       ),
     );
 
-    expect(find.text('PARENT'), findsOneWidget);
+    expect(find.text('Parent / Guardian'), findsOneWidget);
   });
 
   testWidgets('RoleShellScaffold limits student navigation to session entry', (

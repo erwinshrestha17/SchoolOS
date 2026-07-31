@@ -548,6 +548,7 @@ void main() {
         () => apiClient.post<dynamic>(
           '/mobile/students/child-1/payment-intents',
           data: {
+            'confirmStudentId': 'child-1',
             'invoiceId': 'invoice-1',
             'amount': 500,
             'provider': 'NEPAL_GATEWAY',
@@ -829,6 +830,7 @@ void main() {
         () => apiClient.post<Map<String, dynamic>>(
           '/mobile/students/child-1/service-requests',
           data: {
+            'confirmStudentId': 'child-1',
             'type': 'PAYMENT_DISPUTE',
             'category': 'FEES_AND_PAYMENTS',
             'priority': 'NORMAL',

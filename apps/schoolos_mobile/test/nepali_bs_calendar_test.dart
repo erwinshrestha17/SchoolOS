@@ -75,7 +75,12 @@ void main() {
 
       for (final file in files) {
         final source = file.readAsStringSync();
-        expect(source, isNot(contains('DateFormat')), reason: file.path);
+        expect(
+          source,
+          isNot(contains("import 'package:intl/intl.dart'")),
+          reason: file.path,
+        );
+        expect(source, isNot(contains('DateFormat(')), reason: file.path);
         expect(
           source,
           isNot(contains('TimeOfDay.fromDateTime')),
