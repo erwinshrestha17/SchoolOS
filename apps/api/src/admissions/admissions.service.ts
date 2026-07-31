@@ -1285,6 +1285,7 @@ export class AdmissionsService {
       );
     }
 
+    const admissionDate = new Date(dto.admissionDate);
     const enrollment = await tx.enrollment.create({
       data: {
         tenantId: actor.tenantId,
@@ -1294,8 +1295,10 @@ export class AdmissionsService {
         sectionId: dto.sectionId ?? null,
         rollNumber: dto.rollNumber ?? null,
         admissionNumber: dto.admissionNumber ?? null,
-        admissionDate: new Date(dto.admissionDate),
+        admissionDate,
         mediumOfInstruction: dto.mediumOfInstruction ?? 'English',
+        effectiveFrom: admissionDate,
+        effectiveUntil: null,
       },
     });
 

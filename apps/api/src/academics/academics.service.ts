@@ -1320,36 +1320,46 @@ export class AcademicsService {
           studentId: dto.studentId,
           status: 'ACTIVE',
         },
-        data: { status: 'PROMOTED' },
+        data: { status: 'PROMOTED', effectiveUntil: new Date() },
       });
 
-      // Create or update target enrollment
-      const targetEnrollment = await tx.enrollment.upsert({
+      // Create or update target enrollment (P0-04: open segment only)
+      const existingTarget = await tx.enrollment.findFirst({
         where: {
-          tenantId_academicYearId_studentId: {
-            tenantId: actor.tenantId,
-            academicYearId: dto.targetAcademicYearId,
-            studentId: dto.studentId,
-          },
-        },
-        update: {
-          classId: dto.toClassId,
-          sectionId: dto.toSectionId ?? null,
-          status: 'ACTIVE',
-        },
-        create: {
           tenantId: actor.tenantId,
-          studentId: dto.studentId,
           academicYearId: dto.targetAcademicYearId,
-          classId: dto.toClassId,
-          sectionId: dto.toSectionId ?? null,
-          rollNumber: student.rollNumber,
-          admissionNumber: student.admissionNumber,
-          admissionDate: new Date(),
-          mediumOfInstruction: student.mediumOfInstruct,
+          studentId: dto.studentId,
           status: 'ACTIVE',
+          effectiveUntil: null,
         },
       });
+      const admissionDate = new Date();
+      const targetEnrollment = existingTarget
+        ? await tx.enrollment.update({
+            where: { id: existingTarget.id },
+            data: {
+              classId: dto.toClassId,
+              sectionId: dto.toSectionId ?? null,
+              status: 'ACTIVE',
+              effectiveUntil: null,
+            },
+          })
+        : await tx.enrollment.create({
+            data: {
+              tenantId: actor.tenantId,
+              studentId: dto.studentId,
+              academicYearId: dto.targetAcademicYearId,
+              classId: dto.toClassId,
+              sectionId: dto.toSectionId ?? null,
+              rollNumber: student.rollNumber,
+              admissionNumber: student.admissionNumber,
+              admissionDate,
+              mediumOfInstruction: student.mediumOfInstruct,
+              status: 'ACTIVE',
+              effectiveFrom: admissionDate,
+              effectiveUntil: null,
+            },
+          });
 
       // Update student current class/section
       await tx.student.updateMany({
@@ -1471,35 +1481,50 @@ export class AcademicsService {
           await this.prisma.$transaction(async (tx) => {
             await tx.enrollment.update({
               where: { id: enrollment.id },
-              data: { status: 'PROMOTED' },
+              data: {
+                status: 'PROMOTED',
+                effectiveUntil: new Date(),
+              },
             });
 
-            await tx.enrollment.upsert({
+            const existingTarget = await tx.enrollment.findFirst({
               where: {
-                tenantId_academicYearId_studentId: {
-                  tenantId: actor.tenantId,
-                  academicYearId: dto.targetAcademicYearId,
-                  studentId: student.id,
-                },
-              },
-              update: {
-                classId: mapping.toClassId,
-                sectionId: mapping.toSectionId ?? null,
-                status: 'ACTIVE',
-              },
-              create: {
                 tenantId: actor.tenantId,
-                studentId: student.id,
                 academicYearId: dto.targetAcademicYearId,
-                classId: mapping.toClassId,
-                sectionId: mapping.toSectionId ?? null,
-                rollNumber: student.rollNumber,
-                admissionNumber: student.admissionNumber,
-                admissionDate: new Date(),
-                mediumOfInstruction: student.mediumOfInstruct,
+                studentId: student.id,
                 status: 'ACTIVE',
+                effectiveUntil: null,
               },
             });
+            const admissionDate = new Date();
+            if (existingTarget) {
+              await tx.enrollment.update({
+                where: { id: existingTarget.id },
+                data: {
+                  classId: mapping.toClassId,
+                  sectionId: mapping.toSectionId ?? null,
+                  status: 'ACTIVE',
+                  effectiveUntil: null,
+                },
+              });
+            } else {
+              await tx.enrollment.create({
+                data: {
+                  tenantId: actor.tenantId,
+                  studentId: student.id,
+                  academicYearId: dto.targetAcademicYearId,
+                  classId: mapping.toClassId,
+                  sectionId: mapping.toSectionId ?? null,
+                  rollNumber: student.rollNumber,
+                  admissionNumber: student.admissionNumber,
+                  admissionDate,
+                  mediumOfInstruction: student.mediumOfInstruct,
+                  status: 'ACTIVE',
+                  effectiveFrom: admissionDate,
+                  effectiveUntil: null,
+                },
+              });
+            }
 
             await tx.student.update({
               where: { id: student.id },

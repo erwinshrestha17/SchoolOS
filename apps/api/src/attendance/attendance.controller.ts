@@ -34,6 +34,11 @@ import { UpsertCalendarDayDto } from './dto/upsert-calendar-day.dto';
 import { CreateAttendanceCorrectionDto } from './dto/create-attendance-correction.dto';
 import { ReviewAttendanceCorrectionDto } from './dto/review-attendance-correction.dto';
 import { ListAttendanceCorrectionRequestsDto } from './dto/list-attendance-correction-requests.dto';
+import {
+  CreateStudentLeaveRequestDto,
+  ReviewStudentLeaveRequestDto,
+} from './dto/create-student-leave-request.dto';
+import { LeaveRequestStatus } from '@prisma/client';
 import { GetMonthlyRegisterDto } from './dto/get-monthly-register.dto';
 import { GetStudentHistoryDto } from './dto/get-student-history.dto';
 import { UpsertAttendanceDraftDto } from './dto/upsert-attendance-draft.dto';
@@ -371,6 +376,38 @@ export class AttendanceController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.attendanceService.approveCorrectionRequest(id, dto, auth);
+  }
+
+  @Get('student-leave-requests')
+  @Permissions('attendance:read')
+  listStudentLeaveRequests(
+    @CurrentAuth() auth: AuthContext,
+    @Query('studentId') studentId?: string,
+    @Query('status') status?: LeaveRequestStatus,
+  ) {
+    return this.attendanceService.listStudentLeaveRequests(auth, {
+      studentId,
+      status,
+    });
+  }
+
+  @Post('student-leave-requests')
+  @Permissions('attendance:mark')
+  createStudentLeaveRequest(
+    @Body() dto: CreateStudentLeaveRequestDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.createStudentLeaveRequest(dto, auth);
+  }
+
+  @Patch('student-leave-requests/:id/review')
+  @Permissions('attendance:review_conflicts')
+  reviewStudentLeaveRequest(
+    @Param('id') id: string,
+    @Body() dto: ReviewStudentLeaveRequestDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.reviewStudentLeaveRequest(id, dto, auth);
   }
 
   @Get('students/:id/history')

@@ -165,9 +165,15 @@ function buildService(
           }),
         ),
       ),
+      aggregate: jest.fn().mockResolvedValue({
+        _max: { updatedAt: new Date('2026-07-31T10:00:00.000Z') },
+      }),
     },
     teacherDelegation: {
       findMany: jest.fn().mockResolvedValue(delegations),
+      aggregate: jest.fn().mockResolvedValue({
+        _max: { updatedAt: new Date('2026-07-31T12:00:00.000Z') },
+      }),
     },
   } as never;
 
@@ -723,6 +729,36 @@ describe('TeacherScopeService — assignment-based authorization', () => {
           after: expect.objectContaining({ reason: 'missing_scope' }),
         }),
       );
+    });
+  });
+
+  describe('getScopeVersion', () => {
+    it('includes revoked assignment updates in the monotonic scope version', async () => {
+      const { service, prisma } = buildService();
+      (prisma as any).teacherAssignment.aggregate.mockResolvedValue({
+        _max: { updatedAt: new Date('2026-07-31T15:00:00.000Z') },
+      });
+      (prisma as any).teacherDelegation.aggregate.mockResolvedValue({
+        _max: { updatedAt: new Date('2026-07-31T14:00:00.000Z') },
+      });
+
+      const result = await service.getScopeVersion(actor);
+
+      expect(result.scopeVersion).toBe(
+        String(new Date('2026-07-31T15:00:00.000Z').getTime()),
+      );
+      expect((prisma as any).teacherAssignment.aggregate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            tenantId: TENANT,
+            staffId: STAFF,
+          }),
+        }),
+      );
+      expect(
+        (prisma as any).teacherAssignment.aggregate.mock.calls[0][0].where
+          .status,
+      ).toBeUndefined();
     });
   });
 

@@ -41,8 +41,8 @@ import {
 import { MobilePrincipalService } from './mobile-principal.service';
 import {
   AddSchoolServiceRequestNoteDto,
+  EscalateSchoolServiceRequestDto,
   ListSchoolServiceRequestsDto,
-  ReasonedSchoolServiceRequestDto,
   ResolveSchoolServiceRequestDto,
 } from '../service-requests/dto/service-request.dto';
 import { MobilePrincipalServiceRequestTriageDto } from './dto/mobile-principal-service-request.dto';
@@ -200,7 +200,7 @@ export class MobilePrincipalController {
   escalateServiceRequest(
     @CurrentAuth() auth: AuthContext,
     @Param('requestId', new ParseUUIDPipe()) requestId: string,
-    @Body() dto: ReasonedSchoolServiceRequestDto,
+    @Body() dto: EscalateSchoolServiceRequestDto,
   ) {
     return this.service.escalateServiceRequest(auth, requestId, dto);
   }

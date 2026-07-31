@@ -305,6 +305,8 @@ async function seedStudentsAndGuardians(
           admissionNumber: studentSystemId.replace('SCH', 'ADM'),
           admissionDate: date('2026-04-10'),
           mediumOfInstruction: 'English',
+          effectiveFrom: date('2026-04-10'),
+          effectiveUntil: null,
         },
       });
     }

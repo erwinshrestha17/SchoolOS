@@ -1,38 +1,42 @@
 import { BadRequestException } from '@nestjs/common';
 import {
-  assertConfirmStudentId,
   GUARDIAN_CHILD_CONFIRMATION_MISMATCH_CODE,
+  assertConfirmStudentId,
 } from './confirm-student-action';
 
-describe('assertConfirmStudentId', () => {
-  it('accepts a matching confirmation id', () => {
+describe('assertConfirmStudentId (P0-07)', () => {
+  it('allows matching confirmation', () => {
     expect(() =>
-      assertConfirmStudentId('student-1', 'student-1'),
+      assertConfirmStudentId('child-1', 'child-1'),
     ).not.toThrow();
   });
 
-  it('rejects missing confirmation id', () => {
+  it('rejects missing confirmation', () => {
     try {
-      assertConfirmStudentId('student-1', undefined);
+      assertConfirmStudentId('child-1', undefined);
       fail('expected BadRequestException');
     } catch (error) {
       expect(error).toBeInstanceOf(BadRequestException);
-      expect((error as BadRequestException).getResponse()).toMatchObject({
-        code: GUARDIAN_CHILD_CONFIRMATION_MISMATCH_CODE,
-      });
+      expect((error as BadRequestException).getResponse()).toEqual(
+        expect.objectContaining({
+          code: GUARDIAN_CHILD_CONFIRMATION_MISMATCH_CODE,
+        }),
+      );
     }
   });
 
-  it('rejects mismatched confirmation id', () => {
+  it('rejects mismatched confirmation (stale child context)', () => {
     try {
-      assertConfirmStudentId('student-1', 'student-2');
+      assertConfirmStudentId('child-1', 'child-2');
       fail('expected BadRequestException');
     } catch (error) {
       expect(error).toBeInstanceOf(BadRequestException);
-      expect((error as BadRequestException).getResponse()).toMatchObject({
-        code: GUARDIAN_CHILD_CONFIRMATION_MISMATCH_CODE,
-        expectedStudentId: 'student-1',
-      });
+      expect((error as BadRequestException).getResponse()).toEqual(
+        expect.objectContaining({
+          code: GUARDIAN_CHILD_CONFIRMATION_MISMATCH_CODE,
+          expectedStudentId: 'child-1',
+        }),
+      );
     }
   });
 });

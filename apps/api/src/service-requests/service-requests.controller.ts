@@ -21,7 +21,7 @@ import { TenantActiveGuard } from '../auth/guards/tenant-active.guard';
 import {
   AddSchoolServiceRequestNoteDto,
   ListSchoolServiceRequestsDto,
-  ReasonedSchoolServiceRequestDto,
+  EscalateSchoolServiceRequestDto,
   ResolveSchoolServiceRequestDto,
   TriageSchoolServiceRequestDto,
 } from './dto/service-request.dto';
@@ -90,7 +90,7 @@ export class ServiceRequestsController {
   @Permissions('service_requests:manage')
   escalate(
     @Param('id') id: string,
-    @Body() dto: ReasonedSchoolServiceRequestDto,
+    @Body() dto: EscalateSchoolServiceRequestDto,
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.service.escalateRequest(id, dto, auth);

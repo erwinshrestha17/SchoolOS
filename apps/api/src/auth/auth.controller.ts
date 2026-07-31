@@ -23,7 +23,9 @@ import { LoginDto } from './dto/login.dto';
 import { RefreshSessionDto } from './dto/refresh-session.dto';
 import { RequestOtpLoginDto } from './dto/request-otp-login.dto';
 import { RequestPasswordRecoveryDto } from './dto/request-password-recovery.dto';
+import { RevokeOtherSessionsDto } from './dto/revoke-other-sessions.dto';
 import { VerifyOtpLoginDto } from './dto/verify-otp-login.dto';
+import { VerifyPasswordDto } from './dto/verify-password.dto';
 import { SkipMustChangePassword } from './decorators/skip-must-change-password.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
@@ -171,6 +173,16 @@ export class AuthController {
     return this.authService.listSessions(auth);
   }
 
+  @Post('sessions/revoke-others')
+  @UseGuards(JwtAuthGuard)
+  revokeOtherSessions(
+    @CurrentAuth() auth: AuthContext,
+    @Body() dto: RevokeOtherSessionsDto,
+    @Headers('cookie') cookieHeader?: string,
+  ) {
+    return this.authService.revokeOtherSessions(auth, dto, cookieHeader);
+  }
+
   @Post('sessions/:sessionId/revoke')
   @UseGuards(JwtAuthGuard)
   revokeSession(
@@ -178,6 +190,21 @@ export class AuthController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.authService.revokeSession(sessionId, auth);
+  }
+
+  @Post('verify-password')
+  @UseGuards(JwtAuthGuard)
+  @Throttle({
+    default: {
+      limit: AUTH_RATE_LIMIT,
+      ttl: AUTH_RATE_TTL_MS,
+    },
+  })
+  verifyPassword(
+    @CurrentAuth() auth: AuthContext,
+    @Body() dto: VerifyPasswordDto,
+  ) {
+    return this.authService.verifyPassword(auth, dto);
   }
 
   @Post('change-password')

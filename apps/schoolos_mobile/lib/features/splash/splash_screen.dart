@@ -70,6 +70,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
     if (auth.status == AuthStatus.authenticated) {
       context.go(AppRoutes.home);
+    } else if (auth.status == AuthStatus.biometricLocked) {
+      context.go(AppRoutes.biometricUnlock);
     } else {
       context.go(AppRoutes.login);
     }

@@ -47,6 +47,7 @@ class _ParentAuthNotifier extends AuthNotifier {
         email: 'guardian@example.test',
         role: 'PARENT',
         tenantSlug: 'default-school',
+        tenantName: 'Sunrise Secondary School',
         roles: ['PARENT'],
       ),
     );
@@ -109,8 +110,18 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
 
-    await tester.ensureVisible(find.text('Sign Out'));
-    await tester.tap(find.text('Sign Out'));
+    expect(find.text('School Tenant'), findsNothing);
+    expect(find.text('default-school'), findsNothing);
+    expect(find.text('Sunrise Secondary School'), findsWidgets);
+    expect(find.text('Parent / Guardian'), findsWidgets);
+    expect(find.text('Logged-in devices'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Sign out'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('Sign out'));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
 
@@ -130,7 +141,12 @@ void main() {
     expect(authNotifier.signOutCalls, 0);
     expect(find.text('Sign out of SchoolOS?'), findsNothing);
 
-    await tester.tap(find.text('Sign Out'));
+    await tester.scrollUntilVisible(
+      find.text('Sign out'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('Sign out'));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     await tester.tap(find.text('Sign Out').last);

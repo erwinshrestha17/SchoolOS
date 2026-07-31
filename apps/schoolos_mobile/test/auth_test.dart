@@ -253,6 +253,33 @@ void main() {
       );
     });
 
+    test('verifyPassword posts current password payload', () async {
+      final mockResponse = Response(
+        requestOptions: RequestOptions(path: '/auth/verify-password'),
+        statusCode: 200,
+        data: {'success': true, 'message': 'Password verified.'},
+      );
+
+      when(
+        () => mockApiClient.post<dynamic>(
+          '/auth/verify-password',
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer((_) async => mockResponse);
+
+      await repository.verifyPassword(currentPassword: 'CurrentPass1!');
+
+      final payload =
+          verify(
+                () => mockApiClient.post<dynamic>(
+                  '/auth/verify-password',
+                  data: captureAny(named: 'data'),
+                ),
+              ).captured.single
+              as Map<String, dynamic>;
+      expect(payload, {'currentPassword': 'CurrentPass1!'});
+    });
+
     test('changePassword posts authenticated password payload', () async {
       final mockResponse = Response(
         requestOptions: RequestOptions(path: '/auth/change-password'),

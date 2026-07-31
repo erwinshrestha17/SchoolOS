@@ -1,7 +1,9 @@
 import { ForbiddenException } from '@nestjs/common';
 import { GuardianCapability, Prisma } from '@prisma/client';
+import type { AuditService } from '../../audit/audit.service';
 import type { AuthContext } from '../../auth/auth.types';
 import type { PrismaService } from '../../prisma/prisma.service';
+import { recordAuthorizationDenial } from './authorization-audit';
 
 export const GUARDIAN_CAPABILITY_DENIED_CODE =
   'GUARDIAN_CAPABILITY_DENIED';
@@ -134,11 +136,21 @@ export async function requireGuardianCapability(
   actor: AuthContext,
   studentId: string,
   capability: GuardianCapability,
+  audit?: Pick<AuditService, 'record'>,
 ) {
   if (
     !actor.roles.includes('parent') &&
     !actor.roles.includes('guardian')
   ) {
+    if (audit) {
+      await recordAuthorizationDenial(audit, {
+        actor,
+        reason: 'guardian_capability_denied',
+        resource: 'guardian_relationship',
+        resourceId: studentId,
+        capability,
+      });
+    }
     throw createGuardianCapabilityDeniedException(capability);
   }
 
@@ -180,6 +192,15 @@ export async function requireGuardianCapability(
 
   const relationship = guardian?.studentLinks?.[0];
   if (!relationship || relationship.studentId !== studentId) {
+    if (audit) {
+      await recordAuthorizationDenial(audit, {
+        actor,
+        reason: 'guardian_capability_denied',
+        resource: 'guardian_relationship',
+        resourceId: studentId,
+        capability,
+      });
+    }
     throw createGuardianCapabilityDeniedException(capability);
   }
 

@@ -5,6 +5,7 @@ import type {
   ThrottlerStorage,
 } from '@nestjs/throttler';
 import type { ConfigService } from '../../config/config.service';
+import { M1AdmissionsHardeningController } from '../../admissions/m1-admissions-hardening.controller';
 import { StudentsController } from '../../students/students.controller';
 import { AppThrottlerGuard } from './app-throttler.guard';
 
@@ -105,6 +106,28 @@ describe('AppThrottlerGuard', () => {
           ...args: never[]
         ) => unknown,
       controller: StudentsController,
+    });
+
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+    expect(increment).toHaveBeenCalledWith(
+      expect.any(String),
+      60_000,
+      10,
+      60_000,
+      'default',
+    );
+  });
+
+  it('preserves the M1 guardian-removal route decorator', async () => {
+    const { guard, increment } = buildGuard();
+    await guard.onModuleInit();
+    const { context } = contextFor({
+      path: '/api/v1/admissions/m1/students/student-1/guardians/guardian-1',
+      handler:
+        M1AdmissionsHardeningController.prototype.removeGuardianAccess as (
+          ...args: never[]
+        ) => unknown,
+      controller: M1AdmissionsHardeningController,
     });
 
     await expect(guard.canActivate(context)).resolves.toBe(true);

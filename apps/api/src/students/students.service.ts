@@ -1365,22 +1365,48 @@ export class StudentsService {
           'rollNumber' in dto ||
           dto.mediumOfInstruction !== undefined)
       ) {
-        await tx.enrollment.update({
-          where: { id: latestEnrollment.id },
-          data: {
-            classId: nextClassId,
-            sectionId: nextSectionId,
-            rollNumber: nextRollNumber,
-            ...(dto.mediumOfInstruction !== undefined
-              ? {
-                  mediumOfInstruction: assertNonEmpty(
-                    dto.mediumOfInstruction,
-                    'mediumOfInstruction',
-                  ),
-                }
-              : {}),
-          },
-        });
+        const placementChanged =
+          latestEnrollment.classId !== nextClassId ||
+          (latestEnrollment.sectionId ?? null) !== nextSectionId;
+        const mediumOfInstruction =
+          dto.mediumOfInstruction !== undefined
+            ? assertNonEmpty(dto.mediumOfInstruction, 'mediumOfInstruction')
+            : latestEnrollment.mediumOfInstruction;
+
+        if (placementChanged) {
+          const cutover = new Date();
+          await tx.enrollment.update({
+            where: { id: latestEnrollment.id },
+            data: {
+              status: EnrollmentStatus.TRANSFERRED,
+              effectiveUntil: cutover,
+            },
+          });
+          await tx.enrollment.create({
+            data: {
+              tenantId: actor.tenantId,
+              studentId: student.id,
+              academicYearId: latestEnrollment.academicYearId,
+              classId: nextClassId,
+              sectionId: nextSectionId,
+              rollNumber: nextRollNumber,
+              admissionNumber: latestEnrollment.admissionNumber,
+              admissionDate: latestEnrollment.admissionDate,
+              mediumOfInstruction,
+              status: EnrollmentStatus.ACTIVE,
+              effectiveFrom: cutover,
+              effectiveUntil: null,
+            },
+          });
+        } else {
+          await tx.enrollment.update({
+            where: { id: latestEnrollment.id },
+            data: {
+              rollNumber: nextRollNumber,
+              mediumOfInstruction,
+            },
+          });
+        }
       }
 
       if (dto.classId !== undefined && dto.classId !== student.classId) {
@@ -2392,6 +2418,7 @@ export class StudentsService {
         },
         data: {
           status: EnrollmentStatus.TRANSFERRED,
+          effectiveUntil: exitedAt,
         },
       });
 
@@ -2478,6 +2505,7 @@ export class StudentsService {
         },
         data: {
           status: EnrollmentStatus.EXITED,
+          effectiveUntil: exitedAt,
         },
       });
 
@@ -2618,6 +2646,7 @@ export class StudentsService {
         },
         data: {
           status: EnrollmentStatus.EXITED,
+          effectiveUntil: deletedAt,
         },
       });
 
@@ -3036,6 +3065,7 @@ export class StudentsService {
           },
           data: {
             status: EnrollmentStatus.EXITED,
+            effectiveUntil: new Date(),
           },
         });
 

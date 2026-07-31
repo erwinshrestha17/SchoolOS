@@ -266,6 +266,7 @@ class ParentRepository {
     final response = await _client.post(
       '/mobile/students/$childId/payment-intents',
       data: {
+        'confirmStudentId': childId,
         'invoiceId': invoiceId,
         'amount': amount,
         'provider': provider,
@@ -285,6 +286,7 @@ class ParentRepository {
     final response = await _client.post(
       '/mobile/students/$childId/sandbox-payments/fees',
       data: {
+        'confirmStudentId': childId,
         'invoiceId': invoiceId,
         'amount': amount,
         'provider': provider,
@@ -305,6 +307,7 @@ class ParentRepository {
     final response = await _client.post(
       '/mobile/students/$childId/sandbox-payments/canteen-top-up',
       data: {
+        'confirmStudentId': childId,
         'amount': amount,
         'provider': provider,
         'idempotencyKey': idempotencyKey,
@@ -337,6 +340,7 @@ class ParentRepository {
   }
 
   Future<void> decideMyConsent({
+    required String childId,
     required String consentType,
     required String version,
     required bool granted,
@@ -344,6 +348,7 @@ class ParentRepository {
     await _client.post(
       '/mobile/me/consents/decision',
       data: {
+        'confirmStudentId': childId,
         'consentType': consentType,
         'version': version,
         'granted': granted,
@@ -505,6 +510,7 @@ class ParentRepository {
     final response = await _client.post<Map<String, dynamic>>(
       '/mobile/students/$childId/service-requests',
       data: {
+        'confirmStudentId': childId,
         'type': type,
         'category': category,
         'priority': priority,

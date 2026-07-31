@@ -185,6 +185,7 @@ describe('MobilePrincipalController', () => {
     });
     await controller.escalateServiceRequest(actor, 'request-1', {
       reason: 'Accounts provider confirmation is still pending.',
+      assignedToUserId: 'coordinator-1',
     });
 
     expect(service.getServiceRequests).toHaveBeenCalledWith(actor, {

@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/connectivity_provider.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/storage/app_preferences_service.dart';
+import '../../../core/storage/private_data_cleanup_service.dart';
 import '../../../core/storage/private_read_cache.dart';
+import '../../../core/storage/secure_storage_service.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../data/parent_repository.dart';
 import '../domain/parent_action_centre_models.dart';
@@ -26,6 +28,11 @@ final parentControllerProvider =
       return ParentController(
         repository: ref.watch(parentRepositoryProvider),
         preferences: ref.watch(appPreferencesServiceProvider),
+        privateDataCleanup: PrivateDataCleanupService(
+          ref.watch(appPreferencesServiceProvider),
+          ref.watch(secureStorageServiceProvider),
+        ),
+        privateReadCache: ref.watch(privateReadCacheProvider),
         isOnline: ref.watch(connectivityProvider),
       );
     });
@@ -351,6 +358,8 @@ class ParentController extends StateNotifier<ParentState> {
   ParentController({
     required this._repository,
     required this._preferences,
+    required this._privateDataCleanup,
+    required this._privateReadCache,
     required bool isOnline,
   }) : _isOnline = isOnline,
        super(ParentState(isOffline: !isOnline)) {
@@ -359,11 +368,14 @@ class ParentController extends StateNotifier<ParentState> {
 
   final ParentRepository _repository;
   final AppPreferencesService _preferences;
+  final PrivateDataCleanupService _privateDataCleanup;
+  final PrivateReadCache _privateReadCache;
   final bool _isOnline;
   int _loadGeneration = 0;
 
   Future<void> load({String? childId}) async {
     final generation = ++_loadGeneration;
+    final previousChildId = state.selectedChildId;
     state = state.copyWith(
       status: ParentDataStatus.loading,
       selectedChildId: childId,
@@ -377,6 +389,7 @@ class ParentController extends StateNotifier<ParentState> {
       final children = await _repository.getGuardianChildren();
       if (generation != _loadGeneration) return;
       if (children.isEmpty) {
+        await _privateDataCleanup.clearAccessScopedCaches();
         state = ParentState(
           status: ParentDataStatus.empty,
           children: children,
@@ -386,6 +399,19 @@ class ParentController extends StateNotifier<ParentState> {
         return;
       }
 
+      final linkedIds = children.map((child) => child.id).toSet();
+      await _privateReadCache.deleteWhere((resourceKey) {
+        final isChildScoped =
+            resourceKey.startsWith('parent_dashboard_') ||
+            resourceKey.startsWith('parent_dashboard_summary_') ||
+            resourceKey.startsWith('parent_homework_') ||
+            resourceKey.startsWith('parent_timetable_') ||
+            resourceKey.startsWith('parent_exam_schedule_') ||
+            resourceKey.startsWith('attendance_');
+        if (!isChildScoped) return false;
+        return !linkedIds.any(resourceKey.endsWith);
+      });
+
       final savedChildId = childId ?? _preferences.getSelectedChildId();
       final selectedChildId = children.any((child) => child.id == savedChildId)
           ? savedChildId!
@@ -394,6 +420,11 @@ class ParentController extends StateNotifier<ParentState> {
         (child) => child.id == selectedChildId,
         orElse: () => children.first,
       );
+
+      if (previousChildId != null && previousChildId != selectedChildId) {
+        // Never keep the previous child's summary while showing another child.
+        state = state.copyWith(clearDashboard: true, clearProfile: true);
+      }
 
       await _preferences.saveSelectedChildId(selectedChildId);
       if (generation != _loadGeneration) return;
@@ -415,6 +446,10 @@ class ParentController extends StateNotifier<ParentState> {
         if (generation != _loadGeneration) return;
         profile = await _repository.getChildProfileForChild(selectedChild);
       } on AppException catch (error) {
+        if (error is PermissionException && error.isAccessChanged) {
+          await _handleAccessChanged(error);
+          return;
+        }
         if (error is! NetworkException && error is! TimeoutException) rethrow;
         reachedServer = false;
       }
@@ -436,6 +471,10 @@ class ParentController extends StateNotifier<ParentState> {
       );
     } catch (error) {
       if (generation != _loadGeneration) return;
+      if (error is PermissionException && error.isAccessChanged) {
+        await _handleAccessChanged(error);
+        return;
+      }
       final status = switch (error) {
         ModuleLockedException() => ParentDataStatus.moduleLocked,
         PermissionException() => ParentDataStatus.forbidden,
@@ -456,5 +495,14 @@ class ParentController extends StateNotifier<ParentState> {
 
   Future<void> selectChild(String childId) async {
     await load(childId: childId);
+  }
+
+  Future<void> _handleAccessChanged(PermissionException error) async {
+    await _privateDataCleanup.clearAccessScopedCaches();
+    state = ParentState(
+      status: ParentDataStatus.accessChanged,
+      isOffline: !_isOnline,
+      message: error.message,
+    );
   }
 }

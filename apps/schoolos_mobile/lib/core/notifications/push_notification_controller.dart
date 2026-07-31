@@ -88,8 +88,7 @@ class PushNotificationController extends StateNotifier<PushNotificationState> {
         if (!EnvConfig.hasFirebaseConfiguration) {
           state = const PushNotificationState(
             availability: PushNotificationAvailability.unavailable,
-            message:
-                'Push notifications are unavailable until Firebase is configured for this build.',
+            message: 'Push notifications are not available in this build.',
           );
           return;
         }
@@ -151,8 +150,7 @@ class PushNotificationController extends StateNotifier<PushNotificationState> {
     } catch (_) {
       state = const PushNotificationState(
         availability: PushNotificationAvailability.unavailable,
-        message:
-            'Push notifications are unavailable until Firebase is configured for this build.',
+        message: 'Push notifications are not available on this device.',
       );
     }
   }

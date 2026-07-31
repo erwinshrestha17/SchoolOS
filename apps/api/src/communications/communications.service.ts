@@ -2272,8 +2272,9 @@ export class CommunicationsService {
       classId: event.classId,
       sectionId: event.sectionId ?? null,
       studentIds: [event.studentId],
-      title: 'Attendance alert',
-      body: 'Your child was marked absent today.',
+      // P0-09: distinguish verified-absence (Urgent) from emergency notices.
+      title: 'Verified absence',
+      body: 'Your child has a verified absence recorded for today. Please contact the school if this needs review.',
       channels: [NotificationChannel.PUSH, NotificationChannel.SMS],
       requiredConsentTypes: [ConsentType.MESSAGING],
     });
@@ -2877,7 +2878,10 @@ export class CommunicationsService {
     try {
       const result = await this.recordDeliveryRecords({
         actor: toNotificationActor(event),
-        sourceType: 'notice',
+        sourceType:
+          event.priority === NoticePriority.EMERGENCY
+            ? 'notice_emergency'
+            : 'notice',
         sourceId: event.noticeId,
         noticeId: event.noticeId,
         audienceType: event.audienceType,

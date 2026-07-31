@@ -294,6 +294,109 @@ describe('AuthService', () => {
     });
   });
 
+  it('revokes other sessions while keeping the current refresh session', async () => {
+    prisma.refreshToken.findFirst.mockResolvedValue({ id: 'session-current' });
+    prisma.refreshToken.updateMany.mockResolvedValue({ count: 2 });
+
+    const result = await service.revokeOtherSessions(
+      {
+        userId: authUser.id,
+        tenantId: authUser.tenantId,
+        tenantSlug: 'school-a',
+        email: authUser.email,
+        authMethod: AuthMethod.PASSWORD,
+        mustChangePassword: false,
+        roles: ['parent'],
+        permissions: [],
+      },
+      { refreshToken: 'refresh-token' },
+    );
+
+    expect(result).toEqual({ success: true });
+    expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+      where: {
+        userId: authUser.id,
+        revokedAt: null,
+        id: { not: 'session-current' },
+      },
+      data: {
+        revokedAt: expect.any(Date),
+        revokedReason: 'user_revoked_other_sessions',
+      },
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'revoke_other_sessions',
+        tenantId: 'tenant-1',
+        userId: authUser.id,
+      }),
+    );
+  });
+
+  it('verifies current password without rotating sessions', async () => {
+    prisma.tenant.findUnique.mockResolvedValue({
+      id: 'tenant-1',
+      slug: 'school-a',
+      name: 'School A',
+      isActive: true,
+    });
+    prisma.user.findFirst.mockResolvedValue(authUser);
+
+    const result = await service.verifyPassword(
+      {
+        userId: authUser.id,
+        tenantId: authUser.tenantId,
+        tenantSlug: 'school-a',
+        email: authUser.email,
+        authMethod: AuthMethod.PASSWORD,
+        mustChangePassword: false,
+        roles: ['admin'],
+        permissions: [],
+      },
+      { currentPassword: 'password123' },
+    );
+
+    expect(result).toEqual({
+      success: true,
+      message: 'Password verified.',
+    });
+    expect(prisma.refreshToken.updateMany).not.toHaveBeenCalled();
+    expect(prisma.refreshToken.create).not.toHaveBeenCalled();
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'verify_password',
+        tenantId: 'tenant-1',
+        userId: authUser.id,
+      }),
+    );
+  });
+
+  it('rejects wrong current password during verify password', async () => {
+    prisma.tenant.findUnique.mockResolvedValue({
+      id: 'tenant-1',
+      slug: 'school-a',
+      name: 'School A',
+      isActive: true,
+    });
+    prisma.user.findFirst.mockResolvedValue(authUser);
+
+    await expect(
+      service.verifyPassword(
+        {
+          userId: authUser.id,
+          tenantId: authUser.tenantId,
+          tenantSlug: 'school-a',
+          email: authUser.email,
+          authMethod: AuthMethod.PASSWORD,
+          mustChangePassword: false,
+          roles: ['admin'],
+          permissions: [],
+        },
+        { currentPassword: 'wrong-password' },
+      ),
+    ).rejects.toThrow('Current password is incorrect.');
+  });
+
   it('changes password with correct current password and revokes other sessions', async () => {
     prisma.tenant.findUnique.mockResolvedValue({
       id: 'tenant-1',

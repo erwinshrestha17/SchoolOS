@@ -9,6 +9,7 @@ import { TimetableLifecycleService } from './timetable-lifecycle.service';
 import { TimetableService } from './timetable.service';
 
 import { TimetableSubstitutionService } from './timetable-substitution.service';
+import { TeacherReplacementService } from './teacher-replacement.service';
 import { TeacherScopeModule } from '../teacher-scope/teacher-scope.module';
 
 @Module({
@@ -25,12 +26,14 @@ import { TeacherScopeModule } from '../teacher-scope/teacher-scope.module';
     TimetableConflictService,
     TimetableLifecycleService,
     TimetableSubstitutionService,
+    TeacherReplacementService,
   ],
   exports: [
     TimetableService,
     TimetableConflictService,
     TimetableLifecycleService,
     TimetableSubstitutionService,
+    TeacherReplacementService,
   ],
 })
 export class TimetableModule {}

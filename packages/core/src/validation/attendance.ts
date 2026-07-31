@@ -15,7 +15,10 @@ export const attendanceExceptionSchema = z.object({
     'LEAVE',
     'SICK_LEAVE',
     'EXCUSED_LEAVE',
-    'UNEXCUSED_LEAVE'
+    'UNEXCUSED_LEAVE',
+    'EARLY_AUTHORIZED_DEPARTURE',
+    'UNAUTHORIZED_DEPARTURE',
+    'PERIOD_ABSENT'
   ]),
   remark: z.string().optional().nullable(),
   lateAt: z.string().optional().nullable()

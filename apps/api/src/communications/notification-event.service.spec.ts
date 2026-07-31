@@ -188,4 +188,67 @@ describe('NotificationEventService', () => {
     ).rejects.toBeInstanceOf(ConflictException);
     expect(prisma.notificationEvent.create).not.toHaveBeenCalled();
   });
+
+  it('accepts verified-absence events at CRITICAL and allows unauthorized departure status', async () => {
+    prisma.attendanceRecord.findFirst.mockResolvedValueOnce({ id: 'record-1' });
+
+    await expect(
+      service.accept({
+        tenantId: 'tenant-1',
+        type: 'ATTENDANCE_STUDENT_ABSENT',
+        sourceEntityId: 'record-1',
+        actorId: 'admin-1',
+        idempotencyKey: 'attendance:session-1:student-1:absent',
+        metadata: {
+          attendanceSessionId: 'session-1',
+          studentId: 'student-1',
+        },
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        type: 'ATTENDANCE_STUDENT_ABSENT',
+        priority: 'CRITICAL',
+      }),
+    );
+    expect(prisma.attendanceRecord.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: {
+            in: ['ABSENT', 'UNAUTHORIZED_DEPARTURE'],
+          },
+        }),
+      }),
+    );
+  });
+
+  it('accepts leave events that use early authorized departure', async () => {
+    prisma.attendanceRecord.findFirst.mockResolvedValueOnce({ id: 'record-2' });
+
+    await expect(
+      service.accept({
+        tenantId: 'tenant-1',
+        type: 'ATTENDANCE_STUDENT_LEAVE',
+        sourceEntityId: 'record-2',
+        actorId: 'admin-1',
+        idempotencyKey: 'attendance:session-1:student-1:leave',
+        metadata: {
+          attendanceSessionId: 'session-1',
+          studentId: 'student-1',
+        },
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        type: 'ATTENDANCE_STUDENT_LEAVE',
+      }),
+    );
+    expect(prisma.attendanceRecord.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: {
+            in: expect.arrayContaining(['EARLY_AUTHORIZED_DEPARTURE']),
+          },
+        }),
+      }),
+    );
+  });
 });

@@ -112,12 +112,22 @@ class ParentConsentsScreen extends ConsumerWidget {
     required String version,
     required bool granted,
   }) async {
+    final selectedChild = ref.read(parentControllerProvider).selectedChild;
+    if (selectedChild == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Select a child before recording a consent decision.'),
+        ),
+      );
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(granted ? 'Grant consent?' : 'Decline consent?'),
         content: Text(
-          'This will record your ${_labelFor(consentType).toLowerCase()} decision for version $version.',
+          'Confirm this ${_labelFor(consentType).toLowerCase()} decision for ${selectedChild.name} (version $version).',
         ),
         actions: [
           TextButton(
@@ -137,6 +147,7 @@ class ParentConsentsScreen extends ConsumerWidget {
       await ref
           .read(parentRepositoryProvider)
           .decideMyConsent(
+            childId: selectedChild.id,
             consentType: consentType,
             version: version,
             granted: granted,

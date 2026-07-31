@@ -32,6 +32,7 @@ import {
   ConsentType,
   EnrollmentStatus,
   GuardianCapability,
+  LeaveRequestStatus,
   NotificationChannel,
   Prisma,
   StaffStatus,
@@ -49,6 +50,11 @@ import { AdjustLeaveBalanceDto } from './dto/adjust-leave-balance.dto';
 import { CorrectStaffAttendanceDto } from './dto/correct-staff-attendance.dto';
 import { ReviewAttendanceConflictDto } from './dto/review-attendance-conflict.dto';
 import { CreateStaffLeaveRequestDto } from './dto/create-staff-leave-request.dto';
+import {
+  CreateStudentLeaveRequestDto,
+  mapStudentLeaveTypeToAttendanceStatus,
+  ReviewStudentLeaveRequestDto,
+} from './dto/create-student-leave-request.dto';
 import { AttendanceConflictReviewDecision } from './dto/review-attendance-conflict.dto';
 import { ListAttendanceSummaryDto } from './dto/list-attendance-summary.dto';
 import {
@@ -501,6 +507,8 @@ export class AttendanceService {
       where: {
         tenantId: actor.tenantId,
         ...(teacherSectionIds ? { sectionId: { in: teacherSectionIds } } : {}),
+        // P0-08: parents only see finalized/submitted attendance, never drafts.
+        ...(isParentOnly(actor) ? { submittedAt: { not: null } } : {}),
       },
       include: {
         class: true,
@@ -532,6 +540,12 @@ export class AttendanceService {
       sectionName: session.section?.name ?? null,
       submittedAt: session.submittedAt,
       lockAt: session.lockAt,
+      state: resolveAttendanceSessionState({
+        submittedAt: session.submittedAt,
+        lockAt: session.lockAt,
+        conflictStatus: session.conflictStatus,
+        hasRecords: session.records.length > 0,
+      }),
       calendarDay: calendarByDate.get(
         getDateKey(stripTime(session.attendanceDate)),
       ),
@@ -714,6 +728,14 @@ export class AttendanceService {
             });
 
         if (shouldOverwrite) {
+          const approvedLeaveByStudentId =
+            await this.loadApprovedStudentLeavesForDate(
+              actor.tenantId,
+              students.map((student) => student.id),
+              attendanceDate,
+              tx,
+            );
+
           await tx.attendanceRecord.deleteMany({
             where: { attendanceSessionId: upserted.id },
           });
@@ -721,13 +743,22 @@ export class AttendanceService {
           await tx.attendanceRecord.createMany({
             data: students.map((student) => {
               const exception = exceptionMap.get(student.id);
+              const approvedLeave = approvedLeaveByStudentId.get(student.id);
+              const leaveStatus = approvedLeave
+                ? mapStudentLeaveTypeToAttendanceStatus(approvedLeave.leaveType)
+                : null;
 
               return {
                 tenantId: actor.tenantId,
                 attendanceSessionId: upserted.id,
                 studentId: student.id,
-                status: exception?.status ?? AttendanceStatus.PRESENT,
-                remark: exception?.remark ?? null,
+                status:
+                  exception?.status ?? leaveStatus ?? AttendanceStatus.PRESENT,
+                remark:
+                  exception?.remark ??
+                  (approvedLeave
+                    ? `Approved leave request ${approvedLeave.id}`
+                    : null),
                 lateAt: exception?.lateAt ? new Date(exception.lateAt) : null,
               };
             }),
@@ -758,14 +789,18 @@ export class AttendanceService {
         },
       });
 
+      // P0-08: parent absence/late/leave alerts only after finalization cutoff
+      // (session lock), never for draft or just-submitted unfinished sessions.
       const notifyRecords = shouldOverwrite
         ? session.records.filter(
             (record) =>
               record.status === AttendanceStatus.ABSENT ||
+              record.status === AttendanceStatus.UNAUTHORIZED_DEPARTURE ||
               record.status === AttendanceStatus.LATE ||
               record.status === AttendanceStatus.SICK_LEAVE ||
               record.status === AttendanceStatus.EXCUSED_LEAVE ||
-              record.status === AttendanceStatus.UNEXCUSED_LEAVE,
+              record.status === AttendanceStatus.UNEXCUSED_LEAVE ||
+              record.status === AttendanceStatus.EARLY_AUTHORIZED_DEPARTURE,
           )
         : [];
 
@@ -774,7 +809,8 @@ export class AttendanceService {
         if (notificationsFinalized) {
           for (const record of notifyRecords) {
             const eventType =
-              record.status === AttendanceStatus.ABSENT
+              record.status === AttendanceStatus.ABSENT ||
+              record.status === AttendanceStatus.UNAUTHORIZED_DEPARTURE
                 ? 'attendance.student.absent'
                 : record.status === AttendanceStatus.LATE
                   ? 'attendance.student.late'
@@ -791,7 +827,10 @@ export class AttendanceService {
               status: record.status,
             });
 
-            if (record.status === AttendanceStatus.ABSENT) {
+            if (
+              record.status === AttendanceStatus.ABSENT ||
+              record.status === AttendanceStatus.UNAUTHORIZED_DEPARTURE
+            ) {
               const consecutiveAbsences =
                 await this.countConsecutiveAbsencesForStudent(
                   actor.tenantId,
@@ -1731,11 +1770,17 @@ export class AttendanceService {
         } else if (status === 'HOLIDAY') {
           row.totals.HOLIDAY++;
         } else if (
+          status === AttendanceStatus.UNAUTHORIZED_DEPARTURE ||
+          status === AttendanceStatus.PERIOD_ABSENT
+        ) {
+          row.totals.ABSENT++;
+        } else if (
           status === AttendanceStatus.SICK_LEAVE ||
           status === AttendanceStatus.EXCUSED_LEAVE ||
           status === AttendanceStatus.UNEXCUSED_LEAVE ||
           status === AttendanceStatus.ON_LEAVE ||
-          status === AttendanceStatus.LEAVE
+          status === AttendanceStatus.LEAVE ||
+          status === AttendanceStatus.EARLY_AUTHORIZED_DEPARTURE
         ) {
           row.totals.LEAVE++;
         } else if (status === AttendanceStatus.HALF_DAY) {
@@ -2169,6 +2214,8 @@ export class AttendanceService {
         attendanceSession: {
           tenantId: actor.tenantId,
           attendanceDate,
+          // P0-08: parents may only dispute submitted/official attendance.
+          submittedAt: { not: null },
         },
       },
       select: {
@@ -2377,6 +2424,12 @@ export class AttendanceService {
     ) {
       throw new ConflictException(
         'Requested attendance matches the recorded status.',
+      );
+    }
+
+    if (resolvedSession && !resolvedSession.submittedAt) {
+      throw new ConflictException(
+        'Attendance must be submitted before a correction can be requested.',
       );
     }
 
@@ -2686,6 +2739,7 @@ export class AttendanceService {
             classId: true,
             sectionId: true,
             submittedAt: true,
+            submittedById: true,
           },
         },
         record: {
@@ -2701,6 +2755,22 @@ export class AttendanceService {
     if (!request) throw new NotFoundException('Correction request not found');
     if (request.status !== 'PENDING') {
       throw new ConflictException('Request is no longer pending');
+    }
+
+    // P0-08: reviewing authority must be independent of the original marker
+    // and must not self-review their own correction request.
+    if (request.requestedById === actor.userId) {
+      throw new ForbiddenException(
+        'You cannot review your own attendance correction request.',
+      );
+    }
+    if (
+      request.session?.submittedById &&
+      request.session.submittedById === actor.userId
+    ) {
+      throw new ForbiddenException(
+        'Independent review required: the original attendance submitter cannot approve or reject this correction.',
+      );
     }
 
     if (dto.status === 'REJECTED') {
@@ -2863,6 +2933,7 @@ export class AttendanceService {
           attendanceSession: {
             tenantId: actor.tenantId,
             attendanceDate: today,
+            submittedAt: { not: null },
           },
         },
         select: {
@@ -2873,6 +2944,7 @@ export class AttendanceService {
             select: {
               attendanceDate: true,
               submittedAt: true,
+              lockAt: true,
             },
           },
         },
@@ -2887,6 +2959,7 @@ export class AttendanceService {
               gte: firstDayOfMonth,
               lte: lastDayOfMonth,
             },
+            submittedAt: { not: null },
           },
         },
         select: {
@@ -2895,6 +2968,8 @@ export class AttendanceService {
           attendanceSession: {
             select: {
               attendanceDate: true,
+              submittedAt: true,
+              lockAt: true,
             },
           },
         },
@@ -2905,6 +2980,7 @@ export class AttendanceService {
           studentId,
           attendanceSession: {
             tenantId: actor.tenantId,
+            submittedAt: { not: null },
           },
         },
         select: {
@@ -2913,6 +2989,8 @@ export class AttendanceService {
           attendanceSession: {
             select: {
               attendanceDate: true,
+              submittedAt: true,
+              lockAt: true,
             },
           },
         },
@@ -3909,6 +3987,396 @@ export class AttendanceService {
     return updated;
   }
 
+  async createStudentLeaveRequest(
+    dto: CreateStudentLeaveRequestDto,
+    actor: AuthContext,
+  ) {
+    if (isParentOnly(actor)) {
+      throw new ForbiddenException(
+        'Parents must use the parent student leave request route.',
+      );
+    }
+    await this.ensureStudentAttendanceAccess(dto.studentId, actor);
+
+    return this.createStudentLeaveRequestForActor(dto, actor, 'staff');
+  }
+
+  async createParentStudentLeaveRequest(
+    studentId: string,
+    input: {
+      leaveType: string;
+      startsOn: string;
+      endsOn: string;
+      reason: string;
+    },
+    actor: AuthContext,
+  ) {
+    if (!isParentOnly(actor)) {
+      throw new ForbiddenException(
+        'Parent student leave is not available for this account.',
+      );
+    }
+    await this.ensureStudentAttendanceAccess(
+      studentId,
+      actor,
+      undefined,
+      GuardianCapability.LEAVE_MANAGE,
+    );
+
+    return this.createStudentLeaveRequestForActor(
+      {
+        studentId,
+        leaveType: input.leaveType,
+        startsOn: input.startsOn,
+        endsOn: input.endsOn,
+        reason: input.reason,
+      },
+      actor,
+      'parent',
+    );
+  }
+
+  private async createStudentLeaveRequestForActor(
+    dto: CreateStudentLeaveRequestDto,
+    actor: AuthContext,
+    requesterType: 'staff' | 'parent',
+  ) {
+    const startsOn = stripTime(new Date(dto.startsOn));
+    const endsOn = stripTime(new Date(dto.endsOn));
+    if (
+      Number.isNaN(startsOn.getTime()) ||
+      Number.isNaN(endsOn.getTime()) ||
+      endsOn < startsOn
+    ) {
+      throw new BadRequestException(
+        'Leave end date must be on or after the start date.',
+      );
+    }
+
+    const student = await this.prisma.student.findFirst({
+      where: {
+        id: dto.studentId,
+        tenantId: actor.tenantId,
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+      },
+      select: { id: true },
+    });
+    if (!student) {
+      throw new NotFoundException('Student not found in this school.');
+    }
+
+    const overlapping = await this.prisma.studentLeaveRequest.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        studentId: dto.studentId,
+        status: {
+          in: [LeaveRequestStatus.PENDING, LeaveRequestStatus.APPROVED],
+        },
+        startsOn: { lte: endsOn },
+        endsOn: { gte: startsOn },
+      },
+      select: { id: true },
+    });
+    if (overlapping) {
+      throw new ConflictException(
+        'A pending or approved student leave request already overlaps this date range.',
+      );
+    }
+
+    const leave = await this.prisma.studentLeaveRequest.create({
+      data: {
+        tenantId: actor.tenantId,
+        studentId: dto.studentId,
+        leaveType: dto.leaveType.trim(),
+        startsOn,
+        endsOn,
+        reason: dto.reason.trim(),
+        requestedById: actor.userId,
+        status: LeaveRequestStatus.PENDING,
+        metadata: { requesterType },
+      },
+    });
+
+    await this.auditService.record({
+      action: 'create',
+      resource: 'student_leave_request',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: leave.id,
+      after: {
+        studentId: leave.studentId,
+        leaveType: leave.leaveType,
+        startsOn: leave.startsOn,
+        endsOn: leave.endsOn,
+        requesterType,
+      },
+    });
+
+    return leave;
+  }
+
+  async listStudentLeaveRequests(
+    actor: AuthContext,
+    query: { studentId?: string; status?: LeaveRequestStatus } = {},
+  ) {
+    if (isParentOnly(actor)) {
+      if (!query.studentId) {
+        throw new BadRequestException(
+          'studentId is required for parent leave listing.',
+        );
+      }
+      await this.ensureStudentAttendanceAccess(
+        query.studentId,
+        actor,
+        undefined,
+        GuardianCapability.LEAVE_MANAGE,
+      );
+    } else if (
+      !actor.permissions.includes('attendance:read') &&
+      !actor.permissions.includes('attendance:mark') &&
+      !actor.permissions.includes('attendance:manage_all')
+    ) {
+      throw new ForbiddenException(
+        'You do not have permission to list student leave requests.',
+      );
+    }
+
+    return this.prisma.studentLeaveRequest.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        ...(query.studentId ? { studentId: query.studentId } : {}),
+        ...(query.status ? { status: query.status } : {}),
+      },
+      orderBy: [{ startsOn: 'desc' }, { createdAt: 'desc' }],
+      take: 100,
+    });
+  }
+
+  async reviewStudentLeaveRequest(
+    leaveRequestId: string,
+    dto: ReviewStudentLeaveRequestDto,
+    actor: AuthContext,
+  ) {
+    this.ensureAttendanceReviewAuthority(actor);
+
+    const leave = await this.prisma.studentLeaveRequest.findFirst({
+      where: { id: leaveRequestId, tenantId: actor.tenantId },
+      include: {
+        student: {
+          select: {
+            id: true,
+            classId: true,
+            sectionId: true,
+            lifecycleStatus: true,
+          },
+        },
+      },
+    });
+    if (!leave) {
+      throw new NotFoundException('Student leave request not found.');
+    }
+    if (leave.status !== LeaveRequestStatus.PENDING) {
+      throw new ConflictException(
+        'Only pending student leave requests can be reviewed.',
+      );
+    }
+    if (dto.status === 'REJECTED' && !dto.reviewNote?.trim()) {
+      throw new ConflictException(
+        'A review note is required when rejecting a student leave request.',
+      );
+    }
+    if (leave.requestedById === actor.userId) {
+      throw new ForbiddenException(
+        'Independent review required: you cannot approve or reject your own student leave request.',
+      );
+    }
+    if (
+      dto.status === 'APPROVED' &&
+      leave.student.lifecycleStatus !== StudentLifecycleStatus.ACTIVE
+    ) {
+      throw new ConflictException(
+        'Cannot approve leave for a student who is no longer active.',
+      );
+    }
+
+    const conflictingApproved = await this.prisma.studentLeaveRequest.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        studentId: leave.studentId,
+        status: LeaveRequestStatus.APPROVED,
+        id: { not: leave.id },
+        startsOn: { lte: leave.endsOn },
+        endsOn: { gte: leave.startsOn },
+      },
+      take: 1,
+    });
+    if (dto.status === 'APPROVED' && conflictingApproved.length > 0) {
+      throw new ConflictException(
+        'Another approved student leave request already overlaps this date range.',
+      );
+    }
+
+    const leaveStatus = mapStudentLeaveTypeToAttendanceStatus(leave.leaveType);
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const reviewed = await tx.studentLeaveRequest.update({
+        where: { id: leave.id },
+        data: {
+          status:
+            dto.status === 'APPROVED'
+              ? LeaveRequestStatus.APPROVED
+              : LeaveRequestStatus.REJECTED,
+          reviewedById: actor.userId,
+          reviewedAt: new Date(),
+          reviewNote: dto.reviewNote?.trim() || null,
+        },
+      });
+
+      const applicationAnomalies: Array<{
+        date: string;
+        reason: string;
+        existingStatus?: AttendanceStatus;
+      }> = [];
+
+      if (reviewed.status === LeaveRequestStatus.APPROVED) {
+        for (const leaveDate of eachDateInclusive(
+          leave.startsOn,
+          leave.endsOn,
+        )) {
+          const attendanceDay = stripTime(leaveDate);
+          const session = await tx.attendanceSession.findFirst({
+            where: {
+              tenantId: actor.tenantId,
+              attendanceDate: attendanceDay,
+              classId: leave.student.classId,
+              sectionId: leave.student.sectionId,
+            },
+            include: {
+              records: {
+                where: { studentId: leave.studentId },
+                take: 1,
+              },
+            },
+          });
+
+          if (!session) {
+            continue;
+          }
+
+          if (session.lockAt <= new Date()) {
+            applicationAnomalies.push({
+              date: attendanceDay.toISOString().split('T')[0],
+              reason: 'locked_session',
+              existingStatus: session.records[0]?.status,
+            });
+            continue;
+          }
+
+          if (session.submittedAt) {
+            applicationAnomalies.push({
+              date: attendanceDay.toISOString().split('T')[0],
+              reason: 'submitted_session_requires_correction',
+              existingStatus: session.records[0]?.status,
+            });
+            continue;
+          }
+
+          const existing = session.records[0];
+          if (!existing) {
+            await tx.attendanceRecord.create({
+              data: {
+                tenantId: actor.tenantId,
+                attendanceSessionId: session.id,
+                studentId: leave.studentId,
+                status: leaveStatus,
+                remark: `Approved leave request ${leave.id}`,
+              },
+            });
+          } else if (
+            existing.status === AttendanceStatus.PRESENT ||
+            isAttendanceLeaveStatus(existing.status)
+          ) {
+            await tx.attendanceRecord.update({
+              where: { id: existing.id },
+              data: {
+                status: leaveStatus,
+                remark: `Approved leave request ${leave.id}`,
+              },
+            });
+          } else {
+            applicationAnomalies.push({
+              date: attendanceDay.toISOString().split('T')[0],
+              reason: 'non_default_status_preserved',
+              existingStatus: existing.status,
+            });
+          }
+        }
+      }
+
+      return { reviewed, applicationAnomalies };
+    });
+
+    await this.auditService.record({
+      action: 'review',
+      resource: 'student_leave_request',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: updated.reviewed.id,
+      after: {
+        status: updated.reviewed.status,
+        reviewNote: updated.reviewed.reviewNote,
+        applicationAnomalies: updated.applicationAnomalies,
+      },
+    });
+
+    if (updated.reviewed.status === LeaveRequestStatus.APPROVED) {
+      this.eventEmitter.emit('student.leave.approved', {
+        tenantId: actor.tenantId,
+        leaveRequestId: updated.reviewed.id,
+        studentId: updated.reviewed.studentId,
+        startsOn: updated.reviewed.startsOn,
+        endsOn: updated.reviewed.endsOn,
+        leaveType: updated.reviewed.leaveType,
+        reviewedById: actor.userId,
+      });
+    }
+
+    return {
+      ...updated.reviewed,
+      applicationAnomalies: updated.applicationAnomalies,
+    };
+  }
+
+  private async loadApprovedStudentLeavesForDate(
+    tenantId: string,
+    studentIds: string[],
+    attendanceDate: Date,
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    if (studentIds.length === 0) {
+      return new Map<
+        string,
+        { id: string; studentId: string; leaveType: string }
+      >();
+    }
+
+    const leaves = await db.studentLeaveRequest.findMany({
+      where: {
+        tenantId,
+        studentId: { in: studentIds },
+        status: LeaveRequestStatus.APPROVED,
+        startsOn: { lte: attendanceDate },
+        endsOn: { gte: attendanceDate },
+      },
+      select: {
+        id: true,
+        studentId: true,
+        leaveType: true,
+      },
+    });
+
+    return new Map(leaves.map((leave) => [leave.studentId, leave]));
+  }
+
   /**
    * Helper for Timetable substitution to check if a teacher is absent or on leave
    */
@@ -3985,7 +4453,7 @@ export class AttendanceService {
       parsedAttendanceDate,
     );
 
-    const [students, existingSession] = await Promise.all([
+    const [students, existingSession, approvedLeaves] = await Promise.all([
       this.prisma.student.findMany({
         where: {
           tenantId: actor.tenantId,
@@ -4026,10 +4494,26 @@ export class AttendanceService {
           records: true,
         },
       }),
+      this.prisma.studentLeaveRequest.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          status: LeaveRequestStatus.APPROVED,
+          startsOn: { lte: parsedAttendanceDate },
+          endsOn: { gte: parsedAttendanceDate },
+        },
+        select: {
+          id: true,
+          studentId: true,
+          leaveType: true,
+        },
+      }),
     ]);
     const existingRecordByStudent = new Map(
       existingSession?.records.map((record) => [record.studentId, record]) ??
         [],
+    );
+    const approvedLeaveByStudent = new Map(
+      approvedLeaves.map((leave) => [leave.studentId, leave]),
     );
 
     return {
@@ -4058,6 +4542,10 @@ export class AttendanceService {
         : null,
       students: students.map((student) => {
         const record = existingRecordByStudent.get(student.id);
+        const approvedLeave = approvedLeaveByStudent.get(student.id);
+        const leaveStatus = approvedLeave
+          ? mapStudentLeaveTypeToAttendanceStatus(approvedLeave.leaveType)
+          : null;
 
         return {
           id: student.id,
@@ -4069,8 +4557,14 @@ export class AttendanceService {
             student.medicalConditions ||
             student.specialNeeds,
           ),
-          status: record?.status ?? AttendanceStatus.PRESENT,
-          remark: record?.remark ?? null,
+          status: record?.status ?? leaveStatus ?? AttendanceStatus.PRESENT,
+          remark:
+            record?.remark ??
+            (approvedLeave
+              ? `Approved leave request ${approvedLeave.id}`
+              : null),
+          approvedLeaveRequestId: approvedLeave?.id ?? null,
+          leaveInformed: Boolean(approvedLeave) && !record,
         };
       }),
     };
@@ -5372,6 +5866,7 @@ export class AttendanceService {
         actor,
         studentId,
         guardianCapability,
+        this.auditService,
       );
       return;
     }
@@ -6205,7 +6700,12 @@ function summarizeStudentAttendanceRecords(
   const totals = records.reduce(
     (result, record) => {
       if (record.status === AttendanceStatus.PRESENT) result.present += 1;
-      else if (record.status === AttendanceStatus.ABSENT) result.absent += 1;
+      else if (
+        record.status === AttendanceStatus.ABSENT ||
+        record.status === AttendanceStatus.UNAUTHORIZED_DEPARTURE ||
+        record.status === AttendanceStatus.PERIOD_ABSENT
+      )
+        result.absent += 1;
       else if (record.status === AttendanceStatus.LATE) result.late += 1;
       else if (record.status === AttendanceStatus.HALF_DAY) {
         result.present += 0.5;
@@ -6233,7 +6733,8 @@ function isAttendanceLeaveStatus(status: AttendanceStatus) {
     status === AttendanceStatus.SICK_LEAVE ||
     status === AttendanceStatus.EXCUSED_LEAVE ||
     status === AttendanceStatus.UNEXCUSED_LEAVE ||
-    status === AttendanceStatus.ON_LEAVE
+    status === AttendanceStatus.ON_LEAVE ||
+    status === AttendanceStatus.EARLY_AUTHORIZED_DEPARTURE
   );
 }
 
@@ -6362,12 +6863,18 @@ function summarizeAttendance(records: Array<{ status: AttendanceStatus }>) {
       (record) => record.status === AttendanceStatus.PRESENT,
     ).length,
     absent: records.filter(
-      (record) => record.status === AttendanceStatus.ABSENT,
+      (record) =>
+        record.status === AttendanceStatus.ABSENT ||
+        record.status === AttendanceStatus.UNAUTHORIZED_DEPARTURE ||
+        record.status === AttendanceStatus.PERIOD_ABSENT,
     ).length,
     late: records.filter((record) => record.status === AttendanceStatus.LATE)
       .length,
-    leave: records.filter((record) => record.status === AttendanceStatus.LEAVE)
-      .length,
+    leave: records.filter(
+      (record) =>
+        record.status === AttendanceStatus.LEAVE ||
+        record.status === AttendanceStatus.EARLY_AUTHORIZED_DEPARTURE,
+    ).length,
     sickLeave: records.filter(
       (record) => record.status === AttendanceStatus.SICK_LEAVE,
     ).length,
@@ -6376,6 +6883,16 @@ function summarizeAttendance(records: Array<{ status: AttendanceStatus }>) {
     ).length,
     unexcusedLeave: records.filter(
       (record) => record.status === AttendanceStatus.UNEXCUSED_LEAVE,
+    ).length,
+    earlyAuthorizedDeparture: records.filter(
+      (record) =>
+        record.status === AttendanceStatus.EARLY_AUTHORIZED_DEPARTURE,
+    ).length,
+    unauthorizedDeparture: records.filter(
+      (record) => record.status === AttendanceStatus.UNAUTHORIZED_DEPARTURE,
+    ).length,
+    periodAbsent: records.filter(
+      (record) => record.status === AttendanceStatus.PERIOD_ABSENT,
     ).length,
   };
 }
@@ -6539,18 +7056,33 @@ function buildParentAttendanceStatusLabel(
   const dayName = new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(
     date,
   );
+  const isToday = getDateKey(date) === getDateKey(new Date());
 
-  if (getDateKey(date) === getDateKey(new Date())) {
-    if (status === AttendanceStatus.PRESENT) return 'Present today';
-    if (status === AttendanceStatus.ABSENT) return 'Absent today';
-    if (status === AttendanceStatus.LATE) return 'Late today';
-    return 'On leave today';
+  const labelFor = (todayLabel: string, dayLabel: string) =>
+    isToday ? todayLabel : dayLabel;
+
+  if (status === AttendanceStatus.PRESENT) {
+    return labelFor('Present today', `Present on ${dayName}`);
   }
-
-  if (status === AttendanceStatus.PRESENT) return `Present on ${dayName}`;
-  if (status === AttendanceStatus.ABSENT) return `Absent on ${dayName}`;
-  if (status === AttendanceStatus.LATE) return `Late on ${dayName}`;
-  return `On leave on ${dayName}`;
+  if (
+    status === AttendanceStatus.ABSENT ||
+    status === AttendanceStatus.UNAUTHORIZED_DEPARTURE
+  ) {
+    return labelFor('Absent today', `Absent on ${dayName}`);
+  }
+  if (status === AttendanceStatus.PERIOD_ABSENT) {
+    return labelFor('Period absence today', `Period absence on ${dayName}`);
+  }
+  if (status === AttendanceStatus.LATE) {
+    return labelFor('Late today', `Late on ${dayName}`);
+  }
+  if (status === AttendanceStatus.EARLY_AUTHORIZED_DEPARTURE) {
+    return labelFor(
+      'Early authorized departure today',
+      `Early authorized departure on ${dayName}`,
+    );
+  }
+  return labelFor('On leave today', `On leave on ${dayName}`);
 }
 
 function buildAttendanceIncomingPayload(
@@ -6827,6 +7359,13 @@ function classifyAttendanceSyncRejection(error: unknown) {
   }
 
   if (error instanceof ConflictException) {
+    const message = String(error.message ?? '');
+    if (
+      message.includes('already submitted') ||
+      message.includes('request a correction')
+    ) {
+      return AttendanceSyncRejectionReason.STALE_DRAFT;
+    }
     return AttendanceSyncRejectionReason.ROSTER_MISMATCH;
   }
 
@@ -6902,6 +7441,11 @@ function summarizeAttendanceStatuses(
     (summary, record) => {
       if (record.status === AttendanceStatus.ABSENT) {
         summary.absent += 1;
+      } else if (
+        record.status === AttendanceStatus.UNAUTHORIZED_DEPARTURE ||
+        record.status === AttendanceStatus.PERIOD_ABSENT
+      ) {
+        summary.absent += 1;
       } else if (record.status === AttendanceStatus.LATE) {
         summary.late += 1;
       } else if (
@@ -6909,7 +7453,8 @@ function summarizeAttendanceStatuses(
         record.status === AttendanceStatus.ON_LEAVE ||
         record.status === AttendanceStatus.SICK_LEAVE ||
         record.status === AttendanceStatus.EXCUSED_LEAVE ||
-        record.status === AttendanceStatus.UNEXCUSED_LEAVE
+        record.status === AttendanceStatus.UNEXCUSED_LEAVE ||
+        record.status === AttendanceStatus.EARLY_AUTHORIZED_DEPARTURE
       ) {
         summary.leave += 1;
       } else {

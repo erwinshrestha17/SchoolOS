@@ -342,6 +342,13 @@ function categoryForDelivery(
   eventType: string | undefined,
   sourceType: string,
 ): NotificationPreferenceCategory {
+  // P0-09: emergency notices must not be treated as opt-outable NOTICE.
+  if (
+    sourceType.includes('emergency') ||
+    sourceType === 'notice_emergency'
+  ) {
+    return NotificationPreferenceCategory.EMERGENCY;
+  }
   if (
     eventType?.startsWith('ATTENDANCE_') ||
     sourceType.startsWith('attendance')
@@ -356,9 +363,6 @@ function categoryForDelivery(
   }
   if (sourceType.includes('security') || sourceType.includes('auth')) {
     return NotificationPreferenceCategory.SECURITY;
-  }
-  if (sourceType.includes('emergency')) {
-    return NotificationPreferenceCategory.EMERGENCY;
   }
   return NotificationPreferenceCategory.GENERAL;
 }

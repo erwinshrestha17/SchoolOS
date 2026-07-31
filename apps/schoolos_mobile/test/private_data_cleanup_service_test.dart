@@ -130,6 +130,45 @@ void main() {
       expect(secureStorage.values, isEmpty);
     },
   );
+
+  test(
+    'clearAccessScopedCaches removes private caches but keeps session prefs theme',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        'app_selected_child_id': 'child-1',
+        'app_theme_mode': 'dark',
+      });
+      final preferences = AppPreferencesService(
+        await SharedPreferences.getInstance(),
+      );
+      final secureStorage = _MemorySecureStore()
+        ..values['schoolos.private_read_cache.1.record'] = 'encrypted-record'
+        ..values['schoolos.teacher_attendance_draft.secure.1.record'] =
+            'encrypted-draft'
+        ..values['school_os_access_token'] = 'token';
+
+      await PrivateDataCleanupService(
+        preferences,
+        secureStorage,
+      ).clearAccessScopedCaches();
+
+      expect(preferences.getSelectedChildId(), isNull);
+      expect(preferences.getThemeMode(), 'dark');
+      expect(
+        secureStorage.values.containsKey(
+          'schoolos.private_read_cache.1.record',
+        ),
+        isFalse,
+      );
+      expect(
+        secureStorage.values.containsKey(
+          'schoolos.teacher_attendance_draft.secure.1.record',
+        ),
+        isFalse,
+      );
+      expect(secureStorage.values['school_os_access_token'], 'token');
+    },
+  );
 }
 
 class _MemorySecureStore implements SecureKeyValueStore {

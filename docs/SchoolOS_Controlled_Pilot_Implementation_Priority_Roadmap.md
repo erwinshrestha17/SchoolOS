@@ -1512,12 +1512,12 @@ The pilot must prove:
 ## P0 Core
 
 - [x] P0-01 Shared Teacher Authorization and Scope Resolver
-- [ ] P0-02 Temporary Substitute, Replacement, and Handover
-- [ ] P0-03 Offline Revocation and Cache Purge
-- [ ] P0-04 Effective-Dated Student Rosters
+- [x] P0-02 Temporary Substitute, Replacement, and Handover
+- [x] P0-03 Offline Revocation and Cache Purge
+- [x] P0-04 Effective-Dated Student Rosters
 - [x] P0-05 Guardian Capability Permission Model
 - [x] P0-06 Guardian Administration, Recovery, and Revocation
-- [ ] P0-07 Wrong-Child Prevention
+- [x] P0-07 Wrong-Child Prevention
 - [ ] P0-08 Attendance State, Finalization, Conflict, and Correction
 - [ ] P0-09 Notification Severity, Acknowledgement, and Escalation
 - [ ] P0-10 Shared-Device Privacy and Session Security
@@ -1537,7 +1537,7 @@ The pilot must prove:
 
 - [ ] P1-01 Parent Dashboard Reordering
 - [ ] P1-02 Nepali and English Critical-Screen Usability
-- [ ] P1-03 Principal Attention View
+- [x] P1-03 Principal Attention View (local PARTIAL — see evidence register)
 - [ ] P1-04 Timetable and Substitute Coordination
 - [ ] P1-05 Shared Teaching and Subject Components
 - [ ] P1-06 Attendance Presentation
@@ -1814,19 +1814,19 @@ Status values in this register are conservative. `Implemented-unverified` and
 | ID | Previous status | Gap or root cause found | Current evidence and limitations | Release decision |
 |---|---|---|---|---|
 | P0-01 | Development complete; locally verified | Enabled pilot paths previously re-derived teacher authority from legacy assignment sources | Canonical resolver adoption, stable `TEACHER_SCOPE_DENIED`, direct-object/protected-file negative coverage, full API regression, typechecks, and mobile regression pass locally; seeded browser/device proof remains part of P0-15 | Proceed to P0-05; do not treat local evidence as pilot validation |
-| P0-02 | Partial | Effective assignments, delegations, and timetable substitution foundations exist without proven long-term replacement, pending-work handover, cache removal, and complete expiry tests | Needs end-to-end substitute and replacement evidence after P0-01 | Block |
-| P0-03 | Partial | Server attendance sync can reject unassigned teachers and mobile caches exist, but no shared scope-version invalidation and secure purge proof was verified | Needs offline-revocation, queued-write rejection, protected-file revocation, push-topic update, and cache-purge tests | Block |
-| P0-04 | Missing/partial | `Enrollment` has status and admission date but no verified effective end/history model for mid-term section changes | Needs schema/migration/backfill, uniqueness rules, assignment refresh, and historical attendance/marks tests | Block |
+| P0-02 | Development complete; locally verified | Create-and-assign previously marked substitutions ASSIGNED without creating a TeacherDelegation; long-term replacement/handover domain was missing | Linked-delegation create/assign/cancel/complete, TeacherReplacement cutover with authorship preservation, pending-work dispositions, handover notes, coordinator web workspace, and focused unit tests pass locally (`docs/production/evidence/p0-02-substitute-replacement-2026-07-31-local.md`); offline cache purge and device revocation remain P0-03; browser/device evidence remains P0-15 | Proceed to P0-03; do not treat local evidence as pilot validation |
+| P0-03 | Development complete; locally verified | Scope version previously ignored revoked rows; UNASSIGNED sync rejections did not always purge private caches | Monotonic scope version includes revoked/expired rows; UNASSIGNED sync maps to `TEACHER_SCOPE_DENIED` and clears access-scoped caches (`docs/production/evidence/p0-03-offline-revocation-2026-07-31-local.md`); push-topic and offline-during-revocation device proof remain P0-15 | Proceed to P0-04; do not treat local evidence as pilot validation |
+| P0-04 | Development complete; locally verified | `Enrollment` had status and admission date but no effective end/history model for mid-term section changes | Effective-dated enrollment segments, placement cutover, transfer/exit stamping, migration/backfill, and focused student update tests pass locally (`docs/production/evidence/p0-04-effective-dated-rosters-2026-07-31-local.md`); browser/device matrix remains P0-15 | Proceed to P0-07; do not treat local evidence as pilot validation |
 | P0-05 | Development complete; locally verified | Linked-child checks previously treated every guardian as equally authorized and the parent system role retained a broad student-directory permission | Persisted capability/state/effective-date/approval/restriction/priority contract, audited relationship writes, stable `GUARDIAN_CAPABILITY_DENIED`, capability-scoped backend/mobile summaries and files, fail-closed Flutter navigation, migration backfill, full API/mobile regression, schema/OpenAPI/typechecks, and expiry/revocation-at-next-request tests pass locally; offline cache purge, admin/session revocation, browser/device, and staging evidence remain under P0-03, P0-06, and P0-15 | Proceed to P0-06; do not treat local evidence as pilot validation |
 | P0-06 | Development complete; locally verified | Guardian identity and link foundations previously lacked one evidence-backed recovery, account-provisioning, session-revocation, compromise-hold, and relationship-lifecycle workflow | Purpose-limited administration APIs and web UX now require verified recovery proof, reason, evidence reference, confirmation, and permission gates; parent-only provisioning is transactional with forced first password change; safe session metadata, selected/all-session revocation, phone recovery, suspend/restore/expire/revoke/deceased transitions, preserved history, cross-tenant denial, and full API regression pass locally; policy-controlled other-guardian notification, authenticated browser/device, and staging evidence remain | Proceed to P0-14; do not treat local evidence as pilot validation |
-| P0-07 | Partial | Linked-child checks and mobile child switching exist, but every high-impact action cannot revalidate a capability that does not yet exist | Needs backend confirmation-context and stale-child/idempotency tests after P0-05 | Block |
-| P0-08 | Partial | Attendance draft/sync/conflict/correction foundations exist, but required finalization/cutoff, leave reconciliation, daily/period/departure state, correction independence, and conflict evidence are incomplete | Existing schema is valid; full multi-user/offline scenario matrix remains | Block |
-| P0-09 | Partial | Delivery, read receipt, retries, push tokens, and notice acknowledgement foundations exist, but severity and delivery state chains are incomplete | Provider-accepted, acknowledged, expired, escalated, fallback, masked-content, and real-provider evidence remain | Block critical alerts |
+| P0-07 | Development complete; locally verified | Server confirmation helpers existed, but mobile high-impact payloads omitted `confirmStudentId` | Payment, sandbox payment/top-up, service-request, and consent decision payloads send confirmation; consent UI names the selected child; contract tests cover mismatch (`docs/production/evidence/p0-07-wrong-child-prevention-2026-07-31-local.md`); browser/device multi-child proof remains P0-15 | Proceed to Wave 3 P0-08; do not treat local evidence as pilot validation |
+| P0-08 | Development complete for local parent-finalization, correction-independence, status vocabulary, and student-leave auto-link slices; residual gaps remain | Parents previously could see/dispute unsubmitted drafts; original marker could review corrections; departure/period statuses missing; approved leave did not inform attendance | Parent-facing queries/corrections require submitted sessions; independent reviewer enforcement; status vocabulary + migrations; student leave requests auto-inform roster/submit and stamp drafts on approve (`docs/production/evidence/p0-08-attendance-state-conflict-2026-07-31-local.md`, `docs/production/evidence/p0-08-student-leave-auto-link-2026-07-31-local.md`); full conflict evidence matrix and multi-user/offline browser-device proof remain | Proceed to Wave 3 P0-09; do not treat local evidence as pilot validation |
+| P0-09 | Development complete for local severity distinguishability + delivery honesty slice; residual gaps remain | Absence alerts were IMPORTANT (not Urgent); emergency notices stayed in opt-outable NOTICE category; center payloads lacked severity/honest delivery labels; P0-08 departure statuses could fail event accept | Verified absence → CRITICAL + distinct copy; emergency → notice_emergency/EMERGENCY mandatory category; center exposes priority/severity/deliveryState; departure statuses accepted (`docs/production/evidence/p0-09-notification-severity-2026-07-31-local.md`); provider-accepted/escalated/expired/fallback automation and provider evidence remain | Proceed to Wave 3 P0-11; do not treat local evidence as pilot validation |
 | P0-10 | Partial | Secure storage, logout handling, private read cache, and protected downloads exist | Active device list, remote revocation, re-auth, cache encryption/invalidation, screenshot policy, and shared/lost-device evidence remain | Block sensitive mobile workflows |
-| P0-11 | Partial | Structured service requests support idempotency, ownership, deadlines, notes, attachments, escalation, resolution, close, and reopen | Guardian capability checks, category routing, independent dispute review, deduplication/concurrency, and browser/device evidence remain | Block parent cases until verified |
+| P0-11 | Development complete for local independent-resolve / escalate-reassign / category-capability / dedup slice; residual gaps remain | Service-request resolve allowed assigned first responder; escalate did not reassign; category not capability-gated; general complaints lacked active-case dedup; create idempotency races could 500 | Independent resolve + escalate reassignment + category capability + child/category dedup + P2002 idempotent replay (`docs/production/evidence/p0-11-structured-requests-2026-07-31-local.md`); dedicated homework/urgent types, parent note API, web Action Centre, and browser/device evidence remain | Wave 3 P1-03 local slice landed; residual Action Centre / browser-device gates remain |
 | P0-12 | Implemented-unverified conditional foundation | Payment and provider-readiness code exists, but provider reconciliation and release evidence are not established | Sandbox/local tests are not payment-provider proof | Keep real digital payments disabled |
 | P0-13 | Disabled conditional capability | Emergency contact data exists, but app-based medical escalation is not pilot-approved; digital pickup is outside active product scope | Manual school procedures still require approval and drill evidence | Keep app workflows disabled |
-| P0-14 | Partial; local hardening verified | Production rate limiting was not fail-closed, sensitive guardian commands lacked route-specific throttles, revoked guardian links remained visible as file-capable in the M1 ownership audit, notification dev-log mode exposed message payloads, configured outbound provider URLs allowed private-network targets, and one platform export path opened a signed storage URL directly | Production configuration now requires rate limiting, sensitive guardian routes carry explicit throttles, the ownership audit uses only active verified approved in-window relationships, notification dev logs retain delivery metadata only, outbound provider URLs reject non-public HTTPS literals and redirects, platform exports use the authenticated protected-file download, and API unit/E2E plus focused web regression pass locally; the repository security scan, clean migration replay, staging secrets/provider checks, and backup/restore drill remain incomplete | Block pilot release; do not advance beyond Wave 1 |
+| P0-14 | Partial; local hardening + clean migration replay verified | Production rate limiting was not fail-closed, sensitive guardian commands lacked route-specific throttles, revoked guardian links remained visible as file-capable in the M1 ownership audit, notification dev-log mode exposed message payloads, configured outbound provider URLs allowed private-network targets, and one platform export path opened a signed storage URL directly | Production configuration requires rate limiting; StudentsController and M1 guardian-removal routes carry 10/min throttles; ownership audit uses active verified approved in-window relationships; notification dev logs are metadata-only; outbound provider URLs reject non-public HTTPS literals/redirects; platform exports use authenticated protected-file download; empty-DB replay of all 89 migrations and `migrate status` pass locally (`docs/production/evidence/p0-14-security-2026-07-31-local.md`); repository security scan seal, staging secrets/provider checks, and staging/pilot backup-restore drill remain incomplete | Block pilot release; do not advance beyond Wave 1 |
 | P0-15 | Not established | Local tests and smoke scripts do not establish seeded staging/browser/device/provider/restore/incident evidence | No current evidence proves the complete matrix or absence of severity-1/2 defects | Block pilot release |
 | P1-05 conditional P0 | Partial and disabled | Component scopes exist, but shared/practical authoring and concurrency evidence are incomplete | Not applicable while +2/practical pilot is disabled | Keep disabled |
 | P1-13 conditional P0 | Partial and excluded | Low-end UI patterns exist, but representative large-roster performance/device evidence is incomplete | Not applicable while 60-80 student classes/+2 are excluded | Keep excluded |
@@ -1838,7 +1838,7 @@ Status values in this register are conservative. `Implemented-unverified` and
 |---|---|---|---|---|
 | P1-01 | Implemented-unverified | Parent home and prioritization code exists | Must be rechecked after guardian capability and notification severity contracts | Wait for applicable P0 |
 | P1-02 | Partial | English-first critical screens and shared UI foundations exist | Complete critical Nepali copy, accessibility, offline wording, and device evidence only after P0 contracts stabilize | Wait |
-| P1-03 | Partial | Attention-panel and purpose-limited principal foundations exist | Missing verified owning-module drill-through and complete roadmap queue coverage | Wait for Wave 3 |
+| P1-03 | Development complete for local consolidated queues + owning-module drill-through; residual gaps remain | Web missing result-correction attention; mobile Attention omitted pending leave and included non-HIGH parent cases; Flutter only drilled into service-request routes | Pending leave, attendance/result corrections, urgent notices, missing attendance on web+mobile; HIGH/overdue parent cases on mobile with `/principal/...` drill-through (`docs/production/evidence/p1-03-principal-attention-2026-07-31-local.md`); web Action Centre for parent cases and browser/device proof remain | Proceed to Wave 3 residual gates / Wave 4; do not treat local evidence as pilot validation |
 | P1-04 | Partial | Timetable substitution foundations exist | Leave/duty integration, eligible suggestion, temporary scope creation/expiry, and class-occurred evidence remain | Wait for P0-01/P0-02 |
 | P1-05 | Partial | Component scope data exists | Shared authorship, reviewer/publisher separation, concurrency, and practical/+2 evidence remain | Disabled for initial pilot |
 | P1-06 | Partial | Daily attendance presentation exists | Period, arrival/departure, leave, and parent-safe derived presentation are incomplete | Wait for P0-08 |
@@ -1965,6 +1965,33 @@ gate is incomplete or unverified.
 - **Release decision:** P0-01 is development complete with reproducible local
   evidence. Proceed to P0-05. This does not advance the release stage beyond
   Internal QA / controlled-pilot preparation.
+
+### P0-01 — Wave 2 capability contract, RESULT_REVIEW, audit, and mobile access-changed
+
+- **Previous implementation status:** Development complete locally after Wave 1;
+  remaining gaps were capability-name equivalence documentation, result preview
+  capability precision, authorization denial audit helpers, missing-tenant job
+  proof, and mobile access-changed cache invalidation.
+- **Root cause:** Wave 1 closed teacher-scope adoption for enabled modules but
+  left result previews on class/section combo lists, had no single P0-01
+  capability contract map, and treated mobile revocation as next-request /
+  logout cleanup without an explicit access-changed purge path.
+- **Implementation completed:**
+  - added `TeacherCapability.RESULT_REVIEW` and enforced it in `ResultsService`;
+  - added `p0-01-capability-contract` mapping required names onto existing
+    TeacherCapability / RBAC / FileRegistry surfaces without duplicating names;
+  - added `authorization-audit` helpers and wired guardian denial audits on
+    attendance and student-QR parent paths;
+  - extended missing-tenant `runTenantScopedJob` fail-closed coverage;
+  - mobile access-changed codes clear private caches, prune unlinked child
+    caches, discard unauthorized attendance drafts, and show a controlled
+    access-changed parent state.
+- **Migrations added:** None.
+- **Evidence document:**
+  `docs/production/evidence/p0-01-authorization-2026-07-31-local.md`
+- **Release decision:** Local hardening closed for this slice. Staging browser /
+  device / controlled-pilot evidence remain governed by P0-03 and P0-15. Do not
+  treat local evidence as pilot validation.
 
 ### P0-05 — Guardian capability contract and local closure
 
@@ -2245,3 +2272,34 @@ gate is incomplete or unverified.
   hardening and green regression gates. Keep the pilot release blocked and do
   not advance beyond Wave 1 until the repository security scan, clean migration
   replay, staging configuration/provider checks, and backup/restore drill pass.
+
+### P0-14 — Clean migration replay and M1 guardian-removal throttle
+
+- **Previous implementation status:** Partial; local hardening verified.
+- **Problem or gap:** M1 `removeGuardianAccess` lacked the guardian-admin
+  throttle applied to `StudentsController`; ownership-audit tests did not assert
+  the active-relationship where-clause; clean empty-DB migration replay was not
+  recorded for the current 89-migration history.
+- **Implementation completed:**
+  - throttled `DELETE admissions/m1/students/:studentId/guardians/:guardianId`
+    at 10 requests / 60 seconds;
+  - asserted ownership-audit guardian queries require ACTIVE + VERIFIED +
+    APPROVED + effective-window predicates;
+  - added AppThrottlerGuard coverage for the M1 removal decorator;
+  - created empty database `schoolos_p014_migrate_replay`, applied all 89
+    migrations with `prisma migrate deploy`, and confirmed
+    `prisma migrate status` reports the schema up to date.
+- **Evidence document:**
+  `docs/production/evidence/p0-14-security-2026-07-31-local.md`
+- **Migrations added:** None.
+- **Commands executed:**
+  - empty-DB `prisma migrate deploy` + `prisma migrate status` (89/89)
+  - focused M1/throttler/security unit selection: 25 + 76 tests passed
+  - platform export web contract: 14/14
+  - `pnpm verify:openapi`, `pnpm db:validate`
+- **Result:** Clean migration replay PASS locally. Focused security regression
+  PASS. Staging secrets/provider checks, sealed repository security scan, and
+  staging/pilot backup-restore drill remain open.
+- **Release decision:** P0-14 remains **PARTIAL**. Keep pilot release blocked.
+  Next ops actions: seal security scan, run `DEPLOY_ENV_FILE=… pnpm verify:env:staging`
+  on the staging host, and complete the staging backup/restore drill.

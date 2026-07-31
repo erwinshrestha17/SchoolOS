@@ -309,6 +309,7 @@ const demoGuardianCapabilities: GuardianCapability[] = [
   GuardianCapability.FEES_VIEW,
   GuardianCapability.SCHOOL_COMMUNICATE,
   GuardianCapability.COMPLAINT_OR_CORRECTION_SUBMIT,
+  GuardianCapability.LEAVE_MANAGE,
   GuardianCapability.EMERGENCY_ALERT_RECEIVE,
 ];
 
@@ -2121,36 +2122,48 @@ async function seedCanonicalStudents(
           },
         });
 
-        await prisma.enrollment.upsert({
+        const admissionDate = date('2026-04-10');
+        const existingEnrollment = await prisma.enrollment.findFirst({
           where: {
-            tenantId_academicYearId_studentId: {
-              tenantId,
-              academicYearId,
-              studentId: student.id,
-            },
-          },
-          update: {
-            classId: cls.id,
-            sectionId: section.id,
-            rollNumber: roll,
-            admissionNumber: code,
-            admissionDate: date('2026-04-10'),
-            mediumOfInstruction: 'English',
-            status: EnrollmentStatus.ACTIVE,
-          },
-          create: {
             tenantId,
             academicYearId,
             studentId: student.id,
-            classId: cls.id,
-            sectionId: section.id,
-            rollNumber: roll,
-            admissionNumber: code,
-            admissionDate: date('2026-04-10'),
-            mediumOfInstruction: 'English',
             status: EnrollmentStatus.ACTIVE,
+            effectiveUntil: null,
           },
         });
+        if (existingEnrollment) {
+          await prisma.enrollment.update({
+            where: { id: existingEnrollment.id },
+            data: {
+              classId: cls.id,
+              sectionId: section.id,
+              rollNumber: roll,
+              admissionNumber: code,
+              admissionDate,
+              mediumOfInstruction: 'English',
+              status: EnrollmentStatus.ACTIVE,
+              effectiveUntil: null,
+            },
+          });
+        } else {
+          await prisma.enrollment.create({
+            data: {
+              tenantId,
+              academicYearId,
+              studentId: student.id,
+              classId: cls.id,
+              sectionId: section.id,
+              rollNumber: roll,
+              admissionNumber: code,
+              admissionDate,
+              mediumOfInstruction: 'English',
+              status: EnrollmentStatus.ACTIVE,
+              effectiveFrom: admissionDate,
+              effectiveUntil: null,
+            },
+          });
+        }
 
         students.push({
           id: student.id,
@@ -4659,6 +4672,7 @@ async function seedStudentAndEnrollment(
       },
     });
   } else {
+    const admissionDate = new Date();
     await prisma.enrollment.create({
       data: {
         tenantId,
@@ -4667,8 +4681,10 @@ async function seedStudentAndEnrollment(
         classId: class1.id,
         sectionId: sectionA.id,
         status: EnrollmentStatus.ACTIVE,
-        admissionDate: new Date(),
+        admissionDate,
         mediumOfInstruction: 'English',
+        effectiveFrom: admissionDate,
+        effectiveUntil: null,
       },
     });
   }
@@ -4946,7 +4962,9 @@ async function seedPlatformInfrastructure() {
     });
     createdPlans.push(plan);
 
-    // Seed features for each plan
+    // Seed features for each plan. library / transport / canteen are STANDARD
+    // add-ons (and PROFESSIONAL+ base modules) — not base STANDARD entitlements.
+    // Keep this aligned with packages/core ENTITLEMENT_MATRIX.
     const features = [
       'academics',
       'finance',
@@ -4956,16 +4974,22 @@ async function seedPlatformInfrastructure() {
       'transport',
       'canteen',
     ];
+    const deferredAddOnModules = new Set(['library', 'transport', 'canteen']);
+    const planIncludesDeferredAddOns =
+      planData.key === 'premium' ||
+      planData.key === 'professional' ||
+      planData.key === 'enterprise';
     for (const featureKey of features) {
+      const enabled = deferredAddOnModules.has(featureKey)
+        ? planIncludesDeferredAddOns
+        : planData.key !== 'free' || featureKey === 'academics';
       await prisma.platformPlanFeature.upsert({
         where: { planId_featureKey: { planId: plan.id, featureKey } },
-        update: {
-          enabled: planData.key !== 'free' || featureKey === 'academics',
-        },
+        update: { enabled },
         create: {
           planId: plan.id,
           featureKey,
-          enabled: planData.key !== 'free' || featureKey === 'academics',
+          enabled,
         },
       });
     }

@@ -48,15 +48,28 @@ function createController() {
     assignSubstitution: jest.fn(),
     cancelSubstitution: jest.fn(),
     completeSubstitution: jest.fn(),
+    addCoverageNote: jest.fn(),
+  };
+  const replacementService = {
+    list: jest.fn(),
+    get: jest.fn(),
+    schedule: jest.fn(),
+    activate: jest.fn(),
+    complete: jest.fn(),
+    cancel: jest.fn(),
+    disposePendingWork: jest.fn(),
+    addHandoverNote: jest.fn(),
   };
 
   return {
     controller: new TimetableController(
       timetableService as never,
       substitutionService as never,
+      replacementService as never,
     ),
     timetableService,
     substitutionService,
+    replacementService,
   };
 }
 

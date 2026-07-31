@@ -33,6 +33,8 @@ class _HomeRedirectScreenState extends ConsumerState<HomeRedirectScreen> {
 
     if (auth.status == AuthStatus.unauthenticated) {
       context.go(AppRoutes.login);
+    } else if (auth.status == AuthStatus.biometricLocked) {
+      context.go(AppRoutes.biometricUnlock);
     } else if (auth.status == AuthStatus.authenticated) {
       final role = MobileRole.normalize(
         auth.role,

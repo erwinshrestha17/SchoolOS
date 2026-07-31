@@ -89,6 +89,16 @@ describe('MobilePrincipalService', () => {
     notificationDelivery: {
       groupBy: jest.Mock;
     };
+    staffLeaveRequest: {
+      count: jest.Mock;
+      findMany: jest.Mock;
+    };
+    staffAttendance: {
+      findMany: jest.Mock;
+    };
+    timetableSubstitution: {
+      findMany: jest.Mock;
+    };
   };
   let entitlements: {
     assertModuleEnabled: jest.Mock;
@@ -180,6 +190,16 @@ describe('MobilePrincipalService', () => {
       notificationDelivery: {
         groupBy: jest.fn(),
       },
+      staffLeaveRequest: {
+        count: jest.fn().mockResolvedValue(0),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      staffAttendance: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      timetableSubstitution: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
     };
     entitlements = {
       assertModuleEnabled: jest.fn().mockResolvedValue(undefined),
@@ -246,6 +266,36 @@ describe('MobilePrincipalService', () => {
           isOverdue: false,
           createdAt: '2026-07-26T00:00:00.000Z',
         },
+        {
+          id: 'request-medium',
+          type: 'GENERAL_COMPLAINT',
+          priority: 'MEDIUM',
+          status: 'OPEN',
+          subject: 'Routine question',
+          student: {
+            id: 'student-2',
+            name: 'Sita Thapa',
+            classSection: 'Grade 6 - B',
+          },
+          assignedTo: null,
+          isOverdue: false,
+          createdAt: '2026-07-26T01:00:00.000Z',
+        },
+        {
+          id: 'request-overdue',
+          type: 'GENERAL_COMPLAINT',
+          priority: 'MEDIUM',
+          status: 'ASSIGNED',
+          subject: 'Overdue follow-up',
+          student: {
+            id: 'student-3',
+            name: 'Ram Karki',
+            classSection: 'Grade 4 - A',
+          },
+          assignedTo: null,
+          isOverdue: true,
+          createdAt: '2026-07-20T00:00:00.000Z',
+        },
       ],
     });
 
@@ -257,19 +307,55 @@ describe('MobilePrincipalService', () => {
       'all',
     );
 
-    expect(result.items).toEqual([
-      expect.objectContaining({
-        id: 'request-1',
-        type: 'service_request',
-        title: 'Parent Payment Dispute',
-        severity: 'high',
-        route: '/principal/service-requests/request-1',
-      }),
-    ]);
+    expect(result.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'request-1',
+          type: 'service_request',
+          title: 'Parent Payment Dispute',
+          severity: 'high',
+          route: '/principal/service-requests/request-1',
+        }),
+        expect.objectContaining({
+          id: 'request-overdue',
+          type: 'service_request',
+          severity: 'high',
+          route: '/principal/service-requests/request-overdue',
+        }),
+      ]),
+    );
+    expect(result.items.some((item) => item.id === 'request-medium')).toBe(
+      false,
+    );
     expect(serviceRequests.listManagerRequests).toHaveBeenCalledWith(
       { limit: 20 },
       expect.objectContaining({ tenantId: 'tenant-1' }),
     );
+  });
+
+  it('adds pending staff leave to principal attention with approvals drill-through', async () => {
+    entitlements.getEntitlements.mockResolvedValue({
+      modules: ['hr'],
+      features: [],
+    });
+    prisma.staffLeaveRequest.count.mockResolvedValue(2);
+
+    const result = await service.getAttention(actor, 'all');
+
+    expect(result.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'pending-staff-leave',
+          type: 'staff_leave',
+          title: 'Staff leave awaiting approval',
+          severity: 'high',
+          route: '/principal/approvals',
+        }),
+      ]),
+    );
+    expect(prisma.staffLeaveRequest.count).toHaveBeenCalledWith({
+      where: { tenantId: 'tenant-1', status: 'PENDING' },
+    });
   });
 
   it('triages a parent request only to the authenticated principal', async () => {

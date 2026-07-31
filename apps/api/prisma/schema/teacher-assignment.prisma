@@ -44,7 +44,9 @@ model TeacherAssignment {
   createdBy    User?        @relation("CreatedTeacherAssignments", fields: [createdById], references: [id], onDelete: SetNull)
   revokedBy    User?        @relation("RevokedTeacherAssignments", fields: [revokedById], references: [id], onDelete: SetNull)
 
-  delegations TeacherDelegation[] @relation("DelegationSourceAssignment")
+  delegations              TeacherDelegation[]  @relation("DelegationSourceAssignment")
+  replacementsAsSource     TeacherReplacement[] @relation("ReplacementSourceAssignment")
+  replacementsAsTarget     TeacherReplacement[] @relation("ReplacementTargetAssignment")
 
   @@unique([tenantId, academicYearId, staffId, assignmentType, classId, sectionId, subjectId, componentScope], name: "TeacherAssignment_scope_unique")
   @@index([tenantId, staffId, academicYearId, status])
@@ -74,6 +76,11 @@ model TeacherDelegation {
   allowedCapabilities String[]
   reason              String
 
+  // Exact link to a timetable substitution when this delegation was created
+  // by temporary substitute assignment (P0-02). Prefer this over scope/date
+  // matching when revoking on cancel/complete.
+  timetableSubstitutionId String? @unique
+
   effectiveFrom  DateTime
   effectiveUntil DateTime
   status         TeacherDelegationStatus @default(ACTIVE)
@@ -84,18 +91,112 @@ model TeacherDelegation {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  tenant             Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  academicYear       AcademicYear       @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
-  grantor            Staff              @relation("DelegationGrantor", fields: [grantorStaffId], references: [id], onDelete: Restrict)
-  recipient          Staff              @relation("DelegationRecipient", fields: [recipientStaffId], references: [id], onDelete: Restrict)
-  sourceAssignment   TeacherAssignment? @relation("DelegationSourceAssignment", fields: [sourceAssignmentId], references: [id], onDelete: SetNull)
-  class              Class              @relation(fields: [classId], references: [id], onDelete: Restrict)
-  section            Section            @relation(fields: [sectionId], references: [id], onDelete: Restrict)
-  subject            Subject?           @relation(fields: [subjectId], references: [id], onDelete: Restrict)
-  createdBy          User?              @relation("CreatedTeacherDelegations", fields: [createdById], references: [id], onDelete: SetNull)
-  revokedBy          User?              @relation("RevokedTeacherDelegations", fields: [revokedById], references: [id], onDelete: SetNull)
+  tenant                Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear          AcademicYear           @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  grantor               Staff                  @relation("DelegationGrantor", fields: [grantorStaffId], references: [id], onDelete: Restrict)
+  recipient             Staff                  @relation("DelegationRecipient", fields: [recipientStaffId], references: [id], onDelete: Restrict)
+  sourceAssignment      TeacherAssignment?     @relation("DelegationSourceAssignment", fields: [sourceAssignmentId], references: [id], onDelete: SetNull)
+  timetableSubstitution TimetableSubstitution? @relation(fields: [timetableSubstitutionId], references: [id], onDelete: SetNull)
+  class                 Class                  @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section               Section                @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  subject               Subject?               @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  createdBy             User?                  @relation("CreatedTeacherDelegations", fields: [createdById], references: [id], onDelete: SetNull)
+  revokedBy             User?                  @relation("RevokedTeacherDelegations", fields: [revokedById], references: [id], onDelete: SetNull)
 
   @@index([tenantId, recipientStaffId, status, effectiveUntil])
   @@index([tenantId, grantorStaffId])
   @@index([tenantId, classId, sectionId])
+}
+
+// Long-term teacher replacement (P0-02). Does not rewrite historical authorship;
+// activation ends the former assignment's operational window and creates the
+// replacement assignment in one transaction.
+model TeacherReplacement {
+  id                   String                   @id @default(uuid())
+  tenantId             String
+  academicYearId       String
+  sourceAssignmentId   String
+  formerStaffId        String
+  replacementStaffId   String
+  classId              String
+  sectionId            String
+  subjectId            String?
+  assignmentType       TeacherAssignmentType
+  componentScope       TeacherAssignmentComponentScope?
+  effectiveFrom        DateTime
+  reason               String
+  status               TeacherReplacementStatus @default(SCHEDULED)
+  activatedAt          DateTime?
+  completedAt          DateTime?
+  cancelledAt          DateTime?
+  cancellationReason   String?
+  createdById          String?
+  activatedById        String?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+
+  replacementAssignmentId String? @unique
+
+  tenant                Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear          AcademicYear       @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  sourceAssignment      TeacherAssignment  @relation("ReplacementSourceAssignment", fields: [sourceAssignmentId], references: [id], onDelete: Restrict)
+  replacementAssignment TeacherAssignment? @relation("ReplacementTargetAssignment", fields: [replacementAssignmentId], references: [id], onDelete: SetNull)
+  formerStaff           Staff              @relation("FormerTeacherReplacements", fields: [formerStaffId], references: [id], onDelete: Restrict)
+  replacementStaff      Staff              @relation("IncomingTeacherReplacements", fields: [replacementStaffId], references: [id], onDelete: Restrict)
+  class                 Class              @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section               Section            @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  subject               Subject?           @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  createdBy             User?              @relation("CreatedTeacherReplacements", fields: [createdById], references: [id], onDelete: SetNull)
+  activatedBy           User?              @relation("ActivatedTeacherReplacements", fields: [activatedById], references: [id], onDelete: SetNull)
+  pendingWork           TeacherReplacementPendingWork[]
+  handoverNotes         TeacherHandoverNote[]
+
+  @@index([tenantId, status, effectiveFrom])
+  @@index([tenantId, formerStaffId])
+  @@index([tenantId, replacementStaffId])
+  @@index([tenantId, sourceAssignmentId])
+}
+
+model TeacherReplacementPendingWork {
+  id              String                                   @id @default(uuid())
+  tenantId        String
+  replacementId   String
+  kind            TeacherReplacementPendingWorkKind
+  resourceId      String
+  resourceLabel   String?
+  disposition     TeacherReplacementPendingWorkDisposition?
+  dispositionNote String?
+  disposedAt      DateTime?
+  disposedById    String?
+  createdAt       DateTime                                 @default(now())
+  updatedAt       DateTime                                 @updatedAt
+
+  tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  replacement TeacherReplacement @relation(fields: [replacementId], references: [id], onDelete: Cascade)
+  disposedBy  User?              @relation("DisposedReplacementPendingWork", fields: [disposedById], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, replacementId, kind, resourceId])
+  @@index([tenantId, replacementId, disposition])
+}
+
+model TeacherHandoverNote {
+  id              String                 @id @default(uuid())
+  tenantId        String
+  kind            TeacherHandoverNoteKind
+  substitutionId  String?
+  replacementId   String?
+  authorStaffId   String?
+  body            String
+  createdById     String?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  tenant       Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  substitution TimetableSubstitution?  @relation(fields: [substitutionId], references: [id], onDelete: Cascade)
+  replacement  TeacherReplacement?      @relation(fields: [replacementId], references: [id], onDelete: Cascade)
+  authorStaff  Staff?                  @relation("HandoverNoteAuthors", fields: [authorStaffId], references: [id], onDelete: SetNull)
+  createdBy    User?                   @relation("CreatedHandoverNotes", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, substitutionId])
+  @@index([tenantId, replacementId])
 }

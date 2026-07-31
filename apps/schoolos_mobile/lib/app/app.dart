@@ -8,6 +8,8 @@ import 'theme/app_theme.dart';
 import '../core/auth/auth_provider.dart';
 import '../core/notifications/push_deep_link_resolver.dart';
 import '../core/notifications/push_notification_controller.dart';
+import '../core/theme/theme_mode_provider.dart';
+import '../features/auth/presentation/biometric_setup_sheet.dart';
 import '../features/parent/application/parent_providers.dart';
 
 class SchoolOSApp extends ConsumerWidget {
@@ -16,6 +18,7 @@ class SchoolOSApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
+    final themeMode = ref.watch(themeModeProvider);
     ref.listen<AuthState>(authProvider, (previous, next) {
       final pushController = ref.read(
         pushNotificationControllerProvider.notifier,
@@ -27,6 +30,20 @@ class SchoolOSApp extends ConsumerWidget {
             onOpen: (payload) => _openPushNotification(ref, payload),
           ),
         );
+        final becameAuthenticated =
+            previous?.status != AuthStatus.authenticated;
+        final passwordGateCleared =
+            previous?.user?.mustChangePassword == true &&
+            next.user?.mustChangePassword != true;
+        if ((becameAuthenticated || passwordGateCleared) &&
+            next.user?.mustChangePassword != true) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            final navContext = rootNavigatorKey.currentContext;
+            if (navContext != null && navContext.mounted) {
+              unawaited(maybeShowBiometricSetupOffer(navContext, ref));
+            }
+          });
+        }
       } else if (previous?.status == AuthStatus.authenticated &&
           next.status == AuthStatus.unauthenticated) {
         unawaited(pushController.deactivate());
@@ -38,7 +55,7 @@ class SchoolOSApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
+      themeMode: themeMode,
       routerConfig: router,
     );
   }

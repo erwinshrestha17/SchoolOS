@@ -4,12 +4,42 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:schoolos_mobile/core/storage/app_preferences_service.dart';
+import 'package:schoolos_mobile/core/storage/private_data_cleanup_service.dart';
+import 'package:schoolos_mobile/core/storage/private_read_cache.dart';
+import 'package:schoolos_mobile/core/storage/secure_storage_service.dart';
 import 'package:schoolos_mobile/core/errors/app_exception.dart';
 import 'package:schoolos_mobile/features/parent/application/parent_providers.dart';
 import 'package:schoolos_mobile/features/parent/data/parent_repository.dart';
 import 'package:schoolos_mobile/features/parent/domain/parent_models.dart';
 
 class _MockParentRepository extends Mock implements ParentRepository {}
+
+class _MemorySecureStore implements SecureKeyValueStore {
+  final Map<String, String> values = {};
+
+  @override
+  Future<void> write(String key, String value) async => values[key] = value;
+
+  @override
+  Future<String?> read(String key) async => values[key];
+
+  @override
+  Future<Map<String, String>> readAll() async => Map<String, String>.from(values);
+
+  @override
+  Future<void> delete(String key) async => values.remove(key);
+
+  @override
+  Future<void> clearAll() async => values.clear();
+
+  @override
+  Future<bool> containsKey(String key) async => values.containsKey(key);
+
+  @override
+  Future<void> deleteByPrefix(String prefix) async {
+    values.removeWhere((key, _) => key.startsWith(prefix));
+  }
+}
 
 void main() {
   const childA = GuardianChild(
@@ -31,11 +61,34 @@ void main() {
 
   late _MockParentRepository repository;
   late AppPreferencesService preferences;
+  late PrivateDataCleanupService cleanup;
+  late PrivateReadCache cache;
+
+  ParentController buildController({required bool isOnline}) {
+    return ParentController(
+      repository: repository,
+      preferences: preferences,
+      privateDataCleanup: cleanup,
+      privateReadCache: cache,
+      isOnline: isOnline,
+    );
+  }
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     repository = _MockParentRepository();
     preferences = AppPreferencesService(await SharedPreferences.getInstance());
+    final secure = _MemorySecureStore();
+    cleanup = PrivateDataCleanupService(preferences, secure);
+    cache = PrivateReadCache(
+      secure,
+      preferences: preferences,
+      scope: PrivateReadCacheScope(
+        tenantId: 'tenant-1',
+        userId: 'parent-1',
+        role: 'parent',
+      ),
+    );
     when(
       () => repository.getGuardianChildren(),
     ).thenAnswer((_) async => const [childA, childB]);
@@ -53,11 +106,7 @@ void main() {
   test(
     'child switch clears the previous child before refetch completes',
     () async {
-      final controller = ParentController(
-        repository: repository,
-        preferences: preferences,
-        isOnline: true,
-      );
+      final controller = buildController(isOnline: true);
       await _waitForSuccess(controller);
       expect(controller.state.dashboard?.child.id, childA.id);
 
@@ -90,12 +139,6 @@ void main() {
   test(
     'stays usable offline when only the cached children list survives',
     () async {
-      // Device QA 2026-07-25: the linked-children list has an offline cache but
-      // the dashboard summary and child profile deliberately do not. Letting
-      // their failure abort the whole load left every ParentController-gated
-      // screen - attendance, fees, canteen, library, transport, timetable,
-      // report cards - showing a bare "could not be loaded" error offline
-      // instead of the cached record with an offline marker.
       when(
         () => repository.getParentDashboardSummaryForChild(childA),
       ).thenAnswer((_) async => throw const NetworkException());
@@ -103,11 +146,7 @@ void main() {
         () => repository.getChildProfileForChild(childA),
       ).thenAnswer((_) async => throw const NetworkException());
 
-      final controller = ParentController(
-        repository: repository,
-        preferences: preferences,
-        isOnline: false,
-      );
+      final controller = buildController(isOnline: false);
       await _waitForSettled(controller);
 
       expect(
@@ -128,11 +167,7 @@ void main() {
       () => repository.getParentDashboardSummaryForChild(childA),
     ).thenAnswer((_) async => throw const PermissionException());
 
-    final controller = ParentController(
-      repository: repository,
-      preferences: preferences,
-      isOnline: true,
-    );
+    final controller = buildController(isOnline: true);
     await _waitForSettled(controller);
 
     expect(
@@ -144,12 +179,27 @@ void main() {
     );
   });
 
-  test('a late child response cannot replace the latest selection', () async {
-    final controller = ParentController(
-      repository: repository,
-      preferences: preferences,
-      isOnline: true,
+  test('guardian access revocation clears caches and shows access-changed', () async {
+    when(
+      () => repository.getParentDashboardSummaryForChild(childA),
+    ).thenAnswer(
+      (_) async => throw const PermissionException(
+        'Your access to this school data changed. Cached information was cleared.',
+        'GUARDIAN_CAPABILITY_DENIED',
+      ),
     );
+
+    final controller = buildController(isOnline: true);
+    await _waitForSettled(controller);
+
+    expect(controller.state.status, ParentDataStatus.accessChanged);
+    expect(controller.state.children, isEmpty);
+    expect(controller.state.dashboard, isNull);
+    expect(controller.state.message, contains('access'));
+  });
+
+  test('a late child response cannot replace the latest selection', () async {
+    final controller = buildController(isOnline: true);
     await _waitForSuccess(controller);
 
     final started = Completer<void>();

@@ -433,6 +433,34 @@ async function assignSubscription(tenantId: string) {
       addOns: [],
     },
   });
+
+  // Platform seed historically enabled library/transport/canteen on STANDARD.
+  // Align plan features with ENTITLEMENT_MATRIX and fail closed for Wave 1.
+  for (const featureKey of ['library', 'transport', 'canteen'] as const) {
+    await prisma.platformPlanFeature.upsert({
+      where: { planId_featureKey: { planId: plan.id, featureKey } },
+      update: { enabled: false },
+      create: { planId: plan.id, featureKey, enabled: false },
+    });
+    await prisma.tenantFeatureOverride.upsert({
+      where: {
+        tenantId_featureKey: {
+          tenantId,
+          featureKey: `module.${featureKey}`,
+        },
+      },
+      update: {
+        enabled: false,
+        reason: 'Wave 1 deferred — excluded from one-school concurrency program',
+      },
+      create: {
+        tenantId,
+        featureKey: `module.${featureKey}`,
+        enabled: false,
+        reason: 'Wave 1 deferred — excluded from one-school concurrency program',
+      },
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -747,6 +775,8 @@ async function seedStudentsAndParents(
       admissionNumber: `ADM-${pad(i + 1, 5)}`,
       admissionDate,
       mediumOfInstruction: 'English',
+      effectiveFrom: admissionDate,
+      effectiveUntil: null,
     })),
     (chunk) => prisma.enrollment.createMany({ data: chunk, skipDuplicates: true }),
   );

@@ -34,6 +34,23 @@ class PrivateDataCleanupService {
     ]);
   }
 
+  /// Clears tenant-scoped private caches when school context or authorization
+  /// changes while keeping the signed-in session tokens intact.
+  Future<void> clearAccessScopedCaches() async {
+    try {
+      await _secureStorage?.deleteByPrefix(privateReadCacheStoragePrefix);
+      await _secureStorage?.deleteByPrefix(teacherAttendanceDraftStoragePrefix);
+    } catch (_) {
+      // Best effort: access-change cleanup must not block the UI state update.
+    }
+    await _preferences.removeSelectedChildId();
+    await Future.wait([
+      _deleteSchoolOsDirectory(getTemporaryDirectory),
+      _deleteSchoolOsDirectory(getApplicationDocumentsDirectory),
+      _deleteLegacyPayslipDirectory(),
+    ]);
+  }
+
   Future<void> _deleteSchoolOsDirectory(
     Future<Directory> Function() resolveDirectory,
   ) async {

@@ -147,6 +147,41 @@ describe('NotificationPreferencePolicy', () => {
     });
   });
 
+  it('treats emergency notice deliveries as mandatory EMERGENCY category', async () => {
+    prisma.notificationDelivery.findFirst.mockResolvedValueOnce(
+      baseDelivery({
+        type: 'NOTICE_PUBLISHED',
+        sourceType: 'notice_emergency',
+        priority: NotificationEventPriority.MANDATORY,
+      }),
+    );
+    prisma.notificationPreference.findUnique.mockResolvedValueOnce({
+      enabled: false,
+      quietHoursEnabled: true,
+    });
+
+    await expect(
+      policy.evaluateDelivery(
+        'tenant-1',
+        'delivery-1',
+        new Date('2026-07-15T15:00:00.000Z'),
+      ),
+    ).resolves.toEqual({
+      action: 'IMMEDIATE',
+      reason: 'Mandatory security or emergency delivery',
+      mandatory: true,
+    });
+    expect(prisma.notificationPreference.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId_userId_category_channel: expect.objectContaining({
+            category: 'EMERGENCY',
+          }),
+        }),
+      }),
+    );
+  });
+
   it('uses the exact Nepal timezone boundary', async () => {
     await expect(
       policy.evaluateDelivery(

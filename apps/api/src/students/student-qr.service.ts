@@ -771,6 +771,7 @@ export class StudentQrService {
               auth,
               student.id,
               GuardianCapability.ACADEMICS_VIEW,
+              this.auditService,
             );
             parentAllowed = true;
           } catch (error) {
@@ -1041,6 +1042,7 @@ export class StudentQrService {
         auth,
         studentId,
         GuardianCapability.ACADEMICS_VIEW,
+        this.auditService,
       );
       return;
     }

@@ -51,6 +51,9 @@ enum AttendanceStatus {
   SICK_LEAVE
   EXCUSED_LEAVE
   UNEXCUSED_LEAVE
+  EARLY_AUTHORIZED_DEPARTURE
+  UNAUTHORIZED_DEPARTURE
+  PERIOD_ABSENT
 }
 
 enum FeeFrequency {
@@ -1460,4 +1463,28 @@ enum TeacherDelegationStatus {
   ACTIVE
   EXPIRED
   REVOKED
+}
+
+enum TeacherReplacementStatus {
+  SCHEDULED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum TeacherReplacementPendingWorkKind {
+  HOMEWORK_DRAFT
+  MARK_SUBMISSION
+  CORRECTION_REQUEST
+}
+
+enum TeacherReplacementPendingWorkDisposition {
+  TRANSFER
+  RETURN
+  CANCEL
+}
+
+enum TeacherHandoverNoteKind {
+  SUBSTITUTION_COVERAGE
+  REPLACEMENT_HANDOVER
 }

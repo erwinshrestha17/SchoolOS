@@ -474,8 +474,9 @@ void main() {
         expect(find.text('Logout'), findsNothing);
         expect(find.text('Sign Out'), findsNothing);
         expect(find.text('My Profile'), findsOneWidget);
-        expect(find.text('Notification Settings'), findsOneWidget);
-        expect(find.text('Language'), findsOneWidget);
+        expect(find.text('Preferences'), findsOneWidget);
+        expect(find.text('Notification preferences'), findsOneWidget);
+        expect(find.text('Notification Settings'), findsNothing);
       },
     );
 

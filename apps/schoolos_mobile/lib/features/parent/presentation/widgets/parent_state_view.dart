@@ -57,6 +57,14 @@ class ParentStateView extends StatelessWidget {
         return const SessionExpiredState();
       case ParentDataStatus.forbidden:
         return const PermissionDeniedState();
+      case ParentDataStatus.accessChanged:
+        return AppErrorView(
+          title: 'Access changed',
+          message:
+              message ??
+              'Your access to this school data changed. Cached information was cleared.',
+          onRetry: onRetry,
+        );
       case ParentDataStatus.moduleLocked:
         return const ModuleLockedState();
       case ParentDataStatus.offline:

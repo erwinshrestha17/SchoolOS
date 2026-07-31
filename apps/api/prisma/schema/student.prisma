@@ -100,6 +100,7 @@ model Student {
   canteenPosSales              CanteenPosSale[]
   canteenSpendingControls      CanteenSpendingControl[]
   attendanceCorrectionRequests AttendanceCorrectionRequest[]
+  studentLeaveRequests         StudentLeaveRequest[]
   schoolServiceRequests         SchoolServiceRequest[]
   qrCredentials                StudentQrCredential[]
   learningParticipants         LearningParticipant[]
@@ -217,6 +218,10 @@ model Enrollment {
   admissionDate       DateTime
   mediumOfInstruction String
   status              EnrollmentStatus @default(ACTIVE)
+  // P0-04: roster membership is effective-dated so mid-term class/section
+  // changes preserve historical attendance/marks context.
+  effectiveFrom       DateTime
+  effectiveUntil      DateTime?
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
 
@@ -227,8 +232,10 @@ model Enrollment {
   section      Section?     @relation(fields: [sectionId], references: [id], onDelete: SetNull)
   invoices     Invoice[]
 
-  @@unique([tenantId, academicYearId, studentId])
+  @@index([tenantId, academicYearId, studentId, status])
+  @@index([tenantId, academicYearId, studentId, effectiveFrom])
   @@index([tenantId, admissionNumber])
+  @@index([tenantId, classId, sectionId, status, effectiveUntil])
 }
 
 model StudentDocument {

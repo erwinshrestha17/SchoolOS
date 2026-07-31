@@ -136,6 +136,12 @@ export class ReasonedSchoolServiceRequestDto {
   reason!: string;
 }
 
+/** P0-11: escalation must reassign to an independent manager. */
+export class EscalateSchoolServiceRequestDto extends ReasonedSchoolServiceRequestDto {
+  @IsUUID()
+  assignedToUserId!: string;
+}
+
 export class UploadSchoolServiceRequestAttachmentDto {
   @IsString()
   @IsNotEmpty()

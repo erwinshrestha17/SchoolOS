@@ -318,4 +318,54 @@ describe('OperationalSummaryService', () => {
     expect(libraryIssueCount).not.toHaveBeenCalled();
     expect(notificationCount).not.toHaveBeenCalled();
   });
+
+  it('surfaces pending result corrections on the academics summary', async () => {
+    const correctionCount = jest.fn().mockResolvedValue(3);
+    const academicsPrisma = {
+      academicYear: { count: jest.fn().mockResolvedValue(1) },
+      examTimetableSlot: { count: jest.fn().mockResolvedValue(0) },
+      markEntry: { count: jest.fn().mockResolvedValue(0) },
+      markLockRequest: { count: jest.fn().mockResolvedValue(0) },
+      reportCard: {
+        count: jest.fn().mockResolvedValue(0),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      reportCardCorrectionRequest: { count: correctionCount },
+      promotionRecord: { count: jest.fn().mockResolvedValue(0) },
+    } as unknown as PrismaService;
+    const academicsEntitlements = {
+      getEntitlements: jest.fn().mockResolvedValue({
+        modules: ['exams'],
+      }),
+    } as unknown as EntitlementsService;
+    const academicsService = new OperationalSummaryService(
+      academicsPrisma,
+      academicsEntitlements,
+      teacherScopeService as unknown as TeacherScopeService,
+    );
+    const principal: AuthContext = {
+      ...actor,
+      roles: ['principal'],
+      permissions: ['academics:read'],
+    };
+
+    const summary = await academicsService.getModuleSummary(
+      'm4_academics',
+      principal,
+    );
+
+    expect(correctionCount).toHaveBeenCalledWith({
+      where: { tenantId: principal.tenantId, status: 'PENDING' },
+    });
+    expect(summary.attentionItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: 'pendingReportCardCorrections',
+          label: 'Review result corrections',
+          count: 3,
+          action: '/dashboard/academics/report-cards',
+        }),
+      ]),
+    );
+  });
 });

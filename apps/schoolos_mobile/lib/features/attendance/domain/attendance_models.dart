@@ -290,11 +290,18 @@ class TeacherAttendanceSubmitResult {
     required this.serverStatus,
     required this.replayed,
     this.deviceReceiptPersisted = true,
+    this.rejectionReason,
   });
 
   final AttendanceServerSyncStatus serverStatus;
   final bool replayed;
   final bool deviceReceiptPersisted;
+  final String? rejectionReason;
+
+  bool get isAuthorizationRevoked =>
+      serverStatus == AttendanceServerSyncStatus.rejected &&
+      (rejectionReason == 'UNASSIGNED_TEACHER' ||
+          rejectionReason == 'TEACHER_SCOPE_DENIED');
 
   AttendanceSyncStatus get status => switch (serverStatus) {
     AttendanceServerSyncStatus.accepted ||

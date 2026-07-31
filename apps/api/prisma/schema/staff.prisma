@@ -67,6 +67,9 @@ model Staff {
   teacherAssignmentRecords   TeacherAssignment[]
   delegationsGranted         TeacherDelegation[] @relation("DelegationGrantor")
   delegationsReceived        TeacherDelegation[] @relation("DelegationRecipient")
+  formerTeacherReplacements  TeacherReplacement[] @relation("FormerTeacherReplacements")
+  incomingTeacherReplacements TeacherReplacement[] @relation("IncomingTeacherReplacements")
+  handoverNotesAuthored      TeacherHandoverNote[] @relation("HandoverNoteAuthors")
   formativeAssessmentEvidence FormativeAssessmentEvidence[]
   ownedStudentInterventions   StudentInterventionCase[]
   remedialGroups              RemedialGroup[]

@@ -20,6 +20,43 @@ describe('guardian-child capability scope', () => {
     permissions: [],
   };
 
+  it('audits guardian capability denials when an audit sink is provided', async () => {
+    const prisma = {
+      guardian: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+    };
+    const audit = { record: jest.fn().mockResolvedValue(undefined) };
+
+    await expect(
+      requireGuardianCapability(
+        prisma as never,
+        actor,
+        'student-other',
+        GuardianCapability.ACADEMICS_VIEW,
+        audit,
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: GUARDIAN_CAPABILITY_DENIED_CODE,
+      }),
+    });
+
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'authorization.denied',
+        resource: 'guardian_relationship',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        resourceId: 'student-other',
+        after: expect.objectContaining({
+          reason: 'guardian_capability_denied',
+          capability: GuardianCapability.ACADEMICS_VIEW,
+        }),
+      }),
+    );
+  });
+
   it('keeps the parent role off the administrative student API', () => {
     expect(systemRolePermissions.parent).not.toContain('students:read');
   });

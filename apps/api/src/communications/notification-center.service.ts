@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { roadmapSeverityFromEventPriority } from '@schoolos/core';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import type { NotificationCenterQueryDto } from './dto/communication-list-query.dto';
@@ -25,6 +26,7 @@ interface NotificationCenterRow {
   createdAt: Date;
   readAt: Date | null;
   eventType: string | null;
+  eventPriority: string | null;
 }
 
 export interface NotificationCenterItem {
@@ -41,6 +43,15 @@ export interface NotificationCenterItem {
   isRead: boolean;
   linkHref: string;
   category: string;
+  /** Persisted NotificationEventPriority when linked. */
+  priority: string | null;
+  /** P0-09 roadmap severity vocabulary derived from priority. */
+  severity: string;
+  /**
+   * Honest delivery outcome label. SENT means sent-to-provider, not delivered
+   * or acknowledged.
+   */
+  deliveryState: string;
 }
 
 export interface NotificationCenterSummary {
@@ -107,7 +118,8 @@ export class NotificationCenterService {
         d."sentAt",
         d."createdAt",
         r."readAt",
-        ne."type"::text AS "eventType"
+        ne."type"::text AS "eventType",
+        ne."priority"::text AS "eventPriority"
       FROM "NotificationDelivery" d
       LEFT JOIN "NotificationReadReceipt" r
         ON r."tenantId" = d."tenantId"
@@ -285,6 +297,9 @@ function toCenterItem(row: NotificationCenterRow): NotificationCenterItem {
     isRead: Boolean(row.readAt),
     linkHref: resolveNotificationHref(row),
     category: notificationCategory(row.eventType, row.sourceType),
+    priority: row.eventPriority,
+    severity: roadmapSeverityFromEventPriority(row.eventPriority),
+    deliveryState: honestDeliveryState(row.status, Boolean(row.readAt)),
   };
 }
 
@@ -328,17 +343,18 @@ function notificationCenterFilterSql(query: NotificationCenterQueryDto) {
 function notificationCategorySql() {
   return Prisma.sql`(
     CASE
+      WHEN d."sourceType" LIKE '%emergency%' THEN 'EMERGENCY'
       WHEN COALESCE(ne."type"::text, '') LIKE 'ATTENDANCE_%' OR d."sourceType" LIKE 'attendance%' THEN 'ATTENDANCE'
       WHEN ne."type"::text = 'FEE_PAYMENT_CONFIRMED' OR d."sourceType" LIKE '%fee%' THEN 'FEES'
       WHEN COALESCE(ne."type"::text, '') LIKE 'NOTICE_%' OR d."sourceType" = 'notice' THEN 'NOTICE'
       WHEN d."sourceType" LIKE '%security%' OR d."sourceType" LIKE '%auth%' THEN 'SECURITY'
-      WHEN d."sourceType" LIKE '%emergency%' THEN 'EMERGENCY'
       ELSE 'GENERAL'
     END
   )`;
 }
 
 function notificationCategory(eventType: string | null, sourceType: string) {
+  if (sourceType.includes('emergency')) return 'EMERGENCY';
   if (
     eventType?.startsWith('ATTENDANCE_') ||
     sourceType.startsWith('attendance')
@@ -350,6 +366,31 @@ function notificationCategory(eventType: string | null, sourceType: string) {
     return 'NOTICE';
   if (sourceType.includes('security') || sourceType.includes('auth'))
     return 'SECURITY';
-  if (sourceType.includes('emergency')) return 'EMERGENCY';
   return 'GENERAL';
+}
+
+/**
+ * P0-09 honesty: do not collapse sent/delivered/read/acknowledged.
+ * Acknowledgement remains notice-scoped; delivery rows only expose read via
+ * NotificationReadReceipt.
+ */
+function honestDeliveryState(status: string, isRead: boolean): string {
+  if (isRead) return 'READ';
+  switch (status) {
+    case 'QUEUED':
+    case 'RETRY_PENDING':
+      return 'QUEUED';
+    case 'SENT':
+      return 'SENT_TO_PROVIDER';
+    case 'DELIVERED':
+      return 'DELIVERED';
+    case 'FAILED':
+      return 'FAILED';
+    case 'CANCELLED':
+      return 'CANCELLED';
+    case 'SKIPPED':
+      return 'SKIPPED';
+    default:
+      return status;
+  }
 }

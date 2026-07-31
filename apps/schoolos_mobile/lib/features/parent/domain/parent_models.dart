@@ -6,6 +6,7 @@ enum ParentDataStatus {
   offline,
   unauthorized,
   forbidden,
+  accessChanged,
   moduleLocked,
   sessionExpired,
   timeout,

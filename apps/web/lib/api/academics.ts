@@ -69,6 +69,40 @@ export type AcademicGradingPolicy = {
   };
 };
 
+export type TeacherReplacementSummary = {
+  id: string;
+  status: string;
+  effectiveFrom: string;
+  reason: string;
+  formerStaff?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    employeeId?: string | null;
+  } | null;
+  replacementStaff?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    employeeId?: string | null;
+  } | null;
+  class?: { id: string; name: string } | null;
+  section?: { id: string; name: string } | null;
+  subject?: { id: string; name: string; code?: string | null } | null;
+  pendingWork?: Array<{
+    id: string;
+    kind: string;
+    resourceId: string;
+    resourceLabel?: string | null;
+    disposition?: string | null;
+  }>;
+  handoverNotes?: Array<{
+    id: string;
+    body: string;
+    createdAt: string;
+  }>;
+};
+
 export type HomeworkReminderBatchSummary = {
   id: string;
   homeworkId: string;
@@ -710,6 +744,57 @@ export const academicsApi = {
     request<TimetableSubstitutionSummary>(
       `/timetable/substitutions/${encodeURIComponent(id)}/complete`,
       { method: 'PATCH', json: {} },
+    ),
+  addSubstitutionCoverageNote: (id: string, body: JsonBody) =>
+    request<unknown>(
+      `/timetable/substitutions/${encodeURIComponent(id)}/coverage-notes`,
+      { method: 'POST', json: body },
+    ),
+  listTeacherReplacements: (params?: {
+    status?: string;
+    page?: number;
+    limit?: number;
+  }) =>
+    request<PaginatedResponse<TeacherReplacementSummary>>(
+      withQuery('/timetable/replacements', params ?? {}),
+    ),
+  getTeacherReplacement: (id: string) =>
+    request<TeacherReplacementSummary>(
+      `/timetable/replacements/${encodeURIComponent(id)}`,
+    ),
+  scheduleTeacherReplacement: (body: JsonBody) =>
+    request<TeacherReplacementSummary>('/timetable/replacements', {
+      method: 'POST',
+      json: body,
+    }),
+  activateTeacherReplacement: (id: string) =>
+    request<TeacherReplacementSummary>(
+      `/timetable/replacements/${encodeURIComponent(id)}/activate`,
+      { method: 'PATCH' },
+    ),
+  completeTeacherReplacement: (id: string) =>
+    request<TeacherReplacementSummary>(
+      `/timetable/replacements/${encodeURIComponent(id)}/complete`,
+      { method: 'PATCH' },
+    ),
+  cancelTeacherReplacement: (id: string, body: JsonBody) =>
+    request<TeacherReplacementSummary>(
+      `/timetable/replacements/${encodeURIComponent(id)}/cancel`,
+      { method: 'PATCH', json: body },
+    ),
+  disposeReplacementPendingWork: (
+    id: string,
+    pendingWorkId: string,
+    body: JsonBody,
+  ) =>
+    request<unknown>(
+      `/timetable/replacements/${encodeURIComponent(id)}/pending-work/${encodeURIComponent(pendingWorkId)}/dispose`,
+      { method: 'PATCH', json: body },
+    ),
+  addReplacementHandoverNote: (id: string, body: JsonBody) =>
+    request<unknown>(
+      `/timetable/replacements/${encodeURIComponent(id)}/handover-notes`,
+      { method: 'POST', json: body },
     ),
   listHomeworkPage: (params?: HomeworkListParams) =>
     request<HomeworkAssignmentPage>(withQuery('/homework', params ?? {})),

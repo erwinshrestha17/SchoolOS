@@ -368,7 +368,14 @@ class AttendanceRepository {
     var result = TeacherAttendanceSubmitResult(
       serverStatus: _parseAttendanceServerSyncStatus(data['syncStatus']),
       replayed: data['replayed'] as bool? ?? false,
+      rejectionReason: data['rejectionReason'] as String?,
     );
+    if (result.isAuthorizationRevoked) {
+      throw const PermissionException(
+        'Your teaching assignment changed. This attendance draft can no longer be submitted.',
+        'TEACHER_SCOPE_DENIED',
+      );
+    }
     if (result.canClearDeviceDraft) {
       await _removeDraft(classSection.id, date);
     } else {
@@ -385,6 +392,7 @@ class AttendanceRepository {
           serverStatus: result.serverStatus,
           replayed: result.replayed,
           deviceReceiptPersisted: false,
+          rejectionReason: result.rejectionReason,
         );
       }
     }

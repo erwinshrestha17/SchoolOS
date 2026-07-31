@@ -8,6 +8,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
@@ -27,6 +28,10 @@ import {
   ResolveAdmissionRelationshipsDto,
 } from './dto/m1-admissions-hardening.dto';
 import { M1AdmissionsHardeningService } from './m1-admissions-hardening.service';
+
+/** Matches StudentsController guardian-admin throttle (10/min). */
+const GUARDIAN_ADMIN_RATE_LIMIT = 10;
+const GUARDIAN_ADMIN_RATE_TTL_MS = 60_000;
 
 @Controller('admissions/m1')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
@@ -80,6 +85,12 @@ export class M1AdmissionsHardeningController {
   }
 
   @Delete('students/:studentId/guardians/:guardianId')
+  @Throttle({
+    default: {
+      limit: GUARDIAN_ADMIN_RATE_LIMIT,
+      ttl: GUARDIAN_ADMIN_RATE_TTL_MS,
+    },
+  })
   @Permissions(
     'guardians:update',
     'guardians:verify',

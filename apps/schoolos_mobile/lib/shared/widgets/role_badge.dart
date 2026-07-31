@@ -3,34 +3,61 @@ import '../../app/design_system/app_radius.dart';
 import '../../app/theme/app_colors.dart';
 
 class RoleBadge extends StatelessWidget {
-  const RoleBadge({super.key, required this.role});
+  const RoleBadge({super.key, required this.role, this.label});
 
   final String role;
+  final String? label;
+
+  static String displayLabel(String role) {
+    switch (role.trim().toUpperCase()) {
+      case 'PARENT':
+      case 'GUARDIAN':
+        return 'Parent / Guardian';
+      case 'TEACHER':
+        return 'Teacher';
+      case 'STUDENT':
+        return 'Student';
+      case 'DRIVER':
+        return 'Driver';
+      case 'STAFF':
+        return 'Staff';
+      case 'PRINCIPAL':
+        return 'Principal';
+      case 'ADMIN':
+        return 'Admin';
+      default:
+        final cleaned = role.trim();
+        if (cleaned.isEmpty) return 'User';
+        return cleaned[0].toUpperCase() + cleaned.substring(1).toLowerCase();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-
-    final (bgColor, fgColor) = _getColors(role.toUpperCase(), isDark);
+    final normalized = role.toUpperCase();
+    final (bgColor, fgColor) = _getColors(normalized, isDark);
+    final text = label ?? displayLabel(role);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(AppRadius.sm),
+        border: Border.all(color: fgColor.withValues(alpha: 0.35)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(_getIcon(role.toUpperCase()), color: fgColor, size: 12),
+          Icon(_getIcon(normalized), color: fgColor, size: 13),
           const SizedBox(width: 4),
           Text(
-            role.toUpperCase(),
+            text,
             style: TextStyle(
               color: fgColor,
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
               letterSpacing: 0.0,
             ),
           ),

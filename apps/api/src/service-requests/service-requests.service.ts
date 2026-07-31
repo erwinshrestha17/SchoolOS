@@ -8,6 +8,7 @@ import {
 import {
   GuardianCapability,
   Prisma,
+  SchoolServiceRequestCategory,
   SchoolServiceRequestNoteVisibility,
   SchoolServiceRequestPriority,
   SchoolServiceRequestStatus,
@@ -24,6 +25,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import {
   AddSchoolServiceRequestNoteDto,
   CreateSchoolServiceRequestDto,
+  EscalateSchoolServiceRequestDto,
   ListSchoolServiceRequestsDto,
   ReasonedSchoolServiceRequestDto,
   ResolveSchoolServiceRequestDto,
@@ -112,6 +114,25 @@ export class ServiceRequestsService {
       );
     }
 
+    // P0-11: dedupe active general complaints for the same child + category.
+    if (dto.type === SchoolServiceRequestType.GENERAL_COMPLAINT) {
+      const duplicate = await this.prisma.schoolServiceRequest.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          studentId,
+          type: SchoolServiceRequestType.GENERAL_COMPLAINT,
+          category: dto.category,
+          status: { in: [...ACTIVE_REQUEST_STATUSES] },
+        },
+        select: { id: true },
+      });
+      if (duplicate) {
+        throw new ConflictException(
+          'An open request already exists for this child and category. Update that case or wait for the school to close it.',
+        );
+      }
+    }
+
     const priority = dto.priority ?? SchoolServiceRequestPriority.NORMAL;
     const now = new Date();
     const responseDeadline = new Date(
@@ -121,22 +142,57 @@ export class ServiceRequestsService {
           60 *
           1000,
     );
-    const request = await this.prisma.schoolServiceRequest.create({
-      data: {
-        tenantId: actor.tenantId,
-        studentId,
-        invoiceId,
-        requestedById: actor.userId,
-        type: dto.type,
-        category: dto.category,
-        priority,
-        subject: dto.subject.trim(),
-        description: dto.description.trim(),
-        idempotencyKey: dto.idempotencyKey,
-        responseDeadline,
-      },
-      select: { id: true },
-    });
+
+    let request: { id: string };
+    try {
+      request = await this.prisma.schoolServiceRequest.create({
+        data: {
+          tenantId: actor.tenantId,
+          studentId,
+          invoiceId,
+          requestedById: actor.userId,
+          type: dto.type,
+          category: dto.category,
+          priority,
+          subject: dto.subject.trim(),
+          description: dto.description.trim(),
+          idempotencyKey: dto.idempotencyKey,
+          responseDeadline,
+        },
+        select: { id: true },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        const raced = await this.prisma.schoolServiceRequest.findFirst({
+          where: {
+            tenantId: actor.tenantId,
+            idempotencyKey: dto.idempotencyKey,
+          },
+          select: {
+            id: true,
+            requestedById: true,
+            studentId: true,
+            type: true,
+          },
+        });
+        if (
+          raced &&
+          raced.requestedById === actor.userId &&
+          raced.studentId === studentId &&
+          raced.type === dto.type
+        ) {
+          return this.getParentRequest(raced.id, actor);
+        }
+        throw new ConflictException(
+          'Service-request idempotency key was already used.',
+        );
+      }
+      throw error;
+    }
+
     await this.auditService.record({
       action: 'service_request_created',
       resource: 'school_service_request',
@@ -573,6 +629,7 @@ export class ServiceRequestsService {
   ) {
     this.assertManager(actor, true);
     const request = await this.getManagerMutableRequest(requestId, actor);
+    this.assertIndependentResolver(request, actor);
     const now = new Date();
     const result = await this.prisma.schoolServiceRequest.updateMany({
       where: {
@@ -602,11 +659,20 @@ export class ServiceRequestsService {
 
   async escalateRequest(
     requestId: string,
-    dto: ReasonedSchoolServiceRequestDto,
+    dto: EscalateSchoolServiceRequestDto,
     actor: AuthContext,
   ) {
     this.assertManager(actor, true);
     const request = await this.getManagerMutableRequest(requestId, actor);
+    if (
+      request.assignedToId &&
+      request.assignedToId === dto.assignedToUserId
+    ) {
+      throw new ConflictException(
+        'Escalation must reassign the case to a different manager.',
+      );
+    }
+    await this.assertEligibleManager(dto.assignedToUserId, actor);
     const now = new Date();
     const escalationDeadline = new Date(now.getTime() + 24 * 60 * 60 * 1000);
     const result = await this.prisma.schoolServiceRequest.updateMany({
@@ -620,6 +686,13 @@ export class ServiceRequestsService {
         escalatedAt: now,
         escalatedById: actor.userId,
         escalationReason: dto.reason.trim(),
+        assignedToId: dto.assignedToUserId,
+        assignedById: actor.userId,
+        assignedAt: now,
+        status:
+          request.status === SchoolServiceRequestStatus.OPEN
+            ? SchoolServiceRequestStatus.ASSIGNED
+            : request.status,
         responseDeadline:
           request.responseDeadline < escalationDeadline
             ? request.responseDeadline
@@ -633,10 +706,34 @@ export class ServiceRequestsService {
       request,
       actor,
       'service_request_escalated',
-      request.status,
+      request.status === SchoolServiceRequestStatus.OPEN
+        ? SchoolServiceRequestStatus.ASSIGNED
+        : request.status,
       dto.reason,
+      { assignedToId: dto.assignedToUserId },
     );
     return this.getManagerRequest(request.id, actor);
+  }
+
+  private assertIndependentResolver(
+    request: {
+      requestedById: string;
+      assignedToId: string | null;
+      type: SchoolServiceRequestType;
+    },
+    actor: AuthContext,
+  ) {
+    // P0-11: requester and first assigned responder cannot close the dispute.
+    if (request.requestedById === actor.userId) {
+      throw new ForbiddenException(
+        'Independent review required: you cannot resolve your own service request.',
+      );
+    }
+    if (request.assignedToId && request.assignedToId === actor.userId) {
+      throw new ForbiddenException(
+        'Independent review required: the assigned responder cannot resolve this case. Escalate to another manager first.',
+      );
+    }
   }
 
   private async validateRequestContext(
@@ -644,6 +741,8 @@ export class ServiceRequestsService {
     dto: CreateSchoolServiceRequestDto,
     actor: AuthContext,
   ) {
+    await this.requireCategoryCapability(studentId, dto.category, actor);
+
     if (dto.type === SchoolServiceRequestType.PAYMENT_DISPUTE) {
       await requireGuardianCapability(
         this.prisma,
@@ -682,6 +781,41 @@ export class ServiceRequestsService {
       );
     }
     return null;
+  }
+
+  private async requireCategoryCapability(
+    studentId: string,
+    category: SchoolServiceRequestCategory,
+    actor: AuthContext,
+  ) {
+    // COMPLAINT_OR_CORRECTION_SUBMIT is already required by assertParentStudent.
+    // Category-specific capabilities keep P0-11 requester authority honest.
+    if (category === SchoolServiceRequestCategory.ATTENDANCE) {
+      await requireGuardianCapability(
+        this.prisma,
+        actor,
+        studentId,
+        GuardianCapability.ATTENDANCE_VIEW,
+      );
+      return;
+    }
+    if (category === SchoolServiceRequestCategory.ACADEMICS) {
+      await requireGuardianCapability(
+        this.prisma,
+        actor,
+        studentId,
+        GuardianCapability.ACADEMICS_VIEW,
+      );
+      return;
+    }
+    if (category === SchoolServiceRequestCategory.FEES_AND_PAYMENTS) {
+      await requireGuardianCapability(
+        this.prisma,
+        actor,
+        studentId,
+        GuardianCapability.FEES_VIEW,
+      );
+    }
   }
 
   private assertParent(actor: AuthContext) {

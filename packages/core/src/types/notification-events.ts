@@ -29,6 +29,43 @@ export const NOTIFICATION_EVENT_PRIORITIES = [
   "MANDATORY",
 ] as const;
 
+/**
+ * P0-09 roadmap severity vocabulary mapped onto existing
+ * NotificationEventPriority (do not invent a parallel Prisma enum).
+ *
+ * Emergency ≈ MANDATORY
+ * Urgent ≈ CRITICAL (verified absence, sudden closure)
+ * Action required ≈ IMPORTANT
+ * Informational ≈ NORMAL
+ * Digest ≈ NORMAL (batch/summary events; no dedicated priority yet)
+ */
+export const ROADMAP_NOTIFICATION_SEVERITIES = [
+  "EMERGENCY",
+  "URGENT",
+  "ACTION_REQUIRED",
+  "INFORMATIONAL",
+  "DIGEST",
+] as const;
+
+export type RoadmapNotificationSeverity =
+  (typeof ROADMAP_NOTIFICATION_SEVERITIES)[number];
+
+export function roadmapSeverityFromEventPriority(
+  priority: string | null | undefined,
+): RoadmapNotificationSeverity {
+  switch (priority) {
+    case "MANDATORY":
+      return "EMERGENCY";
+    case "CRITICAL":
+      return "URGENT";
+    case "IMPORTANT":
+      return "ACTION_REQUIRED";
+    case "NORMAL":
+    default:
+      return "INFORMATIONAL";
+  }
+}
+
 export const NOTIFICATION_CHANNELS = [
   "IN_APP",
   "PUSH",
@@ -76,7 +113,8 @@ export const NOTIFICATION_EVENT_CATALOGUE: Readonly<
   ATTENDANCE_STUDENT_ABSENT: {
     sourceModule: "M2_ATTENDANCE",
     sourceEntityType: "attendance_record",
-    defaultPriority: "IMPORTANT",
+    // P0-09: verified absence is roadmap Urgent → CRITICAL (quiet-hours bypass).
+    defaultPriority: "CRITICAL",
   },
   ATTENDANCE_STUDENT_LATE: {
     sourceModule: "M2_ATTENDANCE",

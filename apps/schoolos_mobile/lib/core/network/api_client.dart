@@ -260,7 +260,16 @@ class ApiClient {
                 normalized.contains('feature')) {
               return const ModuleLockedException();
             }
-            return const PermissionException();
+            final isAccessChanged =
+                errorCode == 'GUARDIAN_CAPABILITY_DENIED' ||
+                errorCode == 'TEACHER_SCOPE_DENIED';
+            return PermissionException(
+              isAccessChanged
+                  ? 'Your access to this school data changed. Cached information was cleared.'
+                  : 'You do not have permission to view this information.',
+              errorCode ??
+                  (isAccessChanged ? 'ACCESS_CHANGED' : 'PERMISSION_DENIED'),
+            );
           } else if (statusCode == HttpStatus.notFound) {
             return const NotFoundAppException();
           } else if (statusCode == HttpStatus.conflict) {

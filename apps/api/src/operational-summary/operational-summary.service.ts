@@ -549,6 +549,13 @@ export class OperationalSummaryService {
               '/dashboard/academics/report-cards',
             ),
             this.def(
+              'pendingReportCardCorrections',
+              'reportCardCorrectionRequest',
+              { tenantId, status: 'PENDING' },
+              'Review result corrections',
+              '/dashboard/academics/report-cards',
+            ),
+            this.def(
               'promotionReady',
               'promotionRecord',
               { tenantId, status: 'READY' },

@@ -5,6 +5,9 @@ import '../storage/app_preferences_service.dart';
 import '../storage/private_data_cleanup_service.dart';
 import '../storage/secure_storage_service.dart';
 import '../errors/app_exception.dart';
+import 'biometric_auth_service.dart';
+import 'biometric_prompt_state.dart';
+import 'biometric_session_store.dart';
 import 'data/auth_repository.dart';
 import 'models/auth_user.dart';
 import 'models/login_request.dart';
@@ -12,7 +15,7 @@ import 'mobile_role.dart';
 import '../network/api_client.dart';
 import '../notifications/device_installation_service.dart';
 
-enum AuthStatus { unauthenticated, loading, authenticated }
+enum AuthStatus { unauthenticated, loading, authenticated, biometricLocked }
 
 class AuthState {
   AuthState({required this.status, this.role, this.token, this.user});
@@ -53,12 +56,16 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final appPrefs = ref.watch(appPreferencesServiceProvider);
   final secureStorage = ref.watch(secureStorageServiceProvider);
   final installationService = ref.watch(deviceInstallationServiceProvider);
+  final biometricStore = ref.watch(biometricSessionStoreProvider);
+  final biometricAuth = ref.watch(biometricAuthServiceProvider);
   return AuthNotifier(
     tokenStorage,
     authRepository,
     appPrefs,
     PrivateDataCleanupService(appPrefs, secureStorage),
     installationService,
+    biometricStore,
+    biometricAuth,
   );
 });
 
@@ -69,9 +76,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
     this._appPrefs, [
     PrivateDataCleanupService? privateDataCleanup,
     DeviceInstallationService? deviceInstallationService,
+    BiometricSessionStore? biometricStore,
+    BiometricAuthService? biometricAuth,
   ]) : _privateDataCleanup =
            privateDataCleanup ?? PrivateDataCleanupService(_appPrefs),
        _deviceInstallationService = deviceInstallationService,
+       _biometricStore = biometricStore,
+       _biometricAuth = biometricAuth,
        super(AuthState(status: AuthStatus.unauthenticated)) {
     _authRepository.client.onSessionExpired = () {
       logout();
@@ -84,6 +95,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final AppPreferencesService _appPrefs;
   final PrivateDataCleanupService _privateDataCleanup;
   final DeviceInstallationService? _deviceInstallationService;
+  final BiometricSessionStore? _biometricStore;
+  final BiometricAuthService? _biometricAuth;
 
   /// Guards against overlapping sign-outs. Every in-flight request that fails
   /// with 401 asks for a logout, so a single expired session can request one
@@ -91,6 +104,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// re-run private-data cleanup and re-emit auth state once per failure.
   Future<void>? _logoutInFlight;
   bool _sessionCleared = false;
+  bool _biometricUnlockedThisProcess = false;
+  bool _resumeAfterBiometricUnlock = false;
 
   static const _supportedMobileRoles = {
     MobileRole.parent,
@@ -102,7 +117,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
     MobileRole.driver,
   };
 
+  static bool supportsBiometricPersona(
+    String? role, {
+    List<String> roles = const [],
+  }) {
+    final normalized = MobileRole.normalize(role, roles: roles);
+    return normalized == MobileRole.parent ||
+        normalized == MobileRole.teacher ||
+        normalized == MobileRole.principal;
+  }
+
   Future<void> loadSession() async {
+    final afterBiometricUnlock = _resumeAfterBiometricUnlock;
+    _resumeAfterBiometricUnlock = false;
     state = state.copyWith(status: AuthStatus.loading);
     final token = await _tokenStorage.getAccessToken();
     final role = await _tokenStorage.getUserRole();
@@ -112,10 +139,23 @@ class AuthNotifier extends StateNotifier<AuthState> {
         await logout();
         return;
       }
-      // Pre-populate role and token into state during load
-      state = AuthState(status: AuthStatus.loading, role: role, token: token);
 
       final cachedUser = await _loadCachedUser();
+
+      if (!afterBiometricUnlock &&
+          !_biometricUnlockedThisProcess &&
+          cachedUser != null &&
+          await _shouldRequireBiometricGate(cachedUser)) {
+        state = AuthState(
+          status: AuthStatus.biometricLocked,
+          role: role,
+          user: cachedUser,
+        );
+        return;
+      }
+
+      // Pre-populate role and token into state during load
+      state = AuthState(status: AuthStatus.loading, role: role, token: token);
 
       try {
         // Verify session by fetching user profile from server
@@ -138,7 +178,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
           user: user,
         );
       } on AuthException catch (_) {
-        // Session expired, force logout
         await logout();
       } on NetworkException catch (_) {
         await _restoreCachedOfflineSession(
@@ -158,6 +197,135 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } else {
       state = AuthState(status: AuthStatus.unauthenticated);
     }
+  }
+
+  Future<bool> _shouldRequireBiometricGate(AuthUser user) async {
+    final store = _biometricStore;
+    final bio = _biometricAuth;
+    if (store == null || bio == null) return false;
+    if (!store.isEnabled(user.id, tenantId: user.tenantId)) return false;
+    if (!await bio.isSupported) {
+      await store.clearForUser(user.id, tenantId: user.tenantId);
+      return false;
+    }
+    return true;
+  }
+
+  /// True when tokens remain and biometric unlock is enabled for that user.
+  Future<bool> isBiometricUnlockAvailable() async {
+    final token = await _tokenStorage.getAccessToken();
+    final role = await _tokenStorage.getUserRole();
+    if (token == null || role == null) return false;
+    if (_tokenStorage.isAccessTokenExpired(token)) return false;
+    final cachedUser = await _loadCachedUser();
+    if (cachedUser == null) return false;
+    return _shouldRequireBiometricGate(cachedUser);
+  }
+
+  Future<bool> unlockWithBiometrics() async {
+    final store = _biometricStore;
+    final bio = _biometricAuth;
+    if (store == null || bio == null) return false;
+
+    if (state.status != AuthStatus.biometricLocked || state.user == null) {
+      final available = await isBiometricUnlockAvailable();
+      if (!available) return false;
+      final cachedUser = await _loadCachedUser();
+      final role = await _tokenStorage.getUserRole();
+      if (cachedUser == null || role == null) return false;
+      state = AuthState(
+        status: AuthStatus.biometricLocked,
+        role: role,
+        user: cachedUser,
+      );
+    }
+
+    final user = state.user;
+    if (user == null) return false;
+
+    final capability = await bio.resolveCapability();
+    final ok = await bio.authenticate(
+      reason: 'Unlock SchoolOS with ${bio.biometricName(capability)}',
+    );
+    if (ok) {
+      await store.resetFailures(user.id, tenantId: user.tenantId);
+      _biometricUnlockedThisProcess = true;
+      _resumeAfterBiometricUnlock = true;
+      await loadSession();
+      return state.status == AuthStatus.authenticated;
+    }
+
+    final failures = await store.recordFailure(
+      user.id,
+      tenantId: user.tenantId,
+    );
+    if (failures >= BiometricSessionStore.maxFailuresBeforeDisable) {
+      await usePasswordInsteadOfBiometrics();
+    }
+    return false;
+  }
+
+  /// Clears biometric unlock and session so the user can sign in with password.
+  Future<void> usePasswordInsteadOfBiometrics() async {
+    final user = state.user;
+    if (user != null) {
+      await _biometricStore?.clearForUser(user.id, tenantId: user.tenantId);
+    }
+    await logout();
+  }
+
+  Future<bool> enableBiometricLogin() async {
+    final store = _biometricStore;
+    final bio = _biometricAuth;
+    final user = state.user;
+    if (store == null || bio == null || user == null) return false;
+    if (!supportsBiometricPersona(user.role, roles: user.roles)) return false;
+    if (!await bio.isSupported) return false;
+
+    final capability = await bio.resolveCapability();
+    final ok = await bio.authenticate(
+      reason:
+          'Confirm ${bio.biometricName(capability)} to enable biometric login',
+    );
+    if (!ok) return false;
+
+    await store.setEnabled(user.id, tenantId: user.tenantId, enabled: true);
+    return true;
+  }
+
+  Future<void> disableBiometricLogin() async {
+    final user = state.user;
+    if (user == null) return;
+    await _biometricStore?.setEnabled(
+      user.id,
+      tenantId: user.tenantId,
+      enabled: false,
+    );
+    await _biometricStore?.setPromptState(
+      user.id,
+      tenantId: user.tenantId,
+      state: BiometricPromptState.dismissed,
+    );
+  }
+
+  Future<void> dismissBiometricOffer() async {
+    final user = state.user;
+    if (user == null) return;
+    await _biometricStore?.setPromptState(
+      user.id,
+      tenantId: user.tenantId,
+      state: BiometricPromptState.dismissed,
+    );
+  }
+
+  Future<void> markBiometricSoftSuggested() async {
+    final user = state.user;
+    if (user == null) return;
+    await _biometricStore?.setPromptState(
+      user.id,
+      tenantId: user.tenantId,
+      state: BiometricPromptState.softSuggested,
+    );
   }
 
   /// Sign in via backend API
@@ -187,6 +355,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Remove the prior account before writing any part of the new session.
       // The access token is written last so an interrupted account switch
       // cannot combine a new token with the previous cached identity or role.
+      final previousUser = await _loadCachedUser();
+      if (previousUser != null && previousUser.id != response.user.id) {
+        await _biometricStore?.clearForUser(
+          previousUser.id,
+          tenantId: previousUser.tenantId,
+        );
+      }
+
       await _tokenStorage.clearTokens();
       await _privateDataCleanup.clearPrivateData();
       await _tokenStorage.saveRefreshToken(response.tokenPair.refreshToken);
@@ -197,6 +373,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await _tokenStorage.saveAccessToken(response.tokenPair.accessToken);
 
       _sessionCleared = false;
+      _biometricUnlockedThisProcess = true;
       state = AuthState(
         status: AuthStatus.authenticated,
         role: verifiedRole,
@@ -338,6 +515,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> _performLogout() async {
     state = state.copyWith(status: AuthStatus.loading);
+    final userId = state.user?.id;
+    final tenantId = state.user?.tenantId;
     try {
       await _authRepository.logout(
         refreshToken: await _tokenStorage.getRefreshToken(),
@@ -347,9 +526,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } catch (_) {
       // Ignore network errors during logout
     } finally {
+      if (userId != null) {
+        await _biometricStore?.clearForUser(userId, tenantId: tenantId);
+      }
       await _tokenStorage.clearTokens();
       await _privateDataCleanup.clearPrivateData();
       _sessionCleared = true;
+      _biometricUnlockedThisProcess = false;
       state = AuthState(status: AuthStatus.unauthenticated);
     }
   }

@@ -4,8 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import '../core/auth/auth_provider.dart';
 import '../core/auth/mobile_role.dart';
+import '../features/auth/presentation/biometric_unlock_screen.dart';
 import '../features/auth/presentation/forgot_password_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
+import '../features/settings/presentation/biometric_login_settings_screen.dart';
 import '../features/dashboard/presentation/home_redirect_screen.dart';
 import '../features/dashboard/presentation/role_dashboards/admin_dashboard.dart';
 import '../features/dashboard/presentation/role_dashboards/driver_dashboard.dart';
@@ -45,8 +47,11 @@ import '../features/parent/presentation/screens/parent_transport_screen.dart';
 import '../features/parent/presentation/screens/parent_service_requests_screen.dart';
 import '../features/parent/presentation/screens/parent_weekly_progress_screen.dart';
 import '../features/principal/presentation/screens/principal_screens.dart';
+import '../features/profile/presentation/about_screen.dart';
 import '../features/profile/presentation/change_password_screen.dart';
+import '../features/profile/presentation/logged_in_devices_screen.dart';
 import '../features/profile/presentation/profile_screen.dart';
+import '../features/settings/presentation/notification_preferences_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/splash/splash_screen.dart';
 import '../features/staff/presentation/screens/staff_attendance_screen.dart';
@@ -57,6 +62,8 @@ import '../shared/widgets/app_empty_state.dart';
 import '../shared/widgets/app_scaffold.dart';
 import '../shared/widgets/school_os_app_shell.dart';
 import 'constants/app_routes.dart';
+
+final rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   // The router must outlive individual auth transitions. Watching `authProvider`
@@ -73,6 +80,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   ref.onDispose(authRefresh.dispose);
 
   final router = GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: AppRoutes.splash,
     refreshListenable: authRefresh,
     routes: [
@@ -89,6 +97,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ForgotPasswordScreen(),
       ),
       GoRoute(
+        path: AppRoutes.biometricUnlock,
+        builder: (context, state) => const BiometricUnlockScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.home,
         builder: (context, state) => const HomeRedirectScreen(),
       ),
@@ -101,8 +113,24 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ChangePasswordScreen(),
       ),
       GoRoute(
+        path: AppRoutes.loggedInDevices,
+        builder: (context, state) => const LoggedInDevicesScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.about,
+        builder: (context, state) => const AboutScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.settings,
         builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.biometricLogin,
+        builder: (context, state) => const BiometricLoginSettingsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.notificationPreferences,
+        builder: (context, state) => const NotificationPreferencesScreen(),
       ),
       GoRoute(
         path: AppRoutes.notifications,
@@ -535,6 +563,14 @@ String? resolveAuthRedirect(AuthState auth, String location) {
       location == AppRoutes.login ||
       location == AppRoutes.forgotPassword ||
       location == AppRoutes.splash;
+  final goingToBiometricUnlock = location == AppRoutes.biometricUnlock;
+
+  if (auth.status == AuthStatus.biometricLocked) {
+    if (goingToBiometricUnlock || location == AppRoutes.login) {
+      return null;
+    }
+    return AppRoutes.biometricUnlock;
+  }
 
   if (auth.status == AuthStatus.unauthenticated && !goingToPublic) {
     return AppRoutes.login;
@@ -542,7 +578,7 @@ String? resolveAuthRedirect(AuthState auth, String location) {
 
   if (auth.status != AuthStatus.authenticated) return null;
 
-  if (goingToPublic) return AppRoutes.home;
+  if (goingToPublic || goingToBiometricUnlock) return AppRoutes.home;
 
   if (auth.user?.mustChangePassword == true &&
       location != AppRoutes.changePassword) {

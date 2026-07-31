@@ -162,6 +162,8 @@ model TimetableSubstitution {
   timetableSlot     TimetableSlot @relation(fields: [timetableSlotId], references: [id], onDelete: Restrict)
   absentTeacher     Staff         @relation("AbsentTeacherSubstitutions", fields: [absentTeacherId], references: [id], onDelete: Restrict)
   substituteTeacher Staff?        @relation("SubstituteTeacherSubstitutions", fields: [substituteTeacherId], references: [id], onDelete: SetNull)
+  delegation        TeacherDelegation?
+  handoverNotes     TeacherHandoverNote[]
 
   @@index([tenantId, date, status])
   @@index([tenantId, absentTeacherId, date])

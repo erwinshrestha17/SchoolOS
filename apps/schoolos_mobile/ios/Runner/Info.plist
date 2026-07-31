@@ -26,6 +26,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSFaceIDUsageDescription</key>
+	<string>SchoolOS uses Face ID to unlock your signed-in session on this device. Biometric data never leaves your device.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>SchoolOS uses your location while a transport trip is active so parents and school staff can see the latest bus position.</string>
 	<key>UIApplicationSceneManifest</key>

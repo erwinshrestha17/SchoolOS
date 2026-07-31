@@ -44,6 +44,7 @@ import { RefreshSessionDto } from './dto/refresh-session.dto';
 import { RequestOtpLoginDto } from './dto/request-otp-login.dto';
 import { RequestPasswordRecoveryDto } from './dto/request-password-recovery.dto';
 import { VerifyOtpLoginDto } from './dto/verify-otp-login.dto';
+import { VerifyPasswordDto } from './dto/verify-password.dto';
 import { assertPasswordsMatch, assertStrongPassword } from './password-policy';
 
 const MAX_FAILED_LOGIN_ATTEMPTS = 5;
@@ -285,6 +286,35 @@ export class AuthService {
     return { success: true };
   }
 
+  async verifyPassword(auth: AuthContext, dto: VerifyPasswordDto) {
+    const { tenant, user } = await this.resolveTenantAndUserById(
+      auth.tenantId,
+      auth.userId,
+    );
+
+    if (!user.passwordHash) {
+      throw new BadRequestException('Current password is incorrect.');
+    }
+
+    const currentPasswordMatches = await bcrypt.compare(
+      dto.currentPassword,
+      user.passwordHash,
+    );
+
+    if (!currentPasswordMatches) {
+      throw new BadRequestException('Current password is incorrect.');
+    }
+
+    await this.auditService.record({
+      action: 'verify_password',
+      resource: 'auth',
+      tenantId: tenant.id,
+      userId: user.id,
+    });
+
+    return { success: true, message: 'Password verified.' };
+  }
+
   async changePassword(
     auth: AuthContext,
     dto: ChangePasswordDto,
@@ -322,7 +352,10 @@ export class AuthService {
       await this.getPasswordIdentityHints(user.id, user.email),
     );
 
-    const currentSessionId = await this.resolveRefreshSessionId(cookieHeader);
+    const currentSessionId = await this.resolveRefreshSessionId(
+      cookieHeader,
+      undefined,
+    );
     const logoutOtherDevices = dto.logoutOtherDevices ?? true;
 
     await this.prisma.user.update({
@@ -701,6 +734,38 @@ export class AuthService {
       tenantId: auth.tenantId,
       userId: auth.userId,
       resourceId: sessionId,
+    });
+
+    return { success: true as const };
+  }
+
+  async revokeOtherSessions(
+    auth: AuthContext,
+    dto: { refreshToken?: string },
+    cookieHeader?: string,
+  ) {
+    const currentSessionId = await this.resolveRefreshSessionId(
+      cookieHeader,
+      dto.refreshToken,
+    );
+
+    if (!currentSessionId) {
+      throw new BadRequestException(
+        'Your current session could not be identified. Sign in again and retry.',
+      );
+    }
+
+    await this.revokeUserSessions(auth.userId, {
+      exceptRefreshTokenId: currentSessionId,
+      reason: 'user_revoked_other_sessions',
+    });
+
+    await this.auditService.record({
+      action: 'revoke_other_sessions',
+      resource: 'auth',
+      tenantId: auth.tenantId,
+      userId: auth.userId,
+      after: { keptSessionId: currentSessionId },
     });
 
     return { success: true as const };
@@ -1125,8 +1190,13 @@ export class AuthService {
     });
   }
 
-  private async resolveRefreshSessionId(cookieHeader?: string) {
-    const rawToken = parseCookie(cookieHeader, this.getRefreshCookieName());
+  private async resolveRefreshSessionId(
+    cookieHeader?: string,
+    refreshToken?: string,
+  ) {
+    const rawToken =
+      refreshToken?.trim() ||
+      parseCookie(cookieHeader, this.getRefreshCookieName());
     if (!rawToken) {
       return null;
     }

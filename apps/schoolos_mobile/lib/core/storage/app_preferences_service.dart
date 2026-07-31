@@ -12,12 +12,14 @@ class AppPreferencesService {
 
   final SharedPreferences _prefs;
 
+  /// Exposed for user-scoped stores that share the same preferences backend.
+  SharedPreferences get prefs => _prefs;
+
   static const String _themeModeKey = 'app_theme_mode';
   static const String _languageKey = 'app_language_code';
   static const String _tenantKey = 'app_tenant_code';
   static const String _selectedChildIdKey = 'app_selected_child_id';
   static const String _dateDisplayPreferenceKey = 'app_date_display_preference';
-  static const String _biometricEnabledKey = 'app_biometric_enabled';
   static const String _cachedUserKey = 'app_cached_user';
   static const String _privateCachePrefix = 'app_private_read_cache_';
 
@@ -63,14 +65,6 @@ class AppPreferencesService {
 
   String? getDateDisplayPreference() {
     return _prefs.getString(_dateDisplayPreferenceKey);
-  }
-
-  Future<void> saveBiometricEnabled(bool enabled) async {
-    await _prefs.setBool(_biometricEnabledKey, enabled);
-  }
-
-  bool getBiometricEnabled({bool defaultValue = false}) {
-    return _prefs.getBool(_biometricEnabledKey) ?? defaultValue;
   }
 
   Future<void> saveCachedUser(String userJson) async {

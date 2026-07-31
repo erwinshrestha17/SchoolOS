@@ -690,13 +690,14 @@ export class TeacherScopeService {
       return { scopeVersion: '0' };
     }
 
-    const now = new Date();
+    // Include revoked/expired rows so revocation bumps the version. Filtering
+    // to ACTIVE-only can hide a cutover because the revoked row drops out of
+    // the aggregation while the replacement may belong to another staff.
     const [assignmentMax, delegationMax] = await Promise.all([
       this.prisma.teacherAssignment.aggregate({
         where: {
           tenantId: actor.tenantId,
           staffId,
-          status: 'ACTIVE',
         },
         _max: { updatedAt: true },
       }),
@@ -704,8 +705,6 @@ export class TeacherScopeService {
         where: {
           tenantId: actor.tenantId,
           recipientStaffId: staffId,
-          status: 'ACTIVE',
-          effectiveUntil: { gte: now },
         },
         _max: { updatedAt: true },
       }),

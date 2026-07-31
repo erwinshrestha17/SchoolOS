@@ -2048,6 +2048,7 @@ export class AdmissionCasesService implements OnModuleInit {
           },
         });
 
+        const admissionDate = this.admissionDate(metadata);
         const enrollment = await tx.enrollment.create({
           data: {
             tenantId: actor.tenantId,
@@ -2056,9 +2057,11 @@ export class AdmissionCasesService implements OnModuleInit {
             classId: classroom.id,
             sectionId: section?.id ?? null,
             rollNumber: metadata.rollNumber ?? null,
-            admissionDate: this.admissionDate(metadata),
+            admissionDate,
             mediumOfInstruction: metadata.mediumOfInstruction ?? 'English',
             status: EnrollmentStatus.ACTIVE,
+            effectiveFrom: admissionDate,
+            effectiveUntil: null,
           },
         });
 

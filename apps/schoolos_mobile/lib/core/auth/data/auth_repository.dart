@@ -1,4 +1,5 @@
 import '../../network/api_client.dart';
+import '../models/auth_session.dart';
 import '../models/auth_user.dart';
 import '../models/login_request.dart';
 import '../models/login_response.dart';
@@ -45,6 +46,13 @@ class AuthRepository {
     return TokenPair.fromJson(response.data as Map<String, dynamic>);
   }
 
+  Future<void> verifyPassword({required String currentPassword}) async {
+    await client.post(
+      '/auth/verify-password',
+      data: {'currentPassword': currentPassword},
+    );
+  }
+
   Future<String> changePassword({
     required String currentPassword,
     required String newPassword,
@@ -77,6 +85,30 @@ class AuthRepository {
     await client.post(
       '/auth/logout',
       data: {'refreshToken': ?refreshToken, 'installationId': ?installationId},
+    );
+  }
+
+  Future<List<AuthSession>> listSessions() async {
+    final response = await client.get('/auth/sessions');
+    final data = response.data;
+    final items = data is Map<String, dynamic>
+        ? data['items'] as List<dynamic>? ?? const []
+        : const [];
+    return items
+        .whereType<Map<String, dynamic>>()
+        .map(AuthSession.fromJson)
+        .where((session) => session.id.isNotEmpty)
+        .toList();
+  }
+
+  Future<void> revokeSession(String sessionId) async {
+    await client.post('/auth/sessions/$sessionId/revoke');
+  }
+
+  Future<void> revokeOtherSessions({required String refreshToken}) async {
+    await client.post(
+      '/auth/sessions/revoke-others',
+      data: {'refreshToken': refreshToken},
     );
   }
 }

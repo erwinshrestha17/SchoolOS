@@ -63,6 +63,18 @@ describe('M1AdmissionsHardeningController contracts', () => {
       'users:reset_password',
       'student_documents:manage',
     ]);
+    expect(
+      Reflect.getMetadata(
+        'THROTTLER:LIMITdefault',
+        M1AdmissionsHardeningController.prototype.removeGuardianAccess,
+      ),
+    ).toBe(10);
+    expect(
+      Reflect.getMetadata(
+        'THROTTLER:TTLdefault',
+        M1AdmissionsHardeningController.prototype.removeGuardianAccess,
+      ),
+    ).toBe(60_000);
     expect(getRoutePermissions('generateIdCard')).toEqual([
       'student_documents:manage',
     ]);

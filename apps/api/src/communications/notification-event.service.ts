@@ -313,7 +313,10 @@ function attendanceStatusesForEvent(
   switch (type) {
     case 'ATTENDANCE_STUDENT_ABSENT':
     case 'ATTENDANCE_STUDENT_CONSECUTIVE_ABSENCE':
-      return [AttendanceStatus.ABSENT];
+      return [
+        AttendanceStatus.ABSENT,
+        AttendanceStatus.UNAUTHORIZED_DEPARTURE,
+      ];
     case 'ATTENDANCE_STUDENT_LATE':
       return [AttendanceStatus.LATE];
     case 'ATTENDANCE_STUDENT_LEAVE':
@@ -323,6 +326,7 @@ function attendanceStatusesForEvent(
         AttendanceStatus.SICK_LEAVE,
         AttendanceStatus.EXCUSED_LEAVE,
         AttendanceStatus.UNEXCUSED_LEAVE,
+        AttendanceStatus.EARLY_AUTHORIZED_DEPARTURE,
       ];
     default:
       return [];

@@ -122,12 +122,17 @@ class _PrincipalAttentionScreenState
               items: _list(data['items']),
               actionBuilder: (item) {
                 final route = _string(item['route']);
-                if (!route.startsWith(AppRoutes.principalServiceRequests)) {
+                // Drill into the owning principal module for every attention
+                // queue item that carries a /principal/... route.
+                if (!route.startsWith('/principal/')) {
                   return null;
                 }
                 return IconButton(
-                  tooltip: 'Review parent request',
-                  onPressed: () => context.go(route),
+                  tooltip: _string(
+                    item['nextAction'],
+                    fallback: 'Open owning module',
+                  ),
+                  onPressed: () => _go(context, route),
                   icon: const Icon(Icons.chevron_right_rounded),
                 );
               },

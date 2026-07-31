@@ -4,10 +4,15 @@ class AppRoutes {
   static const splash = '/splash';
   static const login = '/login';
   static const forgotPassword = '/forgot-password';
+  static const biometricUnlock = '/auth/biometric-unlock';
   static const home = '/home';
   static const profile = '/profile';
   static const changePassword = '/profile/security/change-password';
+  static const loggedInDevices = '/profile/security/devices';
+  static const about = '/profile/about';
   static const settings = '/settings';
+  static const biometricLogin = '/settings/security/biometric';
+  static const notificationPreferences = '/settings/notifications';
   static const notifications = '/notifications';
   static const notices = '/notices';
 

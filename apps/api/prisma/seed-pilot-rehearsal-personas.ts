@@ -348,36 +348,48 @@ async function seedStudentWithGuardian(input: {
     },
   });
 
-  await prisma.enrollment.upsert({
+  const admissionDate = date('2026-04-10');
+  const existingEnrollment = await prisma.enrollment.findFirst({
     where: {
-      tenantId_academicYearId_studentId: {
-        tenantId: input.tenantId,
-        academicYearId: input.academicYearId,
-        studentId: student.id,
-      },
-    },
-    update: {
-      classId: input.classId,
-      sectionId: input.sectionId,
-      rollNumber: input.roll,
-      admissionNumber: code,
-      admissionDate: date('2026-04-10'),
-      mediumOfInstruction: 'English',
-      status: EnrollmentStatus.ACTIVE,
-    },
-    create: {
       tenantId: input.tenantId,
       academicYearId: input.academicYearId,
       studentId: student.id,
-      classId: input.classId,
-      sectionId: input.sectionId,
-      rollNumber: input.roll,
-      admissionNumber: code,
-      admissionDate: date('2026-04-10'),
-      mediumOfInstruction: 'English',
       status: EnrollmentStatus.ACTIVE,
+      effectiveUntil: null,
     },
   });
+  if (existingEnrollment) {
+    await prisma.enrollment.update({
+      where: { id: existingEnrollment.id },
+      data: {
+        classId: input.classId,
+        sectionId: input.sectionId,
+        rollNumber: input.roll,
+        admissionNumber: code,
+        admissionDate,
+        mediumOfInstruction: 'English',
+        status: EnrollmentStatus.ACTIVE,
+        effectiveUntil: null,
+      },
+    });
+  } else {
+    await prisma.enrollment.create({
+      data: {
+        tenantId: input.tenantId,
+        academicYearId: input.academicYearId,
+        studentId: student.id,
+        classId: input.classId,
+        sectionId: input.sectionId,
+        rollNumber: input.roll,
+        admissionNumber: code,
+        admissionDate,
+        mediumOfInstruction: 'English',
+        status: EnrollmentStatus.ACTIVE,
+        effectiveFrom: admissionDate,
+        effectiveUntil: null,
+      },
+    });
+  }
 
   return student;
 }

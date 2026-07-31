@@ -45,8 +45,8 @@ import {
 import { ServiceRequestsService } from '../service-requests/service-requests.service';
 import {
   AddSchoolServiceRequestNoteDto,
+  EscalateSchoolServiceRequestDto,
   ListSchoolServiceRequestsDto,
-  ReasonedSchoolServiceRequestDto,
   ResolveSchoolServiceRequestDto,
 } from '../service-requests/dto/service-request.dto';
 import { MobilePrincipalServiceRequestTriageDto } from './dto/mobile-principal-service-request.dto';
@@ -381,7 +381,7 @@ export class MobilePrincipalService implements OnModuleInit {
   async escalateServiceRequest(
     actor: AuthContext,
     requestId: string,
-    dto: ReasonedSchoolServiceRequestDto,
+    dto: EscalateSchoolServiceRequestDto,
   ) {
     this.assertPrincipal(actor);
     return this.serviceRequestsService.escalateRequest(requestId, dto, actor);
@@ -3152,8 +3152,15 @@ export class MobilePrincipalService implements OnModuleInit {
       { limit: 20 },
       actor,
     );
+    // Principal Attention surfaces unresolved high-priority parent cases only
+    // (HIGH priority or overdue). Lower-priority active cases remain on the
+    // dedicated service-request queue.
     return result.items
-      .filter((request) => activeStatuses.includes(request.status))
+      .filter(
+        (request) =>
+          activeStatuses.includes(request.status) &&
+          (request.priority === 'HIGH' || request.isOverdue),
+      )
       .map((request) => ({
         id: request.id,
         type: 'service_request',
@@ -3163,9 +3170,7 @@ export class MobilePrincipalService implements OnModuleInit {
             : 'Parent School Request',
         subtitle: `${request.student.name} • ${request.student.classSection}`,
         detail: request.subject,
-        severity: (request.isOverdue || request.priority === 'HIGH'
-          ? 'high'
-          : 'medium') as Severity,
+        severity: 'high' as Severity,
         status: request.status,
         owner:
           request.assignedTo?.id === actor.userId
@@ -3180,8 +3185,28 @@ export class MobilePrincipalService implements OnModuleInit {
   }
 
   private async staffAttention(actor: AuthContext): Promise<PrincipalItem[]> {
-    const staff = await this.getStaffAbsence(actor);
+    const [staff, pendingLeaveCount] = await Promise.all([
+      this.getStaffAbsence(actor),
+      this.prisma.staffLeaveRequest.count({
+        where: { tenantId: actor.tenantId, status: 'PENDING' as never },
+      }),
+    ]);
     return [
+      ...(pendingLeaveCount > 0
+        ? [
+            {
+              id: 'pending-staff-leave',
+              type: 'staff_leave',
+              title: 'Staff leave awaiting approval',
+              subtitle: `${pendingLeaveCount} request${pendingLeaveCount === 1 ? '' : 's'}`,
+              severity: 'high' as Severity,
+              owner: 'Principal',
+              nextAction: 'Review leave requests',
+              timestamp: nowIso(),
+              route: '/principal/approvals',
+            },
+          ]
+        : []),
       ...staff.coverageItems
         .filter((item) => item.severity === 'high')
         .map((item) => ({
@@ -3327,7 +3352,7 @@ export class MobilePrincipalService implements OnModuleInit {
     return blockers.map((row) => ({
       id: row.id,
       type: 'academics',
-      title: 'Report-card publish blocker',
+      title: 'Result correction awaiting review',
       subtitle: classLabel(
         row.reportCard.class?.name,
         row.reportCard.section?.name,
@@ -3335,7 +3360,7 @@ export class MobilePrincipalService implements OnModuleInit {
       detail: row.reason,
       severity: 'high',
       timestamp: toIso(row.createdAt),
-      nextAction: 'Review publish blockers',
+      nextAction: 'Review result corrections',
       route: '/principal/academics-readiness',
     }));
   }

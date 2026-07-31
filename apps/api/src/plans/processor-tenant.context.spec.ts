@@ -60,4 +60,34 @@ describe('runTenantScopedJob', () => {
     expect(cls.set).toHaveBeenCalledWith('tenantId', 'tenant-1');
     expect(handler).toHaveBeenCalled();
   });
+
+  it('fails closed when tenant context is absent from the job payload', async () => {
+    const cls = {
+      run: jest.fn(),
+      set: jest.fn(),
+    };
+    const plansService = {
+      shouldProcessTenantJob: jest.fn(),
+    };
+    const handler = jest.fn();
+
+    await expect(
+      runTenantScopedJob(
+        cls as never,
+        plansService as never,
+        undefined,
+        logger,
+        'export job',
+        handler,
+      ),
+    ).resolves.toBeUndefined();
+
+    expect(handler).not.toHaveBeenCalled();
+    expect(cls.run).not.toHaveBeenCalled();
+    expect(cls.set).not.toHaveBeenCalled();
+    expect(plansService.shouldProcessTenantJob).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining('tenantId is missing'),
+    );
+  });
 });

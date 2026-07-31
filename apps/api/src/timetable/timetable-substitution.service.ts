@@ -329,24 +329,49 @@ export class TimetableSubstitutionService {
         date,
         actor,
       );
+      if (!slot.sectionId) {
+        throw new ConflictException(
+          'Substitutions require a section-scoped timetable slot',
+        );
+      }
     }
 
-    const substitution = await this.prisma.timetableSubstitution.create({
-      data: {
-        tenantId: actor.tenantId,
-        timetableSlotId: dto.timetableSlotId,
-        absentTeacherId: dto.absentTeacherId,
-        substituteTeacherId: dto.substituteTeacherId ?? null,
-        date,
-        reason: dto.reason,
-        status: dto.substituteTeacherId
-          ? TimetableSubstitutionStatus.ASSIGNED
-          : TimetableSubstitutionStatus.DRAFT,
-        createdById: actor.userId,
-        assignedAt: dto.substituteTeacherId ? new Date() : null,
-        approvedById: dto.substituteTeacherId ? actor.userId : null,
-      },
-      include: substitutionInclude(),
+    const substitution = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.timetableSubstitution.create({
+        data: {
+          tenantId: actor.tenantId,
+          timetableSlotId: dto.timetableSlotId,
+          absentTeacherId: dto.absentTeacherId,
+          substituteTeacherId: dto.substituteTeacherId ?? null,
+          date,
+          reason: dto.reason,
+          status: dto.substituteTeacherId
+            ? TimetableSubstitutionStatus.ASSIGNED
+            : TimetableSubstitutionStatus.DRAFT,
+          createdById: actor.userId,
+          assignedAt: dto.substituteTeacherId ? new Date() : null,
+          approvedById: dto.substituteTeacherId ? actor.userId : null,
+        },
+        include: substitutionInclude(),
+      });
+
+      if (dto.substituteTeacherId && slot.sectionId) {
+        await this.createLinkedDelegation(tx, {
+          tenantId: actor.tenantId,
+          academicYearId: slot.academicYearId,
+          grantorStaffId: dto.absentTeacherId,
+          recipientStaffId: dto.substituteTeacherId,
+          classId: slot.classId,
+          sectionId: slot.sectionId,
+          subjectId: slot.subjectId,
+          substitutionId: created.id,
+          reason: created.reason,
+          date,
+          actorUserId: actor.userId,
+        });
+      }
+
+      return created;
     });
 
     await this.audit(
@@ -392,21 +417,47 @@ export class TimetableSubstitutionService {
         actor,
         substitution.id,
       );
+      if (!substitution.timetableSlot.sectionId) {
+        throw new ConflictException(
+          'Substitutions require a section-scoped timetable slot',
+        );
+      }
     }
 
-    const updated = await this.prisma.timetableSubstitution.update({
-      where: { id },
-      data: {
-        substituteTeacherId:
-          dto.substituteTeacherId ?? substitution.substituteTeacherId,
-        reason: dto.reason ?? substitution.reason,
-        status: dto.substituteTeacherId
-          ? TimetableSubstitutionStatus.ASSIGNED
-          : TimetableSubstitutionStatus.DRAFT,
-        assignedAt: dto.substituteTeacherId ? new Date() : null,
-        approvedById: dto.substituteTeacherId ? actor.userId : null,
-      },
-      include: substitutionInclude(),
+    const slot = substitution.timetableSlot;
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const next = await tx.timetableSubstitution.update({
+        where: { id },
+        data: {
+          substituteTeacherId:
+            dto.substituteTeacherId ?? substitution.substituteTeacherId,
+          reason: dto.reason ?? substitution.reason,
+          status: dto.substituteTeacherId
+            ? TimetableSubstitutionStatus.ASSIGNED
+            : TimetableSubstitutionStatus.DRAFT,
+          assignedAt: dto.substituteTeacherId ? new Date() : null,
+          approvedById: dto.substituteTeacherId ? actor.userId : null,
+        },
+        include: substitutionInclude(),
+      });
+
+      if (dto.substituteTeacherId && slot.sectionId) {
+        await this.createLinkedDelegation(tx, {
+          tenantId: actor.tenantId,
+          academicYearId: slot.academicYearId,
+          grantorStaffId: substitution.absentTeacherId,
+          recipientStaffId: dto.substituteTeacherId,
+          classId: slot.classId,
+          sectionId: slot.sectionId,
+          subjectId: slot.subjectId,
+          substitutionId: id,
+          reason: next.reason,
+          date: substitution.date,
+          actorUserId: actor.userId,
+        });
+      }
+
+      return next;
     });
 
     await this.audit('update', 'timetable_substitution', id, actor, updated);
@@ -448,13 +499,10 @@ export class TimetableSubstitutionService {
         'Substitutions require a section-scoped timetable slot',
       );
     }
-    const sectionId = slot.sectionId;
-
-    const effectiveFrom = stripTime(substitution.date);
-    const effectiveUntil = new Date(effectiveFrom);
-    effectiveUntil.setHours(23, 59, 59, 999);
 
     const updated = await this.prisma.$transaction(async (tx) => {
+      await this.revokeLinkedDelegation(tx, id, actor.userId);
+
       const assigned = await tx.timetableSubstitution.update({
         where: { id },
         data: {
@@ -466,25 +514,18 @@ export class TimetableSubstitutionService {
         include: substitutionInclude(),
       });
 
-      await tx.teacherDelegation.create({
-        data: {
-          tenantId: actor.tenantId,
-          academicYearId: slot.academicYearId,
-          grantorStaffId: substitution.absentTeacherId,
-          recipientStaffId: dto.substituteTeacherId,
-          classId: slot.classId,
-          sectionId,
-          subjectId: slot.subjectId,
-          allowedCapabilities: [
-            TeacherCapability.PERIOD_ATTENDANCE_MARK,
-            TeacherCapability.SUBJECT_HOMEWORK_CREATE,
-          ],
-          reason: `Timetable substitution ${id}: ${substitution.reason}`,
-          effectiveFrom,
-          effectiveUntil,
-          status: TeacherDelegationStatus.ACTIVE,
-          createdById: actor.userId,
-        },
+      await this.createLinkedDelegation(tx, {
+        tenantId: actor.tenantId,
+        academicYearId: slot.academicYearId,
+        grantorStaffId: substitution.absentTeacherId,
+        recipientStaffId: dto.substituteTeacherId,
+        classId: slot.classId,
+        sectionId: slot.sectionId as string,
+        subjectId: slot.subjectId,
+        substitutionId: id,
+        reason: substitution.reason,
+        date: substitution.date,
+        actorUserId: actor.userId,
       });
 
       return assigned;
@@ -510,7 +551,9 @@ export class TimetableSubstitutionService {
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      const cancelled = await tx.timetableSubstitution.update({
+      await this.revokeLinkedDelegation(tx, id, actor.userId);
+
+      return tx.timetableSubstitution.update({
         where: { id },
         data: {
           status: TimetableSubstitutionStatus.CANCELLED,
@@ -519,28 +562,6 @@ export class TimetableSubstitutionService {
         },
         include: substitutionInclude(),
       });
-
-      if (substitution.substituteTeacherId && substitution.timetableSlot.sectionId) {
-        await tx.teacherDelegation.updateMany({
-          where: {
-            tenantId: actor.tenantId,
-            recipientStaffId: substitution.substituteTeacherId,
-            classId: substitution.timetableSlot.classId,
-            sectionId: substitution.timetableSlot.sectionId,
-            subjectId: substitution.timetableSlot.subjectId,
-            status: TeacherDelegationStatus.ACTIVE,
-            effectiveFrom: { lte: stripTime(substitution.date) },
-            effectiveUntil: { gte: stripTime(substitution.date) },
-          },
-          data: {
-            status: TeacherDelegationStatus.REVOKED,
-            revokedAt: new Date(),
-            revokedById: actor.userId,
-          },
-        });
-      }
-
-      return cancelled;
     });
     await this.audit('cancel', 'timetable_substitution', id, actor, {
       ...updated,
@@ -660,16 +681,113 @@ export class TimetableSubstitutionService {
       );
     }
 
-    const updated = await this.prisma.timetableSubstitution.update({
-      where: { id },
-      data: {
-        status: TimetableSubstitutionStatus.COMPLETED,
-        completedAt: new Date(),
-      },
-      include: substitutionInclude(),
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await this.revokeLinkedDelegation(tx, id, actor.userId);
+      return tx.timetableSubstitution.update({
+        where: { id },
+        data: {
+          status: TimetableSubstitutionStatus.COMPLETED,
+          completedAt: new Date(),
+        },
+        include: substitutionInclude(),
+      });
     });
     await this.audit('complete', 'timetable_substitution', id, actor, updated);
     return updated;
+  }
+
+  async addCoverageNote(
+    substitutionId: string,
+    body: string,
+    actor: AuthContext,
+  ) {
+    const substitution = await this.findSubstitutionOrThrow(
+      substitutionId,
+      actor,
+    );
+    const trimmed = body.trim();
+    if (!trimmed) {
+      throw new ConflictException('Coverage note body is required');
+    }
+
+    const note = await this.prisma.teacherHandoverNote.create({
+      data: {
+        tenantId: actor.tenantId,
+        kind: 'SUBSTITUTION_COVERAGE',
+        substitutionId: substitution.id,
+        body: trimmed,
+        createdById: actor.userId,
+      },
+    });
+    await this.audit(
+      'coverage_note',
+      'timetable_substitution',
+      substitutionId,
+      actor,
+      note,
+    );
+    return note;
+  }
+
+  private async createLinkedDelegation(
+    tx: Prisma.TransactionClient,
+    input: {
+      tenantId: string;
+      academicYearId: string;
+      grantorStaffId: string;
+      recipientStaffId: string;
+      classId: string;
+      sectionId: string;
+      subjectId: string | null;
+      substitutionId: string;
+      reason: string;
+      date: Date;
+      actorUserId: string;
+    },
+  ) {
+    const effectiveFrom = stripTime(input.date);
+    const effectiveUntil = new Date(effectiveFrom);
+    effectiveUntil.setHours(23, 59, 59, 999);
+
+    await tx.teacherDelegation.create({
+      data: {
+        tenantId: input.tenantId,
+        academicYearId: input.academicYearId,
+        grantorStaffId: input.grantorStaffId,
+        recipientStaffId: input.recipientStaffId,
+        classId: input.classId,
+        sectionId: input.sectionId,
+        subjectId: input.subjectId,
+        timetableSubstitutionId: input.substitutionId,
+        allowedCapabilities: [
+          TeacherCapability.PERIOD_ATTENDANCE_MARK,
+          TeacherCapability.SUBJECT_HOMEWORK_CREATE,
+        ],
+        reason: `Timetable substitution ${input.substitutionId}: ${input.reason}`,
+        effectiveFrom,
+        effectiveUntil,
+        status: TeacherDelegationStatus.ACTIVE,
+        createdById: input.actorUserId,
+      },
+    });
+  }
+
+  private async revokeLinkedDelegation(
+    tx: Prisma.TransactionClient,
+    substitutionId: string,
+    actorUserId: string,
+  ) {
+    await tx.teacherDelegation.updateMany({
+      where: {
+        timetableSubstitutionId: substitutionId,
+        status: TeacherDelegationStatus.ACTIVE,
+      },
+      data: {
+        status: TeacherDelegationStatus.REVOKED,
+        revokedAt: new Date(),
+        revokedById: actorUserId,
+      },
+    });
   }
 
   private async ensureSubstituteAllowed(

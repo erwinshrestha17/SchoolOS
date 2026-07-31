@@ -1,12 +1,8 @@
-import {
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import { StaffStatus } from '@prisma/client';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
+import { TeacherCapability } from '../teacher-scope/teacher-capability';
 import { isTeacherOnly } from '../common/security/parent-scope';
 import {
   GradeCalculatorService,
@@ -371,33 +367,38 @@ export class ResultsService {
   ) {
     if (!isTeacherOnly(actor)) return;
 
-    const classSections = await this.getTeacherAssignedClassSections(actor);
-    // A null on either side is a wildcard match: a class-wide teaching
-    // assignment (cs.sectionId === null) covers every section, and a
-    // section-agnostic target (sectionId === null) is visible to every
-    // section-specific teacher of that class -- mirrors the fix applied to
-    // the equivalent (and previously asymmetric) check in
-    // cas-records.service.ts::findOne, found via live edge-case testing.
-    const inScope = classSections.some(
-      (cs) =>
-        cs.classId === classId &&
-        (cs.sectionId === null ||
-          sectionId === null ||
-          cs.sectionId === sectionId),
+    // RESULT_REVIEW is the single assignment-backed capability for teacher
+    // result previews. Class-wide / section-agnostic targets resolve against
+    // any assigned section of the class so a section teacher is not blocked
+    // from a student whose sectionId is null.
+    if (sectionId) {
+      await this.teacherScopeService.requireActorAccess(
+        {
+          classId,
+          sectionId,
+          capability: TeacherCapability.RESULT_REVIEW,
+        },
+        actor,
+      );
+      return;
+    }
+
+    const grant = await this.teacherScopeService.canActorAccessAnySectionOfClass(
+      {
+        classId,
+        capability: TeacherCapability.RESULT_REVIEW,
+      },
+      actor,
     );
-    if (!inScope) {
-      throw new ForbiddenException(
-        'This result is outside your teaching scope',
+    if (!grant) {
+      await this.teacherScopeService.denyActorAccess(
+        {
+          classId,
+          capability: TeacherCapability.RESULT_REVIEW,
+          reason: 'no_assignment',
+        },
+        actor,
       );
     }
-  }
-
-  private async getTeacherAssignedClassSections(
-    actor: AuthContext,
-  ): Promise<Array<{ classId: string; sectionId: string | null }>> {
-    // Delegates to the canonical resolver: one implementation of "which
-    // class/section combinations does this teacher touch", honouring
-    // assignment effective dates and ACTIVE status.
-    return this.teacherScopeService.listTeacherClassSectionCombos(actor);
   }
 }

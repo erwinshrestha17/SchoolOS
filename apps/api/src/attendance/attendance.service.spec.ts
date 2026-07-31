@@ -133,9 +133,186 @@ describe('attendance production hardening', () => {
       expect.objectContaining({
         id: 'student-1',
         status: AttendanceStatus.PRESENT,
+        leaveInformed: false,
+        approvedLeaveRequestId: null,
       }),
     );
     expect(roster.students[0]).not.toHaveProperty('primaryGuardian');
+  });
+
+  it('surfaces approved student leave on the roster before submission', async () => {
+    const student = buildStudent({
+      rollNumber: 1,
+      guardianLinks: [],
+      severeAllergies: null,
+      medicalConditions: null,
+      specialNeeds: null,
+    });
+    const { service } = buildService({
+      academicYear: { id: 'ay-1' },
+      classroom: { id: 'class-1', name: 'Grade 1' },
+      section: { id: 'section-1', name: 'A', classId: 'class-1' },
+      students: [student],
+      studentLeaveRequests: [
+        {
+          id: 'student-leave-1',
+          studentId: 'student-1',
+          leaveType: 'SICK',
+        },
+      ],
+    });
+
+    const roster = await service.getRoster(
+      adminActor,
+      'ay-1',
+      'class-1',
+      'section-1',
+      '2026-04-28',
+    );
+
+    expect(roster.students[0]).toEqual(
+      expect.objectContaining({
+        status: AttendanceStatus.SICK_LEAVE,
+        approvedLeaveRequestId: 'student-leave-1',
+        leaveInformed: true,
+      }),
+    );
+  });
+
+  it('applies approved student leave when submitting attendance without an exception', async () => {
+    const student = buildStudent();
+    const finalSession = buildAttendanceSession({
+      records: [
+        {
+          studentId: 'student-1',
+          status: AttendanceStatus.SICK_LEAVE,
+          remark: 'Approved leave request student-leave-1',
+        },
+      ],
+    });
+    const { service, tx } = buildService({
+      academicYear: { id: 'ay-1' },
+      classroom: { id: 'class-1', name: 'Grade 1' },
+      section: { id: 'section-1', name: 'A', classId: 'class-1' },
+      students: [student],
+      finalSession,
+      studentLeaveRequests: [
+        {
+          id: 'student-leave-1',
+          studentId: 'student-1',
+          leaveType: 'SICK',
+        },
+      ],
+    });
+
+    await service.submitAttendance(
+      {
+        academicYearId: 'ay-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        attendanceDate: '2026-04-28',
+        exceptions: [],
+      },
+      adminActor,
+    );
+
+    expect(tx.attendanceRecord.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [
+          expect.objectContaining({
+            studentId: 'student-1',
+            status: AttendanceStatus.SICK_LEAVE,
+            remark: 'Approved leave request student-leave-1',
+          }),
+        ],
+      }),
+    );
+  });
+
+  it('approves student leave and stamps unsubmitted draft session records', async () => {
+    const draftSession = {
+      id: 'session-1',
+      submittedAt: null,
+      lockAt: new Date('2099-01-01T00:00:00.000Z'),
+      records: [],
+    };
+    const reviewed = {
+      id: 'student-leave-1',
+      studentId: 'student-1',
+      leaveType: 'EXCUSED',
+      status: 'APPROVED',
+      startsOn: new Date('2026-04-28T00:00:00.000Z'),
+      endsOn: new Date('2026-04-28T00:00:00.000Z'),
+      reviewNote: null,
+    };
+    const { service, tx } = buildService({
+      studentLeaveRequest: {
+        id: 'student-leave-1',
+        studentId: 'student-1',
+        leaveType: 'EXCUSED',
+        status: 'PENDING',
+        requestedById: 'parent-1',
+        startsOn: new Date('2026-04-28T00:00:00.000Z'),
+        endsOn: new Date('2026-04-28T00:00:00.000Z'),
+        student: {
+          id: 'student-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+        },
+      },
+      reviewedStudentLeave: reviewed,
+      attendanceSession: draftSession,
+    });
+
+    // Override tx session find inside review transaction.
+    tx.attendanceSession.findFirst = jest.fn().mockResolvedValue(draftSession);
+
+    const result = await service.reviewStudentLeaveRequest(
+      'student-leave-1',
+      { status: 'APPROVED', reviewNote: 'Verified medical note' },
+      adminActor,
+    );
+
+    expect(result.status).toBe('APPROVED');
+    expect(tx.attendanceRecord.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          studentId: 'student-1',
+          status: AttendanceStatus.EXCUSED_LEAVE,
+          remark: 'Approved leave request student-leave-1',
+        }),
+      }),
+    );
+  });
+
+  it('blocks self-review of a student leave request', async () => {
+    const { service, prisma } = buildService({
+      studentLeaveRequest: {
+        id: 'student-leave-1',
+        studentId: 'student-1',
+        leaveType: 'EXCUSED',
+        status: 'PENDING',
+        requestedById: adminActor.userId,
+        startsOn: new Date('2026-04-28T00:00:00.000Z'),
+        endsOn: new Date('2026-04-28T00:00:00.000Z'),
+        student: {
+          id: 'student-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+        },
+      },
+    });
+
+    await expect(
+      service.reviewStudentLeaveRequest(
+        'student-leave-1',
+        { status: 'APPROVED', reviewNote: 'Self approval attempt' },
+        adminActor,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
   it('resolves the tenant current academic year when none is provided', async () => {
@@ -2302,9 +2479,15 @@ describe('attendance production hardening', () => {
         status: 'PENDING',
         attendanceRecordId: 'record-1',
         studentId: 'student-1',
+        requestedById: 'parent-1',
         requestedStatus: AttendanceStatus.ABSENT,
         previousStatus: AttendanceStatus.PRESENT,
         reason: 'Marked by mistake',
+        session: {
+          id: 'session-1',
+          submittedAt: new Date('2026-07-29T03:00:00.000Z'),
+          submittedById: 'teacher-1',
+        },
       },
       correctionUpdated: rejectedCorrection,
     });
@@ -2326,6 +2509,118 @@ describe('attendance production hardening', () => {
           status: 'REJECTED',
           reviewReason: 'Register already matches the submitted status',
           reviewNote: 'Register already matches the submitted status',
+        }),
+      }),
+    );
+  });
+
+  it('blocks original attendance submitter from reviewing corrections', async () => {
+    const { service, prisma } = buildService({
+      correctionRequest: {
+        id: 'correction-1',
+        status: 'PENDING',
+        attendanceRecordId: 'record-1',
+        studentId: 'student-1',
+        requestedById: 'parent-1',
+        requestedStatus: AttendanceStatus.PRESENT,
+        previousStatus: AttendanceStatus.ABSENT,
+        reason: 'Child was present',
+        session: {
+          id: 'session-1',
+          submittedAt: new Date('2026-07-29T03:00:00.000Z'),
+          submittedById: adminActor.userId,
+        },
+      },
+    });
+
+    await expect(
+      service.approveCorrectionRequest(
+        'correction-1',
+        {
+          status: 'APPROVED',
+          reviewNote: 'Checked against class register and gate log',
+        },
+        adminActor,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.attendanceCorrectionRequest.update).not.toHaveBeenCalled();
+  });
+
+  it('scopes parent attendance summary queries to submitted sessions only', async () => {
+    const parentActor = {
+      ...teacherActor,
+      userId: 'parent-1',
+      roles: ['parent'],
+      permissions: ['attendance:read'],
+    };
+    const { service, prisma } = buildService({
+      studentFindFirst: {
+        id: 'student-1',
+        classId: 'class-1',
+        sectionId: null,
+      },
+      guardianFindFirst: {
+        id: 'guardian-1',
+        studentLinks: [{ studentId: 'student-1' }],
+      },
+      attendanceRecords: [],
+    });
+
+    await service.getParentSummary('student-1', parentActor);
+
+    expect(prisma.attendanceRecord.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          attendanceSession: expect.objectContaining({
+            submittedAt: { not: null },
+          }),
+        }),
+      }),
+    );
+    expect(prisma.attendanceRecord.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          attendanceSession: expect.objectContaining({
+            submittedAt: { not: null },
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('rejects parent correction when attendance is not yet submitted', async () => {
+    const { service, prisma } = buildService({
+      studentFindFirst: {
+        id: 'student-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+      },
+      guardianFindFirst: {
+        id: 'guardian-1',
+        studentLinks: [{ studentId: 'student-1' }],
+      },
+      attendanceRecord: null,
+    });
+
+    await expect(
+      service.createParentCorrectionRequest(
+        {
+          studentId: 'student-1',
+          attendanceDate: '2026-04-28',
+          requestedStatus: AttendanceStatus.PRESENT,
+          reason: 'The child was present and arrived before assembly.',
+        },
+        parentActor,
+      ),
+    ).rejects.toThrow(NotFoundException);
+    expect(prisma.attendanceCorrectionRequest.create).not.toHaveBeenCalled();
+    expect(prisma.attendanceRecord.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          attendanceSession: expect.objectContaining({
+            submittedAt: { not: null },
+          }),
         }),
       }),
     );
@@ -3539,6 +3834,9 @@ function buildService(options: {
   updatedSyncCount?: number;
   leaveRequest?: unknown;
   reviewedLeave?: unknown;
+  studentLeaveRequest?: unknown;
+  studentLeaveRequests?: unknown[];
+  reviewedStudentLeave?: unknown;
   leaveBalance?: unknown;
   notificationDeliveryFindFirstQueue?: unknown[];
   staffAttendanceRows?: unknown[];
@@ -3570,14 +3868,22 @@ function buildService(options: {
       findUniqueOrThrow: jest
         .fn()
         .mockResolvedValue(options.finalSession ?? null),
+      findFirst: jest.fn().mockResolvedValue(options.attendanceSession ?? null),
     },
     attendanceRecord: {
       deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
       createMany: jest.fn().mockResolvedValue({ count: 1 }),
+      create: jest.fn().mockResolvedValue({}),
       update: jest.fn().mockResolvedValue({}),
     },
     staffLeaveRequest: {
       update: jest.fn().mockResolvedValue(options.reviewedLeave ?? null),
+    },
+    studentLeaveRequest: {
+      update: jest
+        .fn()
+        .mockResolvedValue(options.reviewedStudentLeave ?? null),
+      findMany: jest.fn().mockResolvedValue(options.studentLeaveRequests ?? []),
     },
     staffLeaveBalance: {
       findUnique: jest.fn().mockResolvedValue(options.leaveBalance ?? null),
@@ -3756,6 +4062,23 @@ function buildService(options: {
         .fn()
         .mockResolvedValue(options.approvedLeaveRequests ?? []),
       create: jest.fn().mockResolvedValue({ id: 'leave-created' }),
+    },
+    studentLeaveRequest: {
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(options.studentLeaveRequest ?? null),
+      findMany: jest
+        .fn()
+        .mockResolvedValue(options.studentLeaveRequests ?? []),
+      create: jest.fn().mockResolvedValue(
+        options.studentLeaveRequest ?? {
+          id: 'student-leave-1',
+          status: 'PENDING',
+        },
+      ),
+      update: jest
+        .fn()
+        .mockResolvedValue(options.reviewedStudentLeave ?? null),
     },
     subjectTeacherAssignment: {
       findFirst: jest.fn().mockResolvedValue({ id: 'assign-1' }),

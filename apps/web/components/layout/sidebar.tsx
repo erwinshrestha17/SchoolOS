@@ -457,6 +457,16 @@ const DELEGATED_TEACHER_NAV: Array<{
     },
   },
   {
+    capability: TeacherCapability.SUBSTITUTION_ADMIN,
+    group: 'Coordination',
+    item: {
+      href: '/dashboard/timetable/replacements',
+      label: 'Replacements',
+      icon: CalendarDays,
+      permissions: ['timetable:substitute'],
+    },
+  },
+  {
     capability: TeacherCapability.EXAM_TERM_ADMIN,
     group: 'Coordination',
     item: {

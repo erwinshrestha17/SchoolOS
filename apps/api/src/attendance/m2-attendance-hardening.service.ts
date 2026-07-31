@@ -116,13 +116,20 @@ export class M2AttendanceHardeningService {
         state('LEAVE', 'Leave', true),
         state('ON_LEAVE', 'On leave', true),
         state('UNEXCUSED_LEAVE', 'Unexcused leave', true),
+        state(
+          'EARLY_AUTHORIZED_DEPARTURE',
+          'Early authorized departure',
+          true,
+        ),
+        state('UNAUTHORIZED_DEPARTURE', 'Unauthorized departure', true),
+        state('PERIOD_ABSENT', 'Period absent', true),
       ],
       virtual: [
         state('SCHOOL_EVENT', 'School event', false),
         state('NOT_MARKED', 'Not marked', false),
       ],
       supportPolicy:
-        'SCHOOL_EVENT and NOT_MARKED are computed policy states. They are not written into AttendanceRecord until the Prisma enum is expanded by migration.',
+        'SCHOOL_EVENT and NOT_MARKED are computed policy states. They are not written into AttendanceRecord.',
     };
   }
 

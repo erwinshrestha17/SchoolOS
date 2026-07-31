@@ -65,7 +65,13 @@ class ValidationException extends AppException {
 class PermissionException extends AppException {
   const PermissionException([
     String message = 'You do not have permission to view this information.',
-  ]) : super(message, 'PERMISSION_DENIED');
+    String? code,
+  ]) : super(message, code ?? 'PERMISSION_DENIED');
+
+  bool get isAccessChanged =>
+      code == 'GUARDIAN_CAPABILITY_DENIED' ||
+      code == 'TEACHER_SCOPE_DENIED' ||
+      code == 'ACCESS_CHANGED';
 }
 
 class ModuleLockedException extends AppException {

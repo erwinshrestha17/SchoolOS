@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,13 +6,13 @@ import 'package:go_router/go_router.dart';
 import '../../../app/constants/app_routes.dart';
 import '../../../app/design_system/app_spacing.dart';
 import '../../../app/theme/app_colors.dart';
-import '../../../core/auth/auth_provider.dart';
 import '../../../core/network/connectivity_provider.dart';
 import '../../../core/notifications/push_notification_controller.dart';
+import '../../../core/permissions/permission_service.dart';
+import '../../../core/theme/theme_mode_provider.dart';
 import '../../../shared/utils/date_display_preference.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_scaffold.dart';
-import '../../../shared/widgets/status_chip.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -19,13 +20,11 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
     final isOnline = ref.watch(connectivityProvider);
+    final themeMode = ref.watch(themeModeProvider);
+    final datePreference = ref.watch(dateDisplayPreferenceProvider);
     final pushState = ref.watch(pushNotificationControllerProvider);
-    final user = ref.watch(authProvider).user;
-    final schoolLabel =
-        (user?.tenantName ?? user?.tenantSlug ?? 'Current school').trim();
+    final showNotificationsRow = _shouldShowNotificationsRow(pushState);
 
     return AppScaffold(
       appBar: AppBar(
@@ -46,39 +45,6 @@ class SettingsScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(AppSpacing.lg),
         children: [
           Text(
-            'School session',
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: AppColors.slate500,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          AppCard(
-            padding: EdgeInsets.zero,
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.school_outlined),
-                  title: const Text('Signed-in school'),
-                  subtitle: Text(schoolLabel),
-                  trailing: const StatusChip(
-                    status: AppStatusType.approved,
-                    label: 'Active',
-                  ),
-                ),
-                const Divider(),
-                const ListTile(
-                  leading: Icon(Icons.swap_horiz_rounded),
-                  title: Text('Switch school'),
-                  subtitle: Text(
-                    'This login is for one school at a time. To open another linked school, sign out and sign in with that school’s parent credentials.',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          Text(
             'Preferences',
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w800,
@@ -91,61 +57,78 @@ class SettingsScreen extends ConsumerWidget {
             child: Column(
               children: [
                 ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg,
+                    vertical: 4,
+                  ),
                   leading: const Icon(Icons.palette_outlined),
                   title: const Text('Appearance'),
-                  subtitle: const Text(
-                    'Theme follows the device system setting.',
-                  ),
-                  trailing: StatusChip(
-                    status: isDark
-                        ? AppStatusType.onRoute
-                        : AppStatusType.completed,
-                    label: isDark ? 'Dark' : 'Light',
-                  ),
+                  subtitle: Text(_appearanceSubtitle(themeMode, theme)),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => _showAppearanceSheet(context, ref, themeMode),
                 ),
-                const Divider(),
-                ListTile(
-                  leading: const Icon(Icons.language_rounded),
-                  title: const Text('App Language'),
-                  subtitle: const Text('English is active for this build.'),
-                  trailing: const StatusChip(
-                    status: AppStatusType.draft,
-                    label: 'Managed',
+                const Divider(height: 1),
+                const ListTile(
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg,
+                    vertical: 4,
                   ),
+                  leading: Icon(Icons.language_rounded),
+                  title: Text('Language'),
+                  subtitle: Text('English'),
                 ),
-                const Divider(),
+                const Divider(height: 1),
                 ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg,
+                    vertical: 4,
+                  ),
                   leading: const Icon(Icons.calendar_month_outlined),
-                  title: const Text('Date display'),
-                  subtitle: const Text(
-                    'Choose how school dates appear in the app.',
+                  title: const Text('Date format'),
+                  subtitle: Text(
+                    '${datePreference.shortLabel}\n'
+                    '${formatDateDisplayPreview(DateTime.now(), datePreference)}',
                   ),
-                  trailing: DropdownButtonHideUnderline(
-                    child: DropdownButton<DateDisplayPreference>(
-                      value: ref.watch(dateDisplayPreferenceProvider),
-                      items: [
-                        for (final preference in DateDisplayPreference.values)
-                          DropdownMenuItem(
-                            value: preference,
-                            child: Text(preference.label),
-                          ),
-                      ],
-                      onChanged: (preference) {
-                        if (preference == null) return;
-                        ref
-                            .read(dateDisplayPreferenceProvider.notifier)
-                            .setPreference(preference);
-                      },
-                    ),
-                  ),
+                  isThreeLine: true,
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () =>
+                      _showDateFormatSheet(context, ref, datePreference),
                 ),
+                if (showNotificationsRow) ...[
+                  const Divider(height: 1),
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.lg,
+                      vertical: 4,
+                    ),
+                    leading: const Icon(Icons.notifications_outlined),
+                    title: const Text('Notifications'),
+                    subtitle: Text(_notificationsSubtitle(pushState)),
+                    trailing:
+                        pushState.availability ==
+                            PushNotificationAvailability.permissionDenied
+                        ? TextButton(
+                            onPressed: () => ref
+                                .read(permissionServiceProvider)
+                                .openAppSettings(),
+                            child: const Text('Open settings'),
+                          )
+                        : const Icon(Icons.chevron_right_rounded),
+                    onTap:
+                        pushState.availability ==
+                            PushNotificationAvailability.permissionDenied
+                        ? () => ref
+                              .read(permissionServiceProvider)
+                              .openAppSettings()
+                        : () => context.push(AppRoutes.notificationPreferences),
+                  ),
+                ],
               ],
             ),
           ),
           const SizedBox(height: AppSpacing.xl),
-
           Text(
-            'Connectivity',
+            'Connection',
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w800,
               color: AppColors.slate500,
@@ -154,49 +137,22 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: AppSpacing.sm),
           AppCard(
             padding: EdgeInsets.zero,
-            child: Column(
-              children: [
-                ListTile(
-                  leading: Icon(
-                    isOnline ? Icons.wifi_rounded : Icons.wifi_off_rounded,
-                    color: isOnline ? AppColors.success : AppColors.danger,
-                  ),
-                  title: const Text('Network State'),
-                  subtitle: Text(
-                    isOnline
-                        ? 'The app is using online API requests.'
-                        : 'Offline preview is active for draft-capable flows.',
-                  ),
-                  trailing: Semantics(
-                    // The switch is its own tappable node; the ListTile title
-                    // beside it is not announced as its label.
-                    label: 'Online mode',
-                    child: Switch(
-                      value: isOnline,
-                      activeTrackColor: AppColors.success,
-                      onChanged: (value) {
-                        ref
-                            .read(connectivityProvider.notifier)
-                            .setOnline(value);
-                      },
-                    ),
-                  ),
-                ),
-                const Divider(),
-                ListTile(
-                  leading: const Icon(Icons.notifications_active_outlined),
-                  title: const Text('Push Notifications'),
-                  subtitle: Text(pushState.message),
-                  trailing: StatusChip(
-                    status: _pushStatus(pushState.availability),
-                    label: _pushLabel(pushState.availability),
-                  ),
-                ),
-              ],
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+                vertical: 4,
+              ),
+              leading: Icon(
+                isOnline ? Icons.wifi_rounded : Icons.wifi_off_rounded,
+                color: isOnline ? AppColors.success : AppColors.danger,
+              ),
+              title: Text(isOnline ? 'Online' : 'Offline'),
+              subtitle: Text(
+                isOnline ? 'Connected' : 'Some information may be outdated',
+              ),
             ),
           ),
           const SizedBox(height: AppSpacing.xl),
-
           Text(
             'Security',
             style: theme.textTheme.titleSmall?.copyWith(
@@ -210,15 +166,29 @@ class SettingsScreen extends ConsumerWidget {
             child: Column(
               children: [
                 ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg,
+                    vertical: 4,
+                  ),
                   leading: const Icon(Icons.fingerprint_rounded),
-                  title: const Text('Biometric Unlock'),
+                  title: const Text('Biometric Login'),
                   subtitle: const Text(
-                    'Requires a device security integration before release.',
+                    'Face ID, Touch ID, or fingerprint on this device',
                   ),
-                  trailing: const StatusChip(
-                    status: AppStatusType.pending,
-                    label: 'Planned',
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => context.push(AppRoutes.biometricLogin),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg,
+                    vertical: 4,
                   ),
+                  leading: const Icon(Icons.devices_rounded),
+                  title: const Text('Logged-in devices'),
+                  subtitle: const Text('Review and revoke active sessions'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => context.push(AppRoutes.loggedInDevices),
                 ),
               ],
             ),
@@ -229,24 +199,134 @@ class SettingsScreen extends ConsumerWidget {
   }
 }
 
-AppStatusType _pushStatus(PushNotificationAvailability availability) {
-  return switch (availability) {
-    PushNotificationAvailability.ready => AppStatusType.completed,
-    PushNotificationAvailability.initializing => AppStatusType.pending,
-    PushNotificationAvailability.inactive => AppStatusType.draft,
-    _ => AppStatusType.pending,
+bool _shouldShowNotificationsRow(PushNotificationState pushState) {
+  return switch (pushState.availability) {
+    PushNotificationAvailability.unavailable ||
+    PushNotificationAvailability.providerNotReady ||
+    PushNotificationAvailability.providerDisabled ||
+    PushNotificationAvailability.unsupportedPersona ||
+    PushNotificationAvailability.inactive ||
+    PushNotificationAvailability.initializing => kDebugMode,
+    PushNotificationAvailability.ready ||
+    PushNotificationAvailability.permissionDenied => true,
   };
 }
 
-String _pushLabel(PushNotificationAvailability availability) {
-  return switch (availability) {
-    PushNotificationAvailability.ready => 'Ready',
-    PushNotificationAvailability.initializing => 'Checking',
-    PushNotificationAvailability.permissionDenied => 'Off',
-    PushNotificationAvailability.providerDisabled => 'Disabled',
-    PushNotificationAvailability.providerNotReady => 'Not ready',
-    PushNotificationAvailability.unsupportedPersona => 'Unavailable',
-    PushNotificationAvailability.unavailable => 'Unavailable',
-    PushNotificationAvailability.inactive => 'Inactive',
+String _appearanceSubtitle(ThemeMode mode, ThemeData theme) {
+  if (mode == ThemeMode.system) {
+    final current = theme.brightness == Brightness.dark ? 'Dark' : 'Light';
+    return 'System default · Currently using $current';
+  }
+  return themeModeLabel(mode);
+}
+
+String _notificationsSubtitle(PushNotificationState pushState) {
+  return switch (pushState.availability) {
+    PushNotificationAvailability.ready =>
+      'On · Attendance, notices and school alerts',
+    PushNotificationAvailability.permissionDenied =>
+      'Off · Enable in device settings',
+    PushNotificationAvailability.initializing => 'Checking notification status',
+    PushNotificationAvailability.inactive => 'Not active for this account',
+    PushNotificationAvailability.unsupportedPersona =>
+      'Not available for this account type',
+    PushNotificationAvailability.providerDisabled ||
+    PushNotificationAvailability.providerNotReady ||
+    PushNotificationAvailability.unavailable => 'Not available in this build',
   };
+}
+
+Future<void> _showAppearanceSheet(
+  BuildContext context,
+  WidgetRef ref,
+  ThemeMode current,
+) {
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (sheetContext) {
+      return SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final mode in const [
+              ThemeMode.system,
+              ThemeMode.light,
+              ThemeMode.dark,
+            ])
+              ListTile(
+                title: Text(themeModeLabel(mode)),
+                trailing: mode == current
+                    ? Icon(
+                        Icons.check_rounded,
+                        color: Theme.of(sheetContext).colorScheme.primary,
+                      )
+                    : null,
+                onTap: () async {
+                  await ref.read(themeModeProvider.notifier).setThemeMode(mode);
+                  if (sheetContext.mounted) Navigator.pop(sheetContext);
+                },
+              ),
+            const SizedBox(height: AppSpacing.sm),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+Future<void> _showDateFormatSheet(
+  BuildContext context,
+  WidgetRef ref,
+  DateDisplayPreference current,
+) {
+  final previewNow = DateTime.now();
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (sheetContext) {
+      return SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.sm,
+                AppSpacing.lg,
+                AppSpacing.sm,
+              ),
+              child: Text(
+                'Date format',
+                style: Theme.of(
+                  sheetContext,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              ),
+            ),
+            for (final preference in DateDisplayPreference.values)
+              ListTile(
+                title: Text(preference.label),
+                subtitle: Text(
+                  formatDateDisplayPreview(previewNow, preference),
+                ),
+                trailing: preference == current
+                    ? Icon(
+                        Icons.check_rounded,
+                        color: Theme.of(sheetContext).colorScheme.primary,
+                      )
+                    : null,
+                onTap: () async {
+                  await ref
+                      .read(dateDisplayPreferenceProvider.notifier)
+                      .setPreference(preference);
+                  if (sheetContext.mounted) Navigator.pop(sheetContext);
+                },
+              ),
+            const SizedBox(height: AppSpacing.sm),
+          ],
+        ),
+      );
+    },
+  );
 }

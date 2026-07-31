@@ -92,7 +92,8 @@ describe('ServiceRequestsService', () => {
   it('creates a linked-child complaint with tenant-scoped idempotency and audit', async () => {
     prisma.guardian.findFirst.mockResolvedValue(guardianRelationshipFixture());
     prisma.schoolServiceRequest.findFirst
-      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null) // idempotency lookup
+      .mockResolvedValueOnce(null) // active category dedup
       .mockResolvedValueOnce(parentRequestFixture());
     prisma.schoolServiceRequest.create.mockResolvedValue({ id: 'request-1' });
 
@@ -115,7 +116,6 @@ describe('ServiceRequestsService', () => {
         tenantId: 'tenant-1',
         studentId: 'student-1',
         requestedById: 'parent-1',
-        confirmStudentId: 'student-1',
         type: SchoolServiceRequestType.GENERAL_COMPLAINT,
         idempotencyKey: '0fdace11-23ef-4ea5-982e-7c81831d80da',
       }),
@@ -280,6 +280,8 @@ describe('ServiceRequestsService', () => {
       id: 'request-1',
       tenantId: 'tenant-1',
       status: SchoolServiceRequestStatus.IN_PROGRESS,
+      requestedById: 'parent-1',
+      assignedToId: null,
       responseDeadline: new Date('2026-07-27T00:00:00.000Z'),
     });
     prisma.schoolServiceRequest.updateMany.mockResolvedValue({ count: 0 });
@@ -292,6 +294,121 @@ describe('ServiceRequestsService', () => {
       ),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(auditService.record).not.toHaveBeenCalled();
+  });
+
+  it('blocks the assigned responder from resolving without escalation', async () => {
+    prisma.schoolServiceRequest.findFirst.mockResolvedValue({
+      id: 'request-1',
+      tenantId: 'tenant-1',
+      status: SchoolServiceRequestStatus.IN_PROGRESS,
+      requestedById: 'parent-1',
+      assignedToId: managerActor.userId,
+      type: SchoolServiceRequestType.PAYMENT_DISPUTE,
+      responseDeadline: new Date('2026-07-27T00:00:00.000Z'),
+    });
+
+    await expect(
+      service.resolveRequest(
+        'request-1',
+        { resolutionSummary: 'Payment dispute closed by assigned clerk.' },
+        managerActor,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.schoolServiceRequest.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('requires escalation to reassign to a different manager', async () => {
+    prisma.schoolServiceRequest.findFirst.mockResolvedValue({
+      id: 'request-1',
+      tenantId: 'tenant-1',
+      status: SchoolServiceRequestStatus.IN_PROGRESS,
+      requestedById: 'parent-1',
+      assignedToId: 'clerk-1',
+      responseDeadline: new Date('2026-07-27T00:00:00.000Z'),
+    });
+
+    await expect(
+      service.escalateRequest(
+        'request-1',
+        {
+          reason: 'Needs coordinator review after fee office reply.',
+          assignedToUserId: 'clerk-1',
+        },
+        managerActor,
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.schoolServiceRequest.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('escalates by reassigning to an eligible independent manager', async () => {
+    prisma.schoolServiceRequest.findFirst
+      .mockResolvedValueOnce({
+        id: 'request-1',
+        tenantId: 'tenant-1',
+        status: SchoolServiceRequestStatus.IN_PROGRESS,
+        requestedById: 'parent-1',
+        assignedToId: 'clerk-1',
+        responseDeadline: new Date('2026-07-27T00:00:00.000Z'),
+      })
+      .mockResolvedValueOnce(
+        parentRequestFixture({
+          requestedBy: {
+            id: 'parent-1',
+            guardian: { fullName: 'Parent One' },
+            staff: null,
+          },
+          assignedTo: {
+            id: 'coordinator-1',
+            staff: { firstName: 'Coord', lastName: 'One' },
+          },
+          escalatedAt: new Date('2026-07-26T12:00:00.000Z'),
+          escalationReason: 'Needs coordinator review after fee office reply.',
+        }),
+      );
+    prisma.user.findFirst.mockResolvedValue({ id: 'coordinator-1' });
+    prisma.schoolServiceRequest.updateMany.mockResolvedValue({ count: 1 });
+
+    await service.escalateRequest(
+      'request-1',
+      {
+        reason: 'Needs coordinator review after fee office reply.',
+        assignedToUserId: 'coordinator-1',
+      },
+      managerActor,
+    );
+
+    expect(prisma.schoolServiceRequest.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          assignedToId: 'coordinator-1',
+          escalatedById: managerActor.userId,
+          priority: SchoolServiceRequestPriority.HIGH,
+        }),
+      }),
+    );
+  });
+
+  it('rejects a duplicate open general complaint for the same child and category', async () => {
+    prisma.guardian.findFirst.mockResolvedValue(guardianRelationshipFixture());
+    prisma.schoolServiceRequest.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'open-request' });
+
+    await expect(
+      service.createParentRequest(
+        'student-1',
+        {
+          confirmStudentId: 'student-1',
+          type: SchoolServiceRequestType.GENERAL_COMPLAINT,
+          category: SchoolServiceRequestCategory.ATTENDANCE,
+          subject: 'Another attendance concern',
+          description: 'Please review a second attendance concern this week.',
+          idempotencyKey: '9aaace11-23ef-4ea5-982e-7c81831d80da',
+        },
+        parentActor,
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.schoolServiceRequest.create).not.toHaveBeenCalled();
   });
 
   it('checks request ownership and tenant before serving a protected attachment', async () => {
@@ -334,6 +451,8 @@ function guardianRelationshipFixture() {
         relation: 'parent',
         capabilities: [
           'COMPLAINT_OR_CORRECTION_SUBMIT',
+          'ATTENDANCE_VIEW',
+          'ACADEMICS_VIEW',
           'FEES_VIEW',
         ],
         effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),

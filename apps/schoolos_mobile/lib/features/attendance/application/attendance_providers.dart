@@ -5,7 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/network/connectivity_provider.dart';
+import '../../../core/storage/app_preferences_service.dart';
+import '../../../core/storage/private_data_cleanup_service.dart';
 import '../../../core/storage/private_read_cache.dart';
+import '../../../core/storage/secure_storage_service.dart';
 import '../../../core/storage/teacher_attendance_draft_store.dart';
 import '../data/attendance_repository.dart';
 import '../domain/attendance_models.dart';
@@ -116,6 +119,10 @@ final teacherAttendanceControllerProvider =
       return TeacherAttendanceController(
         repository: ref.watch(attendanceRepositoryProvider),
         isOnline: ref.watch(connectivityProvider),
+        privateDataCleanup: PrivateDataCleanupService(
+          ref.watch(appPreferencesServiceProvider),
+          ref.watch(secureStorageServiceProvider),
+        ),
       );
     });
 
@@ -266,8 +273,10 @@ class TeacherAttendanceController
   TeacherAttendanceController({
     required this._repository,
     required bool isOnline,
+    PrivateDataCleanupService? privateDataCleanup,
     this.draftSaveDelay = const Duration(milliseconds: 500),
   }) : _isOnline = isOnline,
+       _privateDataCleanup = privateDataCleanup,
        super(
          TeacherAttendanceState(date: DateTime.now(), isOffline: !isOnline),
        ) {
@@ -276,6 +285,7 @@ class TeacherAttendanceController
 
   final AttendanceRepository _repository;
   final bool _isOnline;
+  final PrivateDataCleanupService? _privateDataCleanup;
   final Duration draftSaveDelay;
   Timer? _draftSaveTimer;
 
@@ -567,6 +577,30 @@ class TeacherAttendanceController
             : 'Attendance submitted successfully.',
       );
     } on AppException catch (error) {
+      if (error is PermissionException && error.isAccessChanged) {
+        // Assignment/scope revocation: discard the unauthorized queued draft
+        // and purge tenant/assignment-scoped private caches (P0-03).
+        try {
+          await _repository.discardDraftAttendance(classId, date);
+        } catch (_) {
+          // Best effort; UI still moves to the access-changed failure state.
+        }
+        try {
+          await _privateDataCleanup?.clearAccessScopedCaches();
+        } catch (_) {
+          // Best effort purge.
+        }
+        state = state.copyWith(
+          isSubmitting: false,
+          hasUnsavedChanges: false,
+          syncStatus: AttendanceSyncStatus.failed,
+          clearDraftClientSubmissionId: true,
+          clearDraftReceiptState: true,
+          entries: state.originalEntries,
+          message: error.message,
+        );
+        return;
+      }
       final receiptPending = state.isReceiptPending || _isAmbiguousSync(error);
       if (receiptPending) {
         final receiptState = state.isReceiptPending

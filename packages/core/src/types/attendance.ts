@@ -81,6 +81,9 @@ export type AttendanceSummary = {
     sickLeave: number;
     excusedLeave: number;
     unexcusedLeave: number;
+    earlyAuthorizedDeparture?: number;
+    unauthorizedDeparture?: number;
+    periodAbsent?: number;
   };
 };
 
@@ -347,6 +350,9 @@ export type StudentAttendanceMonthlyRegisterDay = {
     | "ON_LEAVE"
     | "HALF_DAY"
     | "HOLIDAY"
+    | "EARLY_AUTHORIZED_DEPARTURE"
+    | "UNAUTHORIZED_DEPARTURE"
+    | "PERIOD_ABSENT"
     | "NOT_MARKED"
     | null;
   isToday: boolean;

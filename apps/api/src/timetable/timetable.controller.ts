@@ -47,6 +47,15 @@ import {
 } from './dto/timetable-setup.dto';
 import { TimetableService } from './timetable.service';
 import { TimetableSubstitutionService } from './timetable-substitution.service';
+import { TeacherReplacementService } from './teacher-replacement.service';
+import {
+  CancelTeacherReplacementDto,
+  CreateCoverageNoteDto,
+  CreateReplacementHandoverNoteDto,
+  CreateTeacherReplacementDto,
+  DisposePendingWorkDto,
+  TeacherReplacementQueryDto,
+} from './dto/teacher-replacement.dto';
 
 @Controller('timetable')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
@@ -55,6 +64,7 @@ export class TimetableController {
   constructor(
     private readonly timetableService: TimetableService,
     private readonly substitutionService: TimetableSubstitutionService,
+    private readonly replacementService: TeacherReplacementService,
   ) {}
 
   @Get()
@@ -511,5 +521,96 @@ export class TimetableController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.substitutionService.completeSubstitution(id, auth);
+  }
+
+  @Post('substitutions/:id/coverage-notes')
+  @Permissions('timetable:substitute')
+  addSubstitutionCoverageNote(
+    @Param('id') id: string,
+    @Body() dto: CreateCoverageNoteDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.substitutionService.addCoverageNote(id, dto.body, auth);
+  }
+
+  @Get('replacements')
+  @Permissions('timetable:substitute')
+  listTeacherReplacements(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: TeacherReplacementQueryDto,
+  ) {
+    return this.replacementService.list(auth, query);
+  }
+
+  @Get('replacements/:id')
+  @Permissions('timetable:substitute')
+  getTeacherReplacement(
+    @Param('id') id: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.replacementService.get(id, auth);
+  }
+
+  @Post('replacements')
+  @Permissions('timetable:substitute')
+  scheduleTeacherReplacement(
+    @Body() dto: CreateTeacherReplacementDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.replacementService.schedule(dto, auth);
+  }
+
+  @Patch('replacements/:id/activate')
+  @Permissions('timetable:substitute')
+  activateTeacherReplacement(
+    @Param('id') id: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.replacementService.activate(id, auth);
+  }
+
+  @Patch('replacements/:id/complete')
+  @Permissions('timetable:substitute')
+  completeTeacherReplacement(
+    @Param('id') id: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.replacementService.complete(id, auth);
+  }
+
+  @Patch('replacements/:id/cancel')
+  @Permissions('timetable:substitute')
+  cancelTeacherReplacement(
+    @Param('id') id: string,
+    @Body() dto: CancelTeacherReplacementDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.replacementService.cancel(id, dto, auth);
+  }
+
+  @Patch('replacements/:id/pending-work/:pendingWorkId/dispose')
+  @Permissions('timetable:substitute')
+  disposeReplacementPendingWork(
+    @Param('id') id: string,
+    @Param('pendingWorkId') pendingWorkId: string,
+    @Body() dto: DisposePendingWorkDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.replacementService.disposePendingWork(
+      id,
+      pendingWorkId,
+      dto,
+      auth,
+    );
+  }
+
+  @Post('replacements/:id/handover-notes')
+  @Permissions('timetable:substitute')
+  addReplacementHandoverNote(
+    @Param('id') id: string,
+    @Body() dto: CreateReplacementHandoverNoteDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.replacementService.addHandoverNote(id, dto, auth);
   }
 }

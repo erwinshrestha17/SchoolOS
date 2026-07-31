@@ -163,6 +163,34 @@ model StaffLeaveRequest {
   @@index([tenantId, startsOn, endsOn])
 }
 
+/// P0-08: approved student leave automatically informs attendance state.
+model StudentLeaveRequest {
+  id           String             @id @default(uuid())
+  tenantId     String
+  studentId    String
+  leaveType    String
+  startsOn     DateTime           @db.Date
+  endsOn       DateTime           @db.Date
+  reason       String
+  status       LeaveRequestStatus @default(PENDING)
+  requestedById String
+  reviewedById String?
+  reviewedAt   DateTime?
+  reviewNote   String?
+  metadata     Json?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  tenant      Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  student     Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  requestedBy User    @relation("RequestedStudentLeaveRequests", fields: [requestedById], references: [id], onDelete: Restrict)
+  reviewedBy  User?   @relation("ReviewedStudentLeaveRequests", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, studentId, status])
+  @@index([tenantId, startsOn, endsOn])
+  @@index([tenantId, status, startsOn, endsOn])
+}
+
 model AttendanceConflict {
   id                  String                      @id @default(uuid())
   tenantId            String

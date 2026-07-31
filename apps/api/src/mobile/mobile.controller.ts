@@ -28,6 +28,7 @@ import {
   MobileParentAttendanceCorrectionCancelDto,
   MobileParentAttendanceCorrectionDto,
 } from './dto/mobile-parent-attendance-correction.dto';
+import { MobileParentStudentLeaveRequestDto } from './dto/mobile-parent-student-leave.dto';
 import {
   CreateSchoolServiceRequestDto,
   ReasonedSchoolServiceRequestDto,
@@ -212,6 +213,25 @@ export class MobileController {
       dto,
       auth,
     );
+  }
+
+  @Get('students/:id/leave-requests')
+  @RequiredModule('attendance')
+  listStudentLeaveRequests(
+    @Param('id') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.mobileService.listStudentLeaveRequests(studentId, auth);
+  }
+
+  @Post('students/:id/leave-requests')
+  @RequiredModule('attendance')
+  createStudentLeaveRequest(
+    @Param('id') studentId: string,
+    @Body() dto: MobileParentStudentLeaveRequestDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.mobileService.createStudentLeaveRequest(studentId, dto, auth);
   }
 
   @Get('students/:id/service-requests')

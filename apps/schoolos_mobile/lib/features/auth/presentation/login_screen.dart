@@ -7,6 +7,7 @@ import '../../../app/design_system/app_radius.dart';
 import '../../../app/design_system/app_spacing.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/auth/auth_provider.dart';
+import '../../../core/auth/biometric_auth_service.dart';
 import '../../../core/config/env_config.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_text_field.dart';
@@ -101,6 +102,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   ];
 
   _DemoLoginAccount? _selectedDemoAccount;
+  bool _biometricUnlockAvailable = false;
+  bool _biometricUnlockBusy = false;
+  BiometricCapability _biometricCapability = BiometricCapability.unavailable;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshBiometricShortcut();
+    });
+  }
 
   @override
   void dispose() {
@@ -108,6 +120,51 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _refreshBiometricShortcut() async {
+    final auth = ref.read(authProvider);
+    final bio = ref.read(biometricAuthServiceProvider);
+    final available =
+        auth.status == AuthStatus.biometricLocked ||
+        await ref.read(authProvider.notifier).isBiometricUnlockAvailable();
+    final capability = available
+        ? await bio.resolveCapability()
+        : BiometricCapability.unavailable;
+    if (!mounted) return;
+    setState(() {
+      _biometricUnlockAvailable =
+          available && capability != BiometricCapability.unavailable;
+      _biometricCapability = capability;
+    });
+  }
+
+  Future<void> _handleBiometricUnlock() async {
+    if (_biometricUnlockBusy) return;
+    setState(() => _biometricUnlockBusy = true);
+    final bio = ref.read(biometricAuthServiceProvider);
+    try {
+      final ok = await ref.read(authProvider.notifier).unlockWithBiometrics();
+      if (!mounted) return;
+      if (ok) {
+        context.go(AppRoutes.home);
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not verify ${bio.biometricName(_biometricCapability)}. '
+            'Try again or sign in with your password.',
+          ),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+      await _refreshBiometricShortcut();
+    } finally {
+      if (mounted) {
+        setState(() => _biometricUnlockBusy = false);
+      }
+    }
   }
 
   Future<void> _handleLogin() async {
@@ -149,6 +206,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final authState = ref.watch(authProvider);
+    final bio = ref.watch(biometricAuthServiceProvider);
+
+    ref.listen<AuthState>(authProvider, (previous, next) {
+      if (previous?.status != next.status) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _refreshBiometricShortcut();
+        });
+      }
+    });
 
     return Scaffold(
       body: SafeArea(
@@ -259,9 +325,49 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   AppButton(
                     label: 'Sign in',
                     icon: Icons.login_rounded,
-                    isLoading: authState.status == AuthStatus.loading,
-                    onPressed: _handleLogin,
+                    isLoading:
+                        authState.status == AuthStatus.loading &&
+                        !_biometricUnlockBusy,
+                    onPressed: _biometricUnlockBusy ? null : _handleLogin,
                   ),
+                  if (_biometricUnlockAvailable) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    Row(
+                      children: [
+                        const Expanded(child: Divider()),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                          ),
+                          child: Text(
+                            'or',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: isDark
+                                  ? AppColors.slate400
+                                  : AppColors.slate500,
+                            ),
+                          ),
+                        ),
+                        const Expanded(child: Divider()),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    AppButton(
+                      label: bio.unlockButtonLabel(_biometricCapability),
+                      icon:
+                          _biometricCapability == BiometricCapability.faceId ||
+                              _biometricCapability == BiometricCapability.face
+                          ? Icons.face_rounded
+                          : Icons.fingerprint_rounded,
+                      variant: AppButtonVariant.outlined,
+                      isLoading: _biometricUnlockBusy,
+                      onPressed:
+                          authState.status == AuthStatus.loading ||
+                              _biometricUnlockBusy
+                          ? null
+                          : _handleBiometricUnlock,
+                    ),
+                  ],
                   const SizedBox(height: AppSpacing.xl),
 
                   if (EnvConfig.isDevelopment) ...[

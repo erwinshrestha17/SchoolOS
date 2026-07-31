@@ -20,6 +20,12 @@ enum DateDisplayPreference {
     DateDisplayPreference.both => 'Show both',
   };
 
+  String get shortLabel => switch (this) {
+    DateDisplayPreference.bikramSambat => 'Bikram Sambat',
+    DateDisplayPreference.gregorian => 'Gregorian',
+    DateDisplayPreference.both => 'Both BS and AD',
+  };
+
   static DateDisplayPreference fromStorage(String? value) {
     return DateDisplayPreference.values.firstWhere(
       (item) => item.storageValue == value,
@@ -70,6 +76,16 @@ String formatPreferredDate(
 String? formatSecondaryDate(DateTime value, DateDisplayPreference preference) {
   if (preference != DateDisplayPreference.both) return null;
   return formatGregorianDate(value);
+}
+
+String formatDateDisplayPreview(
+  DateTime value,
+  DateDisplayPreference preference,
+) {
+  final primary = formatPreferredDate(value, preference);
+  final secondary = formatSecondaryDate(value, preference);
+  if (secondary == null) return primary;
+  return '$primary · $secondary';
 }
 
 String formatGregorianDate(DateTime value, {bool long = false}) {

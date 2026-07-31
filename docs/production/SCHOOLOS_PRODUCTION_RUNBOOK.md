@@ -15,7 +15,7 @@ The active education scope is School (Grade 1-10) and Higher Secondary (Grade 11
 ### Scope
 Use this runbook for every staging or production deployment.
 The target pilot architecture is: NestJS API, Next.js dashboard, PostgreSQL, Redis/BullMQ, private local or object storage, and provider adapters in disabled/dev-log/configured mode.
-SchoolOS remains a modular monolith. Angular migration, microservices, AI/ML runtime, biometric workflows, broad Student App access, and unverified live transport map expansion are out of scope unless explicitly approved.
+SchoolOS remains a modular monolith. Angular migration, microservices, AI/ML runtime, broad Student App access, and unverified live transport map expansion are out of scope unless explicitly approved. Optional mobile biometric unlock of local session credentials (M0) is in scope for Parent/Teacher/Principal; biometric templates must never leave the device. Biometric attendance (M2) and other biometric workflows remain out of scope unless explicitly approved.
 
 ### Server Requirements
 Recommended pilot VPS specs:

@@ -59,6 +59,13 @@ export enum TeacherCapability {
    */
   HOMEROOM_ACADEMIC_SUMMARY_READ = 'HOMEROOM_ACADEMIC_SUMMARY_READ',
 
+  /**
+   * Read result previews / class result readiness for an assigned
+   * class+section. Satisfied by any active teaching assignment covering that
+   * class+section. Does not authorize publish, unlock, or mark entry.
+   */
+  RESULT_REVIEW = 'RESULT_REVIEW',
+
   // ---- Homeroom-owned WRITE ----------------------------------------------
   /** Class-wide announcement / parent follow-up for the homeroom. */
   HOMEROOM_COMMUNICATION_CREATE = 'HOMEROOM_COMMUNICATION_CREATE',
@@ -276,6 +283,13 @@ export const CAPABILITY_RULES: Record<TeacherCapability, CapabilityRule> = {
     requiresRecordOwnership: false,
     // ...but never another teacher's private draft.
     visibleRecordStatuses: NON_DRAFT_STATUSES,
+  },
+  [TeacherCapability.RESULT_REVIEW]: {
+    allowedAssignmentTypes: ANY_TEACHING_TYPE,
+    requiresSubject: false,
+    subjectMatch: 'ANY',
+    access: 'READ',
+    requiresRecordOwnership: false,
   },
 
   // ---- Homeroom-owned WRITE ----------------------------------------------

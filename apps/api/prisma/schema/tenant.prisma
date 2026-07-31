@@ -156,6 +156,7 @@ model Tenant {
   schoolCalendarDays            SchoolCalendarDay[]
   staffLeaveBalances            StaffLeaveBalance[]
   staffLeaveRequests            StaffLeaveRequest[]
+  studentLeaveRequests          StudentLeaveRequest[]
   syllabusTopics                SyllabusTopic[]
   settings                      TenantSetting[]
   fileAssets                    FileAsset[]
@@ -232,6 +233,9 @@ model Tenant {
   addresses                     Address[]
   teacherAssignmentRecords      TeacherAssignment[]
   teacherDelegations            TeacherDelegation[]
+  teacherReplacements           TeacherReplacement[]
+  teacherReplacementPendingWork TeacherReplacementPendingWork[]
+  teacherHandoverNotes          TeacherHandoverNote[]
 }
 
 model TenantSetting {

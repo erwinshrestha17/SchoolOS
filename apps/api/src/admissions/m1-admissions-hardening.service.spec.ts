@@ -56,6 +56,26 @@ describe('M1AdmissionsHardeningService', () => {
         where: { tenantId: actor.tenantId, studentId: 'student-1' },
       }),
     );
+    expect(prisma.studentGuardian.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: actor.tenantId,
+          studentId: 'student-1',
+          status: 'ACTIVE',
+          verificationStatus: 'VERIFIED',
+          approvalStatus: 'APPROVED',
+          effectiveFrom: { lte: expect.any(Date) },
+          AND: expect.arrayContaining([
+            expect.objectContaining({
+              OR: expect.arrayContaining([
+                { effectiveUntil: null },
+                { effectiveUntil: { gt: expect.any(Date) } },
+              ]),
+            }),
+          ]),
+        }),
+      }),
+    );
     expect(result.qrAnalytics[0]).not.toHaveProperty('tokenHash');
     expect(result.policy).toEqual(
       expect.objectContaining({

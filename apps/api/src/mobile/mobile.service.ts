@@ -45,6 +45,7 @@ import {
   MobileParentAttendanceCorrectionCancelDto,
   MobileParentAttendanceCorrectionDto,
 } from './dto/mobile-parent-attendance-correction.dto';
+import { MobileParentStudentLeaveRequestDto } from './dto/mobile-parent-student-leave.dto';
 import { ServiceRequestsService } from '../service-requests/service-requests.service';
 import {
   CreateSchoolServiceRequestDto,
@@ -1617,6 +1618,40 @@ export class MobileService {
     return this.attendanceService.cancelParentCorrectionRequest(
       requestId,
       dto.reason,
+      actor,
+    );
+  }
+
+  async listStudentLeaveRequests(studentId: string, actor: AuthContext) {
+    await this.assertStudentAccess(
+      studentId,
+      actor,
+      GuardianCapability.LEAVE_MANAGE,
+    );
+    return this.attendanceService.listStudentLeaveRequests(actor, {
+      studentId,
+    });
+  }
+
+  async createStudentLeaveRequest(
+    studentId: string,
+    dto: MobileParentStudentLeaveRequestDto,
+    actor: AuthContext,
+  ) {
+    assertConfirmStudentId(studentId, dto.confirmStudentId);
+    await this.assertStudentAccess(
+      studentId,
+      actor,
+      GuardianCapability.LEAVE_MANAGE,
+    );
+    return this.attendanceService.createParentStudentLeaveRequest(
+      studentId,
+      {
+        leaveType: dto.leaveType,
+        startsOn: dto.startsOn,
+        endsOn: dto.endsOn,
+        reason: dto.reason,
+      },
       actor,
     );
   }
