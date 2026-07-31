@@ -33,6 +33,8 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { EmptyState } from '@/components/ui/empty-state';
+import { LoadingState } from '@/components/ui/loading-state';
 
 type Props = {
   academicYears: AcademicYearSummary[];
@@ -422,22 +424,25 @@ export function CasRecordsTab({ academicYears, classes, allSections, subjects }:
                     className="premium-input bg-slate-50 min-h-[100px] py-4 text-xs font-medium"
                   />
 
-                  <button 
+                  <Button
+                    type="button"
+                    className="h-14 w-full rounded-2xl font-black uppercase tracking-widest text-xs"
                     onClick={saveSingle}
                     disabled={!cas.studentId || !cas.subjectId || invalidSingleScore || createMutation.isPending || updateMutation.isPending}
-                    className="w-full h-14 rounded-2xl bg-[var(--color-mod-academics-accent)] text-white flex items-center justify-center gap-3 font-black uppercase tracking-widest text-xs shadow-sm hover:bg-[var(--color-mod-academics-text)] active:scale-95 transition-all disabled:opacity-30"
                   >
                     {createMutation.isPending || updateMutation.isPending ? <Loader2 className="animate-spin" size={18} /> : <Zap size={18} />}
                     {editingId ? 'Update Record' : 'Record Now'}
-                  </button>
+                  </Button>
                   
                   {editingId && (
-                    <button 
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="w-full font-black uppercase tracking-widest text-[10px]"
                       onClick={() => { setEditingId(null); setCas(makeDefaultForm(academicYears)); }}
-                      className="w-full py-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors"
                     >
                       Cancel Edit
-                    </button>
+                    </Button>
                   )}
                </div>
             </section>
@@ -451,17 +456,15 @@ export function CasRecordsTab({ academicYears, classes, allSections, subjects }:
                     <h3 className="text-base font-bold text-slate-900">Batch Roster</h3>
                     <p className="mt-1 text-sm text-slate-500">Multi-student entry for {cas.category}.</p>
                   </div>
-                  <button 
+                  <Button
+                    type="button"
+                    className="h-12 rounded-2xl font-black uppercase tracking-widest text-[10px]"
                     onClick={saveBatch}
                     disabled={batchEntries.length === 0 || invalidBatchEntries.length > 0 || batchMutation.isPending}
-                    className={cn(
-                      "h-12 px-6 rounded-2xl flex items-center justify-center gap-2 font-black uppercase tracking-widest text-[10px] transition-all active:scale-95",
-                      batchEntries.length > 0 ? "bg-[var(--color-mod-academics-accent)] text-white shadow-sm hover:bg-[var(--color-mod-academics-text)]" : "bg-slate-100 text-slate-300 pointer-events-none"
-                    )}
                   >
                     {batchMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Layers size={16} />}
                     {batchMutation.isPending ? 'Syncing' : `Sync ${batchEntries.length} Records`}
-                  </button>
+                  </Button>
                </div>
 
                <div className="overflow-x-auto max-h-[600px]">
@@ -474,11 +477,20 @@ export function CasRecordsTab({ academicYears, classes, allSections, subjects }:
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                       {formStudentsForClass.length === 0 ? (
+                       {formRosterQuery.isLoading ? (
                          <tr>
-                           <td colSpan={3} className="py-20 text-center text-slate-300">
-                              <Users className="h-12 w-12 mx-auto mb-4 opacity-10" />
-                              <p className="text-[10px] font-black uppercase tracking-widest">Select class to load batch roster</p>
+                           <td colSpan={3} className="py-12">
+                             <LoadingState label="Loading batch roster..." />
+                           </td>
+                         </tr>
+                       ) : formStudentsForClass.length === 0 ? (
+                         <tr>
+                           <td colSpan={3} className="py-12">
+                             <EmptyState
+                               title="Select class to load batch roster"
+                               description="Choose a class in the single entry form to populate the batch grid."
+                               icon={<Users size={32} />}
+                             />
                            </td>
                          </tr>
                        ) : formStudentsForClass.map((student, rowIndex) => (

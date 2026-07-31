@@ -11,7 +11,6 @@ import {
 } from "../ui/dialog";
 import { Badge } from "../ui/badge";
 import {
-  Loader2,
   ArrowLeftRight,
   Ban,
   CheckCircle2,
@@ -25,6 +24,7 @@ import {
   type JournalEntryView,
 } from "@schoolos/core";
 import { cn } from "../../lib/utils";
+import { Button } from "../ui/button";
 import { Toast, type ToastTone } from "../ui/toast";
 import { useSession } from "../session-provider";
 
@@ -263,13 +263,19 @@ export function JournalDetailDialog({
               </div>
 
               <div className="mt-5 flex justify-end gap-3">
-                <button
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={resetState}
-                  className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 transition-colors"
+                  className="text-xs font-bold text-slate-500"
                 >
                   Cancel Action
-                </button>
-                <button
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={isReversing ? "destructive" : "default"}
                   onClick={() =>
                     isReversing
                       ? reverseMutation.mutate(entry.id)
@@ -280,22 +286,24 @@ export function JournalDetailDialog({
                     reverseMutation.isPending ||
                     correctMutation.isPending
                   }
+                  isLoading={
+                    reverseMutation.isPending || correctMutation.isPending
+                  }
                   className={cn(
-                    "inline-flex items-center gap-2 rounded-xl px-6 py-2 text-xs font-bold text-white shadow-lg transition-all disabled:opacity-50",
-                    isReversing
-                      ? "bg-rose-600 shadow-rose-600/20 hover:bg-rose-700"
-                      : "bg-amber-600 shadow-amber-600/20 hover:bg-amber-700",
+                    "gap-2 rounded-xl px-6 text-xs shadow-lg",
+                    !isReversing &&
+                      "bg-amber-600 shadow-amber-600/20 hover:bg-amber-700",
                   )}
                 >
-                  {reverseMutation.isPending || correctMutation.isPending ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : isReversing ? (
-                    <RotateCcw size={14} />
-                  ) : (
-                    <Wrench size={14} />
-                  )}
+                  {!reverseMutation.isPending && !correctMutation.isPending ? (
+                    isReversing ? (
+                      <RotateCcw size={14} />
+                    ) : (
+                      <Wrench size={14} />
+                    )
+                  ) : null}
                   Confirm {isReversing ? "Reversal" : "Correction"}
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -439,81 +447,83 @@ export function JournalDetailDialog({
           {!isReversing && !isCorrecting && (
             <>
               {entry.status === "DRAFT" && canSubmit && (
-                <button
+                <Button
+                  type="button"
                   onClick={() =>
                     actionMutation.mutate({ id: entry.id, action: "submit" })
                   }
-                  disabled={actionMutation.isPending}
-                  className="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-6 py-2 text-sm font-bold text-white shadow-sm hover:bg-amber-700 transition-all disabled:opacity-50"
+                  isLoading={actionMutation.isPending}
+                  className="gap-2 rounded-xl bg-amber-600 text-sm shadow-sm hover:bg-amber-700"
                 >
-                  {actionMutation.isPending ? (
-                    <Loader2 size={16} className="animate-spin" />
-                  ) : (
+                  {!actionMutation.isPending ? (
                     <CheckCircle2 size={16} />
-                  )}
+                  ) : null}
                   Submit for Approval
-                </button>
+                </Button>
               )}
 
               {entry.status === "SUBMITTED" && canApprove && (
-                <button
+                <Button
+                  type="button"
                   onClick={() =>
                     actionMutation.mutate({ id: entry.id, action: "approve" })
                   }
-                  disabled={actionMutation.isPending}
-                  className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-mod-accounting-accent)] px-6 py-2 text-sm font-bold text-white shadow-sm hover:bg-[var(--color-mod-accounting-text)] transition-all disabled:opacity-50"
+                  isLoading={actionMutation.isPending}
+                  className="gap-2 rounded-xl bg-[var(--color-mod-accounting-accent)] text-sm shadow-sm hover:bg-[var(--color-mod-accounting-text)]"
                 >
-                  {actionMutation.isPending ? (
-                    <Loader2 size={16} className="animate-spin" />
-                  ) : (
+                  {!actionMutation.isPending ? (
                     <CheckCircle2 size={16} />
-                  )}
+                  ) : null}
                   Approve Journal
-                </button>
+                </Button>
               )}
 
               {entry.status === "APPROVED" && canPost && (
-                <button
+                <Button
+                  type="button"
                   onClick={() =>
                     actionMutation.mutate({ id: entry.id, action: "post" })
                   }
-                  disabled={actionMutation.isPending}
-                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-2 text-sm font-bold text-white shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all disabled:opacity-50"
+                  isLoading={actionMutation.isPending}
+                  className="gap-2 rounded-xl bg-emerald-600 text-sm shadow-lg shadow-emerald-600/20 hover:bg-emerald-700"
                 >
-                  {actionMutation.isPending ? (
-                    <Loader2 size={16} className="animate-spin" />
-                  ) : (
+                  {!actionMutation.isPending ? (
                     <CheckCircle2 size={16} />
-                  )}
+                  ) : null}
                   Post Journal
-                </button>
+                </Button>
               )}
 
               {entry.status === "POSTED" && canReverse && (
                 <div className="flex gap-2 mr-auto">
-                  <button
+                  <Button
+                    type="button"
+                    variant="destructive"
                     onClick={() => setIsReversing(true)}
-                    className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-6 py-2 text-sm font-bold text-white shadow-lg shadow-rose-600/20 hover:bg-rose-700 transition-all"
+                    className="gap-2 rounded-xl shadow-lg shadow-rose-600/20"
                   >
                     <RotateCcw size={16} />
                     Reverse
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    type="button"
                     onClick={() => setIsCorrecting(true)}
-                    className="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-6 py-2 text-sm font-bold text-white shadow-lg shadow-amber-600/20 hover:bg-amber-700 transition-all"
+                    className="gap-2 rounded-xl bg-amber-600 shadow-lg shadow-amber-600/20 hover:bg-amber-700"
                   >
                     <Wrench size={16} />
                     Correct
-                  </button>
+                  </Button>
                 </div>
               )}
 
-              <button
+              <Button
+                type="button"
+                variant="outline"
                 onClick={handleClose}
-                className="rounded-xl border border-slate-200 px-6 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all"
+                className="rounded-xl text-sm font-bold text-slate-600"
               >
                 Close
-              </button>
+              </Button>
             </>
           )}
         </DialogFooter>

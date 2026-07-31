@@ -1,20 +1,15 @@
 'use client';
 
-import { academicsWorkspaceOverflowTabs, academicsWorkspaceTabs } from '@/components/academics/academics-tabs';
-import { DashboardPageShell } from '@/components/dashboard/dashboard-page-shell';
-import { ModuleTabs } from '@/components/ui/module-tabs';
-import { PageHeader } from '@/components/ui/page-header';
+import { AcademicsSectionPage } from '@/components/academics/academics-section-page';
 import { ReportCardsWorkspace } from '@/components/academics/report-cards/report-cards-workspace';
 
 export default function AcademicReportCardsPage() {
   return (
-    <DashboardPageShell>
-      <PageHeader
-        title="Report Cards"
-        description="Generate, track, and manage student performance reports using backend-calculated data."
-      />
-      <ModuleTabs items={academicsWorkspaceTabs} overflowItems={academicsWorkspaceOverflowTabs} accentColor="purple" variant="light" className="mb-6" />
+    <AcademicsSectionPage
+      title="Report Cards"
+      description="Generate, track, and manage student performance reports using backend-calculated data."
+    >
       <ReportCardsWorkspace />
-    </DashboardPageShell>
+    </AcademicsSectionPage>
   );
 }

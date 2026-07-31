@@ -362,14 +362,15 @@ export function AssessmentRetakesTab() {
           role="status"
         >
           <span>{successMessage}</span>
-          <button
+          <Button
             type="button"
-            className="rounded p-1 text-emerald-700 hover:bg-emerald-100"
+            variant="ghost"
+            size="sm"
             onClick={() => setSuccessMessage(null)}
             title="Dismiss"
           >
             <X className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
       ) : null}
 

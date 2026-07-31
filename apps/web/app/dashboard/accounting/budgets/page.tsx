@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ChartAccountSummary, FiscalYearSummary } from "@schoolos/core";
 import { api } from "@/lib/api";
 import { SectionCard } from "@/components/ui/section-card";
-import { PageHeader } from "@/components/ui/page-header";
+import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { LoadingState } from "@/components/ui/loading-state";
 import { PageState } from "@/components/ui/page-state";
@@ -105,12 +105,10 @@ export default function AccountingBudgetsPage() {
 
   return (
     <div className="space-y-6 pb-10">
-      <PageHeader
+      <SectionCard
         title="Fiscal Budgets"
         description="Enter and approve an annual account-level budget for budget-vs-actual reporting."
-      />
-
-      <SectionCard title="Budget setup">
+      >
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500">
@@ -144,18 +142,19 @@ export default function AccountingBudgetsPage() {
           </div>
         </div>
         <div className="mt-4">
-          <button
+          <Button
             type="button"
             disabled={
               !selectedYearId ||
               !budgetName.trim() ||
               createBudgetMutation.isPending
             }
+            isLoading={createBudgetMutation.isPending}
             onClick={() => createBudgetMutation.mutate()}
-            className="rounded-xl bg-[var(--color-mod-accounting-accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-40"
+            className="bg-[var(--color-mod-accounting-accent)] hover:bg-[var(--color-mod-accounting-text)]"
           >
-            {createBudgetMutation.isPending ? "Creating..." : "Create draft budget"}
-          </button>
+            Create draft budget
+          </Button>
         </div>
       </SectionCard>
 
@@ -216,18 +215,19 @@ export default function AccountingBudgetsPage() {
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setLineAmount(e.target.value)}
                 className="h-11 rounded-xl border border-slate-200 px-3 text-sm font-semibold"
               />
-              <button
+              <Button
                 type="button"
                 disabled={
                   !selectedAccountId ||
                   !lineAmount ||
                   upsertLineMutation.isPending
                 }
+                isLoading={upsertLineMutation.isPending}
                 onClick={() => upsertLineMutation.mutate()}
-                className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-40"
+                className="bg-emerald-600 hover:bg-emerald-700"
               >
-                {upsertLineMutation.isPending ? "Saving..." : "Add / update line"}
-              </button>
+                Add / update line
+              </Button>
             </div>
           )}
 
@@ -265,16 +265,17 @@ export default function AccountingBudgetsPage() {
                   className="min-h-20 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
                   placeholder="Approval reason"
                 />
-                <button
+                <Button
                   type="button"
                   disabled={
                     approveReason.trim().length < 3 || approveMutation.isPending
                   }
+                  isLoading={approveMutation.isPending}
                   onClick={() => approveMutation.mutate()}
-                  className="rounded-xl bg-[var(--color-mod-accounting-accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-40"
+                  className="bg-[var(--color-mod-accounting-accent)] hover:bg-[var(--color-mod-accounting-text)]"
                 >
-                  {approveMutation.isPending ? "Approving..." : "Approve budget"}
-                </button>
+                  Approve budget
+                </Button>
               </div>
             )}
         </SectionCard>

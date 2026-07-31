@@ -30,7 +30,46 @@ import { useTeacherAssignmentScope } from '@/lib/hooks/use-teacher-assignment-sc
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
 import { ConfirmDialog } from '../../ui/confirm-dialog';
+import { EmptyState } from '../../ui/empty-state';
+import { ErrorState } from '../../ui/error-state';
+import { LoadingState } from '../../ui/loading-state';
 import { AssessmentRetakeRequestDialog } from '../assessment-retake-request-dialog';
+
+function StatusSegmentButton({
+  label,
+  shortLabel,
+  active,
+  activeClassName,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  shortLabel: string;
+  active: boolean;
+  activeClassName: string;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        'h-8 w-8 rounded-lg p-0 text-[10px] font-black',
+        active ? activeClassName : 'bg-slate-100 text-slate-300 hover:bg-slate-200',
+        disabled && 'pointer-events-none opacity-60',
+      )}
+      aria-pressed={active}
+      aria-label={label}
+      title={label}
+    >
+      {shortLabel}
+    </Button>
+  );
+}
 
 type Props = {
   academicYears: any[];
@@ -305,24 +344,25 @@ export function MarksEntryTab({ academicYears, classes, allSections, exams }: Pr
             </select>
           </div>
           <div className="flex gap-2">
-             <button 
-              className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--color-mod-academics-accent)] text-white shadow-sm transition-colors hover:bg-[var(--color-mod-academics-text)]"
+             <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-12 w-12 rounded-xl"
+              aria-label="Refresh roster"
               onClick={() => queryClient.invalidateQueries({ queryKey: ['marks', filters] })}
              >
                 <Search size={20} />
-             </button>
-             <button
+             </Button>
+             <Button
               type="button"
               disabled={!canSave}
-              className={cn(
-                "flex-1 h-12 rounded-2xl flex items-center justify-center gap-2 font-black uppercase tracking-widest text-xs transition-all active:scale-95",
-                canSave ? "bg-[var(--color-mod-academics-accent)] text-white shadow-sm hover:bg-[var(--color-mod-academics-text)]" : "bg-slate-100 text-slate-300 disabled:cursor-not-allowed"
-              )}
+              className="h-12 flex-1 rounded-2xl font-black uppercase tracking-widest text-xs"
               onClick={handleSave}
              >
                 {batchMut.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                 {batchMut.isPending ? 'Saving' : `Save ${changedEntries.length > 0 ? changedEntries.length : ''}`}
-             </button>
+             </Button>
           </div>
         </div>
       </section>
@@ -338,12 +378,14 @@ export function MarksEntryTab({ academicYears, classes, allSections, exams }: Pr
                  <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mt-0.5">Successfully saved {saveSuccess} entries.</p>
               </div>
            </div>
-           <button
+           <Button
+            type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => setSaveSuccess(null)}
-            className="text-[10px] font-black uppercase tracking-widest text-emerald-400 hover:text-emerald-600 transition-colors"
            >
               Dismiss
-           </button>
+           </Button>
         </div>
       )}
 
@@ -361,12 +403,14 @@ export function MarksEntryTab({ academicYears, classes, allSections, exams }: Pr
               <p className="text-[10px] font-bold text-rose-600 uppercase tracking-widest mt-0.5">{saveErrorMessage}</p>
             </div>
           </div>
-          <button
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => batchMut.reset()}
-            className="text-[10px] font-black uppercase tracking-widest text-rose-400 hover:text-rose-600 transition-colors"
           >
             Dismiss
-          </button>
+          </Button>
         </div>
       ) : null}
 
@@ -376,13 +420,14 @@ export function MarksEntryTab({ academicYears, classes, allSections, exams }: Pr
           role="status"
         >
           <span>Retest or make-up request sent for review.</span>
-          <button
+          <Button
             type="button"
-            className="rounded p-1 hover:bg-emerald-100"
+            variant="ghost"
+            size="sm"
             onClick={() => setRetakeSuccess(false)}
           >
             Dismiss
-          </button>
+          </Button>
         </div>
       ) : null}
 
@@ -427,18 +472,36 @@ export function MarksEntryTab({ academicYears, classes, allSections, exams }: Pr
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {existingMarksQuery.isLoading || rosterQuery.isLoading ? (
+                {existingMarksQuery.isError || rosterQuery.isError ? (
                   <tr>
-                    <td colSpan={8} className="py-20 text-center">
-                       <Loader2 className="h-10 w-10 animate-spin text-[var(--color-mod-academics-accent)] mx-auto opacity-20" />
-                       <p className="mt-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Fetching Student Roster</p>
+                    <td colSpan={8} className="py-8">
+                      <ErrorState
+                        title="Could not load mark entry roster"
+                        message="Refresh the roster or adjust your filters and try again."
+                        onRetry={() => {
+                          void queryClient.invalidateQueries({ queryKey: ['marks', filters] });
+                          void queryClient.invalidateQueries({
+                            queryKey: ['students', 'roster', filters.classId, filters.sectionId],
+                          });
+                        }}
+                        className="min-h-0 border-0 bg-transparent p-4"
+                      />
+                    </td>
+                  </tr>
+                ) : existingMarksQuery.isLoading || rosterQuery.isLoading ? (
+                  <tr>
+                    <td colSpan={8} className="py-12">
+                      <LoadingState label="Fetching student roster..." />
                     </td>
                   </tr>
                 ) : studentsForClass.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-20 text-center text-slate-400">
-                       <Users className="h-12 w-12 mx-auto mb-4 opacity-10" />
-                       <p className="text-xs font-black uppercase tracking-widest">No Students Found</p>
+                    <td colSpan={8} className="py-12">
+                      <EmptyState
+                        title="No students found"
+                        description="Choose a class and section with enrolled students to begin mark entry."
+                        icon={<Users size={32} />}
+                      />
                     </td>
                   </tr>
                 ) : (
@@ -475,19 +538,15 @@ export function MarksEntryTab({ academicYears, classes, allSections, exams }: Pr
                         <td className="py-4 px-6">
                            <div className="flex items-center justify-center gap-1">
                               {statusOptions.map(opt => (
-                                <button
+                                <StatusSegmentButton
                                   key={opt.value}
+                                  label={opt.value}
+                                  shortLabel={opt.label}
+                                  active={currentStatus === opt.value}
+                                  activeClassName={opt.color}
                                   disabled={isLocked || isStudentLocked}
                                   onClick={() => setStatuses(c => ({ ...c, [student.id]: opt.value }))}
-                                  className={cn(
-                                    "h-8 w-8 rounded-lg flex items-center justify-center text-[10px] font-black transition-all active:scale-90",
-                                    currentStatus === opt.value ? opt.color : "bg-slate-100 text-slate-300 hover:bg-slate-200",
-                                    (isLocked || isStudentLocked) && "pointer-events-none opacity-60"
-                                  )}
-                                  title={opt.value}
-                                >
-                                  {opt.label}
-                                </button>
+                                />
                               ))}
                            </div>
                         </td>

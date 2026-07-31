@@ -5,7 +5,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatBsDateTime } from '@schoolos/core';
 import { api } from '../../lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
-import { Loader2, AlertTriangle, Lock, Unlock, RefreshCcw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { AlertTriangle, Lock, Unlock, RefreshCcw } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 interface FiscalYearCloseDialogProps {
@@ -99,18 +100,18 @@ export function FiscalYearCloseDialog({ isOpen, onClose, fiscalYear, mode }: Fis
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                   Backend-owned close readiness
                 </p>
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => void readinessQuery.refetch()}
                   disabled={readinessQuery.isFetching}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+                  isLoading={readinessQuery.isFetching}
+                  className="gap-1.5 text-[11px] font-bold"
                 >
-                  <RefreshCcw
-                    size={12}
-                    className={cn(readinessQuery.isFetching && 'animate-spin')}
-                  />
+                  <RefreshCcw size={12} />
                   Recompute
-                </button>
+                </Button>
               </div>
 
               {readinessQuery.isLoading && (
@@ -182,25 +183,18 @@ export function FiscalYearCloseDialog({ isOpen, onClose, fiscalYear, mode }: Fis
             )}
           </div>
 
-          <DialogFooter className="pt-4 grid grid-cols-2 gap-2 sm:space-x-0">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-            >
+          <DialogFooter className="grid grid-cols-2 gap-2 pt-4 sm:space-x-0">
+            <Button type="button" variant="outline" onClick={onClose}>
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
+              variant={mode === 'CLOSE' ? 'destructive' : 'default'}
               disabled={confirmDisabled}
-              className={cn(
-                "inline-flex items-center justify-center gap-2 rounded-xl px-6 py-2 text-sm font-semibold text-white shadow-sm transition-all disabled:opacity-50",
-                mode === 'CLOSE' ? "bg-rose-600 hover:bg-rose-700" : "bg-[var(--color-mod-accounting-accent)] hover:bg-[var(--color-mod-accounting-text)]"
-              )}
+              isLoading={mutation.isPending}
             >
-              {mutation.isPending && <Loader2 size={16} className="animate-spin" />}
               {mode === 'CLOSE' ? 'Confirm Close' : 'Confirm Reopen'}
-            </button>
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

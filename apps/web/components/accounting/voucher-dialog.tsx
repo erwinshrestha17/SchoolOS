@@ -12,7 +12,8 @@ import {
 } from "../ui/dialog";
 import { Input } from "../ui/input";
 import { Select } from "../ui/select";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Button } from "../ui/button";
+import { AlertCircle } from "lucide-react";
 import { showErrorFromUnknown, showSuccess } from "../../lib/toast";
 
 export type VoucherType =
@@ -503,21 +504,16 @@ export function VoucherDialog({
           </div>
 
           <DialogFooter className="pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-            >
+            <Button type="button" variant="outline" onClick={onClose}>
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
-              disabled={loading}
-              className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-mod-accounting-accent)] px-6 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[var(--color-mod-accounting-text)] disabled:opacity-50"
+              isLoading={loading}
+              className="gap-2 bg-[var(--color-mod-accounting-accent)] hover:bg-[var(--color-mod-accounting-text)]"
             >
-              {loading && <Loader2 size={16} className="animate-spin" />}
               Save Draft {voucherLabels[voucherType]}
-            </button>
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

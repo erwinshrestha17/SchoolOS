@@ -2,10 +2,12 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { Button } from "@/components/ui/button";
 import { SectionCard } from "@/components/ui/section-card";
 import { DataTable } from "@/components/ui/data-table";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatBsDate } from "@schoolos/core";
@@ -91,12 +93,11 @@ export function DuesAnalysisSection() {
         const isOverdue = row.status === "overdue" && row.outstanding > 0;
         return (
           <div className="flex flex-col items-end">
-            <Badge
-              variant={isOverdue ? "destructive" : "warning"}
+            <StatusBadge
+              status={isOverdue ? "overdue" : "pending"}
+              label={isOverdue ? "Overdue" : "Due Soon"}
               className="h-5"
-            >
-              {isOverdue ? "Overdue" : "Due Soon"}
-            </Badge>
+            />
             <span className="text-[0.6rem] text-slate-400 font-bold mt-1 uppercase tracking-widest">
               By {formatBsDate(row.dueDate)}
             </span>
@@ -112,15 +113,17 @@ export function DuesAnalysisSection() {
       description="Micro-level breakdown of outstanding fees for operational follow-up."
       headerAction={
         <div className="flex items-center gap-2">
-          <button
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
             onClick={() => exportMutation.mutate()}
             disabled={exportMutation.isPending}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
             data-testid="finance-dues-csv-export"
           >
             <Download size={14} />
             {exportMutation.isPending ? "Exporting..." : "Export Dues"}
-          </button>
+          </Button>
         </div>
       }
     >
@@ -173,13 +176,13 @@ export function DuesAnalysisSection() {
             </div>
           </div>
 
-          <button
+          <Button
             type="button"
-            className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:text-slate-900"
+            variant="outline"
             onClick={() => setFilters({})}
           >
             Clear filters
-          </button>
+          </Button>
         </div>
 
         <div className="relative rounded-2xl border border-slate-100 overflow-hidden shadow-sm bg-white">

@@ -6,6 +6,8 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { SectionCard } from "@/components/ui/section-card";
+import { Button } from '@/components/ui/button';
+import { PermissionDenied } from '@/components/ui/permission-denied';
 import {
   Loader2,
   Plus,
@@ -14,6 +16,7 @@ import {
   Check,
   AlertCircle,
 } from "lucide-react";
+import { useSession } from "@/components/session-provider";
 import {
   Dialog,
   DialogContent,
@@ -47,6 +50,8 @@ const MONTH_NAMES = [
 ] as const;
 
 export function BillingRunsTab() {
+  const { hasPermissions } = useSession();
+  const canBill = hasPermissions(["fees:bill"]);
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
@@ -158,6 +163,13 @@ export function BillingRunsTab() {
           title="Run Monthly Invoices"
           description="Trigger bulk student invoice generation from configured fee plans."
         >
+          {!canBill ? (
+            <PermissionDenied
+              showNavigation={false}
+              title="Billing runs are restricted"
+              description="Your current role does not have the finance permission required to trigger invoice generation."
+            />
+          ) : (
           <form onSubmit={handleTriggerRun} className="space-y-4">
             {successMsg && (
               <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-2.5 text-xs font-bold text-emerald-700">
@@ -263,10 +275,10 @@ export function BillingRunsTab() {
               </div>
             </div>
 
-            <button
+            <Button
               type="submit"
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--color-mod-fees-accent)] px-5 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-[var(--color-mod-fees-text)] disabled:opacity-50 transition-all shadow-sm"
               disabled={billingRunMutation.isPending || !academicYearId}
+              className="flex w-full items-center justify-center gap-2 rounded-xl !bg-[var(--color-mod-fees-accent)] px-5 py-3 text-xs font-black uppercase tracking-widest text-white shadow-sm hover:!bg-[var(--color-mod-fees-text)]"
             >
               {billingRunMutation.isPending ? (
                 <>
@@ -279,8 +291,9 @@ export function BillingRunsTab() {
                   Trigger Billing Run
                 </>
               )}
-            </button>
+            </Button>
           </form>
+          )}
         </SectionCard>
       </div>
 
@@ -386,22 +399,26 @@ export function BillingRunsTab() {
                   of {billingRunsQuery.data.total}
                 </span>
                 <div className="flex gap-2">
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     disabled={billingPage <= 1}
                     onClick={() => updateBillingUrl({ page: billingPage - 1 })}
-                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 disabled:opacity-40"
+                    className="rounded-lg bg-white px-3 py-2"
                   >
                     Previous
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     disabled={!billingRunsQuery.data.hasNextPage}
                     onClick={() => updateBillingUrl({ page: billingPage + 1 })}
-                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 disabled:opacity-40"
+                    className="rounded-lg bg-white px-3 py-2"
                   >
                     Next
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -451,19 +468,20 @@ export function BillingRunsTab() {
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">
-            <button
+            <Button
               type="button"
-              className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+              variant="outline"
               onClick={() => setConfirmOpen(false)}
               disabled={billingRunMutation.isPending}
+              className="rounded-xl px-4 py-2 text-xs font-bold text-slate-600"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="rounded-xl bg-[var(--color-mod-fees-accent)] px-4 py-2 text-xs font-bold text-white hover:bg-[var(--color-mod-fees-text)] disabled:opacity-50 flex items-center gap-2"
-              onClick={confirmBillingRun}
               disabled={billingRunMutation.isPending}
+              onClick={confirmBillingRun}
+              className="flex items-center gap-2 rounded-xl !bg-[var(--color-mod-fees-accent)] px-4 py-2 text-xs font-bold text-white hover:!bg-[var(--color-mod-fees-text)]"
             >
               {billingRunMutation.isPending ? (
                 <>
@@ -473,7 +491,7 @@ export function BillingRunsTab() {
               ) : (
                 "Generate Invoices"
               )}
-            </button>
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

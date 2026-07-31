@@ -3,6 +3,7 @@
 import { formatBsDate, type ExamTermSummary } from '@schoolos/core';
 import { DataTable } from '@/components/ui/data-table';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { Button } from '@/components/ui/button';
 import { Calendar, Lock, Unlock, MoreVertical, Edit2, Trash2, ListChecks } from 'lucide-react';
 import { ActionMenu } from '@/components/ui/action-menu';
 
@@ -88,12 +89,15 @@ export function ExamList({
       cell: (exam: ExamTermSummary) => (
         <ActionMenu
           trigger={
-            <button 
-              className="flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-slate-100"
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-lg"
               aria-label="Open actions menu"
             >
               <MoreVertical size={16} className="text-slate-500" />
-            </button>
+            </Button>
           }
           items={[
             {

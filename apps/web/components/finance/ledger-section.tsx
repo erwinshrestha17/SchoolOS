@@ -13,6 +13,7 @@ import { SearchInput } from "@/components/ui/search-input";
 import { ReprintDialog } from "./reprint-dialog";
 import { useSession } from "@/components/session-provider";
 import { formatBsDateTime } from "@schoolos/core";
+import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import type { PaginatedDataTableSort } from "@/components/schoolos/data/paginated-data-table";
 
@@ -205,22 +206,24 @@ export function LedgerSection({
                       <td className="px-4 py-3.5"><StatusBadge status={receipt.fileStatus} /></td>
                       <td className="px-4 py-3.5">
                         <div className="flex justify-end gap-2">
-                          <button
+                          <Button
                             type="button"
+                            variant="outline"
+                            size="sm"
                             disabled={openReceiptMutation.isPending}
                             onClick={() => openReceiptMutation.mutate(receipt.receiptNumber)}
-                            className="min-h-10 rounded-lg border border-slate-200 px-3 text-xs font-semibold disabled:opacity-40"
                           >
                             Open protected receipt
-                          </button>
+                          </Button>
                           {hasPermissions(["receipts:manage"]) ? (
-                            <button
+                            <Button
                               type="button"
+                              variant="outline"
+                              size="sm"
                               onClick={() => setSelectedReceipt({ id: receipt.id, receiptNumber: receipt.receiptNumber })}
-                              className="min-h-10 rounded-lg border border-slate-200 px-3 text-xs font-semibold"
                             >
                               Prepare reprint
-                            </button>
+                            </Button>
                           ) : null}
                         </div>
                       </td>
@@ -239,26 +242,28 @@ export function LedgerSection({
             <div className="flex items-center justify-between pt-2 text-xs font-bold text-slate-500">
               <span>{receiptsQuery.data.total} receipts</span>
               <div className="flex gap-2">
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   disabled={receiptPage <= 1}
                   onClick={() =>
                     updateFilters({ receiptPage: receiptPage - 1 })
                   }
-                  className="rounded-lg border border-slate-200 px-3 py-2 disabled:opacity-40"
                 >
                   Previous
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   disabled={!receiptsQuery.data.hasNextPage}
                   onClick={() =>
                     updateFilters({ receiptPage: receiptPage + 1 })
                   }
-                  className="rounded-lg border border-slate-200 px-3 py-2 disabled:opacity-40"
                 >
                   Next
-                </button>
+                </Button>
               </div>
             </div>
           </div>

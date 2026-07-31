@@ -18,10 +18,12 @@ import {
   XCircle,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { api } from "../../lib/api";
 import { SummaryCard, SummaryGrid } from "../ui/summary-card";
 import { WorkSurface } from "../ui/work-surface";
 import { Badge } from "../ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "../../lib/utils";
 import { PageState } from "../ui/page-state";
 import { AuditInfo } from "../ui/audit-info";
@@ -44,6 +46,7 @@ function formatMoney(amount?: string | number | null) {
 }
 
 export function AccountingDashboardView() {
+  const router = useRouter();
   const { hasPermissions } = useSession();
   const canCreateJournal = hasPermissions(["accounting:journals:create"]);
   const summaryQuery = useQuery({
@@ -148,13 +151,14 @@ export function AccountingDashboardView() {
                 initialize your chart of accounts and set up your first fiscal
                 period in management.
               </p>
-              <Link
-                href="/dashboard/accounting/management"
-                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-rose-900 px-5 py-2 text-xs font-black text-white hover:bg-rose-950 transition-all"
+              <Button
+                type="button"
+                className="mt-4 bg-rose-900 hover:bg-rose-950"
+                onClick={() => router.push("/dashboard/accounting/management")}
               >
                 Go to Fiscal Management
                 <ArrowRight size={14} />
-              </Link>
+              </Button>
             </div>
           </div>
         </div>
@@ -205,10 +209,12 @@ export function AccountingDashboardView() {
                     action: () => setVoucherType("CONTRA"),
                   },
                 ].map((action, idx) => (
-                  <button
+                  <Button
                     key={idx}
+                    type="button"
+                    variant="ghost"
                     onClick={action.action}
-                    className="group flex flex-col items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4 text-center transition hover:border-[var(--color-mod-accounting-border)] hover:bg-[var(--color-mod-accounting-bg)]"
+                    className="group flex h-auto flex-col items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4 text-center hover:border-[var(--color-mod-accounting-border)] hover:bg-[var(--color-mod-accounting-bg)]"
                   >
                     <div
                       className={cn(
@@ -226,7 +232,7 @@ export function AccountingDashboardView() {
                         {action.desc}
                       </p>
                     </div>
-                  </button>
+                  </Button>
                 ))}
               </div>
             </WorkSurface>
@@ -319,12 +325,14 @@ export function AccountingDashboardView() {
             title="Recent Ledger Postings"
             description="Latest validated transactions across all journals."
             action={
-              <Link
-                href="/dashboard/accounting/journals"
-                className="text-sm font-bold text-emerald-600 hover:text-emerald-700"
+              <Button
+                type="button"
+                variant="link"
+                className="h-auto p-0 text-sm font-bold text-emerald-600 hover:text-emerald-700"
+                onClick={() => router.push("/dashboard/accounting/journals")}
               >
                 View All Journals
-              </Link>
+              </Button>
             }
           >
             {summaryQuery.isLoading ? (
@@ -426,13 +434,15 @@ export function AccountingDashboardView() {
                   </div>
                 </div>
 
-                <Link
-                  href="/dashboard/accounting/management"
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-white border border-slate-200 p-3 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => router.push("/dashboard/accounting/management")}
                 >
                   <Settings size={14} />
                   Manage Fiscal Settings
-                </Link>
+                </Button>
               </div>
             </div>
           </WorkSurface>

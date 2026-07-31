@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { FileText, X } from "lucide-react";
 import { api } from "../../lib/api";
 import { LoadingState } from "../ui/loading-state";
-import { cn } from "../../lib/utils";
+import { Button } from "../ui/button";
 import { formatBsDate } from "@schoolos/core";
 
 interface JournalEntryDialogProps {
@@ -45,12 +45,16 @@ export function JournalEntryDialog({
                 : "Loading ledger details"}
             </p>
           </div>
-          <button
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
             onClick={() => onOpenChange(false)}
-            className="p-2.5 hover:bg-slate-100 rounded-2xl transition-all active:scale-90"
+            className="rounded-2xl"
+            aria-label="Close dialog"
           >
             <X className="w-5 h-5 text-slate-400" />
-          </button>
+          </Button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-8 space-y-8">
@@ -142,12 +146,13 @@ export function JournalEntryDialog({
         </div>
 
         <div className="p-8 border-t border-slate-100 bg-slate-50/50 flex justify-end">
-          <button
+          <Button
+            type="button"
             onClick={() => onOpenChange(false)}
-            className="px-8 py-3 bg-[var(--color-mod-accounting-accent)] text-white font-black text-xs uppercase tracking-widest rounded-xl hover:bg-[var(--color-mod-accounting-text)] transition-all shadow-sm active:scale-95"
+            className="rounded-xl bg-[var(--color-mod-accounting-accent)] px-8 text-xs uppercase tracking-widest hover:bg-[var(--color-mod-accounting-text)]"
           >
             Dismiss
-          </button>
+          </Button>
         </div>
       </div>
     </div>

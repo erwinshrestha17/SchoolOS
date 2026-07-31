@@ -18,6 +18,7 @@ import {
   NEPAL_TIME_ZONE,
 } from "@schoolos/core";
 import { useSession } from "@/components/session-provider";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { SummaryCard, SummaryGrid } from "@/components/ui/summary-card";
@@ -142,18 +143,19 @@ export function FeeOverview() {
             ? `As of ${formatBsDateTime(summary.generatedAt)}`
             : `School day ${formatBsDate(schoolDay.startUtc)}`}
         </span>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={() => void summaryQuery.refetch()}
           disabled={summaryQuery.isFetching}
-          className="inline-flex min-h-9 items-center gap-2 rounded-lg px-3 font-semibold text-[var(--color-mod-fees-text)] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mod-fees-accent)] disabled:opacity-50"
         >
           <RefreshCcw
             className={`h-4 w-4 ${summaryQuery.isFetching ? "animate-spin" : ""}`}
             aria-hidden
           />
           Refresh
-        </button>
+        </Button>
       </div>
 
       {summaryQuery.isError ? (

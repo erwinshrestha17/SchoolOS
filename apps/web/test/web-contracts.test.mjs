@@ -1786,12 +1786,12 @@ describe('SchoolOS web production contracts', () => {
     assert.match(attendanceForm, /attendanceState\?\.isLocked/);
     assert.doesNotMatch(attendanceForm, /rosterQuery\.data\?\.status/);
 
-    // Submit is disabled once locked, and roster edits are disabled too
-    // (also disabled once the day is submitted, not just admin-locked).
-    assert.match(attendanceForm, /futureDateBlocked \|\|\s*\n?\s*isLocked/);
+    // Submit is disabled once locked (unless override authority is active), and
+    // roster edits are disabled too (also disabled once submitted).
+    assert.match(attendanceForm, /rosterEditingDisabled/);
     assert.match(
       attendanceForm,
-      /disabled=\{isLocked \|\| isSubmitted \|\| awaitingServerReceipt\}/,
+      /disabled=\{rosterEditingDisabled\}/,
     );
     assert.match(attendanceForm, /disabled\?: boolean/);
 

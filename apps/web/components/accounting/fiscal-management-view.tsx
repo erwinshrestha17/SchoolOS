@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Lock, Unlock } from "lucide-react";
 import { api } from "../../lib/api";
 import { SectionCard } from "../ui/section-card";
+import { Button } from "../ui/button";
 import { cn } from "../../lib/utils";
 import { useState } from "react";
 import { FiscalPeriodActions } from "./fiscal-period-actions";
@@ -57,29 +58,34 @@ export function FiscalManagementView() {
                     {year.status}
                   </span>
                   {year.status === "OPEN" && canManageFiscalYear ? (
-                    <button
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
                       onClick={() => {
                         setSelectedFy(year);
                         setFyMode("CLOSE");
                         setFyCloseOpen(true);
                       }}
-                      className="inline-flex h-8 items-center gap-2 rounded-lg bg-rose-600 px-3 text-xs font-bold text-white hover:bg-rose-700"
+                      className="h-8 gap-2 rounded-lg px-3 text-xs"
                     >
                       <Lock size={14} />
                       Close Year
-                    </button>
+                    </Button>
                   ) : year.status !== "OPEN" && canReopenFiscalYear ? (
-                    <button
+                    <Button
+                      type="button"
+                      size="sm"
                       onClick={() => {
                         setSelectedFy(year);
                         setFyMode("REOPEN");
                         setFyCloseOpen(true);
                       }}
-                      className="inline-flex h-8 items-center gap-2 rounded-lg bg-[var(--color-mod-accounting-accent)] px-3 text-xs font-bold text-white hover:bg-[var(--color-mod-accounting-text)]"
+                      className="h-8 gap-2 rounded-lg bg-[var(--color-mod-accounting-accent)] px-3 text-xs hover:bg-[var(--color-mod-accounting-text)]"
                     >
                       <Unlock size={14} />
                       Reopen
-                    </button>
+                    </Button>
                   ) : null}
                 </div>
               </div>

@@ -6,9 +6,14 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { SectionCard } from "@/components/ui/section-card";
+import { Button } from '@/components/ui/button';
+import { PermissionDenied } from '@/components/ui/permission-denied';
 import { Loader2, Send, Download, Check, AlertCircle } from "lucide-react";
+import { useSession } from "@/components/session-provider";
 
 export function DefaulterQueueTab() {
+  const { hasPermissions } = useSession();
+  const canManage = hasPermissions(["fees:manage"]);
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
@@ -143,17 +148,20 @@ export function DefaulterQueueTab() {
       title="Overdue Invoice Follow-up"
       description="Track outstanding bills, filter by class/fees, and dispatch notification reminders."
       headerAction={
+        canManage ? (
         <div className="flex gap-2">
-          <button
+          <Button
             type="button"
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-600 shadow-sm transition-all hover:bg-slate-50 disabled:opacity-50"
+            variant="outline"
             disabled={isExporting}
             onClick={onExportAgingCsv}
+            className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-black text-slate-600 shadow-sm"
           >
             <Download size={14} />
             {isExporting ? "Exporting..." : "Export Queue"}
-          </button>
+          </Button>
         </div>
+        ) : undefined
       }
     >
       <div className="space-y-6">
@@ -232,19 +240,28 @@ export function DefaulterQueueTab() {
           </div>
 
           <div className="flex items-end gap-2">
-            <button
+            {!canManage ? (
+              <PermissionDenied
+                showNavigation={false}
+                title="Overdue follow-up actions are restricted"
+                description="Your current role can review overdue invoices, but cannot export the queue or dispatch reminders."
+                className="w-full"
+              />
+            ) : (
+              <>
+            <Button
               type="button"
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs disabled:opacity-50"
-              onClick={handleSelectAll}
+              variant="secondary"
               disabled={defaulters.length === 0}
+              onClick={handleSelectAll}
+              className="rounded-xl px-4 py-2 text-xs font-bold"
             >
               {selectedInvoiceIds.length === defaulters.length
                 ? "Deselect All"
                 : "Select All"}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-mod-fees-accent)] px-4 py-2 text-xs font-black uppercase tracking-widest text-white hover:bg-[var(--color-mod-fees-text)] disabled:opacity-50 transition-all"
               disabled={
                 selectedInvoiceIds.length === 0 || reminderMutation.isPending
               }
@@ -255,10 +272,13 @@ export function DefaulterQueueTab() {
                   message: "Fee payment reminder from SchoolOS.",
                 })
               }
+              className="inline-flex items-center gap-2 rounded-xl !bg-[var(--color-mod-fees-accent)] px-4 py-2 text-xs font-black uppercase tracking-widest text-white hover:!bg-[var(--color-mod-fees-text)]"
             >
               <Send size={12} />
               {reminderMutation.isPending ? "Sending..." : "Remind Selected"}
-            </button>
+            </Button>
+              </>
+            )}
           </div>
         </div>
 
@@ -354,22 +374,26 @@ export function DefaulterQueueTab() {
                 {defaultersQuery.data?.total ?? 0}
               </span>
               <div className="flex gap-2">
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   disabled={page <= 1}
                   onClick={() => updateFilters({ defaulterPage: page - 1 })}
-                  className="rounded-lg border border-slate-200 px-3 py-2 disabled:opacity-40"
+                  className="rounded-lg px-3 py-2"
                 >
                   Previous
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   disabled={!defaultersQuery.data?.hasNextPage}
                   onClick={() => updateFilters({ defaulterPage: page + 1 })}
-                  className="rounded-lg border border-slate-200 px-3 py-2 disabled:opacity-40"
+                  className="rounded-lg px-3 py-2"
                 >
                   Next
-                </button>
+                </Button>
               </div>
             </div>
           </>

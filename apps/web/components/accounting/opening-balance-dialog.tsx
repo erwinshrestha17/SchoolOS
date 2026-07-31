@@ -6,7 +6,8 @@ import { api } from '../../lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
 import { Input } from '../ui/input';
 import { Select } from '../ui/select';
-import { Loader2, Plus, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Plus, Trash2, AlertCircle } from 'lucide-react';
+import { Button } from '../ui/button';
 import { cn } from '../../lib/utils';
 
 interface OpeningBalanceDialogProps {
@@ -133,25 +134,29 @@ export function OpeningBalanceDialog({ isOpen, onClose, fiscalYear, accounts }: 
                   />
                 </div>
                 <div className="col-span-1 flex justify-center">
-                  <button 
-                    type="button" 
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
                     onClick={() => removeLine(index)}
-                    className="text-slate-400 hover:text-rose-500 transition-colors"
+                    className="text-slate-400 hover:text-rose-500"
+                    aria-label="Remove line"
                   >
                     <Trash2 size={16} />
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}
 
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={addLine}
-              className="flex items-center gap-2 text-sm font-bold text-[var(--color-mod-accounting-accent)] hover:text-[var(--color-mod-accounting-text)] transition-colors py-2"
+              className="gap-2 py-2 text-sm font-bold text-[var(--color-mod-accounting-accent)] hover:text-[var(--color-mod-accounting-text)]"
             >
               <Plus size={16} />
               Add line
-            </button>
+            </Button>
           </div>
 
           <div className="mt-4 rounded-2xl bg-slate-50 p-4 space-y-2 border border-slate-100 shadow-inner">
@@ -187,21 +192,17 @@ export function OpeningBalanceDialog({ isOpen, onClose, fiscalYear, accounts }: 
           </div>
 
           <DialogFooter className="mt-6 pt-4 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-            >
+            <Button type="button" variant="outline" onClick={onClose}>
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
-              disabled={loading || Math.abs(diff) > 0.001}
-              className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-mod-accounting-accent)] px-6 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[var(--color-mod-accounting-text)] disabled:opacity-50"
+              disabled={Math.abs(diff) > 0.001}
+              isLoading={loading}
+              className="gap-2 bg-[var(--color-mod-accounting-accent)] hover:bg-[var(--color-mod-accounting-text)]"
             >
-              {loading && <Loader2 size={16} className="animate-spin" />}
               Save Opening Balance
-            </button>
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

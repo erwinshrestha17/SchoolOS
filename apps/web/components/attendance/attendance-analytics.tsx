@@ -8,6 +8,8 @@ import type { ReactNode } from "react";
 import { SectionCard } from "@/components/ui/section-card";
 import { StatCard } from "@/components/ui/stat-card";
 import { Badge } from "@/components/ui/badge";
+import { ErrorState } from "@/components/ui/error-state";
+import { LoadingState } from "@/components/ui/loading-state";
 import type { AttendanceAnomalies } from "@/lib/api/attendance";
 import {
   AlertCircle,
@@ -21,6 +23,8 @@ interface AttendanceAnalyticsProps {
   analytics?: AttendanceAnalyticsData;
   anomalies?: AttendanceAnomalies;
   isLoadingAnomalies?: boolean;
+  isLoadingAnalytics?: boolean;
+  analyticsError?: boolean;
   anomaliesError?: string;
 }
 
@@ -28,8 +32,20 @@ export function AttendanceAnalytics({
   analytics,
   anomalies,
   isLoadingAnomalies = false,
+  isLoadingAnalytics = false,
+  analyticsError = false,
   anomaliesError = "",
 }: AttendanceAnalyticsProps) {
+  if (isLoadingAnalytics) {
+    return <LoadingState label="Loading attendance analytics..." />;
+  }
+
+  if (analyticsError) {
+    return (
+      <ErrorState title="Attendance analytics unavailable" onRetry={() => window.location.reload()} />
+    );
+  }
+
   if (!analytics) return null;
 
   const anomalyCounts = {
@@ -74,6 +90,12 @@ export function AttendanceAnalytics({
           tone={totalAnomalies > 0 ? "warning" : "neutral"}
         />
       </div>
+
+      {isLoadingAnomalies ? (
+        <LoadingState label="Loading anomaly checks..." />
+      ) : anomaliesError ? (
+        <ErrorState title="Anomaly checks unavailable" />
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <SectionCard

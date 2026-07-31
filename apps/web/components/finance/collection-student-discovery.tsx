@@ -2,6 +2,7 @@
 
 import type { CollectionStudentSearchResult } from "@schoolos/core";
 import { Search, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { SearchInput } from "@/components/ui/search-input";
@@ -75,11 +76,12 @@ export function CollectionStudentDiscovery({
         ) : students.length ? (
           <div className="grid gap-3 md:grid-cols-2">
             {students.map((student) => (
-              <button
+              <Button
                 key={student.id}
                 type="button"
+                variant="outline"
                 onClick={() => onSelect(student)}
-                className="min-h-28 rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-[var(--color-mod-fees-border)] hover:bg-[var(--color-mod-fees-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mod-fees-accent)] focus-visible:ring-offset-2"
+                className="h-auto min-h-28 w-full flex-col items-stretch p-4 text-left"
               >
                 <span className="flex items-start justify-between gap-4">
                   <span className="min-w-0">
@@ -109,7 +111,7 @@ export function CollectionStudentDiscovery({
                     </span>
                   </span>
                 </span>
-              </button>
+              </Button>
             ))}
           </div>
         ) : (

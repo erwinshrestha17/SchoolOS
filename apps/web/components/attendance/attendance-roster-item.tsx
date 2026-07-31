@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui/avatar';
 
@@ -22,6 +23,45 @@ interface AttendanceRosterItemProps {
   onStatusChange: (status: AttendanceStatus) => void;
   onRemarkChange: (remark: string) => void;
   disabled?: boolean;
+}
+
+function StatusSegmentButton({
+  label,
+  shortLabel,
+  active,
+  activeClassName,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  shortLabel: string;
+  active: boolean;
+  activeClassName: string;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        'flex h-auto flex-col items-center justify-center rounded-xl py-2 font-bold',
+        active
+          ? activeClassName
+          : 'text-slate-500 hover:bg-slate-100/50 hover:text-slate-900',
+      )}
+      aria-pressed={active}
+      aria-label={label}
+    >
+      <span className="text-xs">{shortLabel}</span>
+      <span className="text-[0.55rem] uppercase tracking-tighter opacity-70">
+        {label}
+      </span>
+    </Button>
+  );
 }
 
 export function AttendanceRosterItem({
@@ -89,70 +129,41 @@ export function AttendanceRosterItem({
         <StatusBadge status={status} className="h-6" />
       </div>
 
-      {/* P A L V status buttons */}
       <div className="mt-4 grid grid-cols-4 gap-1.5 rounded-xl border border-slate-100 bg-slate-50 p-1.5">
-         <button
-           type="button"
-           disabled={disabled}
-           onClick={() => onStatusChange('PRESENT')}
-           className={cn(
-             "flex flex-col items-center justify-center py-2 rounded-xl transition-all font-bold disabled:cursor-not-allowed",
-             isPresent
-               ? "bg-success-500 text-white shadow-md shadow-success-500/20"
-               : "text-slate-500 hover:text-slate-900 hover:bg-slate-100/50"
-           )}
-         >
-           <span className="text-xs">P</span>
-           <span className="text-[0.55rem] uppercase tracking-tighter opacity-70">Present</span>
-         </button>
-         
-         <button
-           type="button"
-           disabled={disabled}
-           onClick={() => onStatusChange('ABSENT')}
-           className={cn(
-             "flex flex-col items-center justify-center py-2 rounded-xl transition-all font-bold disabled:cursor-not-allowed",
-             isAbsent
-               ? "bg-danger-500 text-white shadow-md shadow-danger-500/20"
-               : "text-slate-500 hover:text-slate-900 hover:bg-slate-100/50"
-           )}
-         >
-           <span className="text-xs">A</span>
-           <span className="text-[0.55rem] uppercase tracking-tighter opacity-70">Absent</span>
-         </button>
-         
-         <button
-           type="button"
-           disabled={disabled}
-           onClick={() => onStatusChange('LATE')}
-           className={cn(
-             "flex flex-col items-center justify-center py-2 rounded-xl transition-all font-bold disabled:cursor-not-allowed",
-             isLate
-               ? "bg-warning-500 text-white shadow-md shadow-warning-500/20"
-               : "text-slate-500 hover:text-slate-900 hover:bg-slate-100/50"
-           )}
-         >
-           <span className="text-xs">L</span>
-           <span className="text-[0.55rem] uppercase tracking-tighter opacity-70">Late</span>
-         </button>
-         
-         <button
-           type="button"
-           disabled={disabled}
-           onClick={() => onStatusChange('EXCUSED_LEAVE')}
-           className={cn(
-             "flex flex-col items-center justify-center py-2 rounded-xl transition-all font-bold disabled:cursor-not-allowed",
-             isLeave
-               ? "bg-info-500 text-white shadow-md shadow-info-500/20"
-               : "text-slate-500 hover:text-slate-900 hover:bg-slate-100/50"
-           )}
-         >
-           <span className="text-xs">E</span>
-           <span className="text-[0.55rem] uppercase tracking-tighter opacity-70">Leave / Excused</span>
-         </button>
+        <StatusSegmentButton
+          shortLabel="P"
+          label="Present"
+          active={isPresent}
+          activeClassName="bg-success-500 text-white shadow-md shadow-success-500/20"
+          disabled={disabled}
+          onClick={() => onStatusChange('PRESENT')}
+        />
+        <StatusSegmentButton
+          shortLabel="A"
+          label="Absent"
+          active={isAbsent}
+          activeClassName="bg-danger-500 text-white shadow-md shadow-danger-500/20"
+          disabled={disabled}
+          onClick={() => onStatusChange('ABSENT')}
+        />
+        <StatusSegmentButton
+          shortLabel="L"
+          label="Late"
+          active={isLate}
+          activeClassName="bg-warning-500 text-white shadow-md shadow-warning-500/20"
+          disabled={disabled}
+          onClick={() => onStatusChange('LATE')}
+        />
+        <StatusSegmentButton
+          shortLabel="E"
+          label="Leave / Excused"
+          active={isLeave}
+          activeClassName="bg-info-500 text-white shadow-md shadow-info-500/20"
+          disabled={disabled}
+          onClick={() => onStatusChange('EXCUSED_LEAVE')}
+        />
       </div>
 
-      {/* Exception Remarks and Details Form */}
       {!isPresent && (
         <div className="mt-3.5 space-y-2 border-t border-slate-100 pt-3 animate-in slide-in-from-top-2 duration-300">
            <input

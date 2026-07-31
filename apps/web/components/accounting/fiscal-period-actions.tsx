@@ -5,6 +5,7 @@ import { Lock, Unlock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useState } from 'react';
 import { api } from '../../lib/api';
 import { ConfirmDialog } from '../ui/confirm-dialog';
+import { Button } from '../ui/button';
 import { useSession } from '../session-provider';
 
 interface FiscalPeriodActionsProps {
@@ -59,40 +60,60 @@ export function FiscalPeriodActions({ periodId, status, label }: FiscalPeriodAct
     <>
       <div className="flex gap-1">
         {status === 'OPEN' && canManage && (
-          <button
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
             onClick={() => handleAction('lock')}
-            className="p-1 text-slate-400 hover:text-amber-600 transition-colors"
+            className="h-7 w-7 text-slate-400 hover:text-amber-600"
             title="Lock Period"
+            aria-label="Lock Period"
           >
             <Lock size={14} />
-          </button>
+          </Button>
         )}
         {status === 'LOCKED' && (
           <>
-            {canManage && <button
-              onClick={() => handleAction('close')}
-              className="p-1 text-slate-400 hover:text-emerald-600 transition-colors"
-              title="Close Period"
-            >
-              <CheckCircle2 size={14} />
-            </button>}
-            {canManage && <button
-              onClick={() => handleAction('unlock')}
-              className="p-1 text-slate-400 hover:text-[var(--color-mod-accounting-accent)] transition-colors"
-              title="Unlock Period"
-            >
-              <Unlock size={14} />
-            </button>}
+            {canManage && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => handleAction('close')}
+                className="h-7 w-7 text-slate-400 hover:text-emerald-600"
+                title="Close Period"
+                aria-label="Close Period"
+              >
+                <CheckCircle2 size={14} />
+              </Button>
+            )}
+            {canManage && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => handleAction('unlock')}
+                className="h-7 w-7 text-slate-400 hover:text-[var(--color-mod-accounting-accent)]"
+                title="Unlock Period"
+                aria-label="Unlock Period"
+              >
+                <Unlock size={14} />
+              </Button>
+            )}
           </>
         )}
         {status === 'CLOSED' && canReopen && (
-          <button
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
             onClick={() => handleAction('reopen')}
-            className="p-1 text-slate-400 hover:text-[var(--color-mod-accounting-accent)] transition-colors"
+            className="h-7 w-7 text-slate-400 hover:text-[var(--color-mod-accounting-accent)]"
             title="Reopen Period"
+            aria-label="Reopen Period"
           >
             <Unlock size={14} />
-          </button>
+          </Button>
         )}
       </div>
 

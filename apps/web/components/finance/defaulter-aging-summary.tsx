@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { Clock, ChevronRight, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import { LoadingState } from '@/components/ui/loading-state';
 
 export function DefaulterAgingSummary() {
@@ -65,16 +66,17 @@ export function DefaulterAgingSummary() {
             Backend defaulter buckets for collection follow-up and guardian reminders.
           </p>
         </div>
-        <button
+        <Button
           type="button"
-          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-600 shadow-sm transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          variant="outline"
+          size="sm"
           disabled={exportMutation.isPending}
           onClick={() => exportMutation.mutate()}
           data-testid="finance-defaulter-aging-csv-export"
         >
           <Download size={14} />
           {exportMutation.isPending ? 'Exporting...' : 'Export Summary'}
-        </button>
+        </Button>
       </div>
 
       {exportMutation.error ? (
@@ -113,14 +115,16 @@ export function DefaulterAgingSummary() {
             </div>
             
             <div className="mt-6 flex items-center justify-between pt-4 border-t border-slate-50">
-               <button
+               <Button
                  type="button"
+                 variant="ghost"
+                 size="sm"
                  onClick={() => viewBucket(b.key)}
-                 className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors flex items-center gap-1"
+                 className="h-auto px-0 text-[0.65rem] font-black uppercase tracking-widest text-slate-400 hover:text-slate-900"
                >
                  View List
                  <ChevronRight size={12} />
-               </button>
+               </Button>
                <span className={cn("text-xs font-semibold", b.color)}>{b.label}</span>
             </div>
           </div>

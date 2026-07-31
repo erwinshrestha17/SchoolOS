@@ -5,6 +5,7 @@ import { Landmark, Plus } from 'lucide-react';
 import { api } from '../../lib/api';
 import { SectionCard } from '../ui/section-card';
 import { PageState } from '../ui/page-state';
+import { Button } from '@/components/ui/button';
 import { ReportTable } from './report-table';
 import { useState } from 'react';
 import { OpeningBalanceDialog } from './opening-balance-dialog';
@@ -65,7 +66,8 @@ export function ChartOfAccountsView() {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="flex flex-wrap gap-3">
-        <button
+        <Button
+          type="button"
           onClick={() => {
             const openFy = (fiscalYearsQuery.data ?? []).find(
               (y) => y.status === 'OPEN',
@@ -82,26 +84,27 @@ export function ChartOfAccountsView() {
               });
             }
           }}
-          className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-mod-accounting-accent)] px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-[var(--color-mod-accounting-text)] transition-all"
+          className="bg-[var(--color-mod-accounting-accent)] hover:bg-[var(--color-mod-accounting-text)]"
         >
           <Plus size={18} />
           Opening Balance
-        </button>
+        </Button>
       </div>
 
       <SectionCard
         title="Chart of Accounts"
         description="Manage your school's financial account structure and system defaults."
         headerAction={
-          <button
+          <Button
             type="button"
             disabled={seedMutation.isPending}
+            isLoading={seedMutation.isPending}
             onClick={() => setSeedConfirmOpen(true)}
-            className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-mod-accounting-accent)] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[var(--color-mod-accounting-text)] disabled:opacity-50"
+            className="bg-[var(--color-mod-accounting-accent)] hover:bg-[var(--color-mod-accounting-text)]"
           >
             <Landmark size={16} />
             {seedMutation.isPending ? 'Seeding...' : 'Seed defaults'}
-          </button>
+          </Button>
         }
       >
         {notice ? (

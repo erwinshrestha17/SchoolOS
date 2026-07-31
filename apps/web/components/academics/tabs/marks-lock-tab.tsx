@@ -24,6 +24,9 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { EmptyState } from '@/components/ui/empty-state';
+import { LoadingState } from '@/components/ui/loading-state';
+import { StatusBadge } from '@/components/ui/status-badge';
 
 type Props = {
   exams: ExamTermSummary[];
@@ -276,31 +279,30 @@ export function MarksLockTab({ exams }: Props) {
 
          <div className="p-8 grid gap-6">
             {requestsQuery.isLoading ? (
-               <div className="py-20 text-center">
-                  <Loader2 className="h-10 w-10 animate-spin text-[var(--color-mod-academics-accent)] mx-auto opacity-20" />
-                  <p className="mt-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Loading Audit Trail</p>
-               </div>
+               <LoadingState label="Loading audit trail..." />
             ) : (requestsQuery.data ?? []).length === 0 ? (
-               <div className="py-20 text-center border-2 border-dashed border-slate-100 rounded-3xl">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">No security events recorded</p>
-               </div>
+               <EmptyState
+                 title="No security events recorded"
+                 description="Mark lock requests and unlock reviews will appear here."
+                 icon={<History size={32} />}
+               />
             ) : (requestsQuery.data ?? []).map((request) => (
                <article key={request.id} className="group relative rounded-2xl border border-slate-100 bg-white p-6 transition-all hover:border-[var(--color-mod-academics-border)] hover:shadow-sm">
                   <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                      <div className="flex-1 space-y-4">
                         <div className="flex items-center gap-3">
-                           <div className={cn(
-                             "px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border flex items-center gap-1.5",
-                             request.status === 'APPROVED' ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
-                             request.status === 'REJECTED' ? "bg-rose-50 text-rose-600 border-rose-100" :
-                             request.status === 'UNLOCKED' ? "bg-indigo-50 text-indigo-600 border-indigo-100" :
-                             "bg-amber-50 text-amber-600 border-amber-100"
-                           )}>
-                              {request.status === 'APPROVED' ? <CheckCircle2 size={10} /> : 
-                               request.status === 'REJECTED' ? <XCircle size={10} /> : 
-                               request.status === 'UNLOCKED' ? <Unlock size={10} /> : <Clock size={10} />}
-                              {request.status}
-                           </div>
+                           <StatusBadge
+                             status={request.status}
+                             tone={
+                               request.status === 'APPROVED'
+                                 ? 'approved'
+                                 : request.status === 'REJECTED'
+                                   ? 'rejected'
+                                   : request.status === 'UNLOCKED'
+                                     ? 'published'
+                                     : 'pending'
+                             }
+                           />
                            <h4 className="text-sm font-bold text-slate-900">{request.examTerm?.name}</h4>
                         </div>
                         

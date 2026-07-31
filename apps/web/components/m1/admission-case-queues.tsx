@@ -13,7 +13,7 @@ import {
   Loader2,
   Search,
 } from "lucide-react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { formatBsDate } from "@schoolos/core";
 import {
@@ -23,10 +23,12 @@ import {
 import { schoolFacingErrorMessage } from "../../lib/school-facing-error";
 import { useSession } from "../session-provider";
 import { ConfirmDialog } from "../ui/confirm-dialog";
+import { EmptyState } from "../ui/empty-state";
 import { ErrorState } from "../ui/error-state";
+import { LoadingState } from "../ui/loading-state";
 import { TablePagination } from "../ui/table-pagination";
 import { Badge } from "../ui/primitives/badge";
-import { Button } from "../ui/primitives/button";
+import { Button } from "@/components/ui/button";
 import { WorkSurface } from "../ui/work-surface";
 import {
   DropdownMenu,
@@ -37,19 +39,10 @@ import {
   DropdownMenuTrigger,
 } from "../ui/primitives/dropdown-menu";
 import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "../ui/primitives/empty";
-import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
 } from "../ui/primitives/input-group";
-import { Skeleton } from "../ui/primitives/skeleton";
 import {
   Table,
   TableBody,
@@ -151,6 +144,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export function AdmissionCaseQueues() {
+  const router = useRouter();
   const { hasPermissions } = useSession();
   const queryClient = useQueryClient();
   const [filters, setFilters] = useUrlFilters<{
@@ -335,7 +329,7 @@ export function AdmissionCaseQueues() {
         </form>
 
         {query.isLoading ? (
-          <AdmissionQueueSkeleton />
+          <LoadingState variant="skeleton" label="Loading admissions" />
         ) : query.data?.items.length ? (
           <div className="overflow-x-auto">
             <Table>
@@ -463,22 +457,30 @@ export function AdmissionCaseQueues() {
                           </span>
                         ) : null}
                         {queue === "COMPLETED" && item.admittedStudentId ? (
-                          <Button asChild variant="outline" size="sm">
-                            <Link
-                              href={
-                                "/dashboard/students/" + item.admittedStudentId
-                              }
-                            >
-                              View student profile
-                            </Link>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              router.push(
+                                `/dashboard/students/${item.admittedStudentId}`,
+                              )
+                            }
+                          >
+                            View student profile
                           </Button>
                         ) : (
-                          <Button asChild variant="outline" size="sm">
-                            <Link
-                              href={"/dashboard/admissions/cases/" + item.id}
-                            >
-                              Open case
-                            </Link>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              router.push(
+                                `/dashboard/admissions/cases/${item.id}`,
+                              )
+                            }
+                          >
+                            Open case
                           </Button>
                         )}
                       </div>
@@ -489,27 +491,21 @@ export function AdmissionCaseQueues() {
             </Table>
           </div>
         ) : (
-          <Empty
-            className="gap-4 rounded-none border-0 p-8 md:p-10"
-            role="status"
-          >
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <ClipboardCheck aria-hidden />
-              </EmptyMedia>
-              <EmptyTitle>
-                {submittedSearch
-                  ? "No admissions match this search"
-                  : "No admissions in " + activeQueue.label}
-              </EmptyTitle>
-              <EmptyDescription>
-                {submittedSearch
-                  ? "Clear the search or try another student, guardian, phone, or application ID."
-                  : "There are no cases in this queue. Choose another queue or start a new admission."}
-              </EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent>
-              {submittedSearch ? (
+          <EmptyState
+            className="min-h-80 rounded-none border-0"
+            icon={<ClipboardCheck aria-hidden size={28} />}
+            title={
+              submittedSearch
+                ? "No admissions match this search"
+                : `No admissions in ${activeQueue.label}`
+            }
+            description={
+              submittedSearch
+                ? "Clear the search or try another student, guardian, phone, or application ID."
+                : "There are no cases in this queue. Choose another queue or start a new admission."
+            }
+            action={
+              submittedSearch ? (
                 <Button
                   type="button"
                   variant="outline"
@@ -521,8 +517,11 @@ export function AdmissionCaseQueues() {
                   Clear search
                 </Button>
               ) : canCreateAdmission ? (
-                <Button asChild>
-                  <Link href="/dashboard/admissions/new">New admission</Link>
+                <Button
+                  type="button"
+                  onClick={() => router.push("/dashboard/admissions/new")}
+                >
+                  New admission
                 </Button>
               ) : queue !== "NEEDS_INFORMATION" ? (
                 <Button
@@ -537,9 +536,9 @@ export function AdmissionCaseQueues() {
                 >
                   View needs information
                 </Button>
-              ) : null}
-            </EmptyContent>
-          </Empty>
+              ) : undefined
+            }
+          />
         )}
 
         {query.data && (query.data.total > query.data.limit || page > 1) ? (
@@ -586,20 +585,6 @@ export function AdmissionCaseQueues() {
         ) : null}
       </ConfirmDialog>
     </section>
-  );
-}
-
-function AdmissionQueueSkeleton() {
-  return (
-    <div className="flex flex-col gap-3 p-5" aria-label="Loading admissions">
-      {Array.from({ length: 5 }, (_, index) => (
-        <div key={index} className="grid grid-cols-[2fr_2fr_1fr] gap-4 py-3">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-full" />
-        </div>
-      ))}
-    </div>
   );
 }
 

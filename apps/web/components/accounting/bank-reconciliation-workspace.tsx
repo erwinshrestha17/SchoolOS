@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { SectionCard } from '../ui/section-card';
+import { Button } from '@/components/ui/button';
 import { Select } from '../ui/select';
 import {
   Loader2,
@@ -29,6 +30,7 @@ const BANK_IMPORT_SYNC_ROW_LIMIT = 500;
 
 export function BankReconciliationWorkspace() {
   const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [importing, setImporting] = useState(false);
   const [matching, setMatching] = useState<string | null>(null); // statementId being matched
@@ -292,38 +294,48 @@ export function BankReconciliationWorkspace() {
 
         {selectedAccountId && (
           <div className="flex gap-2 w-full md:w-auto">
-            <label className="flex flex-1 md:flex-none items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer transition-all">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing || queueImportMutation.isPending}
+              isLoading={
+                queueImportMutation.isPending || previewImportMutation.isPending
+              }
+              className="flex-1 md:flex-none border-dashed"
+            >
               <Upload size={16} />
               {queueImportMutation.isPending
                 ? 'Queuing background import...'
                 : importing || previewImportMutation.isPending
                   ? 'Validating...'
                   : 'Import CSV Statement'}
-              <input
-                type="file"
-                accept=".csv"
-                className="hidden"
-                onChange={handleFileUpload}
-                disabled={importing || queueImportMutation.isPending}
-              />
-            </label>
-            <button
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv"
+              className="hidden"
+              onChange={handleFileUpload}
+              disabled={importing || queueImportMutation.isPending}
+            />
+            <Button
               type="button"
               onClick={() => suggestionsQuery.refetch()}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--color-mod-accounting-border)] bg-[var(--color-mod-accounting-accent)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-mod-accounting-text)]"
+              className="bg-[var(--color-mod-accounting-accent)] hover:bg-[var(--color-mod-accounting-text)]"
               data-testid="bank-reconciliation-auto-match"
             >
               <Search size={16} />
               Auto-match
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="outline"
               onClick={() => api.exportBankReconciliationPdf(selectedAccountId)}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-all"
             >
               <Download size={16} />
               Export PDF
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -348,28 +360,29 @@ export function BankReconciliationWorkspace() {
               }))}
             />
             <div className="flex justify-end gap-2">
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => {
                   setImportPreview(null);
                   setPendingImportLines([]);
                 }}
-                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 disabled={
                   !importPreview.readyToCommit || importMutation.isPending
                 }
+                isLoading={importMutation.isPending}
                 onClick={() => importMutation.mutate()}
-                className="rounded-xl bg-[var(--color-mod-accounting-accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                className="bg-[var(--color-mod-accounting-accent)] hover:bg-[var(--color-mod-accounting-text)]"
               >
                 {importMutation.isPending
                   ? 'Committing...'
                   : `Commit ${importPreview.lineCount} rows`}
-              </button>
+              </Button>
             </div>
           </div>
         </SectionCard>
@@ -440,8 +453,9 @@ export function BankReconciliationWorkspace() {
                         {candidate.reason}
                       </div>
                     </div>
-                    <button
-                      className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-bold text-white disabled:opacity-40"
+                    <Button
+                      type="button"
+                      size="sm"
                       disabled={
                         candidate.warningFlags?.includes(
                           'DUPLICATE_CANDIDATE',
@@ -453,9 +467,10 @@ export function BankReconciliationWorkspace() {
                           journalLineId: candidate.ledgerTransactionId,
                         })
                       }
+                      className="bg-emerald-600 hover:bg-emerald-700"
                     >
                       Review
-                    </button>
+                    </Button>
                   </div>
                   {candidate.warningFlags?.length > 0 && (
                     <div className="mt-2 text-xs font-bold text-amber-700">
@@ -550,19 +565,20 @@ export function BankReconciliationWorkspace() {
                     },
                     {
                       value: (
-                        <button
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={matching === stmt.id ? 'default' : 'secondary'}
                           onClick={() =>
                             setMatching(matching === stmt.id ? null : stmt.id)
                           }
                           className={cn(
-                            'rounded-lg px-3 py-1 text-xs font-bold transition-all',
-                            matching === stmt.id
-                              ? 'bg-[var(--color-mod-accounting-accent)] text-white shadow-md shadow-[var(--color-mod-accounting-accent)]/20'
-                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                            matching === stmt.id &&
+                              'bg-[var(--color-mod-accounting-accent)] hover:bg-[var(--color-mod-accounting-text)]',
                           )}
                         >
                           {matching === stmt.id ? 'Cancel' : 'Match'}
-                        </button>
+                        </Button>
                       ),
                     },
                   ],
@@ -621,7 +637,10 @@ export function BankReconciliationWorkspace() {
                         },
                         {
                           value: (
-                            <button
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="secondary"
                               disabled={!matching}
                               onClick={() =>
                                 matching &&
@@ -630,10 +649,10 @@ export function BankReconciliationWorkspace() {
                                   journalLineId: row.journalLineId,
                                 })
                               }
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all disabled:opacity-30"
+                              className="rounded-full bg-emerald-100 text-emerald-600 hover:bg-emerald-600 hover:text-white"
                             >
                               <ArrowRightLeft size={16} />
-                            </button>
+                            </Button>
                           ),
                         },
                       ],

@@ -24,6 +24,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Button } from '@/components/ui/button';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Toast, ToastTone } from '@/components/ui/toast';
 
 type ResultDeliveryNotice = {
@@ -254,30 +256,35 @@ export function ResultPublishingTab({
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Dashboard Visibility & Notifications</p>
            </div>
            <div className="flex flex-wrap gap-3">
-              <button
+              <Button
+                type="button"
+                variant="destructive"
+                className="h-12 rounded-2xl px-6 font-black uppercase tracking-widest text-[10px]"
                 onClick={handleBatchUnpublish}
                 disabled={selectedIds.size === 0 || unpublishMut.isPending}
-                className="h-12 px-6 rounded-2xl bg-white border border-rose-200 flex items-center justify-center gap-2 font-black uppercase tracking-widest text-[10px] text-rose-600 hover:bg-rose-50 transition-all disabled:opacity-30"
               >
                 {unpublishMut.isPending ? <Loader2 className="animate-spin" size={16} /> : <EyeOff size={16} />}
                 Unpublish
-              </button>
-              <button
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-12 rounded-2xl px-6 font-black uppercase tracking-widest text-[10px]"
                 onClick={handleBatchNotify}
                 disabled={selectedIds.size === 0 || notifyMut.isPending}
-                className="h-12 px-6 rounded-2xl bg-white border border-slate-200 flex items-center justify-center gap-2 font-black uppercase tracking-widest text-[10px] text-slate-600 hover:bg-slate-50 transition-all disabled:opacity-30"
               >
                 {notifyMut.isPending ? <Loader2 className="animate-spin" size={16} /> : <Bell size={16} />}
                 Notify Guardians
-              </button>
-              <button
+              </Button>
+              <Button
+                type="button"
+                className="h-12 rounded-2xl px-8 font-black uppercase tracking-widest text-[10px]"
                 onClick={handleBatchPublish}
                 disabled={selectedIds.size === 0 || publishMut.isPending}
-                className="h-12 px-8 rounded-2xl bg-[var(--color-mod-academics-accent)] text-white flex items-center justify-center gap-3 font-black uppercase tracking-widest text-[10px] shadow-sm hover:bg-[var(--color-mod-academics-text)] transition-all active:scale-95 disabled:opacity-30"
               >
                 {publishMut.isPending ? <Loader2 className="animate-spin" size={16} /> : <Zap size={16} />}
                 Publish Visibility ({selectedIds.size})
-              </button>
+              </Button>
            </div>
         </div>
 
@@ -416,23 +423,17 @@ export function ResultPublishingTab({
                           </div>
                        </td>
                        <td className="py-4 px-6 text-center">
-                          <div className={cn(
-                             "inline-flex px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border",
-                             isLocked ? "bg-indigo-50 text-indigo-600 border-indigo-100" : "bg-amber-50 text-amber-600 border-amber-100"
-                          )}>
-                             {isLocked ? <ShieldCheck size={10} className="mr-1" /> : <Clock size={10} className="mr-1" />}
-                             {r.reportStatus}
-                          </div>
+                          <StatusBadge
+                            status={r.reportStatus}
+                            tone={isLocked ? 'locked' : 'pending'}
+                          />
                        </td>
                        <td className="py-4 px-8 text-right">
                           <div className="flex flex-col items-end gap-1">
-                             <div className={cn(
-                               "inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest",
-                               isPublished ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-slate-100 text-slate-400"
-                             )}>
-                                {isPublished ? <Eye size={10} /> : <EyeOff size={10} />}
-                                {r.publishStatus}
-                             </div>
+                             <StatusBadge
+                               status={r.publishStatus}
+                               tone={isPublished ? 'approved' : 'inactive'}
+                             />
                              {r.publishedAt && (
                                <span className="text-[7px] font-bold text-slate-300 uppercase tracking-widest">Released {formatBsDate(r.publishedAt)}</span>
                              )}

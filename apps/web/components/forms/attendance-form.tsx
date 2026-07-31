@@ -50,6 +50,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Button } from "@/components/ui/button";
 
 const nepalNow = getNepalNow();
 const today = `${nepalNow.year}-${String(nepalNow.month).padStart(2, "0")}-${String(nepalNow.day).padStart(2, "0")}`;
@@ -905,40 +906,43 @@ export function AttendanceForm() {
           </div>
           {draftSyncState === "conflict" ? (
             <div className="flex items-center gap-2">
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={keepServerVersion}
-                className="rounded-xl border border-warning-200 bg-white px-3 py-2 text-xs"
               >
                 Keep server version
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                size="sm"
+                className="bg-warning-600 text-white hover:bg-warning-700"
                 onClick={() =>
                   setConflictMessage(
                     "Review the local draft below, then request correction if attendance is submitted or locked.",
                   )
                 }
-                className="rounded-xl bg-warning-600 px-3 py-2 text-xs text-white"
               >
                 Review local draft
-              </button>
+              </Button>
             </div>
           ) : draftSyncState === "rejected" ? (
             <span className="max-w-xs text-right text-xs font-semibold">
               Change the draft below to prepare a new submission.
             </span>
           ) : hasPendingLocalDraft ? (
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={() => void syncDraftSubmission()}
               disabled={syncMutation.isPending}
-              className="rounded-xl border border-info-100 bg-white px-3 py-2 text-xs"
             >
               {draftSyncState === "server_check"
                 ? "Check server again"
                 : "Sync now"}
-            </button>
+            </Button>
           ) : null}
         </div>
       )}
@@ -1304,8 +1308,10 @@ export function AttendanceForm() {
             </div>
           </div>
 
-          <button
+          <Button
             type="button"
+            size="lg"
+            className="gap-3 bg-[var(--color-mod-attendance-accent)] px-10 shadow-lg shadow-[var(--color-mod-attendance-border)]/40 hover:bg-[var(--color-mod-attendance-text)] hover:scale-105 active:scale-95 disabled:hover:scale-100"
             onClick={() => {
               if (isOverrideMode) {
                 setIsOverrideConfirmOpen(true);
@@ -1326,13 +1332,11 @@ export function AttendanceForm() {
               awaitingServerReceipt ||
               draftSyncState === "rejected"
             }
-            className="flex items-center gap-3 rounded-xl bg-[var(--color-mod-attendance-accent)] px-10 py-4 text-sm font-black text-white shadow-lg shadow-[var(--color-mod-attendance-border)]/40 transition-all hover:scale-105 hover:bg-[var(--color-mod-attendance-text)] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+            isLoading={mutation.isPending || overrideMutation.isPending}
           >
-            {mutation.isPending || overrideMutation.isPending ? (
-              <Loader2 size={20} className="animate-spin" />
-            ) : (
+            {!mutation.isPending && !overrideMutation.isPending ? (
               <Save size={20} />
-            )}
+            ) : null}
             {isOverrideMode
               ? "Apply Override"
               : isLocked
@@ -1340,7 +1344,7 @@ export function AttendanceForm() {
                 : isSubmitted
                   ? "Attendance Submitted"
                   : "Submit Attendance"}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -1383,8 +1387,10 @@ export function AttendanceForm() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={() => void saveDraftToServer()}
             disabled={
               saveDraftMutation.isPending ||
@@ -1393,13 +1399,14 @@ export function AttendanceForm() {
               awaitingServerReceipt ||
               draftSyncState === "rejected"
             }
-            className="flex items-center gap-2 rounded-xl border border-[var(--color-mod-attendance-border)] bg-white px-4 py-2 text-xs font-bold text-[var(--color-mod-attendance-text)] transition-colors hover:bg-[var(--color-mod-attendance-soft)] disabled:opacity-50"
           >
             <Save size={14} />
             Save Draft
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={() => void syncDraftSubmission()}
             disabled={
               syncMutation.isPending ||
@@ -1407,11 +1414,10 @@ export function AttendanceForm() {
               !hasPendingLocalDraft ||
               draftSyncState === "rejected"
             }
-            className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50"
           >
             <CheckCircle2 size={14} />
             {awaitingServerReceipt ? "Check Server" : "Sync Draft"}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -1431,8 +1437,10 @@ export function AttendanceForm() {
             </p>
           </div>
         </div>
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           onClick={() => {
             const bsDate = toBsDateFromGregorian(attendanceDate);
             void api.exportAttendanceRegister(
@@ -1447,11 +1455,10 @@ export function AttendanceForm() {
             );
           }}
           disabled={!academicYearId || !classId}
-          className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
         >
           <Download size={14} />
           Export CSV
-        </button>
+        </Button>
       </div>
 
       <ConfirmDialog

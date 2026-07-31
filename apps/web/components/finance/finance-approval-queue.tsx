@@ -224,7 +224,7 @@ export function FinanceApprovalQueue() {
                 placeholder="Required correction reason"
                 className="min-h-24 w-full rounded-xl border border-slate-200 p-3 text-sm"
               />
-              <button
+              <Button
                 type="button"
                 disabled={
                   !paymentId ||
@@ -241,11 +241,10 @@ export function FinanceApprovalQueue() {
                     reason: reason.trim(),
                   })
                 }
-                className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-mod-fees-accent)] px-4 py-3 text-xs font-black uppercase tracking-widest text-white disabled:opacity-50"
               >
                 <ShieldAlert size={16} />
                 Review request
-              </button>
+              </Button>
             </div>
           </div>
         </SectionCard>
@@ -335,22 +334,24 @@ export function FinanceApprovalQueue() {
                 <div className="flex items-center justify-between text-xs font-bold text-slate-500">
                   <span>{approvalQuery.data.total} requests</span>
                   <div className="flex gap-2">
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
+                      size="sm"
                       disabled={page <= 1}
                       onClick={() => updateUrl({ approvalPage: page - 1 })}
-                      className="rounded-lg border border-slate-200 px-3 py-2 disabled:opacity-40"
                     >
                       Previous
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
+                      variant="outline"
+                      size="sm"
                       disabled={!approvalQuery.data.hasNextPage}
                       onClick={() => updateUrl({ approvalPage: page + 1 })}
-                      className="rounded-lg border border-slate-200 px-3 py-2 disabled:opacity-40"
                     >
                       Next
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -408,16 +409,17 @@ export function FinanceApprovalQueue() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <button
+            <Button
               type="button"
+              variant="ghost"
               disabled={decisionMutation.isPending}
               onClick={() => setPendingDecision(null)}
-              className="rounded-xl px-4 py-2 text-sm font-bold text-slate-600"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="destructive"
               disabled={
                 decisionMutation.isPending ||
                 (pendingDecision?.kind === "REVIEW" &&
@@ -427,10 +429,9 @@ export function FinanceApprovalQueue() {
               onClick={() => {
                 if (pendingDecision) decisionMutation.mutate(pendingDecision);
               }}
-              className="rounded-xl bg-danger-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
             >
               {decisionMutation.isPending ? "Processing…" : "Confirm action"}
-            </button>
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

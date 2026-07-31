@@ -27,7 +27,14 @@ const routeSources = {
     "components/finance/fee-overview.tsx",
   ],
   homework: ["app/dashboard/homework/page.tsx"],
-  academics: ["app/dashboard/academics/page.tsx"],
+  academics: [
+    "app/dashboard/academics/page.tsx",
+    "components/academics/academics-section-page.tsx",
+    "app/dashboard/academics/exam-terms/page.tsx",
+    "app/dashboard/academics/marks/page.tsx",
+    "app/dashboard/academics/promotion/page.tsx",
+    "app/dashboard/academics/publishing/page.tsx",
+  ],
   activity: [
     "app/dashboard/activity/page.tsx",
     "components/ui/operational-summary-grid.tsx",
@@ -49,6 +56,11 @@ const routeSources = {
   accounting: [
     "app/dashboard/accounting/layout.tsx",
     "components/accounting/accounting-dashboard-view.tsx",
+    "app/dashboard/accounting/reports/page.tsx",
+    "app/dashboard/accounting/journals/page.tsx",
+    "app/dashboard/accounting/reconciliation/page.tsx",
+    "app/dashboard/accounting/budgets/page.tsx",
+    "app/dashboard/accounting/audit/page.tsx",
   ],
   notices: ["components/notices/notices-workspace.tsx"],
   learning: [

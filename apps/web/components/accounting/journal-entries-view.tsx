@@ -6,6 +6,7 @@ import { Plus, Eye } from "lucide-react";
 import { api } from "../../lib/api";
 import { SectionCard } from "../ui/section-card";
 import { PageState } from "../ui/page-state";
+import { Button } from "@/components/ui/button";
 import { ReportTable } from "./report-table";
 import { VoucherDialog } from "./voucher-dialog";
 import { JournalDetailDialog } from "./journal-detail-dialog";
@@ -80,18 +81,19 @@ export function JournalEntriesView() {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
       {canCreateJournal ? (
         <div className="flex flex-wrap gap-3">
-          <button
+          <Button
+            type="button"
             onClick={handleCreateVoucher}
+            disabled={!activePeriod}
             className={cn(
-              "inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 active:translate-y-0",
               activePeriod
                 ? "bg-[var(--color-mod-accounting-accent)] hover:bg-[var(--color-mod-accounting-text)]"
-                : "bg-slate-400 cursor-not-allowed opacity-70",
+                : "bg-slate-400",
             )}
           >
             <Plus size={18} />
             Create Journal Voucher
-          </button>
+          </Button>
         </div>
       ) : null}
 
@@ -144,13 +146,16 @@ export function JournalEntriesView() {
                 },
                 {
                   value: (
-                    <button
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
                       onClick={() => setSelectedEntry(entry)}
-                      className="p-2 text-slate-400 hover:text-[var(--color-mod-accounting-accent)] transition-colors"
+                      className="text-slate-400 hover:text-[var(--color-mod-accounting-accent)]"
                       title="View Details"
                     >
                       <Eye size={18} />
-                    </button>
+                    </Button>
                   ),
                 },
               ],

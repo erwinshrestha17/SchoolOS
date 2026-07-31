@@ -20,6 +20,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSession } from "@/components/session-provider";
 import { Input } from "../ui/input";
 import { EmptyState } from "../ui/empty-state";
 import {
@@ -28,7 +29,8 @@ import {
   DialogDescription,
   DialogTitle,
 } from "../ui/dialog";
-import { Button } from "../ui/button";
+import { Button } from '@/components/ui/button';
+import { PermissionDenied } from '@/components/ui/permission-denied';
 import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import type {
@@ -96,6 +98,8 @@ export function CollectionCounter({
   total = 0,
   onPageChange,
 }: CollectionCounterProps) {
+  const { hasPermissions } = useSession();
+  const canCollect = hasPermissions(["payments:collect"]);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(
     null,
   );
@@ -200,13 +204,14 @@ export function CollectionCounter({
             </p>
           </div>
           {onChangeStudent ? (
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={onChangeStudent}
-              className="inline-flex min-h-10 items-center justify-center rounded-xl border border-[var(--color-mod-fees-border)] bg-white px-4 text-xs font-black uppercase tracking-widest text-[var(--color-mod-fees-text)] shadow-sm transition hover:bg-slate-50"
+              className="min-h-10 rounded-xl border-[var(--color-mod-fees-border)] px-4 text-xs font-black uppercase tracking-widest text-[var(--color-mod-fees-text)] shadow-sm hover:bg-slate-50"
             >
               Change student
-            </button>
+            </Button>
           ) : null}
         </div>
       ) : null}
@@ -248,14 +253,16 @@ export function CollectionCounter({
 
             <div className="max-h-[620px] space-y-2 overflow-y-auto pr-1 custom-scrollbar">
               {invoices.map((inv) => (
-                <button
+                <Button
                   key={inv.id}
+                  type="button"
+                  variant="ghost"
                   onClick={() => handleSelectInvoice(inv)}
                   className={cn(
-                    "group flex w-full items-start justify-between rounded-xl border p-4 transition-colors",
+                    "group flex h-auto w-full items-start justify-between rounded-xl border p-4 transition-colors",
                     selectedInvoiceId === inv.id
                       ? "border-[var(--color-mod-fees-border)] bg-[var(--color-mod-fees-bg)] text-[var(--color-mod-fees-text)]"
-                      : "bg-white border-slate-100 hover:border-[var(--color-mod-fees-border)] text-slate-900 hover:bg-[var(--color-mod-fees-bg)]",
+                      : "border-slate-100 bg-white text-slate-900 hover:border-[var(--color-mod-fees-border)] hover:bg-[var(--color-mod-fees-bg)]",
                   )}
                 >
                   <div className="flex gap-4">
@@ -298,7 +305,7 @@ export function CollectionCounter({
                     </p>
                     <StatusBadge status={inv.status} className="mt-2 h-5" />
                   </div>
-                </button>
+                </Button>
               ))}
               {isLoading && (
                 <div className="py-12 flex justify-center">
@@ -320,22 +327,26 @@ export function CollectionCounter({
                   {Math.min(page * limit, total)} of {total}
                 </span>
                 <div className="flex gap-2">
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     disabled={page <= 1}
                     onClick={() => onPageChange?.(page - 1)}
-                    className="rounded-lg border border-slate-200 px-3 py-2 disabled:opacity-40"
+                    className="rounded-lg px-3 py-2"
                   >
                     Previous
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     disabled={page * limit >= total}
                     onClick={() => onPageChange?.(page + 1)}
-                    className="rounded-lg border border-slate-200 px-3 py-2 disabled:opacity-40"
+                    className="rounded-lg px-3 py-2"
                   >
                     Next
-                  </button>
+                  </Button>
                 </div>
               </div>
             ) : null}
@@ -399,6 +410,13 @@ export function CollectionCounter({
                 </div>
               ) : null}
 
+              {!canCollect ? (
+                <PermissionDenied
+                  showNavigation={false}
+                  title="Payment collection is restricted"
+                  description="Your current role does not have the finance permission required to record fee payments."
+                />
+              ) : (
               <SectionCard
                 title="Payment review"
                 description="Review the selected invoice, enter the tender, then confirm one payment."
@@ -551,15 +569,17 @@ export function CollectionCounter({
                             label: "Wallet",
                           },
                         ].map((m) => (
-                          <button
+                          <Button
                             key={m.id}
+                            type="button"
+                            variant="ghost"
                             onClick={() => setMethod(m.id)}
                             aria-pressed={method === m.id}
                             className={cn(
-                              "flex min-h-11 items-center gap-2 rounded-lg border p-2.5 transition-colors",
+                              "flex h-auto min-h-11 items-center gap-2 rounded-lg border p-2.5 transition-colors",
                               method === m.id
-                                ? "bg-[var(--color-mod-fees-bg)] border-[var(--color-mod-fees-border)] text-[var(--color-mod-fees-text)] shadow-sm"
-                                : "bg-white border-slate-100 text-slate-600 hover:border-[var(--color-mod-fees-border)]",
+                                ? "border-[var(--color-mod-fees-border)] bg-[var(--color-mod-fees-bg)] text-[var(--color-mod-fees-text)] shadow-sm"
+                                : "border-slate-100 bg-white text-slate-600 hover:border-[var(--color-mod-fees-border)]",
                             )}
                           >
                             <div
@@ -573,7 +593,7 @@ export function CollectionCounter({
                             <span className="min-w-0 text-left text-xs font-bold leading-tight">
                               {m.label}
                             </span>
-                          </button>
+                          </Button>
                         ))}
                       </div>
                     </div>
@@ -587,13 +607,16 @@ export function CollectionCounter({
                       </span>
                     </div>
                     <div className="flex items-center gap-4">
-                      <button
+                      <Button
+                        type="button"
+                        variant="ghost"
                         onClick={() => setSelectedInvoiceId(null)}
                         className="min-h-11 px-4 text-sm font-semibold text-slate-600 hover:text-slate-950"
                       >
                         Reset selection
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        type="button"
                         onClick={() => setIsConfirmingPayment(true)}
                         disabled={
                           isSubmitting ||
@@ -602,15 +625,16 @@ export function CollectionCounter({
                           amount <= 0 ||
                           amount > invoiceDetailQuery.data.outstandingAmount
                         }
-                        className="flex min-h-11 items-center gap-2 whitespace-nowrap rounded-lg bg-[var(--color-mod-fees-accent)] px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--color-mod-fees-text)] disabled:opacity-50"
+                        className="flex min-h-11 items-center gap-2 whitespace-nowrap rounded-lg !bg-[var(--color-mod-fees-accent)] px-5 text-sm font-semibold text-white shadow-sm hover:!bg-[var(--color-mod-fees-text)]"
                       >
                         <CheckSquare size={20} />
                         {isSubmitting ? "Recording payment..." : "Review payment"}
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 </div>
               </SectionCard>
+              )}
             </div>
           ) : (
             <div className="flex min-h-[460px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white p-10 text-center">
@@ -628,13 +652,13 @@ export function CollectionCounter({
                     : "Select an outstanding invoice from the search results to load student details and process payment."}
               </p>
               {studentContext && invoices.length === 0 && onChangeStudent ? (
-                <button
+                <Button
                   type="button"
                   onClick={onChangeStudent}
-                  className="mt-6 rounded-xl bg-[var(--color-mod-fees-accent)] px-5 py-3 text-xs font-black uppercase tracking-widest text-white transition hover:bg-[var(--color-mod-fees-text)]"
+                  className="mt-6 rounded-xl !bg-[var(--color-mod-fees-accent)] px-5 py-3 text-xs font-black uppercase tracking-widest text-white hover:!bg-[var(--color-mod-fees-text)]"
                 >
                   Change student
-                </button>
+                </Button>
               ) : null}
 
             </div>
@@ -880,13 +904,14 @@ function StudentContextSummary({
           </p>
         </div>
         {onChangeStudent ? (
-          <button
+          <Button
             type="button"
+            variant="link"
             onClick={onChangeStudent}
-            className="shrink-0 text-[0.65rem] font-black uppercase tracking-widest text-[var(--color-mod-fees-accent)] hover:text-[var(--color-mod-fees-text)]"
+            className="h-auto shrink-0 p-0 text-[0.65rem] font-black uppercase tracking-widest text-[var(--color-mod-fees-accent)] hover:text-[var(--color-mod-fees-text)]"
           >
             Change
-          </button>
+          </Button>
         ) : null}
       </div>
       <div className="mt-4 grid gap-3 text-xs font-bold text-slate-600">

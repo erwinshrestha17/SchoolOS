@@ -7,7 +7,10 @@ import { api } from "@/lib/api";
 import type { CollectedPaymentResult } from "@/lib/api/finance";
 import type { InvoiceSummary, StudentCollectionContext } from "@schoolos/core";
 import { CheckCircle2, AlertCircle, Printer, X } from "lucide-react";
+import { useSession } from "@/components/session-provider";
+import { Button } from '@/components/ui/button';
 import { ErrorState } from "@/components/ui/error-state";
+import { PermissionDenied } from '@/components/ui/permission-denied';
 
 interface CollectionSectionProps {
   invoices: InvoiceSummary[];
@@ -57,6 +60,8 @@ export function CollectionSection({
   total = 0,
   onPageChange,
 }: CollectionSectionProps) {
+  const { hasPermissions } = useSession();
+  const canCollect = hasPermissions(["payments:collect"]);
   const queryClient = useQueryClient();
   const [lastReceipt, setLastReceipt] = useState<CollectedPaymentResult | null>(
     null,
@@ -184,20 +189,25 @@ export function CollectionSection({
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button
+            <Button
+              type="button"
+              variant="outline"
               onClick={handleOpenReceipt}
-              className="flex items-center gap-2 rounded-xl border border-success-100 bg-white px-6 py-3 text-xs font-bold text-success-700 shadow-sm transition-all hover:bg-success-100 active:scale-95"
+              className="flex items-center gap-2 rounded-xl border-success-100 bg-white px-6 py-3 text-xs font-bold text-success-700 shadow-sm hover:bg-success-100"
             >
               <Printer size={16} />
               Open protected receipt
-            </button>
-            <button
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
               onClick={() => setLastReceipt(null)}
-              className="p-3 text-success-400 transition-colors hover:text-success-600"
+              className="text-success-400 hover:bg-success-100/50 hover:text-success-600"
               aria-label="Collect another payment"
             >
               <X size={20} />
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -227,32 +237,40 @@ export function CollectionSection({
         </div>
       )}
 
-      <CollectionCounter
-        onSearch={onSearchChange ?? (() => undefined)}
-        searchQuery={searchQuery}
-        invoices={visibleInvoices}
-        isLoading={isLoading}
-        isSubmitting={paymentMutation.isPending}
-        initialInvoiceId={initialInvoiceId}
-        studentContext={studentCollectionContext?.student ?? null}
-        isStudentProfileSource={isStudentProfileSource}
-        onChangeStudent={onChangeStudent}
-        disableSearch={isStudentContextMode}
-        page={page}
-        limit={limit}
-        total={isStudentContextMode ? visibleInvoices.length : total}
-        onPageChange={onPageChange}
-        onCollect={(invoiceId, amount, method, reference, remarks) => {
-          setLastReceipt(null);
-          paymentMutation.mutate({
-            invoiceId,
-            amount,
-            method,
-            referenceNumber: reference || undefined,
-            narration: remarks || `Counter collection via Finance Dashboard`,
-          });
-        }}
-      />
+      {!canCollect ? (
+        <PermissionDenied
+          showNavigation={false}
+          title="Payment collection is restricted"
+          description="Your current role does not have the finance permission required to record fee payments."
+        />
+      ) : (
+        <CollectionCounter
+          onSearch={onSearchChange ?? (() => undefined)}
+          searchQuery={searchQuery}
+          invoices={visibleInvoices}
+          isLoading={isLoading}
+          isSubmitting={paymentMutation.isPending}
+          initialInvoiceId={initialInvoiceId}
+          studentContext={studentCollectionContext?.student ?? null}
+          isStudentProfileSource={isStudentProfileSource}
+          onChangeStudent={onChangeStudent}
+          disableSearch={isStudentContextMode}
+          page={page}
+          limit={limit}
+          total={isStudentContextMode ? visibleInvoices.length : total}
+          onPageChange={onPageChange}
+          onCollect={(invoiceId, amount, method, reference, remarks) => {
+            setLastReceipt(null);
+            paymentMutation.mutate({
+              invoiceId,
+              amount,
+              method,
+              referenceNumber: reference || undefined,
+              narration: remarks || `Counter collection via Finance Dashboard`,
+            });
+          }}
+        />
+      )}
     </div>
   );
 }

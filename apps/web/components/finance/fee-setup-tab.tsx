@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { SectionCard } from '@/components/ui/section-card';
 import { Loader2, Plus, Info, Check, AlertCircle } from 'lucide-react';
@@ -208,9 +209,9 @@ export function FeeSetupTab() {
               </label>
             </div>
 
-            <button
+            <Button
               type="submit"
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--color-mod-fees-accent)] px-5 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-[var(--color-mod-fees-text)] disabled:opacity-50 transition-all"
+              className="w-full"
               disabled={feeHeadMutation.isPending}
             >
               {feeHeadMutation.isPending ? (
@@ -224,7 +225,7 @@ export function FeeSetupTab() {
                   Create Fee Head
                 </>
               )}
-            </button>
+            </Button>
           </form>
         </SectionCard>
 
@@ -345,9 +346,9 @@ export function FeeSetupTab() {
               </div>
             </div>
 
-            <button
+            <Button
               type="submit"
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--color-mod-fees-accent)] px-5 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-[var(--color-mod-fees-text)] disabled:opacity-50 transition-all"
+              className="w-full"
               disabled={feePlanMutation.isPending}
             >
               {feePlanMutation.isPending ? (
@@ -361,7 +362,7 @@ export function FeeSetupTab() {
                   Create Fee Plan
                 </>
               )}
-            </button>
+            </Button>
           </form>
         </SectionCard>
       </div>

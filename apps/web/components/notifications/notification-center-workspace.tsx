@@ -19,6 +19,7 @@ import {
   PaginatedDataTable,
   type PaginatedDataTableColumn,
 } from '@/components/schoolos/data/paginated-data-table';
+import { Button } from '@/components/ui/button';
 import { FilterBar } from '@/components/ui/filter-bar';
 import { ModuleHeader } from '@/components/ui/module-header';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -136,15 +137,15 @@ export function NotificationCenterWorkspace() {
         }
         primaryAction={
           canView && (centerQuery.data?.unreadCount ?? 0) > 0 ? (
-            <button
+            <Button
               type="button"
               disabled={markAllRead.isPending}
+              isLoading={markAllRead.isPending}
               onClick={() => markAllRead.mutate()}
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-slate-950 px-4 text-sm font-semibold text-white disabled:opacity-60"
             >
               <CheckCheck size={16} />{' '}
               {markAllRead.isPending ? 'Marking…' : 'Mark all read'}
-            </button>
+            </Button>
           ) : null
         }
       />
@@ -209,14 +210,15 @@ export function NotificationCenterWorkspace() {
         rowActions={(item) => (
           <div className="flex justify-end gap-2">
             {!item.isRead ? (
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 disabled={markRead.isPending}
                 onClick={() => markRead.mutate(item.id)}
-                className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-60"
               >
                 Mark read
-              </button>
+              </Button>
             ) : null}
             <Link
               href={safeDashboardHref(item.linkHref)}

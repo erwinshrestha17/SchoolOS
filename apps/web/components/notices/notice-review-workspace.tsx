@@ -16,6 +16,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useNoticeCapabilities } from "@/lib/permissions-ui";
+import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ErrorState } from "@/components/ui/error-state";
 import { LoadingState } from "@/components/ui/loading-state";
@@ -345,37 +346,38 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
 
           <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             {requiresApproval ? (
-              <button
+              <Button
                 type="button"
+                className="w-full"
                 onClick={() => setPendingAction("approval")}
                 disabled={actionBlocked || Boolean(scheduleError)}
-                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 text-sm font-bold text-white disabled:opacity-50"
               >
                 <ShieldCheck size={17} /> Submit for approval
-              </button>
+              </Button>
             ) : (
               <>
                 {canPublish ? (
-                  <button
+                  <Button
                     type="button"
+                    className="w-full"
                     onClick={() => setPendingAction("publish")}
                     disabled={actionBlocked}
-                    className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 text-sm font-bold text-white disabled:opacity-50"
                   >
                     <Send size={17} /> Publish now
-                  </button>
+                  </Button>
                 ) : null}
                 {canSchedule ? (
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    className="w-full"
                     onClick={() => setPendingAction("schedule")}
                     disabled={
                       actionBlocked || !scheduledFor || Boolean(scheduleError)
                     }
-                    className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-700 disabled:opacity-50"
                   >
                     <CalendarClock size={17} /> Schedule
-                  </button>
+                  </Button>
                 ) : null}
               </>
             )}

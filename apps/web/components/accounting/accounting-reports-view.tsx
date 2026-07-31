@@ -14,6 +14,9 @@ import {
 import { api } from "../../lib/api";
 import { SectionCard } from "../ui/section-card";
 import { PageState } from "../ui/page-state";
+import { Button } from "@/components/ui/button";
+import { LoadingState } from "../ui/loading-state";
+import { ErrorState } from "../ui/error-state";
 import { cn } from "../../lib/utils";
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -23,7 +26,6 @@ import { ReportTable } from "./report-table";
 import { JournalDetailDialog } from "./journal-detail-dialog";
 import { Select } from "../ui/select";
 
-import { PageHeader } from "../ui/page-header";
 import {
   formatBsDateTime,
   type AccountingBalanceSheetResponse,
@@ -331,28 +333,25 @@ export function AccountingReportsView({
 
     if (reportQuery.isLoading) {
       return (
-        <div className="py-20">
-          <PageState
-            tone="loading"
-            title="Generating Financial Report"
-            description="Backend is processing ledger data for the selected period."
-          />
-        </div>
+        <LoadingState
+          variant="page"
+          label="Generating financial report"
+          className="min-h-[320px]"
+        />
       );
     }
 
     if (reportQuery.isError) {
       return (
-        <div className="py-10">
-          <PageState
-            tone="danger"
-            title="Report Generation Failed"
-            description={
-              reportQuery.error?.message ??
-              "Could not retrieve data from the financial ledger."
-            }
-          />
-        </div>
+        <ErrorState
+          title="Report generation failed"
+          message={
+            reportQuery.error?.message ??
+            "Could not retrieve data from the financial ledger."
+          }
+          error={reportQuery.error}
+          onRetry={() => void reportQuery.refetch()}
+        />
       );
     }
 
@@ -708,13 +707,14 @@ export function AccountingReportsView({
               { value: row.entryDate, type: "date" },
               {
                 value: (
-                  <button
+                  <Button
                     type="button"
+                    variant="link"
+                    className="h-auto p-0 font-bold text-[var(--color-mod-accounting-accent)]"
                     onClick={() => openJournalDetail(row.journalEntryId)}
-                    className="font-bold text-[var(--color-mod-accounting-accent)] hover:underline"
                   >
                     {row.entryNumber ?? "View"}
-                  </button>
+                  </Button>
                 ),
               },
               { value: row.narration },
@@ -906,46 +906,44 @@ export function AccountingReportsView({
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500 pb-10">
-      <PageHeader
+      <SectionCard
         title="Accounting Reports"
         description="Comprehensive financial statements and ledger reports generated from real-time accounting data."
-        actions={
-          <div className="flex items-center gap-3">
-            <button
+        headerAction={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
               onClick={() => pdfMutation.mutate(activeReport)}
               disabled={
                 pdfMutation.isPending || !isExportSupported(activeReport)
               }
-              className="group inline-flex items-center gap-2 rounded-xl bg-[var(--color-mod-accounting-accent)] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-[var(--color-mod-accounting-text)] disabled:opacity-30 disabled:grayscale"
+              isLoading={pdfMutation.isPending}
+              className="bg-[var(--color-mod-accounting-accent)] hover:bg-[var(--color-mod-accounting-text)]"
               data-testid="accounting-report-pdf-export"
             >
-              <FileDown
-                size={18}
-                className="transition-transform group-hover:scale-110"
-              />
+              <FileDown size={18} />
               {pdfMutation.isPending ? "Generating..." : "Download PDF"}
-            </button>
-            <button
+            </Button>
+            <Button
+              type="button"
               onClick={() => exportMutation.mutate(activeReport)}
               disabled={
                 exportMutation.isPending || !isExportSupported(activeReport)
               }
-              className="group inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all disabled:opacity-30 disabled:grayscale"
+              isLoading={exportMutation.isPending}
+              className="bg-emerald-600 hover:bg-emerald-700"
             >
-              <FileSpreadsheet
-                size={18}
-                className="transition-transform group-hover:scale-110"
-              />
+              <FileSpreadsheet size={18} />
               {exportMutation.isPending ? "Generating..." : "Download CSV"}
-            </button>
+            </Button>
           </div>
         }
-      />
-
-      <AuditInfo>
-        Financial truth is derived from the backend ledger. Posted journals are
-        immutable; use reversal/correction workflows for any adjustments.
-      </AuditInfo>
+      >
+        <AuditInfo>
+          Financial truth is derived from the backend ledger. Posted journals are
+          immutable; use reversal/correction workflows for any adjustments.
+        </AuditInfo>
+      </SectionCard>
 
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
         <div className="xl:col-span-1 space-y-4">
@@ -1025,23 +1023,25 @@ export function AccountingReportsView({
                   desc: "Tax and statutory summaries",
                 },
               ].map((report) => (
-                <button
+                <Button
                   key={report.id}
+                  type="button"
+                  variant="ghost"
                   onClick={() => handleReportChange(report.id as ReportType)}
                   className={cn(
-                    "flex flex-col gap-0.5 rounded-xl px-4 py-3 text-left transition-all",
+                    "h-auto w-full flex-col items-start gap-0.5 rounded-xl px-4 py-3 text-left transition-all",
                     activeReport === report.id
-                      ? "border border-[var(--color-mod-accounting-border)] bg-[var(--color-mod-accounting-bg)] text-[var(--color-mod-accounting-text)] shadow-sm"
-                      : "bg-white border border-slate-100 text-slate-600 hover:bg-[var(--color-mod-accounting-bg)] hover:border-[var(--color-mod-accounting-border)]",
+                      ? "border border-[var(--color-mod-accounting-border)] bg-[var(--color-mod-accounting-bg)] text-[var(--color-mod-accounting-text)] shadow-sm hover:bg-[var(--color-mod-accounting-bg)]"
+                      : "border border-slate-100 bg-white text-slate-600 hover:border-[var(--color-mod-accounting-border)] hover:bg-[var(--color-mod-accounting-bg)]",
                   )}
                 >
-                  <div className="flex items-center gap-2 font-bold text-sm">
+                  <div className="flex items-center gap-2 text-sm font-bold">
                     <report.icon size={16} />
                     {report.label}
                   </div>
                   <span
                     className={cn(
-                      "text-[10px]",
+                      "text-[10px] font-medium",
                       activeReport === report.id
                         ? "text-[var(--color-mod-accounting-text)]/70"
                         : "text-slate-400",
@@ -1049,7 +1049,7 @@ export function AccountingReportsView({
                   >
                     {report.desc}
                   </span>
-                </button>
+                </Button>
               ))}
             </div>
           </SectionCard>
@@ -1083,21 +1083,17 @@ export function AccountingReportsView({
             )}
           </SectionCard>
 
-          <SectionCard className="min-h-[400px] shadow-sm">
-            <div className="mb-6 flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">
-                  {activeReport.replace("-", " ")}
-                </h3>
-                <p className="text-xs font-medium text-slate-400 mt-0.5">
-                  Ledger-backed preview
-                </p>
-              </div>
-              <div className="flex items-center gap-2 text-[10px] font-bold text-[var(--color-mod-accounting-text)] uppercase tracking-wider bg-[var(--color-mod-accounting-bg)] px-3 py-1.5 rounded-lg">
+          <SectionCard
+            title={activeReport.replace(/-/g, " ")}
+            description="Ledger-backed preview"
+            headerAction={
+              <div className="flex items-center gap-2 rounded-lg bg-[var(--color-mod-accounting-bg)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--color-mod-accounting-text)]">
                 <History size={12} />
                 Current ledger data
               </div>
-            </div>
+            }
+            className="min-h-[400px] shadow-sm"
+          >
             <div className="animate-in fade-in duration-700">
               {renderReportContent()}
             </div>
@@ -1117,19 +1113,21 @@ export function AccountingReportsView({
                 )
                 .slice(0, 5)
                 .map((item: any) => (
-                  <button
+                  <Button
                     key={item.id}
+                    type="button"
+                    variant="outline"
                     onClick={() => api.downloadReportSnapshot(item.id)}
-                    className="flex w-full items-center justify-between rounded-lg border border-slate-100 bg-white px-3 py-2 text-left text-sm hover:bg-slate-50"
+                    className="h-auto w-full justify-between rounded-lg px-3 py-2 text-left text-sm font-normal"
                   >
                     <span className="font-bold text-slate-700">
                       {item.reportKey}
                     </span>
-                    <span className="text-xs text-slate-400">
+                    <span className="text-xs font-medium text-slate-400">
                       {item.format?.toUpperCase()} -{" "}
                       {formatBsDateTime(item.createdAt)}
                     </span>
-                  </button>
+                  </Button>
                 ))}
               {snapshotItems.filter((item) =>
                 String(item.reportKey ?? "").includes(activeReport),

@@ -205,8 +205,9 @@ describe("M3 fees workspace contract", () => {
     const dashboardLayout = read("app/dashboard/layout.tsx");
 
     assert.match(workspace, /<PermissionDenied/);
-    assert.match(dashboardLayout, /href\.startsWith\("\/dashboard\/fees"\)\) return "fees"/);
-    assert.match(dashboardLayout, /href\.startsWith\("\/dashboard\/finance"\)\) return "fees"/);
+    assert.match(dashboardLayout, /dashboardRouteGates/);
+    assert.match(dashboardLayout, /prefix: "\/dashboard\/fees"/);
+    assert.match(dashboardLayout, /prefix: "\/dashboard\/finance"/);
     assert.match(dashboardLayout, /<UpgradePrompt/);
   });
 

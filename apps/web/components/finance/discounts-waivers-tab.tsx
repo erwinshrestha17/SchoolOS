@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { SectionCard } from "@/components/ui/section-card";
 import { Loader2, Plus, Check, AlertCircle } from "lucide-react";
 import {
@@ -414,9 +415,9 @@ export function DiscountsWaiversTab({
               </div>
             </div>
 
-            <button
+            <Button
               type="submit"
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--color-mod-fees-accent)] px-5 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-[var(--color-mod-fees-text)] disabled:opacity-50 transition-all"
+              className="w-full"
               disabled={
                 discountMutation.isPending ||
                 (!discount.feeHeadId &&
@@ -435,7 +436,7 @@ export function DiscountsWaiversTab({
                   Create Discount Rule
                 </>
               )}
-            </button>
+            </Button>
             {!discount.feeHeadId &&
               !discount.classId &&
               !discount.feePlanId && (
@@ -579,9 +580,9 @@ export function DiscountsWaiversTab({
               </p>
             )}
 
-            <button
+            <Button
               type="submit"
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--color-mod-fees-accent)] px-5 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-[var(--color-mod-fees-text)] disabled:opacity-50 transition-all"
+              className="w-full"
               disabled={
                 waiverMutation.isPending ||
                 waiver.amount <= 0 ||
@@ -600,7 +601,7 @@ export function DiscountsWaiversTab({
                   Approve Waiver
                 </>
               )}
-            </button>
+            </Button>
           </form>
         </SectionCard> : null}
       </div>
@@ -657,12 +658,10 @@ export function DiscountsWaiversTab({
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <Badge
-                            variant={item.isActive ? "success" : "neutral"}
+                          <StatusBadge
+                            status={item.isActive ? "ACTIVE" : "INACTIVE"}
                             className="text-[9px] px-1.5 py-0"
-                          >
-                            {item.isActive ? "Active" : "Inactive"}
-                          </Badge>
+                          />
                         </td>
                         <td className="px-4 py-3 font-bold text-slate-800">
                           {item.percentOff
@@ -777,21 +776,20 @@ export function DiscountsWaiversTab({
             <p>Reason: {waiver.reason || "—"}</p>
           </div>
           <DialogFooter>
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={() => setIsConfirmingWaiver(false)}
-              className="rounded-xl px-4 py-2 text-sm font-bold text-slate-600"
             >
               Review again
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               disabled={waiverMutation.isPending}
               onClick={submitWaiver}
-              className="rounded-xl bg-[var(--color-mod-fees-accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
             >
               {waiverMutation.isPending ? "Approving..." : "Approve waiver"}
-            </button>
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog> : null}
@@ -819,22 +817,24 @@ function ListPager({
         {Math.min(page * limit, total)} of {total}
       </span>
       <div className="flex gap-2">
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           disabled={page <= 1}
           onClick={() => onPageChange(page - 1)}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 disabled:opacity-40"
         >
           Previous
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           disabled={!hasNextPage}
           onClick={() => onPageChange(page + 1)}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 disabled:opacity-40"
         >
           Next
-        </button>
+        </Button>
       </div>
     </div>
   );

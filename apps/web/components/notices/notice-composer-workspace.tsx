@@ -10,6 +10,7 @@ import {
   communicationsApi,
   type NoticeRecipientPreview,
 } from "@/lib/api/communications";
+import { Button } from '@/components/ui/button';
 import { FileUploader } from "@/components/ui/file-uploader";
 import { LoadingState } from "@/components/ui/loading-state";
 import { ErrorState } from "@/components/ui/error-state";
@@ -592,26 +593,27 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
         ) : null}
 
         <div className="flex flex-wrap gap-3 border-t border-slate-100 pt-5">
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={() => previewMutation.mutate()}
             disabled={Boolean(validationError) || previewMutation.isPending}
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-700 disabled:opacity-50"
+            isLoading={previewMutation.isPending}
           >
             <Eye size={16} />{" "}
             {previewMutation.isPending
               ? "Resolving audience..."
               : "Preview recipients"}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={() => saveMutation.mutate()}
             disabled={Boolean(validationError) || saveMutation.isPending}
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--primary)] px-4 text-sm font-bold text-white disabled:opacity-50"
+            isLoading={saveMutation.isPending}
           >
             <Save size={16} />{" "}
             {saveMutation.isPending ? "Saving draft..." : "Save draft"}
-          </button>
+          </Button>
         </div>
       </section>
 

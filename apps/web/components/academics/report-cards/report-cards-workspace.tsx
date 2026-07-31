@@ -7,6 +7,7 @@ import { FilterBar } from '@/components/ui/filter-bar';
 import { Select, TextArea } from '@/components/ui/form-field';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
+import { StatusBadge } from '@/components/ui/status-badge';
 import {
   AlertTriangle,
   FileText,
@@ -213,11 +214,11 @@ export function ReportCardsWorkspace() {
     {
       header: 'Status',
       cell: (row: any) => (
-        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${
-          row.status === 'LOCKED' ? 'bg-indigo-50 text-indigo-700' : 'bg-amber-50 text-amber-700'
-        }`}>
-          {row.status}{row.publishStatus ? ` / ${row.publishStatus}` : ''}{row.version > 1 ? ` / v${row.version}` : ''}
-        </span>
+        <StatusBadge
+          status={row.status}
+          label={`${row.status}${row.publishStatus ? ` / ${row.publishStatus}` : ''}${row.version > 1 ? ` / v${row.version}` : ''}`}
+          tone={row.status === 'LOCKED' ? 'locked' : 'pending'}
+        />
       ),
     },
     {

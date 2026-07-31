@@ -17,6 +17,7 @@ import { useSession } from "@/components/session-provider";
 import { BsDateField } from "@/components/ui/bs-date-field";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
+import { Button } from "@/components/ui/button";
 import { SectionCard } from "@/components/ui/section-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { api } from "@/lib/api";
@@ -76,7 +77,7 @@ export function FinanceReportWorkspace() {
         },
         {
           value: "adjustments" as const,
-          label: "Adjustment requests",
+          label: "Adjustments",
           allowed:
             hasPermissions(["payments:refund"]) ||
             hasPermissions(["payments:reverse"]),
@@ -816,13 +817,9 @@ function ReportPeriodFilter() {
           onChange={setFromBs}
         />
         <BsDateField label="To date (BS)" value={toBs} onChange={setToBs} />
-        <button
-          type="button"
-          onClick={runReport}
-          className="min-h-11 rounded-lg bg-[var(--color-mod-fees-accent)] px-5 text-sm font-semibold text-white hover:bg-[var(--color-mod-fees-text)]"
-        >
+        <Button type="button" onClick={runReport}>
           Run report
-        </button>
+        </Button>
       </div>
       {error ? (
         <p className="mt-2 text-xs font-semibold text-rose-700">{error}</p>
@@ -886,22 +883,24 @@ function ReportPagination({
     <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs font-semibold text-slate-600">
       <span>Page {page}</span>
       <div className="flex gap-2">
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           disabled={page <= 1}
           onClick={() => onPageChange(page - 1)}
-          className="min-h-9 rounded-lg border border-slate-200 bg-white px-3 disabled:opacity-40"
         >
           Previous
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           disabled={!hasNextPage}
           onClick={() => onPageChange(page + 1)}
-          className="min-h-9 rounded-lg border border-slate-200 bg-white px-3 disabled:opacity-40"
         >
           Next
-        </button>
+        </Button>
       </div>
     </div>
   );

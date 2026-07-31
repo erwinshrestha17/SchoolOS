@@ -17,8 +17,10 @@ import {
   Clock,
   Loader2
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { SectionCard } from '@/components/ui/section-card';
+import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge } from '@/components/ui/status-badge';
 
 type Props = {
   academicYears: any[];
@@ -122,15 +124,15 @@ export function ExamTermsTab({ academicYears, subjects, exams }: Props) {
               </div>
             </div>
 
-            <button 
-              type="button" 
-              className="mt-4 flex min-h-12 items-center justify-center gap-3 rounded-xl bg-[var(--color-mod-academics-accent)] px-5 py-3 text-sm font-black uppercase tracking-widest text-white shadow-sm transition hover:bg-[var(--color-mod-academics-text)] disabled:opacity-50"
-              disabled={!exam.name || examMut.isPending} 
+            <Button
+              type="button"
+              className="mt-4 min-h-12 w-full gap-3 font-black uppercase tracking-widest"
+              disabled={!exam.name || examMut.isPending}
               onClick={() => examMut.mutate({ ...exam, academicYearId: exam.academicYearId || currentYear?.id, startsOn: new Date(exam.startsOn).toISOString(), endsOn: new Date(exam.endsOn).toISOString() })}
             >
               {examMut.isPending ? <Loader2 className="animate-spin" size={20} /> : <Plus size={20} />}
               Initialize Exam Term
-            </button>
+            </Button>
             {examMut.isError && <p className="text-xs font-bold text-red-600 mt-2 flex items-center gap-1"><AlertCircle size={12} /> {examMut.error.message}</p>}
           </div>
         </div>
@@ -204,15 +206,15 @@ export function ExamTermsTab({ academicYears, subjects, exams }: Props) {
               </div>
             </div>
 
-            <button 
-              type="button" 
-              className="mt-4 flex min-h-12 items-center justify-center gap-3 rounded-xl bg-[var(--color-mod-academics-accent)] px-5 py-3 text-sm font-black uppercase tracking-widest text-white shadow-sm transition hover:bg-[var(--color-mod-academics-text)] disabled:opacity-50"
-              disabled={!comp.examTermId || !comp.subjectId || !comp.name || compMut.isPending} 
+            <Button
+              type="button"
+              className="mt-4 min-h-12 w-full gap-3 font-black uppercase tracking-widest"
+              disabled={!comp.examTermId || !comp.subjectId || !comp.name || compMut.isPending}
               onClick={() => compMut.mutate(comp)}
             >
               {compMut.isPending ? <Loader2 className="animate-spin" size={20} /> : <Layers size={20} />}
               Add Assessment Map
-            </button>
+            </Button>
             {compMut.isError && <p className="text-xs font-bold text-red-600 mt-2 flex items-center gap-1"><AlertCircle size={12} /> {compMut.error.message}</p>}
           </div>
         </div>
@@ -233,10 +235,12 @@ export function ExamTermsTab({ academicYears, subjects, exams }: Props) {
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {exams.length === 0 ? (
-            <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-100 py-20 text-slate-400">
-               <Info className="h-12 w-12 mb-4 opacity-10" />
-               <p className="text-xs font-black uppercase tracking-widest">No Exam Terms Found</p>
-               <p className="mt-2 text-[10px] font-bold">Initialize your first exam term above to begin.</p>
+            <div className="col-span-full">
+              <EmptyState
+                title="No exam terms found"
+                description="Initialize your first exam term above to begin."
+                icon={<Info size={32} />}
+              />
             </div>
           ) : exams.map((e: any) => (
             <div key={e.id} className="group relative rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[var(--color-mod-academics-border)]">
@@ -245,12 +249,11 @@ export function ExamTermsTab({ academicYears, subjects, exams }: Props) {
                   <h4 className="text-lg font-bold leading-none text-slate-900">{e.name}</h4>
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{e.academicYear?.name ?? 'Year'}</p>
                 </div>
-                <div className={cn(
-                  "h-8 px-3 rounded-full flex items-center justify-center text-[8px] font-black uppercase tracking-widest border",
-                  e.isLocked ? "bg-red-50 text-red-600 border-red-100" : "bg-emerald-50 text-emerald-600 border-emerald-100"
-                )}>
-                  {e.isLocked ? 'Locked' : 'Open'}
-                </div>
+                <StatusBadge
+                  status={e.isLocked ? 'LOCKED' : 'OPEN'}
+                  label={e.isLocked ? 'Locked' : 'Open'}
+                  tone={e.isLocked ? 'locked' : 'active'}
+                />
               </div>
 
               <div className="flex items-center gap-2 mb-6">

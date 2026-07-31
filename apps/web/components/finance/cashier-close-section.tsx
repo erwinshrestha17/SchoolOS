@@ -21,6 +21,8 @@ import { useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { formatBsDateTime, getNepalSchoolDay } from "@schoolos/core";
 import { ErrorState } from "@/components/ui/error-state";
+import { Button } from '@/components/ui/button';
+import { PermissionDenied } from '@/components/ui/permission-denied';
 import {
   Dialog,
   DialogContent,
@@ -29,8 +31,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useSession } from "@/components/session-provider";
 
 export function CashierCloseSection() {
+  const { hasPermissions } = useSession();
+  const canClose = hasPermissions(["payments:close"]);
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
@@ -254,6 +259,13 @@ export function CashierCloseSection() {
           title="Counter Handover"
           description="Finalize today's collection and hand over to accounting."
         >
+          {!canClose ? (
+            <PermissionDenied
+              showNavigation={false}
+              title="Cashier close is restricted"
+              description="Your current role does not have the finance permission required to finalize a school-day cashier close."
+            />
+          ) : (
           <div className="space-y-6">
             <div className="space-y-3">
               <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest ml-1">
@@ -308,10 +320,11 @@ export function CashierCloseSection() {
               </div>
             </div>
 
-            <button
+            <Button
+              type="button"
               onClick={() => setIsConfirmingClose(true)}
               disabled={closeDisabled}
-              className="flex w-full items-center justify-center gap-3 rounded-xl bg-[var(--color-mod-fees-accent)] py-4 text-sm font-black text-white shadow-sm transition-all hover:bg-[var(--color-mod-fees-text)] active:scale-95 disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-3 rounded-xl py-4 text-sm font-black !bg-[var(--color-mod-fees-accent)] text-white shadow-sm hover:!bg-[var(--color-mod-fees-text)]"
             >
               {closeMutation.isPending ? (
                 <Loader2 size={20} className="animate-spin" />
@@ -319,7 +332,7 @@ export function CashierCloseSection() {
                 <CheckCircle2 size={20} />
               )}
               Close Counter & Handover
-            </button>
+            </Button>
 
             {closeMutation.isError ? (
               <div
@@ -354,6 +367,7 @@ export function CashierCloseSection() {
               />
             ) : null}
           </div>
+          )}
         </SectionCard>
       </div>
 
@@ -409,22 +423,26 @@ export function CashierCloseSection() {
                 of {closesQuery.data.total}
               </span>
               <div className="flex gap-2">
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   disabled={closePage <= 1}
                   onClick={() => updateClosePage(closePage - 1)}
-                  className="rounded-lg border border-slate-200 px-3 py-2 disabled:opacity-40"
+                  className="rounded-lg px-3 py-2"
                 >
                   Previous
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   disabled={!closesQuery.data.hasNextPage}
                   onClick={() => updateClosePage(closePage + 1)}
-                  className="rounded-lg border border-slate-200 px-3 py-2 disabled:opacity-40"
+                  className="rounded-lg px-3 py-2"
                 >
                   Next
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -455,14 +473,15 @@ export function CashierCloseSection() {
             <p>Net collection: {formatCurrency(preview?.netCollected ?? 0)}</p>
           </div>
           <DialogFooter>
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={() => setIsConfirmingClose(false)}
               className="rounded-xl px-4 py-2 text-sm font-bold text-slate-600"
             >
               Review again
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               disabled={closeDisabled}
               onClick={() =>
@@ -474,10 +493,10 @@ export function CashierCloseSection() {
                   notes: remarks.trim(),
                 })
               }
-              className="rounded-xl bg-[var(--color-mod-fees-accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+              className="rounded-xl !bg-[var(--color-mod-fees-accent)] px-4 py-2 text-sm font-bold text-white hover:!bg-[var(--color-mod-fees-text)]"
             >
               Finalize immutable close
-            </button>
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -11,6 +11,7 @@ import { ErrorState } from "@/components/ui/error-state";
 import { FilterChips } from "@/components/ui/filter-chips";
 import { SearchInput } from "@/components/ui/search-input";
 import { SectionCard } from "@/components/ui/section-card";
+import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { api } from "@/lib/api";
 
@@ -112,9 +113,10 @@ export function StudentLedgerWorkspace() {
               <div className="divide-y divide-slate-100">
                 {searchQuery.data.items.map((student) => {
                   return (
-                    <button
+                    <Button
                       key={student.id}
                       type="button"
+                      variant="ghost"
                       onClick={() =>
                         updateUrl({
                           studentId: student.id,
@@ -122,7 +124,7 @@ export function StudentLedgerWorkspace() {
                           page: null,
                         })
                       }
-                      className="flex min-h-16 w-full items-center justify-between gap-4 px-5 py-3 text-left hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-mod-fees-accent)] disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-auto min-h-16 w-full items-center justify-between gap-4 rounded-none px-5 py-3 text-left hover:bg-slate-50"
                     >
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-semibold text-slate-950">
@@ -136,10 +138,10 @@ export function StudentLedgerWorkspace() {
                           {` · ${student.invoiceCount} ${student.invoiceCount === 1 ? "invoice" : "invoices"}`}
                         </span>
                       </span>
-                      <span className="shrink-0 text-sm font-semibold text-[var(--color-mod-fees-text)]">
+                      <span className="shrink-0 text-sm font-semibold text-slate-700">
                         Open ledger
                       </span>
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
@@ -218,13 +220,13 @@ export function StudentLedgerWorkspace() {
               : ""}
           </p>
         </div>
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={() => updateUrl({ studentId: null })}
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
         >
           <ArrowLeft className="h-4 w-4" /> Change student
-        </button>
+        </Button>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
@@ -375,22 +377,24 @@ export function StudentLedgerWorkspace() {
                 {formatBsDate(ledger.generatedAt)}
               </span>
               <div className="flex gap-2">
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   disabled={ledger.page <= 1}
                   onClick={() => updateUrl({ page: ledger.page - 1 })}
-                  className="min-h-9 rounded-lg border border-slate-200 bg-white px-3 disabled:opacity-40"
                 >
                   Previous
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   disabled={!ledger.hasNextPage}
                   onClick={() => updateUrl({ page: ledger.page + 1 })}
-                  className="min-h-9 rounded-lg border border-slate-200 bg-white px-3 disabled:opacity-40"
                 >
                   Next
-                </button>
+                </Button>
               </div>
             </div>
           </div>

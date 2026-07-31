@@ -8,9 +8,6 @@ import {
   GraduationCap, 
   Search, 
   ArrowRight, 
-  CheckCircle2, 
-  AlertCircle, 
-  XCircle, 
   Loader2, 
   ShieldCheck, 
   Info,
@@ -32,6 +29,15 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
+import { LoadingState } from '@/components/ui/loading-state';
+import { StatusBadge } from '@/components/ui/status-badge';
+
+function readinessTone(status: string): 'approved' | 'pending' | 'rejected' {
+  if (status === 'READY') return 'approved';
+  if (status === 'REVIEW') return 'pending';
+  return 'rejected';
+}
 
 type PromotionNotice = {
   title: string;
@@ -170,14 +176,15 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
               <h2 className="text-2xl font-bold tracking-tight text-slate-950">Year-End Promotion</h2>
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Batch Student Lifecycle Transition</p>
            </div>
-           <button 
+           <Button
+            type="button"
+            className="h-12 rounded-2xl px-8 font-black uppercase tracking-widest text-[10px]"
             onClick={handleBatchPromote}
             disabled={selectedIds.size === 0 || batchPromoteMut.isPending}
-            className="h-12 px-8 rounded-2xl bg-[var(--color-mod-academics-accent)] text-white flex items-center justify-center gap-3 font-black uppercase tracking-widest text-[10px] shadow-sm hover:bg-[var(--color-mod-academics-text)] transition-all active:scale-95 disabled:opacity-30"
            >
               {batchPromoteMut.isPending ? <Loader2 className="animate-spin" size={16} /> : <Zap size={16} />}
               Execute Promotion ({selectedIds.size})
-           </button>
+           </Button>
         </div>
 
         <div className="grid gap-8 lg:grid-cols-2">
@@ -297,16 +304,18 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
                <tbody className="divide-y divide-slate-50">
                  {readinessQuery.isLoading ? (
                    <tr>
-                      <td colSpan={6} className="py-20 text-center">
-                         <Loader2 className="h-10 w-10 animate-spin text-[var(--color-mod-academics-accent)] mx-auto opacity-20" />
-                         <p className="mt-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Validating Readiness Map</p>
+                      <td colSpan={6} className="py-12">
+                         <LoadingState label="Validating readiness map..." />
                       </td>
                    </tr>
                  ) : students.length === 0 ? (
                    <tr>
-                      <td colSpan={6} className="py-20 text-center text-slate-300">
-                         <Info className="h-12 w-12 mx-auto mb-4 opacity-10" />
-                         <p className="text-[10px] font-black uppercase tracking-widest">No students match current scope</p>
+                      <td colSpan={6} className="py-12">
+                         <EmptyState
+                           title="No students match current scope"
+                           description="Adjust filters or choose a different class section."
+                           icon={<Info size={32} />}
+                         />
                       </td>
                    </tr>
                  ) : students.map((s) => {
@@ -351,15 +360,10 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
                        </td>
                        <td className="py-4 px-6">
                           <div className="flex flex-col gap-1">
-                             <div className={cn(
-                               "inline-flex w-fit items-center gap-1.5 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border",
-                               s.status === 'READY' ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
-                               s.status === 'REVIEW' ? "bg-amber-50 text-amber-600 border-amber-100" :
-                               "bg-rose-50 text-rose-600 border-rose-100"
-                             )}>
-                                {s.status === 'READY' ? <CheckCircle2 size={10} /> : s.status === 'REVIEW' ? <AlertCircle size={10} /> : <XCircle size={10} />}
-                                {s.status}
-                             </div>
+                             <StatusBadge
+                               status={s.status}
+                               tone={readinessTone(s.status)}
+                             />
                              {s.reasons.length > 0 && (
                                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tight leading-none ml-1">{s.reasons[0]}</p>
                              )}
@@ -372,12 +376,15 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
                                   <Lock size={14} />
                                </div>
                              )}
-                             <button
-                              className="h-8 px-4 rounded-xl bg-[var(--color-mod-academics-surface)] text-[10px] font-black uppercase tracking-widest text-[var(--color-mod-academics-accent)] hover:bg-[var(--color-mod-academics-accent)] hover:text-white transition-all active:scale-95"
+                             <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 rounded-xl font-black uppercase tracking-widest text-[10px]"
                               onClick={() => setDetailStudent(s)}
                              >
                                 Details
-                             </button>
+                             </Button>
                           </div>
                        </td>
                      </tr>

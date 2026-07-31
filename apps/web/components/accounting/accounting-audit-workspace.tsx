@@ -10,6 +10,7 @@ import { Search, History, Eye, FileSpreadsheet } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { EmptyState } from "../ui/empty-state";
 import { LoadingState } from "../ui/loading-state";
+import { Button } from "@/components/ui/button";
 import { formatBsDateTime } from "@schoolos/core";
 
 export function AccountingAuditWorkspace() {
@@ -65,15 +66,16 @@ export function AccountingAuditWorkspace() {
         title="Financial Audit Trail"
         description="Cross-module audit trail for fees, payroll, and accounting actions."
         headerAction={
-          <button
+          <Button
             type="button"
             onClick={() => exportMutation.mutate()}
             disabled={exportMutation.isPending}
-            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+            isLoading={exportMutation.isPending}
+            className="bg-emerald-600 hover:bg-emerald-700"
           >
             <FileSpreadsheet size={16} />
             {exportMutation.isPending ? "Exporting..." : "Export CSV"}
-          </button>
+          </Button>
         }
       >
         <div className="mb-6 grid gap-3 sm:grid-cols-3">
@@ -201,13 +203,15 @@ export function AccountingAuditWorkspace() {
                   { value: log.userId || "System actor" },
                   {
                     value: (
-                      <button
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
                         onClick={() => setSelectedLog(log)}
-                        className="inline-flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600 hover:bg-slate-200"
                       >
                         <Eye size={12} />
                         View Diff
-                      </button>
+                      </Button>
                     ),
                   },
                 ],
@@ -215,26 +219,30 @@ export function AccountingAuditWorkspace() {
             />
 
             <div className="flex items-center justify-between px-4">
-              <button
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
                 disabled={page === 1}
                 onClick={() => setPage((p) => p - 1)}
-                className="px-4 py-2 text-sm font-semibold rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-50"
               >
                 Previous
-              </button>
+              </Button>
               <span
                 className="text-sm font-bold text-slate-500"
                 data-testid="accounting-audit-page-summary"
               >
                 Page {page} / {records.length} records
               </span>
-              <button
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
                 disabled={!query.data?.hasNextPage}
                 onClick={() => setPage((p) => p + 1)}
-                className="px-4 py-2 text-sm font-semibold rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-50"
               >
                 Next
-              </button>
+              </Button>
             </div>
           </div>
         )}

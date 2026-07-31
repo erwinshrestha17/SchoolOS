@@ -419,6 +419,19 @@ Use this order unless the user explicitly changes priority:
    - Permission/module locked states.
    - Staging smoke.
 
+### W3 header migration (`PageHeader` → `ModuleHeader`)
+
+When polishing legacy routes, map props as follows:
+
+| Legacy `PageHeader` | Canonical `ModuleHeader` |
+|---|---|
+| `title` | `title` |
+| `description` | `description` |
+| `actions` (single cluster) | `primaryAction` for the main CTA; move secondary items to `moreActionItems` |
+| — | Add module `eyebrow` (e.g. `"Academics"`, `"Smart Attendance"`) |
+
+Prefer domain wrappers (`AcademicsSectionPage`, `M1PageHeader`, `SchoolSettingsPageHeader`) over duplicating header markup per route.
+
 ---
 
 ## 12. Verification Commands

@@ -1,19 +1,15 @@
 'use client';
 
+import { AcademicsSectionPage } from '@/components/academics/academics-section-page';
 import { AcademicsWorkspace } from '@/components/academics/academics-workspace';
-import { academicsWorkspaceOverflowTabs, academicsWorkspaceTabs } from '@/components/academics/academics-tabs';
-import { ModuleTabs } from '@/components/ui/module-tabs';
-import { PageHeader } from '@/components/ui/page-header';
 
-export default function CasRecordsPage() {
+export default function CasPage() {
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="CAS Records"
-        description="Track Continuous Assessment System (CAS) scores and behavioral metrics."
-      />
-      <ModuleTabs items={academicsWorkspaceTabs} overflowItems={academicsWorkspaceOverflowTabs} accentColor="purple" variant="light" className="mb-6" />
+    <AcademicsSectionPage
+      title="CAS Records"
+      description="Track co-curricular activity and service records alongside academic marks."
+    >
       <AcademicsWorkspace initialSection="CAS Records" />
-    </div>
+    </AcademicsSectionPage>
   );
 }

@@ -1,28 +1,28 @@
 'use client';
 
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { AcademicsSectionPage } from '@/components/academics/academics-section-page';
 import { AcademicsWorkspace } from '@/components/academics/academics-workspace';
-import { academicsWorkspaceOverflowTabs, academicsWorkspaceTabs } from '@/components/academics/academics-tabs';
-import { ModuleTabs } from '@/components/ui/module-tabs';
-import { PageHeader } from '@/components/ui/page-header';
+import { Button } from '@/components/ui/button';
 
 export default function MarksEntryPage() {
+  const router = useRouter();
+
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Marks Entry"
-        description="Record and review student scores for terminal and periodic assessments."
-        actions={
-          <Link
-            href="/dashboard/academics/retakes"
-            className="inline-flex h-10 items-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"
-          >
-            Retest queue
-          </Link>
-        }
-      />
-      <ModuleTabs items={academicsWorkspaceTabs} overflowItems={academicsWorkspaceOverflowTabs} accentColor="purple" variant="light" className="mb-6" />
+    <AcademicsSectionPage
+      title="Marks Entry"
+      description="Record and review student scores for terminal and periodic assessments."
+      primaryAction={
+        <Button
+          variant="outline"
+          type="button"
+          onClick={() => router.push('/dashboard/academics/retakes')}
+        >
+          Retest queue
+        </Button>
+      }
+    >
       <AcademicsWorkspace initialSection="Marks Entry" />
-    </div>
+    </AcademicsSectionPage>
   );
 }

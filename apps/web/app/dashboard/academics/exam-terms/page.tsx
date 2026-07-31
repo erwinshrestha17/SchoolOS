@@ -1,19 +1,15 @@
 'use client';
 
+import { AcademicsSectionPage } from '@/components/academics/academics-section-page';
 import { AcademicsWorkspace } from '@/components/academics/academics-workspace';
-import { academicsWorkspaceOverflowTabs, academicsWorkspaceTabs } from '@/components/academics/academics-tabs';
-import { ModuleTabs } from '@/components/ui/module-tabs';
-import { PageHeader } from '@/components/ui/page-header';
 
 export default function ExamTermsPage() {
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Exam Terms"
-        description="Configure terminal and periodic exam boundaries for the current academic year."
-      />
-      <ModuleTabs items={academicsWorkspaceTabs} overflowItems={academicsWorkspaceOverflowTabs} accentColor="purple" variant="light" className="mb-6" />
+    <AcademicsSectionPage
+      title="Exam Terms"
+      description="Configure terminal and periodic exam boundaries for the current academic year."
+    >
       <AcademicsWorkspace initialSection="Exam Terms" />
-    </div>
+    </AcademicsSectionPage>
   );
 }

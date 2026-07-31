@@ -1,19 +1,15 @@
 'use client';
 
+import { AcademicsSectionPage } from '@/components/academics/academics-section-page';
 import { AcademicsWorkspace } from '@/components/academics/academics-workspace';
-import { academicsWorkspaceOverflowTabs, academicsWorkspaceTabs } from '@/components/academics/academics-tabs';
-import { ModuleTabs } from '@/components/ui/module-tabs';
-import { PageHeader } from '@/components/ui/page-header';
 
 export default function PromotionPage() {
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Promotion Readiness"
-        description="Review student eligibility and move students to the next academic year."
-      />
-      <ModuleTabs items={academicsWorkspaceTabs} overflowItems={academicsWorkspaceOverflowTabs} accentColor="purple" variant="light" className="mb-6" />
+    <AcademicsSectionPage
+      title="Promotion"
+      description="Review promotion readiness and class progression decisions."
+    >
       <AcademicsWorkspace initialSection="Promotion" />
-    </div>
+    </AcademicsSectionPage>
   );
 }

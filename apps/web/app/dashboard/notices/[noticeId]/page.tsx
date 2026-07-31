@@ -8,10 +8,12 @@ import {
   type NoticeUnreadRecipientsResult,
 } from "@/lib/api";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useRecentlyViewed } from "@/lib/hooks/use-recently-viewed";
-import { PageHeader } from "@/components/ui/page-header";
+import { Button } from "@/components/ui/button";
+import { ModuleHeader } from "@/components/ui/module-header";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ProtectedFileButton } from "@/components/ui/protected-file";
 import { useNoticeCapabilities } from "@/lib/permissions-ui";
@@ -35,6 +37,7 @@ type NoticeLifecycleAction = "cancel" | "archive" | "restore";
 
 export default function NoticeDetailPage() {
   const params = useParams<{ noticeId: string }>();
+  const router = useRouter();
   const noticeId = params.noticeId;
   const queryClient = useQueryClient();
   const noticeCaps = useNoticeCapabilities();
@@ -200,74 +203,91 @@ export default function NoticeDetailPage() {
     ["DRAFT", "APPROVED", "SCHEDULED"].includes(notice.lifecycleStatus) &&
     ((notice.priority !== "NORMAL" && isDraft) || canPublish || canSchedule);
 
+  const lifecycleStatus =
+    notice.lifecycleStatus ||
+    (notice.publishedAt
+      ? "PUBLISHED"
+      : notice.scheduledFor
+        ? "SCHEDULED"
+        : "DRAFT");
+
   return (
     <NoticePageShell>
-      <PageHeader
+      <ModuleHeader
+        eyebrow="Notices"
         title={notice.title}
         description={getAudienceSummary(notice)}
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
+        metadata={
+          <>
+            <PriorityBadge priority={notice.priority} />
+            <span className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold text-gray-600">
+              {formatEnumLabel(notice.audienceType)} audience
+            </span>
+            <span data-testid="notice-lifecycle-badge">
+              <StatusBadge
+                status={lifecycleStatus}
+                label={resolveNoticeState(notice)}
+              />
+            </span>
+          </>
+        }
+        primaryAction={
+          canReview ? (
+            <Button
+              type="button"
+              onClick={() =>
+                router.push(`/dashboard/notices/${noticeId}/review`)
+              }
+            >
+              <Send size={16} />
+              {isDraft ? "Preview & publish" : "Review & publish"}
+            </Button>
+          ) : undefined
+        }
+        secondaryActions={
+          <>
             <BackLink className="mt-0" />
             {canEdit ? (
-              <Link
-                href={`/dashboard/notices/${noticeId}/edit`}
-                className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  router.push(`/dashboard/notices/${noticeId}/edit`)
+                }
               >
                 <Pencil size={16} /> Edit draft
-              </Link>
-            ) : null}
-            {canReview ? (
-              <Link
-                href={`/dashboard/notices/${noticeId}/review`}
-                className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
-              >
-                <Send size={16} />
-                {isDraft ? "Preview & publish" : "Review & publish"}
-              </Link>
+              </Button>
             ) : null}
             {canCancel ? (
-              <button
+              <Button
                 type="button"
+                variant="destructive"
                 onClick={() => setPendingAction("cancel")}
-                className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-danger-200 px-3 py-2 text-sm font-semibold text-danger-700 hover:bg-danger-50"
               >
                 <XCircle size={16} /> Cancel
-              </button>
+              </Button>
             ) : null}
             {canArchive ? (
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => setPendingAction("archive")}
-                className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
               >
                 <Archive size={16} /> Archive
-              </button>
+              </Button>
             ) : null}
             {canRestore ? (
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => setPendingAction("restore")}
-                className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
               >
                 <RotateCcw size={16} /> Restore
-              </button>
+              </Button>
             ) : null}
-          </div>
+          </>
         }
       />
-
-      <div className="flex flex-wrap items-center gap-2">
-        <PriorityBadge priority={notice.priority} />
-        <span className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold text-gray-600">
-          {formatEnumLabel(notice.audienceType)} audience
-        </span>
-        <span
-          data-testid="notice-lifecycle-badge"
-          className="rounded-full border border-info-100 bg-info-50 px-3 py-1 text-xs font-semibold text-info-700"
-        >
-          {resolveNoticeState(notice)}
-        </span>
-      </div>
 
       {lifecycleMutation.isError ? (
         <div className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700">
@@ -464,18 +484,18 @@ function BackLink({
   light?: boolean;
   className?: string;
 }) {
+  const router = useRouter();
+
   return (
-    <Link
-      href="/dashboard/notices"
-      className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
-        light
-          ? "bg-white/10 text-white hover:bg-white/15"
-          : "mt-6 bg-gray-100 text-gray-700 hover:bg-gray-200"
-      } ${className}`}
+    <Button
+      type="button"
+      variant={light ? "ghost" : "secondary"}
+      className={`${light ? "" : "mt-6"} ${className}`}
+      onClick={() => router.push("/dashboard/notices")}
     >
       <ArrowLeft size={16} />
       Back to notices
-    </Link>
+    </Button>
   );
 }
 
