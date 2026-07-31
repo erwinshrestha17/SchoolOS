@@ -1505,6 +1505,133 @@ describe('ActivityFeedService', () => {
       ).rejects.toThrow('Student is outside your teaching scope');
     });
 
+    it('returns an empty parent milestone list without relation fan-out', async () => {
+      const parentActor: AuthContext = {
+        ...actor,
+        userId: 'parent-1',
+        roles: ['parent'],
+      };
+      prisma.guardian.findFirst.mockResolvedValue({
+        id: 'guardian-1',
+        studentLinks: [
+          {
+            studentId: 'student-1',
+            capabilities: ['ACADEMICS_VIEW'],
+          },
+        ],
+      });
+      prisma.developmentalMilestone.findMany.mockResolvedValue([]);
+
+      await expect(service.listMilestones(parentActor, {})).resolves.toEqual([]);
+
+      expect(prisma.class.findMany).not.toHaveBeenCalled();
+      expect(prisma.section.findMany).not.toHaveBeenCalled();
+      expect(prisma.student.findMany).not.toHaveBeenCalled();
+    });
+
+    it('scopes parent milestones to linked children and batches relation lookups', async () => {
+      const parentActor: AuthContext = {
+        ...actor,
+        userId: 'parent-1',
+        roles: ['parent'],
+      };
+      prisma.guardian.findFirst.mockResolvedValue({
+        id: 'guardian-1',
+        studentLinks: [
+          {
+            studentId: 'student-1',
+            capabilities: ['ACADEMICS_VIEW'],
+          },
+          {
+            studentId: 'student-2',
+            capabilities: ['ACADEMICS_VIEW'],
+          },
+        ],
+      });
+      prisma.developmentalMilestone.findMany.mockResolvedValue([
+        {
+          id: 'milestone-1',
+          tenantId: 'tenant-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          studentId: 'student-1',
+          domain: 'Motor',
+          milestone: 'Uses classroom materials independently',
+          status: DevelopmentalMilestoneStatus.PROGRESSING,
+          observationNote: 'Needs occasional prompting.',
+          photoObjectKey: null,
+          photoUrl: null,
+          observedAt: new Date('2026-06-01T00:00:00.000Z'),
+          createdById: 'teacher-1',
+          clientSubmissionId: null,
+          createdAt: new Date('2026-06-01T00:00:00.000Z'),
+          updatedAt: new Date('2026-06-01T00:00:00.000Z'),
+        },
+      ]);
+      prisma.class.findMany.mockResolvedValue([
+        { id: 'class-1', tenantId: 'tenant-1', name: 'Grade 4' },
+      ]);
+      prisma.section.findMany.mockResolvedValue([
+        { id: 'section-1', tenantId: 'tenant-1', name: 'A', classId: 'class-1' },
+      ]);
+      prisma.student.findMany.mockResolvedValue([
+        {
+          id: 'student-1',
+          tenantId: 'tenant-1',
+          firstNameEn: 'Asha',
+          lastNameEn: 'Rai',
+        },
+      ]);
+
+      const result = await service.listMilestones(parentActor, {
+        studentId: 'student-1',
+      });
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual(
+        expect.objectContaining({
+          id: 'milestone-1',
+          domain: 'Motor',
+          class: expect.objectContaining({ id: 'class-1' }),
+          section: expect.objectContaining({ id: 'section-1' }),
+          student: expect.objectContaining({ id: 'student-1' }),
+        }),
+      );
+      expect(prisma.developmentalMilestone.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            tenantId: actor.tenantId,
+            studentId: { in: ['student-1'] },
+          }),
+        }),
+      );
+      expect(prisma.class.findMany).toHaveBeenCalledWith({
+        where: { tenantId: actor.tenantId, id: { in: ['class-1'] } },
+      });
+    });
+
+    it('blocks a parent requesting milestones for an unlinked child', async () => {
+      const parentActor: AuthContext = {
+        ...actor,
+        userId: 'parent-1',
+        roles: ['parent'],
+      };
+      prisma.guardian.findFirst.mockResolvedValue({
+        id: 'guardian-1',
+        studentLinks: [
+          {
+            studentId: 'student-1',
+            capabilities: ['ACADEMICS_VIEW'],
+          },
+        ],
+      });
+
+      await expect(
+        service.listMilestones(parentActor, { studentId: 'student-9' }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prisma.developmentalMilestone.findMany).not.toHaveBeenCalled();
+    });
+
     it('scopes listPosts to the teacher own assigned class/section', async () => {
       prisma.activityPost.findMany.mockResolvedValue([]);
 

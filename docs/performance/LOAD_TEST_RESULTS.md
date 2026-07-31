@@ -267,6 +267,285 @@ apps/api/src/mobile/mobile.service.spec.ts                 fixtures + 1 assertio
 
 ---
 
+## Run 6 — Parent dashboard transport summary (bounded slice)
+
+Same host, same `perf-school` dataset, same concurrency, duration and k6 script
+as Run 5. Only the transport query model changed.
+
+### The finding
+
+`getStudentTransport` issued **12 SQL statements for a child with no transport
+records at all**. Prisma resolves every `include`d relation as its own
+round-trip *even when the root row is null*, so all three root queries returned
+nothing and Prisma still issued nine relation queries:
+
+```text
+1 TransportEnrollment          (null)   7 TransportStop      ← enrollment include
+2 TransportTripStudentStatus   (null)   8 TransportTrip      ← status include
+3 TransportStudentAssignment   (null)   9 TransportStop      ← status include
+4 TransportRoute ← assignment include  10 TransportRoute     ← trip include
+5 TransportStop  ← assignment include  11 TransportLocationPing ← trip include
+6 TransportRoute ← enrollment include  12 TransportVehicle   ← trip include
+```
+
+Most children are not transported, so this was the common case, not an edge
+case.
+
+### Results
+
+| Metric | Before | After | Target | Status |
+| --- | ---: | ---: | ---: | --- |
+| Transport SQL statements | 12 | **3** | ≤ 3 | **met** |
+| Total dashboard statements | 85 | **74** | ≤ 70 | **missed** |
+| Throughput (c=50) | 74 rps | **77 rps** | ≥ 82 rps | **missed** |
+| p50 (c=50) | 655 ms | **632 ms** | — | −3.5% |
+| p97.5 (c=50) | 717 ms | **721 ms** | — | flat |
+| p99 (c=50) | 773 ms | **766 ms** | — | −0.9% |
+| **`parent/bootstrap` p95 @ c=100** | 507 ms | **454 ms** | < 600 ms | **met** |
+| HTTP 5xx | 0 | **0** | 0 | met |
+| Response body | — | **byte-identical** | unchanged | met |
+| DB connections | ~10 pool ceiling | ~10 pool ceiling | no material regression | met |
+
+> The "before" total of 85 was re-measured in this session; the figure carried
+> from Run 5 was 83. The dataset grew slightly because earlier k6 runs write
+> attendance rows. Both numbers are from the same tenant, and the 9-statement
+> transport reduction is unaffected.
+
+### Measurement caveats — read before quoting
+
+1. **The measured 3 transport statements reflect a dataset with no transport
+   rows.** `perf-school` seeds no routes, stops, vehicles or trips. Three
+   statements is the *empty* path — which is the common production case, but it
+   is not the populated path. With a fully transported child the new model costs
+   **8** statements (3 root + trip + routes + stops + vehicle + latest ping)
+   versus 12 before. The populated path is covered by unit tests, not by this
+   load measurement.
+
+2. **The API CPU comparison in this run is not sound and no claim is made.**
+   `ps %cpu` on macOS reports a lifetime average that decays with process
+   uptime; repeated sampling under identical load drifted 85.6% → 65.0% within
+   15 seconds (mean 75.4%). The single 49.6% "before" sample is not comparable
+   to it. Throughput and latency are the reliable signals here.
+
+3. **Single-instant `pg_stat_activity` active/idle splits are noisy.** Sampling
+   five times under sustained load gave 5/8, 0/10, 1/9, 7/3 and 10/6. Total
+   connections stayed at the ~10 Prisma pool ceiling before and after, with zero
+   pool errors — that is the meaningful comparison.
+
+### Queries removed / batched
+
+| Change | Effect |
+| --- | --- |
+| `include` replaced by scalar + FK `select` on the three root queries | relations no longer resolved for rows that do not exist |
+| `TransportRoute` fetched per referencing row (3×) | one batched `findMany({ id: { in } })` |
+| `TransportStop` fetched per referencing row (3×) | one batched `findMany({ id: { in } })` |
+| trip, vehicle and latest ping loaded unconditionally | loaded only when an active trip exists |
+| `locationPings` include with `take: 1` | `findFirst` ordered by `recordedAt desc` — never GPS history |
+
+Batched id lists are deduplicated and sorted, so the generated `IN (...)` list
+and its query plan are stable across requests.
+
+### Security predicates preserved
+
+- every query still filters `tenantId: actor.tenantId`, including the new
+  batched lookups — a route, stop, vehicle or trip belonging to another tenant
+  resolves to `null` rather than being returned;
+- authorization is unchanged: `assertStudentAccess(..., EMERGENCY_ALERT_RECEIVE)`
+  still runs first, so an unauthorized or unrelated child never reaches a
+  transport query;
+- root rows still filter `status: 'ACTIVE'` and `trip: { status: 'ACTIVE' }`;
+- no driver identity, driver assignment, trip notes, route history, vehicle
+  history or GPS history is selected;
+- `activeTrip` is now emitted only when the trip row itself resolves. The old
+  code dereferenced `activeStatus.trip` unconditionally, which was safe only
+  because the include always materialised it.
+
+### Files changed
+
+```text
+apps/api/src/mobile/mobile.service.ts        getStudentTransport + uniqueIds helper
+apps/api/src/mobile/mobile.service.spec.ts   transport fixtures + 16 new tests
+```
+
+**Public API changes: none.** Response verified byte-identical.
+
+### Verification
+
+| Command | Purpose | Result |
+| --- | --- | --- |
+| `pnpm --filter @schoolos/api typecheck` | types | pass |
+| `pnpm --filter @schoolos/api test` | unit | 2,364 / 2,365 pass |
+| `npx jest src/mobile` | mobile + transport | 146 / 146 pass |
+| `pnpm --filter @schoolos/api test:e2e` | e2e | 275 / 283 pass |
+| `pnpm db:validate` | Prisma schema | pass |
+| `pnpm verify:openapi` | OpenAPI gate | pass |
+| `prettier --check` (changed files) | lint | pass |
+| `k6 run -e SCENARIO=C -e VU_SCALE=0.2 -e DURATION=3m` | load | bootstrap p95 454 ms, 0 failures |
+
+Failures are the same pre-existing ones confirmed by stashing in Run 5:
+`service-requests.service.spec.ts` (1 unit) and `app` / `auth-security-hardening`
+/ `platform` e2e (8 tests). Unit count rose 2,349 → 2,365; all 16 additions pass.
+
+### Unresolved transport bottleneck
+
+The populated path still costs 8 statements. Collapsing it further needs either
+Prisma's `relationLoadStrategy: 'join'` — still behind the `relationJoins`
+**preview** flag in Prisma 7.8, and a generator-wide change affecting all 1,345
+routes, so deliberately not enabled for one endpoint — or hand-written SQL,
+which would bypass the tenant-scope client extension. Both are decisions to take
+deliberately, not inside a bounded slice.
+
+---
+
+## Run 7 — Parent dashboard activity + milestone summary (bounded slice)
+
+Same host, same `perf-school` dataset (now with representative M5 activity,
+milestones, consent, and measurement fixture parents), same 1-replica staging
+API. Only the activity query model and milestone relation loading changed.
+
+### Dataset validation (before optimization work)
+
+The performance tenant previously contained **zero** activity/milestone rows.
+This slice extended [`seed-performance-tenant.ts`](../../apps/api/prisma/seed-performance-tenant.ts)
+with:
+
+- 43 approved activity posts, 36 attachments, 19 student tags, 3,000 milestones,
+  15,000 guardian consents (PHOTO_USAGE mixed grant/deny);
+- fixture parents: `parent-perf-empty@`, `parent-perf-one@`, `parent-perf-multi@`
+  (isolated tenant only);
+- `pnpm --filter @schoolos/api perf:verify` row-count gate.
+
+> **Note:** Re-seed with `PERF_RESET=1` (or delete activity rows for the perf
+> tenant only) after pulling this change so fixture parents pick up the revised
+> seed that removes school-wide `ALL` posts from the empty-path section. The
+> first seed on an existing tenant skipped bulk activity recreation because posts
+> were already present from an intermediate run.
+
+### Before (carried from Run 6 — pre-activity-optimization code)
+
+Run 6 measured the dashboard **before** this slice, against an **empty** activity
+table. Those numbers remain the honest “before” baseline for throughput:
+
+| Metric | Run 6 before |
+| --- | ---: |
+| Activity SQL (dashboard bucket) | ~8 |
+| Total dashboard SQL | ~74 (re-measured 85→74 transport slice) |
+| Throughput at c=50 | ~77 rps |
+| p50 at c=50 | ~632 ms |
+| p97.5 at c=50 | ~721 ms |
+| Bootstrap p95 at c=100 | ~454 ms |
+
+### Activity query model — after (isolated path counts)
+
+Measured with `pnpm --filter @schoolos/api perf:measure-activity-sql` against
+the optimized `getStudentActivityFeed` shape (root select → early return → batched
+attachments/reactions):
+
+| Path | Activity SQL | Notes |
+| --- | ---: | --- |
+| Empty (no matching post) | **1** | root `ActivityPost` only |
+| Populated (latest preview) | **3** | root + `ActivityAttachment` + `ActivityReaction` |
+
+Unit tests in `describe('parent activity summary')` enforce the same short-circuit
+and batching contracts.
+
+**Removed:** Prisma `include` fan-out on `activityPost.findMany` (`attachments`,
+`reactions`, `_count.attachments`, `_count.reactions` as separate round-trips).
+
+**Introduced:** phased scalar-root query; batched attachment/reaction `findMany`
+only when `posts.length > 0`; in-memory counts and SEEN derivation.
+
+### Milestone endpoint — after (parent `listMilestones`)
+
+`ActivityFeedService.listMilestones` now loads milestone scalars first, then
+batches `class`, `section`, and `student` with tenant-scoped `findMany({ id: { in } })`
+instead of Prisma `include` fan-out. Empty milestone lists return after one query.
+
+### Dashboard throughput — after (not re-measured)
+
+A full before/after k6/autocannon comparison **could not be completed** in this
+session: after rebuilding the API, `POST /auth/login` returned HTTP 500
+(`PrismaClientKnownRequestError` on `tenant.findUnique`) following a prior
+192k-login k6 attempt against a saturated local pool. Health returned 200.
+
+Expected dashboard SQL reduction: **~5 statements** on populated paths
+(8→3 activity bucket), for an estimated total of **~69** (74−5), pending a clean
+re-run of:
+
+```bash
+pnpm --filter @schoolos/api build
+pnpm staging:api:local
+# obtain token per tests/load/README.md
+PERF_ACCESS_TOKEN=… tests/load/run-ramp.sh /api/v1/mobile/me/dashboard 12 "50"
+k6 run -e SCENARIO=C -e VU_SCALE=0.2 -e DURATION=3m tests/load/k6/scenarios.js
+```
+
+### Results table (partial — throughput pending clean re-run)
+
+| Metric | Before | After | Target | Status |
+| --- | ---: | ---: | ---: | --- |
+| Activity SQL, empty path | ~8 (empty table) | **1** (model) | ≤3 | **met** |
+| Activity SQL, populated path | ~8 | **3** (model) | ≤3 | **met** |
+| Total dashboard SQL | ~74 | ~69 est. | ≤68 | **pending re-measure** |
+| Throughput at c=50 | ~77 rps | not re-run | ≥82 rps | **pending re-measure** |
+| p50 at c=50 | ~632 ms | not re-run | no regression | **pending re-measure** |
+| p95 at c=50 | ~721 ms | not re-run | improve or flat | **pending re-measure** |
+| Bootstrap p95 at c=100 | ~454 ms | not re-run | <600 ms | **pending re-measure** |
+| DB connections | ~10 pool | not re-run | no material regression | **pending re-measure** |
+| HTTP 5xx | 0 | login blocked re-run | 0 | **pending re-measure** |
+| Response contract | unchanged | unit-tested | unchanged | **met** (shape) |
+
+### Security predicates preserved
+
+- every activity/milestone query filters `tenantId`;
+- audience OR unchanged (`ALL` / `STUDENT`+tag / `CLASS` / `SECTION`);
+- `APPROVED`, `parentVisible`, `softDeletedAt: null` unchanged;
+- protected attachment paths only; no storage keys in list responses;
+- parent milestone scope still enforced via `buildActorStudentIdScope` /
+  `getParentStudentIds` with `ACADEMICS_VIEW`;
+- consent enforcement on mobile lists unchanged (download-time via
+  `ActivityMediaService`).
+
+### Files changed
+
+```text
+apps/api/prisma/seed-performance-tenant.ts       activity/milestone/consent/fixtures
+apps/api/prisma/perf-verify.ts                   new row-count gate
+apps/api/prisma/perf-measure-activity-sql.ts     isolated activity SQL counter
+apps/api/package.json                            perf:verify, perf:measure-activity-sql
+apps/api/src/mobile/mobile.service.ts            phased getStudentActivityFeed
+apps/api/src/activity-feed/activity-feed.service.ts   batched listMilestones
+apps/api/src/mobile/mobile.service.spec.ts       parent activity summary tests
+apps/api/src/activity-feed/activity-feed.service.spec.ts   parent milestone tests
+```
+
+**Public API changes: none.**
+
+### Verification
+
+| Command | Result |
+| --- | --- |
+| `pnpm --filter @schoolos/api typecheck` | pass |
+| `pnpm --filter @schoolos/api test -- src/mobile/mobile.service.spec.ts src/activity-feed/activity-feed.service.spec.ts` | 108 / 108 pass |
+| `pnpm db:validate` | pass |
+| `pnpm verify:openapi` | pass |
+| `pnpm --filter @schoolos/api perf:verify` | pass (43 posts, 3000 milestones) |
+| `pnpm --filter @schoolos/api perf:measure-activity-sql` | populated path **3** SQL |
+| k6 / autocannon dashboard | **not run** — login 500 after pool saturation |
+
+### Unresolved activity bottlenecks
+
+- Dashboard throughput still dominated by ~65 non-activity statements (canteen,
+  fees, attendance, homework, notices, auth).
+- Populated-path activity could not be collapsed below 3 without hand-written SQL
+  or Prisma `relationJoins` preview (same transport-slice rationale).
+- Full before/after byte-identical dashboard diff pending clean load harness re-run.
+
+**Activity slice query-model: ready.** End-to-end throughput claim: **not ready**
+until k6/autocannon re-run succeeds.
+
+---
+
 ## Correctness check — attendance idempotency under concurrency
 
 Not a load test, but the correctness property Scenario B is designed to stress.

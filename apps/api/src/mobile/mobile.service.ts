@@ -2060,86 +2060,131 @@ export class MobileService {
     }
     const guardian = { id: guardianLink.guardianId };
     const monthRange = month ? parseMonthRange(month) : null;
-    const items = await this.prisma.activityPost.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        status: 'APPROVED',
-        softDeletedAt: null,
-        parentVisible: true,
-        ...(category ? { category: category as ActivityCategory } : {}),
-        ...(monthRange
-          ? { publishedAt: { gte: monthRange.start, lt: monthRange.end } }
-          : {}),
-        OR: [
-          { audienceType: 'ALL' },
-          { audienceType: 'STUDENT', studentTags: { some: { studentId } } },
-          { audienceType: 'CLASS', classId: student.classId },
-          {
-            audienceType: 'SECTION',
-            classId: student.classId,
-            sectionId: student.sectionId,
-          },
-        ],
-      },
-      include: {
-        attachments: {
-          orderBy: { sortOrder: 'asc' },
-          select: {
-            id: true,
-            fileName: true,
-            contentType: true,
-            sizeBytes: true,
-            processingStatus: true,
-            thumbnailFileAssetId: true,
-            optimizedObjectKey: true,
-          },
+    const tenantId = actor.tenantId;
+    const audienceWhere = {
+      tenantId,
+      status: 'APPROVED' as const,
+      softDeletedAt: null,
+      parentVisible: true,
+      ...(category ? { category: category as ActivityCategory } : {}),
+      ...(monthRange
+        ? { publishedAt: { gte: monthRange.start, lt: monthRange.end } }
+        : {}),
+      OR: [
+        { audienceType: 'ALL' as const },
+        { audienceType: 'STUDENT' as const, studentTags: { some: { studentId } } },
+        { audienceType: 'CLASS' as const, classId: student.classId },
+        {
+          audienceType: 'SECTION' as const,
+          classId: student.classId,
+          sectionId: student.sectionId,
         },
-        reactions: {
-          where: {
-            guardianId: guardian.id,
-            reaction: 'SEEN',
-          },
-          select: { createdAt: true },
-          take: 1,
-        },
-        _count: {
-          select: {
-            attachments: true,
-            reactions: true,
-          },
-        },
+      ],
+    };
+
+    // Phase 1 — root posts only. Prisma resolves every `include` as its own
+    // round-trip even when no rows match; the previous version cost ~8
+    // statements for a single dashboard preview post.
+    const posts = await this.prisma.activityPost.findMany({
+      where: audienceWhere,
+      select: {
+        id: true,
+        title: true,
+        caption: true,
+        category: true,
+        publishedAt: true,
+        createdAt: true,
       },
       orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
       take: boundedTake(take, 20),
     });
 
+    if (posts.length === 0) {
+      return { items: [] };
+    }
+
+    const postIds = posts.map((post) => post.id);
+
+    // Phase 2 — batched attachment and reaction lookups for the bounded
+    // result set only. Counts are derived in memory instead of `_count`
+    // aggregates that each cost an extra round-trip.
+    const [attachments, reactions] = await Promise.all([
+      this.prisma.activityAttachment.findMany({
+        where: { tenantId, activityPostId: { in: postIds } },
+        select: {
+          id: true,
+          activityPostId: true,
+          fileName: true,
+          contentType: true,
+          sizeBytes: true,
+          processingStatus: true,
+          thumbnailFileAssetId: true,
+          optimizedObjectKey: true,
+          sortOrder: true,
+        },
+        orderBy: [{ sortOrder: 'asc' }],
+      }),
+      this.prisma.activityReaction.findMany({
+        where: { tenantId, activityPostId: { in: postIds } },
+        select: {
+          activityPostId: true,
+          guardianId: true,
+          reaction: true,
+          createdAt: true,
+        },
+      }),
+    ]);
+
+    const attachmentsByPost = new Map<string, typeof attachments>();
+    for (const attachment of attachments) {
+      const list = attachmentsByPost.get(attachment.activityPostId) ?? [];
+      list.push(attachment);
+      attachmentsByPost.set(attachment.activityPostId, list);
+    }
+
+    const reactionsByPost = new Map<string, typeof reactions>();
+    for (const reaction of reactions) {
+      const list = reactionsByPost.get(reaction.activityPostId) ?? [];
+      list.push(reaction);
+      reactionsByPost.set(reaction.activityPostId, list);
+    }
+
     return {
-      items: items.map((item) => ({
-        id: item.id,
-        title: item.title,
-        caption: item.caption,
-        category: item.category,
-        publishedAt: toIso(item.publishedAt ?? item.createdAt),
-        seenAt: toIso(item.reactions[0]?.createdAt ?? null),
-        attachmentCount: item._count.attachments,
-        reactionCount: item._count.reactions,
-        attachments: item.attachments.map((attachment) => ({
-          id: attachment.id,
-          fileName: attachment.fileName,
-          contentType: attachment.contentType,
-          sizeBytes: attachment.sizeBytes,
-          processingStatus: attachment.processingStatus,
-          thumbnailPath:
-            attachment.thumbnailFileAssetId || attachment.optimizedObjectKey
-              ? `/activity-feed/attachments/${encodeURIComponent(
-                  attachment.id,
-                )}/thumbnail`
-              : null,
-          previewPath: `/activity-feed/attachments/${encodeURIComponent(
-            attachment.id,
-          )}/preview`,
-        })),
-      })),
+      items: posts.map((post) => {
+        const postAttachments = attachmentsByPost.get(post.id) ?? [];
+        const postReactions = reactionsByPost.get(post.id) ?? [];
+        const seenReaction = postReactions.find(
+          (reaction) =>
+            reaction.guardianId === guardian.id && reaction.reaction === 'SEEN',
+        );
+
+        return {
+          id: post.id,
+          title: post.title,
+          caption: post.caption,
+          category: post.category,
+          publishedAt: toIso(post.publishedAt ?? post.createdAt),
+          seenAt: toIso(seenReaction?.createdAt ?? null),
+          attachmentCount: postAttachments.length,
+          reactionCount: postReactions.length,
+          attachments: postAttachments.map((attachment) => ({
+            id: attachment.id,
+            fileName: attachment.fileName,
+            contentType: attachment.contentType,
+            sizeBytes: attachment.sizeBytes,
+            processingStatus: attachment.processingStatus,
+            thumbnailPath:
+              attachment.thumbnailFileAssetId || attachment.optimizedObjectKey
+                ? `/activity-feed/attachments/${encodeURIComponent(
+                    attachment.id,
+                  )}/thumbnail`
+                : null,
+            previewPath: `/activity-feed/attachments/${encodeURIComponent(
+              attachment.id,
+            )}/preview`,
+          })),
+        };
+      }),
     };
   }
 
@@ -2647,61 +2692,143 @@ export class MobileService {
       actor,
       GuardianCapability.EMERGENCY_ALERT_RECEIVE,
     );
+    const tenantId = actor.tenantId;
+
+    // Phase 1 — the three independent root rows, in parallel.
+    //
+    // These deliberately select scalars and foreign keys only, with no
+    // `include`. Prisma issues every included relation as its own round-trip
+    // *even when the root row is null*: measured against a child with no
+    // transport at all, the previous `include`-based version cost 12
+    // statements, 9 of which resolved relations of rows that did not exist.
+    // Most children are not transported, so that was the common case.
+    //
+    // The `trip: { status: 'ACTIVE' }` filter stays a relation *filter*, not an
+    // include, so it remains part of this single statement.
     const [assignment, enrollment, activeStatus] = await Promise.all([
       this.prisma.transportStudentAssignment.findFirst({
-        where: { tenantId: actor.tenantId, studentId, status: 'ACTIVE' },
-        include: {
-          route: { select: { id: true, name: true, code: true } },
-          stop: { select: { id: true, name: true, sequence: true } },
+        where: { tenantId, studentId, status: 'ACTIVE' },
+        select: {
+          id: true,
+          routeId: true,
+          stopId: true,
+          pickupDirection: true,
+          status: true,
         },
         orderBy: [{ createdAt: 'desc' }],
       }),
       this.prisma.transportEnrollment.findFirst({
-        where: { tenantId: actor.tenantId, studentId, status: 'ACTIVE' },
-        include: {
-          route: { select: { id: true, name: true, code: true } },
-          stop: { select: { id: true, name: true, sequence: true } },
+        where: { tenantId, studentId, status: 'ACTIVE' },
+        select: {
+          id: true,
+          routeId: true,
+          stopId: true,
+          feeAmount: true,
+          status: true,
         },
         orderBy: [{ createdAt: 'desc' }],
       }),
       this.prisma.transportTripStudentStatus.findFirst({
         where: {
-          tenantId: actor.tenantId,
+          tenantId,
           studentId,
           trip: {
             status: 'ACTIVE',
           },
         },
-        include: {
-          trip: {
-            include: {
-              route: { select: { id: true, name: true, code: true } },
-              vehicle: {
-                select: {
-                  id: true,
-                  registrationNumber: true,
-                  model: true,
-                  capacity: true,
-                },
-              },
-              locationPings: {
-                orderBy: [{ recordedAt: 'desc' }],
-                take: 1,
-              },
-            },
-          },
-          stop: { select: { id: true, name: true, sequence: true } },
-        },
+        select: { id: true, tripId: true, stopId: true, status: true },
         orderBy: [{ updatedAt: 'desc' }],
       }),
     ]);
+
+    // Phase 2 — the active trip, only when the student is actually on one.
+    const trip = activeStatus
+      ? await this.prisma.transportTrip.findFirst({
+          where: { tenantId, id: activeStatus.tripId },
+          select: {
+            id: true,
+            routeId: true,
+            vehicleId: true,
+            direction: true,
+            status: true,
+            isDelayed: true,
+            delayMinutes: true,
+            delayReason: true,
+          },
+        })
+      : null;
+
+    // Phase 3 — batched reference lookups.
+    //
+    // Route and stop were each fetched three times (once per root row). They
+    // are now resolved with one set-based query apiece over the ids actually
+    // referenced. Every lookup stays tenant-scoped, so a reference pointing at
+    // another tenant's route, stop, or vehicle resolves to null rather than
+    // being returned.
+    const routeIds = uniqueIds([
+      assignment?.routeId,
+      enrollment?.routeId,
+      trip?.routeId,
+    ]);
+    const stopIds = uniqueIds([
+      assignment?.stopId,
+      enrollment?.stopId,
+      activeStatus?.stopId,
+    ]);
+
+    const [routes, stops, vehicle, latestPing] = await Promise.all([
+      routeIds.length
+        ? this.prisma.transportRoute.findMany({
+            where: { tenantId, id: { in: routeIds } },
+            select: { id: true, name: true, code: true },
+          })
+        : Promise.resolve([]),
+      stopIds.length
+        ? this.prisma.transportStop.findMany({
+            where: { tenantId, id: { in: stopIds } },
+            select: { id: true, name: true, sequence: true },
+          })
+        : Promise.resolve([]),
+      trip
+        ? this.prisma.transportVehicle.findFirst({
+            where: { tenantId, id: trip.vehicleId },
+            select: {
+              id: true,
+              registrationNumber: true,
+              model: true,
+              capacity: true,
+            },
+          })
+        : Promise.resolve(null),
+      trip
+        ? // Only the latest verified position is needed; raw GPS history is
+          // never loaded.
+          this.prisma.transportLocationPing.findFirst({
+            where: { tenantId, tripId: trip.id },
+            select: {
+              latitude: true,
+              longitude: true,
+              speedKph: true,
+              recordedAt: true,
+            },
+            orderBy: [{ recordedAt: 'desc' }],
+          })
+        : Promise.resolve(null),
+    ]);
+
+    const routeById = new Map(
+      routes.map((route) => [route.id, route] as const),
+    );
+    const stopById = new Map(stops.map((stop) => [stop.id, stop] as const));
+    const routeFor = (id?: string) => (id ? (routeById.get(id) ?? null) : null);
+    const stopFor = (id?: string) => (id ? (stopById.get(id) ?? null) : null);
 
     return {
       assignment: assignment
         ? {
             id: assignment.id,
-            route: assignment.route,
-            stop: assignment.stop,
+            route: routeFor(assignment.routeId),
+            stop: stopFor(assignment.stopId),
             pickupDirection: assignment.pickupDirection,
             status: assignment.status,
           }
@@ -2709,44 +2836,43 @@ export class MobileService {
       enrollment: enrollment
         ? {
             id: enrollment.id,
-            route: enrollment.route,
-            stop: enrollment.stop,
+            route: routeFor(enrollment.routeId),
+            stop: stopFor(enrollment.stopId),
             feeAmount: money(enrollment.feeAmount),
             status: enrollment.status,
           }
         : null,
-      activeTrip: activeStatus
-        ? {
-            id: activeStatus.trip.id,
-            route: activeStatus.trip.route,
-            vehicle: activeStatus.trip.vehicle,
-            direction: activeStatus.trip.direction,
-            status: activeStatus.trip.status,
-            studentStatus: activeStatus.status,
-            stop: activeStatus.stop,
-            isDelayed: activeStatus.trip.isDelayed,
-            delayMinutes: activeStatus.trip.delayMinutes,
-            delayReason: activeStatus.trip.delayReason,
-            latestLocation: activeStatus.trip.locationPings[0]
-              ? {
-                  latitude: money(activeStatus.trip.locationPings[0].latitude),
-                  longitude: money(
-                    activeStatus.trip.locationPings[0].longitude,
-                  ),
-                  speedKph:
-                    activeStatus.trip.locationPings[0].speedKph === null
-                      ? null
-                      : money(activeStatus.trip.locationPings[0].speedKph),
-                  recordedAt: toIso(
-                    activeStatus.trip.locationPings[0].recordedAt,
-                  ),
-                  ...transportLocationFreshness(
-                    activeStatus.trip.locationPings[0].recordedAt,
-                  ),
-                }
-              : null,
-          }
-        : null,
+      // `activeTrip` is emitted only when the trip row itself resolved. The
+      // previous shape dereferenced `activeStatus.trip` unconditionally, which
+      // was safe only because the include always materialised it; resolving the
+      // trip separately makes the null case explicit rather than a crash.
+      activeTrip:
+        activeStatus && trip
+          ? {
+              id: trip.id,
+              route: routeFor(trip.routeId),
+              vehicle,
+              direction: trip.direction,
+              status: trip.status,
+              studentStatus: activeStatus.status,
+              stop: stopFor(activeStatus.stopId),
+              isDelayed: trip.isDelayed,
+              delayMinutes: trip.delayMinutes,
+              delayReason: trip.delayReason,
+              latestLocation: latestPing
+                ? {
+                    latitude: money(latestPing.latitude),
+                    longitude: money(latestPing.longitude),
+                    speedKph:
+                      latestPing.speedKph === null
+                        ? null
+                        : money(latestPing.speedKph),
+                    recordedAt: toIso(latestPing.recordedAt),
+                    ...transportLocationFreshness(latestPing.recordedAt),
+                  }
+                : null,
+            }
+          : null,
     };
   }
 
@@ -2961,6 +3087,15 @@ export class MobileService {
     // fan-out) and `assertStudentAccess` resolved it again per sub-service.
     return this.parentScope.allowedStudentIds(actor, capability);
   }
+}
+
+/**
+ * Collapse a set of optional foreign keys into a deduplicated id list for a
+ * batched `findMany`. Sorted so the generated `IN (...)` list — and therefore
+ * the query plan and any query-log diff — is stable across requests.
+ */
+function uniqueIds(ids: Array<string | undefined | null>): string[] {
+  return [...new Set(ids.filter((id): id is string => Boolean(id)))].sort();
 }
 
 function transportLocationFreshness(recordedAt: Date) {

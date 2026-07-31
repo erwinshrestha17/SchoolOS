@@ -1714,7 +1714,7 @@ export class ActivityFeedService {
       }
     }
 
-    return this.prisma.developmentalMilestone.findMany({
+    const milestones = await this.prisma.developmentalMilestone.findMany({
       where: {
         tenantId: actor.tenantId,
         ...(studentScope
@@ -1732,14 +1732,53 @@ export class ActivityFeedService {
             }
           : {}),
       },
-      include: {
-        class: true,
-        section: true,
-        student: true,
-      },
       orderBy: [{ observedAt: 'desc' }, { createdAt: 'desc' }],
       take: 100,
     });
+
+    if (milestones.length === 0) {
+      return [];
+    }
+
+    const tenantId = actor.tenantId;
+    const classIds = uniqueIds(milestones.map((milestone) => milestone.classId));
+    const sectionIds = uniqueIds(
+      milestones.map((milestone) => milestone.sectionId),
+    );
+    const studentIds = uniqueIds(
+      milestones.map((milestone) => milestone.studentId),
+    );
+
+    const [classes, sections, students] = await Promise.all([
+      classIds.length
+        ? this.prisma.class.findMany({
+            where: { tenantId, id: { in: classIds } },
+          })
+        : Promise.resolve([]),
+      sectionIds.length
+        ? this.prisma.section.findMany({
+            where: { tenantId, id: { in: sectionIds } },
+          })
+        : Promise.resolve([]),
+      studentIds.length
+        ? this.prisma.student.findMany({
+            where: { tenantId, id: { in: studentIds } },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const classById = new Map(classes.map((row) => [row.id, row] as const));
+    const sectionById = new Map(sections.map((row) => [row.id, row] as const));
+    const studentById = new Map(students.map((row) => [row.id, row] as const));
+
+    return milestones.map((milestone) => ({
+      ...milestone,
+      class: classById.get(milestone.classId)!,
+      section: milestone.sectionId
+        ? (sectionById.get(milestone.sectionId) ?? null)
+        : null,
+      student: studentById.get(milestone.studentId)!,
+    }));
   }
 
   async createMilestone(
@@ -2622,4 +2661,8 @@ function hasAllowedImageSignature(buffer: Buffer, contentType: string) {
   }
 
   return false;
+}
+
+function uniqueIds(ids: Array<string | undefined | null>): string[] {
+  return [...new Set(ids.filter((id): id is string => Boolean(id)))].sort();
 }

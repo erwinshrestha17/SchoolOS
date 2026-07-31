@@ -22,9 +22,15 @@
  *   PERF_RESET=1 pnpm db:seed:performance                                # purge bulk data first
  */
 import {
+  ActivityCategory,
+  ActivityPostStatus,
+  ActivityReactionType,
   AttendanceStatus,
+  AudienceType,
   AuthMethod,
+  ConsentType,
   ContractType,
+  DevelopmentalMilestoneStatus,
   Gender,
   GuardianCapability,
   GuardianRelationshipApprovalStatus,
@@ -36,6 +42,7 @@ import {
   Prisma,
   PrismaClient,
   StaffStatus,
+  StorageProvider,
   TeacherAssignmentType,
   TenantSubscriptionStatus,
   UserStatus,
@@ -71,6 +78,17 @@ const ATTENDANCE_DAYS = num('PERF_ATTENDANCE_DAYS', 220);
 const NOTICES = num('PERF_NOTICES', 60);
 const HOMEWORK_PER_SECTION = num('PERF_HOMEWORK_PER_SECTION', 40);
 const NOTIFICATIONS_PER_PARENT = num('PERF_NOTIFICATIONS_PER_PARENT', 12);
+const ACTIVITY_POSTS = num('PERF_ACTIVITY_POSTS', 120);
+const ACTIVITY_POSTS_PER_SECTION = num('PERF_ACTIVITY_POSTS_PER_SECTION', 3);
+const MILESTONES_PER_STUDENT = num('PERF_MILESTONES_PER_STUDENT', 2);
+const ACTIVITY_TAGGED_RATIO = ratio('PERF_ACTIVITY_TAGGED_RATIO', 0.15);
+const CONSENT_DENIED_RATIO = ratio('PERF_CONSENT_DENIED_RATIO', 0.05);
+
+const FIXTURE_PARENT_EMAILS = {
+  empty: `parent-perf-empty@${SLUG}.test`,
+  one: `parent-perf-one@${SLUG}.test`,
+  multi: `parent-perf-multi@${SLUG}.test`,
+} as const;
 
 /**
  * Shared load-test password. This dataset is deliberately synthetic and lives
@@ -96,6 +114,16 @@ function num(key: string, fallback: number) {
   const parsed = Number.parseInt(raw, 10);
   if (!Number.isFinite(parsed) || parsed < 0) {
     throw new Error(`${key} must be a non-negative integer, got "${raw}"`);
+  }
+  return parsed;
+}
+
+function ratio(key: string, fallback: number) {
+  const raw = process.env[key];
+  if (!raw) return fallback;
+  const parsed = Number.parseFloat(raw);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
+    throw new Error(`${key} must be a number between 0 and 1, got "${raw}"`);
   }
   return parsed;
 }
@@ -396,6 +424,12 @@ async function purgeBulkData(tenantId: string) {
   console.log('Purging existing bulk data for this tenant...');
   // Ordered by FK dependency. Only the perf tenant is touched.
   await prisma.notificationDelivery.deleteMany({ where: { tenantId } });
+  await prisma.activityReaction.deleteMany({ where: { tenantId } });
+  await prisma.activityAttachment.deleteMany({ where: { tenantId } });
+  await prisma.activityPostStudent.deleteMany({ where: { tenantId } });
+  await prisma.activityPost.deleteMany({ where: { tenantId } });
+  await prisma.developmentalMilestone.deleteMany({ where: { tenantId } });
+  await prisma.guardianConsent.deleteMany({ where: { tenantId } });
   await prisma.attendanceRecord.deleteMany({ where: { tenantId } });
   await prisma.attendanceSession.deleteMany({ where: { tenantId } });
   await prisma.homeworkAssignment.deleteMany({ where: { tenantId } });
@@ -897,6 +931,514 @@ async function seedNotifications(tenantId: string, guardianUserIds: string[]) {
   );
 }
 
+type PerfStudent = {
+  id: string;
+  classId: string;
+  sectionId: string | null;
+};
+
+async function seedGuardianConsents(
+  tenantId: string,
+  guardians: { id: string }[],
+) {
+  const version = 'perf-2026.1';
+  const rows: Prisma.GuardianConsentCreateManyInput[] = [];
+
+  for (const [index, guardian] of guardians.entries()) {
+    const photoGranted = rng() >= CONSENT_DENIED_RATIO;
+    for (const consentType of [
+      ConsentType.PRIVACY,
+      ConsentType.DATA_PROCESSING,
+      ConsentType.MESSAGING,
+      ConsentType.MEDICAL,
+      ConsentType.PHOTO_USAGE,
+    ]) {
+      const granted =
+        consentType === ConsentType.PHOTO_USAGE
+          ? photoGranted
+          : consentType !== ConsentType.MEDICAL || index % 7 !== 0;
+      rows.push({
+        tenantId,
+        guardianId: guardian.id,
+        consentType,
+        granted,
+        version,
+        capturedAt: new Date('2026-04-01T00:00:00.000Z'),
+        revokedAt: granted ? null : new Date('2026-05-01T00:00:00.000Z'),
+        metadata: { source: 'perf-seed' },
+      });
+    }
+  }
+
+  await insertInBatches('guardian consents', rows, (chunk) =>
+    prisma.guardianConsent.createMany({ data: chunk, skipDuplicates: true }),
+  );
+}
+
+async function seedActivityAndMilestones(
+  tenantId: string,
+  sections: { id: string; classId: string; level: number; name: string }[],
+  students: PerfStudent[],
+  teachers: { staffId: string; userId: string }[],
+  excludeSectionId: string,
+) {
+  if (ACTIVITY_POSTS === 0 && MILESTONES_PER_STUDENT === 0) return;
+
+  const already = await prisma.activityPost.count({ where: { tenantId } });
+  if (already >= ACTIVITY_POSTS) {
+    console.log(`  activity: ${already} posts already present, skipping bulk seed`);
+  } else {
+    const teacher = teachers[0];
+    if (!teacher) return;
+
+    const now = Date.now();
+    const postRows: Prisma.ActivityPostCreateManyInput[] = [];
+    const tagRows: Prisma.ActivityPostStudentCreateManyInput[] = [];
+    const attachmentRows: Prisma.ActivityAttachmentCreateManyInput[] = [];
+    const reactionRows: Prisma.ActivityReactionCreateManyInput[] = [];
+    const hiddenPostRows: Prisma.ActivityPostCreateManyInput[] = [];
+
+    let postIndex = 0;
+
+    const audienceCycle: AudienceType[] = [
+      AudienceType.SECTION,
+      AudienceType.CLASS,
+      AudienceType.STUDENT,
+    ];
+
+    for (const section of sections) {
+      if (section.id === excludeSectionId) continue;
+
+      const sectionStudents = students.filter((s) => s.sectionId === section.id);
+      const count = Math.min(
+        ACTIVITY_POSTS_PER_SECTION,
+        Math.max(1, Math.floor(ACTIVITY_POSTS / Math.max(sections.length - 1, 1))),
+      );
+
+      for (let n = 0; n < count; n += 1) {
+        const audienceType = audienceCycle[(postIndex + n) % audienceCycle.length];
+        const daysAgo = n * 3 + (postIndex % 5);
+        const publishedAt = new Date(now - daysAgo * 86400000);
+        const postId = `perf-post-${postIndex}`;
+        postIndex += 1;
+
+        postRows.push({
+          id: postId,
+          tenantId,
+          classId: section.classId,
+          sectionId:
+            audienceType === AudienceType.CLASS ||
+            audienceType === AudienceType.ALL
+              ? null
+              : section.id,
+          createdById: teacher.userId,
+          title: `Class ${section.level}${section.name} activity ${n + 1}`,
+          caption: `Performance fixture activity for section ${section.level}${section.name}.`,
+          category: pick([
+            ActivityCategory.LEARNING,
+            ActivityCategory.ART_AND_CRAFT,
+            ActivityCategory.GENERAL,
+          ]),
+          audienceType,
+          status: ActivityPostStatus.APPROVED,
+          parentVisible: true,
+          publishedAt,
+          activityDate: publishedAt,
+        });
+
+        if (audienceType === AudienceType.STUDENT && sectionStudents.length > 0) {
+          const tagged = sectionStudents.slice(
+            0,
+            rng() < 0.3 ? Math.min(2, sectionStudents.length) : 1,
+          );
+          for (const student of tagged) {
+            tagRows.push({
+              tenantId,
+              activityPostId: postId,
+              studentId: student.id,
+            });
+          }
+        } else if (rng() < ACTIVITY_TAGGED_RATIO && sectionStudents.length > 0) {
+          tagRows.push({
+            tenantId,
+            activityPostId: postId,
+            studentId: sectionStudents[0].id,
+          });
+        }
+
+        const attachmentCount = postIndex % 3;
+        for (let a = 0; a < attachmentCount; a += 1) {
+          attachmentRows.push({
+            tenantId,
+            activityPostId: postId,
+            fileName: `photo-${a + 1}.jpg`,
+            contentType: 'image/jpeg',
+            sizeBytes: 2048 + a * 512,
+            provider: StorageProvider.LOCAL,
+            objectKey: `perf/${postId}/${a}`,
+            sortOrder: a,
+            processingStatus: 'READY',
+            optimizedObjectKey: a === 0 ? `perf/${postId}/optimized` : null,
+            thumbnailFileAssetId: null,
+          });
+        }
+      }
+    }
+
+    // Class-wide post visible to every section in the first active section's class.
+    const firstSection = sections.find((s) => s.id !== excludeSectionId);
+    if (firstSection) {
+      postRows.push({
+        id: 'perf-post-classwide',
+        tenantId,
+        classId: firstSection.classId,
+        sectionId: null,
+        createdById: teacher.userId,
+        title: 'Class-wide celebration',
+        caption: 'Shared class-level activity visible to every section in the class.',
+        category: ActivityCategory.CELEBRATION,
+        audienceType: AudienceType.CLASS,
+        status: ActivityPostStatus.APPROVED,
+        parentVisible: true,
+        publishedAt: new Date(now - 2 * 86400000),
+        activityDate: new Date(now - 2 * 86400000),
+      });
+      postRows.push({
+        id: 'perf-post-old-history',
+        tenantId,
+        classId: firstSection.classId,
+        sectionId: firstSection.id,
+        createdById: teacher.userId,
+        title: 'Older classroom activity',
+        caption: 'Historical activity for ordering tests.',
+        category: ActivityCategory.LEARNING,
+        audienceType: AudienceType.SECTION,
+        status: ActivityPostStatus.APPROVED,
+        parentVisible: true,
+        publishedAt: new Date(now - 75 * 86400000),
+        activityDate: new Date(now - 75 * 86400000),
+      });
+    }
+
+    // Hidden variants — must never surface on parent reads.
+    if (firstSection && students[0]) {
+      hiddenPostRows.push(
+        {
+          id: 'perf-post-draft',
+          tenantId,
+          classId: firstSection.classId,
+          sectionId: firstSection.id,
+          createdById: teacher.userId,
+          title: 'Draft activity',
+          caption: 'Should stay hidden from parents.',
+          category: ActivityCategory.GENERAL,
+          audienceType: AudienceType.SECTION,
+          status: ActivityPostStatus.DRAFT,
+          parentVisible: true,
+          publishedAt: new Date(now),
+        },
+        {
+          id: 'perf-post-archived',
+          tenantId,
+          classId: firstSection.classId,
+          sectionId: firstSection.id,
+          createdById: teacher.userId,
+          title: 'Archived activity',
+          caption: 'Should stay hidden from parents.',
+          category: ActivityCategory.GENERAL,
+          audienceType: AudienceType.SECTION,
+          status: ActivityPostStatus.ARCHIVED,
+          parentVisible: true,
+          publishedAt: new Date(now),
+        },
+        {
+          id: 'perf-post-withdrawn',
+          tenantId,
+          classId: firstSection.classId,
+          sectionId: firstSection.id,
+          createdById: teacher.userId,
+          title: 'Withdrawn activity',
+          caption: 'Soft-deleted post.',
+          category: ActivityCategory.GENERAL,
+          audienceType: AudienceType.SECTION,
+          status: ActivityPostStatus.APPROVED,
+          parentVisible: true,
+          softDeletedAt: new Date(now),
+          publishedAt: new Date(now),
+        },
+        {
+          id: 'perf-post-hidden',
+          tenantId,
+          classId: firstSection.classId,
+          sectionId: firstSection.id,
+          createdById: teacher.userId,
+          title: 'Not parent visible',
+          caption: 'parentVisible=false',
+          category: ActivityCategory.GENERAL,
+          audienceType: AudienceType.SECTION,
+          status: ActivityPostStatus.APPROVED,
+          parentVisible: false,
+          publishedAt: new Date(now),
+        },
+        {
+          id: 'perf-post-wrong-class',
+          tenantId,
+          classId: sections[sections.length - 1]?.classId ?? firstSection.classId,
+          sectionId: sections[sections.length - 1]?.id ?? firstSection.id,
+          createdById: teacher.userId,
+          title: 'Wrong class activity',
+          caption: 'Outside the linked child class.',
+          category: ActivityCategory.GENERAL,
+          audienceType: AudienceType.SECTION,
+          status: ActivityPostStatus.APPROVED,
+          parentVisible: true,
+          publishedAt: new Date(now),
+        },
+        {
+          id: 'perf-post-tagged-other',
+          tenantId,
+          classId: firstSection.classId,
+          sectionId: firstSection.id,
+          createdById: teacher.userId,
+          title: 'Tagged to another student',
+          caption: 'Student audience mismatch.',
+          category: ActivityCategory.GENERAL,
+          audienceType: AudienceType.STUDENT,
+          status: ActivityPostStatus.APPROVED,
+          parentVisible: true,
+          publishedAt: new Date(now),
+        },
+      );
+    }
+
+    await insertInBatches('activity posts', [...postRows, ...hiddenPostRows], (chunk) =>
+      prisma.activityPost.createMany({ data: chunk, skipDuplicates: true }),
+    );
+    await insertInBatches('activity student tags', tagRows, (chunk) =>
+      prisma.activityPostStudent.createMany({ data: chunk, skipDuplicates: true }),
+    );
+
+    if (students[1]) {
+      await prisma.activityPostStudent.createMany({
+        data: [
+          {
+            tenantId,
+            activityPostId: 'perf-post-tagged-other',
+            studentId: students[1].id,
+          },
+        ],
+        skipDuplicates: true,
+      });
+    }
+
+    await insertInBatches('activity attachments', attachmentRows, (chunk) =>
+      prisma.activityAttachment.createMany({ data: chunk, skipDuplicates: true }),
+    );
+
+    // One SEEN reaction on the newest school-wide post for populated-path realism.
+    const firstGuardian = await prisma.guardian.findFirst({
+      where: { tenantId, userId: { not: null } },
+      select: { id: true },
+    });
+    if (firstGuardian) {
+      reactionRows.push({
+        tenantId,
+        activityPostId: 'perf-post-classwide',
+        guardianId: firstGuardian.id,
+        reaction: ActivityReactionType.SEEN,
+        createdAt: new Date(now - 86400000),
+      });
+    }
+    await insertInBatches('activity reactions', reactionRows, (chunk) =>
+      prisma.activityReaction.createMany({ data: chunk, skipDuplicates: true }),
+    );
+
+    console.log(
+      `  activity: ${postRows.length + hiddenPostRows.length} posts, ` +
+        `${attachmentRows.length} attachments, ${tagRows.length} tags`,
+    );
+  }
+
+  if (MILESTONES_PER_STUDENT === 0) return;
+
+  const milestoneAlready = await prisma.developmentalMilestone.count({
+    where: { tenantId },
+  });
+  if (milestoneAlready >= students.length * MILESTONES_PER_STUDENT) {
+    console.log(`  milestones: ${milestoneAlready} already present, skipping`);
+    return;
+  }
+
+  const teacher = teachers[0];
+  if (!teacher) return;
+
+  const milestoneRows: Prisma.DevelopmentalMilestoneCreateManyInput[] = [];
+  const now = Date.now();
+  for (const [index, student] of students.entries()) {
+    for (let m = 0; m < MILESTONES_PER_STUDENT; m += 1) {
+      milestoneRows.push({
+        tenantId,
+        classId: student.classId,
+        sectionId: student.sectionId,
+        studentId: student.id,
+        domain: pick(['Language', 'Motor', 'Social', 'Cognitive']),
+        milestone: `Observed milestone ${m + 1} for student ${index + 1}`,
+        status: pick([
+          DevelopmentalMilestoneStatus.EMERGING,
+          DevelopmentalMilestoneStatus.PROGRESSING,
+          DevelopmentalMilestoneStatus.ACHIEVED,
+        ]),
+        observationNote: 'Performance fixture milestone.',
+        observedAt: new Date(now - (m + 1) * 7 * 86400000),
+        createdById: teacher.userId,
+      });
+    }
+  }
+
+  await insertInBatches('developmental milestones', milestoneRows, (chunk) =>
+    prisma.developmentalMilestone.createMany({ data: chunk, skipDuplicates: true }),
+  );
+}
+
+async function seedMeasurementFixtures(
+  tenantId: string,
+  passwordHash: string,
+  students: PerfStudent[],
+  sections: { id: string; classId: string; level: number; name: string }[],
+) {
+  if (students.length < 3) return;
+
+  const emptySection = sections[sections.length - 1];
+  const emptyStudent = students.find((s) => s.sectionId === emptySection?.id);
+  if (!emptyStudent) {
+    throw new Error(
+      'No student found in the empty-activity section; cannot create measurement fixtures.',
+    );
+  }
+  const oneChild =
+    students.find(
+      (s) => s.sectionId !== emptySection.id && s.id !== emptyStudent.id,
+    ) ?? students[1];
+  const multiChildA = oneChild;
+  const multiChildB =
+    students.find(
+      (s) =>
+        s.id !== oneChild.id &&
+        s.id !== emptyStudent.id &&
+        s.sectionId === oneChild.sectionId,
+    ) ??
+    students.find((s) => s.id !== oneChild.id && s.id !== emptyStudent.id) ??
+    students[2];
+
+  const parentRole = await prisma.role.findUnique({
+    where: { tenantId_name: { tenantId, name: 'parent' } },
+  });
+  if (!parentRole) return;
+  const parentRoleId = parentRole.id;
+
+  const capabilities: GuardianCapability[] = [
+    GuardianCapability.ATTENDANCE_VIEW,
+    GuardianCapability.ACADEMICS_VIEW,
+    GuardianCapability.FEES_VIEW,
+    GuardianCapability.EMERGENCY_ALERT_RECEIVE,
+  ];
+
+  async function upsertFixtureParent(
+    email: string,
+    fullName: string,
+    linkedStudents: PerfStudent[],
+  ) {
+    const user = await prisma.user.upsert({
+      where: { tenantId_email: { tenantId, email } },
+      update: { passwordHash, status: UserStatus.ACTIVE, mustChangePassword: false },
+      create: {
+        tenantId,
+        email,
+        passwordHash,
+        authMethod: AuthMethod.PASSWORD,
+        status: UserStatus.ACTIVE,
+        mustChangePassword: false,
+      },
+    });
+
+    const existingRole = await prisma.userRole.findFirst({
+      where: { tenantId, userId: user.id, roleId: parentRoleId, scopeId: null },
+    });
+    if (!existingRole) {
+      await prisma.userRole.create({
+        data: { tenantId, userId: user.id, roleId: parentRoleId, scopeId: null },
+      });
+    }
+
+    const guardianExisting = await prisma.guardian.findFirst({
+      where: { tenantId, userId: user.id },
+    });
+    const guardian = guardianExisting
+      ? await prisma.guardian.update({
+          where: { id: guardianExisting.id },
+          data: { fullName, receivesAlerts: true, email },
+        })
+      : await prisma.guardian.create({
+          data: {
+            tenantId,
+            userId: user.id,
+            fullName,
+            relation: 'Guardian',
+            primaryPhone: `98${pad(Math.floor(rng() * 100000000), 8)}`,
+            email,
+            receivesAlerts: true,
+          },
+        });
+
+    await prisma.studentGuardian.deleteMany({
+      where: { tenantId, guardianId: guardian.id },
+    });
+
+    await prisma.studentGuardian.createMany({
+      data: linkedStudents.map((student, index) => ({
+        tenantId,
+        studentId: student.id,
+        guardianId: guardian.id,
+        relation: index === 0 ? 'Father' : 'Mother',
+        isPrimary: index === 0,
+        appLoginLinked: true,
+        capabilities,
+        verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
+        status: GuardianRelationshipStatus.ACTIVE,
+        approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+        emergencyContactPriority: index + 1,
+      })),
+    });
+
+    return { email, guardianId: guardian.id, studentIds: linkedStudents.map((s) => s.id) };
+  }
+
+  const fixtures = {
+    empty: await upsertFixtureParent(
+      FIXTURE_PARENT_EMAILS.empty,
+      'Perf Empty Parent',
+      [emptyStudent],
+    ),
+    one: await upsertFixtureParent(FIXTURE_PARENT_EMAILS.one, 'Perf One Child Parent', [
+      oneChild,
+    ]),
+    multi: await upsertFixtureParent(
+      FIXTURE_PARENT_EMAILS.multi,
+      'Perf Multi Child Parent',
+      [multiChildA, multiChildB],
+    ),
+  };
+
+  console.log('  measurement fixtures:');
+  console.log(`    empty path:  ${fixtures.empty.email} -> ${fixtures.empty.studentIds.join(', ')}`);
+  console.log(`    one child:   ${fixtures.one.email} -> ${fixtures.one.studentIds.join(', ')}`);
+  console.log(
+    `    multi child: ${fixtures.multi.email} -> ${fixtures.multi.studentIds.join(', ')}`,
+  );
+
+  return fixtures;
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -919,13 +1461,27 @@ async function main() {
   const passwordHash = await bcrypt.hash(PASSWORD, SEED_BCRYPT_ROUNDS);
 
   const { academicYear, sections, subjects } = await seedStructure(tenant.id);
-  await seedStaff(tenant.id, academicYear.id, sections, subjects, passwordHash);
+  const { teachers } = await seedStaff(tenant.id, academicYear.id, sections, subjects, passwordHash);
   const { students, guardianUserIds } = await seedStudentsAndParents(
     tenant.id,
     academicYear.id,
     sections,
     passwordHash,
   );
+  const emptySectionId = sections[sections.length - 1]?.id ?? '';
+  const guardians = await prisma.guardian.findMany({
+    where: { tenantId: tenant.id },
+    select: { id: true },
+  });
+  await seedGuardianConsents(tenant.id, guardians);
+  await seedActivityAndMilestones(
+    tenant.id,
+    sections,
+    students,
+    teachers,
+    emptySectionId,
+  );
+  await seedMeasurementFixtures(tenant.id, passwordHash, students, sections);
   await seedAttendance(tenant.id, academicYear.id, sections, students);
   await seedNotifications(tenant.id, guardianUserIds);
 
@@ -942,6 +1498,11 @@ async function main() {
   console.log(`  teacher: teacher001@${SLUG}.test .. teacher${pad(TEACHERS, 3)}@${SLUG}.test`);
   console.log(`  admin:   admin001@${SLUG}.test .. admin${pad(ADMINS, 3)}@${SLUG}.test`);
   console.log(`  password: ${PASSWORD}`);
+  console.log('');
+  console.log('Measurement fixture parents (synthetic tenant only):');
+  console.log(`  empty:  ${FIXTURE_PARENT_EMAILS.empty}`);
+  console.log(`  one:    ${FIXTURE_PARENT_EMAILS.one}`);
+  console.log(`  multi:  ${FIXTURE_PARENT_EMAILS.multi}`);
   console.log('');
   console.log('Next: pnpm --filter @schoolos/api perf:verify   (row counts)');
 

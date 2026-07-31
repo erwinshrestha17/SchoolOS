@@ -36,6 +36,8 @@
     "db:seed:pilot-rehearsal-personas": "tsx prisma/seed-pilot-rehearsal-personas.ts",
     "db:seed:geography": "tsx prisma/seed-nepal-geography.ts",
     "db:seed:performance": "tsx prisma/seed-performance-tenant.ts",
+    "perf:verify": "tsx prisma/perf-verify.ts",
+    "perf:measure-activity-sql": "tsx prisma/perf-measure-activity-sql.ts",
     "start": "node dist/apps/api/src/main.js",
     "start:dev": "pnpm run dev",
     "start:debug": "pnpm --filter @schoolos/core build && pnpm run prisma:generate && nest start --debug --watch --entryFile apps/api/src/main",

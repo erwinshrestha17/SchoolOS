@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { AuthMethod, FileStatus, GuardianCapability } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { MobileService } from './mobile.service';
@@ -28,10 +28,17 @@ describe('MobileService', () => {
     reportCard: MockModel<'findMany' | 'findFirst'>;
     examTimetableSlot: MockModel<'findMany'>;
     activityPost: MockModel<'findMany'>;
+    activityAttachment: MockModel<'findMany'>;
+    activityReaction: MockModel<'findMany'>;
     canteenMealServing: MockModel<'findMany'>;
     transportStudentAssignment: MockModel<'findFirst'>;
     transportEnrollment: MockModel<'findFirst'>;
     transportTripStudentStatus: MockModel<'findFirst'>;
+    transportTrip: MockModel<'findFirst'>;
+    transportRoute: MockModel<'findMany'>;
+    transportStop: MockModel<'findMany'>;
+    transportVehicle: MockModel<'findFirst'>;
+    transportLocationPing: MockModel<'findFirst'>;
   }
 
   let prisma: MobileServicePrismaMock;
@@ -118,6 +125,12 @@ describe('MobileService', () => {
       activityPost: {
         findMany: jest.fn(),
       },
+      activityAttachment: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      activityReaction: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       canteenMealServing: {
         findMany: jest.fn().mockResolvedValue([]),
       },
@@ -128,6 +141,21 @@ describe('MobileService', () => {
         findFirst: jest.fn(),
       },
       transportTripStudentStatus: {
+        findFirst: jest.fn(),
+      },
+      transportTrip: {
+        findFirst: jest.fn(),
+      },
+      transportRoute: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      transportStop: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      transportVehicle: {
+        findFirst: jest.fn(),
+      },
+      transportLocationPing: {
         findFirst: jest.fn(),
       },
     };
@@ -2531,20 +2559,33 @@ describe('MobileService', () => {
         category: 'LEARNING',
         publishedAt: new Date('2026-06-29T00:00:00.000Z'),
         createdAt: new Date('2026-06-29T00:00:00.000Z'),
-        attachments: [
-          {
-            id: 'attachment-1',
-            fileName: 'science.jpg',
-            contentType: 'image/jpeg',
-            sizeBytes: 2048,
-            processingStatus: 'READY',
-            thumbnailFileAssetId: null,
-            optimizedObjectKey: 'must-not-leak-optimized-key',
-            objectKey: 'must-not-leak',
-          },
-        ],
-        reactions: [{ createdAt: new Date('2026-07-01T06:30:00.000Z') }],
-        _count: { attachments: 1, reactions: 2 },
+      },
+    ]);
+    prisma.activityAttachment.findMany.mockResolvedValue([
+      {
+        id: 'attachment-1',
+        activityPostId: 'post-1',
+        fileName: 'science.jpg',
+        contentType: 'image/jpeg',
+        sizeBytes: 2048,
+        processingStatus: 'READY',
+        thumbnailFileAssetId: null,
+        optimizedObjectKey: 'must-not-leak-optimized-key',
+        sortOrder: 0,
+      },
+    ]);
+    prisma.activityReaction.findMany.mockResolvedValue([
+      {
+        activityPostId: 'post-1',
+        guardianId: 'guardian-1',
+        reaction: 'SEEN',
+        createdAt: new Date('2026-07-01T06:30:00.000Z'),
+      },
+      {
+        activityPostId: 'post-1',
+        guardianId: 'guardian-2',
+        reaction: 'THANK_YOU',
+        createdAt: new Date('2026-07-01T07:30:00.000Z'),
       },
     ]);
 
@@ -2580,15 +2621,19 @@ describe('MobileService', () => {
           softDeletedAt: null,
           parentVisible: true,
         }),
-        include: expect.objectContaining({
-          reactions: {
-            where: { guardianId: 'guardian-1', reaction: 'SEEN' },
-            select: { createdAt: true },
-            take: 1,
-          },
+        select: expect.objectContaining({
+          id: true,
+          title: true,
+          caption: true,
         }),
       }),
     );
+    expect(prisma.activityAttachment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { tenantId: 'tenant-1', activityPostId: { in: ['post-1'] } },
+      }),
+    );
+    expect(result.items[0].reactionCount).toBe(2);
   });
 
   it('returns homework scoped to the linked child class and section', async () => {
@@ -2814,46 +2859,56 @@ describe('MobileService', () => {
         },
       ],
     });
+    // Root rows now carry foreign keys; routes, stops, the vehicle and the
+    // latest ping are resolved by batched follow-up queries. The assertions
+    // below are unchanged — the response contract is what this test pins.
     prisma.transportStudentAssignment.findFirst.mockResolvedValue({
       id: 'assignment-1',
-      route: { id: 'route-1', name: 'Route A', code: 'R-A' },
-      stop: { id: 'stop-1', name: 'Gate 2', sequence: 3 },
+      routeId: 'route-1',
+      stopId: 'stop-1',
       pickupDirection: 'PICKUP',
       status: 'ACTIVE',
     });
     prisma.transportEnrollment.findFirst.mockResolvedValue({
       id: 'enrollment-1',
-      route: { id: 'route-1', name: 'Route A', code: 'R-A' },
-      stop: { id: 'stop-1', name: 'Gate 2', sequence: 3 },
+      routeId: 'route-1',
+      stopId: 'stop-1',
       feeAmount: 1200,
       status: 'ACTIVE',
     });
     prisma.transportTripStudentStatus.findFirst.mockResolvedValue({
+      id: 'trip-status-1',
+      tripId: 'trip-1',
+      stopId: 'stop-1',
       status: 'BOARDED',
-      stop: { id: 'stop-1', name: 'Gate 2', sequence: 3 },
-      trip: {
-        id: 'trip-1',
-        route: { id: 'route-1', name: 'Route A', code: 'R-A' },
-        vehicle: {
-          id: 'vehicle-1',
-          registrationNumber: 'BA-1-PA-1234',
-          model: 'Bus 3',
-          capacity: 32,
-        },
-        direction: 'PICKUP',
-        status: 'ACTIVE',
-        isDelayed: true,
-        delayMinutes: 12,
-        delayReason: 'Traffic near Ring Road',
-        locationPings: [
-          {
-            latitude: 27.7101,
-            longitude: 85.3222,
-            speedKph: 18.5,
-            recordedAt: new Date('2026-06-02T07:45:00.000Z'),
-          },
-        ],
-      },
+    });
+    prisma.transportTrip.findFirst.mockResolvedValue({
+      id: 'trip-1',
+      routeId: 'route-1',
+      vehicleId: 'vehicle-1',
+      direction: 'PICKUP',
+      status: 'ACTIVE',
+      isDelayed: true,
+      delayMinutes: 12,
+      delayReason: 'Traffic near Ring Road',
+    });
+    prisma.transportRoute.findMany.mockResolvedValue([
+      { id: 'route-1', name: 'Route A', code: 'R-A' },
+    ]);
+    prisma.transportStop.findMany.mockResolvedValue([
+      { id: 'stop-1', name: 'Gate 2', sequence: 3 },
+    ]);
+    prisma.transportVehicle.findFirst.mockResolvedValue({
+      id: 'vehicle-1',
+      registrationNumber: 'BA-1-PA-1234',
+      model: 'Bus 3',
+      capacity: 32,
+    });
+    prisma.transportLocationPing.findFirst.mockResolvedValue({
+      latitude: 27.7101,
+      longitude: 85.3222,
+      speedKph: 18.5,
+      recordedAt: new Date('2026-06-02T07:45:00.000Z'),
     });
 
     const result = await service.getStudentTransport('student-1', actor);
@@ -2891,6 +2946,769 @@ describe('MobileService', () => {
         },
       }),
     );
+  });
+
+  describe('parent transport summary', () => {
+    /** Authorize `studentId` for the acting parent with every capability. */
+    function authorizeChild(studentId = 'student-1') {
+      prisma.student.findFirst.mockResolvedValue({ id: studentId });
+      prisma.guardian.findFirst.mockResolvedValue({
+        id: 'guardian-1',
+        studentLinks: [
+          {
+            studentId,
+            guardianId: 'guardian-1',
+            capabilities: ALL_GUARDIAN_CAPABILITIES,
+          },
+        ],
+      });
+    }
+
+    /** No transport records of any kind for this child. */
+    function noTransport() {
+      prisma.transportStudentAssignment.findFirst.mockResolvedValue(null);
+      prisma.transportEnrollment.findFirst.mockResolvedValue(null);
+      prisma.transportTripStudentStatus.findFirst.mockResolvedValue(null);
+    }
+
+    it('returns empty transport state without touching reference tables', async () => {
+      authorizeChild();
+      noTransport();
+
+      await expect(
+        service.getStudentTransport('student-1', actor),
+      ).resolves.toEqual({
+        assignment: null,
+        enrollment: null,
+        activeTrip: null,
+      });
+
+      // This is the optimization: a child with no transport must not trigger
+      // route, stop, vehicle, trip or ping lookups. The previous
+      // `include`-based version issued all of them regardless.
+      expect(prisma.transportRoute.findMany).not.toHaveBeenCalled();
+      expect(prisma.transportStop.findMany).not.toHaveBeenCalled();
+      expect(prisma.transportVehicle.findFirst).not.toHaveBeenCalled();
+      expect(prisma.transportLocationPing.findFirst).not.toHaveBeenCalled();
+      expect(prisma.transportTrip.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('resolves route and stop for an assignment with one batched query each', async () => {
+      authorizeChild();
+      prisma.transportStudentAssignment.findFirst.mockResolvedValue({
+        id: 'assignment-1',
+        routeId: 'route-1',
+        stopId: 'stop-1',
+        pickupDirection: 'PICKUP',
+        status: 'ACTIVE',
+      });
+      prisma.transportEnrollment.findFirst.mockResolvedValue({
+        id: 'enrollment-1',
+        routeId: 'route-1',
+        stopId: 'stop-1',
+        feeAmount: 900,
+        status: 'ACTIVE',
+      });
+      prisma.transportTripStudentStatus.findFirst.mockResolvedValue(null);
+      prisma.transportRoute.findMany.mockResolvedValue([
+        { id: 'route-1', name: 'Route A', code: 'R-A' },
+      ]);
+      prisma.transportStop.findMany.mockResolvedValue([
+        { id: 'stop-1', name: 'Gate 2', sequence: 3 },
+      ]);
+
+      const result = await service.getStudentTransport('student-1', actor);
+
+      expect(result.assignment).toEqual({
+        id: 'assignment-1',
+        route: { id: 'route-1', name: 'Route A', code: 'R-A' },
+        stop: { id: 'stop-1', name: 'Gate 2', sequence: 3 },
+        pickupDirection: 'PICKUP',
+        status: 'ACTIVE',
+      });
+      // Assignment and enrollment share a route and a stop; each must be
+      // fetched once, not once per referencing row.
+      expect(prisma.transportRoute.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.transportStop.findMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('deduplicates and sorts the batched id lists', async () => {
+      authorizeChild();
+      prisma.transportStudentAssignment.findFirst.mockResolvedValue({
+        id: 'assignment-1',
+        routeId: 'route-b',
+        stopId: 'stop-b',
+        pickupDirection: 'PICKUP',
+        status: 'ACTIVE',
+      });
+      prisma.transportEnrollment.findFirst.mockResolvedValue({
+        id: 'enrollment-1',
+        routeId: 'route-a',
+        stopId: 'stop-b',
+        feeAmount: 0,
+        status: 'ACTIVE',
+      });
+      prisma.transportTripStudentStatus.findFirst.mockResolvedValue(null);
+
+      await service.getStudentTransport('student-1', actor);
+
+      // Stable, deduplicated ordering keeps the generated IN(...) list — and
+      // therefore the query plan — identical across requests.
+      expect(prisma.transportRoute.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            tenantId: 'tenant-1',
+            id: { in: ['route-a', 'route-b'] },
+          }),
+        }),
+      );
+      expect(prisma.transportStop.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ id: { in: ['stop-b'] } }),
+        }),
+      );
+    });
+
+    it('scopes every batched lookup to the acting tenant', async () => {
+      authorizeChild();
+      prisma.transportStudentAssignment.findFirst.mockResolvedValue({
+        id: 'assignment-1',
+        routeId: 'route-1',
+        stopId: 'stop-1',
+        pickupDirection: 'PICKUP',
+        status: 'ACTIVE',
+      });
+      prisma.transportEnrollment.findFirst.mockResolvedValue(null);
+      prisma.transportTripStudentStatus.findFirst.mockResolvedValue(null);
+
+      await service.getStudentTransport('student-1', actor);
+
+      for (const call of [
+        prisma.transportRoute.findMany,
+        prisma.transportStop.findMany,
+      ]) {
+        expect(call).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({ tenantId: 'tenant-1' }),
+          }),
+        );
+      }
+    });
+
+    it('renders a null route when the reference resolves to another tenant', async () => {
+      authorizeChild();
+      prisma.transportStudentAssignment.findFirst.mockResolvedValue({
+        id: 'assignment-1',
+        routeId: 'route-of-other-tenant',
+        stopId: 'stop-1',
+        pickupDirection: 'PICKUP',
+        status: 'ACTIVE',
+      });
+      prisma.transportEnrollment.findFirst.mockResolvedValue(null);
+      prisma.transportTripStudentStatus.findFirst.mockResolvedValue(null);
+      // The tenant-scoped batch simply does not return the foreign row.
+      prisma.transportRoute.findMany.mockResolvedValue([]);
+      prisma.transportStop.findMany.mockResolvedValue([
+        { id: 'stop-1', name: 'Gate 2', sequence: 3 },
+      ]);
+
+      const result = await service.getStudentTransport('student-1', actor);
+
+      expect(result.assignment?.route).toBeNull();
+      expect(JSON.stringify(result)).not.toContain('route-of-other-tenant');
+    });
+
+    it('omits the active trip when the trip row does not resolve', async () => {
+      authorizeChild();
+      prisma.transportStudentAssignment.findFirst.mockResolvedValue(null);
+      prisma.transportEnrollment.findFirst.mockResolvedValue(null);
+      prisma.transportTripStudentStatus.findFirst.mockResolvedValue({
+        id: 'trip-status-1',
+        tripId: 'trip-of-other-tenant',
+        stopId: 'stop-1',
+        status: 'BOARDED',
+      });
+      prisma.transportTrip.findFirst.mockResolvedValue(null);
+
+      const result = await service.getStudentTransport('student-1', actor);
+
+      expect(result.activeTrip).toBeNull();
+      expect(prisma.transportVehicle.findFirst).not.toHaveBeenCalled();
+      expect(prisma.transportLocationPing.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('reports a delayed trip with its delay detail', async () => {
+      authorizeChild();
+      prisma.transportStudentAssignment.findFirst.mockResolvedValue(null);
+      prisma.transportEnrollment.findFirst.mockResolvedValue(null);
+      prisma.transportTripStudentStatus.findFirst.mockResolvedValue({
+        id: 'trip-status-1',
+        tripId: 'trip-1',
+        stopId: 'stop-1',
+        status: 'PENDING',
+      });
+      prisma.transportTrip.findFirst.mockResolvedValue({
+        id: 'trip-1',
+        routeId: 'route-1',
+        vehicleId: 'vehicle-1',
+        direction: 'DROP',
+        status: 'ACTIVE',
+        isDelayed: true,
+        delayMinutes: 20,
+        delayReason: 'Roadworks',
+      });
+      prisma.transportRoute.findMany.mockResolvedValue([
+        { id: 'route-1', name: 'Route A', code: 'R-A' },
+      ]);
+      prisma.transportStop.findMany.mockResolvedValue([
+        { id: 'stop-1', name: 'Gate 2', sequence: 3 },
+      ]);
+      prisma.transportVehicle.findFirst.mockResolvedValue({
+        id: 'vehicle-1',
+        registrationNumber: 'BA-1-PA-1234',
+        model: 'Bus 3',
+        capacity: 32,
+      });
+      prisma.transportLocationPing.findFirst.mockResolvedValue(null);
+
+      const result = await service.getStudentTransport('student-1', actor);
+
+      expect(result.activeTrip).toEqual(
+        expect.objectContaining({
+          isDelayed: true,
+          delayMinutes: 20,
+          delayReason: 'Roadworks',
+          studentStatus: 'PENDING',
+        }),
+      );
+    });
+
+    it('reports an unavailable location when no ping exists', async () => {
+      authorizeChild();
+      prisma.transportStudentAssignment.findFirst.mockResolvedValue(null);
+      prisma.transportEnrollment.findFirst.mockResolvedValue(null);
+      prisma.transportTripStudentStatus.findFirst.mockResolvedValue({
+        id: 'trip-status-1',
+        tripId: 'trip-1',
+        stopId: 'stop-1',
+        status: 'BOARDED',
+      });
+      prisma.transportTrip.findFirst.mockResolvedValue({
+        id: 'trip-1',
+        routeId: 'route-1',
+        vehicleId: 'vehicle-1',
+        direction: 'PICKUP',
+        status: 'ACTIVE',
+        isDelayed: false,
+        delayMinutes: null,
+        delayReason: null,
+      });
+      prisma.transportVehicle.findFirst.mockResolvedValue({
+        id: 'vehicle-1',
+        registrationNumber: 'BA-1-PA-1234',
+        model: 'Bus 3',
+        capacity: 32,
+      });
+      prisma.transportLocationPing.findFirst.mockResolvedValue(null);
+
+      const result = await service.getStudentTransport('student-1', actor);
+
+      expect(result.activeTrip?.latestLocation).toBeNull();
+    });
+
+    it('marks a fresh location as fresh and an old one as stale', async () => {
+      const setUpTripWithPing = (recordedAt: Date) => {
+        authorizeChild();
+        prisma.transportStudentAssignment.findFirst.mockResolvedValue(null);
+        prisma.transportEnrollment.findFirst.mockResolvedValue(null);
+        prisma.transportTripStudentStatus.findFirst.mockResolvedValue({
+          id: 'trip-status-1',
+          tripId: 'trip-1',
+          stopId: 'stop-1',
+          status: 'BOARDED',
+        });
+        prisma.transportTrip.findFirst.mockResolvedValue({
+          id: 'trip-1',
+          routeId: 'route-1',
+          vehicleId: 'vehicle-1',
+          direction: 'PICKUP',
+          status: 'ACTIVE',
+          isDelayed: false,
+          delayMinutes: null,
+          delayReason: null,
+        });
+        prisma.transportVehicle.findFirst.mockResolvedValue({
+          id: 'vehicle-1',
+          registrationNumber: 'BA-1-PA-1234',
+          model: 'Bus 3',
+          capacity: 32,
+        });
+        prisma.transportLocationPing.findFirst.mockResolvedValue({
+          latitude: 27.7101,
+          longitude: 85.3222,
+          speedKph: null,
+          recordedAt,
+        });
+      };
+
+      setUpTripWithPing(new Date());
+      const fresh = await service.getStudentTransport('student-1', actor);
+      expect(fresh.activeTrip?.latestLocation).toEqual(
+        expect.objectContaining({ confidence: 'fresh', isStale: false }),
+      );
+
+      setUpTripWithPing(new Date(Date.now() - 3_600_000));
+      const stale = await service.getStudentTransport('student-1', actor);
+      expect(stale.activeTrip?.latestLocation).toEqual(
+        expect.objectContaining({ confidence: 'stale', isStale: true }),
+      );
+    });
+
+    it('requests only the latest ping, never GPS history', async () => {
+      authorizeChild();
+      prisma.transportStudentAssignment.findFirst.mockResolvedValue(null);
+      prisma.transportEnrollment.findFirst.mockResolvedValue(null);
+      prisma.transportTripStudentStatus.findFirst.mockResolvedValue({
+        id: 'trip-status-1',
+        tripId: 'trip-1',
+        stopId: 'stop-1',
+        status: 'BOARDED',
+      });
+      prisma.transportTrip.findFirst.mockResolvedValue({
+        id: 'trip-1',
+        routeId: 'route-1',
+        vehicleId: 'vehicle-1',
+        direction: 'PICKUP',
+        status: 'ACTIVE',
+        isDelayed: false,
+        delayMinutes: null,
+        delayReason: null,
+      });
+      prisma.transportVehicle.findFirst.mockResolvedValue(null);
+      prisma.transportLocationPing.findFirst.mockResolvedValue(null);
+
+      await service.getStudentTransport('student-1', actor);
+
+      expect(prisma.transportLocationPing.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { tenantId: 'tenant-1', tripId: 'trip-1' },
+          orderBy: [{ recordedAt: 'desc' }],
+        }),
+      );
+    });
+
+    it('never selects driver personal information', async () => {
+      authorizeChild();
+      prisma.transportStudentAssignment.findFirst.mockResolvedValue(null);
+      prisma.transportEnrollment.findFirst.mockResolvedValue(null);
+      prisma.transportTripStudentStatus.findFirst.mockResolvedValue({
+        id: 'trip-status-1',
+        tripId: 'trip-1',
+        stopId: 'stop-1',
+        status: 'BOARDED',
+      });
+      prisma.transportTrip.findFirst.mockResolvedValue({
+        id: 'trip-1',
+        routeId: 'route-1',
+        vehicleId: 'vehicle-1',
+        direction: 'PICKUP',
+        status: 'ACTIVE',
+        isDelayed: false,
+        delayMinutes: null,
+        delayReason: null,
+      });
+      prisma.transportVehicle.findFirst.mockResolvedValue(null);
+      prisma.transportLocationPing.findFirst.mockResolvedValue(null);
+
+      await service.getStudentTransport('student-1', actor);
+
+      const tripSelect = prisma.transportTrip.findFirst.mock.calls[0][0].select;
+      expect(tripSelect).not.toHaveProperty('driverAssignment');
+      expect(tripSelect).not.toHaveProperty('driverAssignmentId');
+      expect(tripSelect).not.toHaveProperty('createdBy');
+      expect(tripSelect).not.toHaveProperty('notes');
+    });
+
+    it('denies a child the parent has no active relationship with', async () => {
+      prisma.student.findFirst.mockResolvedValue({ id: 'student-9' });
+      prisma.guardian.findFirst.mockResolvedValue({
+        id: 'guardian-1',
+        studentLinks: [],
+      });
+
+      await expect(
+        service.getStudentTransport('student-9', actor),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(
+        prisma.transportStudentAssignment.findFirst,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('denies when the guardian relationship lacks the alert capability', async () => {
+      prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+      prisma.guardian.findFirst.mockResolvedValue({
+        id: 'guardian-1',
+        studentLinks: [
+          {
+            studentId: 'student-1',
+            guardianId: 'guardian-1',
+            // Transport requires EMERGENCY_ALERT_RECEIVE; a second guardian
+            // linked to the same child with a narrower capability set must not
+            // see the transport summary.
+            capabilities: [GuardianCapability.ACADEMICS_VIEW],
+          },
+        ],
+      });
+
+      await expect(
+        service.getStudentTransport('student-1', actor),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(
+        prisma.transportStudentAssignment.findFirst,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('denies a student that does not exist in this tenant', async () => {
+      prisma.student.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.getStudentTransport('student-from-other-tenant', actor),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(
+        prisma.transportStudentAssignment.findFirst,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('filters root rows to ACTIVE records for the requested child only', async () => {
+      authorizeChild();
+      noTransport();
+
+      await service.getStudentTransport('student-1', actor);
+
+      expect(prisma.transportStudentAssignment.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            tenantId: 'tenant-1',
+            studentId: 'student-1',
+            status: 'ACTIVE',
+          },
+        }),
+      );
+      expect(prisma.transportEnrollment.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            tenantId: 'tenant-1',
+            studentId: 'student-1',
+            status: 'ACTIVE',
+          },
+        }),
+      );
+      expect(prisma.transportTripStudentStatus.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            tenantId: 'tenant-1',
+            studentId: 'student-1',
+            trip: { status: 'ACTIVE' },
+          },
+        }),
+      );
+    });
+
+    it('keeps each child independent for a parent with several children', async () => {
+      prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+      prisma.guardian.findFirst.mockResolvedValue({
+        id: 'guardian-1',
+        studentLinks: [
+          {
+            studentId: 'student-1',
+            guardianId: 'guardian-1',
+            capabilities: ALL_GUARDIAN_CAPABILITIES,
+          },
+        ],
+      });
+      prisma.transportStudentAssignment.findFirst.mockResolvedValue({
+        id: 'assignment-1',
+        routeId: 'route-1',
+        stopId: 'stop-1',
+        pickupDirection: 'PICKUP',
+        status: 'ACTIVE',
+      });
+      prisma.transportEnrollment.findFirst.mockResolvedValue(null);
+      prisma.transportTripStudentStatus.findFirst.mockResolvedValue(null);
+      prisma.transportRoute.findMany.mockResolvedValue([
+        { id: 'route-1', name: 'Route A', code: 'R-A' },
+      ]);
+      prisma.transportStop.findMany.mockResolvedValue([
+        { id: 'stop-1', name: 'Gate 2', sequence: 3 },
+      ]);
+
+      const transported = await service.getStudentTransport('student-1', actor);
+      expect(transported.assignment?.route).toEqual(
+        expect.objectContaining({ id: 'route-1' }),
+      );
+
+      // Second child, same parent, no transport — must not inherit the first
+      // child's route or assignment.
+      prisma.student.findFirst.mockResolvedValue({ id: 'student-2' });
+      prisma.guardian.findFirst.mockResolvedValue({
+        id: 'guardian-1',
+        studentLinks: [
+          {
+            studentId: 'student-2',
+            guardianId: 'guardian-1',
+            capabilities: ALL_GUARDIAN_CAPABILITIES,
+          },
+        ],
+      });
+      noTransport();
+
+      const notTransported = await service.getStudentTransport(
+        'student-2',
+        actor,
+      );
+      expect(notTransported).toEqual({
+        assignment: null,
+        enrollment: null,
+        activeTrip: null,
+      });
+    });
+  });
+
+  describe('parent activity summary', () => {
+    function authorizeChild(studentId = 'student-1') {
+      prisma.student.findFirst
+        .mockResolvedValueOnce({ id: studentId })
+        .mockResolvedValueOnce({
+          id: studentId,
+          tenantId: 'tenant-1',
+          firstNameEn: 'Asha',
+          lastNameEn: 'Rai',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          class: { id: 'class-1', name: 'Grade 4' },
+          sectionRef: { id: 'section-1', name: 'A' },
+          guardianLinks: [],
+          enrollments: [],
+        });
+      prisma.guardian.findFirst.mockResolvedValue({
+        id: 'guardian-1',
+        studentLinks: [
+          {
+            studentId,
+            guardianId: 'guardian-1',
+            capabilities: ALL_GUARDIAN_CAPABILITIES,
+          },
+        ],
+      });
+    }
+
+    function mockPost(overrides: Record<string, unknown> = {}) {
+      return {
+        id: 'post-1',
+        title: 'Science day',
+        caption: 'Students built models.',
+        category: 'LEARNING',
+        publishedAt: new Date('2026-06-29T00:00:00.000Z'),
+        createdAt: new Date('2026-06-29T00:00:00.000Z'),
+        ...overrides,
+      };
+    }
+
+    it('returns an empty feed without attachment or reaction lookups', async () => {
+      authorizeChild();
+      prisma.activityPost.findMany.mockResolvedValue([]);
+
+      await expect(
+        service.getStudentActivityFeed('student-1', actor, '1'),
+      ).resolves.toEqual({ items: [] });
+
+      expect(prisma.activityAttachment.findMany).not.toHaveBeenCalled();
+      expect(prisma.activityReaction.findMany).not.toHaveBeenCalled();
+    });
+
+    it('loads a populated preview with at most three activity queries', async () => {
+      authorizeChild();
+      prisma.activityPost.findMany.mockResolvedValue([mockPost()]);
+      prisma.activityAttachment.findMany.mockResolvedValue([]);
+      prisma.activityReaction.findMany.mockResolvedValue([]);
+
+      const result = await service.getStudentActivityFeed('student-1', actor, '1');
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]).toEqual(
+        expect.objectContaining({
+          id: 'post-1',
+          attachmentCount: 0,
+          reactionCount: 0,
+          seenAt: null,
+        }),
+      );
+      expect(prisma.activityPost.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.activityAttachment.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.activityReaction.findMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('preserves audience OR predicates for class and section posts', async () => {
+      authorizeChild();
+      prisma.activityPost.findMany.mockResolvedValue([]);
+
+      await service.getStudentActivityFeed('student-1', actor, '5');
+
+      expect(prisma.activityPost.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: expect.arrayContaining([
+              { audienceType: 'ALL' },
+              {
+                audienceType: 'STUDENT',
+                studentTags: { some: { studentId: 'student-1' } },
+              },
+              { audienceType: 'CLASS', classId: 'class-1' },
+              {
+                audienceType: 'SECTION',
+                classId: 'class-1',
+                sectionId: 'section-1',
+              },
+            ]),
+          }),
+        }),
+      );
+    });
+
+    it('maps seenAt from the guardian SEEN reaction and counts all reactions', async () => {
+      authorizeChild();
+      prisma.activityPost.findMany.mockResolvedValue([mockPost()]);
+      prisma.activityAttachment.findMany.mockResolvedValue([
+        {
+          id: 'attachment-1',
+          activityPostId: 'post-1',
+          fileName: 'science.jpg',
+          contentType: 'image/jpeg',
+          sizeBytes: 2048,
+          processingStatus: 'READY',
+          thumbnailFileAssetId: 'thumb-1',
+          optimizedObjectKey: null,
+          sortOrder: 0,
+        },
+      ]);
+      prisma.activityReaction.findMany.mockResolvedValue([
+        {
+          activityPostId: 'post-1',
+          guardianId: 'guardian-1',
+          reaction: 'SEEN',
+          createdAt: new Date('2026-07-01T06:30:00.000Z'),
+        },
+        {
+          activityPostId: 'post-1',
+          guardianId: 'guardian-2',
+          reaction: 'THANK_YOU',
+          createdAt: new Date('2026-07-01T07:30:00.000Z'),
+        },
+      ]);
+
+      const result = await service.getStudentActivityFeed('student-1', actor, '1');
+
+      expect(result.items[0]).toEqual(
+        expect.objectContaining({
+          seenAt: '2026-07-01T06:30:00.000Z',
+          attachmentCount: 1,
+          reactionCount: 2,
+          attachments: [
+            expect.objectContaining({
+              thumbnailPath: '/activity-feed/attachments/attachment-1/thumbnail',
+              previewPath: '/activity-feed/attachments/attachment-1/preview',
+            }),
+          ],
+        }),
+      );
+      expect(JSON.stringify(result)).not.toContain('optimizedObjectKey');
+    });
+
+    it('exposes latestActivity on the dashboard from the first feed item', async () => {
+      jest.spyOn(service, 'listMyStudents').mockResolvedValue({
+        items: [
+          {
+            id: 'student-1',
+            name: 'Asha Rai',
+            classSection: 'Grade 4 - A',
+            classId: 'class-1',
+            sectionId: 'section-1',
+            rollNumber: '7',
+            academicYear: '2082',
+            academicYearStartsOn: '2025-04-14T00:00:00.000Z',
+            academicYearEndsOn: '2026-04-13T00:00:00.000Z',
+            relationship: 'Daughter',
+            isPrimaryGuardian: true,
+            guardianId: 'guardian-1',
+            capabilities: ALL_GUARDIAN_CAPABILITIES,
+            relationshipState: null,
+          },
+        ],
+      });
+      jest.spyOn(service, 'getStudentProfile').mockResolvedValue({
+        child: { id: 'student-1', name: 'Asha Rai' },
+        profile: {},
+      } as never);
+      jest.spyOn(service, 'getStudentActivityFeed').mockResolvedValue({
+        items: [
+          {
+            id: 'post-1',
+            title: 'Science day',
+            caption: 'Students built models.',
+            category: 'LEARNING',
+            publishedAt: '2026-06-29T00:00:00.000Z',
+            seenAt: null,
+            attachmentCount: 0,
+            reactionCount: 0,
+            attachments: [],
+          },
+        ],
+      });
+      jest.spyOn(service, 'listNotifications').mockResolvedValue({
+        unreadCount: 0,
+        items: [],
+        nextCursor: null,
+      });
+      entitlementsService.getEntitlements.mockResolvedValue({
+        modules: ['students', 'activity'],
+        features: [],
+        addOns: [],
+        tier: null,
+      });
+
+      const dashboard = await service.getDashboard(actor);
+
+      expect(dashboard.latestActivity).toEqual(
+        expect.objectContaining({
+          id: 'post-1',
+          title: 'Science day',
+        }),
+      );
+      expect(service.getStudentActivityFeed).toHaveBeenCalledWith(
+        'student-1',
+        actor,
+        '1',
+      );
+    });
+
+    it('denies activity reads without ACADEMICS_VIEW capability', async () => {
+      prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+      prisma.guardian.findFirst.mockResolvedValue({
+        id: 'guardian-1',
+        studentLinks: [
+          {
+            studentId: 'student-1',
+            guardianId: 'guardian-1',
+            capabilities: [GuardianCapability.ATTENDANCE_VIEW],
+          },
+        ],
+      });
+
+      await expect(
+        service.getStudentActivityFeed('student-1', actor, '1'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prisma.activityPost.findMany).not.toHaveBeenCalled();
+    });
   });
 
   it('streams receipt PDFs only after linked-child access is verified', async () => {
