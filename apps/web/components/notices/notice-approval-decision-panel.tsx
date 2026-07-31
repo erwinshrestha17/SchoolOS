@@ -5,6 +5,10 @@ import { useState } from 'react';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import { api } from '@/lib/api';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import {
+  showErrorFromUnknown,
+  showSuccess,
+} from '@/lib/toast';
 
 export function NoticeApprovalDecisionPanel({
   noticeId,
@@ -25,13 +29,24 @@ export function NoticeApprovalDecisionPanel({
         decision,
         reason: reason.trim() || undefined,
       }),
-    onSuccess: async () => {
+    onSuccess: async (_data, decision) => {
       setPendingDecision(null);
       setReason('');
+      showSuccess(
+        decision === 'APPROVE'
+          ? 'Notice approved. It can now move to publication.'
+          : 'Notice rejected. The author can revise and resubmit.',
+      );
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['notice-detail', noticeId] }),
         queryClient.invalidateQueries({ queryKey: ['notices'] }),
       ]);
+    },
+    onError: (error) => {
+      showErrorFromUnknown(
+        error,
+        'Could not record the approval decision. Try again or contact the school administrator.',
+      );
     },
   });
 

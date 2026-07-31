@@ -1,66 +1,80 @@
-'use client';
+"use client";
 
-import type { OperationalNextAction } from '@schoolos/core';
-import { formatBsDateTime } from '@schoolos/core';
-import { ArrowRight } from 'lucide-react';
-import Link from 'next/link';
-import type { ActionMenuItem } from '../../components/ui/action-menu';
-import { useQuery } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
-import { DashboardCommandCenter } from '../../components/dashboard/dashboard-command-center';
-import { TeacherTodayWorkspace } from '../../components/dashboard/teacher-today-workspace';
-import { useTeacherAccess } from '../../lib/teacher-access';
-import { ModuleHeader } from '../../components/ui/module-header';
+import type { OperationalNextAction } from "@schoolos/core";
+import { formatBsDateTime } from "@schoolos/core";
+import { ArrowRight } from "lucide-react";
+import Link from "next/link";
+import type { ActionMenuItem } from "../../components/ui/action-menu";
+import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { AdminDashboard } from "../../components/dashboard/admin-dashboard";
+import { PrincipalDashboard } from "../../components/dashboard/principal-dashboard";
+import { OperationalDashboardLayout } from "../../components/dashboard/operational-dashboard-layout";
+import { TeacherTodayWorkspace } from "../../components/dashboard/teacher-today-workspace";
+import { useTeacherAccess } from "../../lib/teacher-access";
+import { useSchoolWebPersona } from "../../lib/school-web-persona";
+import {
+  projectDashboardForPersona,
+  resolveDashboardCompositionPersona,
+} from "../../lib/dashboard-persona";
+import { ModuleHeader } from "../../components/ui/module-header";
 import {
   OperationalSummaryError,
   OperationalSummaryLoading,
   RefreshSummaryButton,
   resolveOperationalSummaryAction,
   SummaryStatusBadge,
-} from '../../components/ui/operational-summary';
-import { api } from '../../lib/api';
-import { formatSchoolDate } from '../../lib/date-utils';
+} from "../../components/ui/operational-summary";
+import { LoadingState } from "../../components/ui/loading-state";
+import { usePermissionAccess } from "../../lib/permissions-ui";
+import { api } from "../../lib/api";
+import { formatSchoolDate } from "../../lib/date-utils";
 
 export default function DashboardPage() {
   const router = useRouter();
-  // Class/Subject Teachers get a dedicated assignment-scoped Today view
-  // instead of the school-wide operational summary (Teacher Persona spec
-  // 10.1/21.1). Persona resolution is shared with the sidebar and route
-  // guards so all three can never disagree.
   const { isTeacherPersona } = useTeacherAccess();
+  const schoolWebPersona = useSchoolWebPersona();
+  const { resolution: permissionResolution } = usePermissionAccess();
+  const compositionPersona = resolveDashboardCompositionPersona(
+    schoolWebPersona,
+  );
 
   const dashboardQuery = useQuery({
-    queryKey: ['operational-dashboard-summary'],
+    queryKey: ["operational-dashboard-summary", compositionPersona],
     queryFn: api.getDashboardSummary,
     staleTime: 30_000,
-    enabled: !isTeacherPersona,
+    enabled: !isTeacherPersona && permissionResolution === "granted",
   });
 
-  const safeNextActions = (dashboardQuery.data?.nextActions ?? [])
-    .map((action) => ({ action, href: resolveOperationalSummaryAction(action) }))
-    .filter((item): item is { action: OperationalNextAction; href: string } => Boolean(item.href));
+  const projectedDashboard = useMemo(
+    () =>
+      dashboardQuery.data
+        ? projectDashboardForPersona(dashboardQuery.data, compositionPersona)
+        : null,
+    [dashboardQuery.data, compositionPersona],
+  );
 
-  // Context-aware primary action from real permitted dashboard data: when
-  // anything needs review, the header's one primary action is the attention
-  // queue itself ("Review N attention items"); otherwise the backend's
-  // highest-priority authorized next action. Never a hard-coded workflow.
-  const attentionCount = (dashboardQuery.data?.attentionItems ?? []).filter(
+  const safeNextActions = (projectedDashboard?.nextActions ?? [])
+    .map((action) => ({ action, href: resolveOperationalSummaryAction(action) }))
+    .filter((item): item is { action: OperationalNextAction; href: string } =>
+      Boolean(item.href),
+    );
+
+  const attentionCount = (projectedDashboard?.attentionItems ?? []).filter(
     (item) => item.count > 0,
   ).length;
   const [firstNextAction, ...remainingNextActions] = safeNextActions;
   const primaryAction =
     attentionCount > 0
       ? {
-          label: `Review ${attentionCount} attention item${attentionCount === 1 ? '' : 's'}`,
-          href: '#needs-attention',
+          label: `Review ${attentionCount} attention item${attentionCount === 1 ? "" : "s"}`,
+          href: "#needs-attention",
         }
       : firstNextAction
         ? { label: firstNextAction.action.label, href: firstNextAction.href }
         : null;
 
-  // Everything else stays reachable from More Actions. When the primary
-  // action is the attention queue, the backend's first next action still
-  // belongs in the menu rather than disappearing.
   const menuNextActions =
     attentionCount > 0 ? safeNextActions : remainingNextActions;
   const quickActions: ActionMenuItem[] = menuNextActions
@@ -69,6 +83,27 @@ export default function DashboardPage() {
       label: action.label,
       onClick: () => router.push(href),
     }));
+
+  const headerCopy =
+    compositionPersona === "principal"
+      ? {
+          eyebrow: "Executive oversight",
+          title: "Executive Dashboard",
+          description:
+            "Critical attention items, approvals, and school readiness for leadership decisions.",
+        }
+      : compositionPersona === "admin"
+        ? {
+            eyebrow: "School operations",
+            title: "Operations Dashboard",
+            description:
+              "Daily operating snapshot for admissions, attendance, fees, and configuration readiness.",
+          }
+        : {
+            eyebrow: "School operations",
+            title: "School Overview",
+            description: "Daily operating snapshot for your school.",
+          };
 
   if (isTeacherPersona) {
     return (
@@ -83,21 +118,34 @@ export default function DashboardPage() {
     );
   }
 
+  if (permissionResolution === "loading") {
+    return (
+      <div className="space-y-6">
+        <ModuleHeader
+          eyebrow={headerCopy.eyebrow}
+          title={headerCopy.title}
+          description={headerCopy.description}
+        />
+        <LoadingState variant="page" label="Checking workspace access…" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <ModuleHeader
-        eyebrow="School operations"
-        title="School Overview"
-        description="Daily operating snapshot for your school."
+        eyebrow={headerCopy.eyebrow}
+        title={headerCopy.title}
+        description={headerCopy.description}
         metadata={
-          dashboardQuery.data ? (
+          projectedDashboard ? (
             <>
               <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600">
-                School day: {formatSchoolDate(dashboardQuery.data.schoolDay)}
+                School day: {formatSchoolDate(projectedDashboard.schoolDay)}
               </span>
-              <SummaryStatusBadge status={dashboardQuery.data.status} />
+              <SummaryStatusBadge status={projectedDashboard.status} />
               <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500">
-                Updated {formatBsDateTime(dashboardQuery.data.generatedAt)}
+                Updated {formatBsDateTime(projectedDashboard.generatedAt)}
                 <RefreshSummaryButton
                   onClick={() => void dashboardQuery.refetch()}
                   isLoading={dashboardQuery.isFetching}
@@ -124,7 +172,18 @@ export default function DashboardPage() {
       {dashboardQuery.isError ? (
         <OperationalSummaryError onRetry={() => void dashboardQuery.refetch()} />
       ) : null}
-      {dashboardQuery.data ? <DashboardCommandCenter dashboard={dashboardQuery.data} /> : null}
+      {projectedDashboard ? (
+        compositionPersona === "admin" ? (
+          <AdminDashboard dashboard={projectedDashboard} />
+        ) : compositionPersona === "principal" ? (
+          <PrincipalDashboard dashboard={projectedDashboard} />
+        ) : (
+          <OperationalDashboardLayout
+            dashboard={projectedDashboard}
+            persona="general"
+          />
+        )
+      ) : null}
     </div>
   );
 }

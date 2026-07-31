@@ -7,6 +7,10 @@ import type {
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { prioritizeByAttention } from "../../lib/dashboard/prioritize-by-attention";
+import {
+  operationsModulesForPersona,
+  type DashboardCompositionPersona,
+} from "@/lib/dashboard-persona";
 import { cn } from "../../lib/utils";
 import { SectionCard } from "../ui/section-card";
 import {
@@ -24,43 +28,35 @@ import {
  * whose backend attention items are burning floats to the top via the same
  * shared prioritizer the old card sections used — still no role guessing.
  */
-const OPERATIONS_MODULES: OperationalSummaryModule[] = [
-  "m2_attendance",
-  "m3_fees",
-  "m10_communications",
-  "m8b_transport",
-  "m6_homework_timetable",
-  "m7_hr_payroll",
-];
-
-type RowTone = "ok" | "warn" | "muted";
-
-type OperationsRowState = {
-  text: string;
-  tone: RowTone;
-};
-
 export function TodayOperationsPanel({
   moduleMap,
+  persona = "general",
 }: {
   moduleMap: Map<OperationalSummaryModule, OperationalModuleSummary>;
+  persona?: DashboardCompositionPersona;
 }) {
+  const operationsModules = operationsModulesForPersona(persona);
   // Locked (not enabled) modules are omitted entirely — a disabled module
   // gets no dashboard row; direct route access still shows the shared
   // ModuleLockedState. Permission-denied modules never reach the payload.
   const modules = prioritizeByAttention(
-    OPERATIONS_MODULES.map((module) => moduleMap.get(module)).filter(
-      (summary): summary is OperationalModuleSummary =>
-        summary !== undefined && summary.status !== "locked",
-    ),
+    operationsModules
+      .map((module) => moduleMap.get(module))
+      .filter(
+        (summary): summary is OperationalModuleSummary =>
+          summary !== undefined && summary.status !== "locked",
+      ),
   );
 
+  const title =
+    persona === "principal" ? "Operations oversight" : "Today’s operations";
+  const description =
+    persona === "principal"
+      ? "School-wide exceptions that may need your decision."
+      : "Where each daily workflow stands right now.";
+
   return (
-    <SectionCard
-      title="Today’s operations"
-      description="Where each daily workflow stands right now."
-      noPadding
-    >
+    <SectionCard title={title} description={description} noPadding>
       {modules.length ? (
         <ul className="divide-y divide-slate-100">
           {modules.map((summary) => (
@@ -82,6 +78,13 @@ const toneDotClass: Record<RowTone, string> = {
   ok: "bg-success-500",
   warn: "bg-warning-500",
   muted: "bg-slate-300",
+};
+
+type RowTone = "ok" | "warn" | "muted";
+
+type OperationsRowState = {
+  text: string;
+  tone: RowTone;
 };
 
 function OperationsRow({ summary }: { summary: OperationalModuleSummary }) {

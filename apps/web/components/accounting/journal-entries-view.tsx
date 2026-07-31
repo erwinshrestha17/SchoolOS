@@ -11,7 +11,7 @@ import { VoucherDialog } from "./voucher-dialog";
 import { JournalDetailDialog } from "./journal-detail-dialog";
 import { JournalEntryView } from "@schoolos/core";
 import { cn } from "../../lib/utils";
-import { Toast } from "../ui/toast";
+import { showWarning } from "../../lib/toast";
 import { useSession } from "../session-provider";
 
 export function JournalEntriesView() {
@@ -21,7 +21,6 @@ export function JournalEntriesView() {
   const [selectedEntry, setSelectedEntry] = useState<JournalEntryView | null>(
     null,
   );
-  const [notice, setNotice] = useState<string | null>(null);
 
   const accountsQuery = useQuery({
     queryKey: ["chart-accounts"],
@@ -44,7 +43,7 @@ export function JournalEntriesView() {
 
   const handleCreateVoucher = () => {
     if (!activePeriod) {
-      setNotice(
+      showWarning(
         "No active fiscal period found. Open a period in Accounting Management before creating a voucher.",
       );
       return;
@@ -79,16 +78,6 @@ export function JournalEntriesView() {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-      {notice ? (
-        <Toast
-          title="Active fiscal period required"
-          description={notice}
-          tone="warning"
-          onDismiss={() => setNotice(null)}
-          className="max-w-none"
-        />
-      ) : null}
-
       {canCreateJournal ? (
         <div className="flex flex-wrap gap-3">
           <button

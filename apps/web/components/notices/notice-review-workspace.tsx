@@ -1,6 +1,6 @@
 "use client";
 
-import { formatBsDateTime, type PermissionKey } from "@schoolos/core";
+import { formatBsDateTime } from "@schoolos/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -15,7 +15,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useSession } from "@/components/session-provider";
+import { useNoticeCapabilities } from "@/lib/permissions-ui";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ErrorState } from "@/components/ui/error-state";
 import { LoadingState } from "@/components/ui/loading-state";
@@ -31,11 +31,10 @@ type ReviewAction = "publish" | "schedule" | "approval";
 export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { session } = useSession();
-  const permissions = new Set<PermissionKey>(session?.user.permissions ?? []);
-  const canPreview = permissions.has("notices:create");
-  const canPublish = permissions.has("notices:publish");
-  const canSchedule = permissions.has("notices:schedule");
+  const noticeCaps = useNoticeCapabilities();
+  const canPreview = noticeCaps.canCreate;
+  const canPublish = noticeCaps.canPublish;
+  const canSchedule = noticeCaps.canSchedule;
   const [pendingAction, setPendingAction] = useState<ReviewAction | null>(null);
   const [scheduledFor, setScheduledFor] = useState("");
   const [approvalReason, setApprovalReason] = useState("");
@@ -109,6 +108,10 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
       router.replace(`/dashboard/notices/${noticeId}`);
     },
   });
+
+  if (noticeCaps.resolution === "loading") {
+    return <LoadingState label="Checking notice permissions…" />;
+  }
 
   if (detailQuery.isLoading) {
     return <LoadingState label="Loading saved notice for review..." />;

@@ -14,7 +14,11 @@ import { FileUploader } from "@/components/ui/file-uploader";
 import { LoadingState } from "@/components/ui/loading-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { PermissionDenied } from "@/components/ui/permission-denied";
-import { useSession } from "@/components/session-provider";
+import { useTeacherAccess } from "@/lib/teacher-access";
+import {
+  useNoticeCapabilities,
+  type NoticeAudienceScope,
+} from "@/lib/permissions-ui";
 
 const CATEGORY_OPTIONS = [
   "GENERAL",
@@ -91,10 +95,10 @@ function parseIdList(text: string): string[] {
 export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { session } = useSession();
-  const permissions = new Set(session?.user.permissions ?? []);
-  const canCreate = permissions.has("notices:create");
-  const canEdit = permissions.has("notices:edit");
+  const { isTeacherPersona } = useTeacherAccess();
+  const noticeCaps = useNoticeCapabilities({ isTeacherPersona });
+  const canCreate = noticeCaps.canCreate;
+  const canEdit = noticeCaps.canEdit;
   const [form, setForm] = useState<NoticeDraftForm>(emptyDraft);
   const [preview, setPreview] = useState<NoticeRecipientPreview | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -172,6 +176,24 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
   }, [dirty]);
 
   useEffect(() => {
+    if (noticeCaps.resolution !== "granted") return;
+    if (
+      !noticeCaps.allowedAudienceTypes.includes(form.audienceType) &&
+      noticeCaps.allowedAudienceTypes.length > 0
+    ) {
+      setForm((current) => ({
+        ...current,
+        audienceType: noticeCaps.allowedAudienceTypes[0]!,
+      }));
+      setDirty(true);
+    }
+  }, [
+    form.audienceType,
+    noticeCaps.allowedAudienceTypes,
+    noticeCaps.resolution,
+  ]);
+
+  useEffect(() => {
     setPreview(null);
   }, [
     form.audienceType,
@@ -238,6 +260,10 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
         "The draft could not be saved. Your valid form entries have been preserved.",
       ),
   });
+
+  if (noticeCaps.resolution === "loading") {
+    return <LoadingState label="Checking notice permissions…" />;
+  }
 
   if ((!noticeId && !canCreate) || (noticeId && !canEdit)) {
     return (
@@ -423,14 +449,11 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
               }}
               className="min-h-11"
             >
-              <option value="ALL">Whole school</option>
-              <option value="CLASS">Class</option>
-              <option value="SECTION">Section</option>
-              <option value="ROLE">Role</option>
-              <option value="STAFF">Specific staff</option>
-              <option value="STUDENT">Specific students</option>
-              <option value="GUARDIANS">Specific guardians (linked parents)</option>
-              <option value="RECIPIENTS">Specific people</option>
+              {noticeCaps.allowedAudienceTypes.map((option) => (
+                <option key={option} value={option}>
+                  {audienceOptionLabel(option)}
+                </option>
+              ))}
             </select>
           </Field>
           {form.audienceType === "CLASS" || form.audienceType === "SECTION" ? (
@@ -691,6 +714,29 @@ function validate(form: NoticeDraftForm) {
   )
     return "Enter at least one ID for this audience.";
   return null;
+}
+
+function audienceOptionLabel(option: NoticeAudienceScope) {
+  switch (option) {
+    case "ALL":
+      return "Whole school";
+    case "CLASS":
+      return "Class";
+    case "SECTION":
+      return "Section";
+    case "ROLE":
+      return "Role";
+    case "STAFF":
+      return "Specific staff";
+    case "STUDENT":
+      return "Specific students";
+    case "GUARDIANS":
+      return "Specific guardians (linked parents)";
+    case "RECIPIENTS":
+      return "Specific people";
+    default:
+      return option;
+  }
 }
 
 function formatCategoryLabel(category: string) {

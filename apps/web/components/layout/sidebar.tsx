@@ -39,6 +39,7 @@ import {
 import { api } from '../../lib/api';
 import { useEntitlements } from '../entitlements-provider';
 import { useSession } from '../session-provider';
+import { getRequiredModuleForHref } from '../../lib/nav-module-map';
 import { hasAnyPermission } from '../../lib/session';
 import { TeacherCapability, useTeacherAccess } from '../../lib/teacher-access';
 import { useSchoolWebPersona } from '../../lib/school-web-persona';
@@ -81,36 +82,22 @@ const learningPermissions: PermissionKey[] = [
   'learning:progress',
 ];
 const noticesPermissions: PermissionKey[] = ['notices:read', 'notices:create'];
+
 /**
- * This map mirrors the module entitlement gates in the dashboard layout.
- * It is only used to avoid showing unavailable workspaces; direct routes are
- * still protected by the route layout and the backend.
+ * Whether the administrative Settings hub appears in sidebar / command palette.
+ * Teachers and operational personas reach personal settings through other paths.
  */
-function getRequiredModuleForHref(href: string): string | null {
-  if (href.startsWith('/dashboard/communications')) return 'notices';
-  if (href.startsWith('/dashboard/students')) return 'students';
-  if (href.startsWith('/dashboard/admissions')) return 'students';
-  if (href.startsWith('/dashboard/attendance')) return 'attendance';
-  if (href.startsWith('/dashboard/academics')) return 'exams';
-  if (href.startsWith('/dashboard/timetable')) return 'timetable';
-  if (href.startsWith('/dashboard/homework')) return 'homework';
-  if (href.startsWith('/dashboard/learning')) return 'learning';
-  if (href.startsWith('/dashboard/fees')) return 'fees';
-  // '/dashboard/finance' is a legacy alias route for Fees & Receipts (see
-  // activeWhen on the Fees nav item below); direct navigation there must
-  // still gate on the same module entitlement as '/dashboard/fees'.
-  if (href.startsWith('/dashboard/finance')) return 'fees';
-  if (href.startsWith('/dashboard/accounting')) return 'accounting';
-  if (href.startsWith('/dashboard/hr')) return 'hr';
-  if (href.startsWith('/dashboard/payroll')) return 'hr';
-  if (href.startsWith('/dashboard/library')) return 'library';
-  if (href.startsWith('/dashboard/transport')) return 'transport';
-  if (href.startsWith('/dashboard/canteen')) return 'canteen';
-  if (href.startsWith('/dashboard/notices')) return 'notices';
-  if (href.startsWith('/dashboard/activity')) return 'activity';
-  if (href.startsWith('/dashboard/messages')) return 'notices';
-  if (href.startsWith('/dashboard/reports')) return 'reports';
-  return null;
+export function shouldShowSettingsHub(
+  schoolWebPersona: SchoolWebPersona,
+  isTeacherPersona: boolean,
+): boolean {
+  return (
+    !isTeacherPersona &&
+    (schoolWebPersona === 'admin' ||
+      schoolWebPersona === 'principal' ||
+      schoolWebPersona === 'hr' ||
+      schoolWebPersona === 'accountant')
+  );
 }
 
 /**
@@ -1111,12 +1098,10 @@ export function Sidebar({
   // redundant (and would surface tenant-wide settings sections) for them.
   // Operational shells also keep Settings only when the persona is admin /
   // principal / hr (configuration or limited review).
-  const showSettingsHub =
-    !isTeacherPersona &&
-    (schoolWebPersona === 'admin' ||
-      schoolWebPersona === 'principal' ||
-      schoolWebPersona === 'hr' ||
-      schoolWebPersona === 'accountant');
+  const showSettingsHub = shouldShowSettingsHub(
+    schoolWebPersona,
+    isTeacherPersona,
+  );
   const visibleSettings =
     showSettingsHub && canDisplayNavItem(settingsNavItem, session, hasModule)
       ? settingsNavItem

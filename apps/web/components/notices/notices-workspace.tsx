@@ -1,6 +1,5 @@
 'use client';
 
-import type { PermissionKey } from '@schoolos/core';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -13,7 +12,7 @@ import { SummaryCard, SummaryGrid } from '../ui/summary-card';
 import { WorkSurface } from '../ui/work-surface';
 import { ModuleHeader } from '../ui/module-header';
 import { WorkspaceTabs } from '../ui/module-tabs';
-import { useSession } from '../session-provider';
+import { useNoticeCapabilities, useHasPermission } from '../../lib/permissions-ui';
 import { NoticeListWorkspace } from './notice-list-workspace';
 import { NoticeComposerWorkspace } from './notice-composer-workspace';
 
@@ -31,13 +30,12 @@ export function NoticesWorkspace({
   variant?: 'overview' | 'composer';
 }) {
   const router = useRouter();
-  const { session } = useSession();
-  const granted = new Set<PermissionKey>(session?.user.permissions ?? []);
-  const canCreateNotices = granted.has('notices:create');
-  const canReadDeliveries = granted.has(
+  const noticeCaps = useNoticeCapabilities();
+  const canCreateNotices = noticeCaps.canCreate;
+  const canReadDeliveries = useHasPermission(
     'notifications:view_delivery_diagnostics',
   );
-  const canManageTemplates = granted.has('notifications:manage_templates');
+  const canManageTemplates = useHasPermission('notifications:manage_templates');
 
   const summaryQuery = useQuery({
     queryKey: ['communications-summary'],

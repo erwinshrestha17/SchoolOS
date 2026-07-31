@@ -43,6 +43,7 @@ import { AttendanceConflictReview } from "./attendance-conflict-review";
 import { AttendanceCorrectionReview } from "./attendance-correction-review";
 import { useSession } from "@/components/session-provider";
 import { useTeacherAccess } from "@/lib/teacher-access";
+import { useAttendanceCapabilities } from "@/lib/permissions-ui";
 import { DashboardPageShell } from "@/components/dashboard/dashboard-page-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1764,7 +1765,8 @@ export function AttendanceReportsWorkspace() {
 export function AttendanceSettingsWorkspace() {
   const queryClient = useQueryClient();
   const { session } = useSession();
-  const canManage = session?.user.permissions.includes("attendance:manage_all");
+  const attendance = useAttendanceCapabilities();
+  const canManage = attendance.canManageAll;
   const policyQuery = useQuery({
     queryKey: ["attendance-m2-policy"],
     queryFn: api.getM2Policy,

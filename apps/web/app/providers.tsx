@@ -4,7 +4,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PropsWithChildren, useState } from 'react';
 import { SessionProvider } from '../components/session-provider';
 import { EntitlementsProvider } from '../components/entitlements-provider';
-import { SupportOverrideBanner } from '../components/platform/SupportOverrideBanner';
 import { ApiRequestError } from '../lib/api';
 import { TooltipProvider } from '../components/ui/primitives/tooltip';
 import { Toaster } from '../components/ui/primitives/sonner';
@@ -45,7 +44,6 @@ export function Providers({ children }: PropsWithChildren) {
     <QueryClientProvider client={queryClient}>
       <SessionProvider>
         <EntitlementsProvider>
-          <SupportOverrideBanner />
           <ServiceWorkerRegistration />
           <TooltipProvider>
             <SchoolOSMotionProvider>

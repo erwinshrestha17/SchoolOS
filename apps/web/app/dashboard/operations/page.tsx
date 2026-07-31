@@ -1,6 +1,5 @@
 'use client';
 
-import type { PermissionKey } from '@schoolos/core';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import {
@@ -20,7 +19,7 @@ import { KpiCard, KpiGrid } from '@/components/ui/kpi-card';
 import { ModuleTabs } from '@/components/ui/module-tabs';
 import { SectionCard } from '@/components/ui/section-card';
 import { PermissionDenied } from '@/components/ui/permission-denied';
-import { useSession } from '@/components/session-provider';
+import { useHasAnyPermission } from '@/lib/permissions-ui';
 import { canteenApi } from '@/lib/api/canteen';
 import { libraryApi } from '@/lib/api/library';
 import { transportApi } from '@/lib/api/transport';
@@ -32,19 +31,13 @@ function safeValue(error: boolean, value?: number) {
 
 export default function OperationsPage() {
   const router = useRouter();
-  const { session } = useSession();
-  const grantedPermissions = new Set<PermissionKey>(
-    session?.user.permissions ?? [],
-  );
-  const hasAnyPermission = (permissions: PermissionKey[]) =>
-    permissions.some((permission) => grantedPermissions.has(permission));
-  const canUseLibrary = hasAnyPermission(['library:read', 'library:manage']);
-  const canUseTransport = hasAnyPermission([
+  const canUseLibrary = useHasAnyPermission(['library:read', 'library:manage']);
+  const canUseTransport = useHasAnyPermission([
     'transport:read',
     'transport:manage',
     'transport:operate',
   ]);
-  const canUseCanteen = hasAnyPermission([
+  const canUseCanteen = useHasAnyPermission([
     'canteen:menu:read',
     'canteen:plans:read',
     'canteen:enrollments:read',

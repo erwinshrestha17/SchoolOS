@@ -13,6 +13,7 @@ import {
 import { Input } from "../ui/input";
 import { Select } from "../ui/select";
 import { Loader2, AlertCircle } from "lucide-react";
+import { showErrorFromUnknown, showSuccess } from "../../lib/toast";
 
 export type VoucherType =
   | "JOURNAL"
@@ -77,10 +78,14 @@ export function VoucherDialog({
         queryKey: ["accounting-dashboard-summary"],
       });
       void queryClient.invalidateQueries({ queryKey: ["accounting-report"] });
+      showSuccess(`${voucherLabels[voucherType]} saved as draft.`);
       onClose();
     },
-    onError: (err: any) => {
-      setError(err.message || "Failed to create voucher");
+    onError: (err: unknown) => {
+      showErrorFromUnknown(
+        err,
+        "The voucher could not be saved. Check the highlighted fields and try again.",
+      );
     },
     onSettled: () => setLoading(false),
   });

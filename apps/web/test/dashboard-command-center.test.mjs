@@ -29,7 +29,8 @@ describe('principal dashboard command center', () => {
     const page = read('app/dashboard/page.tsx');
 
     assert.match(page, /api\.getDashboardSummary/);
-    assert.match(page, /DashboardCommandCenter/);
+    assert.match(page, /AdminDashboard/);
+    assert.match(page, /PrincipalDashboard/);
     assert.match(page, /resolveOperationalSummaryAction/);
     assert.match(page, /OperationalSummaryLoading/);
     assert.match(page, /OperationalSummaryError/);
@@ -51,13 +52,13 @@ describe('principal dashboard command center', () => {
   });
 
   it('composes the focused one-viewport structure without the old card walls', () => {
-    const commandCenter = read('components/dashboard/dashboard-command-center.tsx');
+    const layout = read('components/dashboard/operational-dashboard-layout.tsx');
 
-    assert.match(commandCenter, /DashboardSummaryStrip/);
-    assert.match(commandCenter, /DashboardAttentionPanel/);
-    assert.match(commandCenter, /TodayOperationsPanel/);
-    assert.match(commandCenter, /SchoolReadinessSection/);
-    assert.match(commandCenter, /LatestSchoolActivityPanel/);
+    assert.match(layout, /DashboardSummaryStrip/);
+    assert.match(layout, /DashboardAttentionPanel/);
+    assert.match(layout, /TodayOperationsPanel/);
+    assert.match(layout, /SchoolReadinessSection/);
+    assert.match(layout, /LatestSchoolActivityPanel/);
 
     const bundle = readDashboardBundle();
     // Removed sections: the six-card pulse strip, module card walls, the
@@ -184,10 +185,10 @@ describe('principal dashboard command center', () => {
   it('derives the header primary action from real dashboard data, attention first', () => {
     const page = read('app/dashboard/page.tsx');
 
-    assert.match(page, /title="School Overview"/);
-    assert.match(page, /Daily operating snapshot for your school/);
+    assert.match(page, /title: "Operations Dashboard"/);
+    assert.match(page, /title: "Executive Dashboard"/);
     assert.match(page, /Review \$\{attentionCount\} attention item/);
-    assert.match(page, /href: '#needs-attention'/);
+    assert.match(page, /href: "#needs-attention"/);
     assert.match(page, /firstNextAction/);
     assert.doesNotMatch(page, /primaryAction=\{\s*<RefreshSummaryButton/);
     // Secondary actions stay in the shared More Actions menu.

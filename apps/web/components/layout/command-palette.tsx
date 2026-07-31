@@ -12,6 +12,7 @@ import {
   canDisplayNavItem,
   navGroupsForPersona,
   settingsNavItem,
+  shouldShowSettingsHub,
   type NavItem,
 } from './sidebar';
 import { useSchoolWebPersona } from '../../lib/school-web-persona';
@@ -49,21 +50,24 @@ export function CommandPalette() {
   const { hasModule } = useEntitlements();
   const { entries: recentlyViewed } = useRecentlyViewed();
   const schoolWebPersona = useSchoolWebPersona();
-  const { capabilities } = useTeacherAccess();
+  const { isTeacherPersona, capabilities } = useTeacherAccess();
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const navItems = useMemo(() => {
-    const flattened: NavItem[] = [
-      ...navGroupsForPersona(schoolWebPersona, capabilities).flatMap(
-        (group) => group.items,
-      ),
-      settingsNavItem,
-    ];
+    const flattened: NavItem[] = navGroupsForPersona(
+      schoolWebPersona,
+      capabilities,
+    ).flatMap((group) => group.items);
+
+    if (shouldShowSettingsHub(schoolWebPersona, isTeacherPersona)) {
+      flattened.push(settingsNavItem);
+    }
+
     return flattened.filter((item) => canDisplayNavItem(item, session, hasModule));
-  }, [session, hasModule, schoolWebPersona, capabilities]);
+  }, [session, hasModule, schoolWebPersona, capabilities, isTeacherPersona]);
 
   const results = useMemo(() => {
     const normalized = query.trim().toLowerCase();

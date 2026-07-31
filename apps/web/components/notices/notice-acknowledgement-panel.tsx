@@ -1,11 +1,11 @@
 'use client';
 
-import { formatBsDateTime, type PermissionKey } from '@schoolos/core';
+import { formatBsDateTime } from '@schoolos/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Send, UsersRound } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { communicationsApi } from '@/lib/api/communications';
-import { useSession } from '@/components/session-provider';
+import { useNoticeCapabilities } from '@/lib/permissions-ui';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { TablePagination } from '@/components/ui/table-pagination';
@@ -19,12 +19,14 @@ export function NoticeAcknowledgementPanel({
   noticeId: string;
   lifecycleStatus: string;
 }) {
-  const { session } = useSession();
   const queryClient = useQueryClient();
-  const permissions = new Set<PermissionKey>(session?.user.permissions ?? []);
-  const canReadReport = permissions.has('notices:read_reports');
+  const noticeCaps = useNoticeCapabilities();
+  const canReadReport =
+    noticeCaps.resolution === 'granted' && noticeCaps.canReadReports;
   const canAcknowledge =
-    permissions.has('notices:read') && lifecycleStatus === 'PUBLISHED';
+    noticeCaps.resolution === 'granted' &&
+    noticeCaps.canView &&
+    lifecycleStatus === 'PUBLISHED';
   const [status, setStatus] = useState<'PENDING' | 'ACKNOWLEDGED'>('PENDING');
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());

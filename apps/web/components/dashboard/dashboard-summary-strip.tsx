@@ -15,9 +15,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "../../lib/utils";
+import type { DashboardCompositionPersona } from "@/lib/dashboard-persona";
 import {
-  attendanceProgress,
   attentionKind,
+  attendanceProgress,
   formatMoneyNpr,
   formatNumber,
   metricNumber,
@@ -44,11 +45,13 @@ type SummaryCardModel = {
 export function DashboardSummaryStrip({
   dashboard,
   moduleMap,
+  persona = "general",
 }: {
   dashboard: OperationalDashboardSummary;
   moduleMap: Map<OperationalSummaryModule, OperationalModuleSummary>;
+  persona?: DashboardCompositionPersona;
 }) {
-  const cards = buildSummaryCards(dashboard, moduleMap).slice(0, 4);
+  const cards = buildSummaryCards(dashboard, moduleMap, persona).slice(0, 4);
   if (!cards.length) return null;
 
   return (
@@ -102,8 +105,12 @@ function SummaryStripCard({ card }: { card: SummaryCardModel }) {
 function buildSummaryCards(
   dashboard: OperationalDashboardSummary,
   moduleMap: Map<OperationalSummaryModule, OperationalModuleSummary>,
+  persona: DashboardCompositionPersona,
 ): SummaryCardModel[] {
   const cards: SummaryCardModel[] = [];
+
+  const includeFees = persona !== "principal";
+  const includeStaff = persona === "admin" || persona === "general";
 
   const attendance = visibleModule(moduleMap, "m2_attendance");
   if (attendance) {
@@ -146,7 +153,7 @@ function buildSummaryCards(
   }
 
   const fees = visibleModule(moduleMap, "m3_fees");
-  if (fees) {
+  if (fees && includeFees) {
     const collected = metricValue(fees, "collectedTodayAmount");
     const paymentCount = metricNumber(fees, "paymentCountToday");
     cards.push({
@@ -168,7 +175,7 @@ function buildSummaryCards(
   }
 
   const hr = visibleModule(moduleMap, "m7_hr_payroll");
-  if (hr) {
+  if (hr && includeStaff) {
     const present = metricNumber(hr, "staffPresentToday");
     const onLeave = metricNumber(hr, "staffOnApprovedLeaveToday");
     cards.push({

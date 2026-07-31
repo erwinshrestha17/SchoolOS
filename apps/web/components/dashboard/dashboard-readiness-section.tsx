@@ -8,6 +8,10 @@ import { ArrowRight, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "../../lib/utils";
 import {
+  shouldShowReadinessPanel,
+  type DashboardCompositionPersona,
+} from "@/lib/dashboard-persona";
+import {
   formatMoneyNpr,
   formatNumber,
   metricNumber,
@@ -176,17 +180,22 @@ const READINESS_PANELS: ReadinessPanelDefinition[] = [
 
 export function SchoolReadinessSection({
   moduleMap,
+  persona = "general",
 }: {
   moduleMap: Map<OperationalSummaryModule, OperationalModuleSummary>;
+  persona?: DashboardCompositionPersona;
 }) {
   return (
     <section aria-label="School readiness">
       <div className="grid gap-4 md:grid-cols-3">
-        {READINESS_PANELS.map((panel) => (
+        {READINESS_PANELS.filter((panel) =>
+          shouldShowReadinessPanel(panel.key, persona),
+        ).map((panel) => (
           <ReadinessPanel
             key={panel.key}
             panel={panel}
             moduleMap={moduleMap}
+            persona={persona}
           />
         ))}
       </div>
@@ -197,9 +206,11 @@ export function SchoolReadinessSection({
 function ReadinessPanel({
   panel,
   moduleMap,
+  persona,
 }: {
   panel: ReadinessPanelDefinition;
   moduleMap: Map<OperationalSummaryModule, OperationalModuleSummary>;
+  persona: DashboardCompositionPersona;
 }) {
   const sourceModules = [...new Set(panel.rows.map((row) => row.module))];
   const visibleModules = sourceModules
@@ -216,6 +227,13 @@ function ReadinessPanel({
     .map((definition) => {
       const summary = moduleMap.get(definition.module);
       if (!summary || summary.status === "locked") return null;
+      if (
+        persona === "principal" &&
+        panel.key === "people-operations" &&
+        definition.metricKey === "applicationsNeedingReview"
+      ) {
+        return null;
+      }
       const count = metricNumber(summary, definition.metricKey);
       if (count === null || count <= 0) return null;
       return {

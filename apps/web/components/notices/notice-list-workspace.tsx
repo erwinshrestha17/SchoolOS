@@ -5,7 +5,6 @@ import {
   formatBsDateTime,
   type NoticeLifecycleStatus,
   type NoticeSummary,
-  type PermissionKey,
 } from "@schoolos/core";
 import { useQuery } from "@tanstack/react-query";
 import { Search, SlidersHorizontal } from "lucide-react";
@@ -18,8 +17,10 @@ import {
   type PaginatedDataTableColumn,
 } from "@/components/schoolos/data/paginated-data-table";
 import { FilterBar } from "@/components/ui/filter-bar";
+import { FilterChips } from "@/components/ui/filter-chips";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useSession } from "@/components/session-provider";
+import { hasAnyPermission } from "@/lib/session";
 
 const PAGE_SIZE = 25;
 const priorities = ["NORMAL", "URGENT", "EMERGENCY"] as const;
@@ -34,8 +35,7 @@ export function NoticeListWorkspace({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { session } = useSession();
-  const permissions = new Set<PermissionKey>(session?.user.permissions ?? []);
-  const canRead = permissions.has("notices:read");
+  const canRead = hasAnyPermission(session, ["notices:read"]);
   const page = positiveNumber(searchParams.get("page"), 1);
   const search = searchParams.get("search") ?? "";
   const priority = searchParams.get("priority") ?? "";
@@ -150,6 +150,42 @@ export function NoticeListWorkspace({
     (!fixedLifecycleStatus && lifecycleStatus),
   );
 
+  const activeFilterChips = [
+    search
+      ? {
+          key: "search",
+          label: `Search: ${search}`,
+          onRemove: () => {
+            setSearchDraft("");
+            setFilters({ search: null, page: null });
+          },
+        }
+      : null,
+    priority
+      ? {
+          key: "priority",
+          label: `Priority: ${label(priority)}`,
+          onRemove: () => setFilters({ priority: null, page: null }),
+        }
+      : null,
+    audienceType
+      ? {
+          key: "audienceType",
+          label: `Audience: ${
+            audienceType === "ALL" ? "Whole school" : label(audienceType)
+          }`,
+          onRemove: () => setFilters({ audienceType: null, page: null }),
+        }
+      : null,
+    !fixedLifecycleStatus && lifecycleStatus
+      ? {
+          key: "lifecycleStatus",
+          label: `Lifecycle: ${label(lifecycleStatus)}`,
+          onRemove: () => setFilters({ lifecycleStatus: null, page: null }),
+        }
+      : null,
+  ].filter((chip): chip is NonNullable<typeof chip> => chip !== null);
+
   return (
     <div className="space-y-4" data-testid="notice-list-workspace">
       <FilterBar
@@ -216,6 +252,18 @@ export function NoticeListWorkspace({
               <SlidersHorizontal size={16} /> Clear
             </button>
           ) : null
+        }
+      />
+
+      <FilterChips
+        chips={activeFilterChips}
+        onClearAll={
+          hasActiveFilters
+            ? () => {
+                setSearchDraft("");
+                router.replace(pathname);
+              }
+            : undefined
         }
       />
 

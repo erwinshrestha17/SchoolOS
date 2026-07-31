@@ -1,6 +1,7 @@
 "use client";
 
 import type { PermissionKey } from "@schoolos/core";
+import { hasEffectivePermission } from "@schoolos/core";
 import { ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -15,6 +16,7 @@ import {
   SETTINGS_NAVIGATION,
   settingsDefinitionMatchesPath,
 } from "../../components/settings/settings-navigation.config";
+import { getRequiredModuleForHref } from "../../lib/nav-module-map";
 
 type RouteGate = {
   prefix: string;
@@ -313,62 +315,6 @@ const settingsRouteGates: RouteGate[] = [
   },
 ];
 
-function getRequiredModuleForHref(href: string): string | null {
-  if (
-    href.startsWith("/dashboard/my-workspace") ||
-    href.startsWith("/dashboard/my-profile")
-  ) {
-    return "hr";
-  }
-  if (href.startsWith("/dashboard/settings/personal/notifications")) {
-    return "notifications";
-  }
-  if (href.startsWith("/dashboard/settings/policies/attendance")) {
-    return "attendance";
-  }
-  if (href.startsWith("/dashboard/settings/policies/exams")) {
-    return "exams";
-  }
-  if (href.startsWith("/dashboard/settings/policies/homework")) {
-    return "homework";
-  }
-  if (href.startsWith("/dashboard/settings/policies/activity-consent")) {
-    return "activity";
-  }
-  if (
-    href.startsWith("/dashboard/settings/school/academic-structure") ||
-    href.startsWith("/dashboard/settings/academic-structure") ||
-    href.startsWith("/dashboard/settings/classes-sections")
-  ) {
-    return "students";
-  }
-  if (href.startsWith("/dashboard/communications")) return "notices";
-  if (href.startsWith("/dashboard/notices/deliveries")) return "notifications";
-  if (href.startsWith("/dashboard/notices/failures")) return "notifications";
-  if (href.startsWith("/dashboard/notifications")) return "notifications";
-  if (href.startsWith("/dashboard/operations")) return null;
-  if (href.startsWith("/dashboard/students")) return "students";
-  if (href.startsWith("/dashboard/admissions")) return "students";
-  if (href.startsWith("/dashboard/attendance")) return "attendance";
-  if (href.startsWith("/dashboard/academics")) return "exams";
-  if (href.startsWith("/dashboard/timetable")) return "timetable";
-  if (href.startsWith("/dashboard/homework")) return "homework";
-  if (href.startsWith("/dashboard/learning")) return "learning";
-  if (href.startsWith("/dashboard/fees")) return "fees";
-  if (href.startsWith("/dashboard/finance")) return "fees";
-  if (href.startsWith("/dashboard/accounting")) return "accounting";
-  if (href.startsWith("/dashboard/hr")) return "hr";
-  if (href.startsWith("/dashboard/payroll")) return "hr";
-  if (href.startsWith("/dashboard/library")) return "library";
-  if (href.startsWith("/dashboard/transport")) return "transport";
-  if (href.startsWith("/dashboard/canteen")) return "canteen";
-  if (href.startsWith("/dashboard/notices")) return "notices";
-  if (href.startsWith("/dashboard/activity")) return "activity";
-  if (href.startsWith("/dashboard/messages")) return "notices";
-  if (href.startsWith("/dashboard/reports")) return "reports";
-  return null;
-}
-
 function getRouteGateForHref(href: string): RouteGate | null {
   // Personal settings are available to every authenticated school user.
   // Each purpose-limited API (password, profile, notification preferences)
@@ -408,10 +354,13 @@ function hasRoutePermission(
     return true;
   }
 
-  const granted = new Set<string>(grantedPermissions);
   return routeGate.permissionMode === "all"
-    ? routeGate.permissions.every((permission) => granted.has(permission))
-    : routeGate.permissions.some((permission) => granted.has(permission));
+    ? routeGate.permissions.every((permission) =>
+        hasEffectivePermission(grantedPermissions, permission),
+      )
+    : routeGate.permissions.some((permission) =>
+        hasEffectivePermission(grantedPermissions, permission),
+      );
 }
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {

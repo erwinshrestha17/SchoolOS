@@ -16,13 +16,14 @@ describe("global command palette (Ctrl/Cmd+K)", () => {
   it("reuses the sidebar's exact nav data and permission filter, not a second copy", () => {
     assert.match(
       palette,
-      /import \{\s*canDisplayNavItem,\s*dashboardNavGroups,\s*settingsNavItem,/,
+      /import \{\s*canDisplayNavItem,\s*navGroupsForPersona,\s*settingsNavItem,\s*shouldShowSettingsHub,/,
     );
     assert.match(palette, /from '\.\/sidebar'/);
     assert.match(
       palette,
       /\.filter\(\(item\) => canDisplayNavItem\(item, session, hasModule\)\)/,
     );
+    assert.match(palette, /shouldShowSettingsHub\(schoolWebPersona, isTeacherPersona\)/);
   });
 
   it("opens on Ctrl/Cmd+K from anywhere and closes on Escape", () => {

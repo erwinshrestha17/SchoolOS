@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { formatBsDateTime, type PermissionKey } from "@schoolos/core";
+import { formatBsDateTime } from "@schoolos/core";
 import {
   api,
   type NoticeDetail,
@@ -14,7 +14,7 @@ import { useRecentlyViewed } from "@/lib/hooks/use-recently-viewed";
 import { PageHeader } from "@/components/ui/page-header";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ProtectedFileButton } from "@/components/ui/protected-file";
-import { useSession } from "@/components/session-provider";
+import { useNoticeCapabilities } from "@/lib/permissions-ui";
 import { NoticeAcknowledgementPanel } from "@/components/notices/notice-acknowledgement-panel";
 import { NoticeApprovalDecisionPanel } from "@/components/notices/notice-approval-decision-panel";
 import { TablePagination } from "@/components/ui/table-pagination";
@@ -37,7 +37,7 @@ export default function NoticeDetailPage() {
   const params = useParams<{ noticeId: string }>();
   const noticeId = params.noticeId;
   const queryClient = useQueryClient();
-  const { session } = useSession();
+  const noticeCaps = useNoticeCapabilities();
   const [pendingAction, setPendingAction] =
     useState<NoticeLifecycleAction | null>(null);
   const [actionReason, setActionReason] = useState("");
@@ -46,17 +46,17 @@ export default function NoticeDetailPage() {
   const noticeQuery = useQuery({
     queryKey: ["notice-detail", noticeId],
     queryFn: () => api.getNoticeDetail(noticeId),
-    enabled: Boolean(noticeId),
+    enabled: Boolean(noticeId) && noticeCaps.canView,
   });
+
+  const showPublicationReporting = hasPublicationReporting(noticeQuery.data);
 
   const unreadRecipientsQuery = useQuery({
     queryKey: ["notice-unread-recipients", noticeId, unreadPage],
     queryFn: () =>
       api.listNoticeUnreadRecipients(noticeId, { page: unreadPage, limit: 25 }),
     enabled: Boolean(
-      noticeId &&
-      session?.user.permissions.includes("notices:read_reports") &&
-      hasPublicationReporting(noticeQuery.data),
+      noticeId && noticeCaps.canReadReports && showPublicationReporting,
     ),
   });
 
@@ -99,6 +99,31 @@ export default function NoticeDetailPage() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noticeId, noticeQuery.data?.title]);
+
+  if (noticeCaps.resolution === "loading") {
+    return (
+      <NoticePageShell>
+        <div className="grid gap-4">
+          <div className="h-40 animate-pulse rounded-2xl bg-gray-100" />
+          <div className="h-80 animate-pulse rounded-2xl bg-gray-100" />
+        </div>
+      </NoticePageShell>
+    );
+  }
+
+  if (!noticeCaps.canView) {
+    return (
+      <NoticePageShell>
+        <div className="rounded-2xl border border-[var(--line)] bg-white p-8 text-center shadow-sm">
+          <h1 className="text-2xl font-bold text-gray-950">Notice unavailable</h1>
+          <p className="mt-2 text-sm text-gray-500">
+            You do not have permission to view this notice.
+          </p>
+          <BackLink />
+        </div>
+      </NoticePageShell>
+    );
+  }
 
   if (noticeQuery.isLoading) {
     return (
@@ -148,32 +173,30 @@ export default function NoticeDetailPage() {
 
   const attachmentFileId =
     notice.attachmentFileId ?? getProtectedFileId(notice.attachmentUrl);
-  const granted = new Set<PermissionKey>(session?.user.permissions ?? []);
   const canCancel =
-    granted.has("notices:cancel") &&
+    noticeCaps.canCancel &&
     ["DRAFT", "APPROVAL_PENDING", "APPROVED", "SCHEDULED"].includes(
       notice.lifecycleStatus,
     );
   const canArchive =
-    granted.has("notices:archive") && notice.lifecycleStatus !== "ARCHIVED";
+    noticeCaps.canArchive && notice.lifecycleStatus !== "ARCHIVED";
   const canRestore =
-    granted.has("notices:archive") && notice.lifecycleStatus === "ARCHIVED";
+    noticeCaps.canArchive && notice.lifecycleStatus === "ARCHIVED";
   const canEdit =
-    granted.has("notices:edit") && notice.lifecycleStatus === "DRAFT";
+    noticeCaps.canEdit && notice.lifecycleStatus === "DRAFT";
   const canPublish =
-    granted.has("notices:publish") &&
+    noticeCaps.canPublish &&
     ["DRAFT", "APPROVED", "SCHEDULED"].includes(notice.lifecycleStatus);
   const canSchedule =
-    granted.has("notices:schedule") &&
+    noticeCaps.canSchedule &&
     ["DRAFT", "APPROVED", "SCHEDULED"].includes(notice.lifecycleStatus);
   const canDecideApproval =
-    granted.has("advanced:approvals:decide") &&
+    noticeCaps.canApprove &&
     notice.lifecycleStatus === "APPROVAL_PENDING" &&
     Boolean(notice.approvalRequestId);
   const isDraft = notice.lifecycleStatus === "DRAFT";
-  const showPublicationReporting = hasPublicationReporting(notice);
   const canReview =
-    granted.has("notices:create") &&
+    noticeCaps.canCreate &&
     ["DRAFT", "APPROVED", "SCHEDULED"].includes(notice.lifecycleStatus) &&
     ((notice.priority !== "NORMAL" && isDraft) || canPublish || canSchedule);
 

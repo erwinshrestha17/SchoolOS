@@ -893,9 +893,13 @@ describe('SchoolOS web production contracts', () => {
     ];
 
     assert.match(sidebar, /export const dashboardNavGroups/);
-    assert.match(sidebar, /visibleGroups = dashboardNavGroups/);
+    assert.match(sidebar, /const visibleGroups = useMemo/);
     assert.match(sidebar, /canDisplayNavItem\(item, session, hasModule\)/);
     assert.match(sidebar, /getRequiredModuleForHref/);
+    assert.match(
+      read('lib/nav-module-map.ts'),
+      /export function getRequiredModuleForHref/,
+    );
     assert.match(sidebar, /aria-label="School operations navigation"/);
 
     for (const label of requiredPhaseOneLabels) {
@@ -990,7 +994,9 @@ describe('SchoolOS web production contracts', () => {
   it('builds the admin dashboard from a backend-owned operational summary without fake KPI numbers', () => {
     const dashboard = readMany([
       'app/dashboard/page.tsx',
-      'components/dashboard/dashboard-command-center.tsx',
+      'components/dashboard/admin-dashboard.tsx',
+      'components/dashboard/principal-dashboard.tsx',
+      'components/dashboard/operational-dashboard-layout.tsx',
       'components/dashboard/dashboard-module-meta.tsx',
       'components/dashboard/dashboard-summary-strip.tsx',
       'components/dashboard/dashboard-attention-panel.tsx',
@@ -1006,10 +1012,11 @@ describe('SchoolOS web production contracts', () => {
       dashboard,
       /request<OperationalDashboardSummary>\('\/dashboard\/summary'\)/,
     );
-    assert.match(dashboard, /DashboardCommandCenter/);
-    assert.match(dashboard, /dashboard\.modules/);
-    assert.match(dashboard, /dashboard\.attentionItems/);
-    assert.match(dashboard, /dashboardQuery\.data\?\.nextActions/);
+    assert.match(dashboard, /AdminDashboard/);
+    assert.match(dashboard, /PrincipalDashboard/);
+    assert.match(dashboard, /projectedDashboard/);
+    assert.match(dashboard, /projectedDashboard\?\.attentionItems/);
+    assert.match(dashboard, /projectedDashboard\?\.nextActions/);
     assert.match(dashboard, /dashboard\.recentItems/);
     assert.match(dashboard, /resolveOperationalSummaryAction/);
 
@@ -1022,7 +1029,9 @@ describe('SchoolOS web production contracts', () => {
   it('keeps the dashboard shell polished and routes fee alerts to the canonical fees page', () => {
     const dashboard = readMany([
       'app/dashboard/page.tsx',
-      'components/dashboard/dashboard-command-center.tsx',
+      'components/dashboard/admin-dashboard.tsx',
+      'components/dashboard/principal-dashboard.tsx',
+      'components/dashboard/operational-dashboard-layout.tsx',
       'components/dashboard/dashboard-module-meta.tsx',
       'components/dashboard/dashboard-summary-strip.tsx',
       'components/dashboard/dashboard-attention-panel.tsx',
@@ -1058,7 +1067,8 @@ describe('SchoolOS web production contracts', () => {
       layoutBasics,
       /bg-slate-950|bg-slate-900|primary-(50|100|200|300|400|500|600|700|800|900)|shadow-xl|shadow-2xl|rounded-3xl/,
     );
-    assert.match(dashboard, /DashboardCommandCenter/);
+    assert.match(dashboard, /AdminDashboard/);
+    assert.match(dashboard, /PrincipalDashboard/);
     assert.match(dashboard, /severityPresentation/);
     assert.match(dashboard, /Needs your attention/);
     assert.match(dashboard, /Today’s operations/);
@@ -1089,7 +1099,9 @@ describe('SchoolOS web production contracts', () => {
   it('keeps admin dashboard quick actions on existing Phase 1 routes', () => {
     const dashboard = readMany([
       'app/dashboard/page.tsx',
-      'components/dashboard/dashboard-command-center.tsx',
+      'components/dashboard/admin-dashboard.tsx',
+      'components/dashboard/principal-dashboard.tsx',
+      'components/dashboard/operational-dashboard-layout.tsx',
       'components/ui/operational-summary.tsx',
     ]);
     const requiredRoutes = [

@@ -8,6 +8,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
+import { FilterChips } from "@/components/ui/filter-chips";
 import { SearchInput } from "@/components/ui/search-input";
 import { SectionCard } from "@/components/ui/section-card";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -179,6 +180,30 @@ export function StudentLedgerWorkspace() {
 
   const ledger = ledgerQuery.data;
 
+  const ledgerFilterChips = [
+    transactionType
+      ? {
+          key: "transactionType",
+          label: `Type: ${transactionTypeLabel(transactionType)}`,
+          onRemove: () => updateUrl({ transactionType: null, page: null }),
+        }
+      : null,
+    invoiceStatus
+      ? {
+          key: "invoiceStatus",
+          label: `Invoice: ${invoiceStatusLabel(invoiceStatus)}`,
+          onRemove: () => updateUrl({ invoiceStatus: null, page: null }),
+        }
+      : null,
+    sortDirection === "asc"
+      ? {
+          key: "sortDirection",
+          label: "Order: Oldest first",
+          onRemove: () => updateUrl({ sortDirection: "desc", page: null }),
+        }
+      : null,
+  ].filter((chip): chip is NonNullable<typeof chip> => chip !== null);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -273,6 +298,21 @@ export function StudentLedgerWorkspace() {
           </select>
         </label>
       </div>
+
+      <FilterChips
+        chips={ledgerFilterChips}
+        onClearAll={
+          ledgerFilterChips.length > 1
+            ? () =>
+                updateUrl({
+                  transactionType: null,
+                  invoiceStatus: null,
+                  sortDirection: null,
+                  page: null,
+                })
+            : undefined
+        }
+      />
 
       <SectionCard
         title="Ledger activity"
@@ -392,4 +432,26 @@ function LedgerSummary({
       </p>
     </div>
   );
+}
+
+function transactionTypeLabel(value: string) {
+  const labels: Record<string, string> = {
+    INVOICE: "Invoices",
+    PAYMENT: "Payments",
+    WAIVER: "Waivers",
+    REFUND: "Refunds",
+    REVERSAL: "Reversals",
+  };
+  return labels[value] ?? value;
+}
+
+function invoiceStatusLabel(value: string) {
+  const labels: Record<string, string> = {
+    DRAFT: "Draft",
+    ISSUED: "Issued",
+    PARTIAL: "Partially paid",
+    PAID: "Paid",
+    VOID: "Void",
+  };
+  return labels[value] ?? value;
 }

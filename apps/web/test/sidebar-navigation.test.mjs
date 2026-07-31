@@ -9,6 +9,18 @@ const sidebar = readFileSync(
   join(webRoot, 'components/layout/sidebar.tsx'),
   'utf8',
 );
+const navModuleMap = readFileSync(
+  join(webRoot, 'lib/nav-module-map.ts'),
+  'utf8',
+);
+const commandPalette = readFileSync(
+  join(webRoot, 'components/layout/command-palette.tsx'),
+  'utf8',
+);
+const dashboardLayout = readFileSync(
+  join(webRoot, 'app/dashboard/layout.tsx'),
+  'utf8',
+);
 
 describe('school operations sidebar', () => {
   it('keeps platform controls out of the school dashboard shell', () => {
@@ -93,7 +105,30 @@ describe('school operations sidebar', () => {
     // implementation living only in the sidebar.
     assert.match(sidebar, /hasAnyPermission\(session, item\.permissions\)/);
     assert.match(sidebar, /moduleKeys\.some\(\(module\) => hasModule\(module\)\)/);
-    assert.match(sidebar, /function getRequiredModuleForHref/);
+    assert.match(sidebar, /getRequiredModuleForHref/);
+    assert.match(sidebar, /from '..\/..\/lib\/nav-module-map'/);
+    assert.match(dashboardLayout, /from "..\/..\/lib\/nav-module-map"/);
+    assert.doesNotMatch(sidebar, /function getRequiredModuleForHref/);
+    assert.doesNotMatch(dashboardLayout, /function getRequiredModuleForHref/);
+  });
+
+  it('keeps a single canonical module map for sidebar and layout gates', () => {
+    assert.match(navModuleMap, /export function getRequiredModuleForHref/);
+    assert.match(navModuleMap, /export const MODULE_HREF_PREFIXES/);
+    assert.match(navModuleMap, /\/dashboard\/my-workspace/);
+    assert.match(navModuleMap, /\/dashboard\/finance/);
+    assert.match(navModuleMap, /\/dashboard\/operations/);
+    assert.match(navModuleMap, /return null;/);
+  });
+
+  it('aligns command palette settings visibility with the sidebar hub rules', () => {
+    assert.match(sidebar, /export function shouldShowSettingsHub/);
+    assert.match(commandPalette, /shouldShowSettingsHub/);
+    assert.match(commandPalette, /isTeacherPersona/);
+    assert.doesNotMatch(
+      commandPalette,
+      /settingsNavItem,\s*\n\s*\];/,
+    );
   });
 
   it('keeps collapsed navigation and the footer accessible', () => {
