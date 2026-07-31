@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { RequestCacheService } from '../common/cache/request-cache.service';
 import {
   SubscriptionTier,
   ENTITLEMENT_MATRIX,
@@ -47,7 +48,10 @@ const ADDON_ENTITLEMENTS: Record<
 
 @Injectable()
 export class EntitlementsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly requestCache: RequestCacheService,
+  ) {}
 
   /**
    * Helper to filter out M0 / platform-related modules or features.
@@ -67,11 +71,36 @@ export class EntitlementsService {
     );
   }
 
+  /**
+   * Entitlement resolution is read several times per request by the guard
+   * stack and again by handlers, always with the same `tenantId` and always
+   * returning the same near-static rows. Memoizing for the lifetime of the
+   * request removed the duplicate `Tenant` / `TenantSubscription` reads
+   * documented in docs/performance/BASELINE_RESULTS.md §6 without introducing
+   * any cross-request staleness: the next request re-reads from PostgreSQL, so
+   * suspension and entitlement changes still take effect immediately.
+   */
   async getEntitlements(tenantId: string): Promise<EntitlementsResponse> {
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
-      select: { id: true, isActive: true },
-    });
+    return this.requestCache.resolve(`entitlements:${tenantId}`, () =>
+      this.loadEntitlements(tenantId),
+    );
+  }
+
+  private async loadEntitlements(
+    tenantId: string,
+  ): Promise<EntitlementsResponse> {
+    // Deliberately shares the `tenantStatus:` key with
+    // `PlansService.getTenantStatus` — both read the identical
+    // `{ id, isActive }` projection of the same row, and the guard stack calls
+    // both on every request. Sharing the key collapses them into one query.
+    const tenant = await this.requestCache.resolve(
+      `tenantStatus:${tenantId}`,
+      () =>
+        this.prisma.tenant.findUnique({
+          where: { id: tenantId },
+          select: { id: true, isActive: true },
+        }),
+    );
 
     if (!tenant) {
       throw new NotFoundException(`Tenant with ID ${tenantId} not found`);
@@ -142,11 +171,7 @@ export class EntitlementsService {
       for (const f of subscription.plan.features) {
         const resolved = resolvePlanFeatureKey(f.featureKey);
         if (resolved.type === 'module') {
-          applyModuleCompatibility(
-            modulesSet,
-            resolved.moduleName,
-            f.enabled,
-          );
+          applyModuleCompatibility(modulesSet, resolved.moduleName, f.enabled);
           if (!f.enabled) {
             purgeLegacyModuleFeatureKeys(featuresSet, resolved.moduleName);
           }

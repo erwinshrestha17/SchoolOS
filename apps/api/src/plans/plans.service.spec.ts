@@ -1,6 +1,7 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PlansService } from './plans.service';
 import { EntitlementsService } from './entitlements.service';
+import { createPassThroughRequestCache } from '../../test/helpers/request-cache';
 
 describe('PlansService entitlement and usage enforcement', () => {
   let service: PlansService;
@@ -20,8 +21,13 @@ describe('PlansService entitlement and usage enforcement', () => {
       },
     };
 
-    entitlementsService = new EntitlementsService(prisma as any);
-    service = new PlansService(prisma as any, entitlementsService);
+    const requestCache = createPassThroughRequestCache();
+    entitlementsService = new EntitlementsService(prisma as any, requestCache);
+    service = new PlansService(
+      prisma as any,
+      entitlementsService,
+      requestCache,
+    );
   });
 
   it('rejects entitlement checks for missing tenants', async () => {

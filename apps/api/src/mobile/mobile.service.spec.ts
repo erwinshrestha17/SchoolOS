@@ -1,11 +1,18 @@
 import { ForbiddenException } from '@nestjs/common';
-import {
-  AuthMethod,
-  FileStatus,
-  GuardianCapability,
-} from '@prisma/client';
+import { AuthMethod, FileStatus, GuardianCapability } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { MobileService } from './mobile.service';
+import { ParentScopeContextService } from './parent-scope-context.service';
+import { createPassThroughRequestCache } from '../../test/helpers/request-cache';
+
+/**
+ * `StudentGuardian.capabilities` is a scalar list, so PostgreSQL always returns
+ * it on the relationship row. Guardian-scope checks read the column directly
+ * rather than filtering on it in SQL, so fixtures representing an authorized
+ * relationship must carry it. Tests that exercise capability *denial* set a
+ * narrower list explicitly — see the capability-scope describe block.
+ */
+const ALL_GUARDIAN_CAPABILITIES = Object.values(GuardianCapability);
 
 describe('MobileService', () => {
   type MockModel<TMethods extends string> = Record<TMethods, jest.Mock>;
@@ -197,6 +204,14 @@ describe('MobileService', () => {
       storageService as never,
       canteenService as never,
       serviceRequestsService as never,
+      // Real context service over the same Prisma mock, with memoization
+      // disabled (no CLS context). Every existing assertion on the mock's call
+      // counts therefore still sees each underlying query, so this spec keeps
+      // testing the queries themselves rather than the cache.
+      new ParentScopeContextService(
+        prisma as never,
+        createPassThroughRequestCache(),
+      ),
     );
     actor = {
       userId: 'parent-1',
@@ -212,7 +227,13 @@ describe('MobileService', () => {
   it('lists only linked students with an active lifecycle and enrollment', async () => {
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-active' }],
+      studentLinks: [
+        {
+          studentId: 'student-active',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
     });
     prisma.student.findMany.mockResolvedValue([]);
 
@@ -236,7 +257,10 @@ describe('MobileService', () => {
               },
             }),
           }),
-          select: { studentId: true },
+          // `capabilities` is now selected so capability filtering happens in
+          // memory against one query, instead of one query per capability.
+          // The security predicates above are unchanged.
+          select: { studentId: true, capabilities: true },
         },
       },
     });
@@ -257,7 +281,13 @@ describe('MobileService', () => {
   it('returns the linked guardian relationship and primary status', async () => {
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-active' }],
+      studentLinks: [
+        {
+          studentId: 'student-active',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
     });
     prisma.student.findMany.mockResolvedValue([
       {
@@ -322,7 +352,13 @@ describe('MobileService', () => {
     prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-1' }],
+      studentLinks: [
+        {
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
     });
     attendanceService.listParentCorrectionRequests.mockResolvedValue({
       items: [],
@@ -387,7 +423,13 @@ describe('MobileService', () => {
     prisma.guardian.findFirst
       .mockResolvedValueOnce({
         id: 'guardian-1',
-        studentLinks: [{ studentId: 'student-1' }],
+        studentLinks: [
+          {
+            studentId: 'student-1',
+            guardianId: 'guardian-1',
+            capabilities: ALL_GUARDIAN_CAPABILITIES,
+          },
+        ],
       })
       .mockResolvedValueOnce({
         id: 'guardian-1',
@@ -438,7 +480,13 @@ describe('MobileService', () => {
     prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-1' }],
+      studentLinks: [
+        {
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
     });
     financeService.getParentPaymentGatewayReadiness.mockResolvedValue({
       enabled: true,
@@ -457,7 +505,13 @@ describe('MobileService', () => {
     prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-1' }],
+      studentLinks: [
+        {
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
     });
     financeService.initiateParentOnlinePayment.mockResolvedValue({
       id: 'intent-1',
@@ -485,7 +539,13 @@ describe('MobileService', () => {
     prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-1' }],
+      studentLinks: [
+        {
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
     });
     financeService.collectParentSandboxPayment.mockResolvedValue({
       sandbox: true,
@@ -517,7 +577,13 @@ describe('MobileService', () => {
     prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-1' }],
+      studentLinks: [
+        {
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
     });
     financeService.getParentPaymentGatewayReadiness.mockResolvedValue({
       enabled: true,
@@ -561,7 +627,13 @@ describe('MobileService', () => {
     prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-1' }],
+      studentLinks: [
+        {
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
     });
     prisma.invoice.findMany.mockResolvedValue([
       {
@@ -689,7 +761,13 @@ describe('MobileService', () => {
     prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-1' }],
+      studentLinks: [
+        {
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
     });
     prisma.invoice.findMany.mockResolvedValue([
       {
@@ -770,7 +848,13 @@ describe('MobileService', () => {
     prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-1' }],
+      studentLinks: [
+        {
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
     });
     prisma.invoice.findMany.mockResolvedValue([
       {
@@ -888,7 +972,13 @@ describe('MobileService', () => {
     });
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-1' }],
+      studentLinks: [
+        {
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
     });
 
     const result = await service.getStudentProfile('student-1', actor);
@@ -935,7 +1025,13 @@ describe('MobileService', () => {
     prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-1' }],
+      studentLinks: [
+        {
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
     });
     prisma.studentDocument.findFirst.mockResolvedValue({
       id: 'doc-1',
@@ -979,7 +1075,13 @@ describe('MobileService', () => {
     prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-1' }],
+      studentLinks: [
+        {
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
     });
     prisma.reportCard.findMany.mockResolvedValue([
       {
@@ -1095,7 +1197,13 @@ describe('MobileService', () => {
       });
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-1' }],
+      studentLinks: [
+        {
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
     });
     prisma.examTimetableSlot.findMany.mockResolvedValue([
       {
@@ -1138,7 +1246,13 @@ describe('MobileService', () => {
   it('lists notifications for the signed-in parent and linked students with read state', async () => {
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-1' }],
+      studentLinks: [
+        {
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
     });
     prisma.notificationDelivery.findMany.mockResolvedValue([
       {
@@ -1308,7 +1422,13 @@ describe('MobileService', () => {
   it('returns a parent-scoped unread count without loading notification bodies', async () => {
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-1' }],
+      studentLinks: [
+        {
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
     });
     prisma.notificationDelivery.count.mockResolvedValue(3);
 
@@ -1391,7 +1511,13 @@ describe('MobileService', () => {
   it('marks only the signed-in parents visible unread notifications as read', async () => {
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-1' }],
+      studentLinks: [
+        {
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
     });
     prisma.notificationDelivery.findMany.mockResolvedValue([
       { id: 'delivery-1' },
@@ -1423,7 +1549,13 @@ describe('MobileService', () => {
   it('marks only parent-visible mobile notifications as read', async () => {
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-1' }],
+      studentLinks: [
+        {
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
     });
     prisma.notificationDelivery.findFirst.mockResolvedValue({
       id: 'delivery-1',
@@ -1477,7 +1609,13 @@ describe('MobileService', () => {
   it('returns only an exact parent-visible notification detail', async () => {
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-1' }],
+      studentLinks: [
+        {
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
     });
     prisma.notificationDelivery.findFirst.mockResolvedValue({
       id: 'delivery-1',
@@ -1530,7 +1668,13 @@ describe('MobileService', () => {
     const fileContent = Buffer.from('%PDF notice');
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-1' }],
+      studentLinks: [
+        {
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
     });
     prisma.notificationDelivery.findFirst.mockResolvedValue({
       id: 'delivery-1',
@@ -1928,10 +2072,7 @@ describe('MobileService', () => {
     } as never);
     const homework = jest.spyOn(service, 'getStudentHomework');
     const fees = jest.spyOn(service, 'getStudentFeesSummary');
-    const corrections = jest.spyOn(
-      service,
-      'listStudentAttendanceCorrections',
-    );
+    const corrections = jest.spyOn(service, 'listStudentAttendanceCorrections');
     const exams = jest.spyOn(service, 'getStudentExamSchedule');
 
     const result = await service.getParentActionCentre(actor);
@@ -2374,7 +2515,13 @@ describe('MobileService', () => {
       });
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-1' }],
+      studentLinks: [
+        {
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
     });
     prisma.activityPost.findMany.mockResolvedValue([
       {
@@ -2463,7 +2610,13 @@ describe('MobileService', () => {
       });
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-1' }],
+      studentLinks: [
+        {
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
     });
     prisma.homeworkAssignment.findMany.mockResolvedValue([
       {
@@ -2541,7 +2694,13 @@ describe('MobileService', () => {
       });
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-1' }],
+      studentLinks: [
+        {
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
     });
     prisma.homeworkAssignment.findFirst.mockResolvedValue({
       id: 'homework-1',
@@ -2603,7 +2762,13 @@ describe('MobileService', () => {
       });
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-1' }],
+      studentLinks: [
+        {
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
     });
     prisma.homeworkAssignment.findFirst.mockResolvedValue({
       id: 'homework-1',
@@ -2641,7 +2806,13 @@ describe('MobileService', () => {
     prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-1' }],
+      studentLinks: [
+        {
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
     });
     prisma.transportStudentAssignment.findFirst.mockResolvedValue({
       id: 'assignment-1',
@@ -2727,7 +2898,13 @@ describe('MobileService', () => {
     prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-1' }],
+      studentLinks: [
+        {
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
     });
     financeService.getReceiptPdfForStudent.mockResolvedValue(pdf);
 
@@ -2750,7 +2927,13 @@ describe('MobileService', () => {
     prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-1' }],
+      studentLinks: [
+        {
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
     });
     prisma.reportCard.findFirst.mockResolvedValue({ id: 'report-card-1' });
     reportCardPdfService.getReportCardPdf.mockResolvedValue(pdf);
@@ -2777,7 +2960,13 @@ describe('MobileService', () => {
   it('returns signed-in guardian consent status through the communications module', async () => {
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-1' }],
+      studentLinks: [
+        {
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
     });
     communicationsService.getGuardianConsentStatus.mockResolvedValue([
       {
@@ -2814,7 +3003,13 @@ describe('MobileService', () => {
   it('captures signed-in guardian consent decisions through the communications module', async () => {
     prisma.guardian.findFirst.mockResolvedValue({
       id: 'guardian-1',
-      studentLinks: [{ studentId: 'student-1' }],
+      studentLinks: [
+        {
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
     });
     communicationsService.captureConsent.mockResolvedValue({
       consentType: 'MESSAGING',

@@ -9,6 +9,7 @@ import { MobilePrincipalController } from './mobile-principal.controller';
 import { MobilePrincipalService } from './mobile-principal.service';
 import { MobileController } from './mobile.controller';
 import { MobileService } from './mobile.service';
+import { ParentScopeContextService } from './parent-scope-context.service';
 import { AttendanceModule } from '../attendance/attendance.module';
 import { FinanceModule } from '../finance/finance.module';
 import { AcademicsModule } from '../academics/academics.module';
@@ -59,6 +60,6 @@ import { TeacherScopeModule } from '../teacher-scope/teacher-scope.module';
     MobilePrincipalController,
     MobilePushTokensController,
   ],
-  providers: [MobileService, MobilePrincipalService],
+  providers: [MobileService, MobilePrincipalService, ParentScopeContextService],
 })
 export class MobileModule {}

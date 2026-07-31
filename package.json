@@ -49,6 +49,7 @@
     "mock:payment-gateway": "node scripts/mock-payment-gateway-local.mjs",
     "smoke:pilot:rehearsal": "node scripts/smoke-pilot-rehearsal.mjs",
     "db:seed:geography": "pnpm --filter @schoolos/api db:seed:geography",
+    "db:seed:performance": "pnpm --filter @schoolos/api db:seed:performance",
     "test:web:e2e": "pnpm --filter @schoolos/web test:e2e; status=$?; pnpm db:clean:e2e || true; exit $status",
     "verify:env:deploy": "node scripts/check-deploy-env.mjs",
     "verify:env:staging": "DEPLOY_ENV=staging NODE_ENV=production node scripts/check-deploy-env.mjs",

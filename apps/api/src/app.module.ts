@@ -11,6 +11,7 @@ import { AccountingModule } from './accounting/accounting.module';
 import { AdmissionsModule } from './admissions/admissions.module';
 import { AcademicsModule } from './academics/academics.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { RequestCacheModule } from './common/cache/request-cache.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { RolesModule } from './roles/roles.module';
@@ -95,6 +96,7 @@ import { AppThrottlerGuard } from './auth/guards/app-throttler.guard';
         },
       }),
     }),
+    RequestCacheModule,
     PrismaModule,
     StorageModule,
     AuditModule,

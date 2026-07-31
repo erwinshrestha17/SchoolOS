@@ -87,3 +87,5 @@ apps/web/typecheck_output*.txt
 /data/
 
 apps/schoolos_mobile/web/manifest.json
+# Load-test run output (evidence is summarised in docs/performance/)
+tests/load/results/

@@ -9,9 +9,11 @@ import {
   FileStatus,
   GuardianCapability,
   PaymentMethod,
+  Prisma,
   type Student,
 } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
+import { ParentScopeContextService } from './parent-scope-context.service';
 import {
   buildActiveGuardianRelationshipWhere,
   createGuardianCapabilityDeniedException,
@@ -19,7 +21,10 @@ import {
   isParentOnly,
   requireGuardianCapability,
 } from '../common/security/parent-scope';
-import { assertConfirmStudentId, assertConfirmStudentIdAllowed } from '../common/security/confirm-student-action';
+import {
+  assertConfirmStudentId,
+  assertConfirmStudentIdAllowed,
+} from '../common/security/confirm-student-action';
 import { PrismaService } from '../prisma/prisma.service';
 import { AttendanceService } from '../attendance/attendance.service';
 import { FinanceService } from '../finance/finance.service';
@@ -82,6 +87,53 @@ interface MobileStudentRow extends Student {
   }>;
 }
 
+/**
+ * Relations the parent-facing student payload renders. Extracted verbatim from
+ * `getAccessibleStudent` so the shape stays identical while the query itself
+ * can be memoized per request by `ParentScopeContextService`.
+ *
+ * This is a function of the calling user, not a constant: `guardianLinks` is
+ * filtered to the *caller's own* guardian record. Hoisting it to a module-level
+ * constant would drop that filter and return every guardian's link rows for the
+ * child, leaking the other guardian's relationship data to this parent.
+ */
+function accessibleStudentInclude(userId: string) {
+  return {
+    class: {
+      select: { id: true, name: true },
+    },
+    sectionRef: {
+      select: {
+        id: true,
+        name: true,
+        classTeacher: {
+          select: { id: true, firstName: true, lastName: true },
+        },
+      },
+    },
+    guardianLinks: {
+      where: {
+        ...buildActiveGuardianRelationshipWhere(),
+        guardian: { userId },
+      },
+      include: {
+        guardian: { select: { id: true, userId: true } },
+      },
+      orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+    },
+    enrollments: {
+      where: { status: 'ACTIVE' },
+      include: {
+        academicYear: {
+          select: { name: true, startsOn: true, endsOn: true },
+        },
+      },
+      orderBy: [{ createdAt: 'desc' }],
+      take: 1,
+    },
+  } satisfies Prisma.StudentInclude;
+}
+
 type ParentActionPriority = 'URGENT' | 'HIGH' | 'NORMAL';
 type ParentActionSource =
   | 'notices'
@@ -130,6 +182,7 @@ export class MobileService {
     private readonly storageService: StorageService,
     private readonly canteenService: CanteenService,
     private readonly serviceRequestsService: ServiceRequestsService,
+    private readonly parentScope: ParentScopeContextService,
   ) {}
 
   async listMyStudents(actor: AuthContext) {
@@ -139,6 +192,12 @@ export class MobileService {
       return { items: [] };
     }
 
+    // Uses the same include as `getAccessibleStudent`. That include is a strict
+    // superset of what this endpoint previously requested — it adds only
+    // `sectionRef.classTeacher`, which `toMobileStudent` does not render, so
+    // the response is unchanged. Sharing it lets the rows be primed into the
+    // request cache below, which turns the selected child's profile lookup on
+    // the dashboard into a cache hit instead of a second query cluster.
     const students = await this.prisma.student.findMany({
       where: {
         tenantId: actor.tenantId,
@@ -148,55 +207,13 @@ export class MobileService {
           some: { status: 'ACTIVE' },
         },
       },
-      include: {
-        class: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        sectionRef: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        guardianLinks: {
-          where: {
-            ...buildActiveGuardianRelationshipWhere(),
-            guardian: {
-              userId: actor.userId,
-            },
-          },
-          include: {
-            guardian: {
-              select: {
-                id: true,
-                userId: true,
-              },
-            },
-          },
-          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
-        },
-        enrollments: {
-          where: {
-            status: 'ACTIVE',
-          },
-          include: {
-            academicYear: {
-              select: {
-                name: true,
-                startsOn: true,
-                endsOn: true,
-              },
-            },
-          },
-          orderBy: [{ createdAt: 'desc' }],
-          take: 1,
-        },
-      },
+      include: accessibleStudentInclude(actor.userId),
       orderBy: [{ firstNameEn: 'asc' }, { lastNameEn: 'asc' }],
     });
+
+    for (const student of students) {
+      this.parentScope.primeAccessibleStudent(actor, student.id, student);
+    }
 
     return {
       items: students.map((student) => toMobileStudent(student)),
@@ -222,23 +239,17 @@ export class MobileService {
     const selectedChild = children.items.find(
       (child) => child.id === selectedStudentId,
     );
-    const guardianCapabilities = new Set(
-      selectedChild?.capabilities ?? [],
-    );
+    const guardianCapabilities = new Set(selectedChild?.capabilities ?? []);
     const can = (capability: GuardianCapability) =>
       guardianCapabilities.has(capability);
     const moduleAvailability = {
       attendance:
-        enabled('attendance') &&
-        can(GuardianCapability.ATTENDANCE_VIEW),
+        enabled('attendance') && can(GuardianCapability.ATTENDANCE_VIEW),
       fees: enabled('fees') && can(GuardianCapability.FEES_VIEW),
-      homework:
-        enabled('homework') && can(GuardianCapability.ACADEMICS_VIEW),
-      activity:
-        enabled('activity') && can(GuardianCapability.ACADEMICS_VIEW),
+      homework: enabled('homework') && can(GuardianCapability.ACADEMICS_VIEW),
+      activity: enabled('activity') && can(GuardianCapability.ACADEMICS_VIEW),
       transport:
-        enabled('transport') &&
-        can(GuardianCapability.EMERGENCY_ALERT_RECEIVE),
+        enabled('transport') && can(GuardianCapability.EMERGENCY_ALERT_RECEIVE),
       canteen: enabled('canteen') && can(GuardianCapability.FEES_VIEW),
     };
 
@@ -372,10 +383,7 @@ export class MobileService {
     > = {
       notices: { status: 'available', reason: null },
       homework: enabled('homework')
-        ? capabilityState(
-            GuardianCapability.ACADEMICS_VIEW,
-            'homework',
-          )
+        ? capabilityState(GuardianCapability.ACADEMICS_VIEW, 'homework')
         : {
             status: 'locked',
             reason: 'Homework is not enabled for this school.',
@@ -462,8 +470,7 @@ export class MobileService {
           child.capabilities.includes(capability);
         const [homework, fees, corrections, requests, exams] =
           await Promise.all([
-            enabled('homework') &&
-            can(GuardianCapability.ACADEMICS_VIEW)
+            enabled('homework') && can(GuardianCapability.ACADEMICS_VIEW)
               ? load('homework', () =>
                   this.getStudentHomework(child.id, actor, '30'),
                 )
@@ -482,8 +489,7 @@ export class MobileService {
                   this.listStudentServiceRequests(child.id, actor),
                 )
               : Promise.resolve(null),
-            enabled('academics') &&
-            can(GuardianCapability.ACADEMICS_VIEW)
+            enabled('academics') && can(GuardianCapability.ACADEMICS_VIEW)
               ? load('exams', () =>
                   this.getStudentExamSchedule(child.id, actor),
                 )
@@ -671,15 +677,14 @@ export class MobileService {
       ParentDigestSourceState
     > = {
       attendance:
-        enabled('attendance') &&
-        can(GuardianCapability.ATTENDANCE_VIEW)
-        ? { status: 'available', reason: null }
-        : {
-            status: 'locked',
-            reason: enabled('attendance')
-              ? 'Your guardian access does not include attendance.'
-              : 'Attendance is not enabled for this school.',
-          },
+        enabled('attendance') && can(GuardianCapability.ATTENDANCE_VIEW)
+          ? { status: 'available', reason: null }
+          : {
+              status: 'locked',
+              reason: enabled('attendance')
+                ? 'Your guardian access does not include attendance.'
+                : 'Attendance is not enabled for this school.',
+            },
       homework: enabled('homework')
         ? { status: 'available', reason: null }
         : {
@@ -717,8 +722,7 @@ export class MobileService {
 
     const [attendance, homeworkRows, reportCards, actionCentre] =
       await Promise.all([
-        enabled('attendance') &&
-        can(GuardianCapability.ATTENDANCE_VIEW)
+        enabled('attendance') && can(GuardianCapability.ATTENDANCE_VIEW)
           ? load('attendance', () =>
               this.getStudentAttendanceSummary(studentId, actor),
             )
@@ -2038,27 +2042,23 @@ export class MobileService {
     month?: string,
   ) {
     const student = await this.getAccessibleStudent(studentId, actor);
-    const guardian = await this.prisma.guardian.findFirst({
-      where: {
-        tenantId: actor.tenantId,
-        userId: actor.userId,
-        studentLinks: {
-          some: {
-            studentId,
-            ...buildActiveGuardianRelationshipWhere(
-              new Date(),
-              GuardianCapability.ACADEMICS_VIEW,
-            ),
-          },
-        },
-      },
-      select: { id: true },
-    });
-    if (!guardian) {
+
+    // Same predicate as the check `getAccessibleStudent` just applied
+    // (it defaults to ACADEMICS_VIEW), so in practice this branch is only
+    // reachable when that call already succeeded. It is kept because it owns a
+    // distinct error message, but it now reads the memoized relationship
+    // instead of re-issuing the Guardian + StudentGuardian query pair.
+    const guardianLink = await this.parentScope.tryGuardianCapability(
+      actor,
+      studentId,
+      GuardianCapability.ACADEMICS_VIEW,
+    );
+    if (!guardianLink) {
       throw new ForbiddenException(
         'This child is not linked to your guardian account',
       );
     }
+    const guardian = { id: guardianLink.guardianId };
     const monthRange = month ? parseMonthRange(month) : null;
     const items = await this.prisma.activityPost.findMany({
       where: {
@@ -2802,70 +2802,16 @@ export class MobileService {
     capability = GuardianCapability.ACADEMICS_VIEW,
   ) {
     await this.assertStudentAccess(studentId, actor, capability);
-    const student = await this.prisma.student.findFirst({
-      where: {
-        id: studentId,
-        tenantId: actor.tenantId,
-        lifecycleStatus: 'ACTIVE',
-        enrollments: {
-          some: { status: 'ACTIVE' },
-        },
-      },
-      include: {
-        class: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        sectionRef: {
-          select: {
-            id: true,
-            name: true,
-            classTeacher: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-              },
-            },
-          },
-        },
-        guardianLinks: {
-          where: {
-            ...buildActiveGuardianRelationshipWhere(),
-            guardian: {
-              userId: actor.userId,
-            },
-          },
-          include: {
-            guardian: {
-              select: {
-                id: true,
-                userId: true,
-              },
-            },
-          },
-          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
-        },
-        enrollments: {
-          where: {
-            status: 'ACTIVE',
-          },
-          include: {
-            academicYear: {
-              select: {
-                name: true,
-                startsOn: true,
-                endsOn: true,
-              },
-            },
-          },
-          orderBy: [{ createdAt: 'desc' }],
-          take: 1,
-        },
-      },
-    });
+
+    // The `include` is unchanged, so the mapped response is byte-identical.
+    // Only the number of times this query is issued changes: three dashboard
+    // sub-services (profile, homework, activity feed) each called this for the
+    // same child.
+    const student = await this.parentScope.accessibleStudent(
+      actor,
+      studentId,
+      accessibleStudentInclude(actor.userId),
+    );
 
     if (!student) {
       throw new NotFoundException('Student not found in this school.');
@@ -2912,34 +2858,29 @@ export class MobileService {
     return assignment;
   }
 
+  /**
+   * Unchanged authorization semantics: student existence is still checked
+   * before capability, the capability branch still short-circuits, and the
+   * fallback still requires the student to be in this parent's allowed set.
+   *
+   * The queries now go through `ParentScopeContextService`, which memoizes
+   * them for the lifetime of the request. The dashboard calls this helper
+   * seven times across its sub-services; previously each call re-issued the
+   * same student and guardian lookups.
+   */
   private async assertStudentAccess(
     studentId: string,
     actor: AuthContext,
     capability?: GuardianCapability,
   ) {
-    const student = await this.prisma.student.findFirst({
-      where: {
-        id: studentId,
-        tenantId: actor.tenantId,
-        lifecycleStatus: 'ACTIVE',
-        enrollments: {
-          some: { status: 'ACTIVE' },
-        },
-      },
-      select: { id: true },
-    });
+    const student = await this.parentScope.activeStudent(actor, studentId);
 
     if (!student) {
       throw new NotFoundException('Student not found in this school.');
     }
 
     if (capability) {
-      await requireGuardianCapability(
-        this.prisma,
-        actor,
-        studentId,
-        capability,
-      );
+      await this.parentScope.guardianCapability(actor, studentId, capability);
       return;
     }
 
@@ -3015,7 +2956,10 @@ export class MobileService {
       throw new ForbiddenException('Mobile student scope is not available');
     }
 
-    return (await getParentStudentIds(this.prisma, actor, capability)) ?? [];
+    // Same query and same guard, memoized for this request only. The dashboard
+    // resolved this set at least twice per call (child list + notification
+    // fan-out) and `assertStudentAccess` resolved it again per sub-service.
+    return this.parentScope.allowedStudentIds(actor, capability);
   }
 }
 

@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 
 import { EntitlementsService } from './entitlements.service';
+import { RequestCacheService } from '../common/cache/request-cache.service';
 import { SUSPENDED_TENANT_MESSAGE } from './tenant-access.constants';
 
 export enum PlanKey {
@@ -30,13 +31,21 @@ export class PlansService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly entitlementsService: EntitlementsService,
+    private readonly requestCache: RequestCacheService,
   ) {}
 
+  /**
+   * Read by `EntitlementGuard` on every request and again by
+   * `checkFeatureEnabled`. Memoized per request only — see
+   * `RequestCacheService`. Suspension still fails closed on the next request.
+   */
   async getTenantStatus(tenantId: string) {
-    return this.prisma.tenant.findUnique({
-      where: { id: tenantId },
-      select: { id: true, isActive: true },
-    });
+    return this.requestCache.resolve(`tenantStatus:${tenantId}`, () =>
+      this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { id: true, isActive: true },
+      }),
+    );
   }
 
   async assertTenantActive(tenantId: string): Promise<void> {
@@ -73,10 +82,10 @@ export class PlansService {
     tenantId: string,
     featureKey: string,
   ): Promise<EntitlementCheckResult> {
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
-      select: { isActive: true },
-    });
+    // Reuses the request-memoized status read rather than issuing a third
+    // identical `Tenant` query per request (BASELINE_RESULTS.md §6, queries
+    // 7/8/10). Behaviour is unchanged: same row, same fail-closed semantics.
+    const tenant = await this.getTenantStatus(tenantId);
 
     if (!tenant) {
       throw new NotFoundException(`Tenant with ID ${tenantId} not found`);
@@ -90,12 +99,16 @@ export class PlansService {
       };
     }
 
-    const subscription = await this.prisma.tenantSubscription.findFirst({
-      where: {
-        tenantId,
-        status: { in: ['ACTIVE', 'TRIAL', 'GRACE'] },
-      },
-    });
+    const subscription = await this.requestCache.resolve(
+      `activeSubscription:${tenantId}`,
+      () =>
+        this.prisma.tenantSubscription.findFirst({
+          where: {
+            tenantId,
+            status: { in: ['ACTIVE', 'TRIAL', 'GRACE'] },
+          },
+        }),
+    );
 
     if (!subscription) {
       return {
