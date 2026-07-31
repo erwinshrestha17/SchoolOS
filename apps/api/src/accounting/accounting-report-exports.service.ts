@@ -14,6 +14,8 @@ import { Prisma } from '@prisma/client';
 import { TrialBalanceQueryDto } from './dto/trial-balance-query.dto';
 import { GeneralLedgerQueryDto } from './dto/general-ledger-query.dto';
 import { CashBookQueryDto } from './dto/cash-book-query.dto';
+import { JournalRegisterQueryDto } from './dto/journal-register-query.dto';
+import { BudgetVsActualQueryDto } from './dto/budget-vs-actual-query.dto';
 import { IncomeStatementQueryDto } from './dto/income-statement-query.dto';
 import { BalanceSheetQueryDto } from './dto/balance-sheet-query.dto';
 import { TaxSummaryQueryDto } from './dto/tax-summary-query.dto';
@@ -351,6 +353,327 @@ export class AccountingReportExportsService {
       reportKey: 'accounting.cash-book',
       title: 'Cash Book',
       subtitle: this.periodSubtitle(query),
+      filters: query as unknown as Prisma.InputJsonValue,
+      rows,
+    });
+  }
+
+  async exportBankBookCsv(
+    tenantId: string,
+    query: CashBookQueryDto,
+    options: { mode?: 'sync' | 'background' } = {},
+  ): Promise<string> {
+    const data = await this.reportsService.getBankBook(tenantId, {
+      ...query,
+      page: options.mode === 'background' ? 1 : query.page,
+      limit: this.rowLimitForMode(options.mode),
+    });
+    this.ensureWithinExportLimit(
+      'Bank Book',
+      data.pagination.total,
+      options.mode,
+    );
+
+    const rows: Array<Record<string, unknown>> = data.rows.map((row) => ({
+      Date: row.entryDate,
+      'Entry Number': row.entryNumber ?? '',
+      'Bank Account': data.account
+        ? `${data.account.code} - ${data.account.name}`
+        : '',
+      Description: row.narration ?? '',
+      'Counterparty Account': `${row.accountCode} - ${row.accountName}`,
+      Deposit: formatCsvDecimal(row.receiptAmount),
+      Withdrawal: formatCsvDecimal(row.paymentAmount),
+      'Running Balance': formatCsvDecimal(row.runningBalance),
+      'Running Balance Side': row.runningBalanceSide,
+    }));
+
+    rows.push({
+      Date: null,
+      'Entry Number': 'TOTAL',
+      'Bank Account': '',
+      Description: '',
+      'Counterparty Account': '',
+      Deposit: formatCsvDecimal(data.totalReceipts),
+      Withdrawal: formatCsvDecimal(data.totalPayments),
+      'Running Balance': formatCsvDecimal(data.closingBalance),
+      'Running Balance Side': data.closingBalanceSide,
+    });
+
+    return convertToCsv(rows);
+  }
+
+  async exportBankBookPdf(
+    tenantId: string,
+    query: CashBookQueryDto,
+    actor: AuthContext,
+    options: { mode?: 'sync' | 'background' } = {},
+  ) {
+    const data = await this.reportsService.getBankBook(tenantId, {
+      ...query,
+      page: options.mode === 'background' ? 1 : query.page,
+      limit: this.rowLimitForMode(options.mode),
+    });
+    this.ensureWithinExportLimit(
+      'Bank Book',
+      data.pagination.total,
+      options.mode,
+    );
+    const rows: Array<Record<string, unknown>> = data.rows.map((row) => ({
+      Date: row.entryDate,
+      Journal: row.entryNumber ?? '',
+      Description: row.narration ?? '',
+      Deposit: formatCsvDecimal(row.receiptAmount),
+      Withdrawal: formatCsvDecimal(row.paymentAmount),
+      Balance: `${formatCsvDecimal(row.runningBalance)} ${row.runningBalanceSide}`,
+    }));
+    rows.push({
+      Date: 'TOTAL',
+      Journal: '',
+      Description: data.account
+        ? `${data.account.code} - ${data.account.name}`
+        : '',
+      Deposit: formatCsvDecimal(data.totalReceipts),
+      Withdrawal: formatCsvDecimal(data.totalPayments),
+      Balance: `${formatCsvDecimal(data.closingBalance)} ${data.closingBalanceSide}`,
+    });
+
+    return this.buildAndSnapshotPdf({
+      tenantId,
+      actor,
+      reportKey: 'accounting.bank-book',
+      title: 'Bank Book',
+      subtitle: this.periodSubtitle(query),
+      filters: query as unknown as Prisma.InputJsonValue,
+      rows,
+    });
+  }
+
+  async exportJournalRegisterCsv(
+    tenantId: string,
+    query: JournalRegisterQueryDto,
+  ): Promise<string> {
+    const data = await this.reportsService.getJournalRegister(tenantId, {
+      ...query,
+      limit: 5000,
+    });
+    const rows = data.rows.map((row) => ({
+      'Entry Number': row.entryNumber ?? '',
+      Date: row.entryDate,
+      Narration: row.narration,
+      'Source Module': row.sourceModule ?? '',
+      'Source Type': row.sourceType,
+      Debited: row.debitedAccounts,
+      Credited: row.creditedAccounts,
+      Debit: formatCsvDecimal(row.totalDebit),
+      Credit: formatCsvDecimal(row.totalCredit),
+      Status: row.status,
+      Approval: row.approvalStatus,
+      Reversal: row.reversalStatus,
+    }));
+    return convertToCsv(rows);
+  }
+
+  async exportJournalRegisterPdf(
+    tenantId: string,
+    query: JournalRegisterQueryDto,
+    actor: AuthContext,
+  ) {
+    const data = await this.reportsService.getJournalRegister(tenantId, {
+      ...query,
+      limit: 5000,
+    });
+    const rows = data.rows.map((row) => ({
+      Date: row.entryDate,
+      Journal: row.entryNumber ?? '',
+      Narration: row.narration,
+      Debit: formatCsvDecimal(row.totalDebit),
+      Credit: formatCsvDecimal(row.totalCredit),
+      Status: row.status,
+    }));
+
+    return this.buildAndSnapshotPdf({
+      tenantId,
+      actor,
+      reportKey: 'accounting.journal-register',
+      title: 'Journal Register',
+      subtitle: this.periodSubtitle(query),
+      filters: query as unknown as Prisma.InputJsonValue,
+      rows,
+    });
+  }
+
+  async exportFailedUnpostedCsv(tenantId: string): Promise<string> {
+    const data =
+      await this.reportsService.getFailedUnpostedTransactions(tenantId);
+    const rows = data.rows.map((row) => ({
+      Module: row.sourceModule,
+      'Source Type': row.sourceType,
+      Reference: row.reference,
+      Amount: row.amount ? formatCsvDecimal(row.amount) : '',
+      Issue: row.issueType,
+      Details: row.details,
+      Detected: row.detectedAt,
+    }));
+    return convertToCsv(rows);
+  }
+
+  async exportFailedUnpostedPdf(tenantId: string, actor: AuthContext) {
+    const data =
+      await this.reportsService.getFailedUnpostedTransactions(tenantId);
+    const rows = data.rows.map((row) => ({
+      Module: row.sourceModule,
+      Reference: row.reference,
+      Issue: row.issueType,
+      Details: row.details,
+    }));
+
+    return this.buildAndSnapshotPdf({
+      tenantId,
+      actor,
+      reportKey: 'accounting.failed-unposted',
+      title: 'Failed and Unposted Transactions',
+      subtitle: `Generated ${new Date().toISOString()}`,
+      filters: {},
+      rows,
+    });
+  }
+
+  async exportCashFlowStatementCsv(
+    tenantId: string,
+    query: IncomeStatementQueryDto,
+  ): Promise<string> {
+    const data = await this.reportsService.getCashFlowStatement(tenantId, query);
+    const rows: Array<Record<string, unknown>> = [];
+    for (const section of data.sections) {
+      for (const line of section.lines) {
+        rows.push({
+          Section: section.section,
+          Label: line.label,
+          Amount: formatCsvDecimal(line.amount),
+        });
+      }
+      rows.push({
+        Section: `${section.section} SUBTOTAL`,
+        Label: '',
+        Amount: formatCsvDecimal(section.subtotal),
+      });
+    }
+    rows.push({
+      Section: 'SUMMARY',
+      Label: 'Opening Cash',
+      Amount: formatCsvDecimal(data.openingCash),
+    });
+    rows.push({
+      Section: 'SUMMARY',
+      Label: 'Net Change',
+      Amount: formatCsvDecimal(data.netChange),
+    });
+    rows.push({
+      Section: 'SUMMARY',
+      Label: 'Closing Cash',
+      Amount: formatCsvDecimal(data.closingCash),
+    });
+    return convertToCsv(rows);
+  }
+
+  async exportCashFlowStatementPdf(
+    tenantId: string,
+    query: IncomeStatementQueryDto,
+    actor: AuthContext,
+  ) {
+    const data = await this.reportsService.getCashFlowStatement(tenantId, query);
+    const rows: Array<Record<string, unknown>> = [];
+    for (const section of data.sections) {
+      for (const line of section.lines) {
+        rows.push({
+          Section: section.section,
+          Line: line.label,
+          Amount: formatCsvDecimal(line.amount),
+        });
+      }
+      rows.push({
+        Section: section.section,
+        Line: 'Subtotal',
+        Amount: formatCsvDecimal(section.subtotal),
+      });
+    }
+    rows.push({
+      Section: 'Opening Cash',
+      Line: '',
+      Amount: formatCsvDecimal(data.openingCash),
+    });
+    rows.push({
+      Section: 'Net Change',
+      Line: '',
+      Amount: formatCsvDecimal(data.netChange),
+    });
+    rows.push({
+      Section: 'Closing Cash',
+      Line: '',
+      Amount: formatCsvDecimal(data.closingCash),
+    });
+
+    return this.buildAndSnapshotPdf({
+      tenantId,
+      actor,
+      reportKey: 'accounting.cash-flow-statement',
+      title: 'Cash Flow Statement',
+      subtitle: this.periodSubtitle(query),
+      filters: query as unknown as Prisma.InputJsonValue,
+      rows,
+    });
+  }
+
+  async exportBudgetVsActualCsv(
+    tenantId: string,
+    query: BudgetVsActualQueryDto,
+  ): Promise<string> {
+    const data = await this.reportsService.getBudgetVsActual(tenantId, query);
+    const rows = data.rows.map((row) => ({
+      Account: `${row.accountCode} - ${row.accountName}`,
+      Budget: formatCsvDecimal(row.budgetAmount),
+      Actual: formatCsvDecimal(row.actualAmount),
+      Variance: formatCsvDecimal(row.variance),
+      'Variance %': row.variancePercent
+        ? formatCsvDecimal(row.variancePercent)
+        : '',
+    }));
+    rows.push({
+      Account: 'TOTAL',
+      Budget: formatCsvDecimal(data.totalBudget),
+      Actual: formatCsvDecimal(data.totalActual),
+      Variance: formatCsvDecimal(data.totalVariance),
+      'Variance %': '',
+    });
+    return convertToCsv(rows);
+  }
+
+  async exportBudgetVsActualPdf(
+    tenantId: string,
+    query: BudgetVsActualQueryDto,
+    actor: AuthContext,
+  ) {
+    const data = await this.reportsService.getBudgetVsActual(tenantId, query);
+    const rows = data.rows.map((row) => ({
+      Account: `${row.accountCode} - ${row.accountName}`,
+      Budget: formatCsvDecimal(row.budgetAmount),
+      Actual: formatCsvDecimal(row.actualAmount),
+      Variance: formatCsvDecimal(row.variance),
+    }));
+    rows.push({
+      Account: 'TOTAL',
+      Budget: formatCsvDecimal(data.totalBudget),
+      Actual: formatCsvDecimal(data.totalActual),
+      Variance: formatCsvDecimal(data.totalVariance),
+    });
+
+    return this.buildAndSnapshotPdf({
+      tenantId,
+      actor,
+      reportKey: 'accounting.budget-vs-actual',
+      title: 'Budget vs Actual',
+      subtitle: `${data.budgetName} · ${this.periodSubtitle(query)}`,
       filters: query as unknown as Prisma.InputJsonValue,
       rows,
     });

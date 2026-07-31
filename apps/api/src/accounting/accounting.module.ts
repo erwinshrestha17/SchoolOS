@@ -18,6 +18,8 @@ import { AccountingM9Controller } from './accounting-m9.controller';
 import { AccountingM9Service } from './accounting-m9.service';
 import { M9TemplateService } from './m9-template.service';
 import { AccountingSourceMappingService } from './accounting-source-mapping.service';
+import { AccountingBudgetController } from './accounting-budget.controller';
+import { AccountingBudgetService } from './accounting-budget.service';
 
 @Module({
   imports: [
@@ -38,6 +40,7 @@ import { AccountingSourceMappingService } from './accounting-source-mapping.serv
     AccountingController,
     AccountingReportsController,
     AccountingM9Controller,
+    AccountingBudgetController,
   ],
   providers: [
     AccountingService,
@@ -49,6 +52,7 @@ import { AccountingSourceMappingService } from './accounting-source-mapping.serv
     AccountingM9Service,
     M9TemplateService,
     AccountingSourceMappingService,
+    AccountingBudgetService,
   ],
   exports: [
     AccountingService,

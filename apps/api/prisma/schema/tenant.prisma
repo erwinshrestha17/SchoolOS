@@ -185,6 +185,8 @@ model Tenant {
   attendanceCorrectionRequests  AttendanceCorrectionRequest[]
   accountingReportMappings      AccountingReportAccountMapping[]
   accountingSourceMappings      AccountingSourceMapping[]
+  fiscalBudgets                 FiscalBudget[]
+  fiscalBudgetLines             FiscalBudgetLine[]
   bankStatements                BankStatement[]
   studentQrCredentials          StudentQrCredential[]
   admissionImportBatches        AdmissionImportBatch[]

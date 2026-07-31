@@ -144,6 +144,15 @@ enum AccountingReportMappingType {
   PF_EMPLOYER_PAYABLE
   PF_PAYABLE
   RETAINED_EARNINGS
+  CASH_FLOW_OPERATING
+  CASH_FLOW_INVESTING
+  CASH_FLOW_FINANCING
+}
+
+enum FiscalBudgetStatus {
+  DRAFT
+  APPROVED
+  LOCKED
 }
 
 enum JournalEntryStatus {

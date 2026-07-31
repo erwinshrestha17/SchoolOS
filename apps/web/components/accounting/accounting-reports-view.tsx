@@ -20,6 +20,8 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { AuditInfo } from "../ui/audit-info";
 import { ReportFilters } from "./report-filters";
 import { ReportTable } from "./report-table";
+import { JournalDetailDialog } from "./journal-detail-dialog";
+import { Select } from "../ui/select";
 
 import { PageHeader } from "../ui/page-header";
 import {
@@ -31,6 +33,7 @@ import {
   type AccountingReportFilters,
   type AccountingTrialBalanceResponse,
 } from "@schoolos/core";
+import type { JournalEntryView } from "@schoolos/core";
 
 type ReportType =
   | "trial-balance"
@@ -39,7 +42,100 @@ type ReportType =
   | "general-ledger"
   | "cash-book"
   | "bank-book"
+  | "journal-register"
+  | "voucher-register"
+  | "failed-unposted"
+  | "cash-flow-statement"
+  | "budget-vs-actual"
   | "tax-summary";
+
+type JournalRegisterResponse = {
+  rows: Array<{
+    journalEntryId: string;
+    entryNumber: string | null;
+    entryDate: string;
+    narration: string;
+    sourceModule: string | null;
+    sourceType: string;
+    debitedAccounts: string;
+    creditedAccounts: string;
+    totalDebit: string;
+    totalCredit: string;
+    status: string;
+    approvalStatus: string;
+    reversalStatus: string;
+  }>;
+};
+
+type BudgetVsActualResponse = {
+  budgetName: string;
+  rows: Array<{
+    accountCode: string;
+    accountName: string;
+    budgetAmount: string;
+    actualAmount: string;
+    variance: string;
+    variancePercent: string | null;
+  }>;
+  totalBudget: string;
+  totalActual: string;
+  totalVariance: string;
+};
+
+type CashFlowStatementResponse = {
+  sections: Array<{
+    section: string;
+    lines: Array<{ label: string; amount: string }>;
+    subtotal: string;
+  }>;
+  openingCash: string;
+  netChange: string;
+  closingCash: string;
+  setupWarnings?: string[];
+};
+
+type FailedUnpostedResponse = {
+  rows: Array<{
+    sourceModule: string;
+    sourceType: string;
+    reference: string;
+    amount: string | null;
+    issueType: string;
+    details: string;
+    detectedAt: string;
+  }>;
+  summary: {
+    totalIssues: number;
+    approvedUnpostedJournals: number;
+    missingGlPostings: number;
+    payrollPostingFailures: number;
+  };
+};
+
+function buildExportParams(
+  filters: {
+    startDate?: string;
+    endDate?: string;
+    fiscalYearId?: string;
+    fiscalPeriodId?: string;
+    accountId?: string;
+  },
+  voucherType?: string,
+): Record<string, string> {
+  const params: Record<string, string> = {};
+  if (filters.fiscalYearId) params.fiscalYearId = filters.fiscalYearId;
+  if (filters.fiscalPeriodId) params.fiscalPeriodId = filters.fiscalPeriodId;
+  if (filters.startDate) params.fromDate = filters.startDate;
+  if (filters.endDate) params.toDate = filters.endDate;
+  if (filters.accountId) params.accountId = filters.accountId;
+  if (voucherType) params.voucherType = voucherType;
+  return params;
+}
+
+function exportReportSlug(report: ReportType): string {
+  if (report === "voucher-register") return "journal-register";
+  return report;
+}
 
 export function AccountingReportsView({
   initialReport = "trial-balance",
@@ -60,6 +156,10 @@ export function AccountingReportsView({
     fiscalPeriodId?: string;
     accountId?: string;
   }>({});
+  const [voucherType, setVoucherType] = useState("RECEIPT_VOUCHER");
+  const [selectedJournalEntry, setSelectedJournalEntry] =
+    useState<JournalEntryView | null>(null);
+  const [journalDialogOpen, setJournalDialogOpen] = useState(false);
 
   useEffect(() => {
     if (reportParam && reportParam !== activeReport) {
@@ -75,8 +175,11 @@ export function AccountingReportsView({
   };
 
   const reportQuery = useQuery({
-    queryKey: ["accounting-report", activeReport, filters],
+    queryKey: ["accounting-report", activeReport, filters, voucherType],
     queryFn: () => {
+      if (activeReport === "failed-unposted") {
+        return api.listFailedUnpostedTransactions();
+      }
       if (!filters.fiscalYearId) {
         throw new Error("Select a fiscal year to generate this report.");
       }
@@ -99,12 +202,24 @@ export function AccountingReportsView({
         return api.listTaxSummary(reportFilters);
       if (activeReport === "bank-book")
         return api.listBankBook(reportFilters);
+      if (activeReport === "journal-register")
+        return api.listJournalRegister(reportFilters);
+      if (activeReport === "voucher-register")
+        return api.listJournalRegister({
+          ...reportFilters,
+          voucherType,
+        });
+      if (activeReport === "cash-flow-statement")
+        return api.listCashFlowStatement(reportFilters);
+      if (activeReport === "budget-vs-actual")
+        return api.listBudgetVsActual(reportFilters);
       return api.listCashBook(reportFilters);
     },
     enabled:
-      Boolean(filters.fiscalYearId) &&
-      (activeReport !== "general-ledger" || Boolean(filters.accountId)) &&
-      (activeReport !== "bank-book" || Boolean(filters.accountId)),
+      activeReport === "failed-unposted" ||
+      (Boolean(filters.fiscalYearId) &&
+        (activeReport !== "general-ledger" || Boolean(filters.accountId)) &&
+        (activeReport !== "bank-book" || Boolean(filters.accountId))),
   });
 
   const snapshotsQuery = useQuery({
@@ -113,7 +228,14 @@ export function AccountingReportsView({
   });
 
   const exportMutation = useMutation({
-    mutationFn: (report: string) => api.exportAccountingCsv(report),
+    mutationFn: (report: ReportType) =>
+      api.exportAccountingCsv(
+        exportReportSlug(report),
+        buildExportParams(
+          filters,
+          report === "voucher-register" ? voucherType : undefined,
+        ),
+      ),
     onSuccess: () => {
       // Success feedback handled by browser download
     },
@@ -123,7 +245,14 @@ export function AccountingReportsView({
   });
 
   const pdfMutation = useMutation({
-    mutationFn: (report: string) => api.exportAccountingPdf(report, filters),
+    mutationFn: (report: ReportType) =>
+      api.exportAccountingPdf(
+        exportReportSlug(report),
+        buildExportParams(
+          filters,
+          report === "voucher-register" ? voucherType : undefined,
+        ),
+      ),
     onError: (err) => {
       console.error("PDF export failed:", err);
     },
@@ -134,10 +263,26 @@ export function AccountingReportsView({
       "trial-balance",
       "general-ledger",
       "cash-book",
+      "bank-book",
       "income-statement",
       "balance-sheet",
       "tax-summary",
+      "journal-register",
+      "voucher-register",
+      "failed-unposted",
+      "cash-flow-statement",
+      "budget-vs-actual",
     ].includes(report);
+  };
+
+  const openJournalDetail = async (journalEntryId: string) => {
+    try {
+      const entry = await api.getJournalEntry(journalEntryId);
+      setSelectedJournalEntry(entry);
+      setJournalDialogOpen(true);
+    } catch (err) {
+      console.error("Failed to load journal entry:", err);
+    }
   };
 
   const snapshotItems = Array.isArray(
@@ -148,7 +293,7 @@ export function AccountingReportsView({
     : [];
 
   const renderReportContent = () => {
-    if (!filters.fiscalYearId) {
+    if (activeReport !== "failed-unposted" && !filters.fiscalYearId) {
       return (
         <div className="py-10">
           <PageState
@@ -213,7 +358,29 @@ export function AccountingReportsView({
 
     const data = reportQuery.data;
 
-    if (!data || (Array.isArray(data) && data.length === 0)) {
+    if (!data) {
+      return (
+        <div className="py-10">
+          <PageState
+            tone="info"
+            title="No Transactions Found"
+            description="There are no ledger entries for the selected report and period."
+          />
+        </div>
+      );
+    }
+
+    if (
+      activeReport !== "failed-unposted" &&
+      activeReport !== "journal-register" &&
+      activeReport !== "voucher-register" &&
+      activeReport !== "tax-summary" &&
+      activeReport !== "trial-balance" &&
+      activeReport !== "income-statement" &&
+      activeReport !== "balance-sheet" &&
+      Array.isArray(data) &&
+      data.length === 0
+    ) {
       return (
         <div className="py-10">
           <PageState
@@ -519,6 +686,221 @@ export function AccountingReportsView({
       );
     }
 
+    if (activeReport === "journal-register" || activeReport === "voucher-register") {
+      const register = data as JournalRegisterResponse;
+      return (
+        <ReportTable
+          headers={[
+            "Date",
+            "Entry No",
+            "Narration",
+            "Debited",
+            "Credited",
+            "Debit",
+            "Credit",
+            "Status",
+            "Approval",
+            "Reversal",
+          ]}
+          rows={(register.rows ?? []).map((row) => ({
+            id: row.journalEntryId,
+            cells: [
+              { value: row.entryDate, type: "date" },
+              {
+                value: (
+                  <button
+                    type="button"
+                    onClick={() => openJournalDetail(row.journalEntryId)}
+                    className="font-bold text-[var(--color-mod-accounting-accent)] hover:underline"
+                  >
+                    {row.entryNumber ?? "View"}
+                  </button>
+                ),
+              },
+              { value: row.narration },
+              { value: row.debitedAccounts },
+              { value: row.creditedAccounts },
+              { value: row.totalDebit, type: "currency", align: "right" },
+              { value: row.totalCredit, type: "currency", align: "right" },
+              { value: row.status },
+              { value: row.approvalStatus },
+              { value: row.reversalStatus },
+            ],
+          }))}
+        />
+      );
+    }
+
+    if (activeReport === "cash-flow-statement") {
+      const cashFlow = data as CashFlowStatementResponse;
+      const rows: any[] = [];
+      for (const section of cashFlow.sections ?? []) {
+        rows.push({
+          id: `${section.section}-header`,
+          isHeader: true,
+          cells: [{ value: section.section, bold: true }],
+        });
+        for (const line of section.lines) {
+          rows.push({
+            id: `${section.section}-${line.label}`,
+            cells: [
+              { value: line.label, indent: 1 },
+              { value: line.amount, type: "currency", align: "right" },
+            ],
+          });
+        }
+        rows.push({
+          id: `${section.section}-subtotal`,
+          isFooter: true,
+          cells: [
+            { value: `Subtotal (${section.section})`, bold: true },
+            {
+              value: section.subtotal,
+              type: "currency",
+              bold: true,
+              align: "right",
+            },
+          ],
+        });
+      }
+      rows.push({
+        id: "opening-cash",
+        isFooter: true,
+        cells: [
+          { value: "Opening cash", bold: true },
+          { value: cashFlow.openingCash, type: "currency", align: "right" },
+        ],
+      });
+      rows.push({
+        id: "net-change",
+        isFooter: true,
+        cells: [
+          { value: "Net change in cash", bold: true },
+          { value: cashFlow.netChange, type: "currency", align: "right" },
+        ],
+      });
+      rows.push({
+        id: "closing-cash",
+        isFooter: true,
+        cells: [
+          { value: "Closing cash", bold: true },
+          {
+            value: cashFlow.closingCash,
+            type: "currency",
+            bold: true,
+            align: "right",
+          },
+        ],
+      });
+      return (
+        <div className="space-y-4">
+          {(cashFlow.setupWarnings ?? []).map((warning) => (
+            <p
+              key={warning}
+              className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+            >
+              {warning}
+            </p>
+          ))}
+          <ReportTable headers={["Line item", "Amount"]} rows={rows} />
+        </div>
+      );
+    }
+
+    if (activeReport === "budget-vs-actual") {
+      const budgetReport = data as BudgetVsActualResponse;
+      return (
+        <div className="space-y-4">
+          <p className="text-sm font-bold text-slate-600">
+            Budget: {budgetReport.budgetName}
+          </p>
+          <ReportTable
+            headers={["Account", "Budget", "Actual", "Variance", "Variance %"]}
+            rows={(budgetReport.rows ?? []).map((row) => ({
+              id: row.accountCode,
+              cells: [
+                {
+                  value: `${row.accountCode} - ${row.accountName}`,
+                  bold: true,
+                },
+                {
+                  value: row.budgetAmount,
+                  type: "currency",
+                  align: "right",
+                },
+                {
+                  value: row.actualAmount,
+                  type: "currency",
+                  align: "right",
+                },
+                {
+                  value: row.variance,
+                  type: "currency",
+                  align: "right",
+                },
+                {
+                  value: row.variancePercent
+                    ? `${row.variancePercent}%`
+                    : "-",
+                  align: "right",
+                },
+              ],
+            }))}
+          />
+        </div>
+      );
+    }
+
+    if (activeReport === "failed-unposted") {
+      const failed = data as FailedUnpostedResponse;
+      return (
+        <div className="space-y-6">
+          <div className="grid gap-3 sm:grid-cols-4">
+            <SummaryCard label="Total issues" value={failed.summary.totalIssues} />
+            <SummaryCard
+              label="Approved unposted"
+              value={failed.summary.approvedUnpostedJournals}
+            />
+            <SummaryCard
+              label="Missing GL postings"
+              value={failed.summary.missingGlPostings}
+            />
+            <SummaryCard
+              label="Payroll posting failures"
+              value={failed.summary.payrollPostingFailures}
+            />
+          </div>
+          <ReportTable
+            headers={[
+              "Module",
+              "Source",
+              "Reference",
+              "Amount",
+              "Issue",
+              "Details",
+              "Detected",
+            ]}
+            rows={(failed.rows ?? []).map((row, index) => ({
+              id: `${row.reference}-${index}`,
+              cells: [
+                { value: row.sourceModule, bold: true },
+                { value: row.sourceType },
+                { value: row.reference },
+                {
+                  value: row.amount ?? "-",
+                  type: row.amount ? "currency" : undefined,
+                  align: "right",
+                },
+                { value: row.issueType },
+                { value: row.details },
+                { value: row.detectedAt, type: "date" },
+              ],
+            }))}
+          />
+        </div>
+      );
+    }
+
     return null;
   };
 
@@ -607,6 +989,36 @@ export function AccountingReportsView({
                   desc: "Per-bank account movements",
                 },
                 {
+                  id: "journal-register",
+                  label: "Journal Register",
+                  icon: History,
+                  desc: "All journal entries for the period",
+                },
+                {
+                  id: "voucher-register",
+                  label: "Voucher Register",
+                  icon: FileText,
+                  desc: "Receipt, payment, expense, and contra vouchers",
+                },
+                {
+                  id: "failed-unposted",
+                  label: "Failed / Unposted",
+                  icon: Calculator,
+                  desc: "Posting gaps and approved unposted journals",
+                },
+                {
+                  id: "cash-flow-statement",
+                  label: "Cash Flow Statement",
+                  icon: BarChart3,
+                  desc: "Operating, investing, and financing cash movement",
+                },
+                {
+                  id: "budget-vs-actual",
+                  label: "Budget vs Actual",
+                  icon: PieChart,
+                  desc: "Approved budget compared to ledger actuals",
+                },
+                {
                   id: "tax-summary",
                   label: "VAT/TDS/PF",
                   icon: Calculator,
@@ -645,9 +1057,30 @@ export function AccountingReportsView({
 
         <div className="xl:col-span-3 space-y-6">
           <SectionCard>
-            <ReportFilters
-              onFilterChange={(f) => setFilters((prev) => ({ ...prev, ...f }))}
-            />
+            {activeReport !== "failed-unposted" && (
+              <ReportFilters
+                onFilterChange={(f) =>
+                  setFilters((prev) => ({ ...prev, ...f }))
+                }
+              />
+            )}
+            {activeReport === "voucher-register" && (
+              <div className="mt-4">
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Voucher type
+                </label>
+                <Select
+                  value={voucherType}
+                  onChange={(e) => setVoucherType(e.target.value)}
+                  className="w-full max-w-sm"
+                >
+                  <option value="RECEIPT_VOUCHER">Receipt voucher</option>
+                  <option value="PAYMENT_VOUCHER">Payment voucher</option>
+                  <option value="EXPENSE_VOUCHER">Expense voucher</option>
+                  <option value="CONTRA_VOUCHER">Contra voucher</option>
+                </Select>
+              </div>
+            )}
           </SectionCard>
 
           <SectionCard className="min-h-[400px] shadow-sm">
@@ -709,6 +1142,32 @@ export function AccountingReportsView({
           </SectionCard>
         </div>
       </div>
+
+      <JournalDetailDialog
+        isOpen={journalDialogOpen}
+        onClose={() => {
+          setJournalDialogOpen(false);
+          setSelectedJournalEntry(null);
+        }}
+        entry={selectedJournalEntry}
+      />
+    </div>
+  );
+}
+
+function SummaryCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: number;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+      <p className="text-[0.65rem] font-black uppercase tracking-wider text-slate-400">
+        {label}
+      </p>
+      <p className="mt-1 text-lg font-black text-slate-950">{value}</p>
     </div>
   );
 }

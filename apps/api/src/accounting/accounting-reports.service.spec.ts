@@ -27,6 +27,8 @@ describe('AccountingReportsService', () => {
         createMany: jest.fn(),
         deleteMany: jest.fn(),
       },
+      fiscalBudget: { findFirst: jest.fn() },
+      journalEntry: { findMany: jest.fn() },
       $transaction: jest.fn((cb) => cb(prisma)),
     };
 
@@ -369,6 +371,34 @@ describe('AccountingReportsService', () => {
       expect(result.vat?.inputVat.toString()).toBe('60');
       expect(result.vat?.netVat.toString()).toBe('40');
       expect(result.vat?.status).toBe('PAYABLE');
+    });
+  });
+
+  describe('getCashFlowStatement', () => {
+    it('returns empty sections when cash/bank mappings are missing', async () => {
+      prisma.fiscalYear.findUnique.mockResolvedValue({ id: 'fy1' });
+      prisma.accountingReportAccountMapping.findMany.mockResolvedValue([]);
+
+      const result = await service.getCashFlowStatement('tenant1', {
+        fiscalYearId: 'fy1',
+      } as any);
+
+      expect(result.openingCash.toString()).toBe('0');
+      expect(result.sections).toHaveLength(3);
+      expect(result.setupWarnings.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('getBudgetVsActual', () => {
+    it('throws when no approved budget exists', async () => {
+      prisma.fiscalYear.findUnique.mockResolvedValue({ id: 'fy1' });
+      prisma.fiscalBudget.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.getBudgetVsActual('tenant1', {
+          fiscalYearId: 'fy1',
+        } as any),
+      ).rejects.toThrow('No approved fiscal budget found');
     });
   });
 });

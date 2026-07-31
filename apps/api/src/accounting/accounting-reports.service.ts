@@ -24,17 +24,24 @@ import {
   FailedUnpostedTransactionsResponse,
   FailedUnpostedTransactionRow,
   BankBookResponse,
+  CashFlowStatementResponse,
+  CashFlowSection,
+  CashFlowLineItem,
+  CashFlowSectionKind,
+  BudgetVsActualResponse,
+  BudgetVsActualRow,
 } from './types/accounting-reports.types';
 import { CashBookQueryDto, CashBookAccountKind } from './dto/cash-book-query.dto';
 import { JournalRegisterQueryDto } from './dto/journal-register-query.dto';
 import { IncomeStatementQueryDto } from './dto/income-statement-query.dto';
 import { BalanceSheetQueryDto } from './dto/balance-sheet-query.dto';
+import { BudgetVsActualQueryDto } from './dto/budget-vs-actual-query.dto';
 import {
   TaxSummaryQueryDto,
   TaxSummaryType,
 } from './dto/tax-summary-query.dto';
 import { UpdateAccountingReportMappingsDto } from './dto/report-account-mapping.dto';
-import { ChartAccountType, JournalLineSide, Prisma, JournalEntryStatus, JournalSourceType, PaymentStatus, PayrollRunStatus, PayrollExceptionCode, PayrollExceptionStatus } from '@prisma/client';
+import { ChartAccountType, JournalLineSide, Prisma, JournalEntryStatus, JournalSourceType, PaymentStatus, PayrollRunStatus, PayrollExceptionCode, PayrollExceptionStatus, AccountingReportMappingType } from '@prisma/client';
 
 const cashBookLineInclude = Prisma.validator<Prisma.JournalLineInclude>()({
   chartAccount: {
@@ -1597,6 +1604,429 @@ export class AccountingReportsService {
         ).length,
       },
       generatedAt: now,
+    };
+  }
+
+  private classifyCashFlowSection(
+    counterparty:
+      | { id: string; type: ChartAccountType; code: string }
+      | undefined,
+    sourceType: JournalSourceType,
+    mappings: Array<{ mappingType: AccountingReportMappingType; accountId: string }>,
+    setupWarnings: string[],
+  ): CashFlowSectionKind {
+    if (counterparty) {
+      const operatingIds = mappings
+        .filter((m) => m.mappingType === AccountingReportMappingType.CASH_FLOW_OPERATING)
+        .map((m) => m.accountId);
+      const investingIds = mappings
+        .filter((m) => m.mappingType === AccountingReportMappingType.CASH_FLOW_INVESTING)
+        .map((m) => m.accountId);
+      const financingIds = mappings
+        .filter((m) => m.mappingType === AccountingReportMappingType.CASH_FLOW_FINANCING)
+        .map((m) => m.accountId);
+
+      if (operatingIds.includes(counterparty.id)) return 'OPERATING';
+      if (investingIds.includes(counterparty.id)) return 'INVESTING';
+      if (financingIds.includes(counterparty.id)) return 'FINANCING';
+    }
+
+    const operatingSources: JournalSourceType[] = [
+      JournalSourceType.FEE_PAYMENT,
+      JournalSourceType.INVOICE,
+      JournalSourceType.PAYMENT_REFUND,
+      JournalSourceType.PAYROLL,
+      JournalSourceType.PAYROLL_RUN,
+      JournalSourceType.PAYROLL_DISBURSEMENT,
+      JournalSourceType.EXPENSE_VOUCHER,
+      JournalSourceType.RECEIPT_VOUCHER,
+      JournalSourceType.PAYMENT_VOUCHER,
+      JournalSourceType.CONTRA_VOUCHER,
+    ];
+    if (operatingSources.includes(sourceType)) return 'OPERATING';
+
+    if (counterparty) {
+      if (
+        counterparty.type === ChartAccountType.EQUITY ||
+        counterparty.type === ChartAccountType.LIABILITY
+      ) {
+        return 'FINANCING';
+      }
+      if (
+        counterparty.type === ChartAccountType.ASSET &&
+        !counterparty.code.startsWith('11')
+      ) {
+        return 'INVESTING';
+      }
+      if (
+        counterparty.type === ChartAccountType.REVENUE ||
+        counterparty.type === ChartAccountType.INCOME ||
+        counterparty.type === ChartAccountType.EXPENSE
+      ) {
+        return 'OPERATING';
+      }
+    }
+
+    setupWarnings.push(
+      `Unmapped cash movement classified as operating (${sourceType}). Configure cash-flow account mappings for accuracy.`,
+    );
+    return 'OPERATING';
+  }
+
+  private async sumMappedCashBalance(
+    tenantId: string,
+    cashBankAccountIds: string[],
+    fiscalYearId: string,
+    boundaryDate: Date | undefined,
+    mode: 'before' | 'through',
+  ): Promise<Prisma.Decimal> {
+    if (cashBankAccountIds.length === 0) return new Prisma.Decimal(0);
+
+    const entryDateFilter =
+      mode === 'before' && boundaryDate
+        ? { lt: boundaryDate }
+        : boundaryDate
+          ? { lte: boundaryDate }
+          : undefined;
+
+    const grouped = await this.prisma.journalLine.groupBy({
+      by: ['chartAccountId'],
+      _sum: { debit: true, credit: true },
+      where: {
+        tenantId,
+        chartAccountId: { in: cashBankAccountIds },
+        journalEntry: {
+          tenantId,
+          status: JournalEntryStatus.POSTED,
+          fiscalYearId,
+          ...(entryDateFilter ? { entryDate: entryDateFilter } : {}),
+        },
+      },
+    });
+
+    let total = new Prisma.Decimal(0);
+    for (const row of grouped) {
+      total = total
+        .plus(this.toDecimal(row._sum.debit))
+        .minus(this.toDecimal(row._sum.credit));
+    }
+    return total;
+  }
+
+  async getCashFlowStatement(
+    tenantId: string,
+    query: IncomeStatementQueryDto,
+  ): Promise<CashFlowStatementResponse> {
+    const { fiscalYearId, fiscalPeriodId, fromDate, toDate } = query;
+    const setupWarnings: string[] = [];
+
+    const fiscalYear = await this.prisma.fiscalYear.findUnique({
+      where: { id: fiscalYearId, tenantId },
+    });
+    if (!fiscalYear) throw new NotFoundException('Fiscal year not found');
+
+    if (fiscalPeriodId) {
+      const fiscalPeriod = await this.prisma.fiscalPeriod.findUnique({
+        where: { id: fiscalPeriodId, tenantId, fiscalYearId },
+      });
+      if (!fiscalPeriod) {
+        throw new BadRequestException('Invalid fiscal period for this year');
+      }
+    }
+
+    const mappings = await this.prisma.accountingReportAccountMapping.findMany({
+      where: { tenantId },
+    });
+    const cashBankAccountIds = mappings
+      .filter(
+        (m) =>
+          m.mappingType === AccountingReportMappingType.CASH ||
+          m.mappingType === AccountingReportMappingType.BANK,
+      )
+      .map((m) => m.accountId);
+
+    if (cashBankAccountIds.length === 0) {
+      setupWarnings.push(
+        'No cash or bank accounts are mapped. Configure Accounting report account mappings.',
+      );
+      return {
+        fiscalYearId,
+        fiscalPeriodId,
+        fromDate,
+        toDate,
+        sections: [
+          { section: 'OPERATING', lines: [], subtotal: new Prisma.Decimal(0) },
+          { section: 'INVESTING', lines: [], subtotal: new Prisma.Decimal(0) },
+          { section: 'FINANCING', lines: [], subtotal: new Prisma.Decimal(0) },
+        ],
+        openingCash: new Prisma.Decimal(0),
+        netChange: new Prisma.Decimal(0),
+        closingCash: new Prisma.Decimal(0),
+        setupWarnings,
+        generatedAt: new Date(),
+      };
+    }
+
+    const journalWhere: Prisma.JournalEntryWhereInput = {
+      tenantId,
+      status: JournalEntryStatus.POSTED,
+      fiscalYearId,
+    };
+    if (fiscalPeriodId) journalWhere.fiscalPeriodId = fiscalPeriodId;
+    if (fromDate || toDate) {
+      journalWhere.entryDate = {};
+      if (fromDate) journalWhere.entryDate.gte = new Date(fromDate);
+      if (toDate) journalWhere.entryDate.lte = new Date(toDate);
+    }
+
+    const fromBoundary = fromDate ? new Date(fromDate) : undefined;
+    const toBoundary = toDate ? new Date(toDate) : new Date();
+
+    const openingCash = await this.sumMappedCashBalance(
+      tenantId,
+      cashBankAccountIds,
+      fiscalYearId,
+      fromBoundary,
+      'before',
+    );
+    const closingCash = await this.sumMappedCashBalance(
+      tenantId,
+      cashBankAccountIds,
+      fiscalYearId,
+      toBoundary,
+      'through',
+    );
+
+    const entries = await this.prisma.journalEntry.findMany({
+      where: journalWhere,
+      include: {
+        lines: {
+          include: {
+            chartAccount: {
+              select: { id: true, code: true, name: true, type: true },
+            },
+          },
+        },
+      },
+      orderBy: [{ entryDate: 'asc' }, { entryNumber: 'asc' }],
+    });
+
+    const cashBankSet = new Set(cashBankAccountIds);
+    const sectionLineTotals = new Map<string, Prisma.Decimal>();
+    const sectionTotals: Record<CashFlowSectionKind, Prisma.Decimal> = {
+      OPERATING: new Prisma.Decimal(0),
+      INVESTING: new Prisma.Decimal(0),
+      FINANCING: new Prisma.Decimal(0),
+    };
+
+    for (const entry of entries) {
+      const cashLines = entry.lines.filter((line) =>
+        cashBankSet.has(line.chartAccountId),
+      );
+      if (cashLines.length === 0) continue;
+
+      for (const cashLine of cashLines) {
+        const netCash = this.toDecimal(cashLine.debit).minus(
+          this.toDecimal(cashLine.credit),
+        );
+        const counterparties = entry.lines.filter(
+          (line) => !cashBankSet.has(line.chartAccountId),
+        );
+        const primaryCounterparty = counterparties[0]?.chartAccount;
+        const section = this.classifyCashFlowSection(
+          primaryCounterparty,
+          entry.sourceType,
+          mappings,
+          setupWarnings,
+        );
+        const label = primaryCounterparty
+          ? `${primaryCounterparty.code} - ${primaryCounterparty.name}`
+          : entry.sourceType;
+        const key = `${section}::${label}`;
+        sectionLineTotals.set(
+          key,
+          (sectionLineTotals.get(key) ?? new Prisma.Decimal(0)).plus(netCash),
+        );
+        sectionTotals[section] = sectionTotals[section].plus(netCash);
+      }
+    }
+
+    const buildSection = (section: CashFlowSectionKind): CashFlowSection => {
+      const lines: CashFlowLineItem[] = [];
+      for (const [key, amount] of sectionLineTotals.entries()) {
+        const [sectionKey, label] = key.split('::');
+        if (sectionKey !== section || amount.isZero()) continue;
+        const [accountCode, ...nameParts] = label.split(' - ');
+        lines.push({
+          label,
+          accountCode: nameParts.length > 0 ? accountCode : undefined,
+          accountName: nameParts.length > 0 ? nameParts.join(' - ') : undefined,
+          amount,
+        });
+      }
+      lines.sort((a, b) => a.label.localeCompare(b.label));
+      return { section, lines, subtotal: sectionTotals[section] };
+    };
+
+    const sections = [
+      buildSection('OPERATING'),
+      buildSection('INVESTING'),
+      buildSection('FINANCING'),
+    ];
+    const netChange = sectionTotals.OPERATING.plus(sectionTotals.INVESTING).plus(
+      sectionTotals.FINANCING,
+    );
+
+    return {
+      fiscalYearId,
+      fiscalPeriodId,
+      fromDate,
+      toDate,
+      sections,
+      openingCash,
+      netChange,
+      closingCash,
+      setupWarnings: [...new Set(setupWarnings)],
+      generatedAt: new Date(),
+    };
+  }
+
+  async getBudgetVsActual(
+    tenantId: string,
+    query: BudgetVsActualQueryDto,
+  ): Promise<BudgetVsActualResponse> {
+    const { fiscalYearId, fiscalPeriodId, fromDate, toDate, budgetId } = query;
+
+    const fiscalYear = await this.prisma.fiscalYear.findUnique({
+      where: { id: fiscalYearId, tenantId },
+    });
+    if (!fiscalYear) throw new NotFoundException('Fiscal year not found');
+
+    const budget = budgetId
+      ? await this.prisma.fiscalBudget.findFirst({
+          where: {
+            id: budgetId,
+            tenantId,
+            fiscalYearId,
+            status: { in: ['APPROVED', 'LOCKED'] },
+          },
+          include: {
+            lines: {
+              include: {
+                chartAccount: {
+                  select: { id: true, code: true, name: true, type: true },
+                },
+              },
+            },
+          },
+        })
+      : await this.prisma.fiscalBudget.findFirst({
+          where: {
+            tenantId,
+            fiscalYearId,
+            status: { in: ['APPROVED', 'LOCKED'] },
+          },
+          orderBy: { approvedAt: 'desc' },
+          include: {
+            lines: {
+              include: {
+                chartAccount: {
+                  select: { id: true, code: true, name: true, type: true },
+                },
+              },
+            },
+          },
+        });
+
+    if (!budget) {
+      throw new NotFoundException(
+        'No approved fiscal budget found for the selected fiscal year.',
+      );
+    }
+
+    const journalWhere: Prisma.JournalEntryWhereInput = {
+      tenantId,
+      status: JournalEntryStatus.POSTED,
+      fiscalYearId,
+    };
+    if (fiscalPeriodId) journalWhere.fiscalPeriodId = fiscalPeriodId;
+    if (fromDate || toDate) {
+      journalWhere.entryDate = {};
+      if (fromDate) journalWhere.entryDate.gte = new Date(fromDate);
+      if (toDate) journalWhere.entryDate.lte = new Date(toDate);
+    }
+
+    const accountIds = budget.lines.map((line) => line.chartAccountId);
+    const linesGrouped =
+      accountIds.length > 0
+        ? await this.prisma.journalLine.groupBy({
+            by: ['chartAccountId'],
+            _sum: { debit: true, credit: true },
+            where: {
+              tenantId,
+              chartAccountId: { in: accountIds },
+              journalEntry: journalWhere,
+            },
+          })
+        : [];
+
+    const rows: BudgetVsActualRow[] = [];
+    let totalBudget = new Prisma.Decimal(0);
+    let totalActual = new Prisma.Decimal(0);
+
+    for (const line of budget.lines) {
+      const budgetAmount = this.toDecimal(line.amount);
+      const grouped = linesGrouped.find(
+        (item) => item.chartAccountId === line.chartAccountId,
+      );
+      const debit = this.toDecimal(grouped?._sum.debit);
+      const credit = this.toDecimal(grouped?._sum.credit);
+      let actualAmount = new Prisma.Decimal(0);
+
+      if (
+        line.chartAccount.type === ChartAccountType.REVENUE ||
+        line.chartAccount.type === ChartAccountType.INCOME
+      ) {
+        actualAmount = credit.minus(debit);
+      } else if (line.chartAccount.type === ChartAccountType.EXPENSE) {
+        actualAmount = debit.minus(credit);
+      } else {
+        actualAmount = debit.minus(credit);
+      }
+
+      const variance = actualAmount.minus(budgetAmount);
+      const variancePercent = budgetAmount.isZero()
+        ? null
+        : variance.div(budgetAmount).times(100);
+
+      rows.push({
+        chartAccountId: line.chartAccountId,
+        accountCode: line.chartAccount.code,
+        accountName: line.chartAccount.name,
+        budgetAmount,
+        actualAmount,
+        variance,
+        variancePercent,
+        forecastAmount: null,
+      });
+      totalBudget = totalBudget.plus(budgetAmount);
+      totalActual = totalActual.plus(actualAmount);
+    }
+
+    rows.sort((a, b) => a.accountCode.localeCompare(b.accountCode));
+
+    return {
+      fiscalYearId,
+      fiscalPeriodId,
+      fromDate,
+      toDate,
+      budgetId: budget.id,
+      budgetName: budget.name,
+      rows,
+      totalBudget,
+      totalActual,
+      totalVariance: totalActual.minus(totalBudget),
+      generatedAt: new Date(),
     };
   }
 }

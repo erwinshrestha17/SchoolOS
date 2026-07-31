@@ -37,6 +37,7 @@ import { JournalRegisterQueryDto } from './dto/journal-register-query.dto';
 import { IncomeStatementQueryDto } from './dto/income-statement-query.dto';
 import { BalanceSheetQueryDto } from './dto/balance-sheet-query.dto';
 import { TaxSummaryQueryDto } from './dto/tax-summary-query.dto';
+import { BudgetVsActualQueryDto } from './dto/budget-vs-actual-query.dto';
 import { UpdateAccountingReportMappingsDto } from './dto/report-account-mapping.dto';
 
 @ApiTags('Accounting Reports')
@@ -144,6 +145,124 @@ export class AccountingReportsController {
   )
   async getFailedUnpostedTransactions(@CurrentAuth() auth: AuthContext) {
     return this.reportsService.getFailedUnpostedTransactions(auth.tenantId);
+  }
+
+  @Get('bank-book/export')
+  @ApiOperation({ summary: 'Export bank book to CSV' })
+  @Permissions('accounting:exports:create', 'accounting:reports:cash-book')
+  async exportBankBook(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: CashBookQueryDto,
+    @Res() res: Response,
+  ) {
+    const csv = await this.exportsService.exportBankBookCsv(
+      auth.tenantId,
+      query,
+    );
+    await this.recordExportAudit(auth, 'Bank Book', query);
+    this.sendCsvResponse(res, csv, 'bank-book');
+  }
+
+  @Get('bank-book/export.pdf')
+  @ApiOperation({ summary: 'Export bank book to PDF' })
+  @Permissions('accounting:exports:create', 'accounting:reports:cash-book')
+  async exportBankBookPdf(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: CashBookQueryDto,
+    @Res() res: Response,
+  ) {
+    const pdf = await this.exportsService.exportBankBookPdf(
+      auth.tenantId,
+      query,
+      auth,
+    );
+    this.sendPdfResponse(res, pdf, 'bank-book');
+  }
+
+  @Get('journal-register/export')
+  @ApiOperation({ summary: 'Export journal register to CSV' })
+  @Permissions('accounting:exports:create', 'accounting:reports:general-ledger')
+  async exportJournalRegister(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: JournalRegisterQueryDto,
+    @Res() res: Response,
+  ) {
+    const csv = await this.exportsService.exportJournalRegisterCsv(
+      auth.tenantId,
+      query,
+    );
+    await this.recordExportAudit(auth, 'Journal Register', query);
+    this.sendCsvResponse(res, csv, 'journal-register');
+  }
+
+  @Get('journal-register/export.pdf')
+  @ApiOperation({ summary: 'Export journal register to PDF' })
+  @Permissions('accounting:exports:create', 'accounting:reports:general-ledger')
+  async exportJournalRegisterPdf(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: JournalRegisterQueryDto,
+    @Res() res: Response,
+  ) {
+    const pdf = await this.exportsService.exportJournalRegisterPdf(
+      auth.tenantId,
+      query,
+      auth,
+    );
+    this.sendPdfResponse(res, pdf, 'journal-register');
+  }
+
+  @Get('failed-unposted/export')
+  @ApiOperation({ summary: 'Export failed/unposted transactions to CSV' })
+  @Permissions('accounting:exports:create', 'accounting:reports:read')
+  async exportFailedUnposted(
+    @CurrentAuth() auth: AuthContext,
+    @Res() res: Response,
+  ) {
+    const csv = await this.exportsService.exportFailedUnpostedCsv(auth.tenantId);
+    await this.recordExportAudit(auth, 'Failed Unposted Transactions', {});
+    this.sendCsvResponse(res, csv, 'failed-unposted');
+  }
+
+  @Get('failed-unposted/export.pdf')
+  @ApiOperation({ summary: 'Export failed/unposted transactions to PDF' })
+  @Permissions('accounting:exports:create', 'accounting:reports:read')
+  async exportFailedUnpostedPdf(
+    @CurrentAuth() auth: AuthContext,
+    @Res() res: Response,
+  ) {
+    const pdf = await this.exportsService.exportFailedUnpostedPdf(
+      auth.tenantId,
+      auth,
+    );
+    this.sendPdfResponse(res, pdf, 'failed-unposted');
+  }
+
+  @Get('cash-flow-statement')
+  @ApiOperation({ summary: 'Get cash flow statement report' })
+  @Permissions(
+    'accounting:reports:cash-flow-statement',
+    'accounting:read',
+    'accounting:reports:read',
+  )
+  async getCashFlowStatement(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: IncomeStatementQueryDto,
+  ) {
+    return this.reportsService.getCashFlowStatement(auth.tenantId, query);
+  }
+
+  @Get('budget-vs-actual')
+  @ApiOperation({ summary: 'Get budget vs actual report' })
+  @Permissions(
+    'accounting:reports:budget-vs-actual',
+    'accounting:read',
+    'accounting:reports:read',
+  )
+  async getBudgetVsActual(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: BudgetVsActualQueryDto,
+  ) {
+    return this.reportsService.getBudgetVsActual(auth.tenantId, query);
   }
 
   @Get('income-statement')
@@ -416,6 +535,82 @@ export class AccountingReportsController {
       auth,
     );
     this.sendPdfResponse(res, pdf, 'tax-summary');
+  }
+
+  @Get('cash-flow-statement/export')
+  @ApiOperation({ summary: 'Export cash flow statement to CSV' })
+  @Permissions(
+    'accounting:exports:create',
+    'accounting:reports:cash-flow-statement',
+  )
+  async exportCashFlowStatement(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: IncomeStatementQueryDto,
+    @Res() res: Response,
+  ) {
+    const csv = await this.exportsService.exportCashFlowStatementCsv(
+      auth.tenantId,
+      query,
+    );
+    await this.recordExportAudit(auth, 'Cash Flow Statement', query);
+    this.sendCsvResponse(res, csv, 'cash-flow-statement');
+  }
+
+  @Get('cash-flow-statement/export.pdf')
+  @ApiOperation({ summary: 'Export cash flow statement to PDF' })
+  @Permissions(
+    'accounting:exports:create',
+    'accounting:reports:cash-flow-statement',
+  )
+  async exportCashFlowStatementPdf(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: IncomeStatementQueryDto,
+    @Res() res: Response,
+  ) {
+    const pdf = await this.exportsService.exportCashFlowStatementPdf(
+      auth.tenantId,
+      query,
+      auth,
+    );
+    this.sendPdfResponse(res, pdf, 'cash-flow-statement');
+  }
+
+  @Get('budget-vs-actual/export')
+  @ApiOperation({ summary: 'Export budget vs actual to CSV' })
+  @Permissions(
+    'accounting:exports:create',
+    'accounting:reports:budget-vs-actual',
+  )
+  async exportBudgetVsActual(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: BudgetVsActualQueryDto,
+    @Res() res: Response,
+  ) {
+    const csv = await this.exportsService.exportBudgetVsActualCsv(
+      auth.tenantId,
+      query,
+    );
+    await this.recordExportAudit(auth, 'Budget vs Actual', query);
+    this.sendCsvResponse(res, csv, 'budget-vs-actual');
+  }
+
+  @Get('budget-vs-actual/export.pdf')
+  @ApiOperation({ summary: 'Export budget vs actual to PDF' })
+  @Permissions(
+    'accounting:exports:create',
+    'accounting:reports:budget-vs-actual',
+  )
+  async exportBudgetVsActualPdf(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: BudgetVsActualQueryDto,
+    @Res() res: Response,
+  ) {
+    const pdf = await this.exportsService.exportBudgetVsActualPdf(
+      auth.tenantId,
+      query,
+      auth,
+    );
+    this.sendPdfResponse(res, pdf, 'budget-vs-actual');
   }
 
   private async recordExportAudit(

@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { SectionCard } from "../ui/section-card";
 import { ReportTable } from "./report-table";
 import { Select } from "../ui/select";
-import { Search, History, Eye } from "lucide-react";
+import { Search, History, Eye, FileSpreadsheet } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { EmptyState } from "../ui/empty-state";
 import { LoadingState } from "../ui/loading-state";
@@ -15,17 +15,41 @@ import { formatBsDateTime } from "@schoolos/core";
 export function AccountingAuditWorkspace() {
   const [resourceFilter, setResourceFilter] = useState<string>("");
   const [actionFilter, setActionFilter] = useState<string>("");
+  const [fromDate, setFromDate] = useState<string>("");
+  const [toDate, setToDate] = useState<string>("");
   const [page, setPage] = useState(1);
   const [selectedLog, setSelectedLog] = useState<any>(null);
 
   const query = useQuery({
-    queryKey: ["accounting-audit-trail", resourceFilter, actionFilter, page],
+    queryKey: [
+      "financial-audit-trail",
+      resourceFilter,
+      actionFilter,
+      fromDate,
+      toDate,
+      page,
+    ],
     queryFn: () =>
-      api.getAccountingAuditTrail({
+      api.listFinancialAuditTrail({
         resource: resourceFilter || undefined,
         action: actionFilter || undefined,
+        fromDate: fromDate || undefined,
+        toDate: toDate || undefined,
         page,
         limit: 50,
+      }),
+  });
+
+  const exportMutation = useMutation({
+    mutationFn: () =>
+      api.exportReport("financial-audit-trail-report", {
+        format: "csv",
+        filters: {
+          resource: resourceFilter || undefined,
+          action: actionFilter || undefined,
+          fromDate: fromDate || undefined,
+          toDate: toDate || undefined,
+        },
       }),
   });
 
@@ -33,13 +57,24 @@ export function AccountingAuditWorkspace() {
   const activeFilterLabel =
     [resourceFilter || null, actionFilter || null]
       .filter(Boolean)
-      .join(" / ") || "All accounting events";
+      .join(" / ") || "All financial events";
 
   return (
     <div className="space-y-6 animate-fade-in">
       <SectionCard
-        title="Accounting Audit Trail"
-        description="Immutable record of all changes to accounting entities, ledgers, and configurations."
+        title="Financial Audit Trail"
+        description="Cross-module audit trail for fees, payroll, and accounting actions."
+        headerAction={
+          <button
+            type="button"
+            onClick={() => exportMutation.mutate()}
+            disabled={exportMutation.isPending}
+            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+          >
+            <FileSpreadsheet size={16} />
+            {exportMutation.isPending ? "Exporting..." : "Export CSV"}
+          </button>
+        }
       >
         <div className="mb-6 grid gap-3 sm:grid-cols-3">
           <AuditSummaryCard label="Records on page" value={records.length} />
@@ -47,7 +82,7 @@ export function AccountingAuditWorkspace() {
           <AuditSummaryCard label="Filter" value={activeFilterLabel} />
         </div>
 
-        <div className="mb-6 flex flex-col gap-4 md:flex-row">
+        <div className="mb-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <div className="relative flex-1">
             <Search
               size={16}
@@ -68,6 +103,15 @@ export function AccountingAuditWorkspace() {
               <option value="fiscal_year">Fiscal Year</option>
               <option value="bank_statement">Bank Statement</option>
               <option value="voucher">Voucher</option>
+              <option value="payment">Payment</option>
+              <option value="receipt">Receipt</option>
+              <option value="invoice">Invoice</option>
+              <option value="payment_refund">Payment Refund</option>
+              <option value="cashier_close">Cashier Close</option>
+              <option value="payroll_run">Payroll Run</option>
+              <option value="finance_approval_request">
+                Finance Approval Request
+              </option>
             </Select>
           </div>
           <div className="flex-1">
@@ -86,7 +130,33 @@ export function AccountingAuditWorkspace() {
               <option value="post">Post</option>
               <option value="reconcile">Reconcile</option>
               <option value="close">Close</option>
+              <option value="approve">Approve</option>
+              <option value="reverse">Reverse</option>
             </Select>
+          </div>
+          <div className="flex-1">
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => {
+                setFromDate(e.target.value);
+                setPage(1);
+              }}
+              className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-700"
+              aria-label="From date"
+            />
+          </div>
+          <div className="flex-1">
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => {
+                setToDate(e.target.value);
+                setPage(1);
+              }}
+              className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-700"
+              aria-label="To date"
+            />
           </div>
         </div>
 
@@ -95,7 +165,7 @@ export function AccountingAuditWorkspace() {
         ) : query.data?.items.length === 0 ? (
           <EmptyState
             title="No audit records"
-            description="No accounting audit logs match your current filters."
+            description="No financial audit logs match your current filters."
             icon={<History size={32} />}
           />
         ) : (

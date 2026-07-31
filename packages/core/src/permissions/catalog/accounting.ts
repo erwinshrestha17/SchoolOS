@@ -124,4 +124,24 @@ export const accountingPermissions = [
     action: "create",
     description: "Create accounting exports",
   },
+  {
+    resource: "accounting:budgets",
+    action: "read",
+    description: "Read fiscal budgets",
+  },
+  {
+    resource: "accounting:budgets",
+    action: "write",
+    description: "Create and update fiscal budgets",
+  },
+  {
+    resource: "accounting:reports",
+    action: "budget-vs-actual",
+    description: "View Budget vs Actual report",
+  },
+  {
+    resource: "accounting:reports",
+    action: "cash-flow-statement",
+    description: "View Cash Flow Statement report",
+  },
 ] as const;

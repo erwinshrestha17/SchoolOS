@@ -270,3 +270,56 @@ export interface TaxSummaryResponse {
   setupWarnings: string[];
   generatedAt: Date;
 }
+
+export type CashFlowSectionKind = 'OPERATING' | 'INVESTING' | 'FINANCING';
+
+export interface CashFlowLineItem {
+  label: string;
+  accountCode?: string;
+  accountName?: string;
+  amount: Prisma.Decimal;
+}
+
+export interface CashFlowSection {
+  section: CashFlowSectionKind;
+  lines: CashFlowLineItem[];
+  subtotal: Prisma.Decimal;
+}
+
+export interface CashFlowStatementResponse {
+  fiscalYearId: string;
+  fiscalPeriodId?: string;
+  fromDate?: string;
+  toDate?: string;
+  sections: CashFlowSection[];
+  openingCash: Prisma.Decimal;
+  netChange: Prisma.Decimal;
+  closingCash: Prisma.Decimal;
+  setupWarnings: string[];
+  generatedAt: Date;
+}
+
+export interface BudgetVsActualRow {
+  chartAccountId: string;
+  accountCode: string;
+  accountName: string;
+  budgetAmount: Prisma.Decimal;
+  actualAmount: Prisma.Decimal;
+  variance: Prisma.Decimal;
+  variancePercent: Prisma.Decimal | null;
+  forecastAmount: null;
+}
+
+export interface BudgetVsActualResponse {
+  fiscalYearId: string;
+  fiscalPeriodId?: string;
+  fromDate?: string;
+  toDate?: string;
+  budgetId: string;
+  budgetName: string;
+  rows: BudgetVsActualRow[];
+  totalBudget: Prisma.Decimal;
+  totalActual: Prisma.Decimal;
+  totalVariance: Prisma.Decimal;
+  generatedAt: Date;
+}

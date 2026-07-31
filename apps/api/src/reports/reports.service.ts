@@ -1677,6 +1677,91 @@ export class ReportsService {
 
     this.register({
       definition: {
+        key: 'cash-flow-statement',
+        name: 'Cash Flow Statement',
+        description:
+          'Operating, investing, and financing cash movements from mapped cash/bank accounts',
+        category: 'finance',
+        module: 'accounting',
+        formats: ['json', 'csv', 'pdf'],
+        filters: [
+          { key: 'fiscalYearId', label: 'Fiscal Year', type: 'select', required: true },
+          { key: 'fromDate', label: 'From Date', type: 'date' },
+          { key: 'toDate', label: 'To Date', type: 'date' },
+        ],
+        requiredPermissions: [
+          'reports:export',
+          'accounting:reports:cash-flow-statement',
+        ],
+      },
+      execute: async (actor, filters) => {
+        if (!filters.fiscalYearId) {
+          throw new ForbiddenException('fiscalYearId filter is required');
+        }
+        const report = await this.accountingReportsService.getCashFlowStatement(
+          actor.tenantId,
+          {
+            fiscalYearId: String(filters.fiscalYearId),
+            fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
+            toDate: filters.toDate ? String(filters.toDate) : undefined,
+          },
+        );
+        return report.sections.flatMap((section) =>
+          section.lines.map((line) => ({
+            Section: section.section,
+            Label: line.label,
+            Amount: Number(line.amount),
+          })),
+        );
+      },
+    });
+
+    this.register({
+      definition: {
+        key: 'budget-vs-actual-report',
+        name: 'Budget vs Actual',
+        description: 'Compare approved fiscal budget lines to ledger actuals',
+        category: 'finance',
+        module: 'accounting',
+        formats: ['json', 'csv', 'pdf'],
+        filters: [
+          { key: 'fiscalYearId', label: 'Fiscal Year', type: 'select', required: true },
+          { key: 'budgetId', label: 'Budget', type: 'select' },
+          { key: 'fromDate', label: 'From Date', type: 'date' },
+          { key: 'toDate', label: 'To Date', type: 'date' },
+        ],
+        requiredPermissions: [
+          'reports:export',
+          'accounting:reports:budget-vs-actual',
+        ],
+      },
+      execute: async (actor, filters) => {
+        if (!filters.fiscalYearId) {
+          throw new ForbiddenException('fiscalYearId filter is required');
+        }
+        const report = await this.accountingReportsService.getBudgetVsActual(
+          actor.tenantId,
+          {
+            fiscalYearId: String(filters.fiscalYearId),
+            budgetId: filters.budgetId ? String(filters.budgetId) : undefined,
+            fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
+            toDate: filters.toDate ? String(filters.toDate) : undefined,
+          },
+        );
+        return report.rows.map((row) => ({
+          Account: `${row.accountCode} - ${row.accountName}`,
+          Budget: Number(row.budgetAmount),
+          Actual: Number(row.actualAmount),
+          Variance: Number(row.variance),
+          'Variance %': row.variancePercent
+            ? Number(row.variancePercent)
+            : null,
+        }));
+      },
+    });
+
+    this.register({
+      definition: {
         key: 'staff-attendance-report',
         name: 'Staff Attendance Report',
         description: 'Detailed attendance report for staff members',

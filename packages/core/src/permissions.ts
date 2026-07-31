@@ -332,6 +332,26 @@ export const permissionCatalog = [
     action: "create",
     description: "Create accounting exports",
   },
+  {
+    resource: "accounting:budgets",
+    action: "read",
+    description: "Read fiscal budgets",
+  },
+  {
+    resource: "accounting:budgets",
+    action: "write",
+    description: "Create and update fiscal budgets",
+  },
+  {
+    resource: "accounting:reports",
+    action: "budget-vs-actual",
+    description: "View Budget vs Actual report",
+  },
+  {
+    resource: "accounting:reports",
+    action: "cash-flow-statement",
+    description: "View Cash Flow Statement report",
+  },
 
   // ─── Compiled from catalog/activity.ts ───
   {
@@ -1917,6 +1937,10 @@ export const systemRolePermissions: Record<string, string[]> = {
     "accounting:reports:income-statement",
     "accounting:reports:balance-sheet",
     "accounting:reports:tax-summary",
+    "accounting:reports:cash-flow-statement",
+    "accounting:reports:budget-vs-actual",
+    "accounting:budgets:read",
+    "accounting:budgets:write",
     "accounting:settings:read",
     "accounting:settings:update",
     "accounting:exports:create",

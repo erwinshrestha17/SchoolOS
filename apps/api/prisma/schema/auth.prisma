@@ -80,6 +80,8 @@ model User {
   updatedAccountMappings         AccountingReportAccountMapping[] @relation("UpdatedAccountMappings")
   createdAccountingSourceMappings AccountingSourceMapping[]       @relation("CreatedAccountingSourceMappings")
   updatedAccountingSourceMappings AccountingSourceMapping[]       @relation("UpdatedAccountingSourceMappings")
+  createdFiscalBudgets           FiscalBudget[]                 @relation("CreatedFiscalBudgets")
+  approvedFiscalBudgets          FiscalBudget[]                 @relation("ApprovedFiscalBudgets")
   reconciledBankStatements       BankStatement[]                  @relation("ReconciledBankStatements")
   verifiedStaffDocuments         StaffDocument[]                  @relation("VerifiedStaffDocuments")
   createdStaffLifecycleEvents    StaffLifecycleEvent[]            @relation("CreatedStaffLifecycleEvents")

@@ -160,6 +160,15 @@ enum AccountingReportMappingType {
   PF_EMPLOYER_PAYABLE
   PF_PAYABLE
   RETAINED_EARNINGS
+  CASH_FLOW_OPERATING
+  CASH_FLOW_INVESTING
+  CASH_FLOW_FINANCING
+}
+
+enum FiscalBudgetStatus {
+  DRAFT
+  APPROVED
+  LOCKED
 }
 
 enum JournalEntryStatus {
@@ -1801,6 +1810,7 @@ model ChartAccount {
   bankStatementImportJobs  BankStatementImportJob[]
   sourceDebitMappings      AccountingSourceMapping[] @relation("AccountingSourceMappingDebitAccount")
   sourceCreditMappings     AccountingSourceMapping[] @relation("AccountingSourceMappingCreditAccount")
+  fiscalBudgetLines        FiscalBudgetLine[]
 
   @@unique([tenantId, code])
   @@index([tenantId, fiscalYearId])
@@ -1958,6 +1968,7 @@ model FiscalYear {
   accounts       ChartAccount[]
   journalEntries JournalEntry[]
   payrollRuns    PayrollRun[]
+  fiscalBudgets  FiscalBudget[]
 
   @@unique([tenantId, name])
   @@index([tenantId, startDate, endDate])
@@ -1991,6 +2002,7 @@ model FiscalPeriod {
   tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   fiscalYear     FiscalYear     @relation(fields: [fiscalYearId], references: [id], onDelete: Cascade)
   journalEntries JournalEntry[]
+  fiscalBudgetLines FiscalBudgetLine[]
 
   @@unique([tenantId, fiscalYearId, periodNumber])
   @@unique([tenantId, fiscalYearId, label])
@@ -2104,6 +2116,48 @@ model BankStatementImportJob {
   @@unique([tenantId, accountId, fingerprint])
   @@index([tenantId, accountId, createdAt])
   @@index([tenantId, status])
+}
+
+model FiscalBudget {
+  id           String             @id @default(uuid())
+  tenantId     String
+  fiscalYearId String
+  name         String
+  status       FiscalBudgetStatus @default(DRAFT)
+  approvedAt   DateTime?
+  approvedById String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  createdById  String?
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  fiscalYear FiscalYear @relation(fields: [fiscalYearId], references: [id], onDelete: Cascade)
+  approvedBy User?      @relation("ApprovedFiscalBudgets", fields: [approvedById], references: [id], onDelete: SetNull)
+  createdBy  User?      @relation("CreatedFiscalBudgets", fields: [createdById], references: [id], onDelete: SetNull)
+  lines      FiscalBudgetLine[]
+
+  @@unique([tenantId, fiscalYearId, name])
+  @@index([tenantId, fiscalYearId, status])
+}
+
+model FiscalBudgetLine {
+  id             String   @id @default(uuid())
+  tenantId       String
+  budgetId       String
+  chartAccountId String
+  fiscalPeriodId String?
+  amount         Decimal  @db.Decimal(12, 2)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  budget       FiscalBudget  @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  chartAccount ChartAccount  @relation(fields: [chartAccountId], references: [id], onDelete: Restrict)
+  fiscalPeriod FiscalPeriod? @relation(fields: [fiscalPeriodId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, budgetId, chartAccountId])
+  @@index([tenantId, budgetId])
+  @@index([tenantId, chartAccountId])
 }
 
 
@@ -3170,6 +3224,8 @@ model User {
   updatedAccountMappings         AccountingReportAccountMapping[] @relation("UpdatedAccountMappings")
   createdAccountingSourceMappings AccountingSourceMapping[]       @relation("CreatedAccountingSourceMappings")
   updatedAccountingSourceMappings AccountingSourceMapping[]       @relation("UpdatedAccountingSourceMappings")
+  createdFiscalBudgets           FiscalBudget[]                 @relation("CreatedFiscalBudgets")
+  approvedFiscalBudgets          FiscalBudget[]                 @relation("ApprovedFiscalBudgets")
   reconciledBankStatements       BankStatement[]                  @relation("ReconciledBankStatements")
   verifiedStaffDocuments         StaffDocument[]                  @relation("VerifiedStaffDocuments")
   createdStaffLifecycleEvents    StaffLifecycleEvent[]            @relation("CreatedStaffLifecycleEvents")
@@ -7936,6 +7992,8 @@ model Tenant {
   attendanceCorrectionRequests  AttendanceCorrectionRequest[]
   accountingReportMappings      AccountingReportAccountMapping[]
   accountingSourceMappings      AccountingSourceMapping[]
+  fiscalBudgets                 FiscalBudget[]
+  fiscalBudgetLines             FiscalBudgetLine[]
   bankStatements                BankStatement[]
   studentQrCredentials          StudentQrCredential[]
   admissionImportBatches        AdmissionImportBatch[]

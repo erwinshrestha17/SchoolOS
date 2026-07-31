@@ -9,6 +9,11 @@
 | Check | Result | Detail |
 |---|---|---|
 | M3 accountant login | PASS | token received |
+| Invoice register API | PASS | `GET /fees/reports/invoices` HTTP 200 |
+| Receipt register API | PASS | `GET /fees/reports/receipts` HTTP 200 |
+| Receipt sequence exceptions API | PASS | `GET /fees/reports/receipt-sequence-exceptions` HTTP 200 |
+| Refund/reversal register API | PASS | `GET /fees/reports/refund-reversals` HTTP 200 |
+| Export catalog keys (M3) | PASS | `invoice-register`, `receipt-register`, `receipt-sequence-exception-report`, `refund-reversal-report` registered |
 | Fees dashboard summary | PASS | HTTP 200 |
 | Invoice list | PASS | HTTP 200 |
 | Idempotent cash collection probe | PASS | first HTTP 201, replay HTTP 201, paymentId=d3f33353-ea64-4939-a64b-c38204a101c3 |

@@ -157,6 +157,41 @@ export const accountingApi = {
     ),
   listFailedUnpostedTransactions: () =>
     request<unknown>("/accounting/reports/failed-unposted"),
+  listCashFlowStatement: (params: AccountingReportFilters) =>
+    request<unknown>(
+      withQuery("/accounting/reports/cash-flow-statement", params ?? {}),
+    ),
+  listBudgetVsActual: (
+    params: AccountingReportFilters & { budgetId?: string },
+  ) =>
+    request<unknown>(
+      withQuery("/accounting/reports/budget-vs-actual", params ?? {}),
+    ),
+  listFiscalBudgets: (fiscalYearId?: string) =>
+    request<unknown>(
+      withQuery("/accounting/budgets", fiscalYearId ? { fiscalYearId } : {}),
+    ),
+  createFiscalBudget: (body: { fiscalYearId: string; name: string }) =>
+    request<unknown>("/accounting/budgets", { method: "POST", json: body }),
+  upsertFiscalBudgetLines: (
+    budgetId: string,
+    body: {
+      lines: Array<{
+        chartAccountId: string;
+        amount: string;
+        fiscalPeriodId?: string;
+      }>;
+    },
+  ) =>
+    request<unknown>(`/accounting/budgets/${encodeURIComponent(budgetId)}/lines`, {
+      method: "PUT",
+      json: body,
+    }),
+  approveFiscalBudget: (budgetId: string, reason: string) =>
+    request<unknown>(
+      `/accounting/budgets/${encodeURIComponent(budgetId)}/approve`,
+      { method: "POST", json: { reason } },
+    ),
   listFinancialAuditTrail: (params?: {
     fromDate?: string;
     toDate?: string;
@@ -175,9 +210,12 @@ export const accountingApi = {
     ),
   listTdsSummary: () => request<any>("/accounting/reports/tds-summary"),
   listPfSummary: () => request<any>("/accounting/reports/pf-summary"),
-  exportAccountingCsv: async (report: string) => {
+  exportAccountingCsv: async (report: string, params?: Record<string, string>) => {
+    const query = params
+      ? `?${new URLSearchParams(params).toString()}`
+      : "";
     const response = await fetch(
-      `${API_BASE_URL}/accounting/reports/${encodeURIComponent(report)}/export`,
+      `${API_BASE_URL}/accounting/reports/${encodeURIComponent(report)}/export${query}`,
       { credentials: "include" },
     );
 
@@ -196,9 +234,12 @@ export const accountingApi = {
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
   },
-  exportAccountingPdf: async (report: string, params?: JsonBody) => {
+  exportAccountingPdf: async (report: string, params?: Record<string, string>) => {
+    const query = params
+      ? `?${new URLSearchParams(params).toString()}`
+      : "";
     const response = await fetch(
-      `${API_BASE_URL}/accounting/reports/${report}/export.pdf${params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : ""}`,
+      `${API_BASE_URL}/accounting/reports/${encodeURIComponent(report)}/export.pdf${query}`,
       { credentials: "include" },
     );
 
