@@ -38,6 +38,7 @@ type ReportType =
   | "balance-sheet"
   | "general-ledger"
   | "cash-book"
+  | "bank-book"
   | "tax-summary";
 
 export function AccountingReportsView({
@@ -96,11 +97,14 @@ export function AccountingReportsView({
         return api.listGeneralLedger(reportFilters);
       if (activeReport === "tax-summary")
         return api.listTaxSummary(reportFilters);
+      if (activeReport === "bank-book")
+        return api.listBankBook(reportFilters);
       return api.listCashBook(reportFilters);
     },
     enabled:
       Boolean(filters.fiscalYearId) &&
-      (activeReport !== "general-ledger" || Boolean(filters.accountId)),
+      (activeReport !== "general-ledger" || Boolean(filters.accountId)) &&
+      (activeReport !== "bank-book" || Boolean(filters.accountId)),
   });
 
   const snapshotsQuery = useQuery({
@@ -163,6 +167,18 @@ export function AccountingReportsView({
             tone="info"
             title="Select a ledger account"
             description="Choose a tenant-owned active account in Report Filters to generate the General Ledger."
+          />
+        </div>
+      );
+    }
+
+    if (activeReport === "bank-book" && !filters.accountId) {
+      return (
+        <div className="py-10">
+          <PageState
+            tone="info"
+            title="Select a bank account"
+            description="Choose a mapped bank account in Report Filters to generate the Bank Book."
           />
         </div>
       );
@@ -440,7 +456,7 @@ export function AccountingReportsView({
       );
     }
 
-    if (activeReport === "cash-book") {
+    if (activeReport === "cash-book" || activeReport === "bank-book") {
       const cb = data as AccountingCashBookResponse;
       return (
         <ReportTable
@@ -562,9 +578,9 @@ export function AccountingReportsView({
                 },
                 {
                   id: "income-statement",
-                  label: "Income Statement",
+                  label: "Income and Expenditure Statement",
                   icon: FileText,
-                  desc: "Revenue vs Expenses (P&L)",
+                  desc: "Revenue vs expenses for the period",
                 },
                 {
                   id: "balance-sheet",
@@ -582,7 +598,13 @@ export function AccountingReportsView({
                   id: "cash-book",
                   label: "Cash Book",
                   icon: Wallet,
-                  desc: "Cash and bank movements",
+                  desc: "Cash movements",
+                },
+                {
+                  id: "bank-book",
+                  label: "Bank Book",
+                  icon: Wallet,
+                  desc: "Per-bank account movements",
                 },
                 {
                   id: "tax-summary",

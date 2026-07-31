@@ -128,6 +128,71 @@ export interface CashBookResponse {
   setupWarnings?: string[];
 }
 
+export interface BankBookResponse extends CashBookResponse {}
+
+export interface JournalRegisterRow {
+  journalEntryId: string;
+  entryNumber: string | null;
+  entryDate: Date;
+  narration: string;
+  sourceModule: string | null;
+  sourceType: string;
+  sourceId: string | null;
+  debitedAccounts: string;
+  creditedAccounts: string;
+  totalDebit: Prisma.Decimal;
+  totalCredit: Prisma.Decimal;
+  status: string;
+  approvalStatus: string;
+  reversalStatus: string;
+  createdById: string | null;
+  approvedById: string | null;
+  postedById: string | null;
+  reversalOfId: string | null;
+  correctionOfId: string | null;
+}
+
+export interface JournalRegisterResponse {
+  fiscalYearId: string;
+  fiscalPeriodId?: string;
+  fromDate?: string;
+  toDate?: string;
+  rows: JournalRegisterRow[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+  generatedAt: Date;
+}
+
+export interface FailedUnpostedTransactionRow {
+  sourceModule: string;
+  sourceType: string;
+  resourceId: string;
+  reference: string;
+  amount: Prisma.Decimal | null;
+  issueType:
+    | 'APPROVED_UNPOSTED_JOURNAL'
+    | 'MISSING_GL_POSTING'
+    | 'POSTING_AMOUNT_MISMATCH'
+    | 'ACCOUNTING_POSTING_FAILED';
+  details: string;
+  detectedAt: Date;
+}
+
+export interface FailedUnpostedTransactionsResponse {
+  rows: FailedUnpostedTransactionRow[];
+  summary: {
+    totalIssues: number;
+    approvedUnpostedJournals: number;
+    missingGlPostings: number;
+    payrollPostingFailures: number;
+  };
+  generatedAt: Date;
+}
+
 export interface IncomeStatementAccount {
   accountId: string;
   accountCode: string;

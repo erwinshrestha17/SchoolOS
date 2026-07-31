@@ -544,6 +544,15 @@ export class PayrollController {
     return this.payrollService.getPayrollLeaveDeductionSummary(auth, query);
   }
 
+  @Get('reports/gl-reconciliation')
+  @Permissions('payroll:reports:read')
+  getPayrollGlReconciliation(
+    @Query() query: PayrollReportQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.getPayrollGlReconciliation(auth, query);
+  }
+
   @Get('reports/register.csv')
   @Header('Content-Type', 'text/csv')
   @Header('Content-Disposition', 'attachment; filename="payroll-register.csv"')

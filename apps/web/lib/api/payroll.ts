@@ -284,6 +284,10 @@ export const payrollApi = {
     request<unknown>(
       withQuery('/payroll/reports/leave-deductions', params ?? {}),
     ),
+  getPayrollGlReconciliation: (params?: JsonBody) =>
+    request<unknown>(
+      withQuery('/payroll/reports/gl-reconciliation', params ?? {}),
+    ),
   exportPayrollRegisterCsv: (params?: JsonBody) =>
     downloadCsv(
       withQuery('/payroll/reports/register.csv', params ?? {}),

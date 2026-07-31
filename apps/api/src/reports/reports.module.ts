@@ -5,6 +5,8 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { AuditModule } from '../audit/audit.module';
 
 import { FinanceModule } from '../finance/finance.module';
+import { AccountingModule } from '../accounting/accounting.module';
+import { PayrollModule } from '../payroll/payroll.module';
 import { FileRegistryModule } from '../file-registry/file-registry.module';
 
 import { BullModule } from '@nestjs/bullmq';
@@ -17,6 +19,8 @@ import { TeacherScopeModule } from '../teacher-scope/teacher-scope.module';
     PrismaModule,
     AuditModule,
     FinanceModule,
+    AccountingModule,
+    PayrollModule,
     FileRegistryModule,
     TeacherScopeModule,
     BullModule.registerQueue({

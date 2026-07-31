@@ -297,6 +297,43 @@ export const financeApi = {
     request<PaymentMethodReport>(
       withQuery("/fees/reports/payment-methods", params ?? {}),
     ),
+  getInvoiceRegister: (params?: {
+    fromDate?: string;
+    toDate?: string;
+    academicYearId?: string;
+    classId?: string;
+    sectionId?: string;
+    studentId?: string;
+    feeHeadId?: string;
+  }) =>
+    request<{ rows: any[]; summary: any }>(
+      withQuery("/fees/reports/invoices", params ?? {}),
+    ),
+  getReceiptRegister: (params?: {
+    fromDate?: string;
+    toDate?: string;
+    studentId?: string;
+    paymentMethod?: string;
+  }) =>
+    request<{ rows: any[]; summary: any }>(
+      withQuery("/fees/reports/receipts", params ?? {}),
+    ),
+  getReceiptSequenceExceptions: (params?: {
+    fiscalYear?: string;
+    fromDate?: string;
+    toDate?: string;
+  }) =>
+    request<{ rows: any[]; summary: any }>(
+      withQuery("/fees/reports/receipt-sequence-exceptions", params ?? {}),
+    ),
+  getRefundReversalRegister: (params?: {
+    fromDate?: string;
+    toDate?: string;
+    recordType?: "REFUND" | "REVERSAL";
+  }) =>
+    request<{ rows: any[]; summary: any }>(
+      withQuery("/fees/reports/refund-reversals", params ?? {}),
+    ),
   listDiscountsPage: (params?: {
     page?: number;
     limit?: number;

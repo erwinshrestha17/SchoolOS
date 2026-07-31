@@ -23,6 +23,8 @@ import {
 } from '@prisma/client';
 
 import { FinanceService } from '../finance/finance.service';
+import { AccountingReportsService } from '../accounting/accounting-reports.service';
+import { PayrollService } from '../payroll/payroll.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PlansService } from '../plans/plans.service';
 import { buildTableReportPdf } from '../common/pdf/simple-pdf';
@@ -54,6 +56,8 @@ export class ReportsService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly financeService: FinanceService,
+    private readonly accountingReportsService: AccountingReportsService,
+    private readonly payrollService: PayrollService,
     private readonly fileRegistryService: FileRegistryService,
     private readonly plansService: PlansService,
     @InjectQueue('reports') private readonly reportsQueue: Queue,
@@ -1317,6 +1321,356 @@ export class ReportsService {
           'Payment Count': c.paymentCount,
           'Refund Count': c.refundCount,
           'Closed By': c.closedBy?.email || 'System',
+        }));
+      },
+    });
+
+    this.register({
+      definition: {
+        key: 'invoice-register',
+        name: 'Invoice Register',
+        description: 'Issued invoices with billing, collection, and balance status',
+        category: 'finance',
+        module: 'finance',
+        formats: ['json', 'csv'],
+        filters: [
+          { key: 'fromDate', label: 'From Date', type: 'date' },
+          { key: 'toDate', label: 'To Date', type: 'date' },
+          { key: 'academicYearId', label: 'Academic Year', type: 'select' },
+          { key: 'classId', label: 'Class', type: 'class' },
+          { key: 'sectionId', label: 'Section', type: 'section' },
+          { key: 'studentId', label: 'Student', type: 'student' },
+          { key: 'feeHeadId', label: 'Fee Head', type: 'select' },
+        ],
+        requiredPermissions: ['reports:export', 'ledger:read'],
+      },
+      execute: async (actor, filters) => {
+        const report = await this.financeService.getInvoiceRegisterRows(actor, {
+          academicYearId: filters.academicYearId
+            ? String(filters.academicYearId)
+            : undefined,
+          classId: filters.classId ? String(filters.classId) : undefined,
+          sectionId: filters.sectionId
+            ? String(filters.sectionId)
+            : undefined,
+          studentId: filters.studentId
+            ? String(filters.studentId)
+            : undefined,
+          feeHeadId: filters.feeHeadId ? String(filters.feeHeadId) : undefined,
+          fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
+          toDate: filters.toDate ? String(filters.toDate) : undefined,
+        });
+
+        return report.rows.map((row) => ({
+          'Invoice No': row.invoiceNumber,
+          'Student ID': row.studentSystemId,
+          Student: row.studentName,
+          Class: row.className,
+          Section: row.sectionName,
+          'Billing Period': row.billingPeriod,
+          'Fee Heads': row.feeHeadNames,
+          Gross: row.grossAmount,
+          Discount: row.discountAmount,
+          Net: row.netAmount,
+          Paid: row.paidAmount,
+          Balance: row.balanceAmount,
+          'Due Date': row.dueDate.toISOString().split('T')[0],
+          Issued: row.issuedAt.toISOString().split('T')[0],
+          Status: row.status,
+        }));
+      },
+    });
+
+    this.register({
+      definition: {
+        key: 'receipt-register',
+        name: 'Receipt Register',
+        description: 'Issued receipts with collection, reprint, and refund status',
+        category: 'finance',
+        module: 'finance',
+        formats: ['json', 'csv'],
+        filters: [
+          { key: 'fromDate', label: 'From Date', type: 'date' },
+          { key: 'toDate', label: 'To Date', type: 'date' },
+          { key: 'studentId', label: 'Student', type: 'student' },
+          { key: 'paymentMethod', label: 'Payment Method', type: 'select' },
+        ],
+        requiredPermissions: ['reports:export', 'receipts:read'],
+      },
+      execute: async (actor, filters) => {
+        const report = await this.financeService.getReceiptRegisterRows(actor, {
+          studentId: filters.studentId
+            ? String(filters.studentId)
+            : undefined,
+          fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
+          toDate: filters.toDate ? String(filters.toDate) : undefined,
+          paymentMethod: filters.paymentMethod
+            ? String(filters.paymentMethod)
+            : undefined,
+        });
+
+        return report.rows.map((row) => ({
+          'Receipt No': row.receiptNumber,
+          Date: row.issuedAt.toISOString().split('T')[0],
+          'Student ID': row.studentSystemId,
+          Student: row.studentName,
+          'Invoice No': row.invoiceNumber,
+          Amount: row.amount,
+          Refunded: row.refundedAmount,
+          Net: row.netAmount,
+          Method: row.paymentMethod,
+          Status: row.paymentStatus,
+          Cashier: row.cashierEmail || '-',
+          Reprints: row.reprintCount,
+          'Latest Reprint': row.latestReprintAt
+            ? row.latestReprintAt.toISOString().split('T')[0]
+            : '-',
+        }));
+      },
+    });
+
+    this.register({
+      definition: {
+        key: 'receipt-sequence-exception-report',
+        name: 'Receipt Sequence Exception Report',
+        description:
+          'Missing, duplicate, out-of-sequence, or reversed receipt numbers',
+        category: 'finance',
+        module: 'finance',
+        formats: ['json', 'csv'],
+        filters: [
+          { key: 'fiscalYear', label: 'Fiscal Year', type: 'text' },
+          { key: 'fromDate', label: 'From Date', type: 'date' },
+          { key: 'toDate', label: 'To Date', type: 'date' },
+        ],
+        requiredPermissions: ['reports:export', 'receipts:read'],
+      },
+      execute: async (actor, filters) => {
+        const report = await this.financeService.getReceiptSequenceExceptions(
+          actor,
+          {
+            fiscalYear: filters.fiscalYear
+              ? String(filters.fiscalYear)
+              : undefined,
+            fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
+            toDate: filters.toDate ? String(filters.toDate) : undefined,
+          },
+        );
+
+        return report.rows.map((row) => ({
+          'Fiscal Year': row.fiscalYear,
+          'Receipt No': row.receiptNumber,
+          'Exception Type': row.exceptionType,
+          Expected: row.expectedSequence ?? '-',
+          Actual: row.actualSequence ?? '-',
+          'Issued At': row.issuedAt
+            ? row.issuedAt.toISOString().split('T')[0]
+            : '-',
+          Details: row.details,
+        }));
+      },
+    });
+
+    this.register({
+      definition: {
+        key: 'refund-reversal-report',
+        name: 'Refund and Reversal Register',
+        description:
+          'Completed refunds and reversals with approval and journal linkage',
+        category: 'finance',
+        module: 'finance',
+        formats: ['json', 'csv'],
+        filters: [
+          { key: 'fromDate', label: 'From Date', type: 'date' },
+          { key: 'toDate', label: 'To Date', type: 'date' },
+          {
+            key: 'recordType',
+            label: 'Record Type',
+            type: 'select',
+            options: [
+              { label: 'Refund', value: 'REFUND' },
+              { label: 'Reversal', value: 'REVERSAL' },
+            ],
+          },
+        ],
+        requiredPermissions: ['reports:export', 'ledger:read'],
+      },
+      execute: async (actor, filters) => {
+        const report = await this.financeService.getRefundReversalRegisterRows(
+          actor,
+          {
+            fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
+            toDate: filters.toDate ? String(filters.toDate) : undefined,
+            recordType: filters.recordType
+              ? (String(filters.recordType) as 'REFUND' | 'REVERSAL')
+              : undefined,
+          },
+        );
+
+        return report.rows.map((row) => ({
+          Type: row.recordType,
+          'Record No': row.recordNumber,
+          'Original Receipt': row.originalReceiptNumber || '-',
+          'Invoice No': row.invoiceNumber,
+          'Student ID': row.studentSystemId,
+          Student: row.studentName,
+          Amount: row.amount,
+          Reason: row.reason,
+          Processed: row.processedAt.toISOString().split('T')[0],
+          RequestedBy: row.requestedByEmail || '-',
+          ApprovedBy: row.approvedByEmail || '-',
+          Journal: row.journalEntryNumber || '-',
+          'Reversal Of Journal': row.reversalOfJournalEntryNumber || '-',
+          Status: row.status,
+        }));
+      },
+    });
+
+    this.register({
+      definition: {
+        key: 'journal-register',
+        name: 'Journal Register',
+        description: 'All journal entries with approval and posting status',
+        category: 'finance',
+        module: 'accounting',
+        formats: ['json', 'csv'],
+        filters: [
+          { key: 'fiscalYearId', label: 'Fiscal Year', type: 'select', required: true },
+          { key: 'fromDate', label: 'From Date', type: 'date' },
+          { key: 'toDate', label: 'To Date', type: 'date' },
+        ],
+        requiredPermissions: ['reports:export', 'accounting:reports:read'],
+      },
+      execute: async (actor, filters) => {
+        if (!filters.fiscalYearId) {
+          throw new ForbiddenException('fiscalYearId filter is required');
+        }
+        const report = await this.accountingReportsService.getJournalRegister(
+          actor.tenantId,
+          {
+            fiscalYearId: String(filters.fiscalYearId),
+            fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
+            toDate: filters.toDate ? String(filters.toDate) : undefined,
+            limit: 5000,
+          },
+        );
+        return report.rows.map((row) => ({
+          'Entry No': row.entryNumber ?? '-',
+          Date: row.entryDate.toISOString().split('T')[0],
+          Narration: row.narration,
+          Source: row.sourceModule ?? '-',
+          'Source Type': row.sourceType,
+          Debited: row.debitedAccounts,
+          Credited: row.creditedAccounts,
+          Debit: Number(row.totalDebit),
+          Credit: Number(row.totalCredit),
+          Status: row.status,
+          Approval: row.approvalStatus,
+          Reversal: row.reversalStatus,
+        }));
+      },
+    });
+
+    this.register({
+      definition: {
+        key: 'failed-unposted-transaction-report',
+        name: 'Failed and Unposted Transaction Report',
+        description:
+          'Approved-but-unposted journals and source events missing GL postings',
+        category: 'finance',
+        module: 'accounting',
+        formats: ['json', 'csv'],
+        filters: [],
+        requiredPermissions: ['reports:export', 'accounting:reports:read'],
+      },
+      execute: async (actor) => {
+        const report =
+          await this.accountingReportsService.getFailedUnpostedTransactions(
+            actor.tenantId,
+          );
+        return report.rows.map((row) => ({
+          Module: row.sourceModule,
+          'Source Type': row.sourceType,
+          Reference: row.reference,
+          Amount: row.amount ? Number(row.amount) : '-',
+          Issue: row.issueType,
+          Details: row.details,
+          Detected: row.detectedAt.toISOString(),
+        }));
+      },
+    });
+
+    this.register({
+      definition: {
+        key: 'payroll-gl-reconciliation',
+        name: 'Payroll-to-GL Reconciliation',
+        description:
+          'Compare posted payroll runs against linked journal entries',
+        category: 'payroll',
+        module: 'payroll',
+        formats: ['json', 'csv'],
+        filters: [
+          { key: 'month', label: 'Month', type: 'text' },
+          { key: 'year', label: 'Year', type: 'text' },
+        ],
+        requiredPermissions: ['reports:export', 'payroll:reports:read'],
+      },
+      execute: async (actor, filters) => {
+        const report = await this.payrollService.getPayrollGlReconciliation(
+          actor,
+          {
+            month: filters.month ? Number(filters.month) : undefined,
+            year: filters.year ? Number(filters.year) : undefined,
+          },
+        );
+        return report.rows.map((row) => ({
+          Period: `${row.periodYear}-${String(row.periodMonth).padStart(2, '0')}`,
+          Status: row.status,
+          'Run Gross': row.runGrossAmount,
+          'Run Net': row.runNetAmount,
+          'Journal No': row.journalEntryNumber ?? '-',
+          'Journal Debit': row.journalTotalDebit,
+          'Journal Credit': row.journalTotalCredit,
+          'Expected Debit': row.expectedExpenseDebit,
+          'Disbursement Journal': row.disbursementJournalEntryNumber ?? '-',
+          Reconciled: row.isReconciled ? 'YES' : 'NO',
+          Issues: row.issues.join(' '),
+        }));
+      },
+    });
+
+    this.register({
+      definition: {
+        key: 'financial-audit-trail-report',
+        name: 'Financial Audit Trail',
+        description:
+          'Cross-module audit trail for fees, payroll, and accounting actions',
+        category: 'finance',
+        module: 'accounting',
+        formats: ['json', 'csv'],
+        filters: [
+          { key: 'fromDate', label: 'From Date', type: 'date' },
+          { key: 'toDate', label: 'To Date', type: 'date' },
+          { key: 'resource', label: 'Resource', type: 'text' },
+          { key: 'action', label: 'Action', type: 'text' },
+        ],
+        requiredPermissions: ['reports:export', 'accounting:reports:read'],
+      },
+      execute: async (actor, filters) => {
+        const report = await this.auditService.queryFinancialAuditTrail({
+          tenantId: actor.tenantId,
+          resource: filters.resource ? String(filters.resource) : undefined,
+          action: filters.action ? String(filters.action) : undefined,
+          fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
+          toDate: filters.toDate ? String(filters.toDate) : undefined,
+          limit: 1000,
+        });
+        return report.items.map((item) => ({
+          Timestamp: item.createdAt.toISOString(),
+          Action: item.action,
+          Resource: item.resource,
+          'Resource ID': item.resourceId ?? '-',
+          User: item.userId ?? '-',
         }));
       },
     });

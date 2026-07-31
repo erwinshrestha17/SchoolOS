@@ -4,6 +4,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
 import { FinanceService } from '../finance/finance.service';
+import { AccountingReportsService } from '../accounting/accounting-reports.service';
+import { PayrollService } from '../payroll/payroll.service';
 import { AuthMethod, FileStatus } from '@prisma/client';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
@@ -206,6 +208,24 @@ describe('ReportsService', () => {
                   status: 'ISSUED',
                 },
               ],
+            }),
+          },
+        },
+        {
+          provide: AccountingReportsService,
+          useValue: {
+            getJournalRegister: jest.fn().mockResolvedValue({ rows: [] }),
+            getFailedUnpostedTransactions: jest
+              .fn()
+              .mockResolvedValue({ rows: [], summary: { totalIssues: 0 } }),
+          },
+        },
+        {
+          provide: PayrollService,
+          useValue: {
+            getPayrollGlReconciliation: jest.fn().mockResolvedValue({
+              rows: [],
+              summary: { totalRuns: 0, reconciledRuns: 0, unreconciledRuns: 0 },
             }),
           },
         },

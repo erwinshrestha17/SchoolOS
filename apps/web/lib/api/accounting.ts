@@ -142,6 +142,33 @@ export const accountingApi = {
     request<AccountingCashBookResponse>(
       withQuery("/accounting/reports/cash-book", params ?? {}),
     ),
+  listBankBook: (params: AccountingReportFilters) =>
+    request<AccountingCashBookResponse>(
+      withQuery("/accounting/reports/bank-book", params ?? {}),
+    ),
+  listJournalRegister: (params: AccountingReportFilters & { voucherType?: string }) =>
+    request<unknown>(
+      withQuery(
+        params.voucherType
+          ? "/accounting/reports/voucher-register"
+          : "/accounting/reports/journal-register",
+        params ?? {},
+      ),
+    ),
+  listFailedUnpostedTransactions: () =>
+    request<unknown>("/accounting/reports/failed-unposted"),
+  listFinancialAuditTrail: (params?: {
+    fromDate?: string;
+    toDate?: string;
+    resource?: string;
+    action?: string;
+    sourceModule?: string;
+    page?: number;
+    limit?: number;
+  }) =>
+    request<unknown>(
+      withQuery("/accounting/reports/financial-audit-trail", params ?? {}),
+    ),
   listTaxSummary: (params: AccountingReportFilters) =>
     request<unknown>(
       withQuery("/accounting/reports/tax-summary", params ?? {}),

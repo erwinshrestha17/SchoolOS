@@ -119,4 +119,91 @@ export class AuditService {
       hasNextPage: page * limit < total,
     };
   }
+
+  async queryFinancialAuditTrail(query: {
+    tenantId: string;
+    resource?: string;
+    action?: string;
+    sourceModule?: string;
+    fromDate?: string;
+    toDate?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const financialResources = [
+      'journal_entry',
+      'chart_account',
+      'accounting_period',
+      'fiscal_year',
+      'fiscal_period',
+      'bank_statement',
+      'accounting_report',
+      'opening_balance',
+      'voucher',
+      'payment',
+      'receipt',
+      'invoice',
+      'payment_refund',
+      'cashier_close',
+      'payroll_run',
+      'finance_approval_request',
+      'finance_daily',
+    ];
+
+    const page = query.page ?? 1;
+    const limit = Math.min(query.limit ?? 25, 100);
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.AuditLogWhereInput = {
+      tenantId: query.tenantId,
+      resource: query.resource ?? { in: financialResources },
+    };
+
+    if (query.action) {
+      where.action = query.action;
+    }
+
+    if (query.fromDate || query.toDate) {
+      where.createdAt = {
+        ...(query.fromDate ? { gte: new Date(query.fromDate) } : {}),
+        ...(query.toDate ? { lte: new Date(query.toDate) } : {}),
+      };
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.auditLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.auditLog.count({ where }),
+    ]);
+
+    const filteredItems = query.sourceModule
+      ? items.filter((item) => {
+          const after =
+            item.after && typeof item.after === 'object'
+              ? (item.after as Record<string, unknown>)
+              : null;
+          const before =
+            item.before && typeof item.before === 'object'
+              ? (item.before as Record<string, unknown>)
+              : null;
+          return (
+            after?.sourceModule === query.sourceModule ||
+            before?.sourceModule === query.sourceModule ||
+            item.resource.includes(String(query.sourceModule).toLowerCase())
+          );
+        })
+      : items;
+
+    return {
+      items: filteredItems,
+      total: query.sourceModule ? filteredItems.length : total,
+      page,
+      limit,
+      hasNextPage: page * limit < total,
+    };
+  }
 }

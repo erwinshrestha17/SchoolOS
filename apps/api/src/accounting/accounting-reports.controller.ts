@@ -33,6 +33,7 @@ import { AuditService } from '../audit/audit.service';
 import { TrialBalanceQueryDto } from './dto/trial-balance-query.dto';
 import { GeneralLedgerQueryDto } from './dto/general-ledger-query.dto';
 import { CashBookQueryDto } from './dto/cash-book-query.dto';
+import { JournalRegisterQueryDto } from './dto/journal-register-query.dto';
 import { IncomeStatementQueryDto } from './dto/income-statement-query.dto';
 import { BalanceSheetQueryDto } from './dto/balance-sheet-query.dto';
 import { TaxSummaryQueryDto } from './dto/tax-summary-query.dto';
@@ -91,6 +92,58 @@ export class AccountingReportsController {
     @Query() query: CashBookQueryDto,
   ) {
     return this.reportsService.getCashBook(auth.tenantId, query);
+  }
+
+  @Get('bank-book')
+  @ApiOperation({ summary: 'Get bank book report for a selected bank account' })
+  @Permissions(
+    'accounting:reports:cash-book',
+    'accounting:read',
+    'accounting:reports:read',
+  )
+  async getBankBook(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: CashBookQueryDto,
+  ) {
+    return this.reportsService.getBankBook(auth.tenantId, query);
+  }
+
+  @Get('journal-register')
+  @ApiOperation({ summary: 'Get journal register report' })
+  @Permissions(
+    'accounting:reports:general-ledger',
+    'accounting:read',
+    'accounting:reports:read',
+  )
+  async getJournalRegister(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: JournalRegisterQueryDto,
+  ) {
+    return this.reportsService.getJournalRegister(auth.tenantId, query);
+  }
+
+  @Get('voucher-register')
+  @ApiOperation({ summary: 'Get voucher register report by voucher type' })
+  @Permissions(
+    'accounting:reports:general-ledger',
+    'accounting:read',
+    'accounting:reports:read',
+  )
+  async getVoucherRegister(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: JournalRegisterQueryDto,
+  ) {
+    return this.reportsService.getVoucherRegister(auth.tenantId, query);
+  }
+
+  @Get('failed-unposted')
+  @ApiOperation({ summary: 'Get failed and unposted transaction report' })
+  @Permissions(
+    'accounting:reports:read',
+    'accounting:read',
+  )
+  async getFailedUnpostedTransactions(@CurrentAuth() auth: AuthContext) {
+    return this.reportsService.getFailedUnpostedTransactions(auth.tenantId);
   }
 
   @Get('income-statement')
@@ -465,6 +518,31 @@ export class AccountingReportsController {
       tenantId: auth.tenantId,
       resource,
       action,
+      fromDate,
+      toDate,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
+  }
+
+  @Get('financial-audit-trail')
+  @ApiOperation({ summary: 'Get cross-module financial audit trail' })
+  @Permissions('accounting:reports:read')
+  async getFinancialAuditTrail(
+    @CurrentAuth() auth: AuthContext,
+    @Query('resource') resource?: string,
+    @Query('action') action?: string,
+    @Query('sourceModule') sourceModule?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.auditService.queryFinancialAuditTrail({
+      tenantId: auth.tenantId,
+      resource,
+      action,
+      sourceModule,
       fromDate,
       toDate,
       page: page ? parseInt(page, 10) : undefined,

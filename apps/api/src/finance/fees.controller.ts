@@ -236,6 +236,63 @@ export class FeesController {
     return this.financeService.getDuesTableReport(query, auth);
   }
 
+  @Get('reports/invoices')
+  @Permissions('fees:manage', 'ledger:read')
+  getInvoiceRegister(
+    @Query() query: FinanceReportQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.getInvoiceRegisterRows(auth, {
+      academicYearId: query.academicYearId,
+      classId: query.classId,
+      sectionId: query.sectionId,
+      studentId: query.studentId,
+      feeHeadId: query.feeHeadId,
+      fromDate: query.fromDate,
+      toDate: query.toDate,
+    });
+  }
+
+  @Get('reports/receipts')
+  @Permissions('receipts:read', 'ledger:read')
+  getReceiptRegister(
+    @Query() query: FinanceReportQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.getReceiptRegisterRows(auth, {
+      studentId: query.studentId,
+      fromDate: query.fromDate,
+      toDate: query.toDate,
+      paymentMethod: query.paymentMethod,
+    });
+  }
+
+  @Get('reports/receipt-sequence-exceptions')
+  @Permissions('receipts:read', 'ledger:read')
+  getReceiptSequenceExceptions(
+    @Query() query: FinanceReportQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.getReceiptSequenceExceptions(auth, {
+      fiscalYear: query.fiscalYear,
+      fromDate: query.fromDate,
+      toDate: query.toDate,
+    });
+  }
+
+  @Get('reports/refund-reversals')
+  @Permissions('payments:refund', 'payments:reverse', 'ledger:read')
+  getRefundReversalRegister(
+    @Query() query: FinanceReportQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.getRefundReversalRegisterRows(auth, {
+      fromDate: query.fromDate,
+      toDate: query.toDate,
+      recordType: query.recordType as 'REFUND' | 'REVERSAL' | undefined,
+    });
+  }
+
   @Post('discounts/recalculate')
   @Permissions('fees:discount')
   recalculateAutomaticDiscounts(@CurrentAuth() auth: AuthContext) {

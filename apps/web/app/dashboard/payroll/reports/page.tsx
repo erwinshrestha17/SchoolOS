@@ -141,6 +141,25 @@ export default function PayrollReportsPage() {
       api.getPayrollLeaveDeductionSummary(queryFilters) as Promise<PayrollLeaveSummary>,
     enabled: status === 'authenticated' && canReadReports,
   });
+  const glReconciliationQuery = useQuery({
+    queryKey: ['payroll-report-gl-reconciliation', queryFilters],
+    queryFn: () => api.getPayrollGlReconciliation(queryFilters) as Promise<{
+      rows: Array<{
+        periodYear: number;
+        periodMonth: number;
+        status: string;
+        isReconciled: boolean;
+        journalEntryNumber: string | null;
+        issues: string[];
+      }>;
+      summary: {
+        totalRuns: number;
+        reconciledRuns: number;
+        unreconciledRuns: number;
+      };
+    }>,
+    enabled: status === 'authenticated' && canReadReports,
+  });
 
   const exportMutation = useMutation({
     mutationFn: (kind: 'register' | 'pf' | 'tds') => {
@@ -227,7 +246,7 @@ export default function PayrollReportsPage() {
           <div>
             <h2 className="text-lg font-bold text-slate-900">Payroll Reports</h2>
             <p className="text-sm text-slate-500">
-              Totals come from payroll backend reports. Posted accounting remains controlled by M9.
+              Totals come from payroll backend reports. Posted accounting remains controlled by M11.
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -419,6 +438,61 @@ export default function PayrollReportsPage() {
             )}
           </div>
         </div>
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-2 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900">Payroll-to-GL Reconciliation</h3>
+            <p className="text-sm text-slate-500">
+              Compare posted payroll runs against linked accrual and disbursement journals.
+            </p>
+          </div>
+          <ShieldCheck className="text-slate-300" size={22} />
+        </div>
+        {glReconciliationQuery.isLoading ? (
+          <div className="py-5">
+            <div className="h-20 animate-pulse rounded-xl bg-slate-50" />
+          </div>
+        ) : glReconciliationQuery.isError ? (
+          <EmptyState
+            title="Reconciliation unavailable"
+            description="The payroll GL reconciliation report could not be loaded."
+          />
+        ) : (glReconciliationQuery.data?.rows.length ?? 0) === 0 ? (
+          <EmptyState
+            title="No posted payroll runs"
+            description="Reconciliation appears after payroll runs are posted to the general ledger."
+          />
+        ) : (
+          <div className="space-y-4 py-5">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Metric label="Runs checked" value={String(glReconciliationQuery.data?.summary.totalRuns ?? 0)} />
+              <Metric label="Reconciled" value={String(glReconciliationQuery.data?.summary.reconciledRuns ?? 0)} />
+              <Metric
+                label="Needs review"
+                value={String(glReconciliationQuery.data?.summary.unreconciledRuns ?? 0)}
+                tone={glReconciliationQuery.data?.summary.unreconciledRuns ? 'strong' : undefined}
+              />
+            </div>
+            <div className="space-y-2">
+              {(glReconciliationQuery.data?.rows ?? [])
+                .filter((row) => !row.isReconciled)
+                .slice(0, 5)
+                .map((row) => (
+                  <div
+                    key={`${row.periodYear}-${row.periodMonth}`}
+                    className="rounded-xl border border-amber-200 bg-amber-50/70 p-3 text-sm text-amber-900"
+                  >
+                    <p className="font-bold">
+                      {monthLabels[row.periodMonth - 1]} {row.periodYear}
+                    </p>
+                    <p className="mt-1 text-xs">{row.issues.join(' ')}</p>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
       </section>
 
       {exportMutation.error && (

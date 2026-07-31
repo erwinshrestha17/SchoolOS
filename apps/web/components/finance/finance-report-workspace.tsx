@@ -28,6 +28,9 @@ type ReportKey =
   | "payment-methods"
   | "cashier-closes"
   | "adjustments"
+  | "refund-reversals"
+  | "invoices"
+  | "sequence-exceptions"
   | "receipts";
 
 const formatCurrency = (amount: string | number) =>
@@ -73,10 +76,28 @@ export function FinanceReportWorkspace() {
         },
         {
           value: "adjustments" as const,
-          label: "Adjustments",
+          label: "Adjustment requests",
           allowed:
             hasPermissions(["payments:refund"]) ||
             hasPermissions(["payments:reverse"]),
+        },
+        {
+          value: "refund-reversals" as const,
+          label: "Refund and reversal register",
+          allowed:
+            hasPermissions(["payments:refund"]) ||
+            hasPermissions(["payments:reverse"]) ||
+            hasPermissions(["ledger:read"]),
+        },
+        {
+          value: "invoices" as const,
+          label: "Invoice register",
+          allowed: hasPermissions(["fees:manage"]),
+        },
+        {
+          value: "sequence-exceptions" as const,
+          label: "Receipt sequence exceptions",
+          allowed: hasPermissions(["receipts:read"]),
         },
         {
           value: "receipts" as const,
@@ -145,6 +166,12 @@ export function FinanceReportWorkspace() {
         <CashierCloseReportPanel />
       ) : report === "adjustments" ? (
         <AdjustmentReportPanel />
+      ) : report === "refund-reversals" ? (
+        <RefundReversalRegisterPanel />
+      ) : report === "invoices" ? (
+        <InvoiceRegisterPanel />
+      ) : report === "sequence-exceptions" ? (
+        <ReceiptSequenceExceptionPanel />
       ) : (
         <LedgerSection mode="receipts" />
       )}
@@ -395,6 +422,232 @@ function CashierCloseReportPanel() {
         />
       )}
     </SectionCard>
+  );
+}
+
+function InvoiceRegisterPanel() {
+  const { fromDate, toDate } = useReportPeriodParams();
+  const reportQuery = useQuery({
+    queryKey: ["finance-report", "invoices", fromDate, toDate],
+    queryFn: () =>
+      api.getInvoiceRegister({
+        fromDate: fromDate || undefined,
+        toDate: toDate || undefined,
+      }),
+  });
+
+  if (reportQuery.isError) {
+    return (
+      <ErrorState
+        title="Invoice register could not load"
+        onRetry={() => void reportQuery.refetch()}
+      />
+    );
+  }
+  if (reportQuery.isLoading || !reportQuery.data) return <ReportLoading />;
+
+  return (
+    <div className="space-y-6">
+      <ReportPeriodFilter />
+      <SectionCard
+        title="Invoice register"
+        description={`${reportQuery.data.summary.totalInvoices} invoices · Outstanding ${formatCurrency(reportQuery.data.summary.totalBalanceAmount)}`}
+        noPadding
+      >
+        {reportQuery.data.rows.length ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[960px] text-left text-sm">
+              <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
+                <tr>
+                  <th className="px-5 py-3">Invoice</th>
+                  <th className="px-5 py-3">Student</th>
+                  <th className="px-5 py-3">Period</th>
+                  <th className="px-5 py-3 text-right">Net</th>
+                  <th className="px-5 py-3 text-right">Paid</th>
+                  <th className="px-5 py-3 text-right">Balance</th>
+                  <th className="px-5 py-3">Due</th>
+                  <th className="px-5 py-3">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 tabular-nums">
+                {reportQuery.data.rows.map((row) => (
+                  <tr key={row.invoiceNumber}>
+                    <td className="px-5 py-3.5 font-semibold text-slate-950">
+                      {row.invoiceNumber}
+                    </td>
+                    <td className="px-5 py-3.5 text-slate-700">
+                      {row.studentName}
+                    </td>
+                    <td className="px-5 py-3.5 text-slate-600">
+                      {row.billingPeriod}
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      {formatCurrency(row.netAmount)}
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      {formatCurrency(row.paidAmount)}
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      {formatCurrency(row.balanceAmount)}
+                    </td>
+                    <td className="px-5 py-3.5 text-slate-600">
+                      {formatBsDate(row.dueDate)}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <StatusBadge status={row.status} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <EmptyState
+            title="No invoices in this period"
+            className="m-5 min-h-52"
+          />
+        )}
+      </SectionCard>
+    </div>
+  );
+}
+
+function ReceiptSequenceExceptionPanel() {
+  const reportQuery = useQuery({
+    queryKey: ["finance-report", "sequence-exceptions"],
+    queryFn: () => api.getReceiptSequenceExceptions(),
+  });
+
+  if (reportQuery.isError) {
+    return (
+      <ErrorState
+        title="Receipt sequence exceptions could not load"
+        onRetry={() => void reportQuery.refetch()}
+      />
+    );
+  }
+  if (reportQuery.isLoading || !reportQuery.data) return <ReportLoading />;
+
+  return (
+    <SectionCard
+      title="Receipt sequence exceptions"
+      description="Review missing, duplicate, out-of-sequence, or reversed receipt numbers before close."
+      noPadding
+    >
+      {reportQuery.data.rows.length ? (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left text-sm">
+            <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
+              <tr>
+                <th className="px-5 py-3">Fiscal year</th>
+                <th className="px-5 py-3">Receipt</th>
+                <th className="px-5 py-3">Exception</th>
+                <th className="px-5 py-3">Details</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {reportQuery.data.rows.map((row, index) => (
+                <tr key={`${row.receiptNumber}-${row.exceptionType}-${index}`}>
+                  <td className="px-5 py-3.5">{row.fiscalYear}</td>
+                  <td className="px-5 py-3.5 font-semibold text-slate-950">
+                    {row.receiptNumber}
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <StatusBadge status={row.exceptionType} />
+                  </td>
+                  <td className="px-5 py-3.5 text-slate-700">{row.details}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <EmptyState
+          title="No receipt sequence exceptions"
+          description="Receipt numbering looks consistent for the current scope."
+          className="m-5 min-h-52"
+        />
+      )}
+    </SectionCard>
+  );
+}
+
+function RefundReversalRegisterPanel() {
+  const { fromDate, toDate } = useReportPeriodParams();
+  const reportQuery = useQuery({
+    queryKey: ["finance-report", "refund-reversals", fromDate, toDate],
+    queryFn: () =>
+      api.getRefundReversalRegister({
+        fromDate: fromDate || undefined,
+        toDate: toDate || undefined,
+      }),
+  });
+
+  if (reportQuery.isError) {
+    return (
+      <ErrorState
+        title="Refund and reversal register could not load"
+        onRetry={() => void reportQuery.refetch()}
+      />
+    );
+  }
+  if (reportQuery.isLoading || !reportQuery.data) return <ReportLoading />;
+
+  return (
+    <div className="space-y-6">
+      <ReportPeriodFilter />
+      <SectionCard
+        title="Refund and reversal register"
+        description={`${reportQuery.data.summary.totalRecords} completed records · ${reportQuery.data.summary.refundCount} refunds · ${reportQuery.data.summary.reversalCount} reversals`}
+        noPadding
+      >
+        {reportQuery.data.rows.length ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[960px] text-left text-sm">
+              <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
+                <tr>
+                  <th className="px-5 py-3">Type</th>
+                  <th className="px-5 py-3">Record</th>
+                  <th className="px-5 py-3">Student</th>
+                  <th className="px-5 py-3 text-right">Amount</th>
+                  <th className="px-5 py-3">Processed</th>
+                  <th className="px-5 py-3">Journal</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 tabular-nums">
+                {reportQuery.data.rows.map((row) => (
+                  <tr key={`${row.recordType}-${row.recordNumber}`}>
+                    <td className="px-5 py-3.5 font-semibold text-slate-950">
+                      {row.recordType}
+                    </td>
+                    <td className="px-5 py-3.5 text-slate-700">
+                      {row.recordNumber}
+                    </td>
+                    <td className="px-5 py-3.5 text-slate-700">
+                      {row.studentName}
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      {formatCurrency(row.amount)}
+                    </td>
+                    <td className="px-5 py-3.5 text-slate-600">
+                      {formatBsDateTime(row.processedAt)}
+                    </td>
+                    <td className="px-5 py-3.5 text-slate-600">
+                      {row.journalEntryNumber || "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <EmptyState
+            title="No completed refunds or reversals"
+            className="m-5 min-h-52"
+          />
+        )}
+      </SectionCard>
+    </div>
   );
 }
 

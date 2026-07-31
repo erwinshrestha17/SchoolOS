@@ -165,6 +165,72 @@ export interface DefaulterAgingReportRow {
   status: InvoiceStatus;
 }
 
+export interface InvoiceRegisterRow {
+  invoiceNumber: string;
+  studentSystemId: string;
+  studentName: string;
+  className: string;
+  sectionName: string;
+  billingPeriod: string;
+  feeHeadNames: string;
+  grossAmount: number;
+  discountAmount: number;
+  netAmount: number;
+  paidAmount: number;
+  balanceAmount: number;
+  dueDate: Date;
+  issuedAt: Date;
+  status: InvoiceStatus;
+}
+
+export interface ReceiptRegisterRow {
+  receiptNumber: string;
+  issuedAt: Date;
+  studentSystemId: string;
+  studentName: string;
+  invoiceNumber: string;
+  amount: number;
+  refundedAmount: number;
+  netAmount: number;
+  paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
+  cashierEmail: string | null;
+  reprintCount: number;
+  latestReprintAt: Date | null;
+}
+
+export interface ReceiptSequenceExceptionRow {
+  fiscalYear: string;
+  receiptNumber: string;
+  exceptionType:
+    | 'MISSING_SEQUENCE'
+    | 'DUPLICATE_NUMBER'
+    | 'OUT_OF_SEQUENCE'
+    | 'REVERSED_PAYMENT';
+  expectedSequence: number | null;
+  actualSequence: number | null;
+  issuedAt: Date | null;
+  details: string;
+}
+
+export interface RefundReversalRegisterRow {
+  recordType: 'REFUND' | 'REVERSAL';
+  recordNumber: string;
+  originalReceiptNumber: string | null;
+  originalPaymentId: string;
+  invoiceNumber: string;
+  studentSystemId: string;
+  studentName: string;
+  amount: number;
+  reason: string;
+  processedAt: Date;
+  requestedByEmail: string | null;
+  approvedByEmail: string | null;
+  journalEntryNumber: string | null;
+  reversalOfJournalEntryNumber: string | null;
+  status: string;
+}
+
 export interface CashierCloseMethodBreakdown extends Prisma.JsonObject {
   method: PaymentMethod;
   grossCollected: number;
@@ -2259,6 +2325,540 @@ export class FinanceService {
     };
 
     return { rows, summary };
+  }
+
+  async getInvoiceRegisterRows(
+    actor: AuthContext,
+    filters: {
+      academicYearId?: string;
+      classId?: string;
+      sectionId?: string;
+      studentId?: string;
+      feeHeadId?: string;
+      status?: InvoiceStatus;
+      fromDate?: string;
+      toDate?: string;
+    },
+  ) {
+    const where = this.buildInvoiceRegisterWhere(actor.tenantId, filters);
+    const invoices = await this.prisma.invoice.findMany({
+      where,
+      include: {
+        student: {
+          include: {
+            class: true,
+            sectionRef: true,
+          },
+        },
+        lines: {
+          include: { feeHead: true },
+        },
+        payments: {
+          include: { refunds: true },
+        },
+        academicYear: { select: { name: true } },
+      },
+      orderBy: [{ issuedAt: 'desc' }, { invoiceNumber: 'desc' }],
+    });
+
+    const rows: InvoiceRegisterRow[] = invoices.map((invoice) => {
+      const grossAmount = invoice.lines.reduce(
+        (sum, line) => sum.add(line.unitAmount.mul(line.quantity)),
+        new Prisma.Decimal(0),
+      );
+      const discountAmount = invoice.lines.reduce(
+        (sum, line) =>
+          sum.add(
+            line.unitAmount
+              .mul(line.quantity)
+              .sub(line.totalAmount),
+          ),
+        new Prisma.Decimal(0),
+      );
+      const paidAmount = sumNetPaidAmount(invoice.payments);
+      const netAmount = invoice.totalAmount;
+
+      return {
+        invoiceNumber: invoice.invoiceNumber,
+        studentSystemId: invoice.student.studentSystemId,
+        studentName: formatStudentName(invoice.student),
+        className: invoice.student.class.name,
+        sectionName: invoice.student.sectionRef?.name || '-',
+        billingPeriod: invoice.academicYear.name,
+        feeHeadNames: invoice.lines.map((line) => line.feeHead.name).join(', '),
+        grossAmount: Number(grossAmount),
+        discountAmount: Number(discountAmount),
+        netAmount: Number(netAmount),
+        paidAmount: Number(paidAmount),
+        balanceAmount: Math.max(0, Number(netAmount.sub(paidAmount))),
+        dueDate: invoice.dueDate,
+        issuedAt: invoice.issuedAt,
+        status: invoice.status,
+      };
+    });
+
+    const summary = {
+      totalInvoices: rows.length,
+      totalGrossAmount: rows.reduce((sum, row) => sum + row.grossAmount, 0),
+      totalNetAmount: rows.reduce((sum, row) => sum + row.netAmount, 0),
+      totalPaidAmount: rows.reduce((sum, row) => sum + row.paidAmount, 0),
+      totalBalanceAmount: rows.reduce((sum, row) => sum + row.balanceAmount, 0),
+    };
+
+    return { rows, summary };
+  }
+
+  async getReceiptRegisterRows(
+    actor: AuthContext,
+    filters: {
+      studentId?: string;
+      fromDate?: string;
+      toDate?: string;
+      paymentMethod?: string;
+    },
+  ) {
+    if (
+      filters.paymentMethod &&
+      !Object.values(PaymentMethod).includes(
+        filters.paymentMethod as PaymentMethod,
+      )
+    ) {
+      throw new BadRequestException(
+        `Invalid payment method: ${filters.paymentMethod}`,
+      );
+    }
+
+    const receipts = await this.prisma.receipt.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        ...(filters.studentId
+          ? { payment: { is: { studentId: filters.studentId } } }
+          : {}),
+        ...(filters.fromDate || filters.toDate
+          ? {
+              issuedAt: {
+                ...(filters.fromDate ? { gte: new Date(filters.fromDate) } : {}),
+                ...(filters.toDate ? { lte: new Date(filters.toDate) } : {}),
+              },
+            }
+          : {}),
+        ...(filters.paymentMethod
+          ? { payment: { is: { method: filters.paymentMethod as PaymentMethod } } }
+          : {}),
+      },
+      include: {
+        payment: {
+          include: {
+            invoice: true,
+            student: true,
+            collectedBy: { select: { email: true } },
+            refunds: true,
+          },
+        },
+        reprintHistory: {
+          orderBy: [{ reprintedAt: 'desc' }],
+        },
+        _count: {
+          select: { reprintHistory: true },
+        },
+      },
+      orderBy: [{ issuedAt: 'desc' }, { receiptNumber: 'desc' }],
+    });
+
+    const rows: ReceiptRegisterRow[] = receipts.map((receipt) => {
+      const refundedAmount = sumRefundedAmount(receipt.payment.refunds);
+      const amount = receipt.payment.amount;
+      return {
+        receiptNumber: receipt.receiptNumber,
+        issuedAt: receipt.issuedAt,
+        studentSystemId: receipt.payment.student.studentSystemId,
+        studentName: formatStudentName(receipt.payment.student),
+        invoiceNumber: receipt.payment.invoice.invoiceNumber,
+        amount: Number(amount),
+        refundedAmount: Number(refundedAmount),
+        netAmount: Number(amount.sub(refundedAmount)),
+        paymentMethod: receipt.payment.method,
+        paymentStatus: receipt.payment.status,
+        cashierEmail: receipt.payment.collectedBy?.email ?? null,
+        reprintCount: receipt._count.reprintHistory,
+        latestReprintAt: receipt.reprintHistory[0]?.reprintedAt ?? null,
+      };
+    });
+
+    const summary = {
+      totalReceipts: rows.length,
+      totalAmount: rows.reduce((sum, row) => sum + row.amount, 0),
+      totalRefundedAmount: rows.reduce(
+        (sum, row) => sum + row.refundedAmount,
+        0,
+      ),
+      totalNetAmount: rows.reduce((sum, row) => sum + row.netAmount, 0),
+    };
+
+    return { rows, summary };
+  }
+
+  async getReceiptSequenceExceptions(
+    actor: AuthContext,
+    filters: { fiscalYear?: string; fromDate?: string; toDate?: string },
+  ) {
+    const receipts = await this.prisma.receipt.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        ...(filters.fiscalYear ? { fiscalYear: filters.fiscalYear } : {}),
+        ...(filters.fromDate || filters.toDate
+          ? {
+              issuedAt: {
+                ...(filters.fromDate ? { gte: new Date(filters.fromDate) } : {}),
+                ...(filters.toDate ? { lte: new Date(filters.toDate) } : {}),
+              },
+            }
+          : {}),
+      },
+      include: {
+        payment: {
+          select: {
+            status: true,
+          },
+        },
+      },
+      orderBy: [{ fiscalYear: 'asc' }, { receiptNumber: 'asc' }],
+    });
+
+    const rows: ReceiptSequenceExceptionRow[] = [];
+    const grouped = new Map<string, typeof receipts>();
+
+    for (const receipt of receipts) {
+      const fiscalYear = receipt.fiscalYear ?? 'UNKNOWN';
+      const bucket = grouped.get(fiscalYear) ?? [];
+      bucket.push(receipt);
+      grouped.set(fiscalYear, bucket);
+    }
+
+    for (const [fiscalYear, fiscalReceipts] of grouped.entries()) {
+      const parsed = fiscalReceipts
+        .map((receipt) => {
+          const match = receipt.receiptNumber.match(/^REC-(.+)-(\d+)$/);
+          return {
+            receipt,
+            sequence: match ? Number(match[2]) : null,
+          };
+        })
+        .filter((entry) => entry.sequence !== null)
+        .sort((a, b) => a.sequence! - b.sequence!);
+
+      const numberCounts = new Map<string, number>();
+      for (const receipt of fiscalReceipts) {
+        numberCounts.set(
+          receipt.receiptNumber,
+          (numberCounts.get(receipt.receiptNumber) ?? 0) + 1,
+        );
+      }
+
+      for (const [receiptNumber, count] of numberCounts.entries()) {
+        if (count > 1) {
+          rows.push({
+            fiscalYear,
+            receiptNumber,
+            exceptionType: 'DUPLICATE_NUMBER',
+            expectedSequence: null,
+            actualSequence: null,
+            issuedAt: null,
+            details: `Receipt number appears ${count} times in fiscal year ${fiscalYear}.`,
+          });
+        }
+      }
+
+      if (parsed.length > 0) {
+        const sequences = parsed.map((entry) => entry.sequence!);
+        const minSeq = sequences[0];
+        const maxSeq = sequences[sequences.length - 1];
+        const sequenceSet = new Set(sequences);
+
+        for (let seq = minSeq; seq <= maxSeq; seq += 1) {
+          if (!sequenceSet.has(seq)) {
+            rows.push({
+              fiscalYear,
+              receiptNumber: `REC-${formatFiscalYearForNumber(fiscalYear)}-${String(seq).padStart(5, '0')}`,
+              exceptionType: 'MISSING_SEQUENCE',
+              expectedSequence: seq,
+              actualSequence: null,
+              issuedAt: null,
+              details: `Missing receipt number in fiscal year ${fiscalYear}.`,
+            });
+          }
+        }
+
+        let previousIssuedAt: Date | null = null;
+        let previousSequence: number | null = null;
+        for (const entry of parsed) {
+          if (
+            previousIssuedAt &&
+            previousSequence !== null &&
+            entry.sequence! < previousSequence &&
+            entry.receipt.issuedAt < previousIssuedAt
+          ) {
+            rows.push({
+              fiscalYear,
+              receiptNumber: entry.receipt.receiptNumber,
+              exceptionType: 'OUT_OF_SEQUENCE',
+              expectedSequence: previousSequence + 1,
+              actualSequence: entry.sequence,
+              issuedAt: entry.receipt.issuedAt,
+              details:
+                'Receipt was issued before an earlier-numbered receipt in the same fiscal year.',
+            });
+          }
+          previousIssuedAt = entry.receipt.issuedAt;
+          previousSequence = entry.sequence;
+        }
+      }
+
+      for (const receipt of fiscalReceipts) {
+        if (receipt.payment.status === PaymentStatus.REVERSED) {
+          rows.push({
+            fiscalYear,
+            receiptNumber: receipt.receiptNumber,
+            exceptionType: 'REVERSED_PAYMENT',
+            expectedSequence: null,
+            actualSequence: null,
+            issuedAt: receipt.issuedAt,
+            details: 'Receipt is linked to a reversed payment.',
+          });
+        }
+      }
+    }
+
+    return {
+      rows,
+      summary: {
+        totalExceptions: rows.length,
+        missingSequenceCount: rows.filter(
+          (row) => row.exceptionType === 'MISSING_SEQUENCE',
+        ).length,
+        duplicateCount: rows.filter(
+          (row) => row.exceptionType === 'DUPLICATE_NUMBER',
+        ).length,
+        outOfSequenceCount: rows.filter(
+          (row) => row.exceptionType === 'OUT_OF_SEQUENCE',
+        ).length,
+        reversedPaymentCount: rows.filter(
+          (row) => row.exceptionType === 'REVERSED_PAYMENT',
+        ).length,
+      },
+    };
+  }
+
+  async getRefundReversalRegisterRows(
+    actor: AuthContext,
+    filters: { fromDate?: string; toDate?: string; recordType?: 'REFUND' | 'REVERSAL' },
+  ) {
+    const fromDate = filters.fromDate ? new Date(filters.fromDate) : undefined;
+    const toDate = filters.toDate ? new Date(filters.toDate) : undefined;
+    const rows: RefundReversalRegisterRow[] = [];
+
+    if (!filters.recordType || filters.recordType === 'REFUND') {
+      const refunds = await this.prisma.paymentRefund.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          ...(fromDate || toDate
+            ? {
+                refundDate: {
+                  ...(fromDate ? { gte: fromDate } : {}),
+                  ...(toDate ? { lte: toDate } : {}),
+                },
+              }
+            : {}),
+        },
+        include: {
+          payment: {
+            include: {
+              receipt: true,
+              invoice: true,
+              student: true,
+              financeApprovalRequests: {
+                include: {
+                  requestedBy: { select: { email: true } },
+                  reviewedBy: { select: { email: true } },
+                },
+                orderBy: [{ createdAt: 'desc' }],
+                take: 1,
+              },
+            },
+          },
+          createdBy: { select: { email: true } },
+        },
+        orderBy: [{ refundDate: 'desc' }],
+      });
+
+      const refundJournalEntries = await this.prisma.journalEntry.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          sourceType: JournalSourceType.PAYMENT_REFUND,
+          sourceId: { in: refunds.map((refund) => refund.id) },
+        },
+        select: {
+          sourceId: true,
+          entryNumber: true,
+        },
+      });
+      const refundJournalMap = new Map(
+        refundJournalEntries.map((entry) => [entry.sourceId, entry.entryNumber]),
+      );
+
+      for (const refund of refunds) {
+        const approval = refund.payment.financeApprovalRequests[0];
+        rows.push({
+          recordType: 'REFUND',
+          recordNumber: refund.refundNumber,
+          originalReceiptNumber: refund.payment.receipt?.receiptNumber ?? null,
+          originalPaymentId: refund.paymentId,
+          invoiceNumber: refund.payment.invoice.invoiceNumber,
+          studentSystemId: refund.payment.student.studentSystemId,
+          studentName: formatStudentName(refund.payment.student),
+          amount: Number(refund.amount),
+          reason: refund.reason,
+          processedAt: refund.refundDate,
+          requestedByEmail:
+            approval?.requestedBy.email ?? refund.createdBy?.email ?? null,
+          approvedByEmail: approval?.reviewedBy?.email ?? null,
+          journalEntryNumber: refundJournalMap.get(refund.id) ?? null,
+          reversalOfJournalEntryNumber: null,
+          status: approval?.status ?? 'COMPLETED',
+        });
+      }
+    }
+
+    if (!filters.recordType || filters.recordType === 'REVERSAL') {
+      const reversedPayments = await this.prisma.payment.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          status: PaymentStatus.REVERSED,
+          ...(fromDate || toDate
+            ? {
+                reversedAt: {
+                  ...(fromDate ? { gte: fromDate } : {}),
+                  ...(toDate ? { lte: toDate } : {}),
+                },
+              }
+            : {}),
+        },
+        include: {
+          receipt: true,
+          invoice: true,
+          student: true,
+          financeApprovalRequests: {
+            where: { type: FinanceRequestType.REVERSAL },
+            include: {
+              requestedBy: { select: { email: true } },
+              reviewedBy: { select: { email: true } },
+            },
+            orderBy: [{ createdAt: 'desc' }],
+            take: 1,
+          },
+        },
+        orderBy: [{ reversedAt: 'desc' }],
+      });
+
+      const reversalEntries = await this.prisma.journalEntry.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          sourceType: JournalSourceType.REVERSAL,
+          sourceId: { in: reversedPayments.map((payment) => payment.id) },
+        },
+        select: {
+          sourceId: true,
+          entryNumber: true,
+          reversalOfId: true,
+          reversalOf: {
+            select: { entryNumber: true },
+          },
+        },
+      });
+      const reversalMap = new Map(
+        reversalEntries.map((entry) => [entry.sourceId, entry]),
+      );
+
+      for (const payment of reversedPayments) {
+        const approval = payment.financeApprovalRequests[0];
+        const reversalEntry = reversalMap.get(payment.id);
+        rows.push({
+          recordType: 'REVERSAL',
+          recordNumber: payment.receipt?.receiptNumber ?? payment.id,
+          originalReceiptNumber: payment.receipt?.receiptNumber ?? null,
+          originalPaymentId: payment.id,
+          invoiceNumber: payment.invoice.invoiceNumber,
+          studentSystemId: payment.student.studentSystemId,
+          studentName: formatStudentName(payment.student),
+          amount: Number(payment.amount),
+          reason: payment.reversalReason ?? approval?.reason ?? 'Payment reversed',
+          processedAt: payment.reversedAt ?? payment.paidAt,
+          requestedByEmail: approval?.requestedBy.email ?? null,
+          approvedByEmail: approval?.reviewedBy?.email ?? null,
+          journalEntryNumber: reversalEntry?.entryNumber ?? null,
+          reversalOfJournalEntryNumber:
+            reversalEntry?.reversalOf?.entryNumber ?? null,
+          status: approval?.status ?? 'COMPLETED',
+        });
+      }
+    }
+
+    rows.sort(
+      (left, right) => right.processedAt.getTime() - left.processedAt.getTime(),
+    );
+
+    return {
+      rows,
+      summary: {
+        totalRecords: rows.length,
+        refundCount: rows.filter((row) => row.recordType === 'REFUND').length,
+        reversalCount: rows.filter((row) => row.recordType === 'REVERSAL')
+          .length,
+        totalAmount: rows.reduce((sum, row) => sum + row.amount, 0),
+      },
+    };
+  }
+
+  private buildInvoiceRegisterWhere(
+    tenantId: string,
+    filters: {
+      academicYearId?: string;
+      classId?: string;
+      sectionId?: string;
+      studentId?: string;
+      feeHeadId?: string;
+      status?: InvoiceStatus;
+      fromDate?: string;
+      toDate?: string;
+    },
+  ): Prisma.InvoiceWhereInput {
+    return {
+      tenantId,
+      ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.academicYearId
+        ? { academicYearId: filters.academicYearId }
+        : {}),
+      ...(filters.studentId ? { studentId: filters.studentId } : {}),
+      ...(filters.classId || filters.sectionId
+        ? {
+            student: {
+              ...(filters.classId ? { classId: filters.classId } : {}),
+              ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
+            },
+          }
+        : {}),
+      ...(filters.feeHeadId
+        ? { lines: { some: { feeHeadId: filters.feeHeadId } } }
+        : {}),
+      ...(filters.fromDate || filters.toDate
+        ? {
+            issuedAt: {
+              ...(filters.fromDate ? { gte: new Date(filters.fromDate) } : {}),
+              ...(filters.toDate ? { lte: new Date(filters.toDate) } : {}),
+            },
+          }
+        : {}),
+    };
   }
 
   private calculateAgingBucket(daysOverdue: number) {

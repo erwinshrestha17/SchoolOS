@@ -2701,6 +2701,114 @@ export class PayrollService {
     };
   }
 
+  async getPayrollGlReconciliation(
+    actor: AuthContext,
+    filtersInput?: PayrollReportFilterInput,
+  ) {
+    const filters = normalizePayrollReportFilters(filtersInput);
+    const runs = await this.prisma.payrollRun.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        status: {
+          in: [PayrollRunStatus.POSTED, PayrollRunStatus.PAID],
+        },
+        ...(filters.payrollRunId ? { id: filters.payrollRunId } : {}),
+        ...(filters.month ? { periodMonth: filters.month } : {}),
+        ...(filters.year ? { periodYear: filters.year } : {}),
+      },
+      orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }],
+      take: 100,
+    });
+
+    const journalIds = [
+      ...runs.map((run) => run.journalEntryId).filter(Boolean),
+      ...runs.map((run) => run.disbursementJournalEntryId).filter(Boolean),
+    ] as string[];
+
+    const journals = journalIds.length
+      ? await this.prisma.journalEntry.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            id: { in: journalIds },
+          },
+          include: { lines: true },
+        })
+      : [];
+    const journalMap = new Map(journals.map((entry) => [entry.id, entry]));
+
+    const rows = runs.map((run) => {
+      const accrualJournal = run.journalEntryId
+        ? journalMap.get(run.journalEntryId)
+        : undefined;
+      const disbursementJournal = run.disbursementJournalEntryId
+        ? journalMap.get(run.disbursementJournalEntryId)
+        : undefined;
+
+      const journalTotalDebit = accrualJournal
+        ? accrualJournal.lines.reduce(
+            (sum, line) => sum.add(line.debit),
+            new Prisma.Decimal(0),
+          )
+        : new Prisma.Decimal(0);
+      const journalTotalCredit = accrualJournal
+        ? accrualJournal.lines.reduce(
+            (sum, line) => sum.add(line.credit),
+            new Prisma.Decimal(0),
+          )
+        : new Prisma.Decimal(0);
+      const expectedExpenseDebit = run.grossAmount.add(run.pfEmployerAmount);
+
+      const issues: string[] = [];
+      if (!accrualJournal) {
+        issues.push('Missing accrual journal entry.');
+      } else {
+        if (!journalTotalDebit.eq(journalTotalCredit)) {
+          issues.push('Accrual journal entry is not balanced.');
+        }
+        if (!journalTotalDebit.eq(expectedExpenseDebit)) {
+          issues.push(
+            'Accrual journal debits do not match payroll gross salary plus employer PF.',
+          );
+        }
+      }
+
+      if (run.status === PayrollRunStatus.PAID && !disbursementJournal) {
+        issues.push('Paid payroll run is missing disbursement journal entry.');
+      }
+
+      return {
+        payrollRunId: run.id,
+        periodMonth: run.periodMonth,
+        periodYear: run.periodYear,
+        status: run.status,
+        runGrossAmount: moneyString(run.grossAmount),
+        runNetAmount: moneyString(run.netAmount),
+        runPfEmployee: moneyString(run.pfEmployeeAmount),
+        runPfEmployer: moneyString(run.pfEmployerAmount),
+        runTds: moneyString(run.tdsAmount),
+        journalEntryId: run.journalEntryId,
+        journalEntryNumber: accrualJournal?.entryNumber ?? null,
+        journalTotalDebit: moneyString(journalTotalDebit),
+        journalTotalCredit: moneyString(journalTotalCredit),
+        expectedExpenseDebit: moneyString(expectedExpenseDebit),
+        disbursementJournalEntryId: run.disbursementJournalEntryId,
+        disbursementJournalEntryNumber:
+          disbursementJournal?.entryNumber ?? null,
+        isReconciled: issues.length === 0,
+        issues,
+      };
+    });
+
+    return {
+      rows,
+      summary: {
+        totalRuns: rows.length,
+        reconciledRuns: rows.filter((row) => row.isReconciled).length,
+        unreconciledRuns: rows.filter((row) => !row.isReconciled).length,
+      },
+    };
+  }
+
   async exportPayrollRegisterCsv(
     actor: AuthContext,
     filtersInput?: PayrollReportFilterInput,

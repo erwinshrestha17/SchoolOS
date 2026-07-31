@@ -19,8 +19,14 @@ import {
   BalanceSheetResponse,
   BalanceSheetAccount,
   TaxSummaryResponse,
+  JournalRegisterResponse,
+  JournalRegisterRow,
+  FailedUnpostedTransactionsResponse,
+  FailedUnpostedTransactionRow,
+  BankBookResponse,
 } from './types/accounting-reports.types';
-import { CashBookQueryDto } from './dto/cash-book-query.dto';
+import { CashBookQueryDto, CashBookAccountKind } from './dto/cash-book-query.dto';
+import { JournalRegisterQueryDto } from './dto/journal-register-query.dto';
 import { IncomeStatementQueryDto } from './dto/income-statement-query.dto';
 import { BalanceSheetQueryDto } from './dto/balance-sheet-query.dto';
 import {
@@ -28,7 +34,7 @@ import {
   TaxSummaryType,
 } from './dto/tax-summary-query.dto';
 import { UpdateAccountingReportMappingsDto } from './dto/report-account-mapping.dto';
-import { ChartAccountType, JournalLineSide, Prisma } from '@prisma/client';
+import { ChartAccountType, JournalLineSide, Prisma, JournalEntryStatus, JournalSourceType, PaymentStatus, PayrollRunStatus, PayrollExceptionCode, PayrollExceptionStatus } from '@prisma/client';
 
 const cashBookLineInclude = Prisma.validator<Prisma.JournalLineInclude>()({
   chartAccount: {
@@ -574,11 +580,18 @@ export class AccountingReportsService {
       throw new BadRequestException('fromDate cannot be after toDate');
     }
 
+    const mappingTypes =
+      query.accountKind === CashBookAccountKind.CASH
+        ? (['CASH'] as const)
+        : query.accountKind === CashBookAccountKind.BANK
+          ? (['BANK'] as const)
+          : (['CASH', 'BANK'] as const);
+
     const cashBankMappings =
       await this.prisma.accountingReportAccountMapping.findMany({
         where: {
           tenantId,
-          mappingType: { in: ['CASH', 'BANK'] },
+          mappingType: { in: [...mappingTypes] },
         },
         include: { account: true },
       });
@@ -1265,6 +1278,325 @@ export class AccountingReportsService {
         : {}),
       setupWarnings,
       generatedAt: new Date(),
+    };
+  }
+
+  async getBankBook(
+    tenantId: string,
+    query: CashBookQueryDto,
+  ): Promise<BankBookResponse> {
+    if (!query.accountId && !query.accountCode) {
+      throw new BadRequestException(
+        'Bank book requires a bank account to be selected.',
+      );
+    }
+
+    return this.getCashBook(tenantId, {
+      ...query,
+      accountKind: CashBookAccountKind.BANK,
+    });
+  }
+
+  async getJournalRegister(
+    tenantId: string,
+    query: JournalRegisterQueryDto,
+  ): Promise<JournalRegisterResponse> {
+    const {
+      fiscalYearId,
+      fiscalPeriodId,
+      fromDate,
+      toDate,
+      status,
+      sourceType,
+      voucherType,
+      page = 1,
+      limit = 50,
+    } = query;
+
+    const fiscalYear = await this.prisma.fiscalYear.findUnique({
+      where: { id: fiscalYearId, tenantId },
+    });
+    if (!fiscalYear) throw new NotFoundException('Fiscal year not found');
+
+    const sourceTypes = voucherType
+      ? [voucherType as JournalSourceType]
+      : sourceType
+        ? [sourceType]
+        : undefined;
+
+    const where: Prisma.JournalEntryWhereInput = {
+      tenantId,
+      fiscalYearId,
+      ...(fiscalPeriodId ? { fiscalPeriodId } : {}),
+      ...(status ? { status } : {}),
+      ...(sourceTypes ? { sourceType: { in: sourceTypes } } : {}),
+    };
+
+    if (fromDate || toDate) {
+      where.entryDate = {
+        ...(fromDate ? { gte: new Date(fromDate) } : {}),
+        ...(toDate ? { lte: new Date(toDate) } : {}),
+      };
+    }
+
+    const total = await this.prisma.journalEntry.count({ where });
+    const totalPages = Math.ceil(total / limit);
+    const skip = (page - 1) * limit;
+
+    const entries = await this.prisma.journalEntry.findMany({
+      where,
+      include: {
+        lines: {
+          include: {
+            chartAccount: {
+              select: { code: true, name: true },
+            },
+          },
+        },
+      },
+      orderBy: [{ entryDate: 'desc' }, { entryNumber: 'desc' }],
+      skip,
+      take: limit,
+    });
+
+    const rows: JournalRegisterRow[] = entries.map((entry) => {
+      const debitedAccounts = entry.lines
+        .filter((line) => line.debit.gt(0))
+        .map((line) => `${line.chartAccount.code} ${line.chartAccount.name}`)
+        .join('; ');
+      const creditedAccounts = entry.lines
+        .filter((line) => line.credit.gt(0))
+        .map((line) => `${line.chartAccount.code} ${line.chartAccount.name}`)
+        .join('; ');
+      const totalDebit = entry.lines.reduce(
+        (sum, line) => sum.add(line.debit),
+        new Prisma.Decimal(0),
+      );
+      const totalCredit = entry.lines.reduce(
+        (sum, line) => sum.add(line.credit),
+        new Prisma.Decimal(0),
+      );
+
+      return {
+        journalEntryId: entry.id,
+        entryNumber: entry.entryNumber,
+        entryDate: entry.entryDate,
+        narration: entry.narration,
+        sourceModule: entry.sourceModule,
+        sourceType: entry.sourceType,
+        sourceId: entry.sourceId,
+        debitedAccounts,
+        creditedAccounts,
+        totalDebit,
+        totalCredit,
+        status: entry.status,
+        approvalStatus: entry.approvedAt
+          ? 'APPROVED'
+          : entry.rejectedAt
+            ? 'REJECTED'
+            : entry.submittedAt
+              ? 'SUBMITTED'
+              : 'DRAFT',
+        reversalStatus: entry.reversalOfId
+          ? 'REVERSAL'
+          : entry.reversedAt
+            ? 'REVERSED'
+            : entry.correctionOfId
+              ? 'CORRECTION'
+              : 'NONE',
+        createdById: entry.createdById,
+        approvedById: entry.approvedById,
+        postedById: entry.postedById,
+        reversalOfId: entry.reversalOfId,
+        correctionOfId: entry.correctionOfId,
+      };
+    });
+
+    return {
+      fiscalYearId,
+      fiscalPeriodId,
+      fromDate,
+      toDate,
+      rows,
+      pagination: { page, limit, total, totalPages },
+      generatedAt: new Date(),
+    };
+  }
+
+  async getVoucherRegister(
+    tenantId: string,
+    query: JournalRegisterQueryDto,
+  ): Promise<JournalRegisterResponse> {
+    if (!query.voucherType) {
+      throw new BadRequestException('voucherType is required for voucher registers.');
+    }
+    return this.getJournalRegister(tenantId, query);
+  }
+
+  async getFailedUnpostedTransactions(
+    tenantId: string,
+  ): Promise<FailedUnpostedTransactionsResponse> {
+    const rows: FailedUnpostedTransactionRow[] = [];
+    const now = new Date();
+
+    const approvedUnposted = await this.prisma.journalEntry.findMany({
+      where: {
+        tenantId,
+        status: JournalEntryStatus.APPROVED,
+      },
+      select: {
+        id: true,
+        entryNumber: true,
+        sourceModule: true,
+        sourceType: true,
+        entryDate: true,
+        lines: {
+          select: { debit: true },
+        },
+      },
+      orderBy: [{ entryDate: 'desc' }],
+      take: 200,
+    });
+
+    for (const entry of approvedUnposted) {
+      const amount = entry.lines.reduce(
+        (sum, line) => sum.add(line.debit),
+        new Prisma.Decimal(0),
+      );
+      rows.push({
+        sourceModule: entry.sourceModule ?? 'M11',
+        sourceType: entry.sourceType,
+        resourceId: entry.id,
+        reference: entry.entryNumber ?? entry.id,
+        amount,
+        issueType: 'APPROVED_UNPOSTED_JOURNAL',
+        details: 'Journal entry is approved but not posted to the general ledger.',
+        detectedAt: now,
+      });
+    }
+
+    const payrollRunsMissingJournal = await this.prisma.payrollRun.findMany({
+      where: {
+        tenantId,
+        status: { in: [PayrollRunStatus.POSTED, PayrollRunStatus.PAID] },
+        journalEntryId: null,
+      },
+      select: {
+        id: true,
+        periodMonth: true,
+        periodYear: true,
+        grossAmount: true,
+      },
+      take: 100,
+    });
+
+    for (const run of payrollRunsMissingJournal) {
+      rows.push({
+        sourceModule: 'PAYROLL',
+        sourceType: 'PAYROLL_RUN',
+        resourceId: run.id,
+        reference: `${run.periodYear}-${String(run.periodMonth).padStart(2, '0')}`,
+        amount: run.grossAmount,
+        issueType: 'MISSING_GL_POSTING',
+        details: 'Posted payroll run has no linked accrual journal entry.',
+        detectedAt: now,
+      });
+    }
+
+    const payrollExceptions = await this.prisma.payrollException.findMany({
+      where: {
+        tenantId,
+        code: PayrollExceptionCode.ACCOUNTING_POSTING_FAILED,
+        status: PayrollExceptionStatus.OPEN,
+      },
+      include: {
+        payrollRun: {
+          select: {
+            id: true,
+            periodMonth: true,
+            periodYear: true,
+          },
+        },
+      },
+      take: 100,
+    });
+
+    for (const exception of payrollExceptions) {
+      rows.push({
+        sourceModule: 'PAYROLL',
+        sourceType: 'PAYROLL_RUN',
+        resourceId: exception.payrollRunId ?? exception.id,
+        reference: exception.payrollRun
+          ? `${exception.payrollRun.periodYear}-${String(exception.payrollRun.periodMonth).padStart(2, '0')}`
+          : exception.payrollRunId ?? exception.id,
+        amount: null,
+        issueType: 'ACCOUNTING_POSTING_FAILED',
+        details: exception.safeMessage,
+        detectedAt: exception.detectedAt,
+      });
+    }
+
+    const recentPayments = await this.prisma.payment.findMany({
+      where: {
+        tenantId,
+        status: { not: PaymentStatus.REVERSED },
+        paidAt: {
+          gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000),
+        },
+      },
+      select: {
+        id: true,
+        amount: true,
+        paidAt: true,
+        receipt: { select: { receiptNumber: true } },
+      },
+      take: 500,
+    });
+
+    if (recentPayments.length > 0) {
+      const paymentJournals = await this.prisma.journalEntry.findMany({
+        where: {
+          tenantId,
+          sourceType: JournalSourceType.FEE_PAYMENT,
+          sourceId: { in: recentPayments.map((payment) => payment.id) },
+        },
+        select: { sourceId: true },
+      });
+      const postedPaymentIds = new Set(
+        paymentJournals.map((entry) => entry.sourceId).filter(Boolean),
+      );
+
+      for (const payment of recentPayments) {
+        if (!postedPaymentIds.has(payment.id)) {
+          rows.push({
+            sourceModule: 'FEES',
+            sourceType: 'FEE_PAYMENT',
+            resourceId: payment.id,
+            reference: payment.receipt?.receiptNumber ?? payment.id,
+            amount: payment.amount,
+            issueType: 'MISSING_GL_POSTING',
+            details: 'Fee payment has no matching posted journal entry.',
+            detectedAt: payment.paidAt,
+          });
+        }
+      }
+    }
+
+    return {
+      rows,
+      summary: {
+        totalIssues: rows.length,
+        approvedUnpostedJournals: rows.filter(
+          (row) => row.issueType === 'APPROVED_UNPOSTED_JOURNAL',
+        ).length,
+        missingGlPostings: rows.filter(
+          (row) => row.issueType === 'MISSING_GL_POSTING',
+        ).length,
+        payrollPostingFailures: rows.filter(
+          (row) => row.issueType === 'ACCOUNTING_POSTING_FAILED',
+        ).length,
+      },
+      generatedAt: now,
     };
   }
 }
