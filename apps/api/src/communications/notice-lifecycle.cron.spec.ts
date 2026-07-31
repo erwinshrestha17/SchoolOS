@@ -5,6 +5,14 @@ function buildCron() {
   const prisma = {
     notice: { findMany: jest.fn() },
     user: { findFirst: jest.fn() },
+    // Tenant-scope helpers: pass-through here so the spec exercises the cron's
+    // own logic, while asserting below that the cron actually delegates to them.
+    runWithoutTenantScope: jest.fn(
+      async (_reason: string, fn: () => Promise<unknown>) => fn(),
+    ),
+    runWithTenantScope: jest.fn(
+      async (_tenantId: string, fn: () => Promise<unknown>) => fn(),
+    ),
   };
   const communicationsService = {
     processScheduledNotices: jest.fn().mockResolvedValue(undefined),

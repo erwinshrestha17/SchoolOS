@@ -17,24 +17,30 @@ export class NoticeLifecycleCron {
   @Cron(CronExpression.EVERY_MINUTE)
   async processDueNoticeLifecycle() {
     const now = new Date();
-    const tenantRows = await this.prisma.notice.findMany({
-      where: {
-        tenant: { isActive: true },
-        OR: [
-          {
-            lifecycleStatus: NoticeLifecycleStatus.SCHEDULED,
-            publishedAt: null,
-            scheduledFor: { lte: now },
+    // Discovering which tenants have due notices is inherently cross-tenant;
+    // the lifecycle work itself runs per tenant below.
+    const tenantRows = await this.prisma.runWithoutTenantScope(
+      'notice lifecycle: discover tenants with due notices',
+      () =>
+        this.prisma.notice.findMany({
+          where: {
+            tenant: { isActive: true },
+            OR: [
+              {
+                lifecycleStatus: NoticeLifecycleStatus.SCHEDULED,
+                publishedAt: null,
+                scheduledFor: { lte: now },
+              },
+              {
+                lifecycleStatus: NoticeLifecycleStatus.PUBLISHED,
+                expiresAt: { lte: now },
+              },
+            ],
           },
-          {
-            lifecycleStatus: NoticeLifecycleStatus.PUBLISHED,
-            expiresAt: { lte: now },
-          },
-        ],
-      },
-      distinct: ['tenantId'],
-      select: { tenantId: true },
-    });
+          distinct: ['tenantId'],
+          select: { tenantId: true },
+        }),
+    );
 
     for (const { tenantId } of tenantRows) {
       const actor = await this.resolveSystemActor(tenantId);
@@ -46,8 +52,10 @@ export class NoticeLifecycleCron {
       }
 
       try {
-        await this.communicationsService.processScheduledNotices(actor);
-        await this.communicationsService.processExpiredNotices(actor);
+        await this.prisma.runWithTenantScope(tenantId, async () => {
+          await this.communicationsService.processScheduledNotices(actor);
+          await this.communicationsService.processExpiredNotices(actor);
+        });
       } catch (error) {
         this.logger.error(
           `Due notice lifecycle failed for tenant ${tenantId}`,

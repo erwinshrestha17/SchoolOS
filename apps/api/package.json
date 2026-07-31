@@ -57,6 +57,7 @@
     "test:cov": "pnpm --filter @schoolos/core build && pnpm run prisma:generate && jest --coverage",
     "test:debug": "pnpm --filter @schoolos/core build && pnpm run prisma:generate && node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "pnpm --filter @schoolos/core build && pnpm run prisma:generate && jest --config ./test/jest-e2e.json --runInBand",
+    "test:integration": "pnpm run prisma:generate && jest --config ./test/jest-integration.json --runInBand",
     "ci": "pnpm run check && pnpm run test"
   },
   "prisma": {

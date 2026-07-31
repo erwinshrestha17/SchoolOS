@@ -7,7 +7,9 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { AuthMethod } from '@prisma/client';
+import { ClsService } from 'nestjs-cls';
 import { PlatformApiKeysService } from '../../platform/platform-api-keys.service';
+import { TENANT_ID_KEY } from '../../prisma/prisma.service';
 import { AuthenticatedRequest } from '../auth-request.interface';
 
 @Injectable()
@@ -15,6 +17,7 @@ export class ApiKeyAuthGuard implements CanActivate {
   constructor(
     @Inject(forwardRef(() => PlatformApiKeysService))
     private readonly apiKeysService: PlatformApiKeysService,
+    private readonly cls: ClsService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -41,6 +44,17 @@ export class ApiKeyAuthGuard implements CanActivate {
       roles: ['api_key_integration'],
       permissions: validated.scopes,
     };
+
+    // Bind the tenant into CLS so PrismaService's tenant-scoping extension
+    // applies. Without this the extension sees `undefined` and returns query
+    // args unchanged -- i.e. every query on an API-key request would run with
+    // no tenant filter at all. Mirrors JwtAuthGuard.
+    const hasActiveCls =
+      typeof this.cls.isActive === 'function' ? this.cls.isActive() : true;
+
+    if (hasActiveCls) {
+      this.cls.set(TENANT_ID_KEY, validated.tenantId);
+    }
 
     return true;
   }

@@ -276,11 +276,15 @@ export class UsageService {
       if (!parsed || !Number.isFinite(delta) || delta === 0) continue;
 
       try {
-        await this.writeUsageDelta(
-          parsed.tenantId,
-          parsed.usageKey,
-          parsed.periodStart,
-          delta,
+        // Each pending counter carries its own tenant, so the write runs under
+        // that tenant's scope rather than with no tenant context at all.
+        await this.prisma.runWithTenantScope(parsed.tenantId, () =>
+          this.writeUsageDelta(
+            parsed.tenantId,
+            parsed.usageKey,
+            parsed.periodStart,
+            delta,
+          ),
         );
       } catch (error) {
         this.logger.error(

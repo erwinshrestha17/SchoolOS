@@ -33,35 +33,48 @@ export class HomeworkCron {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // 1. Find homework due soon (within next 24 hours)
-    const dueSoonHomework = await this.prisma.homeworkAssignment.findMany({
-      where: {
-        tenant: { isActive: true },
-        status: HomeworkAssignmentStatus.ASSIGNED,
-        dueDate: {
-          lte: tomorrow,
-          gte: now,
-        },
-      },
-    });
+    // Scanning every active tenant's assignments is the intent of this job, so
+    // the sweep is an explicit cross-tenant region; each reminder is then
+    // queued back under its own tenant's scope.
+    const [dueSoonHomework, overdueHomework] =
+      await this.prisma.runWithoutTenantScope(
+        'daily homework reminder sweep across all active tenants',
+        async () =>
+          Promise.all([
+            // 1. Find homework due soon (within next 24 hours)
+            this.prisma.homeworkAssignment.findMany({
+              where: {
+                tenant: { isActive: true },
+                status: HomeworkAssignmentStatus.ASSIGNED,
+                dueDate: {
+                  lte: tomorrow,
+                  gte: now,
+                },
+              },
+            }),
+            // 2. Find overdue homework
+            this.prisma.homeworkAssignment.findMany({
+              where: {
+                tenant: { isActive: true },
+                status: HomeworkAssignmentStatus.ASSIGNED,
+                dueDate: {
+                  lt: now,
+                },
+              },
+            }),
+          ]),
+      );
 
     for (const hw of dueSoonHomework) {
-      await this.queueReminder(hw, HomeworkReminderType.HOMEWORK_DUE_SOON);
+      await this.prisma.runWithTenantScope(hw.tenantId, () =>
+        this.queueReminder(hw, HomeworkReminderType.HOMEWORK_DUE_SOON),
+      );
     }
 
-    // 2. Find overdue homework
-    const overdueHomework = await this.prisma.homeworkAssignment.findMany({
-      where: {
-        tenant: { isActive: true },
-        status: HomeworkAssignmentStatus.ASSIGNED,
-        dueDate: {
-          lt: now,
-        },
-      },
-    });
-
     for (const hw of overdueHomework) {
-      await this.queueReminder(hw, HomeworkReminderType.HOMEWORK_OVERDUE);
+      await this.prisma.runWithTenantScope(hw.tenantId, () =>
+        this.queueReminder(hw, HomeworkReminderType.HOMEWORK_OVERDUE),
+      );
     }
 
     this.logger.log(

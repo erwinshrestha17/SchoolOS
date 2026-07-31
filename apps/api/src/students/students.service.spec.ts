@@ -2234,6 +2234,31 @@ describe('students lifecycle hardening', () => {
     );
   });
 
+  it('scopes roster PDF class/section header lookups to the actor tenant', async () => {
+    const prisma = buildPrisma({ studentFindManyResult: [] });
+    const { service } = buildService(prisma);
+
+    await service.exportRoster(
+      { classId: 'foreign-class-1', sectionId: 'foreign-section-1' },
+      actor,
+    );
+
+    // The header lookups must never resolve a foreign tenant's class/section
+    // name, which would both leak the name and confirm the record exists.
+    expect(prisma.class.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'foreign-class-1', tenantId: 'tenant-1' },
+      }),
+    );
+    expect(prisma.section.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'foreign-section-1', tenantId: 'tenant-1' },
+      }),
+    );
+    expect(prisma.class.findUnique).not.toHaveBeenCalled();
+    expect(prisma.section.findUnique).not.toHaveBeenCalled();
+  });
+
   it('embeds the real uploaded student photo in the generated ID card', async () => {
     const student = buildStudent({ guardianLinks: [] });
     const prisma = buildPrisma({

@@ -7,6 +7,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ClsService } from 'nestjs-cls';
 import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
+import { MustChangePasswordGuard } from '../src/auth/guards/must-change-password.guard';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ConfigService } from '../src/config/config.service';
 import { AuditService } from '../src/audit/audit.service';
@@ -32,6 +33,10 @@ describe('Auth Security Hardening (Regression)', () => {
     isActive: jest.fn().mockReturnValue(true),
   };
 
+  const mockMustChangePassword = {
+    canActivate: jest.fn().mockReturnValue(true),
+  };
+
   beforeEach(async () => {
     prisma = createPrismaMock();
     jwtService = {
@@ -46,6 +51,10 @@ describe('Auth Security Hardening (Regression)', () => {
         { provide: ConfigService, useValue: mockConfig },
         { provide: AuditService, useValue: mockAudit },
         { provide: ClsService, useValue: mockCls },
+        // JwtAuthGuard delegates to MustChangePasswordGuard after building
+        // request.auth; these regression cases assert the authorization
+        // decisions that happen before that delegation.
+        { provide: MustChangePasswordGuard, useValue: mockMustChangePassword },
       ],
     }).compile();
 

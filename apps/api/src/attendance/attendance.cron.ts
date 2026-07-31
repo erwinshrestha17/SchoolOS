@@ -38,8 +38,10 @@ export class AttendanceCron {
       }
 
       try {
-        const result =
-          await this.attendanceService.processDailyEscalationWarnings({
+        // Per-tenant work runs under that tenant's Prisma scope, matching how
+        // an authenticated request would be filtered.
+        const result = await this.prisma.runWithTenantScope(tenant.id, () =>
+          this.attendanceService.processDailyEscalationWarnings({
             userId: actorUser.id,
             tenantId: tenant.id,
             tenantSlug: tenant.slug,
@@ -47,7 +49,8 @@ export class AttendanceCron {
             authMethod: actorUser.authMethod,
             roles: ['platform_super_admin'],
             permissions: [],
-          });
+          }),
+        );
 
         this.logger.log(
           `Attendance escalations processed for tenant ${tenant.slug}: ${result.warningCount} warnings`,

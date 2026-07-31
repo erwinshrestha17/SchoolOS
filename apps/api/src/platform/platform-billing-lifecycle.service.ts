@@ -28,16 +28,23 @@ export class PlatformBillingLifecycleService {
   }
 
   async runBillingLifecycle(actorUserId = SYSTEM_BILLING_ACTOR) {
-    const overdueInvoices = await this.checkOverdueInvoices(actorUserId);
-    const subscriptionTransitions =
-      await this.processSubscriptionTransitions(actorUserId);
-    const renewalInvoices = await this.generateRenewalInvoices(actorUserId);
+    // Platform billing operates over every tenant's subscriptions and invoices
+    // by definition, so this is an explicit cross-tenant region.
+    return this.prisma.runWithoutTenantScope(
+      'platform billing lifecycle across all tenants',
+      async () => {
+        const overdueInvoices = await this.checkOverdueInvoices(actorUserId);
+        const subscriptionTransitions =
+          await this.processSubscriptionTransitions(actorUserId);
+        const renewalInvoices = await this.generateRenewalInvoices(actorUserId);
 
-    return {
-      overdueInvoices,
-      subscriptionTransitions,
-      renewalInvoices,
-    };
+        return {
+          overdueInvoices,
+          subscriptionTransitions,
+          renewalInvoices,
+        };
+      },
+    );
   }
 
   private async checkOverdueInvoices(actorUserId: string) {

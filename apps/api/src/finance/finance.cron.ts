@@ -20,12 +20,18 @@ export class FinanceCron {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const activeSchedules = await this.prisma.feeDueSchedule.findMany({
-      where: {
-        dueDate: { lte: today },
-        OR: [{ lastProcessedAt: null }, { lastProcessedAt: { lt: today } }],
-      },
-    });
+    // Due schedules are swept across every tenant by design; each schedule is
+    // then processed under its own tenant's scope below.
+    const activeSchedules = await this.prisma.runWithoutTenantScope(
+      'daily fee due-schedule sweep across all tenants',
+      () =>
+        this.prisma.feeDueSchedule.findMany({
+          where: {
+            dueDate: { lte: today },
+            OR: [{ lastProcessedAt: null }, { lastProcessedAt: { lt: today } }],
+          },
+        }),
+    );
 
     for (const schedule of activeSchedules) {
       this.logger.log(
@@ -40,20 +46,24 @@ export class FinanceCron {
 
         if (!adminUser) continue;
 
-        const result = await this.financeService.processDueSchedule(
-          schedule.id,
-          {
-            message: `Automated reminder: Please clear your pending fee balance for ${schedule.name}.`,
-          },
-          {
-            userId: adminUser.id,
-            tenantId: schedule.tenantId,
-            tenantSlug: 'system',
-            email: adminUser.email ?? 'system@schoolos.com',
-            authMethod: adminUser.authMethod,
-            roles: ['platform_super_admin'],
-            permissions: [],
-          },
+        const result = await this.prisma.runWithTenantScope(
+          schedule.tenantId,
+          () =>
+            this.financeService.processDueSchedule(
+              schedule.id,
+              {
+                message: `Automated reminder: Please clear your pending fee balance for ${schedule.name}.`,
+              },
+              {
+                userId: adminUser.id,
+                tenantId: schedule.tenantId,
+                tenantSlug: 'system',
+                email: adminUser.email ?? 'system@schoolos.com',
+                authMethod: adminUser.authMethod,
+                roles: ['platform_super_admin'],
+                permissions: [],
+              },
+            ),
         );
 
         this.logger.log(

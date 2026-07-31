@@ -39,8 +39,10 @@ export class LibraryCron {
       }
 
       try {
-        const result =
-          await this.libraryHardeningService.sendOverdueRemindersIdempotent({
+        // Per-tenant work runs under that tenant's Prisma scope, matching how
+        // an authenticated request would be filtered.
+        const result = await this.prisma.runWithTenantScope(tenant.id, () =>
+          this.libraryHardeningService.sendOverdueRemindersIdempotent({
             userId: actorUser.id,
             tenantId: tenant.id,
             tenantSlug: tenant.slug,
@@ -48,7 +50,8 @@ export class LibraryCron {
             authMethod: actorUser.authMethod,
             roles: ['platform_super_admin'],
             permissions: ['library:reports:read'],
-          });
+          }),
+        );
 
         if (result.skipped) {
           this.logger.log(

@@ -168,6 +168,12 @@ function makePrisma() {
       })),
       findMany: jest.fn(async () => []),
     },
+    // Added by the P0-08 student-leave auto-link slice: submitAttendance now
+    // reads approved leave for the date. Without this the whole suite fails
+    // with "Cannot read properties of undefined (reading 'findMany')".
+    studentLeaveRequest: {
+      findMany: jest.fn(async () => []),
+    },
     student: {
       findMany: jest.fn(async () =>
         students.filter((student) =>

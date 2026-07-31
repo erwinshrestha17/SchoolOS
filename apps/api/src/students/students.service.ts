@@ -3937,13 +3937,18 @@ export class StudentsService {
       where: { id: actor.tenantId },
     });
 
+    // Tenant-scoped: these only feed the PDF header, but an unscoped lookup
+    // would render another tenant's class/section name (and confirm that the
+    // record exists) for any caller who supplies a foreign id.
     const targetClass = filters.classId
-      ? await this.prisma.class.findUnique({ where: { id: filters.classId } })
+      ? await this.prisma.class.findFirst({
+          where: { id: filters.classId, tenantId: actor.tenantId },
+        })
       : null;
 
     const targetSection = filters.sectionId
-      ? await this.prisma.section.findUnique({
-          where: { id: filters.sectionId },
+      ? await this.prisma.section.findFirst({
+          where: { id: filters.sectionId, tenantId: actor.tenantId },
         })
       : null;
     const logo = await loadSchoolLogoForPdf(

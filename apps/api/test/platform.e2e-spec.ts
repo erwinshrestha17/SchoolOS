@@ -121,10 +121,13 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
     const mockReq = {
       headers: { authorization: `Bearer ${accessToken}` },
     } as unknown as AuthenticatedRequest;
+    // getHandler/getClass must return real metadata targets: JwtAuthGuard
+    // delegates to MustChangePasswordGuard, whose Reflector lookup throws a
+    // TypeError when handed `undefined`.
     const mockContext = {
       switchToHttp: () => ({ getRequest: () => mockReq }),
-      getHandler: jest.fn(),
-      getClass: jest.fn(),
+      getHandler: () => PlatformController.prototype.listTenants,
+      getClass: () => PlatformController,
     } as unknown as ExecutionContext;
 
     await jwtAuthGuard.canActivate(mockContext);

@@ -4,6 +4,11 @@ import { PlatformBillingLifecycleService } from './platform-billing-lifecycle.se
 describe('PlatformBillingLifecycleService', () => {
   function createService() {
     const prisma = {
+      // Platform billing is an intentional cross-tenant region; pass through so
+      // the spec still exercises the lifecycle logic itself.
+      runWithoutTenantScope: jest.fn(
+        async (_reason: string, fn: () => Promise<unknown>) => fn(),
+      ),
       saaSInvoice: {
         findMany: jest.fn(),
         update: jest.fn(),

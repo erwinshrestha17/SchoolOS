@@ -11,6 +11,7 @@
     "typecheck": "pnpm compile:artifacts && pnpm check:core-imports && pnpm --filter @schoolos/core typecheck && pnpm check:core-dist && pnpm --filter @schoolos/api typecheck && pnpm --filter @schoolos/web typecheck",
     "test": "pnpm compile:artifacts && pnpm check:core-imports && pnpm --filter @schoolos/api test && pnpm --filter @schoolos/web test",
     "test:e2e": "pnpm --filter @schoolos/api test:e2e",
+    "test:integration": "pnpm --filter @schoolos/api test:integration",
     "check:core-imports": "node scripts/check-core-imports.mjs",
     "check:core-dist": "node scripts/check-core-dist.mjs",
     "db:generate": "pnpm compile:artifacts && pnpm --filter @schoolos/api prisma:generate",

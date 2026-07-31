@@ -652,6 +652,21 @@ async function authenticateRequest(
     getClass: () => controllerClass,
   } as unknown as ExecutionContext;
 
+  // Users provisioned through usersService are created with
+  // `mustChangePassword: true` (users.service.ts:91), so the real onboarding
+  // flow forces a password change before any resource is reachable. That
+  // first-login flow is covered separately (must-change-password.guard.spec.ts
+  // and the m0-account-security e2e seed); this spec exercises multi-tenant
+  // onboarding and RBAC, so the flag is cleared before authenticating.
+  const guardPrisma = (
+    jwtAuthGuard as unknown as {
+      prisma: { __state?: { users: Record<string, unknown>[] } };
+    }
+  ).prisma;
+  for (const user of guardPrisma.__state?.users ?? []) {
+    user.mustChangePassword = false;
+  }
+
   const cls = (
     jwtAuthGuard as unknown as {
       cls: {
