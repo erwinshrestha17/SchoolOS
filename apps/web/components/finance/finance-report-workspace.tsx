@@ -504,6 +504,7 @@ function InvoiceRegisterPanel() {
         ) : (
           <EmptyState
             title="No invoices in this period"
+            description="No invoices matched the selected reporting period."
             className="m-5 min-h-52"
           />
         )}
@@ -643,6 +644,7 @@ function RefundReversalRegisterPanel() {
         ) : (
           <EmptyState
             title="No completed refunds or reversals"
+            description="No refund or reversal records are available for this report."
             className="m-5 min-h-52"
           />
         )}

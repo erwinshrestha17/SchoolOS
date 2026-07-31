@@ -15,7 +15,7 @@ import { TeacherTodayWorkspace } from "../../components/dashboard/teacher-today-
 import { useTeacherAccess } from "../../lib/teacher-access";
 import { useSchoolWebPersona } from "../../lib/school-web-persona";
 import {
-  projectDashboardForPersona,
+  assertServerDashboardProjection,
   resolveDashboardCompositionPersona,
 } from "../../lib/dashboard-persona";
 import { ModuleHeader } from "../../components/ui/module-header";
@@ -27,21 +27,23 @@ import {
   SummaryStatusBadge,
 } from "../../components/ui/operational-summary";
 import { LoadingState } from "../../components/ui/loading-state";
+import { PermissionDenied } from "../../components/ui/permission-denied";
 import { usePermissionAccess } from "../../lib/permissions-ui";
+import { useSession } from "../../components/session-provider";
 import { api } from "../../lib/api";
 import { formatSchoolDate } from "../../lib/date-utils";
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { session } = useSession();
   const { isTeacherPersona } = useTeacherAccess();
   const schoolWebPersona = useSchoolWebPersona();
   const { resolution: permissionResolution } = usePermissionAccess();
-  const compositionPersona = resolveDashboardCompositionPersona(
-    schoolWebPersona,
-  );
+  const expectedPersona = resolveDashboardCompositionPersona(schoolWebPersona);
+  const tenantId = session?.tenant.id;
 
   const dashboardQuery = useQuery({
-    queryKey: ["operational-dashboard-summary", compositionPersona],
+    queryKey: ["operational-dashboard-summary", tenantId],
     queryFn: api.getDashboardSummary,
     staleTime: 30_000,
     enabled: !isTeacherPersona && permissionResolution === "granted",
@@ -50,10 +52,13 @@ export default function DashboardPage() {
   const projectedDashboard = useMemo(
     () =>
       dashboardQuery.data
-        ? projectDashboardForPersona(dashboardQuery.data, compositionPersona)
+        ? assertServerDashboardProjection(dashboardQuery.data, expectedPersona)
         : null,
-    [dashboardQuery.data, compositionPersona],
+    [dashboardQuery.data, expectedPersona],
   );
+
+  const compositionPersona =
+    projectedDashboard?.compositionPersona ?? expectedPersona;
 
   const safeNextActions = (projectedDashboard?.nextActions ?? [])
     .map((action) => ({ action, href: resolveOperationalSummaryAction(action) }))
@@ -131,6 +136,11 @@ export default function DashboardPage() {
     );
   }
 
+  const projectionMismatch =
+    dashboardQuery.isSuccess &&
+    dashboardQuery.data &&
+    projectedDashboard === null;
+
   return (
     <div className="space-y-6">
       <ModuleHeader
@@ -171,6 +181,12 @@ export default function DashboardPage() {
       {dashboardQuery.isLoading ? <OperationalSummaryLoading /> : null}
       {dashboardQuery.isError ? (
         <OperationalSummaryError onRetry={() => void dashboardQuery.refetch()} />
+      ) : null}
+      {projectionMismatch ? (
+        <PermissionDenied
+          title="Dashboard unavailable"
+          description="The server returned a dashboard projection that does not match your current access. Refresh or sign in again."
+        />
       ) : null}
       {projectedDashboard ? (
         compositionPersona === "admin" ? (

@@ -201,7 +201,7 @@ export const accountingApi = {
     page?: number;
     limit?: number;
   }) =>
-    request<unknown>(
+    request<PaginatedResult<Record<string, unknown>>>(
       withQuery("/accounting/reports/financial-audit-trail", params ?? {}),
     ),
   listTaxSummary: (params: AccountingReportFilters) =>

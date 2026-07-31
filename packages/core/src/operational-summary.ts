@@ -80,10 +80,14 @@ export interface OperationalModuleSummary {
   nextCursor: null;
 }
 
+export type DashboardCompositionPersona = 'admin' | 'principal' | 'general';
+
 export interface OperationalDashboardSummary {
   generatedAt: string;
   schoolDay: string;
   module: 'dashboard';
+  /** Server-resolved composition persona for this projection. */
+  compositionPersona: DashboardCompositionPersona;
   status: Exclude<OperationalSummaryStatus, 'locked' | 'permissionDenied'>;
   summary: Record<string, OperationalSummaryMetricValue>;
   attentionItems: Array<OperationalAttentionItem & { module: OperationalSummaryModule }>;

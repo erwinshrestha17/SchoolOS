@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "../../../lib/api";
-import { SectionCard } from "../../../components/ui/section-card";
-import { PageHeader } from "../../../components/ui/page-header";
-import { Select } from "../../../components/ui/select";
-import { LoadingState } from "../../../components/ui/loading-state";
-import { PageState } from "../../../components/ui/page-state";
+import type { ChartAccountSummary, FiscalYearSummary } from "@schoolos/core";
+import { api } from "@/lib/api";
+import { SectionCard } from "@/components/ui/section-card";
+import { PageHeader } from "@/components/ui/page-header";
+import { Select } from "@/components/ui/select";
+import { LoadingState } from "@/components/ui/loading-state";
+import { PageState } from "@/components/ui/page-state";
 
 type FiscalBudgetView = {
   id: string;
@@ -51,7 +52,7 @@ export default function AccountingBudgetsPage() {
   const selectedBudget = budgets.find((budget) => budget.id === selectedBudgetId);
 
   const activeYear = useMemo(() => {
-    const years = fiscalYearsQuery.data ?? [];
+    const years = (fiscalYearsQuery.data ?? []) as FiscalYearSummary[];
     if (selectedYearId) {
       return years.find((year) => year.id === selectedYearId);
     }
@@ -117,14 +118,14 @@ export default function AccountingBudgetsPage() {
             </label>
             <Select
               value={selectedYearId}
-              onChange={(e) => {
+              onChange={(e: ChangeEvent<HTMLSelectElement>) => {
                 setSelectedYearId(e.target.value);
                 setSelectedBudgetId("");
               }}
               className="w-full"
             >
               <option value="">Select fiscal year</option>
-              {(fiscalYearsQuery.data ?? []).map((year) => (
+              {(fiscalYearsQuery.data ?? []).map((year: FiscalYearSummary) => (
                 <option key={year.id} value={year.id}>
                   {year.name}
                 </option>
@@ -137,7 +138,7 @@ export default function AccountingBudgetsPage() {
             </label>
             <input
               value={budgetName}
-              onChange={(e) => setBudgetName(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setBudgetName(e.target.value)}
               className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold"
             />
           </div>
@@ -171,7 +172,9 @@ export default function AccountingBudgetsPage() {
           <div className="mb-4 grid gap-4 md:grid-cols-2">
             <Select
               value={selectedBudgetId}
-              onChange={(e) => setSelectedBudgetId(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLSelectElement>) =>
+                setSelectedBudgetId(e.target.value)
+              }
               className="w-full"
             >
               <option value="">Select budget</option>
@@ -192,11 +195,13 @@ export default function AccountingBudgetsPage() {
             <div className="mb-6 grid gap-4 md:grid-cols-3">
               <Select
                 value={selectedAccountId}
-                onChange={(e) => setSelectedAccountId(e.target.value)}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) =>
+                  setSelectedAccountId(e.target.value)
+                }
                 className="w-full"
               >
                 <option value="">Select account</option>
-                {(accountsQuery.data ?? []).map((account) => (
+                {(accountsQuery.data ?? []).map((account: ChartAccountSummary) => (
                   <option key={account.id} value={account.id}>
                     {account.code} - {account.name}
                   </option>
@@ -208,7 +213,7 @@ export default function AccountingBudgetsPage() {
                 step="0.01"
                 placeholder="Budget amount"
                 value={lineAmount}
-                onChange={(e) => setLineAmount(e.target.value)}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setLineAmount(e.target.value)}
                 className="h-11 rounded-xl border border-slate-200 px-3 text-sm font-semibold"
               />
               <button
@@ -254,7 +259,9 @@ export default function AccountingBudgetsPage() {
               <div className="mt-6 space-y-3">
                 <textarea
                   value={approveReason}
-                  onChange={(e) => setApproveReason(e.target.value)}
+                  onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
+                    setApproveReason(e.target.value)
+                  }
                   className="min-h-20 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
                   placeholder="Approval reason"
                 />

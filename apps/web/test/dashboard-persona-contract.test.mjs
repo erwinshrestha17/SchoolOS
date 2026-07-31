@@ -14,7 +14,7 @@ describe('admin and principal dashboard separation', () => {
     const principal = read('components/dashboard/principal-dashboard.tsx');
 
     assert.match(page, /resolveDashboardCompositionPersona/);
-    assert.match(page, /projectDashboardForPersona/);
+    assert.match(page, /assertServerDashboardProjection/);
     assert.match(page, /compositionPersona === "admin"/);
     assert.match(page, /<AdminDashboard dashboard=\{projectedDashboard\} \/>/);
     assert.match(page, /compositionPersona === "principal"/);
@@ -25,15 +25,14 @@ describe('admin and principal dashboard separation', () => {
   });
 
   it('projects persona-specific module and attention payloads before render', () => {
-    const persona = read('lib/dashboard-persona.ts');
+    const personaCore = read('../../packages/core/src/dashboard-persona.ts');
     const page = read('app/dashboard/page.tsx');
 
-    assert.match(persona, /export function projectDashboardForPersona/);
-    assert.match(persona, /filterAttentionItemsForPersona/);
-    assert.match(persona, /filterModulesForPersona/);
-    assert.match(persona, /filterNextActionsForPersona/);
-    assert.match(persona, /operationsModulesForPersona/);
+    assert.match(personaCore, /export function projectDashboardForPersona/);
+    assert.match(personaCore, /export function dashboardModulesForComposition/);
+    assert.match(personaCore, /export function assertServerDashboardProjection/);
     assert.match(page, /const projectedDashboard = useMemo/);
+    assert.match(page, /assertServerDashboardProjection/);
   });
 
   it('uses distinct executive and operations headings for principal and admin', () => {

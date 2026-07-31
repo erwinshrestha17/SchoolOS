@@ -1,6 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException } from '@nestjs/common';
 import { GuardianCapability } from '@prisma/client';
-import { getNepalSchoolDay } from '@schoolos/core';
+import {
+  getNepalSchoolDay,
+  dashboardModulesForComposition,
+  projectDashboardForPersona,
+  resolveDashboardCompositionPersonaFromAuth,
+  resolveSchoolWebPersona,
+} from '@schoolos/core';
 import type { AuthContext } from '../auth/auth.types';
 import { getParentStudentIds } from '../common/security/parent-scope';
 import { EntitlementsService } from '../plans/entitlements.service';
@@ -150,15 +156,34 @@ export class OperationalSummaryService {
   ) {}
 
   async getDashboardSummary(actor: AuthContext) {
+    const schoolWebPersona = resolveSchoolWebPersona({
+      roles: actor.roles,
+      permissions: actor.permissions,
+    });
+    if (schoolWebPersona === 'teacher') {
+      throw new ForbiddenException(
+        'Teacher dashboard summaries use assigned-scope mobile and teaching workspaces.',
+      );
+    }
+
+    const compositionPersona =
+      resolveDashboardCompositionPersonaFromAuth({
+        roles: actor.roles,
+        permissions: actor.permissions,
+      });
     const day = getNepalSchoolDay();
     const entitlements = await this.entitlementsService.getEntitlements(
       actor.tenantId,
     );
+    const modulesToQuery = dashboardModulesForComposition(compositionPersona);
     const all = await Promise.all(
-      OPERATIONAL_SUMMARY_MODULES.filter(
-        (module): module is SummaryModule => module !== 'm11_intelligence',
-      ).map((module) =>
-        this.getModuleSummaryInternal(module, actor, day, entitlements.modules),
+      modulesToQuery.map((module) =>
+        this.getModuleSummaryInternal(
+          module as SummaryModule,
+          actor,
+          day,
+          entitlements.modules,
+        ),
       ),
     );
     const modules = all.filter((module) => module.permissions.canView);
@@ -181,22 +206,28 @@ export class OperationalSummaryService {
       .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt))
       .slice(0, 10);
 
-    return {
-      generatedAt: new Date().toISOString(),
-      schoolDay: day.gregorianDate,
-      module: 'dashboard',
-      status: dashboardStatus(modules),
-      summary: {
-        visibleModuleCount: modules.length,
-        readyModuleCount: modules.filter((module) => module.status === 'ready')
-          .length,
-        attentionItemCount: attentionItems.length,
+    const dashboard = projectDashboardForPersona(
+      {
+        generatedAt: new Date().toISOString(),
+        schoolDay: day.gregorianDate,
+        module: 'dashboard',
+        compositionPersona,
+        status: dashboardStatus(modules),
+        summary: {
+          visibleModuleCount: modules.length,
+          readyModuleCount: modules.filter((module) => module.status === 'ready')
+            .length,
+          attentionItemCount: attentionItems.length,
+        },
+        attentionItems,
+        recentItems,
+        nextActions: modules.flatMap((module) => module.nextActions).slice(0, 8),
+        modules,
       },
-      attentionItems,
-      recentItems,
-      nextActions: modules.flatMap((module) => module.nextActions).slice(0, 8),
-      modules,
-    };
+      compositionPersona,
+    );
+
+    return dashboard;
   }
 
   async getModuleSummary(module: OperationalSummaryModule, actor: AuthContext) {
@@ -1566,7 +1597,7 @@ function severityOrder(severity: OperationalAttentionItem['severity']) {
 
 function dashboardStatus(
   summaries: OperationalModuleSummary[],
-): OperationalSummaryStatus {
+): Exclude<OperationalSummaryStatus, 'locked' | 'permissionDenied'> {
   if (summaries.length === 0) return 'empty';
   if (summaries.some((summary) => summary.status === 'partial'))
     return 'partial';
