@@ -1,6 +1,7 @@
 # P0-01 Authorization, Tenant Isolation and Scope Enforcement (2026-07-31, local)
 
-Status: **PARTIAL (local development complete for this hardening slice; not staging / controlled-pilot validated)**
+Status: **PARTIAL — 11 of 12 completion-gate criteria PASS; protected-file/export scoping remains
+mock-only. Local + real-database validated; not staging / controlled-pilot validated.**
 
 Scope: Close remaining P0-01 gaps around capability contract completeness, `RESULT_REVIEW` assignment enforcement, authorization denial audit vocabulary, background-job missing-tenant fail-closed proof, mobile access-changed cache invalidation, and a static authorization matrix contract.
 
@@ -311,6 +312,91 @@ pre-existing by the same stash-and-rerun method:
 
 Neither is an authorization defect. They are left failing deliberately rather than silently
 adjusted, because the attendance one may indicate a real P0-02 correctness question.
+
+## P0-01 completion-gate closure (2026-07-31)
+
+Work done specifically to close the gate items that were still open.
+
+### Clean database migration — PASS
+
+```bash
+# fresh database, all migrations from zero
+createdb schoolos_p001_clean
+DATABASE_URL=...schoolos_p001_clean pnpm exec prisma migrate deploy
+# All migrations have been successfully applied.   (exit 0, 93 applied)
+```
+
+`prisma migrate diff` against the freshly-migrated database reports **28 changes across 17 tables,
+all of them index *renames*** (e.g. `CurriculumProgressItem_scope_status_idx` →
+`CurriculumProgressItem_tenantId_academicYearId_classId_sect_idx`). **Zero** column, table, type or
+constraint differences. This is the known Prisma artifact where migration-declared index names differ
+from the names the schema's `@@index` blocks generate — cosmetic, not structural drift. Recorded as a
+known limitation rather than a blocker; it would make a strict `migrate diff` deploy gate non-empty.
+
+### Real-database authorization matrices — PASS (46/46)
+
+Two further suites join the tenant-isolation one, all with no Prisma mock:
+
+| Suite | Assertions | Covers |
+|---|---|---|
+| `tenant-isolation.int-spec.ts` | 15 | read/write refusal, create tenant-overwrite, excluded models, bypass region |
+| `guardian-scope.int-spec.ts` | **19** | valid linked-child access; capability filtering; SUSPENDED / REVOKED / EXPIRED / UNVERIFIED / PENDING / REJECTED denial; effective-date windows on both ends; unrelated-student and cross-tenant student-id tampering; foreign parent claiming this tenant; parent with no guardian row; staff actor denied the guardian path; admin unrestricted |
+| `teacher-assignment-scope.int-spec.ts` | **12** | exact class+section+subject grant; wrong subject / wrong section / wrong class denial; REVOKED and EXPIRED status; not-yet-started and already-ended assignments; immediate revocation; foreign-tenant actor; actor with no staff row; inactive staff with a live assignment |
+
+```bash
+pnpm test:integration
+# Test Suites: 3 passed, 3 total
+# Tests:       46 passed, 46 total
+```
+
+Fixtures use timestamped `p0-01-*` prefixes and are torn down in `afterAll`; verified 0 leftover
+tenants/students/guardians/classes/users after the run.
+
+Two findings worth recording from building these:
+
+1. `getParentStudentIds` requires **both** `lifecycleStatus: ACTIVE` **and** an `ACTIVE` enrollment.
+   A student without an enrollment row is invisible to their own parent. Correct, but non-obvious —
+   the guardian link alone is not sufficient.
+2. The tenant-scope extension **overwrites** an explicit `tenantId` already present in a service's
+   `where` clause with the CLS value. Harmless in production (both come from the same token via
+   `JwtAuthGuard`), but it means a service cannot deliberately query another tenant, and a test that
+   moves only `actor.tenantId` without moving CLS produces a vacuous pass. Noted in the suite.
+
+### Mobile — analyze PASS, 6 stale-test errors fixed
+
+`flutter analyze` reported **7 issues, 6 of them errors**: `ParentController` gained required
+`privateDataCleanup` / `privateReadCache` parameters during the earlier P0-01 mobile cache-invalidation
+work, and three test files were never updated —
+`parent_weekly_progress_screen_test.dart`, `parent_action_centre_screen_test.dart`,
+`learning_support_screens_test.dart`. Fixed with `Mock` stubs matching each file's existing style.
+
+```
+flutter analyze  → 1 issue found  (info-level `prefer_initializing_formals`
+                                   in lib/features/attendance/…, pre-existing)
+flutter test     → 548 passed, 5 failed
+```
+
+The 5 Flutter failures are **pre-existing**, verified by `git stash` + re-run on the clean tree
+(identical 5): `nepali_bs_calendar_test`, `parent_dashboard_golden_test` (golden image),
+`parent_repository_test` (x2, idempotency-key assertions), `widget_test` (RoleBadge label). None are
+authorization defects; they belong to P0-02/P0-06/localization scope.
+
+### Gate status against the P0-01 completion criteria
+
+| Criterion | Status |
+|---|---|
+| All authoritative API writes are server-authorized | PASS |
+| Entitlements fail closed | PASS (32/32, default-deny on undeclared routes) |
+| Cross-tenant tests pass | PASS (real DB, 15 assertions) |
+| Teacher assignment tests pass | PASS (real DB, 12 assertions + 17 existing) |
+| Guardian relationship tests pass | PASS (real DB, 19 assertions) |
+| Protected files and exports are scoped | **PARTIAL** — file-registry authorization exists and roster export was hardened, but there is no dedicated real-DB protected-file matrix yet |
+| Mobile stale-access caches are invalidated | PASS (analyze clean; `parent_controller` / `private_data_cleanup_service` suites green) |
+| Clean database migration succeeds | PASS |
+| API, web and mobile type checks pass | PASS (typecheck exit 0; flutter analyze error-free) |
+| OpenAPI verification passes | PASS |
+| Existing unrelated workflows remain operational | PASS (`smoke:pilot` green across 6 personas) |
+| Evidence is recorded | PASS (this document) |
 
 ## Honest posture
 

@@ -11,6 +11,8 @@ import 'package:schoolos_mobile/features/parent/data/parent_repository.dart';
 import 'package:schoolos_mobile/features/parent/domain/parent_action_centre_models.dart';
 import 'package:schoolos_mobile/features/parent/domain/parent_models.dart';
 import 'package:schoolos_mobile/features/parent/presentation/screens/parent_action_centre_screen.dart';
+import 'package:schoolos_mobile/core/storage/private_data_cleanup_service.dart';
+import 'package:schoolos_mobile/core/storage/private_read_cache.dart';
 
 class _MockConnectivity extends Mock implements Connectivity {}
 
@@ -18,11 +20,18 @@ class _MockParentRepository extends Mock implements ParentRepository {}
 
 class _MockPreferences extends Mock implements AppPreferencesService {}
 
+class _MockPrivateDataCleanup extends Mock
+    implements PrivateDataCleanupService {}
+
+class _MockPrivateReadCache extends Mock implements PrivateReadCache {}
+
 class _StaticParentController extends ParentController {
   _StaticParentController(ParentState initial)
     : super(
         repository: _MockParentRepository(),
         preferences: _MockPreferences(),
+        privateDataCleanup: _MockPrivateDataCleanup(),
+        privateReadCache: _MockPrivateReadCache(),
         isOnline: true,
       ) {
     state = initial;
