@@ -6,11 +6,14 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, LockKeyhole, Menu, RotateCcw } from 'lucide-react';
 import type { SchoolSettingsAccess } from '@schoolos/core';
+import type { PermissionKey } from '@schoolos/core';
 import { cn } from '../../lib/utils';
 import { schoolSettingsApi } from '../../lib/api/school-settings';
 import { useEntitlements } from '../entitlements-provider';
 import { useSession } from '../session-provider';
 import { TeacherCapability, useTeacherAccess } from '../../lib/teacher-access';
+import { hasPermission } from '../../lib/session';
+import { useSettingsCapabilities } from '../../lib/permissions-ui';
 import { Drawer } from '../ui/drawer';
 import { SearchInput } from '../ui/search-input';
 import { SettingsControlCenter } from './settings-control-center';
@@ -54,19 +57,6 @@ const MIGRATED_LEGACY_SECTIONS: Record<string, string> = {
   'fee-plans': '/dashboard/fees',
 };
 
-function canRequestSchoolSettings(permissions: readonly string[]) {
-  return permissions.some(
-    (permission) =>
-      permission.startsWith('settings:') ||
-      permission.startsWith('admission_policy:') ||
-      permission.startsWith('roles:') ||
-      permission.startsWith('users:') ||
-      permission.startsWith('attendance:') ||
-      permission === 'classes:read' ||
-      permission === 'academic_years:read',
-  );
-}
-
 function groupItems(items: ResolvedSettingsNavigationItem[]) {
   return SETTINGS_NAVIGATION_GROUPS.map((group) => ({
     ...group,
@@ -80,22 +70,16 @@ export function SettingsRouteFrame({ children }: { children: ReactNode }) {
   const searchParams = useSearchParams();
   const { session } = useSession();
   const { hasModule } = useEntitlements();
+  const settingsCaps = useSettingsCapabilities();
   const [query, setQuery] = useState('');
   const [navigationOpen, setNavigationOpen] = useState(false);
   const browseButtonRef = useRef<HTMLButtonElement>(null);
-  const permissions = useMemo(
-    () => session?.user.permissions ?? [],
-    [session?.user.permissions],
-  );
-  // A teacher holds settings:read, classes:read, attendance:read and
-  // academic_years:read, so canRequestSchoolSettings() alone would render the
-  // whole school-configuration navigation around their personal pages (P0.10).
-  // Personal-only teachers get a My Account frame instead, and never issue the
-  // school-settings navigation request at all.
   const { isRestricted } = useTeacherAccess();
   const personalOnly = isRestricted(TeacherCapability.SCHOOL_SETTINGS_ADMIN);
   const mayLoadSchoolSettings =
-    !personalOnly && canRequestSchoolSettings(permissions);
+    !personalOnly &&
+    settingsCaps.resolution === 'granted' &&
+    settingsCaps.canAccessInstitutionalSettings;
 
   const navigationQuery = useQuery({
     queryKey: ['school-settings', 'navigation'],
@@ -110,7 +94,6 @@ export function SettingsRouteFrame({ children }: { children: ReactNode }) {
   }, [navigationQuery.data]);
 
   const visibleItems = useMemo(() => {
-    const grantedPermissions = new Set<string>(permissions);
     return SETTINGS_NAVIGATION.flatMap((definition) => {
       // School and platform configuration is not a teacher's job. Filtering
       // here (rather than only in the route guard) keeps the settings hub,
@@ -129,13 +112,13 @@ export function SettingsRouteFrame({ children }: { children: ReactNode }) {
       }
       if (
         definition.requiredPermission &&
-        !grantedPermissions.has(definition.requiredPermission)
+        !hasPermission(session, definition.requiredPermission as PermissionKey)
       ) {
         return [];
       }
       return [definition];
     });
-  }, [backendItemsById, hasModule, permissions, personalOnly]);
+  }, [backendItemsById, hasModule, personalOnly, session]);
 
   const filteredItems = useMemo(
     () =>

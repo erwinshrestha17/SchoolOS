@@ -4,7 +4,9 @@ import type { AttendanceConflict } from '@schoolos/core';
 import { SectionCard } from '@/components/ui/section-card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { PermissionDenied } from '@/components/ui/permission-denied';
 import { api } from '@/lib/api';
+import { useAttendanceCapabilities } from '@/lib/permissions-ui';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2 } from 'lucide-react';
 import { formatDateTime } from '@/lib/utils';
@@ -17,6 +19,8 @@ export function AttendanceConflictReview({
   conflicts,
 }: AttendanceConflictReviewProps) {
   const queryClient = useQueryClient();
+  const { canReviewConflicts, resolution } = useAttendanceCapabilities();
+  const permissionsLoading = resolution === "loading";
 
   const reviewMutation = useMutation({
     mutationFn: ({
@@ -42,6 +46,16 @@ export function AttendanceConflictReview({
       description="Resolve duplicate or flagged attendance submissions"
     >
       <div className="space-y-4">
+        {permissionsLoading ? (
+          <p className="text-sm font-semibold text-slate-500">
+            Checking review permissions...
+          </p>
+        ) : !canReviewConflicts ? (
+          <PermissionDenied
+            title="Conflict review unavailable"
+            description="Attendance conflict resolution requires review authority from the backend permission model."
+          />
+        ) : null}
         {conflicts.map((conflict) => (
           <div
             key={conflict.id}
@@ -60,7 +74,7 @@ export function AttendanceConflictReview({
               </p>
             </div>
 
-            {!conflict.reviewedAt && (
+            {!conflict.reviewedAt && canReviewConflicts ? (
               <Button
                 type="button"
                 size="sm"
@@ -76,7 +90,7 @@ export function AttendanceConflictReview({
                 <CheckCircle2 size={14} />
                 {reviewMutation.isPending ? 'Resolving...' : 'Mark Resolved'}
               </Button>
-            )}
+            ) : null}
           </div>
         ))}
         {conflicts.length === 0 && (

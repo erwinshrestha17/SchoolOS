@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 import { useState, type RefObject } from "react";
 
 import { Avatar } from "../ui/avatar";
+import { usePermissionAccess } from "../../lib/permissions-ui";
 import { cn } from "../../lib/utils";
 import { Badge } from "../ui/badge";
 import {
@@ -85,10 +86,14 @@ export function Header({
 
   const primaryRole = session?.user.roles[0]?.replace(/_/g, " ") ?? "User";
   const tenantName = session?.tenant.name ?? "SchoolOS";
+  const { resolution: permissionResolution, hasPermission: checkPermission } =
+    usePermissionAccess();
+  const canViewStaffSelf = checkPermission("staff:read");
   const canOpenMyWorkspace = Boolean(
+    permissionResolution === "granted" &&
     profileQuery.data?.staff &&
     hasModule("hr") &&
-    session?.user.permissions.includes("staff:read"),
+    canViewStaffSelf,
   );
 
   return (

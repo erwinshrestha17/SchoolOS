@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { DashboardPageShell } from "@/components/dashboard/dashboard-page-shell";
-import { useSession } from "@/components/session-provider";
+import { useCommunicationsCapabilities } from "@/lib/permissions-ui";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -78,9 +78,8 @@ const emptyDraft: TemplateDraft = {
 
 export default function CommunicationTemplatesPage() {
   const queryClient = useQueryClient();
-  const { session } = useSession();
-  const permissions = new Set(session?.user.permissions ?? []);
-  const canManageTemplates = permissions.has("communications:manage_templates");
+  const commsCaps = useCommunicationsCapabilities();
+  const canManageTemplates = commsCaps.canManageTemplates;
   const [draft, setDraft] = useState<TemplateDraft>(emptyDraft);
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(
     null,
@@ -100,7 +99,8 @@ export default function CommunicationTemplatesPage() {
         page,
         limit: PAGE_SIZE,
       }),
-    enabled: canManageTemplates,
+    enabled:
+      commsCaps.resolution === "granted" && canManageTemplates,
   });
 
   const selectedTemplate = useMemo(

@@ -10,12 +10,14 @@ import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { AdminDashboard } from "../../components/dashboard/admin-dashboard";
 import { PrincipalDashboard } from "../../components/dashboard/principal-dashboard";
-import { OperationalDashboardLayout } from "../../components/dashboard/operational-dashboard-layout";
+import { HrDashboard } from "../../components/dashboard/hr-dashboard";
+import { AccountantDashboard } from "../../components/dashboard/accountant-dashboard";
 import { TeacherTodayWorkspace } from "../../components/dashboard/teacher-today-workspace";
 import { useTeacherAccess } from "../../lib/teacher-access";
 import { useSchoolWebPersona } from "../../lib/school-web-persona";
 import {
   assertServerDashboardProjection,
+  isSupportedDashboardPersona,
   resolveDashboardCompositionPersona,
 } from "../../lib/dashboard-persona";
 import { ModuleHeader } from "../../components/ui/module-header";
@@ -26,6 +28,7 @@ import {
   resolveOperationalSummaryAction,
   SummaryStatusBadge,
 } from "../../components/ui/operational-summary";
+import { EmptyState } from "../../components/ui/empty-state";
 import { LoadingState } from "../../components/ui/loading-state";
 import { PermissionDenied } from "../../components/ui/permission-denied";
 import { usePermissionAccess } from "../../lib/permissions-ui";
@@ -40,18 +43,23 @@ export default function DashboardPage() {
   const schoolWebPersona = useSchoolWebPersona();
   const { resolution: permissionResolution } = usePermissionAccess();
   const expectedPersona = resolveDashboardCompositionPersona(schoolWebPersona);
+  const canFetchDashboard = isSupportedDashboardPersona(schoolWebPersona);
   const tenantId = session?.tenant.id;
 
   const dashboardQuery = useQuery({
     queryKey: ["operational-dashboard-summary", tenantId],
     queryFn: api.getDashboardSummary,
     staleTime: 30_000,
-    enabled: !isTeacherPersona && permissionResolution === "granted",
+    enabled:
+      canFetchDashboard &&
+      !isTeacherPersona &&
+      permissionResolution === "granted" &&
+      expectedPersona !== null,
   });
 
   const projectedDashboard = useMemo(
     () =>
-      dashboardQuery.data
+      dashboardQuery.data && expectedPersona
         ? assertServerDashboardProjection(dashboardQuery.data, expectedPersona)
         : null,
     [dashboardQuery.data, expectedPersona],
@@ -104,11 +112,26 @@ export default function DashboardPage() {
             description:
               "Daily operating snapshot for admissions, attendance, fees, and configuration readiness.",
           }
-        : {
-            eyebrow: "School operations",
-            title: "School Overview",
-            description: "Daily operating snapshot for your school.",
-          };
+        : compositionPersona === "hr"
+          ? {
+              eyebrow: "People operations",
+              title: "HR Dashboard",
+              description:
+                "Staff availability, payroll readiness, and people operations follow-up.",
+            }
+          : compositionPersona === "accountant"
+            ? {
+                eyebrow: "Finance operations",
+                title: "Finance Dashboard",
+                description:
+                  "Fees collections, accounting readiness, and payroll posting status.",
+              }
+            : {
+                eyebrow: "School workspace",
+                title: "Home",
+                description:
+                  "Use the sidebar to open your assigned modules. This account does not receive a school-wide dashboard summary.",
+              };
 
   if (isTeacherPersona) {
     return (
@@ -132,6 +155,22 @@ export default function DashboardPage() {
           description={headerCopy.description}
         />
         <LoadingState variant="page" label="Checking workspace access…" />
+      </div>
+    );
+  }
+
+  if (!canFetchDashboard || !expectedPersona) {
+    return (
+      <div className="space-y-6">
+        <ModuleHeader
+          eyebrow={headerCopy.eyebrow}
+          title={headerCopy.title}
+          description={headerCopy.description}
+        />
+        <EmptyState
+          title="Module workspace"
+          description="Your role uses focused module workspaces instead of a school-wide dashboard. Open a module from the sidebar to get started."
+        />
       </div>
     );
   }
@@ -193,12 +232,11 @@ export default function DashboardPage() {
           <AdminDashboard dashboard={projectedDashboard} />
         ) : compositionPersona === "principal" ? (
           <PrincipalDashboard dashboard={projectedDashboard} />
-        ) : (
-          <OperationalDashboardLayout
-            dashboard={projectedDashboard}
-            persona="general"
-          />
-        )
+        ) : compositionPersona === "hr" ? (
+          <HrDashboard dashboard={projectedDashboard} />
+        ) : compositionPersona === "accountant" ? (
+          <AccountantDashboard dashboard={projectedDashboard} />
+        ) : null
       ) : null}
     </div>
   );

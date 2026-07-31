@@ -45,7 +45,7 @@ type SummaryCardModel = {
 export function DashboardSummaryStrip({
   dashboard,
   moduleMap,
-  persona = "general",
+  persona = "admin",
 }: {
   dashboard: OperationalDashboardSummary;
   moduleMap: Map<OperationalSummaryModule, OperationalModuleSummary>;
@@ -109,8 +109,8 @@ function buildSummaryCards(
 ): SummaryCardModel[] {
   const cards: SummaryCardModel[] = [];
 
-  const includeFees = persona !== "principal";
-  const includeStaff = persona === "admin" || persona === "general";
+  const includeFees = persona === "admin" || persona === "accountant";
+  const includeStaff = persona === "admin" || persona === "hr";
 
   const attendance = visibleModule(moduleMap, "m2_attendance");
   if (attendance) {

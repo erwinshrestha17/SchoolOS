@@ -44,6 +44,7 @@ import { SectionCard } from "../../../components/ui/section-card";
 import { WorkSurface } from "../../../components/ui/work-surface";
 import { useUrlFilters } from "../../../lib/hooks/use-url-filters";
 import { useTeacherAssignmentScope } from "../../../lib/hooks/use-teacher-assignment-scope";
+import { useHomeworkCapabilities } from "../../../lib/permissions-ui";
 import { TablePagination } from "../../../components/ui/table-pagination";
 import { Drawer } from "../../../components/ui/drawer";
 import { Toast, type ToastTone } from "../../../components/ui/toast";
@@ -157,9 +158,15 @@ function HomeworkWorkspace() {
     page: 1,
   });
 
-  const grantedPermissions = new Set(session?.user.permissions ?? []);
-  const canCreateHomework = grantedPermissions.has("homework:create");
-  const canReviewHomework = grantedPermissions.has("homework:review");
+
+  // Class / section / subject options come from the shared assignment-scope
+  // resolver so a teacher is only ever offered their own (P0.4 / P1.6).
+  const assignmentScope = useTeacherAssignmentScope();
+  const homeworkCaps = useHomeworkCapabilities({
+    hasAssignmentScope: !assignmentScope.hasNoAssignments,
+  });
+  const canCreateHomework = homeworkCaps.canCreate;
+  const canReviewHomework = homeworkCaps.canReview;
 
   const summaryQuery = useQuery({
     queryKey: ["homework-summary-today"],
@@ -171,9 +178,6 @@ function HomeworkWorkspace() {
     queryKey: ["subjects", filters.classId],
     queryFn: () => api.listSubjects({ classId: filters.classId || undefined }),
   });
-  // Class / section / subject options come from the shared assignment-scope
-  // resolver so a teacher is only ever offered their own (P0.4 / P1.6).
-  const assignmentScope = useTeacherAssignmentScope();
   // The school-wide staff roster is only needed to populate the "All
   // Teachers" filter, which teachers no longer get -- so they no longer
   // request it either.

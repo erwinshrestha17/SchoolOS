@@ -16,7 +16,8 @@ import {
   type NavItem,
 } from './sidebar';
 import { useSchoolWebPersona } from '../../lib/school-web-persona';
-import { useTeacherAccess } from '../../lib/teacher-access';
+import { TeacherCapability, useTeacherAccess } from '../../lib/teacher-access';
+import { useSettingsCapabilities } from '../../lib/permissions-ui';
 
 const RECENT_KIND_ICON: Record<RecentlyViewedKind, LucideIcon> = {
   student: UserRound,
@@ -50,7 +51,9 @@ export function CommandPalette() {
   const { hasModule } = useEntitlements();
   const { entries: recentlyViewed } = useRecentlyViewed();
   const schoolWebPersona = useSchoolWebPersona();
-  const { isTeacherPersona, capabilities } = useTeacherAccess();
+  const { isTeacherPersona, capabilities, isRestricted } = useTeacherAccess();
+  const settingsCaps = useSettingsCapabilities();
+  const personalOnly = isRestricted(TeacherCapability.SCHOOL_SETTINGS_ADMIN);
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
@@ -62,12 +65,12 @@ export function CommandPalette() {
       capabilities,
     ).flatMap((group) => group.items);
 
-    if (shouldShowSettingsHub(schoolWebPersona, isTeacherPersona)) {
+    if (shouldShowSettingsHub(settingsCaps, isTeacherPersona, personalOnly)) {
       flattened.push(settingsNavItem);
     }
 
     return flattened.filter((item) => canDisplayNavItem(item, session, hasModule));
-  }, [session, hasModule, schoolWebPersona, capabilities, isTeacherPersona]);
+  }, [session, hasModule, schoolWebPersona, capabilities, isTeacherPersona, settingsCaps, personalOnly]);
 
   const results = useMemo(() => {
     const normalized = query.trim().toLowerCase();

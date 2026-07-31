@@ -3,6 +3,7 @@ import { GuardianCapability } from '@prisma/client';
 import {
   getNepalSchoolDay,
   dashboardModulesForComposition,
+  isSupportedDashboardPersona,
   projectDashboardForPersona,
   resolveDashboardCompositionPersonaFromAuth,
   resolveSchoolWebPersona,
@@ -165,12 +166,22 @@ export class OperationalSummaryService {
         'Teacher dashboard summaries use assigned-scope mobile and teaching workspaces.',
       );
     }
+    if (!isSupportedDashboardPersona(schoolWebPersona)) {
+      throw new ForbiddenException(
+        'This persona does not receive a school dashboard summary.',
+      );
+    }
 
     const compositionPersona =
       resolveDashboardCompositionPersonaFromAuth({
         roles: actor.roles,
         permissions: actor.permissions,
       });
+    if (!compositionPersona) {
+      throw new ForbiddenException(
+        'This persona does not receive a school dashboard summary.',
+      );
+    }
     const day = getNepalSchoolDay();
     const entitlements = await this.entitlementsService.getEntitlements(
       actor.tenantId,

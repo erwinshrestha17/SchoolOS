@@ -85,8 +85,9 @@ describe("M2 attendance workspace contract", () => {
 
     assert.match(
       form,
-      /disabled=\{isLocked \|\| isSubmitted \|\| awaitingServerReceipt\}/,
+      /disabled=\{rosterEditingDisabled\}/,
     );
+    assert.match(form, /rosterEditingDisabled[\s\S]*!isOverrideMode && \(isLocked \|\| isSubmitted\)/);
     assert.match(form, /Attendance Submitted/);
     assert.match(form, /Request a correction/);
     assert.match(form, /Not synced\. Draft saved locally/);

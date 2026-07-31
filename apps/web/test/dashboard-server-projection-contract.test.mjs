@@ -41,6 +41,9 @@ describe('Slice 3 dashboard persona core contract', () => {
     assert.match(persona, /export function dashboardModulesForComposition/);
     assert.match(persona, /ADMIN_DASHBOARD_MODULES/);
     assert.match(persona, /PRINCIPAL_DASHBOARD_MODULES/);
+    assert.match(persona, /HR_DASHBOARD_MODULES/);
+    assert.match(persona, /ACCOUNTANT_DASHBOARD_MODULES/);
+    assert.match(persona, /isSupportedDashboardPersona/);
     assert.match(persona, /export function assertServerDashboardProjection/);
   });
 });

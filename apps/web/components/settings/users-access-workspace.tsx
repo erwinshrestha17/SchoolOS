@@ -14,7 +14,7 @@ import { Button } from '../ui/button';
 import { ConfirmDialog } from '../ui/confirm-dialog';
 import { ErrorState } from '../ui/error-state';
 import { api, type SchoolUserStatus } from '../../lib/api';
-import { useSession } from '../session-provider';
+import { useSettingsCapabilities } from '../../lib/permissions-ui';
 import {
   SchoolSettingsPageHeader,
   SettingsPermissionNotice,
@@ -29,12 +29,11 @@ type CreateUserDraft = {
 
 export function UsersAccessWorkspace() {
   const client = useQueryClient();
-  const { session } = useSession();
-  const permissions = session?.user.permissions ?? [];
+  const settingsCaps = useSettingsCapabilities();
   const canCreate =
-    permissions.includes('users:create') && permissions.includes('roles:read');
-  const canUpdateStatus = permissions.includes('users:update_status');
-  const canResetPassword = permissions.includes('users:reset_password');
+    settingsCaps.canCreateUsers && settingsCaps.canReadRoles;
+  const canUpdateStatus = settingsCaps.canUpdateUserStatus;
+  const canResetPassword = settingsCaps.canResetPassword;
   const canManageAny = canCreate || canUpdateStatus || canResetPassword;
   const [draft, setDraft] = useState<CreateUserDraft>({
     email: '',

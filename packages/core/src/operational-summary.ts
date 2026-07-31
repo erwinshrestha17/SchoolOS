@@ -80,7 +80,11 @@ export interface OperationalModuleSummary {
   nextCursor: null;
 }
 
-export type DashboardCompositionPersona = 'admin' | 'principal' | 'general';
+export type DashboardCompositionPersona =
+  | 'admin'
+  | 'principal'
+  | 'hr'
+  | 'accountant';
 
 export interface OperationalDashboardSummary {
   generatedAt: string;

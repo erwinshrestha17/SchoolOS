@@ -30,7 +30,7 @@ import {
  */
 export function TodayOperationsPanel({
   moduleMap,
-  persona = "general",
+  persona = "admin",
 }: {
   moduleMap: Map<OperationalSummaryModule, OperationalModuleSummary>;
   persona?: DashboardCompositionPersona;
@@ -49,11 +49,21 @@ export function TodayOperationsPanel({
   );
 
   const title =
-    persona === "principal" ? "Operations oversight" : "Today’s operations";
+    persona === "principal"
+      ? "Operations oversight"
+      : persona === "hr"
+        ? "People operations"
+        : persona === "accountant"
+          ? "Finance operations"
+          : "Today’s operations";
   const description =
     persona === "principal"
       ? "School-wide exceptions that may need your decision."
-      : "Where each daily workflow stands right now.";
+      : persona === "hr"
+        ? "Staff, payroll, and attendance exceptions for HR follow-up."
+        : persona === "accountant"
+          ? "Fees, accounting, and payroll posting readiness."
+          : "Where each daily workflow stands right now.";
 
   return (
     <SectionCard title={title} description={description} noPadding>

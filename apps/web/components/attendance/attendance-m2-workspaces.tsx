@@ -55,6 +55,7 @@ import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { SummaryCard, SummaryGrid } from "@/components/ui/summary-card";
 import { LoadingState } from "@/components/ui/loading-state";
 import { LockedRecordBanner } from "@/components/ui/locked-record-banner";
+import { PermissionDenied } from "@/components/ui/permission-denied";
 import { ModuleHeader } from "@/components/ui/module-header";
 import {
   SchoolSettingsPageHeader,
@@ -902,6 +903,14 @@ export function AttendanceCorrectionsQueueWorkspace() {
 
 export function AttendanceCorrectionDetailWorkspace({ id }: { id: string }) {
   const queryClient = useQueryClient();
+  const { canReviewConflicts, resolution } = useAttendanceCapabilities();
+  const permissionsLoading = resolution === "loading";
+  const policyQuery = useQuery({
+    queryKey: ["attendance-m2-policy"],
+    queryFn: api.getM2Policy,
+  });
+  const reviewMinReasonLength =
+    policyQuery.data?.policy.correctionReviewMinReasonLength ?? 8;
   const [reason, setReason] = useState("");
   const correctionQuery = useQuery({
     queryKey: ["attendance-correction", id],
@@ -928,6 +937,13 @@ export function AttendanceCorrectionDetailWorkspace({ id }: { id: string }) {
       }),
   });
   const correction = correctionQuery.data;
+  const canDecide =
+    canReviewConflicts &&
+    correction?.status === "PENDING" &&
+    !permissionsLoading;
+  const lockStateRequiresEscalation =
+    correction?.lockState === "OVERRIDE_REQUIRED" ||
+    correction?.lockState === "EXPIRED";
 
   return (
     <DashboardPageShell>
@@ -935,23 +951,31 @@ export function AttendanceCorrectionDetailWorkspace({ id }: { id: string }) {
         title="Correction Review"
         description="Review a single attendance correction request with before/after comparison and audit-safe metadata."
         primaryAction={
-          <div className="flex flex-wrap gap-2">
-            <Button
-              onClick={() => approveMutation.mutate()}
-              disabled={reason.trim().length < 8 || approveMutation.isPending}
-            >
-              <CheckCircle2 className="h-4 w-4" />
-              {approveMutation.isPending ? "Approving..." : "Approve"}
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => rejectMutation.mutate()}
-              disabled={reason.trim().length < 8 || rejectMutation.isPending}
-            >
-              <XCircle className="h-4 w-4" />
-              {rejectMutation.isPending ? "Rejecting..." : "Reject"}
-            </Button>
-          </div>
+          canDecide ? (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => approveMutation.mutate()}
+                disabled={
+                  reason.trim().length < reviewMinReasonLength ||
+                  approveMutation.isPending
+                }
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                {approveMutation.isPending ? "Approving..." : "Approve"}
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => rejectMutation.mutate()}
+                disabled={
+                  reason.trim().length < reviewMinReasonLength ||
+                  rejectMutation.isPending
+                }
+              >
+                <XCircle className="h-4 w-4" />
+                {rejectMutation.isPending ? "Rejecting..." : "Reject"}
+              </Button>
+            </div>
+          ) : undefined
         }
       />
       {correctionQuery.isLoading ? (
@@ -963,6 +987,12 @@ export function AttendanceCorrectionDetailWorkspace({ id }: { id: string }) {
         />
       ) : correction ? (
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+          {!permissionsLoading && !canReviewConflicts ? (
+            <PermissionDenied
+              title="Correction review unavailable"
+              description="You can inspect this request, but approving or rejecting corrections requires attendance conflict review authority."
+            />
+          ) : null}
           <div className="space-y-6">
             <SectionCard
               title={correctionStudentName(correction)}
@@ -980,6 +1010,16 @@ export function AttendanceCorrectionDetailWorkspace({ id }: { id: string }) {
                 />
                 <InfoBlock label="Lock state" value={correction.lockState} />
               </div>
+              {lockStateRequiresEscalation ? (
+                <div className="mt-4">
+                  <Notice tone="warning">
+                    This correction is outside the normal review window.
+                    Approval still applies the requested change under audited
+                    policy, but locked-session overrides may require separate
+                    authority.
+                  </Notice>
+                </div>
+              ) : null}
             </SectionCard>
             <SectionCard title="Attendance Record Comparison">
               <div className="grid gap-4 md:grid-cols-[1fr_auto_1fr] md:items-center">
@@ -1022,10 +1062,20 @@ export function AttendanceCorrectionDetailWorkspace({ id }: { id: string }) {
                 value={reason}
                 onChange={(event) => setReason(event.target.value)}
                 placeholder="Required audit reason..."
+                disabled={!canDecide}
               />
               <p className="mt-2 text-xs font-semibold text-slate-500">
-                Minimum reason length: 8 characters from tenant policy defaults.
+                Minimum reason length: {reviewMinReasonLength} characters from
+                tenant policy.
               </p>
+              {correction.status === "APPROVED" ? (
+                <div className="mt-4">
+                  <Notice tone="success">
+                    Approved corrections update the official record and the day
+                    remains locked under school policy.
+                  </Notice>
+                </div>
+              ) : null}
             </SectionCard>
             <SectionCard title="Approval History">
               <SummaryRows

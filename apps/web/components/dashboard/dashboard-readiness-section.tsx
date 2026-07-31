@@ -180,7 +180,7 @@ const READINESS_PANELS: ReadinessPanelDefinition[] = [
 
 export function SchoolReadinessSection({
   moduleMap,
-  persona = "general",
+  persona = "admin",
 }: {
   moduleMap: Map<OperationalSummaryModule, OperationalModuleSummary>;
   persona?: DashboardCompositionPersona;

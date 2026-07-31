@@ -6,6 +6,7 @@ import { ExternalLink, FileClock, ShieldCheck } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { api } from '../../lib/api';
 import { useSession } from '../session-provider';
+import { useSettingsCapabilities } from '../../lib/permissions-ui';
 import { ErrorState } from '../ui/error-state';
 import {
   SettingsPageHeader,
@@ -14,12 +15,13 @@ import {
 
 export function ActivityConsentSettingsWorkspace() {
   const { session } = useSession();
-  const permissions = session?.user.permissions ?? [];
-  const canReviewStoredPreference = permissions.includes('settings:read');
+  const settingsCaps = useSettingsCapabilities();
+  const canReviewStoredPreference = settingsCaps.canReadSettings;
   const storedSettingsQuery = useQuery({
     queryKey: ['school-settings', 'all'],
     queryFn: api.getTenantSettings,
-    enabled: canReviewStoredPreference,
+    enabled:
+      settingsCaps.resolution === 'granted' && canReviewStoredPreference,
   });
 
   const storedSetting = storedSettingsQuery.data?.find(
@@ -60,14 +62,8 @@ export function ActivityConsentSettingsWorkspace() {
                 'A legacy school preference is stored, but it does not override current publishing protection.',
               subdued: true,
             };
-  const canOpenActivity = permissions.some(
-    (permission) =>
-      permission === 'activity_feed:read' ||
-      permission === 'activity_feed:create',
-  );
-  const canOpenHistory =
-    permissions.includes('settings:audit:read') ||
-    permissions.includes('settings:manage');
+  const canOpenActivity = settingsCaps.canOpenActivity;
+  const canOpenHistory = settingsCaps.canOpenHistory;
   const schoolName = session?.tenant.name ?? 'Current school';
 
   return (

@@ -12,6 +12,7 @@ import {
 import { api } from "@/lib/api";
 import { useSession } from "@/components/session-provider";
 import { useEntitlements } from "@/components/entitlements-provider";
+import { useSettingsCapabilities } from "@/lib/permissions-ui";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingState } from "@/components/ui/loading-state";
 import { SectionCard } from "@/components/ui/section-card";
@@ -23,6 +24,7 @@ import {
 export function PersonalProfileWorkspace() {
   const { session, status } = useSession();
   const { hasModule } = useEntitlements();
+  const settingsCaps = useSettingsCapabilities();
   const profileQuery = useQuery({
     queryKey: ["auth", "profile"],
     queryFn: api.getProfile,
@@ -50,7 +52,7 @@ export function PersonalProfileWorkspace() {
   const canOpenMyWorkspace = Boolean(
     profile?.staff &&
     hasModule("hr") &&
-    session.user.permissions.includes("staff:read"),
+    settingsCaps.canViewStaffSelf,
   );
   const fullName = profile?.staff
     ? [profile.staff.firstName, profile.staff.lastName]

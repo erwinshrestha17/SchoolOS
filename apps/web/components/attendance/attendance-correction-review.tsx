@@ -11,7 +11,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { LoadingState } from '@/components/ui/loading-state';
+import { PermissionDenied } from '@/components/ui/permission-denied';
 import { SectionCard } from '@/components/ui/section-card';
+import { useAttendanceCapabilities } from '@/lib/permissions-ui';
 
 interface AttendanceCorrectionReviewProps {
   corrections: AttendanceCorrectionRequest[];
@@ -30,6 +32,8 @@ export function AttendanceCorrectionReview({
   detailHref,
 }: AttendanceCorrectionReviewProps) {
   const queryClient = useQueryClient();
+  const { canReviewConflicts, resolution } = useAttendanceCapabilities();
+  const permissionsLoading = resolution === "loading";
   const [reviewReasons, setReviewReasons] = useState<Record<string, string>>(
     {},
   );
@@ -100,7 +104,14 @@ export function AttendanceCorrectionReview({
         </Badge>
       }
     >
-      {isLoading ? (
+      {permissionsLoading ? (
+        <LoadingState label="Checking review permissions..." />
+      ) : !canReviewConflicts ? (
+        <PermissionDenied
+          title="Correction review unavailable"
+          description="You can view pending correction requests, but approving or rejecting them requires attendance conflict review authority."
+        />
+      ) : isLoading ? (
         <LoadingState label="Loading correction requests..." />
       ) : corrections.length === 0 ? (
         <EmptyState

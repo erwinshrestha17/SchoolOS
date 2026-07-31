@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useState } from "react";
-import { useSession } from "../../../../components/session-provider";
 import { Button } from "../../../../components/ui/button";
 import {
   Dialog,
@@ -35,6 +34,7 @@ import { LoadingState } from "../../../../components/ui/loading-state";
 import { Select } from "../../../../components/ui/select";
 import { StatusBadge } from "../../../../components/ui/status-badge";
 import { TablePagination } from "../../../../components/ui/table-pagination";
+import { usePayrollCapabilities } from "../../../../lib/permissions-ui";
 import { api } from "../../../../lib/api";
 
 const PAGE_SIZE = 25;
@@ -50,7 +50,7 @@ const severityTone: Record<
 
 export default function PayrollReadinessPage() {
   const queryClient = useQueryClient();
-  const { session } = useSession();
+  const payrollCaps = usePayrollCapabilities();
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1);
@@ -74,9 +74,11 @@ export default function PayrollReadinessPage() {
   const query = useQuery({
     queryKey: ["payroll-exceptions", params],
     queryFn: () => api.listPayrollExceptions(params),
+    enabled:
+      payrollCaps.resolution === "granted" &&
+      (payrollCaps.canReview || payrollCaps.canView),
   });
-  const canReview =
-    session?.user.permissions.includes("payroll:run:review") ?? false;
+  const canReview = payrollCaps.canReview;
   const recheckMutation = useMutation({
     mutationFn: () => api.recheckPayrollReadiness({ year, month }),
     onSuccess: async () => {

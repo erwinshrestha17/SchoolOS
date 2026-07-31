@@ -273,6 +273,17 @@ export const attendanceApi = {
         json: body,
       },
     ),
+  overrideLockedAttendanceSession: (
+    sessionId: string,
+    body: JsonBody,
+  ) =>
+    request<AttendanceSessionOverrideResult>(
+      `/attendance/sessions/${encodeURIComponent(sessionId)}/override`,
+      {
+        method: "PATCH",
+        json: body,
+      },
+    ),
   approveAttendanceCorrection: (id: string, body: JsonBody) =>
     request<AttendanceCorrectionRequest>(
       `/attendance/corrections/${encodeURIComponent(id)}/approve`,
@@ -515,6 +526,22 @@ export type AttendanceDraftSummary = {
   expiresAt: string | null;
   class?: { id: string; name: string } | null;
   section?: { id: string; name: string } | null;
+};
+
+export type AttendanceSessionOverrideResult = {
+  sessionId: string;
+  attendanceDate: string;
+  className: string;
+  sectionName: string | null;
+  conflictStatus: string;
+  affectedSyncSubmissionCount: number;
+  totals: {
+    totalStudents: number;
+    present: number;
+    absent: number;
+    late: number;
+    leave: number;
+  };
 };
 
 export type AttendanceCorrectionDetail = AttendanceCorrectionRequest & {

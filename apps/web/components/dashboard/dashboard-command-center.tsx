@@ -5,9 +5,8 @@ import { OperationalDashboardLayout } from "./operational-dashboard-layout";
 import { projectDashboardForPersona } from "@/lib/dashboard-persona";
 
 /**
- * @deprecated Prefer AdminDashboard, PrincipalDashboard, or
- * OperationalDashboardLayout with an explicit persona. Kept for compatibility
- * with tests and any legacy imports.
+ * @deprecated Prefer AdminDashboard, PrincipalDashboard, HrDashboard,
+ * AccountantDashboard, or OperationalDashboardLayout with an explicit persona.
  */
 export function DashboardCommandCenter({
   dashboard,
@@ -16,8 +15,8 @@ export function DashboardCommandCenter({
 }) {
   return (
     <OperationalDashboardLayout
-      dashboard={projectDashboardForPersona(dashboard, "general")}
-      persona="general"
+      dashboard={projectDashboardForPersona(dashboard, "admin")}
+      persona="admin"
     />
   );
 }

@@ -19,6 +19,8 @@ import {
 } from "@/lib/session";
 import { useSession } from "@/components/session-provider";
 import { useTeacherAccess } from "@/lib/teacher-access";
+import { useAttendanceCapabilities } from "@/lib/permissions-ui";
+import { LockedRecordBanner } from "@/components/ui/locked-record-banner";
 import { formatSchoolDate } from "@/lib/date-utils";
 import {
   canRestoreEditableAttendanceDraftAfterSyncError,
@@ -111,6 +113,14 @@ export function AttendanceForm() {
   >(null);
   const [hasDraftChanges, setHasDraftChanges] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isOverrideConfirmOpen, setIsOverrideConfirmOpen] = useState(false);
+  const [overrideReason, setOverrideReason] = useState("");
+  const [baselineExceptions, setBaselineExceptions] = useState<
+    Record<string, AttendanceStatus>
+  >({});
+  const [baselineRemarks, setBaselineRemarks] = useState<Record<string, string>>(
+    {},
+  );
   const [isReceiptSyncPending, setIsReceiptSyncPending] = useState(false);
   const receiptSyncInFlightRef = useRef(false);
 
@@ -130,6 +140,13 @@ export function AttendanceForm() {
     queryFn: api.listSections,
   });
   const { isTeacherPersona } = useTeacherAccess();
+  const { canOverrideLock } = useAttendanceCapabilities();
+  const policyQuery = useQuery({
+    queryKey: ["attendance-m2-policy"],
+    queryFn: api.getM2Policy,
+  });
+  const lockOverrideMinReasonLength =
+    policyQuery.data?.policy.lockOverrideMinReasonLength ?? 8;
   const assignedSections = useMemo(
     () =>
       (sectionsQuery.data ?? []).filter(
@@ -331,6 +348,9 @@ export function AttendanceForm() {
       });
       setExceptions(nextExceptions);
       setRemarks(nextRemarks);
+      setBaselineExceptions(nextExceptions);
+      setBaselineRemarks(nextRemarks);
+      setOverrideReason("");
       setHasDraftChanges(false);
       setSubmitMessage("");
       setConflictMessage("");
@@ -461,6 +481,36 @@ export function AttendanceForm() {
     },
   });
 
+  const overrideMutation = useMutation({
+    mutationFn: ({
+      sessionId,
+      exceptions: overrideExceptions,
+      reason,
+    }: {
+      sessionId: string;
+      exceptions: Array<{
+        studentId: string;
+        status: AttendanceStatus;
+        remark: string | null;
+      }>;
+      reason: string;
+    }) =>
+      api.overrideLockedAttendanceSession(sessionId, {
+        exceptions: overrideExceptions,
+        reason,
+        source: "manual_override",
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["attendance-roster"] });
+      void queryClient.invalidateQueries({ queryKey: ["attendance-analytics"] });
+      setOverrideReason("");
+      setSubmitMessage(
+        `Locked attendance updated at ${formatNepalTime(new Date())}. Records remain locked under school policy.`,
+      );
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    },
+  });
+
   const saveDraftMutation = useMutation({
     mutationFn: api.saveAttendanceDraft,
     onSuccess: () => {
@@ -554,8 +604,37 @@ export function AttendanceForm() {
   const className =
     availableClasses.find((item) => item.id === classId)?.name ?? "this class";
   const attendanceState = rosterQuery.data?.attendanceState;
+  const existingSessionId = rosterQuery.data?.existingSession?.id ?? null;
   const isLocked = attendanceState?.isLocked ?? false;
   const isSubmitted = attendanceState?.isSubmitted ?? false;
+  const isOverrideMode =
+    canOverrideLock &&
+    Boolean(existingSessionId) &&
+    (isLocked || isSubmitted) &&
+    !hasPendingLocalDraft;
+  const awaitingServerReceipt = draftSyncState === "server_check";
+  const overrideChanges = useMemo(
+    () =>
+      isOverrideMode
+        ? computeOverrideChanges(
+            roster,
+            exceptions,
+            remarks,
+            baselineExceptions,
+            baselineRemarks,
+          )
+        : [],
+    [
+      baselineExceptions,
+      baselineRemarks,
+      exceptions,
+      isOverrideMode,
+      remarks,
+      roster,
+    ],
+  );
+  const rosterEditingDisabled =
+    (!isOverrideMode && (isLocked || isSubmitted)) || awaitingServerReceipt;
   const hasConflict = Boolean(
     attendanceState?.conflictStatus &&
     attendanceState.conflictStatus !== "NONE",
@@ -575,8 +654,6 @@ export function AttendanceForm() {
       : submissionStatus === "NOT_MARKED"
         ? "inactive"
         : undefined;
-
-  const awaitingServerReceipt = draftSyncState === "server_check";
 
   const beginDraftEdit = () => {
     if (draftSyncState === "rejected") {
@@ -1116,7 +1193,29 @@ export function AttendanceForm() {
               />
             </div>
 
-            {isLocked || isSubmitted ? (
+            {isOverrideMode ? (
+              <div className="space-y-4">
+                <LockedRecordBanner
+                  label="Locked session — override authority"
+                  reason="You can apply audited changes to this locked day. Records stay locked after override; teachers should use the correction queue when they cannot override."
+                />
+                <label className="block text-xs font-black uppercase tracking-wide text-slate-500">
+                  Override reason
+                </label>
+                <textarea
+                  className="min-h-24 w-full rounded-xl border border-slate-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-attendance-border)]"
+                  value={overrideReason}
+                  onChange={(event) => setOverrideReason(event.target.value)}
+                  placeholder="Required audit reason for this locked-session change..."
+                />
+                <p className="text-xs font-semibold text-slate-500">
+                  Minimum {lockOverrideMinReasonLength} characters.{" "}
+                  {overrideChanges.length > 0
+                    ? `${overrideChanges.length} student change${overrideChanges.length === 1 ? "" : "s"} pending.`
+                    : "Adjust roster entries below to apply an override."}
+                </p>
+              </div>
+            ) : isLocked || isSubmitted ? (
               <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-bold text-slate-700">
                 <AlertCircle size={20} className="shrink-0 text-slate-500" />
                 <span>
@@ -1145,7 +1244,7 @@ export function AttendanceForm() {
                   student={student}
                   status={exceptions[student.id] ?? "PRESENT"}
                   remark={remarks[student.id] ?? ""}
-                  disabled={isLocked || isSubmitted || awaitingServerReceipt}
+                  disabled={rosterEditingDisabled}
                   onStatusChange={(status) => {
                     beginDraftEdit();
                     setExceptions((current) => {
@@ -1208,35 +1307,44 @@ export function AttendanceForm() {
           <button
             type="button"
             onClick={() => {
+              if (isOverrideMode) {
+                setIsOverrideConfirmOpen(true);
+                return;
+              }
               setAllPresentAcknowledged(false);
               setIsConfirmOpen(true);
             }}
             disabled={
               mutation.isPending ||
+              overrideMutation.isPending ||
               roster.length === 0 ||
               futureDateBlocked ||
-              isLocked ||
-              isSubmitted ||
+              (isOverrideMode
+                ? overrideChanges.length === 0 ||
+                  overrideReason.trim().length < lockOverrideMinReasonLength
+                : isLocked || isSubmitted) ||
               awaitingServerReceipt ||
               draftSyncState === "rejected"
             }
             className="flex items-center gap-3 rounded-xl bg-[var(--color-mod-attendance-accent)] px-10 py-4 text-sm font-black text-white shadow-lg shadow-[var(--color-mod-attendance-border)]/40 transition-all hover:scale-105 hover:bg-[var(--color-mod-attendance-text)] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
           >
-            {mutation.isPending ? (
+            {mutation.isPending || overrideMutation.isPending ? (
               <Loader2 size={20} className="animate-spin" />
             ) : (
               <Save size={20} />
             )}
-            {isLocked
-              ? "Day Locked"
-              : isSubmitted
-                ? "Attendance Submitted"
-                : "Submit Attendance"}
+            {isOverrideMode
+              ? "Apply Override"
+              : isLocked
+                ? "Day Locked"
+                : isSubmitted
+                  ? "Attendance Submitted"
+                  : "Submit Attendance"}
           </button>
         </div>
       )}
 
-      {mutation.isError && (
+      {mutation.isError && !isOverrideMode ? (
         <div className="animate-fade-in flex items-center gap-4 rounded-xl border border-danger-100 bg-danger-50 p-6 text-sm font-bold text-danger-800 shadow-lg">
           <AlertCircle size={24} className="text-danger-500" />
           <div className="flex flex-col">
@@ -1247,7 +1355,20 @@ export function AttendanceForm() {
             and attendance status, then try again.
           </div>
         </div>
-      )}
+      ) : null}
+
+      {overrideMutation.isError ? (
+        <div className="animate-fade-in flex items-center gap-4 rounded-xl border border-danger-100 bg-danger-50 p-6 text-sm font-bold text-danger-800 shadow-lg">
+          <AlertCircle size={24} className="text-danger-500" />
+          <div className="flex flex-col">
+            <span className="text-[0.65rem] uppercase tracking-widest text-danger-600 mb-1">
+              Override Error
+            </span>
+            Locked attendance could not be overridden. Check your reason length,
+            changed students, and permissions, then try again.
+          </div>
+        </div>
+      ) : null}
 
       <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-6 shadow-sm">
         <div className="flex items-center gap-4 text-slate-600">
@@ -1304,8 +1425,9 @@ export function AttendanceForm() {
               Attendance Policy
             </p>
             <p className="text-[0.65rem] mt-0.5">
-              Final submission locks records for the day. Corrections require
-              administrative approval.
+              {isOverrideMode
+                ? "Overrides are audited and records remain locked after save."
+                : "Final submission locks records for the day. Corrections require administrative approval."}
             </p>
           </div>
         </div>
@@ -1388,8 +1510,61 @@ export function AttendanceForm() {
           </label>
         ) : null}
       </ConfirmDialog>
+
+      <ConfirmDialog
+        isOpen={isOverrideConfirmOpen}
+        title="Apply locked-session override?"
+        description={`Apply ${overrideChanges.length} audited change${overrideChanges.length === 1 ? "" : "s"} to locked attendance for ${formatSchoolDate(attendanceDate)}. Records remain locked under school policy after this override.`}
+        confirmLabel={
+          overrideMutation.isPending ? "Applying..." : "Apply & re-lock"
+        }
+        cancelLabel="Review changes"
+        variant="warning"
+        isConfirming={overrideMutation.isPending}
+        onConfirm={() => {
+          if (!existingSessionId) return;
+          overrideMutation.mutate({
+            sessionId: existingSessionId,
+            exceptions: overrideChanges,
+            reason: overrideReason.trim(),
+          });
+          setIsOverrideConfirmOpen(false);
+        }}
+        onClose={() => setIsOverrideConfirmOpen(false)}
+      />
     </div>
   );
+}
+
+function computeOverrideChanges(
+  roster: Array<{ id: string }>,
+  exceptions: Record<string, AttendanceStatus>,
+  remarks: Record<string, string>,
+  baselineExceptions: Record<string, AttendanceStatus>,
+  baselineRemarks: Record<string, string>,
+) {
+  const changes: Array<{
+    studentId: string;
+    status: AttendanceStatus;
+    remark: string | null;
+  }> = [];
+
+  for (const student of roster) {
+    const currentStatus = exceptions[student.id] ?? "PRESENT";
+    const baselineStatus = baselineExceptions[student.id] ?? "PRESENT";
+    const currentRemark = remarks[student.id]?.trim() || null;
+    const baselineRemark = baselineRemarks[student.id]?.trim() || null;
+
+    if (currentStatus !== baselineStatus || currentRemark !== baselineRemark) {
+      changes.push({
+        studentId: student.id,
+        status: currentStatus,
+        remark: currentRemark,
+      });
+    }
+  }
+
+  return changes;
 }
 
 function SummaryStat({

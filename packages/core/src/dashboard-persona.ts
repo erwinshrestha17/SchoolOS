@@ -28,34 +28,46 @@ export const PRINCIPAL_DASHBOARD_MODULES: OperationalSummaryModule[] = [
   "m7_hr_payroll",
 ];
 
-const ALL_DASHBOARD_MODULES: OperationalSummaryModule[] = [
-  "m1_students",
-  "m2_attendance",
-  "m3_fees",
-  "m4_academics",
-  "m5_activity",
-  "m6_homework_timetable",
+export const HR_DASHBOARD_MODULES: OperationalSummaryModule[] = [
   "m7_hr_payroll",
-  "m8a_library",
-  "m8b_transport",
-  "m8c_canteen",
-  "m9_accounting",
   "m10_communications",
-  "m12_learning",
+  "m2_attendance",
 ];
+
+export const ACCOUNTANT_DASHBOARD_MODULES: OperationalSummaryModule[] = [
+  "m3_fees",
+  "m9_accounting",
+  "m7_hr_payroll",
+  "m10_communications",
+];
+
+const SUPPORTED_SCHOOL_WEB_PERSONAS = new Set<SchoolWebPersona>([
+  "admin",
+  "principal",
+  "hr",
+  "accountant",
+]);
+
+export function isSupportedDashboardPersona(
+  schoolWebPersona: SchoolWebPersona,
+): boolean {
+  return SUPPORTED_SCHOOL_WEB_PERSONAS.has(schoolWebPersona);
+}
 
 export function resolveDashboardCompositionPersona(
   schoolWebPersona: SchoolWebPersona,
-): DashboardCompositionPersona {
+): DashboardCompositionPersona | null {
   if (schoolWebPersona === "principal") return "principal";
   if (schoolWebPersona === "admin") return "admin";
-  return "general";
+  if (schoolWebPersona === "hr") return "hr";
+  if (schoolWebPersona === "accountant") return "accountant";
+  return null;
 }
 
 export function resolveDashboardCompositionPersonaFromAuth(input: {
   roles: readonly string[];
   permissions: readonly string[];
-}): DashboardCompositionPersona {
+}): DashboardCompositionPersona | null {
   const schoolWebPersona = resolveSchoolWebPersona(input);
   return resolveDashboardCompositionPersona(schoolWebPersona);
 }
@@ -65,8 +77,9 @@ export function dashboardModulesForComposition(
   persona: DashboardCompositionPersona,
 ): OperationalSummaryModule[] {
   if (persona === "principal") return PRINCIPAL_DASHBOARD_MODULES;
-  if (persona === "admin") return ADMIN_DASHBOARD_MODULES;
-  return ALL_DASHBOARD_MODULES;
+  if (persona === "hr") return HR_DASHBOARD_MODULES;
+  if (persona === "accountant") return ACCOUNTANT_DASHBOARD_MODULES;
+  return ADMIN_DASHBOARD_MODULES;
 }
 
 function attentionKindFromKey(
@@ -91,7 +104,7 @@ export function filterAttentionItemsForPersona(
   items: Array<OperationalAttentionItem & { module: OperationalSummaryModule }>,
   persona: DashboardCompositionPersona,
 ) {
-  if (persona === "admin" || persona === "general") {
+  if (persona === "admin" || persona === "hr" || persona === "accountant") {
     return items;
   }
 
@@ -114,17 +127,7 @@ export function filterModulesForPersona(
   modules: OperationalModuleSummary[],
   persona: DashboardCompositionPersona,
 ): OperationalModuleSummary[] {
-  const allowed =
-    persona === "principal"
-      ? new Set(PRINCIPAL_DASHBOARD_MODULES)
-      : persona === "admin"
-        ? new Set(ADMIN_DASHBOARD_MODULES)
-        : null;
-
-  if (!allowed) {
-    return modules;
-  }
-
+  const allowed = new Set(dashboardModulesForComposition(persona));
   return modules.filter((module) => allowed.has(module.module));
 }
 
@@ -176,6 +179,8 @@ export function operationsModulesForPersona(
   persona: DashboardCompositionPersona,
 ): OperationalSummaryModule[] {
   if (persona === "principal") return PRINCIPAL_DASHBOARD_MODULES;
+  if (persona === "hr") return HR_DASHBOARD_MODULES;
+  if (persona === "accountant") return ACCOUNTANT_DASHBOARD_MODULES;
   return ADMIN_DASHBOARD_MODULES;
 }
 
@@ -191,6 +196,13 @@ export const PRINCIPAL_READINESS_PANEL_KEYS = [
   "people-operations",
 ] as const;
 
+export const HR_READINESS_PANEL_KEYS = ["people-operations"] as const;
+
+export const ACCOUNTANT_READINESS_PANEL_KEYS = [
+  "finance",
+  "people-operations",
+] as const;
+
 export function shouldShowReadinessPanel(
   panelKey: string,
   persona: DashboardCompositionPersona,
@@ -198,7 +210,11 @@ export function shouldShowReadinessPanel(
   const keys =
     persona === "principal"
       ? PRINCIPAL_READINESS_PANEL_KEYS
-      : ADMIN_READINESS_PANEL_KEYS;
+      : persona === "hr"
+        ? HR_READINESS_PANEL_KEYS
+        : persona === "accountant"
+          ? ACCOUNTANT_READINESS_PANEL_KEYS
+          : ADMIN_READINESS_PANEL_KEYS;
   return (keys as readonly string[]).includes(panelKey);
 }
 

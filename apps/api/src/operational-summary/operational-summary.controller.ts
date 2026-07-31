@@ -7,6 +7,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  ApiForbiddenResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
@@ -27,6 +28,7 @@ import {
   type OperationalSummaryModule,
 } from './operational-summary.types';
 import { OperationalSummaryService } from './operational-summary.service';
+import { OperationalDashboardSummaryResponseDto } from './dto/operational-dashboard-summary.dto';
 
 const MODULE_ROUTE_ALIASES: Record<string, OperationalSummaryModule> = {
   students: 'm1_students',
@@ -58,6 +60,7 @@ const MODULE_ROUTE_ALIASES: Record<string, OperationalSummaryModule> = {
   'teacher',
   'subject_teacher',
   'hr',
+  'hr_manager',
   'librarian',
   'transport_manager',
   'canteen_staff',
@@ -72,6 +75,11 @@ export class OperationalDashboardSummaryController {
   @ApiOkResponse({
     description:
       'A bounded, permission-filtered dashboard summary. Module failures are returned as partial module states.',
+    type: OperationalDashboardSummaryResponseDto,
+  })
+  @ApiForbiddenResponse({
+    description:
+      'Teacher and unsupported operational personas do not receive a school dashboard summary.',
   })
   getDashboardSummary(@CurrentAuth() auth: AuthContext) {
     return this.service.getDashboardSummary(auth);

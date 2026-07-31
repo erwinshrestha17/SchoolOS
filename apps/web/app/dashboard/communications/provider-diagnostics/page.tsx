@@ -11,7 +11,7 @@ import {
   Settings,
 } from 'lucide-react';
 import { DashboardPageShell } from '@/components/dashboard/dashboard-page-shell';
-import { useSession } from '@/components/session-provider';
+import { useCommunicationsCapabilities } from '@/lib/permissions-ui';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { KpiCard, KpiGrid } from '@/components/ui/kpi-card';
@@ -24,14 +24,14 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { communicationsApi } from '@/lib/api/communications';
 
 export default function ProviderDiagnosticsPage() {
-  const { session } = useSession();
-  const permissions = new Set(session?.user.permissions ?? []);
-  const canReadDeliveries = permissions.has('communications:read_deliveries');
+  const commsCaps = useCommunicationsCapabilities();
+  const canReadDeliveries = commsCaps.canViewDiagnostics;
 
   const diagnosticsQuery = useQuery({
     queryKey: ['communications', 'provider-diagnostics'],
     queryFn: communicationsApi.getCommunicationsProviderDiagnostics,
-    enabled: canReadDeliveries,
+    enabled:
+      commsCaps.resolution === 'granted' && canReadDeliveries,
   });
   const diagnostics = diagnosticsQuery.data;
 

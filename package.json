@@ -43,6 +43,7 @@
     "verify:m3-fees": "node scripts/verify-m3-fees-local.mjs",
     "verify:m4-academics": "node scripts/verify-m4-academics-local.mjs",
     "verify:m7-hr": "node scripts/verify-m7-hr-local.mjs",
+    "verify:slice4-dashboard-persona": "node scripts/verify-slice4-dashboard-persona-local.mjs",
     "verify:m8-library": "node scripts/verify-m8-library-local.mjs",
     "verify:m9-transport": "node scripts/verify-m9-transport-local.mjs",
     "verify:m10-canteen": "node scripts/verify-m10-canteen-local.mjs",

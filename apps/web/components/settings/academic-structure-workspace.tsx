@@ -15,7 +15,7 @@ import { Button } from '../ui/button';
 import { ConfirmDialog } from '../ui/confirm-dialog';
 import { ErrorState } from '../ui/error-state';
 import { api } from '../../lib/api';
-import { useSession } from '../session-provider';
+import { useSettingsCapabilities } from '../../lib/permissions-ui';
 import {
   SchoolSettingsPageHeader,
   SettingsPermissionNotice,
@@ -31,13 +31,12 @@ type StreamDraft = { name: string; code: string };
 
 export function AcademicStructureWorkspace() {
   const client = useQueryClient();
-  const { session } = useSession();
-  const permissions = session?.user.permissions ?? [];
-  const canCreateClass = permissions.includes('classes:create');
-  const canCreateSection = permissions.includes('sections:create');
-  const canCreateStream = permissions.includes('streams:create');
-  const canReadStreams = canCreateStream || permissions.includes('streams:read');
-  const canAssignClassTeacher = permissions.includes('academics:update');
+  const settingsCaps = useSettingsCapabilities();
+  const canCreateClass = settingsCaps.canCreateClass;
+  const canCreateSection = settingsCaps.canCreateSection;
+  const canCreateStream = settingsCaps.canCreateStream;
+  const canReadStreams = settingsCaps.canReadStreams;
+  const canAssignClassTeacher = settingsCaps.canAssignClassTeacher;
   const canManageAny = canCreateClass || canCreateSection;
   const [classDraft, setClassDraft] = useState<ClassDraft>({
     name: '',

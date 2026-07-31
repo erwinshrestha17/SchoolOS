@@ -42,6 +42,7 @@ import { useSession } from '../session-provider';
 import { getRequiredModuleForHref } from '../../lib/nav-module-map';
 import { hasAnyPermission } from '../../lib/session';
 import { TeacherCapability, useTeacherAccess } from '../../lib/teacher-access';
+import { useSettingsCapabilities } from '../../lib/permissions-ui';
 import { useSchoolWebPersona } from '../../lib/school-web-persona';
 import { cn } from '../../lib/utils';
 import type { SchoolWebPersona } from '@schoolos/core';
@@ -88,15 +89,17 @@ const noticesPermissions: PermissionKey[] = ['notices:read', 'notices:create'];
  * Teachers and operational personas reach personal settings through other paths.
  */
 export function shouldShowSettingsHub(
-  schoolWebPersona: SchoolWebPersona,
+  settingsCaps: {
+    institutionalNavEnabled: boolean;
+    canAccessInstitutionalSettings: boolean;
+  },
   isTeacherPersona: boolean,
+  personalOnly: boolean,
 ): boolean {
+  if (isTeacherPersona || personalOnly) return false;
   return (
-    !isTeacherPersona &&
-    (schoolWebPersona === 'admin' ||
-      schoolWebPersona === 'principal' ||
-      schoolWebPersona === 'hr' ||
-      schoolWebPersona === 'accountant')
+    settingsCaps.institutionalNavEnabled &&
+    settingsCaps.canAccessInstitutionalSettings
   );
 }
 
@@ -1070,8 +1073,10 @@ export function Sidebar({
   // Accountant, and operational personas get purpose-limited trees. Admin and
   // school_config_owner keep the full ops tree. Permission + entitlement
   // filters still apply to every item.
-  const { isTeacherPersona, capabilities } = useTeacherAccess();
+  const { isTeacherPersona, capabilities, isRestricted } = useTeacherAccess();
   const schoolWebPersona = useSchoolWebPersona();
+  const settingsCaps = useSettingsCapabilities();
+  const personalOnly = isRestricted(TeacherCapability.SCHOOL_SETTINGS_ADMIN);
 
   const groupsToRender = navGroupsForPersona(schoolWebPersona, capabilities)
     .map((group) => ({
@@ -1099,8 +1104,9 @@ export function Sidebar({
   // Operational shells also keep Settings only when the persona is admin /
   // principal / hr (configuration or limited review).
   const showSettingsHub = shouldShowSettingsHub(
-    schoolWebPersona,
+    settingsCaps,
     isTeacherPersona,
+    personalOnly,
   );
   const visibleSettings =
     showSettingsHub && canDisplayNavItem(settingsNavItem, session, hasModule)

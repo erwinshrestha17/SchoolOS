@@ -27,7 +27,8 @@ describe('canonical permissions UI layer', () => {
     assert.match(permissionsUi, /if \(sessionStatus === "loading"\)/);
     assert.match(permissionsUi, /if \(access\.resolution !== "granted"\)/);
     assert.match(dashboardPage, /permissionResolution === "loading"/);
-    assert.match(dashboardPage, /enabled: !isTeacherPersona && permissionResolution === "granted"/);
+    assert.match(dashboardPage, /canFetchDashboard/);
+    assert.match(dashboardPage, /permissionResolution === "granted"/);
   });
 
   it('separates notice approval from publication capabilities', () => {

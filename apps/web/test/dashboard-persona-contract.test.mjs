@@ -19,6 +19,8 @@ describe('admin and principal dashboard separation', () => {
     assert.match(page, /<AdminDashboard dashboard=\{projectedDashboard\} \/>/);
     assert.match(page, /compositionPersona === "principal"/);
     assert.match(page, /<PrincipalDashboard dashboard=\{projectedDashboard\} \/>/);
+    assert.match(page, /compositionPersona === "hr"/);
+    assert.match(page, /compositionPersona === "accountant"/);
     assert.match(admin, /persona="admin"/);
     assert.match(principal, /persona="principal"/);
     assert.doesNotMatch(page, /<DashboardCommandCenter dashboard=/);
@@ -52,7 +54,7 @@ describe('admin and principal dashboard separation', () => {
     assert.match(operations, /operationsModulesForPersona\(persona\)/);
     assert.match(operations, /Operations oversight/);
     assert.match(readiness, /shouldShowReadinessPanel/);
-    assert.match(summary, /includeFees = persona !== "principal"/);
-    assert.match(summary, /includeStaff = persona === "admin" \|\| persona === "general"/);
+    assert.match(summary, /includeFees = persona === "admin" \|\| persona === "accountant"/);
+    assert.match(summary, /includeStaff = persona === "admin" \|\| persona === "hr"/);
   });
 });
