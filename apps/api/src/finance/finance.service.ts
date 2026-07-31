@@ -6816,6 +6816,30 @@ export class FinanceService {
       };
     }
 
+    const tenantStatus = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { isActive: true },
+    });
+    if (!tenantStatus?.isActive) {
+      await this.auditService.record({
+        action: 'webhook_ignored',
+        resource: 'online_payment_intent',
+        resourceId: paymentIntent.id,
+        tenantId,
+        userId: 'system',
+        after: {
+          provider: activeProvider.name,
+          reason: 'tenant_suspended',
+        },
+      });
+      return {
+        status: 'ignored',
+        postedToLedger: false,
+        message:
+          'Payment settlement was not posted because the school account is suspended.',
+      };
+    }
+
     // Look up invoice
     const invoice = await this.prisma.invoice.findFirst({
       where: {

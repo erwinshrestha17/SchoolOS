@@ -133,6 +133,11 @@ const dashboardRouteGates: RouteGate[] = [
     permissions: ["notifications:view_own"],
   },
   {
+    prefix: "/dashboard/service-requests",
+    label: "Action Centre",
+    permissions: ["service_requests:read", "service_requests:manage"],
+  },
+  {
     prefix: "/dashboard/messages",
     label: "Chat removed",
     permissions: ["notices:read"],

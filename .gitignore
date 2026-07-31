@@ -38,6 +38,7 @@ apps/schoolos_mobile/.pub-cache/
 apps/schoolos_mobile/.pub/
 apps/schoolos_mobile/build/
 apps/schoolos_mobile/coverage/
+apps/schoolos_mobile/test/failures/
 apps/schoolos_mobile/doc/api/
 apps/schoolos_mobile/ios/Flutter/.last_build_id
 apps/schoolos_mobile/android/app/debug/

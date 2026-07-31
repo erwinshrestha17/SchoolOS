@@ -19,3 +19,4 @@ export * from './learning';
 export * from './school-settings';
 export * from './learning-improvement';
 export * from './institutional-improvement';
+export * from './service-requests';

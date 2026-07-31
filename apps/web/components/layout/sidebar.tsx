@@ -21,6 +21,7 @@ import {
   GraduationCap,
   Images,
   LayoutDashboard,
+  LifeBuoy,
   MessageSquare,
   School,
   Search,
@@ -120,7 +121,15 @@ export const dashboardNavGroups: NavGroup[] = [
   {
     label: 'Home',
     icon: LayoutDashboard,
-    items: [{ href: '/dashboard', label: 'Home', icon: LayoutDashboard }],
+    items: [
+      { href: '/dashboard', label: 'Home', icon: LayoutDashboard },
+      {
+        href: '/dashboard/service-requests',
+        label: 'Action Centre',
+        icon: LifeBuoy,
+        permissions: ['service_requests:read', 'service_requests:manage'],
+      },
+    ],
   },
   {
     label: 'Students & Admissions',

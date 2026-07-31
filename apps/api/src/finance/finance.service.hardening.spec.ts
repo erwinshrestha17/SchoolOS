@@ -451,6 +451,12 @@ describe('FinanceService - Hardening', () => {
   });
 
   describe('handleOnlinePaymentWebhook', () => {
+    beforeEach(() => {
+      (prisma.tenant.findUnique as jest.Mock).mockResolvedValue({
+        isActive: true,
+      });
+    });
+
     it('returns existing payment if webhook is a duplicate (idempotency)', async () => {
       const mockPayment = {
         id: 'p-webhook-1',
@@ -664,6 +670,57 @@ describe('FinanceService - Hardening', () => {
         ),
       ).rejects.toThrow('Webhook amount must be greater than zero.');
       expect(prisma.payment.findFirst).not.toHaveBeenCalled();
+      expect(prisma.invoice.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('ignores new webhook settlement for suspended tenants without posting payment', async () => {
+      (prisma.providerConfig.findFirst as jest.Mock).mockResolvedValue({
+        id: 'prov-suspended',
+        name: 'ESEWA',
+        configEncrypted: { webhookSecret: 'secret' },
+      });
+      jest
+        .spyOn(service as any, 'verifyWebhookSignature')
+        .mockReturnValue(true);
+      (prisma.onlinePaymentIntent.findFirst as jest.Mock).mockResolvedValue({
+        id: 'intent-suspended',
+        tenantId: actor.tenantId,
+        invoiceId: 'invoice-suspended',
+        provider: 'ESEWA',
+        amount: new Prisma.Decimal(1500),
+        status: 'PENDING',
+      });
+      (prisma.payment.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.tenant.findUnique as jest.Mock).mockResolvedValue({
+        isActive: false,
+      });
+
+      const result = await service.handleOnlinePaymentWebhook(
+        'esewa',
+        {
+          reference: 'REF-SUSPENDED',
+          amount: 1500,
+          status: 'SUCCESS',
+        },
+        {
+          signature: 'valid-signature',
+          'x-tenant-id': actor.tenantId,
+        },
+      );
+
+      expect(result).toEqual({
+        status: 'ignored',
+        postedToLedger: false,
+        message:
+          'Payment settlement was not posted because the school account is suspended.',
+      });
+      expect(auditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'webhook_ignored',
+          resourceId: 'intent-suspended',
+          after: expect.objectContaining({ reason: 'tenant_suspended' }),
+        }),
+      );
       expect(prisma.invoice.findFirst).not.toHaveBeenCalled();
     });
 

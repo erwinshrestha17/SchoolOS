@@ -14,6 +14,7 @@ const platformCredentials = {
 
 const schoolRoutes = [
   '/dashboard',
+  '/dashboard/service-requests',
   '/dashboard/students',
   '/dashboard/admissions',
   '/dashboard/attendance',

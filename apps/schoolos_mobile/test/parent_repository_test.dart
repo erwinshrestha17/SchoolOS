@@ -558,6 +558,123 @@ void main() {
       ).called(1);
     });
 
+    test('sends confirmStudentId on sandbox fee payment payloads', () async {
+      when(
+        () => apiClient.post<dynamic>(
+          '/mobile/students/child-1/sandbox-payments/fees',
+          data: any<dynamic>(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: 'sandbox-payments/fees'),
+          data: {
+            'status': 'CONFIRMED',
+            'provider': 'SANDBOX',
+            'amount': 500,
+            'receiptNumber': 'RCPT-001',
+          },
+        ),
+      );
+
+      final result = await repository.payInvoiceInSandbox(
+        childId: 'child-1',
+        invoiceId: 'invoice-1',
+        amount: 500,
+        provider: 'SANDBOX',
+        idempotencyKey: 'parent-sandbox-fee-0001',
+      );
+
+      expect(result.status, 'CONFIRMED');
+      expect(result.receiptNumber, 'RCPT-001');
+      verify(
+        () => apiClient.post<dynamic>(
+          '/mobile/students/child-1/sandbox-payments/fees',
+          data: {
+            'confirmStudentId': 'child-1',
+            'invoiceId': 'invoice-1',
+            'amount': 500,
+            'provider': 'SANDBOX',
+            'idempotencyKey': 'parent-sandbox-fee-0001',
+          },
+        ),
+      ).called(1);
+    });
+
+    test('sends confirmStudentId on sandbox canteen top-up payloads', () async {
+      when(
+        () => apiClient.post<dynamic>(
+          '/mobile/students/child-1/sandbox-payments/canteen-top-up',
+          data: any<dynamic>(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(
+            path: 'sandbox-payments/canteen-top-up',
+          ),
+          data: {
+            'status': 'CONFIRMED',
+            'provider': 'SANDBOX',
+            'amount': 200,
+            'wallet': {'balance': 1200},
+          },
+        ),
+      );
+
+      final result = await repository.topUpCanteenInSandbox(
+        childId: 'child-1',
+        amount: 200,
+        provider: 'SANDBOX',
+        idempotencyKey: 'parent-sandbox-topup-0001',
+      );
+
+      expect(result.status, 'CONFIRMED');
+      expect(result.walletBalance, 1200);
+      verify(
+        () => apiClient.post<dynamic>(
+          '/mobile/students/child-1/sandbox-payments/canteen-top-up',
+          data: {
+            'confirmStudentId': 'child-1',
+            'amount': 200,
+            'provider': 'SANDBOX',
+            'idempotencyKey': 'parent-sandbox-topup-0001',
+          },
+        ),
+      ).called(1);
+    });
+
+    test('sends confirmStudentId on consent decision payloads', () async {
+      when(
+        () => apiClient.post<dynamic>(
+          '/mobile/me/consents/decision',
+          data: any<dynamic>(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: 'consents/decision'),
+          data: const {},
+        ),
+      );
+
+      await repository.decideMyConsent(
+        childId: 'child-1',
+        consentType: 'PHOTO_USAGE',
+        version: '2026-01',
+        granted: true,
+      );
+
+      verify(
+        () => apiClient.post<dynamic>(
+          '/mobile/me/consents/decision',
+          data: {
+            'confirmStudentId': 'child-1',
+            'consentType': 'PHOTO_USAGE',
+            'version': '2026-01',
+            'granted': true,
+          },
+        ),
+      ).called(1);
+    });
+
     test(
       'passes category and month filters to the activity feed endpoint',
       () async {

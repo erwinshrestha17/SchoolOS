@@ -27,6 +27,7 @@ export class FinanceCron {
       () =>
         this.prisma.feeDueSchedule.findMany({
           where: {
+            tenant: { isActive: true },
             dueDate: { lte: today },
             OR: [{ lastProcessedAt: null }, { lastProcessedAt: { lt: today } }],
           },

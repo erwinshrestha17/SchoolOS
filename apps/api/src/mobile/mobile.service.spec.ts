@@ -599,6 +599,26 @@ describe('MobileService', () => {
     );
   });
 
+  it('rejects parent payment initiation when confirmStudentId mismatches the route child', async () => {
+    const dto = {
+      confirmStudentId: 'student-2',
+      invoiceId: 'invoice-1',
+      amount: 500,
+      provider: 'NEPAL_GATEWAY',
+      idempotencyKey: 'parent-payment-test-mismatch',
+    };
+
+    await expect(
+      service.initiateStudentPayment('student-1', dto, actor),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: 'GUARDIAN_CHILD_CONFIRMATION_MISMATCH',
+        expectedStudentId: 'student-1',
+      }),
+    });
+    expect(financeService.initiateParentOnlinePayment).not.toHaveBeenCalled();
+  });
+
   it('collects a linked-child fee through the sandbox finance boundary', async () => {
     prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
     prisma.guardian.findFirst.mockResolvedValue({
