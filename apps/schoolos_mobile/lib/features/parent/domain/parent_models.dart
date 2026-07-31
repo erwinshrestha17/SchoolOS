@@ -272,6 +272,7 @@ class ParentDashboardSummary {
     this.activityEnabled = true,
     this.transportEnabled = true,
     this.canteenEnabled = true,
+    this.libraryEnabled = true,
     this.fromCache = false,
   });
 
@@ -305,6 +306,7 @@ class ParentDashboardSummary {
   final bool activityEnabled;
   final bool transportEnabled;
   final bool canteenEnabled;
+  final bool libraryEnabled;
   final bool fromCache;
 
   factory ParentDashboardSummary.fromMobileDashboard(
@@ -371,6 +373,7 @@ class ParentDashboardSummary {
       activityEnabled: modules?['activity'] as bool? ?? true,
       transportEnabled: modules?['transport'] as bool? ?? true,
       canteenEnabled: modules?['canteen'] as bool? ?? true,
+      libraryEnabled: modules?['library'] as bool? ?? true,
       fromCache: json['_mobileFromCache'] as bool? ?? false,
     );
   }

@@ -38,6 +38,8 @@
     "db:seed:performance": "tsx prisma/seed-performance-tenant.ts",
     "perf:verify": "tsx prisma/perf-verify.ts",
     "perf:measure-activity-sql": "tsx prisma/perf-measure-activity-sql.ts",
+    "perf:measure-canteen-sql": "tsx prisma/perf-measure-canteen-sql.ts",
+    "perf:measure-fees-sql": "tsx prisma/perf-measure-fees-sql.ts",
     "start": "node dist/apps/api/src/main.js",
     "start:dev": "pnpm run dev",
     "start:debug": "pnpm --filter @schoolos/core build && pnpm run prisma:generate && nest start --debug --watch --entryFile apps/api/src/main",

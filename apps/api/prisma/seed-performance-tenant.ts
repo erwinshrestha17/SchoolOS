@@ -27,6 +27,15 @@ import {
   ActivityReactionType,
   AttendanceStatus,
   AudienceType,
+  InvoiceStatus,
+  PaymentMethod,
+  PaymentStatus,
+  CanteenEnrollmentStatus,
+  CanteenMealPlanStatus,
+  CanteenMealServingStatus,
+  CanteenMenuItemStatus,
+  CanteenWalletTransactionSource,
+  CanteenWalletTransactionType,
   AuthMethod,
   ConsentType,
   ContractType,
@@ -83,6 +92,10 @@ const ACTIVITY_POSTS_PER_SECTION = num('PERF_ACTIVITY_POSTS_PER_SECTION', 3);
 const MILESTONES_PER_STUDENT = num('PERF_MILESTONES_PER_STUDENT', 2);
 const ACTIVITY_TAGGED_RATIO = ratio('PERF_ACTIVITY_TAGGED_RATIO', 0.15);
 const CONSENT_DENIED_RATIO = ratio('PERF_CONSENT_DENIED_RATIO', 0.05);
+const CANTEEN_MENU_ITEMS = num('PERF_CANTEEN_MENU_ITEMS', 25);
+const CANTEEN_WALLET_RATIO = ratio('PERF_CANTEEN_WALLET_RATIO', 0.25);
+const CANTEEN_ENROLLED_RATIO = ratio('PERF_CANTEEN_ENROLLED_RATIO', 0.1);
+const FEE_INVOICE_RATIO = ratio('PERF_FEE_INVOICE_RATIO', 0.4);
 
 const FIXTURE_PARENT_EMAILS = {
   empty: `parent-perf-empty@${SLUG}.test`,
@@ -383,7 +396,7 @@ async function ensureTenant() {
         name: NAME,
         slug: SLUG,
         mode: Mode.MULTI,
-        plan: 'professional',
+        plan: 'standard',
         isActive: true,
       },
     });
@@ -393,15 +406,21 @@ async function ensureTenant() {
 }
 
 async function assignSubscription(tenantId: string) {
-  const plan =
-    (await prisma.platformPlan.findUnique({ where: { key: 'professional' } })) ??
-    (await prisma.platformPlan.findUnique({ where: { key: 'standard' } }));
+  // Wave 1 / one-school concurrency program: STANDARD without library,
+  // transport, or canteen add-ons. PROFESSIONAL includes M8–M10 by default and
+  // would inflate the parent dashboard SQL baseline with deferred modules.
+  const plan = await prisma.platformPlan.findUnique({ where: { key: 'standard' } });
 
   if (!plan) {
     throw new Error(
-      'No platform plan found. Run `pnpm db:seed:platform` before seeding the performance tenant.',
+      'No "standard" platform plan found. Run `pnpm db:seed:platform` before seeding the performance tenant.',
     );
   }
+
+  await prisma.tenant.update({
+    where: { id: tenantId },
+    data: { plan: 'standard' },
+  });
 
   await prisma.tenantSubscription.upsert({
     where: { id: `sub-${SLUG}` },
@@ -424,6 +443,23 @@ async function purgeBulkData(tenantId: string) {
   console.log('Purging existing bulk data for this tenant...');
   // Ordered by FK dependency. Only the perf tenant is touched.
   await prisma.notificationDelivery.deleteMany({ where: { tenantId } });
+  await prisma.onlinePaymentIntent.deleteMany({ where: { tenantId } });
+  await prisma.receiptReprintHistory.deleteMany({ where: { tenantId } });
+  await prisma.receipt.deleteMany({ where: { tenantId } });
+  await prisma.financeApprovalRequestHistory.deleteMany({ where: { tenantId } });
+  await prisma.financeApprovalRequest.deleteMany({ where: { tenantId } });
+  await prisma.paymentRefund.deleteMany({ where: { tenantId } });
+  await prisma.payment.deleteMany({ where: { tenantId } });
+  await prisma.invoiceLine.deleteMany({ where: { tenantId } });
+  await prisma.invoice.deleteMany({ where: { tenantId } });
+  await prisma.canteenPosSaleItem.deleteMany({ where: { tenantId } });
+  await prisma.canteenPosSale.deleteMany({ where: { tenantId } });
+  await prisma.canteenWalletTransaction.deleteMany({ where: { tenantId } });
+  await prisma.canteenMealServing.deleteMany({ where: { tenantId } });
+  await prisma.canteenStudentEnrollment.deleteMany({ where: { tenantId } });
+  await prisma.canteenWallet.deleteMany({ where: { tenantId } });
+  await prisma.canteenMenuItem.deleteMany({ where: { tenantId } });
+  await prisma.canteenMealPlan.deleteMany({ where: { tenantId } });
   await prisma.activityReaction.deleteMany({ where: { tenantId } });
   await prisma.activityAttachment.deleteMany({ where: { tenantId } });
   await prisma.activityPostStudent.deleteMany({ where: { tenantId } });
@@ -981,6 +1017,7 @@ async function seedActivityAndMilestones(
   students: PerfStudent[],
   teachers: { staffId: string; userId: string }[],
   excludeSectionId: string,
+  excludeClassId: string,
 ) {
   if (ACTIVITY_POSTS === 0 && MILESTONES_PER_STUDENT === 0) return;
 
@@ -1017,6 +1054,15 @@ async function seedActivityAndMilestones(
 
       for (let n = 0; n < count; n += 1) {
         const audienceType = audienceCycle[(postIndex + n) % audienceCycle.length];
+        // CLASS posts reach every section in the class. The empty-path fixture
+        // student lives in excludeClassId, so skip CLASS audience there.
+        if (
+          audienceType === AudienceType.CLASS &&
+          section.classId === excludeClassId
+        ) {
+          postIndex += 1;
+          continue;
+        }
         const daysAgo = n * 3 + (postIndex % 5);
         const publishedAt = new Date(now - daysAgo * 86400000);
         const postId = `perf-post-${postIndex}`;
@@ -1183,8 +1229,8 @@ async function seedActivityAndMilestones(
         {
           id: 'perf-post-wrong-class',
           tenantId,
-          classId: sections[sections.length - 1]?.classId ?? firstSection.classId,
-          sectionId: sections[sections.length - 1]?.id ?? firstSection.id,
+          classId: firstSection.classId,
+          sectionId: firstSection.id,
           createdById: teacher.userId,
           title: 'Wrong class activity',
           caption: 'Outside the linked child class.',
@@ -1297,6 +1343,333 @@ async function seedActivityAndMilestones(
 
   await insertInBatches('developmental milestones', milestoneRows, (chunk) =>
     prisma.developmentalMilestone.createMany({ data: chunk, skipDuplicates: true }),
+  );
+}
+
+async function seedCanteen(
+  tenantId: string,
+  students: PerfStudent[],
+  fixtureStudentIds: { empty: string; one: string },
+) {
+  if (CANTEEN_MENU_ITEMS === 0) return;
+
+  const already = await prisma.canteenMenuItem.count({ where: { tenantId } });
+  if (already >= CANTEEN_MENU_ITEMS) {
+    console.log(`  canteen: ${already} menu items already present, skipping`);
+    return;
+  }
+
+  const now = Date.now();
+  const mealPlanIds = ['perf-meal-plan-lunch', 'perf-meal-plan-breakfast'];
+
+  await prisma.canteenMealPlan.createMany({
+    data: [
+      {
+        id: mealPlanIds[0],
+        tenantId,
+        name: 'Daily Lunch',
+        description: 'Standard lunch plan',
+        mealType: 'LUNCH',
+        price: 3500,
+        billingFrequency: 'MONTHLY',
+        status: CanteenMealPlanStatus.ACTIVE,
+      },
+      {
+        id: mealPlanIds[1],
+        tenantId,
+        name: 'Breakfast Club',
+        description: 'Morning meal plan',
+        mealType: 'BREAKFAST',
+        price: 2000,
+        billingFrequency: 'MONTHLY',
+        status: CanteenMealPlanStatus.ACTIVE,
+      },
+    ],
+    skipDuplicates: true,
+  });
+
+  const menuRows: Prisma.CanteenMenuItemCreateManyInput[] = [];
+  const categories = ['Snacks', 'Meals', 'Beverages'];
+  for (let i = 0; i < CANTEEN_MENU_ITEMS; i += 1) {
+    menuRows.push({
+      tenantId,
+      name: `Menu item ${i + 1}`,
+      category: categories[i % categories.length],
+      description: i % 4 === 0 ? `Description for item ${i + 1}` : null,
+      unitPrice: 25 + (i % 10) * 5,
+      status: CanteenMenuItemStatus.ACTIVE,
+      isMealItem: i % 5 === 0,
+      allergenTags: i % 7 === 0 ? ['nuts'] : [],
+    });
+  }
+  await insertInBatches('canteen menu items', menuRows, (chunk) =>
+    prisma.canteenMenuItem.createMany({ data: chunk, skipDuplicates: true }),
+  );
+
+  const walletRows: Prisma.CanteenWalletCreateManyInput[] = [];
+  const transactionRows: Prisma.CanteenWalletTransactionCreateManyInput[] = [];
+  const enrollmentRows: Prisma.CanteenStudentEnrollmentCreateManyInput[] = [];
+  const servingRows: Prisma.CanteenMealServingCreateManyInput[] = [];
+
+  for (const [index, student] of students.entries()) {
+    if (student.id === fixtureStudentIds.empty) continue;
+
+    const withWallet =
+      student.id === fixtureStudentIds.one || rng() < CANTEEN_WALLET_RATIO;
+    const withEnrollment =
+      student.id === fixtureStudentIds.one || rng() < CANTEEN_ENROLLED_RATIO;
+
+    let walletId: string | null = null;
+    if (withWallet) {
+      walletId = `perf-wallet-${student.id}`;
+      const balance = student.id === fixtureStudentIds.one ? 450 : 50 + (index % 20) * 25;
+      const threshold = 100;
+      walletRows.push({
+        id: walletId,
+        tenantId,
+        studentId: student.id,
+        balance,
+        lowBalanceThreshold: threshold,
+      });
+
+      const txCount = student.id === fixtureStudentIds.one ? 5 : 2;
+      for (let t = 0; t < txCount; t += 1) {
+        transactionRows.push({
+          tenantId,
+          walletId,
+          studentId: student.id,
+          type:
+            t === 0
+              ? CanteenWalletTransactionType.TOP_UP
+              : CanteenWalletTransactionType.DEDUCTION,
+          source:
+            t === 0
+              ? CanteenWalletTransactionSource.MANUAL
+              : CanteenWalletTransactionSource.POS_SALE,
+          amount: t === 0 ? 500 : 25 + t * 10,
+          balanceAfter: balance - t * 25,
+          transactionDate: new Date(now - t * 86400000),
+          note: t === 0 ? 'Wallet top-up' : `POS purchase ${t}`,
+        });
+      }
+    }
+
+    if (withEnrollment) {
+      const mealPlanId = mealPlanIds[index % mealPlanIds.length];
+      const enrollmentId = `perf-enrollment-${student.id}`;
+      enrollmentRows.push({
+        id: enrollmentId,
+        tenantId,
+        studentId: student.id,
+        mealPlanId,
+        startsOn: new Date('2026-04-01T00:00:00.000Z'),
+        endsOn: null,
+        status: CanteenEnrollmentStatus.ACTIVE,
+      });
+
+      const servingCount = student.id === fixtureStudentIds.one ? 3 : 1;
+      for (let s = 0; s < servingCount; s += 1) {
+        servingRows.push({
+          tenantId,
+          studentId: student.id,
+          enrollmentId,
+          mealPlanId,
+          mealType: s % 2 === 0 ? 'LUNCH' : 'BREAKFAST',
+          mealDate: new Date(now - (s + 1) * 86400000),
+          servedAt: new Date(now - (s + 1) * 86400000 + 3600000),
+          status: CanteenMealServingStatus.SERVED,
+          notes: s === 0 ? 'On time' : null,
+        });
+      }
+    }
+  }
+
+  await insertInBatches('canteen wallets', walletRows, (chunk) =>
+    prisma.canteenWallet.createMany({ data: chunk, skipDuplicates: true }),
+  );
+  await insertInBatches('canteen enrollments', enrollmentRows, (chunk) =>
+    prisma.canteenStudentEnrollment.createMany({ data: chunk, skipDuplicates: true }),
+  );
+  await insertInBatches('canteen servings', servingRows, (chunk) =>
+    prisma.canteenMealServing.createMany({ data: chunk, skipDuplicates: true }),
+  );
+  await insertInBatches('canteen wallet transactions', transactionRows, (chunk) =>
+    prisma.canteenWalletTransaction.createMany({ data: chunk, skipDuplicates: true }),
+  );
+
+  console.log(
+    `  canteen: ${menuRows.length} menu items, ${walletRows.length} wallets, ` +
+      `${enrollmentRows.length} enrollments, ${servingRows.length} servings, ` +
+      `${transactionRows.length} transactions`,
+  );
+}
+
+async function seedFees(
+  tenantId: string,
+  academicYearId: string,
+  students: PerfStudent[],
+  fixtureStudentIds: { empty: string; one: string },
+) {
+  const already = await prisma.invoice.count({ where: { tenantId } });
+  if (already > 0) {
+    console.log(`  fees: ${already} invoices already present, skipping`);
+    return;
+  }
+
+  const feeHeads = await prisma.feeHead.findMany({
+    where: { tenantId },
+    select: { id: true, code: true },
+  });
+  const tuition = feeHeads.find((head) => head.code === 'TUITION') ?? feeHeads[0];
+  const exam = feeHeads.find((head) => head.code === 'EXAM') ?? feeHeads[0];
+  if (!tuition) {
+    console.log('  fees: no fee heads provisioned, skipping');
+    return;
+  }
+
+  const now = Date.now();
+  const invoiceRows: Prisma.InvoiceCreateManyInput[] = [];
+  const lineRows: Prisma.InvoiceLineCreateManyInput[] = [];
+  const paymentRows: Prisma.PaymentCreateManyInput[] = [];
+  const receiptRows: Prisma.ReceiptCreateManyInput[] = [];
+
+  let invoiceIndex = 0;
+
+  function pushInvoice(opts: {
+    studentId: string;
+    status: InvoiceStatus;
+    total: number;
+    paid?: number;
+    dueDaysAgo: number;
+  }) {
+    invoiceIndex += 1;
+    const invoiceId = `perf-inv-${pad(invoiceIndex, 5)}`;
+    const invoiceNumber = `PERF-INV-${pad(invoiceIndex, 5)}`;
+    const dueDate = new Date(now - opts.dueDaysAgo * 86400000);
+    invoiceRows.push({
+      id: invoiceId,
+      tenantId,
+      studentId: opts.studentId,
+      academicYearId,
+      invoiceNumber,
+      dueDate,
+      status: opts.status,
+      subtotal: opts.total,
+      vatAmount: 0,
+      totalAmount: opts.total,
+      issuedAt: new Date(dueDate.getTime() - 14 * 86400000),
+      paidAt: opts.status === InvoiceStatus.PAID ? dueDate : null,
+    });
+    lineRows.push({
+      id: `perf-line-${pad(invoiceIndex, 5)}`,
+      tenantId,
+      invoiceId,
+      feeHeadId: invoiceIndex % 2 === 0 && exam ? exam.id : tuition.id,
+      description: 'Performance fixture fee line',
+      quantity: 1,
+      unitAmount: opts.total,
+      vatAmount: 0,
+      totalAmount: opts.total,
+    });
+
+    if (opts.paid && opts.paid > 0) {
+      const paymentId = `perf-pay-${pad(invoiceIndex, 5)}`;
+      paymentRows.push({
+        id: paymentId,
+        tenantId,
+        studentId: opts.studentId,
+        invoiceId,
+        method: PaymentMethod.CASH,
+        status: PaymentStatus.SUCCESS,
+        amount: opts.paid,
+        paidAt: dueDate,
+        idempotencyKey: `perf-pay-${invoiceNumber}`,
+      });
+      receiptRows.push({
+        id: `perf-rec-${pad(invoiceIndex, 5)}`,
+        tenantId,
+        paymentId,
+        receiptNumber: `PERF-REC-${pad(invoiceIndex, 5)}`,
+        vatAmount: 0,
+        issuedAt: dueDate,
+      });
+    }
+  }
+
+  // Empty-path fixture: no invoices.
+  // Populated fixture: ISSUED + PARTIAL + PAID.
+  pushInvoice({
+    studentId: fixtureStudentIds.one,
+    status: InvoiceStatus.ISSUED,
+    total: 5000,
+    dueDaysAgo: -20,
+  });
+  pushInvoice({
+    studentId: fixtureStudentIds.one,
+    status: InvoiceStatus.PARTIAL,
+    total: 3000,
+    paid: 1000,
+    dueDaysAgo: 10,
+  });
+  pushInvoice({
+    studentId: fixtureStudentIds.one,
+    status: InvoiceStatus.PAID,
+    total: 2000,
+    paid: 2000,
+    dueDaysAgo: 40,
+  });
+
+  for (const student of students) {
+    if (student.id === fixtureStudentIds.empty || student.id === fixtureStudentIds.one) {
+      continue;
+    }
+    if (rng() >= FEE_INVOICE_RATIO) continue;
+    const roll = rng();
+    if (roll < 0.35) {
+      pushInvoice({
+        studentId: student.id,
+        status: InvoiceStatus.ISSUED,
+        total: 2500 + Math.floor(rng() * 3000),
+        dueDaysAgo: Math.floor(rng() * 45) - 15,
+      });
+    } else if (roll < 0.7) {
+      const total = 2500 + Math.floor(rng() * 3000);
+      pushInvoice({
+        studentId: student.id,
+        status: InvoiceStatus.PARTIAL,
+        total,
+        paid: Math.floor(total * 0.4),
+        dueDaysAgo: Math.floor(rng() * 30),
+      });
+    } else {
+      const total = 2000 + Math.floor(rng() * 2000);
+      pushInvoice({
+        studentId: student.id,
+        status: InvoiceStatus.PAID,
+        total,
+        paid: total,
+        dueDaysAgo: 20 + Math.floor(rng() * 60),
+      });
+    }
+  }
+
+  await insertInBatches('fee invoices', invoiceRows, (chunk) =>
+    prisma.invoice.createMany({ data: chunk, skipDuplicates: true }),
+  );
+  await insertInBatches('fee invoice lines', lineRows, (chunk) =>
+    prisma.invoiceLine.createMany({ data: chunk, skipDuplicates: true }),
+  );
+  await insertInBatches('fee payments', paymentRows, (chunk) =>
+    prisma.payment.createMany({ data: chunk, skipDuplicates: true }),
+  );
+  await insertInBatches('fee receipts', receiptRows, (chunk) =>
+    prisma.receipt.createMany({ data: chunk, skipDuplicates: true }),
+  );
+
+  console.log(
+    `  fees: ${invoiceRows.length} invoices, ${lineRows.length} lines, ` +
+      `${paymentRows.length} payments, ${receiptRows.length} receipts ` +
+      `(empty fixture has none)`,
   );
 }
 
@@ -1469,6 +1842,7 @@ async function main() {
     passwordHash,
   );
   const emptySectionId = sections[sections.length - 1]?.id ?? '';
+  const emptyClassId = sections[sections.length - 1]?.classId ?? '';
   const guardians = await prisma.guardian.findMany({
     where: { tenantId: tenant.id },
     select: { id: true },
@@ -1480,8 +1854,19 @@ async function main() {
     students,
     teachers,
     emptySectionId,
+    emptyClassId,
   );
-  await seedMeasurementFixtures(tenant.id, passwordHash, students, sections);
+  const fixtures = await seedMeasurementFixtures(tenant.id, passwordHash, students, sections);
+  if (fixtures) {
+    await seedCanteen(tenant.id, students, {
+      empty: fixtures.empty.studentIds[0],
+      one: fixtures.one.studentIds[0],
+    });
+    await seedFees(tenant.id, academicYear.id, students, {
+      empty: fixtures.empty.studentIds[0],
+      one: fixtures.one.studentIds[0],
+    });
+  }
   await seedAttendance(tenant.id, academicYear.id, sections, students);
   await seedNotifications(tenant.id, guardianUserIds);
 

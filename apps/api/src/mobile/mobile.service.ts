@@ -251,6 +251,9 @@ export class MobileService {
       transport:
         enabled('transport') && can(GuardianCapability.EMERGENCY_ALERT_RECEIVE),
       canteen: enabled('canteen') && can(GuardianCapability.FEES_VIEW),
+      // Flag only — library is not composed on the dashboard. Clients use this
+      // to hide More-tab navigation when M8 is deferred/disabled.
+      library: enabled('library') && can(GuardianCapability.ACADEMICS_VIEW),
     };
 
     if (!selectedStudentId) {
@@ -1713,70 +1716,156 @@ export class MobileService {
       actor,
       GuardianCapability.FEES_VIEW,
     );
+    const tenantId = actor.tenantId;
+
+    // Phase 1 — invoice scalars only. Nested includes previously cost ~6 SQL
+    // even when the child had no invoices (Prisma still issues relation trips).
     const invoices = await this.prisma.invoice.findMany({
       where: {
-        tenantId: actor.tenantId,
+        tenantId,
         studentId,
         status: { in: ['ISSUED', 'PARTIAL', 'PAID'] },
       },
-      include: {
-        // The printed receipt has always itemised the bill (see buildReceiptPdf
-        // in finance.service.ts). The app showed only a total, so a parent
-        // could not tell what a charge was for without the paper copy.
-        lines: {
-          include: {
-            feeHead: { select: { code: true, name: true } },
-          },
-          orderBy: { createdAt: 'asc' },
-        },
-        payments: {
-          where: {
-            status: 'SUCCESS',
-            reversedAt: null,
-          },
-          select: {
-            id: true,
-            amount: true,
-            method: true,
-            paidAt: true,
-            receipt: {
-              select: {
-                id: true,
-                receiptNumber: true,
-                issuedAt: true,
-              },
-            },
-          },
-        },
+      select: {
+        id: true,
+        invoiceNumber: true,
+        status: true,
+        dueDate: true,
+        issuedAt: true,
+        subtotal: true,
+        vatAmount: true,
+        totalAmount: true,
       },
       orderBy: [{ dueDate: 'asc' }, { issuedAt: 'desc' }],
       take: 20,
     });
 
+    if (invoices.length === 0) {
+      return {
+        status: 'PAID' as const,
+        totalAmount: 0,
+        paidAmount: 0,
+        totalOutstanding: 0,
+        overdueCount: 0,
+        nextDueDate: null,
+        recentInvoices: [],
+        recentReceipts: [],
+      };
+    }
+
+    const invoiceIds = invoices.map((invoice) => invoice.id);
+
+    // Phase 2 — lines and payments for the bounded invoice set.
+    const [lines, payments] = await Promise.all([
+      this.prisma.invoiceLine.findMany({
+        where: { tenantId, invoiceId: { in: invoiceIds } },
+        select: {
+          id: true,
+          invoiceId: true,
+          feeHeadId: true,
+          description: true,
+          quantity: true,
+          unitAmount: true,
+          vatAmount: true,
+          totalAmount: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
+      this.prisma.payment.findMany({
+        where: {
+          tenantId,
+          invoiceId: { in: invoiceIds },
+          status: 'SUCCESS',
+          reversedAt: null,
+        },
+        select: {
+          id: true,
+          invoiceId: true,
+          amount: true,
+          method: true,
+          paidAt: true,
+        },
+      }),
+    ]);
+
+    // Phase 3 — batched fee-head and receipt lookups (tenant-scoped).
+    const feeHeadIds = uniqueIds(lines.map((line) => line.feeHeadId));
+    const paymentIds = payments.map((payment) => payment.id);
+    const [feeHeads, receipts] = await Promise.all([
+      feeHeadIds.length
+        ? this.prisma.feeHead.findMany({
+            where: { tenantId, id: { in: feeHeadIds } },
+            select: { id: true, code: true, name: true },
+          })
+        : Promise.resolve(
+            [] as Array<{ id: string; code: string; name: string }>,
+          ),
+      paymentIds.length
+        ? this.prisma.receipt.findMany({
+            where: { tenantId, paymentId: { in: paymentIds } },
+            select: {
+              id: true,
+              paymentId: true,
+              receiptNumber: true,
+              issuedAt: true,
+            },
+          })
+        : Promise.resolve(
+            [] as Array<{
+              id: string;
+              paymentId: string;
+              receiptNumber: string;
+              issuedAt: Date;
+            }>,
+          ),
+    ]);
+
+    const feeHeadById = new Map(
+      feeHeads.map((head) => [head.id, head] as const),
+    );
+    const receiptByPaymentId = new Map(
+      receipts.map((receipt) => [receipt.paymentId, receipt] as const),
+    );
+    const linesByInvoiceId = new Map<string, typeof lines>();
+    for (const line of lines) {
+      const bucket = linesByInvoiceId.get(line.invoiceId) ?? [];
+      bucket.push(line);
+      linesByInvoiceId.set(line.invoiceId, bucket);
+    }
+    const paymentsByInvoiceId = new Map<string, typeof payments>();
+    for (const payment of payments) {
+      const bucket = paymentsByInvoiceId.get(payment.invoiceId) ?? [];
+      bucket.push(payment);
+      paymentsByInvoiceId.set(payment.invoiceId, bucket);
+    }
+
     const now = new Date();
     const items = invoices.map((invoice) => {
+      const invoicePayments = paymentsByInvoiceId.get(invoice.id) ?? [];
       const totalAmount = money(invoice.totalAmount);
-      const paidAmount = invoice.payments.reduce(
+      const paidAmount = invoicePayments.reduce(
         (sum, payment) => sum + money(payment.amount),
         0,
       );
       const outstandingAmount = Math.max(totalAmount - paidAmount, 0);
-      const receipts = invoice.payments.flatMap((payment) => {
-        if (!payment.receipt) {
+      const invoiceReceipts = invoicePayments.flatMap((payment) => {
+        const receipt = receiptByPaymentId.get(payment.id);
+        if (!receipt) {
           return [];
         }
 
         return [
           {
-            id: payment.receipt.id,
-            receiptNumber: payment.receipt.receiptNumber,
+            id: receipt.id,
+            receiptNumber: receipt.receiptNumber,
             invoiceId: invoice.id,
             invoiceNumber: invoice.invoiceNumber,
             paymentId: payment.id,
             amount: money(payment.amount),
             method: payment.method,
             paidAt: toIso(payment.paidAt),
-            issuedAt: toIso(payment.receipt.issuedAt),
+            issuedAt: toIso(receipt.issuedAt),
           },
         ];
       });
@@ -1793,19 +1882,22 @@ export class MobileService {
         paidAmount,
         outstandingAmount,
         isOverdue: outstandingAmount > 0 && invoice.dueDate < now,
-        lines: invoice.lines.map((line) => ({
-          id: line.id,
-          description: line.description,
-          feeHead: {
-            code: line.feeHead.code,
-            name: line.feeHead.name,
-          },
-          quantity: line.quantity,
-          unitAmount: money(line.unitAmount),
-          vatAmount: money(line.vatAmount),
-          totalAmount: money(line.totalAmount),
-        })),
-        receipts,
+        lines: (linesByInvoiceId.get(invoice.id) ?? []).map((line) => {
+          const feeHead = feeHeadById.get(line.feeHeadId);
+          return {
+            id: line.id,
+            description: line.description,
+            feeHead: {
+              code: feeHead?.code ?? '',
+              name: feeHead?.name ?? '',
+            },
+            quantity: line.quantity,
+            unitAmount: money(line.unitAmount),
+            vatAmount: money(line.vatAmount),
+            totalAmount: money(line.totalAmount),
+          };
+        }),
+        receipts: invoiceReceipts,
       };
     });
     const recentReceipts = items
@@ -2510,56 +2602,83 @@ export class MobileService {
       actor,
       GuardianCapability.FEES_VIEW,
     );
-    const [wallet, enrollments, recentTransactions, menuItems, recentServings] =
-      await Promise.all([
-        this.prisma.canteenWallet.findFirst({
-          where: { tenantId: actor.tenantId, studentId },
-        }),
-        this.prisma.canteenStudentEnrollment.findMany({
-          where: {
-            tenantId: actor.tenantId,
-            studentId,
-            status: 'ACTIVE',
-          },
-          include: {
-            mealPlan: {
-              select: {
-                id: true,
-                name: true,
-                mealType: true,
-                price: true,
-                billingFrequency: true,
-              },
+    const tenantId = actor.tenantId;
+
+    // Phase 1 — scalar roots only. Menu is tenant-wide and always returned by
+    // contract; enrollments select mealPlanId instead of an include fan-out.
+    const [wallet, enrollments, menuItems] = await Promise.all([
+      this.prisma.canteenWallet.findFirst({
+        where: { tenantId, studentId },
+      }),
+      this.prisma.canteenStudentEnrollment.findMany({
+        where: {
+          tenantId,
+          studentId,
+          status: 'ACTIVE',
+        },
+        select: {
+          id: true,
+          mealPlanId: true,
+          status: true,
+          startsOn: true,
+          endsOn: true,
+        },
+        orderBy: [{ startsOn: 'desc' }],
+        take: 5,
+      }),
+      this.prisma.canteenMenuItem.findMany({
+        where: { tenantId, status: 'ACTIVE' },
+        orderBy: [{ category: 'asc' }, { name: 'asc' }],
+        take: 25,
+      }),
+    ]);
+
+    const hasWalletOrEnrollment = wallet !== null || enrollments.length > 0;
+
+    // Phase 1b — transactions and servings only when the student has wallet or
+    // enrollment activity. Most dashboard children have neither.
+    const [recentTransactions, recentServings] = hasWalletOrEnrollment
+      ? await Promise.all([
+          this.prisma.canteenWalletTransaction.findMany({
+            where: { tenantId, studentId },
+            orderBy: [{ transactionDate: 'desc' }],
+            take: 10,
+          }),
+          this.prisma.canteenMealServing.findMany({
+            where: { tenantId, studentId },
+            select: {
+              id: true,
+              mealType: true,
+              mealDate: true,
+              servedAt: true,
+              status: true,
+              notes: true,
+              mealPlanId: true,
             },
-          },
-          orderBy: [{ startsOn: 'desc' }],
-          take: 5,
-        }),
-        this.prisma.canteenWalletTransaction.findMany({
-          where: { tenantId: actor.tenantId, studentId },
-          orderBy: [{ transactionDate: 'desc' }],
-          take: 10,
-        }),
-        this.prisma.canteenMenuItem.findMany({
-          where: { tenantId: actor.tenantId, status: 'ACTIVE' },
-          orderBy: [{ category: 'asc' }, { name: 'asc' }],
-          take: 25,
-        }),
-        this.prisma.canteenMealServing.findMany({
-          where: { tenantId: actor.tenantId, studentId },
+            orderBy: [{ mealDate: 'desc' }, { servedAt: 'desc' }],
+            take: 30,
+          }),
+        ])
+      : [[], []];
+
+    // Phase 2 — one batched meal-plan lookup for enrollments and servings.
+    const mealPlanIds = uniqueIds([
+      ...enrollments.map((enrollment) => enrollment.mealPlanId),
+      ...recentServings.map((serving) => serving.mealPlanId),
+    ]);
+    const mealPlans = mealPlanIds.length
+      ? await this.prisma.canteenMealPlan.findMany({
+          where: { tenantId, id: { in: mealPlanIds } },
           select: {
             id: true,
+            name: true,
             mealType: true,
-            mealDate: true,
-            servedAt: true,
-            status: true,
-            notes: true,
-            mealPlan: { select: { name: true } },
+            price: true,
+            billingFrequency: true,
           },
-          orderBy: [{ mealDate: 'desc' }, { servedAt: 'desc' }],
-          take: 30,
-        }),
-      ]);
+        })
+      : [];
+    const mealPlanById = new Map(mealPlans.map((plan) => [plan.id, plan]));
 
     return {
       wallet: wallet
@@ -2571,16 +2690,21 @@ export class MobileService {
               money(wallet.balance) <= money(wallet.lowBalanceThreshold),
           }
         : null,
-      activeMealPlans: enrollments.map((enrollment) => ({
-        id: enrollment.id,
-        status: enrollment.status,
-        startsOn: toIso(enrollment.startsOn),
-        endsOn: toIso(enrollment.endsOn),
-        mealPlan: {
-          ...enrollment.mealPlan,
-          price: money(enrollment.mealPlan.price),
-        },
-      })),
+      activeMealPlans: enrollments.map((enrollment) => {
+        const mealPlan = mealPlanById.get(enrollment.mealPlanId);
+        return {
+          id: enrollment.id,
+          status: enrollment.status,
+          startsOn: toIso(enrollment.startsOn),
+          endsOn: toIso(enrollment.endsOn),
+          mealPlan: mealPlan
+            ? {
+                ...mealPlan,
+                price: money(mealPlan.price),
+              }
+            : null,
+        };
+      }),
       recentTransactions: recentTransactions.map((transaction) => ({
         id: transaction.id,
         type: transaction.type,
@@ -2606,7 +2730,9 @@ export class MobileService {
         servedAt: toIso(serving.servedAt),
         status: serving.status,
         notes: serving.notes,
-        mealPlanName: serving.mealPlan?.name ?? null,
+        mealPlanName: serving.mealPlanId
+          ? (mealPlanById.get(serving.mealPlanId)?.name ?? null)
+          : null,
       })),
     };
   }

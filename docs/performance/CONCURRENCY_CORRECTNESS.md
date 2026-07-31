@@ -131,15 +131,25 @@ lock, and class-teacher vs subject-teacher authorization collision.
 
 ---
 
-## 5. Payments — `GAP` (not assessed)
+## 5. Payments — `ASSESSED` (unit concurrency, 2026-07-31)
 
-Not examined. Outstanding: duplicate provider callbacks, repeated receipt
-generation, retry after timeout, reversal races, duplicate accounting posting.
+Bounded concurrent-call verification in
+`finance.service.hardening.spec.ts` (`describe('payment concurrency correctness')`)
+and existing sequential idempotency coverage in `finance.service.spec.ts`.
 
-`apps/api/AGENTS.md` states money writes must be idempotent and audited, and
-prior work in M3/M11 built idempotency mechanisms — but none of it was
-re-verified under concurrent execution in this pass. **Do not treat this as
-passing.**
+| Scenario | Result | Evidence |
+| --- | --- | --- |
+| Concurrent identical webhooks (same intent already posted) | Both return `duplicate: true`, same `paymentId`; no payment update | hardening concurrent webhook test |
+| Concurrent `collectPayment` with same idempotency key | Both return `REPLAYED` with same `paymentId`; invoice not updated | hardening concurrent collect test |
+| Concurrent `reversePayment` with same reversal key | Both return `REPLAYED`; `postReversal` not called | hardening concurrent reverse test |
+| Sequential P2002 race on `tenantId+idempotencyKey` | Replay path returns existing payment + receipt | `finance.service.spec.ts` collectPayment race |
+| Parent online intent retry with same key | Unique `(tenantId, idempotencyKey)` + create path | `finance.service.spec.ts` intent tests |
+
+**Still not load-proven:** duplicate callbacks under Scenario C/E k6 traffic,
+fee-to-accounting posting under concurrent webhook storms, or multi-replica
+webhook delivery. Those remain platform load-test gates, not unit gaps.
+
+Do not claim production payment concurrency readiness from unit tests alone.
 
 ---
 

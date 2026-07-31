@@ -22,6 +22,10 @@ describe('MobileService', () => {
     studentDocument: MockModel<'findMany' | 'findFirst'>;
     studentQrCredential: MockModel<'findFirst'>;
     invoice: MockModel<'findMany'>;
+    invoiceLine: MockModel<'findMany'>;
+    payment: MockModel<'findMany'>;
+    receipt: MockModel<'findMany'>;
+    feeHead: MockModel<'findMany'>;
     notificationDelivery: MockModel<'findMany' | 'findFirst' | 'count'>;
     notificationReadReceipt: MockModel<'upsert' | 'createMany'>;
     homeworkAssignment: MockModel<'findMany' | 'findFirst'>;
@@ -30,6 +34,11 @@ describe('MobileService', () => {
     activityPost: MockModel<'findMany'>;
     activityAttachment: MockModel<'findMany'>;
     activityReaction: MockModel<'findMany'>;
+    canteenWallet: MockModel<'findFirst'>;
+    canteenStudentEnrollment: MockModel<'findMany'>;
+    canteenWalletTransaction: MockModel<'findMany'>;
+    canteenMenuItem: MockModel<'findMany'>;
+    canteenMealPlan: MockModel<'findMany'>;
     canteenMealServing: MockModel<'findMany'>;
     transportStudentAssignment: MockModel<'findFirst'>;
     transportEnrollment: MockModel<'findFirst'>;
@@ -100,7 +109,19 @@ describe('MobileService', () => {
         findFirst: jest.fn().mockResolvedValue(null),
       },
       invoice: {
-        findMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      invoiceLine: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      payment: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      receipt: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      feeHead: {
+        findMany: jest.fn().mockResolvedValue([]),
       },
       notificationDelivery: {
         findMany: jest.fn(),
@@ -129,6 +150,21 @@ describe('MobileService', () => {
         findMany: jest.fn().mockResolvedValue([]),
       },
       activityReaction: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      canteenWallet: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      canteenStudentEnrollment: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      canteenWalletTransaction: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      canteenMenuItem: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      canteenMealPlan: {
         findMany: jest.fn().mockResolvedValue([]),
       },
       canteenMealServing: {
@@ -673,8 +709,6 @@ describe('MobileService', () => {
         subtotal: 200,
         vatAmount: 0,
         totalAmount: 200,
-        lines: [],
-        payments: [{ amount: 50 }],
       },
       {
         id: 'invoice-2',
@@ -685,8 +719,6 @@ describe('MobileService', () => {
         subtotal: 25.25,
         vatAmount: 0,
         totalAmount: 25.25,
-        lines: [],
-        payments: [],
       },
       {
         id: 'invoice-3',
@@ -697,20 +729,31 @@ describe('MobileService', () => {
         subtotal: 100,
         vatAmount: 0,
         totalAmount: 100,
-        lines: [],
-        payments: [
-          {
-            id: 'payment-3',
-            amount: 100,
-            method: 'CASH',
-            paidAt: new Date('2026-02-01T00:00:00.000Z'),
-            receipt: {
-              id: 'receipt-3',
-              receiptNumber: 'REC-003',
-              issuedAt: new Date('2026-02-01T00:01:00.000Z'),
-            },
-          },
-        ],
+      },
+    ]);
+    prisma.invoiceLine.findMany.mockResolvedValue([]);
+    prisma.payment.findMany.mockResolvedValue([
+      {
+        id: 'payment-1',
+        invoiceId: 'invoice-1',
+        amount: 50,
+        method: 'CASH',
+        paidAt: new Date('2026-01-05T00:00:00.000Z'),
+      },
+      {
+        id: 'payment-3',
+        invoiceId: 'invoice-3',
+        amount: 100,
+        method: 'CASH',
+        paidAt: new Date('2026-02-01T00:00:00.000Z'),
+      },
+    ]);
+    prisma.receipt.findMany.mockResolvedValue([
+      {
+        id: 'receipt-3',
+        paymentId: 'payment-3',
+        receiptNumber: 'REC-003',
+        issuedAt: new Date('2026-02-01T00:01:00.000Z'),
       },
     ]);
 
@@ -807,38 +850,45 @@ describe('MobileService', () => {
         subtotal: 4200,
         vatAmount: 300,
         totalAmount: 4500,
-        lines: [
-          {
-            id: 'line-1',
-            description: 'Monthly tuition',
-            quantity: 1,
-            unitAmount: 3000,
-            vatAmount: 0,
-            totalAmount: 3000,
-            feeHead: { code: 'TUITION', name: 'Tuition Fee' },
-          },
-          {
-            id: 'line-2',
-            description: 'Route A',
-            quantity: 1,
-            unitAmount: 1200,
-            vatAmount: 300,
-            totalAmount: 1500,
-            feeHead: { code: 'TRANSPORT', name: 'Transport Fee' },
-          },
-        ],
-        payments: [],
       },
     ]);
+    prisma.invoiceLine.findMany.mockResolvedValue([
+      {
+        id: 'line-1',
+        invoiceId: 'invoice-1',
+        feeHeadId: 'head-tuition',
+        description: 'Monthly tuition',
+        quantity: 1,
+        unitAmount: 3000,
+        vatAmount: 0,
+        totalAmount: 3000,
+        createdAt: new Date('2026-07-10T00:00:00.000Z'),
+      },
+      {
+        id: 'line-2',
+        invoiceId: 'invoice-1',
+        feeHeadId: 'head-transport',
+        description: 'Route A',
+        quantity: 1,
+        unitAmount: 1200,
+        vatAmount: 300,
+        totalAmount: 1500,
+        createdAt: new Date('2026-07-10T00:00:01.000Z'),
+      },
+    ]);
+    prisma.feeHead.findMany.mockResolvedValue([
+      { id: 'head-tuition', code: 'TUITION', name: 'Tuition Fee' },
+      { id: 'head-transport', code: 'TRANSPORT', name: 'Transport Fee' },
+    ]);
+    prisma.payment.findMany.mockResolvedValue([]);
 
     const summary = await service.getStudentFeesSummary('student-1', actor);
 
-    expect(prisma.invoice.findMany).toHaveBeenCalledWith(
+    expect(prisma.feeHead.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        include: expect.objectContaining({
-          lines: expect.objectContaining({
-            include: { feeHead: { select: { code: true, name: true } } },
-          }),
+        where: expect.objectContaining({
+          tenantId: 'tenant-1',
+          id: { in: expect.arrayContaining(['head-tuition', 'head-transport']) },
         }),
       }),
     );
@@ -894,10 +944,10 @@ describe('MobileService', () => {
         subtotal: 100,
         vatAmount: 0,
         totalAmount: 100,
-        lines: [],
-        payments: [],
       },
     ]);
+    prisma.invoiceLine.findMany.mockResolvedValue([]);
+    prisma.payment.findMany.mockResolvedValue([]);
 
     const summary = await service.getStudentFeesSummary('student-1', actor);
 
@@ -1817,6 +1867,7 @@ describe('MobileService', () => {
       activity: false,
       transport: false,
       canteen: false,
+      library: false,
     });
     expect(result.attendance).toBeNull();
     expect(result.fees).toBeNull();
@@ -1830,6 +1881,8 @@ describe('MobileService', () => {
     expect(transportSpy).not.toHaveBeenCalled();
     expect(canteenSpy).not.toHaveBeenCalled();
     expect(activitySpy).not.toHaveBeenCalled();
+    expect(prisma.canteenWallet.findFirst).not.toHaveBeenCalled();
+    expect(prisma.transportStudentAssignment.findFirst).not.toHaveBeenCalled();
   });
 
   it('rejects an unlinked dashboard child before loading any child-scoped module', async () => {
@@ -3708,6 +3761,364 @@ describe('MobileService', () => {
         service.getStudentActivityFeed('student-1', actor, '1'),
       ).rejects.toBeInstanceOf(ForbiddenException);
       expect(prisma.activityPost.findMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('parent canteen summary', () => {
+    function authorizeChild(studentId = 'student-1') {
+      prisma.student.findFirst.mockResolvedValue({ id: studentId });
+      prisma.guardian.findFirst.mockResolvedValue({
+        id: 'guardian-1',
+        studentLinks: [
+          {
+            studentId,
+            guardianId: 'guardian-1',
+            capabilities: ALL_GUARDIAN_CAPABILITIES,
+          },
+        ],
+      });
+    }
+
+    function noWalletOrEnrollment() {
+      prisma.canteenWallet.findFirst.mockResolvedValue(null);
+      prisma.canteenStudentEnrollment.findMany.mockResolvedValue([]);
+    }
+
+    it('returns menu items without wallet, transaction, or serving lookups', async () => {
+      authorizeChild();
+      noWalletOrEnrollment();
+      prisma.canteenMenuItem.findMany.mockResolvedValue([
+        {
+          id: 'menu-1',
+          name: 'Samosa',
+          category: 'Snacks',
+          description: null,
+          unitPrice: 25,
+          isMealItem: false,
+          allergenTags: [],
+        },
+      ]);
+
+      await expect(
+        service.getStudentCanteen('student-1', actor),
+      ).resolves.toEqual({
+        wallet: null,
+        activeMealPlans: [],
+        recentTransactions: [],
+        menuItems: [
+          expect.objectContaining({
+            id: 'menu-1',
+            name: 'Samosa',
+            unitPrice: 25,
+          }),
+        ],
+        recentServings: [],
+      });
+
+      expect(prisma.canteenWalletTransaction.findMany).not.toHaveBeenCalled();
+      expect(prisma.canteenMealServing.findMany).not.toHaveBeenCalled();
+      expect(prisma.canteenMealPlan.findMany).not.toHaveBeenCalled();
+    });
+
+    it('loads wallet activity with batched meal plans and no include fan-out', async () => {
+      authorizeChild();
+      prisma.canteenWallet.findFirst.mockResolvedValue({
+        id: 'wallet-1',
+        balance: 450,
+        lowBalanceThreshold: 100,
+      });
+      prisma.canteenStudentEnrollment.findMany.mockResolvedValue([
+        {
+          id: 'enrollment-1',
+          mealPlanId: 'plan-1',
+          status: 'ACTIVE',
+          startsOn: new Date('2026-04-01T00:00:00.000Z'),
+          endsOn: null,
+        },
+      ]);
+      prisma.canteenMenuItem.findMany.mockResolvedValue([]);
+      prisma.canteenWalletTransaction.findMany.mockResolvedValue([
+        {
+          id: 'tx-1',
+          type: 'TOP_UP',
+          source: 'MANUAL',
+          amount: 500,
+          balanceAfter: 450,
+          transactionDate: new Date('2026-07-01T00:00:00.000Z'),
+          note: 'Top-up',
+        },
+      ]);
+      prisma.canteenMealServing.findMany.mockResolvedValue([
+        {
+          id: 'serving-1',
+          mealType: 'LUNCH',
+          mealDate: new Date('2026-07-01T00:00:00.000Z'),
+          servedAt: new Date('2026-07-01T06:00:00.000Z'),
+          status: 'SERVED',
+          notes: null,
+          mealPlanId: 'plan-1',
+        },
+      ]);
+      prisma.canteenMealPlan.findMany.mockResolvedValue([
+        {
+          id: 'plan-1',
+          name: 'Daily Lunch',
+          mealType: 'LUNCH',
+          price: 3500,
+          billingFrequency: 'MONTHLY',
+        },
+      ]);
+
+      const result = await service.getStudentCanteen('student-1', actor);
+
+      expect(result.wallet).toEqual({
+        id: 'wallet-1',
+        balance: 450,
+        lowBalanceThreshold: 100,
+        isLowBalance: false,
+      });
+      expect(result.activeMealPlans[0]?.mealPlan).toEqual({
+        id: 'plan-1',
+        name: 'Daily Lunch',
+        mealType: 'LUNCH',
+        price: 3500,
+        billingFrequency: 'MONTHLY',
+      });
+      expect(result.recentServings[0]?.mealPlanName).toBe('Daily Lunch');
+      expect(prisma.canteenMealPlan.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.canteenMealPlan.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            tenantId: 'tenant-1',
+            id: { in: ['plan-1'] },
+          }),
+        }),
+      );
+    });
+
+    it('denies canteen reads without FEES_VIEW capability', async () => {
+      prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+      prisma.guardian.findFirst.mockResolvedValue({
+        id: 'guardian-1',
+        studentLinks: [
+          {
+            studentId: 'student-1',
+            guardianId: 'guardian-1',
+            capabilities: [GuardianCapability.ACADEMICS_VIEW],
+          },
+        ],
+      });
+
+      await expect(
+        service.getStudentCanteen('student-1', actor),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prisma.canteenWallet.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('resolves a cross-tenant meal plan id to null instead of leaking it', async () => {
+      authorizeChild();
+      prisma.canteenWallet.findFirst.mockResolvedValue(null);
+      prisma.canteenStudentEnrollment.findMany.mockResolvedValue([
+        {
+          id: 'enrollment-1',
+          mealPlanId: 'plan-of-other-tenant',
+          status: 'ACTIVE',
+          startsOn: new Date('2026-04-01T00:00:00.000Z'),
+          endsOn: null,
+        },
+      ]);
+      prisma.canteenMenuItem.findMany.mockResolvedValue([]);
+      prisma.canteenWalletTransaction.findMany.mockResolvedValue([]);
+      prisma.canteenMealServing.findMany.mockResolvedValue([]);
+      prisma.canteenMealPlan.findMany.mockResolvedValue([]);
+
+      const result = await service.getStudentCanteen('student-1', actor);
+
+      expect(result.activeMealPlans[0]?.mealPlan).toBeNull();
+      expect(JSON.stringify(result)).not.toContain('plan-of-other-tenant');
+    });
+
+    it('marks low-balance wallets using the configured threshold', async () => {
+      authorizeChild();
+      prisma.canteenWallet.findFirst.mockResolvedValue({
+        id: 'wallet-1',
+        balance: 80,
+        lowBalanceThreshold: 100,
+      });
+      prisma.canteenStudentEnrollment.findMany.mockResolvedValue([]);
+      prisma.canteenMenuItem.findMany.mockResolvedValue([]);
+      prisma.canteenWalletTransaction.findMany.mockResolvedValue([]);
+      prisma.canteenMealServing.findMany.mockResolvedValue([]);
+
+      const result = await service.getStudentCanteen('student-1', actor);
+
+      expect(result.wallet).toEqual(
+        expect.objectContaining({
+          balance: 80,
+          lowBalanceThreshold: 100,
+          isLowBalance: true,
+        }),
+      );
+    });
+  });
+
+  describe('parent fees summary', () => {
+    function authorizeChild(studentId = 'student-1') {
+      prisma.student.findFirst.mockResolvedValue({ id: studentId });
+      prisma.guardian.findFirst.mockResolvedValue({
+        id: 'guardian-1',
+        studentLinks: [
+          {
+            studentId,
+            guardianId: 'guardian-1',
+            capabilities: ALL_GUARDIAN_CAPABILITIES,
+          },
+        ],
+      });
+    }
+
+    it('returns an empty summary without line, payment, or receipt lookups', async () => {
+      authorizeChild();
+      prisma.invoice.findMany.mockResolvedValue([]);
+
+      await expect(
+        service.getStudentFeesSummary('student-1', actor),
+      ).resolves.toEqual({
+        status: 'PAID',
+        totalAmount: 0,
+        paidAmount: 0,
+        totalOutstanding: 0,
+        overdueCount: 0,
+        nextDueDate: null,
+        recentInvoices: [],
+        recentReceipts: [],
+      });
+
+      expect(prisma.invoiceLine.findMany).not.toHaveBeenCalled();
+      expect(prisma.payment.findMany).not.toHaveBeenCalled();
+      expect(prisma.receipt.findMany).not.toHaveBeenCalled();
+      expect(prisma.feeHead.findMany).not.toHaveBeenCalled();
+    });
+
+    it('loads a populated summary with batched fee heads and receipts', async () => {
+      authorizeChild();
+      prisma.invoice.findMany.mockResolvedValue([
+        {
+          id: 'invoice-1',
+          invoiceNumber: 'INV-001',
+          status: 'PAID',
+          dueDate: new Date('2026-07-01T00:00:00.000Z'),
+          issuedAt: new Date('2026-06-01T00:00:00.000Z'),
+          subtotal: 1000,
+          vatAmount: 0,
+          totalAmount: 1000,
+        },
+      ]);
+      prisma.invoiceLine.findMany.mockResolvedValue([
+        {
+          id: 'line-1',
+          invoiceId: 'invoice-1',
+          feeHeadId: 'head-1',
+          description: 'Tuition',
+          quantity: 1,
+          unitAmount: 1000,
+          vatAmount: 0,
+          totalAmount: 1000,
+          createdAt: new Date('2026-06-01T00:00:00.000Z'),
+        },
+      ]);
+      prisma.payment.findMany.mockResolvedValue([
+        {
+          id: 'payment-1',
+          invoiceId: 'invoice-1',
+          amount: 1000,
+          method: 'CASH',
+          paidAt: new Date('2026-06-15T00:00:00.000Z'),
+        },
+      ]);
+      prisma.feeHead.findMany.mockResolvedValue([
+        { id: 'head-1', code: 'TUITION', name: 'Tuition Fee' },
+      ]);
+      prisma.receipt.findMany.mockResolvedValue([
+        {
+          id: 'receipt-1',
+          paymentId: 'payment-1',
+          receiptNumber: 'REC-001',
+          issuedAt: new Date('2026-06-15T00:01:00.000Z'),
+        },
+      ]);
+
+      const result = await service.getStudentFeesSummary('student-1', actor);
+
+      expect(result.status).toBe('PAID');
+      expect(result.recentInvoices[0]?.lines[0]?.feeHead).toEqual({
+        code: 'TUITION',
+        name: 'Tuition Fee',
+      });
+      expect(result.recentReceipts[0]?.receiptNumber).toBe('REC-001');
+      expect(prisma.invoice.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.invoiceLine.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.payment.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.feeHead.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.receipt.findMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('denies fee reads without FEES_VIEW capability', async () => {
+      prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+      prisma.guardian.findFirst.mockResolvedValue({
+        id: 'guardian-1',
+        studentLinks: [
+          {
+            studentId: 'student-1',
+            guardianId: 'guardian-1',
+            capabilities: [GuardianCapability.ACADEMICS_VIEW],
+          },
+        ],
+      });
+
+      await expect(
+        service.getStudentFeesSummary('student-1', actor),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prisma.invoice.findMany).not.toHaveBeenCalled();
+    });
+
+    it('omits cross-tenant fee heads rather than leaking them', async () => {
+      authorizeChild();
+      prisma.invoice.findMany.mockResolvedValue([
+        {
+          id: 'invoice-1',
+          invoiceNumber: 'INV-001',
+          status: 'ISSUED',
+          dueDate: new Date('2026-08-01T00:00:00.000Z'),
+          issuedAt: new Date('2026-07-01T00:00:00.000Z'),
+          subtotal: 500,
+          vatAmount: 0,
+          totalAmount: 500,
+        },
+      ]);
+      prisma.invoiceLine.findMany.mockResolvedValue([
+        {
+          id: 'line-1',
+          invoiceId: 'invoice-1',
+          feeHeadId: 'head-other-tenant',
+          description: 'Mystery charge',
+          quantity: 1,
+          unitAmount: 500,
+          vatAmount: 0,
+          totalAmount: 500,
+          createdAt: new Date('2026-07-01T00:00:00.000Z'),
+        },
+      ]);
+      prisma.payment.findMany.mockResolvedValue([]);
+      prisma.feeHead.findMany.mockResolvedValue([]);
+
+      const result = await service.getStudentFeesSummary('student-1', actor);
+
+      expect(result.recentInvoices[0]?.lines[0]?.feeHead).toEqual({
+        code: '',
+        name: '',
+      });
+      expect(JSON.stringify(result)).not.toContain('head-other-tenant');
     });
   });
 

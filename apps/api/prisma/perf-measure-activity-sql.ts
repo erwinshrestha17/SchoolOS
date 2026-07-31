@@ -100,7 +100,7 @@ async function measureActivityQueries(fixture: Fixture) {
 }
 
 async function main() {
-  const results = [];
+  const results: Array<Awaited<ReturnType<typeof measureActivityQueries>>> = [];
   for (const fixture of ['empty', 'one', 'multi'] as Fixture[]) {
     results.push(await measureActivityQueries(fixture));
   }

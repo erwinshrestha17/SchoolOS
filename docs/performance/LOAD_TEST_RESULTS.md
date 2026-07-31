@@ -443,7 +443,7 @@ attachments/reactions):
 
 | Path | Activity SQL | Notes |
 | --- | ---: | --- |
-| Empty (no matching post) | **1** | root `ActivityPost` only |
+| Empty (no matching post) | **1** | root `ActivityPost` only — `parent-perf-empty@` |
 | Populated (latest preview) | **3** | root + `ActivityAttachment` + `ActivityReaction` |
 
 Unit tests in `describe('parent activity summary')` enforce the same short-circuit
@@ -461,39 +461,42 @@ only when `posts.length > 0`; in-memory counts and SEEN derivation.
 batches `class`, `section`, and `student` with tenant-scoped `findMany({ id: { in } })`
 instead of Prisma `include` fan-out. Empty milestone lists return after one query.
 
-### Dashboard throughput — after (not re-measured)
+### Dashboard throughput — after (measured 2026-07-31)
 
-A full before/after k6/autocannon comparison **could not be completed** in this
-session: after rebuilding the API, `POST /auth/login` returned HTTP 500
-(`PrismaClientKnownRequestError` on `tenant.findUnique`) following a prior
-192k-login k6 attempt against a saturated local pool. Health returned 200.
-
-Expected dashboard SQL reduction: **~5 statements** on populated paths
-(8→3 activity bucket), for an estimated total of **~69** (74−5), pending a clean
-re-run of:
+Re-measured against the dev stack (`docker compose` postgres on `:5433`, API on
+`:4001` with `apps/api/.env`, 1,500-student `perf-school` tenant after
+`PERF_RESET=1` re-seed). The staging-local API profile (`:4000` → `:5434`) was
+**not** used because staging postgres was not running; login returned HTTP 500
+against an unreachable database.
 
 ```bash
 pnpm --filter @schoolos/api build
-pnpm staging:api:local
-# obtain token per tests/load/README.md
-PERF_ACCESS_TOKEN=… tests/load/run-ramp.sh /api/v1/mobile/me/dashboard 12 "50"
-k6 run -e SCENARIO=C -e VU_SCALE=0.2 -e DURATION=3m tests/load/k6/scenarios.js
+cd apps/api && PORT=4001 pnpm start
+PERF_BASE_URL=http://localhost:4001 PERF_ACCESS_TOKEN=… \
+  tests/load/run-ramp.sh /api/v1/mobile/me/dashboard 12 "50"
+PERF_BASE_URL=http://localhost:4001 \
+  k6 run -e SCENARIO=C -e VU_SCALE=0.2 -e DURATION=3m tests/load/k6/scenarios.js
+# dashboard SQL: log_statement='all', 3 requests, docker logs --since 30s
 ```
 
-### Results table (partial — throughput pending clean re-run)
+> **Note:** This throughput run used the build that includes **both** the activity
+> slice and the canteen slice (Run 8). Isolated activity SQL counts above remain
+> the honest Run 7 query-model evidence.
 
-| Metric | Before | After | Target | Status |
+### Results table
+
+| Metric | Before (Run 6) | After | Target | Status |
 | --- | ---: | ---: | ---: | --- |
-| Activity SQL, empty path | ~8 (empty table) | **1** (model) | ≤3 | **met** |
-| Activity SQL, populated path | ~8 | **3** (model) | ≤3 | **met** |
-| Total dashboard SQL | ~74 | ~69 est. | ≤68 | **pending re-measure** |
-| Throughput at c=50 | ~77 rps | not re-run | ≥82 rps | **pending re-measure** |
-| p50 at c=50 | ~632 ms | not re-run | no regression | **pending re-measure** |
-| p95 at c=50 | ~721 ms | not re-run | improve or flat | **pending re-measure** |
-| Bootstrap p95 at c=100 | ~454 ms | not re-run | <600 ms | **pending re-measure** |
-| DB connections | ~10 pool | not re-run | no material regression | **pending re-measure** |
-| HTTP 5xx | 0 | login blocked re-run | 0 | **pending re-measure** |
-| Response contract | unchanged | unit-tested | unchanged | **met** (shape) |
+| Activity SQL, empty path | ~8 (empty table) | **1** | ≤3 | **met** |
+| Activity SQL, populated path | ~8 | **3** | ≤3 | **met** |
+| Total dashboard SQL | ~74 | **~76** (3-req avg) | ≤68 | **miss** |
+| Throughput at c=50 | ~77 rps | **72 rps** | ≥82 rps | **miss** |
+| p50 at c=50 | ~632 ms | **673 ms** | no regression | **flat** |
+| p97.5 at c=50 | ~721 ms | **798 ms** | improve or flat | **flat/slight regression** |
+| Bootstrap p95 at c=100 | ~454 ms | **620 ms** | <600 ms | **miss** |
+| DB connections | ~10 pool | not isolated | no material regression | **not measured** |
+| HTTP 5xx | 0 | **0** | 0 | **met** |
+| Response contract | unchanged | unit-tested | unchanged | **met** |
 
 ### Security predicates preserved
 
@@ -529,20 +532,155 @@ apps/api/src/activity-feed/activity-feed.service.spec.ts   parent milestone test
 | `pnpm --filter @schoolos/api test -- src/mobile/mobile.service.spec.ts src/activity-feed/activity-feed.service.spec.ts` | 108 / 108 pass |
 | `pnpm db:validate` | pass |
 | `pnpm verify:openapi` | pass |
-| `pnpm --filter @schoolos/api perf:verify` | pass (43 posts, 3000 milestones) |
-| `pnpm --filter @schoolos/api perf:measure-activity-sql` | populated path **3** SQL |
-| k6 / autocannon dashboard | **not run** — login 500 after pool saturation |
+| `pnpm --filter @schoolos/api perf:verify` | pass (113 posts, 3000 milestones) |
+| `pnpm --filter @schoolos/api perf:measure-activity-sql` | empty **1**, populated **3** SQL |
+| autocannon dashboard c=50 | **72 rps**, p50 **673 ms**, 0 non-2xx |
+| k6 SCENARIO=C VU_SCALE=0.2 | bootstrap p95 **620 ms**, 0 failures |
+| dashboard SQL (log_statement) | **~76** avg over 3 requests |
 
 ### Unresolved activity bottlenecks
 
-- Dashboard throughput still dominated by ~65 non-activity statements (canteen,
-  fees, attendance, homework, notices, auth).
+- Dashboard throughput still dominated by non-activity statements (canteen, fees,
+  attendance, homework, notices, auth). The ≥82 rps target was not reached.
 - Populated-path activity could not be collapsed below 3 without hand-written SQL
   or Prisma `relationJoins` preview (same transport-slice rationale).
-- Full before/after byte-identical dashboard diff pending clean load harness re-run.
+- Total dashboard SQL (~76) did not reach the ≤68 stretch target; canteen menu
+  (tenant-wide, take 25) and fees remain the next buckets.
 
 **Activity slice query-model: ready.** End-to-end throughput claim: **not ready**
-until k6/autocannon re-run succeeds.
+(72 rps < 82 rps target; bootstrap p95 620 ms > 600 ms).
+
+---
+
+## Run 8 — Parent dashboard canteen summary (bounded slice)
+
+Same host, same `perf-school` dataset (now with representative canteen menu,
+wallets, enrollments, servings, and wallet transactions), same 1-replica API
+on `:4001`. Only the canteen query model changed on top of the Run 7 activity
+optimizations.
+
+### Before (carried from Run 6 — pre-canteen-optimization code)
+
+| Metric | Run 6 before |
+| --- | ---: |
+| Canteen SQL (dashboard bucket) | ~7 |
+| Total dashboard SQL | ~74 |
+
+### Canteen query model — after (isolated path counts)
+
+Measured with `pnpm --filter @schoolos/api perf:measure-canteen-sql`:
+
+| Path | Canteen SQL | Notes |
+| --- | ---: | --- |
+| Empty (no wallet, no enrollments) | **3** | wallet + enrollments + menu |
+| Populated (`parent-perf-one@`) | **6** | + transactions + servings + batched mealPlan |
+| Wallet-only (`parent-perf-multi@` child 2) | **5** | wallet path without enrollments |
+
+Unit tests in `describe('parent canteen summary')` enforce empty-path
+short-circuit, batched `canteenMealPlan.findMany`, and `FEES_VIEW` denial.
+
+**Removed:** Prisma `include: { mealPlan }` fan-out on enrollments and servings.
+
+**Introduced:** phased scalar roots; skip transactions/servings when no wallet and
+no active enrollments; batched tenant-scoped meal-plan lookup.
+
+### Performance seed extensions
+
+[`seed-performance-tenant.ts`](../../apps/api/prisma/seed-performance-tenant.ts)
+now seeds (perf tenant only):
+
+- 25 active menu items, 2 meal plans;
+- wallets (~25% of students), enrollments (~10%), servings, transactions;
+- fixture alignment: `parent-perf-empty@` child has **no wallet**;
+  `parent-perf-one@` has wallet + enrollment + servings.
+
+Env overrides: `PERF_CANTEEN_MENU_ITEMS`, `PERF_CANTEEN_WALLET_RATIO`,
+`PERF_CANTEEN_ENROLLED_RATIO`.
+
+### Dashboard throughput — after (same Run 7 measurement pass)
+
+The Run 7 re-measurement above already exercised this build (activity + canteen).
+No separate k6/autocannon pass was run for Run 8 alone.
+
+| Metric | Run 7 after (combined build) | Target | Status |
+| --- | ---: | ---: | --- |
+| Canteen SQL, empty path | **3** | ≤3 | **met** |
+| Canteen SQL, populated path | **6** | bounded | **met** |
+| Total dashboard SQL | **~76** | ≤68 | **miss** |
+| Throughput at c=50 | **72 rps** | ≥82 rps | **miss** |
+| Bootstrap p95 at c=100 | **620 ms** | <600 ms | **miss** |
+| HTTP 5xx | **0** | 0 | **met** |
+| Response contract | unit-tested | unchanged | **met** |
+
+### Files changed
+
+```text
+apps/api/prisma/seed-performance-tenant.ts       canteen seed + activity fixture fix
+apps/api/prisma/perf-verify.ts                   canteen row counts
+apps/api/prisma/perf-measure-canteen-sql.ts      isolated canteen SQL counter
+apps/api/package.json                            perf:measure-canteen-sql
+apps/api/src/mobile/mobile.service.ts            phased getStudentCanteen
+apps/api/src/mobile/mobile.service.spec.ts       parent canteen summary tests
+```
+
+**Public API changes: none.**
+
+### Verification
+
+| Command | Result |
+| --- | --- |
+| `pnpm --filter @schoolos/api typecheck` | pass |
+| `pnpm --filter @schoolos/api test -- src/mobile/mobile.service.spec.ts` | 74 / 74 pass |
+| `pnpm db:validate` | pass |
+| `pnpm verify:openapi` | pass |
+| `pnpm --filter @schoolos/api perf:verify` | pass (25 menu items, 362 wallets) |
+| `pnpm --filter @schoolos/api perf:measure-canteen-sql` | empty **3**, one **6** SQL |
+
+### Unresolved canteen bottlenecks
+
+- Tenant-wide `canteenMenuItem.findMany` (take 25) runs on every dashboard request;
+  empty-path floor is **3**, not 1.
+- Throughput ≥82 rps remains blocked by fees (~6 SQL) and remaining dashboard fan-out.
+
+**Canteen slice query-model: ready.** Combined dashboard throughput claim: **not ready**.
+
+> **Wave 1 deferral (2026-07-31):** M8 Library, M9 Transport, and M10 Canteen
+> leave the active one-school concurrency program. Code and migrations are
+> preserved. The performance tenant now uses the **STANDARD** plan with
+> `addOns: []` so those modules are entitlement-disabled and execute **zero**
+> dashboard queries. Prior Run 6–8 canteen/transport numbers are historical and
+> must not be used as the pilot core-dashboard baseline.
+
+---
+
+## Core dashboard baseline — M8/M9/M10 off (pre–fee-summary optimize)
+
+Measured after pinning `perf-school` to STANDARD (no library/transport/canteen)
+and confirming `modules.canteen/transport/library === false` on the parent
+dashboard. API on `:4001` against docker postgres `:5433`.
+
+| Metric | Value | Notes |
+| --- | ---: | --- |
+| Total dashboard SQL | _pending measure_ | 3-request avg with `log_statement` |
+| Throughput at c=50 | _pending measure_ | autocannon 12 s |
+| Bootstrap p95 at c=100 | _pending measure_ | k6 SCENARIO=C VU_SCALE=0.2 |
+| HTTP 5xx | _pending measure_ | |
+| Modules canteen/transport/library | **false** | STANDARD plan |
+
+---
+
+## Run 9 — Parent fee summary (bounded slice)
+
+Phased `getStudentFeesSummary`: invoice scalars → early empty return → batched
+lines/payments → batched feeHeads/receipts. Response shape unchanged.
+
+| Metric | Before | After | Target | Status |
+| --- | ---: | ---: | ---: | --- |
+| Fee SQL, empty path | ~6 | _pending_ | ≤2 | pending |
+| Fee SQL, populated path | ~6 | _pending_ | ≤5 | pending |
+| Total dashboard SQL | core baseline | _pending_ | improve | pending |
+| Throughput at c=50 | core baseline | _pending_ | ≥82 stretch | pending |
+| Payment concurrency unit tests | GAP | assessed | duplicate→0 | **met** (unit) |
 
 ---
 

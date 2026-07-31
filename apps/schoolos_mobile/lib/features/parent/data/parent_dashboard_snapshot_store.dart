@@ -299,6 +299,8 @@ Map<String, dynamic> _encodeChild(ParentPortalChild child) => {
   'homeworkEnabled': child.homeworkEnabled,
   'feesEnabled': child.feesEnabled,
   'transportEnabled': child.transportEnabled,
+  'canteenEnabled': child.canteenEnabled,
+  'libraryEnabled': child.libraryEnabled,
   'capabilities': child.capabilities.toList()..sort(),
 };
 
@@ -342,6 +344,8 @@ ParentPortalChild? _decodeChild(Map<String, dynamic> json) {
     homeworkEnabled: json['homeworkEnabled'] != false,
     feesEnabled: json['feesEnabled'] != false,
     transportEnabled: json['transportEnabled'] != false,
+    canteenEnabled: json['canteenEnabled'] == true,
+    libraryEnabled: json['libraryEnabled'] == true,
     capabilities: (json['capabilities'] as List<dynamic>? ?? const [])
         .whereType<String>()
         .toSet(),

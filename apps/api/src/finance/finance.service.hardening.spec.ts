@@ -929,4 +929,133 @@ describe('FinanceService - Hardening', () => {
       );
     });
   });
+
+  describe('payment concurrency correctness', () => {
+    it('deduplicates concurrent identical webhooks to one payment id', async () => {
+      const mockPayment = {
+        id: 'p-webhook-concurrent',
+        amount: new Prisma.Decimal(1500),
+        status: PaymentStatus.SUCCESS,
+        idempotencyKey: 'payment-intent:intent-concurrent',
+      };
+
+      (prisma.providerConfig.findFirst as jest.Mock).mockResolvedValue({
+        id: 'prov-1',
+        name: 'ESEWA',
+        configEncrypted: { webhookSecret: 'secret' },
+      });
+      jest
+        .spyOn(service as any, 'verifyWebhookSignature')
+        .mockReturnValue(true);
+      (prisma.onlinePaymentIntent.findFirst as jest.Mock).mockResolvedValue({
+        id: 'intent-concurrent',
+        tenantId: actor.tenantId,
+        invoiceId: 'invoice-1',
+        provider: 'ESEWA',
+        amount: new Prisma.Decimal(1500),
+        status: 'SUCCEEDED',
+      });
+      (prisma.payment.findFirst as jest.Mock).mockResolvedValue(mockPayment);
+
+      const payload = {
+        reference: 'REF-CONCURRENT',
+        amount: 1500,
+        status: 'SUCCESS',
+      };
+      const headers = {
+        signature: 'valid-signature',
+        'x-tenant-id': actor.tenantId,
+      };
+
+      const [first, second] = await Promise.all([
+        service.handleOnlinePaymentWebhook('esewa', payload, headers),
+        service.handleOnlinePaymentWebhook('esewa', payload, headers),
+      ]);
+
+      expect(first).toEqual(
+        expect.objectContaining({
+          duplicate: true,
+          paymentId: 'p-webhook-concurrent',
+        }),
+      );
+      expect(second).toEqual(
+        expect.objectContaining({
+          duplicate: true,
+          paymentId: 'p-webhook-concurrent',
+        }),
+      );
+      expect(prisma.payment.update).not.toHaveBeenCalled();
+    });
+
+    it('replays concurrent collectPayment calls with the same idempotency key', async () => {
+      const existingPayment = {
+        id: 'payment-existing',
+        invoiceId: 'invoice-1',
+        amount: new Prisma.Decimal(500),
+        method: 'CASH',
+        paidAt: new Date('2026-07-01T00:00:00.000Z'),
+        receipt: {
+          id: 'receipt-existing',
+          receiptNumber: 'REC-CONCURRENT-1',
+          fileAssetId: 'file-1',
+          fileStatus: 'AVAILABLE',
+        },
+      };
+      (prisma.payment.findUnique as jest.Mock).mockResolvedValue(
+        existingPayment,
+      );
+
+      const dto = {
+        invoiceId: 'invoice-1',
+        amount: 500,
+        method: 'CASH' as const,
+        idempotencyKey: 'concurrent-collect-1',
+      };
+
+      const [first, second] = await Promise.all([
+        service.collectPayment(dto, actor as any),
+        service.collectPayment(dto, actor as any),
+      ]);
+
+      expect(first.paymentId).toBe('payment-existing');
+      expect(second.paymentId).toBe('payment-existing');
+      expect(first.disposition).toBe('REPLAYED');
+      expect(second.disposition).toBe('REPLAYED');
+      expect(prisma.invoice.update).not.toHaveBeenCalled();
+    });
+
+    it('does not double-reverse when reversePayment is called concurrently', async () => {
+      const reversedPayment = {
+        id: 'p-reversed',
+        invoiceId: 'i1',
+        status: PaymentStatus.REVERSED,
+        reversedAt: new Date('2026-05-01T10:00:00.000Z'),
+        reversalReason: 'Incorrect charge',
+        reversalIdempotencyKey: 'reverse-concurrent',
+        refunds: [],
+        receipt: null,
+        invoice: { id: 'i1' },
+      };
+      (prisma.payment.findFirst as jest.Mock).mockResolvedValue(
+        reversedPayment,
+      );
+
+      const [first, second] = await Promise.all([
+        service.reversePayment(
+          'p-reversed',
+          { reason: 'Incorrect charge', idempotencyKey: 'reverse-concurrent' },
+          actor as any,
+        ),
+        service.reversePayment(
+          'p-reversed',
+          { reason: 'Incorrect charge', idempotencyKey: 'reverse-concurrent' },
+          actor as any,
+        ),
+      ]);
+
+      expect(first.disposition).toBe('REPLAYED');
+      expect(second.disposition).toBe('REPLAYED');
+      expect(accountingPostingService.postReversal).not.toHaveBeenCalled();
+    });
+  });
 });

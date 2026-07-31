@@ -239,6 +239,8 @@ class ParentPortalRepository {
       homeworkEnabled: dashboard?.homeworkEnabled ?? false,
       feesEnabled: dashboard?.feesEnabled ?? false,
       transportEnabled: dashboard?.transportEnabled ?? false,
+      canteenEnabled: dashboard?.canteenEnabled ?? false,
+      libraryEnabled: dashboard?.libraryEnabled ?? false,
       capabilities: child.capabilities,
     );
   }

@@ -102,13 +102,14 @@ class ParentPortalMoreTab extends StatelessWidget {
             AppRoutes.parentFeesReceipts,
             capability: GuardianCapabilityKey.feesView,
           ),
-          _Menu(
-            Icons.account_balance_wallet_outlined,
-            'Canteen Wallet',
-            'Balance and recent school purchases',
-            AppRoutes.parentCanteen,
-            capability: GuardianCapabilityKey.feesView,
-          ),
+          if (data.activeChild?.canteenEnabled == true)
+            _Menu(
+              Icons.account_balance_wallet_outlined,
+              'Canteen Wallet',
+              'Balance and recent school purchases',
+              AppRoutes.parentCanteen,
+              capability: GuardianCapabilityKey.feesView,
+            ),
         ]),
         _group(context, 'Services', [
           _Menu(
@@ -117,20 +118,22 @@ class ParentPortalMoreTab extends StatelessWidget {
             'Live school tasks that need your attention',
             AppRoutes.parentActionCentre,
           ),
-          _Menu(
-            Icons.directions_bus_outlined,
-            'Transport',
-            'Pickup, route, and trip information',
-            AppRoutes.parentTransport,
-            capability: GuardianCapabilityKey.emergencyAlertReceive,
-          ),
-          _Menu(
-            Icons.local_library_outlined,
-            'Library',
-            'Borrowed books and due dates',
-            AppRoutes.parentLibrary,
-            capability: GuardianCapabilityKey.academicsView,
-          ),
+          if (data.activeChild?.transportEnabled == true)
+            _Menu(
+              Icons.directions_bus_outlined,
+              'Transport',
+              'Pickup, route, and trip information',
+              AppRoutes.parentTransport,
+              capability: GuardianCapabilityKey.emergencyAlertReceive,
+            ),
+          if (data.activeChild?.libraryEnabled == true)
+            _Menu(
+              Icons.local_library_outlined,
+              'Library',
+              'Borrowed books and due dates',
+              AppRoutes.parentLibrary,
+              capability: GuardianCapabilityKey.academicsView,
+            ),
           _Menu(
             Icons.fact_check_outlined,
             'Consent & Permissions',

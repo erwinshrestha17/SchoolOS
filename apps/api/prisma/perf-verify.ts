@@ -61,6 +61,36 @@ async function main() {
   await countFor(tenant.id, 'notification deliveries', () =>
     prisma.notificationDelivery.count({ where: { tenantId: tenant.id } }),
   );
+  await countFor(tenant.id, 'canteen menu items', () =>
+    prisma.canteenMenuItem.count({ where: { tenantId: tenant.id } }),
+  );
+  await countFor(tenant.id, 'canteen meal plans', () =>
+    prisma.canteenMealPlan.count({ where: { tenantId: tenant.id } }),
+  );
+  await countFor(tenant.id, 'canteen wallets', () =>
+    prisma.canteenWallet.count({ where: { tenantId: tenant.id } }),
+  );
+  await countFor(tenant.id, 'canteen enrollments', () =>
+    prisma.canteenStudentEnrollment.count({ where: { tenantId: tenant.id } }),
+  );
+  await countFor(tenant.id, 'canteen servings', () =>
+    prisma.canteenMealServing.count({ where: { tenantId: tenant.id } }),
+  );
+  await countFor(tenant.id, 'canteen wallet transactions', () =>
+    prisma.canteenWalletTransaction.count({ where: { tenantId: tenant.id } }),
+  );
+  await countFor(tenant.id, 'fee invoices', () =>
+    prisma.invoice.count({ where: { tenantId: tenant.id } }),
+  );
+  await countFor(tenant.id, 'fee invoice lines', () =>
+    prisma.invoiceLine.count({ where: { tenantId: tenant.id } }),
+  );
+  await countFor(tenant.id, 'fee payments', () =>
+    prisma.payment.count({ where: { tenantId: tenant.id } }),
+  );
+  await countFor(tenant.id, 'fee receipts', () =>
+    prisma.receipt.count({ where: { tenantId: tenant.id } }),
+  );
 
   await prisma.$disconnect();
 }

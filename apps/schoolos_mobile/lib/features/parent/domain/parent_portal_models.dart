@@ -144,6 +144,8 @@ class ParentPortalChild {
     this.homeworkEnabled = true,
     this.feesEnabled = true,
     this.transportEnabled = true,
+    this.canteenEnabled = true,
+    this.libraryEnabled = true,
     this.capabilities = const <String>{},
   });
 
@@ -182,6 +184,8 @@ class ParentPortalChild {
   final bool homeworkEnabled;
   final bool feesEnabled;
   final bool transportEnabled;
+  final bool canteenEnabled;
+  final bool libraryEnabled;
   final Set<String> capabilities;
 
   bool get hasFeesDue => feesDue > 0;
