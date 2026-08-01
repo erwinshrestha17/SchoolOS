@@ -7,6 +7,10 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ClsService } from 'nestjs-cls';
 import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
+import { AuthzCacheService } from '../src/auth/authz-cache.service';
+import { RequestCacheService } from '../src/common/cache/request-cache.service';
+import { createPassThroughRedisCache } from './helpers/redis-cache';
+import { createPassThroughRequestCache } from './helpers/request-cache';
 import { MustChangePasswordGuard } from '../src/auth/guards/must-change-password.guard';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ConfigService } from '../src/config/config.service';
@@ -55,6 +59,16 @@ describe('Auth Security Hardening (Regression)', () => {
         // request.auth; these regression cases assert the authorization
         // decisions that happen before that delegation.
         { provide: MustChangePasswordGuard, useValue: mockMustChangePassword },
+        // Real service over the same Prisma stub, with caching disabled so
+        // each case resolves roles from the fixture it just set up.
+        {
+          provide: AuthzCacheService,
+          useValue: new AuthzCacheService(
+            prisma as unknown as PrismaService,
+            createPassThroughRedisCache(),
+          ),
+        },
+        { provide: RequestCacheService, useValue: createPassThroughRequestCache() },
       ],
     }).compile();
 
@@ -74,7 +88,6 @@ describe('Auth Security Hardening (Regression)', () => {
       tenantId: 'tenant-A', // Mismatch!
       status: 'ACTIVE',
       tenant: { isActive: true },
-      userRoles: [],
     });
 
     const request = {
@@ -121,6 +134,11 @@ describe('Auth Security Hardening (Regression)', () => {
       tenantId: 'platform-tenant',
       roles: ['platform_super_admin'],
     };
+    // AuthzCacheService resolves roles from these two reads.
+    prisma.userRole.findMany.mockResolvedValue([
+      { role: { name: 'platform_super_admin' } },
+    ]);
+    prisma.rolePermission.findMany.mockResolvedValue([]);
     (jwtService.verifyAsync as jest.Mock).mockResolvedValue(payload);
 
     prisma.user.findUnique.mockResolvedValue({
@@ -128,9 +146,6 @@ describe('Auth Security Hardening (Regression)', () => {
       tenantId: 'platform-tenant',
       status: 'ACTIVE',
       tenant: { isActive: true },
-      userRoles: [
-        { role: { name: 'platform_super_admin', rolePermissions: [] } },
-      ],
     });
 
     // No active override in DB
@@ -157,6 +172,11 @@ describe('Auth Security Hardening (Regression)', () => {
 
   it('should throw ForbiddenException if override reason is shorter than 5 characters', async () => {
     const payload = { sub: 'platform-user', tenantId: 'platform-tenant' };
+    // AuthzCacheService resolves roles from these two reads.
+    prisma.userRole.findMany.mockResolvedValue([
+      { role: { name: 'platform_super_admin' } },
+    ]);
+    prisma.rolePermission.findMany.mockResolvedValue([]);
     (jwtService.verifyAsync as jest.Mock).mockResolvedValue(payload);
 
     prisma.user.findUnique.mockResolvedValue({
@@ -164,9 +184,6 @@ describe('Auth Security Hardening (Regression)', () => {
       tenantId: 'platform-tenant',
       status: 'ACTIVE',
       tenant: { isActive: true },
-      userRoles: [
-        { role: { name: 'platform_super_admin', rolePermissions: [] } },
-      ],
     });
 
     prisma.tenant.findUnique.mockResolvedValue({
@@ -201,6 +218,11 @@ describe('Auth Security Hardening (Regression)', () => {
 
   it('should allow platform users to override tenant with an active SupportOverride session', async () => {
     const payload = { sub: 'platform-user', tenantId: 'platform-tenant' };
+    // AuthzCacheService resolves roles from these two reads.
+    prisma.userRole.findMany.mockResolvedValue([
+      { role: { name: 'platform_super_admin' } },
+    ]);
+    prisma.rolePermission.findMany.mockResolvedValue([]);
     (jwtService.verifyAsync as jest.Mock).mockResolvedValue(payload);
 
     prisma.user.findUnique.mockResolvedValue({
@@ -208,9 +230,6 @@ describe('Auth Security Hardening (Regression)', () => {
       tenantId: 'platform-tenant',
       status: 'ACTIVE',
       tenant: { isActive: true },
-      userRoles: [
-        { role: { name: 'platform_super_admin', rolePermissions: [] } },
-      ],
     });
 
     prisma.tenant.findUnique.mockResolvedValue({

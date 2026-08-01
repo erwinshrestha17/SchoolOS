@@ -35,8 +35,7 @@ export class RequestCacheService {
     if (!isActive) return null;
 
     let store = this.cls.get(REQUEST_CACHE_KEY) as
-      | Map<string, Promise<unknown>>
-      | undefined;
+      Map<string, Promise<unknown>> | undefined;
 
     if (!store) {
       store = new Map<string, Promise<unknown>>();
@@ -66,6 +65,21 @@ export class RequestCacheService {
 
     store.set(key, pending);
     return pending as Promise<T>;
+  }
+
+  /**
+   * Pre-populate `key` with a value already fetched in this request, so a later
+   * reader resolves it without issuing its own query.
+   *
+   * Only for values read live earlier in the *same* request — seeding a value
+   * obtained any other way would make this a correctness hazard rather than a
+   * memo. Existing entries are not overwritten, so the first read of a key in a
+   * request always wins.
+   */
+  seed<T>(key: string, value: T) {
+    const store = this.store();
+    if (!store || store.has(key)) return;
+    store.set(key, Promise.resolve(value));
   }
 
   /** Drop a memoized entry so a later read in the same request re-queries. */

@@ -37,14 +37,17 @@ describe('PlatformService security audit log hardening', () => {
       {} as PlatformServiceArgs[3],
       {} as PlatformServiceArgs[4],
       {} as PlatformServiceArgs[5],
+      // EntitlementsService — inserted at index 6, shifting storage and the
+      // queues by one.
       {} as PlatformServiceArgs[6],
-      makeQueue() as unknown as PlatformServiceArgs[7],
+      {} as PlatformServiceArgs[7],
       makeQueue() as unknown as PlatformServiceArgs[8],
       makeQueue() as unknown as PlatformServiceArgs[9],
       makeQueue() as unknown as PlatformServiceArgs[10],
       makeQueue() as unknown as PlatformServiceArgs[11],
       makeQueue() as unknown as PlatformServiceArgs[12],
       makeQueue() as unknown as PlatformServiceArgs[13],
+      makeQueue() as unknown as PlatformServiceArgs[14],
     );
 
     return { service, prisma };

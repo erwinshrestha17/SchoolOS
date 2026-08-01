@@ -2,6 +2,7 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PlansService } from './plans.service';
 import { EntitlementsService } from './entitlements.service';
 import { createPassThroughRequestCache } from '../../test/helpers/request-cache';
+import { createPassThroughRedisCache } from '../../test/helpers/redis-cache';
 
 describe('PlansService entitlement and usage enforcement', () => {
   let service: PlansService;
@@ -22,7 +23,11 @@ describe('PlansService entitlement and usage enforcement', () => {
     };
 
     const requestCache = createPassThroughRequestCache();
-    entitlementsService = new EntitlementsService(prisma as any, requestCache);
+    entitlementsService = new EntitlementsService(
+      prisma as any,
+      requestCache,
+      createPassThroughRedisCache(),
+    );
     service = new PlansService(
       prisma as any,
       entitlementsService,
@@ -285,5 +290,157 @@ describe('PlansService entitlement and usage enforcement', () => {
     await expect(service.shouldProcessTenantJob('missing')).resolves.toBe(
       false,
     );
+  });
+});
+
+/**
+ * The plan-entitlement cache is cross-request, so these tests pin the one
+ * property that makes it safe: the tenant suspension check is evaluated LIVE
+ * on every call and is never served from the cache.
+ */
+describe('EntitlementsService suspension is never cached', () => {
+  function build() {
+    const store = new Map<string, unknown>();
+    const redisCache = {
+      resolve: async <T>(
+        key: string,
+        _ttl: number,
+        loader: () => Promise<T>,
+      ) => {
+        if (store.has(key)) return store.get(key) as T;
+        const value = await loader();
+        store.set(key, value);
+        return value;
+      },
+      invalidate: jest.fn(async (key: string) => {
+        store.delete(key);
+      }),
+      invalidatePrefix: jest.fn(async (prefix: string) => {
+        for (const key of [...store.keys()]) {
+          if (key.startsWith(prefix)) store.delete(key);
+        }
+      }),
+    };
+    const prisma: any = {
+      tenant: { findUnique: jest.fn().mockResolvedValue({ isActive: true }) },
+      tenantFeatureOverride: { findMany: jest.fn().mockResolvedValue([]) },
+      tenantSubscription: {
+        findFirst: jest.fn().mockResolvedValue({
+          status: 'ACTIVE',
+          plan: {
+            key: 'professional',
+            features: [{ featureKey: 'module.students', enabled: true }],
+          },
+        }),
+      },
+    };
+    const service = new EntitlementsService(
+      prisma,
+      createPassThroughRequestCache(),
+      redisCache as never,
+    );
+    return { service, prisma, redisCache, store };
+  }
+
+  it('caches the plan projection across calls', async () => {
+    const { service, prisma } = build();
+
+    await service.getEntitlements('tenant-1');
+    await service.getEntitlements('tenant-1');
+
+    // The plan half is resolved once...
+    expect(prisma.tenantSubscription.findFirst).toHaveBeenCalledTimes(1);
+    // ...but the suspension check is re-read every time.
+    expect(prisma.tenant.findUnique).toHaveBeenCalledTimes(2);
+  });
+
+  it('fails closed the moment a tenant is suspended, with the cache warm', async () => {
+    const { service, prisma } = build();
+
+    await expect(service.getEntitlements('tenant-1')).resolves.toEqual(
+      expect.objectContaining({
+        modules: expect.arrayContaining(['students']),
+      }),
+    );
+
+    // Suspend, with no invalidation call at all — the cached plan entry is
+    // deliberately left in place.
+    prisma.tenant.findUnique.mockResolvedValue({ isActive: false });
+
+    await expect(service.getEntitlements('tenant-1')).resolves.toEqual({
+      tier: null,
+      modules: [],
+      features: [],
+      addOns: [],
+    });
+  });
+
+  it('restores entitlements when the tenant is reactivated', async () => {
+    const { service, prisma } = build();
+
+    prisma.tenant.findUnique.mockResolvedValue({ isActive: false });
+    await expect(service.getEntitlements('tenant-1')).resolves.toEqual(
+      expect.objectContaining({ modules: [] }),
+    );
+
+    prisma.tenant.findUnique.mockResolvedValue({ isActive: true });
+    await expect(service.getEntitlements('tenant-1')).resolves.toEqual(
+      expect.objectContaining({
+        modules: expect.arrayContaining(['students']),
+      }),
+    );
+  });
+
+  it('re-reads the plan after invalidation', async () => {
+    const { service, prisma } = build();
+
+    await service.getEntitlements('tenant-1');
+    prisma.tenantSubscription.findFirst.mockResolvedValue({
+      status: 'ACTIVE',
+      plan: { key: 'starter', features: [] },
+    });
+
+    // Without invalidation the old projection stands...
+    await expect(service.getEntitlements('tenant-1')).resolves.toEqual(
+      expect.objectContaining({
+        modules: expect.arrayContaining(['students']),
+      }),
+    );
+
+    await service.invalidateTenantEntitlements('tenant-1');
+
+    // ...and after it, the new plan is visible.
+    const after = await service.getEntitlements('tenant-1');
+    expect(after.tier).toBe('STARTER');
+  });
+
+  it('scopes invalidation to one tenant', async () => {
+    const { service, redisCache } = build();
+
+    await service.invalidateTenantEntitlements('tenant-1');
+    expect(redisCache.invalidate).toHaveBeenCalledWith(
+      'entitlements:plan:tenant-1',
+    );
+
+    await service.invalidateAllTenantEntitlements();
+    expect(redisCache.invalidatePrefix).toHaveBeenCalledWith(
+      'entitlements:plan:',
+    );
+  });
+
+  it('never leaks hasActiveSubscription into the public response', async () => {
+    const { service } = build();
+
+    const entitlements = await service.getEntitlements('tenant-1');
+    expect(entitlements).not.toHaveProperty('hasActiveSubscription');
+  });
+
+  it('reports subscription_missing without a separate subscription query', async () => {
+    const { service, prisma } = build();
+    prisma.tenantSubscription.findFirst.mockResolvedValue(null);
+
+    const state = await service.getPlanEntitlementState('tenant-1');
+    expect(state.hasActiveSubscription).toBe(false);
+    expect(prisma.tenantSubscription.findFirst).toHaveBeenCalledTimes(1);
   });
 });

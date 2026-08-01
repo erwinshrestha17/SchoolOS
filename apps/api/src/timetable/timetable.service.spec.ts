@@ -157,3 +157,258 @@ describe('TimetableService lifecycle behavior', () => {
     ]);
   });
 });
+
+describe('TimetableService teacher mobile timetable', () => {
+  const actor = {
+    tenantId: 'tenant-1',
+    userId: 'teacher-user-1',
+    authMethod: AuthMethod.PASSWORD,
+    roles: ['teacher'],
+    permissions: [],
+  } as never;
+
+  const version = {
+    effectiveFrom: new Date('2020-01-01T00:00:00.000Z'),
+    effectiveTo: null,
+  };
+
+  function slotRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'slot-1',
+      dayOfWeek: 1,
+      academicYearId: 'ay-1',
+      classId: 'class-1',
+      sectionId: 'section-1',
+      subjectId: 'subject-1',
+      startsAt: '09:00',
+      endsAt: '09:45',
+      class: { name: 'Class 9' },
+      section: { name: 'B' },
+      subject: { name: 'Science' },
+      roomRef: { name: 'Lab 1' },
+      version,
+      ...overrides,
+    };
+  }
+
+  function makeService(prisma: Record<string, unknown>) {
+    return new TimetableService(
+      prisma as never,
+      {} as never,
+      { record: jest.fn() } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+  }
+
+  function basePrisma() {
+    return {
+      staff: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'staff-1' }),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      timetableSlot: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      timetableSubstitution: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+  }
+
+  it('skips substitution side-lookups entirely when there are none', async () => {
+    const prisma = basePrisma();
+    prisma.timetableSlot.findMany.mockResolvedValue([slotRow()]);
+
+    const result = await makeService(prisma).getTeacherMobileTimetable(actor, {
+      date: '2026-08-03',
+      days: 1,
+    });
+
+    expect(result.substitutions).toEqual([]);
+    // The ordinary daily case: no extra Staff or slot batch queries.
+    expect(prisma.staff.findMany).not.toHaveBeenCalled();
+    expect(prisma.timetableSlot.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('never selects the full Staff row for substitution teacher names', async () => {
+    const prisma = basePrisma();
+    prisma.timetableSubstitution.findMany.mockResolvedValue([
+      {
+        id: 'sub-1',
+        date: new Date('2026-08-03T00:00:00.000Z'),
+        status: 'ASSIGNED',
+        reason: 'Sick leave',
+        timetableSlotId: 'slot-1',
+        absentTeacherId: 'staff-2',
+        substituteTeacherId: 'staff-1',
+      },
+    ]);
+    prisma.timetableSlot.findMany.mockResolvedValue([slotRow()]);
+    prisma.staff.findMany.mockResolvedValue([
+      { id: 'staff-1', firstName: 'Asha', lastName: 'Rai' },
+      { id: 'staff-2', firstName: 'Bikash', lastName: 'Thapa' },
+    ]);
+
+    await makeService(prisma).getTeacherMobileTimetable(actor, {
+      date: '2026-08-03',
+      days: 1,
+    });
+
+    // PAN, bank account and citizenship number must never be fetched to render
+    // a display name.
+    expect(prisma.staff.findMany).toHaveBeenCalledWith({
+      where: { tenantId: 'tenant-1', id: { in: ['staff-1', 'staff-2'] } },
+      select: { id: true, firstName: true, lastName: true },
+    });
+  });
+
+  it('resolves substitution slot detail from the already-loaded slots', async () => {
+    const prisma = basePrisma();
+    prisma.timetableSlot.findMany.mockResolvedValue([slotRow()]);
+    prisma.timetableSubstitution.findMany.mockResolvedValue([
+      {
+        id: 'sub-1',
+        date: new Date('2026-08-03T00:00:00.000Z'),
+        status: 'ASSIGNED',
+        reason: 'Sick leave',
+        timetableSlotId: 'slot-1',
+        absentTeacherId: 'staff-2',
+        substituteTeacherId: 'staff-1',
+      },
+    ]);
+    prisma.staff.findMany.mockResolvedValue([
+      { id: 'staff-1', firstName: 'Asha', lastName: 'Rai' },
+      { id: 'staff-2', firstName: 'Bikash', lastName: 'Thapa' },
+    ]);
+
+    const result = await makeService(prisma).getTeacherMobileTimetable(actor, {
+      date: '2026-08-03',
+      days: 1,
+    });
+
+    expect(result.substitutions[0]).toEqual(
+      expect.objectContaining({
+        className: 'Class 9',
+        sectionName: 'B',
+        subjectName: 'Science',
+        room: 'Lab 1',
+        role: 'SUBSTITUTE',
+        absentTeacherName: 'Bikash Thapa',
+        substituteTeacherName: 'Asha Rai',
+      }),
+    );
+    // slot-1 was already loaded, so no second slot query.
+    expect(prisma.timetableSlot.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('batch-fetches only slots owned by the absent teacher', async () => {
+    const prisma = basePrisma();
+    prisma.timetableSlot.findMany
+      .mockResolvedValueOnce([slotRow()])
+      .mockResolvedValueOnce([
+        slotRow({
+          id: 'slot-other',
+          class: { name: 'Class 7' },
+          section: { name: 'A' },
+          subject: { name: 'Maths' },
+          roomRef: null,
+        }),
+      ]);
+    prisma.timetableSubstitution.findMany.mockResolvedValue([
+      {
+        id: 'sub-1',
+        date: new Date('2026-08-03T00:00:00.000Z'),
+        status: 'ASSIGNED',
+        reason: 'Cover',
+        // This teacher is the substitute, so the slot belongs to someone else
+        // and is not in the first query's result.
+        timetableSlotId: 'slot-other',
+        absentTeacherId: 'staff-2',
+        substituteTeacherId: 'staff-1',
+      },
+    ]);
+    prisma.staff.findMany.mockResolvedValue([
+      { id: 'staff-1', firstName: 'Asha', lastName: 'Rai' },
+      { id: 'staff-2', firstName: 'Bikash', lastName: 'Thapa' },
+    ]);
+
+    const result = await makeService(prisma).getTeacherMobileTimetable(actor, {
+      date: '2026-08-03',
+      days: 1,
+    });
+
+    expect(prisma.timetableSlot.findMany).toHaveBeenCalledTimes(2);
+    expect(prisma.timetableSlot.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: { tenantId: 'tenant-1', id: { in: ['slot-other'] } },
+      }),
+    );
+    expect(result.substitutions[0]).toEqual(
+      expect.objectContaining({
+        className: 'Class 7',
+        subjectName: 'Maths',
+        room: null,
+      }),
+    );
+  });
+
+  it('degrades to nulls when a substitution slot cannot be resolved', async () => {
+    const prisma = basePrisma();
+    prisma.timetableSubstitution.findMany.mockResolvedValue([
+      {
+        id: 'sub-1',
+        date: new Date('2026-08-03T00:00:00.000Z'),
+        status: 'PENDING',
+        reason: null,
+        timetableSlotId: 'slot-deleted',
+        absentTeacherId: 'staff-2',
+        substituteTeacherId: null,
+      },
+    ]);
+    prisma.staff.findMany.mockResolvedValue([
+      { id: 'staff-2', firstName: 'Bikash', lastName: 'Thapa' },
+    ]);
+
+    const result = await makeService(prisma).getTeacherMobileTimetable(actor, {
+      date: '2026-08-03',
+      days: 1,
+    });
+
+    // A slot removed between the two queries must not throw.
+    expect(result.substitutions[0]).toEqual(
+      expect.objectContaining({
+        className: null,
+        subjectName: null,
+        startsAt: null,
+        role: 'ABSENT_TEACHER',
+        substituteTeacherName: null,
+        absentTeacherName: 'Bikash Thapa',
+      }),
+    );
+  });
+
+  it('scopes slot and substitution reads to the acting tenant and teacher', async () => {
+    const prisma = basePrisma();
+
+    await makeService(prisma).getTeacherMobileTimetable(actor, {
+      date: '2026-08-03',
+      days: 1,
+    });
+
+    expect(prisma.timetableSlot.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: 'tenant-1',
+          staffId: 'staff-1',
+        }),
+      }),
+    );
+    expect(prisma.timetableSubstitution.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ tenantId: 'tenant-1' }),
+      }),
+    );
+  });
+});

@@ -16,9 +16,7 @@ export async function runTenantScopedJob<T>(
   jobLabel: string,
   fn: () => Promise<T>,
 ): Promise<T | undefined> {
-  if (
-    await skipSuspendedTenantJob(plansService, tenantId, logger, jobLabel)
-  ) {
+  if (await skipSuspendedTenantJob(plansService, tenantId, logger, jobLabel)) {
     return undefined;
   }
 

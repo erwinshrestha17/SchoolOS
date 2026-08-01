@@ -29,6 +29,10 @@ describe('PlatformBillingLifecycleService', () => {
         prisma as never,
         auditService as never,
         platformService as never,
+        {
+          invalidateTenantEntitlements: jest.fn(async () => undefined),
+          invalidateAllTenantEntitlements: jest.fn(async () => undefined),
+        } as never,
       ),
       prisma,
       auditService,

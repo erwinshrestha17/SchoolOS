@@ -14,6 +14,8 @@ import { AuthenticatedRequest } from '../auth-request.interface';
 import { JwtAccessPayload } from '../auth.types';
 import { parseCookie } from '../auth.utils';
 import { MustChangePasswordGuard } from './must-change-password.guard';
+import { AuthzCacheService } from '../authz-cache.service';
+import { RequestCacheService } from '../../common/cache/request-cache.service';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -24,6 +26,8 @@ export class JwtAuthGuard implements CanActivate {
     private readonly prisma: PrismaService,
     private readonly cls: ClsService,
     private readonly mustChangePasswordGuard: MustChangePasswordGuard,
+    private readonly authzCache: AuthzCacheService,
+    private readonly requestCache: RequestCacheService,
   ) {}
 
   async canActivate(context: ExecutionContext) {
@@ -63,26 +67,20 @@ export class JwtAuthGuard implements CanActivate {
     const user = await this.prisma.runWithoutTenantScope(
       'authenticate: resolve token subject before tenant context exists',
       () =>
+        // Liveness only, and never cached: deactivating an account or
+        // suspending a tenant must fail closed on the very next request.
+        // The previous `include: { tenant: true }` also pulled every column of
+        // both rows — including `passwordHash` — into process memory on every
+        // request; this selects only what the guard uses.
         this.prisma.user.findUnique({
           where: { id: payload.sub },
-          include: {
-            tenant: true,
-            userRoles: {
-              where: {
-                tenantId: payload.tenantId, // Use the user's home tenant for role lookup
-              },
-              include: {
-                role: {
-                  include: {
-                    rolePermissions: {
-                      include: {
-                        permission: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
+          select: {
+            id: true,
+            email: true,
+            status: true,
+            tenantId: true,
+            mustChangePassword: true,
+            tenant: { select: { id: true, isActive: true } },
           },
         }),
     );
@@ -95,13 +93,11 @@ export class JwtAuthGuard implements CanActivate {
       throw new ForbiddenException('Tenant mismatch');
     }
 
-    const permissionKeys = user.userRoles.flatMap((ur) =>
-      ur.role.rolePermissions.map(
-        ({ permission }) => `${permission.resource}:${permission.action}`,
-      ),
-    );
-
-    const roles = user.userRoles.map((ur) => ur.role.name);
+    // Roles and permissions are derived, slow-changing data with an explicit
+    // invalidation contract (see AuthzCacheService). Resolving them here
+    // replaces four nested-include round-trips on every authenticated request.
+    const { roles, permissions: permissionKeys } =
+      await this.authzCache.resolve(payload.tenantId, user.id);
 
     const overrideTenantId = resolveHeader(
       request.headers['x-schoolos-tenant-id'],
@@ -174,6 +170,21 @@ export class JwtAuthGuard implements CanActivate {
 
     if (hasActiveCls) {
       this.cls.set(TENANT_ID_KEY, effectiveTenantId);
+
+      // EntitlementGuard reads the same `{ id, isActive }` projection of this
+      // tenant immediately after, via PlansService.getTenantStatus. Priming the
+      // request-scoped memo with the row just read live saves that query
+      // without weakening anything: it is the same read, in the same request.
+      //
+      // Only for the caller's own tenant. Under a support override the
+      // effective tenant is a different row that was validated separately, so
+      // seeding this key would answer a later lookup with the wrong tenant.
+      if (effectiveTenantId === user.tenantId) {
+        this.requestCache.seed(`tenantStatus:${user.tenantId}`, {
+          id: user.tenantId,
+          isActive: user.tenant.isActive,
+        });
+      }
     }
 
     this.mustChangePasswordGuard.canActivate(context);

@@ -60,6 +60,7 @@ import { parseSafeExternalHttpsUrl } from '../common/security/outbound-url';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PlansService } from '../plans/plans.service';
+import { EntitlementsService } from '../plans/entitlements.service';
 import { buildSimplePdf } from '../common/pdf/simple-pdf';
 import QRCode from 'qrcode';
 
@@ -263,6 +264,7 @@ export class PlatformService {
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
     private readonly plansService: PlansService,
+    private readonly entitlementsService: EntitlementsService,
     private readonly storageService: StorageService,
     @InjectQueue('notifications') private readonly notificationsQueue: Queue,
     @InjectQueue('finance') private readonly financeQueue: Queue,
@@ -950,6 +952,9 @@ export class PlatformService {
       },
       tenantId,
     );
+    // Plan entitlements are cached per tenant; drop the entry so the change
+    // is visible on the next request rather than at TTL expiry.
+    await this.entitlementsService.invalidateTenantEntitlements(tenantId);
     return this.toSubscriptionSummary(subscription);
   }
 
@@ -983,6 +988,10 @@ export class PlatformService {
       { status: dto.status, notes: dto.notes, addOns: dto.addOns },
       tenantId,
     );
+
+    // Plan entitlements are cached per tenant; drop the entry so the change
+    // is visible on the next request rather than at TTL expiry.
+    await this.entitlementsService.invalidateTenantEntitlements(tenantId);
 
     return this.toSubscriptionSummary(subscription);
   }
@@ -1035,6 +1044,9 @@ export class PlatformService {
       { featureKey: dto.featureKey, enabled: dto.enabled, reason: dto.reason },
       tenantId,
     );
+    // Plan entitlements are cached per tenant; drop the entry so the change
+    // is visible on the next request rather than at TTL expiry.
+    await this.entitlementsService.invalidateTenantEntitlements(tenantId);
     return override;
   }
 
@@ -1701,6 +1713,11 @@ export class PlatformService {
         { status: 'GRACE' },
         String(invoice.tenantId),
       );
+      // The subscription status changed, which is part of the cached plan
+      // projection.
+      await this.entitlementsService.invalidateTenantEntitlements(
+        String(invoice.tenantId),
+      );
     }
     return this.toInvoiceSummary(updated);
   }
@@ -1753,6 +1770,10 @@ export class PlatformService {
         tenantId,
       );
     }
+
+    // The subscription moved to SUSPENDED; the tenant's isActive flag is
+    // checked live, but the cached plan projection must still be dropped.
+    await this.entitlementsService.invalidateTenantEntitlements(tenantId);
     return { success: true };
   }
 
@@ -1804,6 +1825,9 @@ export class PlatformService {
         tenantId,
       );
     }
+
+    // Subscription restored to ACTIVE.
+    await this.entitlementsService.invalidateTenantEntitlements(tenantId);
     return { success: true };
   }
 

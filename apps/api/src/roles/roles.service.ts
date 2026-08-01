@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { SCHOOL_CONFIG_OWNER_ROLE } from '@schoolos/core';
 import { AuditService } from '../audit/audit.service';
+import { AuthzCacheService } from '../auth/authz-cache.service';
 import { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { AssignPermissionsDto } from './dto/assign-permissions.dto';
@@ -18,6 +19,7 @@ export class RolesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly authzCache: AuthzCacheService,
   ) {}
 
   async listRoles(actor: AuthContext) {
@@ -134,6 +136,11 @@ export class RolesService {
       })),
     });
 
+    // Changing a role's permissions changes the effective permission set of
+    // every user holding it, so the whole tenant namespace is dropped.
+    // AuthzCacheService documents the full invalidation contract.
+    await this.authzCache.invalidateTenant(actor.tenantId);
+
     await this.auditService.record({
       action: 'assign_permissions',
       resource: 'role',
@@ -212,6 +219,9 @@ export class RolesService {
         assignedById: actor.userId,
       })),
     });
+
+    // Only this user's role membership changed.
+    await this.authzCache.invalidateUser(actor.tenantId, dto.userId);
 
     await this.auditService.record({
       action: 'assign_roles',

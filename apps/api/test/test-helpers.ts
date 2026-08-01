@@ -831,6 +831,41 @@ export function createPrismaMock() {
         state.rolePermissions.push(data as Record<string, unknown>);
         return Promise.resolve(data);
       }),
+      // Backs AuthzCacheService, which reads RolePermission directly rather
+      // than descending User -> UserRole -> Role -> RolePermission -> Permission.
+      // Supports the `role: { tenantId, userRoles: { some: { tenantId, userId } } }`
+      // filter that service uses.
+      findMany: jest.fn((q: PrismaQuery) => {
+        const roleFilter =
+          (q.where?.role as Record<string, any> | undefined) ?? {};
+        const tenantId = roleFilter.tenantId as string | undefined;
+        const userId = roleFilter.userRoles?.some?.userId as string | undefined;
+
+        const roleIds = state.roles
+          .filter((role) => !tenantId || role.tenantId === tenantId)
+          .filter(
+            (role) =>
+              !userId ||
+              state.userRoles.some(
+                (assignment) =>
+                  assignment.roleId === role.id &&
+                  assignment.userId === userId &&
+                  (!tenantId || assignment.tenantId === tenantId),
+              ),
+          )
+          .map((role) => role.id);
+
+        return Promise.resolve(
+          state.rolePermissions
+            .filter((item) => roleIds.includes(item.roleId as string))
+            .map((item) => ({
+              permission: state.permissions.find(
+                (permission) => permission.id === item.permissionId,
+              ),
+            }))
+            .filter((item) => Boolean(item.permission)),
+        );
+      }),
     },
     userRole: {
       create: jest.fn((q: PrismaQuery) => {

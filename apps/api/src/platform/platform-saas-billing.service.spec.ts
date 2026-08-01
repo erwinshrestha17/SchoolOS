@@ -60,6 +60,10 @@ describe('PlatformService SaaS billing lifecycle hardening', () => {
       {} as any,
       {} as any,
       {} as any,
+      {
+        invalidateTenantEntitlements: jest.fn(async () => undefined),
+        invalidateAllTenantEntitlements: jest.fn(async () => undefined),
+      } as any,
       {} as any,
       makeQueue() as any,
       makeQueue() as any,

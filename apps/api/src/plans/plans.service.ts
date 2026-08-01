@@ -99,18 +99,14 @@ export class PlansService {
       };
     }
 
-    const subscription = await this.requestCache.resolve(
-      `activeSubscription:${tenantId}`,
-      () =>
-        this.prisma.tenantSubscription.findFirst({
-          where: {
-            tenantId,
-            status: { in: ['ACTIVE', 'TRIAL', 'GRACE'] },
-          },
-        }),
-    );
+    // Subscription presence now comes from the same resolved entitlement state
+    // the feature check uses, instead of a separate `TenantSubscription` query
+    // per request. Same predicate (`status in ACTIVE/TRIAL/GRACE`), same
+    // `subscription_missing` reason — one fewer round-trip.
+    const planState =
+      await this.entitlementsService.getPlanEntitlementState(tenantId);
 
-    if (!subscription) {
+    if (!planState.hasActiveSubscription) {
       return {
         allowed: false,
         reason: 'subscription_missing',

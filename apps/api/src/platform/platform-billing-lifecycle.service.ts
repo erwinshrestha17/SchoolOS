@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { PlatformService } from './platform.service';
+import { EntitlementsService } from '../plans/entitlements.service';
 
 const SYSTEM_BILLING_ACTOR = 'system:platform-billing-lifecycle';
 
@@ -15,6 +16,7 @@ export class PlatformBillingLifecycleService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly platformService: PlatformService,
+    private readonly entitlementsService: EntitlementsService,
   ) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
@@ -68,6 +70,9 @@ export class PlatformBillingLifecycleService {
           where: { id: invoice.subscriptionId },
           data: { status: 'GRACE' },
         });
+        await this.entitlementsService.invalidateTenantEntitlements(
+          invoice.tenantId,
+        );
 
         await this.auditService.record({
           action: 'subscription_grace_period_started',
@@ -103,6 +108,7 @@ export class PlatformBillingLifecycleService {
         where: { id: sub.id },
         data: { status: 'EXPIRED' },
       });
+      await this.entitlementsService.invalidateTenantEntitlements(sub.tenantId);
 
       await this.auditService.record({
         action: 'subscription_trial_expired',
@@ -140,6 +146,11 @@ export class PlatformBillingLifecycleService {
           where: { id: inv.tenantId },
           data: { isActive: false },
         });
+        // `isActive` is checked live, but the subscription status above is part
+        // of the cached plan projection.
+        await this.entitlementsService.invalidateTenantEntitlements(
+          inv.tenantId,
+        );
 
         await this.auditService.record({
           action: 'tenant_suspended_billing',
@@ -211,6 +222,8 @@ export class PlatformBillingLifecycleService {
         count += 1;
       }
 
+      // No entitlement invalidation: `renewsAt` is not part of the cached
+      // plan projection (status, plan and overrides are).
       await this.prisma.tenantSubscription.update({
         where: { id: subscription.id },
         data: { renewsAt: nextRenewsAt },

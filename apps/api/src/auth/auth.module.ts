@@ -4,6 +4,7 @@ import { AuditModule } from '../audit/audit.module';
 import { ConfigModule } from '../config/config.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AuthService } from './auth.service';
+import { AuthzCacheService } from './authz-cache.service';
 import { AuthController } from './auth.controller';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from './guards/roles-permissions.guard';
@@ -27,6 +28,7 @@ import { PlatformModule } from '../platform/platform.module';
   controllers: [AuthController],
   providers: [
     AuthService,
+    AuthzCacheService,
     JwtAuthGuard,
     RolesPermissionsGuard,
     EntitlementGuard,
@@ -36,6 +38,7 @@ import { PlatformModule } from '../platform/platform.module';
   ],
   exports: [
     AuthService,
+    AuthzCacheService,
     JwtAuthGuard,
     RolesPermissionsGuard,
     EntitlementGuard,

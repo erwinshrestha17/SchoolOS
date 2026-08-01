@@ -237,7 +237,16 @@ describe('Configuration Owner safeguards', () => {
     return {
       prisma,
       auditService,
-      service: new RolesService(prisma as never, auditService as never),
+      service: new RolesService(
+        prisma as never,
+        auditService as never,
+        {
+          // These governance tests assert role-assignment guardrails, not cache
+          // behaviour; invalidation is covered in roles.service.spec.ts.
+          invalidateUser: jest.fn(async () => undefined),
+          invalidateTenant: jest.fn(async () => undefined),
+        } as never,
+      ),
     };
   }
 

@@ -684,6 +684,405 @@ lines/payments → batched feeHeads/receipts. Response shape unchanged.
 
 ---
 
+## Run 7 — Teacher mobile timetable (daily-use module slice)
+
+Chosen by measurement rather than assumption. With the auth/entitlement guard
+floor at ~15 statements (`unread-count`), the per-module cost of the daily-use
+endpoints was:
+
+| Endpoint | Total stmts | Module cost |
+| --- | ---: | ---: |
+| **teacher timetable** | **34** | **~19** |
+| parent notifications | 30 | ~15 |
+| parent homework | 27 | ~12 |
+| parent attendance-summary | 24 | ~9 |
+| parent timetable | 24 | ~9 |
+| teacher attendance classes | 19 | ~4 |
+
+`getTeacherMobileTimetable` was the worst, and it backs three daily surfaces:
+the mobile teacher timetable, `teacher-schedule.controller`, and
+`teacher-today.service`. Every teacher hits it every school day, and it is part
+of Scenario B (morning attendance).
+
+### Root cause
+
+`timetableSlotInclude()` pulls **eight relations with `true`** — every column of
+each — and `substitutionInclude()` nests that whole graph again plus two full
+`Staff` rows:
+
+```text
+slot query:         1 + 8 relations               =  9
+substitution query: 1 + nested slot(1+8) + 2 staff = 12
+staff lookup:                                       1
+                                              total 22
+```
+
+Three of the eight relations (`academicYear`, `staff`, `period`) are **never
+read** by this endpoint's mappers. `absentTeacher: true` / `substituteTeacher:
+true` loaded another teacher's entire `Staff` row — including `panNumber`,
+`bankAccount`, `citizenshipNo` — to render a display name.
+
+### Results
+
+Measured on `default-school`, a teacher with **22 real timetable slots**.
+
+| Metric | Before | After | Δ |
+| --- | ---: | ---: | --- |
+| SQL statements / request | 34 | **20** | −41% |
+| Module cost (excl. guards) | 22 | **8** | −64% |
+| Throughput (c=50) | 263 rps | **369 rps** | **+40%** |
+| p50 | 186 ms | **132 ms** | −29% |
+| p97.5 | 212 ms | **151 ms** | −29% |
+| p99 | 296 ms | **170 ms** | −43% |
+| HTTP non-2xx | 0 | **0** | — |
+| Response contract | — | **byte-identical** | verified |
+
+**Statement count is O(1) in slot count.** Measured 20 statements for a teacher
+with 0 slots (perf tenant) *and* 20 for a teacher with 22 slots
+(`default-school`) — relation loads are batched, not per-row, so this is
+genuinely set-based with no N+1.
+
+**Contract verified against real data**, not just unit fixtures: the endpoint
+was captured on `default-school` with the optimization, then the change was
+stashed, the API rebuilt from unmodified `HEAD`, and the response captured
+again. The two payloads compare byte-identical after stripping `timestamp` and
+`requestId`.
+
+### What changed
+
+Two **new, purpose-limited** projections were added rather than editing the
+shared helpers — `timetableSlotInclude()` has **19 call sites** whose relation
+dependencies have not been audited:
+
+| Change | Effect |
+| --- | --- |
+| `teacherMobileSlotSelect()` — explicit select, drops `academicYear`, `staff`, `period` | 9 → 6 statements; no whole-row fetches |
+| `teacherMobileSubstitutionSelect()` — scalars only, nested slot graph removed | 12 → 1 statement in the common case |
+| Substitution slots resolved from the already-loaded slot map | no second slot graph when the slot is the teacher's own |
+| Slots owned by the *absent* teacher batch-fetched by id | one query, only when such substitutions exist |
+| Teacher display names via one batched `Staff` findMany, `select: {id, firstName, lastName}` | replaces two full-row `Staff` includes |
+
+Both batched id lists are deduplicated and sorted, so the generated `IN (...)`
+list and its plan are stable.
+
+### Security predicates preserved
+
+- `staffId: staff.id` still scopes the slot query to the acting teacher;
+- `tenantId` on every query including the two new batched lookups;
+- version status/effective-window filter unchanged;
+- substitution filter (`absentTeacherId` OR `substituteTeacherId` = me,
+  non-cancelled, date range) unchanged;
+- **narrower** exposure than before: other teachers' `Staff` rows are no longer
+  loaded at all, only `{id, firstName, lastName}`.
+
+A substitution whose slot cannot be resolved now degrades to `null` fields
+instead of throwing — previously the nested include always materialised it.
+
+### Files changed / tests
+
+```text
+apps/api/src/timetable/timetable.service.ts       2 new selects, batched resolution, mappers
+apps/api/src/timetable/timetable.service.spec.ts  6 new tests
+```
+
+New tests: no side-lookups when there are no substitutions; `Staff` select is
+name-only; substitution detail resolved from loaded slots without a second
+query; absent-teacher slots batch-fetched by id; unresolvable slot degrades to
+nulls; tenant + teacher scoping.
+
+**Public API changes: none.**
+
+### Verification
+
+| Command | Result |
+| --- | --- |
+| `pnpm --filter @schoolos/api typecheck` | pass |
+| `npx jest src/timetable src/teacher-workspace src/mobile` | 260 / 260 pass |
+| `npx jest src/timetable/timetable.service.spec.ts` | 11 / 11 pass |
+| `pnpm --filter @schoolos/api test` | 2,464 / 2,468 pass |
+| `pnpm --filter @schoolos/api test:e2e` | **283 / 283 pass** |
+| `pnpm db:validate` | pass |
+| `pnpm verify:openapi` | pass |
+| `prettier --check` (changed files) | pass |
+
+The 4 unit failures (`AccountingReportExportsService`, `M2AttendanceHardeningService`,
+`canonical development seed`, `finance production controls`) were confirmed
+pre-existing by stashing all changes and re-running on unmodified `HEAD`.
+
+### Remaining daily-use targets
+
+| Endpoint | Module cost | Note |
+| --- | ---: | --- |
+| parent notifications | ~15 | next largest daily-use cost |
+| parent homework | ~12 | |
+| parent attendance-summary | ~9 | |
+| parent timetable | ~9 | likely the same include fan-out |
+
+The ~12-statement auth/entitlement guard floor now dominates every one of these
+and is the highest-value remaining target across the whole API — see
+`PERFORMANCE_BOTTLENECKS.md` P0-1 (six `JwtAuthGuard` round-trips per request).
+
+---
+
+## Run 8 — Authentication/entitlement guard floor
+
+The guard stack cost ~12 SQL statements on **every authenticated request across
+all 1,345 routes**, dominating every endpoint after the module-level fixes.
+
+### Root cause
+
+`JwtAuthGuard` resolved the user through a four-level nested `include`
+(`User → UserRole → Role → RolePermission → Permission`). Prisma emits one
+round-trip per relation, so rebuilding a string array that changes only when an
+administrator edits a role cost four queries per request. `include: { tenant: true }`
+additionally pulled every column of both rows, including `passwordHash`.
+
+### Results
+
+Before/after captured on the same host, same datasets, `c=50`, 15 s, with the
+change stashed and the API rebuilt from `HEAD` for the baseline.
+
+| Endpoint | rps before | rps after | Δ | p50 before | p50 after |
+| --- | ---: | ---: | --- | ---: | ---: |
+| `unread-count` (guard-dominated) | 401 | **634** | **+58%** | 122 ms | **77 ms** |
+| `teacher/timetable` | 263 | **536** | **+104%** | 185 ms | **89 ms** |
+| `parent dashboard` | 89 | **89** | flat | 554 ms | **550 ms** |
+
+Statements per request, measured warm:
+
+| Endpoint | before | after |
+| --- | ---: | ---: |
+| **guard floor** | **12** | **7** |
+| `unread-count` | 15 | **10** |
+| `attendance-summary` | 24 | **19** |
+| `teacher timetable` | 20 | **15** |
+| `parent dashboard` | 64 | **59** |
+
+A consistent −5 everywhere: four role/permission round-trips plus one duplicate
+`Tenant` read. Zero non-2xx in every run.
+
+The dashboard is flat because at 59 statements it is bound by its own remaining
+fan-out, not by the guard — the same pattern seen in Run 5.
+
+### Security design — what is and is not cached
+
+Liveness is **never** cached. `User.status` and `Tenant.isActive` are read live
+on every request; only the derived role/permission set moves to Redis.
+
+Verified against a **warm cache** with the tenant state changed directly in
+PostgreSQL, bypassing all application-level invalidation:
+
+| Action | Next request |
+| --- | --- |
+| `UPDATE "Tenant" SET "isActive"=false` | **401** "User or tenant is inactive" |
+| restore | 200 |
+| `UPDATE "User" SET status='SUSPENDED'` | **401** |
+| restore | 200 |
+
+Suspension and deactivation therefore still fail closed immediately, as
+`apps/api/AGENTS.md` requires — the cache cannot extend access to a
+suspended tenant or a disabled account.
+
+Redis keys are namespaced `authz:{tenantId}:{userId}` with a 300 s TTL acting
+as a backstop for a missed invalidation, not as the invalidation mechanism.
+
+### Invalidation contract
+
+Enumerated in `AuthzCacheService`, wired and unit-tested:
+
+| Write | Invalidation |
+| --- | --- |
+| `roles.service.assignPermissions` | `invalidateTenant` — every holder of the role is affected |
+| `roles.service.assignRoles` | `invalidateUser` — only that user's membership changed |
+| `tenants.service` provisioning | none needed — no live sessions exist yet |
+
+A test asserts invalidation happens **after** the write, since invalidating
+first would let a concurrent request re-populate from pre-write state.
+
+### Deliberately not done
+
+The remaining 7 guard statements are the entitlement reads
+(`Tenant`, `TenantSubscription` ×2, `PlatformPlan`, `PlatformPlanFeature`,
+`TenantFeatureOverride`). Caching those in Redis was **rejected for this slice**:
+`EntitlementsResponse` encodes `tenant.isActive`, so a cross-request cache of it
+would let a suspended tenant keep working until the TTL expired. Doing it safely
+requires splitting the live suspension check from the cached plan data and
+wiring the twelve tenant-config write sites listed in
+`CONCURRENCY_CORRECTNESS.md` §7 — a separate bounded slice.
+
+### Files changed / tests
+
+```text
+src/common/cache/redis-cache.service.ts    new — read-through Redis cache
+src/auth/authz-cache.service.ts            new — role/permission resolution + invalidation
+src/auth/authz-cache.service.spec.ts       new — 12 tests
+src/auth/guards/jwt-auth.guard.ts          narrow select, cached authz, seeds tenantStatus
+src/common/cache/request-cache.service.ts  seed() for same-request priming
+src/roles/roles.service.ts                 invalidation at 2 write sites
+test/test-helpers.ts                       rolePermission.findMany in the shared e2e stub
+```
+
+New tests cover: tenant/user key namespacing, cross-tenant and cross-user
+isolation, invalidate-user vs invalidate-tenant scope, re-read after
+invalidation, explicit tenant-scope bypass reason, and invalidation ordering.
+
+**Public API changes: none.**
+
+### Verification
+
+| Command | Result |
+| --- | --- |
+| `pnpm --filter @schoolos/api typecheck` | pass |
+| `pnpm --filter @schoolos/api test` | 2,479 / 2,483 pass |
+| `pnpm --filter @schoolos/api test:e2e` | **283 / 283 pass** |
+| `npx jest src/auth` | 101 / 101 pass |
+| `pnpm db:validate` | pass |
+| `pnpm verify:openapi` | pass |
+
+The 4 unit failures are the same pre-existing set confirmed by stashing on
+unmodified `HEAD`. Unit count rose 2,468 → 2,483.
+
+> Four e2e suites broke mid-slice and were fixed, not waived: they hand-provide
+> the guard's dependencies or stub Prisma, and needed `AuthzCacheService` plus a
+> `rolePermission.findMany` delegate. Several also asserted platform-override
+> behaviour via a nested `userRoles` fixture that the guard no longer reads —
+> those would have passed while proving nothing, so they were re-pointed at the
+> new reads rather than left green.
+
+---
+
+## Run 9 — Entitlement half of the guard floor
+
+Completes the guard work started in Run 8. The remaining 7 statements were the
+entitlement reads: `Tenant`, `TenantSubscription` ×2, `PlatformPlan`,
+`PlatformPlanFeature`, `TenantFeatureOverride`.
+
+### The problem Run 8 deliberately deferred
+
+`EntitlementsResponse` encodes tenant suspension — an inactive tenant returns
+empty modules/features. Caching that response wholesale would let a
+just-suspended tenant keep working until the entry expired, breaking the
+"suspended tenants fail closed" rule.
+
+### The split
+
+Resolution is now two halves:
+
+| Half | Storage | Contents |
+| --- | --- | --- |
+| **Live** | none — read every request | `Tenant.isActive` suspension check |
+| **Cached** | Redis, 300 s TTL | subscription, plan, plan features, tenant overrides |
+
+The live read costs nothing extra in practice: `JwtAuthGuard` already reads the
+tenant row for its own liveness check and seeds it into the request cache. The
+cached half depends only on tables that do not encode suspension, so a stale
+entry can never widen access for a suspended tenant — the live check rejects
+first.
+
+`PlansService.checkFeatureEnabled` also dropped its separate
+`TenantSubscription` existence query: `hasActiveSubscription` now rides along in
+the cached state, preserving the `subscription_missing` reason exactly.
+
+### Results
+
+| Metric | Before | After | Δ |
+| --- | ---: | ---: | --- |
+| **guard floor statements** | **7** | **2** | −71% |
+| `unread-count` statements | 10 | **5** | −50% |
+| `attendance-summary` statements | 19 | **14** | −26% |
+| `parent dashboard` statements | 59 | **54** | −8% |
+| `unread-count` rps (c=50) | 634 | **835** | **+32%** |
+| `teacher/timetable` rps (c=50) | 536 | **726** | **+35%** |
+| `parent dashboard` rps (c=50) | 89 | **95** | +7% |
+| `unread-count` p50 | 77 ms | **59 ms** | −23% |
+| `teacher/timetable` p50 | 89 ms | **68 ms** | −24% |
+| HTTP non-2xx | 0 | **0** | — |
+
+The guard floor is now two statements — the `User` and `Tenant` liveness reads —
+and both are irreducible without caching liveness, which this design refuses to
+do.
+
+Cumulative against the original pre-optimization baseline, `unread-count` has
+gone **302 → 835 rps** and its statement count **18 → 5**.
+
+> One measurement was discarded and re-taken: a `teacher/timetable` run reported
+> 6,437 rps with 96,546 non-2xx. The 15-minute access token had expired
+> mid-session, so it was benchmarking 401s. Re-authenticated and re-measured at
+> 726 rps with zero non-2xx.
+
+### Security verification (executed)
+
+Both checks were run against a **warm** cache with state changed directly in
+PostgreSQL, bypassing every application-level invalidation path.
+
+| Scenario | Result |
+| --- | --- |
+| `UPDATE "Tenant" SET "isActive"=false` | next request **401**, *with the plan cache entry still present in Redis* — proving the live check rejected, not cache absence |
+| restore | 200 |
+| Disable `module.homework` via direct DB insert | still 200 — **stale, as documented** |
+| Invalidate the plan key | **403** — module correctly blocked |
+| Remove override + invalidate | 200 |
+
+The third row is the honest cost of this design: an entitlement change written
+**out of band** (direct SQL, external tooling) is invisible until invalidation or
+TTL expiry. Changes made through the application always invalidate — that is the
+contract below. Suspension is never affected either way.
+
+### Invalidation contract
+
+| Site | Action |
+| --- | --- |
+| `platform.service.assignSubscription` | invalidate tenant |
+| `platform.service.updateSubscriptionStatus` | invalidate tenant |
+| `platform.service.setFeatureOverride` | invalidate tenant |
+| `platform.service.markInvoiceOverdue` (→ GRACE) | invalidate tenant |
+| `platform.service.suspendTenantForBilling` | invalidate tenant |
+| `platform.service.reactivateTenantAfterPayment` | invalidate tenant |
+| `billing-lifecycle` overdue → GRACE | invalidate tenant |
+| `billing-lifecycle` trial → EXPIRED | invalidate tenant |
+| `billing-lifecycle` grace → SUSPENDED | invalidate tenant |
+| `billing-lifecycle` renewal (`renewsAt` only) | **none** — not part of the cached projection, noted in code |
+| `Tenant.isActive` writes | **none needed** — suspension is live |
+
+`invalidateAllTenantEntitlements()` exists for `PlatformPlanFeature` edits,
+which would affect every tenant on a plan. **No caller today** — the codebase has
+no plan-feature mutation surface (plans are seeded). It is provided so a future
+plan-editing feature has the correct primitive rather than inventing one.
+
+### Files changed / tests
+
+```text
+src/plans/entitlements.service.ts          live/cached split + invalidation API
+src/plans/plans.service.ts                 subscription presence from cached state
+src/platform/platform.service.ts           6 invalidation sites
+src/platform/platform-billing-lifecycle.service.ts  3 sites + 1 documented non-site
+src/plans/plans.service.spec.ts            7 new tests
+```
+
+New tests: plan cached across calls while suspension is re-read every time;
+fails closed on suspension with a warm cache; restores on reactivation; re-reads
+after invalidation; tenant-scoped vs global invalidation keys;
+`hasActiveSubscription` never leaks into the public response;
+`subscription_missing` without a separate query.
+
+**Public API changes: none.**
+
+### Verification
+
+| Command | Result |
+| --- | --- |
+| `pnpm --filter @schoolos/api typecheck` | pass |
+| `pnpm --filter @schoolos/api test` | 2,486 / 2,490 pass |
+| `pnpm --filter @schoolos/api test:e2e` | **283 / 283 pass** |
+| `npx jest src/plans` | 29 / 29 pass |
+| `pnpm db:validate` | pass |
+| `pnpm verify:openapi` | pass |
+
+The 4 unit failures are the same pre-existing set confirmed by stashing on
+unmodified `HEAD`. Unit count rose 2,483 → 2,490.
+
+---
+
 ## Correctness check — attendance idempotency under concurrency
 
 Not a load test, but the correctness property Scenario B is designed to stress.
