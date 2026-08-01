@@ -29,8 +29,8 @@ import {
   DialogDescription,
   DialogTitle,
 } from "../ui/dialog";
-import { Button } from '@/components/ui/button';
-import { PermissionDenied } from '@/components/ui/permission-denied';
+import { Button } from "@/components/ui/button";
+import { PermissionDenied } from "@/components/ui/permission-denied";
 import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import type {
@@ -64,7 +64,7 @@ interface CollectionCounterProps {
   onPageChange?: (page: number) => void;
 }
 
-const formatCurrency = (amount: number | string) => {
+const formatCurrency = (amount: string) => {
   return new Intl.NumberFormat("en-NP", {
     style: "currency",
     currency: "NPR",
@@ -417,223 +417,231 @@ export function CollectionCounter({
                   description="Your current role does not have the finance permission required to record fee payments."
                 />
               ) : (
-              <SectionCard
-                title="Payment review"
-                description="Review the selected invoice, enter the tender, then confirm one payment."
-                headerAction={
-                  <div className="flex items-center gap-2 rounded-xl bg-[var(--color-mod-fees-bg)] border border-[var(--color-mod-fees-border)] px-4 py-2 text-[0.65rem] font-black text-[var(--color-mod-fees-text)] uppercase tracking-widest">
-                    <Receipt size={14} />
-                    Invoice breakdown
-                  </div>
-                }
-              >
-                <div className="space-y-8">
-                  <div className="grid grid-cols-2 gap-4 rounded-xl border border-slate-200 bg-slate-50 p-5 md:grid-cols-4">
-                    <StatItem
-                      label="Total Billed"
-                      value={
-                        invoiceDetailQuery.data
-                          ? formatCurrency(invoiceDetailQuery.data.totalAmount)
-                          : "Unavailable"
-                      }
-                      loading={invoiceDetailQuery.isLoading}
-                    />
-                    <StatItem
-                      label="Paid Amount"
-                      value={
-                        invoiceDetailQuery.data
-                          ? formatCurrency(invoiceDetailQuery.data.paidAmount)
-                          : "Unavailable"
-                      }
-                      color="text-emerald-600"
-                      loading={invoiceDetailQuery.isLoading}
-                    />
-                    <StatItem
-                      label="Current Balance"
-                      value={
-                        invoiceDetailQuery.data
-                          ? formatCurrency(
-                              invoiceDetailQuery.data.outstandingAmount,
-                            )
-                          : "Unavailable"
-                      }
-                      color="text-danger-600 font-black"
-                      loading={invoiceDetailQuery.isLoading}
-                    />
-                    <StatItem
-                      label="Due Date"
-                      value={formatDate(selectedInvoice.dueDate)}
-                    />
-                  </div>
-
-                  {/* Dues Breakdown (if available) */}
-                  {invoiceDetailQuery.data && (
-                    <div className="space-y-3">
-                      <h5 className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest ml-1">
-                        Fee Breakdown
-                      </h5>
-                      <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                        {invoiceDetailQuery.data.lines?.map(
-                          (item: InvoiceDetailLine) => (
-                            <div
-                              key={item.id}
-                              className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-3.5"
-                            >
-                              <span className="text-xs font-bold text-slate-700">
-                                {item.feeHeadName || "Fee head not set"}
-                              </span>
-                              <span className="text-xs font-black text-slate-900">
-                                {formatCurrency(item.netAmount)}
-                              </span>
-                            </div>
-                          ),
-                        )}
-                      </div>
+                <SectionCard
+                  title="Payment review"
+                  description="Review the selected invoice, enter the tender, then confirm one payment."
+                  headerAction={
+                    <div className="flex items-center gap-2 rounded-xl bg-[var(--color-mod-fees-bg)] border border-[var(--color-mod-fees-border)] px-4 py-2 text-[0.65rem] font-black text-[var(--color-mod-fees-text)] uppercase tracking-widest">
+                      <Receipt size={14} />
+                      Invoice breakdown
                     </div>
-                  )}
+                  }
+                >
+                  <div className="space-y-8">
+                    <div className="grid grid-cols-2 gap-4 rounded-xl border border-slate-200 bg-slate-50 p-5 md:grid-cols-4">
+                      <StatItem
+                        label="Total Billed"
+                        value={
+                          invoiceDetailQuery.data
+                            ? formatCurrency(
+                                invoiceDetailQuery.data.totalAmount,
+                              )
+                            : "Unavailable"
+                        }
+                        loading={invoiceDetailQuery.isLoading}
+                      />
+                      <StatItem
+                        label="Paid Amount"
+                        value={
+                          invoiceDetailQuery.data
+                            ? formatCurrency(invoiceDetailQuery.data.paidAmount)
+                            : "Unavailable"
+                        }
+                        color="text-emerald-600"
+                        loading={invoiceDetailQuery.isLoading}
+                      />
+                      <StatItem
+                        label="Current Balance"
+                        value={
+                          invoiceDetailQuery.data
+                            ? formatCurrency(
+                                invoiceDetailQuery.data.outstandingAmount,
+                              )
+                            : "Unavailable"
+                        }
+                        color="text-danger-600 font-black"
+                        loading={invoiceDetailQuery.isLoading}
+                      />
+                      <StatItem
+                        label="Due Date"
+                        value={formatDate(selectedInvoice.dueDate)}
+                      />
+                    </div>
 
-                  <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_320px]">
-                    <div className="space-y-6">
+                    {/* Dues Breakdown (if available) */}
+                    {invoiceDetailQuery.data && (
+                      <div className="space-y-3">
+                        <h5 className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest ml-1">
+                          Fee Breakdown
+                        </h5>
+                        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                          {invoiceDetailQuery.data.lines?.map(
+                            (item: InvoiceDetailLine) => (
+                              <div
+                                key={item.id}
+                                className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-3.5"
+                              >
+                                <span className="text-xs font-bold text-slate-700">
+                                  {item.feeHeadName || "Fee head not set"}
+                                </span>
+                                <span className="text-xs font-black text-slate-900">
+                                  {formatCurrency(item.netAmount)}
+                                </span>
+                              </div>
+                            ),
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_320px]">
+                      <div className="space-y-6">
+                        <div className="space-y-3">
+                          <label className="ml-1 text-xs font-semibold text-slate-600">
+                            Collection Amount
+                          </label>
+                          <div className="group flex h-16 items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 transition focus-within:ring-2 focus-within:ring-[var(--color-mod-fees-accent)]">
+                            <span className="shrink-0 text-sm font-black text-slate-400 transition-colors group-focus-within:text-[var(--color-mod-fees-accent)]">
+                              NPR
+                            </span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={amount}
+                              onChange={(e) =>
+                                setAmount(Number(e.target.value))
+                              }
+                              // A scroll over a focused number input silently
+                              // changes the value — unacceptable for money.
+                              onWheel={(e) => e.currentTarget.blur()}
+                              aria-label="Collection amount in NPR"
+                              className="h-full w-full min-w-0 border-0 bg-transparent p-0 text-2xl font-bold text-slate-950 shadow-none outline-none focus:shadow-none focus:ring-0"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="ml-1 text-xs font-semibold text-slate-600">
+                              Reference #
+                            </label>
+                            <Input
+                              placeholder="e.g. Check/Bank Ref"
+                              value={reference}
+                              onChange={(e) => setReference(e.target.value)}
+                              className="h-12 rounded-xl border-slate-100 bg-slate-50/50"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="ml-1 text-xs font-semibold text-slate-600">
+                              Remarks
+                            </label>
+                            <Input
+                              placeholder="Note for ledger..."
+                              value={remarks}
+                              onChange={(e) => setRemarks(e.target.value)}
+                              className="h-12 rounded-xl border-slate-100 bg-slate-50/50"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
                       <div className="space-y-3">
                         <label className="ml-1 text-xs font-semibold text-slate-600">
-                          Collection Amount
+                          Payment Method
                         </label>
-                        <div className="group flex h-16 items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 transition focus-within:ring-2 focus-within:ring-[var(--color-mod-fees-accent)]">
-                          <span className="shrink-0 text-sm font-black text-slate-400 transition-colors group-focus-within:text-[var(--color-mod-fees-accent)]">
-                            NPR
-                          </span>
-                          <input
-                            type="number"
-                            min={0}
-                            value={amount}
-                            onChange={(e) => setAmount(Number(e.target.value))}
-                            // A scroll over a focused number input silently
-                            // changes the value — unacceptable for money.
-                            onWheel={(e) => e.currentTarget.blur()}
-                            aria-label="Collection amount in NPR"
-                            className="h-full w-full min-w-0 border-0 bg-transparent p-0 text-2xl font-bold text-slate-950 shadow-none outline-none focus:shadow-none focus:ring-0"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <label className="ml-1 text-xs font-semibold text-slate-600">
-                            Reference #
-                          </label>
-                          <Input
-                            placeholder="e.g. Check/Bank Ref"
-                            value={reference}
-                            onChange={(e) => setReference(e.target.value)}
-                            className="h-12 rounded-xl border-slate-100 bg-slate-50/50"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="ml-1 text-xs font-semibold text-slate-600">
-                            Remarks
-                          </label>
-                          <Input
-                            placeholder="Note for ledger..."
-                            value={remarks}
-                            onChange={(e) => setRemarks(e.target.value)}
-                            className="h-12 rounded-xl border-slate-100 bg-slate-50/50"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <label className="ml-1 text-xs font-semibold text-slate-600">
-                        Payment Method
-                      </label>
-                      <div className="grid grid-cols-2 gap-3">
-                        {[
-                          {
-                            id: "CASH",
-                            icon: <Banknote size={18} />,
-                            label: "Cash",
-                          },
-                          {
-                            id: "BANK",
-                            icon: <CreditCard size={18} />,
-                            label: "Bank",
-                          },
-                          {
-                            id: "TRANSFER",
-                            icon: <History size={18} />,
-                            label: "Transfer",
-                          },
-                          {
-                            id: "MOBILE",
-                            icon: <CreditCard size={18} />,
-                            label: "Wallet",
-                          },
-                        ].map((m) => (
-                          <Button
-                            key={m.id}
-                            type="button"
-                            variant="ghost"
-                            onClick={() => setMethod(m.id)}
-                            aria-pressed={method === m.id}
-                            className={cn(
-                              "flex h-auto min-h-11 items-center gap-2 rounded-lg border p-2.5 transition-colors",
-                              method === m.id
-                                ? "border-[var(--color-mod-fees-border)] bg-[var(--color-mod-fees-bg)] text-[var(--color-mod-fees-text)] shadow-sm"
-                                : "border-slate-100 bg-white text-slate-600 hover:border-[var(--color-mod-fees-border)]",
-                            )}
-                          >
-                            <div
+                        <div className="grid grid-cols-2 gap-3">
+                          {[
+                            {
+                              id: "CASH",
+                              icon: <Banknote size={18} />,
+                              label: "Cash",
+                            },
+                            {
+                              id: "BANK",
+                              icon: <CreditCard size={18} />,
+                              label: "Bank",
+                            },
+                            {
+                              id: "TRANSFER",
+                              icon: <History size={18} />,
+                              label: "Transfer",
+                            },
+                            {
+                              id: "MOBILE",
+                              icon: <CreditCard size={18} />,
+                              label: "Wallet",
+                            },
+                          ].map((m) => (
+                            <Button
+                              key={m.id}
+                              type="button"
+                              variant="ghost"
+                              onClick={() => setMethod(m.id)}
+                              aria-pressed={method === m.id}
                               className={cn(
-                                "h-8 w-8 shrink-0 rounded-lg flex items-center justify-center",
-                                method === m.id ? "bg-white" : "bg-slate-50",
+                                "flex h-auto min-h-11 items-center gap-2 rounded-lg border p-2.5 transition-colors",
+                                method === m.id
+                                  ? "border-[var(--color-mod-fees-border)] bg-[var(--color-mod-fees-bg)] text-[var(--color-mod-fees-text)] shadow-sm"
+                                  : "border-slate-100 bg-white text-slate-600 hover:border-[var(--color-mod-fees-border)]",
                               )}
                             >
-                              {m.icon}
-                            </div>
-                            <span className="min-w-0 text-left text-xs font-bold leading-tight">
-                              {m.label}
-                            </span>
-                          </Button>
-                        ))}
+                              <div
+                                className={cn(
+                                  "h-8 w-8 shrink-0 rounded-lg flex items-center justify-center",
+                                  method === m.id ? "bg-white" : "bg-slate-50",
+                                )}
+                              >
+                                {m.icon}
+                              </div>
+                              <span className="min-w-0 text-left text-xs font-bold leading-tight">
+                                {m.label}
+                              </span>
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-4 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex items-start gap-2 text-warning-800">
+                        <AlertCircle size={16} />
+                        <span className="max-w-md text-xs font-medium leading-5">
+                          Confirmed payments require an authorized refund or
+                          reversal for any correction.
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => setSelectedInvoiceId(null)}
+                          className="min-h-11 px-4 text-sm font-semibold text-slate-600 hover:text-slate-950"
+                        >
+                          Reset selection
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => setIsConfirmingPayment(true)}
+                          disabled={
+                            isSubmitting ||
+                            invoiceDetailQuery.isLoading ||
+                            !invoiceDetailQuery.data ||
+                            amount <= 0 ||
+                            amount >
+                              Number(invoiceDetailQuery.data.outstandingAmount)
+                          }
+                          className="flex min-h-11 items-center gap-2 whitespace-nowrap rounded-lg !bg-[var(--color-mod-fees-accent)] px-5 text-sm font-semibold text-white shadow-sm hover:!bg-[var(--color-mod-fees-text)]"
+                        >
+                          <CheckSquare size={20} />
+                          {isSubmitting
+                            ? "Recording payment..."
+                            : "Review payment"}
+                        </Button>
                       </div>
                     </div>
                   </div>
-
-                  <div className="flex flex-col gap-4 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-start gap-2 text-warning-800">
-                      <AlertCircle size={16} />
-                      <span className="max-w-md text-xs font-medium leading-5">
-                        Confirmed payments require an authorized refund or reversal for any correction.
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => setSelectedInvoiceId(null)}
-                        className="min-h-11 px-4 text-sm font-semibold text-slate-600 hover:text-slate-950"
-                      >
-                        Reset selection
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={() => setIsConfirmingPayment(true)}
-                        disabled={
-                          isSubmitting ||
-                          invoiceDetailQuery.isLoading ||
-                          !invoiceDetailQuery.data ||
-                          amount <= 0 ||
-                          amount > Number(invoiceDetailQuery.data.outstandingAmount)
-                        }
-                        className="flex min-h-11 items-center gap-2 whitespace-nowrap rounded-lg !bg-[var(--color-mod-fees-accent)] px-5 text-sm font-semibold text-white shadow-sm hover:!bg-[var(--color-mod-fees-text)]"
-                      >
-                        <CheckSquare size={20} />
-                        {isSubmitting ? "Recording payment..." : "Review payment"}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </SectionCard>
+                </SectionCard>
               )}
             </div>
           ) : (
@@ -660,7 +668,6 @@ export function CollectionCounter({
                   Change student
                 </Button>
               ) : null}
-
             </div>
           )}
         </div>
@@ -718,7 +725,7 @@ export function CollectionCounter({
                 />
                 <PaymentReviewItem
                   label="Amount to collect"
-                  value={formatCurrency(amount)}
+                  value={formatCurrency(amount.toFixed(2))}
                   emphasized
                   className="border-t border-slate-200"
                 />
@@ -731,7 +738,9 @@ export function CollectionCounter({
                   label="Outstanding before"
                   value={
                     invoiceDetailQuery.data
-                      ? formatCurrency(invoiceDetailQuery.data.outstandingAmount)
+                      ? formatCurrency(
+                          invoiceDetailQuery.data.outstandingAmount,
+                        )
                       : "Unavailable"
                   }
                   className="border-t border-slate-200"

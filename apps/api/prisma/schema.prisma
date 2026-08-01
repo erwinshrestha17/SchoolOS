@@ -7146,6 +7146,10 @@ model ReportExport {
   tenantId     String?
   scope        String             @default("tenant")
   reportKey    String
+  /// Canonical P0 financial report ID (e.g. FEE-01) when this export is one.
+  /// reportKey is a route slug, so this is what links an export to the shared
+  /// catalog that owns its version, classification, and verification status.
+  financialReportId String?
   format       String
   filters      Json
   status       ReportExportStatus @default(COMPLETED)
@@ -7170,6 +7174,7 @@ model ReportExport {
   @@index([tenantId, createdAt])
   @@index([scope, reportKey])
   @@index([tenantId, reportKey, createdAt])
+  @@index([tenantId, financialReportId, createdAt])
   @@index([tenantId, requestedBy, createdAt])
   @@index([tenantId, fileAssetId])
   @@index([tenantId, status, createdAt])

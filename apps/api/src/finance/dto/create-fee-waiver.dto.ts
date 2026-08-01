@@ -1,4 +1,4 @@
-import { IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsDecimal, IsOptional, IsString } from 'class-validator';
 
 export class CreateFeeWaiverDto {
   @IsString()
@@ -12,9 +12,8 @@ export class CreateFeeWaiverDto {
   @IsString()
   invoiceId?: string;
 
-  @IsNumber()
-  @Min(0.01)
-  amount!: number;
+  @IsDecimal({ decimal_digits: '1,2', force_decimal: false })
+  amount!: string;
 
   @IsString()
   reason!: string;

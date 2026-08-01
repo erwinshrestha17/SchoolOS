@@ -118,6 +118,7 @@ describe('FinanceService P0 report helpers', () => {
             _count: { reprintHistory: 1 },
           },
         ]),
+        count: jest.fn().mockResolvedValue(1),
       },
     };
 
@@ -135,7 +136,80 @@ describe('FinanceService P0 report helpers', () => {
 
     const report = await service.getReceiptRegisterRows(actor, {});
 
-    expect(report.rows[0]?.netAmount).toBe(800);
+    expect(report.rows[0]?.netAmount).toBe('800.00');
     expect(report.summary.totalReceipts).toBe(1);
+  });
+
+  it('returns paginated backend-owned unallocated payment balances with posting lineage', async () => {
+    const prisma = {
+      $queryRaw: jest
+        .fn()
+        .mockResolvedValueOnce([
+          {
+            paymentId: 'payment-1',
+            paymentDate: new Date('2026-07-01T00:00:00.000Z'),
+            receiptNumber: 'REC-001',
+            studentId: 'student-1',
+            studentSystemId: 'ST-001',
+            firstNameEn: 'Asha',
+            lastNameEn: 'Shrestha',
+            paymentMethod: PaymentMethod.CASH,
+            paymentStatus: PaymentStatus.SUCCESS,
+            referenceNumber: null,
+            originalAmount: new Prisma.Decimal('1500.00'),
+            unallocatedBalance: new Prisma.Decimal('500.00'),
+            isAdvance: true,
+          },
+        ])
+        .mockResolvedValueOnce([
+          { total: 1n, totalBalance: new Prisma.Decimal('500.00') },
+        ]),
+      journalEntry: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'journal-1',
+            sourceId: 'payment-1',
+            entryNumber: 'JE-001',
+          },
+        ]),
+      },
+    };
+    const service = new FinanceService(
+      prisma as never,
+      { record: jest.fn() } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    const report = await service.getUnallocatedPaymentReport(actor, {
+      page: 1,
+      limit: 25,
+    });
+
+    expect(report.rows[0]).toEqual(
+      expect.objectContaining({
+        paymentId: 'payment-1',
+        unallocatedBalance: '500.00',
+        balanceType: 'ADVANCE',
+        postingStatus: 'POSTED',
+        journalEntryNumber: 'JE-001',
+      }),
+    );
+    expect(report.summary).toEqual({
+      totalPayments: 1,
+      totalUnallocatedAmount: '500.00',
+      displayedUnallocatedAmount: '500.00',
+    });
+    expect(report.pagination).toEqual({
+      total: 1,
+      page: 1,
+      limit: 25,
+      totalPages: 1,
+    });
   });
 });

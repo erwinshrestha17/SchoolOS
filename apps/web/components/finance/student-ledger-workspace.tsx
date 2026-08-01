@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { api } from "@/lib/api";
 
-const formatCurrency = (amount: number | string) =>
+const formatCurrency = (amount: string) =>
   new Intl.NumberFormat("en-NP", {
     style: "currency",
     currency: "NPR",
@@ -423,7 +423,7 @@ function LedgerSummary({
   emphasized = false,
 }: {
   label: string;
-  value: number | string;
+  value: string;
   emphasized?: boolean;
 }) {
   return (

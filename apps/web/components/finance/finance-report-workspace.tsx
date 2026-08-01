@@ -27,6 +27,7 @@ type ReportKey =
   | "dues"
   | "aging"
   | "payment-methods"
+  | "unallocated-payments"
   | "cashier-closes"
   | "adjustments"
   | "refund-reversals"
@@ -34,7 +35,7 @@ type ReportKey =
   | "sequence-exceptions"
   | "receipts";
 
-const formatCurrency = (amount: string | number) =>
+const formatCurrency = (amount: string) =>
   new Intl.NumberFormat("en-NP", {
     style: "currency",
     currency: "NPR",
@@ -69,6 +70,11 @@ export function FinanceReportWorkspace() {
           value: "payment-methods" as const,
           label: "Payment methods",
           allowed: hasPermissions(["fees:manage"]),
+        },
+        {
+          value: "unallocated-payments" as const,
+          label: "Advances and unallocated payments",
+          allowed: hasPermissions(["fees:manage", "ledger:read"]),
         },
         {
           value: "cashier-closes" as const,
@@ -163,6 +169,8 @@ export function FinanceReportWorkspace() {
         </div>
       ) : report === "payment-methods" ? (
         <PaymentMethodReportPanel />
+      ) : report === "unallocated-payments" ? (
+        <UnallocatedPaymentReportPanel />
       ) : report === "cashier-closes" ? (
         <CashierCloseReportPanel />
       ) : report === "adjustments" ? (
@@ -337,6 +345,109 @@ function PaymentMethodReportPanel() {
   );
 }
 
+function UnallocatedPaymentReportPanel() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const page = Math.max(1, Number(searchParams.get("page") ?? "1") || 1);
+  const reportQuery = useQuery({
+    queryKey: ["finance-report", "unallocated-payments", page],
+    queryFn: () => api.getUnallocatedPaymentReport({ page, limit: 25 }),
+  });
+  const setPage = (nextPage: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextPage <= 1) params.delete("page");
+    else params.set("page", String(nextPage));
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
+  if (reportQuery.isError) {
+    return (
+      <ErrorState
+        title="Advance and unallocated payment report could not load"
+        message="No balance was recalculated in the browser. Retry the tenant-scoped backend report."
+        onRetry={() => void reportQuery.refetch()}
+      />
+    );
+  }
+  if (reportQuery.isLoading || !reportQuery.data) return <ReportLoading />;
+  const report = reportQuery.data;
+
+  return (
+    <SectionCard
+      title="Advances and unallocated payments"
+      description={`${report.summary.totalPayments} payment balances · Total ${formatCurrency(report.summary.totalUnallocatedAmount)} · Generated ${formatBsDateTime(report.generatedAt)}`}
+      noPadding
+    >
+      {report.rows.length ? (
+        <div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[960px] text-left text-sm">
+              <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
+                <tr>
+                  <th className="px-5 py-3">Receipt</th>
+                  <th className="px-5 py-3">Student</th>
+                  <th className="px-5 py-3">Received</th>
+                  <th className="px-5 py-3">Type</th>
+                  <th className="px-5 py-3 text-right">Original</th>
+                  <th className="px-5 py-3 text-right">Available balance</th>
+                  <th className="px-5 py-3">M11 posting</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 tabular-nums">
+                {report.rows.map((row) => (
+                  <tr key={row.paymentId}>
+                    <td className="px-5 py-3.5 font-semibold text-slate-950">
+                      {row.receiptNumber ?? "Receipt pending"}
+                    </td>
+                    <td className="px-5 py-3.5 text-slate-700">
+                      {row.studentName}
+                      <span className="mt-0.5 block text-xs text-slate-500">
+                        {row.studentSystemId}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-slate-600">
+                      {formatBsDateTime(row.paymentDate)}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <StatusBadge status={row.balanceType} />
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      {formatCurrency(row.originalAmount)}
+                    </td>
+                    <td className="px-5 py-3.5 text-right font-semibold text-slate-950">
+                      {formatCurrency(row.unallocatedBalance)}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <StatusBadge status={row.postingStatus} />
+                      {row.journalEntryNumber ? (
+                        <span className="mt-1 block text-xs text-slate-500">
+                          {row.journalEntryNumber}
+                        </span>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <ReportPagination
+            page={page}
+            hasNextPage={page < report.pagination.totalPages}
+            onPageChange={setPage}
+          />
+        </div>
+      ) : (
+        <EmptyState
+          title="No unallocated payment balances"
+          description="Every confirmed payment is fully allocated to an invoice in the current tenant."
+          className="m-5 min-h-52"
+        />
+      )}
+    </SectionCard>
+  );
+}
+
 function CashierCloseReportPanel() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -404,7 +515,7 @@ function CashierCloseReportPanel() {
                       {formatCurrency(row.netCollected)}
                     </td>
                     <td className="px-5 py-3.5 text-right">
-                      {formatCurrency(row.varianceAmount ?? 0)}
+                      {formatCurrency(row.varianceAmount ?? "0.00")}
                     </td>
                   </tr>
                 ))}
@@ -430,12 +541,15 @@ function CashierCloseReportPanel() {
 
 function InvoiceRegisterPanel() {
   const { fromDate, toDate } = useReportPeriodParams();
+  const { page, setPage } = useReportPageParams();
   const reportQuery = useQuery({
-    queryKey: ["finance-report", "invoices", fromDate, toDate],
+    queryKey: ["finance-report", "invoices", fromDate, toDate, page],
     queryFn: () =>
       api.getInvoiceRegister({
         fromDate: fromDate || undefined,
         toDate: toDate || undefined,
+        page,
+        limit: 25,
       }),
   });
 
@@ -454,55 +568,62 @@ function InvoiceRegisterPanel() {
       <ReportPeriodFilter />
       <SectionCard
         title="Invoice register"
-        description={`${reportQuery.data.summary.totalInvoices} invoices · Outstanding ${formatCurrency(reportQuery.data.summary.totalBalanceAmount)}`}
+        description={`${reportQuery.data.summary.displayedInvoices} of ${reportQuery.data.summary.totalInvoices} invoices · Visible outstanding ${formatCurrency(reportQuery.data.summary.totalBalanceAmount)}`}
         noPadding
       >
         {reportQuery.data.rows.length ? (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[960px] text-left text-sm">
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
-                <tr>
-                  <th className="px-5 py-3">Invoice</th>
-                  <th className="px-5 py-3">Student</th>
-                  <th className="px-5 py-3">Period</th>
-                  <th className="px-5 py-3 text-right">Net</th>
-                  <th className="px-5 py-3 text-right">Paid</th>
-                  <th className="px-5 py-3 text-right">Balance</th>
-                  <th className="px-5 py-3">Due</th>
-                  <th className="px-5 py-3">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 tabular-nums">
-                {reportQuery.data.rows.map((row) => (
-                  <tr key={row.invoiceNumber}>
-                    <td className="px-5 py-3.5 font-semibold text-slate-950">
-                      {row.invoiceNumber}
-                    </td>
-                    <td className="px-5 py-3.5 text-slate-700">
-                      {row.studentName}
-                    </td>
-                    <td className="px-5 py-3.5 text-slate-600">
-                      {row.billingPeriod}
-                    </td>
-                    <td className="px-5 py-3.5 text-right">
-                      {formatCurrency(row.netAmount)}
-                    </td>
-                    <td className="px-5 py-3.5 text-right">
-                      {formatCurrency(row.paidAmount)}
-                    </td>
-                    <td className="px-5 py-3.5 text-right">
-                      {formatCurrency(row.balanceAmount)}
-                    </td>
-                    <td className="px-5 py-3.5 text-slate-600">
-                      {formatBsDate(row.dueDate)}
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <StatusBadge status={row.status} />
-                    </td>
+          <div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[960px] text-left text-sm">
+                <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
+                  <tr>
+                    <th className="px-5 py-3">Invoice</th>
+                    <th className="px-5 py-3">Student</th>
+                    <th className="px-5 py-3">Period</th>
+                    <th className="px-5 py-3 text-right">Net</th>
+                    <th className="px-5 py-3 text-right">Paid</th>
+                    <th className="px-5 py-3 text-right">Balance</th>
+                    <th className="px-5 py-3">Due</th>
+                    <th className="px-5 py-3">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100 tabular-nums">
+                  {reportQuery.data.rows.map((row) => (
+                    <tr key={row.invoiceNumber}>
+                      <td className="px-5 py-3.5 font-semibold text-slate-950">
+                        {row.invoiceNumber}
+                      </td>
+                      <td className="px-5 py-3.5 text-slate-700">
+                        {row.studentName}
+                      </td>
+                      <td className="px-5 py-3.5 text-slate-600">
+                        {row.billingPeriod}
+                      </td>
+                      <td className="px-5 py-3.5 text-right">
+                        {formatCurrency(row.netAmount)}
+                      </td>
+                      <td className="px-5 py-3.5 text-right">
+                        {formatCurrency(row.paidAmount)}
+                      </td>
+                      <td className="px-5 py-3.5 text-right">
+                        {formatCurrency(row.balanceAmount)}
+                      </td>
+                      <td className="px-5 py-3.5 text-slate-600">
+                        {formatBsDate(row.dueDate)}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <StatusBadge status={row.status} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <ReportPagination
+              page={page}
+              hasNextPage={page < reportQuery.data.pagination.totalPages}
+              onPageChange={setPage}
+            />
           </div>
         ) : (
           <EmptyState
@@ -517,9 +638,10 @@ function InvoiceRegisterPanel() {
 }
 
 function ReceiptSequenceExceptionPanel() {
+  const { page, setPage } = useReportPageParams();
   const reportQuery = useQuery({
-    queryKey: ["finance-report", "sequence-exceptions"],
-    queryFn: () => api.getReceiptSequenceExceptions(),
+    queryKey: ["finance-report", "sequence-exceptions", page],
+    queryFn: () => api.getReceiptSequenceExceptions({ page, limit: 25 }),
   });
 
   if (reportQuery.isError) {
@@ -539,31 +661,42 @@ function ReceiptSequenceExceptionPanel() {
       noPadding
     >
       {reportQuery.data.rows.length ? (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
-              <tr>
-                <th className="px-5 py-3">Fiscal year</th>
-                <th className="px-5 py-3">Receipt</th>
-                <th className="px-5 py-3">Exception</th>
-                <th className="px-5 py-3">Details</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {reportQuery.data.rows.map((row, index) => (
-                <tr key={`${row.receiptNumber}-${row.exceptionType}-${index}`}>
-                  <td className="px-5 py-3.5">{row.fiscalYear}</td>
-                  <td className="px-5 py-3.5 font-semibold text-slate-950">
-                    {row.receiptNumber}
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <StatusBadge status={row.exceptionType} />
-                  </td>
-                  <td className="px-5 py-3.5 text-slate-700">{row.details}</td>
+        <div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
+                <tr>
+                  <th className="px-5 py-3">Fiscal year</th>
+                  <th className="px-5 py-3">Receipt</th>
+                  <th className="px-5 py-3">Exception</th>
+                  <th className="px-5 py-3">Details</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {reportQuery.data.rows.map((row, index) => (
+                  <tr
+                    key={`${row.receiptNumber}-${row.exceptionType}-${index}`}
+                  >
+                    <td className="px-5 py-3.5">{row.fiscalYear}</td>
+                    <td className="px-5 py-3.5 font-semibold text-slate-950">
+                      {row.receiptNumber}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <StatusBadge status={row.exceptionType} />
+                    </td>
+                    <td className="px-5 py-3.5 text-slate-700">
+                      {row.details}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <ReportPagination
+            page={page}
+            hasNextPage={page < reportQuery.data.pagination.totalPages}
+            onPageChange={setPage}
+          />
         </div>
       ) : (
         <EmptyState
@@ -578,12 +711,15 @@ function ReceiptSequenceExceptionPanel() {
 
 function RefundReversalRegisterPanel() {
   const { fromDate, toDate } = useReportPeriodParams();
+  const { page, setPage } = useReportPageParams();
   const reportQuery = useQuery({
-    queryKey: ["finance-report", "refund-reversals", fromDate, toDate],
+    queryKey: ["finance-report", "refund-reversals", fromDate, toDate, page],
     queryFn: () =>
       api.getRefundReversalRegister({
         fromDate: fromDate || undefined,
         toDate: toDate || undefined,
+        page,
+        limit: 25,
       }),
   });
 
@@ -606,43 +742,50 @@ function RefundReversalRegisterPanel() {
         noPadding
       >
         {reportQuery.data.rows.length ? (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[960px] text-left text-sm">
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
-                <tr>
-                  <th className="px-5 py-3">Type</th>
-                  <th className="px-5 py-3">Record</th>
-                  <th className="px-5 py-3">Student</th>
-                  <th className="px-5 py-3 text-right">Amount</th>
-                  <th className="px-5 py-3">Processed</th>
-                  <th className="px-5 py-3">Journal</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 tabular-nums">
-                {reportQuery.data.rows.map((row) => (
-                  <tr key={`${row.recordType}-${row.recordNumber}`}>
-                    <td className="px-5 py-3.5 font-semibold text-slate-950">
-                      {row.recordType}
-                    </td>
-                    <td className="px-5 py-3.5 text-slate-700">
-                      {row.recordNumber}
-                    </td>
-                    <td className="px-5 py-3.5 text-slate-700">
-                      {row.studentName}
-                    </td>
-                    <td className="px-5 py-3.5 text-right">
-                      {formatCurrency(row.amount)}
-                    </td>
-                    <td className="px-5 py-3.5 text-slate-600">
-                      {formatBsDateTime(row.processedAt)}
-                    </td>
-                    <td className="px-5 py-3.5 text-slate-600">
-                      {row.journalEntryNumber || "—"}
-                    </td>
+          <div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[960px] text-left text-sm">
+                <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
+                  <tr>
+                    <th className="px-5 py-3">Type</th>
+                    <th className="px-5 py-3">Record</th>
+                    <th className="px-5 py-3">Student</th>
+                    <th className="px-5 py-3 text-right">Amount</th>
+                    <th className="px-5 py-3">Processed</th>
+                    <th className="px-5 py-3">Journal</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100 tabular-nums">
+                  {reportQuery.data.rows.map((row) => (
+                    <tr key={`${row.recordType}-${row.recordNumber}`}>
+                      <td className="px-5 py-3.5 font-semibold text-slate-950">
+                        {row.recordType}
+                      </td>
+                      <td className="px-5 py-3.5 text-slate-700">
+                        {row.recordNumber}
+                      </td>
+                      <td className="px-5 py-3.5 text-slate-700">
+                        {row.studentName}
+                      </td>
+                      <td className="px-5 py-3.5 text-right">
+                        {formatCurrency(row.amount)}
+                      </td>
+                      <td className="px-5 py-3.5 text-slate-600">
+                        {formatBsDateTime(row.processedAt)}
+                      </td>
+                      <td className="px-5 py-3.5 text-slate-600">
+                        {row.journalEntryNumber || "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <ReportPagination
+              page={page}
+              hasNextPage={page < reportQuery.data.pagination.totalPages}
+              onPageChange={setPage}
+            />
           </div>
         ) : (
           <EmptyState
@@ -836,6 +979,20 @@ function useReportPeriodParams() {
     fromDate: searchParams.get("fromDate") ?? "",
     toDate: searchParams.get("toDate") ?? "",
   };
+}
+
+function useReportPageParams() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const page = Math.max(1, Number(searchParams.get("page") ?? "1") || 1);
+  const setPage = (nextPage: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextPage <= 1) params.delete("page");
+    else params.set("page", String(nextPage));
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+  return { page, setPage };
 }
 
 function BreakdownTable({

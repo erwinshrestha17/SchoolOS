@@ -56,7 +56,7 @@ interface FeeLedgerProps {
   onSortChange?: (sort: PaginatedDataTableSort | null) => void;
 }
 
-const formatCurrency = (amount: number | string) => {
+const formatCurrency = (amount: string) => {
   return new Intl.NumberFormat("en-NP", {
     style: "currency",
     currency: "NPR",
@@ -98,7 +98,9 @@ export function FeeLedger({
     if (invoiceId) params.set("invoiceId", invoiceId);
     else params.delete("invoiceId");
     const query = params.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    router.replace(query ? `${pathname}?${query}` : pathname, {
+      scroll: false,
+    });
   };
 
   useEffect(() => {
@@ -172,7 +174,7 @@ export function FeeLedger({
       header: "Paid",
       cell: (inv) => (
         <span className="text-sm font-black text-emerald-600">
-          {formatCurrency(inv.paidAmount ?? 0)}
+          {formatCurrency(inv.paidAmount ?? "0.00")}
         </span>
       ),
     },
@@ -182,7 +184,7 @@ export function FeeLedger({
       align: "right",
       cell: (inv) => (
         <span className="block text-right text-sm font-bold text-slate-950 tabular-nums">
-          {typeof inv.outstandingAmount === "number"
+          {inv.outstandingAmount
             ? formatCurrency(inv.outstandingAmount)
             : "Unavailable"}
         </span>
@@ -296,7 +298,9 @@ function InvoiceDetailContent({
   return (
     <div className="space-y-6">
       <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-        <p className="text-base font-semibold text-slate-950">{detail.student.name}</p>
+        <p className="text-base font-semibold text-slate-950">
+          {detail.student.name}
+        </p>
         <p className="mt-1 text-sm text-slate-600">
           {detail.student.studentSystemId} · {detail.student.className}
           {detail.student.sectionName ? ` · ${detail.student.sectionName}` : ""}
@@ -304,7 +308,9 @@ function InvoiceDetailContent({
         {detail.student.guardianName ? (
           <p className="mt-2 text-xs text-slate-500">
             Guardian: {detail.student.guardianName}
-            {detail.student.guardianPhone ? ` · ${detail.student.guardianPhone}` : ""}
+            {detail.student.guardianPhone
+              ? ` · ${detail.student.guardianPhone}`
+              : ""}
           </p>
         ) : null}
       </section>
@@ -314,53 +320,89 @@ function InvoiceDetailContent({
         <InvoiceFact label="Due date" value={formatDate(detail.dueDate)} />
         <InvoiceFact label="Total" value={formatCurrency(detail.totalAmount)} />
         <InvoiceFact label="Paid" value={formatCurrency(detail.paidAmount)} />
-        <InvoiceFact label="Waived" value={formatCurrency(detail.totalWaivedAmount)} />
-        <InvoiceFact label="Outstanding" value={formatCurrency(detail.outstandingAmount)} emphasized />
+        <InvoiceFact
+          label="Waived"
+          value={formatCurrency(detail.totalWaivedAmount)}
+        />
+        <InvoiceFact
+          label="Outstanding"
+          value={formatCurrency(detail.outstandingAmount)}
+          emphasized
+        />
       </dl>
 
       <section>
-        <h3 className="text-sm font-semibold text-slate-950">Invoice line items</h3>
+        <h3 className="text-sm font-semibold text-slate-950">
+          Invoice line items
+        </h3>
         <div className="mt-3 overflow-hidden rounded-xl border border-slate-200">
           {detail.lines.map((line) => (
-            <div key={line.id} className="flex items-start justify-between gap-4 border-b border-slate-100 px-4 py-3 last:border-0">
+            <div
+              key={line.id}
+              className="flex items-start justify-between gap-4 border-b border-slate-100 px-4 py-3 last:border-0"
+            >
               <div>
-                <p className="text-sm font-semibold text-slate-900">{line.feeHeadName}</p>
-                <p className="mt-0.5 text-xs text-slate-500">{line.periodLabel || line.description}</p>
+                <p className="text-sm font-semibold text-slate-900">
+                  {line.feeHeadName}
+                </p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {line.periodLabel || line.description}
+                </p>
               </div>
-              <p className="text-sm font-semibold text-slate-950 tabular-nums">{formatCurrency(line.netAmount)}</p>
+              <p className="text-sm font-semibold text-slate-950 tabular-nums">
+                {formatCurrency(line.netAmount)}
+              </p>
             </div>
           ))}
         </div>
       </section>
 
       <section>
-        <h3 className="text-sm font-semibold text-slate-950">Payments and correction chain</h3>
+        <h3 className="text-sm font-semibold text-slate-950">
+          Payments and correction chain
+        </h3>
         {detail.payments.length ? (
           <div className="mt-3 space-y-3">
             {detail.payments.map((payment) => (
-              <div key={payment.id} className="rounded-xl border border-slate-200 p-4">
+              <div
+                key={payment.id}
+                className="rounded-xl border border-slate-200 p-4"
+              >
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-sm font-semibold text-slate-950">{payment.receipt?.receiptNumber ?? "Receipt pending"}</p>
-                    <p className="mt-1 text-xs text-slate-500">{payment.method} · {formatDate(payment.paidAt)}</p>
+                    <p className="text-sm font-semibold text-slate-950">
+                      {payment.receipt?.receiptNumber ?? "Receipt pending"}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {payment.method} · {formatDate(payment.paidAt)}
+                    </p>
                   </div>
-                  <p className="text-sm font-semibold text-slate-950 tabular-nums">{formatCurrency(payment.netAmount)}</p>
+                  <p className="text-sm font-semibold text-slate-950 tabular-nums">
+                    {formatCurrency(payment.netAmount)}
+                  </p>
                 </div>
                 {payment.refunds.length ? (
                   <div className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-600">
                     {payment.refunds.map((refund) => (
-                      <p key={refund.id}>{refund.refundNumber} · {formatCurrency(refund.amount)} · {refund.reason}</p>
+                      <p key={refund.id}>
+                        {refund.refundNumber} · {formatCurrency(refund.amount)}{" "}
+                        · {refund.reason}
+                      </p>
                     ))}
                   </div>
                 ) : null}
                 <p className="mt-3 text-xs text-slate-500">
-                  Accounting handoff: {payment.journalEntryNumber ?? "Not available in current response"}
+                  Accounting handoff:{" "}
+                  {payment.journalEntryNumber ??
+                    "Not available in current response"}
                 </p>
               </div>
             ))}
           </div>
         ) : (
-          <p className="mt-3 rounded-xl border border-dashed border-slate-200 p-4 text-sm text-slate-600">No payments are recorded for this invoice.</p>
+          <p className="mt-3 rounded-xl border border-dashed border-slate-200 p-4 text-sm text-slate-600">
+            No payments are recorded for this invoice.
+          </p>
         )}
       </section>
 
@@ -369,8 +411,16 @@ function InvoiceDetailContent({
           <h3 className="text-sm font-semibold text-slate-950">Waivers</h3>
           <div className="mt-3 space-y-2">
             {detail.waivers.map((waiver) => (
-              <div key={waiver.id} className="rounded-xl border border-slate-200 p-3 text-sm">
-                <div className="flex justify-between gap-4"><span>{waiver.feeHeadName ?? "Invoice waiver"}</span><span className="font-semibold tabular-nums">{formatCurrency(waiver.amount)}</span></div>
+              <div
+                key={waiver.id}
+                className="rounded-xl border border-slate-200 p-3 text-sm"
+              >
+                <div className="flex justify-between gap-4">
+                  <span>{waiver.feeHeadName ?? "Invoice waiver"}</span>
+                  <span className="font-semibold tabular-nums">
+                    {formatCurrency(waiver.amount)}
+                  </span>
+                </div>
                 <p className="mt-1 text-xs text-slate-500">{waiver.reason}</p>
               </div>
             ))}
@@ -381,11 +431,23 @@ function InvoiceDetailContent({
   );
 }
 
-function InvoiceFact({ label, value, emphasized = false }: { label: string; value: string; emphasized?: boolean }) {
+function InvoiceFact({
+  label,
+  value,
+  emphasized = false,
+}: {
+  label: string;
+  value: string;
+  emphasized?: boolean;
+}) {
   return (
-    <div className={`rounded-xl border p-3 ${emphasized ? "border-[var(--color-mod-fees-border)] bg-[var(--color-mod-fees-bg)]" : "border-slate-200 bg-white"}`}>
+    <div
+      className={`rounded-xl border p-3 ${emphasized ? "border-[var(--color-mod-fees-border)] bg-[var(--color-mod-fees-bg)]" : "border-slate-200 bg-white"}`}
+    >
       <dt className="text-xs text-slate-500">{label}</dt>
-      <dd className="mt-1 text-sm font-semibold text-slate-950 tabular-nums">{value}</dd>
+      <dd className="mt-1 text-sm font-semibold text-slate-950 tabular-nums">
+        {value}
+      </dd>
     </div>
   );
 }

@@ -26,7 +26,7 @@ import { SectionCard } from "@/components/ui/section-card";
 import { WorkSurface } from "@/components/ui/work-surface";
 import { api } from "@/lib/api";
 
-const formatCurrency = (amount: number | string) =>
+const formatCurrency = (amount: string) =>
   new Intl.NumberFormat("en-NP", {
     style: "currency",
     currency: "NPR",
@@ -47,8 +47,7 @@ export function FeeOverview() {
   const canReadReceipts = hasPermissions(["receipts:read"]);
   const canClose = hasPermissions(["payments:close"]);
   const canReviewAdjustments =
-    hasPermissions(["payments:refund"]) ||
-    hasPermissions(["payments:reverse"]);
+    hasPermissions(["payments:refund"]) || hasPermissions(["payments:reverse"]);
   const schoolDay = getNepalSchoolDay();
 
   const summaryQuery = useQuery({
@@ -92,14 +91,14 @@ export function FeeOverview() {
         <SummaryCard
           label="Total outstanding"
           value={
-            summary
-              ? formatCurrency(summary.outstanding.amount)
-              : "Unavailable"
+            summary ? formatCurrency(summary.outstanding.amount) : "Unavailable"
           }
           loading={summaryQuery.isLoading}
           icon={<Wallet className="h-5 w-5" />}
           tone="module"
-          href={canManage ? "/dashboard/fees/invoices?outstanding=true" : undefined}
+          href={
+            canManage ? "/dashboard/fees/invoices?outstanding=true" : undefined
+          }
           description="Backend-owned balance."
         />
         <SummaryCard
@@ -114,9 +113,13 @@ export function FeeOverview() {
           loading={canManage && summaryQuery.isLoading}
           icon={<AlertTriangle className="h-5 w-5" />}
           tone={summary?.overdue.studentCount ? "warning" : "module"}
-          href={canManage ? "/dashboard/fees/reports?agingBucket=all" : undefined}
+          href={
+            canManage ? "/dashboard/fees/reports?agingBucket=all" : undefined
+          }
           description={
-            summary ? `${summary.overdue.studentCount} students.` : "Aging summary."
+            summary
+              ? `${summary.overdue.studentCount} students.`
+              : "Aging summary."
           }
         />
         <SummaryCard
@@ -125,8 +128,8 @@ export function FeeOverview() {
             !canClose
               ? "Restricted"
               : summary
-                ? closeStateLabel[summary.cashierClose.state] ??
-                  summary.cashierClose.state
+                ? (closeStateLabel[summary.cashierClose.state] ??
+                  summary.cashierClose.state)
                 : "Unavailable"
           }
           loading={canClose && summaryQuery.isLoading}
@@ -197,17 +200,33 @@ export function FeeOverview() {
                 <tbody className="divide-y divide-slate-100 tabular-nums">
                   <ActivityRow
                     label="Gross confirmed collections"
-                    amount={summary ? formatCurrency(summary.collectedToday.grossAmount) : "Unavailable"}
-                    context={summary ? `${summary.receiptsIssued} receipts issued` : "Backend summary"}
+                    amount={
+                      summary
+                        ? formatCurrency(summary.collectedToday.grossAmount)
+                        : "Unavailable"
+                    }
+                    context={
+                      summary
+                        ? `${summary.receiptsIssued} receipts issued`
+                        : "Backend summary"
+                    }
                   />
                   <ActivityRow
                     label="Confirmed refunds"
-                    amount={summary ? formatCurrency(summary.collectedToday.refundedAmount) : "Unavailable"}
+                    amount={
+                      summary
+                        ? formatCurrency(summary.collectedToday.refundedAmount)
+                        : "Unavailable"
+                    }
                     context="Included in net collection"
                   />
                   <ActivityRow
                     label="Net confirmed collection"
-                    amount={summary ? formatCurrency(summary.collectedToday.netAmount) : "Unavailable"}
+                    amount={
+                      summary
+                        ? formatCurrency(summary.collectedToday.netAmount)
+                        : "Unavailable"
+                    }
                     context="Official school-day position"
                     emphasized
                   />
@@ -243,7 +262,9 @@ export function FeeOverview() {
                 className="m-5 min-h-44"
               />
             ) : overdueQuery.isLoading ? (
-              <p className="p-6 text-sm font-semibold text-slate-500">Loading overdue invoices…</p>
+              <p className="p-6 text-sm font-semibold text-slate-500">
+                Loading overdue invoices…
+              </p>
             ) : overdueQuery.data?.items.length ? (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[680px] text-left text-sm">
@@ -262,12 +283,20 @@ export function FeeOverview() {
                         <td className="px-5 py-3.5 font-semibold text-slate-900">
                           {item.studentName}
                           <span className="block text-xs font-normal text-slate-500">
-                            {[item.className, item.sectionName].filter(Boolean).join(" · ")}
+                            {[item.className, item.sectionName]
+                              .filter(Boolean)
+                              .join(" · ")}
                           </span>
                         </td>
-                        <td className="px-5 py-3.5 text-slate-700">{item.invoiceNumber}</td>
-                        <td className="px-5 py-3.5 text-slate-600">{formatBsDate(item.dueDate)}</td>
-                        <td className="px-5 py-3.5 text-right text-slate-700">{item.daysOverdue}</td>
+                        <td className="px-5 py-3.5 text-slate-700">
+                          {item.invoiceNumber}
+                        </td>
+                        <td className="px-5 py-3.5 text-slate-600">
+                          {formatBsDate(item.dueDate)}
+                        </td>
+                        <td className="px-5 py-3.5 text-right text-slate-700">
+                          {item.daysOverdue}
+                        </td>
                         <td className="px-5 py-3.5 text-right font-semibold text-slate-900">
                           {formatCurrency(item.outstanding)}
                         </td>
@@ -299,43 +328,97 @@ export function FeeOverview() {
                 <ArrowRight className="h-4 w-4" aria-hidden />
               </Link>
             ) : (
-              <p className="text-sm text-slate-600">Receipt details are restricted for this role.</p>
+              <p className="text-sm text-slate-600">
+                Receipt details are restricted for this role.
+              </p>
             )}
           </SectionCard>
         </div>
 
         <div className="space-y-6">
-          <SectionCard title="Attention required" description="Permission-safe finance work that needs a decision.">
+          <SectionCard
+            title="Attention required"
+            description="Permission-safe finance work that needs a decision."
+          >
             <div className="divide-y divide-slate-100">
               <AttentionRow
                 label="Overdue students"
-                value={canManage && summary ? String(summary.overdue.studentCount) : canManage ? "Unavailable" : "Restricted"}
-                href={canManage ? "/dashboard/fees/reports?agingBucket=all" : undefined}
+                value={
+                  canManage && summary
+                    ? String(summary.overdue.studentCount)
+                    : canManage
+                      ? "Unavailable"
+                      : "Restricted"
+                }
+                href={
+                  canManage
+                    ? "/dashboard/fees/reports?agingBucket=all"
+                    : undefined
+                }
                 tone={summary?.overdue.studentCount ? "warning" : "neutral"}
               />
               <AttentionRow
                 label="Pending adjustments"
-                value={canReviewAdjustments && summary ? String(summary.pendingApprovalCount) : canReviewAdjustments ? "Unavailable" : "Restricted"}
-                href={canReviewAdjustments ? "/dashboard/fees/adjustments?status=PENDING" : undefined}
+                value={
+                  canReviewAdjustments && summary
+                    ? String(summary.pendingApprovalCount)
+                    : canReviewAdjustments
+                      ? "Unavailable"
+                      : "Restricted"
+                }
+                href={
+                  canReviewAdjustments
+                    ? "/dashboard/fees/adjustments?status=PENDING"
+                    : undefined
+                }
                 tone={summary?.pendingApprovalCount ? "warning" : "neutral"}
               />
               <AttentionRow
                 label="Unclosed payments"
-                value={canClose && summary ? String(summary.cashierClose.unclosedPaymentCount) : canClose ? "Unavailable" : "Restricted"}
+                value={
+                  canClose && summary
+                    ? String(summary.cashierClose.unclosedPaymentCount)
+                    : canClose
+                      ? "Unavailable"
+                      : "Restricted"
+                }
                 href={canClose ? "/dashboard/fees/cashier-close" : undefined}
-                tone={summary?.cashierClose.unclosedPaymentCount ? "warning" : "neutral"}
+                tone={
+                  summary?.cashierClose.unclosedPaymentCount
+                    ? "warning"
+                    : "neutral"
+                }
               />
             </div>
           </SectionCard>
 
-          <SectionCard title="Cashier activity" description="Backend-owned close state for this school day.">
+          <SectionCard
+            title="Cashier activity"
+            description="Backend-owned close state for this school day."
+          >
             {!canClose ? (
-              <p className="text-sm text-slate-600">Cashier close details are restricted for this role.</p>
+              <p className="text-sm text-slate-600">
+                Cashier close details are restricted for this role.
+              </p>
             ) : summary ? (
               <dl className="space-y-3 text-sm">
-                <OverviewFact label="Status" value={closeStateLabel[summary.cashierClose.state] ?? summary.cashierClose.state} />
-                <OverviewFact label="Unclosed payments" value={String(summary.cashierClose.unclosedPaymentCount)} />
-                <OverviewFact label="Latest close" value={summary.cashierClose.latestCloseNumber ?? "Not closed yet"} />
+                <OverviewFact
+                  label="Status"
+                  value={
+                    closeStateLabel[summary.cashierClose.state] ??
+                    summary.cashierClose.state
+                  }
+                />
+                <OverviewFact
+                  label="Unclosed payments"
+                  value={String(summary.cashierClose.unclosedPaymentCount)}
+                />
+                <OverviewFact
+                  label="Latest close"
+                  value={
+                    summary.cashierClose.latestCloseNumber ?? "Not closed yet"
+                  }
+                />
                 <OverviewFact
                   label="Closed at"
                   value={
@@ -352,7 +435,9 @@ export function FeeOverview() {
                 </Link>
               </dl>
             ) : (
-              <p className="text-sm text-slate-600">Cashier close status is unavailable.</p>
+              <p className="text-sm text-slate-600">
+                Cashier close status is unavailable.
+              </p>
             )}
           </SectionCard>
         </div>
@@ -374,8 +459,16 @@ function ActivityRow({
 }) {
   return (
     <tr className={emphasized ? "bg-slate-50" : undefined}>
-      <td className={`px-5 py-4 ${emphasized ? "font-semibold text-slate-950" : "text-slate-700"}`}>{label}</td>
-      <td className={`px-5 py-4 text-right ${emphasized ? "font-bold text-slate-950" : "font-semibold text-slate-900"}`}>{amount}</td>
+      <td
+        className={`px-5 py-4 ${emphasized ? "font-semibold text-slate-950" : "text-slate-700"}`}
+      >
+        {label}
+      </td>
+      <td
+        className={`px-5 py-4 text-right ${emphasized ? "font-bold text-slate-950" : "font-semibold text-slate-900"}`}
+      >
+        {amount}
+      </td>
       <td className="px-5 py-4 text-right text-xs text-slate-500">{context}</td>
     </tr>
   );
@@ -395,17 +488,29 @@ function AttentionRow({
   const content = (
     <div className="flex min-h-14 items-center justify-between gap-4 py-3">
       <span className="text-sm font-medium text-slate-700">{label}</span>
-      <span className={`text-sm font-bold tabular-nums ${tone === "warning" ? "text-warning-700" : "text-slate-700"}`}>{value}</span>
+      <span
+        className={`text-sm font-bold tabular-nums ${tone === "warning" ? "text-warning-700" : "text-slate-700"}`}
+      >
+        {value}
+      </span>
     </div>
   );
-  return href ? <Link href={href} className="block hover:bg-slate-50">{content}</Link> : content;
+  return href ? (
+    <Link href={href} className="block hover:bg-slate-50">
+      {content}
+    </Link>
+  ) : (
+    content
+  );
 }
 
 function OverviewFact({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] gap-4 border-b border-slate-100 pb-3 last:border-0 last:pb-0">
       <dt className="text-slate-500">{label}</dt>
-      <dd className="text-right font-semibold text-slate-900 tabular-nums">{value}</dd>
+      <dd className="text-right font-semibold text-slate-900 tabular-nums">
+        {value}
+      </dd>
     </div>
   );
 }

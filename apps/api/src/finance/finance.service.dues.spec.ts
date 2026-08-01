@@ -171,8 +171,8 @@ describe('FinanceService - Dues & Reprints', () => {
       const result = await service.getDuesTableReport({}, actor as any);
 
       expect(result.rows).toHaveLength(1);
-      expect(result.rows[0].outstanding).toBe(5000);
-      expect(result.summary.totalOutstanding).toBe(5000);
+      expect(result.rows[0].outstanding).toBe('5000.00');
+      expect(result.summary.totalOutstanding).toBe('5000.00');
     });
   });
 });

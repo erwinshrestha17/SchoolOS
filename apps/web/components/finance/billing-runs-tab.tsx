@@ -6,8 +6,8 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { SectionCard } from "@/components/ui/section-card";
-import { Button } from '@/components/ui/button';
-import { PermissionDenied } from '@/components/ui/permission-denied';
+import { Button } from "@/components/ui/button";
+import { PermissionDenied } from "@/components/ui/permission-denied";
 import {
   Loader2,
   Plus,
@@ -122,7 +122,7 @@ export function BillingRunsTab() {
       setSuccessMsg(true);
       setTimeout(() => setSuccessMsg(false), 4000);
     },
-    mutationFn: (body: any) => api.generateBillingRun(body),
+    mutationFn: api.generateBillingRun,
   });
 
   const handleTriggerRun = (e: React.FormEvent) => {
@@ -170,129 +170,129 @@ export function BillingRunsTab() {
               description="Your current role does not have the finance permission required to trigger invoice generation."
             />
           ) : (
-          <form onSubmit={handleTriggerRun} className="space-y-4">
-            {successMsg && (
-              <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-2.5 text-xs font-bold text-emerald-700">
-                <Check size={14} />
-                Billing run started. Invoices are generating.
-              </div>
-            )}
-            {billingRunMutation.isError && (
-              <div className="flex items-center gap-2 rounded-xl border border-rose-100 bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-700">
-                <AlertCircle size={14} />
-                {billingRunMutation.error.message ||
-                  "Failed to start billing run."}
-              </div>
-            )}
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">
-                  Academic Year
-                </label>
-                <select
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none bg-white"
-                  value={academicYearId}
-                  onChange={(e) => setAcademicYearId(e.target.value)}
-                  required
-                  disabled={billingRunMutation.isPending}
-                >
-                  <option value="">Select Academic Year</option>
-                  {academicYearsQuery.data?.map((y) => (
-                    <option key={y.id} value={y.id}>
-                      {y.name} {y.isCurrent ? "(Current)" : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">
-                  Fee Plan Scope
-                </label>
-                <select
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none bg-white"
-                  value={feePlanId}
-                  onChange={(e) => setFeePlanId(e.target.value)}
-                  disabled={billingRunMutation.isPending}
-                >
-                  <option value="">All Active Plans (Recommended)</option>
-                  {feePlansQuery.data?.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.code} · {p.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="space-y-2">
-                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">
-                  Billing Month
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  max={12}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
-                  value={runMonth}
-                  onChange={(e) => setRunMonth(Number(e.target.value))}
-                  required
-                  disabled={billingRunMutation.isPending}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">
-                  Billing Year
-                </label>
-                <input
-                  type="number"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
-                  value={runYear}
-                  onChange={(e) => setRunYear(Number(e.target.value))}
-                  required
-                  disabled={billingRunMutation.isPending}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-black text-slate-500 uppercase tracking-widest">
-                  Due Date (BS)
-                </label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  pattern="\d{4}-\d{2}-\d{2}"
-                  placeholder="2083-03-13"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
-                  value={dueDateBs}
-                  onChange={(e) => setDueDateBs(e.target.value)}
-                  required
-                  disabled={billingRunMutation.isPending}
-                />
-              </div>
-            </div>
-
-            <Button
-              type="submit"
-              disabled={billingRunMutation.isPending || !academicYearId}
-              className="flex w-full items-center justify-center gap-2 rounded-xl !bg-[var(--color-mod-fees-accent)] px-5 py-3 text-xs font-black uppercase tracking-widest text-white shadow-sm hover:!bg-[var(--color-mod-fees-text)]"
-            >
-              {billingRunMutation.isPending ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Generating Invoices...
-                </>
-              ) : (
-                <>
-                  <Calendar className="h-3.5 w-3.5" />
-                  Trigger Billing Run
-                </>
+            <form onSubmit={handleTriggerRun} className="space-y-4">
+              {successMsg && (
+                <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-2.5 text-xs font-bold text-emerald-700">
+                  <Check size={14} />
+                  Billing run started. Invoices are generating.
+                </div>
               )}
-            </Button>
-          </form>
+              {billingRunMutation.isError && (
+                <div className="flex items-center gap-2 rounded-xl border border-rose-100 bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-700">
+                  <AlertCircle size={14} />
+                  {billingRunMutation.error.message ||
+                    "Failed to start billing run."}
+                </div>
+              )}
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                    Academic Year
+                  </label>
+                  <select
+                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none bg-white"
+                    value={academicYearId}
+                    onChange={(e) => setAcademicYearId(e.target.value)}
+                    required
+                    disabled={billingRunMutation.isPending}
+                  >
+                    <option value="">Select Academic Year</option>
+                    {academicYearsQuery.data?.map((y) => (
+                      <option key={y.id} value={y.id}>
+                        {y.name} {y.isCurrent ? "(Current)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                    Fee Plan Scope
+                  </label>
+                  <select
+                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none bg-white"
+                    value={feePlanId}
+                    onChange={(e) => setFeePlanId(e.target.value)}
+                    disabled={billingRunMutation.isPending}
+                  >
+                    <option value="">All Active Plans (Recommended)</option>
+                    {feePlansQuery.data?.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.code} · {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                    Billing Month
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={12}
+                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
+                    value={runMonth}
+                    onChange={(e) => setRunMonth(Number(e.target.value))}
+                    required
+                    disabled={billingRunMutation.isPending}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                    Billing Year
+                  </label>
+                  <input
+                    type="number"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
+                    value={runYear}
+                    onChange={(e) => setRunYear(Number(e.target.value))}
+                    required
+                    disabled={billingRunMutation.isPending}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                    Due Date (BS)
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="\d{4}-\d{2}-\d{2}"
+                    placeholder="2083-03-13"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
+                    value={dueDateBs}
+                    onChange={(e) => setDueDateBs(e.target.value)}
+                    required
+                    disabled={billingRunMutation.isPending}
+                  />
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                disabled={billingRunMutation.isPending || !academicYearId}
+                className="flex w-full items-center justify-center gap-2 rounded-xl !bg-[var(--color-mod-fees-accent)] px-5 py-3 text-xs font-black uppercase tracking-widest text-white shadow-sm hover:!bg-[var(--color-mod-fees-text)]"
+              >
+                {billingRunMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Generating Invoices...
+                  </>
+                ) : (
+                  <>
+                    <Calendar className="h-3.5 w-3.5" />
+                    Trigger Billing Run
+                  </>
+                )}
+              </Button>
+            </form>
           )}
         </SectionCard>
       </div>

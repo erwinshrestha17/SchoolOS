@@ -227,6 +227,15 @@ export class FeesController {
     return this.financeService.getPaymentMethodReport(auth, query);
   }
 
+  @Get('reports/unallocated-payments')
+  @Permissions('fees:manage', 'ledger:read')
+  getUnallocatedPaymentReport(
+    @Query() query: FinanceReportQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.getUnallocatedPaymentReport(auth, query);
+  }
+
   @Get('reports/dues')
   @Permissions('fees:manage')
   getDuesTableReport(
@@ -250,6 +259,8 @@ export class FeesController {
       feeHeadId: query.feeHeadId,
       fromDate: query.fromDate,
       toDate: query.toDate,
+      page: query.page,
+      limit: query.limit,
     });
   }
 
@@ -264,6 +275,8 @@ export class FeesController {
       fromDate: query.fromDate,
       toDate: query.toDate,
       paymentMethod: query.paymentMethod,
+      page: query.page,
+      limit: query.limit,
     });
   }
 
@@ -277,6 +290,8 @@ export class FeesController {
       fiscalYear: query.fiscalYear,
       fromDate: query.fromDate,
       toDate: query.toDate,
+      page: query.page,
+      limit: query.limit,
     });
   }
 
@@ -290,6 +305,8 @@ export class FeesController {
       fromDate: query.fromDate,
       toDate: query.toDate,
       recordType: query.recordType as 'REFUND' | 'REVERSAL' | undefined,
+      page: query.page,
+      limit: query.limit,
     });
   }
 

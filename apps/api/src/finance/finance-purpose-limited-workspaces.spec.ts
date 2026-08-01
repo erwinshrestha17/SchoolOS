@@ -88,50 +88,43 @@ describe('FinanceService purpose-limited M3 workspaces', () => {
     );
   });
 
-  it('paginates the backend ledger projection without recalculating running balances in the browser', async () => {
-    const { service } = createService();
-    jest.spyOn(service, 'getStudentFeeLedger').mockResolvedValue({
+  it('projects the ledger page from the database without recomputing balances in JS', async () => {
+    // The SQL itself is proven against real Postgres in
+    // test/student-fee-ledger-projection.int-spec.ts. This asserts the mapping
+    // layer: decimal strings, backend-owned running balances passed through
+    // untouched, and page totals kept separate from window totals.
+    const { service, prisma } = createService({
       student: {
-        id: 'student-1',
-        studentSystemId: 'ST-001',
-        name: 'Asha Shrestha',
-        className: 'Grade 5',
-        sectionName: 'A',
-        guardianName: null,
-        guardianPhone: null,
+        findMany: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'student-1',
+          studentSystemId: 'ST-001',
+          firstNameEn: 'Asha',
+          lastNameEn: 'Shrestha',
+          class: { name: 'Grade 5' },
+          sectionRef: { name: 'A' },
+          guardianLinks: [],
+        }),
       },
-      openingBalance: 0,
-      totalInvoiced: 1000,
-      totalPaid: 500,
-      totalWaived: 0,
-      totalRefunded: 0,
-      outstandingBalance: 500,
-      rows: [
+      fiscalYear: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'fy-1',
+          name: 'FY 2082/83',
+          periods: [{ id: 'fp-1', label: 'Shrawan 2082' }],
+        }),
+      },
+    });
+    prisma.$queryRaw
+      .mockResolvedValueOnce([
         {
-          id: 'invoice:1',
-          date: new Date('2026-06-01T00:00:00.000Z'),
-          type: 'INVOICE',
-          reference: 'INV-001',
-          description: 'Invoice INV-001',
-          debit: 1000,
-          credit: 0,
-          runningBalance: 1000,
-          affectsBalance: true,
-          invoiceId: 'invoice-1',
-          invoiceNumber: 'INV-001',
-          paymentId: null,
-          receiptNumber: null,
-          status: 'ISSUED',
-        },
-        {
-          id: 'payment:1',
-          date: new Date('2026-06-02T00:00:00.000Z'),
-          type: 'PAYMENT',
+          eventId: 'payment:1',
+          eventDate: new Date('2026-06-02T00:00:00.000Z'),
+          eventType: 'PAYMENT',
           reference: 'REC-001',
-          description: 'Cash payment',
-          debit: 0,
-          credit: 500,
-          runningBalance: 500,
+          description: 'CASH allocation for INV-001',
+          debit: new Prisma.Decimal('0'),
+          credit: new Prisma.Decimal('500'),
+          runningBalance: new Prisma.Decimal('500'),
           affectsBalance: true,
           invoiceId: 'invoice-1',
           invoiceNumber: 'INV-001',
@@ -139,8 +132,23 @@ describe('FinanceService purpose-limited M3 workspaces', () => {
           receiptNumber: 'REC-001',
           status: 'SUCCESS',
         },
-      ],
-    } as never);
+      ])
+      .mockResolvedValueOnce([
+        {
+          total: 1n,
+          openingBalance: new Prisma.Decimal('0'),
+          windowDebit: new Prisma.Decimal('0'),
+          windowCredit: new Prisma.Decimal('500'),
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          totalInvoiced: new Prisma.Decimal('1000'),
+          totalPaid: new Prisma.Decimal('500'),
+          totalRefunded: new Prisma.Decimal('0'),
+          totalWaived: new Prisma.Decimal('0'),
+        },
+      ]);
 
     const result = await service.getStudentFeeLedgerPage(
       'student-1',
@@ -154,11 +162,70 @@ describe('FinanceService purpose-limited M3 workspaces', () => {
         page: 1,
         limit: 1,
         hasNextPage: false,
+        outstandingBalance: '500.00',
       }),
     );
     expect(result.rows[0]).toEqual(
-      expect.objectContaining({ type: 'PAYMENT', runningBalance: 500 }),
+      expect.objectContaining({ type: 'PAYMENT', runningBalance: '500.00' }),
     );
+    // Versioned report metadata envelope (FEE-01).
+    expect(result.report).toEqual({
+      id: 'FEE-01',
+      definitionVersion: '1.0',
+      title: 'Student Fee Ledger',
+      family: 'FEE',
+      ownerModule: 'M3',
+      classification: 'CONFIDENTIAL',
+      requiresProfessionalVerification: false,
+      professionalVerificationStatus: 'NOT_REQUIRED',
+    });
+    expect(result.fiscalContext).toEqual({
+      fiscalYearId: 'fy-1',
+      fiscalYearLabel: 'FY 2082/83',
+      fiscalPeriodId: 'fp-1',
+      fiscalPeriodLabel: 'Shrawan 2082',
+      accountingBasis: 'ACCRUAL',
+      postingBasis: 'POSTED_WITH_PENDING_DISCLOSED',
+    });
+    expect(result.validation).toEqual({ status: 'VALID', warnings: [] });
+    expect(result.sourceFreshness).toEqual([
+      { module: 'M3', refreshedAt: result.generatedAt, includesPending: true },
+    ]);
+    expect(result.pagination).toEqual({
+      page: 1,
+      limit: 1,
+      total: 1,
+      totalPages: 1,
+    });
+    // Normalized filters are sorted and drop undefined entries.
+    expect(Object.keys(result.normalizedFilters)).toEqual([
+      'academicYearId',
+      'fromDate',
+      'invoiceStatus',
+      'sortDirection',
+      'studentId',
+      'toDate',
+      'transactionType',
+    ]);
+    expect(result.totals.outstandingBalance).toBe('500.00');
+    expect(result.rows[0].drilldown).toEqual({
+      kind: 'SOURCE_RECORD',
+      id: 'payment-1',
+      route: '/dashboard/fees/payments/payment-1',
+    });
+
+    expect(result.pageTotals).toEqual({
+      rowCount: 1,
+      debit: '0.00',
+      credit: '500.00',
+    });
+    expect(result.windowTotals).toEqual({
+      rowCount: 1,
+      debit: '0.00',
+      credit: '500.00',
+    });
+    // Paging and filtering are pushed into SQL, not applied in the process.
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(3);
   });
 
   it('returns Decimal-safe payment-method totals for the requested Nepal date range', async () => {

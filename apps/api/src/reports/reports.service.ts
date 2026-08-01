@@ -15,21 +15,30 @@ import type {
   ReportExportResult,
   ReportFormat,
 } from '@schoolos/core';
-import { P0_FINANCIAL_REPORT_CATALOG } from '@schoolos/core';
+import {
+  FINANCIAL_REPORT_DEFINITION_VERSION,
+  P0_FINANCIAL_REPORT_CATALOG,
+  findFinancialReportDefinition,
+  resolveFinancialReportClassification,
+} from '@schoolos/core';
 import type {
   FinancialReportClassification,
   FinancialReportDefinition,
+  FinancialReportId,
 } from '@schoolos/core';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 
 import {
+  CashierCloseStatus,
+  InvoiceStatus,
   StudentLifecycleStatus,
   EnrollmentStatus,
   Prisma,
 } from '@prisma/client';
 
 import { FinanceService } from '../finance/finance.service';
+import type { StudentFeeLedgerQueryDto } from '../finance/dto/student-fee-ledger-query.dto';
 import { AccountingReportsService } from '../accounting/accounting-reports.service';
 import { PayrollService } from '../payroll/payroll.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
@@ -47,6 +56,15 @@ export interface ReportExecutor {
     filters: Record<string, unknown>,
     format: string,
   ) => Promise<Array<Record<string, unknown>>>;
+  /**
+   * Backend-owned totals describing the exported artifact, recorded on the
+   * export so a stored file can be checked against the report it claims to be.
+   * Optional: reports without official totals simply omit it.
+   */
+  executeTotals?: (
+    actor: AuthContext,
+    filters: Record<string, unknown>,
+  ) => Promise<Record<string, string>>;
 }
 
 interface ReportExportArtifact {
@@ -58,7 +76,6 @@ interface ReportExportArtifact {
 }
 
 const REPORT_EXPORT_EXPIRY_DAYS = 7;
-const REPORT_DEFINITION_VERSION = '1.0';
 
 @Injectable()
 export class ReportsService {
@@ -86,7 +103,7 @@ export class ReportsService {
         description: 'Comprehensive list of students with basic details',
         category: 'students',
         module: 'students',
-        formats: ['json', 'csv'],
+        formats: ['json', 'csv', 'pdf', 'xlsx'],
         filters: [
           { key: 'classId', label: 'Class', type: 'class' },
           { key: 'sectionId', label: 'Section', type: 'section' },
@@ -880,6 +897,7 @@ export class ReportsService {
     this.register({
       definition: {
         key: 'student-fee-ledger',
+        financialReportId: 'FEE-01',
         name: 'Student Fee Ledger',
         description: 'Complete financial ledger for a specific student',
         category: 'finance',
@@ -900,24 +918,10 @@ export class ReportsService {
         requiredPermissions: ['reports:export', 'ledger:read'],
       },
       execute: async (actor, filters) => {
-        const studentId = filters.studentId
-          ? String(filters.studentId)
-          : undefined;
-        if (!studentId) {
-          throw new ForbiddenException('studentId filter is required');
-        }
-
-        const ledger = await this.financeService.getStudentFeeLedger(
-          studentId,
+        const ledger = await this.financeService.getStudentFeeLedgerExport(
+          this.requireStudentFeeLedgerId(filters),
+          this.toStudentFeeLedgerQuery(filters),
           actor,
-          {
-            academicYearId: filters.academicYearId
-              ? String(filters.academicYearId)
-              : undefined,
-            fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
-            toDate: filters.toDate ? String(filters.toDate) : undefined,
-            status: filters.status ? String(filters.status) : undefined,
-          },
         );
 
         return ledger.rows.map((row) => ({
@@ -938,6 +942,30 @@ export class ReportsService {
           'Receipt Number': row.receiptNumber || '-',
           Status: row.status || '-',
         }));
+      },
+      executeTotals: async (actor, filters) => {
+        // windowTotals and the summary come from report-wide aggregates that
+        // are identical on every page, so one minimal page is enough -- there
+        // is no need to drain the ledger a second time.
+        const ledger = await this.financeService.getStudentFeeLedgerPage(
+          this.requireStudentFeeLedgerId(filters),
+          { ...this.toStudentFeeLedgerQuery(filters), page: 1, limit: 1 },
+          actor,
+        );
+
+        // These describe the whole filtered report, which for an export is the
+        // whole artifact, so they must equal what the screen shows.
+        return {
+          rowCount: String(ledger.windowTotals.rowCount),
+          debit: ledger.windowTotals.debit,
+          credit: ledger.windowTotals.credit,
+          openingBalance: ledger.openingBalance,
+          totalInvoiced: ledger.totalInvoiced,
+          totalPaid: ledger.totalPaid,
+          totalWaived: ledger.totalWaived,
+          totalRefunded: ledger.totalRefunded,
+          outstandingBalance: ledger.outstandingBalance,
+        };
       },
     });
 
@@ -1295,45 +1323,145 @@ export class ReportsService {
           { key: 'toDate', label: 'To Date', type: 'date', required: true },
           { key: 'collectorUserId', label: 'Collector', type: 'select' },
         ],
-        requiredPermissions: ['reports:read', 'payments:close'],
+        requiredPermissions: ['reports:export', 'accounting:reports:read'],
       },
       execute: async (actor, filters) => {
-        const from = new Date(String(filters.fromDate));
-        const to = new Date(String(filters.toDate));
-
-        const closes = await this.prisma.cashierClose.findMany({
-          where: {
-            tenantId: actor.tenantId,
-            openedAt: { gte: from },
-            closedAt: { lte: to },
-            ...(filters.collectorUserId
-              ? { collectorUserId: String(filters.collectorUserId) }
-              : {}),
+        const result = await this.financeService.listCashierCloses(
+          {
+            openedFrom: String(filters.fromDate),
+            closedTo: String(filters.toDate),
+            collectorUserId: filters.collectorUserId
+              ? String(filters.collectorUserId)
+              : undefined,
+            page: 1,
+            limit: 5000,
           },
-          include: {
-            collectorUser: { select: { email: true } },
-            closedBy: { select: { email: true } },
-          },
-          orderBy: { openedAt: 'desc' },
-        });
+          actor,
+        );
 
-        return closes.map((c) => ({
-          'Close Number': c.closeNumber,
-          'Opened At': c.openedAt.toISOString(),
-          'Closed At': c.closedAt?.toISOString() ?? 'Not closed',
-          Collector: c.collectorUser?.email || 'N/A',
-          'Payment Method': c.paymentMethod || 'All',
-          'Gross Collected': Number(c.grossCollected),
-          'Total Refunded': Number(c.totalRefunded),
-          'Net Collected': Number(c.netCollected),
-          'Expected Cash': Number(c.expectedCashAmount || 0),
-          'Actual Cash': Number(c.actualCashAmount || 0),
-          Variance: Number(c.varianceAmount || 0),
-          'Variance Reason': c.varianceReason || '-',
-          'Payment Count': c.paymentCount,
-          'Refund Count': c.refundCount,
-          'Closed By': c.closedBy?.email || 'System',
+        return result.items.map((close) => ({
+          'Close Number': close.closeNumber,
+          Status: close.status,
+          'Opened At': new Date(close.openedAt).toISOString(),
+          'Closed At': close.closedAt
+            ? new Date(close.closedAt).toISOString()
+            : 'Not closed',
+          Collector: close.collectorUser?.email || 'N/A',
+          'Payment Method': close.paymentMethod || 'All',
+          'Gross Collected': close.grossCollected,
+          'Total Refunded': close.totalRefunded,
+          'Net Collected': close.netCollected,
+          'Expected Cash': close.expectedCashAmount,
+          'Actual Cash': close.actualCashAmount ?? '0.00',
+          Variance: close.varianceAmount ?? '0.00',
+          'Variance Reason': close.varianceReason || '-',
+          'Payment Count': close.paymentCount,
+          'Refund Count': close.refundCount,
+          'Deposit ID': close.depositId ?? '-',
+          'Closed By': close.closedBy?.email || 'System',
         }));
+      },
+    });
+
+    this.register({
+      definition: {
+        key: 'cash-deposit-report',
+        name: 'Cash Deposit Report',
+        description:
+          'Prepared and completed cash deposits with cashier-close and M11 journal lineage',
+        category: 'finance',
+        module: 'finance',
+        formats: ['json', 'csv', 'pdf', 'xlsx'],
+        filters: [],
+        requiredPermissions: ['reports:export', 'accounting:reports:read'],
+      },
+      execute: async (actor) => {
+        const result = await this.financeService.listCashDeposits(
+          { page: 1, limit: 5000 },
+          actor,
+        );
+        return result.items.map((deposit) => ({
+          'Deposit No': deposit.depositNumber,
+          'Cashier Close': deposit.cashierCloseNumber,
+          Account: `${deposit.accountCode} ${deposit.accountName}`,
+          Amount: deposit.amount,
+          'Deposit Date': deposit.depositDate,
+          Reference: deposit.referenceNumber ?? '-',
+          Status: deposit.status,
+          Journal: deposit.journalEntryId ?? '-',
+          Submitted: deposit.submittedAt ?? '-',
+          Deposited: deposit.depositedAt ?? '-',
+        }));
+      },
+    });
+
+    this.register({
+      definition: {
+        key: 'undeposited-collection-report',
+        name: 'Undeposited Collection Report',
+        description:
+          'Closed cashier sessions that have not yet completed a cash deposit',
+        category: 'finance',
+        module: 'finance',
+        formats: ['json', 'csv', 'pdf', 'xlsx'],
+        filters: [],
+        requiredPermissions: ['reports:export', 'accounting:reports:read'],
+      },
+      execute: async (actor) => {
+        const result = await this.financeService.listCashierCloses(
+          { status: CashierCloseStatus.CLOSED, page: 1, limit: 5000 },
+          actor,
+        );
+        return result.items.map((close) => ({
+          'Close Number': close.closeNumber,
+          'Closed At': close.closedAt
+            ? new Date(close.closedAt).toISOString()
+            : '-',
+          'Expected Cash': close.expectedCashAmount,
+          'Actual Cash': close.actualCashAmount ?? '0.00',
+          Variance: close.varianceAmount ?? '0.00',
+          'Variance Reason': close.varianceReason ?? '-',
+          Status: close.status,
+        }));
+      },
+    });
+
+    this.register({
+      definition: {
+        key: 'cash-variance-report',
+        name: 'Cash Variance Report',
+        description:
+          'Cashier sessions with a non-zero counted-versus-expected cash difference',
+        category: 'finance',
+        module: 'finance',
+        formats: ['json', 'csv', 'pdf', 'xlsx'],
+        filters: [],
+        requiredPermissions: ['reports:export', 'accounting:reports:read'],
+      },
+      execute: async (actor) => {
+        const result = await this.financeService.listCashierCloses(
+          { page: 1, limit: 5000 },
+          actor,
+        );
+        return result.items
+          .filter(
+            (close) =>
+              close.varianceAmount !== null &&
+              close.varianceAmount !== undefined &&
+              new Prisma.Decimal(close.varianceAmount).abs().gt(0),
+          )
+          .map((close) => ({
+            'Close Number': close.closeNumber,
+            Status: close.status,
+            'Closed At': close.closedAt
+              ? new Date(close.closedAt).toISOString()
+              : '-',
+            'Expected Cash': close.expectedCashAmount,
+            'Actual Cash': close.actualCashAmount ?? '0.00',
+            Variance: close.varianceAmount ?? '0.00',
+            Reason: close.varianceReason ?? '-',
+            'Deposit ID': close.depositId ?? '-',
+          }));
       },
     });
 
@@ -1341,7 +1469,8 @@ export class ReportsService {
       definition: {
         key: 'invoice-register',
         name: 'Invoice Register',
-        description: 'Issued invoices with billing, collection, and balance status',
+        description:
+          'Issued invoices with billing, collection, and balance status',
         category: 'finance',
         module: 'finance',
         formats: ['json', 'csv'],
@@ -1362,15 +1491,13 @@ export class ReportsService {
             ? String(filters.academicYearId)
             : undefined,
           classId: filters.classId ? String(filters.classId) : undefined,
-          sectionId: filters.sectionId
-            ? String(filters.sectionId)
-            : undefined,
-          studentId: filters.studentId
-            ? String(filters.studentId)
-            : undefined,
+          sectionId: filters.sectionId ? String(filters.sectionId) : undefined,
+          studentId: filters.studentId ? String(filters.studentId) : undefined,
           feeHeadId: filters.feeHeadId ? String(filters.feeHeadId) : undefined,
           fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
           toDate: filters.toDate ? String(filters.toDate) : undefined,
+          page: 1,
+          limit: 5000,
         });
 
         return report.rows.map((row) => ({
@@ -1395,9 +1522,44 @@ export class ReportsService {
 
     this.register({
       definition: {
+        key: 'unallocated-payment-report',
+        name: 'Advances and Unallocated Payments',
+        description:
+          'Confirmed payment balances not yet allocated to student invoices, with M11 posting lineage',
+        category: 'finance',
+        module: 'finance',
+        formats: ['json', 'csv', 'pdf', 'xlsx'],
+        filters: [],
+        requiredPermissions: ['reports:export', 'accounting:reports:read'],
+      },
+      execute: async (actor) => {
+        const report = await this.financeService.getUnallocatedPaymentReport(
+          actor,
+          { page: 1, limit: 5000 },
+        );
+        return report.rows.map((row) => ({
+          'Payment ID': row.paymentId,
+          'Receipt No': row.receiptNumber ?? '-',
+          'Payment Date': row.paymentDate,
+          'Student ID': row.studentSystemId,
+          Student: row.studentName,
+          Method: row.paymentMethod,
+          Reference: row.referenceNumber ?? '-',
+          'Original Amount': row.originalAmount,
+          'Available Balance': row.unallocatedBalance,
+          'Balance Type': row.balanceType,
+          'M11 Posting': row.postingStatus,
+          Journal: row.journalEntryNumber ?? '-',
+        }));
+      },
+    });
+
+    this.register({
+      definition: {
         key: 'receipt-register',
         name: 'Receipt Register',
-        description: 'Issued receipts with collection, reprint, and refund status',
+        description:
+          'Issued receipts with collection, reprint, and refund status',
         category: 'finance',
         module: 'finance',
         formats: ['json', 'csv'],
@@ -1411,14 +1573,14 @@ export class ReportsService {
       },
       execute: async (actor, filters) => {
         const report = await this.financeService.getReceiptRegisterRows(actor, {
-          studentId: filters.studentId
-            ? String(filters.studentId)
-            : undefined,
+          studentId: filters.studentId ? String(filters.studentId) : undefined,
           fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
           toDate: filters.toDate ? String(filters.toDate) : undefined,
           paymentMethod: filters.paymentMethod
             ? String(filters.paymentMethod)
             : undefined,
+          page: 1,
+          limit: 5000,
         });
 
         return report.rows.map((row) => ({
@@ -1466,6 +1628,8 @@ export class ReportsService {
               : undefined,
             fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
             toDate: filters.toDate ? String(filters.toDate) : undefined,
+            page: 1,
+            limit: 5000,
           },
         );
 
@@ -1516,6 +1680,8 @@ export class ReportsService {
             recordType: filters.recordType
               ? (String(filters.recordType) as 'REFUND' | 'REVERSAL')
               : undefined,
+            page: 1,
+            limit: 5000,
           },
         );
 
@@ -1547,7 +1713,12 @@ export class ReportsService {
         module: 'accounting',
         formats: ['json', 'csv'],
         filters: [
-          { key: 'fiscalYearId', label: 'Fiscal Year', type: 'select', required: true },
+          {
+            key: 'fiscalYearId',
+            label: 'Fiscal Year',
+            type: 'select',
+            required: true,
+          },
           { key: 'fromDate', label: 'From Date', type: 'date' },
           { key: 'toDate', label: 'To Date', type: 'date' },
         ],
@@ -1697,7 +1868,12 @@ export class ReportsService {
         module: 'accounting',
         formats: ['json', 'csv', 'pdf'],
         filters: [
-          { key: 'fiscalYearId', label: 'Fiscal Year', type: 'select', required: true },
+          {
+            key: 'fiscalYearId',
+            label: 'Fiscal Year',
+            type: 'select',
+            required: true,
+          },
           { key: 'fromDate', label: 'From Date', type: 'date' },
           { key: 'toDate', label: 'To Date', type: 'date' },
         ],
@@ -1737,7 +1913,12 @@ export class ReportsService {
         module: 'accounting',
         formats: ['json', 'csv', 'pdf'],
         filters: [
-          { key: 'fiscalYearId', label: 'Fiscal Year', type: 'select', required: true },
+          {
+            key: 'fiscalYearId',
+            label: 'Fiscal Year',
+            type: 'select',
+            required: true,
+          },
           { key: 'budgetId', label: 'Budget', type: 'select' },
           { key: 'fromDate', label: 'From Date', type: 'date' },
           { key: 'toDate', label: 'To Date', type: 'date' },
@@ -2361,7 +2542,7 @@ export class ReportsService {
     );
 
     const exportMetadata = this.buildExportMetadata(
-      reportKey,
+      executor.definition,
       request.filters,
       actor,
     );
@@ -2393,6 +2574,10 @@ export class ReportsService {
           requestedBy: actor.userId,
           ...exportMetadata,
           rowCount: Array.isArray(data) ? data.length : 0,
+          displayedTotals: await executor.executeTotals?.(
+            actor,
+            request.filters,
+          ),
         });
 
         return {
@@ -2405,6 +2590,10 @@ export class ReportsService {
         };
       }
 
+      const displayedTotals = await executor.executeTotals?.(
+        actor,
+        request.filters,
+      );
       const { content, contentType, fileName } = await this.buildExportArtifact(
         {
           actor,
@@ -2412,6 +2601,8 @@ export class ReportsService {
           executor,
           format: request.format,
           reportKey,
+          watermark: exportMetadata.watermark,
+          displayedTotals,
         },
       );
 
@@ -2428,6 +2619,7 @@ export class ReportsService {
         ...exportMetadata,
         checksum: createHash('sha256').update(content).digest('hex'),
         rowCount: Array.isArray(data) ? data.length : 0,
+        displayedTotals,
       });
 
       return {
@@ -2450,6 +2642,7 @@ export class ReportsService {
           exportMetadata.normalizedParameters as Prisma.InputJsonObject,
         status: 'QUEUED',
         requestedBy: actor.userId,
+        financialReportId: exportMetadata.financialReportId,
         definitionVersion: exportMetadata.definitionVersion,
         classification: exportMetadata.classification,
         watermark: exportMetadata.watermark,
@@ -2511,18 +2704,24 @@ export class ReportsService {
       input.filters,
       input.format,
     );
+    const exportMetadata = this.buildExportMetadata(
+      executor.definition,
+      input.filters,
+      input.actor,
+    );
+    const displayedTotals = await executor.executeTotals?.(
+      input.actor,
+      input.filters,
+    );
     const artifact = await this.buildExportArtifact({
       actor: input.actor,
       data,
       executor,
       format: input.format,
       reportKey: input.reportKey,
+      watermark: exportMetadata.watermark,
+      displayedTotals,
     });
-    const exportMetadata = this.buildExportMetadata(
-      input.reportKey,
-      input.filters,
-      input.actor,
-    );
     const fileAssetId = await this.registerReportExportFile({
       tenantId: input.actor.tenantId,
       requestedBy: input.actor.userId,
@@ -2547,7 +2746,8 @@ export class ReportsService {
         normalizedParameters:
           exportMetadata.normalizedParameters as Prisma.InputJsonObject,
         rowCount: artifact.rowCount,
-        displayedTotals: {} as Prisma.InputJsonObject,
+        displayedTotals: (displayedTotals ?? {}) as Prisma.InputJsonObject,
+        financialReportId: exportMetadata.financialReportId,
         definitionVersion: exportMetadata.definitionVersion,
         checksum: artifact.checksum,
         classification: exportMetadata.classification,
@@ -2745,26 +2945,72 @@ export class ReportsService {
     return [headers.join(','), ...rows].join('\n');
   }
 
+  private requireStudentFeeLedgerId(filters: Record<string, unknown>) {
+    const studentId = filters.studentId ? String(filters.studentId) : undefined;
+
+    if (!studentId) {
+      throw new ForbiddenException('studentId filter is required');
+    }
+
+    return studentId;
+  }
+
+  /**
+   * Maps registry filter keys onto the ledger query contract. The registry
+   * exposes `status`, while the ledger DTO calls the same thing
+   * `invoiceStatus`; both the row executor and the totals executor go through
+   * here so they cannot drift onto different filters.
+   */
+  private toStudentFeeLedgerQuery(
+    filters: Record<string, unknown>,
+  ): StudentFeeLedgerQueryDto {
+    return {
+      academicYearId: filters.academicYearId
+        ? String(filters.academicYearId)
+        : undefined,
+      fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
+      toDate: filters.toDate ? String(filters.toDate) : undefined,
+      invoiceStatus: filters.status
+        ? (String(filters.status) as InvoiceStatus)
+        : undefined,
+      sortDirection: 'asc',
+    };
+  }
+
+  /**
+   * Export-side half of the versioned report metadata envelope.
+   *
+   * Resolution goes through `definition.financialReportId`, not the registry
+   * key: registry keys are route slugs and never equal a catalog ID, so keying
+   * off the slug silently matched nothing and classified every export
+   * `CONFIDENTIAL`. Identity, version, and classification now come from the
+   * same shared catalog helpers the rendered envelope uses, which is what makes
+   * a rendered report and its exported artifact describe themselves alike.
+   */
   private buildExportMetadata(
-    reportKey: string,
+    definition: ReportDefinition,
     filters: Record<string, unknown>,
     actor: AuthContext,
   ) {
     const financialDefinition: FinancialReportDefinition | undefined =
-      P0_FINANCIAL_REPORT_CATALOG.find(
-        (definition) => definition.id === reportKey,
-      );
-    const classification: FinancialReportClassification =
-      financialDefinition?.requiresProfessionalVerification
-        ? 'STATUTORY_DRAFT'
-        : 'CONFIDENTIAL';
+      definition.financialReportId
+        ? findFinancialReportDefinition(
+            definition.financialReportId as FinancialReportId,
+          )
+        : undefined;
+    const classification: FinancialReportClassification = financialDefinition
+      ? resolveFinancialReportClassification(financialDefinition)
+      : 'CONFIDENTIAL';
     const expiresAt = new Date();
     expiresAt.setUTCDate(expiresAt.getUTCDate() + REPORT_EXPORT_EXPIRY_DAYS);
 
     return {
       normalizedParameters: normalizeReportParameters(filters),
-      definitionVersion: REPORT_DEFINITION_VERSION,
+      financialReportId: financialDefinition?.id ?? null,
+      definitionVersion: FINANCIAL_REPORT_DEFINITION_VERSION,
       classification,
+      // Verification status is derivable from financialReportId via the shared
+      // catalog, and STATUTORY_DRAFT already carries it into the watermark.
       watermark: `SchoolOS · ${classification.replaceAll('_', ' ')} · ${actor.tenantSlug}`,
       expiresAt,
     };
@@ -2776,8 +3022,15 @@ export class ReportsService {
     actor: AuthContext;
     data: Array<Record<string, unknown>>;
     format: ReportFormat;
+    watermark?: string;
+    displayedTotals?: Record<string, string>;
   }): Promise<ReportExportArtifact> {
     const fileName = `${input.reportKey}.${input.format}`;
+    // Backend-owned totals travel inside the artifact, not just alongside it,
+    // so a downloaded file can be checked against the report it claims to be.
+    const summaryCards = Object.entries(input.displayedTotals ?? {}).map(
+      ([label, value]) => ({ label, value }),
+    );
     let content: Buffer;
     let contentType: string;
 
@@ -2795,6 +3048,8 @@ export class ReportsService {
         title: input.executor.definition.name,
         subtitle: `Module: ${input.executor.definition.module}`,
         rows: input.data,
+        summaryCards,
+        watermark: input.watermark,
         logo,
       });
       contentType = 'application/pdf';
@@ -2802,6 +3057,7 @@ export class ReportsService {
       content = await this.buildXlsxArtifact(
         input.executor.definition.name,
         input.data,
+        { watermark: input.watermark, displayedTotals: input.displayedTotals },
       );
       contentType =
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -2822,6 +3078,10 @@ export class ReportsService {
   private async buildXlsxArtifact(
     title: string,
     data: Array<Record<string, unknown>>,
+    metadata?: {
+      watermark?: string;
+      displayedTotals?: Record<string, string>;
+    },
   ): Promise<Buffer> {
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'SchoolOS';
@@ -2839,9 +3099,11 @@ export class ReportsService {
         Math.max(
           14,
           header.length + 2,
-          ...data.slice(0, 200).map((row) =>
-            String(this.stringifyExportCell(row[header])).length + 2,
-          ),
+          ...data
+            .slice(0, 200)
+            .map(
+              (row) => String(this.stringifyExportCell(row[header])).length + 2,
+            ),
         ),
       ),
     }));
@@ -2862,6 +3124,26 @@ export class ReportsService {
         from: 'A1',
         to: `${excelColumnName(headers.length)}1`,
       };
+    }
+
+    // Classification and control totals live on their own sheet so the data
+    // grid stays machine-readable from row 1 while the artifact still carries
+    // its own marking and official figures.
+    if (metadata?.watermark || metadata?.displayedTotals) {
+      const metaSheet = workbook.addWorksheet('Report Metadata');
+      metaSheet.columns = [
+        { header: 'Field', key: 'field', width: 32 },
+        { header: 'Value', key: 'value', width: 48 },
+      ];
+      metaSheet.getRow(1).font = { bold: true };
+      if (metadata.watermark) {
+        metaSheet.addRow({ field: 'Classification', value: metadata.watermark });
+      }
+      for (const [field, value] of Object.entries(
+        metadata.displayedTotals ?? {},
+      )) {
+        metaSheet.addRow({ field, value });
+      }
     }
 
     const bytes = await workbook.xlsx.writeBuffer();
@@ -2931,6 +3213,7 @@ export class ReportsService {
     normalizedParameters: Readonly<Record<string, unknown>>;
     rowCount: number;
     displayedTotals?: Readonly<Record<string, string>>;
+    financialReportId?: string | null;
     definitionVersion: string;
     classification: FinancialReportClassification;
     watermark: string;
@@ -2979,7 +3262,9 @@ export class ReportsService {
         normalizedParameters:
           input.normalizedParameters as Prisma.InputJsonObject,
         rowCount: input.rowCount,
-        displayedTotals: (input.displayedTotals ?? {}) as Prisma.InputJsonObject,
+        displayedTotals: (input.displayedTotals ??
+          {}) as Prisma.InputJsonObject,
+        financialReportId: input.financialReportId ?? null,
         definitionVersion: input.definitionVersion,
         checksum:
           input.checksum ??
@@ -3103,9 +3388,7 @@ export class ReportsService {
       );
 
     if (exportRecord.checksum) {
-      const actualChecksum = createHash('sha256')
-        .update(content)
-        .digest('hex');
+      const actualChecksum = createHash('sha256').update(content).digest('hex');
       if (actualChecksum !== exportRecord.checksum) {
         throw new ForbiddenException(
           'This report snapshot failed its integrity check',
@@ -3144,10 +3427,7 @@ function normalizePositiveInteger(
 
 function isReportFormat(value: string): value is ReportFormat {
   return (
-    value === 'csv' ||
-    value === 'pdf' ||
-    value === 'xlsx' ||
-    value === 'json'
+    value === 'csv' || value === 'pdf' || value === 'xlsx' || value === 'json'
   );
 }
 
@@ -3166,7 +3446,10 @@ function normalizeReportParameters(
     Object.entries(value)
       .filter(([, entryValue]) => entryValue !== undefined)
       .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, entryValue]) => [key, normalizeReportParameterValue(entryValue)]),
+      .map(([key, entryValue]) => [
+        key,
+        normalizeReportParameterValue(entryValue),
+      ]),
   );
 }
 

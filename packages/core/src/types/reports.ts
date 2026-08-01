@@ -18,6 +18,15 @@ export interface ReportFilterDefinition {
 
 export interface ReportDefinition {
   key: string;
+  /**
+   * Canonical P0 financial report this export produces, when it is one.
+   *
+   * Registry keys are route-facing slugs and never match a catalog ID, so this
+   * is the only link that lets an export inherit catalog-owned version,
+   * classification, and professional-verification metadata. Without it an
+   * export cannot describe itself the same way the rendered report does.
+   */
+  financialReportId?: string;
   name: string;
   description: string;
   category:

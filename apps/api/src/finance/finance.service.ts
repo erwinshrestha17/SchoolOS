@@ -25,6 +25,7 @@ import {
   Prisma,
   ChartAccountType,
   FeeFrequency,
+  FiscalYearStatus,
   FileAsset,
   CashDeposit,
   AuthMethod,
@@ -119,9 +120,18 @@ import {
   type ParentSandboxPaymentProvider,
 } from './sandbox-payment-provider';
 import {
+  FINANCIAL_REPORT_DEFINITION_VERSION,
   NEPAL_TIME_ZONE,
+  findFinancialReportDefinition,
+  normalizeFinancialReportFilters,
+  resolveFinancialReportClassification,
+  resolveProfessionalVerificationStatus,
   zonedNepalDateTimeToUtc,
   type FinanceDashboardSummary,
+  type FinancialReportEnvelope,
+  type FinancialReportId,
+  type FinancialReportSourceFreshness,
+  type FinancialReportValidationStatus,
   type StudentCollectionContext,
 } from '@schoolos/core';
 
@@ -305,6 +315,11 @@ const cashierCloseUserInclude = {
   collectorUser: { select: { id: true, email: true } },
   closedBy: { select: { id: true, email: true } },
 } as const;
+
+/** Server-side page size used when draining the ledger for an export. */
+const STUDENT_LEDGER_EXPORT_PAGE_SIZE = 500;
+/** Hard ceiling on an exported ledger; beyond this the export is refused. */
+const STUDENT_LEDGER_EXPORT_MAX_ROWS = 10000;
 
 interface CollectionStudentSearchRow {
   id: string;
@@ -1001,6 +1016,13 @@ export class FinanceService {
   }
 
   async createFeeHead(dto: CreateFeeHeadDto, actor: AuthContext) {
+    const defaultAmount = new Prisma.Decimal(dto.defaultAmount);
+    if (defaultAmount.isNegative() || defaultAmount.decimalPlaces() > 2) {
+      throw new BadRequestException(
+        'Fee head default amount must be a non-negative decimal with no more than two decimal places.',
+      );
+    }
+
     const existing = await this.prisma.feeHead.findUnique({
       where: {
         tenantId_code: {
@@ -1020,7 +1042,7 @@ export class FinanceService {
         code: dto.code,
         name: dto.name,
         frequency: dto.frequency,
-        defaultAmount: new Prisma.Decimal(dto.defaultAmount),
+        defaultAmount,
         vatApplicable: dto.vatApplicable ?? true,
       },
     });
@@ -1058,6 +1080,15 @@ export class FinanceService {
   }
 
   async createFeePlan(dto: CreateFeePlanDto, actor: AuthContext) {
+    for (const item of dto.items) {
+      const amount = new Prisma.Decimal(item.amount);
+      if (amount.isNegative() || amount.decimalPlaces() > 2) {
+        throw new BadRequestException(
+          'Each fee plan amount must be a non-negative decimal with no more than two decimal places.',
+        );
+      }
+    }
+
     const academicYear = await this.prisma.academicYear.findFirst({
       where: { id: dto.academicYearId, tenantId: actor.tenantId },
     });
@@ -1375,6 +1406,21 @@ export class FinanceService {
       throw new BadRequestException('Discount reason is required');
     }
 
+    // The web omits the unused side of a rule as null, not undefined.
+    const percentOff =
+      dto.percentOff === undefined || dto.percentOff === null
+        ? null
+        : new Prisma.Decimal(dto.percentOff);
+    const amountOff =
+      dto.amountOff === undefined || dto.amountOff === null
+        ? null
+        : new Prisma.Decimal(dto.amountOff);
+    if (amountOff && (amountOff.isNegative() || amountOff.decimalPlaces() > 2)) {
+      throw new BadRequestException(
+        'Discount amount must be a non-negative decimal with no more than two decimal places.',
+      );
+    }
+
     await this.ensureDiscountReferencesBelongToTenant(dto, actor.tenantId);
 
     const discount = await this.prisma.discountRule.create({
@@ -1385,14 +1431,8 @@ export class FinanceService {
         feeHeadId: dto.feeHeadId ?? null,
         classId: dto.classId ?? null,
         feePlanId: dto.feePlanId ?? null,
-        percentOff:
-          dto.percentOff === undefined
-            ? null
-            : new Prisma.Decimal(dto.percentOff),
-        amountOff:
-          dto.amountOff === undefined
-            ? null
-            : new Prisma.Decimal(dto.amountOff),
+        percentOff,
+        amountOff,
       },
     });
 
@@ -1492,6 +1532,13 @@ export class FinanceService {
       throw new BadRequestException('Waiver reason is required');
     }
 
+    const waiverAmount = new Prisma.Decimal(dto.amount);
+    if (!waiverAmount.isPositive() || waiverAmount.decimalPlaces() > 2) {
+      throw new BadRequestException(
+        'Waiver amount must be a positive decimal with no more than two decimal places.',
+      );
+    }
+
     const student = await this.prisma.student.findFirst({
       where: { id: dto.studentId, tenantId: actor.tenantId },
     });
@@ -1553,7 +1600,7 @@ export class FinanceService {
       }
     }
 
-    const amount = new Prisma.Decimal(dto.amount);
+    const amount = waiverAmount;
     const paidAmount = invoice
       ? sumInvoiceAllocationAmount(invoice.paymentAllocations, invoice.payments)
       : null;
@@ -2057,6 +2104,154 @@ export class FinanceService {
     };
   }
 
+  async getUnallocatedPaymentReport(
+    actor: AuthContext,
+    query: FinanceReportQueryDto = {},
+  ) {
+    if (!actor.permissions.includes('accounting:reports:read')) {
+      assertFinancePermission(actor, 'fees:manage');
+      assertFinancePermission(actor, 'ledger:read');
+    }
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 50;
+    const offset = (page - 1) * limit;
+    type UnallocatedBalanceRow = {
+      paymentId: string;
+      paymentDate: Date;
+      receiptNumber: string | null;
+      studentId: string;
+      studentSystemId: string;
+      firstNameEn: string;
+      lastNameEn: string;
+      paymentMethod: PaymentMethod;
+      paymentStatus: PaymentStatus;
+      referenceNumber: string | null;
+      originalAmount: Prisma.Decimal;
+      unallocatedBalance: Prisma.Decimal;
+      isAdvance: boolean;
+    };
+    type UnallocatedBalanceSummary = {
+      total: bigint;
+      totalBalance: Prisma.Decimal;
+    };
+    const [balanceRows, summaryRows] = await Promise.all([
+      this.prisma.$queryRaw<UnallocatedBalanceRow[]>(Prisma.sql`
+        WITH balances AS (
+          SELECT pa."paymentId", SUM(pa."amount") AS balance
+          FROM "PaymentAllocation" pa
+          WHERE pa."tenantId" = ${actor.tenantId}
+            AND pa."invoiceId" IS NULL
+            AND pa."reversedAt" IS NULL
+          GROUP BY pa."paymentId"
+          HAVING SUM(pa."amount") > 0
+        )
+        SELECT
+          p."id" AS "paymentId",
+          p."paidAt" AS "paymentDate",
+          r."receiptNumber" AS "receiptNumber",
+          s."id" AS "studentId",
+          s."studentSystemId" AS "studentSystemId",
+          s."firstNameEn" AS "firstNameEn",
+          s."lastNameEn" AS "lastNameEn",
+          p."method" AS "paymentMethod",
+          p."status" AS "paymentStatus",
+          p."referenceNumber" AS "referenceNumber",
+          p."amount" AS "originalAmount",
+          balances.balance AS "unallocatedBalance",
+          p."isAdvance" AS "isAdvance"
+        FROM balances
+        JOIN "Payment" p
+          ON p."id" = balances."paymentId"
+         AND p."tenantId" = ${actor.tenantId}
+        JOIN "Student" s
+          ON s."id" = p."studentId"
+         AND s."tenantId" = ${actor.tenantId}
+        LEFT JOIN "Receipt" r
+          ON r."paymentId" = p."id"
+         AND r."tenantId" = ${actor.tenantId}
+        WHERE p."status" <> 'REVERSED'::"PaymentStatus"
+        ORDER BY p."paidAt" DESC, p."id" ASC
+        LIMIT ${limit}
+        OFFSET ${offset}
+      `),
+      this.prisma.$queryRaw<UnallocatedBalanceSummary[]>(Prisma.sql`
+        WITH balances AS (
+          SELECT pa."paymentId", SUM(pa."amount") AS balance
+          FROM "PaymentAllocation" pa
+          JOIN "Payment" p
+            ON p."id" = pa."paymentId"
+           AND p."tenantId" = ${actor.tenantId}
+           AND p."status" <> 'REVERSED'::"PaymentStatus"
+          WHERE pa."tenantId" = ${actor.tenantId}
+            AND pa."invoiceId" IS NULL
+            AND pa."reversedAt" IS NULL
+          GROUP BY pa."paymentId"
+          HAVING SUM(pa."amount") > 0
+        )
+        SELECT
+          COUNT(*)::bigint AS total,
+          COALESCE(SUM(balance), 0)::numeric AS "totalBalance"
+        FROM balances
+      `),
+    ]);
+    const journalEntries = await this.prisma.journalEntry.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        sourceType: JournalSourceType.FEE_PAYMENT,
+        sourceId: { in: balanceRows.map((row) => row.paymentId) },
+        status: { not: 'REVERSED' },
+      },
+      select: { id: true, sourceId: true, entryNumber: true },
+      take: limit,
+    });
+    const journalByPaymentId = new Map(
+      journalEntries.map((entry) => [entry.sourceId, entry]),
+    );
+    const rows = balanceRows.map((row) => {
+      const journal = journalByPaymentId.get(row.paymentId);
+      return {
+        paymentId: row.paymentId,
+        paymentDate: row.paymentDate.toISOString(),
+        receiptNumber: row.receiptNumber,
+        studentId: row.studentId,
+        studentSystemId: row.studentSystemId,
+        studentName: `${row.firstNameEn} ${row.lastNameEn}`.trim(),
+        paymentMethod: row.paymentMethod,
+        paymentStatus: row.paymentStatus,
+        referenceNumber: row.referenceNumber,
+        originalAmount: row.originalAmount.toFixed(2),
+        unallocatedBalance: row.unallocatedBalance.toFixed(2),
+        balanceType: row.isAdvance
+          ? ('ADVANCE' as const)
+          : ('UNALLOCATED' as const),
+        journalEntryId: journal?.id ?? null,
+        journalEntryNumber: journal?.entryNumber ?? null,
+        postingStatus: journal ? ('POSTED' as const) : ('PENDING' as const),
+      };
+    });
+    const total = Number(summaryRows[0]?.total ?? 0n);
+
+    return {
+      rows,
+      summary: {
+        totalPayments: total,
+        totalUnallocatedAmount: new Prisma.Decimal(
+          summaryRows[0]?.totalBalance ?? 0,
+        ).toFixed(2),
+        displayedUnallocatedAmount: sumMoneyStrings(
+          rows.map((row) => row.unallocatedBalance),
+        ),
+      },
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: total === 0 ? 0 : Math.ceil(total / limit),
+      },
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
   async getFeeCollectionReportRows(
     actor: AuthContext,
     filters: {
@@ -2409,30 +2604,39 @@ export class FinanceService {
       status?: InvoiceStatus;
       fromDate?: string;
       toDate?: string;
+      page?: number;
+      limit?: number;
     },
   ) {
     const where = this.buildInvoiceRegisterWhere(actor.tenantId, filters);
-    const invoices = await this.prisma.invoice.findMany({
-      where,
-      include: {
-        student: {
-          include: {
-            class: true,
-            sectionRef: true,
+    const page = filters.page ?? 1;
+    const limit = filters.limit ?? 50;
+    const skip = (page - 1) * limit;
+    const [invoices, total] = await Promise.all([
+      this.prisma.invoice.findMany({
+        where,
+        include: {
+          student: {
+            include: {
+              class: true,
+              sectionRef: true,
+            },
           },
+          lines: {
+            include: { feeHead: true },
+          },
+          payments: {
+            include: { refunds: true },
+          },
+          paymentAllocations: { where: { reversedAt: null } },
+          academicYear: { select: { name: true } },
         },
-        lines: {
-          include: { feeHead: true },
-        },
-        payments: {
-          include: { refunds: true },
-        },
-        paymentAllocations: { where: { reversedAt: null } },
-        academicYear: { select: { name: true } },
-      },
-      orderBy: [{ issuedAt: 'desc' }, { invoiceNumber: 'desc' }],
-      take: 5000,
-    });
+        orderBy: [{ issuedAt: 'desc' }, { invoiceNumber: 'desc' }],
+        skip,
+        take: limit,
+      }),
+      this.prisma.invoice.count({ where }),
+    ]);
     const journalEntries = await this.prisma.journalEntry.findMany({
       where: {
         tenantId: actor.tenantId,
@@ -2490,14 +2694,24 @@ export class FinanceService {
     });
 
     const summary = {
-      totalInvoices: rows.length,
+      totalInvoices: total,
+      displayedInvoices: rows.length,
       totalGrossAmount: sumMoneyStrings(rows.map((row) => row.grossAmount)),
       totalNetAmount: sumMoneyStrings(rows.map((row) => row.netAmount)),
       totalPaidAmount: sumMoneyStrings(rows.map((row) => row.paidAmount)),
       totalBalanceAmount: sumMoneyStrings(rows.map((row) => row.balanceAmount)),
     };
 
-    return { rows, summary };
+    return {
+      rows,
+      summary,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: total === 0 ? 0 : Math.ceil(total / limit),
+      },
+    };
   }
 
   async getReceiptRegisterRows(
@@ -2507,6 +2721,8 @@ export class FinanceService {
       fromDate?: string;
       toDate?: string;
       paymentMethod?: string;
+      page?: number;
+      limit?: number;
     },
   ) {
     if (
@@ -2520,49 +2736,57 @@ export class FinanceService {
       );
     }
 
-    const receipts = await this.prisma.receipt.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        ...(filters.studentId
-          ? { payment: { is: { studentId: filters.studentId } } }
-          : {}),
-        ...(filters.fromDate || filters.toDate
-          ? {
-              issuedAt: {
-                ...(filters.fromDate
-                  ? { gte: new Date(filters.fromDate) }
-                  : {}),
-                ...(filters.toDate ? { lte: new Date(filters.toDate) } : {}),
-              },
-            }
-          : {}),
-        ...(filters.paymentMethod
-          ? {
-              payment: {
-                is: { method: filters.paymentMethod as PaymentMethod },
-              },
-            }
-          : {}),
-      },
-      include: {
-        payment: {
-          include: {
-            invoice: true,
-            student: true,
-            collectedBy: { select: { email: true } },
-            refunds: true,
+    const page = filters.page ?? 1;
+    const limit = filters.limit ?? 50;
+    const skip = (page - 1) * limit;
+    const where: Prisma.ReceiptWhereInput = {
+      tenantId: actor.tenantId,
+      ...(filters.studentId
+        ? { payment: { is: { studentId: filters.studentId } } }
+        : {}),
+      ...(filters.fromDate || filters.toDate
+        ? {
+            issuedAt: {
+              ...(filters.fromDate ? { gte: new Date(filters.fromDate) } : {}),
+              ...(filters.toDate ? { lte: new Date(filters.toDate) } : {}),
+            },
+          }
+        : {}),
+      ...(filters.paymentMethod
+        ? {
+            payment: {
+              is: { method: filters.paymentMethod as PaymentMethod },
+            },
+          }
+        : {}),
+    };
+    const [receipts, total] = await Promise.all([
+      this.prisma.receipt.findMany({
+        where: {
+          ...where,
+        },
+        include: {
+          payment: {
+            include: {
+              invoice: true,
+              student: true,
+              collectedBy: { select: { email: true } },
+              refunds: true,
+            },
+          },
+          reprintHistory: {
+            orderBy: [{ reprintedAt: 'desc' }],
+          },
+          _count: {
+            select: { reprintHistory: true },
           },
         },
-        reprintHistory: {
-          orderBy: [{ reprintedAt: 'desc' }],
-        },
-        _count: {
-          select: { reprintHistory: true },
-        },
-      },
-      orderBy: [{ issuedAt: 'desc' }, { receiptNumber: 'desc' }],
-      take: 5000,
-    });
+        orderBy: [{ issuedAt: 'desc' }, { receiptNumber: 'desc' }],
+        skip,
+        take: limit,
+      }),
+      this.prisma.receipt.count({ where }),
+    ]);
 
     const rows: ReceiptRegisterRow[] = receipts.map((receipt) => {
       const refundedAmount = sumRefundedAmount(receipt.payment.refunds);
@@ -2586,7 +2810,8 @@ export class FinanceService {
     });
 
     const summary = {
-      totalReceipts: rows.length,
+      totalReceipts: total,
+      displayedReceipts: rows.length,
       totalAmount: sumMoneyStrings(rows.map((row) => row.amount)),
       totalRefundedAmount: sumMoneyStrings(
         rows.map((row) => row.refundedAmount),
@@ -2594,12 +2819,27 @@ export class FinanceService {
       totalNetAmount: sumMoneyStrings(rows.map((row) => row.netAmount)),
     };
 
-    return { rows, summary };
+    return {
+      rows,
+      summary,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: total === 0 ? 0 : Math.ceil(total / limit),
+      },
+    };
   }
 
   async getReceiptSequenceExceptions(
     actor: AuthContext,
-    filters: { fiscalYear?: string; fromDate?: string; toDate?: string },
+    filters: {
+      fiscalYear?: string;
+      fromDate?: string;
+      toDate?: string;
+      page?: number;
+      limit?: number;
+    },
   ) {
     const receipts = await this.prisma.receipt.findMany({
       where: {
@@ -2731,8 +2971,18 @@ export class FinanceService {
       }
     }
 
+    const page = filters.page ?? 1;
+    const limit = filters.limit ?? 50;
+    const skip = (page - 1) * limit;
+    rows.sort((left, right) =>
+      `${left.fiscalYear}:${left.receiptNumber}:${left.exceptionType}`.localeCompare(
+        `${right.fiscalYear}:${right.receiptNumber}:${right.exceptionType}`,
+      ),
+    );
+    const pageRows = rows.slice(skip, skip + limit);
+
     return {
-      rows,
+      rows: pageRows,
       summary: {
         totalExceptions: rows.length,
         missingSequenceCount: rows.filter(
@@ -2748,6 +2998,12 @@ export class FinanceService {
           (row) => row.exceptionType === 'REVERSED_PAYMENT',
         ).length,
       },
+      pagination: {
+        total: rows.length,
+        page,
+        limit,
+        totalPages: rows.length === 0 ? 0 : Math.ceil(rows.length / limit),
+      },
     };
   }
 
@@ -2757,6 +3013,8 @@ export class FinanceService {
       fromDate?: string;
       toDate?: string;
       recordType?: 'REFUND' | 'REVERSAL';
+      page?: number;
+      limit?: number;
     },
   ) {
     const fromDate = filters.fromDate ? new Date(filters.fromDate) : undefined;
@@ -2921,14 +3179,25 @@ export class FinanceService {
       (left, right) => right.processedAt.getTime() - left.processedAt.getTime(),
     );
 
+    const page = filters.page ?? 1;
+    const limit = filters.limit ?? 50;
+    const skip = (page - 1) * limit;
+    const pageRows = rows.slice(skip, skip + limit);
+
     return {
-      rows,
+      rows: pageRows,
       summary: {
         totalRecords: rows.length,
         refundCount: rows.filter((row) => row.recordType === 'REFUND').length,
         reversalCount: rows.filter((row) => row.recordType === 'REVERSAL')
           .length,
         totalAmount: sumMoneyStrings(rows.map((row) => row.amount)),
+      },
+      pagination: {
+        total: rows.length,
+        page,
+        limit,
+        totalPages: rows.length === 0 ? 0 : Math.ceil(rows.length / limit),
       },
     };
   }
@@ -4087,6 +4356,341 @@ export class FinanceService {
     };
   }
 
+  /**
+   * Server-owned fiscal context for a financial report envelope.
+   *
+   * The open fiscal year and the period covering `asOf` are backend truth; a
+   * tenant with no open fiscal year yields nulls plus a warning rather than an
+   * invented context.
+   */
+  private async resolveReportFiscalContext(actor: AuthContext, asOf: Date) {
+    const fiscalYear = await this.prisma.fiscalYear.findFirst({
+      where: { tenantId: actor.tenantId, status: FiscalYearStatus.OPEN },
+      orderBy: { startDate: 'desc' },
+      include: {
+        periods: {
+          where: { startDate: { lte: asOf }, endDate: { gte: asOf } },
+          take: 1,
+        },
+      },
+    });
+    const period = fiscalYear?.periods[0] ?? null;
+
+    return {
+      fiscalYearId: fiscalYear?.id ?? null,
+      fiscalYearLabel: fiscalYear?.name ?? null,
+      fiscalPeriodId: period?.id ?? null,
+      fiscalPeriodLabel: period?.label ?? null,
+    };
+  }
+
+  /**
+   * Builds the versioned metadata envelope every rendered P0 financial report
+   * carries. The definition, version, and classification come from the shared
+   * catalog, so a rendered report and its exported artifact describe
+   * themselves identically.
+   */
+  private async buildFinancialReportEnvelope(input: {
+    reportId: FinancialReportId;
+    actor: AuthContext;
+    generatedAt: Date;
+    accountingBasis: FinancialReportEnvelope['fiscalContext']['accountingBasis'];
+    postingBasis: FinancialReportEnvelope['fiscalContext']['postingBasis'];
+    filters: Readonly<
+      Record<string, string | readonly string[] | boolean | null | undefined>
+    >;
+    sourceFreshness: readonly FinancialReportSourceFreshness[];
+    totals: Readonly<Record<string, string>>;
+    pagination: { page: number; limit: number; total: number };
+    warnings?: readonly string[];
+  }): Promise<FinancialReportEnvelope> {
+    const definition = findFinancialReportDefinition(input.reportId);
+
+    if (!definition) {
+      throw new BadRequestException(
+        `Unknown financial report definition: ${input.reportId}`,
+      );
+    }
+
+    const fiscalContext = await this.resolveReportFiscalContext(
+      input.actor,
+      input.generatedAt,
+    );
+    const warnings = [
+      ...(input.warnings ?? []),
+      ...(fiscalContext.fiscalYearId
+        ? []
+        : ['No open fiscal year is configured for this school.']),
+    ];
+    const status: FinancialReportValidationStatus =
+      warnings.length > 0 ? 'WARNING' : 'VALID';
+
+    return {
+      report: {
+        id: definition.id,
+        definitionVersion: FINANCIAL_REPORT_DEFINITION_VERSION,
+        title: definition.name,
+        family: definition.family,
+        ownerModule: definition.ownerModule,
+        classification: resolveFinancialReportClassification(definition),
+        requiresProfessionalVerification: Boolean(
+          definition.requiresProfessionalVerification,
+        ),
+        professionalVerificationStatus:
+          resolveProfessionalVerificationStatus(definition),
+      },
+      fiscalContext: {
+        ...fiscalContext,
+        accountingBasis: input.accountingBasis,
+        postingBasis: input.postingBasis,
+      },
+      normalizedFilters: normalizeFinancialReportFilters(input.filters),
+      generatedAt: input.generatedAt.toISOString(),
+      sourceFreshness: input.sourceFreshness,
+      validation: { status, warnings },
+      totals: input.totals,
+      pagination: {
+        page: input.pagination.page,
+        limit: input.pagination.limit,
+        total: input.pagination.total,
+        totalPages:
+          input.pagination.limit > 0
+            ? Math.ceil(input.pagination.total / input.pagination.limit)
+            : 0,
+      },
+    };
+  }
+
+  /**
+   * Tenant-scoped student ledger event stream.
+   *
+   * Every balance-affecting event nets to `debit - credit`. Allocations are
+   * stored signed — refund and reversal allocations are persisted negated — so
+   * their balance effect is uniformly `-amount`. Legacy per-payment events are
+   * emitted only for invoices that carry no allocation, matching the
+   * allocation-first precedence used by the full-ledger projection.
+   */
+  private buildStudentLedgerEventsSql(
+    studentId: string,
+    actor: AuthContext,
+    filters: { academicYearId?: string; invoiceStatus?: InvoiceStatus },
+  ) {
+    const tenantId = actor.tenantId;
+    const academicYearClause = filters.academicYearId
+      ? Prisma.sql`AND i."academicYearId" = ${filters.academicYearId}`
+      : Prisma.empty;
+    const invoiceStatusClause = filters.invoiceStatus
+      ? Prisma.sql`AND i."status" = ${filters.invoiceStatus}::"InvoiceStatus"`
+      : Prisma.empty;
+    // FeeWaiver carries no academic year of its own, so a year-filtered ledger
+    // can only attribute waivers through their linked invoice.
+    const unlinkedWaiverClause = filters.academicYearId
+      ? Prisma.empty
+      : Prisma.sql`OR w."invoiceId" IS NULL`;
+
+    return Prisma.sql`
+      scoped_invoices AS (
+        SELECT i."id", i."invoiceNumber", i."totalAmount", i."issuedAt", i."status"
+        FROM "Invoice" i
+        WHERE i."tenantId" = ${tenantId}
+          AND i."studentId" = ${studentId}
+          ${academicYearClause}
+          ${invoiceStatusClause}
+      ),
+      allocated_invoices AS (
+        SELECT DISTINCT pa."invoiceId" AS "id"
+        FROM "PaymentAllocation" pa
+        JOIN scoped_invoices si ON si."id" = pa."invoiceId"
+        WHERE pa."tenantId" = ${tenantId}
+          AND pa."reversedAt" IS NULL
+      ),
+      events AS (
+        SELECT
+          'invoice:' || si."id" AS "eventId",
+          si."issuedAt" AS "eventDate",
+          'INVOICE' AS "eventType",
+          1 AS "typeOrder",
+          si."invoiceNumber" AS "reference",
+          'Invoice ' || si."invoiceNumber" AS "description",
+          si."totalAmount" AS "debit",
+          0::numeric AS "credit",
+          TRUE AS "affectsBalance",
+          TRUE AS "countsInTotals",
+          si."id" AS "invoiceId",
+          si."invoiceNumber" AS "invoiceNumber",
+          NULL::text AS "paymentId",
+          NULL::text AS "receiptNumber",
+          si."status"::text AS "status"
+        FROM scoped_invoices si
+
+        UNION ALL
+
+        SELECT
+          'allocation:' || pa."id",
+          pa."allocatedAt",
+          CASE pa."allocationType"
+            WHEN 'REFUND' THEN 'REFUND'
+            WHEN 'REVERSAL' THEN 'REVERSAL'
+            ELSE 'PAYMENT'
+          END,
+          CASE pa."allocationType"
+            WHEN 'REFUND' THEN 4
+            WHEN 'REVERSAL' THEN 5
+            ELSE 3
+          END,
+          COALESCE(r."receiptNumber", p."id"),
+          CASE pa."allocationType"
+            WHEN 'REFUND' THEN 'Refund allocation for ' || si."invoiceNumber"
+            WHEN 'REVERSAL' THEN 'Payment reversal for ' || si."invoiceNumber"
+            ELSE p."method"::text || ' allocation for ' || si."invoiceNumber"
+          END,
+          CASE WHEN pa."allocationType" IN ('REFUND', 'REVERSAL')
+            THEN ABS(pa."amount") ELSE 0::numeric END,
+          CASE WHEN pa."allocationType" IN ('REFUND', 'REVERSAL')
+            THEN 0::numeric ELSE pa."amount" END,
+          TRUE,
+          TRUE,
+          si."id",
+          si."invoiceNumber",
+          p."id",
+          r."receiptNumber",
+          p."status"::text
+        FROM "PaymentAllocation" pa
+        JOIN scoped_invoices si ON si."id" = pa."invoiceId"
+        JOIN "Payment" p
+          ON p."id" = pa."paymentId"
+         AND p."tenantId" = ${tenantId}
+        LEFT JOIN "Receipt" r
+          ON r."paymentId" = p."id"
+         AND r."tenantId" = ${tenantId}
+        WHERE pa."tenantId" = ${tenantId}
+          AND pa."reversedAt" IS NULL
+
+        UNION ALL
+
+        SELECT
+          'payment:' || p."id",
+          p."paidAt",
+          'PAYMENT',
+          3,
+          COALESCE(r."receiptNumber", p."id"),
+          p."method"::text || ' payment for ' || si."invoiceNumber",
+          0::numeric,
+          p."amount",
+          TRUE,
+          p."status" <> 'REVERSED'::"PaymentStatus",
+          si."id",
+          si."invoiceNumber",
+          p."id",
+          r."receiptNumber",
+          p."status"::text
+        FROM "Payment" p
+        JOIN scoped_invoices si ON si."id" = p."invoiceId"
+        LEFT JOIN allocated_invoices ai ON ai."id" = si."id"
+        LEFT JOIN "Receipt" r
+          ON r."paymentId" = p."id"
+         AND r."tenantId" = ${tenantId}
+        WHERE p."tenantId" = ${tenantId}
+          AND ai."id" IS NULL
+
+        UNION ALL
+
+        SELECT
+          'reversal:' || p."id",
+          COALESCE(p."reversedAt", p."paidAt"),
+          'REVERSAL',
+          5,
+          COALESCE(r."receiptNumber", p."id"),
+          'REVERSAL: ' || COALESCE(p."reversalReason", 'Payment voided'),
+          p."amount",
+          0::numeric,
+          TRUE,
+          FALSE,
+          si."id",
+          si."invoiceNumber",
+          p."id",
+          r."receiptNumber",
+          NULL::text
+        FROM "Payment" p
+        JOIN scoped_invoices si ON si."id" = p."invoiceId"
+        LEFT JOIN allocated_invoices ai ON ai."id" = si."id"
+        LEFT JOIN "Receipt" r
+          ON r."paymentId" = p."id"
+         AND r."tenantId" = ${tenantId}
+        WHERE p."tenantId" = ${tenantId}
+          AND ai."id" IS NULL
+          AND p."status" = 'REVERSED'::"PaymentStatus"
+
+        UNION ALL
+
+        SELECT
+          'refund:' || pr."id",
+          pr."refundDate",
+          'REFUND',
+          4,
+          pr."refundNumber",
+          'Refund for ' || COALESCE(r."receiptNumber", si."invoiceNumber"),
+          pr."amount",
+          0::numeric,
+          TRUE,
+          p."status" <> 'REVERSED'::"PaymentStatus",
+          si."id",
+          si."invoiceNumber",
+          p."id",
+          r."receiptNumber",
+          NULL::text
+        FROM "PaymentRefund" pr
+        JOIN "Payment" p
+          ON p."id" = pr."paymentId"
+         AND p."tenantId" = ${tenantId}
+        JOIN scoped_invoices si ON si."id" = p."invoiceId"
+        LEFT JOIN allocated_invoices ai ON ai."id" = si."id"
+        LEFT JOIN "Receipt" r
+          ON r."paymentId" = p."id"
+         AND r."tenantId" = ${tenantId}
+        WHERE pr."tenantId" = ${tenantId}
+          AND ai."id" IS NULL
+
+        UNION ALL
+
+        SELECT
+          'waiver:' || w."id",
+          COALESCE(w."approvedAt", w."createdAt"),
+          'WAIVER',
+          2,
+          COALESCE(fh."name", w."invoiceId", 'Waiver'),
+          w."reason" || ' (already reflected in invoice totals when invoice-linked)',
+          0::numeric,
+          w."amount",
+          FALSE,
+          TRUE,
+          w."invoiceId",
+          si."invoiceNumber",
+          NULL::text,
+          NULL::text,
+          w."status"::text
+        FROM "FeeWaiver" w
+        LEFT JOIN scoped_invoices si ON si."id" = w."invoiceId"
+        LEFT JOIN "FeeHead" fh
+          ON fh."id" = w."feeHeadId"
+         AND fh."tenantId" = ${tenantId}
+        WHERE w."tenantId" = ${tenantId}
+          AND w."studentId" = ${studentId}
+          AND (si."id" IS NOT NULL ${unlinkedWaiverClause})
+      )
+    `;
+  }
+
+  /**
+   * Bounded server-side student ledger projection.
+   *
+   * The running balance is a window function over the whole ordered event
+   * stream, so it stays deterministic and identical to the full-ledger
+   * projection even though only one page crosses the process boundary. The
+   * date window and transaction-type filter are applied after the window
+   * function, which is what makes a filtered page still show a true cumulative
+   * balance rather than a balance restarted at the window.
+   */
   async getStudentFeeLedgerPage(
     studentId: string,
     query: StudentFeeLedgerQueryDto,
@@ -4100,6 +4704,22 @@ export class FinanceService {
       );
     }
 
+    const student = await this.prisma.student.findFirst({
+      where: { id: studentId, tenantId: actor.tenantId },
+      include: {
+        class: true,
+        sectionRef: true,
+        guardianLinks: {
+          include: { guardian: true },
+          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+        },
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found in this tenant');
+    }
+
     const period =
       query.fromDate && query.toDate
         ? resolveFinanceSummaryPeriod(
@@ -4107,34 +4727,259 @@ export class FinanceService {
             NEPAL_TIME_ZONE,
           )
         : null;
-    const ledger = await this.getStudentFeeLedger(studentId, actor, {
-      academicYearId: query.academicYearId,
-      status: query.invoiceStatus,
-    });
-    const matchingRows = ledger.rows.filter((row) => {
-      const rowDate = new Date(row.date);
-      return (
-        (!period ||
-          (rowDate >= period.startUtc && rowDate < period.endExclusiveUtc)) &&
-        (!query.transactionType || row.type === query.transactionType)
-      );
-    });
-    const orderedRows =
-      query.sortDirection === 'asc'
-        ? matchingRows
-        : [...matchingRows].reverse();
     const page = query.page ?? 1;
     const limit = query.limit ?? 25;
     const skip = (page - 1) * limit;
-    const rows = orderedRows.slice(skip, skip + limit);
+    const ascending = query.sortDirection === 'asc';
+
+    const eventsSql = this.buildStudentLedgerEventsSql(studentId, actor, {
+      academicYearId: query.academicYearId,
+      invoiceStatus: query.invoiceStatus,
+    });
+    const windowClause = period
+      ? Prisma.sql`AND o."eventDate" >= ${period.startUtc} AND o."eventDate" < ${period.endExclusiveUtc}`
+      : Prisma.empty;
+    const typeClause = query.transactionType
+      ? Prisma.sql`AND o."eventType" = ${query.transactionType}`
+      : Prisma.empty;
+    const orderClause = ascending
+      ? Prisma.sql`ORDER BY o."eventDate" ASC, o."typeOrder" ASC, o."eventId" ASC`
+      : Prisma.sql`ORDER BY o."eventDate" DESC, o."typeOrder" DESC, o."eventId" DESC`;
+
+    type LedgerPageRow = {
+      eventId: string;
+      eventDate: Date;
+      eventType: 'INVOICE' | 'PAYMENT' | 'WAIVER' | 'REFUND' | 'REVERSAL';
+      reference: string;
+      description: string;
+      debit: Prisma.Decimal;
+      credit: Prisma.Decimal;
+      runningBalance: Prisma.Decimal;
+      affectsBalance: boolean;
+      invoiceId: string | null;
+      invoiceNumber: string | null;
+      paymentId: string | null;
+      receiptNumber: string | null;
+      status: string | null;
+    };
+    type LedgerWindowSummary = {
+      total: bigint;
+      openingBalance: Prisma.Decimal | null;
+      windowDebit: Prisma.Decimal | null;
+      windowCredit: Prisma.Decimal | null;
+    };
+    type LedgerReportSummary = {
+      totalInvoiced: Prisma.Decimal | null;
+      totalPaid: Prisma.Decimal | null;
+      totalRefunded: Prisma.Decimal | null;
+      totalWaived: Prisma.Decimal | null;
+    };
+
+    const orderedCte = Prisma.sql`
+      ordered AS (
+        SELECT
+          e.*,
+          SUM(CASE WHEN e."affectsBalance" THEN e."debit" - e."credit" ELSE 0 END)
+            OVER (
+              ORDER BY e."eventDate" ASC, e."typeOrder" ASC, e."eventId" ASC
+              ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) AS "runningBalance"
+        FROM events e
+      )
+    `;
+
+    const [rows, windowSummaries, reportSummaries] = await Promise.all([
+      this.prisma.$queryRaw<LedgerPageRow[]>(Prisma.sql`
+        WITH ${eventsSql}, ${orderedCte}
+        SELECT
+          o."eventId", o."eventDate", o."eventType", o."typeOrder",
+          o."reference", o."description", o."debit", o."credit",
+          o."runningBalance", o."affectsBalance", o."invoiceId",
+          o."invoiceNumber", o."paymentId", o."receiptNumber", o."status"
+        FROM ordered o
+        WHERE TRUE ${windowClause} ${typeClause}
+        ${orderClause}
+        LIMIT ${limit}
+        OFFSET ${skip}
+      `),
+      this.prisma.$queryRaw<LedgerWindowSummary[]>(Prisma.sql`
+        WITH ${eventsSql}, ${orderedCte}
+        SELECT
+          COUNT(*) FILTER (WHERE TRUE ${windowClause} ${typeClause})::bigint AS "total",
+          COALESCE(
+            SUM(CASE WHEN o."affectsBalance" THEN o."debit" - o."credit" ELSE 0 END)
+              FILTER (WHERE ${
+                period
+                  ? Prisma.sql`o."eventDate" < ${period.startUtc}`
+                  : Prisma.sql`FALSE`
+              }),
+            0
+          ) AS "openingBalance",
+          COALESCE(SUM(o."debit") FILTER (WHERE TRUE ${windowClause} ${typeClause}), 0) AS "windowDebit",
+          COALESCE(SUM(o."credit") FILTER (WHERE TRUE ${windowClause} ${typeClause}), 0) AS "windowCredit"
+        FROM ordered o
+      `),
+      this.prisma.$queryRaw<LedgerReportSummary[]>(Prisma.sql`
+        WITH ${eventsSql}
+        SELECT
+          COALESCE(SUM(e."debit") FILTER (WHERE e."eventType" = 'INVOICE'), 0) AS "totalInvoiced",
+          COALESCE(SUM(e."credit") FILTER (
+            WHERE e."eventType" = 'PAYMENT' AND e."countsInTotals"
+          ), 0) AS "totalPaid",
+          COALESCE(SUM(e."debit") FILTER (
+            WHERE e."eventType" IN ('REFUND', 'REVERSAL') AND e."countsInTotals"
+          ), 0) AS "totalRefunded",
+          COALESCE(SUM(e."credit") FILTER (WHERE e."eventType" = 'WAIVER'), 0) AS "totalWaived"
+        FROM events e
+      `),
+    ]);
+
+    const windowSummary = windowSummaries[0];
+    const reportSummary = reportSummaries[0];
+    const total = Number(windowSummary?.total ?? 0);
+    const totalInvoiced = new Prisma.Decimal(reportSummary?.totalInvoiced ?? 0);
+    const totalPaid = new Prisma.Decimal(reportSummary?.totalPaid ?? 0);
+    const totalRefunded = new Prisma.Decimal(reportSummary?.totalRefunded ?? 0);
+    const totalWaived = new Prisma.Decimal(reportSummary?.totalWaived ?? 0);
+    const outstandingBalance = totalInvoiced.sub(totalPaid).add(totalRefunded);
+    const primaryGuardian =
+      student.guardianLinks.find((link) => link.isPrimary) ??
+      student.guardianLinks[0];
+
+    const pageRows = rows.map((row) => ({
+      id: row.eventId,
+      date: row.eventDate,
+      type: row.eventType,
+      reference: row.reference,
+      description: row.description,
+      debit: new Prisma.Decimal(row.debit).toFixed(2),
+      credit: new Prisma.Decimal(row.credit).toFixed(2),
+      runningBalance: new Prisma.Decimal(row.runningBalance).toFixed(2),
+      affectsBalance: row.affectsBalance,
+      invoiceId: row.invoiceId,
+      invoiceNumber: row.invoiceNumber,
+      paymentId: row.paymentId,
+      receiptNumber: row.receiptNumber,
+      status: row.status,
+      // Report-to-source drill-down. Payment-derived rows resolve to the
+      // payment, everything else to the originating invoice.
+      drilldown: row.paymentId
+        ? {
+            kind: 'SOURCE_RECORD' as const,
+            id: row.paymentId,
+            route: `/dashboard/fees/payments/${row.paymentId}`,
+          }
+        : row.invoiceId
+          ? {
+              kind: 'SOURCE_RECORD' as const,
+              id: row.invoiceId,
+              route: `/dashboard/fees/invoices/${row.invoiceId}`,
+            }
+          : undefined,
+    }));
+
+    const generatedAt = new Date();
+    const openingBalance = new Prisma.Decimal(
+      windowSummary?.openingBalance ?? 0,
+    ).toFixed(2);
+    const reportTotals = {
+      openingBalance,
+      totalInvoiced: totalInvoiced.toFixed(2),
+      totalPaid: totalPaid.toFixed(2),
+      totalWaived: totalWaived.toFixed(2),
+      totalRefunded: totalRefunded.toFixed(2),
+      outstandingBalance: Prisma.Decimal.max(
+        new Prisma.Decimal(0),
+        outstandingBalance,
+      ).toFixed(2),
+      windowDebit: new Prisma.Decimal(windowSummary?.windowDebit ?? 0).toFixed(
+        2,
+      ),
+      windowCredit: new Prisma.Decimal(windowSummary?.windowCredit ?? 0).toFixed(
+        2,
+      ),
+    };
+    const envelope = await this.buildFinancialReportEnvelope({
+      reportId: 'FEE-01' satisfies FinancialReportId,
+      actor,
+      generatedAt,
+      // Receivables arise when an invoice is issued, not when it is collected.
+      accountingBasis: 'ACCRUAL',
+      // M3 source truth: records appear here before they reach an M11 journal.
+      postingBasis: 'POSTED_WITH_PENDING_DISCLOSED',
+      filters: {
+        studentId,
+        fromDate: query.fromDate ?? null,
+        toDate: query.toDate ?? null,
+        academicYearId: query.academicYearId ?? null,
+        invoiceStatus: query.invoiceStatus ?? null,
+        transactionType: query.transactionType ?? null,
+        sortDirection: query.sortDirection ?? 'desc',
+      },
+      sourceFreshness: [
+        {
+          module: 'M3',
+          // Read directly from source tables on request; no cache or snapshot.
+          refreshedAt: generatedAt.toISOString(),
+          includesPending: true,
+        },
+      ],
+      totals: reportTotals,
+      pagination: { page, limit, total },
+      warnings: query.academicYearId
+        ? [
+            'Fee waivers carry no academic year of their own, so a year-filtered ledger shows only waivers linked to an invoice in that year.',
+          ]
+        : [],
+    });
 
     return {
-      ...ledger,
-      rows,
-      total: matchingRows.length,
+      ...envelope,
+      student: {
+        id: student.id,
+        studentSystemId: student.studentSystemId,
+        name: formatStudentName(student),
+        className: student.class.name,
+        sectionName: student.sectionRef?.name ?? null,
+        guardianName: primaryGuardian?.guardian.fullName ?? null,
+        guardianPhone: primaryGuardian?.guardian.primaryPhone ?? null,
+      },
+      openingBalance,
+      totalInvoiced: totalInvoiced.toFixed(2),
+      totalPaid: totalPaid.toFixed(2),
+      totalWaived: totalWaived.toFixed(2),
+      totalRefunded: totalRefunded.toFixed(2),
+      outstandingBalance: Prisma.Decimal.max(
+        new Prisma.Decimal(0),
+        outstandingBalance,
+      ).toFixed(2),
+      rows: pageRows,
+      /** Totals for the rows on this page only — never the official figures. */
+      pageTotals: {
+        rowCount: pageRows.length,
+        debit: pageRows
+          .reduce(
+            (sum, row) => sum.add(row.debit),
+            new Prisma.Decimal(0),
+          )
+          .toFixed(2),
+        credit: pageRows
+          .reduce(
+            (sum, row) => sum.add(row.credit),
+            new Prisma.Decimal(0),
+          )
+          .toFixed(2),
+      },
+      /** Backend-owned totals for the whole filtered window, across all pages. */
+      windowTotals: {
+        rowCount: total,
+        debit: new Prisma.Decimal(windowSummary?.windowDebit ?? 0).toFixed(2),
+        credit: new Prisma.Decimal(windowSummary?.windowCredit ?? 0).toFixed(2),
+      },
+      total,
       page,
       limit,
-      hasNextPage: skip + rows.length < matchingRows.length,
+      hasNextPage: skip + pageRows.length < total,
       filters: {
         fromDate: query.fromDate ?? null,
         toDate: query.toDate ?? null,
@@ -4143,7 +4988,60 @@ export class FinanceService {
         transactionType: query.transactionType ?? null,
         sortDirection: query.sortDirection ?? 'desc',
       },
-      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * FEE-01 export projection.
+   *
+   * Drains the same enveloped SQL projection the screen renders rather than a
+   * parallel query, so an exported artifact and the rendered report cannot
+   * disagree on rows, running balances, or totals. Paging is bounded and a
+   * ledger larger than the cap is refused outright: silently truncating a
+   * financial record is worse than asking for a narrower range.
+   */
+  async getStudentFeeLedgerExport(
+    studentId: string,
+    query: StudentFeeLedgerQueryDto,
+    actor: AuthContext,
+  ) {
+    const first = await this.getStudentFeeLedgerPage(
+      studentId,
+      { ...query, page: 1, limit: STUDENT_LEDGER_EXPORT_PAGE_SIZE },
+      actor,
+    );
+
+    if (first.total > STUDENT_LEDGER_EXPORT_MAX_ROWS) {
+      throw new BadRequestException(
+        `This ledger has ${first.total} entries, above the ${STUDENT_LEDGER_EXPORT_MAX_ROWS} row export limit. Narrow the date range and export again.`,
+      );
+    }
+
+    const rows = [...first.rows];
+    const pageCount = Math.ceil(first.total / STUDENT_LEDGER_EXPORT_PAGE_SIZE);
+
+    for (let page = 2; page <= pageCount; page += 1) {
+      const next = await this.getStudentFeeLedgerPage(
+        studentId,
+        { ...query, page, limit: STUDENT_LEDGER_EXPORT_PAGE_SIZE },
+        actor,
+      );
+      rows.push(...next.rows);
+    }
+
+    return {
+      // Window totals are report-wide, so they describe the whole artifact.
+      ...first,
+      rows,
+      pageTotals: {
+        rowCount: rows.length,
+        debit: rows
+          .reduce((sum, row) => sum.add(row.debit), new Prisma.Decimal(0))
+          .toFixed(2),
+        credit: rows
+          .reduce((sum, row) => sum.add(row.credit), new Prisma.Decimal(0))
+          .toFixed(2),
+      },
     };
   }
 
@@ -7352,8 +8250,10 @@ export class FinanceService {
   }
 
   async listCashDeposits(query: ListCashDepositsDto, actor: AuthContext) {
-    assertFinancePermission(actor, 'payments:close');
-    assertFinancePermission(actor, 'accounting:reconciliation:manage');
+    if (!actor.permissions.includes('accounting:reports:read')) {
+      assertFinancePermission(actor, 'payments:close');
+      assertFinancePermission(actor, 'accounting:reconciliation:manage');
+    }
     const page = query.page ?? 1;
     const limit = query.limit ?? 25;
     const skip = (page - 1) * limit;
@@ -7815,10 +8715,14 @@ export class FinanceService {
   }
 
   async listCashierCloses(query: ListCashierClosesDto, actor: AuthContext) {
-    assertFinancePermission(actor, 'payments:close');
+    assertAnyFinancePermission(actor, [
+      'payments:close',
+      'accounting:reports:read',
+    ]);
     const pagination = resolveFinancePagination(query);
     const where: Prisma.CashierCloseWhereInput = {
       tenantId: actor.tenantId,
+      ...(query.status ? { status: query.status } : {}),
       ...(query.openedFrom
         ? { openedAt: { gte: new Date(query.openedFrom) } }
         : {}),

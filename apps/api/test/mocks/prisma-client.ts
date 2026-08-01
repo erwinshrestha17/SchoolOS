@@ -1099,6 +1099,13 @@ export const CashierCloseStatus = {
   DEPOSITED: 'DEPOSITED',
 } as const;
 
+export const CashDepositStatus = {
+  DRAFT: 'DRAFT',
+  SUBMITTED: 'SUBMITTED',
+  DEPOSITED: 'DEPOSITED',
+  REVERSED: 'REVERSED',
+} as const;
+
 export const PaymentAllocationType = {
   INVOICE: 'INVOICE',
   ADVANCE: 'ADVANCE',

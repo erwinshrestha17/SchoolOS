@@ -39,6 +39,8 @@ describe('FinanceService - Hardening', () => {
       'payments:reverse',
       'payments:close',
       'payments:collect',
+      'accounting:reconciliation:manage',
+      'accounting:journals:post',
       'receipts:manage',
       'receipts:read',
     ],
@@ -81,7 +83,19 @@ describe('FinanceService - Hardening', () => {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         count: jest.fn(),
       },
-      cashDeposit: { findFirst: jest.fn() },
+      cashDeposit: {
+        findUnique: jest.fn(),
+        findFirst: jest.fn(),
+        findMany: jest.fn(),
+        count: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+      },
+      chartAccount: {
+        findFirst: jest.fn(),
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+      },
       journalEntry: { findFirst: jest.fn() },
       accountingPeriod: { findFirst: jest.fn().mockResolvedValue(null) },
       receipt: { findFirst: jest.fn(), count: jest.fn() },
@@ -110,6 +124,23 @@ describe('FinanceService - Hardening', () => {
       financeApprovalRequestHistory: { create: jest.fn() },
       feeHead: {
         findFirst: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn(),
+      },
+      feePlan: {
+        create: jest.fn(),
+      },
+      discountRule: {
+        create: jest.fn(),
+      },
+      feeWaiver: {
+        create: jest.fn(),
+      },
+      academicYear: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      student: {
+        findFirst: jest.fn().mockResolvedValue(null),
       },
       invoiceLine: {
         create: jest.fn(),
@@ -135,6 +166,7 @@ describe('FinanceService - Hardening', () => {
             postPaymentRefund: jest.fn(),
             postReversal: jest.fn().mockResolvedValue({ id: 'rev-1' }),
             postInvoiceAdjustment: jest.fn().mockResolvedValue({ id: 'adj-1' }),
+            postManualJournal: jest.fn().mockResolvedValue({ id: 'journal-1' }),
           },
         },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
@@ -1308,6 +1340,315 @@ describe('FinanceService - Hardening', () => {
       expect(first.disposition).toBe('REPLAYED');
       expect(second.disposition).toBe('REPLAYED');
       expect(accountingPostingService.postReversal).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('cash deposit lifecycle', () => {
+    it('prepares the counted cash amount once for a closed session', async () => {
+      const close = buildCashierCloseFixture({
+        status: 'CLOSED',
+        closedAt: new Date('2026-05-01T10:00:00.000Z'),
+        expectedCashAmount: new Prisma.Decimal('1200.00'),
+        actualCashAmount: new Prisma.Decimal('1195.00'),
+        activeSessionKey: null,
+      });
+      const destinationAccount = {
+        id: 'bank-1',
+        code: '1020',
+        name: 'Operating Bank',
+        type: 'ASSET',
+        isActive: true,
+      };
+      const cashAccount = {
+        id: 'cash-1',
+        code: '1010',
+        name: 'Cash in Hand',
+      };
+      const createdDeposit = {
+        id: 'deposit-1',
+        tenantId: actor.tenantId,
+        depositNumber: 'DEP-2082-83-ABC12345',
+        cashierCloseId: close.id,
+        accountId: destinationAccount.id,
+        amount: new Prisma.Decimal('1195.00'),
+        depositDate: new Date('2026-05-01T10:15:00.000Z'),
+        referenceNumber: 'BANK-SLIP-1',
+        status: 'DRAFT',
+        idempotencyKey: 'deposit-key-1',
+        journalEntryId: null,
+        submittedById: null,
+        submittedAt: null,
+        depositedById: null,
+        depositedAt: null,
+        reversalReason: null,
+        createdAt: new Date('2026-05-01T10:15:00.000Z'),
+        updatedAt: new Date('2026-05-01T10:15:00.000Z'),
+      };
+
+      (prisma.cashDeposit.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.cashierClose.findFirst as jest.Mock).mockResolvedValue(close);
+      (prisma.chartAccount.findFirst as jest.Mock).mockResolvedValue(
+        destinationAccount,
+      );
+      (prisma.chartAccount.findUnique as jest.Mock).mockResolvedValue(
+        cashAccount,
+      );
+      (prisma.cashDeposit.create as jest.Mock).mockResolvedValue(
+        createdDeposit,
+      );
+
+      const result = await service.prepareCashDeposit(
+        {
+          cashierCloseId: close.id,
+          accountId: destinationAccount.id,
+          referenceNumber: 'BANK-SLIP-1',
+          idempotencyKey: 'deposit-key-1',
+        },
+        actor as any,
+      );
+
+      expect(result.amount).toBe('1195.00');
+      expect(prisma.cashDeposit.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            cashierCloseId: close.id,
+            amount: new Prisma.Decimal('1195.00'),
+            idempotencyKey: 'deposit-key-1',
+          }),
+        }),
+      );
+      expect(auditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'prepare',
+          resource: 'cash_deposit',
+        }),
+      );
+    });
+
+    it('atomically posts a balanced cash-to-bank journal and marks the close deposited', async () => {
+      const submittedDeposit = {
+        id: 'deposit-1',
+        tenantId: actor.tenantId,
+        depositNumber: 'DEP-2082-83-ABC12345',
+        cashierCloseId: 'close-1',
+        accountId: 'bank-1',
+        amount: new Prisma.Decimal('1195.00'),
+        depositDate: new Date('2026-05-01T10:15:00.000Z'),
+        referenceNumber: 'BANK-SLIP-1',
+        status: 'SUBMITTED',
+        idempotencyKey: 'deposit-key-1',
+        journalEntryId: null,
+        submittedById: actor.userId,
+        submittedAt: new Date('2026-05-01T10:20:00.000Z'),
+        depositedById: null,
+        depositedAt: null,
+        reversalReason: null,
+        createdAt: new Date('2026-05-01T10:15:00.000Z'),
+        updatedAt: new Date('2026-05-01T10:20:00.000Z'),
+      };
+      const depositedRecord = {
+        ...submittedDeposit,
+        status: 'DEPOSITED',
+        journalEntryId: 'journal-1',
+        depositedById: actor.userId,
+        depositedAt: new Date('2026-05-01T10:25:00.000Z'),
+      };
+      const close = buildCashierCloseFixture({
+        status: 'CLOSED',
+        activeSessionKey: null,
+        closedAt: new Date('2026-05-01T10:00:00.000Z'),
+      });
+      const destinationAccount = {
+        id: 'bank-1',
+        code: '1020',
+        name: 'Operating Bank',
+        type: 'ASSET',
+        isActive: true,
+      };
+      const cashAccount = {
+        id: 'cash-1',
+        code: '1010',
+        name: 'Cash in Hand',
+      };
+
+      (prisma.cashDeposit.findFirst as jest.Mock)
+        .mockResolvedValueOnce(submittedDeposit)
+        .mockResolvedValueOnce(submittedDeposit)
+        .mockResolvedValueOnce(depositedRecord);
+      (prisma.cashierClose.findFirst as jest.Mock)
+        .mockResolvedValueOnce(close)
+        .mockResolvedValueOnce({
+          id: close.id,
+          closeNumber: close.closeNumber,
+        });
+      (prisma.chartAccount.findFirst as jest.Mock)
+        .mockResolvedValueOnce(destinationAccount)
+        .mockResolvedValueOnce(destinationAccount);
+      (prisma.chartAccount.findUnique as jest.Mock).mockResolvedValue(
+        cashAccount,
+      );
+      (prisma.cashDeposit.update as jest.Mock).mockResolvedValue(
+        depositedRecord,
+      );
+
+      const result = await service.completeCashDeposit(
+        submittedDeposit.id,
+        { reason: 'Confirmed against bank deposit slip' },
+        actor as any,
+      );
+
+      expect(result.status).toBe('DEPOSITED');
+      expect(accountingPostingService.postManualJournal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceType: JournalSourceType.CONTRA_VOUCHER,
+          sourceId: submittedDeposit.id,
+          postingType: 'CASH_DEPOSIT',
+          lines: [
+            expect.objectContaining({
+              chartAccountId: destinationAccount.id,
+              debit: submittedDeposit.amount,
+            }),
+            expect.objectContaining({
+              chartAccountId: cashAccount.id,
+              credit: submittedDeposit.amount,
+            }),
+          ],
+        }),
+        expect.any(Object),
+        expect.any(Object),
+      );
+      expect(prisma.cashierClose.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: 'DEPOSITED',
+            depositId: submittedDeposit.id,
+          }),
+        }),
+      );
+    });
+  });
+
+  describe('decimal-string money amount guards', () => {
+    // The public write contracts carry money as decimal strings validated by
+    // @IsDecimal, which accepts a leading sign. Sign and precision are the
+    // service's responsibility, as they are for collectPayment.
+    const setupActor = {
+      ...actor,
+      permissions: [...actor.permissions, 'fees:discount'],
+    };
+
+    it('rejects a negative fee head default amount before persisting', async () => {
+      await expect(
+        service.createFeeHead(
+          {
+            code: 'TUIT',
+            name: 'Tuition',
+            frequency: 'MONTHLY',
+            defaultAmount: '-5000.00',
+          } as never,
+          setupActor as never,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.feeHead.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects a fee head amount with more than two decimal places', async () => {
+      await expect(
+        service.createFeeHead(
+          {
+            code: 'TUIT',
+            name: 'Tuition',
+            frequency: 'MONTHLY',
+            defaultAmount: '5000.005',
+          } as never,
+          setupActor as never,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.feeHead.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects a negative fee plan item amount before persisting', async () => {
+      await expect(
+        service.createFeePlan(
+          {
+            academicYearId: 'ay-1',
+            code: 'PLAN-1',
+            name: 'Plan 1',
+            items: [{ feeHeadId: 'fh-1', amount: '-1.00' }],
+          } as never,
+          setupActor as never,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.academicYear.findFirst).not.toHaveBeenCalled();
+      expect(prisma.feePlan.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects a negative discount amountOff before persisting', async () => {
+      await expect(
+        service.createDiscountRule(
+          {
+            name: 'Sibling',
+            reason: 'Sibling discount',
+            type: 'SIBLING',
+            amountOff: '-250.00',
+          } as never,
+          setupActor as never,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.discountRule.create).not.toHaveBeenCalled();
+    });
+
+    it('accepts a percentage-only discount whose unused amountOff arrives as null', async () => {
+      (prisma.feeHead.findFirst as jest.Mock).mockResolvedValue({
+        id: 'fh-1',
+        tenantId: 't1',
+      });
+      (prisma.discountRule.create as jest.Mock).mockResolvedValue({
+        id: 'disc-1',
+        name: 'Sibling',
+        type: 'SIBLING',
+        percentOff: new Prisma.Decimal('10.00'),
+        amountOff: null,
+      });
+
+      await expect(
+        service.createDiscountRule(
+          {
+            name: 'Sibling',
+            reason: 'Sibling discount',
+            type: 'SIBLING',
+            feeHeadId: 'fh-1',
+            percentOff: 10,
+            amountOff: null,
+          } as never,
+          setupActor as never,
+        ),
+      ).resolves.toEqual(
+        expect.objectContaining({ percentOff: '10.00', amountOff: null }),
+      );
+      expect(prisma.discountRule.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ amountOff: null }),
+        }),
+      );
+    });
+
+    it('rejects a non-positive waiver amount so a waiver can never raise an invoice total', async () => {
+      for (const amount of ['-100.00', '0.00']) {
+        await expect(
+          service.createWaiver(
+            {
+              studentId: 's1',
+              invoiceId: 'inv-1',
+              amount,
+              reason: 'Concession',
+            } as never,
+            setupActor as never,
+          ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      }
+      expect(prisma.student.findFirst).not.toHaveBeenCalled();
+      expect(prisma.feeWaiver.create).not.toHaveBeenCalled();
     });
   });
 });

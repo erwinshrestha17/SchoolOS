@@ -193,10 +193,10 @@ describe("M3 fees workspace contract", () => {
   it("uses school-friendly aging severity and removes decorative pulsing status", () => {
     const aging = read("components/finance/defaulter-aging-summary.tsx");
 
-    assert.match(aging, /severity: 'Recent'/);
-    assert.match(aging, /severity: 'Follow-up'/);
-    assert.match(aging, /severity: 'High priority'/);
-    assert.match(aging, /severity: 'Critical'/);
+    assert.match(aging, /severity: ["']Recent["']/);
+    assert.match(aging, /severity: ["']Follow-up["']/);
+    assert.match(aging, /severity: ["']High priority["']/);
+    assert.match(aging, /severity: ["']Critical["']/);
     assert.doesNotMatch(aging, /animate-pulse/);
   });
 

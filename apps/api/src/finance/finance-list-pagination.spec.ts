@@ -37,6 +37,7 @@ function createService() {
             studentSystemId: 'ST-001',
           },
           payments: [],
+          paymentAllocations: [],
         },
       ]),
       count: jest.fn().mockResolvedValue(3),

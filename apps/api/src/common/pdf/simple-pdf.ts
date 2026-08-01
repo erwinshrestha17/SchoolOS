@@ -776,6 +776,12 @@ export function buildTableReportPdf(input: {
     value: string | number;
     note?: string | null;
   }>;
+  /**
+   * Classification marking carried inside the document itself, so a downloaded
+   * or forwarded artifact stays marked even once it is separated from the
+   * export record that describes it.
+   */
+  watermark?: string | null;
   logo?: PdfImage | null;
 }) {
   const headers = Object.keys(input.rows[0] ?? {}).slice(
@@ -825,7 +831,13 @@ export function buildTableReportPdf(input: {
   contentParts.push(
     '48 76 m 540 76 l S',
     text(`Rows in export: ${input.rows.length}`, 48, 54, 8, 'F2'),
-    text('Protected SchoolOS report snapshot', 360, 54, 8, 'F1'),
+    text(
+      fitText(input.watermark ?? 'Protected SchoolOS report snapshot', 60),
+      48,
+      40,
+      8,
+      'F1',
+    ),
   );
 
   return buildPdfFromContent(

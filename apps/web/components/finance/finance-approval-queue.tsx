@@ -37,7 +37,7 @@ type PendingDecision =
       note: string;
     };
 
-const money = (value: string | number) =>
+const money = (value: string) =>
   new Intl.NumberFormat("en-NP", {
     style: "currency",
     currency: "NPR",

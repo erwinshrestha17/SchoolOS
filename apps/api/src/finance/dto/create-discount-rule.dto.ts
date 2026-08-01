@@ -1,5 +1,12 @@
 import { DiscountType } from '@prisma/client';
-import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import {
+  IsDecimal,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 
 export class CreateDiscountRuleDto {
   @IsString()
@@ -29,7 +36,6 @@ export class CreateDiscountRuleDto {
   percentOff?: number;
 
   @IsOptional()
-  @IsNumber()
-  @Min(0)
-  amountOff?: number;
+  @IsDecimal({ decimal_digits: '1,2', force_decimal: false })
+  amountOff?: string;
 }

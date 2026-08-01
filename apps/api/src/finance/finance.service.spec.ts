@@ -180,7 +180,7 @@ describe('finance production controls', () => {
           reason: '',
           type: 'MANUAL',
           feeHeadId: 'fee-head-1',
-          amountOff: 100,
+          amountOff: '100.00',
         },
         actor,
       ),
@@ -200,7 +200,7 @@ describe('finance production controls', () => {
         {
           studentId: 'student-1',
           invoiceId: invoice.id,
-          amount: 100,
+          amount: '100.00',
           reason: 'Hardship waiver',
         },
         actor,
@@ -219,7 +219,7 @@ describe('finance production controls', () => {
       service.createWaiver(
         {
           studentId: 'student-1',
-          amount: 100,
+          amount: '100.00',
           reason: '   ',
         },
         actor,
@@ -244,7 +244,7 @@ describe('finance production controls', () => {
         {
           studentId: 'student-1',
           invoiceId: invoice.id,
-          amount: 100,
+          amount: '100.00',
           reason: 'Scholarship correction',
         },
         actor,
@@ -271,7 +271,7 @@ describe('finance production controls', () => {
         {
           studentId: 'student-1',
           invoiceId: invoice.id,
-          amount: 100,
+          amount: '100.00',
           reason: 'Scholarship correction',
         },
         actor,

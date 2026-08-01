@@ -1,11 +1,10 @@
 import { FeeFrequency } from '@prisma/client';
 import {
   IsBoolean,
+  IsDecimal,
   IsEnum,
-  IsNumber,
   IsOptional,
   IsString,
-  Min,
 } from 'class-validator';
 
 export class CreateFeeHeadDto {
@@ -18,9 +17,8 @@ export class CreateFeeHeadDto {
   @IsEnum(FeeFrequency)
   frequency!: FeeFrequency;
 
-  @IsNumber()
-  @Min(0)
-  defaultAmount!: number;
+  @IsDecimal({ decimal_digits: '1,2', force_decimal: false })
+  defaultAmount!: string;
 
   @IsOptional()
   @IsBoolean()

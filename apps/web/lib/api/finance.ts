@@ -34,6 +34,7 @@ import type {
   ReportExportRequest,
   StudentCollectionContext,
   StudentFeeLedgerPage,
+  UnallocatedPaymentReport,
   WaiverRecord,
   DiscountRulePage,
   WaiverRecordPage,
@@ -291,6 +292,10 @@ export const financeApi = {
     request<PaymentMethodReport>(
       withQuery("/fees/reports/payment-methods", params ?? {}),
     ),
+  getUnallocatedPaymentReport: (params?: { page?: number; limit?: number }) =>
+    request<UnallocatedPaymentReport>(
+      withQuery("/fees/reports/unallocated-payments", params ?? {}),
+    ),
   getInvoiceRegister: (params?: {
     fromDate?: string;
     toDate?: string;
@@ -299,6 +304,8 @@ export const financeApi = {
     sectionId?: string;
     studentId?: string;
     feeHeadId?: string;
+    page?: number;
+    limit?: number;
   }) =>
     request<InvoiceRegisterReport>(
       withQuery("/fees/reports/invoices", params ?? {}),
@@ -308,6 +315,8 @@ export const financeApi = {
     toDate?: string;
     studentId?: string;
     paymentMethod?: string;
+    page?: number;
+    limit?: number;
   }) =>
     request<ReceiptRegisterReport>(
       withQuery("/fees/reports/receipts", params ?? {}),
@@ -316,6 +325,8 @@ export const financeApi = {
     fiscalYear?: string;
     fromDate?: string;
     toDate?: string;
+    page?: number;
+    limit?: number;
   }) =>
     request<ReceiptSequenceExceptionReport>(
       withQuery("/fees/reports/receipt-sequence-exceptions", params ?? {}),
@@ -324,6 +335,8 @@ export const financeApi = {
     fromDate?: string;
     toDate?: string;
     recordType?: "REFUND" | "REVERSAL";
+    page?: number;
+    limit?: number;
   }) =>
     request<RefundReversalRegisterReport>(
       withQuery("/fees/reports/refund-reversals", params ?? {}),
@@ -401,6 +414,13 @@ export const financeApi = {
     closedTo?: string | null;
     collectorUserId?: string | null;
     paymentMethod?: string | null;
+    status?:
+      | "OPEN"
+      | "COUNTED"
+      | "SUBMITTED"
+      | "APPROVED"
+      | "CLOSED"
+      | "DEPOSITED";
   }) =>
     request<{
       items: CashierCloseSummary[];

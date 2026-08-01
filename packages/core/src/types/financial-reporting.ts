@@ -144,13 +144,47 @@ export type FinancialReportRow = {
   drilldown?: FinancialReportDrilldown;
 };
 
-export type FinancialReportResponse<
-  TRow extends FinancialReportRow = FinancialReportRow,
-> = {
+export type FinancialReportPagination = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+};
+
+export type FinancialReportSourceFreshness = {
+  module: 'M3' | 'M7' | 'M11';
+  refreshedAt: string;
+  includesPending: boolean;
+};
+
+export type FinancialReportFiscalContext = {
+  fiscalYearId: string | null;
+  fiscalYearLabel: string | null;
+  fiscalPeriodId: string | null;
+  fiscalPeriodLabel: string | null;
+  accountingBasis: FinancialAccountingBasis;
+  postingBasis: FinancialPostingBasis;
+};
+
+export type FinancialReportNormalizedFilters = Readonly<
+  Record<string, string | readonly string[] | boolean | null>
+>;
+
+/**
+ * The versioned metadata every rendered P0 financial report must carry.
+ *
+ * Kept separate from {@link FinancialReportResponse} so a report with its own
+ * typed row shape can adopt the identical envelope without being forced into
+ * the generic `cells` table. The export path builds the same envelope, which is
+ * what keeps rendered and exported metadata in parity.
+ */
+export type FinancialReportEnvelope = {
   report: {
     id: FinancialReportId;
     definitionVersion: string;
     title: string;
+    family: FinancialReportFamily;
+    ownerModule: FinancialReportDefinition['ownerModule'];
     classification: FinancialReportClassification;
     requiresProfessionalVerification: boolean;
     professionalVerificationStatus:
@@ -158,34 +192,30 @@ export type FinancialReportResponse<
       | 'NEEDS_PROFESSIONAL_VERIFICATION'
       | 'VERIFIED';
   };
-  fiscalContext: {
-    fiscalYearId: string;
-    fiscalYearLabel: string;
-    fiscalPeriodId: string | null;
-    fiscalPeriodLabel: string | null;
-    accountingBasis: FinancialAccountingBasis;
-    postingBasis: FinancialPostingBasis;
-  };
-  normalizedFilters: Readonly<Record<string, string | readonly string[] | boolean>>;
+  fiscalContext: FinancialReportFiscalContext;
+  normalizedFilters: FinancialReportNormalizedFilters;
   generatedAt: string;
-  sourceFreshness: Array<{
-    module: 'M3' | 'M7' | 'M11';
-    refreshedAt: string;
-    includesPending: boolean;
-  }>;
+  sourceFreshness: readonly FinancialReportSourceFreshness[];
   validation: {
     status: FinancialReportValidationStatus;
     warnings: readonly string[];
   };
+  /** Report-wide backend-owned totals. Never the displayed page's totals. */
   totals: Readonly<Record<string, FinancialMoney>>;
-  rows: readonly TRow[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
+  pagination: FinancialReportPagination;
 };
+
+export type FinancialReportResponse<
+  TRow extends FinancialReportRow = FinancialReportRow,
+> = FinancialReportEnvelope & {
+  rows: readonly TRow[];
+};
+
+/**
+ * Bumped when a report's shape or derivation changes in a way that makes an
+ * older generated artifact non-comparable.
+ */
+export const FINANCIAL_REPORT_DEFINITION_VERSION = '1.0';
 
 const STANDARD_FORMATS = ['json', 'csv', 'pdf', 'xlsx'] as const;
 const ACCOUNTING_REPORT_PERMISSION = ['accounting:reports:read'] as const;
@@ -273,3 +303,47 @@ export const P0_FINANCIAL_REPORT_CATALOG = [
 export const P0_FINANCIAL_REPORT_IDS = P0_FINANCIAL_REPORT_CATALOG.map(
   ({ id }) => id,
 ) as readonly FinancialReportId[];
+
+export function findFinancialReportDefinition(
+  id: FinancialReportId,
+): FinancialReportDefinition | undefined {
+  return P0_FINANCIAL_REPORT_CATALOG.find(
+    (definition) => definition.id === id,
+  );
+}
+
+/**
+ * Statutory output stays a draft until an external Nepal-qualified review
+ * exists, so it is classified separately from ordinary confidential finance
+ * output rather than being presented as final.
+ */
+export function resolveFinancialReportClassification(
+  definition: Pick<FinancialReportDefinition, 'requiresProfessionalVerification'>,
+): FinancialReportClassification {
+  return definition.requiresProfessionalVerification
+    ? 'STATUTORY_DRAFT'
+    : 'CONFIDENTIAL';
+}
+
+export function resolveProfessionalVerificationStatus(
+  definition: Pick<FinancialReportDefinition, 'requiresProfessionalVerification'>,
+): FinancialReportEnvelope['report']['professionalVerificationStatus'] {
+  return definition.requiresProfessionalVerification
+    ? 'NEEDS_PROFESSIONAL_VERIFICATION'
+    : 'NOT_REQUIRED';
+}
+
+/**
+ * Deterministic filter normalization: undefined entries dropped, keys sorted,
+ * so the same logical query always produces the same recorded parameters in
+ * both the rendered envelope and the exported artifact.
+ */
+export function normalizeFinancialReportFilters(
+  filters: Readonly<Record<string, string | readonly string[] | boolean | null | undefined>>,
+): FinancialReportNormalizedFilters {
+  return Object.fromEntries(
+    Object.entries(filters)
+      .filter(([, value]) => value !== undefined)
+      .sort(([left], [right]) => left.localeCompare(right)),
+  ) as FinancialReportNormalizedFilters;
+}

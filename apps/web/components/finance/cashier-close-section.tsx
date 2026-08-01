@@ -210,7 +210,7 @@ export function CashierCloseSection() {
     });
   };
 
-  const formatCurrency = (amount: number | string) => {
+  const formatCurrency = (amount: string) => {
     return new Intl.NumberFormat("en-NP", {
       style: "currency",
       currency: "NPR",
@@ -297,16 +297,14 @@ export function CashierCloseSection() {
       <div className="grid gap-6 md:grid-cols-3">
         <CollectionStat
           label="Total Collection"
-          value={formatCurrency(
-            preview?.netCollected ?? preview?.totalCollected ?? 0,
-          )}
-          sub={`${preview?.paymentCount ?? preview?.transactionCount ?? 0} Transactions`}
+          value={formatCurrency(preview?.netCollected ?? "0.00")}
+          sub={`${preview?.paymentCount ?? 0} Transactions`}
           icon={<Wallet size={20} />}
           color="emerald"
         />
         <CollectionStat
           label="Cash in Hand"
-          value={formatCurrency(preview?.expectedCashAmount ?? 0)}
+          value={formatCurrency(preview?.expectedCashAmount ?? "0.00")}
           sub="Physical Handover"
           icon={<Banknote size={20} />}
           color="primary"
@@ -418,7 +416,9 @@ export function CashierCloseSection() {
                   <p className="text-xs font-semibold text-warning-700">
                     Variance:{" "}
                     {formatCurrency(
-                      (countedCashAmount ?? 0) - expectedCashAmount,
+                      ((countedCashAmount ?? 0) - expectedCashAmount).toFixed(
+                        2,
+                      ),
                     )}
                     . Explain it in the handover remarks.
                   </p>
@@ -763,21 +763,25 @@ export function CashierCloseSection() {
       <Dialog open={isConfirmingClose} onOpenChange={setIsConfirmingClose}>
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
-            <DialogTitle>Confirm lifecycle action</DialogTitle>
+            <DialogTitle>Confirm cashier close action</DialogTitle>
             <DialogDescription>
               {lifecycleActionLabel} for this Nepal school-day window. Every
               transition is recorded in the audit trail.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 rounded-xl border border-warning-100 bg-warning-50 p-4 text-sm text-warning-900">
-            <p>Expected cash: {formatCurrency(expectedCashAmount)}</p>
+            <p>
+              Expected cash: {formatCurrency(expectedCashAmount.toFixed(2))}
+            </p>
             <p>
               Counted cash:{" "}
               {countedCashAmount === null
                 ? "Not entered"
-                : formatCurrency(countedCashAmount)}
+                : formatCurrency(countedCashAmount.toFixed(2))}
             </p>
-            <p>Net collection: {formatCurrency(preview?.netCollected ?? 0)}</p>
+            <p>
+              Net collection: {formatCurrency(preview?.netCollected ?? "0.00")}
+            </p>
           </div>
           <DialogFooter>
             <Button

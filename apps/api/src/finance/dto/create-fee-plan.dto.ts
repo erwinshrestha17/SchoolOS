@@ -1,10 +1,9 @@
 import {
   ArrayMinSize,
   IsArray,
-  IsNumber,
+  IsDecimal,
   IsOptional,
   IsString,
-  Min,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -13,9 +12,8 @@ class CreateFeePlanItemDto {
   @IsString()
   feeHeadId!: string;
 
-  @IsNumber()
-  @Min(0)
-  amount!: number;
+  @IsDecimal({ decimal_digits: '1,2', force_decimal: false })
+  amount!: string;
 }
 
 export class CreateFeePlanDto {

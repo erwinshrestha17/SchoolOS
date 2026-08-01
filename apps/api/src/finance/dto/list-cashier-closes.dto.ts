@@ -1,4 +1,4 @@
-import { PaymentMethod } from '@prisma/client';
+import { CashierCloseStatus, PaymentMethod } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   IsDateString,
@@ -12,6 +12,10 @@ import {
 } from 'class-validator';
 
 export class ListCashierClosesDto {
+  @IsOptional()
+  @IsEnum(CashierCloseStatus)
+  status?: CashierCloseStatus;
+
   @IsOptional()
   @IsDateString()
   openedFrom?: string;

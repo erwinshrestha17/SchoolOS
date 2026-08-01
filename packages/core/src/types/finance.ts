@@ -1,4 +1,8 @@
 import type { PaginatedResponse } from "./common.js";
+import type {
+  FinancialReportDrilldown,
+  FinancialReportEnvelope,
+} from "./financial-reporting.js";
 
 export type FinanceMoneyAmount = string;
 
@@ -227,6 +231,8 @@ export type StudentFeeLedgerRow = {
   paymentId: string | null;
   receiptNumber: string | null;
   status: string | null;
+  /** Context-preserving link back to the originating source record. */
+  drilldown?: FinancialReportDrilldown;
 };
 
 export type StudentFeeLedger = {
@@ -248,21 +254,40 @@ export type StudentFeeLedger = {
   rows: StudentFeeLedgerRow[];
 };
 
-export type StudentFeeLedgerPage = StudentFeeLedger & {
-  total: number;
-  page: number;
-  limit: number;
-  hasNextPage: boolean;
-  filters: {
-    fromDate: string | null;
-    toDate: string | null;
-    academicYearId: string | null;
-    invoiceStatus: string | null;
-    transactionType: StudentFeeLedgerRow["type"] | null;
-    sortDirection: "asc" | "desc";
-  };
-  generatedAt: string;
+/** Totals for the rows on the displayed page only. Never official figures. */
+export type StudentFeeLedgerPageTotals = {
+  rowCount: number;
+  debit: FinanceMoneyAmount;
+  credit: FinanceMoneyAmount;
 };
+
+/** Backend-owned totals for the whole filtered window, across every page. */
+export type StudentFeeLedgerWindowTotals = StudentFeeLedgerPageTotals;
+
+/**
+ * FEE-01 Student Fee Ledger.
+ *
+ * Carries the canonical versioned report metadata envelope alongside its own
+ * typed rows. `generatedAt`, `pagination`, and report-wide `totals` come from
+ * the envelope; `pageTotals` describes only the rows actually displayed.
+ */
+export type StudentFeeLedgerPage = StudentFeeLedger &
+  FinancialReportEnvelope & {
+    total: number;
+    page: number;
+    limit: number;
+    hasNextPage: boolean;
+    pageTotals: StudentFeeLedgerPageTotals;
+    windowTotals: StudentFeeLedgerWindowTotals;
+    filters: {
+      fromDate: string | null;
+      toDate: string | null;
+      academicYearId: string | null;
+      invoiceStatus: string | null;
+      transactionType: StudentFeeLedgerRow["type"] | null;
+      sortDirection: "asc" | "desc";
+    };
+  };
 
 export type PaymentReceipt = {
   paymentId: string;
@@ -349,8 +374,6 @@ export type CashierClosePreview = {
   refundCount: number;
   firstReceiptNumber: string | null;
   lastReceiptNumber: string | null;
-  totalCollected?: number;
-  transactionCount?: number;
   byMethod?: Array<{
     method: string;
     count: number;
@@ -498,6 +521,19 @@ export type FeePlanSummary = {
   academicYearId: string;
   classId: string | null;
   isActive: boolean;
+  academicYear?: {
+    id: string;
+    name: string;
+  };
+  class?: {
+    id: string;
+    name: string;
+  } | null;
+  items?: Array<{
+    id: string;
+    feeHeadId: string;
+    amount: FinanceMoneyAmount;
+  }>;
 };
 
 export type FeeBillingRun = {
@@ -629,10 +665,17 @@ export type InvoiceRegisterReport = {
   }>;
   summary: {
     totalInvoices: number;
+    displayedInvoices: number;
     totalGrossAmount: FinanceMoneyAmount;
     totalNetAmount: FinanceMoneyAmount;
     totalPaidAmount: FinanceMoneyAmount;
     totalBalanceAmount: FinanceMoneyAmount;
+  };
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
   };
 };
 
@@ -654,9 +697,16 @@ export type ReceiptRegisterReport = {
   }>;
   summary: {
     totalReceipts: number;
+    displayedReceipts: number;
     totalAmount: FinanceMoneyAmount;
     totalRefundedAmount: FinanceMoneyAmount;
     totalNetAmount: FinanceMoneyAmount;
+  };
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
   };
 };
 
@@ -680,6 +730,12 @@ export type ReceiptSequenceExceptionReport = {
     duplicateCount: number;
     outOfSequenceCount: number;
     reversedPaymentCount: number;
+  };
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
   };
 };
 
@@ -707,6 +763,44 @@ export type RefundReversalRegisterReport = {
     reversalCount: number;
     totalAmount: FinanceMoneyAmount;
   };
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+};
+
+export type UnallocatedPaymentReport = {
+  rows: Array<{
+    paymentId: string;
+    paymentDate: string;
+    receiptNumber: string | null;
+    studentId: string;
+    studentSystemId: string;
+    studentName: string;
+    paymentMethod: string;
+    paymentStatus: string;
+    referenceNumber: string | null;
+    originalAmount: FinanceMoneyAmount;
+    unallocatedBalance: FinanceMoneyAmount;
+    balanceType: "ADVANCE" | "UNALLOCATED";
+    journalEntryId: string | null;
+    journalEntryNumber: string | null;
+    postingStatus: "POSTED" | "PENDING";
+  }>;
+  summary: {
+    totalPayments: number;
+    totalUnallocatedAmount: FinanceMoneyAmount;
+    displayedUnallocatedAmount: FinanceMoneyAmount;
+  };
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+  generatedAt: string;
 };
 
 export type PaymentMethodReport = {

@@ -18,6 +18,7 @@ import {
   TeacherScopeService,
 } from '../teacher-scope/teacher-scope.service';
 import { SUSPENDED_TENANT_MESSAGE } from '../plans/tenant-access.constants';
+import { FINANCIAL_REPORT_DEFINITION_VERSION } from '@schoolos/core';
 import sharp from 'sharp';
 import ExcelJS from 'exceljs';
 import { createHash } from 'node:crypto';
@@ -221,6 +222,55 @@ describe('ReportsService', () => {
                 },
               ],
             }),
+            // FEE-01 export totals come from a single minimal page, since the
+            // window totals are report-wide aggregates.
+            getStudentFeeLedgerPage: jest.fn().mockResolvedValue({
+              openingBalance: '0.00',
+              totalInvoiced: '1000.00',
+              totalPaid: '0.00',
+              totalWaived: '0.00',
+              totalRefunded: '0.00',
+              outstandingBalance: '1000.00',
+              windowTotals: { rowCount: 1, debit: '1000.00', credit: '0.00' },
+              rows: [],
+            }),
+            // FEE-01 exports drain the enveloped projection, so the mock
+            // mirrors that shape including backend-owned window totals.
+            getStudentFeeLedgerExport: jest.fn().mockResolvedValue({
+              student: {
+                studentSystemId: 'SCH-001',
+                name: 'Erwin Shrestha',
+                className: 'Grade 10',
+                sectionName: 'A',
+                guardianName: 'John Doe',
+                guardianPhone: '9800000000',
+              },
+              openingBalance: '0.00',
+              totalInvoiced: '1000.00',
+              totalPaid: '0.00',
+              totalWaived: '0.00',
+              totalRefunded: '0.00',
+              outstandingBalance: '1000.00',
+              windowTotals: {
+                rowCount: 1,
+                debit: '1000.00',
+                credit: '0.00',
+              },
+              rows: [
+                {
+                  date: new Date('2024-05-01'),
+                  type: 'INVOICE',
+                  reference: 'INV-001',
+                  description: 'Tuition Fee',
+                  debit: '1000.00',
+                  credit: '0.00',
+                  runningBalance: '1000.00',
+                  invoiceNumber: 'INV-001',
+                  receiptNumber: null,
+                  status: 'ISSUED',
+                },
+              ],
+            }),
           },
         },
         {
@@ -298,6 +348,55 @@ describe('ReportsService', () => {
     expect(reports.map((r) => r.key)).toContain('class-roster');
     expect(reports.map((r) => r.key)).toContain('monthly-attendance-register');
     expect(reports.map((r) => r.key)).toContain('student-fee-ledger');
+  });
+
+  it('exposes the central cash-control reports to Accountant and financial_auditor only with both report permissions', () => {
+    const CASH_CONTROL_REPORT_KEYS = [
+      'cashier-close-report',
+      'cash-deposit-report',
+      'undeposited-collection-report',
+      'cash-variance-report',
+      'unallocated-payment-report',
+    ];
+    // Both presets carry reports:export + accounting:reports:read.
+    const financePermissions = [
+      'reports:read',
+      'reports:export',
+      'accounting:reports:read',
+    ];
+
+    for (const roles of [['accountant'], ['financial_auditor']]) {
+      const keys = service
+        .listReports({ ...actor, roles, permissions: financePermissions })
+        .map((report) => report.key);
+      for (const key of CASH_CONTROL_REPORT_KEYS) {
+        expect(keys).toContain(key);
+      }
+    }
+
+    // Missing accounting:reports:read must fail closed, export permission alone is not enough.
+    const withoutAccountingReports = service
+      .listReports({
+        ...actor,
+        roles: ['teacher'],
+        permissions: ['reports:read', 'reports:export'],
+      })
+      .map((report) => report.key);
+    for (const key of CASH_CONTROL_REPORT_KEYS) {
+      expect(withoutAccountingReports).not.toContain(key);
+    }
+
+    // Missing reports:export must fail closed too.
+    const withoutExport = service
+      .listReports({
+        ...actor,
+        roles: ['principal'],
+        permissions: ['reports:read', 'accounting:reports:read'],
+      })
+      .map((report) => report.key);
+    for (const key of CASH_CONTROL_REPORT_KEYS) {
+      expect(withoutExport).not.toContain(key);
+    }
   });
 
   it('filters out reports user cannot access', () => {
@@ -472,6 +571,98 @@ describe('ReportsService', () => {
     expect(audit.record).toHaveBeenCalled();
   });
 
+  it('records the FEE-01 export with catalog-owned metadata matching the rendered envelope', async () => {
+    await service.exportReport(
+      'student-fee-ledger',
+      {
+        format: 'csv',
+        filters: { studentId: 's1', toDate: '2026-06-30', fromDate: undefined },
+      },
+      actor,
+    );
+
+    expect(prisma.reportExport.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reportKey: 'student-fee-ledger',
+          // The registry key is a route slug; this is the catalog linkage.
+          financialReportId: 'FEE-01',
+          definitionVersion: FINANCIAL_REPORT_DEFINITION_VERSION,
+          classification: 'CONFIDENTIAL',
+        }),
+      }),
+    );
+
+    const recorded = (prisma.reportExport.create as jest.Mock).mock
+      .calls[0][0] as {
+      data: {
+        normalizedParameters: Record<string, unknown>;
+        watermark: string;
+        displayedTotals: Record<string, string>;
+        rowCount: number;
+      };
+    };
+    // Displayed-total parity: the stored artifact records the same
+    // backend-owned window totals the rendered report shows, and the row count
+    // it claims matches the rows actually written.
+    expect(recorded.data.displayedTotals).toEqual({
+      rowCount: '1',
+      debit: '1000.00',
+      credit: '0.00',
+      openingBalance: '0.00',
+      totalInvoiced: '1000.00',
+      totalPaid: '0.00',
+      totalWaived: '0.00',
+      totalRefunded: '0.00',
+      outstandingBalance: '1000.00',
+    });
+    expect(String(recorded.data.rowCount)).toBe(
+      recorded.data.displayedTotals.rowCount,
+    );
+    // Same normalization rule as the rendered envelope: undefined dropped, keys sorted.
+    expect(Object.keys(recorded.data.normalizedParameters)).toEqual([
+      'studentId',
+      'toDate',
+    ]);
+    expect(recorded.data.watermark).toContain('CONFIDENTIAL');
+  });
+
+  it('classifies a statutory report as STATUTORY_DRAFT once it is linked to the catalog', () => {
+    // Regression guard: metadata used to be keyed off the registry slug, which
+    // never equals a catalog ID, so every export -- including TDS and tax
+    // reports -- was silently classified CONFIDENTIAL.
+    const buildExportMetadata = (
+      service as unknown as {
+        buildExportMetadata: (
+          definition: { key: string; financialReportId?: string },
+          filters: Record<string, unknown>,
+          actor: AuthContext,
+        ) => { financialReportId: string | null; classification: string };
+      }
+    ).buildExportMetadata.bind(service);
+
+    expect(
+      buildExportMetadata(
+        { key: 'tds-deduction-report', financialReportId: 'TAX-01' },
+        {},
+        actor,
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        financialReportId: 'TAX-01',
+        classification: 'STATUTORY_DRAFT',
+      }),
+    );
+
+    // An unlinked, non-financial export stays confidential with no catalog id.
+    expect(buildExportMetadata({ key: 'student-roster' }, {}, actor)).toEqual(
+      expect.objectContaining({
+        financialReportId: null,
+        classification: 'CONFIDENTIAL',
+      }),
+    );
+  });
+
   it('exports finance reports as a real XLSX workbook', async () => {
     const result = await service.exportReport(
       'student-fee-ledger',
@@ -492,6 +683,57 @@ describe('ReportsService', () => {
     const worksheet = workbook.getWorksheet('Report');
     expect(worksheet?.getCell('A1').value).toBe('Student ID');
     expect(worksheet?.getCell('A2').value).toBe('SCH-001');
+  });
+
+  it('carries the classification watermark and control totals inside the XLSX artifact', async () => {
+    const result = await service.exportReport(
+      'student-fee-ledger',
+      { format: 'xlsx', filters: { studentId: 's1' } },
+      actor,
+    );
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(Uint8Array.from(result.content as Buffer).buffer);
+
+    // The data grid still starts at row 1 so it stays machine-readable.
+    expect(workbook.getWorksheet('Report')?.getCell('A1').value).toBe(
+      'Student ID',
+    );
+
+    const metaSheet = workbook.getWorksheet('Report Metadata');
+    expect(metaSheet).toBeDefined();
+
+    const metadata = new Map<string, unknown>();
+    metaSheet?.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return;
+      metadata.set(String(row.getCell(1).value), row.getCell(2).value);
+    });
+
+    expect(String(metadata.get('Classification'))).toContain('CONFIDENTIAL');
+    expect(String(metadata.get('Classification'))).toContain(actor.tenantSlug);
+    // Backend-owned totals travel inside the file, not just beside it.
+    expect(metadata.get('outstandingBalance')).toBe('1000.00');
+    expect(metadata.get('totalInvoiced')).toBe('1000.00');
+    expect(metadata.get('rowCount')).toBe('1');
+  });
+
+  it('carries the classification watermark and control totals inside the PDF artifact', async () => {
+    const result = await service.exportReport(
+      'student-fee-ledger',
+      { format: 'pdf', filters: { studentId: 's1' } },
+      actor,
+    );
+
+    expect(result.contentType).toBe('application/pdf');
+    const pdf = (result.content as Buffer).toString('latin1');
+    expect(pdf.startsWith('%PDF')).toBe(true);
+
+    // Text is drawn as literal PDF strings, so the marking is assertable.
+    expect(pdf).toContain('CONFIDENTIAL');
+    expect(pdf).toContain('CONTROL TOTALS');
+    expect(pdf).toContain('OUTSTANDINGBALANCE');
+    expect(pdf).toContain('1000.00');
+    expect(pdf).toContain('Rows in export: 1');
   });
 
   it('exports academic-cas-summary in CSV format', async () => {

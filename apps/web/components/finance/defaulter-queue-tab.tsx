@@ -6,10 +6,11 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { SectionCard } from "@/components/ui/section-card";
-import { Button } from '@/components/ui/button';
-import { PermissionDenied } from '@/components/ui/permission-denied';
+import { Button } from "@/components/ui/button";
+import { PermissionDenied } from "@/components/ui/permission-denied";
 import { Loader2, Send, Download, Check, AlertCircle } from "lucide-react";
 import { useSession } from "@/components/session-provider";
+import type { DefaulterReminderResult } from "@schoolos/core";
 
 export function DefaulterQueueTab() {
   const { hasPermissions } = useSession();
@@ -29,7 +30,8 @@ export function DefaulterQueueTab() {
   );
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
   const [isExporting, setIsExporting] = useState(false);
-  const [reminderResult, setReminderResult] = useState<any | null>(null);
+  const [reminderResult, setReminderResult] =
+    useState<DefaulterReminderResult | null>(null);
 
   // Queries
   const classesQuery = useQuery({
@@ -94,7 +96,7 @@ export function DefaulterQueueTab() {
       setSelectedInvoiceIds([]);
       setTimeout(() => setReminderResult(null), 5000);
     },
-    mutationFn: (body: any) => api.sendDefaulterReminders(body),
+    mutationFn: api.sendDefaulterReminders,
   });
 
   const onExportAgingCsv = async () => {
@@ -133,7 +135,7 @@ export function DefaulterQueueTab() {
     }
   };
 
-  const formatCurrency = (amount: string | number) => {
+  const formatCurrency = (amount: string) => {
     return new Intl.NumberFormat("en-NP", {
       style: "currency",
       currency: "NPR",
@@ -149,18 +151,18 @@ export function DefaulterQueueTab() {
       description="Track outstanding bills, filter by class/fees, and dispatch notification reminders."
       headerAction={
         canManage ? (
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            disabled={isExporting}
-            onClick={onExportAgingCsv}
-            className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-black text-slate-600 shadow-sm"
-          >
-            <Download size={14} />
-            {isExporting ? "Exporting..." : "Export Queue"}
-          </Button>
-        </div>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isExporting}
+              onClick={onExportAgingCsv}
+              className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-black text-slate-600 shadow-sm"
+            >
+              <Download size={14} />
+              {isExporting ? "Exporting..." : "Export Queue"}
+            </Button>
+          </div>
         ) : undefined
       }
     >
@@ -249,34 +251,37 @@ export function DefaulterQueueTab() {
               />
             ) : (
               <>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={defaulters.length === 0}
-              onClick={handleSelectAll}
-              className="rounded-xl px-4 py-2 text-xs font-bold"
-            >
-              {selectedInvoiceIds.length === defaulters.length
-                ? "Deselect All"
-                : "Select All"}
-            </Button>
-            <Button
-              type="button"
-              disabled={
-                selectedInvoiceIds.length === 0 || reminderMutation.isPending
-              }
-              onClick={() =>
-                reminderMutation.mutate({
-                  invoiceIds: selectedInvoiceIds,
-                  channels: ["EMAIL", "SMS", "PUSH"],
-                  message: "Fee payment reminder from SchoolOS.",
-                })
-              }
-              className="inline-flex items-center gap-2 rounded-xl !bg-[var(--color-mod-fees-accent)] px-4 py-2 text-xs font-black uppercase tracking-widest text-white hover:!bg-[var(--color-mod-fees-text)]"
-            >
-              <Send size={12} />
-              {reminderMutation.isPending ? "Sending..." : "Remind Selected"}
-            </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={defaulters.length === 0}
+                  onClick={handleSelectAll}
+                  className="rounded-xl px-4 py-2 text-xs font-bold"
+                >
+                  {selectedInvoiceIds.length === defaulters.length
+                    ? "Deselect All"
+                    : "Select All"}
+                </Button>
+                <Button
+                  type="button"
+                  disabled={
+                    selectedInvoiceIds.length === 0 ||
+                    reminderMutation.isPending
+                  }
+                  onClick={() =>
+                    reminderMutation.mutate({
+                      invoiceIds: selectedInvoiceIds,
+                      channels: ["EMAIL", "SMS", "PUSH"],
+                      message: "Fee payment reminder from SchoolOS.",
+                    })
+                  }
+                  className="inline-flex items-center gap-2 rounded-xl !bg-[var(--color-mod-fees-accent)] px-4 py-2 text-xs font-black uppercase tracking-widest text-white hover:!bg-[var(--color-mod-fees-text)]"
+                >
+                  <Send size={12} />
+                  {reminderMutation.isPending
+                    ? "Sending..."
+                    : "Remind Selected"}
+                </Button>
               </>
             )}
           </div>
