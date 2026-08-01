@@ -71,7 +71,9 @@ export class ReportsProcessor extends WorkerHost {
             where: { id: exportId },
             data: {
               status: 'FAILED',
-              errorSummary: message,
+              errorSummary: 'Report generation failed',
+              failureDetail:
+                'The report could not be generated. Retry the export or contact an authorized school administrator.',
               completedAt: new Date(),
             },
           });
@@ -87,6 +89,7 @@ export class ReportsProcessor extends WorkerHost {
         data: {
           status: 'FAILED',
           errorSummary: SUSPENDED_TENANT_MESSAGE,
+          failureDetail: SUSPENDED_TENANT_MESSAGE,
           completedAt: new Date(),
         },
       });

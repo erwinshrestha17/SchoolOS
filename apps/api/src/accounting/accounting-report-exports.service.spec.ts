@@ -621,23 +621,34 @@ describe('AccountingReportExportsService', () => {
     const methods = Object.getOwnPropertyNames(
       Object.getPrototypeOf(service),
     ).filter((m) => m.startsWith('export'));
-    expect(methods.length).toBe(14);
-
-    // Each method name corresponds to a report service method
-    expect(methods).toContain('exportTrialBalanceCsv');
-    expect(methods).toContain('exportGeneralLedgerCsv');
-    expect(methods).toContain('exportCashBookCsv');
-    expect(methods).toContain('exportIncomeStatementCsv');
-    expect(methods).toContain('exportBalanceSheetCsv');
-    expect(methods).toContain('exportTaxSummaryCsv');
-    expect(methods).toContain('exportTrialBalancePdf');
-    expect(methods).toContain('exportGeneralLedgerPdf');
-    expect(methods).toContain('exportCashBookPdf');
-    expect(methods).toContain('exportIncomeStatementPdf');
-    expect(methods).toContain('exportBalanceSheetPdf');
-    expect(methods).toContain('exportTaxSummaryPdf');
-    expect(methods).toContain('exportBankReconciliationCsv');
-    expect(methods).toContain('exportBankReconciliationPdf');
+    expect(methods.sort()).toEqual(
+      [
+        'exportBalanceSheetCsv',
+        'exportBalanceSheetPdf',
+        'exportBankBookCsv',
+        'exportBankBookPdf',
+        'exportBankReconciliationCsv',
+        'exportBankReconciliationPdf',
+        'exportBudgetVsActualCsv',
+        'exportBudgetVsActualPdf',
+        'exportCashBookCsv',
+        'exportCashBookPdf',
+        'exportCashFlowStatementCsv',
+        'exportCashFlowStatementPdf',
+        'exportFailedUnpostedCsv',
+        'exportFailedUnpostedPdf',
+        'exportGeneralLedgerCsv',
+        'exportGeneralLedgerPdf',
+        'exportIncomeStatementCsv',
+        'exportIncomeStatementPdf',
+        'exportJournalRegisterCsv',
+        'exportJournalRegisterPdf',
+        'exportTaxSummaryCsv',
+        'exportTaxSummaryPdf',
+        'exportTrialBalanceCsv',
+        'exportTrialBalancePdf',
+      ].sort(),
+    );
   });
 
   it('exports a valid Trial Balance PDF and records a protected snapshot', async () => {

@@ -162,7 +162,7 @@ describe('OperationalSummaryService dashboard persona projection', () => {
       'm4_academics',
     );
     expect(summary.modules.map((module) => module.module)).not.toContain(
-      'm9_accounting',
+      'm11_accounting',
     );
   });
 
@@ -186,7 +186,7 @@ describe('OperationalSummaryService dashboard persona projection', () => {
 
     expect(summary.compositionPersona).toBe('accountant');
     expect(summary.modules.map((module) => module.module)).toEqual(
-      expect.arrayContaining(['m3_fees', 'm9_accounting', 'm7_hr_payroll']),
+      expect.arrayContaining(['m3_fees', 'm11_accounting', 'm7_hr_payroll']),
     );
     expect(summary.modules.map((module) => module.module)).not.toContain(
       'm1_students',

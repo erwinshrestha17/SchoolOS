@@ -390,7 +390,9 @@ function CashierCloseReportPanel() {
                       {row.closeNumber}
                     </td>
                     <td className="px-5 py-3.5 text-slate-600">
-                      {formatBsDateTime(row.closedAt)}
+                      {row.closedAt
+                        ? formatBsDateTime(row.closedAt)
+                        : "Session open"}
                     </td>
                     <td className="px-5 py-3.5 text-slate-700">
                       {row.collectorUser?.email ?? "All cashiers"}

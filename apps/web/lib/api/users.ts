@@ -9,7 +9,9 @@ export type SchoolUserSummary = {
   phone: string | null;
   status: SchoolUserStatus;
   mustChangePassword: boolean;
-  roles: Array<Pick<RoleSummary, "id" | "name">>;
+  roles: Array<
+    Pick<RoleSummary, "id" | "name"> & { expiresAt: string | null }
+  >;
   profileType: "staff" | "student" | "user";
   staffId: string | null;
   studentId: string | null;

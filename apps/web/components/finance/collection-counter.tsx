@@ -46,7 +46,7 @@ interface CollectionCounterProps {
   invoices: InvoiceSummary[];
   onCollect: (
     invoiceId: string,
-    amount: number,
+    amount: string,
     method: string,
     reference?: string,
     remarks?: string,
@@ -64,12 +64,12 @@ interface CollectionCounterProps {
   onPageChange?: (page: number) => void;
 }
 
-const formatCurrency = (amount: number) => {
+const formatCurrency = (amount: number | string) => {
   return new Intl.NumberFormat("en-NP", {
     style: "currency",
     currency: "NPR",
     maximumFractionDigits: 0,
-  }).format(amount);
+  }).format(Number(amount));
 };
 
 const formatDate = (value: string) => formatBsDate(value);
@@ -187,7 +187,7 @@ export function CollectionCounter({
 
   useEffect(() => {
     if (!invoiceDetailQuery.data) return;
-    setAmount(invoiceDetailQuery.data.outstandingAmount);
+    setAmount(Number(invoiceDetailQuery.data.outstandingAmount));
   }, [invoiceDetailQuery.data]);
 
   return (
@@ -623,7 +623,7 @@ export function CollectionCounter({
                           invoiceDetailQuery.isLoading ||
                           !invoiceDetailQuery.data ||
                           amount <= 0 ||
-                          amount > invoiceDetailQuery.data.outstandingAmount
+                          amount > Number(invoiceDetailQuery.data.outstandingAmount)
                         }
                         className="flex min-h-11 items-center gap-2 whitespace-nowrap rounded-lg !bg-[var(--color-mod-fees-accent)] px-5 text-sm font-semibold text-white shadow-sm hover:!bg-[var(--color-mod-fees-text)]"
                       >
@@ -774,7 +774,7 @@ export function CollectionCounter({
                 setIsConfirmingPayment(false);
                 onCollect(
                   selectedInvoice.id,
-                  amount,
+                  amount.toFixed(2),
                   method,
                   reference,
                   remarks,

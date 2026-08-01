@@ -297,6 +297,16 @@ model ReportExport {
   fileAssetId  String?
   requestedBy  String?
   errorSummary String?
+  normalizedParameters Json             @default("{}")
+  rowCount      Int?
+  displayedTotals Json                  @default("{}")
+  definitionVersion String              @default("1.0")
+  checksum      String?
+  classification String                 @default("CONFIDENTIAL")
+  watermark     String?
+  expiresAt     DateTime?
+  failureDetail String?
+  auditEventId  String?
   createdAt    DateTime           @default(now())
   completedAt  DateTime?
 
@@ -307,6 +317,9 @@ model ReportExport {
   @@index([tenantId, reportKey, createdAt])
   @@index([tenantId, requestedBy, createdAt])
   @@index([tenantId, fileAssetId])
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, expiresAt])
+  @@index([tenantId, checksum])
 }
 
 model TenantOnboardingChecklistOverride {

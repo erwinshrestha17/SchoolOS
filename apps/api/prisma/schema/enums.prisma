@@ -105,6 +105,7 @@ enum JournalSourceType {
   INVOICE
   FEE_PAYMENT
   PAYMENT_REFUND
+  PAYMENT_ALLOCATION
   PAYROLL
   PAYROLL_RUN
   PAYROLL_DISBURSEMENT
@@ -630,6 +631,92 @@ enum AccountingPeriodStatus {
   CLOSED
 }
 
+enum AccountingPostingBatchStatus {
+  DRAFT
+  READY
+  POSTING
+  POSTED
+  FAILED
+  REVERSED
+}
+
+enum AccountingPostingItemStatus {
+  READY
+  POSTED
+  FAILED
+  SKIPPED
+}
+
+enum CashierCloseStatus {
+  OPEN
+  COUNTED
+  SUBMITTED
+  APPROVED
+  CLOSED
+  DEPOSITED
+}
+
+enum PaymentAllocationType {
+  INVOICE
+  ADVANCE
+  UNALLOCATED
+  REFUND
+  REVERSAL
+  REALLOCATION
+}
+
+enum FinanceVendorStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum FinanceExpenseStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  POSTED
+  REVERSED
+}
+
+enum FinancePayableStatus {
+  OPEN
+  PARTIALLY_PAID
+  PAID
+  VOID
+}
+
+enum BankReconciliationStatus {
+  OPEN
+  FINALIZED
+  REOPENED
+}
+
+enum BankReconciliationMatchType {
+  EXACT
+  SUGGESTED
+  TIMING_DIFFERENCE
+  ADJUSTMENT
+  MANUAL
+}
+
+enum BankReconciliationMatchStatus {
+  MATCHED
+  UNMATCHED
+}
+
+enum CashDepositStatus {
+  DRAFT
+  SUBMITTED
+  DEPOSITED
+  REVERSED
+}
+
+enum PayrollAccountingSnapshotStatus {
+  FROZEN
+  POSTED
+  CORRECTED
+}
+
 enum FiscalYearStatus {
   OPEN
   CLOSED
@@ -1145,6 +1232,7 @@ enum ApprovalWorkflowType {
   EMERGENCY_HIGH_IMPACT_NOTICE
   PLATFORM_SUPPORT_OVERRIDE
   ADMISSION_CASE
+  FISCAL_PERIOD_REOPEN
 }
 
 enum ApprovalRequestStatus {

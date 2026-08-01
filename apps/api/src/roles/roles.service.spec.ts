@@ -145,8 +145,8 @@ describe('RolesService authorization cache invalidation', () => {
         createMany: jest.fn().mockResolvedValue({ count: 2 }),
       },
       userRole: {
-        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
-        createMany: jest.fn().mockResolvedValue({ count: 1 }),
+        update: jest.fn().mockResolvedValue({}),
+        create: jest.fn().mockResolvedValue({ id: 'assignment-1' }),
         findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn().mockResolvedValue(null),
         count: jest.fn().mockResolvedValue(2),
@@ -155,6 +155,9 @@ describe('RolesService authorization cache invalidation', () => {
         findFirst: jest.fn().mockResolvedValue({ id: 'user-9' }),
         findUnique: jest.fn().mockResolvedValue({ id: 'user-9' }),
       },
+      $transaction: jest.fn(async (work: (tx: unknown) => Promise<unknown>) =>
+        work(prisma),
+      ),
       ...overrides,
     };
     const auditService = { record: jest.fn().mockResolvedValue({}) };
@@ -208,9 +211,9 @@ describe('RolesService authorization cache invalidation', () => {
   it('invalidates only after the write has been committed', async () => {
     const order: string[] = [];
     const { service, authzCache, prisma } = buildService();
-    (prisma.userRole.createMany as jest.Mock).mockImplementation(async () => {
+    (prisma.userRole.create as jest.Mock).mockImplementation(async () => {
       order.push('write');
-      return { count: 1 };
+      return { id: 'assignment-1' };
     });
     authzCache.invalidateUser.mockImplementation(async () => {
       order.push('invalidate');
@@ -224,5 +227,74 @@ describe('RolesService authorization cache invalidation', () => {
     // Invalidating before the write would let a concurrent request re-populate
     // the cache from the pre-write state.
     expect(order).toEqual(['write', 'invalidate']);
+  });
+
+  it('reports finance authority blocked when no Accountant is designated', async () => {
+    const prisma = {
+      role: { findMany: jest.fn().mockResolvedValue([]) },
+      userRole: { count: jest.fn().mockResolvedValue(0) },
+    };
+    const service = new RolesService(
+      prisma as never,
+      { record: jest.fn() } as never,
+      authzCacheDouble(),
+    );
+
+    const preview = await service.previewFinancePermissionReconciliation(actor);
+
+    expect(preview.status).toBe('BLOCKED');
+    expect(preview.financeAuthorityLocked).toBe(true);
+    expect(preview.designatedFinanceUserCount).toBe(0);
+    expect(preview.changes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ roleName: 'admin', missingRole: true }),
+        expect.objectContaining({ roleName: 'accountant', missingRole: true }),
+      ]),
+    );
+  });
+
+  it('applies preset reconciliation without assigning a finance role to a user', async () => {
+    const authzCache = {
+      invalidateUser: jest.fn(),
+      invalidateTenant: jest.fn().mockResolvedValue(undefined),
+    };
+    const audit = { record: jest.fn().mockResolvedValue({ id: 'audit-1' }) };
+    const prisma = {
+      role: { findMany: jest.fn().mockResolvedValue([]) },
+      userRole: {
+        count: jest.fn().mockResolvedValue(0),
+        create: jest.fn(),
+      },
+      permission: { findMany: jest.fn().mockResolvedValue([]) },
+      rolePermission: {
+        deleteMany: jest.fn(),
+        createMany: jest.fn(),
+      },
+      $transaction: jest.fn(async (work: (tx: unknown) => Promise<unknown>) =>
+        work(prisma),
+      ),
+    };
+    const service = new RolesService(
+      prisma as never,
+      audit as never,
+      authzCache as never,
+    );
+
+    const result = await service.reconcileFinancePermissions(
+      'Owner-approved P0 finance boundary',
+      actor,
+    );
+
+    expect(result.status).toBe('BLOCKED');
+    expect(prisma.userRole.create).not.toHaveBeenCalled();
+    expect(authzCache.invalidateTenant).toHaveBeenCalledWith('tenant-1');
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'reconcile_finance_permissions',
+        after: expect.objectContaining({
+          userRoleAssignmentsChanged: false,
+        }),
+      }),
+    );
   });
 });

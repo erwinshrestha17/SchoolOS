@@ -104,6 +104,7 @@ model Invoice {
   billingRun    FeeBillingRun? @relation(fields: [billingRunId], references: [id])
   lines         InvoiceLine[]
   payments      Payment[]
+  paymentAllocations PaymentAllocation[]
   onlinePaymentIntents OnlinePaymentIntent[]
   libraryIssues LibraryIssue[]
   schoolServiceRequests SchoolServiceRequest[]
@@ -135,7 +136,7 @@ model Payment {
   id              String        @id @default(uuid())
   tenantId        String
   studentId       String
-  invoiceId       String
+  invoiceId       String?
   collectedById   String?
   method          PaymentMethod
   status          PaymentStatus @default(SUCCESS)
@@ -155,19 +156,45 @@ model Payment {
 
   tenant      Tenant          @relation(fields: [tenantId], references: [id])
   student     Student         @relation(fields: [studentId], references: [id])
-  invoice     Invoice         @relation(fields: [invoiceId], references: [id])
+  invoice     Invoice?        @relation(fields: [invoiceId], references: [id])
   collectedBy User?           @relation("CollectedPayments", fields: [collectedById], references: [id])
   reversedBy  User?                  @relation("ReversedPayments", fields: [reversedById], references: [id])
   receipt     Receipt?
   refunds     PaymentRefund[]
   financeApprovalRequests FinanceApprovalRequest[]
   onlinePaymentIntents OnlinePaymentIntent[]
+  allocations PaymentAllocation[]
 
   @@unique([tenantId, idempotencyKey])
   @@unique([tenantId, reversalIdempotencyKey])
   @@index([tenantId, method, referenceNumber])
   @@index([tenantId, paidAt, status])
   @@index([tenantId, studentId, paidAt])
+}
+
+model PaymentAllocation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  paymentId       String
+  invoiceId       String?
+  amount          Decimal  @db.Decimal(12, 2)
+  allocationType  PaymentAllocationType @default(INVOICE)
+  allocationGroupId String?
+  reason          String?
+  allocatedAt     DateTime @default(now())
+  allocatedById   String?
+  reversedAt      DateTime?
+  reversedById    String?
+  reversalReason  String?
+  createdAt       DateTime @default(now())
+
+  payment Payment  @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  invoice Invoice? @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, paymentId, allocatedAt])
+  @@index([tenantId, invoiceId, allocatedAt])
+  @@index([tenantId, allocationType, allocatedAt])
+  @@index([tenantId, paymentId, allocationGroupId])
 }
 
 model OnlinePaymentIntent {
@@ -230,8 +257,23 @@ model CashierClose {
   tenantId              String
   closeNumber           String
   closeWindowKey        String?
+  activeSessionKey      String?
   openedAt              DateTime
-  closedAt              DateTime
+  closedAt              DateTime?
+  countedThroughAt      DateTime?
+  status                CashierCloseStatus @default(CLOSED)
+  countedAt             DateTime?
+  countedById           String?
+  submittedAt           DateTime?
+  submittedById         String?
+  approvedAt            DateTime?
+  approvedById          String?
+  depositedAt           DateTime?
+  depositedById         String?
+  depositId             String?
+  reopenedAt            DateTime?
+  reopenedById          String?
+  reopenReason          String?
   collectorUserId       String?
   paymentMethod         PaymentMethod?
   grossCollected        Decimal        @db.Decimal(12, 2)
@@ -257,8 +299,38 @@ model CashierClose {
 
   @@unique([tenantId, closeNumber])
   @@unique([tenantId, closeWindowKey])
+  @@unique([tenantId, activeSessionKey])
   @@index([tenantId, openedAt, closedAt])
   @@index([tenantId, collectorUserId, paymentMethod])
+  @@index([tenantId, status, openedAt])
+}
+
+model CashDeposit {
+  id              String            @id @default(uuid())
+  tenantId        String
+  depositNumber   String
+  cashierCloseId  String?
+  accountId       String
+  amount          Decimal           @db.Decimal(18, 2)
+  depositDate     DateTime
+  referenceNumber String?
+  status          CashDepositStatus @default(DRAFT)
+  idempotencyKey  String
+  journalEntryId  String?
+  submittedById   String?
+  submittedAt     DateTime?
+  depositedById   String?
+  depositedAt     DateTime?
+  reversalReason  String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@unique([tenantId, depositNumber])
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, status, depositDate])
+  @@index([tenantId, cashierCloseId])
+  @@index([tenantId, accountId, depositDate])
+  @@index([tenantId, journalEntryId])
 }
 
 model Receipt {

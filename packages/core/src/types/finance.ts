@@ -40,10 +40,10 @@ export type InvoiceSummary = {
   status: string;
   dueDate: string;
   issuedAt?: string;
-  totalAmount: number;
+  totalAmount: FinanceMoneyAmount;
   studentId?: string;
-  paidAmount?: number;
-  outstandingAmount?: number;
+  paidAmount?: FinanceMoneyAmount;
+  outstandingAmount?: FinanceMoneyAmount;
   student?: {
     id: string;
     name: string;
@@ -66,9 +66,9 @@ export type StudentCollectionContext = {
     invoiceNumber: string;
     status: string;
     dueDate: string;
-    totalAmount: number;
-    paidAmount: number;
-    outstandingAmount: number;
+    totalAmount: FinanceMoneyAmount;
+    paidAmount: FinanceMoneyAmount;
+    outstandingAmount: FinanceMoneyAmount;
   }>;
 };
 
@@ -113,21 +113,22 @@ export type InvoiceDetailLine = {
   description: string;
   periodLabel: string;
   quantity: number;
-  unitAmount: number;
-  baseAmount: number;
-  discountAmount: number;
-  waiverAmount: number;
-  lateFeeAmount: number;
-  vatAmount: number;
-  totalAmount: number;
-  netAmount: number;
+  unitAmount: FinanceMoneyAmount;
+  baseAmount: FinanceMoneyAmount;
+  discountAmount: FinanceMoneyAmount;
+  waiverAmount: FinanceMoneyAmount;
+  lateFeeAmount: FinanceMoneyAmount;
+  vatAmount: FinanceMoneyAmount;
+  totalAmount: FinanceMoneyAmount;
+  netAmount: FinanceMoneyAmount;
 };
 
 export type InvoiceDetailPayment = {
   id: string;
-  amount: number;
-  refundedAmount: number;
-  netAmount: number;
+  amount: FinanceMoneyAmount;
+  allocatedAmount: FinanceMoneyAmount;
+  refundedAmount: FinanceMoneyAmount;
+  netAmount: FinanceMoneyAmount;
   method: string;
   referenceNumber: string | null;
   paidAt: string;
@@ -146,7 +147,7 @@ export type InvoiceDetailPayment = {
   refunds: Array<{
     id: string;
     refundNumber: string;
-    amount: number;
+    amount: FinanceMoneyAmount;
     refundDate: string;
     reason: string;
     referenceNumber: string | null;
@@ -183,18 +184,18 @@ export type InvoiceDetail = {
     guardianName: string | null;
     guardianPhone: string | null;
   };
-  subtotal: number;
-  vatAmount: number;
-  totalAmount: number;
-  paidAmount: number;
-  outstandingAmount: number;
-  totalWaivedAmount: number;
+  subtotal: FinanceMoneyAmount;
+  vatAmount: FinanceMoneyAmount;
+  totalAmount: FinanceMoneyAmount;
+  paidAmount: FinanceMoneyAmount;
+  outstandingAmount: FinanceMoneyAmount;
+  totalWaivedAmount: FinanceMoneyAmount;
   lines: InvoiceDetailLine[];
   waivers: Array<{
     id: string;
     feeHeadId: string | null;
     feeHeadName: string | null;
-    amount: number;
+    amount: FinanceMoneyAmount;
     reason: string;
     status: string;
     approvedAt: string | null;
@@ -204,6 +205,7 @@ export type InvoiceDetail = {
     } | null;
   }>;
   payments: InvoiceDetailPayment[];
+  allocations: PaymentAllocationSummary[];
   source: {
     billingRunId: string | null;
     enrollmentId: string | null;
@@ -216,9 +218,9 @@ export type StudentFeeLedgerRow = {
   type: "INVOICE" | "PAYMENT" | "WAIVER" | "REFUND" | "REVERSAL";
   reference: string;
   description: string;
-  debit: number;
-  credit: number;
-  runningBalance: number;
+  debit: FinanceMoneyAmount;
+  credit: FinanceMoneyAmount;
+  runningBalance: FinanceMoneyAmount;
   affectsBalance: boolean;
   invoiceId: string | null;
   invoiceNumber: string | null;
@@ -237,12 +239,12 @@ export type StudentFeeLedger = {
     guardianName: string | null;
     guardianPhone: string | null;
   };
-  openingBalance: number;
-  totalInvoiced: number;
-  totalPaid: number;
-  totalWaived: number;
-  totalRefunded: number;
-  outstandingBalance: number;
+  openingBalance: FinanceMoneyAmount;
+  totalInvoiced: FinanceMoneyAmount;
+  totalPaid: FinanceMoneyAmount;
+  totalWaived: FinanceMoneyAmount;
+  totalRefunded: FinanceMoneyAmount;
+  outstandingBalance: FinanceMoneyAmount;
   rows: StudentFeeLedgerRow[];
 };
 
@@ -265,8 +267,12 @@ export type StudentFeeLedgerPage = StudentFeeLedger & {
 export type PaymentReceipt = {
   paymentId: string;
   receiptNumber: string;
-  invoiceId: string;
-  amount: number;
+  invoiceId: string | null;
+  invoiceIds: string[];
+  amount: FinanceMoneyAmount;
+  allocatedAmount: FinanceMoneyAmount;
+  unallocatedAmount: FinanceMoneyAmount;
+  allocations: PaymentAllocationSummary[];
   method: string;
   paidAt: string;
 };
@@ -275,28 +281,52 @@ export type PaymentRefundSummary = {
   refundId: string;
   refundNumber: string;
   paymentId: string;
-  invoiceId: string;
-  amount: number;
+  invoiceId: string | null;
+  amount: FinanceMoneyAmount;
   refundDate: string;
   journalEntryNumber: string;
-  remainingRefundableAmount: number;
-  invoiceStatus: string;
+  remainingRefundableAmount: FinanceMoneyAmount;
+  invoiceStatus: string | null;
 };
 
 export type PaymentRefundPayload = {
   idempotencyKey: string;
-  amount?: number;
+  amount?: FinanceMoneyAmount;
   reason: string;
   refundDate?: string;
   referenceNumber?: string;
   narration?: string;
 };
 
+export type PaymentAllocationType =
+  | "INVOICE"
+  | "ADVANCE"
+  | "UNALLOCATED"
+  | "REFUND"
+  | "REVERSAL"
+  | "REALLOCATION";
+
+export type PaymentAllocationSummary = {
+  id?: string;
+  paymentId?: string;
+  invoiceId: string | null;
+  invoiceNumber?: string | null;
+  amount: FinanceMoneyAmount;
+  allocationType: PaymentAllocationType;
+  allocatedAt?: string;
+  reversedAt?: string | null;
+  allocatedById?: string | null;
+  reversedById?: string | null;
+  allocationGroupId?: string | null;
+  reason?: string | null;
+  reversalReason?: string | null;
+};
+
 export type CashierCloseMethodBreakdown = {
   method: string;
-  grossCollected: number;
-  totalRefunded: number;
-  netCollected: number;
+  grossCollected: FinanceMoneyAmount;
+  totalRefunded: FinanceMoneyAmount;
+  netCollected: FinanceMoneyAmount;
   paymentCount: number;
   refundCount: number;
 };
@@ -306,12 +336,12 @@ export type CashierClosePreview = {
   closedAt: string | Date;
   collectorUserId: string | null;
   paymentMethod: string | null;
-  grossCollected: number;
-  totalRefunded: number;
-  netCollected: number;
-  expectedCashAmount: number;
-  actualCashAmount?: number | null;
-  varianceAmount?: number | null;
+  grossCollected: FinanceMoneyAmount;
+  totalRefunded: FinanceMoneyAmount;
+  netCollected: FinanceMoneyAmount;
+  expectedCashAmount: FinanceMoneyAmount;
+  actualCashAmount?: FinanceMoneyAmount | null;
+  varianceAmount?: FinanceMoneyAmount | null;
   varianceReason?: string | null;
   denominationBreakdown?: Record<string, unknown> | null;
   methodBreakdown: CashierCloseMethodBreakdown[];
@@ -324,31 +354,51 @@ export type CashierClosePreview = {
   byMethod?: Array<{
     method: string;
     count: number;
-    amount: number;
+    amount: FinanceMoneyAmount;
   }>;
   byUser?: Array<{
     userId: string;
     userName: string;
-    amount: number;
+    amount: FinanceMoneyAmount;
   }>;
 };
 
 export type CashierCloseSummary = {
   id: string;
   closeNumber: string;
+  status:
+    | "OPEN"
+    | "COUNTED"
+    | "SUBMITTED"
+    | "APPROVED"
+    | "CLOSED"
+    | "DEPOSITED";
   openedAt: string | Date;
-  closedAt: string | Date;
+  closedAt: string | Date | null;
+  countedThroughAt?: string | Date | null;
+  countedAt?: string | Date | null;
+  countedById?: string | null;
+  submittedAt?: string | Date | null;
+  submittedById?: string | null;
+  approvedAt?: string | Date | null;
+  approvedById?: string | null;
+  depositedAt?: string | Date | null;
+  depositedById?: string | null;
+  depositId?: string | null;
+  reopenedAt?: string | Date | null;
+  reopenedById?: string | null;
+  reopenReason?: string | null;
   collectorUser?: {
     id: string;
     email: string | null;
   } | null;
   paymentMethod?: string | null;
-  grossCollected: number;
-  totalRefunded: number;
-  netCollected: number;
-  expectedCashAmount: number;
-  actualCashAmount?: number | null;
-  varianceAmount?: number | null;
+  grossCollected: FinanceMoneyAmount;
+  totalRefunded: FinanceMoneyAmount;
+  netCollected: FinanceMoneyAmount;
+  expectedCashAmount: FinanceMoneyAmount;
+  actualCashAmount?: FinanceMoneyAmount | null;
+  varianceAmount?: FinanceMoneyAmount | null;
   varianceReason?: string | null;
   denominationBreakdown?: Record<string, unknown> | null;
   methodBreakdown: CashierCloseMethodBreakdown[];
@@ -370,6 +420,32 @@ export type CashierCloseSummary = {
   createdAt?: string | Date;
 };
 
+export type CashDepositSummary = {
+  id: string;
+  depositNumber: string;
+  cashierCloseId: string;
+  cashierCloseNumber: string;
+  accountId: string;
+  accountCode: string;
+  accountName: string;
+  amount: FinanceMoneyAmount;
+  depositDate: string;
+  referenceNumber: string | null;
+  status: "DRAFT" | "SUBMITTED" | "DEPOSITED" | "REVERSED";
+  journalEntryId: string | null;
+  submittedAt: string | null;
+  depositedAt: string | null;
+  createdAt: string;
+};
+
+export type CashDepositPage = {
+  items: CashDepositSummary[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+};
+
 export type ReconciliationRow = {
   paymentId: string;
   paymentDate: string;
@@ -388,9 +464,9 @@ export type ReconciliationRow = {
     email: string | null;
   } | null;
   method: string;
-  grossAmount: number;
-  refundedAmount: number;
-  netAmount: number;
+  grossAmount: FinanceMoneyAmount;
+  refundedAmount: FinanceMoneyAmount;
+  netAmount: FinanceMoneyAmount;
   journalEntryNumber: string | null;
   refundJournalEntryNumbers: string[];
   statusMarkers: string[];
@@ -400,9 +476,9 @@ export type ReconciliationSummary = {
   openedAt: string;
   closedAt: string;
   totalRows: number;
-  grossCollected: number;
-  totalRefunded: number;
-  netCollected: number;
+  grossCollected: FinanceMoneyAmount;
+  totalRefunded: FinanceMoneyAmount;
+  netCollected: FinanceMoneyAmount;
   rows: ReconciliationRow[];
 };
 
@@ -411,7 +487,7 @@ export type FeeHeadSummary = {
   code: string;
   name: string;
   frequency: string;
-  defaultAmount: number;
+  defaultAmount: FinanceMoneyAmount;
   vatApplicable: boolean;
 };
 
@@ -485,6 +561,154 @@ export type FeeCollectionReport = {
   generatedAt: string;
 };
 
+export type DuesReportFilters = {
+  academicYearId?: string;
+  classId?: string;
+  sectionId?: string;
+  feeHeadId?: string;
+  studentId?: string;
+  page?: number;
+  limit?: number;
+};
+
+export type DuesReportRow = {
+  studentId: string;
+  studentName: string;
+  studentSystemId: string;
+  className: string;
+  sectionName: string;
+  feeHeadId: string;
+  feeHead: string;
+  billed: FinanceMoneyAmount;
+  waived: FinanceMoneyAmount;
+  paid: FinanceMoneyAmount;
+  outstanding: FinanceMoneyAmount;
+  dueDate: string;
+  invoiceNumber: string;
+  status: string;
+  agingBucket: string;
+};
+
+export type DuesReportResponse = {
+  rows: DuesReportRow[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+  summary: {
+    totalBilled: FinanceMoneyAmount;
+    totalWaived: FinanceMoneyAmount;
+    totalPaid: FinanceMoneyAmount;
+    totalOutstanding: FinanceMoneyAmount;
+  };
+};
+
+export type InvoiceRegisterReport = {
+  rows: Array<{
+    invoiceId: string;
+    invoiceNumber: string;
+    studentSystemId: string;
+    studentName: string;
+    className: string;
+    sectionName: string;
+    billingPeriod: string;
+    feeHeadNames: string;
+    grossAmount: FinanceMoneyAmount;
+    discountAmount: FinanceMoneyAmount;
+    netAmount: FinanceMoneyAmount;
+    paidAmount: FinanceMoneyAmount;
+    balanceAmount: FinanceMoneyAmount;
+    dueDate: string;
+    issuedAt: string;
+    status: string;
+    journalEntryId: string | null;
+    journalEntryNumber: string | null;
+    postingStatus: "POSTED" | "PENDING";
+  }>;
+  summary: {
+    totalInvoices: number;
+    totalGrossAmount: FinanceMoneyAmount;
+    totalNetAmount: FinanceMoneyAmount;
+    totalPaidAmount: FinanceMoneyAmount;
+    totalBalanceAmount: FinanceMoneyAmount;
+  };
+};
+
+export type ReceiptRegisterReport = {
+  rows: Array<{
+    receiptNumber: string;
+    issuedAt: string;
+    studentSystemId: string;
+    studentName: string;
+    invoiceNumber: string;
+    amount: FinanceMoneyAmount;
+    refundedAmount: FinanceMoneyAmount;
+    netAmount: FinanceMoneyAmount;
+    paymentMethod: string;
+    paymentStatus: string;
+    cashierEmail: string | null;
+    reprintCount: number;
+    latestReprintAt: string | null;
+  }>;
+  summary: {
+    totalReceipts: number;
+    totalAmount: FinanceMoneyAmount;
+    totalRefundedAmount: FinanceMoneyAmount;
+    totalNetAmount: FinanceMoneyAmount;
+  };
+};
+
+export type ReceiptSequenceExceptionReport = {
+  rows: Array<{
+    fiscalYear: string;
+    receiptNumber: string;
+    exceptionType:
+      | "MISSING_SEQUENCE"
+      | "DUPLICATE_NUMBER"
+      | "OUT_OF_SEQUENCE"
+      | "REVERSED_PAYMENT";
+    expectedSequence: number | null;
+    actualSequence: number | null;
+    issuedAt: string | null;
+    details: string;
+  }>;
+  summary: {
+    totalExceptions: number;
+    missingSequenceCount: number;
+    duplicateCount: number;
+    outOfSequenceCount: number;
+    reversedPaymentCount: number;
+  };
+};
+
+export type RefundReversalRegisterReport = {
+  rows: Array<{
+    recordType: "REFUND" | "REVERSAL";
+    recordNumber: string;
+    originalReceiptNumber: string | null;
+    originalPaymentId: string;
+    invoiceNumber: string;
+    studentSystemId: string;
+    studentName: string;
+    amount: FinanceMoneyAmount;
+    reason: string;
+    processedAt: string;
+    requestedByEmail: string | null;
+    approvedByEmail: string | null;
+    journalEntryNumber: string | null;
+    reversalOfJournalEntryNumber: string | null;
+    status: string;
+  }>;
+  summary: {
+    totalRecords: number;
+    refundCount: number;
+    reversalCount: number;
+    totalAmount: FinanceMoneyAmount;
+  };
+};
+
 export type PaymentMethodReport = {
   rows: Array<{
     method: string;
@@ -510,7 +734,7 @@ export type DefaulterSummary = {
   className: string;
   sectionName: string | null;
   dueDate: string;
-  outstanding: number;
+  outstanding: FinanceMoneyAmount;
   daysOverdue: number;
   agingBucket: string;
   reportCardBlocked?: boolean;
@@ -521,8 +745,8 @@ export type DiscountRule = {
   id: string;
   name: string;
   type: string;
-  percentOff: number | null;
-  amountOff: number | null;
+  percentOff: string | null;
+  amountOff: FinanceMoneyAmount | null;
   isActive: boolean;
 };
 
@@ -531,7 +755,7 @@ export type WaiverRecord = {
   studentId: string;
   invoiceId: string | null;
   feeHeadId: string | null;
-  amount: number;
+  amount: FinanceMoneyAmount;
   status: string;
   reason: string;
   approvedAt: string | null;
@@ -544,8 +768,8 @@ export type ReceiptView = {
   fileStatus: "PENDING" | "AVAILABLE" | "UNAVAILABLE";
   issuedAt: string;
   paymentId?: string;
-  amount?: number;
-  refundedAmount?: number;
+  amount?: FinanceMoneyAmount;
+  refundedAmount?: FinanceMoneyAmount;
   method?: string;
   invoiceNumber?: string;
   student?: {
@@ -565,7 +789,7 @@ export type ReceiptView = {
   } | null;
   payment?: {
     id: string;
-    amount: number;
+    amount: FinanceMoneyAmount;
     method: string;
     paidAt: string;
     invoiceId: string;
@@ -584,7 +808,7 @@ export type FinanceApprovalRequestView = {
     | "EXECUTED"
     | "FAILED";
   paymentId: string;
-  amount: number | null;
+  amount: FinanceMoneyAmount | null;
   reason: string;
   reviewNote: string | null;
   failureMessage: string | null;

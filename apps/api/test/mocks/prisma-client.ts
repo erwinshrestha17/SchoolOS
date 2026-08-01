@@ -59,8 +59,17 @@ class Decimal {
     return new Decimal(Number(this.numericValue.toFixed(places)));
   }
 
+  decimalPlaces() {
+    const normalized = this.numericValue.toString();
+    return normalized.includes('.') ? normalized.split('.')[1].length : 0;
+  }
+
   abs() {
     return new Decimal(Math.abs(this.numericValue));
+  }
+
+  negated() {
+    return new Decimal(-this.numericValue);
   }
 
   plus(value: number | string | Decimal) {
@@ -275,6 +284,7 @@ export const ApprovalWorkflowType = {
   EMERGENCY_HIGH_IMPACT_NOTICE: 'EMERGENCY_HIGH_IMPACT_NOTICE',
   PLATFORM_SUPPORT_OVERRIDE: 'PLATFORM_SUPPORT_OVERRIDE',
   ADMISSION_CASE: 'ADMISSION_CASE',
+  FISCAL_PERIOD_REOPEN: 'FISCAL_PERIOD_REOPEN',
 } as const;
 
 export const ApprovalRequestStatus = {
@@ -557,6 +567,7 @@ export const JournalSourceType = {
   INVOICE: 'INVOICE',
   FEE_PAYMENT: 'FEE_PAYMENT',
   PAYMENT_REFUND: 'PAYMENT_REFUND',
+  PAYMENT_ALLOCATION: 'PAYMENT_ALLOCATION',
   PAYROLL: 'PAYROLL',
   PAYROLL_RUN: 'PAYROLL_RUN',
   PAYROLL_DISBURSEMENT: 'PAYROLL_DISBURSEMENT',
@@ -1061,6 +1072,40 @@ export const AccountingPeriodStatus = {
   OPEN: 'OPEN',
   LOCKED: 'LOCKED',
   CLOSED: 'CLOSED',
+} as const;
+
+export const AccountingPostingBatchStatus = {
+  DRAFT: 'DRAFT',
+  READY: 'READY',
+  POSTING: 'POSTING',
+  POSTED: 'POSTED',
+  FAILED: 'FAILED',
+  REVERSED: 'REVERSED',
+} as const;
+
+export const AccountingPostingItemStatus = {
+  READY: 'READY',
+  POSTED: 'POSTED',
+  FAILED: 'FAILED',
+  SKIPPED: 'SKIPPED',
+} as const;
+
+export const CashierCloseStatus = {
+  OPEN: 'OPEN',
+  COUNTED: 'COUNTED',
+  SUBMITTED: 'SUBMITTED',
+  APPROVED: 'APPROVED',
+  CLOSED: 'CLOSED',
+  DEPOSITED: 'DEPOSITED',
+} as const;
+
+export const PaymentAllocationType = {
+  INVOICE: 'INVOICE',
+  ADVANCE: 'ADVANCE',
+  UNALLOCATED: 'UNALLOCATED',
+  REFUND: 'REFUND',
+  REVERSAL: 'REVERSAL',
+  REALLOCATION: 'REALLOCATION',
 } as const;
 
 export const FiscalYearStatus = {

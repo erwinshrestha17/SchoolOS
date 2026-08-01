@@ -19,16 +19,29 @@ import { CashierCloseWindowDto } from './dto/cashier-close-window.dto';
 import { CollectPaymentDto } from './dto/collect-payment.dto';
 import { InitiateOnlinePaymentDto } from './dto/initiate-online-payment.dto';
 import { CreateCashierCloseDto } from './dto/create-cashier-close.dto';
+import { OpenCashierCloseDto } from './dto/open-cashier-close.dto';
+import { CountCashierCloseDto } from './dto/count-cashier-close.dto';
+import {
+  CashierCloseTransitionDto,
+  DepositCashierCloseDto,
+} from './dto/cashier-close-transition.dto';
 import { CreatePaymentRefundDto } from './dto/create-payment-refund.dto';
 import { ListCashierClosesDto } from './dto/list-cashier-closes.dto';
 import { ReversePaymentDto } from './dto/reverse-payment.dto';
+import { ReallocatePaymentDto } from './dto/reallocate-payment.dto';
 import { CreateFinanceRequestDto } from './dto/create-finance-request.dto';
 import { ReviewFinanceRequestDto } from './dto/review-finance-request.dto';
 import { FinanceService } from './finance.service';
 import {
   ListFinanceApprovalRequestsQueryDto,
+  ListPaymentAllocationsQueryDto,
   ListPaymentsQueryDto,
 } from './dto/list-finance-records.query.dto';
+import {
+  CashDepositTransitionDto,
+  ListCashDepositsDto,
+  PrepareCashDepositDto,
+} from './dto/cash-deposit.dto';
 
 @Controller('payments')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
@@ -43,6 +56,25 @@ export class PaymentsController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.financeService.listPayments(query, auth);
+  }
+
+  @Get(':id/allocations')
+  listPaymentAllocations(
+    @Param('id') paymentId: string,
+    @Query() query: ListPaymentAllocationsQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.listPaymentAllocations(paymentId, query, auth);
+  }
+
+  @Post(':id/allocations/reallocate')
+  @Permissions('payments:collect')
+  reallocatePayment(
+    @Param('id') paymentId: string,
+    @Body() dto: ReallocatePaymentDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.reallocatePayment(paymentId, dto, auth);
   }
 
   @Post()
@@ -67,6 +99,48 @@ export class PaymentsController {
   @Permissions('payments:collect')
   getPaymentGatewayReadiness(@CurrentAuth() auth: AuthContext) {
     return this.financeService.getPaymentGatewayReadiness(auth);
+  }
+
+  @Get('cash-deposits')
+  @Permissions('payments:close', 'accounting:reconciliation:manage')
+  listCashDeposits(
+    @Query() query: ListCashDepositsDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.listCashDeposits(query, auth);
+  }
+
+  @Post('cash-deposits')
+  @Permissions('payments:close', 'accounting:reconciliation:manage')
+  prepareCashDeposit(
+    @Body() dto: PrepareCashDepositDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.prepareCashDeposit(dto, auth);
+  }
+
+  @Post('cash-deposits/:id/submit')
+  @Permissions('payments:close', 'accounting:reconciliation:manage')
+  submitCashDeposit(
+    @Param('id') depositId: string,
+    @Body() dto: CashDepositTransitionDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.submitCashDeposit(depositId, dto, auth);
+  }
+
+  @Post('cash-deposits/:id/complete')
+  @Permissions(
+    'payments:close',
+    'accounting:reconciliation:manage',
+    'accounting:journals:post',
+  )
+  completeCashDeposit(
+    @Param('id') depositId: string,
+    @Body() dto: CashDepositTransitionDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.completeCashDeposit(depositId, dto, auth);
   }
 
   @Get('cashier-close/preview')
@@ -94,6 +168,65 @@ export class PaymentsController {
     @CurrentAuth() auth: AuthContext,
   ): Promise<unknown> {
     return this.financeService.finalizeCashierClose(dto, auth);
+  }
+
+  @Post('cashier-close/open')
+  @Permissions('payments:close')
+  openCashierClose(
+    @Body() dto: OpenCashierCloseDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.openCashierClose(dto, auth);
+  }
+
+  @Post('cashier-close/:id/count')
+  @Permissions('payments:close')
+  countCashierClose(
+    @Param('id') closeId: string,
+    @Body() dto: CountCashierCloseDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.countCashierClose(closeId, dto, auth);
+  }
+
+  @Post('cashier-close/:id/submit')
+  @Permissions('payments:close')
+  submitCashierClose(
+    @Param('id') closeId: string,
+    @Body() dto: CashierCloseTransitionDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.submitCashierClose(closeId, dto, auth);
+  }
+
+  @Post('cashier-close/:id/approve')
+  @Permissions('payments:close')
+  approveCashierClose(
+    @Param('id') closeId: string,
+    @Body() dto: CashierCloseTransitionDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.approveCashierClose(closeId, dto, auth);
+  }
+
+  @Post('cashier-close/:id/close')
+  @Permissions('payments:close')
+  closeCashierClose(
+    @Param('id') closeId: string,
+    @Body() dto: CashierCloseTransitionDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.closeCashierClose(closeId, dto, auth);
+  }
+
+  @Post('cashier-close/:id/deposit')
+  @Permissions('payments:close')
+  depositCashierClose(
+    @Param('id') closeId: string,
+    @Body() dto: DepositCashierCloseDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.depositCashierClose(closeId, dto, auth);
   }
 
   @Post(':id/refund')

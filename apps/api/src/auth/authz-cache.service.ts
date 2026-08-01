@@ -7,6 +7,16 @@ export interface ResolvedAuthz {
   permissions: string[];
 }
 
+interface CachedRoleGrant {
+  role: string;
+  expiresAt: string | null;
+  permissions: string[];
+}
+
+interface CachedAuthz {
+  grants: CachedRoleGrant[];
+}
+
 /**
  * TTL is a backstop for a missed invalidation, not the invalidation mechanism.
  * Five minutes bounds how long a stale permission set could survive if a write
@@ -62,14 +72,29 @@ export class AuthzCacheService {
 
   /** Roles and `resource:action` permission keys for one user in one tenant. */
   async resolve(tenantId: string, userId: string): Promise<ResolvedAuthz> {
-    return this.cache.resolve(
+    const cached = await this.cache.resolve(
       this.key(tenantId, userId),
       AUTHZ_TTL_SECONDS,
       () => this.load(tenantId, userId),
     );
+
+    // Expiry is evaluated on every request rather than only on cache fill. A
+    // time-bounded auditor therefore loses access at the exact expiry even if
+    // the Redis entry remains warm.
+    const now = Date.now();
+    const active = cached.grants.filter(
+      ({ expiresAt }) => expiresAt === null || Date.parse(expiresAt) > now,
+    );
+
+    return {
+      roles: [...new Set(active.map(({ role }) => role))],
+      permissions: [
+        ...new Set(active.flatMap(({ permissions }) => permissions)),
+      ],
+    };
   }
 
-  private async load(tenantId: string, userId: string): Promise<ResolvedAuthz> {
+  private async load(tenantId: string, userId: string): Promise<CachedAuthz> {
     // This runs inside JwtAuthGuard, i.e. before the CLS tenant context exists
     // — establishing it is what the guard is in the middle of doing. `UserRole`
     // is tenant-scoped, so without an explicit bypass the fail-closed extension
@@ -79,37 +104,34 @@ export class AuthzCacheService {
     return this.prisma.runWithoutTenantScope(
       'authorize: resolve role/permission set while establishing tenant context',
       async () => {
-        // Reads `RolePermission` directly instead of descending
-        // User → UserRole → Role → RolePermission → Permission. Same rows, same
-        // tenant predicate, but two round-trips instead of four.
-        const [assignments, rolePermissions] = await Promise.all([
-          this.prisma.userRole.findMany({
-            where: { tenantId, userId },
-            select: { role: { select: { name: true } } },
-          }),
-          this.prisma.rolePermission.findMany({
-            where: {
-              role: {
-                tenantId,
-                userRoles: { some: { tenantId, userId } },
+        const assignments = await this.prisma.userRole.findMany({
+          where: { tenantId, userId, revokedAt: null },
+          select: {
+            expiresAt: true,
+            role: {
+              select: {
+                name: true,
+                rolePermissions: {
+                  select: {
+                    permission: {
+                      select: { resource: true, action: true },
+                    },
+                  },
+                },
               },
             },
-            select: {
-              permission: { select: { resource: true, action: true } },
-            },
-          }),
-        ]);
+          },
+        });
 
         return {
-          roles: [...new Set(assignments.map((entry) => entry.role.name))],
-          permissions: [
-            ...new Set(
-              rolePermissions.map(
-                ({ permission }) =>
-                  `${permission.resource}:${permission.action}`,
-              ),
+          grants: assignments.map(({ role, expiresAt }) => ({
+            role: role.name,
+            expiresAt: expiresAt?.toISOString() ?? null,
+            permissions: role.rolePermissions.map(
+              ({ permission }) =>
+                `${permission.resource}:${permission.action}`,
             ),
-          ],
+          })),
         };
       },
     );

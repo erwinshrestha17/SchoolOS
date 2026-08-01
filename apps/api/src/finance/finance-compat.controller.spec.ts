@@ -68,7 +68,7 @@ describe('FinanceCompatController', () => {
     const { controller, financeService } = createController();
     const dto = {
       invoiceId: 'invoice-1',
-      amount: 1000,
+      amount: '1000.00',
       method: PaymentMethod.CASH,
       referenceNumber: 'CASH-001',
       idempotencyKey: 'payment-key-1',

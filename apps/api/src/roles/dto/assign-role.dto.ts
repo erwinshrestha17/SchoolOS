@@ -1,4 +1,10 @@
-import { IsArray, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsArray,
+  IsObject,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 
 export class AssignRoleDto {
   @IsString()
@@ -7,6 +13,11 @@ export class AssignRoleDto {
   @IsArray()
   @IsString({ each: true })
   roleIds!: string[];
+
+  /** Optional ISO expiry keyed by role id. */
+  @IsOptional()
+  @IsObject()
+  expiresAtByRole?: Record<string, string>;
 
   /**
    * Required when the change removes the School Configuration Owner role

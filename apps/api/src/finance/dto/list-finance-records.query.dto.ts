@@ -108,6 +108,12 @@ export class ListPaymentsQueryDto extends BaseFinanceListQueryDto {
   sortBy?: 'paidAt' | 'amount' | 'createdAt';
 }
 
+export class ListPaymentAllocationsQueryDto extends BaseFinanceListQueryDto {
+  @IsOptional()
+  @IsIn(['allocatedAt', 'amount', 'createdAt'])
+  sortBy?: 'allocatedAt' | 'amount' | 'createdAt';
+}
+
 export class ListReceiptsQueryDto extends BaseFinanceListQueryDto {
   @IsOptional()
   @IsUUID()

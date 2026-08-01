@@ -121,6 +121,7 @@ enum JournalSourceType {
   INVOICE
   FEE_PAYMENT
   PAYMENT_REFUND
+  PAYMENT_ALLOCATION
   PAYROLL
   PAYROLL_RUN
   PAYROLL_DISBURSEMENT
@@ -646,6 +647,92 @@ enum AccountingPeriodStatus {
   CLOSED
 }
 
+enum AccountingPostingBatchStatus {
+  DRAFT
+  READY
+  POSTING
+  POSTED
+  FAILED
+  REVERSED
+}
+
+enum AccountingPostingItemStatus {
+  READY
+  POSTED
+  FAILED
+  SKIPPED
+}
+
+enum CashierCloseStatus {
+  OPEN
+  COUNTED
+  SUBMITTED
+  APPROVED
+  CLOSED
+  DEPOSITED
+}
+
+enum PaymentAllocationType {
+  INVOICE
+  ADVANCE
+  UNALLOCATED
+  REFUND
+  REVERSAL
+  REALLOCATION
+}
+
+enum FinanceVendorStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum FinanceExpenseStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  POSTED
+  REVERSED
+}
+
+enum FinancePayableStatus {
+  OPEN
+  PARTIALLY_PAID
+  PAID
+  VOID
+}
+
+enum BankReconciliationStatus {
+  OPEN
+  FINALIZED
+  REOPENED
+}
+
+enum BankReconciliationMatchType {
+  EXACT
+  SUGGESTED
+  TIMING_DIFFERENCE
+  ADJUSTMENT
+  MANUAL
+}
+
+enum BankReconciliationMatchStatus {
+  MATCHED
+  UNMATCHED
+}
+
+enum CashDepositStatus {
+  DRAFT
+  SUBMITTED
+  DEPOSITED
+  REVERSED
+}
+
+enum PayrollAccountingSnapshotStatus {
+  FROZEN
+  POSTED
+  CORRECTED
+}
+
 enum FiscalYearStatus {
   OPEN
   CLOSED
@@ -1161,6 +1248,7 @@ enum ApprovalWorkflowType {
   EMERGENCY_HIGH_IMPACT_NOTICE
   PLATFORM_SUPPORT_OVERRIDE
   ADMISSION_CASE
+  FISCAL_PERIOD_REOPEN
 }
 
 enum ApprovalRequestStatus {
@@ -1969,6 +2057,8 @@ model FiscalYear {
   journalEntries JournalEntry[]
   payrollRuns    PayrollRun[]
   fiscalBudgets  FiscalBudget[]
+  postingBatches AccountingPostingBatch[]
+  payrollAccountingSnapshots PayrollAccountingSnapshot[]
 
   @@unique([tenantId, name])
   @@index([tenantId, startDate, endDate])
@@ -1996,6 +2086,8 @@ model FiscalPeriod {
   reopenedAt   DateTime?
   reopenedById String?
   reopenReason String?
+  reopenedWarning Boolean                @default(false)
+  legacyAccountingPeriodId String?       @unique
   createdAt    DateTime               @default(now())
   updatedAt    DateTime               @updatedAt
 
@@ -2003,6 +2095,8 @@ model FiscalPeriod {
   fiscalYear     FiscalYear     @relation(fields: [fiscalYearId], references: [id], onDelete: Cascade)
   journalEntries JournalEntry[]
   fiscalBudgetLines FiscalBudgetLine[]
+  postingBatches AccountingPostingBatch[]
+  reconciliationSessions BankReconciliationSession[]
 
   @@unique([tenantId, fiscalYearId, periodNumber])
   @@unique([tenantId, fiscalYearId, label])
@@ -2023,11 +2117,309 @@ model AccountingPeriod {
   closedAt            DateTime?
   createdAt           DateTime               @default(now())
   updatedAt           DateTime               @updatedAt
+  canonicalFiscalPeriodId String?             @unique
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
   @@unique([tenantId, name])
   @@index([tenantId, status])
+}
+
+model AccountingPostingBatch {
+  id                    String                       @id @default(uuid())
+  tenantId              String
+  fiscalYearId          String
+  fiscalPeriodId        String?
+  sourceModule          String
+  sourceType            String
+  sourceBatchId         String
+  postingType           String                       @default("DEFAULT")
+  status                AccountingPostingBatchStatus @default(DRAFT)
+  sourceTotal           Decimal                      @db.Decimal(18, 2)
+  postedTotal           Decimal                      @default(0) @db.Decimal(18, 2)
+  reconciliationDifference Decimal                   @default(0) @db.Decimal(18, 2)
+  normalizedPayload     Json                         @default("{}")
+  idempotencyKey        String
+  journalEntryId        String?
+  failureCode           String?
+  failureDetail         String?
+  retryCount            Int                          @default(0)
+  requestedById         String?
+  postedById            String?
+  postedAt              DateTime?
+  reversedAt            DateTime?
+  reversalReason        String?
+  createdAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
+
+  fiscalYear   FiscalYear   @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
+  fiscalPeriod FiscalPeriod? @relation(fields: [fiscalPeriodId], references: [id], onDelete: Restrict)
+  items        AccountingPostingItem[]
+
+  @@unique([tenantId, idempotencyKey])
+  @@unique([tenantId, sourceModule, sourceType, sourceBatchId, postingType])
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, fiscalYearId, fiscalPeriodId, status])
+  @@index([tenantId, sourceModule, sourceBatchId])
+  @@index([tenantId, journalEntryId])
+}
+
+model AccountingPostingItem {
+  id              String                      @id @default(uuid())
+  tenantId        String
+  batchId         String
+  sourceItemId    String
+  lineNumber      Int
+  accountId       String
+  debit           Decimal                     @default(0) @db.Decimal(18, 2)
+  credit          Decimal                     @default(0) @db.Decimal(18, 2)
+  status          AccountingPostingItemStatus @default(READY)
+  failureDetail   String?
+  journalLineId   String?
+  createdAt       DateTime                    @default(now())
+
+  batch AccountingPostingBatch @relation(fields: [batchId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, batchId, sourceItemId, lineNumber])
+  @@index([tenantId, batchId, status])
+  @@index([tenantId, accountId])
+  @@index([tenantId, journalLineId])
+}
+
+model FinanceVendor {
+  id              String              @id @default(uuid())
+  tenantId        String
+  vendorCode      String
+  legalName       String
+  displayName     String
+  panNumber       String?
+  phone           String?
+  email           String?
+  address         String?
+  status          FinanceVendorStatus @default(ACTIVE)
+  duplicateKey    String?
+  createdById     String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  expenses FinanceExpense[]
+  payables FinancePayable[]
+
+  @@unique([tenantId, vendorCode])
+  @@index([tenantId, status, displayName])
+  @@index([tenantId, panNumber])
+  @@index([tenantId, duplicateKey])
+}
+
+model FinanceExpense {
+  id                    String               @id @default(uuid())
+  tenantId              String
+  expenseNumber         String
+  vendorId              String?
+  fiscalYearId          String
+  fiscalPeriodId        String?
+  expenseDate           DateTime
+  dueDate               DateTime?
+  description           String
+  amount                Decimal              @db.Decimal(18, 2)
+  taxAmount             Decimal              @default(0) @db.Decimal(18, 2)
+  totalAmount           Decimal              @db.Decimal(18, 2)
+  status                FinanceExpenseStatus @default(DRAFT)
+  recurringReference    String?
+  supportingFileAssetId String?
+  duplicateFingerprint  String?
+  idempotencyKey        String?
+  postingBatchId        String?
+  reversalOfId          String?
+  correctionReason      String?
+  createdById           String?
+  approvedById          String?
+  approvedAt            DateTime?
+  postedAt              DateTime?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  vendor   FinanceVendor?  @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  payable  FinancePayable?
+  reversalOf FinanceExpense? @relation("FinanceExpenseReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversals  FinanceExpense[] @relation("FinanceExpenseReversal")
+
+  @@unique([tenantId, expenseNumber])
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, status, expenseDate])
+  @@index([tenantId, vendorId, status])
+  @@index([tenantId, fiscalYearId, fiscalPeriodId])
+  @@index([tenantId, duplicateFingerprint])
+  @@index([tenantId, postingBatchId])
+}
+
+model FinancePayable {
+  id              String               @id @default(uuid())
+  tenantId        String
+  payableNumber   String
+  vendorId        String?
+  expenseId       String               @unique
+  dueDate         DateTime
+  originalAmount  Decimal              @db.Decimal(18, 2)
+  outstandingAmount Decimal            @db.Decimal(18, 2)
+  status          FinancePayableStatus @default(OPEN)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  vendor      FinanceVendor?             @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  expense     FinanceExpense              @relation(fields: [expenseId], references: [id], onDelete: Restrict)
+  settlements FinancePayableSettlement[]
+
+  @@unique([tenantId, payableNumber])
+  @@index([tenantId, status, dueDate])
+  @@index([tenantId, vendorId, status])
+}
+
+model FinancePayableSettlement {
+  id              String   @id @default(uuid())
+  tenantId        String
+  payableId       String
+  amount          Decimal  @db.Decimal(18, 2)
+  settledAt       DateTime
+  paymentReference String?
+  idempotencyKey  String
+  journalEntryId  String?
+  reversalOfId    String?
+  reversalReason  String?
+  createdById     String?
+  createdAt       DateTime @default(now())
+
+  payable    FinancePayable @relation(fields: [payableId], references: [id], onDelete: Restrict)
+  reversalOf FinancePayableSettlement? @relation("FinancePayableSettlementReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversals  FinancePayableSettlement[] @relation("FinancePayableSettlementReversal")
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, payableId, settledAt])
+  @@index([tenantId, journalEntryId])
+}
+
+model BankReconciliationSession {
+  id                  String                   @id @default(uuid())
+  tenantId            String
+  accountId           String
+  fiscalPeriodId      String?
+  statementFrom       DateTime
+  statementTo         DateTime
+  openingBookBalance  Decimal                  @db.Decimal(18, 2)
+  closingBookBalance  Decimal                  @db.Decimal(18, 2)
+  openingBankBalance  Decimal                  @db.Decimal(18, 2)
+  closingBankBalance  Decimal                  @db.Decimal(18, 2)
+  difference          Decimal                  @default(0) @db.Decimal(18, 2)
+  status              BankReconciliationStatus @default(OPEN)
+  finalizedAt         DateTime?
+  finalizedById       String?
+  reopenReason        String?
+  createdById         String
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+
+  fiscalPeriod FiscalPeriod? @relation(fields: [fiscalPeriodId], references: [id], onDelete: Restrict)
+  matches      BankReconciliationMatch[]
+  history      BankReconciliationHistory[]
+
+  @@index([tenantId, accountId, status])
+  @@index([tenantId, fiscalPeriodId, status])
+  @@index([tenantId, statementFrom, statementTo])
+}
+
+model BankReconciliationMatch {
+  id                  String                        @id @default(uuid())
+  tenantId            String
+  sessionId           String
+  bankStatementId     String
+  journalLineId       String?
+  matchType           BankReconciliationMatchType
+  status              BankReconciliationMatchStatus @default(MATCHED)
+  bankAmount          Decimal                       @db.Decimal(18, 2)
+  bookAmount          Decimal                       @db.Decimal(18, 2)
+  difference          Decimal                       @default(0) @db.Decimal(18, 2)
+  reason              String?
+  matchedById         String
+  matchedAt           DateTime                      @default(now())
+  unmatchedById       String?
+  unmatchedAt         DateTime?
+  unmatchReason       String?
+
+  session BankReconciliationSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, sessionId, bankStatementId, journalLineId])
+  @@index([tenantId, sessionId, status])
+  @@index([tenantId, bankStatementId])
+  @@index([tenantId, journalLineId])
+}
+
+model BankReconciliationHistory {
+  id          String   @id @default(uuid())
+  tenantId    String
+  sessionId   String
+  action      String
+  actorUserId String
+  reason      String?
+  beforeState Json?
+  afterState  Json?
+  createdAt   DateTime @default(now())
+
+  session BankReconciliationSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, sessionId, createdAt])
+  @@index([tenantId, actorUserId, createdAt])
+}
+
+model ReportSavedView {
+  id                  String   @id @default(uuid())
+  tenantId            String
+  reportId            String
+  name                String
+  normalizedFilters   Json     @default("{}")
+  columnConfiguration Json     @default("{}")
+  sortConfiguration   Json     @default("{}")
+  requiredPermissions String[] @default([])
+  isShared            Boolean  @default(false)
+  createdById         String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([tenantId, createdById, reportId, name])
+  @@index([tenantId, reportId, createdAt])
+  @@index([tenantId, createdById, reportId])
+}
+
+model PayrollAccountingSnapshot {
+  id                    String                          @id @default(uuid())
+  tenantId              String
+  payrollRunId          String
+  fiscalYearId          String
+  snapshotVersion       Int                             @default(1)
+  status                PayrollAccountingSnapshotStatus @default(FROZEN)
+  sourceTotal           Decimal                         @db.Decimal(18, 2)
+  earningTotal          Decimal                         @db.Decimal(18, 2)
+  deductionTotal        Decimal                         @db.Decimal(18, 2)
+  netPayTotal           Decimal                         @db.Decimal(18, 2)
+  liabilityTotal        Decimal                         @db.Decimal(18, 2)
+  normalizedSnapshot    Json
+  checksum              String
+  postingBatchId        String?
+  correctionOfId        String?
+  correctionReason      String?
+  frozenById            String
+  frozenAt              DateTime                        @default(now())
+  postedAt              DateTime?
+  createdAt             DateTime                        @default(now())
+
+  fiscalYear   FiscalYear @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
+  correctionOf PayrollAccountingSnapshot? @relation("PayrollAccountingSnapshotCorrection", fields: [correctionOfId], references: [id], onDelete: Restrict)
+  corrections  PayrollAccountingSnapshot[] @relation("PayrollAccountingSnapshotCorrection")
+
+  @@unique([tenantId, payrollRunId, snapshotVersion])
+  @@unique([tenantId, checksum])
+  @@index([tenantId, status, frozenAt])
+  @@index([tenantId, fiscalYearId, status])
+  @@index([tenantId, postingBatchId])
 }
 
 model AccountingReportAccountMapping {
@@ -3312,11 +3704,17 @@ model UserRole {
   scopeId      String?
   assignedById String?
   assignedAt   DateTime @default(now())
+  expiresAt    DateTime?
+  revokedAt    DateTime?
+  revokedById  String?
+  revokeReason String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@unique([userId, roleId, scopeId])
+  @@index([tenantId, userId, revokedAt, expiresAt])
+  @@index([tenantId, roleId, revokedAt, expiresAt])
 }
 
 model RolePermission {
@@ -4528,6 +4926,7 @@ model Invoice {
   billingRun    FeeBillingRun? @relation(fields: [billingRunId], references: [id])
   lines         InvoiceLine[]
   payments      Payment[]
+  paymentAllocations PaymentAllocation[]
   onlinePaymentIntents OnlinePaymentIntent[]
   libraryIssues LibraryIssue[]
   schoolServiceRequests SchoolServiceRequest[]
@@ -4559,7 +4958,7 @@ model Payment {
   id              String        @id @default(uuid())
   tenantId        String
   studentId       String
-  invoiceId       String
+  invoiceId       String?
   collectedById   String?
   method          PaymentMethod
   status          PaymentStatus @default(SUCCESS)
@@ -4579,19 +4978,45 @@ model Payment {
 
   tenant      Tenant          @relation(fields: [tenantId], references: [id])
   student     Student         @relation(fields: [studentId], references: [id])
-  invoice     Invoice         @relation(fields: [invoiceId], references: [id])
+  invoice     Invoice?        @relation(fields: [invoiceId], references: [id])
   collectedBy User?           @relation("CollectedPayments", fields: [collectedById], references: [id])
   reversedBy  User?                  @relation("ReversedPayments", fields: [reversedById], references: [id])
   receipt     Receipt?
   refunds     PaymentRefund[]
   financeApprovalRequests FinanceApprovalRequest[]
   onlinePaymentIntents OnlinePaymentIntent[]
+  allocations PaymentAllocation[]
 
   @@unique([tenantId, idempotencyKey])
   @@unique([tenantId, reversalIdempotencyKey])
   @@index([tenantId, method, referenceNumber])
   @@index([tenantId, paidAt, status])
   @@index([tenantId, studentId, paidAt])
+}
+
+model PaymentAllocation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  paymentId       String
+  invoiceId       String?
+  amount          Decimal  @db.Decimal(12, 2)
+  allocationType  PaymentAllocationType @default(INVOICE)
+  allocationGroupId String?
+  reason          String?
+  allocatedAt     DateTime @default(now())
+  allocatedById   String?
+  reversedAt      DateTime?
+  reversedById    String?
+  reversalReason  String?
+  createdAt       DateTime @default(now())
+
+  payment Payment  @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  invoice Invoice? @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, paymentId, allocatedAt])
+  @@index([tenantId, invoiceId, allocatedAt])
+  @@index([tenantId, allocationType, allocatedAt])
+  @@index([tenantId, paymentId, allocationGroupId])
 }
 
 model OnlinePaymentIntent {
@@ -4654,8 +5079,23 @@ model CashierClose {
   tenantId              String
   closeNumber           String
   closeWindowKey        String?
+  activeSessionKey      String?
   openedAt              DateTime
-  closedAt              DateTime
+  closedAt              DateTime?
+  countedThroughAt      DateTime?
+  status                CashierCloseStatus @default(CLOSED)
+  countedAt             DateTime?
+  countedById           String?
+  submittedAt           DateTime?
+  submittedById         String?
+  approvedAt            DateTime?
+  approvedById          String?
+  depositedAt           DateTime?
+  depositedById         String?
+  depositId             String?
+  reopenedAt            DateTime?
+  reopenedById          String?
+  reopenReason          String?
   collectorUserId       String?
   paymentMethod         PaymentMethod?
   grossCollected        Decimal        @db.Decimal(12, 2)
@@ -4681,8 +5121,38 @@ model CashierClose {
 
   @@unique([tenantId, closeNumber])
   @@unique([tenantId, closeWindowKey])
+  @@unique([tenantId, activeSessionKey])
   @@index([tenantId, openedAt, closedAt])
   @@index([tenantId, collectorUserId, paymentMethod])
+  @@index([tenantId, status, openedAt])
+}
+
+model CashDeposit {
+  id              String            @id @default(uuid())
+  tenantId        String
+  depositNumber   String
+  cashierCloseId  String?
+  accountId       String
+  amount          Decimal           @db.Decimal(18, 2)
+  depositDate     DateTime
+  referenceNumber String?
+  status          CashDepositStatus @default(DRAFT)
+  idempotencyKey  String
+  journalEntryId  String?
+  submittedById   String?
+  submittedAt     DateTime?
+  depositedById   String?
+  depositedAt     DateTime?
+  reversalReason  String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@unique([tenantId, depositNumber])
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, status, depositDate])
+  @@index([tenantId, cashierCloseId])
+  @@index([tenantId, accountId, depositDate])
+  @@index([tenantId, journalEntryId])
 }
 
 model Receipt {
@@ -6682,6 +7152,16 @@ model ReportExport {
   fileAssetId  String?
   requestedBy  String?
   errorSummary String?
+  normalizedParameters Json             @default("{}")
+  rowCount      Int?
+  displayedTotals Json                  @default("{}")
+  definitionVersion String              @default("1.0")
+  checksum      String?
+  classification String                 @default("CONFIDENTIAL")
+  watermark     String?
+  expiresAt     DateTime?
+  failureDetail String?
+  auditEventId  String?
   createdAt    DateTime           @default(now())
   completedAt  DateTime?
 
@@ -6692,6 +7172,9 @@ model ReportExport {
   @@index([tenantId, reportKey, createdAt])
   @@index([tenantId, requestedBy, createdAt])
   @@index([tenantId, fileAssetId])
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, expiresAt])
+  @@index([tenantId, checksum])
 }
 
 model TenantOnboardingChecklistOverride {

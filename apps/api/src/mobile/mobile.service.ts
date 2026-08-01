@@ -532,14 +532,14 @@ export class MobileService {
         }
 
         for (const invoice of fees?.recentInvoices ?? []) {
-          if (invoice.outstandingAmount <= 0) continue;
+          if (Number(invoice.outstandingAmount) <= 0) continue;
           actions.push({
             id: `fee:${child.id}:${invoice.id}`,
             source: 'fees',
             type: 'FEE_DUE',
             priority: invoice.isOverdue ? 'URGENT' : 'HIGH',
             title: `Fee balance for ${invoice.invoiceNumber}`,
-            description: `NPR ${invoice.outstandingAmount.toFixed(2)} remains due.`,
+            description: `NPR ${invoice.outstandingAmount} remains due.`,
             child: actionChild,
             dueAt: invoice.dueDate,
             isOverdue: invoice.isOverdue,
@@ -1778,20 +1778,21 @@ export class MobileService {
     if (invoices.length === 0) {
       return {
         status: 'PAID' as const,
-        totalAmount: 0,
-        paidAmount: 0,
-        totalOutstanding: 0,
+        totalAmount: '0.00',
+        paidAmount: '0.00',
+        totalOutstanding: '0.00',
         overdueCount: 0,
         nextDueDate: null,
         recentInvoices: [],
         recentReceipts: [],
+        recentRefunds: [],
       };
     }
 
     const invoiceIds = invoices.map((invoice) => invoice.id);
 
     // Phase 2 — lines and payments for the bounded invoice set.
-    const [lines, payments] = await Promise.all([
+    const [lines, queriedAllocations] = await Promise.all([
       this.prisma.invoiceLine.findMany({
         where: { tenantId, invoiceId: { in: invoiceIds } },
         select: {
@@ -1807,7 +1808,37 @@ export class MobileService {
         },
         orderBy: { createdAt: 'asc' },
       }),
-      this.prisma.payment.findMany({
+      this.prisma.paymentAllocation.findMany({
+        where: {
+          tenantId,
+          invoiceId: { in: invoiceIds },
+          reversedAt: null,
+          payment: {
+            status: 'SUCCESS',
+            reversedAt: null,
+          },
+        },
+        select: {
+          id: true,
+          invoiceId: true,
+          amount: true,
+          allocationType: true,
+          allocationGroupId: true,
+          reason: true,
+          allocatedAt: true,
+          payment: {
+            select: {
+              id: true,
+              method: true,
+              paidAt: true,
+            },
+          },
+        },
+      }),
+    ]);
+    let allocations = queriedAllocations;
+    if (allocations.length === 0) {
+      const legacyPayments = await this.prisma.payment.findMany({
         where: {
           tenantId,
           invoiceId: { in: invoiceIds },
@@ -1821,13 +1852,36 @@ export class MobileService {
           method: true,
           paidAt: true,
         },
-      }),
-    ]);
+      });
+      allocations = legacyPayments.map((payment) => ({
+        id: `legacy:${payment.id}`,
+        invoiceId: payment.invoiceId,
+        amount: payment.amount,
+        allocationType: 'INVOICE' as const,
+        allocationGroupId: null,
+        reason: null,
+        allocatedAt: payment.paidAt,
+        payment: {
+          id: payment.id,
+          method: payment.method,
+          paidAt: payment.paidAt,
+        },
+      }));
+    }
 
     // Phase 3 — batched fee-head and receipt lookups (tenant-scoped).
     const feeHeadIds = uniqueIds(lines.map((line) => line.feeHeadId));
-    const paymentIds = payments.map((payment) => payment.id);
-    const [feeHeads, receipts] = await Promise.all([
+    const paymentIds = uniqueIds(
+      allocations.map((allocation) => allocation.payment.id),
+    );
+    const refundIds = uniqueIds(
+      allocations.flatMap((allocation) =>
+        allocation.allocationType === 'REFUND' && allocation.allocationGroupId
+          ? [allocation.allocationGroupId]
+          : [],
+      ),
+    );
+    const [feeHeads, receipts, waivers, refunds] = await Promise.all([
       feeHeadIds.length
         ? this.prisma.feeHead.findMany({
             where: { tenantId, id: { in: feeHeadIds } },
@@ -1854,6 +1908,43 @@ export class MobileService {
               issuedAt: Date;
             }>,
           ),
+      this.prisma.feeWaiver.findMany({
+        where: {
+          tenantId,
+          studentId,
+          invoiceId: { in: invoiceIds },
+          status: 'APPROVED',
+        },
+        select: {
+          id: true,
+          invoiceId: true,
+          feeHeadId: true,
+          amount: true,
+          reason: true,
+          approvedAt: true,
+          createdAt: true,
+        },
+        orderBy: [{ approvedAt: 'desc' }, { createdAt: 'desc' }],
+        take: 50,
+      }),
+      refundIds.length
+        ? this.prisma.paymentRefund.findMany({
+            where: { tenantId, id: { in: refundIds } },
+            select: {
+              id: true,
+              refundNumber: true,
+              refundDate: true,
+              reason: true,
+            },
+          })
+        : Promise.resolve(
+            [] as Array<{
+              id: string;
+              refundNumber: string;
+              refundDate: Date;
+              reason: string;
+            }>,
+          ),
     ]);
 
     const feeHeadById = new Map(
@@ -1862,48 +1953,88 @@ export class MobileService {
     const receiptByPaymentId = new Map(
       receipts.map((receipt) => [receipt.paymentId, receipt] as const),
     );
+    const refundById = new Map(
+      refunds.map((refund) => [refund.id, refund] as const),
+    );
+    const waiversByInvoiceId = new Map<string, typeof waivers>();
+    for (const waiver of waivers) {
+      if (!waiver.invoiceId) continue;
+      const bucket = waiversByInvoiceId.get(waiver.invoiceId) ?? [];
+      bucket.push(waiver);
+      waiversByInvoiceId.set(waiver.invoiceId, bucket);
+    }
     const linesByInvoiceId = new Map<string, typeof lines>();
     for (const line of lines) {
       const bucket = linesByInvoiceId.get(line.invoiceId) ?? [];
       bucket.push(line);
       linesByInvoiceId.set(line.invoiceId, bucket);
     }
-    const paymentsByInvoiceId = new Map<string, typeof payments>();
-    for (const payment of payments) {
-      const bucket = paymentsByInvoiceId.get(payment.invoiceId) ?? [];
-      bucket.push(payment);
-      paymentsByInvoiceId.set(payment.invoiceId, bucket);
+    const allocationsByInvoiceId = new Map<string, typeof allocations>();
+    for (const allocation of allocations) {
+      if (!allocation.invoiceId) continue;
+      const bucket = allocationsByInvoiceId.get(allocation.invoiceId) ?? [];
+      bucket.push(allocation);
+      allocationsByInvoiceId.set(allocation.invoiceId, bucket);
     }
 
     const now = new Date();
     const items = invoices.map((invoice) => {
-      const invoicePayments = paymentsByInvoiceId.get(invoice.id) ?? [];
-      const totalAmount = money(invoice.totalAmount);
-      const paidAmount = invoicePayments.reduce(
-        (sum, payment) => sum + money(payment.amount),
-        0,
+      const invoiceAllocations = allocationsByInvoiceId.get(invoice.id) ?? [];
+      const totalAmount = new Prisma.Decimal(invoice.totalAmount);
+      const paidAmount = invoiceAllocations.reduce(
+        (sum, allocation) => sum.add(new Prisma.Decimal(allocation.amount)),
+        new Prisma.Decimal(0),
       );
-      const outstandingAmount = Math.max(totalAmount - paidAmount, 0);
-      const invoiceReceipts = invoicePayments.flatMap((payment) => {
-        const receipt = receiptByPaymentId.get(payment.id);
-        if (!receipt) {
-          return [];
+      const outstandingAmount = Prisma.Decimal.max(
+        new Prisma.Decimal(0),
+        totalAmount.sub(paidAmount),
+      );
+      const receiptAllocations = new Map<
+        string,
+        {
+          payment: (typeof invoiceAllocations)[number]['payment'];
+          amount: Prisma.Decimal;
         }
+      >();
+      for (const allocation of invoiceAllocations) {
+        const allocationAmount = new Prisma.Decimal(allocation.amount);
+        if (
+          allocationAmount.lte(0) ||
+          allocation.allocationType === 'REFUND' ||
+          allocation.allocationType === 'REVERSAL'
+        ) {
+          continue;
+        }
+        const current = receiptAllocations.get(allocation.payment.id);
+        receiptAllocations.set(allocation.payment.id, {
+          payment: allocation.payment,
+          amount: (current?.amount ?? new Prisma.Decimal(0)).add(
+            allocationAmount,
+          ),
+        });
+      }
+      const invoiceReceipts = Array.from(receiptAllocations.values()).flatMap(
+        ({ payment, amount }) => {
+          const receipt = receiptByPaymentId.get(payment.id);
+          if (!receipt) {
+            return [];
+          }
 
-        return [
-          {
-            id: receipt.id,
-            receiptNumber: receipt.receiptNumber,
-            invoiceId: invoice.id,
-            invoiceNumber: invoice.invoiceNumber,
-            paymentId: payment.id,
-            amount: money(payment.amount),
-            method: payment.method,
-            paidAt: toIso(payment.paidAt),
-            issuedAt: toIso(receipt.issuedAt),
-          },
-        ];
-      });
+          return [
+            {
+              id: receipt.id,
+              receiptNumber: receipt.receiptNumber,
+              invoiceId: invoice.id,
+              invoiceNumber: invoice.invoiceNumber,
+              paymentId: payment.id,
+              amount: amount.toFixed(2),
+              method: payment.method,
+              paidAt: toIso(payment.paidAt),
+              issuedAt: toIso(receipt.issuedAt),
+            },
+          ];
+        },
+      );
 
       return {
         id: invoice.id,
@@ -1911,12 +2042,12 @@ export class MobileService {
         status: invoice.status,
         dueDate: toIso(invoice.dueDate),
         issuedAt: toIso(invoice.issuedAt),
-        subtotal: money(invoice.subtotal),
-        vatAmount: money(invoice.vatAmount),
-        totalAmount,
-        paidAmount,
-        outstandingAmount,
-        isOverdue: outstandingAmount > 0 && invoice.dueDate < now,
+        subtotal: new Prisma.Decimal(invoice.subtotal).toFixed(2),
+        vatAmount: new Prisma.Decimal(invoice.vatAmount).toFixed(2),
+        totalAmount: totalAmount.toFixed(2),
+        paidAmount: paidAmount.toFixed(2),
+        outstandingAmount: outstandingAmount.toFixed(2),
+        isOverdue: outstandingAmount.gt(0) && invoice.dueDate < now,
         lines: (linesByInvoiceId.get(invoice.id) ?? []).map((line) => {
           const feeHead = feeHeadById.get(line.feeHeadId);
           return {
@@ -1927,12 +2058,46 @@ export class MobileService {
               name: feeHead?.name ?? '',
             },
             quantity: line.quantity,
-            unitAmount: money(line.unitAmount),
-            vatAmount: money(line.vatAmount),
-            totalAmount: money(line.totalAmount),
+            unitAmount: new Prisma.Decimal(line.unitAmount).toFixed(2),
+            vatAmount: new Prisma.Decimal(line.vatAmount).toFixed(2),
+            totalAmount: new Prisma.Decimal(line.totalAmount).toFixed(2),
           };
         }),
         receipts: invoiceReceipts,
+        waivers: (waiversByInvoiceId.get(invoice.id) ?? []).map((waiver) => ({
+          id: waiver.id,
+          feeHeadId: waiver.feeHeadId,
+          amount: new Prisma.Decimal(waiver.amount).toFixed(2),
+          reason: waiver.reason,
+          approvedAt: toIso(waiver.approvedAt ?? waiver.createdAt),
+        })),
+        refunds: invoiceAllocations
+          .filter(
+            (allocation) =>
+              allocation.allocationType === 'REFUND' &&
+              new Prisma.Decimal(allocation.amount).isNegative(),
+          )
+          .map((allocation) => {
+            const refund = allocation.allocationGroupId
+              ? refundById.get(allocation.allocationGroupId)
+              : null;
+            return {
+              id: allocation.allocationGroupId ?? allocation.id,
+              refundNumber: refund?.refundNumber ?? null,
+              amount: new Prisma.Decimal(allocation.amount).abs().toFixed(2),
+              reason:
+                refund?.reason ?? allocation.reason ?? 'Payment correction',
+              refundedAt: toIso(refund?.refundDate ?? allocation.allocatedAt),
+            };
+          }),
+        allocationHistory: invoiceAllocations.map((allocation) => ({
+          id: allocation.id,
+          paymentId: allocation.payment.id,
+          type: allocation.allocationType,
+          amount: new Prisma.Decimal(allocation.amount).toFixed(2),
+          reason: allocation.reason,
+          allocatedAt: toIso(allocation.allocatedAt),
+        })),
       };
     });
     const recentReceipts = items
@@ -1943,27 +2108,47 @@ export class MobileService {
           timestampOrZero(a.issuedAt ?? a.paidAt),
       )
       .slice(0, 10);
-    const totalAmount = roundMoney(
-      items.reduce((sum, item) => sum + item.totalAmount, 0),
+    const recentRefunds = items
+      .flatMap((item) =>
+        item.refunds.map((refund) => ({
+          ...refund,
+          invoiceId: item.id,
+          invoiceNumber: item.invoiceNumber,
+        })),
+      )
+      .sort(
+        (a, b) => timestampOrZero(b.refundedAt) - timestampOrZero(a.refundedAt),
+      )
+      .slice(0, 10);
+    const totalAmount = items.reduce(
+      (sum, item) => sum.add(item.totalAmount),
+      new Prisma.Decimal(0),
     );
-    const paidAmount = roundMoney(
-      items.reduce((sum, item) => sum + item.paidAmount, 0),
+    const paidAmount = items.reduce(
+      (sum, item) => sum.add(item.paidAmount),
+      new Prisma.Decimal(0),
     );
-    const totalOutstanding = roundMoney(
-      items.reduce((sum, item) => sum + item.outstandingAmount, 0),
+    const totalOutstanding = items.reduce(
+      (sum, item) => sum.add(item.outstandingAmount),
+      new Prisma.Decimal(0),
     );
 
     return {
-      status:
-        totalOutstanding <= 0 ? 'PAID' : paidAmount > 0 ? 'PARTIAL' : 'DUE',
-      totalAmount,
-      paidAmount,
-      totalOutstanding,
+      status: totalOutstanding.lte(0)
+        ? 'PAID'
+        : paidAmount.gt(0)
+          ? 'PARTIAL'
+          : 'DUE',
+      totalAmount: totalAmount.toFixed(2),
+      paidAmount: paidAmount.toFixed(2),
+      totalOutstanding: totalOutstanding.toFixed(2),
       overdueCount: items.filter((item) => item.isOverdue).length,
       nextDueDate:
-        items.find((item) => item.outstandingAmount > 0)?.dueDate ?? null,
+        items.find((item) => Number(item.outstandingAmount) > 0)?.dueDate ??
+        null,
       recentInvoices: items.slice(0, 10),
       recentReceipts,
+      recentRefunds,
     };
   }
 
@@ -2199,7 +2384,10 @@ export class MobileService {
         : {}),
       OR: [
         { audienceType: 'ALL' as const },
-        { audienceType: 'STUDENT' as const, studentTags: { some: { studentId } } },
+        {
+          audienceType: 'STUDENT' as const,
+          studentTags: { some: { studentId } },
+        },
         { audienceType: 'CLASS' as const, classId: student.classId },
         {
           audienceType: 'SECTION' as const,

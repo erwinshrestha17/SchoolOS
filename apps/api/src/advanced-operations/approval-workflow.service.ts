@@ -10,6 +10,7 @@ import {
   ApprovalFinalActionStatus,
   ApprovalRequestStatus,
   ApprovalStepStatus,
+  ApprovalWorkflowType,
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -144,6 +145,10 @@ export class ApprovalWorkflowService {
     const catalogEntry = approvalWorkflowCatalog.find(
       (entry) => entry.workflowType === dto.workflowType,
     );
+    const defaultApproverPermission =
+      catalogEntry && 'defaultApproverPermission' in catalogEntry
+        ? catalogEntry.defaultApproverPermission
+        : undefined;
     const finalActionKey =
       dto.finalActionKey ??
       policy?.finalActionKey ??
@@ -173,7 +178,10 @@ export class ApprovalWorkflowService {
         idempotencyKey: dto.idempotencyKey ?? null,
         deadlineAt,
         steps: {
-          create: this.buildSteps(policy).map((step) => ({
+          create: this.buildSteps(
+            policy,
+            defaultApproverPermission,
+          ).map((step) => ({
             tenantId: actor.tenantId,
             ...step,
           })),
@@ -237,6 +245,14 @@ export class ApprovalWorkflowService {
     );
     if (!step) {
       throw new ConflictException('No pending approval step remains');
+    }
+    if (
+      request.workflowType === ApprovalWorkflowType.FISCAL_PERIOD_REOPEN &&
+      request.requestedById === actor.userId
+    ) {
+      throw new ForbiddenException(
+        'The person requesting a fiscal-period reopen cannot approve the same request.',
+      );
     }
     this.assertStepActor(step, actor, request.delegatedToId);
 
@@ -423,7 +439,9 @@ export class ApprovalWorkflowService {
     if (!pendingStep) {
       throw new ConflictException('No pending approval step remains');
     }
-    this.assertStepActor(pendingStep, actor, request.delegatedToId);
+    if (!actor.permissions.includes('advanced:approvals:manage')) {
+      this.assertStepActor(pendingStep, actor, request.delegatedToId);
+    }
 
     const delegate = await this.prisma.user.findFirst({
       where: {
@@ -566,6 +584,7 @@ export class ApprovalWorkflowService {
 
   private buildSteps(
     policy: { approverRoles: unknown; approverPermissions: unknown } | null,
+    defaultApproverPermission?: string,
   ) {
     const roles = Array.isArray(policy?.approverRoles)
       ? (policy?.approverRoles as string[])
@@ -573,6 +592,9 @@ export class ApprovalWorkflowService {
     const permissions = Array.isArray(policy?.approverPermissions)
       ? (policy?.approverPermissions as string[])
       : [];
+    if (permissions.length === 0 && defaultApproverPermission) {
+      permissions.push(defaultApproverPermission);
+    }
     const count = Math.max(roles.length, permissions.length, 1);
     return Array.from({ length: count }, (_, index) => ({
       sequence: index + 1,
@@ -595,6 +617,10 @@ export class ApprovalWorkflowService {
       throw new ForbiddenException(
         'This approval step is delegated to another user',
       );
+    }
+    if (step.approverRole || step.approverPermission) {
+      if (this.canUserDecideStep(step, actor.roles, actor.permissions)) return;
+      throw new ForbiddenException('You cannot decide this approval step');
     }
     if (
       actor.roles.includes('admin') ||

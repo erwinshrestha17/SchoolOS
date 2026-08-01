@@ -8,6 +8,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { AssignPermissionsDto } from './dto/assign-permissions.dto';
 import { AssignRoleDto } from './dto/assign-role.dto';
 import { CreateRoleDto } from './dto/create-role.dto';
+import { ReconcileFinancePermissionsDto } from './dto/reconcile-finance-permissions.dto';
 import { RolesService } from './roles.service';
 
 @Controller('roles')
@@ -37,6 +38,23 @@ export class RolesController {
   @Permissions('roles:assign')
   assignRoles(@Body() dto: AssignRoleDto, @CurrentAuth() auth: AuthContext) {
     return this.rolesService.assignRoles(dto, auth);
+  }
+
+  @Get('finance-reconciliation')
+  @Permissions('roles:manage_permissions')
+  previewFinancePermissionReconciliation(
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.rolesService.previewFinancePermissionReconciliation(auth);
+  }
+
+  @Post('finance-reconciliation/apply')
+  @Permissions('roles:manage_permissions')
+  reconcileFinancePermissions(
+    @Body() dto: ReconcileFinancePermissionsDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.rolesService.reconcileFinancePermissions(dto.reason, auth);
   }
 
   @Post(':id/permissions')

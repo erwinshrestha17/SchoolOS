@@ -287,7 +287,7 @@ describe('fiscal period lifecycle management', () => {
       label: '2026-04',
       fiscalYear: { status: 'OPEN' },
     };
-    const { service, prisma } = buildService({
+    const { service, prisma, approvalWorkflowService } = buildService({
       fiscalPeriod: period,
     });
 
@@ -297,14 +297,16 @@ describe('fiscal period lifecycle management', () => {
       actor,
     );
 
-    expect(prisma.fiscalPeriod.update).toHaveBeenCalledWith(
+    expect(approvalWorkflowService.createRequest).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({
-          status: 'OPEN',
-          reopenReason: 'Audit adjustment',
-        }),
+        workflowType: 'FISCAL_PERIOD_REOPEN',
+        targetId: 'p1',
+        reason: 'Audit adjustment',
+        finalActionKey: 'accounting.fiscal_period.reopen',
       }),
+      actor,
     );
+    expect(prisma.fiscalPeriod.update).not.toHaveBeenCalled();
   });
 
   it('rejects reopening a period in a CLOSED fiscal year', async () => {
@@ -627,15 +629,25 @@ function buildService(options: {
       return Promise.resolve();
     }),
   };
+  const approvalWorkflowService = {
+    registerFinalAction: jest.fn(),
+    createRequest: jest.fn().mockResolvedValue({
+      id: 'approval-1',
+      status: 'PENDING',
+      targetId: 'p1',
+    }),
+  };
 
   return {
     service: new AccountingService(
       prisma as never,
       auditService as never,
       postingService as never,
+      approvalWorkflowService as never,
     ),
     prisma,
     auditService,
     postingService,
+    approvalWorkflowService,
   };
 }

@@ -123,7 +123,7 @@ export class ResultPublishingService {
           card.studentId,
           actor,
         );
-        if (ledger.outstandingBalance > 0) {
+        if (Number(ledger.outstandingBalance) > 0) {
           blockedReasons.push(
             `Student has outstanding dues of ${ledger.outstandingBalance}`,
           );
@@ -218,7 +218,7 @@ export class ResultPublishingService {
           card.studentId,
           actor,
         );
-        if (ledger.outstandingBalance > 0) {
+        if (Number(ledger.outstandingBalance) > 0) {
           results.skipped++;
           results.failed.push({
             id: card.id,

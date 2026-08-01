@@ -168,11 +168,17 @@ model UserRole {
   scopeId      String?
   assignedById String?
   assignedAt   DateTime @default(now())
+  expiresAt    DateTime?
+  revokedAt    DateTime?
+  revokedById  String?
+  revokeReason String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@unique([userId, roleId, scopeId])
+  @@index([tenantId, userId, revokedAt, expiresAt])
+  @@index([tenantId, roleId, revokedAt, expiresAt])
 }
 
 model RolePermission {

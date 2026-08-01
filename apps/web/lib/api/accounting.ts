@@ -15,6 +15,7 @@ import type {
   BankStatementImportJobStatus,
   BankStatementLineSummary,
   AccountingPeriodSummary,
+  AccountingPostingBatchSummary,
   AccountingReport,
   AccountingSourceMappingHealth,
   AccountingSourceMappingSummary,
@@ -23,6 +24,7 @@ import type {
   FiscalPeriodCloseReadiness,
   FiscalYearCloseReadiness,
   FiscalYearSummary,
+  FinancialAuditLogSummary,
   JournalEntryView,
   PaginatedResult,
 } from "@schoolos/core";
@@ -57,6 +59,20 @@ export const accountingApi = {
     (await accountingApi.listLedgerEntriesPage({ limit: 25 })).items,
   listAccountingPeriods: () =>
     request<AccountingPeriodSummary[]>("/accounting/periods"),
+  listPostingBatches: (params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    sourceModule?: string;
+  }) =>
+    request<PaginatedResult<AccountingPostingBatchSummary>>(
+      withQuery("/accounting/posting-batches", params ?? {}),
+    ),
+  retryPostingBatch: (id: string) =>
+    request<AccountingPostingBatchSummary>(
+      `/accounting/posting-batches/${encodeURIComponent(id)}/retry`,
+      { method: "POST", json: {} },
+    ),
   listChartAccounts: () =>
     request<ChartAccountSummary[]>("/accounting/accounts"),
   listChartAccountTree: () =>
@@ -201,7 +217,7 @@ export const accountingApi = {
     page?: number;
     limit?: number;
   }) =>
-    request<PaginatedResult<Record<string, unknown>>>(
+    request<PaginatedResult<FinancialAuditLogSummary>>(
       withQuery("/accounting/reports/financial-audit-trail", params ?? {}),
     ),
   listTaxSummary: (params: AccountingReportFilters) =>

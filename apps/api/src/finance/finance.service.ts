@@ -7,22 +7,26 @@ import {
   Optional,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import {
   AccountingPeriodStatus,
   AudienceType,
+  CashDepositStatus,
+  CashierCloseStatus,
   ConsentType,
   InvoiceStatus,
   JournalLineSide,
   JournalSourceType,
   NotificationChannel,
   PaymentMethod,
+  PaymentAllocationType,
   PaymentStatus,
   OnlinePaymentIntentStatus,
   Prisma,
   ChartAccountType,
   FeeFrequency,
   FileAsset,
+  CashDeposit,
   AuthMethod,
   FinanceRequestType,
   FinanceRequestStatus,
@@ -63,6 +67,12 @@ import { InitiateOnlinePaymentDto } from './dto/initiate-online-payment.dto';
 import { CreateFinanceRequestDto } from './dto/create-finance-request.dto';
 import { ReviewFinanceRequestDto } from './dto/review-finance-request.dto';
 import { CreateCashierCloseDto } from './dto/create-cashier-close.dto';
+import { OpenCashierCloseDto } from './dto/open-cashier-close.dto';
+import { CountCashierCloseDto } from './dto/count-cashier-close.dto';
+import {
+  CashierCloseTransitionDto,
+  DepositCashierCloseDto,
+} from './dto/cashier-close-transition.dto';
 import { CreateDiscountRuleDto } from './dto/create-discount-rule.dto';
 import { CreateFeeDueScheduleDto } from './dto/create-fee-due-schedule.dto';
 import { CreateFeeHeadDto } from './dto/create-fee-head.dto';
@@ -81,11 +91,17 @@ import { VoidInvoiceDto } from './dto/void-invoice.dto';
 import { resolveCashAccountCode } from './finance.defaults';
 import { ReprintReceiptDto } from './dto/reprint-receipt.dto';
 import { ReversePaymentDto } from './dto/reverse-payment.dto';
+import { ReallocatePaymentDto } from './dto/reallocate-payment.dto';
 import { DuesQueryDto } from './dto/dues-query.dto';
 import { FeeAgingBucket, ListDefaultersDto } from './dto/list-defaulters.dto';
 import { FinanceDashboardSummaryQueryDto } from './dto/finance-dashboard-summary-query.dto';
 import { FinanceReportQueryDto } from './dto/finance-report-query.dto';
 import { StudentFeeLedgerQueryDto } from './dto/student-fee-ledger-query.dto';
+import {
+  CashDepositTransitionDto,
+  ListCashDepositsDto,
+  PrepareCashDepositDto,
+} from './dto/cash-deposit.dto';
 import {
   BaseFinanceListQueryDto,
   ListBillingRunsQueryDto,
@@ -93,6 +109,7 @@ import {
   ListFinanceApprovalRequestsQueryDto,
   ListInvoicesQueryDto,
   ListLedgerEntriesQueryDto,
+  ListPaymentAllocationsQueryDto,
   ListPaymentsQueryDto,
   ListReceiptsQueryDto,
   ListWaiversQueryDto,
@@ -110,10 +127,15 @@ import {
 
 interface CollectedPaymentWithReceipt {
   id: string;
-  invoiceId: string;
+  invoiceId: string | null;
   amount: Prisma.Decimal;
   method: PaymentMethod;
   paidAt: Date;
+  allocations?: Array<{
+    invoiceId: string | null;
+    amount: Prisma.Decimal;
+    allocationType: PaymentAllocationType;
+  }>;
   receipt: {
     id: string;
     receiptNumber: string;
@@ -141,7 +163,7 @@ export interface FeeCollectionReportRow {
   paidAmount: number;
   refundAmount: number;
   netCollectedAmount: number;
-  status: InvoiceStatus;
+  status: InvoiceStatus | PaymentStatus;
 }
 
 export interface DefaulterAgingReportRow {
@@ -166,6 +188,7 @@ export interface DefaulterAgingReportRow {
 }
 
 export interface InvoiceRegisterRow {
+  invoiceId: string;
   invoiceNumber: string;
   studentSystemId: string;
   studentName: string;
@@ -173,14 +196,17 @@ export interface InvoiceRegisterRow {
   sectionName: string;
   billingPeriod: string;
   feeHeadNames: string;
-  grossAmount: number;
-  discountAmount: number;
-  netAmount: number;
-  paidAmount: number;
-  balanceAmount: number;
+  grossAmount: string;
+  discountAmount: string;
+  netAmount: string;
+  paidAmount: string;
+  balanceAmount: string;
   dueDate: Date;
   issuedAt: Date;
   status: InvoiceStatus;
+  journalEntryId: string | null;
+  journalEntryNumber: string | null;
+  postingStatus: 'POSTED' | 'PENDING';
 }
 
 export interface ReceiptRegisterRow {
@@ -189,9 +215,9 @@ export interface ReceiptRegisterRow {
   studentSystemId: string;
   studentName: string;
   invoiceNumber: string;
-  amount: number;
-  refundedAmount: number;
-  netAmount: number;
+  amount: string;
+  refundedAmount: string;
+  netAmount: string;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
   cashierEmail: string | null;
@@ -221,7 +247,7 @@ export interface RefundReversalRegisterRow {
   invoiceNumber: string;
   studentSystemId: string;
   studentName: string;
-  amount: number;
+  amount: string;
   reason: string;
   processedAt: Date;
   requestedByEmail: string | null;
@@ -274,6 +300,11 @@ type CashierCloseWithUsers = Prisma.CashierCloseGetPayload<{
     closedBy: { select: { id: true; email: true } };
   };
 }>;
+
+const cashierCloseUserInclude = {
+  collectorUser: { select: { id: true, email: true } },
+  closedBy: { select: { id: true, email: true } },
+} as const;
 
 interface CollectionStudentSearchRow {
   id: string;
@@ -481,7 +512,7 @@ export class FinanceService {
         status: PaymentStatus.SUCCESS,
         paidAt: {
           gte:
-            latestClose && latestClose.closedAt > period.startUtc
+            latestClose?.closedAt && latestClose.closedAt > period.startUtc
               ? latestClose.closedAt
               : period.startUtc,
           lt: period.endExclusiveUtc,
@@ -533,7 +564,7 @@ export class FinanceService {
         state: cashierState,
         latestCloseId: latestClose?.id ?? null,
         latestCloseNumber: latestClose?.closeNumber ?? null,
-        latestClosedAt: latestClose?.closedAt.toISOString() ?? null,
+        latestClosedAt: latestClose?.closedAt?.toISOString() ?? null,
         unclosedPaymentCount,
       },
       receiptsIssued,
@@ -624,6 +655,11 @@ export class FinanceService {
 
     const student = receipt.payment.student;
     const invoice = receipt.payment.invoice;
+    if (!invoice) {
+      throw new ConflictException(
+        'This receipt is not linked to an invoice and cannot be reprinted.',
+      );
+    }
 
     const pdf = buildReceiptPdf({
       schoolName: school?.name || 'SchoolOS',
@@ -830,6 +866,7 @@ export class FinanceService {
           billingRun: true,
           lines: { include: { feeHead: true } },
           payments: { include: { refunds: true } },
+          paymentAllocations: { where: { reversedAt: null } },
         },
         orderBy: [{ dueDate: 'asc' }, { createdAt: 'asc' }],
         skip,
@@ -857,7 +894,10 @@ export class FinanceService {
     }
 
     const allRows = invoices.flatMap((invoice) => {
-      const netPaidTotal = sumNetPaidAmount(invoice.payments);
+      const netPaidTotal = sumInvoiceAllocationAmount(
+        invoice.paymentAllocations,
+        invoice.payments,
+      );
       let remainingPaid = netPaidTotal;
 
       return invoice.lines
@@ -902,20 +942,20 @@ export class FinanceService {
                   label: `${invoice.billingRun.runYear}-${String(invoice.billingRun.runMonth).padStart(2, '0')}`,
                 }
               : null,
-            originalAmount: Number(lineBilled),
-            discountAmount: 0,
-            fineAmount: 0,
-            paidAmount: Number(linePaid),
-            remainingDue: Number(outstanding),
+            originalAmount: lineBilled.toFixed(2),
+            discountAmount: '0.00',
+            fineAmount: '0.00',
+            paidAmount: linePaid.toFixed(2),
+            remainingDue: outstanding.toFixed(2),
             status: resolveDuesRowStatus(
               invoice.dueDate,
               linePaid,
               outstanding,
             ),
-            billed: Number(lineBilled),
-            waived: Number(lineWaiver),
-            paid: Number(linePaid),
-            outstanding: Number(outstanding),
+            billed: lineBilled.toFixed(2),
+            waived: lineWaiver.toFixed(2),
+            paid: linePaid.toFixed(2),
+            outstanding: outstanding.toFixed(2),
             dueDate: invoice.dueDate,
             invoiceNumber: invoice.invoiceNumber,
             agingBucket,
@@ -936,13 +976,18 @@ export class FinanceService {
         totalPages: Math.ceil(totalCount / limit),
       },
       summary: {
-        totalBilled: filteredRows.reduce((sum, r) => sum + r.billed, 0),
-        totalWaived: filteredRows.reduce((sum, r) => sum + r.waived, 0),
-        totalPaid: filteredRows.reduce((sum, r) => sum + r.paid, 0),
-        totalOutstanding: filteredRows.reduce(
-          (sum, r) => sum + r.outstanding,
-          0,
-        ),
+        totalBilled: filteredRows
+          .reduce((sum, row) => sum.add(row.billed), new Prisma.Decimal(0))
+          .toFixed(2),
+        totalWaived: filteredRows
+          .reduce((sum, row) => sum.add(row.waived), new Prisma.Decimal(0))
+          .toFixed(2),
+        totalPaid: filteredRows
+          .reduce((sum, row) => sum.add(row.paid), new Prisma.Decimal(0))
+          .toFixed(2),
+        totalOutstanding: filteredRows
+          .reduce((sum, row) => sum.add(row.outstanding), new Prisma.Decimal(0))
+          .toFixed(2),
       },
     };
   }
@@ -1311,7 +1356,15 @@ export class FinanceService {
       }),
       this.prisma.discountRule.count({ where }),
     ]);
-    return buildFinancePage(items, total, pagination);
+    return buildFinancePage(
+      items.map((item) => ({
+        ...item,
+        percentOff: item.percentOff?.toFixed(2) ?? null,
+        amountOff: item.amountOff?.toFixed(2) ?? null,
+      })),
+      total,
+      pagination,
+    );
   }
 
   async createDiscountRule(dto: CreateDiscountRuleDto, actor: AuthContext) {
@@ -1356,7 +1409,11 @@ export class FinanceService {
       },
     });
 
-    return discount;
+    return {
+      ...discount,
+      percentOff: discount.percentOff?.toFixed(2) ?? null,
+      amountOff: discount.amountOff?.toFixed(2) ?? null,
+    };
   }
 
   async listWaivers(query: ListWaiversQueryDto, actor: AuthContext) {
@@ -1420,7 +1477,11 @@ export class FinanceService {
       }),
       this.prisma.feeWaiver.count({ where }),
     ]);
-    return buildFinancePage(items, total, pagination);
+    return buildFinancePage(
+      items.map((item) => ({ ...item, amount: item.amount.toFixed(2) })),
+      total,
+      pagination,
+    );
   }
 
   async createWaiver(dto: CreateFeeWaiverDto, actor: AuthContext) {
@@ -1442,7 +1503,10 @@ export class FinanceService {
     const invoice = dto.invoiceId
       ? await this.prisma.invoice.findFirst({
           where: { id: dto.invoiceId, tenantId: actor.tenantId },
-          include: { payments: { include: { refunds: true } } },
+          include: {
+            payments: { include: { refunds: true } },
+            paymentAllocations: { where: { reversedAt: null } },
+          },
         })
       : null;
 
@@ -1490,7 +1554,9 @@ export class FinanceService {
     }
 
     const amount = new Prisma.Decimal(dto.amount);
-    const paidAmount = invoice ? sumNetPaidAmount(invoice.payments) : null;
+    const paidAmount = invoice
+      ? sumInvoiceAllocationAmount(invoice.paymentAllocations, invoice.payments)
+      : null;
     const newSubtotal = invoice ? invoice.subtotal.sub(amount) : null;
     const newTotal = invoice ? invoice.totalAmount.sub(amount) : null;
 
@@ -1569,7 +1635,7 @@ export class FinanceService {
       },
     });
 
-    return waiver;
+    return { ...waiver, amount: waiver.amount.toFixed(2) };
   }
 
   async listDueSchedules(actor: AuthContext) {
@@ -2081,6 +2147,7 @@ export class FinanceService {
             },
           },
         },
+        allocations: { where: { reversedAt: null } },
         invoice: {
           include: {
             lines: {
@@ -2105,10 +2172,12 @@ export class FinanceService {
         new Prisma.Decimal(0),
       );
 
-      const grossAmount = p.invoice.lines.reduce(
-        (sum, l) => sum.add(l.unitAmount.mul(l.quantity)),
-        new Prisma.Decimal(0),
-      );
+      const grossAmount = p.invoice
+        ? p.invoice.lines.reduce(
+            (sum, l) => sum.add(l.unitAmount.mul(l.quantity)),
+            new Prisma.Decimal(0),
+          )
+        : p.amount;
 
       const discountAmount = new Prisma.Decimal(0);
       const waiverAmount = new Prisma.Decimal(0);
@@ -2125,9 +2194,11 @@ export class FinanceService {
         sectionName: p.student.sectionRef?.name || '-',
         guardianName: guardian?.fullName || '-',
         guardianPhone: guardian?.primaryPhone || '-',
-        invoiceNumber: p.invoice.invoiceNumber,
+        invoiceNumber: p.invoice?.invoiceNumber ?? 'Unallocated payment',
         feeHeadName:
-          p.invoice.lines.length === 1 ? p.invoice.lines[0].feeHead.name : null,
+          p.invoice?.lines.length === 1
+            ? p.invoice.lines[0].feeHead.name
+            : null,
         paymentMethod: p.method,
         collectedBy: p.collectedBy?.email || 'System',
         grossAmount: Number(grossAmount),
@@ -2136,7 +2207,7 @@ export class FinanceService {
         paidAmount: Number(paidAmount),
         refundAmount: Number(refundAmount),
         netCollectedAmount: Number(netCollectedAmount),
-        status: p.invoice.status,
+        status: p.invoice?.status ?? p.status,
       } satisfies FeeCollectionReportRow;
     });
 
@@ -2356,10 +2427,24 @@ export class FinanceService {
         payments: {
           include: { refunds: true },
         },
+        paymentAllocations: { where: { reversedAt: null } },
         academicYear: { select: { name: true } },
       },
       orderBy: [{ issuedAt: 'desc' }, { invoiceNumber: 'desc' }],
+      take: 5000,
     });
+    const journalEntries = await this.prisma.journalEntry.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        sourceType: JournalSourceType.INVOICE,
+        sourceId: { in: invoices.map((invoice) => invoice.id) },
+      },
+      select: { id: true, sourceId: true, entryNumber: true },
+      take: 5000,
+    });
+    const journalByInvoiceId = new Map(
+      journalEntries.map((entry) => [entry.sourceId, entry]),
+    );
 
     const rows: InvoiceRegisterRow[] = invoices.map((invoice) => {
       const grossAmount = invoice.lines.reduce(
@@ -2368,17 +2453,18 @@ export class FinanceService {
       );
       const discountAmount = invoice.lines.reduce(
         (sum, line) =>
-          sum.add(
-            line.unitAmount
-              .mul(line.quantity)
-              .sub(line.totalAmount),
-          ),
+          sum.add(line.unitAmount.mul(line.quantity).sub(line.totalAmount)),
         new Prisma.Decimal(0),
       );
-      const paidAmount = sumNetPaidAmount(invoice.payments);
+      const paidAmount = sumInvoiceAllocationAmount(
+        invoice.paymentAllocations,
+        invoice.payments,
+      );
       const netAmount = invoice.totalAmount;
+      const journalEntry = journalByInvoiceId.get(invoice.id);
 
       return {
+        invoiceId: invoice.id,
         invoiceNumber: invoice.invoiceNumber,
         studentSystemId: invoice.student.studentSystemId,
         studentName: formatStudentName(invoice.student),
@@ -2386,23 +2472,29 @@ export class FinanceService {
         sectionName: invoice.student.sectionRef?.name || '-',
         billingPeriod: invoice.academicYear.name,
         feeHeadNames: invoice.lines.map((line) => line.feeHead.name).join(', '),
-        grossAmount: Number(grossAmount),
-        discountAmount: Number(discountAmount),
-        netAmount: Number(netAmount),
-        paidAmount: Number(paidAmount),
-        balanceAmount: Math.max(0, Number(netAmount.sub(paidAmount))),
+        grossAmount: grossAmount.toFixed(2),
+        discountAmount: discountAmount.toFixed(2),
+        netAmount: netAmount.toFixed(2),
+        paidAmount: paidAmount.toFixed(2),
+        balanceAmount: Prisma.Decimal.max(
+          new Prisma.Decimal(0),
+          netAmount.sub(paidAmount),
+        ).toFixed(2),
         dueDate: invoice.dueDate,
         issuedAt: invoice.issuedAt,
         status: invoice.status,
+        journalEntryId: journalEntry?.id ?? null,
+        journalEntryNumber: journalEntry?.entryNumber ?? null,
+        postingStatus: journalEntry ? 'POSTED' : 'PENDING',
       };
     });
 
     const summary = {
       totalInvoices: rows.length,
-      totalGrossAmount: rows.reduce((sum, row) => sum + row.grossAmount, 0),
-      totalNetAmount: rows.reduce((sum, row) => sum + row.netAmount, 0),
-      totalPaidAmount: rows.reduce((sum, row) => sum + row.paidAmount, 0),
-      totalBalanceAmount: rows.reduce((sum, row) => sum + row.balanceAmount, 0),
+      totalGrossAmount: sumMoneyStrings(rows.map((row) => row.grossAmount)),
+      totalNetAmount: sumMoneyStrings(rows.map((row) => row.netAmount)),
+      totalPaidAmount: sumMoneyStrings(rows.map((row) => row.paidAmount)),
+      totalBalanceAmount: sumMoneyStrings(rows.map((row) => row.balanceAmount)),
     };
 
     return { rows, summary };
@@ -2437,13 +2529,19 @@ export class FinanceService {
         ...(filters.fromDate || filters.toDate
           ? {
               issuedAt: {
-                ...(filters.fromDate ? { gte: new Date(filters.fromDate) } : {}),
+                ...(filters.fromDate
+                  ? { gte: new Date(filters.fromDate) }
+                  : {}),
                 ...(filters.toDate ? { lte: new Date(filters.toDate) } : {}),
               },
             }
           : {}),
         ...(filters.paymentMethod
-          ? { payment: { is: { method: filters.paymentMethod as PaymentMethod } } }
+          ? {
+              payment: {
+                is: { method: filters.paymentMethod as PaymentMethod },
+              },
+            }
           : {}),
       },
       include: {
@@ -2463,6 +2561,7 @@ export class FinanceService {
         },
       },
       orderBy: [{ issuedAt: 'desc' }, { receiptNumber: 'desc' }],
+      take: 5000,
     });
 
     const rows: ReceiptRegisterRow[] = receipts.map((receipt) => {
@@ -2473,10 +2572,11 @@ export class FinanceService {
         issuedAt: receipt.issuedAt,
         studentSystemId: receipt.payment.student.studentSystemId,
         studentName: formatStudentName(receipt.payment.student),
-        invoiceNumber: receipt.payment.invoice.invoiceNumber,
-        amount: Number(amount),
-        refundedAmount: Number(refundedAmount),
-        netAmount: Number(amount.sub(refundedAmount)),
+        invoiceNumber:
+          receipt.payment.invoice?.invoiceNumber ?? 'Unallocated payment',
+        amount: amount.toFixed(2),
+        refundedAmount: refundedAmount.toFixed(2),
+        netAmount: amount.sub(refundedAmount).toFixed(2),
         paymentMethod: receipt.payment.method,
         paymentStatus: receipt.payment.status,
         cashierEmail: receipt.payment.collectedBy?.email ?? null,
@@ -2487,12 +2587,11 @@ export class FinanceService {
 
     const summary = {
       totalReceipts: rows.length,
-      totalAmount: rows.reduce((sum, row) => sum + row.amount, 0),
-      totalRefundedAmount: rows.reduce(
-        (sum, row) => sum + row.refundedAmount,
-        0,
+      totalAmount: sumMoneyStrings(rows.map((row) => row.amount)),
+      totalRefundedAmount: sumMoneyStrings(
+        rows.map((row) => row.refundedAmount),
       ),
-      totalNetAmount: rows.reduce((sum, row) => sum + row.netAmount, 0),
+      totalNetAmount: sumMoneyStrings(rows.map((row) => row.netAmount)),
     };
 
     return { rows, summary };
@@ -2509,7 +2608,9 @@ export class FinanceService {
         ...(filters.fromDate || filters.toDate
           ? {
               issuedAt: {
-                ...(filters.fromDate ? { gte: new Date(filters.fromDate) } : {}),
+                ...(filters.fromDate
+                  ? { gte: new Date(filters.fromDate) }
+                  : {}),
                 ...(filters.toDate ? { lte: new Date(filters.toDate) } : {}),
               },
             }
@@ -2523,6 +2624,7 @@ export class FinanceService {
         },
       },
       orderBy: [{ fiscalYear: 'asc' }, { receiptNumber: 'asc' }],
+      take: 5000,
     });
 
     const rows: ReceiptSequenceExceptionRow[] = [];
@@ -2651,7 +2753,11 @@ export class FinanceService {
 
   async getRefundReversalRegisterRows(
     actor: AuthContext,
-    filters: { fromDate?: string; toDate?: string; recordType?: 'REFUND' | 'REVERSAL' },
+    filters: {
+      fromDate?: string;
+      toDate?: string;
+      recordType?: 'REFUND' | 'REVERSAL';
+    },
   ) {
     const fromDate = filters.fromDate ? new Date(filters.fromDate) : undefined;
     const toDate = filters.toDate ? new Date(filters.toDate) : undefined;
@@ -2689,6 +2795,7 @@ export class FinanceService {
           createdBy: { select: { email: true } },
         },
         orderBy: [{ refundDate: 'desc' }],
+        take: 5000,
       });
 
       const refundJournalEntries = await this.prisma.journalEntry.findMany({
@@ -2703,7 +2810,10 @@ export class FinanceService {
         },
       });
       const refundJournalMap = new Map(
-        refundJournalEntries.map((entry) => [entry.sourceId, entry.entryNumber]),
+        refundJournalEntries.map((entry) => [
+          entry.sourceId,
+          entry.entryNumber,
+        ]),
       );
 
       for (const refund of refunds) {
@@ -2713,10 +2823,11 @@ export class FinanceService {
           recordNumber: refund.refundNumber,
           originalReceiptNumber: refund.payment.receipt?.receiptNumber ?? null,
           originalPaymentId: refund.paymentId,
-          invoiceNumber: refund.payment.invoice.invoiceNumber,
+          invoiceNumber:
+            refund.payment.invoice?.invoiceNumber ?? 'Unallocated payment',
           studentSystemId: refund.payment.student.studentSystemId,
           studentName: formatStudentName(refund.payment.student),
-          amount: Number(refund.amount),
+          amount: refund.amount.toFixed(2),
           reason: refund.reason,
           processedAt: refund.refundDate,
           requestedByEmail:
@@ -2758,6 +2869,7 @@ export class FinanceService {
           },
         },
         orderBy: [{ reversedAt: 'desc' }],
+        take: 5000,
       });
 
       const reversalEntries = await this.prisma.journalEntry.findMany({
@@ -2787,11 +2899,13 @@ export class FinanceService {
           recordNumber: payment.receipt?.receiptNumber ?? payment.id,
           originalReceiptNumber: payment.receipt?.receiptNumber ?? null,
           originalPaymentId: payment.id,
-          invoiceNumber: payment.invoice.invoiceNumber,
+          invoiceNumber:
+            payment.invoice?.invoiceNumber ?? 'Unallocated payment',
           studentSystemId: payment.student.studentSystemId,
           studentName: formatStudentName(payment.student),
-          amount: Number(payment.amount),
-          reason: payment.reversalReason ?? approval?.reason ?? 'Payment reversed',
+          amount: payment.amount.toFixed(2),
+          reason:
+            payment.reversalReason ?? approval?.reason ?? 'Payment reversed',
           processedAt: payment.reversedAt ?? payment.paidAt,
           requestedByEmail: approval?.requestedBy.email ?? null,
           approvedByEmail: approval?.reviewedBy?.email ?? null,
@@ -2814,7 +2928,7 @@ export class FinanceService {
         refundCount: rows.filter((row) => row.recordType === 'REFUND').length,
         reversalCount: rows.filter((row) => row.recordType === 'REVERSAL')
           .length,
-        totalAmount: rows.reduce((sum, row) => sum + row.amount, 0),
+        totalAmount: sumMoneyStrings(rows.map((row) => row.amount)),
       },
     };
   }
@@ -3003,6 +3117,11 @@ export class FinanceService {
             },
             orderBy: { paidAt: 'desc' },
           },
+          paymentAllocations: {
+            where: { reversedAt: null },
+            include: { payment: { include: { receipt: true } } },
+            orderBy: [{ allocatedAt: 'desc' }, { id: 'asc' }],
+          },
         },
         orderBy: [{ [sortBy]: sortDirection }, { id: 'asc' }],
         skip: pagination.skip,
@@ -3012,9 +3131,13 @@ export class FinanceService {
     ]);
 
     const items = invoices.map((invoice) => {
-      const lastPayment = invoice.payments[0];
+      const lastPayment =
+        invoice.paymentAllocations[0]?.payment ?? invoice.payments[0];
       const receipt = lastPayment?.receipt;
-      const paidAmount = sumNetPaidAmount(invoice.payments);
+      const paidAmount = sumInvoiceAllocationAmount(
+        invoice.paymentAllocations,
+        invoice.payments,
+      );
 
       return {
         id: invoice.id,
@@ -3022,17 +3145,17 @@ export class FinanceService {
         status: invoice.status,
         dueDate: invoice.dueDate,
         issuedAt: invoice.issuedAt,
-        totalAmount: Number(invoice.totalAmount),
+        totalAmount: invoice.totalAmount.toFixed(2),
         student: {
           id: invoice.student.id,
           name: `${invoice.student.firstNameEn} ${invoice.student.lastNameEn}`.trim(),
           studentSystemId: invoice.student.studentSystemId,
         },
-        paidAmount: Number(paidAmount),
-        outstandingAmount: Math.max(
-          0,
-          Number(invoice.totalAmount.sub(paidAmount)),
-        ),
+        paidAmount: paidAmount.toFixed(2),
+        outstandingAmount: Prisma.Decimal.max(
+          new Prisma.Decimal(0),
+          invoice.totalAmount.sub(paidAmount),
+        ).toFixed(2),
         receiptId: receipt?.id || null,
         receiptNumber: receipt?.receiptNumber || null,
       };
@@ -3067,6 +3190,21 @@ export class FinanceService {
           },
           orderBy: [{ paidAt: 'asc' }, { createdAt: 'asc' }],
         },
+        paymentAllocations: {
+          where: { reversedAt: null },
+          include: {
+            payment: {
+              include: {
+                collectedBy: { select: { id: true, email: true } },
+                receipt: true,
+                refunds: {
+                  orderBy: [{ refundDate: 'asc' }, { createdAt: 'asc' }],
+                },
+              },
+            },
+          },
+          orderBy: [{ allocatedAt: 'asc' }, { createdAt: 'asc' }],
+        },
         student: {
           include: {
             class: true,
@@ -3098,14 +3236,22 @@ export class FinanceService {
         },
         orderBy: [{ createdAt: 'asc' }],
       }),
-      invoice.payments.length === 0
+      invoice.payments.length === 0 &&
+      (invoice.paymentAllocations?.length ?? 0) === 0
         ? Promise.resolve([])
         : this.prisma.journalEntry.findMany({
             where: {
               tenantId: actor.tenantId,
               sourceType: JournalSourceType.FEE_PAYMENT,
               sourceId: {
-                in: invoice.payments.map((payment) => payment.id),
+                in: Array.from(
+                  new Set([
+                    ...invoice.payments.map((payment) => payment.id),
+                    ...(invoice.paymentAllocations ?? []).map(
+                      (allocation) => allocation.paymentId,
+                    ),
+                  ]),
+                ),
               },
             },
             orderBy: [{ entryDate: 'asc' }, { createdAt: 'asc' }],
@@ -3118,11 +3264,51 @@ export class FinanceService {
           : [],
       ),
     );
-    const paidAmount = sumNetPaidAmount(invoice.payments);
+    const paidAmount = sumInvoiceAllocationAmount(
+      invoice.paymentAllocations ?? [],
+      invoice.payments,
+    );
     const outstandingAmount = invoice.totalAmount.sub(paidAmount);
     const primaryGuardian =
       invoice.student.guardianLinks.find((link) => link.isPrimary) ??
       invoice.student.guardianLinks[0];
+    const allocationPayments = new Map<
+      string,
+      {
+        payment: (typeof invoice.paymentAllocations)[number]['payment'];
+        allocatedAmount: Prisma.Decimal;
+        refundedAmount: Prisma.Decimal;
+      }
+    >();
+    for (const allocation of invoice.paymentAllocations ?? []) {
+      const current = allocationPayments.get(allocation.paymentId) ?? {
+        payment: allocation.payment,
+        allocatedAmount: new Prisma.Decimal(0),
+        refundedAmount: new Prisma.Decimal(0),
+      };
+      if (
+        allocation.allocationType === PaymentAllocationType.REFUND ||
+        allocation.allocationType === PaymentAllocationType.REVERSAL
+      ) {
+        current.refundedAmount = current.refundedAmount.add(
+          allocation.amount.abs(),
+        );
+      } else {
+        current.allocatedAmount = current.allocatedAmount.add(
+          allocation.amount,
+        );
+      }
+      allocationPayments.set(allocation.paymentId, current);
+    }
+    if (allocationPayments.size === 0) {
+      for (const payment of invoice.payments) {
+        allocationPayments.set(payment.id, {
+          payment,
+          allocatedAmount: payment.amount,
+          refundedAmount: sumRefundedAmount(payment.refunds),
+        });
+      }
+    }
 
     return {
       id: invoice.id,
@@ -3155,15 +3341,17 @@ export class FinanceService {
         guardianName: primaryGuardian?.guardian.fullName ?? null,
         guardianPhone: primaryGuardian?.guardian.primaryPhone ?? null,
       },
-      subtotal: Number(invoice.subtotal),
-      vatAmount: Number(invoice.vatAmount),
-      totalAmount: Number(invoice.totalAmount),
-      paidAmount: Number(paidAmount),
-      outstandingAmount: Math.max(0, Number(outstandingAmount)),
-      totalWaivedAmount: waivers.reduce(
-        (sum, waiver) => sum + Number(waiver.amount),
-        0,
-      ),
+      subtotal: invoice.subtotal.toFixed(2),
+      vatAmount: invoice.vatAmount.toFixed(2),
+      totalAmount: invoice.totalAmount.toFixed(2),
+      paidAmount: paidAmount.toFixed(2),
+      outstandingAmount: Prisma.Decimal.max(
+        new Prisma.Decimal(0),
+        outstandingAmount,
+      ).toFixed(2),
+      totalWaivedAmount: waivers
+        .reduce((sum, waiver) => sum.add(waiver.amount), new Prisma.Decimal(0))
+        .toFixed(2),
       lines: invoice.lines.map((line) => {
         const baseAmount = line.unitAmount.mul(line.quantity);
         const matchingWaiverAmount = waivers
@@ -3183,21 +3371,21 @@ export class FinanceService {
             ? `${invoice.billingRun.runYear}-${String(invoice.billingRun.runMonth).padStart(2, '0')}`
             : invoice.academicYear.name,
           quantity: line.quantity,
-          unitAmount: Number(line.unitAmount),
-          baseAmount: Number(baseAmount),
-          discountAmount: 0,
-          waiverAmount: Number(matchingWaiverAmount),
-          lateFeeAmount: 0,
-          vatAmount: Number(line.vatAmount),
-          totalAmount: Number(line.totalAmount),
-          netAmount: Number(line.totalAmount.sub(matchingWaiverAmount)),
+          unitAmount: line.unitAmount.toFixed(2),
+          baseAmount: baseAmount.toFixed(2),
+          discountAmount: '0.00',
+          waiverAmount: matchingWaiverAmount.toFixed(2),
+          lateFeeAmount: '0.00',
+          vatAmount: line.vatAmount.toFixed(2),
+          totalAmount: line.totalAmount.toFixed(2),
+          netAmount: line.totalAmount.sub(matchingWaiverAmount).toFixed(2),
         };
       }),
       waivers: waivers.map((waiver) => ({
         id: waiver.id,
         feeHeadId: waiver.feeHeadId,
         feeHeadName: waiver.feeHead?.name ?? null,
-        amount: Number(waiver.amount),
+        amount: waiver.amount.toFixed(2),
         reason: waiver.reason,
         status: waiver.status,
         approvedAt: waiver.approvedAt,
@@ -3208,44 +3396,55 @@ export class FinanceService {
             }
           : null,
       })),
-      payments: invoice.payments.map((payment) => {
-        const refundedAmount = sumRefundedAmount(payment.refunds);
-
-        return {
-          id: payment.id,
-          amount: Number(payment.amount),
-          refundedAmount: Number(refundedAmount),
-          netAmount: Number(payment.amount.sub(refundedAmount)),
-          method: payment.method,
-          referenceNumber: payment.referenceNumber,
-          paidAt: payment.paidAt,
-          narration: payment.narration,
-          collector: payment.collectedBy
-            ? {
-                id: payment.collectedBy.id,
-                email: payment.collectedBy.email,
-              }
-            : null,
-          receipt: payment.receipt
-            ? {
-                id: payment.receipt.id,
-                receiptNumber: payment.receipt.receiptNumber,
-                issuedAt: payment.receipt.issuedAt,
-                fileAssetId: payment.receipt.fileAssetId,
-                fileStatus: payment.receipt.fileStatus,
-              }
-            : null,
-          refunds: payment.refunds.map((refund) => ({
-            id: refund.id,
-            refundNumber: refund.refundNumber,
-            amount: Number(refund.amount),
-            refundDate: refund.refundDate,
-            reason: refund.reason,
-            referenceNumber: refund.referenceNumber,
-          })),
-          journalEntryNumber: paymentEntryBySourceId.get(payment.id) ?? null,
-        };
-      }),
+      payments: Array.from(allocationPayments.values()).map(
+        ({ payment, allocatedAmount, refundedAmount }) => {
+          return {
+            id: payment.id,
+            amount: payment.amount.toFixed(2),
+            allocatedAmount: allocatedAmount.toFixed(2),
+            refundedAmount: refundedAmount.toFixed(2),
+            netAmount: allocatedAmount.sub(refundedAmount).toFixed(2),
+            method: payment.method,
+            referenceNumber: payment.referenceNumber,
+            paidAt: payment.paidAt,
+            narration: payment.narration,
+            collector: payment.collectedBy
+              ? {
+                  id: payment.collectedBy.id,
+                  email: payment.collectedBy.email,
+                }
+              : null,
+            receipt: payment.receipt
+              ? {
+                  id: payment.receipt.id,
+                  receiptNumber: payment.receipt.receiptNumber,
+                  issuedAt: payment.receipt.issuedAt,
+                  fileAssetId: payment.receipt.fileAssetId,
+                  fileStatus: payment.receipt.fileStatus,
+                }
+              : null,
+            refunds: payment.refunds.map((refund) => ({
+              id: refund.id,
+              refundNumber: refund.refundNumber,
+              amount: refund.amount.toFixed(2),
+              refundDate: refund.refundDate,
+              reason: refund.reason,
+              referenceNumber: refund.referenceNumber,
+            })),
+            journalEntryNumber: paymentEntryBySourceId.get(payment.id) ?? null,
+          };
+        },
+      ),
+      allocations: (invoice.paymentAllocations ?? []).map((allocation) => ({
+        id: allocation.id,
+        invoiceId: allocation.invoiceId,
+        invoiceNumber: invoice.invoiceNumber,
+        amount: allocation.amount.toFixed(2),
+        allocationType: allocation.allocationType,
+        allocatedAt: allocation.allocatedAt,
+        reversedAt: allocation.reversedAt,
+        reversalReason: allocation.reversalReason,
+      })),
       source: {
         billingRunId: invoice.billingRunId,
         enrollmentId: invoice.enrollmentId,
@@ -3292,6 +3491,7 @@ export class FinanceService {
             refunds: true,
           },
         },
+        paymentAllocations: { where: { reversedAt: null } },
       },
       orderBy: [{ dueDate: 'asc' }, { issuedAt: 'asc' }],
     });
@@ -3312,7 +3512,10 @@ export class FinanceService {
       },
       invoices: invoices
         .map((invoice) => {
-          const paidAmount = sumNetPaidAmount(invoice.payments);
+          const paidAmount = sumInvoiceAllocationAmount(
+            invoice.paymentAllocations,
+            invoice.payments,
+          );
           const outstandingAmount = invoice.totalAmount.sub(paidAmount);
 
           return {
@@ -3320,12 +3523,17 @@ export class FinanceService {
             invoiceNumber: invoice.invoiceNumber,
             status: invoice.status,
             dueDate: invoice.dueDate.toISOString(),
-            totalAmount: Number(invoice.totalAmount),
-            paidAmount: Number(paidAmount),
-            outstandingAmount: Math.max(0, Number(outstandingAmount)),
+            totalAmount: invoice.totalAmount.toFixed(2),
+            paidAmount: paidAmount.toFixed(2),
+            outstandingAmount: Prisma.Decimal.max(
+              new Prisma.Decimal(0),
+              outstandingAmount,
+            ).toFixed(2),
           };
         })
-        .filter((invoice) => invoice.outstandingAmount > 0),
+        .filter((invoice) =>
+          new Prisma.Decimal(invoice.outstandingAmount).gt(0),
+        ),
     };
   }
 
@@ -3609,6 +3817,20 @@ export class FinanceService {
             },
             orderBy: [{ paidAt: 'asc' }, { createdAt: 'asc' }],
           },
+          paymentAllocations: {
+            where: { reversedAt: null },
+            include: {
+              payment: {
+                include: {
+                  receipt: true,
+                  refunds: {
+                    orderBy: [{ refundDate: 'asc' }, { createdAt: 'asc' }],
+                  },
+                },
+              },
+            },
+            orderBy: [{ allocatedAt: 'asc' }, { createdAt: 'asc' }],
+          },
           lines: {
             include: {
               feeHead: true,
@@ -3674,55 +3896,83 @@ export class FinanceService {
         status: invoice.status,
       });
 
-      for (const payment of invoice.payments) {
-        ledgerEvents.push({
-          id: `payment:${payment.id}`,
-          date: payment.paidAt,
-          type: 'PAYMENT',
-          reference: payment.receipt?.receiptNumber ?? payment.id,
-          description: `${payment.method} payment for ${invoice.invoiceNumber}${payment.status === PaymentStatus.REVERSED ? ' (REVERSED)' : ''}`,
-          debit: new Prisma.Decimal(0),
-          credit: payment.amount,
-          affectsBalance: true,
-          invoiceId: invoice.id,
-          invoiceNumber: invoice.invoiceNumber,
-          paymentId: payment.id,
-          receiptNumber: payment.receipt?.receiptNumber ?? null,
-          status: payment.status,
-        });
-
-        if (payment.status === PaymentStatus.REVERSED) {
+      if ((invoice.paymentAllocations?.length ?? 0) > 0) {
+        for (const allocation of invoice.paymentAllocations ?? []) {
+          const payment = allocation.payment;
+          const isRefund =
+            allocation.allocationType === PaymentAllocationType.REFUND;
+          const isReversal =
+            allocation.allocationType === PaymentAllocationType.REVERSAL;
+          const correction = isRefund || isReversal;
           ledgerEvents.push({
-            id: `reversal:${payment.id}`,
-            date: payment.reversedAt ?? payment.paidAt,
-            type: 'REVERSAL',
+            id: `allocation:${allocation.id}`,
+            date: allocation.allocatedAt,
+            type: isRefund ? 'REFUND' : isReversal ? 'REVERSAL' : 'PAYMENT',
             reference: payment.receipt?.receiptNumber ?? payment.id,
-            description: `REVERSAL: ${payment.reversalReason ?? 'Payment voided'}`,
-            debit: payment.amount,
-            credit: new Prisma.Decimal(0),
+            description: isRefund
+              ? `Refund allocation for ${invoice.invoiceNumber}`
+              : isReversal
+                ? `Payment reversal for ${invoice.invoiceNumber}`
+                : `${payment.method} allocation for ${invoice.invoiceNumber}`,
+            debit: correction ? allocation.amount.abs() : new Prisma.Decimal(0),
+            credit: correction ? new Prisma.Decimal(0) : allocation.amount,
             affectsBalance: true,
             invoiceId: invoice.id,
             invoiceNumber: invoice.invoiceNumber,
             paymentId: payment.id,
             receiptNumber: payment.receipt?.receiptNumber ?? null,
+            status: payment.status,
           });
         }
-
-        for (const refund of payment.refunds) {
+      } else {
+        for (const payment of invoice.payments) {
           ledgerEvents.push({
-            id: `refund:${refund.id}`,
-            date: refund.refundDate,
-            type: 'REFUND',
-            reference: refund.refundNumber,
-            description: `Refund for ${payment.receipt?.receiptNumber ?? invoice.invoiceNumber}`,
-            debit: refund.amount,
-            credit: new Prisma.Decimal(0),
+            id: `payment:${payment.id}`,
+            date: payment.paidAt,
+            type: 'PAYMENT',
+            reference: payment.receipt?.receiptNumber ?? payment.id,
+            description: `${payment.method} payment for ${invoice.invoiceNumber}`,
+            debit: new Prisma.Decimal(0),
+            credit: payment.amount,
             affectsBalance: true,
             invoiceId: invoice.id,
             invoiceNumber: invoice.invoiceNumber,
             paymentId: payment.id,
             receiptNumber: payment.receipt?.receiptNumber ?? null,
+            status: payment.status,
           });
+          if (payment.status === PaymentStatus.REVERSED) {
+            ledgerEvents.push({
+              id: `reversal:${payment.id}`,
+              date: payment.reversedAt ?? payment.paidAt,
+              type: 'REVERSAL',
+              reference: payment.receipt?.receiptNumber ?? payment.id,
+              description: `REVERSAL: ${payment.reversalReason ?? 'Payment voided'}`,
+              debit: payment.amount,
+              credit: new Prisma.Decimal(0),
+              affectsBalance: true,
+              invoiceId: invoice.id,
+              invoiceNumber: invoice.invoiceNumber,
+              paymentId: payment.id,
+              receiptNumber: payment.receipt?.receiptNumber ?? null,
+            });
+          }
+          for (const refund of payment.refunds) {
+            ledgerEvents.push({
+              id: `refund:${refund.id}`,
+              date: refund.refundDate,
+              type: 'REFUND',
+              reference: refund.refundNumber,
+              description: `Refund for ${payment.receipt?.receiptNumber ?? invoice.invoiceNumber}`,
+              debit: refund.amount,
+              credit: new Prisma.Decimal(0),
+              affectsBalance: true,
+              invoiceId: invoice.id,
+              invoiceNumber: invoice.invoiceNumber,
+              paymentId: payment.id,
+              receiptNumber: payment.receipt?.receiptNumber ?? null,
+            });
+          }
         }
       }
     }
@@ -3764,9 +4014,9 @@ export class FinanceService {
         type: event.type,
         reference: event.reference,
         description: event.description,
-        debit: Number(event.debit),
-        credit: Number(event.credit),
-        runningBalance: Number(runningBalance),
+        debit: event.debit.toFixed(2),
+        credit: event.credit.toFixed(2),
+        runningBalance: runningBalance.toFixed(2),
         affectsBalance: event.affectsBalance,
         invoiceId: event.invoiceId ?? null,
         invoiceNumber: event.invoiceNumber ?? null,
@@ -3779,15 +4029,32 @@ export class FinanceService {
       (sum, invoice) => sum.add(invoice.totalAmount),
       new Prisma.Decimal(0),
     );
+    const allAllocations = invoices.flatMap(
+      (invoice) => invoice.paymentAllocations,
+    );
     const allPayments = invoices.flatMap((invoice) => invoice.payments);
-    const totalPaid = allPayments.reduce((sum, payment) => {
-      if (payment.status === PaymentStatus.REVERSED) return sum;
-      return sum.add(payment.amount);
-    }, new Prisma.Decimal(0));
-    const totalRefunded = allPayments.reduce((sum, payment) => {
-      if (payment.status === PaymentStatus.REVERSED) return sum;
-      return sum.add(sumRefundedAmount(payment.refunds));
-    }, new Prisma.Decimal(0));
+    const totalPaid =
+      allAllocations.length > 0
+        ? allAllocations.reduce(
+            (sum, allocation) =>
+              allocation.amount.gt(0) ? sum.add(allocation.amount) : sum,
+            new Prisma.Decimal(0),
+          )
+        : allPayments.reduce((sum, payment) => {
+            if (payment.status === PaymentStatus.REVERSED) return sum;
+            return sum.add(payment.amount);
+          }, new Prisma.Decimal(0));
+    const totalRefunded =
+      allAllocations.length > 0
+        ? allAllocations.reduce(
+            (sum, allocation) =>
+              allocation.amount.lt(0) ? sum.add(allocation.amount.abs()) : sum,
+            new Prisma.Decimal(0),
+          )
+        : allPayments.reduce((sum, payment) => {
+            if (payment.status === PaymentStatus.REVERSED) return sum;
+            return sum.add(sumRefundedAmount(payment.refunds));
+          }, new Prisma.Decimal(0));
     const totalWaived = waivers.reduce(
       (sum, waiver) => sum.add(waiver.amount),
       new Prisma.Decimal(0),
@@ -3807,12 +4074,15 @@ export class FinanceService {
         guardianName: primaryGuardian?.guardian.fullName ?? null,
         guardianPhone: primaryGuardian?.guardian.primaryPhone ?? null,
       },
-      openingBalance: 0,
-      totalInvoiced: Number(totalInvoiced),
-      totalPaid: Number(totalPaid),
-      totalWaived: Number(totalWaived),
-      totalRefunded: Number(totalRefunded),
-      outstandingBalance: Math.max(0, Number(outstandingBalance)),
+      openingBalance: '0.00',
+      totalInvoiced: totalInvoiced.toFixed(2),
+      totalPaid: totalPaid.toFixed(2),
+      totalWaived: totalWaived.toFixed(2),
+      totalRefunded: totalRefunded.toFixed(2),
+      outstandingBalance: Prisma.Decimal.max(
+        new Prisma.Decimal(0),
+        outstandingBalance,
+      ).toFixed(2),
       rows,
     };
   }
@@ -4316,6 +4586,7 @@ export class FinanceService {
       invoices,
       total,
       invoiceAmountAggregate,
+      allocationAmountAggregate,
       paymentAmountAggregate,
       refundAmountAggregate,
     ] = await Promise.all([
@@ -4331,6 +4602,7 @@ export class FinanceService {
           payments: {
             include: { refunds: true },
           },
+          paymentAllocations: { where: { reversedAt: null } },
         },
         orderBy,
         skip: pagination.skip,
@@ -4341,11 +4613,20 @@ export class FinanceService {
         where,
         _sum: { totalAmount: true },
       }),
+      this.prisma.paymentAllocation.aggregate({
+        where: {
+          tenantId: actor.tenantId,
+          reversedAt: null,
+          invoice: { is: where },
+        },
+        _sum: { amount: true },
+      }),
       this.prisma.payment.aggregate({
         where: {
           tenantId: actor.tenantId,
           status: PaymentStatus.SUCCESS,
           invoice: where,
+          allocations: { none: {} },
         },
         _sum: { amount: true },
       }),
@@ -4355,6 +4636,7 @@ export class FinanceService {
           payment: {
             status: PaymentStatus.SUCCESS,
             invoice: where,
+            allocations: { none: {} },
           },
         },
         _sum: { amount: true },
@@ -4363,8 +4645,14 @@ export class FinanceService {
 
     const items = invoices
       .map((invoice) => {
-        const paidAmount = Number(sumNetPaidAmount(invoice.payments));
-        const outstanding = Number(invoice.totalAmount) - paidAmount;
+        const paidAmount = sumInvoiceAllocationAmount(
+          invoice.paymentAllocations,
+          invoice.payments,
+        );
+        const outstanding = Prisma.Decimal.max(
+          new Prisma.Decimal(0),
+          invoice.totalAmount.sub(paidAmount),
+        );
         const daysOverdue = Math.max(
           0,
           Math.floor(
@@ -4381,14 +4669,14 @@ export class FinanceService {
           className: invoice.student.class.name,
           sectionName: invoice.student.sectionRef?.name ?? null,
           dueDate: invoice.dueDate,
-          outstanding,
+          outstanding: outstanding.toFixed(2),
           daysOverdue,
           agingBucket: getAgingBucket(daysOverdue),
-          reportCardBlocked: invoice.reportCardBlocked || outstanding > 0,
-          hallTicketBlocked: invoice.hallTicketBlocked || outstanding > 0,
+          reportCardBlocked: invoice.reportCardBlocked || outstanding.gt(0),
+          hallTicketBlocked: invoice.hallTicketBlocked || outstanding.gt(0),
         };
       })
-      .filter((defaulter) => defaulter.outstanding > 0);
+      .filter((defaulter) => new Prisma.Decimal(defaulter.outstanding).gt(0));
 
     return {
       filters: {
@@ -4402,13 +4690,13 @@ export class FinanceService {
       page: pagination.page,
       limit: pagination.limit,
       hasNextPage: pagination.skip + items.length < total,
-      totalOutstanding: Number(
-        calculateOutstandingAmount(
-          invoiceAmountAggregate._sum.totalAmount,
-          paymentAmountAggregate._sum.amount,
-          refundAmountAggregate._sum.amount,
-        ),
-      ),
+      totalOutstanding: Prisma.Decimal.max(
+        new Prisma.Decimal(0),
+        decimalOrZero(invoiceAmountAggregate._sum.totalAmount)
+          .sub(decimalOrZero(allocationAmountAggregate._sum.amount))
+          .sub(decimalOrZero(paymentAmountAggregate._sum.amount))
+          .add(decimalOrZero(refundAmountAggregate._sum.amount)),
+      ).toFixed(2),
       segments: buildDefaulterSegmentSummary(items),
       items,
     };
@@ -4453,9 +4741,7 @@ export class FinanceService {
         title: `Fee payment reminder (${defaulter.agingBucket} overdue)`,
         body:
           dto.message ??
-          `Outstanding fee balance Rs ${defaulter.outstanding.toFixed(
-            2,
-          )} is ${defaulter.daysOverdue} days overdue for invoice ${defaulter.invoiceNumber}.`,
+          `Outstanding fee balance Rs ${defaulter.outstanding} is ${defaulter.daysOverdue} days overdue for invoice ${defaulter.invoiceNumber}.`,
         channels,
         requiredConsentTypes: [ConsentType.MESSAGING],
         communicationCategory: 'ESSENTIAL',
@@ -4736,7 +5022,7 @@ export class FinanceService {
           idempotencyKey,
         },
       },
-      include: { receipt: true },
+      include: { receipt: true, allocations: true },
     });
 
     if (existingPayment) {
@@ -4754,31 +5040,116 @@ export class FinanceService {
       return mapCollectedPaymentResult(existingPayment, 'REPLAYED');
     }
 
-    const invoice = await this.prisma.invoice.findFirst({
-      where: { id: dto.invoiceId, tenantId: actor.tenantId },
-      include: {
-        student: true,
-        lines: {
-          include: {
-            feeHead: true,
-          },
-        },
-        payments: {
-          include: { refunds: true },
-        },
-      },
-    });
-
-    if (!invoice) {
-      throw new NotFoundException('Invoice not found in this tenant');
+    const paymentAmount = new Prisma.Decimal(dto.amount);
+    if (!paymentAmount.isPositive() || paymentAmount.decimalPlaces() > 2) {
+      throw new BadRequestException(
+        'Payment amount must be a positive decimal with no more than two decimal places.',
+      );
+    }
+    if (dto.invoiceId && dto.allocations?.length) {
+      throw new BadRequestException(
+        'Use either invoiceId or allocations, not both.',
+      );
     }
 
-    const paidSoFar = sumNetPaidAmount(invoice.payments);
-    const paymentAmount = new Prisma.Decimal(dto.amount);
-    const remaining = invoice.totalAmount.sub(paidSoFar);
+    const requestedAllocations = dto.allocations?.length
+      ? dto.allocations
+      : dto.invoiceId
+        ? [{ invoiceId: dto.invoiceId, amount: dto.amount }]
+        : [];
+    const invoiceAllocationAmounts = new Map<string, Prisma.Decimal>();
+    for (const allocation of requestedAllocations) {
+      const amount = new Prisma.Decimal(allocation.amount);
+      if (!amount.isPositive() || amount.decimalPlaces() > 2) {
+        throw new BadRequestException(
+          'Each allocation must be a positive decimal with no more than two decimal places.',
+        );
+      }
+      invoiceAllocationAmounts.set(
+        allocation.invoiceId,
+        (
+          invoiceAllocationAmounts.get(allocation.invoiceId) ??
+          new Prisma.Decimal(0)
+        ).add(amount),
+      );
+    }
+    const allocatedAmount = Array.from(
+      invoiceAllocationAmounts.values(),
+    ).reduce((sum, amount) => sum.add(amount), new Prisma.Decimal(0));
+    if (allocatedAmount.gt(paymentAmount)) {
+      throw new ConflictException(
+        'Invoice allocations exceed the payment amount.',
+      );
+    }
+    const unallocatedAmount = paymentAmount.sub(allocatedAmount);
+    const invoiceIds = Array.from(invoiceAllocationAmounts.keys());
+    if (invoiceIds.length === 0 && !dto.studentId) {
+      throw new BadRequestException(
+        'A student is required when collecting an advance or unallocated payment.',
+      );
+    }
 
-    if (paymentAmount.gt(remaining)) {
-      throw new ConflictException('Payment exceeds the remaining balance');
+    const invoices =
+      invoiceIds.length === 0
+        ? []
+        : await this.prisma.invoice.findMany({
+            where: { id: { in: invoiceIds }, tenantId: actor.tenantId },
+            include: {
+              student: true,
+              lines: { include: { feeHead: true } },
+              paymentAllocations: { where: { reversedAt: null } },
+              payments: { include: { refunds: true } },
+            },
+          });
+    if (invoices.length !== invoiceIds.length) {
+      throw new NotFoundException(
+        'One or more invoices were not found in this tenant.',
+      );
+    }
+
+    const studentIds = new Set(invoices.map((invoice) => invoice.studentId));
+    if (dto.studentId) studentIds.add(dto.studentId);
+    if (studentIds.size !== 1) {
+      throw new ConflictException(
+        'All payment allocations must belong to the same student.',
+      );
+    }
+    const studentId = studentIds.values().next().value as string;
+    if (invoiceIds.length === 0) {
+      const student = await this.prisma.student.findFirst({
+        where: { id: studentId, tenantId: actor.tenantId },
+        select: { id: true },
+      });
+      if (!student)
+        throw new NotFoundException('Student not found in this tenant');
+    }
+
+    const allocationPlan = invoices.map((invoice) => {
+      const amount = invoiceAllocationAmounts.get(invoice.id)!;
+      const paidSoFar = sumInvoiceAllocationAmount(
+        invoice.paymentAllocations,
+        invoice.payments,
+      );
+      const remaining = Prisma.Decimal.max(
+        new Prisma.Decimal(0),
+        invoice.totalAmount.sub(paidSoFar),
+      );
+      if (amount.gt(remaining)) {
+        throw new ConflictException(
+          `Payment exceeds the remaining balance for invoice ${invoice.invoiceNumber}.`,
+        );
+      }
+      return { invoice, amount, paidSoFar, remaining };
+    });
+    const compatibilityInvoiceId =
+      allocationPlan.length === 1 && unallocatedAmount.isZero()
+        ? allocationPlan[0].invoice.id
+        : null;
+
+    if (unallocatedAmount.isPositive() && dto.isAdvance === false) {
+      throw new ConflictException(
+        'The payment includes an unallocated amount. Mark it as an advance or allocate the full amount.',
+      );
     }
 
     if (dto.referenceNumber) {
@@ -4815,23 +5186,29 @@ export class FinanceService {
           tx,
         );
 
-        const receiptVat = invoice.totalAmount.gt(0)
-          ? invoice.vatAmount.mul(paymentAmount).div(invoice.totalAmount)
-          : new Prisma.Decimal(0);
+        const receiptVat = allocationPlan.reduce(
+          (sum, { invoice, amount }) =>
+            invoice.totalAmount.gt(0)
+              ? sum.add(invoice.vatAmount.mul(amount).div(invoice.totalAmount))
+              : sum,
+          new Prisma.Decimal(0),
+        );
         const payment = await tx.payment.create({
           data: {
             tenantId: actor.tenantId,
-            studentId: invoice.studentId,
-            invoiceId: invoice.id,
+            studentId,
+            invoiceId: compatibilityInvoiceId,
             collectedById: actor.userId,
             method: dto.method,
             status: PaymentStatus.SUCCESS,
             referenceNumber: dto.referenceNumber ?? null,
             amount: paymentAmount,
-            isAdvance: dto.isAdvance ?? false,
+            isAdvance: dto.isAdvance ?? unallocatedAmount.isPositive(),
             recognizedAt: dto.recognizedAt ? new Date(dto.recognizedAt) : null,
             metadata: {
-              remainingBeforePayment: Number(remaining),
+              allocationCount: allocationPlan.length,
+              allocatedAmount: allocatedAmount.toFixed(2),
+              unallocatedAmount: unallocatedAmount.toFixed(2),
             },
             paidAt: new Date(),
             narration: dto.narration ?? null,
@@ -4845,8 +5222,11 @@ export class FinanceService {
                 vatAmount: receiptVat,
                 metadata: {
                   nonReusable: true,
-                  invoiceFiscalYear: invoice.fiscalYear,
-                  billNumber: invoice.billNumber ?? invoice.invoiceNumber,
+                  invoiceIds,
+                  invoiceNumbers: allocationPlan.map(
+                    ({ invoice }) => invoice.invoiceNumber,
+                  ),
+                  unallocatedAmount: unallocatedAmount.toFixed(2),
                 },
                 pdfUrl: null,
                 fileStatus: ReceiptFileStatus.PENDING,
@@ -4858,71 +5238,120 @@ export class FinanceService {
           },
         });
 
+        const createdAllocations = await Promise.all([
+          ...allocationPlan.map(({ invoice, amount }) =>
+            tx.paymentAllocation.create({
+              data: {
+                tenantId: actor.tenantId,
+                paymentId: payment.id,
+                invoiceId: invoice.id,
+                amount,
+                allocationType: PaymentAllocationType.INVOICE,
+                allocatedById: actor.userId,
+              },
+            }),
+          ),
+          ...(unallocatedAmount.isPositive()
+            ? [
+                tx.paymentAllocation.create({
+                  data: {
+                    tenantId: actor.tenantId,
+                    paymentId: payment.id,
+                    invoiceId: null,
+                    amount: unallocatedAmount,
+                    allocationType: dto.isAdvance
+                      ? PaymentAllocationType.ADVANCE
+                      : PaymentAllocationType.UNALLOCATED,
+                    allocatedById: actor.userId,
+                  },
+                }),
+              ]
+            : []),
+        ]);
+
         await this.usageService.incrementUsage(
           actor.tenantId,
           'receipts.generated',
           1,
         );
 
-        const totalPaid = paidSoFar.add(paymentAmount);
-
-        await tx.invoice.update({
-          where: { id: invoice.id },
-          data: {
-            status: totalPaid.gte(invoice.totalAmount)
-              ? InvoiceStatus.PAID
-              : InvoiceStatus.PARTIAL,
-            paidAt: totalPaid.gte(invoice.totalAmount) ? new Date() : null,
-          },
-        });
-
-        const allocatedLines = allocatePaymentAcrossLines(
-          invoice.lines.map((line) => ({
-            id: line.id,
-            totalAmount: line.totalAmount,
-            feeHeadCode: line.feeHead.code,
-            description: line.description,
-          })),
-          paymentAmount,
-          invoice.totalAmount,
-        );
-
         await Promise.all(
-          allocatedLines.map(async (line) => {
-            const account = await tx.chartAccount.findUniqueOrThrow({
-              where: {
-                tenantId_code: {
-                  tenantId: actor.tenantId,
-                  code: resolveIncomeAccountCode(line.feeHeadCode),
-                },
+          allocationPlan.map(({ invoice, amount, paidSoFar }) => {
+            const totalPaid = paidSoFar.add(amount);
+            return tx.invoice.update({
+              where: { id: invoice.id },
+              data: {
+                status: totalPaid.gte(invoice.totalAmount)
+                  ? InvoiceStatus.PAID
+                  : InvoiceStatus.PARTIAL,
+                paidAt: totalPaid.gte(invoice.totalAmount) ? new Date() : null,
               },
             });
-
-            return {
-              chartAccountId: account.id,
-              amount: line.totalAmount,
-              description: line.description,
-            };
           }),
         );
+
+        const receivableAccount = allocatedAmount.isPositive()
+          ? await tx.chartAccount.findUniqueOrThrow({
+              where: {
+                tenantId_code: { tenantId: actor.tenantId, code: '1200' },
+              },
+            })
+          : null;
+        const advanceAccount = unallocatedAmount.isPositive()
+          ? await tx.chartAccount.upsert({
+              where: {
+                tenantId_code: { tenantId: actor.tenantId, code: '2250' },
+              },
+              update: {},
+              create: {
+                tenantId: actor.tenantId,
+                code: '2250',
+                name: 'Student Advances',
+                type: ChartAccountType.LIABILITY,
+                isSystem: true,
+              },
+            })
+          : null;
 
         await this.accountingPostingService.postFeePayment(
           {
             tenantId: actor.tenantId,
             paymentId: payment.id,
-            invoiceNumber: invoice.invoiceNumber,
+            invoiceNumber:
+              allocationPlan
+                .map(({ invoice }) => invoice.invoiceNumber)
+                .join(', ') || 'Unallocated advance',
             receiptNumber,
             paymentAmount,
             paymentMethod: dto.method,
             paymentAccountCode: resolveCashAccountCode(dto.method),
             narration: dto.narration,
-            lines: [], // Lines no longer needed for payment in accrual model
+            lines: [
+              ...(receivableAccount
+                ? [
+                    {
+                      chartAccountId: receivableAccount.id,
+                      amount: allocatedAmount,
+                      description: 'Payment allocated to student receivables',
+                    },
+                  ]
+                : []),
+              ...(advanceAccount
+                ? [
+                    {
+                      chartAccountId: advanceAccount.id,
+                      amount: unallocatedAmount,
+                      description: 'Student advance or unallocated receipt',
+                    },
+                  ]
+                : []),
+            ],
           },
           actor,
           tx,
         );
 
-        return payment;
+        return { ...payment, allocations: createdAllocations };
       });
     } catch (error) {
       if (isPrismaUniqueConstraintError(error)) {
@@ -4933,7 +5362,7 @@ export class FinanceService {
               idempotencyKey,
             },
           },
-          include: { receipt: true },
+          include: { receipt: true, allocations: true },
         });
 
         if (existingPayment) {
@@ -4963,8 +5392,10 @@ export class FinanceService {
       userId: actor.userId,
       resourceId: result.id,
       after: {
-        invoiceId: dto.invoiceId,
-        amount: dto.amount,
+        invoiceIds,
+        allocatedAmount: allocatedAmount.toFixed(2),
+        unallocatedAmount: unallocatedAmount.toFixed(2),
+        amount: paymentAmount.toFixed(2),
         method: dto.method,
         receiptNumber: result.receipt?.receiptNumber ?? null,
       },
@@ -4974,14 +5405,343 @@ export class FinanceService {
       tenantId: actor.tenantId,
       actor,
       paymentId: result.id,
-      invoiceId: dto.invoiceId,
-      studentId: invoice.studentId,
-      amount: Number(result.amount),
+      invoiceId: compatibilityInvoiceId,
+      invoiceIds,
+      studentId,
+      amount: result.amount.toFixed(2),
       method: result.method,
       receiptNumber: result.receipt?.receiptNumber ?? null,
     });
 
     return mapCollectedPaymentResult(result, 'SUCCEEDED');
+  }
+
+  async listPaymentAllocations(
+    paymentId: string,
+    query: ListPaymentAllocationsQueryDto,
+    actor: AuthContext,
+  ) {
+    assertAnyFinancePermission(actor, [
+      'payments:collect',
+      'payments:refund',
+      'payments:reverse',
+      'fees:manage',
+    ]);
+    const payment = await this.prisma.payment.findFirst({
+      where: { id: paymentId, tenantId: actor.tenantId },
+      select: { id: true },
+    });
+    if (!payment) {
+      throw new NotFoundException('Payment not found in this tenant');
+    }
+
+    const pagination = resolveFinancePagination(query);
+    const sortBy = query.sortBy ?? 'allocatedAt';
+    const sortDirection = query.sortDirection ?? 'asc';
+    const where: Prisma.PaymentAllocationWhereInput = {
+      tenantId: actor.tenantId,
+      paymentId,
+    };
+    const [allocations, total] = await Promise.all([
+      this.prisma.paymentAllocation.findMany({
+        where,
+        include: {
+          invoice: { select: { id: true, invoiceNumber: true } },
+        },
+        orderBy: [{ [sortBy]: sortDirection }, { id: 'asc' }],
+        skip: pagination.skip,
+        take: pagination.limit,
+      }),
+      this.prisma.paymentAllocation.count({ where }),
+    ]);
+
+    await this.auditService.record({
+      action: 'view_allocation_history',
+      resource: 'payment',
+      resourceId: paymentId,
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: {
+        page: pagination.page,
+        limit: pagination.limit,
+        returned: allocations.length,
+      },
+    });
+
+    return buildFinancePage(
+      allocations.map((allocation) => ({
+        id: allocation.id,
+        paymentId: allocation.paymentId,
+        invoiceId: allocation.invoiceId,
+        invoiceNumber: allocation.invoice?.invoiceNumber ?? null,
+        amount: allocation.amount.toFixed(2),
+        allocationType: allocation.allocationType,
+        allocatedAt: allocation.allocatedAt,
+        allocatedById: allocation.allocatedById,
+        reversedAt: allocation.reversedAt,
+        reversedById: allocation.reversedById,
+        reversalReason: allocation.reversalReason,
+      })),
+      total,
+      pagination,
+    );
+  }
+
+  async reallocatePayment(
+    paymentId: string,
+    dto: ReallocatePaymentDto,
+    actor: AuthContext,
+  ) {
+    assertFinancePermission(actor, 'payments:collect');
+    const idempotencyKey = dto.idempotencyKey.trim();
+    const reason = dto.reason.trim();
+    const replay = await this.prisma.paymentAllocation.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        paymentId,
+        allocationGroupId: idempotencyKey,
+      },
+      include: { invoice: { select: { invoiceNumber: true } } },
+      orderBy: [{ createdAt: 'asc' }],
+    });
+    if (replay.length > 0) {
+      return mapPaymentReallocationResult(replay, 'REPLAYED');
+    }
+
+    const payment = await this.prisma.payment.findFirst({
+      where: {
+        id: paymentId,
+        tenantId: actor.tenantId,
+        status: { not: PaymentStatus.REVERSED },
+      },
+      include: {
+        allocations: { where: { reversedAt: null } },
+      },
+    });
+    if (!payment) {
+      throw new NotFoundException('Active payment not found in this tenant');
+    }
+    const unallocatedBalance = payment.allocations
+      .filter((allocation) => allocation.invoiceId === null)
+      .reduce(
+        (sum, allocation) => sum.add(allocation.amount),
+        new Prisma.Decimal(0),
+      );
+    if (!unallocatedBalance.isPositive()) {
+      throw new ConflictException(
+        'This payment has no unallocated advance balance.',
+      );
+    }
+
+    const targetAmounts = new Map<string, Prisma.Decimal>();
+    for (const target of dto.allocations) {
+      const amount = new Prisma.Decimal(target.amount);
+      if (!amount.isPositive() || amount.decimalPlaces() > 2) {
+        throw new BadRequestException(
+          'Each reallocation amount must be positive with no more than two decimal places.',
+        );
+      }
+      targetAmounts.set(
+        target.invoiceId,
+        (targetAmounts.get(target.invoiceId) ?? new Prisma.Decimal(0)).add(
+          amount,
+        ),
+      );
+    }
+    const total = Array.from(targetAmounts.values()).reduce(
+      (sum, amount) => sum.add(amount),
+      new Prisma.Decimal(0),
+    );
+    if (total.gt(unallocatedBalance)) {
+      throw new ConflictException(
+        'Reallocation exceeds the payment advance balance.',
+      );
+    }
+
+    const invoices = await this.prisma.invoice.findMany({
+      where: {
+        id: { in: Array.from(targetAmounts.keys()) },
+        tenantId: actor.tenantId,
+        studentId: payment.studentId,
+      },
+      include: {
+        paymentAllocations: { where: { reversedAt: null } },
+        payments: { include: { refunds: true } },
+      },
+    });
+    if (invoices.length !== targetAmounts.size) {
+      throw new NotFoundException(
+        'One or more target invoices were not found for this student.',
+      );
+    }
+    for (const invoice of invoices) {
+      const existingPaid = sumInvoiceAllocationAmount(
+        invoice.paymentAllocations,
+        invoice.payments,
+      );
+      const remaining = Prisma.Decimal.max(
+        new Prisma.Decimal(0),
+        invoice.totalAmount.sub(existingPaid),
+      );
+      if (targetAmounts.get(invoice.id)!.gt(remaining)) {
+        throw new ConflictException(
+          `Reallocation exceeds the remaining balance for invoice ${invoice.invoiceNumber}.`,
+        );
+      }
+    }
+
+    const allocationDate = new Date();
+    const result = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw(Prisma.sql`
+        SELECT "id"
+        FROM "Payment"
+        WHERE "id" = ${payment.id}
+          AND "tenantId" = ${actor.tenantId}
+        FOR UPDATE
+      `);
+      const concurrentReplay = await tx.paymentAllocation.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          paymentId,
+          allocationGroupId: idempotencyKey,
+        },
+        include: { invoice: { select: { invoiceNumber: true } } },
+        orderBy: [{ createdAt: 'asc' }],
+      });
+      if (concurrentReplay.length > 0) {
+        return {
+          allocations: concurrentReplay,
+          disposition: 'REPLAYED' as const,
+        };
+      }
+      const currentUnallocated = await tx.paymentAllocation.aggregate({
+        where: {
+          tenantId: actor.tenantId,
+          paymentId,
+          invoiceId: null,
+          reversedAt: null,
+        },
+        _sum: { amount: true },
+      });
+      if (decimalOrZero(currentUnallocated._sum.amount).lt(total)) {
+        throw new ConflictException(
+          'Another allocation changed the payment advance balance. Refresh before retrying.',
+        );
+      }
+
+      const source = await tx.paymentAllocation.create({
+        data: {
+          tenantId: actor.tenantId,
+          paymentId,
+          invoiceId: null,
+          amount: total.negated(),
+          allocationType: PaymentAllocationType.REALLOCATION,
+          allocationGroupId: idempotencyKey,
+          reason,
+          allocatedAt: allocationDate,
+          allocatedById: actor.userId,
+        },
+        include: { invoice: { select: { invoiceNumber: true } } },
+      });
+      const targets = await Promise.all(
+        invoices.map((invoice) =>
+          tx.paymentAllocation.create({
+            data: {
+              tenantId: actor.tenantId,
+              paymentId,
+              invoiceId: invoice.id,
+              amount: targetAmounts.get(invoice.id)!,
+              allocationType: PaymentAllocationType.REALLOCATION,
+              allocationGroupId: idempotencyKey,
+              reason,
+              allocatedAt: allocationDate,
+              allocatedById: actor.userId,
+            },
+            include: { invoice: { select: { invoiceNumber: true } } },
+          }),
+        ),
+      );
+
+      const advanceAccount = await tx.chartAccount.findUniqueOrThrow({
+        where: { tenantId_code: { tenantId: actor.tenantId, code: '2250' } },
+      });
+      const receivableAccount = await tx.chartAccount.findUniqueOrThrow({
+        where: { tenantId_code: { tenantId: actor.tenantId, code: '1200' } },
+      });
+      await this.accountingPostingService.postManualJournal(
+        {
+          tenantId: actor.tenantId,
+          entryDate: allocationDate,
+          narration: `Apply student advance: ${reason}`,
+          sourceModule: 'M3',
+          sourceType: JournalSourceType.PAYMENT_ALLOCATION,
+          sourceId: idempotencyKey,
+          postingType: 'ADVANCE_REALLOCATION',
+          lines: [
+            {
+              chartAccountId: advanceAccount.id,
+              debit: total,
+              description: 'Reduce student advance liability',
+            },
+            {
+              chartAccountId: receivableAccount.id,
+              credit: total,
+              description: 'Apply advance to student receivables',
+            },
+          ],
+        },
+        actor,
+        tx,
+      );
+
+      await Promise.all(
+        invoices.map(async (invoice) => {
+          const aggregate = await tx.paymentAllocation.aggregate({
+            where: {
+              tenantId: actor.tenantId,
+              invoiceId: invoice.id,
+              reversedAt: null,
+            },
+            _sum: { amount: true },
+          });
+          const paidAmount = decimalOrZero(aggregate._sum.amount);
+          await tx.invoice.update({
+            where: { id: invoice.id },
+            data: {
+              status: resolveInvoiceStatusAfterAdjustment(
+                invoice.status,
+                paidAmount,
+                invoice.totalAmount,
+              ),
+              paidAt: paidAmount.gte(invoice.totalAmount)
+                ? allocationDate
+                : null,
+            },
+          });
+        }),
+      );
+
+      return {
+        allocations: [source, ...targets],
+        disposition: 'SUCCEEDED' as const,
+      };
+    });
+
+    await this.auditService.record({
+      action: 'reallocate_advance',
+      resource: 'payment',
+      resourceId: paymentId,
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: {
+        allocationGroupId: idempotencyKey,
+        amount: total.toFixed(2),
+        invoiceIds: invoices.map((invoice) => invoice.id),
+        reason,
+        disposition: result.disposition,
+      },
+    });
+    return mapPaymentReallocationResult(result.allocations, result.disposition);
   }
 
   async requestRefund(
@@ -5014,7 +5774,10 @@ export class FinanceService {
           type: replay.type,
         },
       });
-      return { ...replay, disposition: 'REPLAYED' as const };
+      return {
+        ...serializeFinanceApprovalRequest(replay),
+        disposition: 'REPLAYED' as const,
+      };
     }
 
     const payment = await this.prisma.payment.findFirst({
@@ -5044,6 +5807,12 @@ export class FinanceService {
     if (refundAmount.gt(refundableAmount)) {
       throw new ConflictException(
         'Refund exceeds the remaining refundable amount',
+      );
+    }
+
+    if (!refundAmount.isPositive() || refundAmount.decimalPlaces() > 2) {
+      throw new BadRequestException(
+        'Refund amount must be a positive value with no more than two decimal places',
       );
     }
 
@@ -5123,7 +5892,10 @@ export class FinanceService {
           concurrent: true,
         },
       });
-      return { ...concurrentReplay, disposition: 'REPLAYED' as const };
+      return {
+        ...serializeFinanceApprovalRequest(concurrentReplay),
+        disposition: 'REPLAYED' as const,
+      };
     }
 
     await this.auditService.record({
@@ -5135,12 +5907,15 @@ export class FinanceService {
       after: {
         paymentId,
         type: FinanceRequestType.REFUND,
-        amount: Number(refundAmount),
+        amount: refundAmount.toFixed(2),
         reason: dto.reason,
       },
     });
 
-    return { ...request, disposition: 'SUCCEEDED' as const };
+    return {
+      ...serializeFinanceApprovalRequest(request),
+      disposition: 'SUCCEEDED' as const,
+    };
   }
 
   async requestReversal(
@@ -5271,7 +6046,10 @@ export class FinanceService {
           concurrent: true,
         },
       });
-      return { ...concurrentReplay, disposition: 'REPLAYED' as const };
+      return {
+        ...serializeFinanceApprovalRequest(concurrentReplay),
+        disposition: 'REPLAYED' as const,
+      };
     }
 
     await this.auditService.record({
@@ -5287,7 +6065,10 @@ export class FinanceService {
       },
     });
 
-    return { ...request, disposition: 'SUCCEEDED' as const };
+    return {
+      ...serializeFinanceApprovalRequest(request),
+      disposition: 'SUCCEEDED' as const,
+    };
   }
 
   async listApprovalRequests(
@@ -5382,7 +6163,11 @@ export class FinanceService {
       }),
       this.prisma.financeApprovalRequest.count({ where }),
     ]);
-    return buildFinancePage(items, total, pagination);
+    return buildFinancePage(
+      items.map(serializeFinanceApprovalRequest),
+      total,
+      pagination,
+    );
   }
 
   async reviewApprovalRequest(
@@ -5472,7 +6257,7 @@ export class FinanceService {
         resourceId: request.id,
         after: { status: rejected.status, reviewNote },
       });
-      return rejected;
+      return serializeFinanceApprovalRequest(rejected);
     }
 
     const claim = await this.prisma.financeApprovalRequest.updateMany({
@@ -5509,7 +6294,7 @@ export class FinanceService {
         await this.refundPayment(
           request.paymentId,
           {
-            amount: request.amount ? Number(request.amount) : undefined,
+            amount: request.amount?.toFixed(2),
             reason: request.reason,
             idempotencyKey: executionIdempotencyKey,
           },
@@ -5596,7 +6381,7 @@ export class FinanceService {
       },
     });
 
-    return updated;
+    return serializeFinanceApprovalRequest(updated);
   }
 
   async refundPayment(
@@ -5622,6 +6407,11 @@ export class FinanceService {
           include: {
             invoice: true,
             refunds: true,
+            allocations: {
+              where: { reversedAt: null },
+              include: { invoice: true },
+              orderBy: [{ allocatedAt: 'asc' }, { createdAt: 'asc' }],
+            },
           },
         },
       },
@@ -5641,16 +6431,26 @@ export class FinanceService {
         refundNumber: existingRefund.refundNumber,
         paymentId: existingRefund.paymentId,
         invoiceId: existingRefund.payment.invoiceId,
-        amount: Number(existingRefund.amount),
+        invoiceIds: Array.from(
+          new Set(
+            (existingRefund.payment.allocations ?? []).flatMap((allocation) =>
+              allocation.invoiceId ? [allocation.invoiceId] : [],
+            ),
+          ),
+        ).concat(
+          existingRefund.payment.allocations?.length ||
+            !existingRefund.payment.invoiceId
+            ? []
+            : [existingRefund.payment.invoiceId],
+        ),
+        amount: existingRefund.amount.toFixed(2),
         refundDate: existingRefund.refundDate,
         journalEntryNumber: journalEntry?.entryNumber ?? null,
-        remainingRefundableAmount: Number(
-          Prisma.Decimal.max(
-            new Prisma.Decimal(0),
-            existingRefund.payment.amount.sub(refundedAmount),
-          ),
-        ),
-        invoiceStatus: existingRefund.payment.invoice.status,
+        remainingRefundableAmount: Prisma.Decimal.max(
+          new Prisma.Decimal(0),
+          existingRefund.payment.amount.sub(refundedAmount),
+        ).toFixed(2),
+        invoiceStatus: existingRefund.payment.invoice?.status ?? null,
         disposition: 'REPLAYED' as const,
       };
     }
@@ -5660,6 +6460,11 @@ export class FinanceService {
       include: {
         receipt: true,
         refunds: true,
+        allocations: {
+          where: { reversedAt: null },
+          include: { invoice: true },
+          orderBy: [{ allocatedAt: 'asc' }, { createdAt: 'asc' }],
+        },
         invoice: {
           include: {
             payments: {
@@ -5673,8 +6478,27 @@ export class FinanceService {
     if (!payment) {
       throw new NotFoundException('Payment not found in this tenant');
     }
-
-    if (payment.invoice.status === InvoiceStatus.VOID) {
+    const paymentAllocations = payment.allocations ?? [];
+    if (paymentAllocations.length === 0 && !payment.invoice) {
+      throw new ConflictException(
+        'This payment has no allocation history and cannot be refunded safely.',
+      );
+    }
+    const allocatedInvoices = Array.from(
+      new Map(
+        paymentAllocations.flatMap((allocation) =>
+          allocation.invoice
+            ? ([[allocation.invoice.id, allocation.invoice]] as const)
+            : [],
+        ),
+      ).values(),
+    );
+    if (allocatedInvoices.length === 0 && payment.invoice) {
+      allocatedInvoices.push(payment.invoice);
+    }
+    if (
+      allocatedInvoices.some((invoice) => invoice.status === InvoiceStatus.VOID)
+    ) {
       throw new ConflictException('Voided invoices cannot be refunded');
     }
 
@@ -5732,11 +6556,31 @@ export class FinanceService {
         ? refundableAmount
         : new Prisma.Decimal(dto.amount);
 
+    if (!refundAmount.isPositive() || refundAmount.decimalPlaces() > 2) {
+      throw new BadRequestException(
+        'Refund amount must be a positive value with no more than two decimal places',
+      );
+    }
+
     if (refundAmount.gt(refundableAmount)) {
       throw new ConflictException(
         'Refund exceeds the remaining refundable amount',
       );
     }
+
+    const correctionPlan = allocateCorrectionAcrossPaymentAllocations(
+      paymentAllocations.length > 0
+        ? paymentAllocations
+        : payment.invoiceId
+          ? [
+              {
+                invoiceId: payment.invoiceId,
+                amount: payment.amount,
+              },
+            ]
+          : [],
+      refundAmount,
+    );
 
     const refundDate = dto.refundDate ? new Date(dto.refundDate) : new Date();
     await this.ensurePostingPeriodIsOpen(actor.tenantId, refundDate);
@@ -5814,6 +6658,24 @@ export class FinanceService {
           },
         });
 
+        await Promise.all(
+          correctionPlan.map((allocation) =>
+            tx.paymentAllocation.create({
+              data: {
+                tenantId: actor.tenantId,
+                paymentId: payment.id,
+                invoiceId: allocation.invoiceId,
+                amount: allocation.amount.negated(),
+                allocationType: PaymentAllocationType.REFUND,
+                allocationGroupId: refund.id,
+                reason,
+                allocatedAt: refundDate,
+                allocatedById: actor.userId,
+              },
+            }),
+          ),
+        );
+
         const journalEntry =
           await this.accountingPostingService.postPaymentRefund(
             {
@@ -5835,36 +6697,48 @@ export class FinanceService {
             tx,
           );
 
-        const netPaidAmount = sumNetPaidAmount(
-          payment.invoice.payments.map((invoicePayment) =>
-            invoicePayment.id === payment.id
-              ? {
-                  ...invoicePayment,
-                  refunds: [
-                    ...invoicePayment.refunds,
-                    { amount: refundAmount },
-                  ],
-                }
-              : invoicePayment,
-          ),
+        const updatedInvoices = await Promise.all(
+          correctionPlan
+            .flatMap((allocation) =>
+              allocation.invoiceId ? [allocation.invoiceId] : [],
+            )
+            .map(async (invoiceId) => {
+              const target = allocatedInvoices.find(
+                (invoice) => invoice.id === invoiceId,
+              );
+              if (!target) {
+                throw new ConflictException(
+                  'An invoice allocation changed while the refund was being recorded.',
+                );
+              }
+              const aggregate = await tx.paymentAllocation.aggregate({
+                where: {
+                  tenantId: actor.tenantId,
+                  invoiceId,
+                  reversedAt: null,
+                },
+                _sum: { amount: true },
+              });
+              const netPaidAmount = decimalOrZero(aggregate._sum.amount);
+              return tx.invoice.update({
+                where: { id: invoiceId },
+                data: {
+                  status: resolveInvoiceStatusAfterAdjustment(
+                    target.status,
+                    netPaidAmount,
+                    target.totalAmount,
+                  ),
+                  paidAt:
+                    netPaidAmount.gte(target.totalAmount) &&
+                    target.totalAmount.gt(0)
+                      ? (target.paidAt ?? refundDate)
+                      : null,
+                },
+              });
+            }),
         );
-        const updatedInvoice = await tx.invoice.update({
-          where: { id: payment.invoiceId },
-          data: {
-            status: resolveInvoiceStatusAfterAdjustment(
-              payment.invoice.status,
-              netPaidAmount,
-              payment.invoice.totalAmount,
-            ),
-            paidAt:
-              netPaidAmount.gte(payment.invoice.totalAmount) &&
-              payment.invoice.totalAmount.gt(0)
-                ? (payment.invoice.paidAt ?? refundDate)
-                : null,
-          },
-        });
 
-        return { refund, journalEntry, updatedInvoice };
+        return { refund, journalEntry, updatedInvoices };
       });
     } catch (error) {
       if (!isPrismaUniqueConstraintError(error)) {
@@ -5880,6 +6754,10 @@ export class FinanceService {
             include: {
               invoice: true,
               refunds: true,
+              allocations: {
+                where: { reversedAt: null },
+                include: { invoice: true },
+              },
             },
           },
         },
@@ -5905,16 +6783,27 @@ export class FinanceService {
         refundNumber: concurrentReplay.refundNumber,
         paymentId: concurrentReplay.paymentId,
         invoiceId: concurrentReplay.payment.invoiceId,
-        amount: Number(concurrentReplay.amount),
+        invoiceIds: Array.from(
+          new Set(
+            (concurrentReplay.payment.allocations ?? []).flatMap(
+              (allocation) =>
+                allocation.invoiceId ? [allocation.invoiceId] : [],
+            ),
+          ),
+        ).concat(
+          concurrentReplay.payment.allocations?.length ||
+            !concurrentReplay.payment.invoiceId
+            ? []
+            : [concurrentReplay.payment.invoiceId],
+        ),
+        amount: concurrentReplay.amount.toFixed(2),
         refundDate: concurrentReplay.refundDate,
         journalEntryNumber: journalEntry?.entryNumber ?? null,
-        remainingRefundableAmount: Number(
-          Prisma.Decimal.max(
-            new Prisma.Decimal(0),
-            concurrentReplay.payment.amount.sub(concurrentRefundedAmount),
-          ),
-        ),
-        invoiceStatus: concurrentReplay.payment.invoice.status,
+        remainingRefundableAmount: Prisma.Decimal.max(
+          new Prisma.Decimal(0),
+          concurrentReplay.payment.amount.sub(concurrentRefundedAmount),
+        ).toFixed(2),
+        invoiceStatus: concurrentReplay.payment.invoice?.status ?? null,
         disposition: 'REPLAYED' as const,
       };
     }
@@ -5927,12 +6816,13 @@ export class FinanceService {
       resourceId: result.refund.id,
       before: {
         paymentId: payment.id,
-        amount: Number(payment.amount),
+        amount: payment.amount.toFixed(2),
       },
       after: {
         refundId: result.refund.id,
-        amount: Number(result.refund.amount),
-        status: result.updatedInvoice.status,
+        amount: result.refund.amount.toFixed(2),
+        invoiceIds: result.updatedInvoices.map((invoice) => invoice.id),
+        statuses: result.updatedInvoices.map((invoice) => invoice.status),
       },
     });
 
@@ -5941,11 +6831,12 @@ export class FinanceService {
       refundNumber: result.refund.refundNumber,
       paymentId: payment.id,
       invoiceId: payment.invoiceId,
-      amount: Number(result.refund.amount),
+      invoiceIds: result.updatedInvoices.map((invoice) => invoice.id),
+      amount: result.refund.amount.toFixed(2),
       refundDate: result.refund.refundDate,
       journalEntryNumber: result.journalEntry.entryNumber,
-      remainingRefundableAmount: Number(refundableAmount.sub(refundAmount)),
-      invoiceStatus: result.updatedInvoice.status,
+      remainingRefundableAmount: refundableAmount.sub(refundAmount).toFixed(2),
+      invoiceStatus: result.updatedInvoices[0]?.status ?? null,
       disposition: 'SUCCEEDED' as const,
     };
   }
@@ -5975,6 +6866,11 @@ export class FinanceService {
       where: { id: paymentId, tenantId: actor.tenantId },
       include: {
         invoice: true,
+        allocations: {
+          where: { reversedAt: null },
+          include: { invoice: true },
+          orderBy: [{ allocatedAt: 'asc' }, { createdAt: 'asc' }],
+        },
         refunds: true,
         receipt: true,
       },
@@ -5991,6 +6887,17 @@ export class FinanceService {
       return {
         paymentId: payment.id,
         invoiceId: payment.invoiceId,
+        invoiceIds: Array.from(
+          new Set(
+            (payment.allocations ?? []).flatMap((allocation) =>
+              allocation.invoiceId ? [allocation.invoiceId] : [],
+            ),
+          ),
+        ).concat(
+          payment.allocations?.length || !payment.invoiceId
+            ? []
+            : [payment.invoiceId],
+        ),
         status: payment.status,
         reversedAt: payment.reversedAt,
         reversalReason: payment.reversalReason,
@@ -6007,6 +6914,38 @@ export class FinanceService {
         'Cannot reverse a payment that has been partially or fully refunded. Void the refunds first.',
       );
     }
+
+    const paymentAllocations = payment.allocations ?? [];
+    if (paymentAllocations.length === 0 && !payment.invoice) {
+      throw new ConflictException(
+        'This payment has no allocation history and cannot be reversed safely.',
+      );
+    }
+    const allocatedInvoices = Array.from(
+      new Map(
+        paymentAllocations.flatMap((allocation) =>
+          allocation.invoice
+            ? ([[allocation.invoice.id, allocation.invoice]] as const)
+            : [],
+        ),
+      ).values(),
+    );
+    if (allocatedInvoices.length === 0 && payment.invoice) {
+      allocatedInvoices.push(payment.invoice);
+    }
+    const correctionPlan = allocateCorrectionAcrossPaymentAllocations(
+      paymentAllocations.length > 0
+        ? paymentAllocations
+        : payment.invoiceId
+          ? [
+              {
+                invoiceId: payment.invoiceId,
+                amount: payment.amount,
+              },
+            ]
+          : [],
+      payment.amount,
+    );
 
     const closedWindow = await this.prisma.cashierClose.findFirst({
       where: {
@@ -6055,12 +6994,14 @@ export class FinanceService {
       resourceId: payment.id,
       before: {
         invoiceId: payment.invoiceId,
-        amount: Number(payment.amount),
+        invoiceIds: allocatedInvoices.map((invoice) => invoice.id),
+        amount: payment.amount.toFixed(2),
         receiptNumber: payment.receipt?.receiptNumber ?? null,
       },
       after: { reason },
     });
 
+    const reversalDate = new Date();
     const result = await this.prisma.$transaction(async (tx) => {
       const claim = await tx.payment.updateMany({
         where: {
@@ -6071,7 +7012,7 @@ export class FinanceService {
         },
         data: {
           status: PaymentStatus.REVERSED,
-          reversedAt: new Date(),
+          reversedAt: reversalDate,
           reversedById: actor.userId,
           reversalReason: reason,
           reversalIdempotencyKey: idempotencyKey,
@@ -6087,7 +7028,7 @@ export class FinanceService {
         {
           tenantId: actor.tenantId,
           originalEntryId: sourceJournal.id,
-          reversalDate: new Date(),
+          reversalDate,
           narration: `Voiding Payment ${payment.receipt?.receiptNumber ?? payment.id}: ${reason}`,
           reason,
           lines: sourceJournal.lines.map((line) => ({
@@ -6104,29 +7045,53 @@ export class FinanceService {
         tx,
       );
 
-      const remainingPayments = await tx.payment.findMany({
-        where: {
-          tenantId: actor.tenantId,
-          invoiceId: payment.invoiceId,
-          status: { not: PaymentStatus.REVERSED },
-        },
-      });
-      const paidSoFar = remainingPayments.reduce(
-        (sum, p) => sum.add(p.amount),
-        new Prisma.Decimal(0),
+      await Promise.all(
+        correctionPlan.map((allocation) =>
+          tx.paymentAllocation.create({
+            data: {
+              tenantId: actor.tenantId,
+              paymentId: payment.id,
+              invoiceId: allocation.invoiceId,
+              amount: allocation.amount.negated(),
+              allocationType: PaymentAllocationType.REVERSAL,
+              allocationGroupId: payment.id,
+              reason,
+              allocatedAt: reversalDate,
+              allocatedById: actor.userId,
+            },
+          }),
+        ),
       );
 
-      await tx.invoice.update({
-        where: { id: payment.invoiceId },
-        data: {
-          status: paidSoFar.gt(0)
-            ? InvoiceStatus.PARTIAL
-            : InvoiceStatus.ISSUED,
-          paidAt: paidSoFar.gt(0) ? payment.invoice.paidAt : null,
-        },
-      });
+      const updatedInvoices = await Promise.all(
+        allocatedInvoices.map(async (invoice) => {
+          const aggregate = await tx.paymentAllocation.aggregate({
+            where: {
+              tenantId: actor.tenantId,
+              invoiceId: invoice.id,
+              reversedAt: null,
+            },
+            _sum: { amount: true },
+          });
+          const paidAmount = decimalOrZero(aggregate._sum.amount);
+          return tx.invoice.update({
+            where: { id: invoice.id },
+            data: {
+              status: resolveInvoiceStatusAfterAdjustment(
+                invoice.status,
+                paidAmount,
+                invoice.totalAmount,
+              ),
+              paidAt:
+                paidAmount.gte(invoice.totalAmount) && invoice.totalAmount.gt(0)
+                  ? invoice.paidAt
+                  : null,
+            },
+          });
+        }),
+      );
 
-      return { reversal };
+      return { reversal, updatedInvoices };
     });
 
     await this.auditService.record({
@@ -6137,7 +7102,8 @@ export class FinanceService {
       resourceId: paymentId,
       after: {
         invoiceId: payment.invoiceId,
-        amount: Number(payment.amount),
+        invoiceIds: result.updatedInvoices.map((invoice) => invoice.id),
+        amount: payment.amount.toFixed(2),
         reason,
       },
     });
@@ -6145,10 +7111,673 @@ export class FinanceService {
     return {
       paymentId: payment.id,
       invoiceId: payment.invoiceId,
+      invoiceIds: result.updatedInvoices.map((invoice) => invoice.id),
       status: PaymentStatus.REVERSED,
       reversalEntryNumber: result.reversal.entryNumber,
       disposition: 'SUCCEEDED' as const,
     };
+  }
+
+  async openCashierClose(dto: OpenCashierCloseDto, actor: AuthContext) {
+    assertFinancePermission(actor, 'payments:close');
+    if (this.entitlementsService) {
+      await this.entitlementsService.assertFeatureEnabled(
+        actor.tenantId,
+        'feature.fees.cashier_close',
+      );
+    }
+    const openedAt = new Date(dto.openedAt);
+    const activeSessionKey = buildCashierActiveSessionKey({
+      collectorUserId: dto.collectorUserId,
+      paymentMethod: dto.paymentMethod,
+    });
+
+    let close: CashierCloseWithUsers;
+    try {
+      close = await this.prisma.$transaction(async (tx) => {
+        const closeNumber = await this.generateCashierCloseNumber(
+          actor.tenantId,
+          tx,
+        );
+        return tx.cashierClose.create({
+          data: {
+            tenantId: actor.tenantId,
+            closeNumber,
+            activeSessionKey,
+            openedAt,
+            status: CashierCloseStatus.OPEN,
+            collectorUserId: dto.collectorUserId ?? null,
+            paymentMethod: dto.paymentMethod ?? null,
+            grossCollected: new Prisma.Decimal(0),
+            totalRefunded: new Prisma.Decimal(0),
+            netCollected: new Prisma.Decimal(0),
+            paymentCount: 0,
+            refundCount: 0,
+            notes: dto.notes?.trim() || null,
+          },
+          include: cashierCloseUserInclude,
+        });
+      });
+    } catch (error) {
+      if (isPrismaUniqueConstraintError(error)) {
+        throw new ConflictException(
+          'An open cashier session already exists for this collector and payment method.',
+        );
+      }
+      throw error;
+    }
+
+    await this.auditService.record({
+      action: 'open',
+      resource: 'cashier_close',
+      resourceId: close.id,
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: {
+        status: close.status,
+        openedAt: close.openedAt,
+        collectorUserId: close.collectorUserId,
+        paymentMethod: close.paymentMethod,
+      },
+    });
+    return this.buildCashierCloseResponse(close);
+  }
+
+  async countCashierClose(
+    closeId: string,
+    dto: CountCashierCloseDto,
+    actor: AuthContext,
+  ) {
+    assertFinancePermission(actor, 'payments:close');
+    const close = await this.prisma.cashierClose.findFirst({
+      where: { id: closeId, tenantId: actor.tenantId },
+    });
+    if (!close) {
+      throw new NotFoundException('Cashier session not found');
+    }
+    if (close.status !== CashierCloseStatus.OPEN) {
+      throw new ConflictException(
+        'Only an open cashier session can be counted.',
+      );
+    }
+    const countedThroughAt = new Date(dto.countedThroughAt);
+    if (countedThroughAt <= close.openedAt) {
+      throw new BadRequestException(
+        'Counted-through time must be after the session opened.',
+      );
+    }
+    const actualCashAmount = new Prisma.Decimal(dto.actualCashAmount);
+    if (actualCashAmount.isNegative() || actualCashAmount.decimalPlaces() > 2) {
+      throw new BadRequestException(
+        'Actual cash must be zero or greater with no more than two decimal places.',
+      );
+    }
+
+    const summary = await this.buildCashierCloseSummary(
+      {
+        openedAt: close.openedAt,
+        closedAt: countedThroughAt,
+        collectorUserId: close.collectorUserId ?? undefined,
+        paymentMethod: close.paymentMethod ?? undefined,
+      },
+      actor,
+    );
+    const expectedCashAmount = new Prisma.Decimal(summary.expectedCashAmount);
+    const varianceAmount = actualCashAmount.sub(expectedCashAmount);
+    const hasVariance = !varianceAmount.isZero();
+    const varianceReason = dto.varianceReason?.trim() || null;
+    if (hasVariance && !varianceReason) {
+      throw new BadRequestException(
+        'A variance reason is required when actual cash differs from expected cash.',
+      );
+    }
+
+    return this.transitionCashierClose({
+      closeId,
+      from: CashierCloseStatus.OPEN,
+      to: CashierCloseStatus.COUNTED,
+      action: 'count',
+      reason: varianceReason,
+      reasonRequired: false,
+      actor,
+      data: {
+        countedThroughAt,
+        countedAt: new Date(),
+        countedById: actor.userId,
+        grossCollected: new Prisma.Decimal(summary.grossCollected),
+        totalRefunded: new Prisma.Decimal(summary.totalRefunded),
+        netCollected: new Prisma.Decimal(summary.netCollected),
+        expectedCashAmount,
+        actualCashAmount,
+        varianceAmount,
+        varianceReason: hasVariance ? varianceReason : null,
+        denominationBreakdown:
+          (dto.denominationBreakdown as Prisma.InputJsonValue | undefined) ??
+          Prisma.JsonNull,
+        methodBreakdown: summary.methodBreakdown,
+        paymentCount: summary.paymentCount,
+        refundCount: summary.refundCount,
+        firstReceiptNumber: summary.firstReceiptNumber,
+        lastReceiptNumber: summary.lastReceiptNumber,
+      },
+    });
+  }
+
+  async submitCashierClose(
+    closeId: string,
+    dto: CashierCloseTransitionDto,
+    actor: AuthContext,
+  ) {
+    assertFinancePermission(actor, 'payments:close');
+    return this.transitionCashierClose({
+      closeId,
+      from: CashierCloseStatus.COUNTED,
+      to: CashierCloseStatus.SUBMITTED,
+      action: 'submit',
+      reason: dto.reason.trim(),
+      actor,
+      data: { submittedAt: new Date(), submittedById: actor.userId },
+    });
+  }
+
+  async approveCashierClose(
+    closeId: string,
+    dto: CashierCloseTransitionDto,
+    actor: AuthContext,
+  ) {
+    assertFinancePermission(actor, 'payments:close');
+    const close = await this.prisma.cashierClose.findFirst({
+      where: { id: closeId, tenantId: actor.tenantId },
+      select: { submittedById: true },
+    });
+    if (!close) {
+      throw new NotFoundException('Cashier session not found');
+    }
+    if (close.submittedById === actor.userId) {
+      throw new ForbiddenException(
+        'The person who submitted this cashier count cannot approve it.',
+      );
+    }
+    return this.transitionCashierClose({
+      closeId,
+      from: CashierCloseStatus.SUBMITTED,
+      to: CashierCloseStatus.APPROVED,
+      action: 'approve',
+      reason: dto.reason.trim(),
+      actor,
+      data: { approvedAt: new Date(), approvedById: actor.userId },
+    });
+  }
+
+  async closeCashierClose(
+    closeId: string,
+    dto: CashierCloseTransitionDto,
+    actor: AuthContext,
+  ) {
+    assertFinancePermission(actor, 'payments:close');
+    const close = await this.prisma.cashierClose.findFirst({
+      where: { id: closeId, tenantId: actor.tenantId },
+      select: { countedThroughAt: true },
+    });
+    if (!close) {
+      throw new NotFoundException('Cashier session not found');
+    }
+    if (!close.countedThroughAt) {
+      throw new ConflictException(
+        'The cashier session must be counted before it can close.',
+      );
+    }
+    await this.transitionCashierClose({
+      closeId,
+      from: CashierCloseStatus.APPROVED,
+      to: CashierCloseStatus.CLOSED,
+      action: 'close',
+      reason: dto.reason.trim(),
+      actor,
+      data: {
+        closedAt: close.countedThroughAt,
+        closedById: actor.userId,
+        activeSessionKey: null,
+      },
+    });
+    const closed = await this.prisma.cashierClose.findFirst({
+      where: { id: closeId, tenantId: actor.tenantId },
+      include: cashierCloseUserInclude,
+    });
+    if (!closed) {
+      throw new NotFoundException('Cashier session not found');
+    }
+    const closePdfFile = await this.generateCashierClosePdfFile(closed, actor);
+    return this.buildCashierCloseResponse(closed, closePdfFile);
+  }
+
+  async listCashDeposits(query: ListCashDepositsDto, actor: AuthContext) {
+    assertFinancePermission(actor, 'payments:close');
+    assertFinancePermission(actor, 'accounting:reconciliation:manage');
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 25;
+    const skip = (page - 1) * limit;
+    const where: Prisma.CashDepositWhereInput = {
+      tenantId: actor.tenantId,
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.cashierCloseId ? { cashierCloseId: query.cashierCloseId } : {}),
+    };
+    const [deposits, total] = await Promise.all([
+      this.prisma.cashDeposit.findMany({
+        where,
+        orderBy: [{ depositDate: 'desc' }, { createdAt: 'desc' }],
+        skip,
+        take: limit,
+      }),
+      this.prisma.cashDeposit.count({ where }),
+    ]);
+    const [accounts, closes] = await Promise.all([
+      this.prisma.chartAccount.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          id: { in: deposits.map((deposit) => deposit.accountId) },
+        },
+        select: { id: true, code: true, name: true },
+        take: limit,
+      }),
+      this.prisma.cashierClose.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          id: {
+            in: deposits.flatMap((deposit) =>
+              deposit.cashierCloseId ? [deposit.cashierCloseId] : [],
+            ),
+          },
+        },
+        select: { id: true, closeNumber: true },
+        take: limit,
+      }),
+    ]);
+    const accountById = new Map(
+      accounts.map((account) => [account.id, account]),
+    );
+    const closeById = new Map(closes.map((close) => [close.id, close]));
+
+    return {
+      items: deposits.map((deposit) =>
+        serializeCashDeposit(
+          deposit,
+          accountById.get(deposit.accountId),
+          deposit.cashierCloseId
+            ? closeById.get(deposit.cashierCloseId)
+            : undefined,
+        ),
+      ),
+      total,
+      page,
+      limit,
+      hasNextPage: skip + deposits.length < total,
+    };
+  }
+
+  async prepareCashDeposit(dto: PrepareCashDepositDto, actor: AuthContext) {
+    assertFinancePermission(actor, 'payments:close');
+    assertFinancePermission(actor, 'accounting:reconciliation:manage');
+    const existing = await this.prisma.cashDeposit.findUnique({
+      where: {
+        tenantId_idempotencyKey: {
+          tenantId: actor.tenantId,
+          idempotencyKey: dto.idempotencyKey,
+        },
+      },
+    });
+    if (existing) {
+      if (
+        existing.cashierCloseId !== dto.cashierCloseId ||
+        existing.accountId !== dto.accountId
+      ) {
+        throw new ConflictException(
+          'This deposit retry key is already attached to different deposit details.',
+        );
+      }
+      return this.getCashDepositSummary(existing.id, actor.tenantId);
+    }
+
+    const [close, account, cashAccount] = await Promise.all([
+      this.prisma.cashierClose.findFirst({
+        where: {
+          id: dto.cashierCloseId,
+          tenantId: actor.tenantId,
+          status: CashierCloseStatus.CLOSED,
+          depositId: null,
+        },
+      }),
+      this.prisma.chartAccount.findFirst({
+        where: {
+          id: dto.accountId,
+          tenantId: actor.tenantId,
+          type: ChartAccountType.ASSET,
+          isActive: true,
+          archivedAt: null,
+        },
+      }),
+      this.prisma.chartAccount.findUnique({
+        where: {
+          tenantId_code: {
+            tenantId: actor.tenantId,
+            code: resolveCashAccountCode(PaymentMethod.CASH),
+          },
+        },
+      }),
+    ]);
+    if (!close) {
+      throw new ConflictException(
+        'Only a closed, undeposited cashier session can be prepared for deposit.',
+      );
+    }
+    if (!account) {
+      throw new NotFoundException(
+        'The selected active asset account was not found in this tenant.',
+      );
+    }
+    if (!cashAccount) {
+      throw new ConflictException(
+        'The tenant cash account must be configured before preparing a deposit.',
+      );
+    }
+    if (account.id === cashAccount.id) {
+      throw new BadRequestException(
+        'Select a bank or deposit account rather than the cash-in-hand account.',
+      );
+    }
+    const amount = close.actualCashAmount ?? close.expectedCashAmount;
+    if (!amount || !amount.gt(0)) {
+      throw new ConflictException(
+        'This cashier session has no positive counted cash to deposit.',
+      );
+    }
+    const depositDate = dto.depositDate
+      ? new Date(dto.depositDate)
+      : new Date();
+    const depositId = randomUUID();
+    const depositNumber = `DEP-${formatFiscalYearForNumber(
+      resolveFiscalYear(depositDate),
+    )}-${depositId.slice(0, 8).toUpperCase()}`;
+    const deposit = await this.prisma.cashDeposit.create({
+      data: {
+        id: depositId,
+        tenantId: actor.tenantId,
+        depositNumber,
+        cashierCloseId: close.id,
+        accountId: account.id,
+        amount,
+        depositDate,
+        referenceNumber: dto.referenceNumber?.trim() || null,
+        status: CashDepositStatus.DRAFT,
+        idempotencyKey: dto.idempotencyKey,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'prepare',
+      resource: 'cash_deposit',
+      resourceId: deposit.id,
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: {
+        depositNumber: deposit.depositNumber,
+        cashierCloseId: close.id,
+        amount: amount.toFixed(2),
+        accountId: account.id,
+        status: deposit.status,
+      },
+    });
+    return serializeCashDeposit(deposit, account, close);
+  }
+
+  async submitCashDeposit(
+    depositId: string,
+    dto: CashDepositTransitionDto,
+    actor: AuthContext,
+  ) {
+    assertFinancePermission(actor, 'payments:close');
+    assertFinancePermission(actor, 'accounting:reconciliation:manage');
+    const deposit = await this.prisma.cashDeposit.findFirst({
+      where: { id: depositId, tenantId: actor.tenantId },
+    });
+    if (!deposit) throw new NotFoundException('Cash deposit not found');
+    if (
+      deposit.status === CashDepositStatus.SUBMITTED ||
+      deposit.status === CashDepositStatus.DEPOSITED
+    ) {
+      return this.getCashDepositSummary(deposit.id, actor.tenantId);
+    }
+    if (deposit.status !== CashDepositStatus.DRAFT) {
+      throw new ConflictException(
+        'Only a draft cash deposit can be submitted.',
+      );
+    }
+    const updated = await this.prisma.cashDeposit.update({
+      where: { id: deposit.id },
+      data: {
+        status: CashDepositStatus.SUBMITTED,
+        submittedAt: new Date(),
+        submittedById: actor.userId,
+      },
+    });
+    await this.auditService.record({
+      action: 'submit',
+      resource: 'cash_deposit',
+      resourceId: deposit.id,
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: { status: updated.status, reason: dto.reason.trim() },
+    });
+    return this.getCashDepositSummary(updated.id, actor.tenantId);
+  }
+
+  async completeCashDeposit(
+    depositId: string,
+    dto: CashDepositTransitionDto,
+    actor: AuthContext,
+  ) {
+    assertFinancePermission(actor, 'payments:close');
+    assertFinancePermission(actor, 'accounting:reconciliation:manage');
+    assertFinancePermission(actor, 'accounting:journals:post');
+    const existing = await this.prisma.cashDeposit.findFirst({
+      where: { id: depositId, tenantId: actor.tenantId },
+    });
+    if (!existing) throw new NotFoundException('Cash deposit not found');
+    if (existing.status === CashDepositStatus.DEPOSITED) {
+      return this.getCashDepositSummary(existing.id, actor.tenantId);
+    }
+    if (existing.status !== CashDepositStatus.SUBMITTED) {
+      throw new ConflictException(
+        'The cash deposit must be submitted before it can be completed.',
+      );
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const deposit = await tx.cashDeposit.findFirst({
+        where: {
+          id: depositId,
+          tenantId: actor.tenantId,
+          status: CashDepositStatus.SUBMITTED,
+        },
+      });
+      if (!deposit) {
+        throw new ConflictException(
+          'The cash deposit state changed before completion. Refresh and retry.',
+        );
+      }
+      const close = await tx.cashierClose.findFirst({
+        where: {
+          id: deposit.cashierCloseId ?? undefined,
+          tenantId: actor.tenantId,
+          status: CashierCloseStatus.CLOSED,
+          depositId: null,
+        },
+      });
+      if (!close) {
+        throw new ConflictException(
+          'The linked cashier session is no longer eligible for deposit.',
+        );
+      }
+      const [destinationAccount, cashAccount] = await Promise.all([
+        tx.chartAccount.findFirst({
+          where: {
+            id: deposit.accountId,
+            tenantId: actor.tenantId,
+            type: ChartAccountType.ASSET,
+            isActive: true,
+            archivedAt: null,
+          },
+        }),
+        tx.chartAccount.findUnique({
+          where: {
+            tenantId_code: {
+              tenantId: actor.tenantId,
+              code: resolveCashAccountCode(PaymentMethod.CASH),
+            },
+          },
+        }),
+      ]);
+      if (!destinationAccount || !cashAccount) {
+        throw new ConflictException(
+          'Both the cash and destination accounts must remain active to complete the deposit.',
+        );
+      }
+      const journal = await this.accountingPostingService.postManualJournal(
+        {
+          tenantId: actor.tenantId,
+          entryDate: deposit.depositDate,
+          narration: `Cash deposit ${deposit.depositNumber} from cashier close ${close.closeNumber}`,
+          sourceModule: 'M3',
+          sourceType: JournalSourceType.CONTRA_VOUCHER,
+          sourceId: deposit.id,
+          postingType: 'CASH_DEPOSIT',
+          lines: [
+            {
+              chartAccountId: destinationAccount.id,
+              debit: deposit.amount,
+              description: `Deposit to ${destinationAccount.code} ${destinationAccount.name}`,
+            },
+            {
+              chartAccountId: cashAccount.id,
+              credit: deposit.amount,
+              description: `Cash transferred from ${cashAccount.code} ${cashAccount.name}`,
+            },
+          ],
+        },
+        actor,
+        tx,
+      );
+      await tx.cashDeposit.update({
+        where: { id: deposit.id },
+        data: {
+          status: CashDepositStatus.DEPOSITED,
+          depositedAt: new Date(),
+          depositedById: actor.userId,
+          journalEntryId: journal.id,
+        },
+      });
+      const closeUpdate = await tx.cashierClose.updateMany({
+        where: {
+          id: close.id,
+          tenantId: actor.tenantId,
+          status: CashierCloseStatus.CLOSED,
+          depositId: null,
+        },
+        data: {
+          status: CashierCloseStatus.DEPOSITED,
+          depositedAt: new Date(),
+          depositedById: actor.userId,
+          depositId: deposit.id,
+        },
+      });
+      if (closeUpdate.count !== 1) {
+        throw new ConflictException(
+          'The cashier session was deposited by another request.',
+        );
+      }
+    });
+
+    await Promise.all([
+      this.auditService.record({
+        action: 'complete',
+        resource: 'cash_deposit',
+        resourceId: depositId,
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        after: {
+          status: CashDepositStatus.DEPOSITED,
+          reason: dto.reason.trim(),
+        },
+      }),
+      this.auditService.record({
+        action: 'deposit',
+        resource: 'cashier_close',
+        resourceId: existing.cashierCloseId ?? undefined,
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        after: { depositId, reason: dto.reason.trim() },
+      }),
+    ]);
+    return this.getCashDepositSummary(depositId, actor.tenantId);
+  }
+
+  private async getCashDepositSummary(depositId: string, tenantId: string) {
+    const deposit = await this.prisma.cashDeposit.findFirst({
+      where: { id: depositId, tenantId },
+    });
+    if (!deposit) throw new NotFoundException('Cash deposit not found');
+    const [account, close] = await Promise.all([
+      this.prisma.chartAccount.findFirst({
+        where: { id: deposit.accountId, tenantId },
+        select: { id: true, code: true, name: true },
+      }),
+      deposit.cashierCloseId
+        ? this.prisma.cashierClose.findFirst({
+            where: { id: deposit.cashierCloseId, tenantId },
+            select: { id: true, closeNumber: true },
+          })
+        : null,
+    ]);
+    return serializeCashDeposit(
+      deposit,
+      account ?? undefined,
+      close ?? undefined,
+    );
+  }
+
+  async depositCashierClose(
+    closeId: string,
+    dto: DepositCashierCloseDto,
+    actor: AuthContext,
+  ) {
+    assertFinancePermission(actor, 'payments:close');
+    const deposit = await this.prisma.cashDeposit.findFirst({
+      where: {
+        id: dto.depositId,
+        tenantId: actor.tenantId,
+        cashierCloseId: closeId,
+        status: CashDepositStatus.DEPOSITED,
+      },
+      select: { id: true },
+    });
+    if (!deposit) {
+      throw new ConflictException(
+        'A completed tenant-scoped cash deposit is required before this session can be marked deposited.',
+      );
+    }
+    return this.transitionCashierClose({
+      closeId,
+      from: CashierCloseStatus.CLOSED,
+      to: CashierCloseStatus.DEPOSITED,
+      action: 'deposit',
+      reason: dto.reason.trim(),
+      actor,
+      data: {
+        depositedAt: new Date(),
+        depositedById: actor.userId,
+        depositId: deposit.id,
+      },
+    });
   }
 
   async previewCashierClose(query: CashierCloseWindowDto, actor: AuthContext) {
@@ -6182,7 +7811,7 @@ export class FinanceService {
       },
     });
 
-    return summary;
+    return serializeCashierCloseSummary(summary);
   }
 
   async listCashierCloses(query: ListCashierClosesDto, actor: AuthContext) {
@@ -6316,6 +7945,7 @@ export class FinanceService {
         'A variance reason is required when actual cash differs from expected cash',
       );
     }
+    const finalizedAt = new Date();
 
     let close: CashierCloseWithUsers;
 
@@ -6347,6 +7977,14 @@ export class FinanceService {
             closeWindowKey,
             openedAt: window.openedAt,
             closedAt: window.closedAt,
+            countedThroughAt: window.closedAt,
+            status: CashierCloseStatus.CLOSED,
+            countedAt: finalizedAt,
+            countedById: actor.userId,
+            submittedAt: finalizedAt,
+            submittedById: actor.userId,
+            approvedAt: finalizedAt,
+            approvedById: actor.userId,
             collectorUserId: dto.collectorUserId ?? null,
             paymentMethod: dto.paymentMethod ?? null,
             grossCollected: new Prisma.Decimal(summary.grossCollected),
@@ -6385,66 +8023,8 @@ export class FinanceService {
       throw error;
     }
 
-    const school = await this.prisma.tenant.findUnique({
-      where: { id: actor.tenantId },
-    });
-    const schoolName = school?.name || 'SchoolOS';
-    const logo = await loadSchoolLogoForPdf(
-      this.prisma,
-      this.fileRegistryService,
-      actor,
-    );
-
-    const methodBreakdown = parseCashierCloseMethodBreakdown(
-      close.methodBreakdown,
-    );
-
-    const closePdf = buildCashierClosePdf({
-      schoolName,
-      closeNumber: close.closeNumber,
-      openedAt: close.openedAt,
-      closedAt: close.closedAt,
-      collectorName: close.collectorUser?.email ?? 'System',
-      paymentMethod: close.paymentMethod,
-      methodBreakdown,
-      grossCollected: Number(close.grossCollected),
-      totalRefunded: Number(close.totalRefunded),
-      netCollected: Number(close.netCollected),
-      expectedCashAmount: Number(close.expectedCashAmount ?? 0),
-      actualCashAmount:
-        close.actualCashAmount === null ? null : Number(close.actualCashAmount),
-      varianceAmount:
-        close.varianceAmount === null ? null : Number(close.varianceAmount),
-      varianceReason: close.varianceReason,
-      paymentCount: close.paymentCount,
-      refundCount: close.refundCount,
-      firstReceiptNumber: close.firstReceiptNumber,
-      lastReceiptNumber: close.lastReceiptNumber,
-      notes: close.notes,
-      closedByName: close.closedBy?.email ?? 'System',
-      logo,
-    });
-
-    let fileAssetId: string | null = null;
-    let closePdfFile: CashierClosePdfFileSummary | null = null;
-    if (this.fileRegistryService) {
-      const asset = await this.fileRegistryService.registerGeneratedFile({
-        tenantId: actor.tenantId,
-        generatedByUserId: actor.userId,
-        originalFilename: `DayEndClose_${close.closeNumber}.pdf`,
-        content: closePdf,
-        mimeType: 'application/pdf',
-        module: 'fees',
-        entityId: close.id,
-        metadata: {
-          kind: 'cashier_close_pdf',
-          closeId: close.id,
-          closeNumber: close.closeNumber,
-        },
-      });
-      fileAssetId = asset.id;
-      closePdfFile = mapCashierClosePdfFile(asset);
-    }
+    const closePdfFile = await this.generateCashierClosePdfFile(close, actor);
+    const fileAssetId = closePdfFile?.fileAssetId ?? null;
 
     await this.auditService.record({
       action: 'finalize',
@@ -6499,21 +8079,72 @@ export class FinanceService {
     if (!close) {
       throw new NotFoundException('Cashier close not found');
     }
+    if (close.status === CashierCloseStatus.DEPOSITED) {
+      await this.auditService.record({
+        action: 'reopen_denied',
+        resource: 'cashier_close',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        resourceId: closeId,
+        after: { closeNumber: close.closeNumber, reason, deposited: true },
+      });
+      throw new ConflictException(
+        'Deposited cashier sessions are immutable. Record an approved correction instead.',
+      );
+    }
+    if (close.status === CashierCloseStatus.OPEN) {
+      throw new ConflictException('This cashier session is already open.');
+    }
+
+    const activeSessionKey = buildCashierActiveSessionKey({
+      collectorUserId: close.collectorUserId,
+      paymentMethod: close.paymentMethod,
+    });
+    let reopened: CashierCloseWithUsers;
+    try {
+      reopened = await this.prisma.cashierClose.update({
+        where: { id: close.id },
+        data: {
+          status: CashierCloseStatus.OPEN,
+          activeSessionKey,
+          countedThroughAt: null,
+          closedAt: null,
+          closedById: null,
+          countedAt: null,
+          countedById: null,
+          submittedAt: null,
+          submittedById: null,
+          approvedAt: null,
+          approvedById: null,
+          reopenedAt: new Date(),
+          reopenedById: actor.userId,
+          reopenReason: reason,
+        },
+        include: cashierCloseUserInclude,
+      });
+    } catch (error) {
+      if (isPrismaUniqueConstraintError(error)) {
+        throw new ConflictException(
+          'Another cashier session is already open for this collector and payment method.',
+        );
+      }
+      throw error;
+    }
+
     await this.auditService.record({
-      action: 'reopen_denied',
+      action: 'reopen',
       resource: 'cashier_close',
       tenantId: actor.tenantId,
       userId: actor.userId,
       resourceId: closeId,
-      after: {
+      before: {
         closeNumber: close.closeNumber,
-        reason,
-        immutable: true,
+        status: close.status,
+        closedAt: close.closedAt,
       },
+      after: { status: reopened.status, reason },
     });
-    throw new ConflictException(
-      'Finalized cashier closes are immutable. Record a separately approved correction instead.',
-    );
+    return this.buildCashierCloseResponse(reopened);
   }
 
   async runFinanceConsistencyCheck(actor: AuthContext) {
@@ -6585,12 +8216,27 @@ export class FinanceService {
       openedAt: query.openedAt,
       closedAt: query.closedAt,
       totalRows: rows.length,
-      grossCollected: rows.reduce((sum, row) => sum + row.grossAmount, 0),
-      totalRefunded: rows.reduce((sum, row) => sum + row.refundedAmount, 0),
-      netCollected: rows.reduce((sum, row) => sum + row.netAmount, 0),
-      methodSummary,
-      varianceTotal: methodSummary.reduce((sum, row) => sum + row.variance, 0),
-      rows,
+      grossCollected: sumNumericMoney(rows.map((row) => row.grossAmount)),
+      totalRefunded: sumNumericMoney(rows.map((row) => row.refundedAmount)),
+      netCollected: sumNumericMoney(rows.map((row) => row.netAmount)),
+      methodSummary: methodSummary.map((row) => ({
+        ...row,
+        grossCollected: toMoneyString(row.grossCollected),
+        reversalsAndRefunds: toMoneyString(row.reversalsAndRefunds),
+        netAmount: toMoneyString(row.netAmount),
+        declaredAmount:
+          row.declaredAmount === null
+            ? null
+            : toMoneyString(row.declaredAmount),
+        variance: toMoneyString(row.variance),
+      })),
+      varianceTotal: sumNumericMoney(methodSummary.map((row) => row.variance)),
+      rows: rows.map((row) => ({
+        ...row,
+        grossAmount: toMoneyString(row.grossAmount),
+        refundedAmount: toMoneyString(row.refundedAmount),
+        netAmount: toMoneyString(row.netAmount),
+      })),
     };
   }
 
@@ -6730,11 +8376,11 @@ export class FinanceService {
 
     const items = payments.map((payment) => ({
       id: payment.id,
-      amount: Number(payment.amount),
-      refundedAmount: Number(sumRefundedAmount(payment.refunds)),
-      refundableAmount: Number(
-        payment.amount.sub(sumRefundedAmount(payment.refunds)),
-      ),
+      amount: payment.amount.toFixed(2),
+      refundedAmount: sumRefundedAmount(payment.refunds).toFixed(2),
+      refundableAmount: payment.amount
+        .sub(sumRefundedAmount(payment.refunds))
+        .toFixed(2),
       method: payment.method,
       paidAt: payment.paidAt,
       student: {
@@ -6809,7 +8455,7 @@ export class FinanceService {
     const result = await this.collectPayment(
       {
         invoiceId: invoice.id,
-        amount: input.amount,
+        amount: new Prisma.Decimal(input.amount).toFixed(2),
         method: PaymentMethod.MOBILE,
         narration: `Parent sandbox payment via ${input.provider}`,
         idempotencyKey: `parent-sandbox-fee:${input.idempotencyKey}`,
@@ -7134,7 +8780,10 @@ export class FinanceService {
     }
     let parsedUrl: URL;
     try {
-      parsedUrl = parsePaymentProviderOutboundUrl(intentUrl, 'Payment intent URL');
+      parsedUrl = parsePaymentProviderOutboundUrl(
+        intentUrl,
+        'Payment intent URL',
+      );
     } catch {
       throw new BadRequestException('Payment intent URL is invalid.');
     }
@@ -7568,6 +9217,16 @@ export class FinanceService {
           },
         });
 
+        await tx.paymentAllocation.create({
+          data: {
+            tenantId,
+            paymentId: payment.id,
+            invoiceId: invoice.id,
+            amount: paymentAmount,
+            allocationType: 'INVOICE',
+          },
+        });
+
         const usageNow = new Date();
         const usagePeriodStart = new Date(
           Date.UTC(usageNow.getUTCFullYear(), usageNow.getUTCMonth(), 1),
@@ -7866,10 +9525,11 @@ export class FinanceService {
       fileAssetId: receipt.fileAssetId,
       fileStatus: receipt.fileStatus,
       paymentId: receipt.paymentId,
-      amount: Number(receipt.payment.amount),
-      refundedAmount: Number(sumRefundedAmount(receipt.payment.refunds)),
+      amount: receipt.payment.amount.toFixed(2),
+      refundedAmount: sumRefundedAmount(receipt.payment.refunds).toFixed(2),
       method: receipt.payment.method,
-      invoiceNumber: receipt.payment.invoice.invoiceNumber,
+      invoiceNumber:
+        receipt.payment.invoice?.invoiceNumber ?? 'Unallocated payment',
       student: {
         id: receipt.payment.student.id,
         name: `${receipt.payment.student.firstNameEn} ${receipt.payment.student.lastNameEn}`.trim(),
@@ -7973,6 +9633,12 @@ export class FinanceService {
         throw new NotFoundException('Receipt not found in this tenant');
       }
     }
+    if (!receipt.payment.invoice) {
+      throw new ConflictException(
+        'This receipt is not linked to an invoice and cannot be downloaded.',
+      );
+    }
+    const invoice = receipt.payment.invoice;
 
     const fileName = `Receipt_${receipt.receiptNumber}.pdf`;
     let pdf: Buffer;
@@ -7994,7 +9660,7 @@ export class FinanceService {
     });
 
     const { payment } = receipt;
-    const { invoice, student } = payment;
+    const { student } = payment;
 
     const subtotal =
       invoice.lines?.reduce((sum, line) => sum + Number(line.totalAmount), 0) ??
@@ -8163,6 +9829,72 @@ export class FinanceService {
     });
   }
 
+  private async transitionCashierClose(input: {
+    closeId: string;
+    from: CashierCloseStatus;
+    to: CashierCloseStatus;
+    action: string;
+    reason: string | null;
+    reasonRequired?: boolean;
+    actor: AuthContext;
+    data: Prisma.CashierCloseUncheckedUpdateManyInput;
+  }) {
+    if (input.reasonRequired !== false && !input.reason?.trim()) {
+      throw new BadRequestException(
+        `A reason is required to ${input.action} this cashier session.`,
+      );
+    }
+    const close = await this.prisma.$transaction(async (tx) => {
+      const claim = await tx.cashierClose.updateMany({
+        where: {
+          id: input.closeId,
+          tenantId: input.actor.tenantId,
+          status: input.from,
+        },
+        data: {
+          ...input.data,
+          status: input.to,
+        },
+      });
+      if (claim.count !== 1) {
+        const current = await tx.cashierClose.findFirst({
+          where: { id: input.closeId, tenantId: input.actor.tenantId },
+          select: { status: true },
+        });
+        if (!current) {
+          throw new NotFoundException('Cashier session not found');
+        }
+        throw new ConflictException(
+          `Cashier session is ${current.status.toLowerCase()} and cannot move from ${input.from.toLowerCase()} to ${input.to.toLowerCase()}.`,
+        );
+      }
+      const updated = await tx.cashierClose.findFirst({
+        where: { id: input.closeId, tenantId: input.actor.tenantId },
+        include: cashierCloseUserInclude,
+      });
+      if (!updated) {
+        throw new NotFoundException('Cashier session not found');
+      }
+      return updated;
+    });
+
+    await this.auditService.record({
+      action: input.action,
+      resource: 'cashier_close',
+      resourceId: close.id,
+      tenantId: input.actor.tenantId,
+      userId: input.actor.userId,
+      before: { status: input.from },
+      after: {
+        status: input.to,
+        reason: input.reason?.trim() ?? null,
+        varianceAmount: close.varianceAmount?.toFixed(2) ?? null,
+        depositId: close.depositId,
+      },
+    });
+    return this.buildCashierCloseResponse(close);
+  }
+
   private buildCashierCloseResponse(
     close: CashierCloseWithUsers,
     closePdfFile: CashierClosePdfFileSummary | null = null,
@@ -8170,8 +9902,22 @@ export class FinanceService {
     return {
       id: close.id,
       closeNumber: close.closeNumber,
+      status: close.status,
       openedAt: close.openedAt,
       closedAt: close.closedAt,
+      countedThroughAt: close.countedThroughAt,
+      countedAt: close.countedAt,
+      countedById: close.countedById,
+      submittedAt: close.submittedAt,
+      submittedById: close.submittedById,
+      approvedAt: close.approvedAt,
+      approvedById: close.approvedById,
+      depositedAt: close.depositedAt,
+      depositedById: close.depositedById,
+      depositId: close.depositId,
+      reopenedAt: close.reopenedAt,
+      reopenedById: close.reopenedById,
+      reopenReason: close.reopenReason,
       collectorUser: close.collectorUser
         ? {
             id: close.collectorUser.id,
@@ -8179,17 +9925,21 @@ export class FinanceService {
           }
         : null,
       paymentMethod: close.paymentMethod,
-      grossCollected: Number(close.grossCollected),
-      totalRefunded: Number(close.totalRefunded),
-      netCollected: Number(close.netCollected),
-      expectedCashAmount: Number(close.expectedCashAmount ?? 0),
+      grossCollected: close.grossCollected.toFixed(2),
+      totalRefunded: close.totalRefunded.toFixed(2),
+      netCollected: close.netCollected.toFixed(2),
+      expectedCashAmount: decimalOrZero(close.expectedCashAmount).toFixed(2),
       actualCashAmount:
-        close.actualCashAmount === null ? null : Number(close.actualCashAmount),
+        close.actualCashAmount === null
+          ? null
+          : close.actualCashAmount.toFixed(2),
       varianceAmount:
-        close.varianceAmount === null ? null : Number(close.varianceAmount),
+        close.varianceAmount === null ? null : close.varianceAmount.toFixed(2),
       varianceReason: close.varianceReason,
       denominationBreakdown: normalizeJsonObject(close.denominationBreakdown),
-      methodBreakdown: parseCashierCloseMethodBreakdown(close.methodBreakdown),
+      methodBreakdown: serializeCashierMethodBreakdown(
+        parseCashierCloseMethodBreakdown(close.methodBreakdown),
+      ),
       paymentCount: close.paymentCount,
       refundCount: close.refundCount,
       firstReceiptNumber: close.firstReceiptNumber,
@@ -8204,6 +9954,91 @@ export class FinanceService {
       createdAt: close.createdAt,
       closePdfFile,
     };
+  }
+
+  private async generateCashierClosePdfFile(
+    close: CashierCloseWithUsers,
+    actor: AuthContext,
+  ): Promise<CashierClosePdfFileSummary | null> {
+    if (!close.closedAt) {
+      throw new ConflictException(
+        'The cashier session must be closed before its close report is generated.',
+      );
+    }
+    if (!this.fileRegistryService) {
+      return null;
+    }
+
+    const existingFiles = await this.getCashierClosePdfFilesByCloseId(
+      actor.tenantId,
+      [close.id],
+    );
+    const existingFile = existingFiles.get(close.id);
+    if (existingFile) {
+      return existingFile;
+    }
+
+    const school = await this.prisma.tenant.findUnique({
+      where: { id: actor.tenantId },
+    });
+    const logo = await loadSchoolLogoForPdf(
+      this.prisma,
+      this.fileRegistryService,
+      actor,
+    );
+    const closePdf = buildCashierClosePdf({
+      schoolName: school?.name || 'SchoolOS',
+      closeNumber: close.closeNumber,
+      openedAt: close.openedAt,
+      closedAt: close.closedAt,
+      collectorName: close.collectorUser?.email ?? 'System',
+      paymentMethod: close.paymentMethod,
+      methodBreakdown: parseCashierCloseMethodBreakdown(close.methodBreakdown),
+      grossCollected: Number(close.grossCollected),
+      totalRefunded: Number(close.totalRefunded),
+      netCollected: Number(close.netCollected),
+      expectedCashAmount: Number(close.expectedCashAmount ?? 0),
+      actualCashAmount:
+        close.actualCashAmount === null ? null : Number(close.actualCashAmount),
+      varianceAmount:
+        close.varianceAmount === null ? null : Number(close.varianceAmount),
+      varianceReason: close.varianceReason,
+      paymentCount: close.paymentCount,
+      refundCount: close.refundCount,
+      firstReceiptNumber: close.firstReceiptNumber,
+      lastReceiptNumber: close.lastReceiptNumber,
+      notes: close.notes,
+      closedByName: close.closedBy?.email ?? 'System',
+      logo,
+    });
+    const asset = await this.fileRegistryService.registerGeneratedFile({
+      tenantId: actor.tenantId,
+      generatedByUserId: actor.userId,
+      originalFilename: `DayEndClose_${close.closeNumber}.pdf`,
+      content: closePdf,
+      mimeType: 'application/pdf',
+      module: 'fees',
+      entityId: close.id,
+      metadata: {
+        kind: 'cashier_close_pdf',
+        closeId: close.id,
+        closeNumber: close.closeNumber,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'generate_report',
+      resource: 'cashier_close',
+      resourceId: close.id,
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: {
+        closeNumber: close.closeNumber,
+        fileAssetId: asset.id,
+        status: close.status,
+      },
+    });
+    return mapCashierClosePdfFile(asset);
   }
 
   private async getCashierClosePdfFilesByCloseId(
@@ -8447,7 +10282,7 @@ export class FinanceService {
         refundNumber:
           refundNumbers.length > 0 ? refundNumbers.join(', ') : null,
         invoiceId: payment.invoiceId,
-        invoiceNumber: payment.invoice.invoiceNumber,
+        invoiceNumber: payment.invoice?.invoiceNumber ?? 'Unallocated payment',
         student: {
           id: payment.student.id,
           name: `${payment.student.firstNameEn} ${payment.student.lastNameEn}`.trim(),
@@ -8854,22 +10689,58 @@ function dateDaysAgo(date: Date, days: number) {
 }
 
 function buildDefaulterSegmentSummary(
-  items: Array<{ agingBucket: string; outstanding: number }>,
+  items: Array<{ agingBucket: string; outstanding: string }>,
 ) {
   return ['0-30', '31-60', '61-90', '90+'].map((bucket) => {
     const bucketItems = items.filter((item) => item.agingBucket === bucket);
     return {
       agingBucket: bucket,
       count: bucketItems.length,
-      outstanding: roundMoney(
-        bucketItems.reduce((sum, item) => sum + item.outstanding, 0),
-      ),
+      outstanding: bucketItems
+        .reduce((sum, item) => sum.add(item.outstanding), new Prisma.Decimal(0))
+        .toFixed(2),
     };
   });
 }
 
 function roundMoney(value: number) {
   return Math.round(value * 100) / 100;
+}
+
+function toMoneyString(value: number | Prisma.Decimal) {
+  return new Prisma.Decimal(value).toFixed(2);
+}
+
+function sumNumericMoney(values: number[]) {
+  return values
+    .reduce((sum, value) => sum.add(value), new Prisma.Decimal(0))
+    .toFixed(2);
+}
+
+function sumMoneyStrings(values: string[]) {
+  return values
+    .reduce((sum, value) => sum.add(value), new Prisma.Decimal(0))
+    .toFixed(2);
+}
+
+function serializeFinanceApprovalRequest<
+  T extends {
+    amount?: Prisma.Decimal | null;
+    payment?: { amount: Prisma.Decimal } | null;
+  },
+>(request: T) {
+  return {
+    ...request,
+    amount: request.amount?.toFixed(2) ?? null,
+    ...(request.payment
+      ? {
+          payment: {
+            ...request.payment,
+            amount: request.payment.amount.toFixed(2),
+          },
+        }
+      : {}),
+  };
 }
 
 function sumRefundedAmount(refunds: Array<{ amount: Prisma.Decimal }>) {
@@ -8883,13 +10754,88 @@ function sumNetPaidAmount(
   payments: Array<{
     amount: Prisma.Decimal;
     status?: PaymentStatus;
-    refunds: Array<{ amount: Prisma.Decimal }>;
+    refunds?: Array<{ amount: Prisma.Decimal }>;
   }>,
 ) {
   return payments.reduce((sum, p) => {
     if (p.status === PaymentStatus.REVERSED) return sum;
-    return sum.add(p.amount).sub(sumRefundedAmount(p.refunds));
+    return sum.add(p.amount).sub(sumRefundedAmount(p.refunds ?? []));
   }, new Prisma.Decimal(0));
+}
+
+function sumInvoiceAllocationAmount(
+  allocations:
+    | Array<{
+        amount: Prisma.Decimal;
+        reversedAt?: Date | null;
+      }>
+    | undefined,
+  legacyPayments: Array<{
+    amount: Prisma.Decimal;
+    status?: PaymentStatus;
+    refunds?: Array<{ amount: Prisma.Decimal }>;
+  }>,
+) {
+  if (
+    allocations !== undefined &&
+    (allocations.length > 0 || legacyPayments.length === 0)
+  ) {
+    return allocations.reduce(
+      (sum, allocation) =>
+        allocation.reversedAt ? sum : sum.add(allocation.amount),
+      new Prisma.Decimal(0),
+    );
+  }
+  return sumNetPaidAmount(legacyPayments);
+}
+
+function allocateCorrectionAcrossPaymentAllocations(
+  allocations: Array<{
+    invoiceId: string | null;
+    amount: Prisma.Decimal;
+  }>,
+  correctionAmount: Prisma.Decimal,
+) {
+  if (!correctionAmount.isPositive()) {
+    throw new BadRequestException('Correction amount must be positive');
+  }
+
+  const balances = new Map<
+    string,
+    {
+      invoiceId: string | null;
+      amount: Prisma.Decimal;
+    }
+  >();
+  for (const allocation of allocations) {
+    const key = allocation.invoiceId ?? '__UNALLOCATED__';
+    const current = balances.get(key);
+    balances.set(key, {
+      invoiceId: allocation.invoiceId,
+      amount: (current?.amount ?? new Prisma.Decimal(0)).add(allocation.amount),
+    });
+  }
+
+  let remaining = correctionAmount;
+  const plan: Array<{
+    invoiceId: string | null;
+    amount: Prisma.Decimal;
+  }> = [];
+  for (const balance of balances.values()) {
+    if (remaining.lte(0)) break;
+    if (!balance.amount.isPositive()) continue;
+    const amount = Prisma.Decimal.min(balance.amount, remaining);
+    plan.push({ invoiceId: balance.invoiceId, amount });
+    remaining = remaining.sub(amount);
+  }
+
+  if (remaining.gt(0)) {
+    throw new ConflictException(
+      'The payment allocation history does not cover the requested correction amount.',
+    );
+  }
+
+  return plan;
 }
 
 function allocateJournalLinesForRefund(
@@ -9147,6 +11093,65 @@ function buildCashierMethodBreakdown(
   });
 }
 
+function serializeCashierMethodBreakdown(rows: CashierCloseMethodBreakdown[]) {
+  return rows.map((row) => ({
+    ...row,
+    grossCollected: new Prisma.Decimal(row.grossCollected).toFixed(2),
+    totalRefunded: new Prisma.Decimal(row.totalRefunded).toFixed(2),
+    netCollected: new Prisma.Decimal(row.netCollected).toFixed(2),
+  }));
+}
+
+function serializeCashierCloseSummary(summary: CashierCloseSummary) {
+  return {
+    ...summary,
+    grossCollected: new Prisma.Decimal(summary.grossCollected).toFixed(2),
+    totalRefunded: new Prisma.Decimal(summary.totalRefunded).toFixed(2),
+    netCollected: new Prisma.Decimal(summary.netCollected).toFixed(2),
+    expectedCashAmount: new Prisma.Decimal(summary.expectedCashAmount).toFixed(
+      2,
+    ),
+    actualCashAmount:
+      summary.actualCashAmount === null
+        ? null
+        : new Prisma.Decimal(summary.actualCashAmount).toFixed(2),
+    varianceAmount:
+      summary.varianceAmount === null
+        ? null
+        : new Prisma.Decimal(summary.varianceAmount).toFixed(2),
+    methodBreakdown: serializeCashierMethodBreakdown(summary.methodBreakdown),
+  };
+}
+
+function serializeCashDeposit(
+  deposit: CashDeposit,
+  account?: { id: string; code: string; name: string },
+  close?: { id: string; closeNumber: string },
+) {
+  if (!account || !close || !deposit.cashierCloseId) {
+    throw new ConflictException(
+      'Cash deposit account or cashier-close lineage is unavailable.',
+    );
+  }
+  return {
+    id: deposit.id,
+    depositNumber: deposit.depositNumber,
+    cashierCloseId: deposit.cashierCloseId,
+    cashierCloseNumber: close.closeNumber,
+    accountId: account.id,
+    accountCode: account.code,
+    accountName: account.name,
+    amount: deposit.amount.toFixed(2),
+    depositDate: deposit.depositDate.toISOString(),
+    referenceNumber: deposit.referenceNumber,
+    status: deposit.status,
+    journalEntryId: deposit.journalEntryId,
+    submittedAt: deposit.submittedAt?.toISOString() ?? null,
+    depositedAt: deposit.depositedAt?.toISOString() ?? null,
+    createdAt: deposit.createdAt.toISOString(),
+  };
+}
+
 function parseCashierCloseMethodBreakdown(
   value: Prisma.JsonValue | null,
 ): CashierCloseMethodBreakdown[] {
@@ -9262,6 +11267,16 @@ function assertAnyFinancePermission(actor: AuthContext, permissions: string[]) {
       'You do not have permission for this finance action.',
     );
   }
+}
+
+function buildCashierActiveSessionKey(input: {
+  collectorUserId?: string | null;
+  paymentMethod?: PaymentMethod | null;
+}) {
+  return [
+    input.collectorUserId ?? 'ALL_COLLECTORS',
+    input.paymentMethod ?? 'ALL_METHODS',
+  ].join('|');
 }
 
 function resolveDuesRowStatus(
@@ -9556,10 +11571,40 @@ function mapCollectedPaymentResult(
   payment: CollectedPaymentWithReceipt,
   disposition: 'SUCCEEDED' | 'REPLAYED',
 ) {
+  const sourceAllocations =
+    payment.allocations?.length || !payment.invoiceId
+      ? (payment.allocations ?? [])
+      : [
+          {
+            invoiceId: payment.invoiceId,
+            amount: payment.amount,
+            allocationType: PaymentAllocationType.INVOICE,
+          },
+        ];
+  const allocations = sourceAllocations.map((allocation) => ({
+    invoiceId: allocation.invoiceId,
+    amount: new Prisma.Decimal(allocation.amount).toFixed(2),
+    allocationType: allocation.allocationType,
+  }));
+  const allocatedAmount = allocations
+    .filter((allocation) => allocation.invoiceId !== null)
+    .reduce(
+      (sum, allocation) => sum.add(allocation.amount),
+      new Prisma.Decimal(0),
+    );
+  const unallocatedAmount = new Prisma.Decimal(payment.amount).sub(
+    allocatedAmount,
+  );
   return {
     paymentId: payment.id,
     invoiceId: payment.invoiceId,
-    amount: Number(payment.amount),
+    invoiceIds: allocations.flatMap((allocation) =>
+      allocation.invoiceId ? [allocation.invoiceId] : [],
+    ),
+    amount: payment.amount.toFixed(2),
+    allocatedAmount: allocatedAmount.toFixed(2),
+    unallocatedAmount: unallocatedAmount.toFixed(2),
+    allocations,
     method: payment.method,
     paidAt: payment.paidAt,
     disposition,
@@ -9567,6 +11612,54 @@ function mapCollectedPaymentResult(
     receiptFileAssetId: payment.receipt?.fileAssetId ?? null,
     receiptFileStatus:
       payment.receipt?.fileStatus ?? ReceiptFileStatus.UNAVAILABLE,
+  };
+}
+
+function mapPaymentReallocationResult(
+  allocations: Array<{
+    id: string;
+    paymentId: string;
+    invoiceId: string | null;
+    amount: Prisma.Decimal;
+    allocationType: PaymentAllocationType;
+    allocationGroupId: string | null;
+    reason: string | null;
+    allocatedAt: Date;
+    allocatedById: string | null;
+    reversedAt: Date | null;
+    reversedById: string | null;
+    reversalReason: string | null;
+    invoice?: { invoiceNumber: string } | null;
+  }>,
+  disposition: 'SUCCEEDED' | 'REPLAYED',
+) {
+  const appliedAmount = allocations
+    .filter((allocation) => allocation.invoiceId !== null)
+    .reduce(
+      (sum, allocation) => sum.add(allocation.amount),
+      new Prisma.Decimal(0),
+    );
+  return {
+    paymentId: allocations[0]?.paymentId ?? null,
+    allocationGroupId: allocations[0]?.allocationGroupId ?? null,
+    reason: allocations[0]?.reason ?? null,
+    appliedAmount: appliedAmount.toFixed(2),
+    disposition,
+    allocations: allocations.map((allocation) => ({
+      id: allocation.id,
+      paymentId: allocation.paymentId,
+      invoiceId: allocation.invoiceId,
+      invoiceNumber: allocation.invoice?.invoiceNumber ?? null,
+      amount: allocation.amount.toFixed(2),
+      allocationType: allocation.allocationType,
+      allocationGroupId: allocation.allocationGroupId,
+      reason: allocation.reason,
+      allocatedAt: allocation.allocatedAt,
+      allocatedById: allocation.allocatedById,
+      reversedAt: allocation.reversedAt,
+      reversedById: allocation.reversedById,
+      reversalReason: allocation.reversalReason,
+    })),
   };
 }
 

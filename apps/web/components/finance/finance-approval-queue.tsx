@@ -27,7 +27,7 @@ type PendingDecision =
       kind: "REQUEST";
       requestType: "REFUND" | "REVERSAL";
       paymentId: string;
-      amount?: number;
+      amount?: string;
       reason: string;
     }
   | {
@@ -37,12 +37,12 @@ type PendingDecision =
       note: string;
     };
 
-const money = (value: number) =>
+const money = (value: string | number) =>
   new Intl.NumberFormat("en-NP", {
     style: "currency",
     currency: "NPR",
     maximumFractionDigits: 2,
-  }).format(value);
+  }).format(Number(value));
 
 export function FinanceApprovalQueue() {
   const { hasPermissions } = useSession();
@@ -236,8 +236,7 @@ export function FinanceApprovalQueue() {
                     kind: "REQUEST",
                     requestType,
                     paymentId,
-                    amount:
-                      requestType === "REFUND" ? Number(amount) : undefined,
+                    amount: requestType === "REFUND" ? amount : undefined,
                     reason: reason.trim(),
                   })
                 }

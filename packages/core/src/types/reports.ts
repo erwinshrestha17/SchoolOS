@@ -1,4 +1,4 @@
-export type ReportFormat = "csv" | "pdf" | "json";
+export type ReportFormat = "csv" | "pdf" | "xlsx" | "json";
 
 export interface ReportFilterDefinition {
   key: string;
@@ -37,16 +37,16 @@ export interface ReportDefinition {
 
 export interface ReportExportRequest {
   format: ReportFormat;
-  filters: Record<string, any>;
+  filters: Record<string, unknown>;
   async?: boolean;
 }
 
 export interface ReportExportResult {
   format?: ReportFormat;
-  content?: any; // Buffer for binary, object for JSON
+  content?: unknown;
   fileName?: string;
   contentType?: string;
-  data?: any;
+  data?: unknown;
   status?: "QUEUED" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED";
   jobId?: string | number;
 }

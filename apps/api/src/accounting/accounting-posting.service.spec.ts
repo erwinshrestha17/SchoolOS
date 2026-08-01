@@ -65,6 +65,11 @@ function createPostingClient(overrides?: {
             },
       ),
     },
+    accountingPostingBatch: {
+      upsert: jest.fn().mockImplementation(({ create }) =>
+        Promise.resolve({ id: 'batch-1', ...create }),
+      ),
+    },
     chartAccount: {
       upsert: jest.fn().mockImplementation(({ where, create }) => {
         const account = upsertedAccounts.get(where.tenantId_code.code);
@@ -141,6 +146,18 @@ describe('AccountingPostingService payroll posting', () => {
         }),
       }),
     );
+    expect(client.accountingPostingBatch.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          sourceModule: 'M7',
+          sourceBatchId: 'run-1',
+          sourceTotal: new Prisma.Decimal(75000),
+          postedTotal: new Prisma.Decimal(75000),
+          reconciliationDifference: new Prisma.Decimal(0),
+          journalEntryId: 'journal-1',
+        }),
+      }),
+    );
   });
 
   it('returns existing payroll journal for duplicate source document posting', async () => {
@@ -168,6 +185,7 @@ describe('AccountingPostingService payroll posting', () => {
     );
 
     expect(result.entryNumber).toBe('JE-2026-00005');
+    expect(client.accountingPostingBatch.upsert).toHaveBeenCalledTimes(1);
   });
 
   it('blocks payroll posting into a closed accounting period', async () => {

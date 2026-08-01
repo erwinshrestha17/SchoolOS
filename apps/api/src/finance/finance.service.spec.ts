@@ -142,7 +142,11 @@ describe('finance production controls', () => {
       actor,
     );
 
-    expect(result).toBe(createdDiscount);
+    expect(result).toEqual({
+      ...createdDiscount,
+      percentOff: null,
+      amountOff: null,
+    });
     expect(prisma.feeHead.findFirst).toHaveBeenCalledWith({
       where: { id: feeHead.id, tenantId: actor.tenantId },
     });
@@ -298,7 +302,7 @@ describe('finance production controls', () => {
       service.collectPayment(
         {
           invoiceId: invoice.id,
-          amount: 100,
+          amount: '100.00',
           method: PaymentMethod.BANK,
           referenceNumber: 'BANK-REF-001',
           idempotencyKey: 'duplicate-reference-1',
@@ -339,7 +343,7 @@ describe('finance production controls', () => {
       service.collectPayment(
         {
           invoiceId: invoice.id,
-          amount: 20,
+          amount: '20.00',
           method: PaymentMethod.CASH,
           idempotencyKey: 'overpayment-1',
         },
@@ -393,7 +397,7 @@ describe('finance production controls', () => {
     const result = await service.collectPayment(
       {
         invoiceId: invoice.id,
-        amount: 100,
+        amount: '100.00',
         method: PaymentMethod.CASH,
         referenceNumber: 'COUNTER-001',
         idempotencyKey: 'counter-event-1',
@@ -409,8 +413,245 @@ describe('finance production controls', () => {
         paymentId: createdPayment.id,
         invoiceId: invoice.id,
         studentId: invoice.studentId,
-        amount: 100,
+        amount: '100.00',
       }),
+    );
+  });
+
+  it('collects one payment across multiple invoices without using the legacy invoice link', async () => {
+    const firstInvoice = buildInvoice({
+      id: 'invoice-1',
+      invoiceNumber: 'INV-001',
+      totalAmount: new Prisma.Decimal(500),
+      vatAmount: new Prisma.Decimal(0),
+      student: { id: 'student-1' },
+      lines: [],
+    });
+    const secondInvoice = buildInvoice({
+      id: 'invoice-2',
+      invoiceNumber: 'INV-002',
+      totalAmount: new Prisma.Decimal(600),
+      vatAmount: new Prisma.Decimal(0),
+      student: { id: 'student-1' },
+      lines: [],
+    });
+    const createdPayment = {
+      id: 'payment-multi-1',
+      invoiceId: null,
+      amount: new Prisma.Decimal(700),
+      method: PaymentMethod.CASH,
+      paidAt: new Date('2026-04-27T10:00:00.000Z'),
+      receipt: {
+        id: 'receipt-multi-1',
+        receiptNumber: 'REC-MULTI-1',
+        fileAssetId: null,
+        fileStatus: 'PENDING',
+      },
+    };
+    const { service, prisma, accountingPostingService } = buildService({
+      invoice: null,
+      invoices: [firstInvoice, secondInvoice],
+      feeHead: buildFeeHead(),
+      tenant: { id: actor.tenantId, panNumber: 'PAN-123' },
+      createdPayment,
+    });
+
+    const result = await service.collectPayment(
+      {
+        amount: '700.00',
+        allocations: [
+          { invoiceId: firstInvoice.id, amount: '300.00' },
+          { invoiceId: secondInvoice.id, amount: '400.00' },
+        ],
+        method: PaymentMethod.CASH,
+        idempotencyKey: 'multi-invoice-collection-1',
+      },
+      actor,
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        paymentId: 'payment-multi-1',
+        invoiceId: null,
+        invoiceIds: ['invoice-1', 'invoice-2'],
+        amount: '700.00',
+        allocatedAmount: '700.00',
+        unallocatedAmount: '0.00',
+      }),
+    );
+    expect(prisma.paymentAllocation.create).toHaveBeenCalledTimes(2);
+    expect(prisma.payment.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ invoiceId: null }),
+      }),
+    );
+    expect(accountingPostingService.postFeePayment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        paymentAmount: new Prisma.Decimal(700),
+        lines: [expect.objectContaining({ amount: new Prisma.Decimal(700) })],
+      }),
+      actor,
+      expect.anything(),
+    );
+  });
+
+  it('records a student advance as an unallocated liability with no invoice link', async () => {
+    const createdPayment = {
+      id: 'payment-advance-1',
+      invoiceId: null,
+      amount: new Prisma.Decimal(250),
+      method: PaymentMethod.CASH,
+      paidAt: new Date('2026-04-27T10:00:00.000Z'),
+      receipt: {
+        id: 'receipt-advance-1',
+        receiptNumber: 'REC-ADV-1',
+        fileAssetId: null,
+        fileStatus: 'PENDING',
+      },
+    };
+    const { service, prisma, accountingPostingService } = buildService({
+      invoice: null,
+      invoices: [],
+      student: { id: 'student-1', tenantId: actor.tenantId },
+      feeHead: buildFeeHead(),
+      tenant: { id: actor.tenantId, panNumber: 'PAN-123' },
+      createdPayment,
+    });
+
+    const result = await service.collectPayment(
+      {
+        studentId: 'student-1',
+        amount: '250.00',
+        isAdvance: true,
+        method: PaymentMethod.CASH,
+        idempotencyKey: 'student-advance-1',
+      },
+      actor,
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        invoiceId: null,
+        invoiceIds: [],
+        allocatedAmount: '0.00',
+        unallocatedAmount: '250.00',
+        allocations: [
+          expect.objectContaining({
+            invoiceId: null,
+            amount: '250.00',
+            allocationType: 'ADVANCE',
+          }),
+        ],
+      }),
+    );
+    expect(prisma.paymentAllocation.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        paymentId: 'payment-advance-1',
+        invoiceId: null,
+        amount: new Prisma.Decimal(250),
+        allocationType: 'ADVANCE',
+      }),
+    });
+    expect(accountingPostingService.postFeePayment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lines: [
+          expect.objectContaining({
+            chartAccountId: '2250',
+            amount: new Prisma.Decimal(250),
+          }),
+        ],
+      }),
+      actor,
+      expect.anything(),
+    );
+  });
+
+  it('applies an advance to an invoice with one idempotent allocation group and balanced journal', async () => {
+    const invoice = buildInvoice({
+      id: 'invoice-advance-target',
+      invoiceNumber: 'INV-ADV-TARGET',
+      totalAmount: new Prisma.Decimal(500),
+      studentId: 'student-1',
+    });
+    const payment = buildPayment({
+      id: 'payment-advance-source',
+      invoiceId: null,
+      studentId: 'student-1',
+      amount: new Prisma.Decimal(500),
+      invoice: null,
+      allocations: [
+        {
+          id: 'allocation-advance',
+          invoiceId: null,
+          amount: new Prisma.Decimal(500),
+          allocationType: 'ADVANCE',
+        },
+      ],
+    });
+    const { service, prisma, accountingPostingService } = buildService({
+      invoice: null,
+      invoices: [invoice],
+      feeHead: null,
+      payment,
+    });
+    (prisma.invoice.update as jest.Mock).mockResolvedValue({
+      id: invoice.id,
+      status: InvoiceStatus.PARTIAL,
+    });
+
+    const result = await service.reallocatePayment(
+      payment.id,
+      {
+        idempotencyKey: 'advance-reallocation-1',
+        reason: 'Apply advance to current tuition invoice',
+        allocations: [{ invoiceId: invoice.id, amount: '300.00' }],
+      },
+      actor,
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        paymentId: payment.id,
+        allocationGroupId: 'advance-reallocation-1',
+        appliedAmount: '300.00',
+        disposition: 'SUCCEEDED',
+      }),
+    );
+    expect(prisma.paymentAllocation.create).toHaveBeenNthCalledWith(1, {
+      data: expect.objectContaining({
+        invoiceId: null,
+        amount: new Prisma.Decimal(-300),
+        allocationType: 'REALLOCATION',
+        allocationGroupId: 'advance-reallocation-1',
+      }),
+      include: { invoice: { select: { invoiceNumber: true } } },
+    });
+    expect(prisma.paymentAllocation.create).toHaveBeenNthCalledWith(2, {
+      data: expect.objectContaining({
+        invoiceId: invoice.id,
+        amount: new Prisma.Decimal(300),
+        allocationType: 'REALLOCATION',
+        allocationGroupId: 'advance-reallocation-1',
+      }),
+      include: { invoice: { select: { invoiceNumber: true } } },
+    });
+    expect(accountingPostingService.postManualJournal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceType: 'PAYMENT_ALLOCATION',
+        sourceId: 'advance-reallocation-1',
+        lines: [
+          expect.objectContaining({
+            chartAccountId: '2250',
+            debit: new Prisma.Decimal(300),
+          }),
+          expect.objectContaining({
+            chartAccountId: '1200',
+            credit: new Prisma.Decimal(300),
+          }),
+        ],
+      }),
+      actor,
+      expect.anything(),
     );
   });
 
@@ -462,7 +703,7 @@ describe('finance production controls', () => {
     const result = await service.collectPayment(
       {
         invoiceId: invoice.id,
-        amount: 100,
+        amount: '100.00',
         method: PaymentMethod.CASH,
         idempotencyKey: 'counter-submit-1',
       },
@@ -472,7 +713,17 @@ describe('finance production controls', () => {
     expect(result).toEqual({
       paymentId: existingPayment.id,
       invoiceId: invoice.id,
-      amount: 100,
+      invoiceIds: [invoice.id],
+      amount: '100.00',
+      allocatedAmount: '100.00',
+      unallocatedAmount: '0.00',
+      allocations: [
+        {
+          invoiceId: invoice.id,
+          amount: '100.00',
+          allocationType: 'INVOICE',
+        },
+      ],
       method: PaymentMethod.CASH,
       paidAt: existingPayment.paidAt,
       disposition: 'REPLAYED',
@@ -601,14 +852,14 @@ describe('finance production controls', () => {
         guardianPhone: '9800000000',
       }),
     );
-    expect(result.totalAmount).toBe(1117);
-    expect(result.paidAmount).toBe(200);
-    expect(result.outstandingAmount).toBe(917);
+    expect(result.totalAmount).toBe('1117.00');
+    expect(result.paidAmount).toBe('200.00');
+    expect(result.outstandingAmount).toBe('917.00');
     expect(result.lines[0]).toEqual(
       expect.objectContaining({
         feeHeadName: 'Tuition',
-        vatAmount: 117,
-        waiverAmount: 50,
+        vatAmount: '117.00',
+        waiverAmount: '50.00',
       }),
     );
     expect(result.payments[0]).toEqual(
@@ -616,8 +867,8 @@ describe('finance production controls', () => {
         receipt: expect.objectContaining({
           receiptNumber: 'REC-2026-00001',
         }),
-        refundedAmount: 50,
-        netAmount: 200,
+        refundedAmount: '50.00',
+        netAmount: '200.00',
         journalEntryNumber: 'JE-2026-00001',
       }),
     );
@@ -718,9 +969,9 @@ describe('finance production controls', () => {
         invoiceNumber: 'INV-2026-00010',
         status: InvoiceStatus.ISSUED,
         dueDate: '2026-05-15T00:00:00.000Z',
-        totalAmount: 1000,
-        paidAmount: 250,
-        outstandingAmount: 750,
+        totalAmount: '1000.00',
+        paidAmount: '250.00',
+        outstandingAmount: '750.00',
       },
     ]);
   });
@@ -826,18 +1077,18 @@ describe('finance production controls', () => {
         where: { tenantId: actor.tenantId, studentId: 'student-1' },
       }),
     );
-    expect(result.totalInvoiced).toBe(1000);
-    expect(result.totalPaid).toBe(400);
-    expect(result.totalRefunded).toBe(100);
-    expect(result.totalWaived).toBe(100);
-    expect(result.outstandingBalance).toBe(700);
+    expect(result.totalInvoiced).toBe('1000.00');
+    expect(result.totalPaid).toBe('400.00');
+    expect(result.totalRefunded).toBe('100.00');
+    expect(result.totalWaived).toBe('100.00');
+    expect(result.outstandingBalance).toBe('700.00');
     expect(result.rows.map((row) => row.type)).toEqual([
       'INVOICE',
       'WAIVER',
       'PAYMENT',
       'REFUND',
     ]);
-    expect(result.rows.at(-1)?.runningBalance).toBe(700);
+    expect(result.rows.at(-1)?.runningBalance).toBe('700.00');
     expect(result.rows[1]).toEqual(
       expect.objectContaining({
         type: 'WAIVER',
@@ -1019,18 +1270,18 @@ describe('finance production controls', () => {
     );
     expect(result.filters.agingBucket).toBe('31-60');
     expect(result.total).toBe(1);
-    expect(result.totalOutstanding).toBe(750);
+    expect(result.totalOutstanding).toBe('750.00');
     expect(result.items[0]).toEqual(
       expect.objectContaining({
         invoiceId: 'invoice-overdue-1',
-        outstanding: 750,
+        outstanding: '750.00',
         agingBucket: '31-60',
       }),
     );
     expect(result.segments).toContainEqual({
       agingBucket: '31-60',
       count: 1,
-      outstanding: 750,
+      outstanding: '750.00',
     });
   });
 
@@ -1077,7 +1328,7 @@ describe('finance production controls', () => {
         after: expect.objectContaining({
           filters: expect.objectContaining({ agingBucket: '90+' }),
           segments: expect.arrayContaining([
-            { agingBucket: '90+', count: 1, outstanding: 1200 },
+            { agingBucket: '90+', count: 1, outstanding: '1200.00' },
           ]),
         }),
       }),
@@ -1263,11 +1514,14 @@ describe('finance production controls', () => {
         paymentRefundCount: 0,
         journalCount: 4,
       });
+    (prisma.paymentAllocation.aggregate as jest.Mock).mockResolvedValue({
+      _sum: { amount: new Prisma.Decimal(300) },
+    });
 
     const result = await service.refundPayment(
       payment.id,
       {
-        amount: 200,
+        amount: '200.00',
         reason: ' Parent requested correction ',
         refundDate: '2026-04-27',
         idempotencyKey: 'refund-success-1',
@@ -1285,10 +1539,11 @@ describe('finance production controls', () => {
       refundNumber: createdRefund.refundNumber,
       paymentId: payment.id,
       invoiceId: payment.invoiceId,
-      amount: 200,
+      invoiceIds: [payment.invoiceId],
+      amount: '200.00',
       refundDate: createdRefund.refundDate,
       journalEntryNumber: createdRefundJournal.entryNumber,
-      remainingRefundableAmount: 300,
+      remainingRefundableAmount: '300.00',
       invoiceStatus: InvoiceStatus.PARTIAL,
       disposition: 'SUCCEEDED',
     });
@@ -1332,6 +1587,158 @@ describe('finance production controls', () => {
     );
   });
 
+  it('refunds a multi-invoice payment through immutable negative allocations', async () => {
+    const firstInvoice = buildInvoice({
+      id: 'invoice-1',
+      status: InvoiceStatus.PARTIAL,
+      totalAmount: new Prisma.Decimal(500),
+    });
+    const secondInvoice = buildInvoice({
+      id: 'invoice-2',
+      status: InvoiceStatus.PARTIAL,
+      totalAmount: new Prisma.Decimal(600),
+    });
+    const payment = buildPayment({
+      id: 'payment-multi-refund',
+      invoiceId: null,
+      amount: new Prisma.Decimal(700),
+      invoice: null,
+      allocations: [
+        {
+          id: 'allocation-1',
+          invoiceId: firstInvoice.id,
+          amount: new Prisma.Decimal(300),
+          invoice: firstInvoice,
+        },
+        {
+          id: 'allocation-2',
+          invoiceId: secondInvoice.id,
+          amount: new Prisma.Decimal(400),
+          invoice: secondInvoice,
+        },
+      ],
+    });
+    const createdRefund = {
+      id: 'refund-multi-1',
+      refundNumber: 'RFD-MULTI-1',
+      paymentId: payment.id,
+      amount: new Prisma.Decimal(400),
+      refundDate: new Date('2026-04-27T12:00:00.000Z'),
+    };
+    const { service, prisma } = buildService({
+      invoice: null,
+      feeHead: null,
+      payment,
+      sourceJournal: buildPaymentJournal({ amount: new Prisma.Decimal(700) }),
+      createdRefund,
+      createdJournalEntry: { entryNumber: 'JE-REF-MULTI-1' },
+    });
+    (prisma.invoice.update as jest.Mock).mockImplementation(
+      async ({ where }: { where: { id: string } }) => ({
+        id: where.id,
+        status: InvoiceStatus.ISSUED,
+      }),
+    );
+
+    const result = await service.refundPayment(
+      payment.id,
+      {
+        amount: '400.00',
+        reason: 'Correct multi-invoice allocation',
+        idempotencyKey: 'refund-multi-allocation-1',
+      },
+      actor,
+    );
+
+    expect(result.invoiceId).toBeNull();
+    expect(result.invoiceIds).toEqual(['invoice-1', 'invoice-2']);
+    expect(prisma.paymentAllocation.create).toHaveBeenNthCalledWith(1, {
+      data: expect.objectContaining({
+        invoiceId: 'invoice-1',
+        amount: new Prisma.Decimal(-300),
+        allocationType: 'REFUND',
+      }),
+    });
+    expect(prisma.paymentAllocation.create).toHaveBeenNthCalledWith(2, {
+      data: expect.objectContaining({
+        invoiceId: 'invoice-2',
+        amount: new Prisma.Decimal(-100),
+        allocationType: 'REFUND',
+      }),
+    });
+  });
+
+  it('reverses all allocations for a multi-invoice payment', async () => {
+    const firstInvoice = buildInvoice({
+      id: 'invoice-1',
+      status: InvoiceStatus.PAID,
+      totalAmount: new Prisma.Decimal(300),
+    });
+    const secondInvoice = buildInvoice({
+      id: 'invoice-2',
+      status: InvoiceStatus.PARTIAL,
+      totalAmount: new Prisma.Decimal(600),
+    });
+    const payment = buildPayment({
+      id: 'payment-multi-reverse',
+      invoiceId: null,
+      amount: new Prisma.Decimal(700),
+      invoice: null,
+      allocations: [
+        {
+          id: 'allocation-1',
+          invoiceId: firstInvoice.id,
+          amount: new Prisma.Decimal(300),
+          invoice: firstInvoice,
+        },
+        {
+          id: 'allocation-2',
+          invoiceId: secondInvoice.id,
+          amount: new Prisma.Decimal(400),
+          invoice: secondInvoice,
+        },
+      ],
+    });
+    const { service, prisma } = buildService({
+      invoice: null,
+      feeHead: null,
+      payment,
+      sourceJournal: buildPaymentJournal({ amount: new Prisma.Decimal(700) }),
+    });
+    (prisma.invoice.update as jest.Mock).mockImplementation(
+      async ({ where }: { where: { id: string } }) => ({
+        id: where.id,
+        status: InvoiceStatus.ISSUED,
+      }),
+    );
+
+    const result = await service.reversePayment(
+      payment.id,
+      {
+        reason: 'Wrong student payment',
+        idempotencyKey: 'reverse-multi-allocation-1',
+      },
+      actor,
+    );
+
+    expect(result.invoiceId).toBeNull();
+    expect(result.invoiceIds).toEqual(['invoice-1', 'invoice-2']);
+    expect(prisma.paymentAllocation.create).toHaveBeenNthCalledWith(1, {
+      data: expect.objectContaining({
+        invoiceId: 'invoice-1',
+        amount: new Prisma.Decimal(-300),
+        allocationType: 'REVERSAL',
+      }),
+    });
+    expect(prisma.paymentAllocation.create).toHaveBeenNthCalledWith(2, {
+      data: expect.objectContaining({
+        invoiceId: 'invoice-2',
+        amount: new Prisma.Decimal(-400),
+        allocationType: 'REVERSAL',
+      }),
+    });
+  });
+
   it('requires an auditable refund reason before reversing a payment', async () => {
     const { service, prisma } = buildService({
       invoice: null,
@@ -1344,7 +1751,7 @@ describe('finance production controls', () => {
       service.refundPayment(
         'payment-1',
         {
-          amount: 100,
+          amount: '100.00',
           reason: '   ',
           idempotencyKey: 'refund-blank-reason',
         },
@@ -1381,7 +1788,7 @@ describe('finance production controls', () => {
       service.refundPayment(
         payment.id,
         {
-          amount: 150,
+          amount: '150.00',
           reason: 'Too much originally charged',
           idempotencyKey: 'refund-too-much',
         },
@@ -1438,7 +1845,7 @@ describe('finance production controls', () => {
       service.refundPayment(
         payment.id,
         {
-          amount: 100,
+          amount: '100.00',
           reason: 'Correction',
           idempotencyKey: 'refund-voided',
         },
@@ -1472,7 +1879,7 @@ describe('finance production controls', () => {
       service.refundPayment(
         payment.id,
         {
-          amount: 100,
+          amount: '100.00',
           reason: 'Correction',
           refundDate: '2026-04-27',
           idempotencyKey: 'refund-closed-period',
@@ -1592,23 +1999,23 @@ describe('finance production controls', () => {
 
     expect(preview).toEqual(
       expect.objectContaining({
-        grossCollected: 800,
-        totalRefunded: 100,
-        netCollected: 700,
+        grossCollected: '800.00',
+        totalRefunded: '100.00',
+        netCollected: '700.00',
         paymentCount: 2,
         refundCount: 1,
-        expectedCashAmount: 400,
+        expectedCashAmount: '400.00',
         methodBreakdown: expect.arrayContaining([
           expect.objectContaining({
             method: PaymentMethod.CASH,
-            grossCollected: 500,
-            totalRefunded: 100,
-            netCollected: 400,
+            grossCollected: '500.00',
+            totalRefunded: '100.00',
+            netCollected: '400.00',
           }),
           expect.objectContaining({
             method: PaymentMethod.BANK,
-            grossCollected: 300,
-            netCollected: 300,
+            grossCollected: '300.00',
+            netCollected: '300.00',
           }),
         ]),
       }),
@@ -1903,9 +2310,9 @@ describe('finance production controls', () => {
     );
 
     expect(summary.totalRows).toBe(1);
-    expect(summary.grossCollected).toBe(500);
-    expect(summary.totalRefunded).toBe(100);
-    expect(summary.netCollected).toBe(400);
+    expect(summary.grossCollected).toBe('500.00');
+    expect(summary.totalRefunded).toBe('100.00');
+    expect(summary.netCollected).toBe('400.00');
     expect(summary.rows[0]).toEqual(
       expect.objectContaining({
         receiptNumber: 'REC-2026-00001',
@@ -2130,6 +2537,7 @@ describe('finance production controls', () => {
         name: 'SchoolOS',
         slug: 'school-os',
         panNumber: '123456789',
+        isActive: true,
       },
       gatewayProvider: {
         id: 'provider-1',
@@ -2229,7 +2637,7 @@ describe('finance production controls', () => {
       missingJournalService.refundPayment(
         payment.id,
         {
-          amount: 50,
+          amount: '50.00',
           reason: 'Correction',
           idempotencyKey: 'refund-missing-journal',
         },
@@ -2281,6 +2689,7 @@ function buildInvoice(overrides: Record<string, unknown> = {}) {
     hallTicketBlocked: false,
     paidAt: null,
     payments: [],
+    paymentAllocations: [],
     ...overrides,
   };
 }
@@ -2304,6 +2713,7 @@ function buildInvoicePayment(overrides: Record<string, unknown> = {}) {
     id: 'payment-1',
     amount: new Prisma.Decimal(0),
     refunds: [],
+    allocations: [],
     ...overrides,
   };
 }
@@ -2440,7 +2850,11 @@ function buildService(options: {
     },
     invoice: {
       findFirst: jest.fn().mockResolvedValue(options.invoice),
-      findMany: jest.fn().mockResolvedValue(options.invoices ?? []),
+      findMany: jest
+        .fn()
+        .mockResolvedValue(
+          options.invoices ?? (options.invoice ? [options.invoice] : []),
+        ),
       count: jest
         .fn()
         .mockResolvedValue(
@@ -2515,6 +2929,40 @@ function buildService(options: {
         },
       }),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
+    paymentAllocation: {
+      create: jest.fn().mockImplementation(async ({ data }) => ({
+        id: 'allocation-1',
+        ...data,
+      })),
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
+      aggregate: jest.fn().mockImplementation(async ({ where }) => {
+        if (where?.invoiceId === null) {
+          const allocations =
+            (
+              options.payment as
+                | {
+                    allocations?: Array<{
+                      invoiceId: string | null;
+                      amount: Prisma.Decimal;
+                    }>;
+                  }
+                | undefined
+            )?.allocations ?? [];
+          return {
+            _sum: {
+              amount: allocations
+                .filter((allocation) => allocation.invoiceId === null)
+                .reduce(
+                  (sum, allocation) => sum.add(allocation.amount),
+                  new Prisma.Decimal(0),
+                ),
+            },
+          };
+        }
+        return { _sum: { amount: new Prisma.Decimal(0) } };
+      }),
     },
     paymentRefund: {
       findFirst: jest.fn().mockResolvedValue(null),
@@ -2629,9 +3077,17 @@ function buildService(options: {
               return options.cashAccount ?? { id: 'cash' };
             }
 
+            if (code === '1200' || code === '2250') {
+              return { id: code };
+            }
+
             return options.incomeAccount ?? { id: 'income' };
           },
         ),
+      upsert: jest.fn().mockImplementation(async ({ create }) => ({
+        id: create.code,
+        ...create,
+      })),
     },
     accountingPeriod: {
       findFirst: jest.fn().mockResolvedValue(options.closedPeriod ?? null),
@@ -2675,6 +3131,11 @@ function buildService(options: {
       .fn()
       .mockResolvedValue(
         options.createdJournalEntry ?? { entryNumber: 'JE-REV-1' },
+      ),
+    postManualJournal: jest
+      .fn()
+      .mockResolvedValue(
+        options.createdJournalEntry ?? { entryNumber: 'JE-REALLOC-1' },
       ),
   };
   const eventEmitter = {

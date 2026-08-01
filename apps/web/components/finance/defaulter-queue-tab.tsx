@@ -133,12 +133,12 @@ export function DefaulterQueueTab() {
     }
   };
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: string | number) => {
     return new Intl.NumberFormat("en-NP", {
       style: "currency",
       currency: "NPR",
       maximumFractionDigits: 0,
-    }).format(amount);
+    }).format(Number(amount));
   };
 
   const defaulters = defaultersQuery.data?.items || [];

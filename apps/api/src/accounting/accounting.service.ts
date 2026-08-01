@@ -3,11 +3,15 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { ReportsQueryDto } from './dto/reports-query.dto';
 
 import {
   AccountingPeriodStatus,
+  AccountingPostingBatchStatus,
+  ApprovalWorkflowType,
   ChartAccountType,
   JournalEntryStatus,
   JournalLineSide,
@@ -48,7 +52,12 @@ import {
   ReceiptVoucherDto,
   ContraVoucherDto,
 } from './dto/voucher.dto';
-import { DEFAULT_CHART_ACCOUNTS } from '../finance/finance.defaults';
+import {
+  DEFAULT_CHART_ACCOUNTS,
+  resolveCashAccountCode,
+} from '../finance/finance.defaults';
+import { ApprovalWorkflowService } from '../advanced-operations/approval-workflow.service';
+import { ListPostingBatchesQueryDto } from './dto/list-posting-batches.query.dto';
 
 export interface UnsafeBankStatement {
   id: string;
@@ -64,12 +73,29 @@ export interface UnsafeBankStatement {
 }
 
 @Injectable()
-export class AccountingService {
+export class AccountingService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly postingService: AccountingPostingService,
+    @Optional()
+    private readonly approvalWorkflowService?: ApprovalWorkflowService,
   ) {}
+
+  onModuleInit() {
+    this.approvalWorkflowService?.registerFinalAction(
+      'accounting.fiscal_period.reopen',
+      {
+        apply: async ({ tenantId, targetId, payload, actor }) => {
+          if (tenantId !== actor.tenantId) {
+            throw new NotFoundException('Fiscal period not found');
+          }
+          const reason = readRequiredReason(payload);
+          return this.applyApprovedFiscalPeriodReopen(targetId, reason, actor);
+        },
+      },
+    );
+  }
 
   /**
    * Block direct updates to posted journal entries.
@@ -292,28 +318,325 @@ export class AccountingService {
     });
   }
 
-  async createPeriod(dto: CreateAccountingPeriodDto, actor: AuthContext) {
-    const period = await this.prisma.accountingPeriod.create({
-      data: {
-        tenantId: actor.tenantId,
-        name: dto.name,
-        startsOn: new Date(dto.startsOn),
-        endsOn: new Date(dto.endsOn),
-      },
-    });
-
-    await this.auditService.record({
-      action: 'create',
-      resource: 'accounting_period',
+  async listPostingBatches(
+    query: ListPostingBatchesQueryDto,
+    actor: AuthContext,
+  ) {
+    const where: Prisma.AccountingPostingBatchWhereInput = {
       tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: period.id,
-      after: {
-        name: period.name,
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.sourceModule
+        ? { sourceModule: query.sourceModule.trim().toUpperCase() }
+        : {}),
+    };
+    const skip = (query.page - 1) * query.limit;
+    const [batches, total] = await Promise.all([
+      this.prisma.accountingPostingBatch.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        skip,
+        take: query.limit,
+        select: {
+          id: true,
+          sourceModule: true,
+          sourceType: true,
+          sourceBatchId: true,
+          postingType: true,
+          status: true,
+          fiscalYearId: true,
+          fiscalPeriodId: true,
+          sourceTotal: true,
+          postedTotal: true,
+          reconciliationDifference: true,
+          journalEntryId: true,
+          failureCode: true,
+          failureDetail: true,
+          retryCount: true,
+          postedAt: true,
+          createdAt: true,
+          _count: { select: { items: true } },
+        },
+      }),
+      this.prisma.accountingPostingBatch.count({ where }),
+    ]);
+
+    return {
+      items: batches.map((batch) => ({
+        ...batch,
+        sourceTotal: batch.sourceTotal.toFixed(2),
+        postedTotal: batch.postedTotal.toFixed(2),
+        reconciliationDifference: batch.reconciliationDifference.toFixed(2),
+        itemCount: batch._count.items,
+        _count: undefined,
+      })),
+      page: query.page,
+      limit: query.limit,
+      total,
+      hasNextPage: skip + batches.length < total,
+      totalPages: Math.ceil(total / query.limit),
+    };
+  }
+
+  async retryPostingBatch(id: string, actor: AuthContext) {
+    const batch = await this.prisma.accountingPostingBatch.findFirst({
+      where: { id, tenantId: actor.tenantId },
+    });
+    if (!batch) {
+      throw new NotFoundException('Source posting batch not found');
+    }
+    if (batch.status === AccountingPostingBatchStatus.POSTED) {
+      return this.serializePostingBatch(batch);
+    }
+    if (batch.status !== AccountingPostingBatchStatus.FAILED) {
+      throw new ConflictException(
+        `Only failed source posting batches can be retried. Current status: ${batch.status}.`,
+      );
+    }
+
+    const claimed = await this.prisma.accountingPostingBatch.updateMany({
+      where: {
+        id: batch.id,
+        tenantId: actor.tenantId,
+        status: AccountingPostingBatchStatus.FAILED,
+      },
+      data: {
+        status: AccountingPostingBatchStatus.POSTING,
+        retryCount: { increment: 1 },
+        failureCode: null,
+        failureDetail: null,
+        requestedById: actor.userId,
       },
     });
+    if (claimed.count !== 1) {
+      throw new ConflictException(
+        'This source posting batch is already being retried. Refresh before trying again.',
+      );
+    }
 
-    return period;
+    try {
+      await this.replaySourcePostingBatch(batch, actor);
+      const posted = await this.prisma.accountingPostingBatch.findFirstOrThrow({
+        where: { id: batch.id, tenantId: actor.tenantId },
+      });
+      await this.auditService.record({
+        action: 'retry',
+        resource: 'accounting_posting_batch',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        resourceId: batch.id,
+        before: { status: batch.status, retryCount: batch.retryCount },
+        after: { status: posted.status, retryCount: posted.retryCount },
+      });
+      return this.serializePostingBatch(posted);
+    } catch (error) {
+      const failureDetail =
+        error instanceof ConflictException || error instanceof NotFoundException
+          ? error.message
+          : 'The source posting retry failed. Review account mappings and the fiscal period before retrying.';
+      await this.prisma.accountingPostingBatch.updateMany({
+        where: { id: batch.id, tenantId: actor.tenantId },
+        data: {
+          status: AccountingPostingBatchStatus.FAILED,
+          failureCode: 'SOURCE_RETRY_FAILED',
+          failureDetail,
+        },
+      });
+      await this.auditService.record({
+        action: 'retry_failed',
+        resource: 'accounting_posting_batch',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        resourceId: batch.id,
+        before: { status: batch.status, retryCount: batch.retryCount },
+        after: { status: AccountingPostingBatchStatus.FAILED, failureDetail },
+      });
+      throw new ConflictException(failureDetail);
+    }
+  }
+
+  private async replaySourcePostingBatch(
+    batch: {
+      sourceModule: string;
+      sourceType: string;
+      sourceBatchId: string;
+      postingType: string;
+    },
+    actor: AuthContext,
+  ) {
+    if (batch.sourceModule === 'M7') {
+      const run = await this.prisma.payrollRun.findFirst({
+        where: { id: batch.sourceBatchId, tenantId: actor.tenantId },
+      });
+      if (!run) throw new NotFoundException('Payroll source record not found');
+      if (batch.postingType === 'APPROVAL') {
+        await this.postingService.postPayrollAccrual(
+          {
+            tenantId: actor.tenantId,
+            payrollRunId: run.id,
+            periodMonth: run.periodMonth,
+            periodYear: run.periodYear,
+            grossAmount: run.grossAmount,
+            deductionAmount: run.deductionAmount,
+            netAmount: run.netAmount,
+            pfEmployeeAmount: run.pfEmployeeAmount,
+            pfEmployerAmount: run.pfEmployerAmount,
+            tdsAmount: run.tdsAmount,
+            entryDate: run.periodEnd ?? run.updatedAt,
+          },
+          actor,
+        );
+        return;
+      }
+      if (batch.postingType === 'DISBURSEMENT') {
+        await this.postingService.postPayrollDisbursement(
+          {
+            tenantId: actor.tenantId,
+            payrollRunId: run.id,
+            periodMonth: run.periodMonth,
+            periodYear: run.periodYear,
+            netAmount: run.netAmount,
+            entryDate: run.paidAt ?? run.updatedAt,
+          },
+          actor,
+        );
+        return;
+      }
+    }
+
+    if (batch.sourceModule === 'M3' && batch.postingType === 'RECEIPT') {
+      const payment = await this.prisma.payment.findFirst({
+        where: { id: batch.sourceBatchId, tenantId: actor.tenantId },
+        include: { invoice: true, receipt: true },
+      });
+      if (!payment || !payment.receipt) {
+        throw new NotFoundException('Fee payment source record not found');
+      }
+      await this.postingService.postFeePayment(
+        {
+          tenantId: actor.tenantId,
+          paymentId: payment.id,
+          invoiceNumber: payment.invoice?.invoiceNumber ?? 'Unallocated advance',
+          receiptNumber: payment.receipt.receiptNumber,
+          paymentAmount: payment.amount,
+          paymentMethod: payment.method,
+          paymentAccountCode: resolveCashAccountCode(payment.method),
+          narration: payment.narration,
+          entryDate: payment.paidAt,
+          lines: [],
+        },
+        actor,
+      );
+      return;
+    }
+
+    if (batch.sourceModule === 'M3' && batch.postingType === 'BILLING') {
+      const invoice = await this.prisma.invoice.findFirst({
+        where: { id: batch.sourceBatchId, tenantId: actor.tenantId },
+        include: { lines: { include: { feeHead: true } } },
+      });
+      if (!invoice) throw new NotFoundException('Invoice source record not found');
+      await this.postingService.postInvoice(
+        {
+          tenantId: actor.tenantId,
+          invoiceId: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
+          studentId: invoice.studentId,
+          totalAmount: invoice.totalAmount,
+          entryDate: invoice.issuedAt,
+          lines: invoice.lines.map((line) => ({
+            accountCode: incomeAccountCodeForFeeHead(line.feeHead.code),
+            accountName: line.feeHead.name,
+            accountType: ChartAccountType.REVENUE,
+            amount: line.totalAmount,
+            description: `Revenue from ${line.feeHead.name}`,
+          })),
+        },
+        actor,
+      );
+      return;
+    }
+
+    if (batch.sourceModule === 'M3' && batch.postingType === 'WAIVER') {
+      const waiver = await this.prisma.feeWaiver.findFirst({
+        where: { id: batch.sourceBatchId, tenantId: actor.tenantId },
+      });
+      if (!waiver) throw new NotFoundException('Fee waiver source record not found');
+      await this.postingService.postFeeWaiver(
+        {
+          tenantId: actor.tenantId,
+          waiverId: waiver.id,
+          studentId: waiver.studentId,
+          invoiceId: waiver.invoiceId,
+          amount: waiver.amount,
+          reason: waiver.reason,
+          entryDate: waiver.approvedAt ?? waiver.createdAt,
+        },
+        actor,
+      );
+      return;
+    }
+
+    if (batch.sourceModule === 'M3' && batch.postingType === 'REFUND') {
+      const refund = await this.prisma.paymentRefund.findFirst({
+        where: { id: batch.sourceBatchId, tenantId: actor.tenantId },
+        include: { payment: true },
+      });
+      if (!refund) throw new NotFoundException('Payment refund source record not found');
+      const receivable = await this.prisma.chartAccount.findUniqueOrThrow({
+        where: {
+          tenantId_code: { tenantId: actor.tenantId, code: '1200' },
+        },
+      });
+      await this.postingService.postPaymentRefund(
+        {
+          tenantId: actor.tenantId,
+          refundId: refund.id,
+          paymentId: refund.paymentId,
+          amount: refund.amount,
+          reason: refund.reason,
+          paymentMethod: refund.payment.method,
+          paymentAccountCode: resolveCashAccountCode(refund.payment.method),
+          entryDate: refund.refundDate,
+          lines: [
+            {
+              chartAccountId: receivable.id,
+              amount: refund.amount,
+              description: 'Student receivable refund reversal',
+            },
+          ],
+        },
+        actor,
+      );
+      return;
+    }
+
+    throw new ConflictException(
+      'This source posting type is not eligible for an automated retry.',
+    );
+  }
+
+  private serializePostingBatch<
+    T extends {
+    sourceTotal: Prisma.Decimal;
+    postedTotal: Prisma.Decimal;
+    reconciliationDifference: Prisma.Decimal;
+    [key: string]: unknown;
+    },
+  >(batch: T) {
+    return {
+      ...batch,
+      sourceTotal: batch.sourceTotal.toFixed(2),
+      postedTotal: batch.postedTotal.toFixed(2),
+      reconciliationDifference: batch.reconciliationDifference.toFixed(2),
+    };
+  }
+
+  async createPeriod(dto: CreateAccountingPeriodDto, actor: AuthContext) {
+    void dto;
+    void actor;
+    throw new BadRequestException(
+      'Legacy accounting periods are read-only. Create a fiscal year and use its fiscal periods.',
+    );
   }
 
   async listChartAccounts(actor: AuthContext) {
@@ -1076,35 +1399,11 @@ export class AccountingService {
   }
 
   async closePeriod(id: string, actor: AuthContext) {
-    const period = await this.prisma.accountingPeriod.findFirst({
-      where: { id, tenantId: actor.tenantId },
-    });
-
-    if (!period) {
-      throw new NotFoundException('Accounting period not found in this tenant');
-    }
-
-    const closed = await this.prisma.accountingPeriod.update({
-      where: { id: period.id },
-      data: {
-        status: AccountingPeriodStatus.CLOSED,
-        closedAt: new Date(),
-      },
-    });
-
-    await this.auditService.record({
-      action: 'close',
-      resource: 'accounting_period',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: closed.id,
-      after: {
-        name: closed.name,
-        status: closed.status,
-      },
-    });
-
-    return closed;
+    void id;
+    void actor;
+    throw new BadRequestException(
+      'Legacy accounting periods are read-only. Close the linked fiscal period through Fiscal Periods.',
+    );
   }
 
   async createFiscalYear(dto: CreateFiscalYearDto, actor: AuthContext) {
@@ -1194,6 +1493,7 @@ export class AccountingService {
         lockedAt: new Date(),
         lockedById: actor.userId,
         lockReason: dto.reason,
+        reopenedWarning: false,
       },
     });
 
@@ -1527,17 +1827,61 @@ export class AccountingService {
         'Cannot reopen a fiscal period in a closed fiscal year. Reopen the fiscal year first.',
       );
     }
+    if (period.status !== AccountingPeriodStatus.CLOSED) {
+      throw new ConflictException(
+        'Only a closed fiscal period can enter the reopen approval workflow.',
+      );
+    }
+    if (!this.approvalWorkflowService) {
+      throw new ConflictException(
+        'Fiscal-period reopen approval is temporarily unavailable.',
+      );
+    }
 
+    return this.approvalWorkflowService.createRequest(
+      {
+        workflowType: ApprovalWorkflowType.FISCAL_PERIOD_REOPEN,
+        title: `Reopen fiscal period ${period.label}`,
+        reason: dto.reason,
+        targetModule: 'accounting',
+        targetType: 'fiscal_period',
+        targetId: period.id,
+        beforeContext: { status: period.status, label: period.label },
+        afterContext: {
+          requestedStatus: AccountingPeriodStatus.OPEN,
+          reopenedWarning: true,
+        },
+        safeContext: { fiscalPeriodId: period.id, label: period.label },
+        finalActionKey: 'accounting.fiscal_period.reopen',
+        finalActionPayload: { reason: dto.reason },
+        idempotencyKey: dto.idempotencyKey,
+      },
+      actor,
+    );
+  }
+
+  private async applyApprovedFiscalPeriodReopen(
+    id: string,
+    reason: string,
+    actor: AuthContext,
+  ) {
+    const period = await this.prisma.fiscalPeriod.findFirst({
+      where: { id, tenantId: actor.tenantId },
+    });
+    if (!period) throw new NotFoundException('Fiscal period not found');
+    if (period.status !== AccountingPeriodStatus.CLOSED) {
+      throw new ConflictException('Fiscal period is no longer closed');
+    }
     const updated = await this.prisma.fiscalPeriod.update({
       where: { id: period.id },
       data: {
         status: AccountingPeriodStatus.OPEN,
         reopenedAt: new Date(),
         reopenedById: actor.userId,
-        reopenReason: dto.reason,
+        reopenReason: reason,
+        reopenedWarning: true,
       },
     });
-
     await this.auditService.record({
       action: 'reopen',
       resource: 'fiscal_period',
@@ -1545,9 +1889,12 @@ export class AccountingService {
       userId: actor.userId,
       resourceId: updated.id,
       before: { status: period.status },
-      after: { status: updated.status, reason: dto.reason },
+      after: {
+        status: updated.status,
+        reason,
+        reopenedWarning: true,
+      },
     });
-
     return updated;
   }
   async correctJournalEntry(
@@ -3126,6 +3473,17 @@ function sumRows(rows: Array<{ type: string; balance: number }>, type: string) {
     .reduce((sum, row) => sum + row.balance, 0);
 }
 
+function readRequiredReason(payload: unknown) {
+  if (!payload || typeof payload !== 'object') {
+    throw new BadRequestException('Fiscal-period reopen reason is required');
+  }
+  const reason = Reflect.get(payload, 'reason');
+  if (typeof reason !== 'string' || !reason.trim()) {
+    throw new BadRequestException('Fiscal-period reopen reason is required');
+  }
+  return reason.trim();
+}
+
 export function reverseJournalSide(side: JournalLineSide) {
   return side === JournalLineSide.DEBIT
     ? JournalLineSide.CREDIT
@@ -3253,6 +3611,23 @@ function summarizeSourceModuleCoverage(
 
 function getDefaultSchoolChartAccounts() {
   return DEFAULT_CHART_ACCOUNTS;
+}
+
+function incomeAccountCodeForFeeHead(feeHeadCode: string) {
+  switch (feeHeadCode) {
+    case 'ADMISSION':
+      return '4010';
+    case 'EXAM':
+      return '4020';
+    case 'TRANSPORT':
+      return '4030';
+    case 'LIBFINE':
+      return '4040';
+    case 'MEALPLAN':
+      return '4050';
+    default:
+      return '4000';
+  }
 }
 
 function toCsv(rows: Array<Record<string, unknown>>) {

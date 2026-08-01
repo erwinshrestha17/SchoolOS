@@ -32,7 +32,7 @@ interface CollectionSectionProps {
 
 type CollectionPaymentPayload = {
   invoiceId: string;
-  amount: number;
+  amount: string;
   method: string;
   referenceNumber?: string;
   narration: string;
@@ -42,6 +42,12 @@ const getErrorMessage = (error: unknown) =>
   error instanceof Error
     ? error.message
     : "Payment could not be recorded. Please retry.";
+
+const formatMoney = (amount: string) =>
+  new Intl.NumberFormat("en-NP", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(amount));
 
 export function CollectionSection({
   invoices,
@@ -177,8 +183,8 @@ export function CollectionSection({
               </p>
               <p className="mt-0.5 text-sm font-semibold text-success-800 tabular-nums">
                 {lastReceipt.disposition === "REPLAYED"
-                  ? `Safely replayed · ${lastReceipt.receiptNumber ? `Receipt ${lastReceipt.receiptNumber}` : "Receipt pending"} · ${lastReceipt.method} · NPR ${lastReceipt.amount.toLocaleString("en-NP")}`
-                  : `${lastReceipt.receiptNumber ? `Receipt ${lastReceipt.receiptNumber}` : "Receipt pending"} · ${lastReceipt.method} · NPR ${lastReceipt.amount.toLocaleString("en-NP")}`}
+                  ? `Safely replayed · ${lastReceipt.receiptNumber ? `Receipt ${lastReceipt.receiptNumber}` : "Receipt pending"} · ${lastReceipt.method} · NPR ${formatMoney(lastReceipt.amount)}`
+                  : `${lastReceipt.receiptNumber ? `Receipt ${lastReceipt.receiptNumber}` : "Receipt pending"} · ${lastReceipt.method} · NPR ${formatMoney(lastReceipt.amount)}`}
               </p>
               {lastReceipt.receiptFileStatus !== "AVAILABLE" ? (
                 <p className="mt-1 text-xs font-semibold text-warning-700">

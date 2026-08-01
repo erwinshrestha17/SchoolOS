@@ -70,8 +70,8 @@ describe('FinanceCompatService', () => {
     expect(result.warnings).toEqual([]);
     expect(result.receipt.receiptNumber).toBe('REC-2026-00001');
     expect(result.student.studentSystemId).toBe('SCH-001');
-    expect(result.payment.amount).toBe(1000);
-    expect(result.payment.refundedAmount).toBe(0);
+    expect(result.payment.amount).toBe('1000.00');
+    expect(result.payment.refundedAmount).toBe('0.00');
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'verify_receipt',
@@ -99,8 +99,8 @@ describe('FinanceCompatService', () => {
     expect(result.warnings).toContain('Payment has been reversed');
     expect(result.warnings).toContain('Refunded amount: 1000.00');
     expect(result.payment.reversalReason).toBe('Duplicate payment');
-    expect(result.payment.refundedAmount).toBe(1000);
-    expect(result.payment.netAmount).toBe(0);
+    expect(result.payment.refundedAmount).toBe('1000.00');
+    expect(result.payment.netAmount).toBe('0.00');
   });
 
   it('rejects receipt reprint history lookup outside tenant', async () => {

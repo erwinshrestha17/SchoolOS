@@ -255,6 +255,7 @@ class ParentDashboardSummary {
     this.nextFeeDueDate,
     this.recentInvoices = const [],
     this.recentReceipts = const [],
+    this.recentRefunds = const [],
     required this.unreadNotices,
     required this.transportStatus,
     this.transportDetail,
@@ -289,6 +290,7 @@ class ParentDashboardSummary {
   final String? nextFeeDueDate;
   final List<ParentFeeInvoice> recentInvoices;
   final List<ParentFeeReceipt> recentReceipts;
+  final List<ParentFeeRefund> recentRefunds;
   final int unreadNotices;
   final String transportStatus;
   final String? transportDetail;
@@ -339,6 +341,9 @@ class ParentDashboardSummary {
         .whereType<Map<String, dynamic>>()
         .map(ParentFeeReceipt.fromJson)
         .toList();
+    final recentRefunds = (_asList(
+      fees?['recentRefunds'],
+    )).whereType<Map<String, dynamic>>().map(ParentFeeRefund.fromJson).toList();
 
     return ParentDashboardSummary(
       child: child,
@@ -353,6 +358,7 @@ class ParentDashboardSummary {
       nextFeeDueDate: fees?['nextDueDate'] as String?,
       recentInvoices: recentInvoices,
       recentReceipts: recentReceipts,
+      recentRefunds: recentRefunds,
       unreadNotices: _asInt(notices?['unreadCount']),
       transportStatus: _formatTransportStatus(transport),
       transportDetail: _formatTransportDetail(transport),
@@ -437,6 +443,9 @@ class ParentFeeInvoice {
     this.vatAmount = 0,
     this.lines = const [],
     this.receipts = const [],
+    this.waivers = const [],
+    this.refunds = const [],
+    this.allocationHistory = const [],
   });
 
   final String id;
@@ -452,6 +461,9 @@ class ParentFeeInvoice {
   final num vatAmount;
   final List<ParentFeeInvoiceLine> lines;
   final List<ParentFeeReceipt> receipts;
+  final List<ParentFeeWaiver> waivers;
+  final List<ParentFeeRefund> refunds;
+  final List<ParentFeeAllocation> allocationHistory;
 
   bool get isItemised => lines.isNotEmpty;
 
@@ -478,6 +490,18 @@ class ParentFeeInvoice {
       receipts: _asList(json['receipts'])
           .whereType<Map<String, dynamic>>()
           .map(ParentFeeReceipt.fromJson)
+          .toList(),
+      waivers: _asList(json['waivers'])
+          .whereType<Map<String, dynamic>>()
+          .map(ParentFeeWaiver.fromJson)
+          .toList(),
+      refunds: _asList(json['refunds'])
+          .whereType<Map<String, dynamic>>()
+          .map(ParentFeeRefund.fromJson)
+          .toList(),
+      allocationHistory: _asList(json['allocationHistory'])
+          .whereType<Map<String, dynamic>>()
+          .map(ParentFeeAllocation.fromJson)
           .toList(),
     );
   }
@@ -517,6 +541,93 @@ class ParentFeeReceipt {
       method: json['method'] as String? ?? 'PAYMENT',
       paidAt: json['paidAt'] as String?,
       issuedAt: json['issuedAt'] as String?,
+    );
+  }
+}
+
+class ParentFeeWaiver {
+  const ParentFeeWaiver({
+    required this.id,
+    required this.amount,
+    required this.reason,
+    this.feeHeadId,
+    this.approvedAt,
+  });
+
+  final String id;
+  final String? feeHeadId;
+  final num amount;
+  final String reason;
+  final String? approvedAt;
+
+  factory ParentFeeWaiver.fromJson(Map<String, dynamic> json) {
+    return ParentFeeWaiver(
+      id: json['id'] as String? ?? '',
+      feeHeadId: json['feeHeadId'] as String?,
+      amount: _asNum(json['amount']),
+      reason: json['reason'] as String? ?? 'Approved by the school',
+      approvedAt: json['approvedAt'] as String?,
+    );
+  }
+}
+
+class ParentFeeRefund {
+  const ParentFeeRefund({
+    required this.id,
+    required this.amount,
+    required this.reason,
+    this.refundNumber,
+    this.refundedAt,
+    this.invoiceId,
+    this.invoiceNumber,
+  });
+
+  final String id;
+  final String? refundNumber;
+  final num amount;
+  final String reason;
+  final String? refundedAt;
+  final String? invoiceId;
+  final String? invoiceNumber;
+
+  factory ParentFeeRefund.fromJson(Map<String, dynamic> json) {
+    return ParentFeeRefund(
+      id: json['id'] as String? ?? '',
+      refundNumber: json['refundNumber'] as String?,
+      amount: _asNum(json['amount']),
+      reason: json['reason'] as String? ?? 'Payment correction',
+      refundedAt: json['refundedAt'] as String?,
+      invoiceId: json['invoiceId'] as String?,
+      invoiceNumber: json['invoiceNumber'] as String?,
+    );
+  }
+}
+
+class ParentFeeAllocation {
+  const ParentFeeAllocation({
+    required this.id,
+    required this.paymentId,
+    required this.type,
+    required this.amount,
+    this.reason,
+    this.allocatedAt,
+  });
+
+  final String id;
+  final String paymentId;
+  final String type;
+  final num amount;
+  final String? reason;
+  final String? allocatedAt;
+
+  factory ParentFeeAllocation.fromJson(Map<String, dynamic> json) {
+    return ParentFeeAllocation(
+      id: json['id'] as String? ?? '',
+      paymentId: json['paymentId'] as String? ?? '',
+      type: json['type'] as String? ?? 'INVOICE',
+      amount: _asNum(json['amount']),
+      reason: json['reason'] as String?,
+      allocatedAt: json['allocatedAt'] as String?,
     );
   }
 }

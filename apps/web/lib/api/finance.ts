@@ -1,6 +1,8 @@
 import type {
   CashierClosePreview,
   CashierCloseSummary,
+  CashDepositPage,
+  CashDepositSummary,
   CollectionStudentSearchResponse,
   DefaulterReminderResult,
   DefaulterSummary,
@@ -8,11 +10,14 @@ import type {
   FeeBillingRun,
   FeeBillingRunPage,
   FeeCollectionReport,
+  DuesReportFilters,
+  DuesReportResponse,
   FinanceApprovalRequestPage,
   FinanceDashboardSummary,
   FeeHeadSummary,
   FeePlanSummary,
   InvoiceDetail,
+  InvoiceRegisterReport,
   InvoiceSummary,
   InvoiceSummaryPage,
   LedgerStudentSearchResponse,
@@ -22,6 +27,9 @@ import type {
   PaymentRefundSummary,
   ReceiptView,
   ReceiptViewPage,
+  ReceiptRegisterReport,
+  ReceiptSequenceExceptionReport,
+  RefundReversalRegisterReport,
   ReportDefinition,
   ReportExportRequest,
   StudentCollectionContext,
@@ -104,15 +112,15 @@ export type ReceiptVerificationResult = {
     id: string;
     invoiceNumber: string;
     status: string;
-    totalAmount: number;
+    totalAmount: string;
   };
   payment: {
     id: string;
     method: string;
     status: string;
-    amount: number;
-    refundedAmount: number;
-    netAmount: number;
+    amount: string;
+    refundedAmount: string;
+    netAmount: string;
     paidAt: string;
     referenceNumber: string | null;
     reversedAt: string | null;
@@ -127,7 +135,7 @@ export type ReceiptVerificationResult = {
 export type CollectedPaymentResult = {
   paymentId: string;
   invoiceId: string;
-  amount: number;
+  amount: string;
   method: string;
   paidAt: string;
   disposition: "SUCCEEDED" | "REPLAYED";
@@ -148,20 +156,20 @@ export type DefaultersResponse = {
   page: number;
   limit: number;
   hasNextPage: boolean;
-  totalOutstanding: number;
+  totalOutstanding: string;
   segments: Array<{
     agingBucket: string;
     count: number;
-    outstanding: number;
+    outstanding: string;
   }>;
   items: DefaulterSummary[];
 };
 
 export type FinancePaymentListItem = {
   id: string;
-  amount: number;
-  refundedAmount: number;
-  refundableAmount: number;
+  amount: string;
+  refundedAmount: string;
+  refundableAmount: string;
   method: string;
   paidAt: string;
   student: {
@@ -273,22 +281,8 @@ export const financeApi = {
     }),
   downloadReport: (reportKey: string, payload: ReportExportRequest) =>
     downloadReport(reportKey, payload),
-  getDuesTableReport: (params?: {
-    academicYearId?: string;
-    classId?: string;
-    sectionId?: string;
-    feeHeadId?: string;
-    studentId?: string;
-    month?: number;
-    year?: number;
-  }) =>
-    request<{ rows: any[]; summary: any }>(
-      withQuery("/fees/reports/dues", {
-        ...params,
-        month: params?.month ? String(params.month) : undefined,
-        year: params?.year ? String(params.year) : undefined,
-      }),
-    ),
+  getDuesTableReport: (params?: DuesReportFilters) =>
+    request<DuesReportResponse>(withQuery("/fees/reports/dues", params ?? {})),
   getCollectionReport: (params?: { fromDate?: string; toDate?: string }) =>
     request<FeeCollectionReport>(
       withQuery("/fees/reports/collections", params ?? {}),
@@ -306,7 +300,7 @@ export const financeApi = {
     studentId?: string;
     feeHeadId?: string;
   }) =>
-    request<{ rows: any[]; summary: any }>(
+    request<InvoiceRegisterReport>(
       withQuery("/fees/reports/invoices", params ?? {}),
     ),
   getReceiptRegister: (params?: {
@@ -315,7 +309,7 @@ export const financeApi = {
     studentId?: string;
     paymentMethod?: string;
   }) =>
-    request<{ rows: any[]; summary: any }>(
+    request<ReceiptRegisterReport>(
       withQuery("/fees/reports/receipts", params ?? {}),
     ),
   getReceiptSequenceExceptions: (params?: {
@@ -323,7 +317,7 @@ export const financeApi = {
     fromDate?: string;
     toDate?: string;
   }) =>
-    request<{ rows: any[]; summary: any }>(
+    request<ReceiptSequenceExceptionReport>(
       withQuery("/fees/reports/receipt-sequence-exceptions", params ?? {}),
     ),
   getRefundReversalRegister: (params?: {
@@ -331,7 +325,7 @@ export const financeApi = {
     toDate?: string;
     recordType?: "REFUND" | "REVERSAL";
   }) =>
-    request<{ rows: any[]; summary: any }>(
+    request<RefundReversalRegisterReport>(
       withQuery("/fees/reports/refund-reversals", params ?? {}),
     ),
   listDiscountsPage: (params?: {
@@ -436,6 +430,73 @@ export const financeApi = {
       method: "POST",
       json: body as JsonBody,
     }),
+  openCashierClose: (body: {
+    openedAt: string;
+    collectorUserId?: string | null;
+    paymentMethod?: string | null;
+    notes?: string | null;
+  }) =>
+    request<CashierCloseSummary>("/payments/cashier-close/open", {
+      method: "POST",
+      json: body as JsonBody,
+    }),
+  countCashierClose: (
+    closeId: string,
+    body: {
+      countedThroughAt: string;
+      actualCashAmount: string;
+      varianceReason?: string | null;
+      denominationBreakdown?: Record<string, unknown> | null;
+    },
+  ) =>
+    request<CashierCloseSummary>(
+      `/payments/cashier-close/${encodeURIComponent(closeId)}/count`,
+      { method: "POST", json: body as JsonBody },
+    ),
+  submitCashierClose: (closeId: string, reason: string) =>
+    request<CashierCloseSummary>(
+      `/payments/cashier-close/${encodeURIComponent(closeId)}/submit`,
+      { method: "POST", json: { reason } },
+    ),
+  approveCashierClose: (closeId: string, reason: string) =>
+    request<CashierCloseSummary>(
+      `/payments/cashier-close/${encodeURIComponent(closeId)}/approve`,
+      { method: "POST", json: { reason } },
+    ),
+  closeCashierClose: (closeId: string, reason: string) =>
+    request<CashierCloseSummary>(
+      `/payments/cashier-close/${encodeURIComponent(closeId)}/close`,
+      { method: "POST", json: { reason } },
+    ),
+  listCashDeposits: (params?: {
+    page?: number;
+    limit?: number;
+    status?: "DRAFT" | "SUBMITTED" | "DEPOSITED" | "REVERSED";
+    cashierCloseId?: string;
+  }) =>
+    request<CashDepositPage>(
+      withQuery("/payments/cash-deposits", params ?? {}),
+    ),
+  prepareCashDeposit: (body: {
+    cashierCloseId: string;
+    accountId: string;
+    referenceNumber?: string;
+    idempotencyKey: string;
+  }) =>
+    request<CashDepositSummary>("/payments/cash-deposits", {
+      method: "POST",
+      json: body,
+    }),
+  submitCashDeposit: (depositId: string, reason: string) =>
+    request<CashDepositSummary>(
+      `/payments/cash-deposits/${encodeURIComponent(depositId)}/submit`,
+      { method: "POST", json: { reason } },
+    ),
+  completeCashDeposit: (depositId: string, reason: string) =>
+    request<CashDepositSummary>(
+      `/payments/cash-deposits/${encodeURIComponent(depositId)}/complete`,
+      { method: "POST", json: { reason } },
+    ),
   reversePayment: (
     paymentId: string,
     body: { reason: string; idempotencyKey: string },
@@ -470,7 +531,7 @@ export const financeApi = {
   requestPaymentRefund: (
     paymentId: string,
     body: {
-      amount?: number;
+      amount?: string;
       reason: string;
       idempotencyKey: string;
     },

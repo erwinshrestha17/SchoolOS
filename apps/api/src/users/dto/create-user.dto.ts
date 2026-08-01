@@ -1,4 +1,10 @@
-import { IsArray, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsArray,
+  IsObject,
+  IsOptional,
+  IsString,
+  MinLength,
+} from 'class-validator';
 import {
   IsNepalPhone,
   IsProfileEmail,
@@ -24,4 +30,8 @@ export class CreateUserDto {
   @IsArray()
   @IsString({ each: true })
   roleIds!: string[];
+
+  @IsOptional()
+  @IsObject()
+  expiresAtByRole?: Record<string, string>;
 }

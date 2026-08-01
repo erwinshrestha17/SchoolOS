@@ -54,6 +54,14 @@ describe('FinanceService - Hardening', () => {
         update: jest.fn(),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
+      paymentAllocation: {
+        create: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+        aggregate: jest.fn().mockResolvedValue({
+          _sum: { amount: new Prisma.Decimal(500) },
+        }),
+      },
       paymentRefund: {
         count: jest.fn(),
         create: jest.fn(),
@@ -67,13 +75,20 @@ describe('FinanceService - Hardening', () => {
       },
       cashierClose: {
         findFirst: jest.fn(),
+        findMany: jest.fn(),
         create: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         count: jest.fn(),
       },
+      cashDeposit: { findFirst: jest.fn() },
       journalEntry: { findFirst: jest.fn() },
       accountingPeriod: { findFirst: jest.fn().mockResolvedValue(null) },
       receipt: { findFirst: jest.fn(), count: jest.fn() },
-      fileAsset: { findFirst: jest.fn() },
+      fileAsset: {
+        findFirst: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       tenant: {
         findUnique: jest.fn(),
         findUniqueOrThrow: jest
@@ -100,7 +115,9 @@ describe('FinanceService - Hardening', () => {
         create: jest.fn(),
       },
       $queryRaw: jest.fn().mockResolvedValue([]),
-      $transaction: jest.fn((cb) => cb(mockPrisma)),
+      $transaction: jest.fn((work) =>
+        Array.isArray(work) ? Promise.all(work) : work(mockPrisma),
+      ),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -152,6 +169,7 @@ describe('FinanceService - Hardening', () => {
     it('prevents refund exceeding net paid amount', async () => {
       const mockPayment = {
         id: 'p1',
+        invoiceId: 'i1',
         amount: new Prisma.Decimal(1000),
         refunds: [{ amount: new Prisma.Decimal(600) }],
         invoice: {
@@ -172,7 +190,7 @@ describe('FinanceService - Hardening', () => {
         service.refundPayment(
           'p1',
           {
-            amount: 500,
+            amount: '500.00',
             refundDate: '2026-05-01',
             reason: 'Overpaid',
             idempotencyKey: 'refund-overpaid',
@@ -206,7 +224,7 @@ describe('FinanceService - Hardening', () => {
       const result = await service.refundPayment(
         'payment-1',
         {
-          amount: 250,
+          amount: '250.00',
           reason: 'Correction',
           idempotencyKey: 'refund-replay',
         },
@@ -277,6 +295,11 @@ describe('FinanceService - Hardening', () => {
         refunds: [{ id: 'r1', amount: new Prisma.Decimal(100) }],
         tenantId: 't1',
         invoiceId: 'i1',
+        invoice: {
+          id: 'i1',
+          status: InvoiceStatus.PAID,
+          paidAt: new Date('2026-04-01T00:00:00.000Z'),
+        },
       };
 
       (prisma.payment.findFirst as jest.Mock).mockResolvedValue(mockPayment);
@@ -326,7 +349,12 @@ describe('FinanceService - Hardening', () => {
         paidAt: new Date('2026-05-01T10:00:00.000Z'),
         collectedById: 'cashier-1',
         method: 'CASH',
-        invoice: { id: 'i1', totalAmount: new Prisma.Decimal(1000) },
+        invoice: {
+          id: 'i1',
+          status: InvoiceStatus.PAID,
+          totalAmount: new Prisma.Decimal(1000),
+          paidAt: new Date('2026-05-01T10:00:00.000Z'),
+        },
       };
 
       (prisma.payment.findFirst as jest.Mock).mockResolvedValue(mockPayment);
@@ -371,7 +399,13 @@ describe('FinanceService - Hardening', () => {
         entryNumber: 'JE-001',
         lines: [],
       });
-      (prisma.payment.findMany as jest.Mock).mockResolvedValue([]); // No remaining payments
+      (prisma.paymentAllocation.aggregate as jest.Mock).mockResolvedValue({
+        _sum: { amount: new Prisma.Decimal(0) },
+      });
+      (prisma.invoice.update as jest.Mock).mockResolvedValue({
+        id: 'i1',
+        status: InvoiceStatus.ISSUED,
+      });
 
       const result = await service.reversePayment(
         'p1',
@@ -427,11 +461,171 @@ describe('FinanceService - Hardening', () => {
     });
   });
 
-  describe('immutable cashier close', () => {
-    it('denies reopening without deleting the finalized close', async () => {
+  describe('cashier close correction lifecycle', () => {
+    it('moves an open session to counted with backend-owned totals and variance evidence', async () => {
+      const openedAt = new Date('2026-05-01T03:15:00.000Z');
+      const countedThroughAt = new Date('2026-05-01T10:15:00.000Z');
+      const openClose = buildCashierCloseFixture({ openedAt });
+      const countedClose = buildCashierCloseFixture({
+        openedAt,
+        countedThroughAt,
+        status: 'COUNTED',
+        grossCollected: new Prisma.Decimal(500),
+        totalRefunded: new Prisma.Decimal(100),
+        netCollected: new Prisma.Decimal(400),
+        expectedCashAmount: new Prisma.Decimal(400),
+        actualCashAmount: new Prisma.Decimal(390),
+        varianceAmount: new Prisma.Decimal(-10),
+        varianceReason: 'Cash drawer short after recount',
+        paymentCount: 1,
+        refundCount: 1,
+      });
+      (prisma.cashierClose.findFirst as jest.Mock)
+        .mockResolvedValueOnce(openClose)
+        .mockResolvedValueOnce(countedClose);
+      (prisma.payment.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: 'payment-1',
+          method: 'CASH',
+          amount: new Prisma.Decimal(500),
+          receipt: { receiptNumber: 'REC-001' },
+        },
+      ]);
+      (prisma.paymentRefund.findMany as jest.Mock).mockResolvedValue([
+        {
+          amount: new Prisma.Decimal(100),
+          payment: {
+            method: 'CASH',
+            receipt: { receiptNumber: 'REC-001' },
+          },
+        },
+      ]);
+
+      const result = await service.countCashierClose(
+        'close-1',
+        {
+          countedThroughAt: countedThroughAt.toISOString(),
+          actualCashAmount: '390.00',
+          varianceReason: 'Cash drawer short after recount',
+        },
+        actor as any,
+      );
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          status: 'COUNTED',
+          grossCollected: '500.00',
+          totalRefunded: '100.00',
+          expectedCashAmount: '400.00',
+          actualCashAmount: '390.00',
+          varianceAmount: '-10.00',
+        }),
+      );
+      expect(prisma.cashierClose.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: 'close-1',
+            tenantId: 't1',
+            status: 'OPEN',
+          }),
+          data: expect.objectContaining({
+            status: 'COUNTED',
+            grossCollected: new Prisma.Decimal(500),
+            totalRefunded: new Prisma.Decimal(100),
+            varianceReason: 'Cash drawer short after recount',
+          }),
+        }),
+      );
+      expect(auditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'count',
+          resource: 'cashier_close',
+          resourceId: 'close-1',
+        }),
+      );
+    });
+
+    it('prevents the submitter from approving the same cashier count', async () => {
+      (prisma.cashierClose.findFirst as jest.Mock).mockResolvedValue({
+        submittedById: actor.userId,
+      });
+
+      await expect(
+        service.approveCashierClose(
+          'close-1',
+          { reason: 'Count reviewed' },
+          actor as any,
+        ),
+      ).rejects.toThrow(
+        'The person who submitted this cashier count cannot approve it.',
+      );
+      expect(prisma.cashierClose.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('registers a protected close report after an approved session closes', async () => {
+      const countedThroughAt = new Date('2026-05-01T10:15:00.000Z');
+      const closed = buildCashierCloseFixture({
+        status: 'CLOSED',
+        countedThroughAt,
+        closedAt: countedThroughAt,
+        closedById: actor.userId,
+        closedBy: { id: actor.userId, email: 'accountant@school.test' },
+        grossCollected: new Prisma.Decimal(500),
+        netCollected: new Prisma.Decimal(500),
+        expectedCashAmount: new Prisma.Decimal(500),
+        actualCashAmount: new Prisma.Decimal(500),
+      });
+      (prisma.cashierClose.findFirst as jest.Mock)
+        .mockResolvedValueOnce({ countedThroughAt })
+        .mockResolvedValueOnce(closed)
+        .mockResolvedValueOnce(closed);
+      (prisma.tenant.findUnique as jest.Mock).mockResolvedValue({
+        id: actor.tenantId,
+        name: 'Demo School',
+      });
+      (fileRegistry.registerGeneratedFile as jest.Mock).mockResolvedValue({
+        id: 'cashier-close-file-1',
+        originalFilename: 'DayEndClose_CLS-001.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 2048,
+      });
+
+      const result = await service.closeCashierClose(
+        'close-1',
+        { reason: 'Approved count completed' },
+        actor as any,
+      );
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          status: 'CLOSED',
+          closePdfFile: expect.objectContaining({
+            fileAssetId: 'cashier-close-file-1',
+          }),
+        }),
+      );
+      expect(fileRegistry.registerGeneratedFile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: actor.tenantId,
+          module: 'fees',
+          entityId: 'close-1',
+          mimeType: 'application/pdf',
+          metadata: expect.objectContaining({ kind: 'cashier_close_pdf' }),
+        }),
+      );
+      expect(auditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'generate_report',
+          resourceId: 'close-1',
+        }),
+      );
+    });
+
+    it('denies reopening a deposited close', async () => {
       (prisma.cashierClose.findFirst as jest.Mock).mockResolvedValue({
         id: 'close-1',
         closeNumber: 'CLS-001',
+        status: 'DEPOSITED',
       });
 
       await expect(
@@ -440,7 +634,7 @@ describe('FinanceService - Hardening', () => {
           { reason: 'Counted cash was entered incorrectly' },
           actor as any,
         ),
-      ).rejects.toThrow('Finalized cashier closes are immutable');
+      ).rejects.toThrow('Deposited cashier sessions are immutable');
       expect(auditService.record).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'reopen_denied',
@@ -543,7 +737,7 @@ describe('FinanceService - Hardening', () => {
         'khalti',
         {
           reference: 'REF-456',
-          amount: 1000,
+          amount: '1000.00',
           status: 'SUCCESS',
           invoiceId: 'i-webhook-1',
         },
@@ -786,7 +980,7 @@ describe('FinanceService - Hardening', () => {
       const result = await service.requestRefund(
         'p-req-1',
         {
-          amount: 1000,
+          amount: '1000.00',
           reason: 'Accidental charge',
           idempotencyKey: 'request-refund-1',
         },
@@ -869,6 +1063,7 @@ describe('FinanceService - Hardening', () => {
       // Mock refundPayment dependencies
       const mockPayment = {
         id: 'p1',
+        invoiceId: 'i1',
         amount: new Prisma.Decimal(1000),
         status: PaymentStatus.SUCCESS,
         refunds: [],
@@ -1064,7 +1259,7 @@ describe('FinanceService - Hardening', () => {
 
       const dto = {
         invoiceId: 'invoice-1',
-        amount: 500,
+        amount: '500.00',
         method: 'CASH' as const,
         idempotencyKey: 'concurrent-collect-1',
       };
@@ -1116,3 +1311,50 @@ describe('FinanceService - Hardening', () => {
     });
   });
 });
+
+function buildCashierCloseFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'close-1',
+    tenantId: 't1',
+    closeNumber: 'CLS-001',
+    closeWindowKey: null,
+    activeSessionKey: 'ALL_COLLECTORS|ALL_METHODS',
+    openedAt: new Date('2026-05-01T03:15:00.000Z'),
+    closedAt: null,
+    countedThroughAt: null,
+    status: 'OPEN',
+    countedAt: null,
+    countedById: null,
+    submittedAt: null,
+    submittedById: null,
+    approvedAt: null,
+    approvedById: null,
+    depositedAt: null,
+    depositedById: null,
+    depositId: null,
+    reopenedAt: null,
+    reopenedById: null,
+    reopenReason: null,
+    collectorUserId: null,
+    paymentMethod: null,
+    grossCollected: new Prisma.Decimal(0),
+    totalRefunded: new Prisma.Decimal(0),
+    netCollected: new Prisma.Decimal(0),
+    expectedCashAmount: null,
+    actualCashAmount: null,
+    varianceAmount: null,
+    varianceReason: null,
+    denominationBreakdown: null,
+    methodBreakdown: null,
+    paymentCount: 0,
+    refundCount: 0,
+    firstReceiptNumber: null,
+    lastReceiptNumber: null,
+    notes: null,
+    closedById: null,
+    createdAt: new Date('2026-05-01T03:15:00.000Z'),
+    collectorUser: null,
+    closedBy: null,
+    ...overrides,
+  };
+}

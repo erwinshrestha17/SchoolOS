@@ -65,6 +65,36 @@ export type FiscalPeriodSummary = {
   startDate: string;
   endDate: string;
   status: string;
+  reopenedWarning?: boolean;
+};
+
+export type AccountingPostingBatchStatus =
+  | 'DRAFT'
+  | 'READY'
+  | 'POSTING'
+  | 'POSTED'
+  | 'FAILED'
+  | 'REVERSED';
+
+export type AccountingPostingBatchSummary = {
+  id: string;
+  sourceModule: 'M3' | 'M7' | string;
+  sourceType: string;
+  sourceBatchId: string;
+  postingType: string;
+  status: AccountingPostingBatchStatus;
+  fiscalYearId: string;
+  fiscalPeriodId: string | null;
+  sourceTotal: string;
+  postedTotal: string;
+  reconciliationDifference: string;
+  journalEntryId: string | null;
+  failureCode: string | null;
+  failureDetail: string | null;
+  retryCount: number;
+  itemCount?: number;
+  postedAt: string | null;
+  createdAt: string;
 };
 
 export type FiscalPeriodCloseReadiness = {
@@ -454,6 +484,19 @@ export type AccountingSourceMappingHealth = {
     configuredMappingCount: number;
   }>;
   isClean: boolean;
+};
+
+export type FinancialAuditLogSummary = {
+  id: string;
+  tenantId: string;
+  userId: string | null;
+  action: string;
+  resource: string;
+  resourceId: string | null;
+  before: Readonly<Record<string, unknown>> | null;
+  after: Readonly<Record<string, unknown>> | null;
+  metadata: Readonly<Record<string, unknown>> | null;
+  createdAt: string;
 };
 
 export type BankStatementImportLine = {

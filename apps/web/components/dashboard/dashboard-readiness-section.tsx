@@ -119,14 +119,14 @@ const READINESS_PANELS: ReadinessPanelDefinition[] = [
         route: "/dashboard/fees/adjustments",
       },
       {
-        module: "m9_accounting",
+        module: "m11_accounting",
         metricKey: "unreconciledStatements",
         label: (count) =>
           `${formatNumber(count)} bank statement${count === 1 ? "" : "s"} to reconcile`,
         route: "/dashboard/accounting/reconciliation",
       },
       {
-        module: "m9_accounting",
+        module: "m11_accounting",
         metricKey: "unpostedJournals",
         label: (count) =>
           `${formatNumber(count)} journal${count === 1 ? "" : "s"} awaiting posting`,

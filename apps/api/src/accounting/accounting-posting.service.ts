@@ -1,6 +1,7 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import {
   AccountingPeriodStatus,
+  AccountingPostingBatchStatus,
   ChartAccountType,
   JournalEntryStatus,
   JournalLineSide,
@@ -279,6 +280,18 @@ export class AccountingPostingService {
     );
 
     if (existing) {
+      await this.recordPostedSourceBatch(tx, {
+        tenantId: input.tenantId,
+        fiscalYearId: period.fiscalYearId,
+        fiscalPeriodId: period.id,
+        sourceModule: 'M7',
+        sourceType: JournalSourceType.PAYROLL_RUN,
+        sourceBatchId: input.payrollRunId,
+        postingType: 'APPROVAL',
+        sourceTotal: input.grossAmount,
+        journalEntry: existing,
+        actor,
+      });
       return existing;
     }
 
@@ -460,6 +473,19 @@ export class AccountingPostingService {
       },
     });
 
+    await this.recordPostedSourceBatch(tx, {
+      tenantId: input.tenantId,
+      fiscalYearId: period.fiscalYearId,
+      fiscalPeriodId: period.id,
+      sourceModule: 'M7',
+      sourceType: JournalSourceType.PAYROLL_RUN,
+      sourceBatchId: input.payrollRunId,
+      postingType: 'APPROVAL',
+      sourceTotal: input.grossAmount,
+      journalEntry: entry,
+      actor,
+    });
+
     return entry;
   }
 
@@ -485,6 +511,18 @@ export class AccountingPostingService {
     );
 
     if (existing) {
+      await this.recordPostedSourceBatch(tx, {
+        tenantId: input.tenantId,
+        fiscalYearId: period.fiscalYearId,
+        fiscalPeriodId: period.id,
+        sourceModule: 'M7',
+        sourceType: JournalSourceType.PAYROLL_DISBURSEMENT,
+        sourceBatchId: input.payrollRunId,
+        postingType: 'DISBURSEMENT',
+        sourceTotal: input.netAmount,
+        journalEntry: existing,
+        actor,
+      });
       return existing;
     }
 
@@ -564,6 +602,19 @@ export class AccountingPostingService {
         sourceId: entry.sourceId,
         amount: input.netAmount.toString(),
       },
+    });
+
+    await this.recordPostedSourceBatch(tx, {
+      tenantId: input.tenantId,
+      fiscalYearId: period.fiscalYearId,
+      fiscalPeriodId: period.id,
+      sourceModule: 'M7',
+      sourceType: JournalSourceType.PAYROLL_DISBURSEMENT,
+      sourceBatchId: input.payrollRunId,
+      postingType: 'DISBURSEMENT',
+      sourceTotal: input.netAmount,
+      journalEntry: entry,
+      actor,
     });
 
     return entry;
@@ -855,6 +906,18 @@ export class AccountingPostingService {
     );
 
     if (existing) {
+      await this.recordPostedSourceBatch(tx, {
+        tenantId: input.tenantId,
+        fiscalYearId: period.fiscalYearId,
+        fiscalPeriodId: period.id,
+        sourceModule: 'M3',
+        sourceType: JournalSourceType.FEE_PAYMENT,
+        sourceBatchId: input.paymentId,
+        postingType: 'RECEIPT',
+        sourceTotal: input.paymentAmount,
+        journalEntry: existing,
+        actor,
+      });
       return existing;
     }
 
@@ -931,6 +994,7 @@ export class AccountingPostingService {
           })),
         },
       },
+      include: { lines: true },
     });
 
     await this.auditService.record({
@@ -944,6 +1008,19 @@ export class AccountingPostingService {
         sourceId: entry.sourceId,
         amount: input.paymentAmount.toString(),
       },
+    });
+
+    await this.recordPostedSourceBatch(tx, {
+      tenantId: input.tenantId,
+      fiscalYearId: period.fiscalYearId,
+      fiscalPeriodId: period.id,
+      sourceModule: 'M3',
+      sourceType: JournalSourceType.FEE_PAYMENT,
+      sourceBatchId: input.paymentId,
+      postingType: 'RECEIPT',
+      sourceTotal: input.paymentAmount,
+      journalEntry: entry,
+      actor,
     });
 
     return entry;
@@ -971,6 +1048,18 @@ export class AccountingPostingService {
     );
 
     if (existing) {
+      await this.recordPostedSourceBatch(tx, {
+        tenantId: input.tenantId,
+        fiscalYearId: period.fiscalYearId,
+        fiscalPeriodId: period.id,
+        sourceModule: 'M3',
+        sourceType: JournalSourceType.INVOICE,
+        sourceBatchId: input.invoiceId,
+        postingType: 'BILLING',
+        sourceTotal: input.totalAmount,
+        journalEntry: existing,
+        actor,
+      });
       return existing;
     }
 
@@ -1047,6 +1136,7 @@ export class AccountingPostingService {
           })),
         },
       },
+      include: { lines: true },
     });
 
     await this.auditService.record({
@@ -1060,6 +1150,19 @@ export class AccountingPostingService {
         sourceId: entry.sourceId,
         amount: input.totalAmount.toString(),
       },
+    });
+
+    await this.recordPostedSourceBatch(tx, {
+      tenantId: input.tenantId,
+      fiscalYearId: period.fiscalYearId,
+      fiscalPeriodId: period.id,
+      sourceModule: 'M3',
+      sourceType: JournalSourceType.INVOICE,
+      sourceBatchId: input.invoiceId,
+      postingType: 'BILLING',
+      sourceTotal: input.totalAmount,
+      journalEntry: entry,
+      actor,
     });
 
     return entry;
@@ -1227,6 +1330,18 @@ export class AccountingPostingService {
     );
 
     if (existing) {
+      await this.recordPostedSourceBatch(tx, {
+        tenantId: input.tenantId,
+        fiscalYearId: period.fiscalYearId,
+        fiscalPeriodId: period.id,
+        sourceModule: 'M3',
+        sourceType: JournalSourceType.ADJUSTMENT,
+        sourceBatchId: input.waiverId,
+        postingType: 'WAIVER',
+        sourceTotal: input.amount,
+        journalEntry: existing,
+        actor,
+      });
       return existing;
     }
 
@@ -1289,6 +1404,7 @@ export class AccountingPostingService {
           })),
         },
       },
+      include: { lines: true },
     });
 
     await this.auditService.record({
@@ -1302,6 +1418,19 @@ export class AccountingPostingService {
         sourceId: entry.sourceId,
         amount: input.amount.toString(),
       },
+    });
+
+    await this.recordPostedSourceBatch(tx, {
+      tenantId: input.tenantId,
+      fiscalYearId: period.fiscalYearId,
+      fiscalPeriodId: period.id,
+      sourceModule: 'M3',
+      sourceType: JournalSourceType.ADJUSTMENT,
+      sourceBatchId: input.waiverId,
+      postingType: 'WAIVER',
+      sourceTotal: input.amount,
+      journalEntry: entry,
+      actor,
     });
 
     return entry;
@@ -1329,6 +1458,18 @@ export class AccountingPostingService {
     );
 
     if (existing) {
+      await this.recordPostedSourceBatch(tx, {
+        tenantId: input.tenantId,
+        fiscalYearId: period.fiscalYearId,
+        fiscalPeriodId: period.id,
+        sourceModule: 'M3',
+        sourceType: JournalSourceType.PAYMENT_REFUND,
+        sourceBatchId: input.refundId,
+        postingType: 'REFUND',
+        sourceTotal: input.amount,
+        journalEntry: existing,
+        actor,
+      });
       return existing;
     }
 
@@ -1389,6 +1530,7 @@ export class AccountingPostingService {
           })),
         },
       },
+      include: { lines: true },
     });
 
     await this.auditService.record({
@@ -1402,6 +1544,19 @@ export class AccountingPostingService {
         sourceId: entry.sourceId,
         amount: input.amount.toString(),
       },
+    });
+
+    await this.recordPostedSourceBatch(tx, {
+      tenantId: input.tenantId,
+      fiscalYearId: period.fiscalYearId,
+      fiscalPeriodId: period.id,
+      sourceModule: 'M3',
+      sourceType: JournalSourceType.PAYMENT_REFUND,
+      sourceBatchId: input.refundId,
+      postingType: 'REFUND',
+      sourceTotal: input.amount,
+      journalEntry: entry,
+      actor,
     });
 
     return entry;
@@ -1879,6 +2034,137 @@ export class AccountingPostingService {
     }
 
     return null;
+  }
+
+  /**
+   * Records the immutable M3/M7 -> M11 handoff beside the posted journal.
+   * The journal source uniqueness remains the concurrency gate; the batch
+   * adds explicit reconciliation and retry/history truth without changing
+   * the established journal identifiers.
+   */
+  private async recordPostedSourceBatch(
+    tx: PostingClient,
+    input: {
+      tenantId: string;
+      fiscalYearId: string;
+      fiscalPeriodId?: string | null;
+      sourceModule: 'M3' | 'M7';
+      sourceType: JournalSourceType;
+      sourceBatchId: string;
+      postingType: string;
+      sourceTotal: Prisma.Decimal;
+      journalEntry: {
+        id: string;
+        lines?: Array<{
+          id?: string;
+          chartAccountId: string;
+          side?: JournalLineSide;
+          debit?: Prisma.Decimal | number | string;
+          credit?: Prisma.Decimal | number | string;
+          amount?: Prisma.Decimal | number | string;
+        }>;
+      };
+      actor: AuthContext;
+    },
+  ) {
+    // Focused unit tests use deliberately small Prisma doubles. Production
+    // Prisma clients always expose this delegate after the P0 migration.
+    if (!("accountingPostingBatch" in tx)) {
+      return null;
+    }
+
+    const lines = input.journalEntry.lines ?? [];
+    const postedTotal = lines.reduce((total, line) => {
+      const debit =
+        line.debit !== undefined
+          ? new Prisma.Decimal(line.debit)
+          : line.side === JournalLineSide.DEBIT && line.amount !== undefined
+            ? new Prisma.Decimal(line.amount)
+            : new Prisma.Decimal(0);
+      return total.add(debit);
+    }, new Prisma.Decimal(0));
+    const reconciliationDifference = input.sourceTotal.sub(postedTotal);
+    const idempotencyKey = [
+      input.sourceModule,
+      input.sourceType,
+      input.sourceBatchId,
+      input.postingType,
+    ].join(':');
+
+    return tx.accountingPostingBatch.upsert({
+      where: {
+        tenantId_sourceModule_sourceType_sourceBatchId_postingType: {
+          tenantId: input.tenantId,
+          sourceModule: input.sourceModule,
+          sourceType: input.sourceType,
+          sourceBatchId: input.sourceBatchId,
+          postingType: input.postingType,
+        },
+      },
+      update: {
+        journalEntryId: input.journalEntry.id,
+        status: AccountingPostingBatchStatus.POSTED,
+        postedTotal,
+        reconciliationDifference,
+        failureCode: null,
+        failureDetail: null,
+        postedById: input.actor.userId,
+        postedAt: new Date(),
+      },
+      create: {
+        tenantId: input.tenantId,
+        fiscalYearId: input.fiscalYearId,
+        fiscalPeriodId: input.fiscalPeriodId ?? null,
+        sourceModule: input.sourceModule,
+        sourceType: input.sourceType,
+        sourceBatchId: input.sourceBatchId,
+        postingType: input.postingType,
+        status: AccountingPostingBatchStatus.POSTED,
+        sourceTotal: input.sourceTotal,
+        postedTotal,
+        reconciliationDifference,
+        normalizedPayload: {
+          sourceModule: input.sourceModule,
+          sourceType: input.sourceType,
+          sourceBatchId: input.sourceBatchId,
+          postingType: input.postingType,
+          sourceTotal: input.sourceTotal.toFixed(2),
+        },
+        idempotencyKey,
+        journalEntryId: input.journalEntry.id,
+        requestedById: input.actor.userId,
+        postedById: input.actor.userId,
+        postedAt: new Date(),
+        items: {
+          create: lines.map((line, index) => {
+            const debit =
+              line.debit !== undefined
+                ? new Prisma.Decimal(line.debit)
+                : line.side === JournalLineSide.DEBIT &&
+                    line.amount !== undefined
+                  ? new Prisma.Decimal(line.amount)
+                  : new Prisma.Decimal(0);
+            const credit =
+              line.credit !== undefined
+                ? new Prisma.Decimal(line.credit)
+                : line.side === JournalLineSide.CREDIT &&
+                    line.amount !== undefined
+                  ? new Prisma.Decimal(line.amount)
+                  : new Prisma.Decimal(0);
+            return {
+              tenantId: input.tenantId,
+              sourceItemId: input.journalEntry.id,
+              lineNumber: index + 1,
+              accountId: line.chartAccountId,
+              debit,
+              credit,
+              status: 'POSTED' as const,
+              journalLineId: line.id ?? null,
+            };
+          }),
+        },
+      },
+    });
   }
 
   async generateJournalEntryNumber(

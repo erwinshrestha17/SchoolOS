@@ -36,7 +36,7 @@ export const HR_DASHBOARD_MODULES: OperationalSummaryModule[] = [
 
 export const ACCOUNTANT_DASHBOARD_MODULES: OperationalSummaryModule[] = [
   "m3_fees",
-  "m9_accounting",
+  "m11_accounting",
   "m7_hr_payroll",
   "m10_communications",
 ];

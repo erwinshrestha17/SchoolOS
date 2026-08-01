@@ -207,12 +207,12 @@ export function DiscountsWaiversTab({
     ? (selectedInvoiceObj.outstandingAmount ?? 0)
     : 0;
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number | string) => {
     return new Intl.NumberFormat("en-NP", {
       style: "currency",
       currency: "NPR",
       maximumFractionDigits: 0,
-    }).format(amount);
+    }).format(Number(amount));
   };
 
   return (
@@ -484,7 +484,7 @@ export function DiscountsWaiversTab({
                 onChange={(e) => {
                   const val = e.target.value;
                   const inv = invoicesQuery.data?.find((i) => i.id === val);
-                  const rem = inv?.outstandingAmount ?? 0;
+                  const rem = Number(inv?.outstandingAmount ?? 0);
                   setWaiver((prev) => ({
                     ...prev,
                     invoiceId: val,
@@ -496,7 +496,7 @@ export function DiscountsWaiversTab({
               >
                 <option value="">Select Invoice</option>
                 {invoicesQuery.data
-                  ?.filter((inv) => (inv.outstandingAmount ?? 0) > 0)
+                  ?.filter((inv) => Number(inv.outstandingAmount ?? 0) > 0)
                   ?.map((inv) => (
                     <option key={inv.id} value={inv.id}>
                       {inv.invoiceNumber} · {inv.student?.name ?? "Student"}{" "}

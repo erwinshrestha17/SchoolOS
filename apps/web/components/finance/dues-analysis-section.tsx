@@ -1,5 +1,7 @@
 "use client";
 
+import type { DuesReportFilters, DuesReportRow } from "@schoolos/core";
+import { formatBsDate } from "@schoolos/core";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -10,10 +12,17 @@ import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Download } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatBsDate } from "@schoolos/core";
+
+const formatCurrency = (amount: string) =>
+  new Intl.NumberFormat("en-NP", {
+    style: "currency",
+    currency: "NPR",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(amount));
 
 export function DuesAnalysisSection() {
-  const [filters, setFilters] = useState<any>({});
+  const [filters, setFilters] = useState<DuesReportFilters>({});
 
   const duesQuery = useQuery({
     queryKey: ["dues-report", filters],
@@ -38,7 +47,7 @@ export function DuesAnalysisSection() {
   const columns = [
     {
       header: "Student Information",
-      cell: (row: any) => (
+      cell: (row: DuesReportRow) => (
         <div className="flex flex-col">
           <span className="font-bold text-slate-900">{row.studentName}</span>
           <span className="text-[0.65rem] text-slate-500 uppercase tracking-widest font-bold">
@@ -49,7 +58,7 @@ export function DuesAnalysisSection() {
     },
     {
       header: "Fee Head",
-      cell: (row: any) => (
+      cell: (row: DuesReportRow) => (
         <Badge
           variant="info"
           className="h-6 font-bold uppercase tracking-tighter text-[0.65rem]"
@@ -60,18 +69,18 @@ export function DuesAnalysisSection() {
     },
     {
       header: "Financials",
-      cell: (row: any) => (
+      cell: (row: DuesReportRow) => (
         <div className="flex flex-col">
           <div className="flex items-center justify-between gap-4 text-xs">
             <span className="text-slate-400 font-medium">Billed:</span>
             <span className="font-bold text-slate-900">
-              Rs. {row.billed.toLocaleString()}
+              {formatCurrency(row.billed)}
             </span>
           </div>
-          {row.waived > 0 && (
+          {Number(row.waived) > 0 && (
             <div className="flex items-center justify-between gap-4 text-[0.65rem] text-emerald-600 font-bold">
               <span>Waived:</span>
-              <span>- Rs. {row.waived.toLocaleString()}</span>
+              <span>- {formatCurrency(row.waived)}</span>
             </div>
           )}
         </div>
@@ -79,18 +88,19 @@ export function DuesAnalysisSection() {
     },
     {
       header: "Outstanding",
-      cell: (row: any) => (
+      cell: (row: DuesReportRow) => (
         <div className="text-right">
           <span className="text-sm font-black text-danger-600 tabular-nums">
-            Rs. {row.outstanding.toLocaleString()}
+            {formatCurrency(row.outstanding)}
           </span>
         </div>
       ),
     },
     {
       header: "Status",
-      cell: (row: any) => {
-        const isOverdue = row.status === "overdue" && row.outstanding > 0;
+      cell: (row: DuesReportRow) => {
+        const isOverdue =
+          row.status === "overdue" && Number(row.outstanding) > 0;
         return (
           <div className="flex flex-col items-end">
             <StatusBadge
@@ -225,7 +235,7 @@ function SummaryStat({
   isMain = false,
 }: {
   label: string;
-  value: number;
+  value: string;
   color?: string;
   isMain?: boolean;
 }) {
@@ -261,7 +271,7 @@ function SummaryStat({
             isMain ? "text-[var(--color-mod-fees-text)]" : color,
           )}
         >
-          {value.toLocaleString()}
+          {formatCurrency(value).replace(/^NPR\s*/, "")}
         </p>
       </div>
     </div>

@@ -4,6 +4,8 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
+import { createHash } from 'node:crypto';
+import ExcelJS from 'exceljs';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
@@ -12,6 +14,11 @@ import type {
   ReportExportRequest,
   ReportExportResult,
   ReportFormat,
+} from '@schoolos/core';
+import { P0_FINANCIAL_REPORT_CATALOG } from '@schoolos/core';
+import type {
+  FinancialReportClassification,
+  FinancialReportDefinition,
 } from '@schoolos/core';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -46,7 +53,12 @@ interface ReportExportArtifact {
   content: Buffer;
   contentType: string;
   fileName: string;
+  checksum: string;
+  rowCount: number;
 }
+
+const REPORT_EXPORT_EXPIRY_DAYS = 7;
+const REPORT_DEFINITION_VERSION = '1.0';
 
 @Injectable()
 export class ReportsService {
@@ -1308,7 +1320,7 @@ export class ReportsService {
         return closes.map((c) => ({
           'Close Number': c.closeNumber,
           'Opened At': c.openedAt.toISOString(),
-          'Closed At': c.closedAt.toISOString(),
+          'Closed At': c.closedAt?.toISOString() ?? 'Not closed',
           Collector: c.collectorUser?.email || 'N/A',
           'Payment Method': c.paymentMethod || 'All',
           'Gross Collected': Number(c.grossCollected),
@@ -2288,6 +2300,14 @@ export class ReportsService {
   }
 
   register(executor: ReportExecutor) {
+    if (
+      ['finance', 'payroll'].includes(executor.definition.category) &&
+      executor.definition.formats.includes('csv')
+    ) {
+      executor.definition.formats = Array.from(
+        new Set([...executor.definition.formats, 'pdf', 'xlsx']),
+      );
+    }
     this.registry.set(executor.definition.key, executor);
   }
 
@@ -2297,6 +2317,14 @@ export class ReportsService {
       .filter((def) =>
         def.requiredPermissions.every((p) => actor.permissions.includes(p)),
       );
+  }
+
+  listFinancialReportCatalog(actor: AuthContext) {
+    return P0_FINANCIAL_REPORT_CATALOG.filter((definition) =>
+      definition.requiredPermissions.every((permission) =>
+        actor.permissions.includes(permission),
+      ),
+    );
   }
 
   async exportReport(
@@ -2332,6 +2360,12 @@ export class ReportsService {
       actor,
     );
 
+    const exportMetadata = this.buildExportMetadata(
+      reportKey,
+      request.filters,
+      actor,
+    );
+
     if (!request.async) {
       const data = await executor.execute(
         actor,
@@ -2357,6 +2391,8 @@ export class ReportsService {
           format: request.format,
           filters: request.filters,
           requestedBy: actor.userId,
+          ...exportMetadata,
+          rowCount: Array.isArray(data) ? data.length : 0,
         });
 
         return {
@@ -2389,6 +2425,9 @@ export class ReportsService {
         contentType,
         fileName,
         module: executor.definition.module,
+        ...exportMetadata,
+        checksum: createHash('sha256').update(content).digest('hex'),
+        rowCount: Array.isArray(data) ? data.length : 0,
       });
 
       return {
@@ -2406,9 +2445,15 @@ export class ReportsService {
         tenantId: actor.tenantId,
         reportKey,
         format: request.format,
-        filters: request.filters,
+        filters: request.filters as Prisma.InputJsonObject,
+        normalizedParameters:
+          exportMetadata.normalizedParameters as Prisma.InputJsonObject,
         status: 'QUEUED',
         requestedBy: actor.userId,
+        definitionVersion: exportMetadata.definitionVersion,
+        classification: exportMetadata.classification,
+        watermark: exportMetadata.watermark,
+        expiresAt: exportMetadata.expiresAt,
       },
     });
 
@@ -2473,6 +2518,11 @@ export class ReportsService {
       format: input.format,
       reportKey: input.reportKey,
     });
+    const exportMetadata = this.buildExportMetadata(
+      input.reportKey,
+      input.filters,
+      input.actor,
+    );
     const fileAssetId = await this.registerReportExportFile({
       tenantId: input.actor.tenantId,
       requestedBy: input.actor.userId,
@@ -2480,6 +2530,9 @@ export class ReportsService {
       format: input.format,
       filters: input.filters as Prisma.InputJsonValue,
       module: executor.definition.module,
+      classification: exportMetadata.classification,
+      watermark: exportMetadata.watermark,
+      definitionVersion: exportMetadata.definitionVersion,
       ...artifact,
     });
 
@@ -2489,11 +2542,21 @@ export class ReportsService {
         status: 'COMPLETED',
         completedAt: new Date(),
         errorSummary: null,
+        failureDetail: null,
         fileAssetId,
+        normalizedParameters:
+          exportMetadata.normalizedParameters as Prisma.InputJsonObject,
+        rowCount: artifact.rowCount,
+        displayedTotals: {} as Prisma.InputJsonObject,
+        definitionVersion: exportMetadata.definitionVersion,
+        checksum: artifact.checksum,
+        classification: exportMetadata.classification,
+        watermark: exportMetadata.watermark,
+        expiresAt: exportMetadata.expiresAt,
       },
     });
 
-    await this.auditService.record({
+    const auditEvent = await this.auditService.record({
       action: 'export_report',
       resource: 'report',
       resourceId: input.reportKey,
@@ -2506,6 +2569,12 @@ export class ReportsService {
         fileAssetId,
       },
     });
+    if (auditEvent?.id) {
+      await this.prisma.reportExport.update({
+        where: { id: input.exportId },
+        data: { auditEventId: auditEvent.id },
+      });
+    }
   }
 
   async retryExport(
@@ -2564,6 +2633,7 @@ export class ReportsService {
       data: {
         status: 'QUEUED',
         errorSummary: null,
+        failureDetail: null,
         completedAt: null,
         requestedBy: actor.userId,
       },
@@ -2675,6 +2745,31 @@ export class ReportsService {
     return [headers.join(','), ...rows].join('\n');
   }
 
+  private buildExportMetadata(
+    reportKey: string,
+    filters: Record<string, unknown>,
+    actor: AuthContext,
+  ) {
+    const financialDefinition: FinancialReportDefinition | undefined =
+      P0_FINANCIAL_REPORT_CATALOG.find(
+        (definition) => definition.id === reportKey,
+      );
+    const classification: FinancialReportClassification =
+      financialDefinition?.requiresProfessionalVerification
+        ? 'STATUTORY_DRAFT'
+        : 'CONFIDENTIAL';
+    const expiresAt = new Date();
+    expiresAt.setUTCDate(expiresAt.getUTCDate() + REPORT_EXPORT_EXPIRY_DAYS);
+
+    return {
+      normalizedParameters: normalizeReportParameters(filters),
+      definitionVersion: REPORT_DEFINITION_VERSION,
+      classification,
+      watermark: `SchoolOS · ${classification.replaceAll('_', ' ')} · ${actor.tenantSlug}`,
+      expiresAt,
+    };
+  }
+
   private async buildExportArtifact(input: {
     reportKey: string;
     executor: ReportExecutor;
@@ -2683,39 +2778,106 @@ export class ReportsService {
     format: ReportFormat;
   }): Promise<ReportExportArtifact> {
     const fileName = `${input.reportKey}.${input.format}`;
+    let content: Buffer;
+    let contentType: string;
 
     if (input.format === 'json') {
-      return {
-        content: Buffer.from(JSON.stringify(input.data, null, 2)),
-        contentType: 'application/json',
-        fileName,
-      };
-    }
-
-    if (input.format === 'pdf') {
+      content = Buffer.from(JSON.stringify(input.data, null, 2));
+      contentType = 'application/json';
+    } else if (input.format === 'pdf') {
       const logo = await loadSchoolLogoForPdf(
         this.prisma,
         this.fileRegistryService,
         input.actor,
       );
-      return {
-        content: buildTableReportPdf({
-          schoolName: input.actor.tenantSlug,
-          title: input.executor.definition.name,
-          subtitle: `Module: ${input.executor.definition.module}`,
-          rows: input.data,
-          logo,
-        }),
-        contentType: 'application/pdf',
-        fileName,
-      };
+      content = buildTableReportPdf({
+        schoolName: input.actor.tenantSlug,
+        title: input.executor.definition.name,
+        subtitle: `Module: ${input.executor.definition.module}`,
+        rows: input.data,
+        logo,
+      });
+      contentType = 'application/pdf';
+    } else if (input.format === 'xlsx') {
+      content = await this.buildXlsxArtifact(
+        input.executor.definition.name,
+        input.data,
+      );
+      contentType =
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    } else {
+      content = Buffer.from(this.convertToCsv(input.data));
+      contentType = 'text/csv';
     }
 
     return {
-      content: Buffer.from(this.convertToCsv(input.data)),
-      contentType: 'text/csv',
+      content,
+      contentType,
       fileName,
+      checksum: createHash('sha256').update(content).digest('hex'),
+      rowCount: input.data.length,
     };
+  }
+
+  private async buildXlsxArtifact(
+    title: string,
+    data: Array<Record<string, unknown>>,
+  ): Promise<Buffer> {
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'SchoolOS';
+    workbook.subject = title;
+    workbook.created = new Date();
+    const worksheet = workbook.addWorksheet('Report', {
+      views: [{ state: 'frozen', ySplit: 1 }],
+    });
+    const headers = data.length > 0 ? Object.keys(data[0]) : [];
+    worksheet.columns = headers.map((header) => ({
+      header,
+      key: header,
+      width: Math.min(
+        48,
+        Math.max(
+          14,
+          header.length + 2,
+          ...data.slice(0, 200).map((row) =>
+            String(this.stringifyExportCell(row[header])).length + 2,
+          ),
+        ),
+      ),
+    }));
+    worksheet.getRow(1).font = { bold: true };
+    worksheet.getRow(1).alignment = { vertical: 'middle' };
+    for (const row of data) {
+      worksheet.addRow(
+        Object.fromEntries(
+          headers.map((header) => [
+            header,
+            this.stringifyExportCell(row[header]),
+          ]),
+        ),
+      );
+    }
+    if (headers.length) {
+      worksheet.autoFilter = {
+        from: 'A1',
+        to: `${excelColumnName(headers.length)}1`,
+      };
+    }
+
+    const bytes = await workbook.xlsx.writeBuffer();
+    return Buffer.from(bytes);
+  }
+
+  private stringifyExportCell(value: unknown): string | number | boolean {
+    if (value === null || value === undefined) return '';
+    if (
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+    ) {
+      return value;
+    }
+    return JSON.stringify(value);
   }
 
   private async registerReportExportFile(input: {
@@ -2728,6 +2890,11 @@ export class ReportsService {
     contentType: string;
     fileName: string;
     module?: string;
+    checksum: string;
+    rowCount: number;
+    classification: FinancialReportClassification;
+    watermark: string;
+    definitionVersion: string;
   }) {
     const asset = await this.fileRegistryService.registerGeneratedFile({
       tenantId: input.tenantId,
@@ -2741,6 +2908,11 @@ export class ReportsService {
         reportKey: input.reportKey,
         format: input.format,
         filters: input.filters,
+        checksum: input.checksum,
+        rowCount: input.rowCount,
+        classification: input.classification,
+        watermark: input.watermark,
+        definitionVersion: input.definitionVersion,
       },
     });
     return asset.id;
@@ -2750,12 +2922,20 @@ export class ReportsService {
     tenantId: string;
     reportKey: string;
     format: string;
-    filters: Prisma.InputJsonValue;
+    filters: Record<string, unknown>;
     requestedBy: string;
     content?: Buffer;
     contentType?: string;
     fileName?: string;
     module?: string;
+    normalizedParameters: Readonly<Record<string, unknown>>;
+    rowCount: number;
+    displayedTotals?: Readonly<Record<string, string>>;
+    definitionVersion: string;
+    classification: FinancialReportClassification;
+    watermark: string;
+    expiresAt: Date;
+    checksum?: string;
   }) {
     const delegate = (
       this.prisma as unknown as {
@@ -2774,39 +2954,93 @@ export class ReportsService {
         requestedBy: input.requestedBy,
         reportKey: input.reportKey,
         format: input.format,
-        filters: input.filters,
+        filters: input.filters as Prisma.InputJsonObject,
         module: input.module,
         fileName: input.fileName,
         content: input.content,
         contentType: input.contentType,
+        checksum:
+          input.checksum ??
+          createHash('sha256').update(input.content).digest('hex'),
+        rowCount: input.rowCount,
+        classification: input.classification,
+        watermark: input.watermark,
+        definitionVersion: input.definitionVersion,
       });
     }
 
-    await delegate.create({
+    const exportRecord = (await delegate.create({
       data: {
         tenantId: input.tenantId,
         scope: input.tenantId === 'platform' ? 'platform' : 'tenant',
         reportKey: input.reportKey,
         format: input.format,
-        filters: input.filters,
+        filters: input.filters as Prisma.InputJsonObject,
+        normalizedParameters:
+          input.normalizedParameters as Prisma.InputJsonObject,
+        rowCount: input.rowCount,
+        displayedTotals: (input.displayedTotals ?? {}) as Prisma.InputJsonObject,
+        definitionVersion: input.definitionVersion,
+        checksum:
+          input.checksum ??
+          (input.content
+            ? createHash('sha256').update(input.content).digest('hex')
+            : undefined),
+        classification: input.classification,
+        watermark: input.watermark,
+        expiresAt: input.expiresAt,
         fileAssetId,
         requestedBy: input.requestedBy,
         status: 'COMPLETED',
         completedAt: new Date(),
       },
-    });
+    })) as { id?: string } | undefined;
+
+    if (exportRecord?.id) {
+      const auditEvent = await this.auditService.record({
+        action: 'record_report_export',
+        resource: 'report_export',
+        resourceId: exportRecord.id,
+        tenantId: input.tenantId,
+        userId: input.requestedBy,
+        after: {
+          reportKey: input.reportKey,
+          format: input.format,
+          checksum: input.checksum,
+          rowCount: input.rowCount,
+          fileAssetId,
+          expiresAt: input.expiresAt.toISOString(),
+        },
+      });
+      if (auditEvent?.id) {
+        await this.prisma.reportExport.update({
+          where: { id: exportRecord.id },
+          data: { auditEventId: auditEvent.id },
+        });
+      }
+    }
   }
 
   async getExportHistory(
-    tenantId: string,
+    actor: AuthContext,
     query: { page?: number | string; limit?: number | string },
   ) {
-    await this.plansService.assertTenantActive(tenantId);
+    await this.plansService.assertTenantActive(actor.tenantId);
     const page = normalizePositiveInteger(query.page, 1);
     const limit = Math.min(normalizePositiveInteger(query.limit, 25), 100);
     const skip = (page - 1) * limit;
 
-    const where: Prisma.ReportExportWhereInput = { tenantId };
+    const allowedReportKeys = Array.from(this.registry.values())
+      .filter((executor) =>
+        executor.definition.requiredPermissions.every((permission) =>
+          actor.permissions.includes(permission),
+        ),
+      )
+      .map((executor) => executor.definition.key);
+    const where: Prisma.ReportExportWhereInput = {
+      tenantId: actor.tenantId,
+      reportKey: { in: allowedReportKeys },
+    };
 
     const [items, total] = await Promise.all([
       this.prisma.reportExport.findMany({
@@ -2844,12 +3078,40 @@ export class ReportsService {
       throw new NotFoundException('Report snapshot file is not available');
     }
 
+    const executor = this.registry.get(exportRecord.reportKey);
+    if (
+      !executor ||
+      !executor.definition.requiredPermissions.every((permission) =>
+        actor.permissions.includes(permission),
+      ) ||
+      !actor.permissions.includes('reports:export')
+    ) {
+      throw new ForbiddenException(
+        'You no longer have permission to download this report snapshot',
+      );
+    }
+
+    if (exportRecord.expiresAt && exportRecord.expiresAt <= new Date()) {
+      throw new ForbiddenException('This report snapshot has expired');
+    }
+
     const { asset, content } =
       await this.fileRegistryService.getProtectedDownload(
         actor.tenantId,
         exportRecord.fileAssetId,
         actor.userId,
       );
+
+    if (exportRecord.checksum) {
+      const actualChecksum = createHash('sha256')
+        .update(content)
+        .digest('hex');
+      if (actualChecksum !== exportRecord.checksum) {
+        throw new ForbiddenException(
+          'This report snapshot failed its integrity check',
+        );
+      }
+    }
 
     await this.auditService.record({
       action: 'download_report_snapshot',
@@ -2881,7 +3143,12 @@ function normalizePositiveInteger(
 }
 
 function isReportFormat(value: string): value is ReportFormat {
-  return value === 'csv' || value === 'pdf' || value === 'json';
+  return (
+    value === 'csv' ||
+    value === 'pdf' ||
+    value === 'xlsx' ||
+    value === 'json'
+  );
 }
 
 function coerceReportFilters(value: Prisma.JsonValue): Record<string, unknown> {
@@ -2890,4 +3157,36 @@ function coerceReportFilters(value: Prisma.JsonValue): Record<string, unknown> {
   }
 
   return value;
+}
+
+function normalizeReportParameters(
+  value: Record<string, unknown>,
+): Readonly<Record<string, unknown>> {
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([, entryValue]) => entryValue !== undefined)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entryValue]) => [key, normalizeReportParameterValue(entryValue)]),
+  );
+}
+
+function normalizeReportParameterValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(normalizeReportParameterValue);
+  }
+  if (value && typeof value === 'object') {
+    return normalizeReportParameters(value as Record<string, unknown>);
+  }
+  return value;
+}
+
+function excelColumnName(columnNumber: number): string {
+  let result = '';
+  let cursor = columnNumber;
+  while (cursor > 0) {
+    cursor -= 1;
+    result = String.fromCharCode(65 + (cursor % 26)) + result;
+    cursor = Math.floor(cursor / 26);
+  }
+  return result;
 }

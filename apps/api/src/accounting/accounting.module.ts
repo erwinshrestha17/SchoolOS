@@ -20,6 +20,7 @@ import { M9TemplateService } from './m9-template.service';
 import { AccountingSourceMappingService } from './accounting-source-mapping.service';
 import { AccountingBudgetController } from './accounting-budget.controller';
 import { AccountingBudgetService } from './accounting-budget.service';
+import { AdvancedOperationsModule } from '../advanced-operations/advanced-operations.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { AccountingBudgetService } from './accounting-budget.service';
     AccountingPostingModule,
     FileRegistryModule,
     StorageModule,
+    AdvancedOperationsModule,
     BullModule.registerQueue({
       name: 'accounting-reports',
     }),

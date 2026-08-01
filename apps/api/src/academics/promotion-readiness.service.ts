@@ -152,7 +152,7 @@ export class PromotionReadinessService {
           student.id,
           actor,
         );
-        const outstandingBalance = ledger.outstandingBalance;
+        const outstandingBalance = Number(ledger.outstandingBalance);
         return this.buildReadinessRow(student, reportCard, outstandingBalance);
       }),
     );
@@ -230,7 +230,7 @@ export class PromotionReadinessService {
       dto.studentId,
       actor,
     );
-    const outstandingBalance = ledger.outstandingBalance;
+    const outstandingBalance = Number(ledger.outstandingBalance);
 
     const readiness = this.buildReadinessRow(
       student,

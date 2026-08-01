@@ -134,6 +134,40 @@ void main() {
     expect(find.text('Hide breakdown'), findsOneWidget);
   });
 
+  testWidgets('expanded records show approved waivers and refunds', (
+    tester,
+  ) async {
+    final invoice = Map<String, dynamic>.from(_threeMonths[1])
+      ..['waivers'] = [
+        {
+          'id': 'waiver-1',
+          'amount': '500.00',
+          'reason': 'Sibling discount',
+          'approvedAt': '2026-07-10T00:00:00.000Z',
+        },
+      ]
+      ..['refunds'] = [
+        {
+          'id': 'refund-1',
+          'amount': '250.00',
+          'reason': 'Duplicate collection corrected',
+          'refundedAt': '2026-07-15T00:00:00.000Z',
+        },
+      ];
+    await pump(tester, _FeesApiClient(invoices: [invoice]));
+
+    await tester.tap(find.text('View fee breakdown'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Approved discounts and waivers'), findsOneWidget);
+    expect(find.text('Sibling discount'), findsOneWidget);
+    expect(find.text('Refunds and corrections'), findsOneWidget);
+    expect(
+      find.textContaining('Duplicate collection corrected'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('a bill the school did not itemise says so', (tester) async {
     await pump(
       tester,

@@ -24,8 +24,11 @@ describe('MobileService', () => {
     invoice: MockModel<'findMany'>;
     invoiceLine: MockModel<'findMany'>;
     payment: MockModel<'findMany'>;
+    paymentAllocation: MockModel<'findMany'>;
     receipt: MockModel<'findMany'>;
     feeHead: MockModel<'findMany'>;
+    feeWaiver: MockModel<'findMany'>;
+    paymentRefund: MockModel<'findMany'>;
     notificationDelivery: MockModel<'findMany' | 'findFirst' | 'count'>;
     notificationReadReceipt: MockModel<'upsert' | 'createMany'>;
     homeworkAssignment: MockModel<'findMany' | 'findFirst'>;
@@ -117,10 +120,19 @@ describe('MobileService', () => {
       payment: {
         findMany: jest.fn().mockResolvedValue([]),
       },
+      paymentAllocation: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       receipt: {
         findMany: jest.fn().mockResolvedValue([]),
       },
       feeHead: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      feeWaiver: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      paymentRefund: {
         findMany: jest.fn().mockResolvedValue([]),
       },
       notificationDelivery: {
@@ -503,7 +515,9 @@ describe('MobileService', () => {
 
     await expect(
       service.getStudentFeesSummary('student-1', actor),
-    ).resolves.toEqual(expect.objectContaining({ totalOutstanding: 0 }));
+    ).resolves.toEqual(
+      expect.objectContaining({ totalOutstanding: '0.00' }),
+    );
     await expect(
       service.getStudentFeesSummary('student-1', actor),
     ).rejects.toBeInstanceOf(ForbiddenException);
@@ -789,30 +803,30 @@ describe('MobileService', () => {
     );
     expect(summary).toEqual({
       status: 'PARTIAL',
-      totalAmount: 325.25,
-      paidAmount: 150,
-      totalOutstanding: 175.25,
+      totalAmount: '325.25',
+      paidAmount: '150.00',
+      totalOutstanding: '175.25',
       overdueCount: 1,
       nextDueDate: '2026-01-10T00:00:00.000Z',
       recentInvoices: [
         expect.objectContaining({
           id: 'invoice-1',
-          paidAmount: 50,
-          outstandingAmount: 150,
+          paidAmount: '50.00',
+          outstandingAmount: '150.00',
           isOverdue: true,
           receipts: [],
         }),
         expect.objectContaining({
           id: 'invoice-2',
-          paidAmount: 0,
-          outstandingAmount: 25.25,
+          paidAmount: '0.00',
+          outstandingAmount: '25.25',
           isOverdue: false,
           receipts: [],
         }),
         expect.objectContaining({
           id: 'invoice-3',
-          paidAmount: 100,
-          outstandingAmount: 0,
+          paidAmount: '100.00',
+          outstandingAmount: '0.00',
           isOverdue: false,
           receipts: [
             {
@@ -821,7 +835,7 @@ describe('MobileService', () => {
               invoiceId: 'invoice-3',
               invoiceNumber: 'INV-003',
               paymentId: 'payment-3',
-              amount: 100,
+              amount: '100.00',
               method: 'CASH',
               paidAt: '2026-02-01T00:00:00.000Z',
               issuedAt: '2026-02-01T00:01:00.000Z',
@@ -836,12 +850,13 @@ describe('MobileService', () => {
           invoiceId: 'invoice-3',
           invoiceNumber: 'INV-003',
           paymentId: 'payment-3',
-          amount: 100,
+          amount: '100.00',
           method: 'CASH',
           paidAt: '2026-02-01T00:00:00.000Z',
           issuedAt: '2026-02-01T00:01:00.000Z',
         },
       ],
+      recentRefunds: [],
     });
   });
 
@@ -867,9 +882,9 @@ describe('MobileService', () => {
         status: 'ISSUED',
         dueDate: new Date('2026-08-08T00:00:00.000Z'),
         issuedAt: new Date('2026-07-10T00:00:00.000Z'),
-        subtotal: 4200,
-        vatAmount: 300,
-        totalAmount: 4500,
+        subtotal: '4200.00',
+        vatAmount: '300.00',
+        totalAmount: '4500.00',
       },
     ]);
     prisma.invoiceLine.findMany.mockResolvedValue([
@@ -914,27 +929,27 @@ describe('MobileService', () => {
     );
     expect(summary.recentInvoices[0]).toEqual(
       expect.objectContaining({
-        subtotal: 4200,
-        vatAmount: 300,
-        totalAmount: 4500,
+        subtotal: '4200.00',
+        vatAmount: '300.00',
+        totalAmount: '4500.00',
         lines: [
           {
             id: 'line-1',
             description: 'Monthly tuition',
             feeHead: { code: 'TUITION', name: 'Tuition Fee' },
             quantity: 1,
-            unitAmount: 3000,
-            vatAmount: 0,
-            totalAmount: 3000,
+            unitAmount: '3000.00',
+            vatAmount: '0.00',
+            totalAmount: '3000.00',
           },
           {
             id: 'line-2',
             description: 'Route A',
             feeHead: { code: 'TRANSPORT', name: 'Transport Fee' },
             quantity: 1,
-            unitAmount: 1200,
-            vatAmount: 300,
-            totalAmount: 1500,
+            unitAmount: '1200.00',
+            vatAmount: '300.00',
+            totalAmount: '1500.00',
           },
         ],
       }),
@@ -2038,12 +2053,13 @@ describe('MobileService', () => {
     });
     jest.spyOn(service, 'getStudentFeesSummary').mockResolvedValue({
       status: 'DUE',
-      totalAmount: 1000,
-      paidAmount: 0,
-      totalOutstanding: 1000,
+      totalAmount: '1000.00',
+      paidAmount: '0.00',
+      totalOutstanding: '1000.00',
       overdueCount: 1,
       nextDueDate: '2026-07-20T00:00:00.000Z',
       recentReceipts: [],
+      recentRefunds: [],
       recentInvoices: [
         {
           id: 'invoice-1',
@@ -2051,14 +2067,17 @@ describe('MobileService', () => {
           status: 'ISSUED',
           dueDate: '2026-07-20T00:00:00.000Z',
           issuedAt: '2026-07-01T00:00:00.000Z',
-          subtotal: 1000,
-          vatAmount: 0,
-          totalAmount: 1000,
-          paidAmount: 0,
-          outstandingAmount: 1000,
+          subtotal: '1000.00',
+          vatAmount: '0.00',
+          totalAmount: '1000.00',
+          paidAmount: '0.00',
+          outstandingAmount: '1000.00',
           isOverdue: true,
           lines: [],
           receipts: [],
+          waivers: [],
+          refunds: [],
+          allocationHistory: [],
         },
       ],
     });
@@ -2229,12 +2248,13 @@ describe('MobileService', () => {
       .spyOn(service, 'getStudentFeesSummary')
       .mockResolvedValue({
         status: 'PAID',
-        totalAmount: 0,
-        paidAmount: 0,
-        totalOutstanding: 0,
+        totalAmount: '0.00',
+        paidAmount: '0.00',
+        totalOutstanding: '0.00',
         overdueCount: 0,
         nextDueDate: null,
         recentReceipts: [],
+        recentRefunds: [],
         recentInvoices: [],
       });
     const homework = jest.spyOn(service, 'getStudentHomework');
@@ -4005,17 +4025,18 @@ describe('MobileService', () => {
         service.getStudentFeesSummary('student-1', actor),
       ).resolves.toEqual({
         status: 'PAID',
-        totalAmount: 0,
-        paidAmount: 0,
-        totalOutstanding: 0,
+        totalAmount: '0.00',
+        paidAmount: '0.00',
+        totalOutstanding: '0.00',
         overdueCount: 0,
         nextDueDate: null,
         recentInvoices: [],
         recentReceipts: [],
+        recentRefunds: [],
       });
 
       expect(prisma.invoiceLine.findMany).not.toHaveBeenCalled();
-      expect(prisma.payment.findMany).not.toHaveBeenCalled();
+      expect(prisma.paymentAllocation.findMany).not.toHaveBeenCalled();
       expect(prisma.receipt.findMany).not.toHaveBeenCalled();
       expect(prisma.feeHead.findMany).not.toHaveBeenCalled();
     });
@@ -4047,13 +4068,18 @@ describe('MobileService', () => {
           createdAt: new Date('2026-06-01T00:00:00.000Z'),
         },
       ]);
-      prisma.payment.findMany.mockResolvedValue([
+      prisma.paymentAllocation.findMany.mockResolvedValue([
         {
-          id: 'payment-1',
+          id: 'allocation-1',
           invoiceId: 'invoice-1',
           amount: 1000,
-          method: 'CASH',
-          paidAt: new Date('2026-06-15T00:00:00.000Z'),
+          allocationType: 'INVOICE',
+          allocatedAt: new Date('2026-06-15T00:00:00.000Z'),
+          payment: {
+            id: 'payment-1',
+            method: 'CASH',
+            paidAt: new Date('2026-06-15T00:00:00.000Z'),
+          },
         },
       ]);
       prisma.feeHead.findMany.mockResolvedValue([
@@ -4078,7 +4104,7 @@ describe('MobileService', () => {
       expect(result.recentReceipts[0]?.receiptNumber).toBe('REC-001');
       expect(prisma.invoice.findMany).toHaveBeenCalledTimes(1);
       expect(prisma.invoiceLine.findMany).toHaveBeenCalledTimes(1);
-      expect(prisma.payment.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.paymentAllocation.findMany).toHaveBeenCalledTimes(1);
       expect(prisma.feeHead.findMany).toHaveBeenCalledTimes(1);
       expect(prisma.receipt.findMany).toHaveBeenCalledTimes(1);
     });
@@ -4129,7 +4155,7 @@ describe('MobileService', () => {
           createdAt: new Date('2026-07-01T00:00:00.000Z'),
         },
       ]);
-      prisma.payment.findMany.mockResolvedValue([]);
+      prisma.paymentAllocation.findMany.mockResolvedValue([]);
       prisma.feeHead.findMany.mockResolvedValue([]);
 
       const result = await service.getStudentFeesSummary('student-1', actor);

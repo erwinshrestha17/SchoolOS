@@ -58,6 +58,7 @@ import {
   CreateAccountingSourceMappingDto,
   ListAccountingSourceMappingsQueryDto,
 } from './dto/accounting-source-mapping.dto';
+import { ListPostingBatchesQueryDto } from './dto/list-posting-batches.query.dto';
 
 @Controller('accounting')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
@@ -74,6 +75,24 @@ export class AccountingController {
   @Permissions('accounting:reports:read')
   dashboardSummary(@CurrentAuth() auth: AuthContext) {
     return this.accountingService.getDashboardSummary(auth);
+  }
+
+  @Get('posting-batches')
+  @Permissions('accounting:posting-batches:read')
+  listPostingBatches(
+    @Query() query: ListPostingBatchesQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.listPostingBatches(query, auth);
+  }
+
+  @Post('posting-batches/:id/retry')
+  @Permissions('accounting:posting-batches:retry')
+  retryPostingBatch(
+    @Param('id') id: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.retryPostingBatch(id, auth);
   }
 
   @Get('source-mappings')

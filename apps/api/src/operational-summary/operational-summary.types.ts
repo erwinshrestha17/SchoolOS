@@ -9,7 +9,7 @@ export const OPERATIONAL_SUMMARY_MODULES = [
   'm8a_library',
   'm8b_transport',
   'm8c_canteen',
-  'm9_accounting',
+  'm11_accounting',
   'm10_communications',
   'm11_intelligence',
   'm12_learning',

@@ -520,7 +520,9 @@ class _BillBreakdown extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!expanded) return const SizedBox.shrink();
 
-    if (!invoice.isItemised) {
+    if (!invoice.isItemised &&
+        invoice.waivers.isEmpty &&
+        invoice.refunds.isEmpty) {
       return const Padding(
         padding: EdgeInsets.only(top: 8),
         child: Text(
@@ -555,6 +557,52 @@ class _BillBreakdown extends StatelessWidget {
               if (invoice.vatAmount > 0) ...[
                 _BreakdownRow(label: 'VAT', amount: _money(invoice.vatAmount)),
                 const SizedBox(height: 8),
+              ],
+              if (invoice.waivers.isNotEmpty) ...[
+                const Divider(height: 12),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Approved discounts and waivers',
+                    style: TextStyle(
+                      color: ParentPortalColors.navy,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                for (final waiver in invoice.waivers)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _BreakdownRow(
+                      label: waiver.reason,
+                      amount: '-${_money(waiver.amount)}',
+                    ),
+                  ),
+              ],
+              if (invoice.refunds.isNotEmpty) ...[
+                const Divider(height: 12),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Refunds and corrections',
+                    style: TextStyle(
+                      color: ParentPortalColors.navy,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                for (final refund in invoice.refunds)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _BreakdownRow(
+                      label: refund.refundedAt == null
+                          ? refund.reason
+                          : '${refund.reason} · ${_date(refund.refundedAt)}',
+                      amount: _money(refund.amount),
+                    ),
+                  ),
               ],
               const Divider(height: 12),
               _BreakdownRow(
@@ -813,7 +861,10 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
                   label: const Text('View receipt'),
                 ),
               OutlinedButton.icon(
-                onPressed: invoice.isItemised
+                onPressed:
+                    invoice.isItemised ||
+                        invoice.waivers.isNotEmpty ||
+                        invoice.refunds.isNotEmpty
                     ? () => setState(() => _showBreakdown = !_showBreakdown)
                     : null,
                 icon: Icon(
@@ -822,7 +873,9 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
                       : Icons.keyboard_arrow_down_rounded,
                 ),
                 label: Text(
-                  invoice.isItemised
+                  invoice.isItemised ||
+                          invoice.waivers.isNotEmpty ||
+                          invoice.refunds.isNotEmpty
                       ? _showBreakdown
                             ? 'Hide breakdown'
                             : 'View fee breakdown'

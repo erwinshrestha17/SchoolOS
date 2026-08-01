@@ -352,16 +352,21 @@ export function AccountingDashboardView() {
               />
             ) : (
               <ReportTable
-                headers={["Date", "Number", "Narration", "Amount"]}
+                columns={[
+                  { id: "date", label: "Date", width: 150 },
+                  { id: "number", label: "Number", width: 160 },
+                  { id: "narration", label: "Narration", width: 260 },
+                  { id: "amount", label: "Amount", align: "right" },
+                ]}
                 rows={(summaryQuery.data?.recentJournals ?? []).map(
                   (entry) => ({
                     id: entry.id,
-                    cells: [
-                      { value: entry.entryDate, type: "date" },
-                      { value: entry.entryNumber, bold: true },
-                      { value: entry.narration },
-                      { value: entry.totalDebit, type: "currency" },
-                    ],
+                    cells: {
+                      date: { value: entry.entryDate, type: "date" },
+                      number: { value: entry.entryNumber, bold: true },
+                      narration: { value: entry.narration },
+                      amount: { value: entry.totalDebit, type: "currency" },
+                    },
                   }),
                 )}
               />

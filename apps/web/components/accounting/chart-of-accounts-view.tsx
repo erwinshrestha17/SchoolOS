@@ -11,11 +11,12 @@ import { useState } from 'react';
 import { OpeningBalanceDialog } from './opening-balance-dialog';
 import { ConfirmDialog } from '../ui/confirm-dialog';
 import { Toast, type ToastTone } from '../ui/toast';
+import type { FiscalYearSummary } from '@schoolos/core';
 
 export function ChartOfAccountsView() {
   const queryClient = useQueryClient();
   const [openingBalOpen, setOpeningBalOpen] = useState(false);
-  const [selectedFy, setSelectedFy] = useState<any>(null);
+  const [selectedFy, setSelectedFy] = useState<FiscalYearSummary | null>(null);
   const [seedConfirmOpen, setSeedConfirmOpen] = useState(false);
   const [notice, setNotice] = useState<{
     title: string;
@@ -118,15 +119,20 @@ export function ChartOfAccountsView() {
         ) : null}
 
         <ReportTable
-          headers={['Code', 'Name', 'Group', 'Kind']}
+          columns={[
+            { id: 'code', label: 'Code', width: 120 },
+            { id: 'name', label: 'Name', width: 240 },
+            { id: 'group', label: 'Group' },
+            { id: 'kind', label: 'Kind' },
+          ]}
           rows={(accountsQuery.data ?? []).map((account) => ({
             id: account.id,
-            cells: [
-              { value: account.code, bold: true },
-              { value: account.name },
-              { value: account.type },
-              { value: account.isSystem ? 'System' : 'Custom' }
-            ],
+            cells: {
+              code: { value: account.code, bold: true },
+              name: { value: account.name },
+              group: { value: account.type },
+              kind: { value: account.isSystem ? 'System' : 'Custom' },
+            },
           }))}
         />
       </SectionCard>

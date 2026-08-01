@@ -9,7 +9,7 @@ export const OPERATIONAL_SUMMARY_MODULES = [
   'm8a_library',
   'm8b_transport',
   'm8c_canteen',
-  'm9_accounting',
+  'm11_accounting',
   'm10_communications',
   'm11_intelligence',
   'm12_learning',
@@ -17,6 +17,15 @@ export const OPERATIONAL_SUMMARY_MODULES = [
 
 export type OperationalSummaryModule =
   (typeof OPERATIONAL_SUMMARY_MODULES)[number];
+
+/** Persisted/read compatibility only. New finance surfaces emit m11_accounting. */
+export type LegacyOperationalSummaryModule = 'm9_accounting';
+
+export function normalizeOperationalSummaryModule(
+  module: OperationalSummaryModule | LegacyOperationalSummaryModule,
+): OperationalSummaryModule {
+  return module === 'm9_accounting' ? 'm11_accounting' : module;
+}
 
 export const OPERATIONAL_SUMMARY_ROUTE_MODULES = [
   'students',

@@ -36,6 +36,11 @@ export const systemRoleDefinitions = [
   { name: "parent", description: "System preset role for parent" },
   { name: "accountant", description: "System preset role for accountant" },
   {
+    name: "financial_auditor",
+    description:
+      "Time-bounded read-only financial evidence and protected export access",
+  },
+  {
     name: "hr_manager",
     description: "System preset role for HR/staff administration",
   },
@@ -142,7 +147,42 @@ const PRINCIPAL_EXCLUDED_ACCOUNTING_OPERATIONAL_KEYS = [
 const PRINCIPAL_EXCLUDED_KEYS = [
   ...PRINCIPAL_EXCLUDED_SETTINGS_KEYS,
   ...PRINCIPAL_EXCLUDED_ACCOUNTING_OPERATIONAL_KEYS,
+  "fees:manage",
+  "fees:bill",
+  "fees:discount",
+  "fees:adjust",
+  "payments:collect",
+  "payments:refund",
+  "payments:reverse",
+  "payments:close",
+  "receipts:manage",
+  "ledger:read",
+  "payroll:read",
+  "payroll:manage",
+  "payroll:salary:read",
+  "payroll:salary:write",
+  "payroll:run:create",
+  "payroll:run:read",
+  "payroll:run:review",
+  "payroll:run:approve",
+  "payroll:run:post",
+  "payroll:run:pay",
+  "payroll:payslip:read",
+  "payroll:payslip:generate",
+  "payroll:reports:read",
+  "payroll:exports:create",
+  "finance:approvals:read",
+  "finance:approvals:decide",
 ];
+
+const ADMIN_EXCLUDED_FINANCE_KEYS = TENANT_PERMISSION_KEYS.filter((key) => {
+  const [root] = key.split(":");
+  return (
+    ["accounting", "fees", "payments", "receipts", "ledger", "payroll", "finance"].includes(root) ||
+    key === "settings:finance:manage" ||
+    key === "settings:accounting:manage"
+  );
+});
 
 const SCHOOL_CONFIG_OWNER_PERMISSION_KEYS = [
   "settings:read_public",
@@ -173,7 +213,9 @@ const SCHOOL_CONFIG_OWNER_PERMISSION_KEYS = [
 ];
 
 export const systemRolePermissions: Record<string, string[]> = {
-  admin: [...TENANT_PERMISSION_KEYS],
+  admin: TENANT_PERMISSION_KEYS.filter(
+    (key) => !ADMIN_EXCLUDED_FINANCE_KEYS.includes(key),
+  ),
   school_config_owner: [...SCHOOL_CONFIG_OWNER_PERMISSION_KEYS],
   principal: TENANT_PERMISSION_KEYS.filter(
     (key) => !PRINCIPAL_EXCLUDED_KEYS.includes(key),
@@ -325,23 +367,12 @@ export const systemRolePermissions: Record<string, string[]> = {
     "accounting:read",
     "accounting:close",
     "accounting:reverse",
-    "payroll:read",
-    "payroll:manage",
     "settings:read_public",
     "settings:read",
     "reports:read",
     "reports:export",
-    "payroll:salary:read",
-    "payroll:salary:write",
-    "payroll:run:create",
-    "payroll:run:read",
-    "payroll:run:review",
-    "payroll:run:post",
-    "payroll:run:pay",
-    "payroll:payslip:read",
-    "payroll:payslip:generate",
-    "payroll:reports:read",
-    "payroll:exports:create",
+    "accounting:payroll-handoff:read",
+    "accounting:payroll-handoff:post",
     "accounting:accounts:read",
     "accounting:accounts:write",
     "accounting:fiscal:manage",
@@ -355,6 +386,7 @@ export const systemRolePermissions: Record<string, string[]> = {
     "accounting:journals:reverse",
     "accounting:journals:cancel",
     "accounting:reports:read",
+    "accounting:audit:read",
     "accounting:reports:trial-balance",
     "accounting:reports:general-ledger",
     "accounting:reports:cash-book",
@@ -368,10 +400,48 @@ export const systemRolePermissions: Record<string, string[]> = {
     "accounting:settings:read",
     "accounting:settings:update",
     "accounting:exports:create",
+    "accounting:posting-batches:read",
+    "accounting:posting-batches:retry",
+    "accounting:expenses:read",
+    "accounting:expenses:write",
+    "accounting:vendors:read",
+    "accounting:vendors:write",
+    "accounting:payables:read",
+    "accounting:payables:write",
+    "accounting:reconciliation:read",
+    "accounting:reconciliation:manage",
+    "accounting:reconciliation:finalize",
     "settings:finance:manage",
     "settings:accounting:manage",
     "service_requests:read",
     "service_requests:manage",
+  ],
+  financial_auditor: [
+    "settings:read_public",
+    "settings:read",
+    "roles:read",
+    "reports:read",
+    "reports:export",
+    "receipts:read",
+    "accounting:read",
+    "accounting:accounts:read",
+    "accounting:journals:read",
+    "accounting:reports:read",
+    "accounting:audit:read",
+    "accounting:reports:trial-balance",
+    "accounting:reports:general-ledger",
+    "accounting:reports:cash-book",
+    "accounting:reports:income-statement",
+    "accounting:reports:balance-sheet",
+    "accounting:reports:tax-summary",
+    "accounting:settings:read",
+    "accounting:exports:create",
+    "accounting:posting-batches:read",
+    "accounting:expenses:read",
+    "accounting:vendors:read",
+    "accounting:payables:read",
+    "accounting:reconciliation:read",
+    "accounting:payroll-handoff:read",
   ],
   hr_manager: [
     "roles:read",

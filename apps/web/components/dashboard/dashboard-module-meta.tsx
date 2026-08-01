@@ -109,7 +109,7 @@ export const MODULE_DEFINITIONS: Record<
     accentClass:
       "text-[color:var(--color-mod-canteen-text)] bg-[var(--color-mod-canteen-soft)] border-[color:var(--color-mod-canteen-border)]",
   },
-  m9_accounting: {
+  m11_accounting: {
     label: "Accounting & Finance",
     shortLabel: "Accounting",
     icon: Landmark,
@@ -158,7 +158,7 @@ const MODULE_WORKSPACE_ROUTES: Partial<
   m8a_library: "/dashboard/library",
   m8b_transport: "/dashboard/transport",
   m8c_canteen: "/dashboard/canteen",
-  m9_accounting: "/dashboard/accounting",
+  m11_accounting: "/dashboard/accounting",
   m10_communications: "/dashboard/notices",
   m12_learning: "/dashboard/learning",
 };
@@ -320,7 +320,7 @@ export const ACTIVITY_EVENT_LABELS: Record<OperationalSummaryModule, string> =
     m8a_library: "Library book issued",
     m8b_transport: "Transport trip recorded",
     m8c_canteen: "Canteen sale recorded",
-    m9_accounting: "Journal entry recorded",
+    m11_accounting: "Journal entry recorded",
     m10_communications: "Notice delivery processed",
     m11_intelligence: "Activity recorded",
     m12_learning: "Learning session created",

@@ -40,7 +40,7 @@ export function JournalEntriesView() {
 
   const activePeriod = (fiscalYearsQuery.data ?? [])
     .find((y) => y.status === "OPEN")
-    ?.periods?.find((p: any) => p.status === "OPEN");
+    ?.periods?.find((period) => period.status === "OPEN");
 
   const handleCreateVoucher = () => {
     if (!activePeriod) {
@@ -112,23 +112,25 @@ export function JournalEntriesView() {
           />
         ) : (
           <ReportTable
-            headers={[
-              "Date",
-              "Number",
-              "Narration",
-              "Type",
-              "Status",
-              "Amount",
-              "Action",
+            columns={[
+              { id: "date", label: "Date", width: 150 },
+              { id: "number", label: "Number", width: 160 },
+              { id: "narration", label: "Narration", width: 280 },
+              { id: "type", label: "Type" },
+              { id: "status", label: "Status" },
+              { id: "amount", label: "Amount", align: "right" },
+              { id: "action", label: "Action", align: "center", width: 96 },
             ]}
             rows={(journalsQuery.data ?? []).map((entry) => ({
               id: entry.id,
-              cells: [
-                { value: entry.entryDate, type: "date" },
-                { value: entry.entryNumber, bold: true },
-                { value: entry.narration },
-                { value: entry.sourceType },
-                {
+              accessibleLabel: `Open journal ${entry.entryNumber ?? entry.id}`,
+              onActivate: () => setSelectedEntry(entry),
+              cells: {
+                date: { value: entry.entryDate, type: "date" },
+                number: { value: entry.entryNumber, bold: true },
+                narration: { value: entry.narration },
+                type: { value: entry.sourceType },
+                status: {
                   value: (
                     <span
                       className={cn(
@@ -140,11 +142,11 @@ export function JournalEntriesView() {
                     </span>
                   ),
                 },
-                {
+                amount: {
                   value: entry.totalDebit || entry.totalCredit || 0,
                   type: "currency",
                 },
-                {
+                action: {
                   value: (
                     <Button
                       type="button"
@@ -158,7 +160,7 @@ export function JournalEntriesView() {
                     </Button>
                   ),
                 },
-              ],
+              },
             }))}
           />
         )}

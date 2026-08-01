@@ -24,6 +24,7 @@ import type {
   BankStatementImportLine,
   BankStatementImportPreview,
   BankStatementImportJobStatus,
+  BankStatementLineSummary,
 } from '@schoolos/core';
 
 const BANK_IMPORT_SYNC_ROW_LIMIT = 500;
@@ -347,16 +348,22 @@ export function BankReconciliationWorkspace() {
         >
           <div className="space-y-4" data-testid="bank-import-preview">
             <ReportTable
-              headers={['Date', 'Description', 'Reference', 'Debit', 'Credit']}
+              columns={[
+                { id: 'date', label: 'Date', width: 150 },
+                { id: 'description', label: 'Description', width: 280 },
+                { id: 'reference', label: 'Reference', width: 180 },
+                { id: 'debit', label: 'Debit', align: 'right' },
+                { id: 'credit', label: 'Credit', align: 'right' },
+              ]}
               rows={importPreview.rows.map((row, index) => ({
                 id: `${importPreview.fingerprint}-${index}`,
-                cells: [
-                  { value: row.statementDate, type: 'date' },
-                  { value: row.description },
-                  { value: row.reference ?? '—' },
-                  { value: row.debitAmount, type: 'currency' },
-                  { value: row.creditAmount, type: 'currency' },
-                ],
+                cells: {
+                  date: { value: row.statementDate, type: 'date' },
+                  description: { value: row.description },
+                  reference: { value: row.reference ?? '—' },
+                  debit: { value: row.debitAmount, type: 'currency' },
+                  credit: { value: row.creditAmount, type: 'currency' },
+                },
               }))}
             />
             <div className="flex justify-end gap-2">
@@ -542,28 +549,33 @@ export function BankReconciliationWorkspace() {
           >
             <div className="max-h-[600px] overflow-y-auto">
               <ReportTable
-                headers={['Date', 'Description', 'Amount', 'Action']}
-                rows={(unreconciledQuery.data ?? []).map((stmt: any) => ({
+                columns={[
+                  { id: 'date', label: 'Date', width: 150 },
+                  { id: 'description', label: 'Description', width: 260 },
+                  { id: 'amount', label: 'Amount', align: 'right' },
+                  { id: 'action', label: 'Action', align: 'center', width: 100 },
+                ]}
+                rows={(unreconciledQuery.data ?? []).map((stmt: BankStatementLineSummary) => ({
                   id: stmt.id,
                   className:
                     matching === stmt.id
                       ? 'bg-[var(--color-mod-accounting-bg)] ring-2 ring-[var(--color-mod-accounting-accent)] ring-inset'
                       : '',
-                  cells: [
-                    { value: stmt.statementDate, type: 'date' },
-                    { value: stmt.description },
-                    {
+                  cells: {
+                    date: { value: stmt.statementDate, type: 'date' },
+                    description: { value: stmt.description },
+                    amount: {
                       value:
-                        stmt.debitAmount > 0
+                        Number(stmt.debitAmount) > 0
                           ? stmt.debitAmount
-                          : -stmt.creditAmount,
+                          : `-${stmt.creditAmount}`,
                       type: 'currency',
                       className:
-                        stmt.debitAmount > 0
+                        Number(stmt.debitAmount) > 0
                           ? 'text-emerald-600'
                           : 'text-rose-600',
                     },
-                    {
+                    action: {
                       value: (
                         <Button
                           type="button"
@@ -581,7 +593,7 @@ export function BankReconciliationWorkspace() {
                         </Button>
                       ),
                     },
-                  ],
+                  },
                 }))}
               />
             </div>
@@ -611,31 +623,36 @@ export function BankReconciliationWorkspace() {
 
               <div className="max-h-[500px] overflow-y-auto">
                 <ReportTable
-                  headers={['Date', 'Journal #', 'Amount', 'Select']}
+                  columns={[
+                    { id: 'date', label: 'Date', width: 150 },
+                    { id: 'journal', label: 'Journal #', width: 160 },
+                    { id: 'amount', label: 'Amount', align: 'right' },
+                    { id: 'select', label: 'Select', align: 'center', width: 96 },
+                  ]}
                   rows={(ledgerQuery.data?.rows ?? [])
                     .filter(
-                      (row: any) =>
+                      (row) =>
                         String(row.entryNumber ?? '').includes(journalFilter) ||
                         String(row.debit).includes(journalFilter) ||
                         String(row.credit).includes(journalFilter),
                     )
-                    .map((row: any) => ({
+                    .map((row) => ({
                       id: row.journalLineId,
-                      cells: [
-                        { value: row.entryDate, type: 'date' },
-                        { value: row.entryNumber ?? 'Unnumbered', bold: true },
-                        {
+                      cells: {
+                        date: { value: row.entryDate, type: 'date' },
+                        journal: { value: row.entryNumber ?? 'Unnumbered', bold: true },
+                        amount: {
                           value:
                             Number(row.debit) > 0
                               ? row.debit
-                              : -Number(row.credit),
+                              : `-${row.credit}`,
                           type: 'currency',
                           className:
                             Number(row.debit) > 0
                               ? 'text-emerald-600'
                               : 'text-rose-600',
                         },
-                        {
+                        select: {
                           value: (
                             <Button
                               type="button"
@@ -655,7 +672,7 @@ export function BankReconciliationWorkspace() {
                             </Button>
                           ),
                         },
-                      ],
+                      },
                     }))}
                 />
               </div>

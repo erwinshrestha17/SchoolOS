@@ -36,7 +36,7 @@ export class AuditService {
     // recovery) where no CLS tenant exists yet. When a tenant context IS
     // present the extension still scopes the write, so this only relaxes the
     // pre-authentication case.
-    await this.prisma.runWithoutTenantScope(
+    return this.prisma.runWithoutTenantScope(
       'audit: append with caller-supplied tenantId, including pre-authentication events',
       () =>
         client.auditLog.create({

@@ -31,6 +31,12 @@ export class ReportsController {
     return this.reportsService.listReports(actor);
   }
 
+  @Get('financial-catalog')
+  @Permissions('reports:read')
+  financialCatalog(@CurrentAuth() actor: AuthContext) {
+    return this.reportsService.listFinancialReportCatalog(actor);
+  }
+
   @Post(':reportKey/export')
   @Permissions('reports:export')
   async exportReport(
@@ -95,7 +101,7 @@ export class ReportsController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.reportsService.getExportHistory(auth.tenantId, { page, limit });
+    return this.reportsService.getExportHistory(auth, { page, limit });
   }
 
   @Post('export-history/:id/retry')
@@ -108,7 +114,7 @@ export class ReportsController {
   }
 
   @Get('export-history/:id/download')
-  @Permissions('reports:read')
+  @Permissions('reports:export')
   async downloadExportHistory(
     @CurrentAuth() auth: AuthContext,
     @Param('id') id: string,

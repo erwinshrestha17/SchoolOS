@@ -80,6 +80,11 @@ export const accountingPermissions = [
     description: "Read accounting reports",
   },
   {
+    resource: "accounting:audit",
+    action: "read",
+    description: "Read tenant-scoped financial audit and access evidence",
+  },
+  {
     resource: "accounting:reports",
     action: "trial-balance",
     description: "View Trial Balance report",
@@ -123,6 +128,86 @@ export const accountingPermissions = [
     resource: "accounting:exports",
     action: "create",
     description: "Create accounting exports",
+  },
+  {
+    resource: "accounting:posting-batches",
+    action: "read",
+    description: "Read source posting batches and reconciliation state",
+  },
+  {
+    resource: "accounting:posting-batches",
+    action: "retry",
+    description: "Retry failed source posting batches",
+  },
+  {
+    resource: "accounting:payroll-handoff",
+    action: "read",
+    description: "Read approved payroll accounting handoff summaries",
+  },
+  {
+    resource: "accounting:payroll-handoff",
+    action: "post",
+    description: "Post an approved payroll snapshot through the accounting boundary",
+  },
+  {
+    resource: "accounting:expenses",
+    action: "read",
+    description: "Read tenant-scoped expenses and supporting-document state",
+  },
+  {
+    resource: "accounting:expenses",
+    action: "write",
+    description: "Create and correct tenant-scoped expenses",
+  },
+  {
+    resource: "accounting:vendors",
+    action: "read",
+    description: "Read tenant-scoped vendors and vendor balances",
+  },
+  {
+    resource: "accounting:vendors",
+    action: "write",
+    description: "Create and update tenant-scoped vendors",
+  },
+  {
+    resource: "accounting:payables",
+    action: "read",
+    description: "Read tenant-scoped payables and settlements",
+  },
+  {
+    resource: "accounting:payables",
+    action: "write",
+    description: "Create and correct tenant-scoped payables and settlements",
+  },
+  {
+    resource: "accounting:reconciliation",
+    action: "read",
+    description: "Read bank reconciliation sessions and match evidence",
+  },
+  {
+    resource: "accounting:reconciliation",
+    action: "manage",
+    description: "Match and unmatch bank reconciliation items with reason",
+  },
+  {
+    resource: "accounting:reconciliation",
+    action: "finalize",
+    description: "Finalize a balanced bank reconciliation session",
+  },
+  {
+    resource: "finance:principal",
+    action: "read",
+    description: "Read server-projected Principal financial oversight summaries",
+  },
+  {
+    resource: "finance:approvals",
+    action: "read",
+    description: "Read policy-designated financial approval requests",
+  },
+  {
+    resource: "finance:approvals",
+    action: "decide",
+    description: "Decide policy-designated financial approval requests",
   },
   {
     resource: "accounting:budgets",

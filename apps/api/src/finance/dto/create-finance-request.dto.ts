@@ -2,8 +2,7 @@ import {
   IsString,
   IsNotEmpty,
   IsOptional,
-  IsNumber,
-  Min,
+  IsDecimal,
   MaxLength,
 } from 'class-validator';
 
@@ -14,9 +13,8 @@ export class CreateFinanceRequestDto {
   idempotencyKey!: string;
 
   @IsOptional()
-  @IsNumber()
-  @Min(0.01)
-  amount?: number;
+  @IsDecimal({ decimal_digits: '1,2', force_decimal: false })
+  amount?: string;
 
   @IsString()
   @IsNotEmpty()

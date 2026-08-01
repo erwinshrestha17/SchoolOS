@@ -15,13 +15,13 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { api } from "@/lib/api";
 
-const formatCurrency = (amount: number) =>
+const formatCurrency = (amount: number | string) =>
   new Intl.NumberFormat("en-NP", {
     style: "currency",
     currency: "NPR",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(amount);
+  }).format(Number(amount));
 
 export function StudentLedgerWorkspace() {
   const pathname = usePathname();
@@ -423,7 +423,7 @@ function LedgerSummary({
   emphasized = false,
 }: {
   label: string;
-  value: number;
+  value: number | string;
   emphasized?: boolean;
 }) {
   return (

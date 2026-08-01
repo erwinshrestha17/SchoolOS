@@ -12,6 +12,7 @@ import { EmptyState } from "../ui/empty-state";
 import { LoadingState } from "../ui/loading-state";
 import { Button } from "@/components/ui/button";
 import { formatBsDateTime } from "@schoolos/core";
+import type { FinancialAuditLogSummary } from "@schoolos/core";
 
 export function AccountingAuditWorkspace() {
   const [resourceFilter, setResourceFilter] = useState<string>("");
@@ -19,7 +20,8 @@ export function AccountingAuditWorkspace() {
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>("");
   const [page, setPage] = useState(1);
-  const [selectedLog, setSelectedLog] = useState<any>(null);
+  const [selectedLog, setSelectedLog] =
+    useState<FinancialAuditLogSummary | null>(null);
 
   const query = useQuery({
     queryKey: [
@@ -173,21 +175,20 @@ export function AccountingAuditWorkspace() {
         ) : (
           <div className="space-y-4">
             <ReportTable
-              headers={[
-                "Timestamp",
-                "Action",
-                "Resource",
-                "Actor ID",
-                "Details",
+              columns={[
+                { id: "createdAt", label: "Timestamp", width: 180 },
+                { id: "action", label: "Action" },
+                { id: "resource", label: "Resource", width: 220 },
+                { id: "actorId", label: "Actor ID", width: 200 },
+                { id: "details", label: "Details", width: 120 },
               ]}
-              rows={(query.data?.items ?? []).map((log: any) => ({
+              rows={(query.data?.items ?? []).map((log) => ({
                 id: log.id,
-                cells: [
-                  {
+                cells: {
+                  createdAt: {
                     value: formatBsDateTime(log.createdAt),
-                    type: "date",
                   },
-                  {
+                  action: {
                     value: log.action.toUpperCase(),
                     bold: true,
                     className:
@@ -197,11 +198,11 @@ export function AccountingAuditWorkspace() {
                           ? "text-rose-600"
                           : "text-[var(--color-mod-accounting-accent)]",
                   },
-                  {
+                  resource: {
                     value: `${log.resource} (${log.resourceId || "Resource ID not recorded"})`,
                   },
-                  { value: log.userId || "System actor" },
-                  {
+                  actorId: { value: log.userId || "System actor" },
+                  details: {
                     value: (
                       <Button
                         type="button"
@@ -214,36 +215,15 @@ export function AccountingAuditWorkspace() {
                       </Button>
                     ),
                   },
-                ],
+                },
               }))}
+              pagination={{
+                page,
+                totalPages: Math.max(1, Math.ceil((query.data?.total ?? 0) / 50)),
+                totalRows: query.data?.total ?? 0,
+                onPageChange: setPage,
+              }}
             />
-
-            <div className="flex items-center justify-between px-4">
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                disabled={page === 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                Previous
-              </Button>
-              <span
-                className="text-sm font-bold text-slate-500"
-                data-testid="accounting-audit-page-summary"
-              >
-                Page {page} / {records.length} records
-              </span>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                disabled={!query.data?.hasNextPage}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Next
-              </Button>
-            </div>
           </div>
         )}
       </SectionCard>

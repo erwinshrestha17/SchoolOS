@@ -21,6 +21,7 @@ import {
   optionalNepalPhone,
   requireProfileEmail,
 } from '../common/validation/contact-profile';
+import { resolveRoleAssignmentExpiries } from '../roles/role-assignment-expiry';
 
 @Injectable()
 export class UsersService {
@@ -37,6 +38,7 @@ export class UsersService {
       phone: dto.phone,
       password: dto.password,
       roleIds: dto.roleIds,
+      expiresAtByRole: dto.expiresAtByRole,
       assignedById: actor.userId,
     });
 
@@ -49,6 +51,7 @@ export class UsersService {
       after: {
         email: user.email,
         roleIds: dto.roleIds,
+        expiresAtByRole: dto.expiresAtByRole ?? {},
       },
     });
 
@@ -76,6 +79,10 @@ export class UsersService {
         'One or more roles do not exist in this tenant',
       );
     }
+    const expiresAtByRole = resolveRoleAssignmentExpiries(
+      roles,
+      input.expiresAtByRole,
+    );
 
     const passwordHash = await bcrypt.hash(
       input.password,
@@ -96,6 +103,7 @@ export class UsersService {
             roleId,
             tenantId: input.tenantId,
             assignedById: input.assignedById ?? null,
+            expiresAt: expiresAtByRole.get(roleId) ?? null,
           })),
         },
       },
@@ -273,13 +281,17 @@ export class UsersService {
   private get userInclude() {
     return {
       userRoles: {
+        where: {
+          revokedAt: null,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        },
         include: {
           role: true,
         },
       },
       staff: true,
       student: true,
-    } as const;
+    } satisfies Prisma.UserInclude;
   }
 
   private async ensureEmailIsAvailable(
@@ -362,9 +374,10 @@ export class UsersService {
       phone: user.phone,
       status: user.status,
       mustChangePassword: user.mustChangePassword,
-      roles: user.userRoles.map(({ role }) => ({
+      roles: user.userRoles.map(({ role, expiresAt }) => ({
         id: role.id,
         name: role.name,
+        expiresAt: expiresAt?.toISOString() ?? null,
       })),
       profileType: user.staff ? 'staff' : user.student ? 'student' : 'user',
       staffId: user.staff?.id ?? null,
@@ -381,6 +394,7 @@ interface CreateManagedUserInput {
   password: string;
   phone?: string;
   roleIds: string[];
+  expiresAtByRole?: Record<string, string>;
   assignedById?: string | null;
   status?: UserStatus;
   mustChangePassword?: boolean;
@@ -399,6 +413,7 @@ interface UserWithRelations {
   lastLoginAt: Date | null;
   createdAt: Date;
   userRoles: Array<{
+    expiresAt: Date | null;
     role: {
       id: string;
       name: string;

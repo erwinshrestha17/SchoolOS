@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -127,6 +128,11 @@ export class FinanceCompatService {
       (sum, refund) => sum.add(refund.amount),
       new Prisma.Decimal(0),
     );
+    if (!receipt.payment.invoice) {
+      throw new ConflictException(
+        'This receipt is not linked to an invoice and cannot be verified through the invoice view.',
+      );
+    }
     const reversed = Boolean(receipt.payment.reversedAt);
     const status = reversed
       ? 'REVERSED'
@@ -181,15 +187,15 @@ export class FinanceCompatService {
         id: receipt.payment.invoice.id,
         invoiceNumber: receipt.payment.invoice.invoiceNumber,
         status: receipt.payment.invoice.status,
-        totalAmount: Number(receipt.payment.invoice.totalAmount),
+        totalAmount: receipt.payment.invoice.totalAmount.toFixed(2),
       },
       payment: {
         id: receipt.payment.id,
         method: receipt.payment.method,
         status: receipt.payment.status,
-        amount: Number(receipt.payment.amount),
-        refundedAmount: Number(refundedAmount),
-        netAmount: Number(receipt.payment.amount.sub(refundedAmount)),
+        amount: receipt.payment.amount.toFixed(2),
+        refundedAmount: refundedAmount.toFixed(2),
+        netAmount: receipt.payment.amount.sub(refundedAmount).toFixed(2),
         paidAt: receipt.payment.paidAt,
         referenceNumber: receipt.payment.referenceNumber,
         reversedAt: receipt.payment.reversedAt,

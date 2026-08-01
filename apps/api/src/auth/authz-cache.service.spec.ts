@@ -20,7 +20,6 @@ describe('AuthzCacheService', () => {
   let prisma: {
     runWithoutTenantScope: jest.Mock;
     userRole: { findMany: jest.Mock };
-    rolePermission: { findMany: jest.Mock };
   };
   let store: Map<string, unknown>;
   let cache: RedisCacheService;
@@ -57,15 +56,18 @@ describe('AuthzCacheService', () => {
         async (_reason: string, fn: () => Promise<unknown>) => fn(),
       ),
       userRole: {
-        findMany: jest.fn().mockResolvedValue([{ role: { name: 'teacher' } }]),
-      },
-      rolePermission: {
-        findMany: jest
-          .fn()
-          .mockResolvedValue([
-            { permission: { resource: 'students', action: 'read' } },
-            { permission: { resource: 'attendance', action: 'mark' } },
-          ]),
+        findMany: jest.fn().mockResolvedValue([
+          {
+            expiresAt: null,
+            role: {
+              name: 'teacher',
+              rolePermissions: [
+                { permission: { resource: 'students', action: 'read' } },
+                { permission: { resource: 'attendance', action: 'mark' } },
+              ],
+            },
+          },
+        ]),
       },
     };
     cache = makeCache();
@@ -79,21 +81,30 @@ describe('AuthzCacheService', () => {
     });
   });
 
-  it('filters both reads by the requested tenant', async () => {
+  it('filters active assignments by the requested tenant', async () => {
     await service.resolve('tenant-1', 'user-1');
 
     expect(prisma.userRole.findMany).toHaveBeenCalledWith({
-      where: { tenantId: 'tenant-1', userId: 'user-1' },
-      select: { role: { select: { name: true } } },
-    });
-    expect(prisma.rolePermission.findMany).toHaveBeenCalledWith({
       where: {
+        tenantId: 'tenant-1',
+        userId: 'user-1',
+        revokedAt: null,
+      },
+      select: {
+        expiresAt: true,
         role: {
-          tenantId: 'tenant-1',
-          userRoles: { some: { tenantId: 'tenant-1', userId: 'user-1' } },
+          select: {
+            name: true,
+            rolePermissions: {
+              select: {
+                permission: {
+                  select: { resource: true, action: true },
+                },
+              },
+            },
+          },
         },
       },
-      select: { permission: { select: { resource: true, action: true } } },
     });
   });
 
@@ -113,13 +124,12 @@ describe('AuthzCacheService', () => {
     await service.resolve('tenant-1', 'user-1');
 
     expect(prisma.userRole.findMany).toHaveBeenCalledTimes(1);
-    expect(prisma.rolePermission.findMany).toHaveBeenCalledTimes(1);
   });
 
   it('never serves one user the permissions cached for another', async () => {
     prisma.userRole.findMany
-      .mockResolvedValueOnce([{ role: { name: 'admin' } }])
-      .mockResolvedValueOnce([{ role: { name: 'parent' } }]);
+      .mockResolvedValueOnce([roleGrant('admin')])
+      .mockResolvedValueOnce([roleGrant('parent')]);
 
     const first = await service.resolve('tenant-1', 'user-1');
     const second = await service.resolve('tenant-1', 'user-2');
@@ -130,8 +140,8 @@ describe('AuthzCacheService', () => {
 
   it('never serves one tenant the permissions cached for another', async () => {
     prisma.userRole.findMany
-      .mockResolvedValueOnce([{ role: { name: 'admin' } }])
-      .mockResolvedValueOnce([{ role: { name: 'teacher' } }]);
+      .mockResolvedValueOnce([roleGrant('admin')])
+      .mockResolvedValueOnce([roleGrant('teacher')]);
 
     // Same user id in two tenants must not share an entry.
     const a = await service.resolve('tenant-1', 'user-1');
@@ -143,8 +153,8 @@ describe('AuthzCacheService', () => {
 
   it('re-reads after the user entry is invalidated', async () => {
     prisma.userRole.findMany
-      .mockResolvedValueOnce([{ role: { name: 'teacher' } }])
-      .mockResolvedValueOnce([{ role: { name: 'parent' } }]);
+      .mockResolvedValueOnce([roleGrant('teacher')])
+      .mockResolvedValueOnce([roleGrant('parent')]);
 
     await expect(service.resolve('tenant-1', 'user-1')).resolves.toEqual(
       expect.objectContaining({ roles: ['teacher'] }),
@@ -196,12 +206,8 @@ describe('AuthzCacheService', () => {
 
   it('deduplicates roles and permissions granted by several roles', async () => {
     prisma.userRole.findMany.mockResolvedValue([
-      { role: { name: 'teacher' } },
-      { role: { name: 'teacher' } },
-    ]);
-    prisma.rolePermission.findMany.mockResolvedValue([
-      { permission: { resource: 'students', action: 'read' } },
-      { permission: { resource: 'students', action: 'read' } },
+      roleGrant('teacher', 'students', 'read'),
+      roleGrant('teacher', 'students', 'read'),
     ]);
 
     await expect(service.resolve('tenant-1', 'user-1')).resolves.toEqual({
@@ -212,11 +218,43 @@ describe('AuthzCacheService', () => {
 
   it('returns empty sets for a user with no roles', async () => {
     prisma.userRole.findMany.mockResolvedValue([]);
-    prisma.rolePermission.findMany.mockResolvedValue([]);
 
     await expect(service.resolve('tenant-1', 'user-1')).resolves.toEqual({
       roles: [],
       permissions: [],
     });
   });
+
+  it('removes a time-bounded grant at expiry even while the cache is warm', async () => {
+    const expiresAt = new Date(Date.now() + 1_000);
+    prisma.userRole.findMany.mockResolvedValue([
+      roleGrant('financial_auditor', 'reports', 'export', expiresAt),
+    ]);
+
+    await expect(service.resolve('tenant-1', 'user-1')).resolves.toEqual({
+      roles: ['financial_auditor'],
+      permissions: ['reports:export'],
+    });
+
+    jest.spyOn(Date, 'now').mockReturnValue(expiresAt.getTime());
+    await expect(service.resolve('tenant-1', 'user-1')).resolves.toEqual({
+      roles: [],
+      permissions: [],
+    });
+  });
 });
+
+function roleGrant(
+  name: string,
+  resource = 'students',
+  action = 'read',
+  expiresAt: Date | null = null,
+) {
+  return {
+    expiresAt,
+    role: {
+      name,
+      rolePermissions: [{ permission: { resource, action } }],
+    },
+  };
+}

@@ -18,12 +18,12 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
 import { formatBsDateTime } from "@schoolos/core";
 
-const formatCurrency = (amount: number) =>
+const formatCurrency = (amount: string) =>
   new Intl.NumberFormat("en-NP", {
     style: "currency",
     currency: "NPR",
     maximumFractionDigits: 0,
-  }).format(amount);
+  }).format(Number(amount));
 
 const formatDateTime = (value: string) => formatBsDateTime(value);
 

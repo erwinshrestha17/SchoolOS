@@ -19,6 +19,8 @@ import {
 } from '../teacher-scope/teacher-scope.service';
 import { SUSPENDED_TENANT_MESSAGE } from '../plans/tenant-access.constants';
 import sharp from 'sharp';
+import ExcelJS from 'exceljs';
+import { createHash } from 'node:crypto';
 
 describe('ReportsService', () => {
   let service: ReportsService;
@@ -45,10 +47,20 @@ describe('ReportsService', () => {
       'classes:read',
       'attendance:read',
       'ledger:read',
+      'accounting:reports:read',
+      'payroll:reports:read',
       'academics:read',
     ],
     tenantSlug: 'everest',
   };
+
+  it('registers exactly the 75 applicable P0 finance reports and excludes FA-01', () => {
+    const catalog = service.listFinancialReportCatalog(actor);
+
+    expect(catalog).toHaveLength(75);
+    expect(catalog.map(({ id }) => id)).not.toContain('FA-01');
+    expect(new Set(catalog.map(({ id }) => id)).size).toBe(75);
+  });
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -232,7 +244,7 @@ describe('ReportsService', () => {
         {
           provide: AuditService,
           useValue: {
-            record: jest.fn(),
+            record: jest.fn().mockResolvedValue({ id: 'audit-1' }),
           },
         },
         {
@@ -460,6 +472,28 @@ describe('ReportsService', () => {
     expect(audit.record).toHaveBeenCalled();
   });
 
+  it('exports finance reports as a real XLSX workbook', async () => {
+    const result = await service.exportReport(
+      'student-fee-ledger',
+      {
+        format: 'xlsx',
+        filters: { studentId: 's1' },
+      },
+      actor,
+    );
+
+    expect(result.format).toBe('xlsx');
+    expect(result.contentType).toBe(
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    const workbook = new ExcelJS.Workbook();
+    const workbookBytes = Uint8Array.from(result.content as Buffer).buffer;
+    await workbook.xlsx.load(workbookBytes);
+    const worksheet = workbook.getWorksheet('Report');
+    expect(worksheet?.getCell('A1').value).toBe('Student ID');
+    expect(worksheet?.getCell('A2').value).toBe('SCH-001');
+  });
+
   it('exports academic-cas-summary in CSV format', async () => {
     const result = await service.exportReport(
       'academic-cas-summary',
@@ -609,19 +643,25 @@ describe('ReportsService', () => {
     ]);
     (prisma.reportExport.count as jest.Mock).mockResolvedValueOnce(250);
 
-    const result = await service.getExportHistory(actor.tenantId, {
+    const result = await service.getExportHistory(actor, {
       page: '-5',
       limit: '500',
     });
 
     expect(prisma.reportExport.findMany).toHaveBeenCalledWith({
-      where: { tenantId: actor.tenantId },
+      where: {
+        tenantId: actor.tenantId,
+        reportKey: { in: expect.arrayContaining(['student-roster']) },
+      },
       orderBy: { createdAt: 'desc' },
       skip: 0,
       take: 100,
     });
     expect(prisma.reportExport.count).toHaveBeenCalledWith({
-      where: { tenantId: actor.tenantId },
+      where: {
+        tenantId: actor.tenantId,
+        reportKey: { in: expect.arrayContaining(['student-roster']) },
+      },
     });
     expect(result).toEqual({
       items: [{ id: 'export-1', tenantId: actor.tenantId }],
@@ -652,6 +692,7 @@ describe('ReportsService', () => {
       data: {
         status: 'QUEUED',
         errorSummary: null,
+        failureDetail: null,
         completedAt: null,
         requestedBy: actor.userId,
       },
@@ -698,6 +739,60 @@ describe('ReportsService', () => {
     expect(audit.record).not.toHaveBeenCalledWith(
       expect.objectContaining({ action: 'retry_report_export' }),
     );
+  });
+
+  it('revalidates permissions and checksum when downloading an export', async () => {
+    const content = Buffer.from('protected finance export');
+    (prisma.reportExport.findFirst as jest.Mock).mockResolvedValueOnce({
+      id: 'export-1',
+      tenantId: actor.tenantId,
+      reportKey: 'student-fee-ledger',
+      format: 'csv',
+      status: 'COMPLETED',
+      fileAssetId: 'file-1',
+      checksum: createHash('sha256').update(content).digest('hex'),
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+    (fileRegistry.getProtectedDownload as jest.Mock).mockResolvedValueOnce({
+      asset: {
+        originalFilename: 'student-fee-ledger.csv',
+        mimeType: 'text/csv',
+      },
+      content,
+    });
+
+    const result = await service.downloadExportSnapshot('export-1', actor);
+
+    expect(result.content).toEqual(content);
+    expect(fileRegistry.getProtectedDownload).toHaveBeenCalledWith(
+      actor.tenantId,
+      'file-1',
+      actor.userId,
+    );
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'download_report_snapshot',
+        resourceId: 'export-1',
+      }),
+    );
+  });
+
+  it('denies an expired protected report snapshot', async () => {
+    (prisma.reportExport.findFirst as jest.Mock).mockResolvedValueOnce({
+      id: 'export-1',
+      tenantId: actor.tenantId,
+      reportKey: 'student-fee-ledger',
+      format: 'csv',
+      status: 'COMPLETED',
+      fileAssetId: 'file-1',
+      checksum: 'not-used',
+      expiresAt: new Date(Date.now() - 60_000),
+    });
+
+    await expect(
+      service.downloadExportSnapshot('export-1', actor),
+    ).rejects.toThrow('expired');
+    expect(fileRegistry.getProtectedDownload).not.toHaveBeenCalled();
   });
 });
 

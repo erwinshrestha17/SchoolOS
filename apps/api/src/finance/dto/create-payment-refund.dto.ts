@@ -1,11 +1,10 @@
 import {
   IsDateString,
   IsNotEmpty,
-  IsNumber,
+  IsDecimal,
   IsOptional,
   IsString,
   MaxLength,
-  Min,
 } from 'class-validator';
 
 export class CreatePaymentRefundDto {
@@ -15,9 +14,8 @@ export class CreatePaymentRefundDto {
   idempotencyKey!: string;
 
   @IsOptional()
-  @IsNumber()
-  @Min(0.01)
-  amount?: number;
+  @IsDecimal({ decimal_digits: '1,2', force_decimal: false })
+  amount?: string;
 
   @IsString()
   @IsNotEmpty()

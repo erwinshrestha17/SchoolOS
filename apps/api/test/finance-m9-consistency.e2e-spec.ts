@@ -515,7 +515,7 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
     return financeService.collectPayment(
       {
         invoiceId: overrides.invoiceId ?? 'inv-1',
-        amount: overrides.amount ?? 1000,
+        amount: new Prisma.Decimal(overrides.amount ?? 1000).toFixed(2),
         method: PaymentMethod.CASH,
         idempotencyKey:
           overrides.idempotencyKey ??

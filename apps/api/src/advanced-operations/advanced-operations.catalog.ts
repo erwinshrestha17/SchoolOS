@@ -71,6 +71,13 @@ export const approvalWorkflowCatalog = [
     targetType: 'admission_application',
     defaultFinalActionKey: 'admissions.case.approve',
   },
+  {
+    workflowType: ApprovalWorkflowType.FISCAL_PERIOD_REOPEN,
+    module: 'accounting',
+    targetType: 'fiscal_period',
+    defaultFinalActionKey: 'accounting.fiscal_period.reopen',
+    defaultApproverPermission: 'finance:approvals:decide',
+  },
 ] as const;
 
 export const initialAutomationRuleCatalog = [

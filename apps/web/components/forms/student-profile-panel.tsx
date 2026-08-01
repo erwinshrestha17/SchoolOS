@@ -302,6 +302,6 @@ function initials(name: string) {
     .join('');
 }
 
-function formatMoney(amount: number) {
-  return new Intl.NumberFormat('en-NP').format(amount);
+function formatMoney(amount: number | string) {
+  return new Intl.NumberFormat('en-NP').format(Number(amount));
 }

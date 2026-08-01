@@ -120,7 +120,7 @@ export class ReportCardsService {
         dto.studentId,
         actor,
       );
-      if (ledger.outstandingBalance > 0) {
+      if (Number(ledger.outstandingBalance) > 0) {
         throw new ConflictException(
           `Report card generation blocked: student has outstanding dues of ${ledger.outstandingBalance}`,
         );

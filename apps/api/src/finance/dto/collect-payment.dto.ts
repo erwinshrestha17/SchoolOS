@@ -1,23 +1,48 @@
 import { PaymentMethod } from '@prisma/client';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsDateString,
+  IsDecimal,
   IsEnum,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsString,
   MaxLength,
-  Min,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
-export class CollectPaymentDto {
+export class CollectPaymentAllocationDto {
   @IsString()
+  @IsNotEmpty()
   invoiceId!: string;
 
-  @IsNumber()
-  @Min(0.01)
-  amount!: number;
+  @IsDecimal({ decimal_digits: '1,2', force_decimal: false })
+  amount!: string;
+}
+
+export class CollectPaymentDto {
+  /** Compatibility shortcut for one full invoice allocation. */
+  @IsOptional()
+  @IsString()
+  invoiceId?: string;
+
+  /** Required when recording an advance without an invoice. */
+  @IsOptional()
+  @IsString()
+  studentId?: string;
+
+  @IsDecimal({ decimal_digits: '1,2', force_decimal: false })
+  amount!: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => CollectPaymentAllocationDto)
+  allocations?: CollectPaymentAllocationDto[];
 
   @IsEnum(PaymentMethod)
   method!: PaymentMethod;

@@ -3,6 +3,11 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  formatBsDate,
+  toGregorianDateFromBs,
+  zonedNepalDateTimeToUtc,
+} from '@schoolos/core';
+import {
   CheckCircle2,
   CircleAlert,
   KeyRound,
@@ -12,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { ConfirmDialog } from '../ui/confirm-dialog';
+import { BsDateField } from '../ui/bs-date-field';
 import { ErrorState } from '../ui/error-state';
 import { api, type SchoolUserStatus } from '../../lib/api';
 import { useSettingsCapabilities } from '../../lib/permissions-ui';
@@ -25,6 +31,7 @@ type CreateUserDraft = {
   phone: string;
   password: string;
   roleIds: string[];
+  auditorExpiresOnBs: string;
 };
 
 export function UsersAccessWorkspace() {
@@ -40,6 +47,7 @@ export function UsersAccessWorkspace() {
     phone: '',
     password: '',
     roleIds: [],
+    auditorExpiresOnBs: '',
   });
   const [notice, setNotice] = useState<{
     kind: 'success' | 'error';
@@ -70,7 +78,13 @@ export function UsersAccessWorkspace() {
   const createMutation = useMutation({
     mutationFn: api.createUser,
     onSuccess: async () => {
-      setDraft({ email: '', phone: '', password: '', roleIds: [] });
+      setDraft({
+        email: '',
+        phone: '',
+        password: '',
+        roleIds: [],
+        auditorExpiresOnBs: '',
+      });
       setNotice({
         kind: 'success',
         text: 'User account created and role assignments saved.',
@@ -139,6 +153,12 @@ export function UsersAccessWorkspace() {
 
   const users = useMemo(() => usersQuery.data ?? [], [usersQuery.data]);
   const roles = rolesQuery.data ?? [];
+  const financialAuditorRole = roles.find(
+    ({ name }) => name === 'financial_auditor',
+  );
+  const assigningFinancialAuditor = Boolean(
+    financialAuditorRole && draft.roleIds.includes(financialAuditorRole.id),
+  );
   const counts = useMemo(
     () => ({
       active: users.filter((user) => user.status === 'ACTIVE').length,
@@ -183,11 +203,39 @@ export function UsersAccessWorkspace() {
       });
       return;
     }
+    let auditorExpiry: string | null = null;
+    if (assigningFinancialAuditor && financialAuditorRole) {
+      try {
+        if (!draft.auditorExpiresOnBs.trim()) {
+          throw new Error('missing');
+        }
+        const gregorian = toGregorianDateFromBs(draft.auditorExpiresOnBs);
+        auditorExpiry = zonedNepalDateTimeToUtc({
+          ...gregorian,
+          hour: 23,
+          minute: 59,
+          second: 59,
+        }).toISOString();
+      } catch {
+        setNotice({
+          kind: 'error',
+          text: 'Enter a valid future BS access end date for the financial auditor.',
+        });
+        return;
+      }
+    }
     createMutation.mutate({
       email: draft.email.trim(),
       phone: draft.phone.trim() || undefined,
       password: draft.password,
       roleIds: draft.roleIds,
+      ...(financialAuditorRole && auditorExpiry
+        ? {
+            expiresAtByRole: {
+              [financialAuditorRole.id]: auditorExpiry,
+            },
+          }
+        : {}),
     });
   };
   const submitReset = () => {
@@ -297,6 +345,19 @@ export function UsersAccessWorkspace() {
                   })}
                 </div>
               </fieldset>
+              {assigningFinancialAuditor ? (
+                <BsDateField
+                  label="Financial auditor access end date (BS)"
+                  value={draft.auditorExpiresOnBs}
+                  onChange={(auditorExpiresOnBs) =>
+                    setDraft((current) => ({
+                      ...current,
+                      auditorExpiresOnBs,
+                    }))
+                  }
+                  required
+                />
+              ) : null}
               <Button
                 type="button"
                 className="w-full"
@@ -343,8 +404,15 @@ export function UsersAccessWorkspace() {
                       {user.email ?? user.phone ?? 'User account'}
                     </p>
                     <p className="mt-1 text-sm text-slate-600">
-                      {user.roles.map((role) => role.name).join(' · ') ||
-                        'No role assigned'}
+                      {user.roles.length
+                        ? user.roles
+                            .map((role) =>
+                              role.expiresAt
+                                ? `${role.name} until ${formatBsDate(role.expiresAt)}`
+                                : role.name,
+                            )
+                            .join(' · ')
+                        : 'No role assigned'}
                     </p>
                     <p className="mt-1 text-xs font-semibold text-slate-500">
                       {user.profileType} ·{' '}

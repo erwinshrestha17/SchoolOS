@@ -54,7 +54,9 @@ void main() {
           'nextDueAt': '2026-06-02T09:00:00.000Z',
         },
         'fees': {
-          'totalOutstanding': 175.25,
+          'totalOutstanding': '175.25',
+          'paidAmount': '50.00',
+          'totalAmount': '225.25',
           'overdueCount': 1,
           'nextDueDate': '2026-06-05T00:00:00.000Z',
           'recentInvoices': [
@@ -62,9 +64,9 @@ void main() {
               'id': 'invoice-1',
               'invoiceNumber': 'INV-001',
               'status': 'PARTIAL',
-              'totalAmount': 200,
-              'paidAmount': 50,
-              'outstandingAmount': 150,
+              'totalAmount': '200.00',
+              'paidAmount': '50.00',
+              'outstandingAmount': '150.00',
               'isOverdue': true,
               'receipts': [
                 {
@@ -73,9 +75,35 @@ void main() {
                   'invoiceId': 'invoice-1',
                   'invoiceNumber': 'INV-001',
                   'paymentId': 'payment-1',
-                  'amount': 50,
+                  'amount': '50.00',
                   'method': 'CASH',
                   'issuedAt': '2026-05-10T00:00:00.000Z',
+                },
+              ],
+              'waivers': [
+                {
+                  'id': 'waiver-1',
+                  'amount': '25.00',
+                  'reason': 'Sibling discount',
+                  'approvedAt': '2026-05-09T00:00:00.000Z',
+                },
+              ],
+              'refunds': [
+                {
+                  'id': 'refund-1',
+                  'refundNumber': 'REF-001',
+                  'amount': '10.00',
+                  'reason': 'Duplicate collection corrected',
+                  'refundedAt': '2026-05-11T00:00:00.000Z',
+                },
+              ],
+              'allocationHistory': [
+                {
+                  'id': 'allocation-1',
+                  'paymentId': 'payment-1',
+                  'type': 'INVOICE',
+                  'amount': '50.00',
+                  'allocatedAt': '2026-05-10T00:00:00.000Z',
                 },
               ],
             },
@@ -87,9 +115,20 @@ void main() {
               'invoiceId': 'invoice-1',
               'invoiceNumber': 'INV-001',
               'paymentId': 'payment-1',
-              'amount': 50,
+              'amount': '50.00',
               'method': 'CASH',
               'issuedAt': '2026-05-10T00:00:00.000Z',
+            },
+          ],
+          'recentRefunds': [
+            {
+              'id': 'refund-1',
+              'refundNumber': 'REF-001',
+              'invoiceId': 'invoice-1',
+              'invoiceNumber': 'INV-001',
+              'amount': '10.00',
+              'reason': 'Duplicate collection corrected',
+              'refundedAt': '2026-05-11T00:00:00.000Z',
             },
           ],
         },
@@ -135,6 +174,16 @@ void main() {
         'REC-001',
       );
       expect(summary.recentReceipts.single.amount, 50);
+      expect(summary.recentInvoices.single.waivers.single.amount, 25);
+      expect(
+        summary.recentInvoices.single.refunds.single.refundNumber,
+        'REF-001',
+      );
+      expect(
+        summary.recentInvoices.single.allocationHistory.single.type,
+        'INVOICE',
+      );
+      expect(summary.recentRefunds.single.amount, 10);
       expect(summary.unreadNotices, 3);
       expect(summary.transportStatus, 'Boarded');
       expect(summary.transportDetail, 'Route A');

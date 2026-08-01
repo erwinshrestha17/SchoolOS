@@ -2,7 +2,7 @@ import { IsBoolean, IsEnum, IsObject, IsOptional } from 'class-validator';
 import type { ReportFormat } from '@schoolos/core';
 
 export class ReportExportDto {
-  @IsEnum(['csv', 'pdf', 'json'])
+  @IsEnum(['csv', 'pdf', 'xlsx', 'json'])
   format!: ReportFormat;
 
   @IsObject()

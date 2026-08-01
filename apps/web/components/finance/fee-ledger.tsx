@@ -23,9 +23,9 @@ interface Invoice {
   invoiceNumber: string;
   issuedAt?: string;
   dueDate: string;
-  totalAmount: number;
-  paidAmount?: number;
-  outstandingAmount?: number;
+  totalAmount: string;
+  paidAmount?: string;
+  outstandingAmount?: string;
   status: string;
   receiptId?: string | null;
   receiptNumber?: string | null;
@@ -56,12 +56,12 @@ interface FeeLedgerProps {
   onSortChange?: (sort: PaginatedDataTableSort | null) => void;
 }
 
-const formatCurrency = (amount: number) => {
+const formatCurrency = (amount: number | string) => {
   return new Intl.NumberFormat("en-NP", {
     style: "currency",
     currency: "NPR",
     maximumFractionDigits: 0,
-  }).format(amount);
+  }).format(Number(amount));
 };
 
 const formatDate = (value: string) => formatBsDate(value);

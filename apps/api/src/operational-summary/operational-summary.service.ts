@@ -119,7 +119,7 @@ const MODULE_CONFIG: Record<
     route: '/dashboard/canteen',
     label: 'Canteen',
   },
-  m9_accounting: {
+  m11_accounting: {
     entitlement: 'accounting',
     permissions: ['accounting:read'],
     route: '/dashboard/accounting',
@@ -870,7 +870,7 @@ export class OperationalSummaryService {
           status: 'ACTIVE',
         }),
       ],
-      m9_accounting: [
+      m11_accounting: [
         this.def('openFiscalPeriods', 'fiscalPeriod', {
           tenantId,
           status: 'OPEN',
@@ -891,7 +891,7 @@ export class OperationalSummaryService {
         ),
         this.def(
           'periodCloseBlockers',
-          'accountingPeriod',
+          'fiscalPeriod',
           { tenantId, status: { in: ['OPEN', 'LOCKED'] } },
           'Review period close status',
           '/dashboard/accounting/fiscal-periods',
@@ -1486,7 +1486,7 @@ export class OperationalSummaryService {
       m8a_library: 'libraryIssue',
       m8b_transport: 'transportTrip',
       m8c_canteen: 'canteenPosSale',
-      m9_accounting: 'journalEntry',
+      m11_accounting: 'journalEntry',
       m10_communications: 'notificationDelivery',
       m12_learning: 'learningSession',
     }[module];

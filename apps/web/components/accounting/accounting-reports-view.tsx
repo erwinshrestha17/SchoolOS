@@ -22,7 +22,7 @@ import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { AuditInfo } from "../ui/audit-info";
 import { ReportFilters } from "./report-filters";
-import { ReportTable } from "./report-table";
+import { ReportTable, type ReportTableRow } from "./report-table";
 import { JournalDetailDialog } from "./journal-detail-dialog";
 import { Select } from "../ui/select";
 
@@ -395,29 +395,28 @@ export function AccountingReportsView({
       const trialBalance = data as AccountingTrialBalanceResponse;
       return (
         <ReportTable
-          headers={[
-            "Code",
-            "Account",
-            "Type",
-            "Period Debit",
-            "Period Credit",
-            "Closing Balance",
+          columns={[
+            { id: "code", label: "Code", width: 120 },
+            { id: "account", label: "Account", width: 240 },
+            { id: "type", label: "Type" },
+            { id: "periodDebit", label: "Period Debit", align: "right" },
+            { id: "periodCredit", label: "Period Credit", align: "right" },
+            { id: "closingBalance", label: "Closing Balance", align: "right" },
           ]}
           rows={(trialBalance.rows ?? []).map((row) => ({
             id: row.accountId,
-            cells: [
-              { value: row.accountCode, bold: true },
-              { value: row.accountName },
-              { value: row.accountType },
-              { value: row.periodDebit, type: "currency", align: "right" },
-              { value: row.periodCredit, type: "currency", align: "right" },
-              {
+            cells: {
+              code: { value: row.accountCode, bold: true },
+              account: { value: row.accountName },
+              type: { value: row.accountType },
+              periodDebit: { value: row.periodDebit, type: "currency" },
+              periodCredit: { value: row.periodCredit, type: "currency" },
+              closingBalance: {
                 value: row.netBalance,
                 type: "currency",
                 bold: true,
-                align: "right",
               },
-            ],
+            },
           }))}
         />
       );
@@ -430,61 +429,53 @@ export function AccountingReportsView({
         (section) => section.section === "EXPENSE",
       );
 
-      const rows: any[] = [];
+      const rows: ReportTableRow[] = [];
 
       rows.push({
         id: "rev-header",
         isHeader: true,
-        cells: [{ value: "REVENUE", bold: true }],
+        cells: { classification: { value: "REVENUE", bold: true } },
       });
       (income?.accounts ?? []).forEach((r) => {
         rows.push({
           id: r.accountId,
-          cells: [
-            { value: `${r.accountCode} - ${r.accountName}`, indent: 1 },
-            { value: "" },
-            { value: "" },
-            { value: r.amount, type: "currency", align: "right" },
-          ],
+          cells: {
+            classification: { value: `${r.accountCode} - ${r.accountName}`, indent: 1 },
+            amount: { value: r.amount, type: "currency" },
+          },
         });
       });
       rows.push({
         id: "rev-total",
         isFooter: true,
-        cells: [
-          { value: "Total Revenue" },
-          { value: "" },
-          { value: "" },
-          { value: pnl.totalIncome, type: "currency", align: "right" },
-        ],
+        cells: {
+          classification: { value: "Total Revenue" },
+          amount: { value: pnl.totalIncome, type: "currency" },
+        },
       });
 
       rows.push({
         id: "exp-header",
         isHeader: true,
         className: "mt-4",
-        cells: [{ value: "EXPENSES", bold: true }],
+        cells: { classification: { value: "EXPENSES", bold: true } },
       });
       (expenses?.accounts ?? []).forEach((e) => {
         rows.push({
           id: e.accountId,
-          cells: [
-            { value: `${e.accountCode} - ${e.accountName}`, indent: 1 },
-            { value: "" },
-            { value: "" },
-            { value: e.amount, type: "currency", align: "right" },
-          ],
+          cells: {
+            classification: { value: `${e.accountCode} - ${e.accountName}`, indent: 1 },
+            amount: { value: e.amount, type: "currency" },
+          },
         });
       });
       rows.push({
         id: "exp-total",
         isFooter: true,
-        cells: [
-          { value: "Total Expenses" },
-          { value: "" },
-          { value: "" },
-          { value: pnl.totalExpense, type: "currency", align: "right" },
-        ],
+        cells: {
+          classification: { value: "Total Expenses" },
+          amount: { value: pnl.totalExpense, type: "currency" },
+        },
       });
 
       rows.push({
@@ -492,21 +483,21 @@ export function AccountingReportsView({
         isFooter: true,
         className:
           "bg-[var(--color-mod-accounting-bg)] text-[var(--color-mod-accounting-text)] hover:bg-[var(--color-mod-accounting-bg)]",
-        cells: [
-          { value: "NET INCOME", bold: true },
-          { value: "" },
-          { value: "" },
-          {
+        cells: {
+          classification: { value: "NET INCOME", bold: true },
+          amount: {
             value: pnl.netSurplusOrDeficit,
             type: "currency",
-            align: "right",
           },
-        ],
+        },
       });
 
       return (
         <ReportTable
-          headers={["Classification", "", "", "Amount"]}
+          columns={[
+            { id: "classification", label: "Classification", width: 360 },
+            { id: "amount", label: "Amount", align: "right" },
+          ]}
           rows={rows}
         />
       );
@@ -519,104 +510,117 @@ export function AccountingReportsView({
         (section) => section.section === "LIABILITIES",
       );
       const equity = bs.sections.find((section) => section.section === "EQUITY");
-      const rows: any[] = [];
+      const rows: ReportTableRow[] = [];
 
       rows.push({
         id: "ast-header",
         isHeader: true,
-        cells: [{ value: "ASSETS", bold: true }],
+        cells: { account: { value: "ASSETS", bold: true } },
       });
       (assets?.accounts ?? []).forEach((a) => {
         rows.push({
-          id: a.accountId,
-          cells: [
-            { value: `${a.accountCode} - ${a.accountName}`, indent: 1 },
-            { value: a.amount, type: "currency", align: "right" },
-          ],
+          id: `asset-${a.accountId ?? a.accountCode}`,
+          cells: {
+            account: { value: `${a.accountCode} - ${a.accountName}`, indent: 1 },
+            balance: { value: a.amount, type: "currency" },
+          },
         });
       });
       rows.push({
         id: "ast-total",
         isFooter: true,
-        cells: [
-          { value: "Total Assets" },
-          { value: bs.totalAssets, type: "currency", align: "right" },
-        ],
+        cells: {
+          account: { value: "Total Assets" },
+          balance: { value: bs.totalAssets, type: "currency" },
+        },
       });
 
       rows.push({
         id: "liab-header",
         isHeader: true,
-        cells: [{ value: "LIABILITIES", bold: true }],
+        cells: { account: { value: "LIABILITIES", bold: true } },
       });
       (liabilities?.accounts ?? []).forEach((l) => {
         rows.push({
-          id: l.accountId,
-          cells: [
-            { value: `${l.accountCode} - ${l.accountName}`, indent: 1 },
-            { value: l.amount, type: "currency", align: "right" },
-          ],
+          id: `liability-${l.accountId ?? l.accountCode}`,
+          cells: {
+            account: { value: `${l.accountCode} - ${l.accountName}`, indent: 1 },
+            balance: { value: l.amount, type: "currency" },
+          },
         });
       });
       rows.push({
         id: "liab-total",
         isFooter: true,
-        cells: [
-          { value: "Total Liabilities" },
-          {
+        cells: {
+          account: { value: "Total Liabilities" },
+          balance: {
             value: bs.totalLiabilities,
             type: "currency",
-            align: "right",
           },
-        ],
+        },
       });
 
       rows.push({
         id: "eq-header",
         isHeader: true,
-        cells: [{ value: "EQUITY", bold: true }],
+        cells: { account: { value: "EQUITY", bold: true } },
       });
       (equity?.accounts ?? []).forEach((e) => {
         rows.push({
-          id: e.accountId,
-          cells: [
-            { value: `${e.accountCode} - ${e.accountName}`, indent: 1 },
-            { value: e.amount, type: "currency", align: "right" },
-          ],
+          id: `equity-${e.accountId ?? e.accountCode}`,
+          cells: {
+            account: { value: `${e.accountCode} - ${e.accountName}`, indent: 1 },
+            balance: { value: e.amount, type: "currency" },
+          },
         });
       });
       rows.push({
         id: "eq-total",
         isFooter: true,
-        cells: [
-          { value: "Total Equity" },
-          { value: bs.totalEquity, type: "currency", align: "right" },
-        ],
+        cells: {
+          account: { value: "Total Equity" },
+          balance: { value: bs.totalEquity, type: "currency" },
+        },
       });
 
-      return <ReportTable headers={["Account", "Balance"]} rows={rows} />;
+      return (
+        <ReportTable
+          columns={[
+            { id: "account", label: "Account", width: 360 },
+            { id: "balance", label: "Balance", align: "right" },
+          ]}
+          rows={rows}
+        />
+      );
     }
 
     if (activeReport === "general-ledger") {
       const ledger = data as AccountingGeneralLedgerResponse;
       return (
         <ReportTable
-          headers={["Date", "Journal", "Account", "Debit", "Credit", "Balance"]}
+          columns={[
+            { id: "date", label: "Date", width: 150 },
+            { id: "journal", label: "Journal", width: 150 },
+            { id: "account", label: "Account", width: 240 },
+            { id: "debit", label: "Debit", align: "right" },
+            { id: "credit", label: "Credit", align: "right" },
+            { id: "balance", label: "Balance", align: "right" },
+          ]}
           rows={(ledger.rows ?? []).map((row, index) => ({
             id: `${row.journalEntryId}-${index}`,
-            cells: [
-              { value: row.entryDate, type: "date" },
-              { value: row.entryNumber ?? "Unnumbered", bold: true },
-              { value: row.accountName },
-              { value: row.debit, type: "currency", align: "right" },
-              { value: row.credit, type: "currency", align: "right" },
-              {
+            cells: {
+              date: { value: row.entryDate, type: "date" },
+              journal: { value: row.entryNumber ?? "Unnumbered", bold: true },
+              account: { value: row.accountName },
+              debit: { value: row.debit, type: "currency" },
+              credit: { value: row.credit, type: "currency" },
+              balance: {
                 value: row.runningBalance,
                 type: "currency",
                 bold: true,
-                align: "right",
               },
-            ],
+            },
           }))}
         />
       );
@@ -626,29 +630,28 @@ export function AccountingReportsView({
       const cb = data as AccountingCashBookResponse;
       return (
         <ReportTable
-          headers={[
-            "Date",
-            "Journal",
-            "Narration",
-            "Receipt",
-            "Payment",
-            "Balance",
+          columns={[
+            { id: "date", label: "Date", width: 150 },
+            { id: "journal", label: "Journal", width: 150 },
+            { id: "narration", label: "Narration", width: 280 },
+            { id: "receipt", label: "Receipt", align: "right" },
+            { id: "payment", label: "Payment", align: "right" },
+            { id: "balance", label: "Balance", align: "right" },
           ]}
           rows={(cb.rows ?? []).map((row, index) => ({
             id: `${row.journalEntryId}-${index}`,
-            cells: [
-              { value: row.entryDate, type: "date" },
-              { value: row.entryNumber ?? "Unnumbered" },
-              { value: row.narration },
-              { value: row.receiptAmount, type: "currency", align: "right" },
-              { value: row.paymentAmount, type: "currency", align: "right" },
-              {
+            cells: {
+              date: { value: row.entryDate, type: "date" },
+              journal: { value: row.entryNumber ?? "Unnumbered" },
+              narration: { value: row.narration },
+              receipt: { value: row.receiptAmount, type: "currency" },
+              payment: { value: row.paymentAmount, type: "currency" },
+              balance: {
                 value: row.runningBalance,
                 type: "currency",
                 bold: true,
-                align: "right",
               },
-            ],
+            },
           }))}
         />
       );
@@ -672,14 +675,18 @@ export function AccountingReportsView({
       ].filter(Boolean) as string[][];
       return (
         <ReportTable
-          headers={["Type", "Summary", "Amount"]}
+          columns={[
+            { id: "type", label: "Type" },
+            { id: "summary", label: "Summary", width: 240 },
+            { id: "amount", label: "Amount", align: "right" },
+          ]}
           rows={rows.map((row, index) => ({
             id: `tax-${index}`,
-            cells: [
-              { value: row[0], bold: true },
-              { value: row[1] },
-              { value: row[2], type: "currency", bold: true, align: "right" },
-            ],
+            cells: {
+              type: { value: row[0], bold: true },
+              summary: { value: row[1] },
+              amount: { value: row[2], type: "currency", bold: true },
+            },
           }))}
         />
       );
@@ -689,23 +696,25 @@ export function AccountingReportsView({
       const register = data as JournalRegisterResponse;
       return (
         <ReportTable
-          headers={[
-            "Date",
-            "Entry No",
-            "Narration",
-            "Debited",
-            "Credited",
-            "Debit",
-            "Credit",
-            "Status",
-            "Approval",
-            "Reversal",
+          columns={[
+            { id: "date", label: "Date", width: 150 },
+            { id: "entryNumber", label: "Entry No", width: 150 },
+            { id: "narration", label: "Narration", width: 280 },
+            { id: "debited", label: "Debited", width: 220 },
+            { id: "credited", label: "Credited", width: 220 },
+            { id: "debit", label: "Debit", align: "right" },
+            { id: "credit", label: "Credit", align: "right" },
+            { id: "status", label: "Status" },
+            { id: "approval", label: "Approval" },
+            { id: "reversal", label: "Reversal" },
           ]}
           rows={(register.rows ?? []).map((row) => ({
             id: row.journalEntryId,
-            cells: [
-              { value: row.entryDate, type: "date" },
-              {
+            accessibleLabel: `Open journal ${row.entryNumber ?? row.journalEntryId}`,
+            onActivate: () => openJournalDetail(row.journalEntryId),
+            cells: {
+              date: { value: row.entryDate, type: "date" },
+              entryNumber: {
                 value: (
                   <Button
                     type="button"
@@ -717,15 +726,15 @@ export function AccountingReportsView({
                   </Button>
                 ),
               },
-              { value: row.narration },
-              { value: row.debitedAccounts },
-              { value: row.creditedAccounts },
-              { value: row.totalDebit, type: "currency", align: "right" },
-              { value: row.totalCredit, type: "currency", align: "right" },
-              { value: row.status },
-              { value: row.approvalStatus },
-              { value: row.reversalStatus },
-            ],
+              narration: { value: row.narration },
+              debited: { value: row.debitedAccounts },
+              credited: { value: row.creditedAccounts },
+              debit: { value: row.totalDebit, type: "currency" },
+              credit: { value: row.totalCredit, type: "currency" },
+              status: { value: row.status },
+              approval: { value: row.approvalStatus },
+              reversal: { value: row.reversalStatus },
+            },
           }))}
         />
       );
@@ -733,64 +742,62 @@ export function AccountingReportsView({
 
     if (activeReport === "cash-flow-statement") {
       const cashFlow = data as CashFlowStatementResponse;
-      const rows: any[] = [];
+      const rows: ReportTableRow[] = [];
       for (const section of cashFlow.sections ?? []) {
         rows.push({
           id: `${section.section}-header`,
           isHeader: true,
-          cells: [{ value: section.section, bold: true }],
+          cells: { lineItem: { value: section.section, bold: true } },
         });
         for (const line of section.lines) {
           rows.push({
             id: `${section.section}-${line.label}`,
-            cells: [
-              { value: line.label, indent: 1 },
-              { value: line.amount, type: "currency", align: "right" },
-            ],
+            cells: {
+              lineItem: { value: line.label, indent: 1 },
+              amount: { value: line.amount, type: "currency" },
+            },
           });
         }
         rows.push({
           id: `${section.section}-subtotal`,
           isFooter: true,
-          cells: [
-            { value: `Subtotal (${section.section})`, bold: true },
-            {
+          cells: {
+            lineItem: { value: `Subtotal (${section.section})`, bold: true },
+            amount: {
               value: section.subtotal,
               type: "currency",
               bold: true,
-              align: "right",
             },
-          ],
+          },
         });
       }
       rows.push({
         id: "opening-cash",
         isFooter: true,
-        cells: [
-          { value: "Opening cash", bold: true },
-          { value: cashFlow.openingCash, type: "currency", align: "right" },
-        ],
+        cells: {
+          lineItem: { value: "Opening cash", bold: true },
+          amount: { value: cashFlow.openingCash, type: "currency" },
+        },
       });
       rows.push({
         id: "net-change",
         isFooter: true,
-        cells: [
-          { value: "Net change in cash", bold: true },
-          { value: cashFlow.netChange, type: "currency", align: "right" },
-        ],
+        cells: {
+          lineItem: { value: "Net change in cash", bold: true },
+          amount: { value: cashFlow.netChange, type: "currency" },
+        },
       });
       rows.push({
         id: "closing-cash",
         isFooter: true,
-        cells: [
-          { value: "Closing cash", bold: true },
-          {
+        cells: {
+          lineItem: { value: "Closing cash", bold: true },
+          amount: {
             value: cashFlow.closingCash,
             type: "currency",
             bold: true,
-            align: "right",
           },
-        ],
+        },
       });
       return (
         <div className="space-y-4">
@@ -802,7 +809,13 @@ export function AccountingReportsView({
               {warning}
             </p>
           ))}
-          <ReportTable headers={["Line item", "Amount"]} rows={rows} />
+          <ReportTable
+            columns={[
+              { id: "lineItem", label: "Line item", width: 360 },
+              { id: "amount", label: "Amount", align: "right" },
+            ]}
+            rows={rows}
+          />
         </div>
       );
     }
@@ -815,36 +828,38 @@ export function AccountingReportsView({
             Budget: {budgetReport.budgetName}
           </p>
           <ReportTable
-            headers={["Account", "Budget", "Actual", "Variance", "Variance %"]}
+            columns={[
+              { id: "account", label: "Account", width: 280 },
+              { id: "budget", label: "Budget", align: "right" },
+              { id: "actual", label: "Actual", align: "right" },
+              { id: "variance", label: "Variance", align: "right" },
+              { id: "variancePercent", label: "Variance %", align: "right" },
+            ]}
             rows={(budgetReport.rows ?? []).map((row) => ({
               id: row.accountCode,
-              cells: [
-                {
+              cells: {
+                account: {
                   value: `${row.accountCode} - ${row.accountName}`,
                   bold: true,
                 },
-                {
+                budget: {
                   value: row.budgetAmount,
                   type: "currency",
-                  align: "right",
                 },
-                {
+                actual: {
                   value: row.actualAmount,
                   type: "currency",
-                  align: "right",
                 },
-                {
+                variance: {
                   value: row.variance,
                   type: "currency",
-                  align: "right",
                 },
-                {
+                variancePercent: {
                   value: row.variancePercent
                     ? `${row.variancePercent}%`
                     : "-",
-                  align: "right",
                 },
-              ],
+              },
             }))}
           />
         </div>
@@ -871,30 +886,29 @@ export function AccountingReportsView({
             />
           </div>
           <ReportTable
-            headers={[
-              "Module",
-              "Source",
-              "Reference",
-              "Amount",
-              "Issue",
-              "Details",
-              "Detected",
+            columns={[
+              { id: "module", label: "Module" },
+              { id: "source", label: "Source" },
+              { id: "reference", label: "Reference", width: 180 },
+              { id: "amount", label: "Amount", align: "right" },
+              { id: "issue", label: "Issue", width: 180 },
+              { id: "details", label: "Details", width: 280 },
+              { id: "detected", label: "Detected", width: 150 },
             ]}
             rows={(failed.rows ?? []).map((row, index) => ({
               id: `${row.reference}-${index}`,
-              cells: [
-                { value: row.sourceModule, bold: true },
-                { value: row.sourceType },
-                { value: row.reference },
-                {
+              cells: {
+                module: { value: row.sourceModule, bold: true },
+                source: { value: row.sourceType },
+                reference: { value: row.reference },
+                amount: {
                   value: row.amount ?? "-",
                   type: row.amount ? "currency" : undefined,
-                  align: "right",
                 },
-                { value: row.issueType },
-                { value: row.details },
-                { value: row.detectedAt, type: "date" },
-              ],
+                issue: { value: row.issueType },
+                details: { value: row.details },
+                detected: { value: row.detectedAt, type: "date" },
+              },
             }))}
           />
         </div>
