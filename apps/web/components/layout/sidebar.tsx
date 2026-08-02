@@ -16,6 +16,7 @@ import { api } from '../../lib/api';
 import { useEntitlements } from '../entitlements-provider';
 import { useSession } from '../session-provider';
 import { getRequiredModuleForHref } from '../../lib/nav-module-map';
+import { computeActiveNavHref, scrollToNavHash } from '../../lib/nav-hash';
 import { hasAnyPermission } from '../../lib/session';
 import { TeacherCapability, useTeacherAccess } from '../../lib/teacher-access';
 import { useSettingsCapabilities } from '../../lib/permissions-ui';
@@ -65,6 +66,7 @@ export function Sidebar({
   onMobileClose,
 }: SidebarProps) {
   const pathname = usePathname();
+  const [locationHash, setLocationHash] = useState('');
   const { session } = useSession();
   const { hasModule } = useEntitlements();
 
@@ -130,8 +132,15 @@ export function Sidebar({
   const activeHref = useMemo(() => {
     const allItems = groupsToRender.flatMap((group) => group.items);
     if (visibleSettings) allItems.push(visibleSettings);
-    return computeActiveHref(allItems, pathname);
-  }, [groupsToRender, visibleSettings, pathname]);
+    return computeActiveNavHref(allItems, pathname, locationHash);
+  }, [groupsToRender, visibleSettings, pathname, locationHash]);
+
+  useEffect(() => {
+    const syncHash = () => setLocationHash(window.location.hash);
+    syncHash();
+    window.addEventListener('hashchange', syncHash);
+    return () => window.removeEventListener('hashchange', syncHash);
+  }, [pathname]);
 
   const schoolName = session?.tenant.name ?? 'School workspace';
   const roleLabel = formatRole(session?.user.roles[0] ?? 'school_user');
@@ -472,7 +481,12 @@ function NavEntry({
       active={isActiveNavItem(item, activeHref)}
       collapsed={collapsed}
       badge={item.badge}
-      onNavigate={onMobileClose}
+      onNavigate={(event) => {
+        if (event && scrollToNavHash(item.href)) {
+          event.preventDefault();
+        }
+        onMobileClose();
+      }}
     />
   );
 }
@@ -492,51 +506,14 @@ export function canDisplayNavItem(
   const moduleKeys =
     item.moduleKeys ??
     (() => {
-      const requiredModule = getRequiredModuleForHref(item.href);
+      const normalizedHref = item.href.split('#')[0] ?? item.href;
+      const requiredModule = getRequiredModuleForHref(normalizedHref);
       return requiredModule ? [requiredModule] : [];
     })();
 
   return (
     moduleKeys.length === 0 || moduleKeys.some((module) => hasModule(module))
   );
-}
-
-/**
- * Resolves the single most specific navigation match for the current route.
- * Exact matches always beat prefix matches, and longer/more specific
- * candidates beat shorter ones, so exactly one item is ever highlighted even
- * when several items' routes overlap (e.g. a parent module route and one of
- * its more specific sub-routes).
- */
-function computeActiveHref(
-  items: NavItem[],
-  pathname: string | null,
-): string | null {
-  if (!pathname) return null;
-
-  let bestHref: string | null = null;
-  let bestScore = -1;
-
-  for (const item of items) {
-    const candidates = item.activeWhen?.length ? item.activeWhen : [item.href];
-    for (const candidate of candidates) {
-      let score = -1;
-      if (pathname === candidate) {
-        score = candidate.length + 10_000;
-      } else if (
-        candidate !== '/dashboard' &&
-        pathname.startsWith(`${candidate}/`)
-      ) {
-        score = candidate.length;
-      }
-      if (score > bestScore) {
-        bestScore = score;
-        bestHref = item.href;
-      }
-    }
-  }
-
-  return bestHref;
 }
 
 function isActiveNavItem(item: NavItem, activeHref: string | null) {

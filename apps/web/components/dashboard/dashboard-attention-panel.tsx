@@ -6,7 +6,8 @@ import type {
 } from "@schoolos/core";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { scrollToNavHash } from "../../lib/nav-hash";
 import { cn } from "../../lib/utils";
 import { SectionCard } from "../ui/section-card";
 import {
@@ -40,6 +41,10 @@ export function DashboardAttentionPanel({
     ? openItems
     : openItems.slice(0, DEFAULT_VISIBLE_ITEMS);
   const hiddenCount = openItems.length - DEFAULT_VISIBLE_ITEMS;
+
+  useEffect(() => {
+    scrollToNavHash('/dashboard#needs-attention');
+  }, [openItems.length]);
 
   return (
     <section id="needs-attention" className="scroll-mt-6" aria-label="Needs your attention">

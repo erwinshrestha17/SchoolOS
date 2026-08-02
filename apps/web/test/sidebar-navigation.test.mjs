@@ -121,12 +121,17 @@ describe('school operations sidebar', () => {
   });
 
   it('resolves exactly one active nav item when routes overlap', () => {
-    assert.match(sidebar, /function computeActiveHref/);
+    const navHash = readFileSync(
+      join(webRoot, 'lib/nav-hash.ts'),
+      'utf8',
+    );
+    assert.match(navHash, /export function computeActiveNavHref/);
+    assert.match(sidebar, /computeActiveNavHref/);
     assert.match(
       personaNavConfig,
       /activeWhen: \['\/dashboard\/communications', '\/dashboard\/notices'\]/,
     );
-    assert.match(sidebar, /score = candidate\.length \+ 10_000/);
+    assert.match(navHash, /score = candidatePath\.length \+ 10_000/);
   });
 
   it('shows every section flat with no click-to-expand accordion, and supports quick search', () => {

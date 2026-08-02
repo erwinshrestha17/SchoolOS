@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -16,7 +16,7 @@ export type SidebarNavLinkProps = {
   variant?: 'light' | 'dark';
   disabled?: boolean;
   trailing?: ReactNode;
-  onNavigate?: () => void;
+  onNavigate?: (event: MouseEvent<HTMLAnchorElement>) => void;
   className?: string;
 };
 
@@ -137,7 +137,7 @@ function DarkSidebarNavLink({
   active?: boolean;
   description?: string;
   disabled?: boolean;
-  onNavigate?: () => void;
+  onNavigate?: (event: MouseEvent<HTMLAnchorElement>) => void;
   className?: string;
 }) {
   const linkClassName = cn(

@@ -22,7 +22,7 @@ describe("M1 Students and Admissions workspace navigation", () => {
     assert.match(personaNav, /label: 'Students & Admissions'/);
     assert.match(personaNav, /href: '\/dashboard\/students',\s*label: 'Students'/);
     assert.match(personaNav, /href: '\/dashboard\/admissions',\s*label: 'Admissions'/);
-    assert.match(sidebar, /function computeActiveHref/);
+    assert.match(read("lib/nav-hash.ts"), /export function computeActiveNavHref/);
     assert.match(sidebar, /function isActiveNavItem/);
   });
 
