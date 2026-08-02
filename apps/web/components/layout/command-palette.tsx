@@ -274,7 +274,7 @@ function PaletteSection({
 }) {
   return (
     <div className="mb-1 last:mb-0">
-      <p className="px-3 pb-1 pt-2 text-[0.65rem] font-bold uppercase tracking-[0.08em] text-slate-400">
+      <p className="px-3 pb-1 pt-2 text-[0.65rem] font-bold uppercase tracking-[0.08em] text-[var(--sidebar-heading)]">
         {label}
       </p>
       {children}
@@ -300,7 +300,7 @@ function PaletteRowButton({
       onMouseEnter={onHover}
       onClick={onSelect}
       className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition-colors ${
-        active ? 'bg-[var(--primary-soft)] text-[var(--primary-dark)]' : 'text-slate-700 hover:bg-slate-50'
+        active ? 'bg-[var(--sidebar-active-bg)] text-[var(--sidebar-active-label)]' : 'text-[var(--sidebar-label)] hover:bg-[var(--sidebar-hover)]'
       }`}
     >
       <Icon size={16} className="shrink-0" aria-hidden="true" />

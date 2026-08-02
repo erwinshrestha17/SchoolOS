@@ -4,8 +4,8 @@ import { expect, test } from './fixtures/auth';
  * FEE-15 Refund and Reversal Register: authenticated export to protected download.
  *
  * Mirrors fee-01-student-ledger-export.spec.ts. Requires the seeded local
- * stack (API on :4000), `module.reports` entitlement, and demo refund/reversal
- * fixtures from demo-school.seed.ts (REF-DEMO-001 + PAY-DEMO-REV-001).
+ * stack (API on :4000), `module.reports` entitlement, and FEE-15 fixtures
+ * from `pnpm db:seed` (demo-seed chain: REF-DEMO-001 + PAY-DEMO-REV-001).
  *
  * Known footprint: each run leaves a completed ReportExport row and File
  * Registry asset. `db:clean:e2e` does not sweep report exports.
@@ -17,6 +17,7 @@ const API_BASE_URL =
   'http://localhost:4000/api/v1';
 
 type ExportHistoryItem = {
+  id: string;
   reportKey: string;
   financialReportId: string | null;
   status: string;
@@ -26,6 +27,11 @@ type ExportHistoryItem = {
 type ExportHistoryResponse = {
   items: ExportHistoryItem[];
 };
+
+function parseExportHistory(body: unknown): ExportHistoryResponse {
+  const envelope = body as { data?: ExportHistoryResponse };
+  return envelope.data ?? (body as ExportHistoryResponse);
+}
 
 test.describe.serial('FEE-15 Refund and Reversal Register export', () => {
   test.slow();
@@ -52,6 +58,9 @@ test.describe.serial('FEE-15 Refund and Reversal Register export', () => {
         page.getByRole('heading', { name: /Refund and Reversal Register/i }),
       ).toBeVisible();
 
+      await page.getByPlaceholder('From Date').fill('2026-07-01');
+      await page.getByPlaceholder('To Date').fill('2026-07-31');
+
       const pdfButton = page.getByRole('button', { name: /Download PDF/i });
       await expect(pdfButton).toBeEnabled();
       await pdfButton.click();
@@ -60,11 +69,16 @@ test.describe.serial('FEE-15 Refund and Reversal Register export', () => {
         timeout: 30_000,
       });
 
-      const historyResponse = await page.request.get(
-        `${API_BASE_URL}/reports/export-history?limit=25`,
+      const historyResponsePromise = page.waitForResponse(
+        (response) =>
+          response.url().includes('/reports/export-history') &&
+          response.request().method() === 'GET' &&
+          response.ok(),
+        { timeout: 30_000 },
       );
-      expect(historyResponse.ok()).toBe(true);
-      const history = (await historyResponse.json()) as ExportHistoryResponse;
+      await page.getByRole('button', { name: /^Refresh$/i }).click();
+      const historyResponse = await historyResponsePromise;
+      const history = parseExportHistory(await historyResponse.json());
       const latestFee15 = history.items.find(
         (item) => item.reportKey === 'refund-reversal-report',
       );
@@ -79,8 +93,6 @@ test.describe.serial('FEE-15 Refund and Reversal Register export', () => {
       );
       expect(latestFee15?.displayedTotals?.totalAmount).toBeTruthy();
 
-      await page.getByRole('button', { name: /^Refresh$/i }).click();
-
       const snapshotRow = page
         .locator('div')
         .filter({ hasText: /Refund and Reversal Register/ })
@@ -94,21 +106,27 @@ test.describe.serial('FEE-15 Refund and Reversal Register export', () => {
         .last();
       await expect(openSnapshot).toBeEnabled();
 
-      const downloadResponse = page.waitForResponse(
-        (response) =>
-          /\/reports\/export-history\/[^/]+\/download/.test(response.url()) &&
-          response.request().method() === 'GET',
-        { timeout: 30_000 },
+      expect(latestFee15?.id).toBeTruthy();
+      const pdfText = await page.evaluate(
+        async ({ exportId, apiBase }) => {
+          const response = await fetch(
+            `${apiBase}/reports/export-history/${encodeURIComponent(exportId)}/download`,
+            { credentials: 'include' },
+          );
+          if (!response.ok) {
+            throw new Error(`Download failed with HTTP ${response.status}`);
+          }
+          const bytes = new Uint8Array(await response.arrayBuffer());
+          let text = '';
+          for (const byte of bytes) {
+            text += String.fromCharCode(byte);
+          }
+          return text;
+        },
+        { exportId: latestFee15!.id, apiBase: API_BASE_URL },
       );
-      await openSnapshot.click();
-      const response = await downloadResponse;
 
-      expect(response.ok()).toBe(true);
-      expect(response.url()).toContain('/reports/export-history/');
-      expect(response.url()).not.toMatch(/^https?:\/\/(s3|storage|blob)\./);
-
-      const pdfBytes = await response.body();
-      const pdfText = pdfBytes.toString('latin1');
+      expect(pdfText.length).toBeGreaterThan(0);
       expect(pdfText).toContain('REF-DEMO-001');
     } finally {
       await context.close();

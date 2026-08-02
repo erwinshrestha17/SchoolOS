@@ -5,6 +5,9 @@ import {
   ConsentType,
   ContractType,
   Gender,
+  GuardianRelationshipApprovalStatus,
+  GuardianRelationshipStatus,
+  GuardianRelationshipVerificationStatus,
   InvoiceStatus,
   NoticePriority,
   NotificationChannel,
@@ -106,11 +109,26 @@ async function seedStaff(prisma: PrismaClient, tenantId: string, users: UserMap)
       privacyConsentAt: new Date(),
     };
 
-    await prisma.staff.upsert({
-      where: { tenantId_employeeId: { tenantId, employeeId } },
-      update: data,
-      create: data,
+    const existingByEmployee = await prisma.staff.findFirst({
+      where: { tenantId, employeeId },
     });
+    const existingByUser = await prisma.staff.findFirst({
+      where: { tenantId, userId: user.id },
+    });
+
+    if (existingByEmployee) {
+      await prisma.staff.update({
+        where: { id: existingByEmployee.id },
+        data,
+      });
+    } else if (existingByUser) {
+      await prisma.staff.update({
+        where: { id: existingByUser.id },
+        data,
+      });
+    } else {
+      await prisma.staff.create({ data });
+    }
   }
 }
 
@@ -268,10 +286,40 @@ async function seedStudentsAndGuardians(
       ? await prisma.guardian.update({ where: { id: existingGuardian.id }, data: guardianData, select: { id: true, userId: true, primaryPhone: true } })
       : await prisma.guardian.create({ data: { tenantId, ...guardianData }, select: { id: true, userId: true, primaryPhone: true } });
 
+    // P1-05: at most one ACTIVE primary guardian per student within a tenant.
+    await prisma.studentGuardian.updateMany({
+      where: {
+        tenantId,
+        studentId: safeStudent.id,
+        isPrimary: true,
+        status: GuardianRelationshipStatus.ACTIVE,
+        guardianId: { not: guardian.id },
+      },
+      data: { isPrimary: false },
+    });
+
     await prisma.studentGuardian.upsert({
       where: { studentId_guardianId: { studentId: safeStudent.id, guardianId: guardian.id } },
-      update: { isPrimary: true, appLoginLinked: linkParent },
-      create: { tenantId, studentId: safeStudent.id, guardianId: guardian.id, relation: 'Guardian', isPrimary: true, appLoginLinked: linkParent },
+      update: {
+        isPrimary: true,
+        appLoginLinked: linkParent,
+        status: GuardianRelationshipStatus.ACTIVE,
+        verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
+        approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+        effectiveFrom: date('2026-04-10'),
+      },
+      create: {
+        tenantId,
+        studentId: safeStudent.id,
+        guardianId: guardian.id,
+        relation: 'Guardian',
+        isPrimary: true,
+        appLoginLinked: linkParent,
+        status: GuardianRelationshipStatus.ACTIVE,
+        verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
+        approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+        effectiveFrom: date('2026-04-10'),
+      },
     });
 
     const existingEnrollment = await prisma.enrollment.findFirst({
@@ -394,36 +442,58 @@ async function seedFees(
   const reversalStudent = students.find(
     (s) => s.student.studentSystemId === 'SCH-2026-0006',
   );
-  if (partialStudent && accountant) {
-    const partialPayment = await prisma.payment.findFirst({
-      where: { tenantId, referenceNumber: 'PAY-INV-2026-0002' },
-    });
-    if (partialPayment) {
-      await prisma.paymentRefund.upsert({
-        where: {
-          tenantId_refundNumber: { tenantId, refundNumber: 'REF-DEMO-001' },
-        },
-        update: {
-          paymentId: partialPayment.id,
-          amount: new Prisma.Decimal('500.00'),
-          refundDate: date('2026-07-10'),
-          reason: 'Demo partial refund for FEE-15 export evidence',
-        },
-        create: {
-          tenantId,
-          paymentId: partialPayment.id,
-          refundNumber: 'REF-DEMO-001',
-          amount: new Prisma.Decimal('500.00'),
-          refundDate: date('2026-07-10'),
-          reason: 'Demo partial refund for FEE-15 export evidence',
-          createdById: accountant.id,
-        },
-      });
-    }
+  if (!partialStudent) {
+    throw new Error(
+      'FEE-15 fixture prerequisite missing: demo student SCH-2026-0005 was not seeded.',
+    );
+  }
+  if (!reversalStudent) {
+    throw new Error(
+      'FEE-15 fixture prerequisite missing: demo student SCH-2026-0006 was not seeded.',
+    );
+  }
+  if (!accountant) {
+    throw new Error(
+      'FEE-15 fixture prerequisite missing: accountant@schoolos.com user was not found.',
+    );
+  }
+  if (!tuition) {
+    throw new Error(
+      'FEE-15 fixture prerequisite missing: tuition fee head was not found.',
+    );
   }
 
-  if (reversalStudent && accountant && tuition) {
-    const reversalInvoice = await prisma.invoice.upsert({
+  const partialPayment = await prisma.payment.findFirst({
+    where: { tenantId, referenceNumber: 'PAY-INV-2026-0002' },
+  });
+  if (!partialPayment) {
+    throw new Error(
+      'FEE-15 fixture prerequisite missing: payment PAY-INV-2026-0002 was not seeded.',
+    );
+  }
+
+  await prisma.paymentRefund.upsert({
+    where: {
+      tenantId_refundNumber: { tenantId, refundNumber: 'REF-DEMO-001' },
+    },
+    update: {
+      paymentId: partialPayment.id,
+      amount: new Prisma.Decimal('500.00'),
+      refundDate: date('2026-07-10'),
+      reason: 'Demo partial refund for FEE-15 export evidence',
+    },
+    create: {
+      tenantId,
+      paymentId: partialPayment.id,
+      refundNumber: 'REF-DEMO-001',
+      amount: new Prisma.Decimal('500.00'),
+      refundDate: date('2026-07-10'),
+      reason: 'Demo partial refund for FEE-15 export evidence',
+      createdById: accountant.id,
+    },
+  });
+
+  const reversalInvoice = await prisma.invoice.upsert({
       where: { tenantId_invoiceNumber: { tenantId, invoiceNumber: 'INV-DEMO-REV-001' } },
       update: {
         studentId: reversalStudent.student.id,
@@ -508,7 +578,10 @@ async function seedFees(
         issuedAt: date('2026-07-12'),
       },
     });
-  }
+
+  console.log(
+    'FEE-15 browser fixtures seeded: REF-DEMO-001 refund and PAY-DEMO-REV-001 reversal.',
+  );
 }
 
 async function seedAttendance(

@@ -9,6 +9,10 @@ const sidebar = readFileSync(
   join(webRoot, 'components/layout/sidebar.tsx'),
   'utf8',
 );
+const sidebarNavLink = readFileSync(
+  join(webRoot, 'components/layout/sidebar-nav-link.tsx'),
+  'utf8',
+);
 const navModuleMap = readFileSync(
   join(webRoot, 'lib/nav-module-map.ts'),
   'utf8',
@@ -132,8 +136,8 @@ describe('school operations sidebar', () => {
   });
 
   it('keeps collapsed navigation and the footer accessible', () => {
-    assert.match(sidebar, /aria-label=\{collapsed \? item\.label : undefined\}/);
-    assert.match(sidebar, /title=\{collapsed \? item\.label : undefined\}/);
+    assert.match(sidebarNavLink, /aria-label=\{collapsed \? label : undefined\}/);
+    assert.match(sidebarNavLink, /title=\{collapsed \? label : undefined\}/);
     assert.match(sidebar, /aria-label=\{collapsed \? 'Expand sidebar' : 'Collapse sidebar'\}/);
     assert.match(sidebar, /School workspace/);
     assert.match(sidebar, /CircleUserRound/);
@@ -148,6 +152,17 @@ describe('school operations sidebar', () => {
     assert.match(sidebar, /function formatBadgeCount/);
     assert.match(sidebar, /count > 99 \? '99\+' : count/);
     assert.doesNotMatch(sidebar, /badge: \d/);
+  });
+
+  it('uses semantic sidebar design tokens for navigation states', () => {
+    assert.match(sidebar, /--sidebar-hover/);
+    assert.match(sidebar, /--sidebar-heading/);
+    assert.match(sidebar, /SidebarNavLink/);
+    assert.match(sidebarNavLink, /--sidebar-active-bg/);
+    assert.match(sidebarNavLink, /--sidebar-active-indicator/);
+    assert.match(sidebarNavLink, /--sidebar-hover/);
+    assert.doesNotMatch(sidebar, /hover:bg-slate-100/);
+    assert.doesNotMatch(sidebarNavLink, /hover:bg-slate-100/);
   });
 
   it('closes the mobile drawer on Escape from anywhere inside it and manages dialog focus', () => {

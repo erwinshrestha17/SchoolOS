@@ -27,6 +27,10 @@ import {
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { SchoolBreadcrumbs } from "../schoolos/navigation/school-breadcrumbs";
+import {
+  PlatformNavHeading,
+  SidebarNavLink,
+} from "./sidebar-nav-link";
 
 type PlatformNavItem = {
   href: string;
@@ -185,18 +189,20 @@ export function PlatformShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen bg-slate-100">
       {mobileOpen && (
-        <button
-          type="button"
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
-          aria-label="Close platform navigation"
+        <div
+          className="sidebar-overlay lg:hidden"
           onClick={() => setMobileOpen(false)}
+          role="button"
+          tabIndex={0}
+          aria-label="Close platform navigation"
         />
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[304px] flex-col border-r border-white/10 bg-[var(--color-mod-platform-text)] text-white shadow-lg shadow-black/20 transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${
-          mobileOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={cn(
+          "sidebar-transition fixed inset-y-0 left-0 z-50 flex w-[304px] flex-col border-r border-white/10 bg-[var(--platform-sidebar-bg)] text-white shadow-lg shadow-black/20 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0",
+          mobileOpen ? "translate-x-0" : "-translate-x-full",
+        )}
       >
         <div className="flex h-20 items-center justify-between border-b border-white/10 px-5">
           <div className="flex items-center gap-3">
@@ -205,14 +211,14 @@ export function PlatformShell({ children }: { children: ReactNode }) {
             </div>
             <div>
               <p className="text-sm font-semibold text-white">SchoolOS</p>
-              <p className="text-xs font-semibold text-indigo-200">
+              <p className="text-xs font-semibold text-[var(--platform-sidebar-text)]">
                 Control Plane
               </p>
             </div>
           </div>
           <button
             type="button"
-            className="rounded-xl p-2 text-slate-400 hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-2 focus:ring-offset-slate-950 lg:hidden"
+            className="rounded-xl p-2 text-[var(--platform-sidebar-muted)] hover:bg-[var(--platform-sidebar-hover)] hover:text-white focus:outline-none focus:ring-2 focus:ring-[var(--platform-sidebar-focus)] focus:ring-offset-2 focus:ring-offset-[var(--platform-sidebar-bg)] lg:hidden"
             onClick={() => setMobileOpen(false)}
             aria-label="Close platform navigation"
           >
@@ -221,12 +227,12 @@ export function PlatformShell({ children }: { children: ReactNode }) {
         </div>
 
         <div className="border-b border-white/10 px-5 py-4">
-          <div className="rounded-2xl border border-indigo-300/20 bg-indigo-400/10 p-4">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-indigo-200">
+          <div className="rounded-2xl border border-white/10 bg-[var(--platform-sidebar-hover)] p-4">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--platform-sidebar-text)]">
               <ShieldCheck size={14} />
               Operator scope
             </div>
-            <p className="mt-2 text-sm text-slate-300">
+            <p className="mt-2 text-sm text-[var(--platform-sidebar-text)]">
               Cross-tenant operations for SchoolOS owners only. School module
               data remains tenant-scoped inside the admin workspace.
             </p>
@@ -239,9 +245,7 @@ export function PlatformShell({ children }: { children: ReactNode }) {
         >
           {visibleGroups.map((group) => (
             <div key={group.label} className="mb-5 last:mb-0">
-              <p className="px-3 pb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-                {group.label}
-              </p>
+              <PlatformNavHeading>{group.label}</PlatformNavHeading>
               <div className="space-y-1">
                 {group.items.map((item) => (
                   <PlatformNavEntry
@@ -260,14 +264,14 @@ export function PlatformShell({ children }: { children: ReactNode }) {
         <div className="border-t border-white/10 p-4">
           <Link
             href="/platform/account-security"
-            className="mb-2 flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-2 focus:ring-offset-slate-950"
+            className="mb-2 flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold text-[var(--platform-sidebar-text)] transition-colors hover:bg-[var(--platform-sidebar-hover)] hover:text-white focus:outline-none focus:ring-2 focus:ring-[var(--platform-sidebar-focus)] focus:ring-offset-2 focus:ring-offset-[var(--platform-sidebar-bg)]"
           >
             <KeyRound size={18} />
             Account &amp; Security
           </Link>
           <Link
             href="/dashboard"
-            className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-2 focus:ring-offset-slate-950"
+            className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold text-[var(--platform-sidebar-text)] transition-colors hover:bg-[var(--platform-sidebar-hover)] hover:text-white focus:outline-none focus:ring-2 focus:ring-[var(--platform-sidebar-focus)] focus:ring-offset-2 focus:ring-offset-[var(--platform-sidebar-bg)]"
           >
             <School size={18} />
             School workspace
@@ -357,67 +361,20 @@ function PlatformNavEntry({
   currentSearch: string;
   onClick: () => void;
 }) {
-  const Icon = item.icon;
   const active =
     !item.disabled && isActivePlatformRoute(item.href, pathname, currentSearch);
-  const className = cn(
-    "group flex min-h-16 items-start gap-3 rounded-2xl px-3 py-3 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-2 focus:ring-offset-slate-950",
-    active
-      ? "bg-mod-platform-accent text-white shadow-sm shadow-slate-950/20"
-      : "text-slate-400 hover:bg-white/10 hover:text-white",
-    item.disabled &&
-      "cursor-not-allowed opacity-55 hover:bg-transparent hover:text-slate-400",
-  );
-
-  const content = (
-    <>
-      <span
-        className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-          active
-            ? "bg-white text-mod-platform-text"
-            : "bg-white/5 text-slate-400 group-hover:text-white"
-        }`}
-      >
-        <Icon size={18} />
-      </span>
-      <span className="min-w-0">
-        <span className="block text-sm font-semibold">{item.label}</span>
-        <span
-          className={cn(
-            "mt-0.5 block text-xs leading-5",
-            active
-              ? "text-indigo-100"
-              : "text-slate-500 group-hover:text-slate-400",
-          )}
-        >
-          {item.description}
-        </span>
-        {item.disabled && (
-          <span className="mt-2 inline-flex rounded-full border border-white/10 px-2 py-0.5 text-[0.62rem] font-bold uppercase tracking-wide text-slate-500">
-            Later
-          </span>
-        )}
-      </span>
-    </>
-  );
-
-  if (item.disabled) {
-    return (
-      <button type="button" className={className} disabled aria-disabled="true">
-        {content}
-      </button>
-    );
-  }
 
   return (
-    <Link
+    <SidebarNavLink
       href={item.href}
-      className={className}
-      onClick={onClick}
-      aria-current={active ? "page" : undefined}
-    >
-      {content}
-    </Link>
+      label={item.label}
+      icon={item.icon}
+      description={item.description}
+      active={active}
+      disabled={item.disabled}
+      variant="dark"
+      onNavigate={onClick}
+    />
   );
 }
 

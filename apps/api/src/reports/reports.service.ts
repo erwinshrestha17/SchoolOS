@@ -1723,7 +1723,7 @@ export class ReportsService {
           'Completed refunds and reversals with approval and journal linkage',
         category: 'finance',
         module: 'finance',
-        formats: ['json', 'csv'],
+        formats: ['json', 'csv', 'pdf'],
         filters: [
           { key: 'fromDate', label: 'From Date', type: 'date' },
           { key: 'toDate', label: 'To Date', type: 'date' },

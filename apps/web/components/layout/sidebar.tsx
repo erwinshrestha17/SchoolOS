@@ -2,7 +2,6 @@
 
 import type { PermissionKey } from '@schoolos/core';
 import { useQuery } from '@tanstack/react-query';
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -46,6 +45,10 @@ import { useSettingsCapabilities } from '../../lib/permissions-ui';
 import { useSchoolWebPersona } from '../../lib/school-web-persona';
 import { cn } from '../../lib/utils';
 import type { SchoolWebPersona } from '@schoolos/core';
+import {
+  SidebarNavHeading,
+  SidebarNavLink,
+} from './sidebar-nav-link';
 
 export type NavItem = {
   href: string;
@@ -1196,11 +1199,11 @@ function SidebarContent({
   return (
     <div
       className={cn(
-        'sidebar-transition flex h-full flex-col border-r border-slate-200 bg-[var(--sidebar-bg)] text-slate-700',
+        'sidebar-transition flex h-full flex-col border-r border-[var(--line)] bg-[var(--sidebar-bg)] text-[var(--sidebar-label)]',
         collapsed ? 'w-[72px]' : 'w-[264px]',
       )}
     >
-      <header className="border-b border-slate-200 px-3 py-3">
+      <header className="border-b border-[var(--line)] px-3 py-3">
         <div className="flex h-10 items-center gap-3 px-1">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--primary)] text-white shadow-sm">
             <School size={18} aria-hidden="true" />
@@ -1214,22 +1217,22 @@ function SidebarContent({
             <span className="block truncate text-base font-extrabold tracking-tight text-[var(--primary)]">
               School<span className="font-semibold">OS</span>
             </span>
-            <span className="block truncate text-[0.7rem] font-medium text-slate-500">
+            <span className="block truncate text-[0.7rem] font-medium text-[var(--sidebar-icon)]">
               School operating desk
             </span>
           </div>
         </div>
 
         {!collapsed && (
-          <div className="mt-3 flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-[var(--primary)] shadow-sm ring-1 ring-slate-200">
+          <div className="mt-3 flex items-center gap-2.5 rounded-xl border border-[var(--line)] bg-[var(--sidebar-hover)] px-3 py-2.5">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--surface)] text-[var(--primary)] shadow-sm ring-1 ring-[var(--line)]">
               <School size={14} aria-hidden="true" />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-xs font-bold text-slate-900">
+              <p className="truncate text-xs font-bold text-[var(--ink)]">
                 {schoolName}
               </p>
-              <p className="mt-0.5 text-[0.68rem] font-medium text-slate-500">
+              <p className="mt-0.5 text-[0.68rem] font-medium text-[var(--sidebar-icon)]">
                 School workspace
               </p>
             </div>
@@ -1238,14 +1241,14 @@ function SidebarContent({
       </header>
 
       {!collapsed && (
-        <div className="border-b border-slate-200 px-3 py-2.5">
+        <div className="border-b border-[var(--line)] px-3 py-2.5">
           <label className="sr-only" htmlFor="sidebar-nav-search">
             Find a workspace
           </label>
           <div className="relative">
             <Search
               size={15}
-              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"
+              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--sidebar-heading)]"
               aria-hidden="true"
             />
             <input
@@ -1254,13 +1257,13 @@ function SidebarContent({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Find a workspace..."
-              className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-7 text-[0.8rem] font-medium text-slate-700 outline-none transition-colors placeholder:text-slate-400 focus:border-[var(--primary)] focus:bg-white focus:ring-2 focus:ring-[var(--primary-soft)]"
+              className="h-9 w-full rounded-lg border border-[var(--line)] bg-[var(--sidebar-hover)] pl-8 pr-7 text-[0.8rem] font-medium text-[var(--sidebar-label)] outline-none transition-colors placeholder:text-[var(--sidebar-heading)] focus:border-[var(--primary)] focus:bg-[var(--surface)] focus:ring-2 focus:ring-[var(--primary-soft)]"
             />
             {query ? (
               <button
                 type="button"
                 onClick={() => setQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-700"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-[var(--sidebar-heading)] transition-colors hover:bg-[var(--sidebar-hover)] hover:text-[var(--sidebar-label)]"
                 aria-label="Clear search"
               >
                 <X size={13} aria-hidden="true" />
@@ -1275,7 +1278,7 @@ function SidebarContent({
         aria-label="School operations navigation"
       >
         {isSearching && visibleGroups.length === 0 ? (
-          <p className="px-2.5 py-6 text-center text-xs font-semibold text-slate-400">
+          <p className="px-2.5 py-6 text-center text-xs font-semibold text-[var(--sidebar-heading)]">
             No workspace matches &ldquo;{query.trim()}&rdquo;.
           </p>
         ) : null}
@@ -1302,17 +1305,10 @@ function SidebarContent({
         )}
       </nav>
 
-      <footer className="border-t border-slate-200 px-3 py-3">
+      <footer className="border-t border-[var(--line)] px-3 py-3">
         {settingsItem ? (
           <section className="mb-2">
-            <p
-              className={cn(
-                'px-2.5 pb-2 text-[0.65rem] font-bold uppercase tracking-[0.08em] text-slate-500',
-                collapsed && 'sr-only',
-              )}
-            >
-              Settings
-            </p>
+            <SidebarNavHeading collapsed={collapsed}>Settings</SidebarNavHeading>
             <NavEntry
               collapsed={collapsed}
               item={settingsItem}
@@ -1325,21 +1321,21 @@ function SidebarContent({
         <div
           className={cn(
             'mt-2 flex items-center gap-2.5 rounded-xl px-2.5 py-2',
-            collapsed ? 'flex-col justify-center' : 'bg-slate-50',
+            collapsed ? 'flex-col justify-center' : 'bg-[var(--sidebar-hover)]',
           )}
         >
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-600">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--line)] text-[var(--sidebar-icon)]">
             <CircleUserRound size={18} aria-hidden="true" />
           </div>
           {!collapsed && (
             <div className="min-w-0 flex-1">
               <p
-                className="truncate text-xs font-bold text-slate-800"
+                className="truncate text-xs font-bold text-[var(--ink)]"
                 title={userLabel}
               >
                 {userLabel}
               </p>
-              <p className="truncate text-[0.68rem] font-medium text-slate-500">
+              <p className="truncate text-[0.68rem] font-medium text-[var(--sidebar-icon)]">
                 {roleLabel}
               </p>
             </div>
@@ -1350,7 +1346,7 @@ function SidebarContent({
               type="button"
               onClick={onToggle}
               className={cn(
-                'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2 focus:ring-offset-white',
+                'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--sidebar-icon)] transition-colors hover:bg-[var(--sidebar-hover)] hover:text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2 focus:ring-offset-[var(--sidebar-bg)]',
                 collapsed && 'mt-1',
               )}
               aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -1390,11 +1386,7 @@ function NavGroupSection({
 }) {
   return (
     <section className="mb-1 last:mb-0">
-      {!collapsed ? (
-        <p className="truncate px-2.5 pb-1.5 pt-3 text-left text-[0.68rem] font-extrabold uppercase tracking-[0.06em] text-slate-500 first:pt-0">
-          {group.label}
-        </p>
-      ) : null}
+      <SidebarNavHeading collapsed={collapsed}>{group.label}</SidebarNavHeading>
 
       <div className="space-y-0.5">
         {group.items.map((item) => (
@@ -1422,59 +1414,16 @@ function NavEntry({
   activeHref: string | null;
   onMobileClose: () => void;
 }) {
-  const Icon = item.icon;
-  const active = isActiveNavItem(item, activeHref);
-  const content = (
-    <>
-      {active && (
-        <span
-          className="absolute -left-3 top-1/2 h-7 w-[3px] -translate-y-1/2 rounded-r-full bg-[var(--primary)]"
-          aria-hidden="true"
-        />
-      )}
-      <Icon
-        size={18}
-        className={cn(
-          'shrink-0 transition-colors',
-          active
-            ? 'text-[var(--primary)]'
-            : 'text-slate-500 group-hover:text-slate-800',
-        )}
-        aria-hidden="true"
-      />
-      <span
-        className={cn(
-          'min-w-0 flex-1 truncate font-semibold transition-all duration-200',
-          collapsed ? 'w-0 overflow-hidden opacity-0' : 'opacity-100',
-        )}
-      >
-        {item.label}
-      </span>
-      {!collapsed && item.badge ? (
-        <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[var(--primary)] px-1.5 text-[0.65rem] font-bold text-white">
-          {item.badge}
-        </span>
-      ) : null}
-    </>
-  );
-
   return (
-    <Link
+    <SidebarNavLink
       href={item.href}
-      onClick={onMobileClose}
-      className={cn(
-        'group relative flex min-h-11 items-center gap-3 rounded-lg px-2.5 py-2 text-[0.8rem] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2 focus:ring-offset-white',
-        collapsed && 'justify-center px-0',
-        active
-          ? 'bg-[var(--primary-soft)] text-[var(--primary-dark)]'
-          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950',
-      )}
-      aria-current={active ? 'page' : undefined}
-      aria-label={collapsed ? item.label : undefined}
-      title={collapsed ? item.label : undefined}
-    >
-      {content}
-    </Link>
+      label={item.label}
+      icon={item.icon}
+      active={isActiveNavItem(item, activeHref)}
+      collapsed={collapsed}
+      badge={item.badge}
+      onNavigate={onMobileClose}
+    />
   );
 }
 

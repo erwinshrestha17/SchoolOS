@@ -60,6 +60,14 @@ describe('School Settings redesign', () => {
     assert.match(policy, /schoolSettingsApi\.getSchoolSettingsNavigation/);
   });
 
+  it('uses shared sidebar tokens in the settings sub-navigation', () => {
+    const frame = read('components/settings/settings-route-frame.tsx');
+    assert.match(frame, /SidebarNavLink/);
+    assert.match(frame, /--sidebar-bg/);
+    assert.match(frame, /sidebar-nav-heading/);
+    assert.doesNotMatch(frame, /bg-blue-50 text-blue-700/);
+  });
+
   it('maps backend capabilities into the four user-facing access states', () => {
     const catalog = read('components/settings/school-settings-catalog.ts');
     const header = read('components/settings/settings-page-header.tsx');

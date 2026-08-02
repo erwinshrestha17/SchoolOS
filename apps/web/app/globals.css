@@ -47,6 +47,15 @@
   --sidebar-active-indicator: #2563EB;
   --sidebar-heading: #98A2B3;
 
+  /* Platform operator navigation shell (dark) */
+  --platform-sidebar-bg: var(--color-mod-platform-text);
+  --platform-sidebar-hover: rgba(255, 255, 255, 0.08);
+  --platform-sidebar-active: var(--color-mod-platform-accent);
+  --platform-sidebar-muted: #94A3B8;
+  --platform-sidebar-heading: #64748B;
+  --platform-sidebar-text: #CBD5E1;
+  --platform-sidebar-focus: rgba(255, 255, 255, 0.24);
+
   /* Report chart sequence: module accent first, then brand blue, teal, slate, marigold */
   --chart-1: var(--primary);
   --chart-2: #2563EB;
@@ -778,6 +787,99 @@ button.shell-card:hover {
   backdrop-filter: blur(2px);
   z-index: 40;
   animation: fadeIn 0.2s ease-out;
+}
+
+/* ─── Shared sidebar navigation utilities ─── */
+.sidebar-nav-heading {
+  color: var(--sidebar-heading);
+}
+
+.sidebar-nav-item {
+  position: relative;
+  display: flex;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--sidebar-label);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.sidebar-nav-item:hover {
+  background: var(--sidebar-hover);
+  color: var(--ink);
+}
+
+.sidebar-nav-item:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--sidebar-bg), 0 0 0 4px var(--focus-ring);
+}
+
+.sidebar-nav-item--active {
+  background: var(--sidebar-active-bg);
+  color: var(--sidebar-active-label);
+}
+
+.sidebar-nav-item--active:hover {
+  background: var(--sidebar-active-bg);
+  color: var(--sidebar-active-label);
+}
+
+.sidebar-nav-item--active::before {
+  content: '';
+  position: absolute;
+  left: -0.75rem;
+  top: 50%;
+  height: 1.75rem;
+  width: 3px;
+  transform: translateY(-50%);
+  border-radius: 0 9999px 9999px 0;
+  background: var(--sidebar-active-indicator);
+}
+
+.sidebar-nav-item--collapsed {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.platform-nav-item {
+  display: flex;
+  min-height: 4rem;
+  align-items: flex-start;
+  gap: 0.75rem;
+  border-radius: 1rem;
+  padding: 0.75rem;
+  color: var(--platform-sidebar-muted);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.platform-nav-item:hover {
+  background: var(--platform-sidebar-hover);
+  color: #fff;
+}
+
+.platform-nav-item:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--platform-sidebar-bg), 0 0 0 4px var(--platform-sidebar-focus);
+}
+
+.platform-nav-item--active {
+  background: var(--platform-sidebar-active);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.2);
+}
+
+.platform-nav-item--active:hover {
+  background: var(--platform-sidebar-active);
+  color: #fff;
+}
+
+.platform-nav-heading {
+  color: var(--platform-sidebar-heading);
 }
 
 /* ─── Notification badge ─── */

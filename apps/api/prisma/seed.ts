@@ -2090,6 +2090,18 @@ async function seedCanonicalStudents(
           },
         });
 
+        // P1-05: at most one ACTIVE primary guardian per student within a tenant.
+        await prisma.studentGuardian.updateMany({
+          where: {
+            tenantId,
+            studentId: student.id,
+            isPrimary: true,
+            status: GuardianRelationshipStatus.ACTIVE,
+            guardianId: { not: guardian.id },
+          },
+          data: { isPrimary: false },
+        });
+
         await prisma.studentGuardian.upsert({
           where: {
             studentId_guardianId: {

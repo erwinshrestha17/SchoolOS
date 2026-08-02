@@ -16,6 +16,9 @@ import { hasPermission } from '../../lib/session';
 import { useSettingsCapabilities } from '../../lib/permissions-ui';
 import { Drawer } from '../ui/drawer';
 import { SearchInput } from '../ui/search-input';
+import {
+  SidebarNavLink,
+} from '../layout/sidebar-nav-link';
 import { SettingsControlCenter } from './settings-control-center';
 import {
   SETTINGS_NAVIGATION,
@@ -216,7 +219,7 @@ export function SettingsRouteFrame({ children }: { children: ReactNode }) {
 
       <div className="mx-auto grid max-w-[1560px] xl:grid-cols-[250px_minmax(0,1fr)]">
         <aside
-          className="sticky top-0 hidden h-[calc(100vh-4rem)] overflow-y-auto border-r border-slate-200 bg-white xl:block"
+          className="sticky top-0 hidden h-[calc(100vh-4rem)] overflow-y-auto border-r border-[var(--line)] bg-[var(--sidebar-bg)] xl:block"
           aria-label="Settings sections"
         >
           <SettingsNavigation
@@ -295,38 +298,32 @@ function SettingsNavigation({
         <section key={group.id} aria-labelledby={`settings-group-${group.id}`}>
           <h2
             id={`settings-group-${group.id}`}
-            className="px-3 pb-1 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400"
+            className="sidebar-nav-heading px-3 pb-1 pt-0 text-[11px] tracking-[0.12em]"
           >
             {group.label}
           </h2>
           <div className="space-y-0.5">
             {group.items.map((item) => {
-              const Icon = item.icon;
               const selected = activeItemId === item.id;
               return (
-                <Link
+                <SidebarNavLink
                   key={item.id}
                   href={item.href}
-                  aria-current={selected ? 'page' : undefined}
-                  className={cn(
-                    'flex min-h-10 items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200',
-                    selected
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950',
-                  )}
-                >
-                  <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-                  <span className="min-w-0 flex-1">{item.label}</span>
-                  {item.status === 'platform-managed' ? (
-                    <span
-                      className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-slate-400"
-                      aria-label="Platform managed"
-                      title="Platform managed"
-                    >
-                      <LockKeyhole className="h-3.5 w-3.5" aria-hidden="true" />
-                    </span>
-                  ) : null}
-                </Link>
+                  label={item.label}
+                  icon={item.icon}
+                  active={selected}
+                  trailing={
+                    item.status === 'platform-managed' ? (
+                      <span
+                        className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-[var(--sidebar-heading)]"
+                        aria-label="Platform managed"
+                        title="Platform managed"
+                      >
+                        <LockKeyhole className="h-3.5 w-3.5" aria-hidden="true" />
+                      </span>
+                    ) : null
+                  }
+                />
               );
             })}
           </div>
@@ -338,14 +335,14 @@ function SettingsNavigation({
           {Array.from({ length: 5 }, (_, index) => (
             <div
               key={index}
-              className="h-10 animate-pulse rounded-lg bg-slate-100"
+              className="h-10 animate-pulse rounded-lg bg-[var(--sidebar-hover)]"
             />
           ))}
         </div>
       ) : null}
 
       {!loading && groups.length === 0 ? (
-        <p className="px-3 py-6 text-sm leading-6 text-slate-500">
+        <p className="px-3 py-6 text-sm leading-6 text-[var(--sidebar-icon)]">
           {query.trim()
             ? `No settings match “${query}”.`
             : 'No settings are available for this account.'}
