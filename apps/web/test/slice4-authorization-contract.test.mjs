@@ -144,13 +144,13 @@ describe('Slice 4 institutional settings hub visibility', () => {
   it('gates sidebar and command palette settings on capabilities', () => {
     const sidebar = read('components/layout/sidebar.tsx');
     const palette = read('components/layout/command-palette.tsx');
+    const personaNavConfig = read(
+      'components/layout/sidebar-persona-nav.config.ts',
+    );
 
     assert.match(sidebar, /useSettingsCapabilities/);
-    assert.match(sidebar, /shouldShowSettingsHub\(\s*settingsCaps/);
-    assert.match(palette, /shouldShowSettingsHub\(settingsCaps/);
-    assert.doesNotMatch(
-      palette,
-      /shouldShowSettingsHub\(schoolWebPersona, isTeacherPersona\)/,
-    );
+    assert.match(sidebar, /shouldShowSettingsHub\([\s\S]*schoolWebPersona/);
+    assert.match(palette, /shouldShowSettingsHub\([\s\S]*schoolWebPersona/);
+    assert.match(personaNavConfig, /persona === 'principal'/);
   });
 });

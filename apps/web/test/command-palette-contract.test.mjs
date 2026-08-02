@@ -27,7 +27,7 @@ describe("global command palette (Ctrl/Cmd+K)", () => {
       palette,
       /\.filter\(\(item\) => canDisplayNavItem\(item, session, hasModule\)\)/,
     );
-    assert.match(palette, /shouldShowSettingsHub\(settingsCaps, isTeacherPersona, personalOnly\)/);
+    assert.match(palette, /shouldShowSettingsHub\([\s\S]*schoolWebPersona/);
   });
 
   it("opens on Ctrl/Cmd+K from anywhere and closes on Escape", () => {

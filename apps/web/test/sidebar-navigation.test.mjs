@@ -218,15 +218,25 @@ describe('persona sidebar contracts', () => {
     assert.ok(operations);
     assert.equal(operations.href, '/dashboard/operations');
 
+    const principalSlice = sliceNavGroupsExport(
+      personaNavConfig,
+      'principalNavGroups',
+    );
+    const oversightSlice = principalSlice.slice(
+      principalSlice.indexOf("label: 'Oversight'"),
+      principalSlice.indexOf("label: 'Communication'"),
+    );
+    assert.match(oversightSlice, /href: '\/dashboard\/operations'/);
+    assert.doesNotMatch(
+      principalSlice,
+      /label: 'Operations',\s*\n\s*icon: School,\s*\n\s*items:/,
+    );
+
     const audit = entries.find((entry) => entry.label === 'Audit');
     assert.ok(audit);
     assert.equal(audit.href, '/dashboard/accounting/audit');
 
     const permissions = collectPermissionStrings(
-      personaNavConfig,
-      'principalNavGroups',
-    );
-    const principalSlice = sliceNavGroupsExport(
       personaNavConfig,
       'principalNavGroups',
     );
@@ -272,5 +282,21 @@ describe('persona sidebar contracts', () => {
     );
     assert.doesNotMatch(permissions.join(','), /accounting:manage/);
     assert.doesNotMatch(permissions.join(','), /settings:manage/);
+  });
+
+  it('principal nav omits attention-items dashboard activeWhen and settings hub', () => {
+    const principalSlice = sliceNavGroupsExport(
+      personaNavConfig,
+      'principalNavGroups',
+    );
+    assert.match(
+      principalSlice,
+      /href: '\/dashboard#needs-attention'[\s\S]*label: 'Attention Items'/,
+    );
+    assert.doesNotMatch(
+      principalSlice,
+      /label: 'Attention Items'[\s\S]*activeWhen: \['\/dashboard'\]/,
+    );
+    assert.match(personaNavConfig, /persona === 'principal'/);
   });
 });

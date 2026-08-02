@@ -112,7 +112,8 @@ const principalAuditPermissions: PermissionKey[] = [
 
 /**
  * Whether the administrative Settings hub appears in sidebar / command palette.
- * Teachers and operational personas reach personal settings through other paths.
+ * Teachers, principals, and operational personas reach personal settings through
+ * other paths (header profile menu or teacher "My Account" group).
  */
 export function shouldShowSettingsHub(
   settingsCaps: {
@@ -121,8 +122,9 @@ export function shouldShowSettingsHub(
   },
   isTeacherPersona: boolean,
   personalOnly: boolean,
+  persona: SchoolWebPersona,
 ): boolean {
-  if (isTeacherPersona || personalOnly) return false;
+  if (isTeacherPersona || personalOnly || persona === 'principal') return false;
   return (
     settingsCaps.institutionalNavEnabled &&
     settingsCaps.canAccessInstitutionalSettings
@@ -573,7 +575,6 @@ export const principalNavGroups: NavGroup[] = [
         href: '/dashboard#needs-attention',
         label: 'Attention Items',
         icon: ClipboardList,
-        activeWhen: ['/dashboard'],
       },
       {
         href: '/dashboard/notices/approvals',
@@ -630,12 +631,6 @@ export const principalNavGroups: NavGroup[] = [
         icon: UserCog,
         permissions: ['hr:read'],
       },
-    ],
-  },
-  {
-    label: 'Operations',
-    icon: School,
-    items: [
       {
         href: '/dashboard/operations',
         label: 'Operations',

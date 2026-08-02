@@ -113,15 +113,14 @@ export function Sidebar({
     }))
     .filter((group) => group.items.length > 0);
 
-  // Teachers reach Profile/Preferences/Security directly from the "My
-  // Workspace" group above; the generic administrative Settings hub link is
-  // redundant (and would surface tenant-wide settings sections) for them.
-  // Operational shells also keep Settings only when the persona is admin /
-  // principal / hr (configuration or limited review).
+  // Teachers reach Profile/Preferences/Security from "My Account"; principals
+  // use the header profile menu. The institutional Settings hub is for admin,
+  // HR, and other configuration personas only.
   const showSettingsHub = shouldShowSettingsHub(
     settingsCaps,
     isTeacherPersona,
     personalOnly,
+    schoolWebPersona,
   );
   const visibleSettings =
     showSettingsHub && canDisplayNavItem(settingsNavItem, session, hasModule)

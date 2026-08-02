@@ -65,7 +65,14 @@ export function CommandPalette() {
       capabilities,
     ).flatMap((group) => group.items);
 
-    if (shouldShowSettingsHub(settingsCaps, isTeacherPersona, personalOnly)) {
+    if (
+      shouldShowSettingsHub(
+        settingsCaps,
+        isTeacherPersona,
+        personalOnly,
+        schoolWebPersona,
+      )
+    ) {
       flattened.push(settingsNavItem);
     }
 
