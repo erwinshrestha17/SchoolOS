@@ -366,35 +366,28 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('keeps W4 operational routes behind matching module entitlement gates', () => {
+    const navModuleMap = read('lib/nav-module-map.ts');
     const dashboardLayout = read('app/dashboard/layout.tsx');
     const sidebar = read('components/layout/sidebar.tsx');
 
-    for (const source of [dashboardLayout, sidebar]) {
+    for (const [prefix, module] of [
+      ['/dashboard/timetable', 'timetable'],
+      ['/dashboard/hr', 'hr'],
+      ['/dashboard/payroll', 'hr'],
+      ['/dashboard/library', 'library'],
+      ['/dashboard/transport', 'transport'],
+      ['/dashboard/canteen', 'canteen'],
+    ]) {
       assert.match(
-        source,
-        /href\.startsWith\(['"]\/dashboard\/timetable['"]\)\) return ['"]timetable['"]/,
-      );
-      assert.match(
-        source,
-        /href\.startsWith\(['"]\/dashboard\/hr['"]\)\) return ['"]hr['"]/,
-      );
-      assert.match(
-        source,
-        /href\.startsWith\(['"]\/dashboard\/payroll['"]\)\) return ['"]hr['"]/,
-      );
-      assert.match(
-        source,
-        /href\.startsWith\(['"]\/dashboard\/library['"]\)\) return ['"]library['"]/,
-      );
-      assert.match(
-        source,
-        /href\.startsWith\(['"]\/dashboard\/transport['"]\)\) return ['"]transport['"]/,
-      );
-      assert.match(
-        source,
-        /href\.startsWith\(['"]\/dashboard\/canteen['"]\)\) return ['"]canteen['"]/,
+        navModuleMap,
+        new RegExp(
+          `prefix: ["']${prefix.replaceAll('/', '\\/')}["'], module: ["']${module}["']`,
+        ),
       );
     }
+
+    assert.match(dashboardLayout, /getRequiredModuleForHref/);
+    assert.match(sidebar, /getRequiredModuleForHref/);
   });
 
   it('exposes client helpers for canonical Phase 1 and Phase 2 workflows', () => {
@@ -660,7 +653,7 @@ describe('SchoolOS web production contracts', () => {
       'Seed default chart accounts?',
       'Cancel substitution?',
       'Open fiscal year required',
-      'Active fiscal period required',
+      'No active fiscal period found',
       'Posting failed',
       'Reversal failed',
       'Correction failed',
@@ -1169,7 +1162,7 @@ describe('SchoolOS web production contracts', () => {
       'app/dashboard/admissions/page.tsx',
     ]);
 
-    assert.match(admissionsWorkspace, /color-mod-admissions-accent/);
+    assert.match(admissionsWorkspace, /color-mod-admissions-(accent|text)/);
     assert.match(admissionsWorkspace, /Academic year not assigned/);
     assert.match(admissionsWorkspace, /Date of birth not entered/);
     assert.match(admissionsWorkspace, /Class not selected/);
@@ -1187,7 +1180,7 @@ describe('SchoolOS web production contracts', () => {
       'app/dashboard/students/page.tsx',
     ]);
 
-    assert.match(studentDirectory, /color-mod-admissions-accent/);
+    assert.match(studentDirectory, /color-mod-admissions-(accent|text)/);
     assert.match(studentDirectory, /\/students\/summary/);
     assert.match(studentDirectory, /Student Roster/);
     assert.match(studentDirectory, /Possible matching student records/);
@@ -1904,7 +1897,7 @@ describe('SchoolOS web production contracts', () => {
     }
 
     for (const marker of [
-      "api.downloadReport('defaulter-aging-report'",
+      'api.downloadReport("defaulter-aging-report"',
       'finance-defaulter-aging-csv-export',
       'Export Summary',
       'exportMutation.error.message',

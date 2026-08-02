@@ -192,10 +192,7 @@ describe('guardian-child capability scope', () => {
     });
     const now = new Date('2026-07-28T00:00:00.000Z');
     expect(
-      buildActiveGuardianRelationshipWhere(
-        now,
-        GuardianCapability.FEES_VIEW,
-      ),
+      buildActiveGuardianRelationshipWhere(now, GuardianCapability.FEES_VIEW),
     ).toEqual({
       status: 'ACTIVE',
       verificationStatus: 'VERIFIED',
@@ -203,10 +200,7 @@ describe('guardian-child capability scope', () => {
       effectiveFrom: { lte: now },
       AND: [
         {
-          OR: [
-            { effectiveUntil: null },
-            { effectiveUntil: { gt: now } },
-          ],
+          OR: [{ effectiveUntil: null }, { effectiveUntil: { gt: now } }],
         },
         { capabilities: { has: GuardianCapability.FEES_VIEW } },
       ],

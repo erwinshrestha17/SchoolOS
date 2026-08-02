@@ -1153,7 +1153,8 @@ export function createPrismaMock() {
             mapping.sourceModule === where.sourceModule &&
             mapping.sourceType === where.sourceType &&
             mapping.postingType === where.postingType &&
-            (where.isActive === undefined || mapping.isActive === where.isActive),
+            (where.isActive === undefined ||
+              mapping.isActive === where.isActive),
         );
         return Promise.resolve(match ?? null);
       }),

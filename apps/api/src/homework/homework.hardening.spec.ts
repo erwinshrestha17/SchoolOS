@@ -553,12 +553,8 @@ describe('Homework Hardening', () => {
       p.academicYear.findMany = jest
         .fn()
         .mockResolvedValue([{ id: 'year-1', name: '2026-2027' }]);
-      p.class.findMany.mockResolvedValue([
-        { id: 'class-1', name: 'Grade 3' },
-      ]);
-      p.section.findMany.mockResolvedValue([
-        { id: 'section-1', name: 'A' },
-      ]);
+      p.class.findMany.mockResolvedValue([{ id: 'class-1', name: 'Grade 3' }]);
+      p.section.findMany.mockResolvedValue([{ id: 'section-1', name: 'A' }]);
       p.subject.findMany.mockResolvedValue([
         { id: 'sub-1', name: 'Mathematics' },
       ]);

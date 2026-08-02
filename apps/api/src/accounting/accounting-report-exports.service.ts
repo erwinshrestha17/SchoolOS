@@ -543,7 +543,10 @@ export class AccountingReportExportsService {
     tenantId: string,
     query: IncomeStatementQueryDto,
   ): Promise<string> {
-    const data = await this.reportsService.getCashFlowStatement(tenantId, query);
+    const data = await this.reportsService.getCashFlowStatement(
+      tenantId,
+      query,
+    );
     const rows: Array<Record<string, unknown>> = [];
     for (const section of data.sections) {
       for (const line of section.lines) {
@@ -582,7 +585,10 @@ export class AccountingReportExportsService {
     query: IncomeStatementQueryDto,
     actor: AuthContext,
   ) {
-    const data = await this.reportsService.getCashFlowStatement(tenantId, query);
+    const data = await this.reportsService.getCashFlowStatement(
+      tenantId,
+      query,
+    );
     const rows: Array<Record<string, unknown>> = [];
     for (const section of data.sections) {
       for (const line of section.lines) {

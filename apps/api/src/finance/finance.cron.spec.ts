@@ -12,7 +12,9 @@ function buildCron() {
     ),
   };
   const financeService = {
-    processDueSchedule: jest.fn().mockResolvedValue({ reminderResult: { reminded: 0 } }),
+    processDueSchedule: jest
+      .fn()
+      .mockResolvedValue({ reminderResult: { reminded: 0 } }),
   };
   const cron = new FinanceCron(prisma as never, financeService as never);
   return { cron, prisma, financeService };

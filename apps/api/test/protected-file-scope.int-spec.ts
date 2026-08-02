@@ -165,7 +165,10 @@ describe('P0-01 protected file scoping (real database)', () => {
 
   it('denies an unknown asset id without leaking existence', async () => {
     await expect(
-      service.getFileMetadata(tenantAId, '00000000-0000-4000-8000-000000000000'),
+      service.getFileMetadata(
+        tenantAId,
+        '00000000-0000-4000-8000-000000000000',
+      ),
     ).rejects.toThrow(NotFoundException);
   });
 

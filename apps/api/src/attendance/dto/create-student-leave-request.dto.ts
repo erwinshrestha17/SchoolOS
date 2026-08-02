@@ -52,7 +52,10 @@ export class ReviewStudentLeaveRequestDto {
 export function mapStudentLeaveTypeToAttendanceStatus(
   leaveType: string,
 ): AttendanceStatus {
-  const normalized = leaveType.trim().toUpperCase().replace(/[\s-]+/g, '_');
+  const normalized = leaveType
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, '_');
   if (
     normalized === 'SICK' ||
     normalized === 'SICK_LEAVE' ||

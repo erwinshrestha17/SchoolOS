@@ -139,10 +139,7 @@ export class AccountingReportsController {
 
   @Get('failed-unposted')
   @ApiOperation({ summary: 'Get failed and unposted transaction report' })
-  @Permissions(
-    'accounting:reports:read',
-    'accounting:read',
-  )
+  @Permissions('accounting:reports:read', 'accounting:read')
   async getFailedUnpostedTransactions(@CurrentAuth() auth: AuthContext) {
     return this.reportsService.getFailedUnpostedTransactions(auth.tenantId);
   }
@@ -218,7 +215,9 @@ export class AccountingReportsController {
     @CurrentAuth() auth: AuthContext,
     @Res() res: Response,
   ) {
-    const csv = await this.exportsService.exportFailedUnpostedCsv(auth.tenantId);
+    const csv = await this.exportsService.exportFailedUnpostedCsv(
+      auth.tenantId,
+    );
     await this.recordExportAudit(auth, 'Failed Unposted Transactions', {});
     this.sendCsvResponse(res, csv, 'failed-unposted');
   }

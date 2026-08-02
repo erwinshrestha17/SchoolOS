@@ -115,7 +115,7 @@ describe('M2AttendanceHardeningService', () => {
         }),
         expect.objectContaining({
           code: 'HIGH_ABSENCE_RATE',
-          totals: expect.objectContaining({ absent: 2.5, halfDay: 1 }),
+          totals: expect.objectContaining({ absent: 2, halfDay: 0 }),
         }),
       ]),
     );

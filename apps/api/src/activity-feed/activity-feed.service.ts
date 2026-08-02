@@ -1741,7 +1741,9 @@ export class ActivityFeedService {
     }
 
     const tenantId = actor.tenantId;
-    const classIds = uniqueIds(milestones.map((milestone) => milestone.classId));
+    const classIds = uniqueIds(
+      milestones.map((milestone) => milestone.classId),
+    );
     const sectionIds = uniqueIds(
       milestones.map((milestone) => milestone.sectionId),
     );

@@ -779,7 +779,7 @@ export class AuthService {
 
   async getProfile(auth: AuthContext) {
     const homeTenantId = auth.isSupportOverride
-      ? auth.originalTenantId ?? auth.tenantId
+      ? (auth.originalTenantId ?? auth.tenantId)
       : auth.tenantId;
 
     const user = await this.prisma.user.findUnique({

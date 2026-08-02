@@ -383,13 +383,14 @@ export class ResultsService {
       return;
     }
 
-    const grant = await this.teacherScopeService.canActorAccessAnySectionOfClass(
-      {
-        classId,
-        capability: TeacherCapability.RESULT_REVIEW,
-      },
-      actor,
-    );
+    const grant =
+      await this.teacherScopeService.canActorAccessAnySectionOfClass(
+        {
+          classId,
+          capability: TeacherCapability.RESULT_REVIEW,
+        },
+        actor,
+      );
     if (!grant) {
       await this.teacherScopeService.denyActorAccess(
         {

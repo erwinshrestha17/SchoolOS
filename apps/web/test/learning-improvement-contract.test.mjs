@@ -4,34 +4,19 @@ import { describe, it } from 'node:test';
 
 const webRoot = new URL('../', import.meta.url);
 const read = (path) => readFileSync(new URL(path, webRoot), 'utf8');
-const readMany = (paths) => paths.map(read).join('\n');
 
 describe('Stage 3 M4 learning-improvement workspace contract', () => {
-  it('uses an active M4 route without extending the frozen M13 Learning area', () => {
+  it('keeps the learning-improvement route fail-closed outside the pilot boundary', () => {
     const route = read(
       'app/dashboard/academics/learning-improvement/page.tsx',
     );
-    const tabs = read('components/academics/academics-tabs.tsx');
     const workspace = read(
       'components/academics/learning-improvement/learning-improvement-workspace.tsx',
     );
 
-    assert.match(tabs, /label: 'Learning Support'/);
-    assert.match(
-      tabs,
-      /href: '\/dashboard\/academics\/learning-improvement'/,
-    );
-    const visibleTabs = tabs.split(
-      'export const academicsWorkspaceOverflowTabs',
-    )[0];
-    assert.equal(
-      (visibleTabs.match(/href: '\/dashboard\/academics/g) ?? []).length,
-      7,
-    );
-    assert.match(tabs, /academicsWorkspaceOverflowTabs/);
-    assert.match(route, /LearningImprovementWorkspace/);
+    assert.match(route, /notFound\(\)/);
     assert.doesNotMatch(
-      `${route}\n${tabs}\n${workspace}`,
+      `${route}\n${workspace}`,
       /lib\/api\/learning['"]|learningApi\.|\/dashboard\/learning/,
     );
   });

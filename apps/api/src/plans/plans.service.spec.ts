@@ -198,6 +198,47 @@ describe('PlansService entitlement and usage enforcement', () => {
     expect(entitlements.features).not.toContain('library');
   });
 
+  it('grants module.reports on every customer tier so report exports are reachable', async () => {
+    // Regression guard: ReportsController enforces `module.reports`, but no
+    // tier declared a `reports` module and the plan feature keys are
+    // `feature.reports.*`, so the whole report/export registry -- every P0
+    // financial report included -- was refused on every plan.
+    for (const planKey of [
+      'starter',
+      'standard',
+      'professional',
+      'enterprise',
+    ]) {
+      prisma.tenant.findUnique.mockResolvedValue({ isActive: true });
+      prisma.tenantFeatureOverride.findMany.mockResolvedValue([]);
+      prisma.tenantSubscription.findFirst.mockResolvedValue({
+        status: 'ACTIVE',
+        plan: { key: planKey, features: [] },
+      });
+
+      await expect(
+        service.checkFeatureEnabled('tenant-1', 'module.reports'),
+      ).resolves.toEqual(expect.objectContaining({ allowed: true }));
+    }
+  });
+
+  it('still fails closed on module.reports when a tenant override disables it', async () => {
+    prisma.tenant.findUnique.mockResolvedValue({ isActive: true });
+    prisma.tenantFeatureOverride.findMany.mockResolvedValue([
+      { featureKey: 'module.reports', enabled: false },
+    ]);
+    prisma.tenantSubscription.findFirst.mockResolvedValue({
+      status: 'ACTIVE',
+      plan: { key: 'enterprise', features: [] },
+    });
+
+    await expect(
+      service.checkFeatureEnabled('tenant-1', 'module.reports'),
+    ).resolves.toEqual(
+      expect.objectContaining({ allowed: false, reason: 'feature_locked' }),
+    );
+  });
+
   it('rejects usage when there is no active subscription', async () => {
     prisma.tenantSubscription.findFirst.mockResolvedValue(null);
 

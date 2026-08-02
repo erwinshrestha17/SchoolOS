@@ -35,7 +35,11 @@ export class JournalRegisterQueryDto {
 
   @IsOptional()
   @IsString()
-  voucherType?: 'RECEIPT_VOUCHER' | 'PAYMENT_VOUCHER' | 'EXPENSE_VOUCHER' | 'CONTRA_VOUCHER';
+  voucherType?:
+    | 'RECEIPT_VOUCHER'
+    | 'PAYMENT_VOUCHER'
+    | 'EXPENSE_VOUCHER'
+    | 'CONTRA_VOUCHER';
 
   @IsOptional()
   @Type(() => Number)

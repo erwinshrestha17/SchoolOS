@@ -80,7 +80,10 @@ export function AccountingAuditWorkspace() {
           </Button>
         }
       >
-        <div className="mb-6 grid gap-3 sm:grid-cols-3">
+        <div
+          className="mb-6 grid gap-3 sm:grid-cols-3"
+          data-testid="accounting-audit-page-summary"
+        >
           <AuditSummaryCard label="Records on page" value={records.length} />
           <AuditSummaryCard label="Page" value={page} />
           <AuditSummaryCard label="Filter" value={activeFilterLabel} />

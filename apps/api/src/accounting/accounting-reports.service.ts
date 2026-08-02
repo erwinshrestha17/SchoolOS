@@ -31,7 +31,10 @@ import {
   BudgetVsActualResponse,
   BudgetVsActualRow,
 } from './types/accounting-reports.types';
-import { CashBookQueryDto, CashBookAccountKind } from './dto/cash-book-query.dto';
+import {
+  CashBookQueryDto,
+  CashBookAccountKind,
+} from './dto/cash-book-query.dto';
 import { JournalRegisterQueryDto } from './dto/journal-register-query.dto';
 import { IncomeStatementQueryDto } from './dto/income-statement-query.dto';
 import { BalanceSheetQueryDto } from './dto/balance-sheet-query.dto';
@@ -41,7 +44,18 @@ import {
   TaxSummaryType,
 } from './dto/tax-summary-query.dto';
 import { UpdateAccountingReportMappingsDto } from './dto/report-account-mapping.dto';
-import { ChartAccountType, JournalLineSide, Prisma, JournalEntryStatus, JournalSourceType, PaymentStatus, PayrollRunStatus, PayrollExceptionCode, PayrollExceptionStatus, AccountingReportMappingType } from '@prisma/client';
+import {
+  ChartAccountType,
+  JournalLineSide,
+  Prisma,
+  JournalEntryStatus,
+  JournalSourceType,
+  PaymentStatus,
+  PayrollRunStatus,
+  PayrollExceptionCode,
+  PayrollExceptionStatus,
+  AccountingReportMappingType,
+} from '@prisma/client';
 
 const cashBookLineInclude = Prisma.validator<Prisma.JournalLineInclude>()({
   chartAccount: {
@@ -1435,7 +1449,9 @@ export class AccountingReportsService {
     query: JournalRegisterQueryDto,
   ): Promise<JournalRegisterResponse> {
     if (!query.voucherType) {
-      throw new BadRequestException('voucherType is required for voucher registers.');
+      throw new BadRequestException(
+        'voucherType is required for voucher registers.',
+      );
     }
     return this.getJournalRegister(tenantId, query);
   }
@@ -1477,7 +1493,8 @@ export class AccountingReportsService {
         reference: entry.entryNumber ?? entry.id,
         amount,
         issueType: 'APPROVED_UNPOSTED_JOURNAL',
-        details: 'Journal entry is approved but not posted to the general ledger.',
+        details:
+          'Journal entry is approved but not posted to the general ledger.',
         detectedAt: now,
       });
     }
@@ -1535,7 +1552,7 @@ export class AccountingReportsService {
         resourceId: exception.payrollRunId ?? exception.id,
         reference: exception.payrollRun
           ? `${exception.payrollRun.periodYear}-${String(exception.payrollRun.periodMonth).padStart(2, '0')}`
-          : exception.payrollRunId ?? exception.id,
+          : (exception.payrollRunId ?? exception.id),
         amount: null,
         issueType: 'ACCOUNTING_POSTING_FAILED',
         details: exception.safeMessage,
@@ -1612,18 +1629,30 @@ export class AccountingReportsService {
       | { id: string; type: ChartAccountType; code: string }
       | undefined,
     sourceType: JournalSourceType,
-    mappings: Array<{ mappingType: AccountingReportMappingType; accountId: string }>,
+    mappings: Array<{
+      mappingType: AccountingReportMappingType;
+      accountId: string;
+    }>,
     setupWarnings: string[],
   ): CashFlowSectionKind {
     if (counterparty) {
       const operatingIds = mappings
-        .filter((m) => m.mappingType === AccountingReportMappingType.CASH_FLOW_OPERATING)
+        .filter(
+          (m) =>
+            m.mappingType === AccountingReportMappingType.CASH_FLOW_OPERATING,
+        )
         .map((m) => m.accountId);
       const investingIds = mappings
-        .filter((m) => m.mappingType === AccountingReportMappingType.CASH_FLOW_INVESTING)
+        .filter(
+          (m) =>
+            m.mappingType === AccountingReportMappingType.CASH_FLOW_INVESTING,
+        )
         .map((m) => m.accountId);
       const financingIds = mappings
-        .filter((m) => m.mappingType === AccountingReportMappingType.CASH_FLOW_FINANCING)
+        .filter(
+          (m) =>
+            m.mappingType === AccountingReportMappingType.CASH_FLOW_FINANCING,
+        )
         .map((m) => m.accountId);
 
       if (operatingIds.includes(counterparty.id)) return 'OPERATING';
@@ -1873,9 +1902,9 @@ export class AccountingReportsService {
       buildSection('INVESTING'),
       buildSection('FINANCING'),
     ];
-    const netChange = sectionTotals.OPERATING.plus(sectionTotals.INVESTING).plus(
-      sectionTotals.FINANCING,
-    );
+    const netChange = sectionTotals.OPERATING.plus(
+      sectionTotals.INVESTING,
+    ).plus(sectionTotals.FINANCING);
 
     return {
       fiscalYearId,

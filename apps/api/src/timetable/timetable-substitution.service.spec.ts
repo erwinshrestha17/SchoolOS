@@ -229,9 +229,7 @@ describe('TimetableSubstitutionService', () => {
       jest
         .spyOn(prisma.timetableSlot, 'findFirst')
         .mockResolvedValue(mockSlot as any);
-      jest.spyOn(prisma.staff, 'findFirst').mockImplementation(((
-        args: any,
-      ) => {
+      jest.spyOn(prisma.staff, 'findFirst').mockImplementation(((args: any) => {
         const id = args?.where?.id;
         return Promise.resolve({ id } as any);
       }) as any);

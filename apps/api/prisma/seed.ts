@@ -4849,6 +4849,10 @@ async function seedDemoTenantFeatureOverrides(tenantId: string) {
     'module.accounting',
     'module.notifications',
     'module.notices',
+    // Gates /dashboard/reports and the whole report export registry via
+    // @Entitlement('module.reports'). Without it every report export, including
+    // FEE-01, is unreachable in a seeded environment.
+    'module.reports',
     'feature.mobile.parent_basic',
     'feature.mobile.teacher_parent',
     'feature.mobile.full_role',
@@ -4973,6 +4977,8 @@ async function seedPlatformInfrastructure() {
       'library',
       'transport',
       'canteen',
+      // Gates the cross-module report/export centre (`module.reports`).
+      'reports',
     ];
     const deferredAddOnModules = new Set(['library', 'transport', 'canteen']);
     const planIncludesDeferredAddOns =

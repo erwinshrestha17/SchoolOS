@@ -146,6 +146,20 @@ describe('ReportsService', () => {
               count: jest.fn().mockResolvedValue(0),
               findFirst: jest.fn(),
             },
+            payrollLine: {
+              findMany: jest.fn().mockResolvedValue([
+                {
+                  grossSalary: 60000,
+                  tds: 4500,
+                  staff: {
+                    employeeId: 'EMP-001',
+                    firstName: 'Sita',
+                    lastName: 'Rai',
+                    panNumber: '123456789',
+                  },
+                },
+              ]),
+            },
             casRecord: {
               findMany: jest.fn().mockResolvedValue([
                 {
@@ -641,18 +655,23 @@ describe('ReportsService', () => {
       }
     ).buildExportMetadata.bind(service);
 
-    expect(
-      buildExportMetadata(
-        { key: 'tds-deduction-report', financialReportId: 'TAX-01' },
-        {},
-        actor,
-      ),
-    ).toEqual(
+    // Asserted through the real registry entry, not a synthetic definition, so
+    // the link itself is covered rather than just the resolution helper.
+    const tdsExecutor = service.registry.get('statutory-tds-summary');
+    expect(tdsExecutor?.definition.financialReportId).toBe('TAX-01');
+
+    expect(buildExportMetadata(tdsExecutor!.definition, {}, actor)).toEqual(
       expect.objectContaining({
         financialReportId: 'TAX-01',
         classification: 'STATUTORY_DRAFT',
       }),
     );
+
+    // Statutory output must be watermarked as a draft, so a generated artifact
+    // is never presented as final before Nepal-qualified review exists.
+    expect(
+      buildExportMetadata(tdsExecutor!.definition, {}, actor).watermark,
+    ).toContain('STATUTORY DRAFT');
 
     // An unlinked, non-financial export stays confidential with no catalog id.
     expect(buildExportMetadata({ key: 'student-roster' }, {}, actor)).toEqual(
@@ -661,6 +680,45 @@ describe('ReportsService', () => {
         classification: 'CONFIDENTIAL',
       }),
     );
+  });
+
+  it('marks the exported statutory TDS artifact as a draft inside the document', async () => {
+    const result = await service.exportReport(
+      'statutory-tds-summary',
+      { format: 'pdf', filters: { month: '5', year: '2026' } },
+      { ...actor, permissions: [...actor.permissions, 'payroll:read'] },
+    );
+
+    const pdf = (result.content as Buffer).toString('latin1');
+    expect(pdf.startsWith('%PDF')).toBe(true);
+    // Nepal-qualified review is external, so the artifact itself must say so
+    // rather than relying on metadata a downloaded file does not carry.
+    expect(pdf).toContain('STATUTORY DRAFT');
+    expect(pdf).not.toContain('CONFIDENTIAL');
+
+    expect(prisma.reportExport.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          financialReportId: 'TAX-01',
+          classification: 'STATUTORY_DRAFT',
+        }),
+      }),
+    );
+  });
+
+  it('records which catalog reports still have no registered export', () => {
+    // PAY-04 (Tax Deduction Report) and TAX-02 (TDS Payable Report) are in the
+    // P0 catalog but have no implementation, so there is nothing to link. This
+    // pins that gap rather than letting a future reader assume they are wired.
+    const linked = new Set(
+      Array.from(service.registry.values())
+        .map((executor) => executor.definition.financialReportId)
+        .filter(Boolean),
+    );
+
+    expect(linked.has('TAX-01')).toBe(true);
+    expect(linked.has('PAY-04')).toBe(false);
+    expect(linked.has('TAX-02')).toBe(false);
   });
 
   it('exports finance reports as a real XLSX workbook', async () => {

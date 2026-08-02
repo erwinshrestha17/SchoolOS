@@ -2069,7 +2069,7 @@ export class AccountingPostingService {
   ) {
     // Focused unit tests use deliberately small Prisma doubles. Production
     // Prisma clients always expose this delegate after the P0 migration.
-    if (!("accountingPostingBatch" in tx)) {
+    if (!('accountingPostingBatch' in tx)) {
       return null;
     }
 

@@ -86,9 +86,11 @@ describe('Typography Standardization Contract', () => {
       'components/hr/payroll-preview.tsx',
       'components/accounting/opening-balance-dialog.tsx',
       'components/accounting/accounting-source-mappings-workspace.tsx',
+      'components/accounting/source-posting-batches-panel.tsx',
       'components/academics/tabs/promotion-tab.tsx',
       'components/academics/tabs/result-publishing-tab.tsx',
       'components/notices/notice-composer-workspace.tsx',
+      'components/settings/settings-policy-workspace.tsx',
     ];
 
     for (const file of files) {

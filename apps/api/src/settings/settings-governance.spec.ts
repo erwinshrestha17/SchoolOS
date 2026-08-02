@@ -212,9 +212,11 @@ describe('Tenant audit exposure', () => {
 
 describe('Configuration Owner safeguards', () => {
   function buildRolesService(options: {
-    ownerAssignment: { roleId: string } | null;
+    ownerAssignment: { roleId: string; assignmentId?: string } | null;
     otherActiveOwners: number;
   }) {
+    const ownerAssignmentId =
+      options.ownerAssignment?.assignmentId ?? 'assignment-owner';
     const prisma = {
       role: {
         findMany: jest.fn().mockResolvedValue([{ id: 'role-other' }]),
@@ -229,9 +231,27 @@ describe('Configuration Owner safeguards', () => {
         count: jest.fn().mockResolvedValue(options.otherActiveOwners),
         deleteMany: jest.fn(),
         createMany: jest.fn(),
-        findMany: jest.fn().mockResolvedValue([]),
+        findMany: jest
+          .fn()
+          .mockImplementation(({ where }: { where?: { userId?: string } }) => {
+            if (!options.ownerAssignment || where?.userId !== 'user-owner') {
+              return Promise.resolve([]);
+            }
+            return Promise.resolve([
+              {
+                id: ownerAssignmentId,
+                roleId: options.ownerAssignment.roleId,
+                role: { name: 'school_config_owner' },
+              },
+            ]);
+          }),
+        update: jest.fn().mockResolvedValue({}),
+        create: jest.fn().mockResolvedValue({}),
       },
       permission: { findMany: jest.fn() },
+      $transaction: jest.fn(async (work: (tx: unknown) => Promise<unknown>) =>
+        work(prisma),
+      ),
     };
     const auditService = { record: jest.fn().mockResolvedValue({}) };
     return {
@@ -268,7 +288,8 @@ describe('Configuration Owner safeguards', () => {
         actor,
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(prisma.userRole.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.userRole.update).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
   it('requires a reason to remove the Configuration Owner role', async () => {
@@ -283,7 +304,8 @@ describe('Configuration Owner safeguards', () => {
         actor,
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
-    expect(prisma.userRole.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.userRole.update).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
   it('allows owner-role transfer when another active owner remains', async () => {
@@ -297,7 +319,16 @@ describe('Configuration Owner safeguards', () => {
       actor,
     );
 
-    expect(prisma.userRole.deleteMany).toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(prisma.userRole.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'assignment-owner' },
+        data: expect.objectContaining({
+          revokedAt: expect.any(Date),
+          revokeReason: 'transfer',
+        }),
+      }),
+    );
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
         after: expect.objectContaining({

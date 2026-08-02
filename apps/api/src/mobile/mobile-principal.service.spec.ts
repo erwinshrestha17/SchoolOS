@@ -366,7 +366,6 @@ describe('MobilePrincipalService', () => {
     });
   });
 
-
   it('returns tenant-scoped escalation candidates excluding the current assignee', async () => {
     prisma.schoolServiceRequest.findFirst.mockResolvedValue({
       id: 'request-1',

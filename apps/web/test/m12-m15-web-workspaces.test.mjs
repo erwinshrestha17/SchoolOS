@@ -70,14 +70,9 @@ describe('M12 and M15 rendered web workspaces', () => {
       'components/notifications/delivery-operations-workspace.tsx',
     );
 
-    for (const permission of [
-      'notices:publish',
-      'notices:schedule',
-      'notices:cancel',
-      'notices:archive',
-    ]) {
-      assert.ok(detail.includes(permission));
-    }
+    assert.match(detail, /useNoticeCapabilities/);
+    assert.match(detail, /canPublish/);
+    assert.match(detail, /canCancel/);
     assert.match(detail, /lifecycleMutation\.isPending/);
     assert.match(detail, /actionReason\.trim\(\)/);
     assert.match(acknowledgement, /reason\.trim\(\)/);
@@ -118,10 +113,15 @@ describe('M12 and M15 rendered web workspaces', () => {
       'components/notifications/notification-center-workspace.tsx',
     );
     const layout = read('app/dashboard/layout.tsx');
+    const navModuleMap = read('lib/nav-module-map.ts');
 
     assert.match(center, /safeDashboardHref/);
     assert.match(layout, /prefix: ["']\/dashboard\/notifications["']/);
-    assert.match(layout, /return ["']notifications["']/);
+    assert.match(layout, /getRequiredModuleForHref/);
+    assert.match(
+      navModuleMap,
+      /prefix: ["']\/dashboard\/notifications["'], module: ["']notifications["']/,
+    );
     assert.match(layout, /notifications:view_own/);
   });
 });

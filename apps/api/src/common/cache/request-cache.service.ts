@@ -35,7 +35,8 @@ export class RequestCacheService {
     if (!isActive) return null;
 
     let store = this.cls.get(REQUEST_CACHE_KEY) as
-      Map<string, Promise<unknown>> | undefined;
+      | Map<string, Promise<unknown>>
+      | undefined;
 
     if (!store) {
       store = new Map<string, Promise<unknown>>();

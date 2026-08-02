@@ -48,16 +48,21 @@ describe('M13 Learning frontend contracts', () => {
   it('wires Learning through dashboard permissions and module entitlements', () => {
     const layout = read('app/dashboard/layout.tsx');
     const sidebar = read('components/layout/sidebar.tsx');
+    const navModuleMap = read('lib/nav-module-map.ts');
 
     assert.match(layout, /prefix:\s*['"]\/dashboard\/learning['"]/);
     assert.match(layout, /['"]learning:read['"]/);
     assert.match(layout, /['"]learning:launch['"]/);
-    assert.match(layout, /return ['"]learning['"]/);
+    assert.match(layout, /getRequiredModuleForHref/);
+    assert.match(
+      navModuleMap,
+      /prefix: ["']\/dashboard\/learning["'], module: ["']learning["']/,
+    );
 
     assert.match(sidebar, /label:\s*'Learning'/);
     assert.match(sidebar, /href:\s*'\/dashboard\/learning'/);
     assert.match(sidebar, /learningPermissions/);
-    assert.match(sidebar, /return 'learning'/);
+    assert.match(sidebar, /getRequiredModuleForHref/);
   });
 
   it('adds a real Learning API client for the backend MVP endpoints', () => {

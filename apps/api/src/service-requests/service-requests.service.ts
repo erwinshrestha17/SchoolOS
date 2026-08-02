@@ -664,10 +664,7 @@ export class ServiceRequestsService {
   ) {
     this.assertManager(actor, true);
     const request = await this.getManagerMutableRequest(requestId, actor);
-    if (
-      request.assignedToId &&
-      request.assignedToId === dto.assignedToUserId
-    ) {
+    if (request.assignedToId && request.assignedToId === dto.assignedToUserId) {
       throw new ConflictException(
         'Escalation must reassign the case to a different manager.',
       );

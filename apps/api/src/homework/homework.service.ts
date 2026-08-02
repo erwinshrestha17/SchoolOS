@@ -325,12 +325,8 @@ export class HomeworkService {
       academicYears.map((item) => [item.id, item.name]),
     );
     const classNames = new Map(classes.map((item) => [item.id, item.name]));
-    const sectionNames = new Map(
-      sections.map((item) => [item.id, item.name]),
-    );
-    const subjectNames = new Map(
-      subjects.map((item) => [item.id, item.name]),
-    );
+    const sectionNames = new Map(sections.map((item) => [item.id, item.name]));
+    const subjectNames = new Map(subjects.map((item) => [item.id, item.name]));
     const items = scopes
       .filter(
         (scope) =>

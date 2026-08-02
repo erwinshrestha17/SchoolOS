@@ -17,7 +17,9 @@ describe('parsePaymentProviderOutboundUrl', () => {
     process.env.NODE_ENV = 'development';
     process.env.DEPLOY_ENV = 'local-staging';
     expect(
-      parsePaymentProviderOutboundUrl('http://127.0.0.1:4010/intents').toString(),
+      parsePaymentProviderOutboundUrl(
+        'http://127.0.0.1:4010/intents',
+      ).toString(),
     ).toBe('http://127.0.0.1:4010/intents');
   });
 });

@@ -150,13 +150,7 @@ export class PrismaService
             const tenantId = cls?.get(TENANT_ID_KEY);
             const bypass = Boolean(cls?.get(TENANT_SCOPE_BYPASS_KEY));
             return query(
-              applyTenantScopeToArgs(
-                model,
-                operation,
-                args,
-                tenantId,
-                bypass,
-              ),
+              applyTenantScopeToArgs(model, operation, args, tenantId, bypass),
             );
           },
         },

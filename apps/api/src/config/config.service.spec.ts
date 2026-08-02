@@ -211,8 +211,7 @@ describe('ConfigService production validation', () => {
 function setCompleteProductionEnvironment() {
   process.env.NODE_ENV = 'production';
   process.env.ALLOW_PROD_BOOT = 'true';
-  process.env.DATABASE_URL =
-    'postgresql://schoolos:schoolos@db:5432/schoolos';
+  process.env.DATABASE_URL = 'postgresql://schoolos:schoolos@db:5432/schoolos';
   process.env.REDIS_HOST = 'redis';
   process.env.REDIS_PORT = '6379';
   process.env.JWT_SECRET = 'x'.repeat(40);

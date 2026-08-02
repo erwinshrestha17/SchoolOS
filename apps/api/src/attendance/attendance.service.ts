@@ -6885,8 +6885,7 @@ function summarizeAttendance(records: Array<{ status: AttendanceStatus }>) {
       (record) => record.status === AttendanceStatus.UNEXCUSED_LEAVE,
     ).length,
     earlyAuthorizedDeparture: records.filter(
-      (record) =>
-        record.status === AttendanceStatus.EARLY_AUTHORIZED_DEPARTURE,
+      (record) => record.status === AttendanceStatus.EARLY_AUTHORIZED_DEPARTURE,
     ).length,
     unauthorizedDeparture: records.filter(
       (record) => record.status === AttendanceStatus.UNAUTHORIZED_DEPARTURE,

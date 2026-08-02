@@ -1,4 +1,11 @@
-import { IsDateString, IsDecimal, IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsDateString,
+  IsDecimal,
+  IsObject,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 
 export class CountCashierCloseDto {
   @IsDateString()

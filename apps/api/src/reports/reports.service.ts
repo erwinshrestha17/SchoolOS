@@ -2228,6 +2228,11 @@ export class ReportsService {
     this.register({
       definition: {
         key: 'statutory-tds-summary',
+        // Per-deductee TDS detail for a payroll month, which is TAX-01 rather
+        // than PAY-04 (payroll-side tax deductions) or TAX-02 (the payable
+        // side). Linking it makes the export classify STATUTORY_DRAFT so the
+        // artifact is not presented as final before Nepal-qualified review.
+        financialReportId: 'TAX-01',
         name: 'Statutory TDS Summary',
         description: 'Monthly summary of TDS deductions',
         category: 'payroll',
@@ -3137,7 +3142,10 @@ export class ReportsService {
       ];
       metaSheet.getRow(1).font = { bold: true };
       if (metadata.watermark) {
-        metaSheet.addRow({ field: 'Classification', value: metadata.watermark });
+        metaSheet.addRow({
+          field: 'Classification',
+          value: metadata.watermark,
+        });
       }
       for (const [field, value] of Object.entries(
         metadata.displayedTotals ?? {},

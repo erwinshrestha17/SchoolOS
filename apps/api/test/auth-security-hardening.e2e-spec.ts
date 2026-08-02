@@ -68,7 +68,10 @@ describe('Auth Security Hardening (Regression)', () => {
             createPassThroughRedisCache(),
           ),
         },
-        { provide: RequestCacheService, useValue: createPassThroughRequestCache() },
+        {
+          provide: RequestCacheService,
+          useValue: createPassThroughRequestCache(),
+        },
       ],
     }).compile();
 

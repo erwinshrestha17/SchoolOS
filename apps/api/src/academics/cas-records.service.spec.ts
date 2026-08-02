@@ -181,13 +181,10 @@ describe('CasRecordsService', () => {
       ];
 
       await expect(
-        service.create(
-          { ...validDto, sectionId: 'section-1' },
-          {
-            ...teacherActor,
-            permissions: ['academics:enter_marks'],
-          } as AuthContext,
-        ),
+        service.create({ ...validDto, sectionId: 'section-1' }, {
+          ...teacherActor,
+          permissions: ['academics:enter_marks'],
+        } as AuthContext),
       ).rejects.toThrow(ForbiddenException);
     });
 
@@ -220,13 +217,10 @@ describe('CasRecordsService', () => {
       });
 
       await expect(
-        service.create(
-          { ...validDto, sectionId: 'section-1' },
-          {
-            ...teacherActor,
-            permissions: ['academics:enter_marks'],
-          } as AuthContext,
-        ),
+        service.create({ ...validDto, sectionId: 'section-1' }, {
+          ...teacherActor,
+          permissions: ['academics:enter_marks'],
+        } as AuthContext),
       ).resolves.toBeDefined();
     });
   });

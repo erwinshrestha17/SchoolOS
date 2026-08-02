@@ -66,7 +66,11 @@ describe('Student fee ledger bounded projection (real database)', () => {
 
   async function seedStudent(ownerTenantId: string, label: string) {
     const classroom = await prisma.class.create({
-      data: { tenantId: ownerTenantId, name: `Grade ${label} ${SUFFIX}`, level: 1 },
+      data: {
+        tenantId: ownerTenantId,
+        name: `Grade ${label} ${SUFFIX}`,
+        level: 1,
+      },
     });
     const academicYear = await prisma.academicYear.create({
       data: {
@@ -283,17 +287,39 @@ describe('Student fee ledger bounded projection (real database)', () => {
   afterAll(async () => {
     cls.setTenant(undefined);
     await prisma.runWithoutTenantScope('test teardown', async () => {
-      await prisma.fiscalPeriod.deleteMany({ where: { tenantId: { in: [tenantId, otherTenantId] } } });
-      await prisma.fiscalYear.deleteMany({ where: { tenantId: { in: [tenantId, otherTenantId] } } });
-      await prisma.paymentAllocation.deleteMany({ where: { tenantId: { in: [tenantId, otherTenantId] } } });
-      await prisma.paymentRefund.deleteMany({ where: { tenantId: { in: [tenantId, otherTenantId] } } });
-      await prisma.receipt.deleteMany({ where: { tenantId: { in: [tenantId, otherTenantId] } } });
-      await prisma.payment.deleteMany({ where: { tenantId: { in: [tenantId, otherTenantId] } } });
-      await prisma.feeWaiver.deleteMany({ where: { tenantId: { in: [tenantId, otherTenantId] } } });
-      await prisma.invoice.deleteMany({ where: { tenantId: { in: [tenantId, otherTenantId] } } });
-      await prisma.student.deleteMany({ where: { tenantId: { in: [tenantId, otherTenantId] } } });
-      await prisma.academicYear.deleteMany({ where: { tenantId: { in: [tenantId, otherTenantId] } } });
-      await prisma.class.deleteMany({ where: { tenantId: { in: [tenantId, otherTenantId] } } });
+      await prisma.fiscalPeriod.deleteMany({
+        where: { tenantId: { in: [tenantId, otherTenantId] } },
+      });
+      await prisma.fiscalYear.deleteMany({
+        where: { tenantId: { in: [tenantId, otherTenantId] } },
+      });
+      await prisma.paymentAllocation.deleteMany({
+        where: { tenantId: { in: [tenantId, otherTenantId] } },
+      });
+      await prisma.paymentRefund.deleteMany({
+        where: { tenantId: { in: [tenantId, otherTenantId] } },
+      });
+      await prisma.receipt.deleteMany({
+        where: { tenantId: { in: [tenantId, otherTenantId] } },
+      });
+      await prisma.payment.deleteMany({
+        where: { tenantId: { in: [tenantId, otherTenantId] } },
+      });
+      await prisma.feeWaiver.deleteMany({
+        where: { tenantId: { in: [tenantId, otherTenantId] } },
+      });
+      await prisma.invoice.deleteMany({
+        where: { tenantId: { in: [tenantId, otherTenantId] } },
+      });
+      await prisma.student.deleteMany({
+        where: { tenantId: { in: [tenantId, otherTenantId] } },
+      });
+      await prisma.academicYear.deleteMany({
+        where: { tenantId: { in: [tenantId, otherTenantId] } },
+      });
+      await prisma.class.deleteMany({
+        where: { tenantId: { in: [tenantId, otherTenantId] } },
+      });
     });
     await prisma.tenant.deleteMany({
       where: { id: { in: [tenantId, otherTenantId].filter(Boolean) } },
@@ -437,7 +463,9 @@ describe('Student fee ledger bounded projection (real database)', () => {
 
     expect(payments.rows.every((row) => row.type === 'PAYMENT')).toBe(true);
     for (const row of payments.rows) {
-      const inFullStream = all.rows.find((candidate) => candidate.id === row.id);
+      const inFullStream = all.rows.find(
+        (candidate) => candidate.id === row.id,
+      );
       expect(row.runningBalance).toBe(inFullStream?.runningBalance);
     }
   });

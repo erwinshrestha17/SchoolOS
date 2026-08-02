@@ -334,8 +334,8 @@ export class RolesService {
       const role = roleByName.get(roleName);
       const current = new Set(
         (role?.rolePermissions ?? [])
-          .map(({ permission }) =>
-            `${permission.resource}:${permission.action}`,
+          .map(
+            ({ permission }) => `${permission.resource}:${permission.action}`,
           )
           .filter(isFinancePermissionKey),
       );

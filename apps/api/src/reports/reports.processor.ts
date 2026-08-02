@@ -44,7 +44,9 @@ export class ReportsProcessor extends WorkerHost {
       this.logger,
       `report export ${reportKey}`,
       async () => {
-        this.logger.log(`Processing report ${reportKey} for export ${exportId}`);
+        this.logger.log(
+          `Processing report ${reportKey} for export ${exportId}`,
+        );
 
         try {
           await this.prisma.reportExport.update({

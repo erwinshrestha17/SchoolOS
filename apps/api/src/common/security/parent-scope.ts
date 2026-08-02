@@ -5,8 +5,7 @@ import type { AuthContext } from '../../auth/auth.types';
 import type { PrismaService } from '../../prisma/prisma.service';
 import { recordAuthorizationDenial } from './authorization-audit';
 
-export const GUARDIAN_CAPABILITY_DENIED_CODE =
-  'GUARDIAN_CAPABILITY_DENIED';
+export const GUARDIAN_CAPABILITY_DENIED_CODE = 'GUARDIAN_CAPABILITY_DENIED';
 
 const GUARDIAN_CAPABILITY_DENIED_MESSAGE =
   'You are not authorized for this guardian-child action';
@@ -138,10 +137,7 @@ export async function requireGuardianCapability(
   capability: GuardianCapability,
   audit?: Pick<AuditService, 'record'>,
 ) {
-  if (
-    !actor.roles.includes('parent') &&
-    !actor.roles.includes('guardian')
-  ) {
+  if (!actor.roles.includes('parent') && !actor.roles.includes('guardian')) {
     if (audit) {
       await recordAuthorizationDenial(audit, {
         actor,

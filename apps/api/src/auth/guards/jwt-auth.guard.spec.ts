@@ -27,7 +27,6 @@ describe('JwtAuthGuard', () => {
     user: { findUnique: jest.Mock };
     supportOverride: { findFirst: jest.Mock };
     userRole: { findMany: jest.Mock };
-    rolePermission: { findMany: jest.Mock };
   };
   let cls: { set: jest.Mock; isActive: jest.Mock<boolean, []> };
 
@@ -51,12 +50,31 @@ describe('JwtAuthGuard', () => {
     tenant: { id: 'tenant-1', isActive: true },
   };
 
-  // Roles and permissions are resolved by AuthzCacheService from these two
-  // reads instead of a nested include on the user row.
-  const mockUserRoles = [{ role: { name: 'admin' } }];
-  const mockRolePermissions = [
-    { permission: { resource: 'students', action: 'read' } },
+  // Roles and permissions are resolved by AuthzCacheService from a nested
+  // userRole.findMany select instead of a flat rolePermission query.
+  const mockUserRoles = [
+    {
+      expiresAt: null,
+      role: {
+        name: 'admin',
+        rolePermissions: [
+          { permission: { resource: 'students', action: 'read' } },
+        ],
+      },
+    },
   ];
+
+  function mockPlatformSuperAdminRoles() {
+    prisma.userRole.findMany.mockResolvedValue([
+      {
+        expiresAt: null,
+        role: {
+          name: 'platform_super_admin',
+          rolePermissions: [],
+        },
+      },
+    ]);
+  }
 
   beforeEach(() => {
     jwtService = {
@@ -85,9 +103,6 @@ describe('JwtAuthGuard', () => {
       },
       userRole: {
         findMany: jest.fn().mockResolvedValue(mockUserRoles),
-      },
-      rolePermission: {
-        findMany: jest.fn().mockResolvedValue(mockRolePermissions),
       },
     };
     cls = {
@@ -214,9 +229,11 @@ describe('JwtAuthGuard', () => {
 
   it('rejects tenant override attempts from tenant users including principals', async () => {
     prisma.userRole.findMany.mockResolvedValueOnce([
-      { role: { name: 'principal' } },
+      {
+        expiresAt: null,
+        role: { name: 'principal', rolePermissions: [] },
+      },
     ]);
-    prisma.rolePermission.findMany.mockResolvedValueOnce([]);
     const { context } = createContext({
       'x-schoolos-tenant-id': 'tenant-2',
     });
@@ -230,10 +247,7 @@ describe('JwtAuthGuard', () => {
   });
 
   it('rejects platform overrides without an active support session', async () => {
-    prisma.userRole.findMany.mockResolvedValueOnce([
-      { role: { name: 'platform_super_admin' } },
-    ]);
-    prisma.rolePermission.findMany.mockResolvedValueOnce([]);
+    mockPlatformSuperAdminRoles();
     prisma.supportOverride.findFirst.mockResolvedValueOnce(null);
     const { context } = createContext({
       'x-schoolos-tenant-id': 'tenant-2',
@@ -259,10 +273,7 @@ describe('JwtAuthGuard', () => {
   });
 
   it('allows platform super admins to override to an active tenant and audits it', async () => {
-    prisma.userRole.findMany.mockResolvedValueOnce([
-      { role: { name: 'platform_super_admin' } },
-    ]);
-    prisma.rolePermission.findMany.mockResolvedValueOnce([]);
+    mockPlatformSuperAdminRoles();
     prisma.tenant.findUnique.mockResolvedValueOnce({
       id: 'tenant-2',
       isActive: true,
@@ -303,10 +314,7 @@ describe('JwtAuthGuard', () => {
     // Both assertions below run a full canActivate, so this must be a
     // persistent mock: with `mockResolvedValueOnce` the second call would fall
     // back to a non-platform role and reject for the wrong reason.
-    prisma.userRole.findMany.mockResolvedValue([
-      { role: { name: 'platform_super_admin' } },
-    ]);
-    prisma.rolePermission.findMany.mockResolvedValue([]);
+    mockPlatformSuperAdminRoles();
     prisma.supportOverride.findFirst.mockResolvedValue({
       id: 'override-1',
       isActive: true,

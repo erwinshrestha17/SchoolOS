@@ -176,7 +176,7 @@ describe('ServiceRequestsService', () => {
         'student-1',
         {
           confirmStudentId: 'student-1',
-        type: SchoolServiceRequestType.GENERAL_COMPLAINT,
+          type: SchoolServiceRequestType.GENERAL_COMPLAINT,
           category: SchoolServiceRequestCategory.OTHER,
           subject: 'Existing key',
           description: 'This should not reuse another family request key.',

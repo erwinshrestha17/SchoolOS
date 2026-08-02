@@ -94,10 +94,12 @@ describe('P0-01 tenant isolation (real database)', () => {
   afterAll(async () => {
     // Isolated fixtures, removed so this suite never pollutes a shared tenant.
     cls.setTenant(undefined);
-    await prisma.runWithoutTenantScope('test teardown across both tenants', () =>
-      prisma.class.deleteMany({
-        where: { name: { contains: SUFFIX } },
-      }),
+    await prisma.runWithoutTenantScope(
+      'test teardown across both tenants',
+      () =>
+        prisma.class.deleteMany({
+          where: { name: { contains: SUFFIX } },
+        }),
     );
     await prisma.tenant.deleteMany({
       where: { id: { in: [tenantAId, tenantBId].filter(Boolean) } },

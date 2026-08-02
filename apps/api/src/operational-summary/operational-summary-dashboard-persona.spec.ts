@@ -146,14 +146,23 @@ describe('OperationalSummaryService dashboard persona projection', () => {
       email: 'hr@school.test',
       authMethod: AuthMethod.PASSWORD,
       roles: ['hr_manager'],
-      permissions: ['staff:read', 'payroll:read', 'attendance:read', 'notices:read'],
+      permissions: [
+        'staff:read',
+        'payroll:read',
+        'attendance:read',
+        'notices:read',
+      ],
     };
 
     const summary = await service.getDashboardSummary(hr);
 
     expect(summary.compositionPersona).toBe('hr');
     expect(summary.modules.map((module) => module.module)).toEqual(
-      expect.arrayContaining(['m7_hr_payroll', 'm2_attendance', 'm10_communications']),
+      expect.arrayContaining([
+        'm7_hr_payroll',
+        'm2_attendance',
+        'm10_communications',
+      ]),
     );
     expect(summary.modules.map((module) => module.module)).not.toContain(
       'm1_students',

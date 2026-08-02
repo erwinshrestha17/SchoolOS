@@ -42,9 +42,7 @@ export class RolesController {
 
   @Get('finance-reconciliation')
   @Permissions('roles:manage_permissions')
-  previewFinancePermissionReconciliation(
-    @CurrentAuth() auth: AuthContext,
-  ) {
+  previewFinancePermissionReconciliation(@CurrentAuth() auth: AuthContext) {
     return this.rolesService.previewFinancePermissionReconciliation(auth);
   }
 

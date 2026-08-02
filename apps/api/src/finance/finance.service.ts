@@ -320,6 +320,12 @@ const cashierCloseUserInclude = {
 const STUDENT_LEDGER_EXPORT_PAGE_SIZE = 500;
 /** Hard ceiling on an exported ledger; beyond this the export is refused. */
 const STUDENT_LEDGER_EXPORT_MAX_ROWS = 10000;
+/**
+ * Deep-paging ceiling for the refund/reversal register. The register merges two
+ * differently-ordered sources, so a page at offset N needs N+limit rows from
+ * each; this bounds that scan instead of letting it grow without limit.
+ */
+const REFUND_REGISTER_MAX_SCAN = 5000;
 
 interface CollectionStudentSearchRow {
   id: string;
@@ -1415,7 +1421,10 @@ export class FinanceService {
       dto.amountOff === undefined || dto.amountOff === null
         ? null
         : new Prisma.Decimal(dto.amountOff);
-    if (amountOff && (amountOff.isNegative() || amountOff.decimalPlaces() > 2)) {
+    if (
+      amountOff &&
+      (amountOff.isNegative() || amountOff.decimalPlaces() > 2)
+    ) {
       throw new BadRequestException(
         'Discount amount must be a non-negative decimal with no more than two decimal places.',
       );
@@ -2809,19 +2818,73 @@ export class FinanceService {
       };
     });
 
+    // Report-wide money totals come from database aggregates over the whole
+    // filtered set. Summing the page would silently understate every figure
+    // beyond page one while still being labelled a total.
+    const [grossAggregate, refundAggregate] = await Promise.all([
+      this.prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: { tenantId: actor.tenantId, receipt: { is: where } },
+      }),
+      this.prisma.paymentRefund.aggregate({
+        _sum: { amount: true },
+        where: {
+          tenantId: actor.tenantId,
+          payment: { is: { receipt: { is: where } } },
+        },
+      }),
+    ]);
+    const reportGross = new Prisma.Decimal(grossAggregate._sum.amount ?? 0);
+    const reportRefunded = new Prisma.Decimal(refundAggregate._sum.amount ?? 0);
+
     const summary = {
       totalReceipts: total,
       displayedReceipts: rows.length,
-      totalAmount: sumMoneyStrings(rows.map((row) => row.amount)),
-      totalRefundedAmount: sumMoneyStrings(
-        rows.map((row) => row.refundedAmount),
-      ),
-      totalNetAmount: sumMoneyStrings(rows.map((row) => row.netAmount)),
+      totalAmount: reportGross.toFixed(2),
+      totalRefundedAmount: reportRefunded.toFixed(2),
+      totalNetAmount: reportGross.sub(reportRefunded).toFixed(2),
+    };
+    /** Totals for the displayed page only — never the official figures. */
+    const pageTotals = {
+      rowCount: rows.length,
+      amount: sumMoneyStrings(rows.map((row) => row.amount)),
+      refundedAmount: sumMoneyStrings(rows.map((row) => row.refundedAmount)),
+      netAmount: sumMoneyStrings(rows.map((row) => row.netAmount)),
     };
 
+    const envelope = await this.buildFinancialReportEnvelope({
+      reportId: 'FEE-17' satisfies FinancialReportId,
+      actor,
+      generatedAt: new Date(),
+      accountingBasis: 'CASH',
+      postingBasis: 'POSTED_WITH_PENDING_DISCLOSED',
+      filters: {
+        studentId: filters.studentId ?? null,
+        fromDate: filters.fromDate ?? null,
+        toDate: filters.toDate ?? null,
+        paymentMethod: filters.paymentMethod ?? null,
+      },
+      sourceFreshness: [
+        {
+          module: 'M3',
+          refreshedAt: new Date().toISOString(),
+          includesPending: true,
+        },
+      ],
+      // Envelope totals are money only; row counts live in pagination.
+      totals: {
+        totalAmount: summary.totalAmount,
+        totalRefundedAmount: summary.totalRefundedAmount,
+        totalNetAmount: summary.totalNetAmount,
+      },
+      pagination: { page, limit, total },
+    });
+
     return {
+      ...envelope,
       rows,
       summary,
+      pageTotals,
       pagination: {
         total,
         page,
@@ -3019,6 +3082,21 @@ export class FinanceService {
   ) {
     const fromDate = filters.fromDate ? new Date(filters.fromDate) : undefined;
     const toDate = filters.toDate ? new Date(filters.toDate) : undefined;
+    const page = filters.page ?? 1;
+    const limit = filters.limit ?? 50;
+    const skip = (page - 1) * limit;
+
+    if (skip + limit > REFUND_REGISTER_MAX_SCAN) {
+      throw new BadRequestException(
+        `This register supports paging up to ${REFUND_REGISTER_MAX_SCAN} records. Narrow the date range to reach older entries.`,
+      );
+    }
+
+    // The register merges two sources ordered by processedAt, so neither can be
+    // offset independently in SQL. Taking skip+limit from each is the smallest
+    // bound that still yields an exact merged page, instead of loading every
+    // refund and reversal in the tenant and slicing in memory.
+    const perSourceTake = skip + limit;
     const rows: RefundReversalRegisterRow[] = [];
 
     if (!filters.recordType || filters.recordType === 'REFUND') {
@@ -3052,8 +3130,9 @@ export class FinanceService {
           },
           createdBy: { select: { email: true } },
         },
-        orderBy: [{ refundDate: 'desc' }],
-        take: 5000,
+        // id breaks ties so the merged page is deterministic across requests.
+        orderBy: [{ refundDate: 'desc' }, { id: 'desc' }],
+        take: perSourceTake,
       });
 
       const refundJournalEntries = await this.prisma.journalEntry.findMany({
@@ -3126,8 +3205,8 @@ export class FinanceService {
             take: 1,
           },
         },
-        orderBy: [{ reversedAt: 'desc' }],
-        take: 5000,
+        orderBy: [{ reversedAt: 'desc' }, { id: 'desc' }],
+        take: perSourceTake,
       });
 
       const reversalEntries = await this.prisma.journalEntry.findMany({
@@ -3179,25 +3258,103 @@ export class FinanceService {
       (left, right) => right.processedAt.getTime() - left.processedAt.getTime(),
     );
 
-    const page = filters.page ?? 1;
-    const limit = filters.limit ?? 50;
-    const skip = (page - 1) * limit;
     const pageRows = rows.slice(skip, skip + limit);
 
+    // Report-wide counts and totals are database aggregates over the whole
+    // filtered set, not over the bounded slice fetched for this page.
+    const refundWhere: Prisma.PaymentRefundWhereInput = {
+      tenantId: actor.tenantId,
+      ...(fromDate || toDate
+        ? {
+            refundDate: {
+              ...(fromDate ? { gte: fromDate } : {}),
+              ...(toDate ? { lte: toDate } : {}),
+            },
+          }
+        : {}),
+    };
+    const reversalWhere: Prisma.PaymentWhereInput = {
+      tenantId: actor.tenantId,
+      status: PaymentStatus.REVERSED,
+      ...(fromDate || toDate
+        ? {
+            reversedAt: {
+              ...(fromDate ? { gte: fromDate } : {}),
+              ...(toDate ? { lte: toDate } : {}),
+            },
+          }
+        : {}),
+    };
+    const includeRefunds =
+      !filters.recordType || filters.recordType === 'REFUND';
+    const includeReversals =
+      !filters.recordType || filters.recordType === 'REVERSAL';
+    const [refundAggregate, reversalAggregate] = await Promise.all([
+      includeRefunds
+        ? this.prisma.paymentRefund.aggregate({
+            _count: { _all: true },
+            _sum: { amount: true },
+            where: refundWhere,
+          })
+        : null,
+      includeReversals
+        ? this.prisma.payment.aggregate({
+            _count: { _all: true },
+            _sum: { amount: true },
+            where: reversalWhere,
+          })
+        : null,
+    ]);
+
+    const refundCount = refundAggregate?._count._all ?? 0;
+    const reversalCount = reversalAggregate?._count._all ?? 0;
+    const total = refundCount + reversalCount;
+    const totalAmount = new Prisma.Decimal(refundAggregate?._sum.amount ?? 0)
+      .add(new Prisma.Decimal(reversalAggregate?._sum.amount ?? 0))
+      .toFixed(2);
+    const summary = {
+      totalRecords: total,
+      refundCount,
+      reversalCount,
+      totalAmount,
+    };
+
+    const envelope = await this.buildFinancialReportEnvelope({
+      reportId: 'FEE-15' satisfies FinancialReportId,
+      actor,
+      generatedAt: new Date(),
+      accountingBasis: 'CASH',
+      postingBasis: 'POSTED_WITH_PENDING_DISCLOSED',
+      filters: {
+        fromDate: filters.fromDate ?? null,
+        toDate: filters.toDate ?? null,
+        recordType: filters.recordType ?? null,
+      },
+      sourceFreshness: [
+        {
+          module: 'M3',
+          refreshedAt: new Date().toISOString(),
+          includesPending: true,
+        },
+      ],
+      totals: { totalAmount },
+      pagination: { page, limit, total },
+    });
+
     return {
+      ...envelope,
       rows: pageRows,
-      summary: {
-        totalRecords: rows.length,
-        refundCount: rows.filter((row) => row.recordType === 'REFUND').length,
-        reversalCount: rows.filter((row) => row.recordType === 'REVERSAL')
-          .length,
-        totalAmount: sumMoneyStrings(rows.map((row) => row.amount)),
+      summary,
+      /** Totals for the displayed page only — never the official figures. */
+      pageTotals: {
+        rowCount: pageRows.length,
+        amount: sumMoneyStrings(pageRows.map((row) => row.amount)),
       },
       pagination: {
-        total: rows.length,
+        total,
         page,
         limit,
-        totalPages: rows.length === 0 ? 0 : Math.ceil(rows.length / limit),
+        totalPages: total === 0 ? 0 : Math.ceil(total / limit),
       },
     };
   }
@@ -4895,9 +5052,9 @@ export class FinanceService {
       windowDebit: new Prisma.Decimal(windowSummary?.windowDebit ?? 0).toFixed(
         2,
       ),
-      windowCredit: new Prisma.Decimal(windowSummary?.windowCredit ?? 0).toFixed(
-        2,
-      ),
+      windowCredit: new Prisma.Decimal(
+        windowSummary?.windowCredit ?? 0,
+      ).toFixed(2),
     };
     const envelope = await this.buildFinancialReportEnvelope({
       reportId: 'FEE-01' satisfies FinancialReportId,
@@ -4958,16 +5115,10 @@ export class FinanceService {
       pageTotals: {
         rowCount: pageRows.length,
         debit: pageRows
-          .reduce(
-            (sum, row) => sum.add(row.debit),
-            new Prisma.Decimal(0),
-          )
+          .reduce((sum, row) => sum.add(row.debit), new Prisma.Decimal(0))
           .toFixed(2),
         credit: pageRows
-          .reduce(
-            (sum, row) => sum.add(row.credit),
-            new Prisma.Decimal(0),
-          )
+          .reduce((sum, row) => sum.add(row.credit), new Prisma.Decimal(0))
           .toFixed(2),
       },
       /** Backend-owned totals for the whole filtered window, across all pages. */

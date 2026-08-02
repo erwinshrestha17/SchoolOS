@@ -37,7 +37,8 @@ describe('canonical development seed', () => {
     expect(source).toContain('prisma.guardian.findFirst');
     expect(source).toContain('prisma.guardian.create');
     expect(source).toContain('prisma.studentGuardian.upsert');
-    expect(source).toContain('prisma.enrollment.upsert');
+    expect(source).toContain('prisma.enrollment.findFirst');
+    expect(source).toContain('prisma.enrollment.create');
     expect(source).toContain('prisma.subjectTeacherAssignment.findMany');
     expect(source).toContain('prisma.timetableSlot.findFirst');
     expect(source).toContain('prisma.attendanceRecord.upsert');

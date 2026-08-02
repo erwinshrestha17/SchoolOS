@@ -33,16 +33,16 @@ describe('MustChangePasswordGuard (P1-01)', () => {
 
   it('passes when mustChangePassword is false', () => {
     (reflector.getAllAndOverride as jest.Mock).mockReturnValue(false);
-    expect(
-      guard.canActivate(makeContext({ mustChangePassword: false })),
-    ).toBe(true);
+    expect(guard.canActivate(makeContext({ mustChangePassword: false }))).toBe(
+      true,
+    );
   });
 
   it('passes when route is allowlisted via SkipMustChangePassword', () => {
     (reflector.getAllAndOverride as jest.Mock).mockReturnValue(true);
-    expect(
-      guard.canActivate(makeContext({ mustChangePassword: true })),
-    ).toBe(true);
+    expect(guard.canActivate(makeContext({ mustChangePassword: true }))).toBe(
+      true,
+    );
   });
 
   it('blocks sensitive routes when mustChangePassword is true', () => {

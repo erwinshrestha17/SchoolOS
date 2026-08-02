@@ -7,9 +7,7 @@ import {
 
 describe('assertConfirmStudentId (P0-07)', () => {
   it('allows matching confirmation', () => {
-    expect(() =>
-      assertConfirmStudentId('child-1', 'child-1'),
-    ).not.toThrow();
+    expect(() => assertConfirmStudentId('child-1', 'child-1')).not.toThrow();
   });
 
   it('rejects missing confirmation', () => {

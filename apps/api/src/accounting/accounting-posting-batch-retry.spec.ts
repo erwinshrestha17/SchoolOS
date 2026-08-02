@@ -80,9 +80,9 @@ describe('AccountingService source posting retry', () => {
     };
     const { service, prisma, auditService } = buildService(batch);
 
-    await expect(service.retryPostingBatch(batch.id, actor)).rejects.toBeInstanceOf(
-      ConflictException,
-    );
+    await expect(
+      service.retryPostingBatch(batch.id, actor),
+    ).rejects.toBeInstanceOf(ConflictException);
 
     expect(prisma.accountingPostingBatch.updateMany).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -115,8 +115,10 @@ function buildBatch(status: AccountingPostingBatchStatus) {
     normalizedPayload: {},
     idempotencyKey: 'M7:PAYROLL_RUN:payroll-1:APPROVAL',
     journalEntryId: null,
-    failureCode: status === AccountingPostingBatchStatus.FAILED ? 'LOCKED' : null,
-    failureDetail: status === AccountingPostingBatchStatus.FAILED ? 'Locked' : null,
+    failureCode:
+      status === AccountingPostingBatchStatus.FAILED ? 'LOCKED' : null,
+    failureDetail:
+      status === AccountingPostingBatchStatus.FAILED ? 'Locked' : null,
     retryCount: 0,
     requestedById: actor.userId,
     postedById: null,
@@ -142,7 +144,9 @@ function buildService(batch: ReturnType<typeof buildBatch>) {
     paymentRefund: { findFirst: jest.fn() },
     chartAccount: { findUniqueOrThrow: jest.fn() },
   };
-  const auditService = { record: jest.fn().mockResolvedValue({ id: 'audit-1' }) };
+  const auditService = {
+    record: jest.fn().mockResolvedValue({ id: 'audit-1' }),
+  };
   const postingService = {
     postPayrollAccrual: jest.fn().mockResolvedValue({ id: 'journal-1' }),
     postPayrollDisbursement: jest.fn(),

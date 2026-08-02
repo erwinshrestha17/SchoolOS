@@ -515,7 +515,8 @@ export class AccountingService implements OnModuleInit {
         {
           tenantId: actor.tenantId,
           paymentId: payment.id,
-          invoiceNumber: payment.invoice?.invoiceNumber ?? 'Unallocated advance',
+          invoiceNumber:
+            payment.invoice?.invoiceNumber ?? 'Unallocated advance',
           receiptNumber: payment.receipt.receiptNumber,
           paymentAmount: payment.amount,
           paymentMethod: payment.method,
@@ -534,7 +535,8 @@ export class AccountingService implements OnModuleInit {
         where: { id: batch.sourceBatchId, tenantId: actor.tenantId },
         include: { lines: { include: { feeHead: true } } },
       });
-      if (!invoice) throw new NotFoundException('Invoice source record not found');
+      if (!invoice)
+        throw new NotFoundException('Invoice source record not found');
       await this.postingService.postInvoice(
         {
           tenantId: actor.tenantId,
@@ -560,7 +562,8 @@ export class AccountingService implements OnModuleInit {
       const waiver = await this.prisma.feeWaiver.findFirst({
         where: { id: batch.sourceBatchId, tenantId: actor.tenantId },
       });
-      if (!waiver) throw new NotFoundException('Fee waiver source record not found');
+      if (!waiver)
+        throw new NotFoundException('Fee waiver source record not found');
       await this.postingService.postFeeWaiver(
         {
           tenantId: actor.tenantId,
@@ -581,7 +584,8 @@ export class AccountingService implements OnModuleInit {
         where: { id: batch.sourceBatchId, tenantId: actor.tenantId },
         include: { payment: true },
       });
-      if (!refund) throw new NotFoundException('Payment refund source record not found');
+      if (!refund)
+        throw new NotFoundException('Payment refund source record not found');
       const receivable = await this.prisma.chartAccount.findUniqueOrThrow({
         where: {
           tenantId_code: { tenantId: actor.tenantId, code: '1200' },
@@ -617,10 +621,10 @@ export class AccountingService implements OnModuleInit {
 
   private serializePostingBatch<
     T extends {
-    sourceTotal: Prisma.Decimal;
-    postedTotal: Prisma.Decimal;
-    reconciliationDifference: Prisma.Decimal;
-    [key: string]: unknown;
+      sourceTotal: Prisma.Decimal;
+      postedTotal: Prisma.Decimal;
+      reconciliationDifference: Prisma.Decimal;
+      [key: string]: unknown;
     },
   >(batch: T) {
     return {

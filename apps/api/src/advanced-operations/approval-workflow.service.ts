@@ -178,13 +178,12 @@ export class ApprovalWorkflowService {
         idempotencyKey: dto.idempotencyKey ?? null,
         deadlineAt,
         steps: {
-          create: this.buildSteps(
-            policy,
-            defaultApproverPermission,
-          ).map((step) => ({
-            tenantId: actor.tenantId,
-            ...step,
-          })),
+          create: this.buildSteps(policy, defaultApproverPermission).map(
+            (step) => ({
+              tenantId: actor.tenantId,
+              ...step,
+            }),
+          ),
         },
       },
       include: { steps: true, decisions: true, comments: true },

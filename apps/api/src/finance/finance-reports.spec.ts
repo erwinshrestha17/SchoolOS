@@ -22,9 +22,11 @@ function createService(receipts: Array<Record<string, unknown>>) {
     },
     paymentRefund: {
       findMany: jest.fn().mockResolvedValue([]),
+      aggregate: jest.fn().mockResolvedValue({ _sum: { amount: null } }),
     },
     payment: {
       findMany: jest.fn().mockResolvedValue([]),
+      aggregate: jest.fn().mockResolvedValue({ _sum: { amount: null } }),
     },
     journalEntry: {
       findMany: jest.fn().mockResolvedValue([]),
@@ -120,6 +122,19 @@ describe('FinanceService P0 report helpers', () => {
         ]),
         count: jest.fn().mockResolvedValue(1),
       },
+      payment: {
+        aggregate: jest.fn().mockResolvedValue({
+          _sum: { amount: new Prisma.Decimal(1000) },
+        }),
+      },
+      paymentRefund: {
+        aggregate: jest.fn().mockResolvedValue({
+          _sum: { amount: new Prisma.Decimal(200) },
+        }),
+      },
+      fiscalYear: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
     };
 
     const service = new FinanceService(
@@ -138,6 +153,37 @@ describe('FinanceService P0 report helpers', () => {
 
     expect(report.rows[0]?.netAmount).toBe('800.00');
     expect(report.summary.totalReceipts).toBe(1);
+
+    // Report-wide money totals come from database aggregates over the whole
+    // filtered set, not from summing the displayed page.
+    expect(prisma.payment.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({ _sum: { amount: true } }),
+    );
+    expect(report.summary.totalAmount).toBe('1000.00');
+    expect(report.summary.totalRefundedAmount).toBe('200.00');
+    expect(report.summary.totalNetAmount).toBe('800.00');
+
+    // Page totals stay separate and are labelled as such.
+    expect(report.pageTotals).toEqual({
+      rowCount: 1,
+      amount: '1000.00',
+      refundedAmount: '200.00',
+      netAmount: '800.00',
+    });
+
+    // FEE-17 carries the same versioned envelope as FEE-01.
+    expect(report.report).toEqual(
+      expect.objectContaining({
+        id: 'FEE-17',
+        definitionVersion: '1.0',
+        title: 'Receipt Register',
+        classification: 'CONFIDENTIAL',
+      }),
+    );
+    expect(report.fiscalContext.accountingBasis).toBe('CASH');
+    expect(report.pagination).toEqual(
+      expect.objectContaining({ page: 1, total: 1, totalPages: 1 }),
+    );
   });
 
   it('returns paginated backend-owned unallocated payment balances with posting lineage', async () => {
@@ -211,5 +257,92 @@ describe('FinanceService P0 report helpers', () => {
       limit: 25,
       totalPages: 1,
     });
+  });
+  it('reports FEE-15 refund/reversal totals from aggregates, not from the fetched page', async () => {
+    const prisma = {
+      paymentRefund: {
+        findMany: jest.fn().mockResolvedValue([]),
+        // Report-wide: 40 refunds totalling 9,000 across every page.
+        aggregate: jest.fn().mockResolvedValue({
+          _count: { _all: 40 },
+          _sum: { amount: new Prisma.Decimal('9000.00') },
+        }),
+      },
+      payment: {
+        findMany: jest.fn().mockResolvedValue([]),
+        aggregate: jest.fn().mockResolvedValue({
+          _count: { _all: 10 },
+          _sum: { amount: new Prisma.Decimal('1000.00') },
+        }),
+      },
+      journalEntry: { findMany: jest.fn().mockResolvedValue([]) },
+      fiscalYear: { findFirst: jest.fn().mockResolvedValue(null) },
+    };
+    const service = new FinanceService(
+      prisma as never,
+      { record: jest.fn() } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    const report = await service.getRefundReversalRegisterRows(actor, {
+      page: 1,
+      limit: 10,
+    });
+
+    // Counts and money are backend aggregates over the whole filtered set.
+    expect(report.summary).toEqual({
+      totalRecords: 50,
+      refundCount: 40,
+      reversalCount: 10,
+      totalAmount: '10000.00',
+    });
+    expect(report.pagination).toEqual(
+      expect.objectContaining({ total: 50, page: 1, limit: 10, totalPages: 5 }),
+    );
+    // Page totals describe only what was fetched.
+    expect(report.pageTotals).toEqual({ rowCount: 0, amount: '0.00' });
+
+    // Each source is bounded to skip+limit rather than scanning the tenant.
+    expect(prisma.paymentRefund.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ take: 10 }),
+    );
+    expect(prisma.payment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ take: 10 }),
+    );
+
+    expect(report.report).toEqual(
+      expect.objectContaining({ id: 'FEE-15', title: 'Refund Report' }),
+    );
+  });
+
+  it('refuses refund-register deep paging beyond the bounded scan ceiling', async () => {
+    const prisma = {
+      paymentRefund: { findMany: jest.fn(), aggregate: jest.fn() },
+      payment: { findMany: jest.fn(), aggregate: jest.fn() },
+      journalEntry: { findMany: jest.fn() },
+      fiscalYear: { findFirst: jest.fn() },
+    };
+    const service = new FinanceService(
+      prisma as never,
+      { record: jest.fn() } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(
+      service.getRefundReversalRegisterRows(actor, { page: 200, limit: 50 }),
+    ).rejects.toThrow(/Narrow the date range/);
+    expect(prisma.paymentRefund.findMany).not.toHaveBeenCalled();
   });
 });

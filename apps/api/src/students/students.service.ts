@@ -1427,10 +1427,7 @@ export class StudentsService {
         });
       }
 
-      if (
-        'sectionId' in dto &&
-        nextSectionId !== student.sectionId
-      ) {
+      if ('sectionId' in dto && nextSectionId !== student.sectionId) {
         await tx.studentLifecycleTransition.create({
           data: {
             tenantId: actor.tenantId,

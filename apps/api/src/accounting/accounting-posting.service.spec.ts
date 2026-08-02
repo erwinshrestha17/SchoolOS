@@ -66,9 +66,11 @@ function createPostingClient(overrides?: {
       ),
     },
     accountingPostingBatch: {
-      upsert: jest.fn().mockImplementation(({ create }) =>
-        Promise.resolve({ id: 'batch-1', ...create }),
-      ),
+      upsert: jest
+        .fn()
+        .mockImplementation(({ create }) =>
+          Promise.resolve({ id: 'batch-1', ...create }),
+        ),
     },
     chartAccount: {
       upsert: jest.fn().mockImplementation(({ where, create }) => {

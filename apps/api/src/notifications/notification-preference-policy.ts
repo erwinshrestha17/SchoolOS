@@ -343,10 +343,7 @@ function categoryForDelivery(
   sourceType: string,
 ): NotificationPreferenceCategory {
   // P0-09: emergency notices must not be treated as opt-outable NOTICE.
-  if (
-    sourceType.includes('emergency') ||
-    sourceType === 'notice_emergency'
-  ) {
+  if (sourceType.includes('emergency') || sourceType === 'notice_emergency') {
     return NotificationPreferenceCategory.EMERGENCY;
   }
   if (

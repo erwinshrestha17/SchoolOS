@@ -39,7 +39,11 @@ describe('NotificationsProcessor', () => {
   });
 
   it('keeps dev-log delivery metadata-only for email, SMS, and push', async () => {
-    const processor = new NotificationsProcessor({} as never, {} as never, createProcessorClsMock() as never);
+    const processor = new NotificationsProcessor(
+      {} as never,
+      {} as never,
+      createProcessorClsMock() as never,
+    );
     const log = jest.fn();
     (processor as any).logger.log = log;
     const deliveryId = 'delivery-safe-log';

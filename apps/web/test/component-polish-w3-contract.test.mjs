@@ -55,7 +55,7 @@ describe("W3 component polish contracts", () => {
       "components/finance/cashier-close-section.tsx",
     ]) {
       const source = read(path);
-      assert.match(source, /from '@\/components\/ui\/button'/);
+      assert.match(source, /from ['"]@\/components\/ui\/button['"]/);
     }
   });
 

@@ -101,10 +101,9 @@ describe('AppThrottlerGuard', () => {
     await guard.onModuleInit();
     const { context } = contextFor({
       path: '/api/v1/students/student-1/guardians/guardian-1/access-actions',
-      handler:
-        StudentsController.prototype.performGuardianRecoveryAction as (
-          ...args: never[]
-        ) => unknown,
+      handler: StudentsController.prototype.performGuardianRecoveryAction as (
+        ...args: never[]
+      ) => unknown,
       controller: StudentsController,
     });
 
@@ -123,10 +122,8 @@ describe('AppThrottlerGuard', () => {
     await guard.onModuleInit();
     const { context } = contextFor({
       path: '/api/v1/admissions/m1/students/student-1/guardians/guardian-1',
-      handler:
-        M1AdmissionsHardeningController.prototype.removeGuardianAccess as (
-          ...args: never[]
-        ) => unknown,
+      handler: M1AdmissionsHardeningController.prototype
+        .removeGuardianAccess as (...args: never[]) => unknown,
       controller: M1AdmissionsHardeningController,
     });
 

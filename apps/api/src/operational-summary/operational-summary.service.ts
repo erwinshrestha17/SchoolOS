@@ -172,11 +172,10 @@ export class OperationalSummaryService {
       );
     }
 
-    const compositionPersona =
-      resolveDashboardCompositionPersonaFromAuth({
-        roles: actor.roles,
-        permissions: actor.permissions,
-      });
+    const compositionPersona = resolveDashboardCompositionPersonaFromAuth({
+      roles: actor.roles,
+      permissions: actor.permissions,
+    });
     if (!compositionPersona) {
       throw new ForbiddenException(
         'This persona does not receive a school dashboard summary.',
@@ -226,13 +225,16 @@ export class OperationalSummaryService {
         status: dashboardStatus(modules),
         summary: {
           visibleModuleCount: modules.length,
-          readyModuleCount: modules.filter((module) => module.status === 'ready')
-            .length,
+          readyModuleCount: modules.filter(
+            (module) => module.status === 'ready',
+          ).length,
           attentionItemCount: attentionItems.length,
         },
         attentionItems,
         recentItems,
-        nextActions: modules.flatMap((module) => module.nextActions).slice(0, 8),
+        nextActions: modules
+          .flatMap((module) => module.nextActions)
+          .slice(0, 8),
         modules,
       },
       compositionPersona,

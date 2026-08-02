@@ -476,7 +476,11 @@ export class MarksService {
       throw new NotFoundException('Student not found in tenant');
     }
 
-    await this.assertStudentMarkReadAccess(actor, student, options.academicYearId);
+    await this.assertStudentMarkReadAccess(
+      actor,
+      student,
+      options.academicYearId,
+    );
 
     const teacherReadScope = await this.getMarkReadScope(actor);
     if (teacherReadScope === 'NONE') {
@@ -840,9 +844,7 @@ export class MarksService {
         TeacherCapability.SUBJECT_RECORD_READ,
       )
     ).filter(
-      (
-        assignment,
-      ): assignment is typeof assignment & { subjectId: string } =>
+      (assignment): assignment is typeof assignment & { subjectId: string } =>
         Boolean(assignment.subjectId),
     );
 

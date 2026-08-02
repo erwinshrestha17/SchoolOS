@@ -158,7 +158,8 @@ export const DEFAULT_ACCOUNTING_SOURCE_MAPPINGS: Array<{
     postingType: 'RECEIPT',
     debitCode: '1010',
     creditCode: '1200',
-    description: 'Default fee receipt posting (cash/bank to student receivable)',
+    description:
+      'Default fee receipt posting (cash/bank to student receivable)',
   },
 ];
 

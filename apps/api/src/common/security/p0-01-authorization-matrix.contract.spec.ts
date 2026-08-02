@@ -88,7 +88,7 @@ describe('P0-01 authorization matrix contract', () => {
 
   it('gates RESULT_PUBLISH and MARKS_UNLOCK on RBAC permissions', () => {
     const controller = readSource('academics/academics.controller.ts');
-    expect(controller).toContain("results/publishing/publish");
+    expect(controller).toContain('results/publishing/publish');
     expect(controller).toContain(
       "@Permissions('academics:manage_report_cards')",
     );
@@ -111,7 +111,9 @@ describe('P0-01 authorization matrix contract', () => {
 
   it('fails closed for missing/suspended tenant jobs', () => {
     const guard = readSource('plans/processor-tenant.guard.ts');
-    expect(guard).toContain('tenantId is missing from job payload (fail-closed)');
+    expect(guard).toContain(
+      'tenantId is missing from job payload (fail-closed)',
+    );
     expect(guard).toContain('shouldProcessTenantJob');
   });
 

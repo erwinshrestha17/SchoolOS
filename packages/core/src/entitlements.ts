@@ -28,6 +28,10 @@ export const CUSTOMER_MODULES = [
   'notifications', // M12 Notifications & Delivery
   'notices', // M15 Notices & Announcements (stable key retained)
   'learning', // M13 Learning Layer
+  // Cross-module reporting and export centre. Enforced as `module.reports` by
+  // ReportsController; the `feature.reports.*` keys below grade its depth, but
+  // without the module every report export is refused outright.
+  'reports',
 ];
 
 export const FEATURE_KEYS = {
@@ -136,6 +140,7 @@ export const ENTITLEMENT_MATRIX: Record<
       'homework',
       'notifications',
       'notices',
+      'reports',
     ],
     features: [
       FEATURE_KEYS.FEES_BASIC,
@@ -159,6 +164,7 @@ export const ENTITLEMENT_MATRIX: Record<
       'homework',
       'notifications',
       'notices',
+      'reports',
     ],
     features: [
       FEATURE_KEYS.FEES_BASIC,
@@ -198,6 +204,7 @@ export const ENTITLEMENT_MATRIX: Record<
       'accounting',
       'notifications',
       'notices',
+      'reports',
     ],
     features: [
       FEATURE_KEYS.FEES_BASIC,
@@ -254,6 +261,7 @@ export const ENTITLEMENT_MATRIX: Record<
       'accounting',
       'notifications',
       'notices',
+      'reports',
     ],
     features: [
       FEATURE_KEYS.FEES_BASIC,

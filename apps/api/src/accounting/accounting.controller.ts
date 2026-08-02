@@ -88,10 +88,7 @@ export class AccountingController {
 
   @Post('posting-batches/:id/retry')
   @Permissions('accounting:posting-batches:retry')
-  retryPostingBatch(
-    @Param('id') id: string,
-    @CurrentAuth() auth: AuthContext,
-  ) {
+  retryPostingBatch(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
     return this.accountingService.retryPostingBatch(id, auth);
   }
 

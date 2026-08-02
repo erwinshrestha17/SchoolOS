@@ -589,19 +589,18 @@ export class AssessmentRetakesService {
       return {};
     }
 
-    const assignments =
+    const assignments = (
+      await this.teacherScopeService.listActiveAssignmentsForCapability(
+        actor,
+        TeacherCapability.SUBJECT_RECORD_READ,
+      )
+    ).filter(
       (
-        await this.teacherScopeService.listActiveAssignmentsForCapability(
-          actor,
-          TeacherCapability.SUBJECT_RECORD_READ,
-        )
-      ).filter(
-        (
-          assignment,
-        ): assignment is typeof assignment & {
-          subjectId: string;
-        } => Boolean(assignment.subjectId),
-      );
+        assignment,
+      ): assignment is typeof assignment & {
+        subjectId: string;
+      } => Boolean(assignment.subjectId),
+    );
     if (assignments.length === 0) {
       return { id: { in: [] } };
     }

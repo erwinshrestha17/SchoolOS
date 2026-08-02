@@ -140,10 +140,18 @@ describe('P0-01 teacher assignment scoping (real database)', () => {
 
         const [sec1, sec2] = await Promise.all([
           prisma.section.create({
-            data: { tenantId: tenantAId, classId: classAId, name: `A${SUFFIX}` },
+            data: {
+              tenantId: tenantAId,
+              classId: classAId,
+              name: `A${SUFFIX}`,
+            },
           }),
           prisma.section.create({
-            data: { tenantId: tenantAId, classId: classAId, name: `B${SUFFIX}` },
+            data: {
+              tenantId: tenantAId,
+              classId: classAId,
+              name: `B${SUFFIX}`,
+            },
           }),
         ]);
         sectionAId = sec1.id;
@@ -373,10 +381,7 @@ describe('P0-01 teacher assignment scoping (real database)', () => {
         permissions: [],
       } as unknown as AuthContext;
 
-      const grant = await service.canActorAccess(
-        marksWrite() as never,
-        orphan,
-      );
+      const grant = await service.canActorAccess(marksWrite() as never, orphan);
 
       expect(grant).toBeNull();
     });

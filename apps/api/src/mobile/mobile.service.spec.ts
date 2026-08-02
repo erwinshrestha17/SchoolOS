@@ -515,9 +515,7 @@ describe('MobileService', () => {
 
     await expect(
       service.getStudentFeesSummary('student-1', actor),
-    ).resolves.toEqual(
-      expect.objectContaining({ totalOutstanding: '0.00' }),
-    );
+    ).resolves.toEqual(expect.objectContaining({ totalOutstanding: '0.00' }));
     await expect(
       service.getStudentFeesSummary('student-1', actor),
     ).rejects.toBeInstanceOf(ForbiddenException);
@@ -923,7 +921,9 @@ describe('MobileService', () => {
       expect.objectContaining({
         where: expect.objectContaining({
           tenantId: 'tenant-1',
-          id: { in: expect.arrayContaining(['head-tuition', 'head-transport']) },
+          id: {
+            in: expect.arrayContaining(['head-tuition', 'head-transport']),
+          },
         }),
       }),
     );
@@ -3625,7 +3625,11 @@ describe('MobileService', () => {
       prisma.activityAttachment.findMany.mockResolvedValue([]);
       prisma.activityReaction.findMany.mockResolvedValue([]);
 
-      const result = await service.getStudentActivityFeed('student-1', actor, '1');
+      const result = await service.getStudentActivityFeed(
+        'student-1',
+        actor,
+        '1',
+      );
 
       expect(result.items).toHaveLength(1);
       expect(result.items[0]).toEqual(
@@ -3699,7 +3703,11 @@ describe('MobileService', () => {
         },
       ]);
 
-      const result = await service.getStudentActivityFeed('student-1', actor, '1');
+      const result = await service.getStudentActivityFeed(
+        'student-1',
+        actor,
+        '1',
+      );
 
       expect(result.items[0]).toEqual(
         expect.objectContaining({
@@ -3708,7 +3716,8 @@ describe('MobileService', () => {
           reactionCount: 2,
           attachments: [
             expect.objectContaining({
-              thumbnailPath: '/activity-feed/attachments/attachment-1/thumbnail',
+              thumbnailPath:
+                '/activity-feed/attachments/attachment-1/thumbnail',
               previewPath: '/activity-feed/attachments/attachment-1/preview',
             }),
           ],

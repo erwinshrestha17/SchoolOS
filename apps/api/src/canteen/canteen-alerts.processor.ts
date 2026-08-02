@@ -62,7 +62,10 @@ export class CanteenAlertsProcessor extends WorkerHost {
         });
 
         if (existing > 0) {
-          return { skipped: true as const, reason: 'Already sent in this window' };
+          return {
+            skipped: true as const,
+            reason: 'Already sent in this window',
+          };
         }
 
         await this.communicationsService.recordDeliveryRecords({

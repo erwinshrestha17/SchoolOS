@@ -1522,7 +1522,9 @@ describe('ActivityFeedService', () => {
       });
       prisma.developmentalMilestone.findMany.mockResolvedValue([]);
 
-      await expect(service.listMilestones(parentActor, {})).resolves.toEqual([]);
+      await expect(service.listMilestones(parentActor, {})).resolves.toEqual(
+        [],
+      );
 
       expect(prisma.class.findMany).not.toHaveBeenCalled();
       expect(prisma.section.findMany).not.toHaveBeenCalled();
@@ -1572,7 +1574,12 @@ describe('ActivityFeedService', () => {
         { id: 'class-1', tenantId: 'tenant-1', name: 'Grade 4' },
       ]);
       prisma.section.findMany.mockResolvedValue([
-        { id: 'section-1', tenantId: 'tenant-1', name: 'A', classId: 'class-1' },
+        {
+          id: 'section-1',
+          tenantId: 'tenant-1',
+          name: 'A',
+          classId: 'class-1',
+        },
       ]);
       prisma.student.findMany.mockResolvedValue([
         {

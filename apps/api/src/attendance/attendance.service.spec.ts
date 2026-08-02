@@ -3880,9 +3880,7 @@ function buildService(options: {
       update: jest.fn().mockResolvedValue(options.reviewedLeave ?? null),
     },
     studentLeaveRequest: {
-      update: jest
-        .fn()
-        .mockResolvedValue(options.reviewedStudentLeave ?? null),
+      update: jest.fn().mockResolvedValue(options.reviewedStudentLeave ?? null),
       findMany: jest.fn().mockResolvedValue(options.studentLeaveRequests ?? []),
     },
     staffLeaveBalance: {
@@ -4067,18 +4065,14 @@ function buildService(options: {
       findFirst: jest
         .fn()
         .mockResolvedValue(options.studentLeaveRequest ?? null),
-      findMany: jest
-        .fn()
-        .mockResolvedValue(options.studentLeaveRequests ?? []),
+      findMany: jest.fn().mockResolvedValue(options.studentLeaveRequests ?? []),
       create: jest.fn().mockResolvedValue(
         options.studentLeaveRequest ?? {
           id: 'student-leave-1',
           status: 'PENDING',
         },
       ),
-      update: jest
-        .fn()
-        .mockResolvedValue(options.reviewedStudentLeave ?? null),
+      update: jest.fn().mockResolvedValue(options.reviewedStudentLeave ?? null),
     },
     subjectTeacherAssignment: {
       findFirst: jest.fn().mockResolvedValue({ id: 'assign-1' }),

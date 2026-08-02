@@ -128,8 +128,7 @@ export class AuthzCacheService {
             role: role.name,
             expiresAt: expiresAt?.toISOString() ?? null,
             permissions: role.rolePermissions.map(
-              ({ permission }) =>
-                `${permission.resource}:${permission.action}`,
+              ({ permission }) => `${permission.resource}:${permission.action}`,
             ),
           })),
         };
