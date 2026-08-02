@@ -19,6 +19,7 @@ import {
 } from '../teacher-scope/teacher-scope.service';
 import { SUSPENDED_TENANT_MESSAGE } from '../plans/tenant-access.constants';
 import { FINANCIAL_REPORT_DEFINITION_VERSION } from '@schoolos/core';
+import { findFinancialReportDefinition } from '@schoolos/core';
 import sharp from 'sharp';
 import ExcelJS from 'exceljs';
 import { createHash } from 'node:crypto';
@@ -48,6 +49,7 @@ describe('ReportsService', () => {
       'classes:read',
       'attendance:read',
       'ledger:read',
+      'receipts:read',
       'accounting:reports:read',
       'payroll:reports:read',
       'academics:read',
@@ -282,6 +284,120 @@ describe('ReportsService', () => {
                   invoiceNumber: 'INV-001',
                   receiptNumber: null,
                   status: 'ISSUED',
+                },
+              ],
+            }),
+            getReceiptRegisterRows: jest.fn().mockResolvedValue({
+              summary: {
+                totalReceipts: 1,
+                displayedReceipts: 1,
+                totalAmount: '1000.00',
+                totalRefundedAmount: '200.00',
+                totalNetAmount: '800.00',
+              },
+            }),
+            getReceiptRegisterExport: jest.fn().mockResolvedValue({
+              rows: [
+                {
+                  receiptNumber: 'REC-001',
+                  issuedAt: new Date('2026-07-01T00:00:00.000Z'),
+                  studentSystemId: 'ST-001',
+                  studentName: 'Asha Shrestha',
+                  invoiceNumber: 'INV-001',
+                  amount: '1000.00',
+                  refundedAmount: '200.00',
+                  netAmount: '800.00',
+                  paymentMethod: 'CASH',
+                  paymentStatus: 'SUCCESS',
+                  cashierEmail: 'cashier@school.test',
+                  reprintCount: 0,
+                  latestReprintAt: null,
+                },
+              ],
+            }),
+            getRefundReversalRegisterRows: jest.fn().mockResolvedValue({
+              summary: {
+                totalRecords: 1,
+                refundCount: 1,
+                reversalCount: 0,
+                totalAmount: '500.00',
+              },
+            }),
+            getRefundReversalRegisterExport: jest.fn().mockResolvedValue({
+              rows: [
+                {
+                  recordType: 'REFUND',
+                  recordNumber: 'REF-001',
+                  originalReceiptNumber: 'REC-001',
+                  originalPaymentId: 'pay-1',
+                  invoiceNumber: 'INV-001',
+                  studentSystemId: 'ST-001',
+                  studentName: 'Asha Shrestha',
+                  amount: '500.00',
+                  reason: 'Overpayment',
+                  processedAt: new Date('2026-07-01T00:00:00.000Z'),
+                  requestedByEmail: 'cashier@school.test',
+                  approvedByEmail: 'accountant@school.test',
+                  journalEntryNumber: 'JE-001',
+                  reversalOfJournalEntryNumber: null,
+                  status: 'COMPLETED',
+                },
+              ],
+            }),
+            getInvoiceRegisterRows: jest.fn().mockResolvedValue({
+              summary: {
+                totalInvoices: 1,
+                displayedInvoices: 1,
+                totalGrossAmount: '3500.00',
+                totalNetAmount: '3500.00',
+                totalPaidAmount: '3500.00',
+                totalBalanceAmount: '0.00',
+              },
+            }),
+            getInvoiceRegisterExport: jest.fn().mockResolvedValue({
+              rows: [
+                {
+                  invoiceNumber: 'INV-001',
+                  studentSystemId: 'ST-001',
+                  studentName: 'Asha Shrestha',
+                  className: 'Grade 10',
+                  sectionName: 'A',
+                  billingPeriod: '2026',
+                  feeHeadNames: 'Tuition',
+                  grossAmount: '3500.00',
+                  discountAmount: '0.00',
+                  netAmount: '3500.00',
+                  paidAmount: '3500.00',
+                  balanceAmount: '0.00',
+                  dueDate: new Date('2026-07-01T00:00:00.000Z'),
+                  issuedAt: new Date('2026-07-01T00:00:00.000Z'),
+                  status: 'PAID',
+                },
+              ],
+            }),
+            getUnallocatedPaymentReport: jest.fn().mockResolvedValue({
+              summary: {
+                totalPayments: 1,
+                totalUnallocatedAmount: '500.00',
+                displayedUnallocatedAmount: '500.00',
+              },
+            }),
+            getUnallocatedPaymentExport: jest.fn().mockResolvedValue({
+              rows: [
+                {
+                  paymentId: 'pay-1',
+                  receiptNumber: 'REC-001',
+                  paymentDate: '2026-07-01T00:00:00.000Z',
+                  studentSystemId: 'ST-001',
+                  studentName: 'Asha Shrestha',
+                  paymentMethod: 'CASH',
+                  paymentStatus: 'SUCCESS',
+                  referenceNumber: null,
+                  originalAmount: '1500.00',
+                  unallocatedBalance: '500.00',
+                  balanceType: 'ADVANCE',
+                  postingStatus: 'POSTED',
+                  journalEntryNumber: 'JE-001',
                 },
               ],
             }),
@@ -717,8 +833,344 @@ describe('ReportsService', () => {
     );
 
     expect(linked.has('TAX-01')).toBe(true);
+    expect(linked.has('FEE-15')).toBe(true);
+    expect(linked.has('FEE-17')).toBe(true);
+    expect(linked.has('AR-01')).toBe(true);
+    expect(linked.has('AR-06')).toBe(true);
     expect(linked.has('PAY-04')).toBe(false);
     expect(linked.has('TAX-02')).toBe(false);
+  });
+
+  it('links FEE-15 and FEE-17 registry entries to the financial report catalog', () => {
+    expect(findFinancialReportDefinition('FEE-15')?.id).toBe('FEE-15');
+    expect(findFinancialReportDefinition('FEE-17')?.id).toBe('FEE-17');
+    expect(findFinancialReportDefinition('AR-01')?.id).toBe('AR-01');
+    expect(findFinancialReportDefinition('AR-06')?.id).toBe('AR-06');
+    expect(service.registry.get('refund-reversal-report')?.definition).toEqual(
+      expect.objectContaining({ financialReportId: 'FEE-15' }),
+    );
+    expect(service.registry.get('receipt-register')?.definition).toEqual(
+      expect.objectContaining({ financialReportId: 'FEE-17' }),
+    );
+    expect(service.registry.get('invoice-register')?.definition).toEqual(
+      expect.objectContaining({ financialReportId: 'AR-01' }),
+    );
+    expect(
+      service.registry.get('unallocated-payment-report')?.definition,
+    ).toEqual(expect.objectContaining({ financialReportId: 'AR-06' }));
+  });
+
+  it('records the FEE-17 export with catalog-owned metadata and displayed totals', async () => {
+    await service.exportReport(
+      'receipt-register',
+      { format: 'csv', filters: { fromDate: '2026-07-01' } },
+      actor,
+    );
+
+    expect(prisma.reportExport.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reportKey: 'receipt-register',
+          financialReportId: 'FEE-17',
+          definitionVersion: FINANCIAL_REPORT_DEFINITION_VERSION,
+          classification: 'CONFIDENTIAL',
+        }),
+      }),
+    );
+
+    const recorded = (prisma.reportExport.create as jest.Mock).mock.calls.at(
+      -1,
+    )?.[0] as {
+      data: {
+        displayedTotals: Record<string, string>;
+        rowCount: number;
+        watermark: string;
+      };
+    };
+    expect(recorded.data.displayedTotals).toEqual({
+      rowCount: '1',
+      totalAmount: '1000.00',
+      totalRefundedAmount: '200.00',
+      totalNetAmount: '800.00',
+    });
+    expect(String(recorded.data.rowCount)).toBe(
+      recorded.data.displayedTotals.rowCount,
+    );
+    expect(recorded.data.watermark).toContain('CONFIDENTIAL');
+  });
+
+  it('records the FEE-15 export with catalog-owned metadata and displayed totals', async () => {
+    await service.exportReport(
+      'refund-reversal-report',
+      { format: 'csv', filters: { toDate: '2026-07-31' } },
+      actor,
+    );
+
+    expect(prisma.reportExport.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reportKey: 'refund-reversal-report',
+          financialReportId: 'FEE-15',
+          definitionVersion: FINANCIAL_REPORT_DEFINITION_VERSION,
+          classification: 'CONFIDENTIAL',
+        }),
+      }),
+    );
+
+    const recorded = (prisma.reportExport.create as jest.Mock).mock.calls.at(
+      -1,
+    )?.[0] as {
+      data: {
+        displayedTotals: Record<string, string>;
+        rowCount: number;
+      };
+    };
+    expect(recorded.data.displayedTotals).toEqual({
+      rowCount: '1',
+      refundCount: '1',
+      reversalCount: '0',
+      totalAmount: '500.00',
+    });
+    expect(String(recorded.data.rowCount)).toBe(
+      recorded.data.displayedTotals.rowCount,
+    );
+  });
+
+  it('carries FEE-17 watermark and control totals inside PDF and XLSX artifacts', async () => {
+    const pdfResult = await service.exportReport(
+      'receipt-register',
+      { format: 'pdf', filters: {} },
+      actor,
+    );
+    const pdf = (pdfResult.content as Buffer).toString('latin1');
+    expect(pdf).toContain('CONFIDENTIAL');
+    expect(pdf).toContain('CONTROL TOTALS');
+    expect(pdf).toContain('TOTALAMOUNT');
+    expect(pdf).toContain('1000.00');
+    expect(pdf).toContain('Rows in export: 1');
+
+    const xlsxResult = await service.exportReport(
+      'receipt-register',
+      { format: 'xlsx', filters: {} },
+      actor,
+    );
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(
+      Uint8Array.from(xlsxResult.content as Buffer).buffer,
+    );
+    const metadata = new Map<string, unknown>();
+    workbook.getWorksheet('Report Metadata')?.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return;
+      metadata.set(String(row.getCell(1).value), row.getCell(2).value);
+    });
+    expect(String(metadata.get('Classification'))).toContain('CONFIDENTIAL');
+    expect(metadata.get('totalAmount')).toBe('1000.00');
+    expect(metadata.get('rowCount')).toBe('1');
+  });
+
+  it('carries FEE-15 watermark and control totals inside PDF and XLSX artifacts', async () => {
+    const pdfResult = await service.exportReport(
+      'refund-reversal-report',
+      { format: 'pdf', filters: {} },
+      actor,
+    );
+    const pdf = (pdfResult.content as Buffer).toString('latin1');
+    expect(pdf).toContain('CONFIDENTIAL');
+    expect(pdf).toContain('CONTROL TOTALS');
+    expect(pdf).toContain('TOTALAMOUNT');
+    expect(pdf).toContain('500.00');
+
+    const xlsxResult = await service.exportReport(
+      'refund-reversal-report',
+      { format: 'xlsx', filters: {} },
+      actor,
+    );
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(
+      Uint8Array.from(xlsxResult.content as Buffer).buffer,
+    );
+    const metadata = new Map<string, unknown>();
+    workbook.getWorksheet('Report Metadata')?.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return;
+      metadata.set(String(row.getCell(1).value), row.getCell(2).value);
+    });
+    expect(String(metadata.get('Classification'))).toContain('CONFIDENTIAL');
+    expect(metadata.get('totalAmount')).toBe('500.00');
+    expect(metadata.get('refundCount')).toBe('1');
+  });
+
+  it('fails FEE-17 export metadata when the catalog link is removed', () => {
+    const buildExportMetadata = (
+      service as unknown as {
+        buildExportMetadata: (
+          definition: { key: string; financialReportId?: string },
+          filters: Record<string, unknown>,
+          actor: AuthContext,
+        ) => { financialReportId: string | null; classification: string };
+      }
+    ).buildExportMetadata.bind(service);
+
+    const receiptExecutor = service.registry.get('receipt-register');
+    expect(buildExportMetadata(receiptExecutor!.definition, {}, actor)).toEqual(
+      expect.objectContaining({
+        financialReportId: 'FEE-17',
+        classification: 'CONFIDENTIAL',
+      }),
+    );
+
+    expect(
+      buildExportMetadata(
+        { ...receiptExecutor!.definition, financialReportId: undefined },
+        {},
+        actor,
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        financialReportId: null,
+        classification: 'CONFIDENTIAL',
+      }),
+    );
+  });
+
+  it('records the AR-01 export with catalog-owned metadata and displayed totals', async () => {
+    await service.exportReport(
+      'invoice-register',
+      { format: 'csv', filters: { fromDate: '2026-07-01' } },
+      actor,
+    );
+
+    expect(prisma.reportExport.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reportKey: 'invoice-register',
+          financialReportId: 'AR-01',
+          classification: 'CONFIDENTIAL',
+        }),
+      }),
+    );
+
+    const recorded = (prisma.reportExport.create as jest.Mock).mock.calls.at(
+      -1,
+    )?.[0] as {
+      data: {
+        displayedTotals: Record<string, string>;
+        rowCount: number;
+      };
+    };
+    expect(recorded.data.displayedTotals).toEqual({
+      rowCount: '1',
+      totalGrossAmount: '3500.00',
+      totalNetAmount: '3500.00',
+      totalPaidAmount: '3500.00',
+      totalBalanceAmount: '0.00',
+    });
+    expect(String(recorded.data.rowCount)).toBe(
+      recorded.data.displayedTotals.rowCount,
+    );
+  });
+
+  it('records the AR-06 export with catalog-owned metadata and displayed totals', async () => {
+    await service.exportReport(
+      'unallocated-payment-report',
+      { format: 'csv', filters: {} },
+      {
+        ...actor,
+        permissions: [...actor.permissions, 'accounting:reports:read'],
+      },
+    );
+
+    expect(prisma.reportExport.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reportKey: 'unallocated-payment-report',
+          financialReportId: 'AR-06',
+          classification: 'CONFIDENTIAL',
+        }),
+      }),
+    );
+
+    const recorded = (prisma.reportExport.create as jest.Mock).mock.calls.at(
+      -1,
+    )?.[0] as {
+      data: {
+        displayedTotals: Record<string, string>;
+        rowCount: number;
+      };
+    };
+    expect(recorded.data.displayedTotals).toEqual({
+      rowCount: '1',
+      totalPayments: '1',
+      totalUnallocatedAmount: '500.00',
+    });
+    expect(String(recorded.data.rowCount)).toBe(
+      recorded.data.displayedTotals.rowCount,
+    );
+  });
+
+  it('carries AR-01 watermark and control totals inside PDF and XLSX artifacts', async () => {
+    const pdfResult = await service.exportReport(
+      'invoice-register',
+      { format: 'pdf', filters: {} },
+      actor,
+    );
+    const pdf = (pdfResult.content as Buffer).toString('latin1');
+    expect(pdf).toContain('CONFIDENTIAL');
+    expect(pdf).toContain('CONTROL TOTALS');
+    expect(pdf).toContain('TOTALNETAMO');
+    expect(pdf).toContain('3500.00');
+
+    const xlsxResult = await service.exportReport(
+      'invoice-register',
+      { format: 'xlsx', filters: {} },
+      actor,
+    );
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(
+      Uint8Array.from(xlsxResult.content as Buffer).buffer,
+    );
+    const metadata = new Map<string, unknown>();
+    workbook.getWorksheet('Report Metadata')?.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return;
+      metadata.set(String(row.getCell(1).value), row.getCell(2).value);
+    });
+    expect(String(metadata.get('Classification'))).toContain('CONFIDENTIAL');
+    expect(metadata.get('totalNetAmount')).toBe('3500.00');
+    expect(metadata.get('rowCount')).toBe('1');
+  });
+
+  it('carries AR-06 watermark and control totals inside PDF and XLSX artifacts', async () => {
+    const financeActor = {
+      ...actor,
+      permissions: [...actor.permissions, 'accounting:reports:read'],
+    };
+    const pdfResult = await service.exportReport(
+      'unallocated-payment-report',
+      { format: 'pdf', filters: {} },
+      financeActor,
+    );
+    const pdf = (pdfResult.content as Buffer).toString('latin1');
+    expect(pdf).toContain('CONFIDENTIAL');
+    expect(pdf).toContain('CONTROL TOTALS');
+    expect(pdf).toContain('TOTALUNALLOCATEDAMO');
+    expect(pdf).toContain('500.00');
+
+    const xlsxResult = await service.exportReport(
+      'unallocated-payment-report',
+      { format: 'xlsx', filters: {} },
+      financeActor,
+    );
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(
+      Uint8Array.from(xlsxResult.content as Buffer).buffer,
+    );
+    const metadata = new Map<string, unknown>();
+    workbook.getWorksheet('Report Metadata')?.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return;
+      metadata.set(String(row.getCell(1).value), row.getCell(2).value);
+    });
+    expect(String(metadata.get('Classification'))).toContain('CONFIDENTIAL');
+    expect(metadata.get('totalUnallocatedAmount')).toBe('500.00');
+    expect(metadata.get('rowCount')).toBe('1');
   });
 
   it('exports finance reports as a real XLSX workbook', async () => {

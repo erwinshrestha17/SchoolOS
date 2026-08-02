@@ -10,6 +10,7 @@ import {
   NotificationChannel,
   NotificationStatus,
   PaymentMethod,
+  PaymentStatus,
   Prisma,
   PrismaClient,
 } from '@prisma/client';
@@ -384,6 +385,129 @@ async function seedFees(
         create: { tenantId, paymentId: payment.id, receiptNumber: `RCPT-${invoiceNumber}`, pdfUrl: `/demo/receipts/RCPT-${invoiceNumber}.pdf` },
       });
     }
+  }
+
+  // FEE-15 browser evidence: one completed refund and one reversed payment.
+  const partialStudent = students.find(
+    (s) => s.student.studentSystemId === 'SCH-2026-0005',
+  );
+  const reversalStudent = students.find(
+    (s) => s.student.studentSystemId === 'SCH-2026-0006',
+  );
+  if (partialStudent && accountant) {
+    const partialPayment = await prisma.payment.findFirst({
+      where: { tenantId, referenceNumber: 'PAY-INV-2026-0002' },
+    });
+    if (partialPayment) {
+      await prisma.paymentRefund.upsert({
+        where: {
+          tenantId_refundNumber: { tenantId, refundNumber: 'REF-DEMO-001' },
+        },
+        update: {
+          paymentId: partialPayment.id,
+          amount: new Prisma.Decimal('500.00'),
+          refundDate: date('2026-07-10'),
+          reason: 'Demo partial refund for FEE-15 export evidence',
+        },
+        create: {
+          tenantId,
+          paymentId: partialPayment.id,
+          refundNumber: 'REF-DEMO-001',
+          amount: new Prisma.Decimal('500.00'),
+          refundDate: date('2026-07-10'),
+          reason: 'Demo partial refund for FEE-15 export evidence',
+          createdById: accountant.id,
+        },
+      });
+    }
+  }
+
+  if (reversalStudent && accountant && tuition) {
+    const reversalInvoice = await prisma.invoice.upsert({
+      where: { tenantId_invoiceNumber: { tenantId, invoiceNumber: 'INV-DEMO-REV-001' } },
+      update: {
+        studentId: reversalStudent.student.id,
+        academicYearId,
+        dueDate: date('2026-07-01'),
+        status: InvoiceStatus.PARTIAL,
+        subtotal: new Prisma.Decimal('2000.00'),
+        vatAmount: new Prisma.Decimal(0),
+        totalAmount: new Prisma.Decimal('2000.00'),
+      },
+      create: {
+        tenantId,
+        studentId: reversalStudent.student.id,
+        academicYearId,
+        invoiceNumber: 'INV-DEMO-REV-001',
+        dueDate: date('2026-07-01'),
+        status: InvoiceStatus.PARTIAL,
+        subtotal: new Prisma.Decimal('2000.00'),
+        vatAmount: new Prisma.Decimal(0),
+        totalAmount: new Prisma.Decimal('2000.00'),
+      },
+    });
+    await prisma.invoiceLine.deleteMany({
+      where: { tenantId, invoiceId: reversalInvoice.id },
+    });
+    await prisma.invoiceLine.create({
+      data: {
+        tenantId,
+        invoiceId: reversalInvoice.id,
+        feeHeadId: tuition.id,
+        description: 'Demo reversal invoice line',
+        quantity: 1,
+        unitAmount: new Prisma.Decimal('2000.00'),
+        vatAmount: new Prisma.Decimal(0),
+        totalAmount: new Prisma.Decimal('2000.00'),
+      },
+    });
+
+    const reversalPaymentExisting = await prisma.payment.findFirst({
+      where: { tenantId, referenceNumber: 'PAY-DEMO-REV-001' },
+    });
+    const reversalPayment = reversalPaymentExisting
+      ? await prisma.payment.update({
+          where: { id: reversalPaymentExisting.id },
+          data: {
+            studentId: reversalStudent.student.id,
+            invoiceId: reversalInvoice.id,
+            collectedById: accountant.id,
+            method: PaymentMethod.CASH,
+            status: PaymentStatus.REVERSED,
+            amount: new Prisma.Decimal('2000.00'),
+            paidAt: date('2026-07-12'),
+            reversedAt: date('2026-07-15'),
+            reversalReason: 'Demo duplicate collection reversal',
+          },
+        })
+      : await prisma.payment.create({
+          data: {
+            tenantId,
+            studentId: reversalStudent.student.id,
+            invoiceId: reversalInvoice.id,
+            collectedById: accountant.id,
+            method: PaymentMethod.CASH,
+            referenceNumber: 'PAY-DEMO-REV-001',
+            status: PaymentStatus.REVERSED,
+            amount: new Prisma.Decimal('2000.00'),
+            paidAt: date('2026-07-12'),
+            reversedAt: date('2026-07-15'),
+            reversalReason: 'Demo duplicate collection reversal',
+            narration: 'Demo reversed payment for FEE-15 export evidence',
+          },
+        });
+    await prisma.receipt.upsert({
+      where: {
+        tenantId_receiptNumber: { tenantId, receiptNumber: 'RCPT-DEMO-REV-001' },
+      },
+      update: { paymentId: reversalPayment.id },
+      create: {
+        tenantId,
+        paymentId: reversalPayment.id,
+        receiptNumber: 'RCPT-DEMO-REV-001',
+        issuedAt: date('2026-07-12'),
+      },
+    });
   }
 }
 

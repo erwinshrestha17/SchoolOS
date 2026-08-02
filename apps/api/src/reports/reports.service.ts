@@ -1468,6 +1468,7 @@ export class ReportsService {
     this.register({
       definition: {
         key: 'invoice-register',
+        financialReportId: 'AR-01',
         name: 'Invoice Register',
         description:
           'Issued invoices with billing, collection, and balance status',
@@ -1486,19 +1487,26 @@ export class ReportsService {
         requiredPermissions: ['reports:export', 'ledger:read'],
       },
       execute: async (actor, filters) => {
-        const report = await this.financeService.getInvoiceRegisterRows(actor, {
-          academicYearId: filters.academicYearId
-            ? String(filters.academicYearId)
-            : undefined,
-          classId: filters.classId ? String(filters.classId) : undefined,
-          sectionId: filters.sectionId ? String(filters.sectionId) : undefined,
-          studentId: filters.studentId ? String(filters.studentId) : undefined,
-          feeHeadId: filters.feeHeadId ? String(filters.feeHeadId) : undefined,
-          fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
-          toDate: filters.toDate ? String(filters.toDate) : undefined,
-          page: 1,
-          limit: 5000,
-        });
+        const report = await this.financeService.getInvoiceRegisterExport(
+          actor,
+          {
+            academicYearId: filters.academicYearId
+              ? String(filters.academicYearId)
+              : undefined,
+            classId: filters.classId ? String(filters.classId) : undefined,
+            sectionId: filters.sectionId
+              ? String(filters.sectionId)
+              : undefined,
+            studentId: filters.studentId
+              ? String(filters.studentId)
+              : undefined,
+            feeHeadId: filters.feeHeadId
+              ? String(filters.feeHeadId)
+              : undefined,
+            fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
+            toDate: filters.toDate ? String(filters.toDate) : undefined,
+          },
+        );
 
         return report.rows.map((row) => ({
           'Invoice No': row.invoiceNumber,
@@ -1518,11 +1526,35 @@ export class ReportsService {
           Status: row.status,
         }));
       },
+      executeTotals: async (actor, filters) => {
+        const report = await this.financeService.getInvoiceRegisterRows(actor, {
+          academicYearId: filters.academicYearId
+            ? String(filters.academicYearId)
+            : undefined,
+          classId: filters.classId ? String(filters.classId) : undefined,
+          sectionId: filters.sectionId ? String(filters.sectionId) : undefined,
+          studentId: filters.studentId ? String(filters.studentId) : undefined,
+          feeHeadId: filters.feeHeadId ? String(filters.feeHeadId) : undefined,
+          fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
+          toDate: filters.toDate ? String(filters.toDate) : undefined,
+          page: 1,
+          limit: 1,
+        });
+
+        return {
+          rowCount: String(report.summary.totalInvoices),
+          totalGrossAmount: report.summary.totalGrossAmount,
+          totalNetAmount: report.summary.totalNetAmount,
+          totalPaidAmount: report.summary.totalPaidAmount,
+          totalBalanceAmount: report.summary.totalBalanceAmount,
+        };
+      },
     });
 
     this.register({
       definition: {
         key: 'unallocated-payment-report',
+        financialReportId: 'AR-06',
         name: 'Advances and Unallocated Payments',
         description:
           'Confirmed payment balances not yet allocated to student invoices, with M11 posting lineage',
@@ -1533,9 +1565,9 @@ export class ReportsService {
         requiredPermissions: ['reports:export', 'accounting:reports:read'],
       },
       execute: async (actor) => {
-        const report = await this.financeService.getUnallocatedPaymentReport(
+        const report = await this.financeService.getUnallocatedPaymentExport(
           actor,
-          { page: 1, limit: 5000 },
+          {},
         );
         return report.rows.map((row) => ({
           'Payment ID': row.paymentId,
@@ -1552,11 +1584,24 @@ export class ReportsService {
           Journal: row.journalEntryNumber ?? '-',
         }));
       },
+      executeTotals: async (actor) => {
+        const report = await this.financeService.getUnallocatedPaymentReport(
+          actor,
+          { page: 1, limit: 1 },
+        );
+
+        return {
+          rowCount: String(report.summary.totalPayments),
+          totalPayments: String(report.summary.totalPayments),
+          totalUnallocatedAmount: report.summary.totalUnallocatedAmount,
+        };
+      },
     });
 
     this.register({
       definition: {
         key: 'receipt-register',
+        financialReportId: 'FEE-17',
         name: 'Receipt Register',
         description:
           'Issued receipts with collection, reprint, and refund status',
@@ -1572,16 +1617,19 @@ export class ReportsService {
         requiredPermissions: ['reports:export', 'receipts:read'],
       },
       execute: async (actor, filters) => {
-        const report = await this.financeService.getReceiptRegisterRows(actor, {
-          studentId: filters.studentId ? String(filters.studentId) : undefined,
-          fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
-          toDate: filters.toDate ? String(filters.toDate) : undefined,
-          paymentMethod: filters.paymentMethod
-            ? String(filters.paymentMethod)
-            : undefined,
-          page: 1,
-          limit: 5000,
-        });
+        const report = await this.financeService.getReceiptRegisterExport(
+          actor,
+          {
+            studentId: filters.studentId
+              ? String(filters.studentId)
+              : undefined,
+            fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
+            toDate: filters.toDate ? String(filters.toDate) : undefined,
+            paymentMethod: filters.paymentMethod
+              ? String(filters.paymentMethod)
+              : undefined,
+          },
+        );
 
         return report.rows.map((row) => ({
           'Receipt No': row.receiptNumber,
@@ -1600,6 +1648,25 @@ export class ReportsService {
             ? row.latestReprintAt.toISOString().split('T')[0]
             : '-',
         }));
+      },
+      executeTotals: async (actor, filters) => {
+        const report = await this.financeService.getReceiptRegisterRows(actor, {
+          studentId: filters.studentId ? String(filters.studentId) : undefined,
+          fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
+          toDate: filters.toDate ? String(filters.toDate) : undefined,
+          paymentMethod: filters.paymentMethod
+            ? String(filters.paymentMethod)
+            : undefined,
+          page: 1,
+          limit: 1,
+        });
+
+        return {
+          rowCount: String(report.summary.totalReceipts),
+          totalAmount: report.summary.totalAmount,
+          totalRefundedAmount: report.summary.totalRefundedAmount,
+          totalNetAmount: report.summary.totalNetAmount,
+        };
       },
     });
 
@@ -1650,6 +1717,7 @@ export class ReportsService {
     this.register({
       definition: {
         key: 'refund-reversal-report',
+        financialReportId: 'FEE-15',
         name: 'Refund and Reversal Register',
         description:
           'Completed refunds and reversals with approval and journal linkage',
@@ -1672,18 +1740,14 @@ export class ReportsService {
         requiredPermissions: ['reports:export', 'ledger:read'],
       },
       execute: async (actor, filters) => {
-        const report = await this.financeService.getRefundReversalRegisterRows(
-          actor,
-          {
+        const report =
+          await this.financeService.getRefundReversalRegisterExport(actor, {
             fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
             toDate: filters.toDate ? String(filters.toDate) : undefined,
             recordType: filters.recordType
               ? (String(filters.recordType) as 'REFUND' | 'REVERSAL')
               : undefined,
-            page: 1,
-            limit: 5000,
-          },
-        );
+          });
 
         return report.rows.map((row) => ({
           Type: row.recordType,
@@ -1701,6 +1765,27 @@ export class ReportsService {
           'Reversal Of Journal': row.reversalOfJournalEntryNumber || '-',
           Status: row.status,
         }));
+      },
+      executeTotals: async (actor, filters) => {
+        const report = await this.financeService.getRefundReversalRegisterRows(
+          actor,
+          {
+            fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
+            toDate: filters.toDate ? String(filters.toDate) : undefined,
+            recordType: filters.recordType
+              ? (String(filters.recordType) as 'REFUND' | 'REVERSAL')
+              : undefined,
+            page: 1,
+            limit: 1,
+          },
+        );
+
+        return {
+          rowCount: String(report.summary.totalRecords),
+          refundCount: String(report.summary.refundCount),
+          reversalCount: String(report.summary.reversalCount),
+          totalAmount: report.summary.totalAmount,
+        };
       },
     });
 

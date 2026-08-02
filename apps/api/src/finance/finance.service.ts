@@ -320,6 +320,20 @@ const cashierCloseUserInclude = {
 const STUDENT_LEDGER_EXPORT_PAGE_SIZE = 500;
 /** Hard ceiling on an exported ledger; beyond this the export is refused. */
 const STUDENT_LEDGER_EXPORT_MAX_ROWS = 10000;
+/** Server-side page size used when draining the receipt register for export. */
+const RECEIPT_REGISTER_EXPORT_PAGE_SIZE = 500;
+/** Hard ceiling on an exported receipt register; beyond this the export is refused. */
+const RECEIPT_REGISTER_EXPORT_MAX_ROWS = 10000;
+/** Server-side page size used when draining the invoice register for export. */
+const INVOICE_REGISTER_EXPORT_PAGE_SIZE = 500;
+/** Hard ceiling on an exported invoice register; beyond this the export is refused. */
+const INVOICE_REGISTER_EXPORT_MAX_ROWS = 10000;
+/** Server-side page size used when draining unallocated payments for export. */
+const UNALLOCATED_PAYMENT_EXPORT_PAGE_SIZE = 500;
+/** Hard ceiling on an exported unallocated-payment report; beyond this refused. */
+const UNALLOCATED_PAYMENT_EXPORT_MAX_ROWS = 10000;
+/** Server-side page size used when draining the refund/reversal register for export. */
+const REFUND_REGISTER_EXPORT_PAGE_SIZE = 50;
 /**
  * Deep-paging ceiling for the refund/reversal register. The register merges two
  * differently-ordered sources, so a page at offset N needs N+limit rows from
@@ -2239,25 +2253,101 @@ export class FinanceService {
       };
     });
     const total = Number(summaryRows[0]?.total ?? 0n);
+    const summary = {
+      totalPayments: total,
+      totalUnallocatedAmount: new Prisma.Decimal(
+        summaryRows[0]?.totalBalance ?? 0,
+      ).toFixed(2),
+      displayedUnallocatedAmount: sumMoneyStrings(
+        rows.map((row) => row.unallocatedBalance),
+      ),
+    };
+    const pageTotals = {
+      rowCount: rows.length,
+      unallocatedAmount: summary.displayedUnallocatedAmount,
+    };
+
+    const envelope = await this.buildFinancialReportEnvelope({
+      reportId: 'AR-06' satisfies FinancialReportId,
+      actor,
+      generatedAt: new Date(),
+      accountingBasis: 'CASH',
+      postingBasis: 'POSTED_WITH_PENDING_DISCLOSED',
+      filters: {},
+      sourceFreshness: [
+        {
+          module: 'M3',
+          refreshedAt: new Date().toISOString(),
+          includesPending: true,
+        },
+        {
+          module: 'M11',
+          refreshedAt: new Date().toISOString(),
+          includesPending: true,
+        },
+      ],
+      totals: {
+        totalUnallocatedAmount: summary.totalUnallocatedAmount,
+      },
+      pagination: { page, limit, total },
+    });
 
     return {
+      ...envelope,
       rows,
-      summary: {
-        totalPayments: total,
-        totalUnallocatedAmount: new Prisma.Decimal(
-          summaryRows[0]?.totalBalance ?? 0,
-        ).toFixed(2),
-        displayedUnallocatedAmount: sumMoneyStrings(
-          rows.map((row) => row.unallocatedBalance),
-        ),
-      },
+      summary,
+      pageTotals,
       pagination: {
         total,
         page,
         limit,
         totalPages: total === 0 ? 0 : Math.ceil(total / limit),
       },
-      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * AR-06 export projection — drains the same enveloped report the screen renders.
+   */
+  async getUnallocatedPaymentExport(
+    actor: AuthContext,
+    query: FinanceReportQueryDto = {},
+  ) {
+    const first = await this.getUnallocatedPaymentReport(actor, {
+      ...query,
+      page: 1,
+      limit: UNALLOCATED_PAYMENT_EXPORT_PAGE_SIZE,
+    });
+
+    if (first.pagination.total > UNALLOCATED_PAYMENT_EXPORT_MAX_ROWS) {
+      throw new BadRequestException(
+        `This report has ${first.pagination.total} unallocated payments, above the ${UNALLOCATED_PAYMENT_EXPORT_MAX_ROWS} row export limit. Narrow the scope and export again.`,
+      );
+    }
+
+    const rows = [...first.rows];
+    const pageCount = Math.ceil(
+      first.pagination.total / UNALLOCATED_PAYMENT_EXPORT_PAGE_SIZE,
+    );
+
+    for (let page = 2; page <= pageCount; page += 1) {
+      const next = await this.getUnallocatedPaymentReport(actor, {
+        ...query,
+        page,
+        limit: UNALLOCATED_PAYMENT_EXPORT_PAGE_SIZE,
+      });
+      rows.push(...next.rows);
+    }
+
+    return {
+      ...first,
+      rows,
+      pageTotals: {
+        rowCount: rows.length,
+        unallocatedAmount: sumMoneyStrings(
+          rows.map((row) => row.unallocatedBalance),
+        ),
+      },
     };
   }
 
@@ -2705,21 +2795,175 @@ export class FinanceService {
     const summary = {
       totalInvoices: total,
       displayedInvoices: rows.length,
-      totalGrossAmount: sumMoneyStrings(rows.map((row) => row.grossAmount)),
-      totalNetAmount: sumMoneyStrings(rows.map((row) => row.netAmount)),
-      totalPaidAmount: sumMoneyStrings(rows.map((row) => row.paidAmount)),
-      totalBalanceAmount: sumMoneyStrings(rows.map((row) => row.balanceAmount)),
+      ...(await this.aggregateInvoiceRegisterMoneyTotals(
+        actor.tenantId,
+        where,
+      )),
+    };
+    const pageTotals = {
+      rowCount: rows.length,
+      grossAmount: sumMoneyStrings(rows.map((row) => row.grossAmount)),
+      netAmount: sumMoneyStrings(rows.map((row) => row.netAmount)),
+      paidAmount: sumMoneyStrings(rows.map((row) => row.paidAmount)),
+      balanceAmount: sumMoneyStrings(rows.map((row) => row.balanceAmount)),
     };
 
+    const envelope = await this.buildFinancialReportEnvelope({
+      reportId: 'AR-01' satisfies FinancialReportId,
+      actor,
+      generatedAt: new Date(),
+      accountingBasis: 'ACCRUAL',
+      postingBasis: 'POSTED_WITH_PENDING_DISCLOSED',
+      filters: {
+        academicYearId: filters.academicYearId ?? null,
+        classId: filters.classId ?? null,
+        sectionId: filters.sectionId ?? null,
+        studentId: filters.studentId ?? null,
+        feeHeadId: filters.feeHeadId ?? null,
+        status: filters.status ?? null,
+        fromDate: filters.fromDate ?? null,
+        toDate: filters.toDate ?? null,
+      },
+      sourceFreshness: [
+        {
+          module: 'M3',
+          refreshedAt: new Date().toISOString(),
+          includesPending: true,
+        },
+      ],
+      totals: {
+        totalGrossAmount: summary.totalGrossAmount,
+        totalNetAmount: summary.totalNetAmount,
+        totalPaidAmount: summary.totalPaidAmount,
+        totalBalanceAmount: summary.totalBalanceAmount,
+      },
+      pagination: { page, limit, total },
+    });
+
     return {
+      ...envelope,
       rows,
       summary,
+      pageTotals,
       pagination: {
         total,
         page,
         limit,
         totalPages: total === 0 ? 0 : Math.ceil(total / limit),
       },
+    };
+  }
+
+  /**
+   * AR-01 export projection — drains the same enveloped register the screen renders.
+   */
+  async getInvoiceRegisterExport(
+    actor: AuthContext,
+    filters: {
+      academicYearId?: string;
+      classId?: string;
+      sectionId?: string;
+      studentId?: string;
+      feeHeadId?: string;
+      status?: InvoiceStatus;
+      fromDate?: string;
+      toDate?: string;
+    },
+  ) {
+    const first = await this.getInvoiceRegisterRows(actor, {
+      ...filters,
+      page: 1,
+      limit: INVOICE_REGISTER_EXPORT_PAGE_SIZE,
+    });
+
+    if (first.pagination.total > INVOICE_REGISTER_EXPORT_MAX_ROWS) {
+      throw new BadRequestException(
+        `This invoice register has ${first.pagination.total} invoices, above the ${INVOICE_REGISTER_EXPORT_MAX_ROWS} row export limit. Narrow the filters and export again.`,
+      );
+    }
+
+    const rows = [...first.rows];
+    const pageCount = Math.ceil(
+      first.pagination.total / INVOICE_REGISTER_EXPORT_PAGE_SIZE,
+    );
+
+    for (let page = 2; page <= pageCount; page += 1) {
+      const next = await this.getInvoiceRegisterRows(actor, {
+        ...filters,
+        page,
+        limit: INVOICE_REGISTER_EXPORT_PAGE_SIZE,
+      });
+      rows.push(...next.rows);
+    }
+
+    return {
+      ...first,
+      rows,
+      pageTotals: {
+        rowCount: rows.length,
+        grossAmount: sumMoneyStrings(rows.map((row) => row.grossAmount)),
+        netAmount: sumMoneyStrings(rows.map((row) => row.netAmount)),
+        paidAmount: sumMoneyStrings(rows.map((row) => row.paidAmount)),
+        balanceAmount: sumMoneyStrings(rows.map((row) => row.balanceAmount)),
+      },
+    };
+  }
+
+  private async aggregateInvoiceRegisterMoneyTotals(
+    tenantId: string,
+    where: Prisma.InvoiceWhereInput,
+  ) {
+    const invoices = await this.prisma.invoice.findMany({
+      where,
+      select: {
+        totalAmount: true,
+        lines: {
+          select: { unitAmount: true, quantity: true, totalAmount: true },
+        },
+        paymentAllocations: {
+          where: { reversedAt: null },
+          select: { amount: true },
+        },
+        payments: {
+          select: {
+            amount: true,
+            status: true,
+            refunds: { select: { amount: true } },
+          },
+        },
+      },
+    });
+
+    let totalGross = new Prisma.Decimal(0);
+    let totalNet = new Prisma.Decimal(0);
+    let totalPaid = new Prisma.Decimal(0);
+    let totalBalance = new Prisma.Decimal(0);
+
+    for (const invoice of invoices) {
+      const grossAmount = invoice.lines.reduce(
+        (sum, line) => sum.add(line.unitAmount.mul(line.quantity)),
+        new Prisma.Decimal(0),
+      );
+      const paidAmount = sumInvoiceAllocationAmount(
+        invoice.paymentAllocations,
+        invoice.payments,
+      );
+      const netAmount = invoice.totalAmount;
+      const balanceAmount = Prisma.Decimal.max(
+        new Prisma.Decimal(0),
+        netAmount.sub(paidAmount),
+      );
+      totalGross = totalGross.add(grossAmount);
+      totalNet = totalNet.add(netAmount);
+      totalPaid = totalPaid.add(paidAmount);
+      totalBalance = totalBalance.add(balanceAmount);
+    }
+
+    return {
+      totalGrossAmount: totalGross.toFixed(2),
+      totalNetAmount: totalNet.toFixed(2),
+      totalPaidAmount: totalPaid.toFixed(2),
+      totalBalanceAmount: totalBalance.toFixed(2),
     };
   }
 
@@ -2890,6 +3134,62 @@ export class FinanceService {
         page,
         limit,
         totalPages: total === 0 ? 0 : Math.ceil(total / limit),
+      },
+    };
+  }
+
+  /**
+   * FEE-17 export projection.
+   *
+   * Drains the same enveloped projection the screen renders rather than a
+   * single oversized page, so an exported artifact and the rendered report
+   * cannot disagree on rows or totals. A register larger than the cap is
+   * refused outright: silently truncating a financial record is worse than
+   * asking for a narrower range.
+   */
+  async getReceiptRegisterExport(
+    actor: AuthContext,
+    filters: {
+      studentId?: string;
+      fromDate?: string;
+      toDate?: string;
+      paymentMethod?: string;
+    },
+  ) {
+    const first = await this.getReceiptRegisterRows(actor, {
+      ...filters,
+      page: 1,
+      limit: RECEIPT_REGISTER_EXPORT_PAGE_SIZE,
+    });
+
+    if (first.pagination.total > RECEIPT_REGISTER_EXPORT_MAX_ROWS) {
+      throw new BadRequestException(
+        `This receipt register has ${first.pagination.total} receipts, above the ${RECEIPT_REGISTER_EXPORT_MAX_ROWS} row export limit. Narrow the date range and export again.`,
+      );
+    }
+
+    const rows = [...first.rows];
+    const pageCount = Math.ceil(
+      first.pagination.total / RECEIPT_REGISTER_EXPORT_PAGE_SIZE,
+    );
+
+    for (let page = 2; page <= pageCount; page += 1) {
+      const next = await this.getReceiptRegisterRows(actor, {
+        ...filters,
+        page,
+        limit: RECEIPT_REGISTER_EXPORT_PAGE_SIZE,
+      });
+      rows.push(...next.rows);
+    }
+
+    return {
+      ...first,
+      rows,
+      pageTotals: {
+        rowCount: rows.length,
+        amount: sumMoneyStrings(rows.map((row) => row.amount)),
+        refundedAmount: sumMoneyStrings(rows.map((row) => row.refundedAmount)),
+        netAmount: sumMoneyStrings(rows.map((row) => row.netAmount)),
       },
     };
   }
@@ -3355,6 +3655,57 @@ export class FinanceService {
         page,
         limit,
         totalPages: total === 0 ? 0 : Math.ceil(total / limit),
+      },
+    };
+  }
+
+  /**
+   * FEE-15 export projection.
+   *
+   * Drains the same bounded merge the screen uses page by page rather than
+   * loading a single oversized slice. Registers above {@link REFUND_REGISTER_MAX_SCAN}
+   * are refused outright.
+   */
+  async getRefundReversalRegisterExport(
+    actor: AuthContext,
+    filters: {
+      fromDate?: string;
+      toDate?: string;
+      recordType?: 'REFUND' | 'REVERSAL';
+    },
+  ) {
+    const first = await this.getRefundReversalRegisterRows(actor, {
+      ...filters,
+      page: 1,
+      limit: REFUND_REGISTER_EXPORT_PAGE_SIZE,
+    });
+
+    if (first.summary.totalRecords > REFUND_REGISTER_MAX_SCAN) {
+      throw new BadRequestException(
+        `This register has ${first.summary.totalRecords} records, above the ${REFUND_REGISTER_MAX_SCAN} row export limit. Narrow the date range and export again.`,
+      );
+    }
+
+    const rows = [...first.rows];
+    const pageCount = Math.ceil(
+      first.pagination.total / REFUND_REGISTER_EXPORT_PAGE_SIZE,
+    );
+
+    for (let page = 2; page <= pageCount; page += 1) {
+      const next = await this.getRefundReversalRegisterRows(actor, {
+        ...filters,
+        page,
+        limit: REFUND_REGISTER_EXPORT_PAGE_SIZE,
+      });
+      rows.push(...next.rows);
+    }
+
+    return {
+      ...first,
+      rows,
+      pageTotals: {
+        rowCount: rows.length,
+        amount: sumMoneyStrings(rows.map((row) => row.amount)),
       },
     };
   }
