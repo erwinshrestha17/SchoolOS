@@ -96,6 +96,11 @@ export const permissionCatalog = [
     description: "Manage exam terms",
   },
   {
+    resource: "exam-terms",
+    action: "unlock",
+    description: "Unlock exam terms for controlled correction after leadership review",
+  },
+  {
     resource: "assessment-components",
     action: "read",
     description: "Read assessment components",
@@ -116,6 +121,11 @@ export const permissionCatalog = [
     description: "Manage marks",
   },
   {
+    resource: "marks",
+    action: "review_lock",
+    description: "Review and decide mark lock and unlock requests",
+  },
+  {
     resource: "academics:cas",
     action: "manage",
     description: "Manage CAS assessments and records",
@@ -134,6 +144,21 @@ export const permissionCatalog = [
     resource: "results",
     action: "read",
     description: "Read result previews and grading scale",
+  },
+  {
+    resource: "results",
+    action: "publish",
+    description: "Publish approved exam results to students and guardians",
+  },
+  {
+    resource: "results",
+    action: "unpublish",
+    description: "Withdraw published exam results with audit reason",
+  },
+  {
+    resource: "academics:report_cards",
+    action: "review",
+    description: "Review and decide report card correction requests",
   },
   {
     resource: "timetable",
@@ -1772,68 +1797,83 @@ const SETTINGS_DOMAIN_MANAGE_KEYS = [
 ];
 
 /**
- * Settings-management authority is not granted to the principal preset by
- * default. Principals see school policies read-only unless a Configuration
- * Owner explicitly grants broader access.
+ * PRD 11.12 / PPR-P0-01: Principal preset uses an explicit allowlist.
+ * New tenant permissions must not silently flow into this role.
  */
-const PRINCIPAL_EXCLUDED_SETTINGS_KEYS = [
-  "settings:manage",
-  "settings:delegate",
-  ...SETTINGS_DOMAIN_MANAGE_KEYS,
+const PRINCIPAL_ACCOUNTING_READ_KEYS = permissionCatalog
+  .filter(
+    ({ resource, action }) =>
+      (resource.startsWith("accounting") || resource === "accounting") &&
+      (action === "read" || resource === "accounting:reports"),
+  )
+  .map(({ resource, action }) =>
+    buildPermissionKey(resource, action),
+  ) as PermissionKey[];
+
+const PRINCIPAL_OVERSIGHT_READ_KEYS: PermissionKey[] = [
+  // identity and inbox
+  "settings:read_public",
+  "settings:read",
+  "notifications:view_own",
+  "roles:read",
+  // students and admissions
+  "students:read",
+  "enrollments:read",
+  "guardians:read",
+  "admission_policy:read",
+  // structure
+  "classes:read",
+  "sections:read",
+  "streams:read",
+  "academic_years:read",
+  // M2 / M4 read
+  "attendance:read",
+  "academics:read",
+  "results:read",
+  "marks:read",
+  "exam-terms:read",
+  "assessment-components:read",
+  "cas-records:read",
+  // M7 read
+  "staff:read",
+  "hr:read",
+  "hr:staff:read",
+  "hr:attendance:read",
+  "hr:leave:read",
+  // communication read
+  "notices:read",
+  "notices:read_reports",
+  "activity_feed:read",
+  "events:read",
+  "communications:read_deliveries",
+  // evidence and escalations
+  "reports:read",
+  "settings:audit:read",
+  "service_requests:read",
+  // principal-safe finance read summaries
+  "finance:principal:read",
 ];
 
-/**
- * PRD 11.12 requires "Principal read-only summary separate from accountant
- * operations." Principals keep every accounting:*:read and
- * accounting:reports:* key but lose the write/approve/post/close surface,
- * which stays with the accountant preset and explicitly granted roles.
- */
-const PRINCIPAL_EXCLUDED_ACCOUNTING_OPERATIONAL_KEYS = [
-  "accounting:close",
-  "accounting:reverse",
-  "accounting:accounts:write",
-  "accounting:fiscal:manage",
-  "accounting:fiscal:reopen",
-  "accounting:journals:create",
-  "accounting:journals:submit",
-  "accounting:journals:approve",
-  "accounting:journals:reject",
-  "accounting:journals:post",
-  "accounting:journals:cancel",
-  "accounting:journals:reverse",
-  "accounting:settings:update",
-  "accounting:exports:create",
+const PRINCIPAL_APPROVAL_KEYS: PermissionKey[] = [
+  "notices:approve",
+  "advanced:approvals:read",
+  "advanced:approvals:decide",
+  "attendance:review_conflicts",
+  "attendance:override_lock",
+  "hr:leave:approve",
+  "marks:review_lock",
+  "exam-terms:unlock",
+  "results:publish",
+  "results:unpublish",
+  "academics:report_cards:review",
 ];
 
-const PRINCIPAL_EXCLUDED_KEYS = [
-  ...PRINCIPAL_EXCLUDED_SETTINGS_KEYS,
-  ...PRINCIPAL_EXCLUDED_ACCOUNTING_OPERATIONAL_KEYS,
-  "fees:manage",
-  "fees:bill",
-  "fees:discount",
-  "fees:adjust",
-  "payments:collect",
-  "payments:refund",
-  "payments:reverse",
-  "payments:close",
-  "receipts:manage",
-  "ledger:read",
-  "payroll:read",
-  "payroll:manage",
-  "payroll:salary:read",
-  "payroll:salary:write",
-  "payroll:run:create",
-  "payroll:run:read",
-  "payroll:run:review",
-  "payroll:run:approve",
-  "payroll:run:post",
-  "payroll:run:pay",
-  "payroll:payslip:read",
-  "payroll:payslip:generate",
-  "payroll:reports:read",
-  "payroll:exports:create",
-  "finance:approvals:read",
-  "finance:approvals:decide",
+export const PRINCIPAL_PERMISSION_KEYS: PermissionKey[] = [
+  ...new Set([
+    ...PRINCIPAL_OVERSIGHT_READ_KEYS,
+    ...PRINCIPAL_ACCOUNTING_READ_KEYS,
+    ...PRINCIPAL_APPROVAL_KEYS,
+  ]),
 ];
 
 const ADMIN_EXCLUDED_FINANCE_KEYS = TENANT_PERMISSION_KEYS.filter((key) => {
@@ -1878,9 +1918,7 @@ export const systemRolePermissions: Record<string, string[]> = {
     (key) => !ADMIN_EXCLUDED_FINANCE_KEYS.includes(key),
   ),
   school_config_owner: [...SCHOOL_CONFIG_OWNER_PERMISSION_KEYS],
-  principal: TENANT_PERMISSION_KEYS.filter(
-    (key) => !PRINCIPAL_EXCLUDED_KEYS.includes(key),
-  ),
+  principal: [...PRINCIPAL_PERMISSION_KEYS],
   teacher: [
     "roles:read",
     "classes:read",

@@ -85,6 +85,11 @@ export const academicsPermissions = [
     description: "Manage exam terms",
   },
   {
+    resource: "exam-terms",
+    action: "unlock",
+    description: "Unlock exam terms for controlled correction after leadership review",
+  },
+  {
     resource: "assessment-components",
     action: "read",
     description: "Read assessment components",
@@ -105,6 +110,11 @@ export const academicsPermissions = [
     description: "Manage marks",
   },
   {
+    resource: "marks",
+    action: "review_lock",
+    description: "Review and decide mark lock and unlock requests",
+  },
+  {
     resource: "academics:cas",
     action: "manage",
     description: "Manage CAS assessments and records",
@@ -123,6 +133,21 @@ export const academicsPermissions = [
     resource: "results",
     action: "read",
     description: "Read result previews and grading scale",
+  },
+  {
+    resource: "results",
+    action: "publish",
+    description: "Publish approved exam results to students and guardians",
+  },
+  {
+    resource: "results",
+    action: "unpublish",
+    description: "Withdraw published exam results with audit reason",
+  },
+  {
+    resource: "academics:report_cards",
+    action: "review",
+    description: "Review and decide report card correction requests",
   },
   {
     resource: "timetable",

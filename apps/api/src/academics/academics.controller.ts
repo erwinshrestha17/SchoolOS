@@ -174,7 +174,7 @@ export class AcademicsController {
   }
 
   @Patch('exam-terms/:id/unlock')
-  @Permissions('exam-terms:manage', 'academics:manage')
+  @Permissions('exam-terms:unlock')
   unlockExamTerm(
     @Param('id') examTermId: string,
     @Body() dto: UnlockExamTermDto,
@@ -429,7 +429,7 @@ export class AcademicsController {
   }
 
   @Patch('marks/lock-requests/:id/review')
-  @Permissions('academics:update')
+  @Permissions('marks:review_lock')
   reviewMarkLockRequest(
     @Param('id') requestId: string,
     @Body() dto: ReviewMarkLockDto,
@@ -568,7 +568,7 @@ export class AcademicsController {
   }
 
   @Patch('report-cards/corrections/:id/review')
-  @Permissions('academics:manage_report_cards')
+  @Permissions('academics:report_cards:review')
   reviewReportCardCorrection(
     @Param('id') requestId: string,
     @Body() dto: ReviewReportCardCorrectionDto,
@@ -698,7 +698,7 @@ export class AcademicsController {
   }
 
   @Post('results/publishing/publish')
-  @Permissions('academics:manage_report_cards')
+  @Permissions('results:publish')
   publishResults(
     @Body() dto: PublishResultsDto,
     @CurrentAuth() auth: AuthContext,
@@ -707,7 +707,7 @@ export class AcademicsController {
   }
 
   @Post('results/publishing/unpublish')
-  @Permissions('academics:manage_report_cards')
+  @Permissions('results:unpublish')
   unpublishResults(
     @Body() dto: UnpublishResultsDto,
     @CurrentAuth() auth: AuthContext,
