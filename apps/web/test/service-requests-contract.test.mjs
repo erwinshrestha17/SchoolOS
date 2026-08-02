@@ -32,14 +32,14 @@ describe('Service requests Action Centre contracts', () => {
 
   it('registers Action Centre routes, navigation, and permission gates', () => {
     const layout = read('app/dashboard/layout.tsx');
-    const sidebar = read('components/layout/sidebar.tsx');
+    const personaNav = read('components/layout/sidebar-persona-nav.config.ts');
     const listPage = read('app/dashboard/service-requests/page.tsx');
     const detailPage = read('app/dashboard/service-requests/[requestId]/page.tsx');
 
     assert.match(layout, /\/dashboard\/service-requests/);
     assert.match(layout, /service_requests:read/);
-    assert.match(sidebar, /\/dashboard\/service-requests/);
-    assert.match(sidebar, /Action Centre/);
+    assert.match(personaNav, /\/dashboard\/service-requests/);
+    assert.match(personaNav, /Action Centre/);
     assert.match(listPage, /ServiceRequestsQueueWorkspace/);
     assert.match(detailPage, /ServiceRequestDetailWorkspace/);
   });

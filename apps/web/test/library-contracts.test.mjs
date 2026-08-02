@@ -25,13 +25,13 @@ describe('Phase 3B Library frontend contracts', () => {
   });
 
   it('enables Library and implemented operations modules in the dashboard sidebar', () => {
-    const sidebar = read('components/layout/sidebar.tsx');
+    const personaNav = read('components/layout/sidebar-persona-nav.config.ts');
 
-    assert.match(sidebar, /label: 'Library'/);
-    assert.match(sidebar, /href: '\/dashboard\/library'/);
-    assert.doesNotMatch(sidebar, /#library-coming-soon/);
-    assert.match(sidebar, /href: '\/dashboard\/transport'[\s\S]*label: 'Transport'/);
-    assert.match(sidebar, /href: '\/dashboard\/canteen'[\s\S]*label: 'Canteen'/);
+    assert.match(personaNav, /label: 'Library'/);
+    assert.match(personaNav, /href: '\/dashboard\/library'/);
+    assert.doesNotMatch(personaNav, /#library-coming-soon/);
+    assert.match(personaNav, /href: '\/dashboard\/transport'[\s\S]*label: 'Transport'/);
+    assert.match(personaNav, /href: '\/dashboard\/canteen'[\s\S]*label: 'Canteen'/);
   });
 
   it('adds Library API client methods for the Phase 3A backend endpoints', () => {

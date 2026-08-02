@@ -75,10 +75,10 @@ describe('reference dashboard foundation', () => {
   it('keeps the permission-scoped real-API operations composition route', () => {
     const operations = read('app/dashboard/operations/page.tsx');
     const layout = read('app/dashboard/layout.tsx');
-    const sidebar = read('components/layout/sidebar.tsx');
+    const personaNav = read('components/layout/sidebar-persona-nav.config.ts');
 
     assert.match(layout, /prefix: ['"]\/dashboard\/operations['"]/);
-    assert.doesNotMatch(sidebar, /href: '\/dashboard\/operations'/);
+    assert.match(personaNav, /href: '\/dashboard\/operations'/);
     for (const helper of [
       'libraryApi.getOverdueBooksReport',
       'transportApi.getReports',
@@ -96,12 +96,12 @@ describe('reference dashboard foundation', () => {
     const communications = read('app/dashboard/communications/page.tsx');
     const noticesWorkspace = read('components/notices/notices-workspace.tsx');
     const layout = read('app/dashboard/layout.tsx');
-    const sidebar = read('components/layout/sidebar.tsx');
+    const personaNav = read('components/layout/sidebar-persona-nav.config.ts');
 
     // /dashboard/notices is the canonical M15 workspace; the older route is
     // retained only as a compatibility redirect.
     assert.match(layout, /prefix: ['"]\/dashboard\/communications['"]/);
-    assert.match(sidebar, /href: '\/dashboard\/notices'/);
+    assert.match(personaNav, /href: '\/dashboard\/notices'/);
     assert.match(communications, /redirect\('\/dashboard\/notices'\)/);
     assert.match(noticesWorkspace, /communicationsApi\.getCommunicationsSummary/);
     assert.equal((noticesWorkspace.match(/<SummaryCard/g) ?? []).length, 4);

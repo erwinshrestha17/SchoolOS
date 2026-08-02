@@ -175,6 +175,11 @@ const dashboardRouteGates: RouteGate[] = [
     permissions: ["payroll:read", "payroll:manage"],
   },
   {
+    prefix: "/dashboard/accounting/audit",
+    label: "Accounting audit",
+    permissions: ["accounting:audit:read", "accounting:read"],
+  },
+  {
     prefix: "/dashboard/accounting",
     label: "Accounting",
     permissions: [

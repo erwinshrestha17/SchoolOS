@@ -9,6 +9,7 @@ const read = (path) => readFileSync(join(webRoot, path), "utf8");
 
 describe("M1 Students and Admissions workspace navigation", () => {
   const sidebar = read("components/layout/sidebar.tsx");
+  const personaNav = read("components/layout/sidebar-persona-nav.config.ts");
   const studentsPage = read("app/dashboard/students/page.tsx");
   const admissionsPage = read("app/dashboard/admissions/page.tsx");
   const pageHeader = read("components/m1/m1-page-header.tsx");
@@ -18,9 +19,9 @@ describe("M1 Students and Admissions workspace navigation", () => {
   const workspaceTabs = read("components/dashboard/module-tabs.tsx");
 
   it("keeps Students and Admissions as separate sidebar workspaces", () => {
-    assert.match(sidebar, /label: 'Students & Admissions'/);
-    assert.match(sidebar, /href: '\/dashboard\/students',\s*label: 'Students'/);
-    assert.match(sidebar, /href: '\/dashboard\/admissions',\s*label: 'Admissions'/);
+    assert.match(personaNav, /label: 'Students & Admissions'/);
+    assert.match(personaNav, /href: '\/dashboard\/students',\s*label: 'Students'/);
+    assert.match(personaNav, /href: '\/dashboard\/admissions',\s*label: 'Admissions'/);
     assert.match(sidebar, /function computeActiveHref/);
     assert.match(sidebar, /function isActiveNavItem/);
   });

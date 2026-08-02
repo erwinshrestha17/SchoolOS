@@ -15,16 +15,18 @@ describe('SchoolOS Settings Page Contracts', () => {
     const page = read('app/dashboard/settings/page.tsx');
     const frame = read('components/settings/settings-route-frame.tsx');
     const sidebar = read('components/layout/sidebar.tsx');
+    const personaNav = read('components/layout/sidebar-persona-nav.config.ts');
 
     assert.ok(page.length < 600, 'settings index must stay a thin page');
     assert.match(frame, /SettingsControlCenter/);
     assert.match(frame, /getSchoolSettingsNavigation/);
     assert.doesNotMatch(page, /SETTINGS_SECTIONS|SettingsSidebar|UnsavedBar/);
     assert.equal(
-      sidebar.match(/href: ['"]\/dashboard\/settings['"]/g)?.length,
+      personaNav.match(/href: ['"]\/dashboard\/settings['"]/g)?.length,
       1,
       'the global sidebar must contain one Settings destination',
     );
+    assert.match(sidebar, /settingsNavItem/);
   });
 
   it('uses one route metadata catalog while keeping backend visibility authoritative', () => {

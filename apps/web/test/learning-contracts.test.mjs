@@ -48,6 +48,7 @@ describe('M13 Learning frontend contracts', () => {
   it('wires Learning through dashboard permissions and module entitlements', () => {
     const layout = read('app/dashboard/layout.tsx');
     const sidebar = read('components/layout/sidebar.tsx');
+    const personaNav = read('components/layout/sidebar-persona-nav.config.ts');
     const navModuleMap = read('lib/nav-module-map.ts');
 
     assert.match(layout, /prefix:\s*['"]\/dashboard\/learning['"]/);
@@ -59,9 +60,9 @@ describe('M13 Learning frontend contracts', () => {
       /prefix: ["']\/dashboard\/learning["'], module: ["']learning["']/,
     );
 
-    assert.match(sidebar, /label:\s*'Learning'/);
-    assert.match(sidebar, /href:\s*'\/dashboard\/learning'/);
-    assert.match(sidebar, /learningPermissions/);
+    assert.match(personaNav, /label:\s*'Learning'/);
+    assert.match(personaNav, /href:\s*'\/dashboard\/learning'/);
+    assert.match(personaNav, /learningPermissions/);
     assert.match(sidebar, /getRequiredModuleForHref/);
   });
 

@@ -8,13 +8,13 @@ import { useEntitlements } from '../entitlements-provider';
 import { useRecentlyViewed } from '../../lib/hooks/use-recently-viewed';
 import type { RecentlyViewedKind } from '../../lib/recently-viewed';
 import { useSession } from '../session-provider';
+import { canDisplayNavItem } from './sidebar';
 import {
-  canDisplayNavItem,
   navGroupsForPersona,
   settingsNavItem,
   shouldShowSettingsHub,
   type NavItem,
-} from './sidebar';
+} from './sidebar-persona-nav.config';
 import { useSchoolWebPersona } from '../../lib/school-web-persona';
 import { TeacherCapability, useTeacherAccess } from '../../lib/teacher-access';
 import { useSettingsCapabilities } from '../../lib/permissions-ui';

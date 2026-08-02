@@ -875,6 +875,7 @@ describe('SchoolOS web production contracts', () => {
 
   it('keeps Phase 1 pilot navigation permission-gated and prominent', () => {
     const sidebar = read('components/layout/sidebar.tsx');
+    const personaNav = read('components/layout/sidebar-persona-nav.config.ts');
     const requiredPhaseOneLabels = [
       'Students',
       'Admissions',
@@ -885,7 +886,7 @@ describe('SchoolOS web production contracts', () => {
       'Settings',
     ];
 
-    assert.match(sidebar, /export const dashboardNavGroups/);
+    assert.match(personaNav, /export const adminNavGroups/);
     assert.match(sidebar, /const visibleGroups = useMemo/);
     assert.match(sidebar, /canDisplayNavItem\(item, session, hasModule\)/);
     assert.match(sidebar, /getRequiredModuleForHref/);
@@ -896,22 +897,22 @@ describe('SchoolOS web production contracts', () => {
     assert.match(sidebar, /aria-label="School operations navigation"/);
 
     for (const label of requiredPhaseOneLabels) {
-      assert.match(sidebar, new RegExp(label.replace('/', '\\/')));
+      assert.match(personaNav, new RegExp(label.replace('/', '\\/')));
     }
 
-    assert.match(sidebar, /href: '\/dashboard\/activity'/);
-    assert.doesNotMatch(sidebar, /href: '\/dashboard\/messages'/);
-    assert.match(sidebar, /href: '\/dashboard\/notices'/);
-    assert.match(sidebar, /href: '\/dashboard\/transport'/);
-    assert.match(sidebar, /href: '\/dashboard\/canteen'/);
-    assert.match(sidebar, /label: 'HR \/ Staff'/);
-    assert.match(sidebar, /label: 'Payroll'/);
+    assert.match(personaNav, /href: '\/dashboard\/activity'/);
+    assert.doesNotMatch(personaNav, /href: '\/dashboard\/messages'/);
+    assert.match(personaNav, /href: '\/dashboard\/notices'/);
+    assert.match(personaNav, /href: '\/dashboard\/transport'/);
+    assert.match(personaNav, /href: '\/dashboard\/canteen'/);
+    assert.match(personaNav, /label: 'Staff'/);
+    assert.match(personaNav, /label: 'Payroll'/);
     assert.match(
-      sidebar,
+      personaNav,
       /href: '\/dashboard\/transport'[\s\S]*label: 'Transport'/,
     );
     assert.match(
-      sidebar,
+      personaNav,
       /href: '\/dashboard\/library'[\s\S]*label: 'Library'/,
     );
   });
@@ -2833,7 +2834,7 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('provides a dedicated HR & Payroll workspace with contract and leave management', () => {
-    const sidebar = read('components/layout/sidebar.tsx');
+    const personaNav = read('components/layout/sidebar-persona-nav.config.ts');
     const hrWorkspace = read('components/hr/hr-workspace.tsx');
     const hrOverview = read('components/hr/hr-overview.tsx');
     const contractList = read('components/hr/contract-list.tsx');
@@ -2847,12 +2848,12 @@ describe('SchoolOS web production contracts', () => {
     const payrollApi = read('lib/api/payroll.ts');
     const payslipList = read('components/hr/payslip-list.tsx');
 
-    assert.match(sidebar, /label: 'HR \/ Staff'/);
-    assert.match(sidebar, /label: 'Payroll'/);
-    assert.match(sidebar, /href: '\/dashboard\/hr'/);
-    assert.match(sidebar, /href: '\/dashboard\/payroll'/);
+    assert.match(personaNav, /label: 'Staff'/);
+    assert.match(personaNav, /label: 'Payroll'/);
+    assert.match(personaNav, /href: '\/dashboard\/hr'/);
+    assert.match(personaNav, /href: '\/dashboard\/payroll'/);
     assert.match(
-      sidebar,
+      personaNav,
       /permissions: \['hr:read', 'payroll:read', 'payroll:manage'\]/,
     );
     assert.match(payrollPage, /PayrollDashboardPage/);

@@ -9,6 +9,10 @@ const sidebar = readFileSync(
   join(webRoot, 'components/layout/sidebar.tsx'),
   'utf8',
 );
+const personaNavConfig = readFileSync(
+  join(webRoot, 'components/layout/sidebar-persona-nav.config.ts'),
+  'utf8',
+);
 const sidebarNavLink = readFileSync(
   join(webRoot, 'components/layout/sidebar-nav-link.tsx'),
   'utf8',
@@ -26,11 +30,58 @@ const dashboardLayout = readFileSync(
   'utf8',
 );
 
+const PRINCIPAL_EXCLUDED_PERMISSIONS = [
+  'fees:manage',
+  'payments:collect',
+  'settings:manage',
+  'payroll:read',
+];
+
+function sliceNavGroupsExport(source, navGroupsName) {
+  const start = source.indexOf(`export const ${navGroupsName}`);
+  assert.notEqual(start, -1, `${navGroupsName} not found`);
+  const afterStart = source.slice(start + 1);
+  const nextExport = afterStart.search(/\nexport (const|function) /);
+  const end =
+    nextExport === -1 ? source.length : start + 1 + nextExport;
+  return source.slice(start, end);
+}
+
+function collectPermissionStrings(source, navGroupsName) {
+  const slice = sliceNavGroupsExport(source, navGroupsName);
+  const matches = [...slice.matchAll(/permissions: \[([^\]]+)\]/g)];
+  return matches.flatMap((match) =>
+    [...match[1].matchAll(/'([^']+)'/g)].map((m) => m[1]),
+  );
+}
+
+function collectNavEntries(source, navGroupsName) {
+  const slice = sliceNavGroupsExport(source, navGroupsName);
+  const entries = [];
+  for (const match of slice.matchAll(
+    /href: '([^']+)'[\s\S]*?label: '([^']+)'/g,
+  )) {
+    entries.push({ href: match[1], label: match[2] });
+  }
+  return entries;
+}
+
 describe('school operations sidebar', () => {
   it('keeps platform controls out of the school dashboard shell', () => {
-    assert.doesNotMatch(sidebar, /label: 'Platform Control'/);
-    assert.doesNotMatch(sidebar, /label: 'Managed Schools'/);
-    assert.doesNotMatch(sidebar, /label: 'Operations Hub'/);
+    assert.doesNotMatch(personaNavConfig, /label: 'Platform Control'/);
+    assert.doesNotMatch(personaNavConfig, /label: 'Managed Schools'/);
+    assert.doesNotMatch(personaNavConfig, /label: 'Operations Hub'/);
+  });
+
+  it('extracts persona nav trees into sidebar-persona-nav.config.ts', () => {
+    assert.match(personaNavConfig, /export const adminNavGroups/);
+    assert.match(personaNavConfig, /export const principalNavGroups/);
+    assert.match(personaNavConfig, /export const teacherNavGroups/);
+    assert.match(personaNavConfig, /export const hrNavGroups/);
+    assert.match(personaNavConfig, /export const accountantNavGroups/);
+    assert.match(personaNavConfig, /export function navGroupsForPersona/);
+    assert.match(sidebar, /from '\.\/sidebar-persona-nav\.config'/);
+    assert.doesNotMatch(sidebar, /export const principalNavGroups: NavGroup/);
   });
 
   it('uses the consolidated school-operating information architecture', () => {
@@ -38,62 +89,47 @@ describe('school operations sidebar', () => {
       'Home',
       'Students & Admissions',
       'Academics',
-      'Daily Operations',
+      'Attendance',
       'School Operations',
       'Staff & Finance',
-      'Notices',
-      'Reports',
-      'Settings',
-      'Fees & Receipts',
       'Notices & Announcements',
       'Homework & Timetable',
       'Exams & Results',
       'Reports & Exports',
+      'Fees & Receipts',
     ]) {
-      assert.match(sidebar, new RegExp(`label: '${label}'`));
+      assert.match(personaNavConfig, new RegExp(`label: '${label}'`));
     }
 
     assert.match(sidebar, /function NavGroupSection/);
-    assert.match(sidebar, /principalNavGroups/);
-    assert.match(sidebar, /hrNavGroups/);
-    assert.match(sidebar, /accountantNavGroups/);
-    assert.match(sidebar, /librarianNavGroups/);
-    assert.match(sidebar, /cashierNavGroups/);
-    assert.match(sidebar, /function navGroupsForPersona/);
-    assert.doesNotMatch(sidebar, /label: 'Overview'/);
-    assert.doesNotMatch(sidebar, /label: 'People'/);
-    assert.doesNotMatch(sidebar, /label: 'Campus Services'/);
-    assert.doesNotMatch(sidebar, /label: 'Workforce & Finance'/);
-    assert.doesNotMatch(sidebar, /label: 'Insights'/);
-    assert.doesNotMatch(sidebar, /label: 'CAS Records'/);
-    assert.doesNotMatch(sidebar, /label: 'Report Cards'/);
+    assert.doesNotMatch(personaNavConfig, /label: 'Overview'/);
+    assert.doesNotMatch(personaNavConfig, /label: 'People'/);
+    assert.doesNotMatch(personaNavConfig, /label: 'Campus Services'/);
+    assert.doesNotMatch(personaNavConfig, /label: 'Workforce & Finance'/);
+    assert.doesNotMatch(personaNavConfig, /label: 'Insights'/);
+    assert.doesNotMatch(personaNavConfig, /label: 'CAS Records'/);
+    assert.doesNotMatch(personaNavConfig, /label: 'Report Cards'/);
   });
 
   it('keeps notice compatibility and academic routes active through their consolidated entries', () => {
-    assert.match(sidebar, /'\/dashboard\/notices'/);
-    assert.doesNotMatch(sidebar, /href: '\/dashboard\/messages'/);
-    assert.match(sidebar, /'\/dashboard\/academics\/cas'/);
-    assert.match(sidebar, /'\/dashboard\/academics\/report-cards'/);
-    assert.match(sidebar, /'\/dashboard\/timetable'/);
+    assert.match(personaNavConfig, /'\/dashboard\/notices'/);
+    assert.doesNotMatch(personaNavConfig, /href: '\/dashboard\/messages'/);
+    assert.match(personaNavConfig, /'\/dashboard\/academics\/cas'/);
+    assert.match(personaNavConfig, /'\/dashboard\/academics\/report-cards'/);
+    assert.match(personaNavConfig, /'\/dashboard\/timetable'/);
     assert.match(sidebar, /function isActiveNavItem/);
   });
 
   it('resolves exactly one active nav item when routes overlap', () => {
-    // Legacy communication URLs resolve through the M15 notice entry, while
-    // Academics' href-prefix remains single-match for its deeper routes.
     assert.match(sidebar, /function computeActiveHref/);
     assert.match(
-      sidebar,
+      personaNavConfig,
       /activeWhen: \['\/dashboard\/communications', '\/dashboard\/notices'\]/,
     );
     assert.match(sidebar, /score = candidate\.length \+ 10_000/);
   });
 
   it('shows every section flat with no click-to-expand accordion, and supports quick search', () => {
-    // Reference design shows every nav item under its section label at all
-    // times (no click-to-expand groups) — this also fixes a real collapsed
-    // -rail bug where items in a non-active group were unreachable without
-    // first expanding the whole sidebar.
     assert.doesNotMatch(sidebar, /function toggleGroup/);
     assert.doesNotMatch(sidebar, /expandedGroups/);
     assert.doesNotMatch(sidebar, /onExpand/);
@@ -104,9 +140,6 @@ describe('school operations sidebar', () => {
 
   it('keeps visibility scoped to session permissions and module entitlements', () => {
     assert.match(sidebar, /function canDisplayNavItem/);
-    // Permission matching is shared with the dashboard route gate via
-    // lib/session.ts's hasAnyPermission, instead of a second inline
-    // implementation living only in the sidebar.
     assert.match(sidebar, /hasAnyPermission\(session, item\.permissions\)/);
     assert.match(sidebar, /moduleKeys\.some\(\(module\) => hasModule\(module\)\)/);
     assert.match(sidebar, /getRequiredModuleForHref/);
@@ -126,9 +159,10 @@ describe('school operations sidebar', () => {
   });
 
   it('aligns command palette settings visibility with the sidebar hub rules', () => {
-    assert.match(sidebar, /export function shouldShowSettingsHub/);
+    assert.match(personaNavConfig, /export function shouldShowSettingsHub/);
     assert.match(commandPalette, /shouldShowSettingsHub/);
     assert.match(commandPalette, /isTeacherPersona/);
+    assert.match(commandPalette, /from '\.\/sidebar-persona-nav\.config'/);
     assert.doesNotMatch(
       commandPalette,
       /settingsNavItem,\s*\n\s*\];/,
@@ -144,14 +178,11 @@ describe('school operations sidebar', () => {
   });
 
   it('badges Notices with the real unread count instead of a hardcoded number', () => {
-    // Reuses the same 'notification-center' query key as the topbar bell so
-    // TanStack Query dedupes the fetch instead of a second request; badge
-    // loading/failure must fall back to no badge, never a fake number.
     assert.match(sidebar, /queryKey: \['notification-center'\]/);
     assert.match(sidebar, /queryFn: api\.getNotificationCenter/);
     assert.match(sidebar, /function formatBadgeCount/);
     assert.match(sidebar, /count > 99 \? '99\+' : count/);
-    assert.doesNotMatch(sidebar, /badge: \d/);
+    assert.doesNotMatch(personaNavConfig, /badge: \d/);
   });
 
   it('uses semantic sidebar design tokens for navigation states', () => {
@@ -166,11 +197,6 @@ describe('school operations sidebar', () => {
   });
 
   it('closes the mobile drawer on Escape from anywhere inside it and manages dialog focus', () => {
-    // A regression test for two real drawer accessibility bugs: Escape only
-    // used to close the drawer if the overlay div itself had focus (which
-    // almost never happens once a user tabs into the nav links), and focus
-    // was never moved into the drawer on open or back to the trigger button
-    // on close.
     assert.match(sidebar, /role="dialog"/);
     assert.match(sidebar, /aria-modal="true"/);
     assert.match(sidebar, /aria-hidden=\{!mobileOpen\}/);
@@ -178,5 +204,73 @@ describe('school operations sidebar', () => {
     assert.match(sidebar, /mobilePanelRef\.current\?\.focus\(\)/);
     assert.match(sidebar, /document\.addEventListener\('keydown', handleKeyDown\)/);
     assert.match(sidebar, /event\.key === 'Escape'/);
+  });
+});
+
+describe('persona sidebar contracts', () => {
+  it('principal nav uses accounting read finance and operations hub, not fee collection', () => {
+    const entries = collectNavEntries(personaNavConfig, 'principalNavGroups');
+    const finance = entries.find((entry) => entry.label === 'Finance Overview');
+    assert.ok(finance);
+    assert.equal(finance.href, '/dashboard/accounting');
+
+    const operations = entries.find((entry) => entry.label === 'Operations');
+    assert.ok(operations);
+    assert.equal(operations.href, '/dashboard/operations');
+
+    const audit = entries.find((entry) => entry.label === 'Audit');
+    assert.ok(audit);
+    assert.equal(audit.href, '/dashboard/accounting/audit');
+
+    const permissions = collectPermissionStrings(
+      personaNavConfig,
+      'principalNavGroups',
+    );
+    const principalSlice = sliceNavGroupsExport(
+      personaNavConfig,
+      'principalNavGroups',
+    );
+    for (const excluded of PRINCIPAL_EXCLUDED_PERMISSIONS) {
+      assert.ok(
+        !permissions.includes(excluded),
+        `principal nav must not require ${excluded}`,
+      );
+      assert.doesNotMatch(
+        principalSlice,
+        new RegExp(`'${excluded.replace(/:/g, '\\:')}'`),
+        `principal nav must not reference ${excluded}`,
+      );
+    }
+  });
+
+  it('accountant nav includes cashier close, reconciliation, and module postings', () => {
+    const entries = collectNavEntries(personaNavConfig, 'accountantNavGroups');
+    for (const label of [
+      'Cashier Close',
+      'Reconciliation',
+      'Module Postings',
+      'Finance Dashboard',
+      'Audit Trail',
+    ]) {
+      assert.ok(
+        entries.some((entry) => entry.label === label),
+        `accountant nav missing ${label}`,
+      );
+    }
+  });
+
+  it('teacher nav includes notifications without inventing class reports', () => {
+    const entries = collectNavEntries(personaNavConfig, 'teacherNavGroups');
+    assert.ok(entries.some((entry) => entry.href === '/dashboard/notifications'));
+    assert.doesNotMatch(personaNavConfig, /label: 'Class Reports'/);
+  });
+
+  it('cashier shell stays on counter operations only', () => {
+    const permissions = collectPermissionStrings(
+      personaNavConfig,
+      'cashierNavGroups',
+    );
+    assert.doesNotMatch(permissions.join(','), /accounting:manage/);
+    assert.doesNotMatch(permissions.join(','), /settings:manage/);
   });
 });
