@@ -81,7 +81,9 @@ describe('Principal explicit permission allowlist (PPR-P0-01)', () => {
   ];
 
   it('uses the exported explicit allowlist as the principal preset', () => {
-    expect([...principal].sort()).toEqual([...PRINCIPAL_PERMISSION_KEYS].sort());
+    expect([...principal].sort()).toEqual(
+      [...PRINCIPAL_PERMISSION_KEYS].sort(),
+    );
   });
 
   it('does not inherit tenant permissions by default (anti-inheritance)', () => {
