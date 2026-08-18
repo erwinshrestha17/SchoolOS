@@ -122,8 +122,26 @@ jobs:
       - name: Lint
         run: pnpm lint
 
-      - name: Typecheck
-        run: pnpm typecheck
+      # The root typecheck is intentionally expanded into its canonical
+      # subcommands so the first failing workspace is visible in Actions while
+      # retaining the same fail-closed ordering.
+      - name: Typecheck generated artifacts
+        run: pnpm compile:artifacts
+
+      - name: Typecheck core import boundaries
+        run: pnpm check:core-imports
+
+      - name: Typecheck core
+        run: pnpm --filter @schoolos/core typecheck
+
+      - name: Verify core dist
+        run: pnpm check:core-dist
+
+      - name: Typecheck API
+        run: pnpm --filter @schoolos/api typecheck
+
+      - name: Typecheck web
+        run: pnpm --filter @schoolos/web typecheck
 
       - name: Unit tests
         run: pnpm test
