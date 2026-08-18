@@ -134,8 +134,10 @@ jobs:
       - name: Typecheck core
         run: pnpm --filter @schoolos/core typecheck
 
-      - name: Verify core dist
-        run: pnpm check:core-dist
+      - name: Build and verify core dist
+        run: |
+          pnpm --filter @schoolos/core build
+          pnpm check:core-dist
 
       - name: Typecheck API
         run: pnpm --filter @schoolos/api typecheck
