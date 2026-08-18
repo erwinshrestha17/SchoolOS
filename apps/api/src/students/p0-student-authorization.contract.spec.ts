@@ -34,7 +34,9 @@ describe('P0 student authorization contract', () => {
     'librarian',
     'driver',
   ])('%s cannot satisfy the iEMIS export permission contract', (role) => {
-    expect(roleCanSatisfy(role, requiredPermissions('exportIemis'))).toBe(false);
+    expect(roleCanSatisfy(role, requiredPermissions('exportIemis'))).toBe(
+      false,
+    );
   });
 
   it('preserves teacher student reads while removing generic student-directory access from non-teaching operational personas', () => {
