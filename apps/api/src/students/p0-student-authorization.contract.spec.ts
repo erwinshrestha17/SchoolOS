@@ -27,12 +27,15 @@ describe('P0 student authorization contract', () => {
     ]);
   });
 
-  it.each(['teacher', 'subject_teacher', 'support_staff', 'librarian', 'driver'])(
-    '%s cannot satisfy the iEMIS export permission contract',
-    (role) => {
-      expect(roleCanSatisfy(role, requiredPermissions('exportIemis'))).toBe(false);
-    },
-  );
+  it.each([
+    'teacher',
+    'subject_teacher',
+    'support_staff',
+    'librarian',
+    'driver',
+  ])('%s cannot satisfy the iEMIS export permission contract', (role) => {
+    expect(roleCanSatisfy(role, requiredPermissions('exportIemis'))).toBe(false);
+  });
 
   it('preserves teacher student reads while removing generic student-directory access from non-teaching operational personas', () => {
     expect(systemRolePermissions.teacher).toContain('students:read');
