@@ -270,7 +270,7 @@ export class StudentsController {
   }
 
   @Get('iemis/validation')
-  @Permissions('students:read')
+  @Permissions('students:manage_lifecycle')
   getIemisValidationList(
     @Query('classId') classId: string | undefined,
     @Query('sectionId') sectionId: string | undefined,
@@ -284,13 +284,13 @@ export class StudentsController {
   }
 
   @Get('iemis/export')
-  @Permissions('students:read')
+  @Permissions('students:manage_lifecycle', 'reports:export')
   exportIemis(@CurrentAuth() auth: AuthContext) {
     return this.studentsService.exportIemis(auth);
   }
 
   @Get('roster/export')
-  @Permissions('students:read')
+  @Permissions('students:manage_lifecycle', 'reports:export')
   exportRoster(
     @Query('academicYearId') academicYearId: string | undefined,
     @Query('classId') classId: string | undefined,
