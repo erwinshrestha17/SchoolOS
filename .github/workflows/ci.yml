@@ -98,8 +98,41 @@ jobs:
           pnpm --filter @schoolos/api exec prettier --write "src/**/*.ts" "test/**/*.ts"
           git diff --exit-code -- apps/api/src apps/api/test
 
-      - name: Verify deploy gate
-        run: pnpm verify:deploy:core
+      # Keep the deploy gate fail-closed, but expose each canonical sub-gate as
+      # its own Actions step so release blockers cannot hide inside one chained
+      # shell command.
+      - name: Compile generated artifacts
+        run: pnpm compile:artifacts
+
+      - name: Verify deploy environment
+        run: pnpm verify:env:deploy
+
+      - name: Verify tracked artifacts
+        run: pnpm verify:tracked-artifacts
+
+      - name: Generate Prisma client
+        run: pnpm db:generate
+
+      - name: Validate Prisma schema
+        run: pnpm db:validate
+
+      - name: Verify OpenAPI contract
+        run: pnpm verify:openapi
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: API e2e tests
+        run: pnpm test:e2e
+
+      - name: Build
+        run: pnpm build
 
       - name: Migrate and seed e2e database
         if: steps.changes.outputs.web == 'true'
@@ -186,5 +219,5 @@ jobs:
       # baselines stay pinned to the platform that generates them. See
       # apps/schoolos_mobile/dart_test.yaml.
       - name: Test
-        if: steps.changes.outputs.mobile == 'true'
+        if: always() && steps.changes.outputs.mobile == 'true'
         run: flutter test --exclude-tags golden
