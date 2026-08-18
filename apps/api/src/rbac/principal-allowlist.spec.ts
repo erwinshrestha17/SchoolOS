@@ -89,7 +89,8 @@ describe('Principal explicit permission allowlist (PPR-P0-01)', () => {
       buildPermissionKey(resource, action),
     );
     const inheritedOperational = allTenantKeys.filter(
-      (key) => PRINCIPAL_FORBIDDEN_KEYS.includes(key) && principal.includes(key),
+      (key) =>
+        PRINCIPAL_FORBIDDEN_KEYS.includes(key) && principal.includes(key),
     );
     expect(inheritedOperational).toEqual([]);
   });
