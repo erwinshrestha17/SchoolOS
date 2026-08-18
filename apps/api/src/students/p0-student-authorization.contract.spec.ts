@@ -30,9 +30,7 @@ describe('P0 student authorization contract', () => {
   it.each(['teacher', 'subject_teacher', 'support_staff', 'librarian', 'driver'])(
     '%s cannot satisfy the iEMIS export permission contract',
     (role) => {
-      expect(roleCanSatisfy(role, requiredPermissions('exportIemis'))).toBe(
-        false,
-      );
+      expect(roleCanSatisfy(role, requiredPermissions('exportIemis'))).toBe(false);
     },
   );
 
