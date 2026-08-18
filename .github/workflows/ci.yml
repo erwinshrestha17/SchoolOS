@@ -93,6 +93,11 @@ jobs:
         if: steps.changes.outputs.web == 'true'
         run: pnpm --filter @schoolos/web exec playwright install chromium
 
+      - name: Verify API formatting
+        run: |
+          pnpm --filter @schoolos/api exec prettier --write "src/**/*.ts" "test/**/*.ts"
+          git diff --exit-code -- apps/api/src apps/api/test
+
       - name: Verify deploy gate
         run: pnpm verify:deploy:core
 
