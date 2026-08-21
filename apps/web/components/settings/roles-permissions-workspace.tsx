@@ -65,7 +65,7 @@ export function RolesPermissionsWorkspace() {
     <div className="space-y-6 p-6 pb-24">
       <SchoolSettingsPageHeader
         title="Roles & permissions"
-        description="Review the roles available to this school and the permission coverage granted by each role. Backend authorisation remains the source of truth."
+        description="Review the roles available to this school and the permission coverage granted by each role. Access is checked again for every protected action."
         access="view-only"
       />
       <SettingsPermissionNotice
@@ -158,12 +158,12 @@ export function RolesPermissionsWorkspace() {
           <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
           <div>
             <p className="font-bold">
-              Role assignment is not a frontend security control
+              Role assignment is enforced on every protected action
             </p>
             <p className="mt-1 leading-6">
-              The school dashboard may hide actions for a role, but every
-              backend route must also verify the user’s tenant, role,
-              permission, and module entitlement.
+              The school dashboard may hide unavailable actions, and each
+              protected action verifies the user’s school, role, permission,
+              and module entitlement.
             </p>
           </div>
         </div>

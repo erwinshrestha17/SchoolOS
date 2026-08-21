@@ -130,7 +130,7 @@ export function LedgerSection({
 
       {mode !== "receipts" ? <SectionCard
         title="Billing History"
-        description="Server-paginated invoices and their current backend status."
+        description="Invoices and their current payment status."
       >
         <FeeLedger
           invoices={invoicesQuery.data?.items ?? []}
@@ -154,7 +154,7 @@ export function LedgerSection({
 
       {mode !== "invoices" ? <div id="receipt-history"><SectionCard
         title="Receipt History"
-        description="Tenant-scoped protected receipts with server-side search and paging."
+        description="Protected school receipts with search and paging."
       >
         <SearchInput
           label="Search receipts"

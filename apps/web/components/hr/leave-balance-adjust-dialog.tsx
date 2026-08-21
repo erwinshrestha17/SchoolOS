@@ -1,13 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { FormField, Input, Select, TextArea } from '../ui/form-field';
 import { Toast } from '../ui/toast';
 import { X, Sliders } from 'lucide-react';
+import { getNepalNow, type StaffLookupOption } from '@schoolos/core';
+import { RemoteStaffSelector } from '../staff/remote-staff-selector';
 
 type LeaveBalanceAdjustDialogProps = {
   isOpen: boolean;
@@ -24,16 +26,12 @@ export function LeaveBalanceAdjustDialog({
   const [toastError, setToastError] = useState<string | null>(null);
 
   const [staffId, setStaffId] = useState(lockedStaffId ?? '');
+  const [staffOption, setStaffOption] =
+    useState<StaffLookupOption | null>(null);
   const [leaveType, setLeaveType] = useState('CASUAL');
-  const [year, setYear] = useState(new Date().getFullYear());
+  const [year, setYear] = useState(() => getNepalNow().year);
   const [adjustment, setAdjustment] = useState<number>(0);
   const [reason, setReason] = useState('');
-
-  const staffQuery = useQuery({
-    queryKey: ['staff'],
-    queryFn: api.listStaff,
-    enabled: isOpen && !lockedStaffId,
-  });
 
   const adjustMutation = useMutation({
     mutationFn: api.adjustLeaveBalance,
@@ -45,7 +43,10 @@ export function LeaveBalanceAdjustDialog({
       setLeaveType('CASUAL');
       setAdjustment(0);
       setReason('');
-      if (!lockedStaffId) setStaffId('');
+      if (!lockedStaffId) {
+        setStaffId('');
+        setStaffOption(null);
+      }
     },
     onError: (error: any) => {
       setToastError(error.message || 'Failed to adjust leave balance.');
@@ -85,8 +86,6 @@ export function LeaveBalanceAdjustDialog({
     });
   };
 
-  const staffList = staffQuery.data ?? [];
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md rounded-2xl">
@@ -119,16 +118,16 @@ export function LeaveBalanceAdjustDialog({
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           {!lockedStaffId ? (
-            <FormField label="Staff Member">
-              <Select value={staffId} onChange={(e) => setStaffId(e.target.value)}>
-                <option value="">Choose staff member...</option>
-                {staffList.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.firstName} {s.lastName} ({s.employeeId})
-                  </option>
-                ))}
-              </Select>
-            </FormField>
+            <RemoteStaffSelector
+              value={staffId}
+              selectedOption={staffOption}
+              onChange={(nextStaffId, option) => {
+                setStaffId(nextStaffId);
+                setStaffOption(option);
+              }}
+              label="Staff member"
+              placeholder="Search staff member"
+            />
           ) : null}
 
           <div className="grid grid-cols-2 gap-4">

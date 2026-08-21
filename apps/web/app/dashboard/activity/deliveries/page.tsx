@@ -20,7 +20,7 @@ export default function ActivityDeliveriesPage() {
     <DashboardPageShell>
       <PageHeader
         title="Activity deliveries"
-        description="Guardian notification delivery state for published activity posts — channel, destination, timestamps, and failures. Backend-owned records only."
+        description="Guardian notification delivery state for published activity posts — channel, destination, timestamps, and failures."
       />
 
       <DataTable

@@ -50,11 +50,14 @@ describe('M12 notifications and M15 notices boundary', () => {
 
   it('hides chat navigation and renders bounded compatibility routes', () => {
     const sidebar = read('components/layout/sidebar.tsx');
+    const personaNav = read('components/layout/sidebar-persona-nav.config.ts');
     const removed = read('components/messaging/chat-removed-state.tsx');
     const messagesPage = read('app/dashboard/messages/page.tsx');
 
     assert.doesNotMatch(sidebar, /label: 'Messages'/);
     assert.doesNotMatch(sidebar, /messaging:create/);
+    assert.doesNotMatch(personaNav, /Messages & Announcements/);
+    assert.match(personaNav, /Notices & Announcements/);
     assert.match(removed, /Chat has been removed/);
     assert.match(messagesPage, /ChatRemovedState/);
   });

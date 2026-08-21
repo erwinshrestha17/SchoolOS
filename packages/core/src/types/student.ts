@@ -40,9 +40,7 @@ export type GuardianCapability =
   | "PICKUP_AUTHORIZE"
   | "COMPLAINT_OR_CORRECTION_SUBMIT";
 
-export type GuardianRelationshipVerificationStatus =
-  | "UNVERIFIED"
-  | "VERIFIED";
+export type GuardianRelationshipVerificationStatus = "UNVERIFIED" | "VERIFIED";
 
 export type GuardianRelationshipStatus =
   | "ACTIVE"
@@ -65,8 +63,7 @@ export const GUARDIAN_RECOVERY_ACTIONS = [
   "MARK_DECEASED",
 ] as const;
 
-export type GuardianRecoveryAction =
-  (typeof GUARDIAN_RECOVERY_ACTIONS)[number];
+export type GuardianRecoveryAction = (typeof GUARDIAN_RECOVERY_ACTIONS)[number];
 
 export const GUARDIAN_RECOVERY_VERIFICATION_METHODS = [
   "TRUSTED_SESSION",
@@ -236,6 +233,17 @@ export type StudentProfile = {
     lastScannedAt: string | null;
     fileAssetId?: string | null;
   } | null;
+};
+
+export type StudentLookupOption = {
+  id: string;
+  studentSystemId: string;
+  admissionNumber: string | null;
+  fullNameEn: string;
+  classId: string;
+  className: string;
+  sectionId: string | null;
+  sectionName: string | null;
 };
 
 export type StudentModuleSummary = {

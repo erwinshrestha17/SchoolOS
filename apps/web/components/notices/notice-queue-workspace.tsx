@@ -38,7 +38,10 @@ export function NoticeQueueWorkspace({
           { href: '/dashboard/notices', label: 'All notices' },
           { href: '/dashboard/notices/scheduled', label: 'Scheduled' },
           { href: '/dashboard/notices/approvals', label: 'Approvals' },
-          { href: '/dashboard/notices/deliveries', label: 'Delivery logs' },
+          {
+            href: '/dashboard/notifications/deliveries',
+            label: 'Delivery logs',
+          },
         ]}
       />
       {readOnlyNotice ? (

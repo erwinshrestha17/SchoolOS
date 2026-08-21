@@ -14,9 +14,9 @@ import {
 import {
   formatBsDate,
   formatBsDateTime,
-  type StudentProfile,
+  getNepalSchoolDay,
+  type PermissionKey,
 } from "@schoolos/core";
-import { api } from "../../lib/api";
 import {
   transportApi,
   type TransportDriverAssignmentPayload,
@@ -38,7 +38,11 @@ import { SummaryCard, SummaryGrid } from "../ui/summary-card";
 import { WorkSurface } from "../ui/work-surface";
 import { StatusBadge, type StatusTone } from "../ui/status-badge";
 import { ConfirmDialog } from "../ui/confirm-dialog";
+import { RemoteStaffSelector } from "../staff/remote-staff-selector";
+import { RemoteStudentSelector } from "../students/remote-student-selector";
 import { cn } from "../../lib/utils";
+import { PermissionDenied } from "../ui/permission-denied";
+import { usePermissionAccess } from "../../lib/permissions-ui";
 
 type TransportTab =
   | "overview"
@@ -50,28 +54,30 @@ type TransportTab =
   | "reports";
 
 type TransportWorkspaceProps = {
-  initialTab?: TransportTab;
+  workspace?: TransportTab;
 };
 
-const tabs: Array<{ key: TransportTab; label: string; href: string }> = [
-  { key: "overview", label: "Overview", href: "/dashboard/transport" },
-  {
-    key: "routes",
-    label: "Routes & Stops",
-    href: "/dashboard/transport/routes",
-  },
-  { key: "vehicles", label: "Vehicles", href: "/dashboard/transport/vehicles" },
-  {
-    key: "assignments",
-    label: "Assignments",
-    href: "/dashboard/transport/assignments",
-  },
-  { key: "trips", label: "Trips", href: "/dashboard/transport/trips" },
-  { key: "location", label: "Location", href: "/dashboard/transport/location" },
-  { key: "reports", label: "Reports", href: "/dashboard/transport/reports" },
+const transportTabReadPermissions: Record<
+  Exclude<TransportTab, "overview">,
+  PermissionKey
+> = {
+  routes: "transport:routes:read",
+  vehicles: "transport:vehicles:read",
+  assignments: "transport:assignments:read",
+  trips: "transport:trips:read",
+  location: "transport:location:read",
+  reports: "transport:reports:read",
+};
+
+const transportOverviewReadPermissions: PermissionKey[] = [
+  "transport:routes:read",
+  "transport:vehicles:read",
+  "transport:assignments:read",
+  "transport:trips:read",
+  "transport:reports:read",
 ];
 
-const today = new Date().toISOString().slice(0, 10);
+const today = getNepalSchoolDay().gregorianDate;
 
 const addDays = (date: Date, days: number) => {
   const result = new Date(date);
@@ -130,9 +136,37 @@ const emptyPingForm: TransportLocationPingPayload = {
 };
 
 export function TransportWorkspace({
-  initialTab = "overview",
+  workspace = "overview",
 }: TransportWorkspaceProps) {
-  const [activeTab, setActiveTab] = useState<TransportTab>(initialTab);
+  const activeTab = workspace;
+  const access = usePermissionAccess();
+  const canReadRoutes = access.hasPermission("transport:routes:read");
+  const canReadVehicles = access.hasPermission("transport:vehicles:read");
+  const canReadAssignments = access.hasPermission(
+    "transport:assignments:read",
+  );
+  const canReadTrips = access.hasPermission("transport:trips:read");
+  const canReadLocation = access.hasPermission("transport:location:read");
+  const canReadReports = access.hasPermission("transport:reports:read");
+  const canCreateRoutes = access.hasPermission("transport:routes:create");
+  const canUpdateRoutes = access.hasPermission("transport:routes:update");
+  const canCreateVehicles = access.hasPermission("transport:vehicles:create");
+  const canUpdateVehicles = access.hasPermission("transport:vehicles:update");
+  const canCreateAssignments = access.hasPermission(
+    "transport:assignments:create",
+  );
+  const canUpdateAssignments = access.hasPermission(
+    "transport:assignments:update",
+  );
+  const canCreateTrips = access.hasPermission("transport:trips:create");
+  const canUpdateTrips = access.hasPermission("transport:trips:update");
+  const canUpdateLocation = access.hasPermission("transport:location:update");
+  const canViewActiveTab =
+    activeTab === "overview"
+      ? access.hasAnyPermission(transportOverviewReadPermissions)
+      : access.hasPermission(transportTabReadPermissions[activeTab]);
+  const isWorkspace = (...workspaces: TransportTab[]) =>
+    workspaces.includes(activeTab);
   const [routeForm, setRouteForm] =
     useState<TransportRoutePayload>(emptyRouteForm);
   const [stopForm, setStopForm] = useState<TransportStopPayload>(emptyStopForm);
@@ -166,42 +200,63 @@ export function TransportWorkspace({
   const routesQuery = useQuery({
     queryKey: ["transport-routes"],
     queryFn: () => transportApi.listRoutes(),
+    enabled: canReadRoutes && isWorkspace(
+      "overview",
+      "routes",
+      "assignments",
+      "trips",
+      "reports",
+    ),
   });
   const stopsQuery = useQuery({
     queryKey: ["transport-stops"],
     queryFn: () => transportApi.listStops(),
+    enabled:
+      canReadRoutes && isWorkspace("overview", "routes", "assignments"),
   });
   const vehiclesQuery = useQuery({
     queryKey: ["transport-vehicles"],
     queryFn: () => transportApi.listVehicles(),
+    enabled:
+      canReadVehicles &&
+      isWorkspace("vehicles", "assignments", "trips", "reports"),
   });
   const driversQuery = useQuery({
     queryKey: ["transport-driver-assignments"],
     queryFn: () => transportApi.listDriverAssignments(),
+    enabled:
+      canReadAssignments && isWorkspace("assignments", "trips", "reports"),
   });
   const studentsQuery = useQuery({
     queryKey: ["transport-student-assignments"],
     queryFn: () => transportApi.listStudentAssignments(),
+    enabled:
+      canReadAssignments && isWorkspace("overview", "assignments"),
   });
   const activeTripsQuery = useQuery({
     queryKey: ["transport-active-trips"],
     queryFn: () => transportApi.listActiveTrips(),
+    enabled: canReadTrips && isWorkspace("overview", "trips", "location"),
   });
   const tripsQuery = useQuery({
     queryKey: ["transport-trips"],
     queryFn: () => transportApi.listTrips(),
+    enabled: canReadTrips && isWorkspace("trips", "location"),
   });
   const reportsQuery = useQuery({
     queryKey: ["transport-reports"],
     queryFn: () => transportApi.getReports(),
+    enabled: canReadReports && isWorkspace("overview", "reports"),
   });
   const staleGpsReportQuery = useQuery({
     queryKey: ["transport-report-stale-gps"],
     queryFn: () => transportApi.getStaleGpsReport(),
+    enabled: canReadReports && activeTab === "reports",
   });
   const vehicleDocumentsReportQuery = useQuery({
     queryKey: ["transport-report-vehicle-documents", 30],
     queryFn: () => transportApi.getVehicleDocumentExpiryReport({ days: 30 }),
+    enabled: canReadReports && isWorkspace("overview", "reports"),
   });
   const gpsQualityReportQuery = useQuery({
     queryKey: ["transport-report-gps-pings", reportRouteId, reportVehicleId],
@@ -210,18 +265,18 @@ export function TransportWorkspace({
         routeId: reportRouteId,
         vehicleId: reportVehicleId,
       }),
-    enabled: activeTab === "reports",
+    enabled: canReadReports && activeTab === "reports",
   });
   const oneDayRouteChangesReportQuery = useQuery({
     queryKey: ["transport-report-one-day-route-changes", today],
     queryFn: () =>
       transportApi.getOneDayRouteChangesReport({ serviceDate: today }),
-    enabled: activeTab === "reports",
+    enabled: canReadReports && activeTab === "reports",
   });
   const maintenanceReportQuery = useQuery({
     queryKey: ["transport-report-maintenance"],
     queryFn: () => transportApi.getMaintenanceReminderReport(),
-    enabled: activeTab === "reports",
+    enabled: canReadReports && activeTab === "reports",
   });
   const tripHistoryReportQuery = useQuery({
     queryKey: [
@@ -236,25 +291,18 @@ export function TransportWorkspace({
         vehicleId: reportVehicleId,
         driverAssignmentId: reportDriverAssignmentId,
       }),
-    enabled: activeTab === "reports",
+    enabled: canReadReports && activeTab === "reports",
   });
   const boardingReportQuery = useQuery({
     queryKey: ["transport-report-boarding"],
     queryFn: () => transportApi.getBoardingReport(),
-    enabled: activeTab === "reports",
-  });
-  const schoolStudentsQuery = useQuery({
-    queryKey: ["students-for-transport"],
-    queryFn: () => api.listStudents({ limit: 1000 }),
-  });
-  const staffQuery = useQuery({
-    queryKey: ["staff-for-transport"],
-    queryFn: () => api.listStaff(),
+    enabled: canReadReports && activeTab === "reports",
   });
   const locationQuery = useQuery({
     queryKey: ["transport-latest-location", selectedTripId],
     queryFn: () => transportApi.getLatestLocation(selectedTripId),
-    enabled: Boolean(selectedTripId),
+    enabled:
+      canReadLocation && activeTab === "location" && Boolean(selectedTripId),
   });
 
   const invalidateTransport = () => {
@@ -455,7 +503,10 @@ export function TransportWorkspace({
   const tripDetailsQuery = useQuery({
     queryKey: ["transport-trip-details", viewingTripId],
     queryFn: () => transportApi.getTripDetails(viewingTripId!),
-    enabled: Boolean(viewingTripId),
+    enabled:
+      canReadTrips &&
+      isWorkspace("overview", "trips") &&
+      Boolean(viewingTripId),
   });
 
   const routes = routesQuery.data ?? [];
@@ -485,17 +536,64 @@ export function TransportWorkspace({
   const driverLicenseAlertCount =
     reportsQuery.data?.driverLicenseAlerts?.length ?? 0;
 
-  const firstError =
-    routesQuery.error ||
-    stopsQuery.error ||
-    vehiclesQuery.error ||
-    driversQuery.error ||
-    studentsQuery.error ||
-    activeTripsQuery.error ||
-    tripsQuery.error ||
-    reportsQuery.error ||
-    staleGpsReportQuery.error ||
-    vehicleDocumentsReportQuery.error;
+  const workspaceErrors: Record<TransportTab, Array<Error | null>> = {
+    overview: [
+      routesQuery.error,
+      stopsQuery.error,
+      studentsQuery.error,
+      activeTripsQuery.error,
+      reportsQuery.error,
+      vehicleDocumentsReportQuery.error,
+      tripDetailsQuery.error,
+    ],
+    routes: [routesQuery.error, stopsQuery.error],
+    vehicles: [vehiclesQuery.error],
+    assignments: [
+      routesQuery.error,
+      stopsQuery.error,
+      vehiclesQuery.error,
+      driversQuery.error,
+      studentsQuery.error,
+    ],
+    trips: [
+      routesQuery.error,
+      vehiclesQuery.error,
+      driversQuery.error,
+      activeTripsQuery.error,
+      tripsQuery.error,
+      tripDetailsQuery.error,
+    ],
+    location: [activeTripsQuery.error, tripsQuery.error, locationQuery.error],
+    reports: [
+      routesQuery.error,
+      vehiclesQuery.error,
+      driversQuery.error,
+      reportsQuery.error,
+      staleGpsReportQuery.error,
+      vehicleDocumentsReportQuery.error,
+      gpsQualityReportQuery.error,
+      oneDayRouteChangesReportQuery.error,
+      maintenanceReportQuery.error,
+      tripHistoryReportQuery.error,
+      boardingReportQuery.error,
+    ],
+  };
+  const firstError = workspaceErrors[activeTab].find(Boolean);
+
+  if (access.resolution === "loading") {
+    return <LoadingState label="Checking transport access..." />;
+  }
+
+  if (!canViewActiveTab) {
+    return (
+      <PermissionDenied
+        title="Transport workspace restricted"
+        description="Your role does not include read access to this transport workspace."
+        resource="Transport"
+        action="Read"
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -568,52 +666,30 @@ export function TransportWorkspace({
                 trips={activeTrips}
                 emptyTitle="No active trips"
                 onSelect={setViewingTripId}
-                onDelay={(tripId, isDelayed) =>
-                  setDelayingTrip({ tripId, isDelayed })
+                onDelay={canUpdateTrips ? (tripId, isDelayed) =>
+                  setDelayingTrip({ tripId, isDelayed }) : undefined
                 }
-                onComplete={(tripId) =>
-                  setConfirmingTripAction({ action: "complete", tripId })
+                onComplete={canUpdateTrips ? (tripId) =>
+                  setConfirmingTripAction({ action: "complete", tripId }) : undefined
                 }
               />
 
               <InfoCard
                 title="Privacy and safety rules"
                 lines={[
-                  "Parents will only see their own child’s assigned vehicle/trip in the future parent view.",
-                  "Driver app will only expose trips assigned to that driver later.",
-                  "Never expose a full bus passenger list to parents.",
-                  "Live map/WebSocket tracking is intentionally deferred; this admin slice shows latest coordinates only.",
+                  "Parent access is limited to the linked child’s assigned vehicle and trip status.",
+                  "Driver access is limited to trips assigned to that driver.",
+                  "Passenger lists remain restricted to authorized school staff.",
+                  "Location status shows the latest recorded coordinates and their freshness; it is not a live map.",
                 ]}
               />
-              <Panel
-                title="Remaining Issues"
-                description="Transport items that still need backend or pilot decisions before wider rollout."
-              >
-                <ul className="space-y-2 text-sm text-slate-600">
-                  <li>
-                    Report-level delay, stale-GPS, and document-expiry totals
-                    are unavailable: needs summary API. The workspace still
-                    shows the bounded backend report rows and timestamps.
-                  </li>
-                  <li>
-                    Live map, route deviation, ETA, geofence, and overspeed
-                    views remain deferred until SSE/WebSocket and load-test
-                    decisions are approved.
-                  </li>
-                  <li>
-                    End-to-end GPS retention and route/CSV staging smoke still
-                    need staging provider data.
-                  </li>
-                </ul>
-              </Panel>
             </div>
 
             <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <h3 className="font-bold text-slate-900">Quick Actions</h3>
               <div className="grid gap-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("routes")}
+                {canCreateRoutes ? <Link
+                  href="/dashboard/transport/routes"
                   className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:bg-slate-100"
                 >
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-mod-transport-bg)] text-[var(--color-mod-transport-text)]">
@@ -627,10 +703,9 @@ export function TransportWorkspace({
                       Create new bus path
                     </p>
                   </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("vehicles")}
+                </Link> : null}
+                {canCreateVehicles ? <Link
+                  href="/dashboard/transport/vehicles"
                   className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:bg-slate-100"
                 >
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-mod-transport-bg)] text-[var(--color-mod-transport-text)]">
@@ -642,10 +717,9 @@ export function TransportWorkspace({
                     </p>
                     <p className="text-xs text-slate-500">Register new bus</p>
                   </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("assignments")}
+                </Link> : null}
+                {canCreateAssignments ? <Link
+                  href="/dashboard/transport/assignments"
                   className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:bg-slate-100"
                 >
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-mod-transport-bg)] text-[var(--color-mod-transport-text)]">
@@ -659,10 +733,9 @@ export function TransportWorkspace({
                       Enrol student to route
                     </p>
                   </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("trips")}
+                </Link> : null}
+                {canCreateTrips ? <Link
+                  href="/dashboard/transport/trips"
                   className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:bg-slate-100"
                 >
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 text-orange-600">
@@ -676,7 +749,7 @@ export function TransportWorkspace({
                       Start or track trip
                     </p>
                   </div>
-                </button>
+                </Link> : null}
               </div>
             </section>
           </div>
@@ -721,7 +794,7 @@ export function TransportWorkspace({
                             .length}{" "}
                         stops
                       </span>
-                      <button
+                      {canUpdateRoutes ? <button
                         type="button"
                         onClick={() =>
                           updateRouteMutation.mutate({
@@ -732,7 +805,7 @@ export function TransportWorkspace({
                         className="text-xs font-bold text-[var(--color-mod-transport-text)] hover:underline"
                       >
                         {route.isActive ? "Deactivate" : "Activate"}
-                      </button>
+                      </button> : null}
                     </div>
                   </div>
                   {route.stops && route.stops.length > 0 && (
@@ -765,7 +838,7 @@ export function TransportWorkspace({
               ))}
             </div>
           </Panel>
-          <Panel
+          {canCreateRoutes ? <Panel
             title="Create route / stop"
             description="Start with one stop, then add more stops to an existing route."
           >
@@ -847,7 +920,7 @@ export function TransportWorkspace({
                 {createStopMutation.isPending ? "Adding..." : "Add stop"}
               </button>
             </form>
-          </Panel>
+          </Panel> : null}
         </TwoColumn>
       )}
 
@@ -914,7 +987,7 @@ export function TransportWorkspace({
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <button
+                      {canUpdateVehicles ? <button
                         type="button"
                         onClick={() =>
                           updateVehicleMutation.mutate({
@@ -932,7 +1005,7 @@ export function TransportWorkspace({
                         {vehicle.status === "ACTIVE"
                           ? "Maintenance"
                           : "Set Active"}
-                      </button>
+                      </button> : null}
                     </div>
                   </div>
                 </div>
@@ -945,7 +1018,7 @@ export function TransportWorkspace({
               />
             ) : null}
           </Panel>
-          <Panel
+          {canCreateVehicles ? <Panel
             title="Create vehicle"
             description="Document expiry dates help produce operational alerts."
           >
@@ -1033,7 +1106,7 @@ export function TransportWorkspace({
                   : "Create vehicle"}
               </button>
             </form>
-          </Panel>
+          </Panel> : null}
         </TwoColumn>
       )}
 
@@ -1082,7 +1155,7 @@ export function TransportWorkspace({
                         <TransportStatusBadge status={assignment.status} />
                       </div>
                     </div>
-                    {assignment.status === "ACTIVE" && (
+                    {canUpdateAssignments && assignment.status === "ACTIVE" && (
                       <div className="flex gap-2">
                         <button
                           type="button"
@@ -1109,7 +1182,7 @@ export function TransportWorkspace({
               ))}
             </div>
           </Panel>
-          <Panel
+          {canCreateAssignments ? <Panel
             title="Create assignments"
             description="Use real staff and student records from the school directory."
           >
@@ -1120,18 +1193,13 @@ export function TransportWorkspace({
                 assignDriverMutation.mutate(cleanDriver(driverForm));
               }}
             >
-              <SelectInput
+              <RemoteStaffSelector
                 label="Driver/staff"
                 value={driverForm.staffId}
                 onChange={(staffId) =>
                   setDriverForm({ ...driverForm, staffId })
                 }
-                required
-                options={(staffQuery.data ?? []).map((staff) => ({
-                  label:
-                    `${staff.firstName ?? ""} ${staff.lastName ?? ""} ${staff.employeeId ? `(${staff.employeeId})` : ""}`.trim(),
-                  value: staff.id,
-                }))}
+                placeholder="Search by name or employee ID"
               />
               <SelectInput
                 label="Vehicle"
@@ -1159,7 +1227,11 @@ export function TransportWorkspace({
               <button
                 type="submit"
                 className="btn-primary"
-                disabled={assignDriverMutation.isPending}
+                disabled={
+                  assignDriverMutation.isPending ||
+                  !driverForm.staffId ||
+                  !driverForm.vehicleId
+                }
               >
                 {assignDriverMutation.isPending
                   ? "Assigning..."
@@ -1176,19 +1248,13 @@ export function TransportWorkspace({
                 );
               }}
             >
-              <SelectInput
+              <RemoteStudentSelector
                 label="Student"
                 value={studentForm.studentId}
                 onChange={(studentId) =>
                   setStudentForm({ ...studentForm, studentId })
                 }
-                required
-                options={(schoolStudentsQuery.data?.items ?? []).map(
-                  (student) => ({
-                    label: studentLabel(student) || student.id,
-                    value: student.id,
-                  }),
-                )}
+                placeholder="Search by name or student code"
               />
               <SelectInput
                 label="Route"
@@ -1234,14 +1300,19 @@ export function TransportWorkspace({
               <button
                 type="submit"
                 className="btn-secondary"
-                disabled={assignStudentMutation.isPending}
+                disabled={
+                  assignStudentMutation.isPending ||
+                  !studentForm.studentId ||
+                  !studentForm.routeId ||
+                  !studentForm.stopId
+                }
               >
                 {assignStudentMutation.isPending
                   ? "Assigning..."
                   : "Assign student"}
               </button>
             </form>
-          </Panel>
+          </Panel> : null}
         </TwoColumn>
       )}
 
@@ -1255,22 +1326,22 @@ export function TransportWorkspace({
               <TripList
                 trips={activeTrips}
                 emptyTitle="No active trips"
-                onComplete={(tripId) =>
+                onComplete={canUpdateTrips ? (tripId) =>
                   setConfirmingTripAction({ action: "complete", tripId })
-                }
-                onCancel={(tripId) =>
+                : undefined}
+                onCancel={canUpdateTrips ? (tripId) =>
                   setConfirmingTripAction({ action: "cancel", tripId })
-                }
+                : undefined}
                 onSelect={setViewingTripId}
-                onDelay={(tripId, isDelayed) =>
+                onDelay={canUpdateTrips ? (tripId, isDelayed) =>
                   setDelayingTrip({ tripId, isDelayed })
-                }
+                : undefined}
                 showLocationWarning
               />
             </Panel>
             <Panel
               title="Trip History"
-              description="Current trip history returned by the backend; live route replay can come later."
+              description="Recent route runs, status, and recorded student counts."
             >
               <TripList
                 trips={trips.slice(0, 8)}
@@ -1313,29 +1384,27 @@ export function TransportWorkspace({
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
+                  {canReadLocation ? <Link
+                    href="/dashboard/transport/location"
                     className="btn-secondary"
-                    onClick={() => setActiveTab("location")}
                   >
                     Check latest location
-                  </button>
-                  <button
-                    type="button"
+                  </Link> : null}
+                  {canReadAssignments ? <Link
+                    href="/dashboard/transport/assignments"
                     className="btn-secondary"
-                    onClick={() => setActiveTab("assignments")}
                   >
                     Review assignments
-                  </button>
+                  </Link> : null}
                 </div>
               </div>
             </Panel>
           </div>
-          <Panel
+          {canCreateTrips || canUpdateTrips ? <Panel
             title="Start trip / mark student"
-            description="Boarding and drop actions use real backend status endpoints."
+            description="Start a route run and record student boarding or drop status."
           >
-            <form
+            {canCreateTrips ? <form
               className="space-y-3"
               onSubmit={(event) => {
                 event.preventDefault();
@@ -1396,9 +1465,9 @@ export function TransportWorkspace({
               >
                 {startTripMutation.isPending ? "Starting..." : "Start trip"}
               </button>
-            </form>
-            <hr className="my-5" />
-            <SelectInput
+            </form> : null}
+            {canCreateTrips && canUpdateTrips ? <hr className="my-5" /> : null}
+            {canUpdateTrips ? <><SelectInput
               label="Active trip"
               value={selectedTripId}
               onChange={setSelectedTripId}
@@ -1485,8 +1554,8 @@ export function TransportWorkspace({
               >
                 Mark dropped
               </button>
-            </div>
-          </Panel>
+            </div></> : null}
+          </Panel> : null}
         </TwoColumn>
       )}
 
@@ -1494,7 +1563,7 @@ export function TransportWorkspace({
         <div className="space-y-6">
           <Panel
             title="Report filters"
-            description="Filter backend report rows and download the audited full trip-history CSV export."
+            description="Filter transport records and download the audited trip-history CSV export."
           >
             <div className="grid gap-4 lg:grid-cols-3">
               <SelectInput
@@ -1562,7 +1631,7 @@ export function TransportWorkspace({
           <TwoColumn>
             <Panel
               title="GPS Quality"
-              description="Accepted persisted pings and observed rejection counters from the backend driver GPS endpoint."
+              description="Review accepted location updates and rejected update counts."
             >
               {gpsQualityReportQuery.isLoading ? (
                 <LoadingState label="Loading GPS quality..." />
@@ -1625,7 +1694,7 @@ export function TransportWorkspace({
             <div className="space-y-6">
               <Panel
                 title="Stale GPS Report"
-                description="Active trips whose latest backend coordinate is stale or missing."
+                description="Active trips whose latest recorded location is stale or missing."
               >
                 {staleGpsReportQuery.isLoading ? (
                   <LoadingState label="Loading stale GPS..." />
@@ -1712,7 +1781,7 @@ export function TransportWorkspace({
           <TwoColumn>
             <Panel
               title="Vehicle Documents"
-              description="Backend vehicle-document expiry checks across active and inactive vehicles."
+              description="Document-expiry checks across active and inactive vehicles."
             >
               {vehicleDocumentsReportQuery.isLoading ? (
                 <LoadingState label="Loading vehicle documents..." />
@@ -1769,7 +1838,7 @@ export function TransportWorkspace({
             </Panel>
             <Panel
               title="Maintenance Reminders"
-              description="Trip-count maintenance foundation from backend transport history."
+              description="Trip-count maintenance reminders from transport history."
             >
               {maintenanceReportQuery.isLoading ? (
                 <LoadingState label="Loading maintenance..." />
@@ -1801,7 +1870,7 @@ export function TransportWorkspace({
                 !maintenanceReportQuery.isLoading ? (
                   <EmptyState
                     title="No maintenance reminders"
-                    description="Maintenance reminders will appear after backend trip history exists."
+                    description="Maintenance reminders will appear after trip history is recorded."
                   />
                 ) : null}
               </div>
@@ -1880,7 +1949,7 @@ export function TransportWorkspace({
           <InfoCard
             title="Reporting boundary"
             lines={[
-              "Trip-history CSV export uses server-side generation and audit logging.",
+              "Trip-history CSV exports are generated securely and recorded in the audit trail.",
               "Reporting data is restricted to authorized transport administrators only.",
             ]}
           />
@@ -1891,7 +1960,7 @@ export function TransportWorkspace({
         <TwoColumn>
           <Panel
             title="Latest location"
-            description="Map and WebSocket live tracking will be added later; this reads the latest backend location."
+            description="Review the latest recorded location and freshness for a selected trip."
           >
             <SelectInput
               label="Trip"
@@ -1959,8 +2028,8 @@ export function TransportWorkspace({
                       label="Source"
                       value={
                         locationQuery.data.source === "history"
-                          ? "Persisted history"
-                          : "Redis latest cache"
+                          ? "Recorded history"
+                          : "Latest position record"
                       }
                     />
                   </div>
@@ -1974,19 +2043,13 @@ export function TransportWorkspace({
                     <span>{locationFreshness.message}</span>
                   </div>
                 </div>
-                <div className="flex h-48 items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-100 text-slate-400">
-                  <MapPin size={32} />
-                  <span className="ml-2 font-semibold">
-                    Map Preview Deferred
-                  </span>
-                </div>
               </div>
             ) : selectedTripId &&
               !locationQuery.isFetching &&
               !locationQuery.error ? (
               <EmptyState
-                title="No backend coordinate"
-                description="This trip has no Redis latest-location cache or persisted GPS history yet."
+                title="No recorded location"
+                description="No location has been recorded for this trip yet. Confirm the trip position with the assigned driver."
               />
             ) : (
               <EmptyState
@@ -1996,9 +2059,9 @@ export function TransportWorkspace({
             )}
           </Panel>
           <div className="space-y-6">
-            <Panel
-              title="Manual location ping"
-              description="Useful for API smoke testing until the driver app sends GPS automatically."
+            {canUpdateLocation ? <Panel
+              title="Record a location update"
+              description="Authorized transport operators can record a verified position when an automatic update is unavailable."
             >
               <form
                 className="space-y-3"
@@ -2035,13 +2098,13 @@ export function TransportWorkspace({
                   {pingMutation.isPending ? "Recording..." : "Record ping"}
                 </button>
               </form>
-            </Panel>
+            </Panel> : null}
             <InfoCard
               title="Safety warning"
               lines={[
-                "Location data is read-only for admins.",
-                "Manual pings are for testing purposes only.",
-                "Real-time GPS flow requires the driver mobile application.",
+                "Location details are restricted to authorized transport staff.",
+                "Record a position only after confirming it with the assigned driver.",
+                "The latest update is a point-in-time record, not continuous tracking.",
               ]}
             />
           </div>
@@ -2049,7 +2112,7 @@ export function TransportWorkspace({
       )}
 
       <ConfirmDialog
-        isOpen={Boolean(confirmingTripAction)}
+        isOpen={canUpdateTrips && Boolean(confirmingTripAction)}
         onClose={() => setConfirmingTripAction(null)}
         onConfirm={() => {
           if (confirmingTripAction?.action === "complete") {
@@ -2070,7 +2133,7 @@ export function TransportWorkspace({
         }
         description={
           confirmingTripAction?.action === "cancel"
-            ? "This cancels the trip and records the action through the backend. Use cancellation only when the trip will not continue."
+            ? "This cancels the trip and records the action in the audit trail. Use cancellation only when the trip will not continue."
             : "This completes the active trip and closes boarding/drop tracking for this route run."
         }
         confirmLabel={
@@ -2087,7 +2150,7 @@ export function TransportWorkspace({
       />
 
       <ConfirmDialog
-        isOpen={Boolean(delayingTrip)}
+        isOpen={canUpdateTrips && Boolean(delayingTrip)}
         onClose={() => setDelayingTrip(null)}
         onConfirm={() => {
           if (delayingTrip) {
@@ -2555,8 +2618,8 @@ function TripList({
               )}
               {showLocationWarning ? (
                 <p className="mt-2 text-xs font-semibold text-amber-600">
-                  Open Details or Location to verify the latest backend
-                  coordinate before parent updates.
+                  Open Details or Location to verify the latest recorded
+                  position before parent updates.
                 </p>
               ) : null}
             </div>
@@ -2775,7 +2838,7 @@ function getLocationFreshness(location?: TransportLocationPing | null) {
       label: "No ping",
       className: "bg-slate-100 text-slate-600",
       noticeClassName: "bg-slate-100 text-slate-700",
-      message: "No backend coordinate has been recorded for this trip yet.",
+      message: "No location has been recorded for this trip yet.",
     };
   }
 
@@ -2791,15 +2854,15 @@ function getLocationFreshness(location?: TransportLocationPing | null) {
     (ageSeconds > 600 ? "stale" : ageSeconds > 120 ? "delayed" : "fresh");
   const source =
     location.source === "history"
-      ? "persisted GPS history"
-      : "Redis latest-location cache";
+      ? "recorded trip history"
+      : "the latest position record";
 
   if (confidence === "stale") {
     return {
       label: "Stale",
       className: "bg-red-100 text-red-700",
       noticeClassName: "bg-red-100 text-red-700",
-      message: `Last backend coordinate from ${source} is ${ageMinutes} minutes old. Confirm with the driver before sharing transport updates.`,
+      message: `The last location from ${source} is ${ageMinutes} minutes old. Confirm with the driver before sharing transport updates.`,
     };
   }
 
@@ -2808,7 +2871,7 @@ function getLocationFreshness(location?: TransportLocationPing | null) {
       label: "Delayed",
       className: "bg-amber-100 text-amber-700",
       noticeClassName: "bg-amber-100 text-amber-800",
-      message: `Last backend coordinate from ${source} is ${ageMinutes} minutes old. Treat the trip position as approximate.`,
+      message: `The last location from ${source} is ${ageMinutes} minutes old. Treat the trip position as approximate.`,
     };
   }
 
@@ -2816,7 +2879,7 @@ function getLocationFreshness(location?: TransportLocationPing | null) {
     label: "Fresh",
     className: "bg-emerald-100 text-emerald-700",
     noticeClassName: "bg-emerald-100 text-emerald-800",
-    message: `Latest backend coordinate from ${source} is fresh enough for admin monitoring.`,
+    message: `The latest location from ${source} is fresh enough for staff monitoring.`,
   };
 }
 

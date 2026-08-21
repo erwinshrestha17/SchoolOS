@@ -17,6 +17,7 @@ import {
   FileStatus,
   NotificationChannel,
   Prisma,
+  StaffStatus,
   StudentLifecycleStatus,
   TeacherAssignmentType,
 } from '@prisma/client';
@@ -3558,6 +3559,72 @@ describe('staff-attendance and leave confirmed-gap fixes (2026-07-19)', () => {
     );
   });
 
+  it('blocks a base teacher from the active-staff attendance marking roster', async () => {
+    const { service } = buildService({});
+
+    await expect(
+      service.listStaffAttendanceRoster({ page: 1, limit: 25 }, teacherActor),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('returns a tenant-scoped paginated active-staff attendance roster with minimal fields', async () => {
+    const rosterActor = {
+      ...hrActor,
+      permissions: ['hr:attendance:write'],
+    };
+    const { service, prisma } = buildService({
+      staffRosterRows: [
+        {
+          id: 'staff-26',
+          employeeId: 'EMP-026',
+          firstName: 'Mina',
+          lastName: 'Rai',
+        },
+      ],
+      staffRosterCount: 26,
+    });
+
+    const result = await service.listStaffAttendanceRoster(
+      { page: 2, limit: 25 },
+      rosterActor,
+    );
+
+    expect(prisma.staff.findMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: rosterActor.tenantId,
+        status: StaffStatus.ACTIVE,
+      },
+      select: {
+        id: true,
+        employeeId: true,
+        firstName: true,
+        lastName: true,
+      },
+      orderBy: [{ employeeId: 'asc' }, { id: 'asc' }],
+      skip: 25,
+      take: 25,
+    });
+    expect(prisma.staff.count).toHaveBeenCalledWith({
+      where: {
+        tenantId: rosterActor.tenantId,
+        status: StaffStatus.ACTIVE,
+      },
+    });
+    expect(result).toEqual({
+      items: [
+        {
+          staffId: 'staff-26',
+          employeeId: 'EMP-026',
+          fullName: 'Mina Rai',
+        },
+      ],
+      total: 26,
+      page: 2,
+      limit: 25,
+      hasNextPage: false,
+    });
+  });
+
   it('allows an HR-privileged actor to list the staff attendance roster without leaking passwordHash', async () => {
     const { service, prisma } = buildService({
       staffAttendanceRows: [{ id: 'sa-1', status: 'PRESENT' }],
@@ -3840,6 +3907,8 @@ function buildService(options: {
   leaveBalance?: unknown;
   notificationDeliveryFindFirstQueue?: unknown[];
   staffAttendanceRows?: unknown[];
+  staffRosterRows?: unknown[];
+  staffRosterCount?: number;
   approvedLeaveRequests?: unknown[];
   studentFindFirst?: unknown;
   staffFindFirst?: unknown;
@@ -4038,7 +4107,8 @@ function buildService(options: {
       }),
     },
     staff: {
-      count: jest.fn().mockResolvedValue(1),
+      count: jest.fn().mockResolvedValue(options.staffRosterCount ?? 1),
+      findMany: jest.fn().mockResolvedValue(options.staffRosterRows ?? []),
       findUnique: jest
         .fn()
         .mockResolvedValue({ id: 'staff-1', userId: 'user-1' }),

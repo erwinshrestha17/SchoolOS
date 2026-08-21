@@ -456,13 +456,32 @@ export const canteenApi = {
       json: body,
     }),
   getSpendingControl: (studentId: string) => request<CanteenSpendingControl | null>(`/canteen/spending-controls/student/${encodeURIComponent(studentId)}`),
-  listSuppliers: (params?: { page?: number; limit?: number }) => request<CanteenPaginatedResult<CanteenSupplier>>(withQuery('/canteen/suppliers', params ?? {})),
+  listSuppliers: (
+    params?: { query?: string; page?: number; limit?: number },
+    signal?: AbortSignal,
+  ) =>
+    request<CanteenPaginatedResult<CanteenSupplier>>(
+      withQuery('/canteen/suppliers', params ?? {}),
+      { signal },
+    ),
   createSupplier: (body: CanteenSupplierPayload) =>
     request<CanteenSupplier>('/canteen/suppliers', {
       method: 'POST',
       json: body,
     }),
-  listInventoryItems: (params?: { category?: string | null; page?: number; limit?: number }) => request<CanteenPaginatedResult<CanteenInventoryItem>>(withQuery('/canteen/inventory-items', params ?? {})),
+  listInventoryItems: (
+    params?: {
+      query?: string;
+      category?: string | null;
+      page?: number;
+      limit?: number;
+    },
+    signal?: AbortSignal,
+  ) =>
+    request<CanteenPaginatedResult<CanteenInventoryItem>>(
+      withQuery('/canteen/inventory-items', params ?? {}),
+      { signal },
+    ),
   createInventoryItem: (body: CanteenInventoryItemPayload) =>
     request<CanteenInventoryItem>('/canteen/inventory-items', {
       method: 'POST',

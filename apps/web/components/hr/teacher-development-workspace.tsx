@@ -6,6 +6,7 @@ import {
   formatBsDate,
   parseBsDateInput,
   toGregorianDateFromBs,
+  type StaffLookupOption,
   type TeacherDevelopmentGoalRecord,
   type TeacherObservationRecord,
 } from "@schoolos/core";
@@ -31,6 +32,7 @@ import { ErrorState } from "@/components/ui/error-state";
 import { PermissionDenied } from "@/components/ui/permission-denied";
 import { ProtectedFileButton } from "@/components/ui/protected-file";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { RemoteStaffSelector } from "@/components/staff/remote-staff-selector";
 
 type CreateKind = "observation" | "goal" | "training";
 
@@ -42,11 +44,6 @@ export function TeacherDevelopmentWorkspace() {
   const yearsQuery = useQuery({
     queryKey: ["academic-years"],
     queryFn: api.listAcademicYears,
-    enabled: Boolean(canRead),
-  });
-  const staffQuery = useQuery({
-    queryKey: ["staff", "teacher-development"],
-    queryFn: api.listStaff,
     enabled: Boolean(canRead),
   });
   const [academicYearId, setAcademicYearId] = useState("");
@@ -137,7 +134,6 @@ export function TeacherDevelopmentWorkspace() {
       {canManage ? (
         <TeacherDevelopmentCreateForm
           academicYearId={effectiveYearId}
-          staff={staffQuery.data ?? []}
           onCreated={refresh}
         />
       ) : null}
@@ -217,21 +213,18 @@ export function TeacherDevelopmentWorkspace() {
 
 function TeacherDevelopmentCreateForm({
   academicYearId,
-  staff,
   onCreated,
 }: {
   academicYearId: string;
-  staff: Array<{
-    id: string;
-    firstName: string;
-    lastName: string;
-    designation?: string | null;
-  }>;
   onCreated: () => void;
 }) {
   const [kind, setKind] = useState<CreateKind>("observation");
   const [teacherStaffId, setTeacherStaffId] = useState("");
   const [mentorStaffId, setMentorStaffId] = useState("");
+  const [teacherOption, setTeacherOption] =
+    useState<StaffLookupOption | null>(null);
+  const [mentorOption, setMentorOption] =
+    useState<StaffLookupOption | null>(null);
   const [title, setTitle] = useState("");
   const [primary, setPrimary] = useState("");
   const [secondary, setSecondary] = useState("");
@@ -358,35 +351,27 @@ function TeacherDevelopmentCreateForm({
             <option value="training">Training history</option>
           </Select>
         </FormField>
-        <FormField label="Teacher">
-          <Select
-            required
-            value={teacherStaffId}
-            onChange={(event) => setTeacherStaffId(event.target.value)}
-          >
-            <option value="">Choose teacher</option>
-            {staff.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.firstName} {item.lastName}
-                {item.designation ? ` • ${item.designation}` : ""}
-              </option>
-            ))}
-          </Select>
-        </FormField>
+        <RemoteStaffSelector
+          value={teacherStaffId}
+          selectedOption={teacherOption}
+          onChange={(staffId, option) => {
+            setTeacherStaffId(staffId);
+            setTeacherOption(option);
+          }}
+          label="Teacher"
+          placeholder="Search teacher"
+        />
         {kind === "goal" ? (
-          <FormField label="Mentor (optional)">
-            <Select
-              value={mentorStaffId}
-              onChange={(event) => setMentorStaffId(event.target.value)}
-            >
-              <option value="">No mentor assigned</option>
-              {staff.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.firstName} {item.lastName}
-                </option>
-              ))}
-            </Select>
-          </FormField>
+          <RemoteStaffSelector
+            value={mentorStaffId}
+            selectedOption={mentorOption}
+            onChange={(staffId, option) => {
+              setMentorStaffId(staffId);
+              setMentorOption(option);
+            }}
+            label="Mentor (optional)"
+            placeholder="No mentor assigned"
+          />
         ) : (
           <div />
         )}

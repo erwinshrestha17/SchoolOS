@@ -57,6 +57,7 @@ describe('HomeworkController M6 contracts', () => {
       classId: 'class-1',
       sectionId: 'section-1',
       subjectId: 'subject-1',
+      assignedDate: '2026-06-20',
       page: 1,
       limit: 50,
     };

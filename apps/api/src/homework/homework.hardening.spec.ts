@@ -160,6 +160,49 @@ describe('Homework Hardening', () => {
   });
 
   describe('Date Integrity', () => {
+    it('uses Nepal half-open day bounds for summary and workload queries', async () => {
+      const p = prisma;
+      const adminActor: AuthContext = { ...actor, roles: ['admin'] };
+      p.homeworkAssignment.count.mockResolvedValue(0);
+      p.homeworkSubmission.findMany.mockResolvedValue([]);
+      p.homeworkAssignment.findMany.mockResolvedValue([]);
+      p.section.findMany.mockResolvedValue([]);
+
+      await homeworkService.getHomeworkSummaryToday(adminActor, {
+        date: '2026-06-19T18:15:00.000Z',
+      });
+
+      const startUtc = new Date('2026-06-19T18:15:00.000Z');
+      const endExclusiveUtc = new Date('2026-06-20T18:15:00.000Z');
+      expect(
+        p.homeworkAssignment.count.mock.calls[0][0].where.assignedDate,
+      ).toEqual({ gte: startUtc, lt: endExclusiveUtc });
+      expect(p.homeworkAssignment.count.mock.calls[1][0].where.dueDate).toEqual(
+        { gte: startUtc, lt: endExclusiveUtc },
+      );
+      expect(
+        p.homeworkAssignment.findMany.mock.calls[0][0].where.assignedDate,
+      ).toEqual({ gte: startUtc, lt: endExclusiveUtc });
+
+      p.homeworkAssignment.count.mockClear();
+      p.homeworkAssignment.count.mockResolvedValue(2);
+      const workload = await homeworkService.getHomeworkWorkload(adminActor, {
+        classId: 'class-1',
+        date: '2026-06-20T00:00:00.000Z',
+      });
+
+      expect(p.homeworkAssignment.count.mock.calls[0][0].where.dueDate).toEqual(
+        { gte: startUtc, lt: endExclusiveUtc },
+      );
+      expect(workload).toEqual({
+        classId: 'class-1',
+        sectionId: null,
+        date: startUtc.toISOString(),
+        count: 2,
+        level: 'NORMAL',
+      });
+    });
+
     it('should reject due date before assigned date', async () => {
       const p = prisma as any;
       p.academicYear.findFirst.mockResolvedValue({
@@ -586,6 +629,55 @@ describe('Homework Hardening', () => {
   });
 
   describe('Teacher "my homework only" self-scope', () => {
+    it('filters and paginates more than 100 assignments by Nepal school day without widening teacher scope', async () => {
+      const p = prisma;
+      teacherAssignments.push(
+        teacherAssignmentFixture({
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: 'sub-1',
+          staffId: 'teacher-1',
+        }),
+      );
+      p.homeworkAssignment.findMany.mockResolvedValue([]);
+      p.homeworkAssignment.count.mockResolvedValue(121);
+
+      const result = await homeworkService.listAssignments(actor, {
+        assignedDate: '2026-06-20',
+        page: 6,
+        limit: 20,
+        sortBy: 'assignedDate',
+        sortOrder: 'asc',
+      });
+
+      const findArgs = p.homeworkAssignment.findMany.mock.calls.at(-1)[0];
+      const countArgs = p.homeworkAssignment.count.mock.calls.at(-1)[0];
+      expect(findArgs).toMatchObject({
+        where: {
+          tenantId: 'tenant-a',
+          assignedDate: {
+            gte: new Date('2026-06-19T18:15:00.000Z'),
+            lt: new Date('2026-06-20T18:15:00.000Z'),
+          },
+          AND: expect.arrayContaining([
+            expect.objectContaining({ OR: expect.any(Array) }),
+          ]),
+        },
+        orderBy: [{ assignedDate: 'asc' }, { id: 'asc' }],
+        skip: 100,
+        take: 20,
+      });
+      expect(countArgs.where).toEqual(findArgs.where);
+      expect(result.meta).toEqual({
+        total: 121,
+        page: 6,
+        limit: 20,
+        totalPages: 7,
+        hasNextPage: true,
+        hasPreviousPage: true,
+      });
+    });
+
     it('resolves `mine` from the caller own staff row, never a client id', async () => {
       const p = prisma as any;
       p.staff.findFirst.mockResolvedValue({

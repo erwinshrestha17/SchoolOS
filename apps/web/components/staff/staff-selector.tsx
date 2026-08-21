@@ -1,9 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
-import { Select } from '@/components/ui/select';
-import { FormField } from '@/components/ui/form-field';
+import { RemoteStaffSelector } from '@/components/staff/remote-staff-selector';
 
 interface StaffSelectorProps {
   value: string;
@@ -11,6 +8,7 @@ interface StaffSelectorProps {
   label?: string;
   error?: string;
   placeholder?: string;
+  selectedLabel?: string;
   disabled?: boolean;
 }
 
@@ -20,32 +18,24 @@ export function StaffSelector({
   label,
   error,
   placeholder = 'Select Staff member',
+  selectedLabel,
   disabled,
 }: StaffSelectorProps) {
-  const staffQuery = useQuery({
-    queryKey: ['staff-list'],
-    queryFn: () => api.listStaff(),
-  });
-
-  const options = staffQuery.data?.map((s) => ({
-    label: `${s.firstName} ${s.lastName} (${s.employeeId || 'No ID'})`,
-    value: s.id,
-  })) || [];
-
   return (
-    <FormField label={label || 'Staff Member'} error={error}>
-      <Select
+    <div>
+      <RemoteStaffSelector
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled || staffQuery.isLoading}
-      >
-        <option value="">{placeholder}</option>
-        {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </Select>
-    </FormField>
+        onChange={(staffId) => onChange(staffId)}
+        selectedLabel={selectedLabel}
+        label={label || 'Staff Member'}
+        placeholder={placeholder}
+        disabled={disabled}
+      />
+      {error ? (
+        <p className="mt-1 text-sm font-medium text-red-600" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }

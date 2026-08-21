@@ -149,7 +149,7 @@ export function ChartOfAccountsView() {
         onClose={() => setSeedConfirmOpen(false)}
         onConfirm={() => seedMutation.mutate()}
         title="Seed default chart accounts?"
-        description="This adds system default accounts through the backend. Existing custom accounts are not edited from this screen."
+        description="This adds the standard system accounts. Existing custom accounts are not edited from this screen."
         confirmLabel="Seed defaults"
         isConfirming={seedMutation.isPending}
       />

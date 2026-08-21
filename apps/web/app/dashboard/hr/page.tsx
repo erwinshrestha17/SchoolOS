@@ -147,7 +147,7 @@ export default function HRDashboardPage() {
           icon={<Users className="h-5 w-5" />}
           loading={payrollSummaryQuery.isLoading}
           tone="module"
-          description="Backend-owned staff count"
+          description="Active staff records"
         />
         <SummaryCard
           label="On Leave Today"
@@ -186,7 +186,7 @@ export default function HRDashboardPage() {
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
         <WorkSurface
           title="Leave Approval Queue"
-          description="Pending leave requests from the approval queue endpoint."
+          description="Leave requests waiting for review."
           variant="queue"
           action={
             <Link
@@ -450,8 +450,8 @@ export default function HRDashboardPage() {
         title="Staffing Coverage"
         description={
           coverage
-            ? `Backend-owned, as of ${formatBsDate(coverage.asOf)}`
-            : "Backend-owned staffing gaps that could block payroll or leave a class uncovered."
+            ? `As of ${formatBsDate(coverage.asOf)}`
+            : "Staffing gaps that could block payroll or leave a class uncovered."
         }
         variant="monitoring"
       >

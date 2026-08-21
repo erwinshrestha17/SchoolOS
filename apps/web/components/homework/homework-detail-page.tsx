@@ -14,7 +14,6 @@ import {
   Trash2,
   CheckCircle2,
   ClipboardCheck,
-  MessageSquare,
   FileText,
   Download,
 } from "lucide-react";
@@ -386,14 +385,6 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                 setSelectedSubmission(row);
                 setIsReviewModalOpen(true);
               },
-            },
-            {
-              label: "Message Student",
-              icon: <MessageSquare className="h-4 w-4" />,
-              onClick: () =>
-                router.push(
-                  `/dashboard/messages/new?studentId=${row.studentId}`,
-                ),
             },
           ]}
         />

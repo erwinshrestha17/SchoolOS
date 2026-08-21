@@ -8,6 +8,7 @@ import { Button } from '../ui/button';
 import { FormField, Input, Select, TextArea } from '../ui/form-field';
 import { Toast } from '../ui/toast';
 import { X, AlertTriangle } from 'lucide-react';
+import { getNepalSchoolDay } from '@schoolos/core';
 
 type StaffLifecycleDialogProps = {
   isOpen: boolean;
@@ -29,7 +30,7 @@ export function StaffLifecycleDialog({
 
   const [status, setStatus] = useState<'ACTIVE' | 'INACTIVE' | 'TERMINATED'>('ACTIVE');
   const [reason, setReason] = useState('');
-  const [effectiveDate, setEffectiveDate] = useState(new Date().toISOString().slice(0, 10));
+  const [effectiveDate, setEffectiveDate] = useState(getNepalSchoolDay().gregorianDate);
 
   useEffect(() => {
     if (currentStatus === 'ACTIVE' || currentStatus === 'INACTIVE' || currentStatus === 'TERMINATED') {

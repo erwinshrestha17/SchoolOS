@@ -2,10 +2,15 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  NotFoundException,
 } from '@nestjs/common';
 import { TransportService } from './transport.service';
 import { TransportHardeningService } from './transport-hardening.service';
-import { TransportTripStatus } from '@prisma/client';
+import {
+  StaffStatus,
+  StudentLifecycleStatus,
+  TransportTripStatus,
+} from '@prisma/client';
 
 describe('Transport Security Boundaries', () => {
   let prisma: any;
@@ -47,6 +52,21 @@ describe('Transport Security Boundaries', () => {
         findFirst: jest.fn(),
         findMany: jest.fn(),
       },
+      transportVehicle: {
+        findFirst: jest.fn(),
+      },
+      transportRoute: {
+        findFirst: jest.fn(),
+      },
+      transportStop: {
+        findFirst: jest.fn(),
+      },
+      staff: {
+        findFirst: jest.fn(),
+      },
+      student: {
+        findFirst: jest.fn(),
+      },
       studentGuardian: {
         findFirst: jest.fn(),
       },
@@ -78,6 +98,53 @@ describe('Transport Security Boundaries', () => {
       {} as any,
       service,
     );
+  });
+
+  describe('Assignment lifecycle boundaries', () => {
+    it('refuses a driver assignment unless the tenant staff profile is active', async () => {
+      prisma.transportVehicle.findFirst.mockResolvedValue({ id: 'vehicle-1' });
+      prisma.staff.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.assignDriver(
+          {
+            vehicleId: 'vehicle-1',
+            staffId: 'inactive-staff',
+            startsAt: '2026-08-21T00:00:00.000Z',
+          },
+          adminActor,
+        ),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(prisma.staff.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: 'inactive-staff',
+          tenantId,
+          status: StaffStatus.ACTIVE,
+        },
+      });
+    });
+
+    it('refuses a transport enrollment unless the tenant student is active', async () => {
+      prisma.student.findFirst.mockResolvedValue(null);
+      prisma.transportRoute.findFirst.mockResolvedValue({ id: 'route-1' });
+      prisma.transportStop.findFirst.mockResolvedValue({ id: 'stop-1' });
+
+      await expect(
+        service.assignStudent(
+          { studentId: 'archived-student', routeId: 'route-1', stopId: 'stop-1' },
+          adminActor,
+        ),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(prisma.student.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: 'archived-student',
+          tenantId,
+          lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+        },
+      });
+    });
   });
 
   describe('Driver Boundary', () => {

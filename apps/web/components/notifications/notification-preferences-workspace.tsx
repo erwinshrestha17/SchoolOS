@@ -254,7 +254,7 @@ export function NotificationPreferencesWorkspace({
                 <BellRing className="mt-0.5 h-5 w-5 shrink-0" />
                 <p>
                   Critical messages may bypass quiet hours. Mandatory emergency
-                  and security rules remain backend-enforced.
+                  and security rules always remain enforced.
                 </p>
               </div>
             </section>

@@ -186,7 +186,7 @@ export function StudentDocumentsWorkspace() {
     mutationFn: ({ documentId, status, notes }: { documentId: string; status: 'VERIFIED' | 'REJECTED'; notes: string }) => api.verifyStudentDocument(documentId, { status, notes }),
     onSuccess: () => {
       setReviewReason('');
-      setToast({ tone: 'success', title: 'Verification updated', description: 'The backend recorded the document review and audit metadata.' });
+      setToast({ tone: 'success', title: 'Verification updated', description: 'The document review and audit details were recorded.' });
       void queryClient.invalidateQueries({ queryKey: ['student-profile', selectedStudent?.id] });
       void queryClient.invalidateQueries({ queryKey: ['student-document-history', selectedStudent?.id] });
     },
@@ -211,7 +211,7 @@ export function StudentDocumentsWorkspace() {
     mutationFn: ({ documentId, reason }: { documentId: string; reason: string }) =>
       api.archiveStudentDocument(documentId, { reason }),
     onSuccess: () => {
-      setToast({ tone: 'success', title: 'Document archived', description: 'The backend archived the document and recorded the audit reason.' });
+      setToast({ tone: 'success', title: 'Document archived', description: 'The document was archived and the audit reason was recorded.' });
       setDocumentToArchive(null);
       setArchiveReason('');
       setSelectedDocument(null);

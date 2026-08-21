@@ -430,7 +430,7 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
       <ConfirmDialog
         isOpen={confirmOpen}
         title="Execute Promotion"
-        description={`Promote ${students.filter(s => selectedIds.has(s.studentId) && s.status === 'READY').length} READY students? Any non-ready selections will be skipped by the backend workflow.`}
+        description={`Promote ${students.filter(s => selectedIds.has(s.studentId) && s.status === 'READY').length} READY students? Any non-ready selections will be skipped.`}
         confirmLabel="Promote Students"
         isConfirming={batchPromoteMut.isPending}
         onConfirm={confirmBatchPromote}

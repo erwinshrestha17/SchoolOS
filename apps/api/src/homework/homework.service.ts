@@ -51,6 +51,7 @@ import {
 import type { HomeworkRecurrenceDto } from './dto/create-homework.dto';
 import { randomUUID } from 'node:crypto';
 import { buildActiveGuardianRelationshipWhere } from '../common/security/parent-scope';
+import { getNepalSchoolDay } from '@schoolos/core';
 
 const EDIT_BLOCKED_ASSIGNMENT_STATUSES: readonly HomeworkAssignmentStatus[] = [
   HomeworkAssignmentStatus.CLOSED,
@@ -86,6 +87,9 @@ export class HomeworkService {
     const take = limit;
     let scopedStudentId: string | null = null;
     const and: Prisma.HomeworkAssignmentWhereInput[] = [];
+    const assignedSchoolDay = query.assignedDate
+      ? getNepalSchoolDay(query.assignedDate)
+      : null;
 
     const where: Prisma.HomeworkAssignmentWhereInput = {
       tenantId: actor.tenantId,
@@ -95,6 +99,14 @@ export class HomeworkService {
       ...(query.subjectId ? { subjectId: query.subjectId } : {}),
       ...(query.teacherId ? { assignedByStaffId: query.teacherId } : {}),
       ...(query.status ? { status: query.status } : {}),
+      ...(assignedSchoolDay
+        ? {
+            assignedDate: {
+              gte: assignedSchoolDay.startUtc,
+              lt: assignedSchoolDay.endExclusiveUtc,
+            },
+          }
+        : {}),
       ...(query.dueFrom || query.dueTo
         ? {
             dueDate: {
@@ -472,11 +484,11 @@ export class HomeworkService {
         'Homework summary is limited to authorized staff',
       );
     }
-    const date = query.date
-      ? parseRequiredDate(query.date, 'date')
-      : new Date();
-    const dayStart = startOfDay(date);
-    const dayEnd = endOfDay(date);
+    const schoolDay = getNepalSchoolDay(
+      query.date ? parseRequiredDate(query.date, 'date') : new Date(),
+    );
+    const dayStart = schoolDay.startUtc;
+    const dayEndExclusive = schoolDay.endExclusiveUtc;
 
     const scopeFilter = await this.resolveHomeworkAssignmentScopeFilter(actor);
     if (scopeFilter === null) {
@@ -500,7 +512,7 @@ export class HomeworkService {
       this.prisma.homeworkAssignment.count({
         where: {
           tenantId: actor.tenantId,
-          assignedDate: { gte: dayStart, lte: dayEnd },
+          assignedDate: { gte: dayStart, lt: dayEndExclusive },
           status: { not: HomeworkAssignmentStatus.CANCELLED },
           ...scopeFilter,
         },
@@ -508,7 +520,7 @@ export class HomeworkService {
       this.prisma.homeworkAssignment.count({
         where: {
           tenantId: actor.tenantId,
-          dueDate: { gte: dayStart, lte: dayEnd },
+          dueDate: { gte: dayStart, lt: dayEndExclusive },
           status: HomeworkAssignmentStatus.ASSIGNED,
           ...scopeFilter,
         },
@@ -534,7 +546,7 @@ export class HomeworkService {
               HomeworkSubmissionStatus.ABSENT,
             ],
           },
-          homework: { dueDate: { lte: dayEnd }, ...scopeFilter },
+          homework: { dueDate: { lt: dayEndExclusive }, ...scopeFilter },
         },
         distinct: ['studentId'],
         select: { studentId: true },
@@ -543,7 +555,7 @@ export class HomeworkService {
       this.prisma.homeworkAssignment.findMany({
         where: {
           tenantId: actor.tenantId,
-          assignedDate: { gte: dayStart, lte: dayEnd },
+          assignedDate: { gte: dayStart, lt: dayEndExclusive },
           status: { not: HomeworkAssignmentStatus.CANCELLED },
           ...scopeFilter,
         },
@@ -586,18 +598,18 @@ export class HomeworkService {
     actor: AuthContext,
     query: { classId: string; sectionId?: string; date?: string },
   ) {
-    const date = query.date
-      ? parseRequiredDate(query.date, 'date')
-      : new Date();
-    const dayStart = startOfDay(date);
-    const dayEnd = endOfDay(date);
+    const schoolDay = getNepalSchoolDay(
+      query.date ? parseRequiredDate(query.date, 'date') : new Date(),
+    );
+    const dayStart = schoolDay.startUtc;
+    const dayEndExclusive = schoolDay.endExclusiveUtc;
 
     const count = await this.prisma.homeworkAssignment.count({
       where: {
         tenantId: actor.tenantId,
         classId: query.classId,
         status: { not: HomeworkAssignmentStatus.CANCELLED },
-        dueDate: { gte: dayStart, lte: dayEnd },
+        dueDate: { gte: dayStart, lt: dayEndExclusive },
         ...(query.sectionId
           ? { OR: [{ sectionId: query.sectionId }, { sectionId: null }] }
           : {}),
@@ -3073,18 +3085,6 @@ function normalizeJsonObject(value: Record<string, unknown> | undefined) {
 function shiftDate(date: Date, days: number) {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
-  return next;
-}
-
-function startOfDay(date: Date) {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  return next;
-}
-
-function endOfDay(date: Date) {
-  const next = new Date(date);
-  next.setHours(23, 59, 59, 999);
   return next;
 }
 

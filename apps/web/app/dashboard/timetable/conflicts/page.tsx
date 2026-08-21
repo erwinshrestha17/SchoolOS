@@ -59,7 +59,7 @@ export default function TimetableConflictsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Timetable Conflicts"
-        description="Run backend validation for published or draft timetable versions before operators publish, lock, or rely on the schedule."
+        description="Check published or draft timetable versions for blocking conflicts before staff publish, lock, or rely on the schedule."
         actions={headerActions}
       />
 

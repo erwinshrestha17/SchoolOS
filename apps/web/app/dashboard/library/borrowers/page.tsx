@@ -1,7 +1,5 @@
-'use client';
-
-import { LibraryWorkspace } from '../../../../components/library/library-workspace';
+import { redirect } from 'next/navigation';
 
 export default function LibraryBorrowersPage() {
-  return <LibraryWorkspace initialTab="issues" />;
+  redirect('/dashboard/library/issue-return');
 }

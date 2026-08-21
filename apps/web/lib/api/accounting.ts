@@ -28,6 +28,7 @@ import type {
   JournalEntryView,
   PaginatedResult,
 } from "@schoolos/core";
+import { getNepalSchoolDay } from "@schoolos/core";
 import {
   API_BASE_URL,
   JsonBody,
@@ -244,7 +245,7 @@ export const accountingApi = {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${report}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `${report}-${getNepalSchoolDay().gregorianDate}.csv`;
     document.body.appendChild(a);
     a.click();
     window.URL.revokeObjectURL(url);

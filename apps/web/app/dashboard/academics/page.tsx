@@ -86,7 +86,7 @@ export default function AcademicsOverviewPage() {
       <ModuleHeader
         eyebrow="Academics & Exams"
         title="Academics"
-        description={`Manage exam terms, marks, CAS, report cards, and result publishing${session?.tenant.name ? ` for ${session.tenant.name}` : ''}. Official readiness remains backend-owned.`}
+        description={`Manage exam terms, marks, CAS, report cards, and result publishing${session?.tenant.name ? ` for ${session.tenant.name}` : ''}. Official readiness is confirmed from saved school records.`}
         primaryAction={
           canManageAcademics ? (
             <Button asChild>
@@ -177,7 +177,7 @@ export default function AcademicsOverviewPage() {
             icon={<GraduationCap size={20} />}
             tone={isPositive('promotionReady') ? 'info' : 'module'}
             href="/dashboard/academics/promotion"
-            description="Students with a backend-calculated ready decision."
+            description="Students currently ready for the next reviewed action."
           />
         </SummaryGrid>
       </ModuleHeader>
@@ -190,7 +190,7 @@ export default function AcademicsOverviewPage() {
 
         <WorkSurface
           title="Core academic workspaces"
-          description="Open the next focused job. Marks, locks, grading, promotion, publishing, and protected PDF access remain backend-controlled across tenant-scoped and permissioned M4 workspaces."
+          description="Open the next focused job. Marks, locks, grading, promotion, publishing, and protected report cards remain permission-controlled across M4 workspaces."
           flush
         >
           <div className="divide-y divide-slate-100">

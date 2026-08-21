@@ -9,7 +9,7 @@ import { Button } from '../ui/button';
 import { FormField, Input, Select, TextArea } from '../ui/form-field';
 import { Toast } from '../ui/toast';
 import { X, Shield } from 'lucide-react';
-import { isValidDateOfBirth, isValidEmail, isValidPersonName, normalizeEmail, normalizeNepalPhone, normalizePersonName, tryNormalizeNepalPhone } from '@schoolos/core';
+import { getNepalSchoolDay, isValidDateOfBirth, isValidEmail, isValidPersonName, normalizeEmail, normalizeNepalPhone, normalizePersonName, tryNormalizeNepalPhone } from '@schoolos/core';
 import { NepalAddressSelector, type NepalAddressValue } from '../geography/nepal-address-selector';
 
 type StaffCreateDialogProps = {
@@ -33,7 +33,7 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
     dateOfBirth: '',
     gender: '',
     address: '',
-    joiningDate: new Date().toISOString().slice(0, 10),
+    joiningDate: getNepalSchoolDay().gregorianDate,
     contractType: '',
     teacherRegistryId: '',
     citizenshipNo: '',

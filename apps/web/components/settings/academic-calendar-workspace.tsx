@@ -235,8 +235,8 @@ export function AcademicCalendarWorkspace() {
             <p className="font-bold">Nepal school calendar standard</p>
             <p className="mt-1">
               Timezone: {calendar.timeZone}. Enter BS dates as YYYY-MM-DD with
-              English numerals, for example 2083-01-01. The backend converts
-              them to safe Nepal-midnight UTC storage.
+              English numerals, for example 2083-01-01. SchoolOS stores each
+              date using the Nepal school-day boundary.
             </p>
           </div>
         </div>

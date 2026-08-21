@@ -20,6 +20,14 @@ export type PaginatedResponse<T> = {
   hasNextPage?: boolean;
 };
 
+export type RemoteLookupPage<T> = {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+};
+
 export type StablePaginationMeta = {
   total: number;
   page: number;

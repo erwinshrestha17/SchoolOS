@@ -55,9 +55,10 @@ describe('dashboard safe-route allowlist points at real pages', () => {
       '/dashboard/fees/invoices',
       '/dashboard/fees/adjustments',
       '/dashboard/homework/review',
-      '/dashboard/transport/live-status',
+      '/dashboard/transport/location',
+      '/dashboard/canteen/stock',
       '/dashboard/accounting/fiscal-periods',
-      '/dashboard/notices/deliveries',
+      '/dashboard/notifications/deliveries',
     ];
     for (const route of correctedRoutes) {
       assert.ok(backend.includes(`'${route}'`), `Backend missing corrected route: ${route}`);
@@ -69,8 +70,11 @@ describe('dashboard safe-route allowlist points at real pages', () => {
       '/dashboard/fees/reversals',
       '/dashboard/homework/submissions',
       '/dashboard/transport/gps-quality',
+      '/dashboard/transport/live-status',
+      '/dashboard/canteen/inventory',
       '/dashboard/accounting/period-close',
       '/dashboard/notices/delivery',
+      '/dashboard/notices/deliveries',
     ];
     for (const route of staleRoutes) {
       assert.ok(!backend.includes(`'${route}'`), `Backend still has stale dead route: ${route}`);

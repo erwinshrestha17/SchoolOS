@@ -390,7 +390,7 @@ export function DuplicateCandidatesWorkspace() {
         <div>
           <p className="text-sm font-semibold text-foreground">Review queue</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Backend-owned counts for the current school. Decisions are audited.
+            Current-school counts. Review decisions are audited.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

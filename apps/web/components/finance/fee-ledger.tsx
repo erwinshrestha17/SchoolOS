@@ -267,7 +267,7 @@ export function FeeLedger({
         isOpen={Boolean(selectedInvoiceId)}
         onClose={() => setSelectedInvoice(null)}
         title={invoiceDetailQuery.data?.invoiceNumber ?? "Invoice detail"}
-        description="Backend-owned invoice, payment, waiver, receipt, and handoff context."
+        description="Official invoice, payment, waiver, receipt, and accounting-handoff context."
         width="lg"
       >
         {invoiceDetailQuery.isLoading ? (

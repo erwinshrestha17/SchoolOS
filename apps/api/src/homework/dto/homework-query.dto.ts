@@ -1,6 +1,7 @@
 import { HomeworkAssignmentStatus } from '@prisma/client';
 import {
   IsBoolean,
+  IsDateString,
   IsEnum,
   IsIn,
   IsInt,
@@ -9,9 +10,12 @@ import {
   IsString,
   Max,
   MaxLength,
+  Matches,
   Min,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
+
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 export class HomeworkQueryDto {
   @IsOptional()
@@ -57,6 +61,13 @@ export class HomeworkQueryDto {
   @IsString()
   @MaxLength(120)
   search?: string;
+
+  @IsOptional()
+  @IsDateString({ strict: true })
+  @Matches(DATE_ONLY_PATTERN, {
+    message: 'assignedDate must use YYYY-MM-DD.',
+  })
+  assignedDate?: string;
 
   @IsOptional()
   @IsISO8601()

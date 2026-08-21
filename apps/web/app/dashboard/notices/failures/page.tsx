@@ -1,5 +1,15 @@
-import { DeliveryOperationsWorkspace } from '@/components/notifications/delivery-operations-workspace';
+import {
+  redirectWithSearchParams,
+  type RouteSearchParams,
+} from '@/lib/redirect-with-search-params';
 
-export default function NoticeFailuresPage() {
-  return <DeliveryOperationsWorkspace initialView="failures" />;
+export default function LegacyNoticeFailuresPage({
+  searchParams,
+}: {
+  searchParams: Promise<RouteSearchParams>;
+}) {
+  return redirectWithSearchParams(
+    '/dashboard/notifications/failures',
+    searchParams,
+  );
 }

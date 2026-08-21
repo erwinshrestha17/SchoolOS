@@ -15,6 +15,7 @@ import { Select } from "../ui/select";
 import { Button } from "../ui/button";
 import { AlertCircle } from "lucide-react";
 import { showErrorFromUnknown, showSuccess } from "../../lib/toast";
+import { getNepalSchoolDay } from "@schoolos/core";
 
 export type VoucherType =
   | "JOURNAL"
@@ -59,7 +60,7 @@ export function VoucherDialog({
     fromAccountId: "",
     toAccountId: "",
     amount: 0,
-    entryDate: new Date().toISOString().split("T")[0],
+    entryDate: getNepalSchoolDay().gregorianDate,
     narration: "",
     reference: "",
   });
@@ -94,6 +95,10 @@ export function VoucherDialog({
   useEffect(() => {
     if (isOpen) {
       setError(null);
+      setFormData((current) => ({
+        ...current,
+        entryDate: getNepalSchoolDay().gregorianDate,
+      }));
     }
   }, [isOpen, voucherType]);
 

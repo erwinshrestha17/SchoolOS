@@ -99,7 +99,7 @@ export function FeeOverview() {
           href={
             canManage ? "/dashboard/fees/invoices?outstanding=true" : undefined
           }
-          description="Backend-owned balance."
+          description="Official outstanding balance."
         />
         <SummaryCard
           label="Overdue"
@@ -164,7 +164,7 @@ export function FeeOverview() {
       {summaryQuery.isError ? (
         <ErrorState
           title="Fees overview could not refresh"
-          message="No finance value has been replaced with zero. Retry to load the latest backend summary."
+          message="Unavailable finance values are not shown as zero. Retry to load the latest summary."
           onRetry={() => void summaryQuery.refetch()}
           className="min-h-48"
         />
@@ -174,7 +174,7 @@ export function FeeOverview() {
         <div className="space-y-6">
           <WorkSurface
             title="Today's collection activity"
-            description="Confirmed backend totals for the current Nepal school day."
+            description="Confirmed totals for the current Nepal school day."
             action={
               canCollect ? (
                 <Link
@@ -208,7 +208,7 @@ export function FeeOverview() {
                     context={
                       summary
                         ? `${summary.receiptsIssued} receipts issued`
-                        : "Backend summary"
+                        : "Official summary"
                     }
                   />
                   <ActivityRow
@@ -237,7 +237,7 @@ export function FeeOverview() {
 
           <SectionCard
             title="Overdue follow-up"
-            description="Highest-age invoices from the server-paginated defaulter queue."
+            description="Oldest unpaid invoices matching the current queue."
             headerAction={
               canManage ? (
                 <Link
@@ -308,7 +308,7 @@ export function FeeOverview() {
             ) : (
               <EmptyState
                 title="No overdue invoices"
-                description="The backend did not return any overdue invoices for the current queue."
+                description="No overdue invoices match the current queue."
                 className="m-5 min-h-48"
               />
             )}
@@ -394,7 +394,7 @@ export function FeeOverview() {
 
           <SectionCard
             title="Cashier activity"
-            description="Backend-owned close state for this school day."
+            description="Official close state for this school day."
           >
             {!canClose ? (
               <p className="text-sm text-slate-600">

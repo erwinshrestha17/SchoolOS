@@ -1,5 +1,9 @@
 import { StaffStatus } from '@prisma/client';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 import type { AuthContext } from '../auth/auth.types';
+import { PERMISSIONS_KEY } from '../auth/decorators/permissions.decorator';
+import { ListStaffOptionsDto } from './dto/list-staff-options.dto';
 import { StaffController } from './staff.controller';
 
 const actor: AuthContext = {
@@ -15,6 +19,8 @@ const actor: AuthContext = {
 function createController() {
   const staffService = {
     listStaff: jest.fn(),
+    listStaffDirectory: jest.fn(),
+    listStaffOptions: jest.fn(),
     getStaffProfile: jest.fn(),
     getStaffDetail: jest.fn(),
     createStaff: jest.fn(),
@@ -29,6 +35,44 @@ function createController() {
 }
 
 describe('StaffController M7 contracts', () => {
+  it('delegates tenant-scoped staff option search behind staff:read', () => {
+    const { controller, staffService } = createController();
+    const query = { search: 'Sita', page: 1, limit: 25 };
+    staffService.listStaffOptions.mockReturnValue({ items: [], total: 0 });
+
+    expect(controller.listStaffOptions(query, actor)).toEqual({
+      items: [],
+      total: 0,
+    });
+    expect(staffService.listStaffOptions).toHaveBeenCalledWith(query, actor);
+    expect(
+      Reflect.getMetadata(
+        PERMISSIONS_KEY,
+        StaffController.prototype.listStaffOptions,
+      ),
+    ).toEqual(['staff:read']);
+  });
+
+  it('requires a trimmed two-character search and caps staff option pages at 25', async () => {
+    const shortSearch = plainToInstance(ListStaffOptionsDto, {
+      search: ' x ',
+      limit: 26,
+    });
+    const validSearch = plainToInstance(ListStaffOptionsDto, {
+      search: ' Sita ',
+      limit: 25,
+    });
+
+    expect(await validate(shortSearch)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ property: 'search' }),
+        expect.objectContaining({ property: 'limit' }),
+      ]),
+    );
+    expect(await validate(validSearch)).toHaveLength(0);
+    expect(validSearch.search).toBe('Sita');
+  });
+
   it('delegates staff list and self profile with current actor', () => {
     const { controller, staffService } = createController();
     staffService.listStaff.mockReturnValue([{ id: 'staff-1' }]);

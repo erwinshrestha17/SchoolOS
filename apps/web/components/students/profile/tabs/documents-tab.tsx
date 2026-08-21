@@ -523,8 +523,8 @@ function AllFilesTable({
         <div>
           <h2 className="text-base font-black text-slate-950">All files</h2>
           <p className="mt-1 text-xs leading-5 text-slate-500">
-            The current student profile does not provide server-side search,
-            filters, or pagination metadata.
+            Search, filter, and page controls are not available in this profile
+            view yet.
           </p>
         </div>
         <StatusBadge

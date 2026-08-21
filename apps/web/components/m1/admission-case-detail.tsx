@@ -248,7 +248,7 @@ export function AdmissionCaseDetail({
 
       <SectionCard
         title="Admission check"
-        description="The backend decides whether this case can be admitted now."
+        description="Current validation determines whether this case can be admitted now."
       >
         <div className="space-y-3">
           {admissionCase.missingRequiredFields.length > 0 ? (

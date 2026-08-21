@@ -9,7 +9,7 @@ export default function DuplicateCandidatesPage() {
     <DashboardPageShell>
       <M1PageHeader
         title="Duplicate Candidates"
-        description="Review probable duplicate student records and execute audited, atomic server-side merges."
+        description="Review probable duplicate student records and complete an audited, all-or-nothing merge."
         primaryAction={
           <Link
             href="#duplicate-review"

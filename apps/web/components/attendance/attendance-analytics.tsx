@@ -173,7 +173,7 @@ export function AttendanceAnalytics({
 
       <SectionCard
         title="Operational Anomaly Dashboard"
-        description="Backend-detected absence streaks, repeated late arrivals, roster mismatches, delayed submissions, attendance drops, and unsubmitted working days."
+        description="Detected absence streaks, repeated late arrivals, roster mismatches, delayed submissions, attendance drops, and unsubmitted working days."
       >
         {isLoadingAnomalies ? (
           <p className="py-4 text-center text-sm text-slate-500">

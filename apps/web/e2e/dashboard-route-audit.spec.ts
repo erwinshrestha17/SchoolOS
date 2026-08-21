@@ -40,8 +40,13 @@ const schoolRoutes = [
   '/dashboard/accounting',
   '/dashboard/reports',
   '/dashboard/library',
+  '/dashboard/library/catalog',
+  '/dashboard/library/issue-return',
   '/dashboard/canteen',
+  '/dashboard/canteen/stock',
   '/dashboard/transport',
+  '/dashboard/transport/assignments',
+  '/dashboard/transport/location',
   '/dashboard/settings',
 ] as const;
 
@@ -129,6 +134,45 @@ test.describe('Dashboard route audit smoke', () => {
     await expect(
       page.getByRole('heading', { name: /Chat has been removed/i }),
     ).toBeVisible();
+  });
+
+  test('keeps canonical module deep links stable across refresh, history, and legacy aliases', async ({
+    page,
+  }) => {
+    await login(page, schoolCredentials);
+
+    const journeys = [
+      {
+        overview: '/dashboard/library',
+        link: /Issue \/ Return/i,
+        canonical: '/dashboard/library/issue-return',
+        alias: '/dashboard/library/issues',
+      },
+      {
+        overview: '/dashboard/transport',
+        link: /^Assignments$/i,
+        canonical: '/dashboard/transport/assignments',
+        alias: '/dashboard/transport/students',
+      },
+      {
+        overview: '/dashboard/canteen',
+        link: /Stock & Suppliers/i,
+        canonical: '/dashboard/canteen/stock',
+        alias: '/dashboard/canteen/inventory',
+      },
+    ] as const;
+
+    for (const journey of journeys) {
+      await page.goto(journey.overview);
+      await page.getByRole('link', { name: journey.link }).first().click();
+      await expect(page).toHaveURL(journey.canonical);
+      await page.reload();
+      await expectUsableRoute(page, journey.canonical);
+      await page.goto(journey.alias);
+      await expect(page).toHaveURL(journey.canonical);
+      await page.goBack();
+      await expect(page).toHaveURL(journey.canonical);
+    }
   });
 });
 

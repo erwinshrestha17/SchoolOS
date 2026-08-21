@@ -9,6 +9,8 @@ import {
   LibraryFineStatus,
   LibraryIssueStatus,
   Prisma,
+  StaffStatus,
+  StudentLifecycleStatus,
 } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { LibraryHardeningService } from './library-hardening.service';
@@ -369,7 +371,7 @@ describe('LibraryHardeningService catalog + circulation core workflows', () => {
   });
 
   it('issues an available copy to a student inside a transaction', async () => {
-    const { service, tx, auditService } = buildService();
+    const { service, tx, auditService, prisma } = buildService();
 
     const result = await service.issueCopy(
       {
@@ -381,6 +383,13 @@ describe('LibraryHardeningService catalog + circulation core workflows', () => {
     );
 
     expect(result).toEqual(expect.objectContaining({ id: 'issue-1' }));
+    expect(prisma.student.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'student-1',
+        tenantId: actor.tenantId,
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+      },
+    });
     expect(tx.libraryCopy.updateMany).toHaveBeenCalledWith({
       where: {
         id: 'copy-1',
@@ -415,7 +424,11 @@ describe('LibraryHardeningService catalog + circulation core workflows', () => {
 
     expect(prisma.staff.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'staff-1', tenantId: actor.tenantId },
+        where: {
+          id: 'staff-1',
+          tenantId: actor.tenantId,
+          status: StaffStatus.ACTIVE,
+        },
       }),
     );
     expect(tx.libraryIssue.create).toHaveBeenCalledWith(
@@ -441,7 +454,11 @@ describe('LibraryHardeningService catalog + circulation core workflows', () => {
 
     expect(prisma.student.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'student-cross-tenant', tenantId: actor.tenantId },
+        where: {
+          id: 'student-cross-tenant',
+          tenantId: actor.tenantId,
+          lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+        },
       }),
     );
     expect(prisma.$transaction).not.toHaveBeenCalled();

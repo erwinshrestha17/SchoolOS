@@ -57,8 +57,8 @@ export function NoticesWorkspace({
         }
         description={
           variant === 'composer'
-            ? 'Create or update a draft and preview its backend-resolved recipients. Publication and scheduling happen after review on the notice detail.'
-            : 'Draft, preview, publish, and review official school notices. Recipient and delivery truth remains backend-owned.'
+            ? 'Create or update a draft and preview its recipients. Publication and scheduling happen after review on the notice detail.'
+            : 'Draft, preview, publish, and review official school notices. Open Notifications for personal inboxes and delivery status.'
         }
         primaryAction={
           variant === 'overview' && canCreateNotices ? (
@@ -77,7 +77,8 @@ export function NoticesWorkspace({
                 {
                   label: 'Delivery Logs',
                   icon: <Clock3 size={16} />,
-                  onClick: () => router.push('/dashboard/notices/deliveries'),
+                  onClick: () =>
+                    router.push('/dashboard/notifications/deliveries'),
                 },
               ]
             : []),
@@ -152,7 +153,7 @@ export function NoticesWorkspace({
           ...(canReadDeliveries
             ? [
                 {
-                  href: '/dashboard/notices/deliveries',
+                  href: '/dashboard/notifications/deliveries',
                   label: 'Delivery Logs',
                 },
               ]
@@ -173,8 +174,8 @@ export function NoticesWorkspace({
           title={variant === 'composer' ? 'Notice composer' : initialSection}
           description={
             variant === 'composer'
-              ? 'Build the audience, preview backend recipient resolution, and save the reviewed draft.'
-              : 'Operate official notice and delivery records from backend-owned state.'
+              ? 'Build the audience, preview recipients, and save the reviewed draft.'
+              : 'Create and review official school notices from one workspace.'
           }
           variant={variant === 'composer' ? 'builder' : 'queue'}
           flush

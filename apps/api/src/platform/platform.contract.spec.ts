@@ -34,6 +34,18 @@ describe('M0 Platform Control Plane contracts', () => {
     expect(controller).toContain('ListPlatformTenantsDto');
   });
 
+  it('projects shared tenant detail with the authenticated platform actor', () => {
+    const controller = read('src/platform/platform.controller.ts');
+
+    expect(controller).toContain(
+      'projectPlatformTenantDetail(detail, req.auth)',
+    );
+    expect(controller).toContain('@Req() req: AuthenticatedRequest');
+    expect(controller).not.toContain(
+      'return this.platformService.getTenantDetail(tenantId);',
+    );
+  });
+
   it('supports paginated and filterable platform tenant reads', () => {
     const dto = read('src/platform/dto/list-platform-tenants.dto.ts');
     const service = read('src/platform/platform.service.ts');

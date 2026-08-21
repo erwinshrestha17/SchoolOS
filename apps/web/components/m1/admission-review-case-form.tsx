@@ -3,6 +3,7 @@
 import type { CreateAdmissionCasePayload } from "@schoolos/core";
 import {
   formatBsDateForInput,
+  getNepalSchoolDay,
   isValidDateOfBirth,
   isValidEmail,
   isValidPersonName,
@@ -36,7 +37,7 @@ const emptyForm: CreateAdmissionCasePayload = {
   classId: "",
   sectionId: "",
   source: "PARENT_ONLINE",
-  admissionDate: new Date().toISOString().slice(0, 10),
+  admissionDate: getNepalSchoolDay().gregorianDate,
   notes: "",
 };
 

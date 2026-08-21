@@ -8,6 +8,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ApiOkResponse, ApiOperation } from '@nestjs/swagger';
 import { StaffStatus } from '@prisma/client';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
@@ -19,6 +20,10 @@ import type { AuthContext } from '../auth/auth.types';
 import { CreateStaffDto } from './dto/create-staff.dto';
 import { StaffLifecycleDto } from './dto/staff-lifecycle.dto';
 import { ListStaffQueryDto } from './dto/list-staff-query.dto';
+import {
+  ListStaffOptionsDto,
+  StaffLookupPageResponseDto,
+} from './dto/list-staff-options.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
 import { StaffService } from './staff.service';
 import {
@@ -45,6 +50,19 @@ export class StaffController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.staffService.listStaffDirectory(query, auth);
+  }
+
+  @Get('options')
+  @Permissions('staff:read')
+  @ApiOperation({
+    summary: 'Search the tenant staff directory for selector options',
+  })
+  @ApiOkResponse({ type: StaffLookupPageResponseDto })
+  listStaffOptions(
+    @Query() query: ListStaffOptionsDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.staffService.listStaffOptions(query, auth);
   }
 
   @Get('me')

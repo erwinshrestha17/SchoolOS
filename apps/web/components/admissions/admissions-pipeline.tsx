@@ -4,6 +4,7 @@ import {
   ADMISSION_CASE_DISPLAY_STATUSES,
   formatBsDate,
   formatBsDateTime,
+  getNepalSchoolDay,
   LEGACY_ADMISSION_APPLICATION_STATUSES,
   type AdmissionApplication,
   type AdmissionApplicationStatus,
@@ -545,8 +546,7 @@ function ApplicationInspector({
           </div>
         ) : (
           <p className="mt-2 text-xs text-slate-500">
-            The backend returned no duplicate warning when this application was
-            created.
+            No possible duplicate was found when this application was created.
           </p>
         )}
       </div>
@@ -672,7 +672,7 @@ function EnrollmentConversion({
   const [form, setForm] = useState({
     dateOfBirth: application.dateOfBirth?.slice(0, 10) ?? "",
     gender: application.gender ?? "FEMALE",
-    admissionDate: new Date().toISOString().slice(0, 10),
+    admissionDate: getNepalSchoolDay().gregorianDate,
     academicYearId: application.academicYearId ?? "",
     classId: application.classId ?? "",
     sectionId: application.sectionId ?? "",
@@ -774,7 +774,7 @@ function EnrollmentConversion({
         </h3>
       </div>
       <p className="mt-1 text-xs text-success-800">
-        The backend creates the student, enrollment, and guardian atomically.
+        The student, enrollment, and guardian records are created together when you confirm.
       </p>
       <div className="mt-4 grid gap-3">
         <CompactField label="Date of birth">

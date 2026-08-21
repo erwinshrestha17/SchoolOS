@@ -59,8 +59,7 @@ export function SettingsDirectoryWorkspace({
                 {area.status === 'contract-needed' ? (
                   <p className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-amber-800">
                     <CircleAlert className="h-3.5 w-3.5" />
-                    Configuration is not editable until the backend contract is
-                    confirmed.
+                    Configuration is not available for this area yet.
                   </p>
                 ) : null}
               </div>
@@ -94,7 +93,6 @@ export function SettingsDirectoryWorkspace({
             <div>
               <p className="font-bold">Configuration boundary</p>
               <p className="mt-1 leading-6">{note}</p>
-              <p className="sr-only">needs API contract</p>
             </div>
           </div>
         </section>

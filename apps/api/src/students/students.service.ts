@@ -63,6 +63,7 @@ import { ArchiveStudentDto } from './dto/archive-student.dto';
 import { CreateStudentGuardianDto } from './dto/create-student-guardian.dto';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { ListStudentsDto } from './dto/list-students.dto';
+import { ListStudentOptionsDto } from './dto/list-student-options.dto';
 import { DeleteStudentDto } from './dto/delete-student.dto';
 import { InviteGuardianDto } from './dto/invite-guardian.dto';
 import { MergeDuplicateStudentDto } from './dto/merge-duplicate-student.dto';
@@ -373,6 +374,68 @@ export class StudentsService {
               fileAssetId: student.qrCredentials[0].fileAssetId ?? null,
             }
           : null,
+      })),
+      total,
+      page,
+      limit,
+      hasNextPage: total > skip + students.length,
+    };
+  }
+
+  async listStudentOptions(query: ListStudentOptionsDto, actor: AuthContext) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 25;
+    const skip = (page - 1) * limit;
+    const scopedWhere = await this.buildStudentDirectoryWhere(
+      {
+        academicYearId: query.academicYearId,
+        classId: query.classId,
+        sectionId: query.sectionId,
+        status: StudentLifecycleStatus.ACTIVE,
+      },
+      actor,
+    );
+    const where: Prisma.StudentWhereInput = {
+      AND: [scopedWhere, buildStudentOptionSearchWhere(query.search.trim())],
+    };
+
+    const [total, students] = await Promise.all([
+      this.prisma.student.count({ where }),
+      this.prisma.student.findMany({
+        where,
+        select: {
+          id: true,
+          studentSystemId: true,
+          admissionNumber: true,
+          firstNameEn: true,
+          lastNameEn: true,
+          classId: true,
+          class: { select: { name: true } },
+          sectionId: true,
+          sectionRef: { select: { name: true } },
+          section: true,
+        },
+        orderBy: [
+          { firstNameEn: 'asc' },
+          { lastNameEn: 'asc' },
+          { studentSystemId: 'asc' },
+          { id: 'asc' },
+        ],
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    return {
+      items: students.map((student) => ({
+        id: student.id,
+        studentSystemId: student.studentSystemId,
+        admissionNumber: student.admissionNumber,
+        fullNameEn: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
+        classId: student.classId,
+        className: student.class.name,
+        sectionId: student.sectionId,
+        sectionName: student.sectionRef?.name ?? student.section ?? null,
       })),
       total,
       page,
@@ -5289,6 +5352,25 @@ function buildStudentDirectorySearchWhere(
           },
         },
       },
+    ],
+  }));
+
+  return termConditions.length === 1
+    ? termConditions[0]
+    : { AND: termConditions };
+}
+
+function buildStudentOptionSearchWhere(
+  search: string,
+): Prisma.StudentWhereInput {
+  const termConditions = search.split(/\s+/).map((term) => ({
+    OR: [
+      { firstNameEn: { contains: term, mode: 'insensitive' as const } },
+      { lastNameEn: { contains: term, mode: 'insensitive' as const } },
+      { firstNameNp: { contains: term, mode: 'insensitive' as const } },
+      { lastNameNp: { contains: term, mode: 'insensitive' as const } },
+      { studentSystemId: { contains: term, mode: 'insensitive' as const } },
+      { admissionNumber: { contains: term, mode: 'insensitive' as const } },
     ],
   }));
 

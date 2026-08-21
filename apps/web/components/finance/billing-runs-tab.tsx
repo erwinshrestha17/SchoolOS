@@ -344,7 +344,7 @@ export function BillingRunsTab() {
                               {getMonthName(run.runMonth)} {run.runYear}
                             </span>
                             <span className="text-[10px] text-slate-400 font-medium">
-                              Backend run period
+                              Billing period
                             </span>
                           </div>
                         </td>

@@ -21,6 +21,76 @@ const hrActor: AuthContext = {
 };
 
 describe('StaffService M7 HR hardening', () => {
+  it('returns paginated staff options without email, role, or payroll details', async () => {
+    const { service, prisma } = buildService({
+      staffList: [
+        buildStaff({
+          id: 'staff-2',
+          employeeId: 'EMP-002',
+          staffCode: 'T-002',
+          firstName: 'Bina',
+          lastName: 'Karki',
+          department: 'Primary',
+          designation: 'Teacher',
+          bankAccount: '9999999999',
+          panNumber: 'PAN-999',
+        }),
+      ],
+      staffCount: 26,
+    });
+
+    const result = await service.listStaffOptions(
+      { search: 'Bina', page: 2, limit: 25 },
+      actor,
+    );
+
+    const findManyQuery = prisma.staff.findMany.mock.calls[0][0];
+    expect(findManyQuery).toEqual(
+      expect.objectContaining({
+        where: {
+          AND: [
+            { tenantId: actor.tenantId, status: StaffStatus.ACTIVE },
+            {
+              OR: expect.arrayContaining([
+                { firstName: { contains: 'Bina', mode: 'insensitive' } },
+              ]),
+            },
+          ],
+        },
+        select: {
+          id: true,
+          employeeId: true,
+          staffCode: true,
+          firstName: true,
+          lastName: true,
+          department: true,
+          designation: true,
+        },
+        skip: 25,
+        take: 25,
+      }),
+    );
+    expect(JSON.stringify(findManyQuery)).not.toMatch(
+      /email|userRoles|bankAccount|panNumber/,
+    );
+    expect(result).toEqual({
+      items: [
+        {
+          id: 'staff-2',
+          employeeId: 'EMP-002',
+          staffCode: 'T-002',
+          fullName: 'Bina Karki',
+          department: 'Primary',
+          designation: 'Teacher',
+        },
+      ],
+      total: 26,
+      page: 2,
+      limit: 25,
+      hasNextPage: false,
+    });
+  });
+
   it('masks bank, PAN, salary, and payroll fields without HR/payroll management permission', async () => {
     const { service } = buildService({
       staff: buildStaff({

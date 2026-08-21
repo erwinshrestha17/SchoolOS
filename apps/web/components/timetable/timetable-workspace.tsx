@@ -47,7 +47,6 @@ export function TimetableWorkspace({ initialSection }: TimetableWorkspaceProps =
   const academicYearsQuery = useQuery({ queryKey: ['academic-years'], queryFn: api.listAcademicYears });
   const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
   const sectionsQuery = useQuery({ queryKey: ['sections'], queryFn: api.listSections });
-  const staffQuery = useQuery({ queryKey: ['staff'], queryFn: api.listStaff });
   const subjectsQuery = useQuery({ queryKey: ['subjects'], queryFn: () => api.listSubjects() });
 
   const workloadQuery = useQuery({
@@ -69,7 +68,6 @@ export function TimetableWorkspace({ initialSection }: TimetableWorkspaceProps =
         classes={classesQuery.data ?? []}
         allSections={sectionsQuery.data ?? []}
         subjects={subjectsQuery.data ?? []}
-        staff={staffQuery.data ?? []}
         timetable={timetableQuery.data?.items ?? []}
         isLoadingTimetable={timetableQuery.isLoading && Boolean(classId)}
         classId={classId}

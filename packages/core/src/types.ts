@@ -15,6 +15,14 @@ export type PaginatedResponse<T> = {
   hasNextPage?: boolean;
 };
 
+export type RemoteLookupPage<T> = {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+};
+
 export type StablePaginationMeta = {
   total: number;
   page: number;
@@ -4818,7 +4826,8 @@ export type PlatformTenantUsage = {
 };
 
 export type PlatformTenantDetail = PlatformTenantSummary & {
-  usage: PlatformTenantUsage;
+  /** Present only when the platform actor can read tenant usage. */
+  usage?: PlatformTenantUsage;
   panNumber?: string | null;
   subscription?: PlatformTenantSubscriptionSummary | null;
   billingProfile?: PlatformBillingProfile | null;
@@ -4831,7 +4840,7 @@ export type PlatformTenantDetail = PlatformTenantSummary & {
     providerId: string;
     type: string;
     name: string;
-    status: 'ready' | 'degraded' | 'not_configured' | 'failed';
+    status: "ready" | "degraded" | "not_configured" | "failed";
     message: string;
   }>;
   supportOverrideHistory?: Array<{
@@ -4857,10 +4866,13 @@ export type PlatformDashboardSummary = {
     totalUsers: number;
     totalStorageBytes: number;
   };
-  healthStatus: 'ready' | 'degraded';
+  healthStatus: "ready" | "degraded";
   failedJobsCount: number;
   recentAudit: PlatformAuditLog[];
-  providerReadinessStatus: Record<string, 'ready' | 'degraded' | 'not_configured' | 'failed'>;
+  providerReadinessStatus: Record<
+    string,
+    "ready" | "degraded" | "not_configured" | "failed"
+  >;
   subscriptionSummary?: {
     activeSubscriptions: number;
     graceSubscriptions: number;
@@ -4884,7 +4896,7 @@ export type PlatformPlanSummary = {
   key: string;
   name: string;
   description?: string | null;
-  status: 'ACTIVE' | 'ARCHIVED';
+  status: "ACTIVE" | "ARCHIVED";
   priceNpr: string;
   billingCycle: string;
   features: Array<{ featureKey: string; enabled: boolean }>;
@@ -4897,7 +4909,7 @@ export type PlatformTenantSubscriptionSummary = {
   planId: string;
   planKey: string;
   planName: string;
-  status: 'TRIAL' | 'ACTIVE' | 'GRACE' | 'SUSPENDED' | 'EXPIRED' | 'CANCELLED';
+  status: "TRIAL" | "ACTIVE" | "GRACE" | "SUSPENDED" | "EXPIRED" | "CANCELLED";
   startsAt: string;
   endsAt?: string | null;
   renewsAt?: string | null;
@@ -4910,12 +4922,12 @@ export type PlatformEntitlementCheck = {
   tenantId: string;
   featureKey: string;
   reason:
-    | 'allowed'
-    | 'tenant_inactive'
-    | 'no_subscription'
-    | 'subscription_inactive'
-    | 'feature_locked';
-  source?: 'plan' | 'override' | 'none';
+    | "allowed"
+    | "tenant_inactive"
+    | "no_subscription"
+    | "subscription_inactive"
+    | "feature_locked";
+  source?: "plan" | "override" | "none";
   subscriptionStatus?: string | null;
   limit?: number | null;
   currentValue?: number | null;
@@ -4952,7 +4964,7 @@ export type PlatformSaaSInvoiceSummary = {
   currency: string;
   issueDate: string;
   dueDate: string;
-  status: 'DRAFT' | 'ISSUED' | 'PAID' | 'PARTIAL' | 'OVERDUE' | 'CANCELLED';
+  status: "DRAFT" | "ISSUED" | "PAID" | "PARTIAL" | "OVERDUE" | "CANCELLED";
   lines: Array<{
     id: string;
     lineType: string;
@@ -4970,7 +4982,7 @@ export type PlatformApiKeySummary = {
   prefix: string;
   keyPreview: string;
   scopes: string[];
-  status: 'ACTIVE' | 'REVOKED';
+  status: "ACTIVE" | "REVOKED";
   expiresAt?: string | null;
   lastUsedAt?: string | null;
   revokedAt?: string | null;
@@ -4998,8 +5010,8 @@ export type PlatformProviderConfigSummary = {
 
 export type PlatformProviderReadinessDetail = {
   provider: PlatformProviderConfigSummary;
-  status: 'ready' | 'degraded' | 'not_configured' | 'failed';
-  mode: 'disabled' | 'dry_run' | 'sandbox_probe';
+  status: "ready" | "degraded" | "not_configured" | "failed";
+  mode: "disabled" | "dry_run" | "sandbox_probe";
   message: string;
   missingKeys: string[];
   paidExternalCallSkipped: boolean;
@@ -5016,11 +5028,11 @@ export type PlatformProviderReadinessDetail = {
 
 export type PlatformWebhookEndpointSummary = {
   id: string;
-  ownerType: 'PLATFORM' | 'TENANT';
+  ownerType: "PLATFORM" | "TENANT";
   tenantId?: string | null;
   url: string;
   eventTypes: string[];
-  status: 'ACTIVE' | 'DISABLED';
+  status: "ACTIVE" | "DISABLED";
   createdAt: string;
   updatedAt: string;
 };
@@ -5031,7 +5043,7 @@ export type PlatformWebhookDeliverySummary = {
   tenantId?: string | null;
   eventType: string;
   payloadChecksum: string;
-  status: 'PENDING' | 'DELIVERED' | 'FAILED' | 'RETRYING';
+  status: "PENDING" | "DELIVERED" | "FAILED" | "RETRYING";
   retryCount: number;
   responseCode?: number | null;
   responseMessageSummary?: string | null;
@@ -5048,7 +5060,7 @@ export type PlatformQueueSummary = {
   failed: number;
   delayed: number;
   paused: boolean;
-  workerHealth: 'healthy' | 'degraded' | 'unknown';
+  workerHealth: "healthy" | "degraded" | "unknown";
   error?: string;
 };
 
@@ -5084,21 +5096,21 @@ export type PlatformFailedJobGroup = {
   affectedTenantIds: string[];
   diagnostic: {
     category:
-      | 'provider'
-      | 'storage'
-      | 'tenant_state'
-      | 'entitlement'
-      | 'data_validation'
-      | 'transient'
-      | 'unknown';
+      | "provider"
+      | "storage"
+      | "tenant_state"
+      | "entitlement"
+      | "data_validation"
+      | "transient"
+      | "unknown";
     retryable: boolean;
     recommendedAction: string;
   };
 };
 
 export type PlatformHealthSummary = {
-  status: 'ready' | 'degraded';
-  checks: Record<string, { status: 'ok' | 'error'; message?: string }>;
+  status: "ready" | "degraded";
+  checks: Record<string, { status: "ok" | "error"; message?: string }>;
   timestamp: string;
 };
 
@@ -5111,7 +5123,7 @@ export type PlatformOnboardingChecklist = {
     key: string;
     label: string;
     completed: boolean;
-    source: 'computed' | 'manual';
+    source: "computed" | "manual";
     href: string;
     required: boolean;
   }>;
@@ -5364,6 +5376,29 @@ export type StaffSummary = {
   staffContracts?: StaffContractSummary[];
 };
 
+export type StaffLookupOption = {
+  id: string;
+  employeeId: string;
+  staffCode: string | null;
+  fullName: string;
+  department: string | null;
+  designation: string | null;
+};
+
+export type StaffAttendanceRosterItem = {
+  staffId: string;
+  employeeId: string;
+  fullName: string;
+};
+
+export type StaffAttendanceRosterPage = {
+  items: StaffAttendanceRosterItem[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+};
+
 export type StaffDetail = StaffSummary & {
   personal?: {
     dateOfBirth: string;
@@ -5514,9 +5549,7 @@ export type GuardianCapability =
   | "PICKUP_AUTHORIZE"
   | "COMPLAINT_OR_CORRECTION_SUBMIT";
 
-export type GuardianRelationshipVerificationStatus =
-  | "UNVERIFIED"
-  | "VERIFIED";
+export type GuardianRelationshipVerificationStatus = "UNVERIFIED" | "VERIFIED";
 
 export type GuardianRelationshipStatus =
   | "ACTIVE"
@@ -5539,8 +5572,7 @@ export const GUARDIAN_RECOVERY_ACTIONS = [
   "MARK_DECEASED",
 ] as const;
 
-export type GuardianRecoveryAction =
-  (typeof GUARDIAN_RECOVERY_ACTIONS)[number];
+export type GuardianRecoveryAction = (typeof GUARDIAN_RECOVERY_ACTIONS)[number];
 
 export const GUARDIAN_RECOVERY_VERIFICATION_METHODS = [
   "TRUSTED_SESSION",
@@ -5710,6 +5742,17 @@ export type StudentProfile = {
     lastScannedAt: string | null;
     fileAssetId?: string | null;
   } | null;
+};
+
+export type StudentLookupOption = {
+  id: string;
+  studentSystemId: string;
+  admissionNumber: string | null;
+  fullNameEn: string;
+  classId: string;
+  className: string;
+  sectionId: string | null;
+  sectionName: string | null;
 };
 
 export type StudentModuleSummary = {

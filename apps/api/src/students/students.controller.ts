@@ -26,6 +26,10 @@ import { ArchiveStudentDto } from './dto/archive-student.dto';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { CreateStudentGuardianDto } from './dto/create-student-guardian.dto';
 import { ListStudentsDto } from './dto/list-students.dto';
+import {
+  ListStudentOptionsDto,
+  StudentLookupPageResponseDto,
+} from './dto/list-student-options.dto';
 import { DeleteStudentDto } from './dto/delete-student.dto';
 import { InviteGuardianDto } from './dto/invite-guardian.dto';
 import { ListDuplicateStudentCandidatesDto } from './dto/list-duplicate-student-candidates.dto';
@@ -75,6 +79,19 @@ export class StudentsController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.studentsService.listStudents(query, auth);
+  }
+
+  @Get('options')
+  @Permissions('students:read')
+  @ApiOperation({
+    summary: 'Search the actor-scoped student directory for selector options',
+  })
+  @ApiOkResponse({ type: StudentLookupPageResponseDto })
+  listStudentOptions(
+    @Query() query: ListStudentOptionsDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.listStudentOptions(query, auth);
   }
 
   @Get('summary')

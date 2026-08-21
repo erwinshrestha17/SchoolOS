@@ -263,7 +263,7 @@ export function UsersAccessWorkspace() {
     <div className="space-y-6 p-6 pb-24">
       <SchoolSettingsPageHeader
         title="Users & access"
-        description="Manage school user accounts and role assignments. Backend authorisation remains the source of truth."
+        description="Manage school user accounts and role assignments. Access is checked again for every protected action."
         access={canManageAny ? 'can-manage' : 'view-only'}
       />
       {!canManageAny ? <SettingsPermissionNotice access="view-only" /> : null}
@@ -475,7 +475,7 @@ export function UsersAccessWorkspace() {
         }
         description={
           pendingStatus?.status === 'SUSPENDED'
-            ? `Suspend ${pendingStatus.email ?? 'this account'}? The backend will revoke its active sessions. At least one active School Configuration Owner must always remain.`
+            ? `Suspend ${pendingStatus.email ?? 'this account'}? Active sessions will be revoked. At least one active School Configuration Owner must always remain.`
             : `Activate ${pendingStatus?.email ?? 'this account'}?`
         }
         confirmLabel={
@@ -522,8 +522,8 @@ export function UsersAccessWorkspace() {
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
               Generate a temporary password for{' '}
-              {pendingReset.email ?? 'this user'}. The backend will revoke
-              active sessions and require change on next login.
+              {pendingReset.email ?? 'this user'}. Active sessions will be
+              revoked and a password change will be required at next login.
             </p>
             <Field
               label="Temporary password"

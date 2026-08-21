@@ -1,5 +1,7 @@
 import { AuthMethod } from '@prisma/client';
 import { DECORATORS } from '@nestjs/swagger/dist/constants';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 import type { AuthContext } from '../auth/auth.types';
 import { PERMISSIONS_KEY } from '../auth/decorators/permissions.decorator';
 import {
@@ -7,6 +9,7 @@ import {
   ListDuplicateStudentCandidatesResponseDto,
 } from './dto/duplicate-student-review-response.dto';
 import { ListDuplicateStudentCandidatesDto } from './dto/list-duplicate-student-candidates.dto';
+import { ListStudentOptionsDto } from './dto/list-student-options.dto';
 import { MarkDuplicateStudentPairNotDuplicateDto } from './dto/mark-duplicate-student-pair-not-duplicate.dto';
 import { ReopenDuplicateStudentReviewDto } from './dto/reopen-duplicate-student-review.dto';
 import { StudentsController } from './students.controller';
@@ -24,6 +27,7 @@ const actor: AuthContext = {
 function createController() {
   const service = {
     listStudents: jest.fn(),
+    listStudentOptions: jest.fn(),
     getStudentModuleSummary: jest.fn(),
     getStudentProfile: jest.fn(),
     createStudent: jest.fn(),
@@ -70,6 +74,44 @@ function createController() {
 }
 
 describe('StudentsController M1 contracts', () => {
+  it('delegates the actor-scoped student option search behind students:read', () => {
+    const { controller, service } = createController();
+    const query = { search: 'Maya', page: 2, limit: 25 };
+    service.listStudentOptions.mockReturnValue({ items: [], total: 0 });
+
+    expect(controller.listStudentOptions(query, actor)).toEqual({
+      items: [],
+      total: 0,
+    });
+    expect(service.listStudentOptions).toHaveBeenCalledWith(query, actor);
+    expect(
+      Reflect.getMetadata(
+        PERMISSIONS_KEY,
+        StudentsController.prototype.listStudentOptions,
+      ),
+    ).toEqual(['students:read']);
+  });
+
+  it('requires a trimmed two-character search and caps student option pages at 25', async () => {
+    const shortSearch = plainToInstance(ListStudentOptionsDto, {
+      search: ' x ',
+      limit: 26,
+    });
+    const validSearch = plainToInstance(ListStudentOptionsDto, {
+      search: ' Maya ',
+      limit: 25,
+    });
+
+    expect(await validate(shortSearch)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ property: 'search' }),
+        expect.objectContaining({ property: 'limit' }),
+      ]),
+    );
+    expect(await validate(validSearch)).toHaveLength(0);
+    expect(validSearch.search).toBe('Maya');
+  });
+
   it('delegates student module summary filters to the backend service', () => {
     const { controller, service } = createController();
     const query = {

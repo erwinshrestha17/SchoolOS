@@ -1264,7 +1264,7 @@ describe('SchoolOS web production contracts', () => {
     );
     assert.match(
       studentQrCard,
-      /credential secrets are held\s+only in backend memory/i,
+      /credential secrets are\s+protected while the ID card is generated/i,
     );
     assert.doesNotMatch(
       studentQrCard,
@@ -1449,7 +1449,7 @@ describe('SchoolOS web production contracts', () => {
     const apiClient = read('lib/api/students.ts');
 
     assert.match(apiClient, /updateStudent:/);
-    assert.match(apiClient, /method: 'PATCH'/);
+    assert.match(apiClient, /method: ["']PATCH["']/);
     assert.match(apiClient, /updateStudentGuardian:/);
     assert.match(detailPage, /Edit profile|Edit Profile/);
     assert.match(detailPage, /Save Changes/);
@@ -1687,7 +1687,7 @@ describe('SchoolOS web production contracts', () => {
     assert.match(attendanceForm, /AttendanceCorrectionReview/);
     assert.match(attendanceForm, /Correction Review Queue/);
     assert.match(attendanceForm, /Required audit reason/);
-    assert.match(attendanceForm, /export prepared by the attendance backend/);
+    assert.match(attendanceForm, /attendance export prepared/);
     assert.match(attendanceForm, /\/attendance\/register\/exports/);
     assert.match(attendanceForm, /Retained Register Exports/);
     assert.match(attendanceForm, /Protected File Registry helper/);
@@ -1999,7 +1999,6 @@ describe('SchoolOS web production contracts', () => {
     const requiredApis = [
       'api.listClasses',
       'api.listSections',
-      'api.listStudents',
       'api.listActivityPosts',
       'api.listActivityGallery',
       'api.listMoodLogs',
@@ -2021,6 +2020,12 @@ describe('SchoolOS web production contracts', () => {
     for (const apiCall of requiredApis) {
       assert.match(activitySurfaces, new RegExp(apiCall.replace('.', '\\.')));
     }
+    assert.match(activitySurfaces, /RemoteStudentSelector/);
+    assert.match(
+      read('components/students/remote-student-selector.tsx'),
+      /studentsApi\.listStudentOptions/,
+    );
+    assert.doesNotMatch(activitySurfaces, /limit:\s*1000/);
 
     const parentRoute = read('app/dashboard/activity/parent/page.tsx');
     const retiredParentView = read(
@@ -2066,7 +2071,10 @@ describe('SchoolOS web production contracts', () => {
 
   it('keeps canteen reports and CSV exports wired to backend report routes', () => {
     const canteenClient = read('lib/api/canteen.ts');
-    const canteenWorkspace = read('components/canteen/canteen-workspace.tsx');
+    const canteenWorkspace = [
+      read('components/canteen/canteen-workspace.tsx'),
+      read('components/canteen/canteen-reports-workspace.tsx'),
+    ].join('\n');
 
     for (const helper of [
       'getDailyMealCountReport',
@@ -2151,13 +2159,13 @@ describe('SchoolOS web production contracts', () => {
       'transport-location-freshness-panel',
       'getLocationFreshness',
       'LocationMetric',
-      'Latest backend coordinate from',
+      'The latest location from',
       'Confirm with the driver before sharing transport updates',
       'Treat the trip position as approximate',
-      'Persisted history',
-      'Redis latest cache',
+      'Recorded history',
+      'Latest position record',
       'formatLocationSignal',
-      'No backend coordinate',
+      'No recorded location',
     ]) {
       assert.ok(
         transportWorkspace.includes(marker),
@@ -2239,7 +2247,7 @@ describe('SchoolOS web production contracts', () => {
       'Report filters',
       'transport-trip-history-csv-export',
       'Export full trip CSV',
-      'Trip-history CSV export uses server-side generation',
+      'Trip-history CSV exports are generated securely',
       'setReportRouteId',
       'setReportVehicleId',
       'setReportDriverAssignmentId',
@@ -2248,11 +2256,21 @@ describe('SchoolOS web production contracts', () => {
       'transport-one-day-route-changes-report',
       'transport-vehicle-documents-report',
       'transport-maintenance-report',
-      'Remaining Issues',
     ]) {
       assert.ok(
         transportWorkspace.includes(marker),
         `Missing marker: ${marker}`,
+      );
+    }
+    for (const staffFacingDiagnostic of [
+      'Remaining Issues',
+      'needs summary API',
+      'WebSocket',
+      'staging provider data',
+    ]) {
+      assert.ok(
+        !transportWorkspace.includes(staffFacingDiagnostic),
+        `School workspace still exposes engineering diagnostic: ${staffFacingDiagnostic}`,
       );
     }
   });
@@ -2281,13 +2299,13 @@ describe('SchoolOS web production contracts', () => {
       'SummaryGrid',
       'SummaryCard',
       'WorkSurface',
-      'needs summary API',
     ]) {
       assert.ok(
         transportWorkspace.includes(marker),
         `Missing marker: ${marker}`,
       );
     }
+    assert.doesNotMatch(transportWorkspace, /needs summary API/);
 
     assert.doesNotMatch(transportPage, /PageHeader|headerActions/);
     assert.doesNotMatch(transportLayout, /Live Status/);
@@ -2378,7 +2396,7 @@ describe('SchoolOS web production contracts', () => {
     assert.match(canteenWorkspace, /wastageMutation/);
     assert.match(canteenWorkspace, /stockAdjustmentMutation/);
     assert.match(canteenWorkspace, /walletTransactions = itemsFromResult/);
-    assert.match(canteenWorkspace, /Stock ledger/);
+    assert.match(canteenWorkspace, /stock ledger/i);
     assert.equal(
       existsSync(join(webRoot, 'app/dashboard/canteen/inventory/page.tsx')),
       true,

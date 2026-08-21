@@ -142,7 +142,7 @@ export function AdmissionApplicationForm() {
             </p>
             {duplicateCount > 0 ? (
               <p className="mt-3 rounded-xl border border-warning-200 bg-warning-50 p-3 text-sm font-semibold text-warning-800">
-                Backend duplicate review found {duplicateCount} possible
+                Duplicate review found {duplicateCount} possible
                 {duplicateCount === 1 ? ' match' : ' matches'}. Review before
                 acceptance or enrollment.
               </p>
@@ -181,7 +181,7 @@ export function AdmissionApplicationForm() {
     <form className="space-y-5" onSubmit={submit}>
       <SectionCard
         title="Student and application details"
-        description="Create an inquiry/application record first. Enrollment remains a separate audited backend transition."
+        description="Create an inquiry or application first. Enrollment remains a separate audited step."
       >
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="First name (English)" required>

@@ -293,10 +293,11 @@ export class CanteenController {
   @Permissions('canteen:inventory:read')
   listSuppliers(
     @CurrentAuth() auth: AuthContext,
+    @Query('query') query?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.canteenService.listSuppliers(auth, { page, limit });
+    return this.canteenService.listSuppliers(auth, { query, page, limit });
   }
 
   @Post('inventory-items')
@@ -312,11 +313,13 @@ export class CanteenController {
   @Permissions('canteen:inventory:read')
   listInventoryItems(
     @CurrentAuth() auth: AuthContext,
+    @Query('query') query?: string,
     @Query('category') category?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
     return this.canteenService.listInventoryItems(auth, {
+      query,
       category,
       page,
       limit,

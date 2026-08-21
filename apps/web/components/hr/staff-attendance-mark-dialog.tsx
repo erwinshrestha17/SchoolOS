@@ -1,14 +1,16 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { FormField, Input } from '../ui/form-field';
 import { Toast } from '../ui/toast';
-import { X, ClipboardCheck, CheckCircle2, AlertCircle } from 'lucide-react';
+import { X, ClipboardCheck } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { getNepalSchoolDay } from '@schoolos/core';
+import { nepalDateTimeLocalInputToUtc } from '../../lib/date-utils';
 
 type StaffAttendanceMarkDialogProps = {
   isOpen: boolean;
@@ -28,34 +30,29 @@ export function StaffAttendanceMarkDialog({ isOpen, onClose }: StaffAttendanceMa
   const queryClient = useQueryClient();
   const [toastError, setToastError] = useState<string | null>(null);
 
-  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().slice(0, 10));
+  const [attendanceDate, setAttendanceDate] = useState(getNepalSchoolDay().gregorianDate);
   const [records, setRecords] = useState<TempRecord[]>([]);
 
-  const staffQuery = useQuery({
-    queryKey: ['staff'],
-    queryFn: api.listStaff,
+  const staffRosterQuery = useQuery({
+    queryKey: ['staff-attendance-roster'],
+    queryFn: ({ signal }) => api.listStaffAttendanceRoster(signal),
     enabled: isOpen,
   });
 
-  const activeStaff = useMemo(
-    () => (staffQuery.data ?? []).filter((s) => s.status === 'ACTIVE' || !s.status),
-    [staffQuery.data]
-  );
-
-  // Initialize records when staff list is loaded
   useEffect(() => {
-    if (activeStaff.length > 0) {
-      const initialRecords = activeStaff.map((s) => ({
-        staffId: s.id,
-        fullName: `${s.firstName} ${s.lastName}`,
-        employeeId: s.employeeId,
+    if (!isOpen || !staffRosterQuery.data) return;
+
+    setRecords(
+      staffRosterQuery.data.map((staff) => ({
+        staffId: staff.staffId,
+        fullName: staff.fullName,
+        employeeId: staff.employeeId,
         status: 'PRESENT' as const,
         checkInTime: '09:00',
         note: '',
-      }));
-      setRecords(initialRecords);
-    }
-  }, [activeStaff, isOpen]);
+      })),
+    );
+  }, [isOpen, staffRosterQuery.data]);
 
   const markMutation = useMutation({
     mutationFn: api.submitStaffAttendance,
@@ -101,12 +98,14 @@ export function StaffAttendanceMarkDialog({ isOpen, onClose }: StaffAttendanceMa
     }
 
     const payload = {
-      attendanceDate: new Date(attendanceDate).toISOString(),
+      attendanceDate,
       records: records.map((r) => {
         // Construct checkInAt ISO timestamp
         let checkInAt: string | undefined = undefined;
         if (r.status !== 'ABSENT' && r.checkInTime) {
-          checkInAt = new Date(`${attendanceDate}T${r.checkInTime}:00`).toISOString();
+          checkInAt = nepalDateTimeLocalInputToUtc(
+            `${attendanceDate}T${r.checkInTime}`,
+          );
         }
         return {
           staffId: r.staffId,
@@ -191,7 +190,7 @@ export function StaffAttendanceMarkDialog({ isOpen, onClose }: StaffAttendanceMa
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {staffQuery.isLoading ? (
+                {staffRosterQuery.isLoading ? (
                   Array.from({ length: 4 }).map((_, idx) => (
                     <tr key={idx} className="animate-pulse">
                       <td className="px-5 py-4"><div className="h-4 w-32 bg-slate-100 rounded" /></td>
@@ -200,6 +199,21 @@ export function StaffAttendanceMarkDialog({ isOpen, onClose }: StaffAttendanceMa
                       <td className="px-5 py-4"><div className="h-8 w-32 bg-slate-100 rounded" /></td>
                     </tr>
                   ))
+                ) : staffRosterQuery.isError ? (
+                  <tr>
+                    <td colSpan={4} className="px-5 py-12 text-center">
+                      <p className="font-semibold text-rose-700">
+                        The active staff roster could not be loaded.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => void staffRosterQuery.refetch()}
+                        className="mt-3 text-sm font-bold text-[var(--color-mod-hr-text)] underline"
+                      >
+                        Retry
+                      </button>
+                    </td>
+                  </tr>
                 ) : records.length > 0 ? (
                   records.map((row) => (
                     <tr key={row.staffId} className="hover:bg-slate-50/30 transition-colors">
@@ -267,7 +281,12 @@ export function StaffAttendanceMarkDialog({ isOpen, onClose }: StaffAttendanceMa
           <Button
             type="submit"
             onClick={handleSubmit}
-            disabled={records.length === 0 || markMutation.isPending}
+            disabled={
+              staffRosterQuery.isLoading ||
+              staffRosterQuery.isError ||
+              records.length === 0 ||
+              markMutation.isPending
+            }
             isLoading={markMutation.isPending}
             className="bg-[var(--color-mod-hr-accent)] hover:bg-[var(--color-mod-hr-text)]"
           >

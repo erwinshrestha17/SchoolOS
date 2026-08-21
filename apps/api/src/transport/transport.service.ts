@@ -12,6 +12,8 @@ import {
   ConsentType,
   NotificationChannel,
   Prisma,
+  StaffStatus,
+  StudentLifecycleStatus,
   TransportBoardingStatus,
   TransportEnrollmentStatus,
   TransportStudentTripStatus,
@@ -457,7 +459,11 @@ export class TransportService {
     const [vehicle, staff] = await Promise.all([
       this.requireVehicle(actor.tenantId, dto.vehicleId),
       this.prisma.staff.findFirst({
-        where: { id: dto.staffId, tenantId: actor.tenantId },
+        where: {
+          id: dto.staffId,
+          tenantId: actor.tenantId,
+          status: StaffStatus.ACTIVE,
+        },
       }),
     ]);
 
@@ -560,7 +566,11 @@ export class TransportService {
   async assignStudent(dto: EnrollTransportStudentDto, actor: AuthContext) {
     const [student, route, stop] = await Promise.all([
       this.prisma.student.findFirst({
-        where: { id: dto.studentId, tenantId: actor.tenantId },
+        where: {
+          id: dto.studentId,
+          tenantId: actor.tenantId,
+          lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+        },
       }),
       this.requireRoute(actor.tenantId, dto.routeId),
       this.requireStop(actor.tenantId, dto.stopId, dto.routeId),

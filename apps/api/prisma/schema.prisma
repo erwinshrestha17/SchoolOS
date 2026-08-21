@@ -5539,6 +5539,7 @@ model HomeworkAssignment {
   @@index([tenantId, status, dueDate])
   @@index([tenantId, classId, sectionId])
   @@index([tenantId, subjectId, assignedByStaffId, status])
+  @@index([tenantId, assignedDate])
   @@index([tenantId, dueDate, status])
   @@index([tenantId, classId, sectionId, dueDate])
 }

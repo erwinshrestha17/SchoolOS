@@ -215,7 +215,7 @@ function SchoolSetupSummary({
               aria-hidden="true"
             />
             <p className="leading-6">
-              Backend-confirmed setup items are complete. This covers school
+              Confirmed setup items are complete. This covers school
               identity, branding, and the academic calendar only.
             </p>
           </div>

@@ -20,6 +20,7 @@ import { ConflictsList } from '@/components/timetable/conflicts-list';
 import { SubstitutionsList } from '@/components/timetable/substitutions-list';
 import { TeacherScheduleWorkspace } from '@/components/timetable/teacher-schedule-workspace';
 import { TeacherCapability, useTeacherAccess } from '@/lib/teacher-access';
+import { RemoteStaffSelector } from '@/components/staff/remote-staff-selector';
 
 export default function TimetablePage() {
   const { isRestricted } = useTeacherAccess();
@@ -62,11 +63,6 @@ function SchoolTimetableConsole() {
   const classesQuery = useQuery({
     queryKey: ['classes'],
     queryFn: api.listClasses,
-  });
-
-  const staffQuery = useQuery({
-    queryKey: ['staff'],
-    queryFn: api.listStaff,
   });
 
   const roomsQuery = useQuery({
@@ -132,7 +128,7 @@ function SchoolTimetableConsole() {
       icon: <FileWarning className="h-5 w-5" />,
       loading: validationQuery.isLoading,
       tone: validationQuery.data?.errors.length ? 'danger' as const : 'warning' as const,
-      description: 'Backend validation errors and warnings',
+      description: 'Schedule conflicts and warnings that need review',
     },
     {
       title: 'Substitutions',
@@ -245,15 +241,13 @@ function SchoolTimetableConsole() {
             ))}
           </Select>
 
-          <Select
+          <RemoteStaffSelector
             value={filters.teacherId}
-            onChange={(e) => setFilters(prev => ({ ...prev, teacherId: e.target.value }))}
-          >
-            <option value="">All Teachers</option>
-            {staffQuery.data?.map(s => (
-              <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>
-            ))}
-          </Select>
+            onChange={(teacherId) => setFilters(prev => ({ ...prev, teacherId }))}
+            label="Filter by teacher"
+            placeholder="All teachers"
+            hideLabel
+          />
 
           <Select
             value={filters.roomId}

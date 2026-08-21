@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   formatBsDateForInput,
   parseBsDateInput,
   toGregorianDateFromBs,
+  type StaffLookupOption,
 } from '@schoolos/core';
 import { api } from '../../lib/api';
 import {
@@ -21,6 +22,7 @@ import { FormField, Select, TextArea } from '../ui/form-field';
 import { Toast } from '../ui/toast';
 import { X, Calendar } from 'lucide-react';
 import { useSession } from '../session-provider';
+import { RemoteStaffSelector } from '../staff/remote-staff-selector';
 
 type LeaveRequestCreateDialogProps = {
   isOpen: boolean;
@@ -42,6 +44,8 @@ export function LeaveRequestCreateDialog({
   const [toastError, setToastError] = useState<string | null>(null);
 
   const [staffId, setStaffId] = useState(lockedStaffId ?? '');
+  const [staffOption, setStaffOption] =
+    useState<StaffLookupOption | null>(null);
   const [leaveType, setLeaveType] = useState('CASUAL');
   const [startsOnBs, setStartsOnBs] = useState(() =>
     formatBsDateForInput(new Date()),
@@ -50,12 +54,6 @@ export function LeaveRequestCreateDialog({
     formatBsDateForInput(new Date()),
   );
   const [reason, setReason] = useState('');
-
-  const staffQuery = useQuery({
-    queryKey: ['staff'],
-    queryFn: api.listStaff,
-    enabled: isOpen && !selfService && !lockedStaffId && canManageLeave,
-  });
 
   const requestMutation = useMutation<
     unknown,
@@ -101,7 +99,10 @@ export function LeaveRequestCreateDialog({
       setStartsOnBs(formatBsDateForInput(new Date()));
       setEndsOnBs(formatBsDateForInput(new Date()));
       setReason('');
-      if (!lockedStaffId) setStaffId('');
+      if (!lockedStaffId) {
+        setStaffId('');
+        setStaffOption(null);
+      }
     },
     onError: () => {
       setToastError(
@@ -158,8 +159,6 @@ export function LeaveRequestCreateDialog({
     });
   };
 
-  const staffList = staffQuery.data ?? [];
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md rounded-2xl">
@@ -194,19 +193,16 @@ export function LeaveRequestCreateDialog({
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           {!selfService && !lockedStaffId && canManageLeave ? (
-            <FormField label="Staff Member">
-              <Select
-                value={staffId}
-                onChange={(e) => setStaffId(e.target.value)}
-              >
-                <option value="">Choose staff member...</option>
-                {staffList.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.firstName} {s.lastName} ({s.employeeId})
-                  </option>
-                ))}
-              </Select>
-            </FormField>
+            <RemoteStaffSelector
+              value={staffId}
+              selectedOption={staffOption}
+              onChange={(nextStaffId, option) => {
+                setStaffId(nextStaffId);
+                setStaffOption(option);
+              }}
+              label="Staff member"
+              placeholder="Search staff member"
+            />
           ) : null}
 
           <FormField label="Leave Type">

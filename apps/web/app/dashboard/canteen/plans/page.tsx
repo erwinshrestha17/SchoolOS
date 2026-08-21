@@ -1,5 +1,5 @@
-import { CanteenWorkspace } from '../../../../components/canteen/canteen-workspace';
+import { redirect } from "next/navigation";
 
 export default function CanteenPlansPage() {
-  return <CanteenWorkspace initialTab="plans" />;
+  redirect("/dashboard/canteen/meal-plans");
 }

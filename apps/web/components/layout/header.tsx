@@ -45,7 +45,9 @@ export function Header({
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const canReadAcademicYears = hasPermissions(["academic_years:read"]);
-  const canReadNotifications = hasPermissions(["notices:read"]);
+  const canReadNotifications =
+    hasModule("notifications") &&
+    hasPermissions(["notifications:view_own"]);
 
   const academicYearsQuery = useQuery({
     queryKey: ["layout-academic-years"],

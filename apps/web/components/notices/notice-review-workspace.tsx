@@ -26,6 +26,10 @@ import {
   communicationsApi,
   type NoticeDetail,
 } from "@/lib/api/communications";
+import {
+  formatNepalDateTimeLocalInput,
+  nepalDateTimeLocalInputToUtc,
+} from "@/lib/date-utils";
 
 type ReviewAction = "publish" | "schedule" | "approval";
 
@@ -48,11 +52,9 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
 
   useEffect(() => {
     if (!detailQuery.data?.scheduledFor) return;
-    const scheduled = new Date(detailQuery.data.scheduledFor);
-    const local = new Date(
-      scheduled.getTime() - scheduled.getTimezoneOffset() * 60_000,
+    setScheduledFor(
+      formatNepalDateTimeLocalInput(detailQuery.data.scheduledFor),
     );
-    setScheduledFor(local.toISOString().slice(0, 16));
   }, [detailQuery.data?.scheduledFor]);
 
   const notice = detailQuery.data;
@@ -139,7 +141,7 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
     return (
       <ErrorState
         title="This notice is no longer awaiting publication"
-        message="Open the notice detail to review its current backend lifecycle."
+        message="Open the notice detail to review its current status."
       />
     );
   }
@@ -168,7 +170,7 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
           <div>
             <h1 className="text-2xl font-bold text-slate-950">Review notice</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-              Confirm the saved content, backend-resolved audience, channels,
+              Confirm the saved content, resolved audience, channels,
               schedule, and approval requirement before publication.
             </p>
           </div>
@@ -280,7 +282,7 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
             <div className="flex items-center gap-3">
               <ShieldCheck className="h-5 w-5 text-rose-700" />
               <h2 className="font-bold text-slate-950">
-                Backend recipient preview
+                Recipient preview
               </h2>
             </div>
             {previewQuery.isLoading ? (
@@ -384,7 +386,7 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
             {!previewReady ? (
               <p className="text-xs leading-5 text-slate-500">
                 Final actions unlock only after required validation and the
-                current backend recipient preview complete.
+                current recipient preview complete.
               </p>
             ) : null}
           </section>
@@ -508,15 +510,19 @@ function validateNoticeForReview(notice: NoticeDetail) {
 }
 
 function validateScheduledFor(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime()) || date <= new Date()) {
+  try {
+    const date = new Date(nepalDateTimeLocalInputToUtc(value));
+    if (date <= new Date()) {
+      return "Choose a future schedule time.";
+    }
+  } catch {
     return "Choose a future schedule time.";
   }
   return null;
 }
 
 function toScheduledIso(value: string) {
-  return new Date(value).toISOString();
+  return nepalDateTimeLocalInputToUtc(value);
 }
 
 function reviewActionTitle(action: ReviewAction | null) {
@@ -527,10 +533,10 @@ function reviewActionTitle(action: ReviewAction | null) {
 
 function reviewActionDescription(action: ReviewAction | null) {
   if (action === "approval") {
-    return "The saved notice and current backend recipient counts will be attached to the approval request.";
+    return "The saved notice and current recipient counts will be attached to the approval request.";
   }
   if (action === "schedule") {
-    return "The notice will remain scheduled until the backend-controlled publication time.";
+    return "The notice will remain scheduled until its publication time.";
   }
   return "M15 will publish the notice, then M12 will resolve delivery from the persisted publication event.";
 }

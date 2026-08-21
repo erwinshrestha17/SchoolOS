@@ -233,7 +233,7 @@ export function NotificationCenterWorkspace() {
         )}
         caption={
           <caption className="sr-only">
-            Server-paginated notification center.
+            Notifications matching the current filters.
           </caption>
         }
       />

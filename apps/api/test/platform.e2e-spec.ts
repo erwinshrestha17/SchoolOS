@@ -197,7 +197,7 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
         auth: { userId: platformAdmin.id },
       } as unknown as AuthenticatedRequest,
     );
-    const detail = await platformController.getTenantDetail(tenantId);
+    const detail = await platformController.getTenantDetail(tenantId, mockReq);
     expect(detail.isActive).toBe(false);
 
     // 8. Verify audit log

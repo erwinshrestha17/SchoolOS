@@ -105,7 +105,7 @@ function ReportsWorkspace() {
       setExportNotice({
         title: queued ? "Export queued" : "Export ready",
         description: queued
-          ? `${selectedReport?.name ?? "Report"} will appear in recent exports when the backend worker finishes it.`
+          ? `${selectedReport?.name ?? "Report"} will appear in recent exports when processing finishes.`
           : `${selectedReport?.name ?? "Report"} ${format.toUpperCase()} export completed.`,
         tone: "success",
       });
@@ -343,8 +343,7 @@ function ReportsWorkspace() {
                   </span>
                   <span className="mt-1 block text-xs font-semibold leading-5 text-slate-500">
                     Use this for larger CSV/PDF/JSON exports. The generated file
-                    is tracked in recent exports when the backend worker
-                    completes it.
+                    is tracked in recent exports when processing completes.
                   </span>
                 </span>
               </label>

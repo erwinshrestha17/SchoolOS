@@ -193,8 +193,8 @@ export function StudentQrCard({
               Protected ID card generated
             </p>
             <p className="mt-1 text-xs text-slate-500 max-w-[240px] mx-auto">
-              The QR credential is embedded by the backend. Its secret is never
-              returned to this browser.
+              The QR credential is embedded securely. Its secret is never
+              shown in this browser.
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               <ProtectedFileButton
@@ -392,8 +392,8 @@ export function StudentQrCard({
                 Scan audit history
               </p>
               <p className="mt-1 text-[0.65rem] font-medium text-slate-500">
-                Recent QR lifecycle and resolve attempts recorded by the backend
-                audit log.
+                Recent QR lifecycle and resolve attempts from the protected
+                audit history.
               </p>
             </div>
             {qrScansQuery.isLoading ? (
@@ -438,9 +438,9 @@ export function StudentQrCard({
             </p>
           </div>
           <p className="text-[0.65rem] text-slate-500 leading-relaxed">
-            QR Identity uses protected token hashes. Credential secrets are held
-            only in backend memory while the protected ID-card artifact is
-            generated. Rotation invalidates the previous card and file.
+            QR Identity uses protected token hashes. Credential secrets are
+            protected while the ID card is generated. Rotation invalidates the
+            previous card and file.
           </p>
         </div>
       </div>

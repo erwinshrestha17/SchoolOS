@@ -94,8 +94,7 @@ export function DefaulterAgingSummary() {
             Defaulter Aging
           </h2>
           <p className="mt-1 text-sm font-medium text-slate-500">
-            Backend defaulter buckets for collection follow-up and guardian
-            reminders.
+            Official aging buckets for collection follow-up and guardian reminders.
           </p>
         </div>
         <Button

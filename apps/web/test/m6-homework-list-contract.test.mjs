@@ -24,10 +24,25 @@ describe("M6 homework list contract", () => {
     assert.match(page, /filters\.sectionId/);
     assert.match(page, /filters\.subjectId/);
     assert.match(page, /filters\.status/);
+    assert.match(api, /assignedDate\?: string/);
+    assert.match(page, /assignedDate: effectiveDate/);
     assert.match(page, /HOMEWORK_PAGE_SIZE/);
     assert.match(page, /<TablePagination/);
     assert.match(page, /homeworkMeta\.total/);
     assert.match(page, /setFilters\(\{ page \}\)/);
+    assert.doesNotMatch(page, /DATE_FILTER_FETCH_LIMIT/);
+    assert.doesNotMatch(page, /assignedDate \?\? ""\)\.slice/);
+    assert.doesNotMatch(page, /dateFilteredItems/);
+  });
+
+  it("derives today's assignment date from the Nepal school-day policy", () => {
+    const page = read("app/dashboard/homework/page.tsx");
+    const createForm = read("components/homework/homework-create-form.tsx");
+
+    assert.match(page, /getNepalSchoolDay\(\)\.gregorianDate/);
+    assert.match(createForm, /getNepalSchoolDay\(\)\.gregorianDate/);
+    assert.doesNotMatch(page, /new Date\(\)\.toISOString\(\)\.slice\(0, 10\)/);
+    assert.doesNotMatch(createForm, /new Date\(\)\.toISOString\(\)\.slice\(0, 10\)/);
   });
 
   it("keeps quick inspection in a drawer and protected files behind the helper", () => {

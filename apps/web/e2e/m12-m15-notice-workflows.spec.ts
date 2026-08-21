@@ -153,7 +153,7 @@ test.describe.serial('M12 and M15 authenticated notice workflows', () => {
       await page.setViewportSize({ width, height: 900 });
       await page.goto('/dashboard/notices');
       await expect(page.getByTestId('notice-list-workspace')).toBeVisible();
-      await page.goto('/dashboard/notices/deliveries');
+      await page.goto('/dashboard/notifications/deliveries');
       await expect(
         page.getByRole('heading', { name: 'Delivery logs' }),
       ).toBeVisible();

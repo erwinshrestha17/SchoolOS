@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ApiOkResponse, ApiOperation } from '@nestjs/swagger';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
@@ -16,6 +17,11 @@ import type { AuthContext } from '../auth/auth.types';
 import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import {
+  ActiveStaffLookupPageResponseDto,
+  ListActiveStaffOptionsDto,
+} from '../common/dto/list-active-staff-options.dto';
+import { assertTenantWideTransportAccess } from '../common/security/transport-scope';
 import { AssignTransportDriverDto } from './dto/assign-transport-driver.dto';
 import { BroadcastRouteDelayDto } from './dto/broadcast-route-delay.dto';
 import { CancelTransportTripDto } from './dto/cancel-transport-trip.dto';
@@ -51,6 +57,7 @@ export class TransportController {
   @Get('routes')
   @Permissions('transport:routes:read')
   listRoutes(@CurrentAuth() auth: AuthContext, @Query('q') query?: string) {
+    assertTenantWideTransportAccess(auth, 'read the tenant route directory');
     return this.transportService.listRoutes(auth, query);
   }
 
@@ -88,6 +95,7 @@ export class TransportController {
     @CurrentAuth() auth: AuthContext,
     @Query('routeId') routeId?: string,
   ) {
+    assertTenantWideTransportAccess(auth, 'read the tenant stop directory');
     return this.transportService.listStops(auth, routeId);
   }
 
@@ -113,6 +121,7 @@ export class TransportController {
   @Get('vehicles')
   @Permissions('transport:vehicles:read')
   listVehicles(@CurrentAuth() auth: AuthContext, @Query('q') query?: string) {
+    assertTenantWideTransportAccess(auth, 'read the tenant vehicle directory');
     return this.transportService.listVehicles(auth, query);
   }
 
@@ -142,6 +151,10 @@ export class TransportController {
     @Query('routeId') routeId?: string,
     @Query('vehicleId') vehicleId?: string,
   ) {
+    assertTenantWideTransportAccess(
+      auth,
+      'read tenant-wide driver assignments',
+    );
     return this.transportService.listDriverAssignments(auth, {
       routeId,
       vehicleId,
@@ -157,6 +170,19 @@ export class TransportController {
     return this.transportService.assignDriver(dto, auth);
   }
 
+  @Get('staff-options')
+  @Permissions('transport:assignments:create')
+  @ApiOperation({
+    summary: 'Search active tenant staff for a Transport driver assignment',
+  })
+  @ApiOkResponse({ type: ActiveStaffLookupPageResponseDto })
+  listTransportStaffOptions(
+    @Query() query: ListActiveStaffOptionsDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.transportService.listActiveStaffOptions(query, auth);
+  }
+
   @Get('assignments/students')
   @Permissions('transport:assignments:read')
   listStudentAssignments(
@@ -164,6 +190,10 @@ export class TransportController {
     @Query('routeId') routeId?: string,
     @Query('studentId') studentId?: string,
   ) {
+    assertTenantWideTransportAccess(
+      auth,
+      'read tenant-wide student assignments',
+    );
     return this.transportService.listStudentAssignments(auth, {
       routeId,
       studentId,
@@ -249,7 +279,7 @@ export class TransportController {
   @Get('driver/assignments')
   @Permissions('transport:operate')
   listDriverOwnAssignments(@CurrentAuth() auth: AuthContext) {
-    return this.transportService.listDriverAssignments(auth, {});
+    return this.transportService.listDriverOwnAssignments(auth);
   }
 
   @Get('driver/trips/active')
@@ -372,6 +402,7 @@ export class TransportController {
   @Get('trips/active')
   @Permissions('transport:trips:read')
   listActiveTrips(@CurrentAuth() auth: AuthContext) {
+    assertTenantWideTransportAccess(auth, 'read tenant-wide active trips');
     return this.transportService.listActiveTrips(auth);
   }
 
@@ -382,6 +413,7 @@ export class TransportController {
     @Query('routeId') routeId?: string,
     @Query('vehicleId') vehicleId?: string,
   ) {
+    assertTenantWideTransportAccess(auth, 'read tenant-wide trip history');
     return this.transportService.listTripHistory(auth, { routeId, vehicleId });
   }
 
@@ -391,6 +423,7 @@ export class TransportController {
     @Param('id') tripId: string,
     @CurrentAuth() auth: AuthContext,
   ) {
+    assertTenantWideTransportAccess(auth, 'read tenant-wide trip details');
     return this.transportService.getTripDetails(tripId, auth);
   }
 

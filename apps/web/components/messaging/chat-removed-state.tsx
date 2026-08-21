@@ -8,7 +8,7 @@ export function ChatRemovedState() {
       <PageState
         tone="warning"
         title="Chat has been removed"
-        description="New conversations and messages are unavailable. Historical records remain protected by backend authorization and retention policy."
+        description="New conversations and messages are unavailable. Historical records remain protected and are not available for new conversations."
         secondaryAction={
           <Link
             href="/dashboard/notices"

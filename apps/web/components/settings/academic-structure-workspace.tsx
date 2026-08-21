@@ -14,6 +14,7 @@ import {
 import { Button } from '../ui/button';
 import { ConfirmDialog } from '../ui/confirm-dialog';
 import { ErrorState } from '../ui/error-state';
+import { RemoteStaffSelector } from '../staff/remote-staff-selector';
 import { api } from '../../lib/api';
 import { useSettingsCapabilities } from '../../lib/permissions-ui';
 import {
@@ -72,11 +73,6 @@ export function AcademicStructureWorkspace() {
     queryKey: ['streams'],
     queryFn: api.listStreams,
     enabled: canReadStreams,
-  });
-  const staffQuery = useQuery({
-    queryKey: ['staff'],
-    queryFn: api.listStaff,
-    enabled: canAssignClassTeacher,
   });
   const academicYearsQuery = useQuery({
     queryKey: ['academic-years'],
@@ -187,7 +183,6 @@ export function AcademicStructureWorkspace() {
     [sectionsQuery.data],
   );
   const streams = useMemo(() => streamsQuery.data ?? [], [streamsQuery.data]);
-  const staffMembers = useMemo(() => staffQuery.data ?? [], [staffQuery.data]);
   const currentAcademicYear = useMemo(
     () => academicYearsQuery.data?.find((year) => year.isCurrent) ?? null,
     [academicYearsQuery.data],
@@ -223,7 +218,7 @@ export function AcademicStructureWorkspace() {
   if (
     classesQuery.isError ||
     sectionsQuery.isError ||
-    (canAssignClassTeacher && (staffQuery.isError || academicYearsQuery.isError))
+    (canAssignClassTeacher && academicYearsQuery.isError)
   )
     return (
       <div className="p-6">
@@ -233,14 +228,12 @@ export function AcademicStructureWorkspace() {
           error={
             classesQuery.error ??
             sectionsQuery.error ??
-            staffQuery.error ??
             academicYearsQuery.error
           }
           onRetry={() => {
             void classesQuery.refetch();
             void sectionsQuery.refetch();
             if (canAssignClassTeacher) {
-              void staffQuery.refetch();
               void academicYearsQuery.refetch();
             }
           }}
@@ -559,19 +552,9 @@ export function AcademicStructureWorkspace() {
               Holidays before assigning class teachers.
             </p>
           </div>
-        ) : staffQuery.isLoading || academicYearsQuery.isLoading ? (
+        ) : academicYearsQuery.isLoading ? (
           <div className="p-5">
             <div className="h-40 animate-pulse rounded-xl bg-slate-100" />
-          </div>
-        ) : staffMembers.length === 0 ? (
-          <div className="p-10 text-center">
-            <UserRound className="mx-auto h-7 w-7 text-slate-400" />
-            <p className="mt-3 font-semibold text-slate-900">
-              No staff members available
-            </p>
-            <p className="mt-1 text-sm text-slate-600">
-              Add staff records before assigning class teachers.
-            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -606,24 +589,24 @@ export function AcademicStructureWorkspace() {
                           : 'Not assigned'}
                       </td>
                       <td className="px-5 py-4">
-                        <select
+                        <RemoteStaffSelector
                           value={draftStaffId}
-                          onChange={(event) =>
+                          onChange={(staffId) =>
                             setStaffDraftBySection((current) => ({
                               ...current,
-                              [section.id]: event.target.value,
+                              [section.id]: staffId,
                             }))
                           }
-                          className="h-10 min-w-[220px] rounded-lg border border-slate-200 bg-white px-3 text-sm"
-                        >
-                          <option value="">Select staff member</option>
-                          {staffMembers.map((member) => (
-                            <option key={member.id} value={member.id}>
-                              {member.firstName} {member.lastName} (
-                              {member.employeeId})
-                            </option>
-                          ))}
-                        </select>
+                          selectedLabel={
+                            currentTeacher && draftStaffId === currentTeacher.id
+                              ? `${currentTeacher.firstName} ${currentTeacher.lastName} (${currentTeacher.employeeId})`
+                              : undefined
+                          }
+                          label={`Class teacher for ${section.class?.name ?? 'class'} ${section.name}`}
+                          placeholder="Search staff member"
+                          hideLabel
+                          className="min-w-[220px]"
+                        />
                       </td>
                       <td className="px-5 py-4">
                         <div className="flex flex-wrap gap-2">

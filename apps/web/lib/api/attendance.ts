@@ -7,12 +7,15 @@ import type {
   AttendanceRoster,
   AttendanceSyncSubmission,
   PaginatedResponse,
+  StaffAttendanceRosterItem,
+  StaffAttendanceRosterPage,
   StaffAttendanceMonthlySummary,
   StaffLeaveBalanceSummary,
   StaffLeaveRequestSummary,
   StaffLeaveReviewResult,
   StudentAttendanceMonthlyRegister,
 } from "@schoolos/core";
+import { getNepalSchoolDay } from "@schoolos/core";
 import {
   API_BASE_URL,
   JsonBody,
@@ -40,7 +43,37 @@ export type StaffSelfLeaveRequest = {
   reviewNote: string | null;
 };
 
+const STAFF_ATTENDANCE_ROSTER_PAGE_SIZE = 100;
+
+function listStaffAttendanceRosterPage(
+  page: number,
+  signal?: AbortSignal,
+) {
+  return request<StaffAttendanceRosterPage>(
+    withQuery("/hr/staff-attendance/roster", {
+      page,
+      limit: STAFF_ATTENDANCE_ROSTER_PAGE_SIZE,
+    }),
+    { signal },
+  );
+}
+
+async function listStaffAttendanceRoster(
+  signal?: AbortSignal,
+): Promise<StaffAttendanceRosterItem[]> {
+  const firstPage = await listStaffAttendanceRosterPage(1, signal);
+  const totalPages = Math.ceil(firstPage.total / firstPage.limit);
+  const remainingPages = await Promise.all(
+    Array.from({ length: Math.max(0, totalPages - 1) }, (_, index) =>
+      listStaffAttendanceRosterPage(index + 2, signal),
+    ),
+  );
+
+  return [firstPage, ...remainingPages].flatMap((page) => page.items);
+}
+
 export const attendanceApi = {
+  listStaffAttendanceRoster,
   getAttendanceRoster: (params: {
     /** Omitted = the backend resolves the tenant's current academic year. */
     academicYearId?: string;
@@ -238,7 +271,7 @@ export const attendanceApi = {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `class-roster-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `class-roster-${getNepalSchoolDay().gregorianDate}.csv`;
     document.body.appendChild(a);
     a.click();
     window.URL.revokeObjectURL(url);

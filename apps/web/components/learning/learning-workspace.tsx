@@ -37,6 +37,8 @@ import { WorkSurface } from "../ui/work-surface";
 import { LearningResourcesPanel } from "./learning-resources-panel";
 import { LearningSessionsPanel } from "./learning-sessions-panel";
 import { LearningRouteGuard } from "./learning-runtime";
+import { RemoteStaffSelector } from "../staff/remote-staff-selector";
+import { RemoteStudentSelector } from "../students/remote-student-selector";
 
 type LearningTab =
   | "overview"
@@ -173,11 +175,6 @@ function LearningWorkspaceContent({
     queryKey: ["subjects", form.classId],
     queryFn: () => api.listSubjects({ classId: form.classId || undefined }),
   });
-  const staffQuery = useQuery({ queryKey: ["staff"], queryFn: api.listStaff });
-  const studentsQuery = useQuery({
-    queryKey: ["students-for-learning"],
-    queryFn: () => api.listStudents({ limit: 1000 }),
-  });
   const classProgressQuery = useQuery({
     queryKey: ["learning-class-progress", progressClassId],
     queryFn: () => learningApi.getClassProgress(progressClassId),
@@ -190,7 +187,6 @@ function LearningWorkspaceContent({
   });
 
   const activities = activitiesQuery.data?.items ?? [];
-  const students = studentsQuery.data?.items ?? [];
 
   function updateFilter<Key extends keyof typeof filters>(
     key: Key,
@@ -285,6 +281,13 @@ function LearningWorkspaceContent({
   }
 
   const currentActivity = activityDetailQuery.data;
+  const currentTeacher = currentActivity?.teacher;
+  const currentTeacherLabel =
+    currentTeacher && currentTeacher.id === form.teacherId
+      ? [currentTeacher.firstName, currentTeacher.lastName]
+          .filter(Boolean)
+          .join(" ")
+      : undefined;
   useEffect(() => {
     if (!currentActivity) return;
     setForm(activityToForm(currentActivity));
@@ -504,21 +507,14 @@ function LearningWorkspaceContent({
                     label: item.name,
                   }))}
                 />
-                <SelectField
+                <RemoteStaffSelector
                   label="Teacher"
                   value={form.teacherId ?? ""}
-                  onChange={(value) =>
-                    setForm((current) => ({ ...current, teacherId: value }))
+                  onChange={(teacherId) =>
+                    setForm((current) => ({ ...current, teacherId }))
                   }
-                  options={(staffQuery.data ?? []).map((item) => ({
-                    value: item.id,
-                    label:
-                      [item.firstName, item.lastName]
-                        .filter(Boolean)
-                        .join(" ") ||
-                      item.employeeId ||
-                      item.id,
-                  }))}
+                  selectedLabel={currentTeacherLabel}
+                  placeholder="Search for a teacher"
                 />
                 <SelectField
                   label="Activity type"
@@ -669,15 +665,6 @@ function LearningWorkspaceContent({
           classes={(classesQuery.data ?? []).map((item) => ({
             id: item.id,
             name: item.name,
-          }))}
-          students={students.map((student) => ({
-            id: student.id,
-            name:
-              [student.firstNameEn, student.lastNameEn]
-                .filter(Boolean)
-                .join(" ") ||
-              student.studentSystemId ||
-              student.id,
           }))}
           classId={progressClassId}
           studentId={progressStudentId}
@@ -862,7 +849,6 @@ function LabPanel() {
 
 function ProgressPanel(props: {
   classes: Array<{ id: string; name: string }>;
-  students: Array<{ id: string; name: string }>;
   classId: string;
   studentId: string;
   onClassIdChange: (value: string) => void;
@@ -883,14 +869,11 @@ function ProgressPanel(props: {
             label: item.name,
           }))}
         />
-        <SelectField
+        <RemoteStudentSelector
           label="Student progress"
           value={props.studentId}
-          onChange={props.onStudentIdChange}
-          options={props.students.map((item) => ({
-            value: item.id,
-            label: item.name,
-          }))}
+          onChange={(studentId) => props.onStudentIdChange(studentId)}
+          placeholder="Search for a student"
         />
       </div>
       {props.isLoading ? <LoadingState variant="skeleton" /> : null}

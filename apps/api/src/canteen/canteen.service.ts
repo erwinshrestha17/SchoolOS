@@ -66,6 +66,9 @@ interface PaginationQuery {
   page?: string;
   limit?: string;
 }
+interface StockDirectoryQuery extends PaginationQuery {
+  query?: string;
+}
 interface ListMenuItemsQuery extends PaginationQuery {
   query?: string;
   category?: string;
@@ -1956,9 +1959,16 @@ export class CanteenService {
     return supplier;
   }
 
-  async listSuppliers(actor: AuthContext, options: PaginationQuery = {}) {
+  async listSuppliers(actor: AuthContext, options: StockDirectoryQuery = {}) {
     const { skip, take, page } = this.pagination(options);
-    const where = { tenantId: actor.tenantId, isActive: true };
+    const search = options.query?.trim();
+    const where: Prisma.CanteenSupplierWhereInput = {
+      tenantId: actor.tenantId,
+      isActive: true,
+      ...(search
+        ? { name: { contains: search, mode: 'insensitive' } }
+        : {}),
+    };
     const [items, total] = await this.prisma.$transaction([
       this.prisma.canteenSupplier.findMany({
         where,
@@ -2008,13 +2018,32 @@ export class CanteenService {
 
   async listInventoryItems(
     actor: AuthContext,
-    options: PaginationQuery & { category?: string } = {},
+    options: StockDirectoryQuery & { category?: string } = {},
   ) {
     const { skip, take, page } = this.pagination(options);
-    const where = {
+    const search = options.query?.trim();
+    const where: Prisma.CanteenInventoryItemWhereInput = {
       tenantId: actor.tenantId,
       isActive: true,
       ...(options.category ? { category: options.category } : {}),
+      ...(search
+        ? {
+            OR: [
+              {
+                name: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                sku: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+            ],
+          }
+        : {}),
     };
     const [items, total] = await this.prisma.$transaction([
       this.prisma.canteenInventoryItem.findMany({

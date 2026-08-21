@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   ArrowUpRight,
@@ -18,7 +19,12 @@ import {
   RotateCcw,
   Search,
 } from "lucide-react";
-import { formatBsDate, type StudentProfile } from "@schoolos/core";
+import {
+  formatBsDate,
+  type PermissionKey,
+  type StaffLookupOption,
+  type StudentLookupOption,
+} from "@schoolos/core";
 import {
   libraryApi,
   type LibraryBook,
@@ -38,7 +44,6 @@ import {
   type FulfillLibraryReservationPayload,
   type ReturnLibraryIssuePayload,
 } from "../../lib/library-api";
-import { api } from "../../lib/api";
 import { SummaryCard, SummaryGrid } from "../ui/summary-card";
 import { WorkSurface } from "../ui/work-surface";
 import { EmptyState } from "../ui/empty-state";
@@ -46,16 +51,23 @@ import { ErrorState } from "../ui/error-state";
 import { LoadingState } from "../ui/loading-state";
 import { StatusBadge, type StatusTone } from "../ui/status-badge";
 import { cn } from "../../lib/utils";
-import { StudentSelector } from "../students/student-selector";
+import { RemoteStudentSelector } from "../students/remote-student-selector";
+import { RemoteStaffSelector } from "../staff/remote-staff-selector";
 import { BookSelector } from "./book-selector";
 import { QRResolver } from "../ui/qr-resolver";
 import { ConfirmDialog } from "../ui/confirm-dialog";
+import { PermissionDenied } from "../ui/permission-denied";
+import { usePermissionAccess } from "../../lib/permissions-ui";
 
 const tabs = [
   { key: "overview", label: "Overview", href: "/dashboard/library" },
-  { key: "books", label: "Books", href: "/dashboard/library/books" },
+  { key: "books", label: "Catalog", href: "/dashboard/library/catalog" },
   { key: "copies", label: "Copies", href: "/dashboard/library/copies" },
-  { key: "issues", label: "Issues", href: "/dashboard/library/issues" },
+  {
+    key: "issues",
+    label: "Issue / Return",
+    href: "/dashboard/library/issue-return",
+  },
   {
     key: "reservations",
     label: "Reservations",
@@ -66,11 +78,31 @@ const tabs = [
   { key: "reports", label: "Reports", href: "/dashboard/library/reports" },
 ] as const;
 
-type LibraryTab = (typeof tabs)[number]["key"];
+export type LibraryWorkspaceSection = (typeof tabs)[number]["key"];
 
 type LibraryWorkspaceProps = {
-  initialTab?: LibraryTab;
+  section?: LibraryWorkspaceSection;
 };
+
+const libraryTabReadPermissions: Record<
+  Exclude<LibraryWorkspaceSection, "overview">,
+  PermissionKey
+> = {
+  books: "library:books:read",
+  copies: "library:copies:read",
+  issues: "library:issues:read",
+  reservations: "library:issues:read",
+  overdue: "library:reports:read",
+  fines: "library:reports:read",
+  reports: "library:reports:read",
+};
+
+const libraryOverviewReadPermissions: PermissionKey[] = [
+  "library:books:read",
+  "library:copies:read",
+  "library:issues:read",
+  "library:reports:read",
+];
 
 const copyStatuses: LibraryCopyStatus[] = [
   "AVAILABLE",
@@ -140,9 +172,28 @@ type LibraryCopyScanResult = {
 };
 
 export function LibraryWorkspace({
-  initialTab = "overview",
+  section = "overview",
 }: LibraryWorkspaceProps) {
-  const [activeTab, setActiveTab] = useState<LibraryTab>(initialTab);
+  const router = useRouter();
+  const activeTab = section;
+  const access = usePermissionAccess();
+  const canReadBooks = access.hasPermission("library:books:read");
+  const canReadCopies = access.hasPermission("library:copies:read");
+  const canReadIssues = access.hasPermission("library:issues:read");
+  const canReadReports = access.hasPermission("library:reports:read");
+  const canCreateBooks = access.hasPermission("library:books:create");
+  const canUpdateBooks = access.hasPermission("library:books:update");
+  const canCreateCopies = access.hasPermission("library:copies:create");
+  const canUpdateCopies = access.hasPermission("library:copies:update");
+  const canCreateIssues = access.hasPermission("library:issues:create");
+  const canReturnIssues = access.hasPermission("library:issues:return");
+  const canCreateFines = access.hasPermission("library:fines:create");
+  const canUpdateFines = access.hasPermission("library:fines:update");
+  const canPostFines = access.hasPermission("library:fines:post");
+  const canViewActiveTab =
+    activeTab === "overview"
+      ? access.hasAnyPermission(libraryOverviewReadPermissions)
+      : access.hasPermission(libraryTabReadPermissions[activeTab]);
   const [bookSearch, setBookSearch] = useState("");
   const [copySearch, setCopySearch] = useState("");
   const [copyStatus, setCopyStatus] = useState("");
@@ -192,6 +243,11 @@ export function LibraryWorkspace({
         page: String(bookPage),
         limit: listPageSize,
       }),
+    enabled:
+      canReadBooks &&
+      ["overview", "books", "copies", "issues", "reservations"].includes(
+        activeTab,
+      ),
   });
   const copiesQuery = useQuery({
     queryKey: ["library-copies", copySearch, copyStatus, copyPage],
@@ -202,6 +258,9 @@ export function LibraryWorkspace({
         page: String(copyPage),
         limit: listPageSize,
       }),
+    enabled:
+      canReadCopies &&
+      ["overview", "copies", "issues", "reservations"].includes(activeTab),
   });
   const issuesQuery = useQuery({
     queryKey: ["library-issues", issueStatus, issuePage],
@@ -211,12 +270,14 @@ export function LibraryWorkspace({
         page: String(issuePage),
         limit: listPageSize,
       }),
+    enabled:
+      canReadIssues && ["overview", "issues", "fines"].includes(activeTab),
   });
   const activeLoansQuery = useQuery({
     queryKey: ["library-issues", "ISSUED", "overview"],
     queryFn: () =>
       libraryApi.listIssues({ status: "ISSUED", page: "1", limit: "1" }),
-    enabled: activeTab === "overview",
+    enabled: canReadIssues && activeTab === "overview",
   });
   const overdueQuery = useQuery({
     queryKey: ["library-overdue", overduePage],
@@ -225,6 +286,9 @@ export function LibraryWorkspace({
         page: String(overduePage),
         limit: listPageSize,
       }),
+    enabled:
+      canReadReports &&
+      (activeTab === "overview" || activeTab === "overdue"),
   });
   const reservationsQuery = useQuery({
     queryKey: ["library-reservations", reservationStatus, reservationPage],
@@ -234,14 +298,9 @@ export function LibraryWorkspace({
         page: String(reservationPage),
         limit: listPageSize,
       }),
-  });
-  const schoolStudentsQuery = useQuery({
-    queryKey: ["students-for-library"],
-    queryFn: () => api.listStudents({ limit: 1000 }),
-  });
-  const staffQuery = useQuery({
-    queryKey: ["staff-for-library"],
-    queryFn: api.listStaff,
+    enabled:
+      canReadIssues &&
+      (activeTab === "overview" || activeTab === "reservations"),
   });
 
   const finesQuery = useQuery({
@@ -251,37 +310,38 @@ export function LibraryWorkspace({
         page: String(finePage),
         limit: listPageSize,
       }),
-    enabled: activeTab === "fines" || activeTab === "overview",
+    enabled:
+      canReadReports && (activeTab === "fines" || activeTab === "overview"),
   });
 
   const popularBooksQuery = useQuery({
     queryKey: ["library-popular-books"],
     queryFn: () => libraryApi.getPopularBooks({ limit: "10" }),
-    enabled: activeTab === "reports",
+    enabled: canReadReports && activeTab === "reports",
   });
 
   const issuedBooksReportQuery = useQuery({
     queryKey: ["library-issued-books-report"],
     queryFn: () => libraryApi.getIssuedBooksReport({ limit: "8" }),
-    enabled: activeTab === "reports",
+    enabled: canReadReports && activeTab === "reports",
   });
 
   const overdueBooksReportQuery = useQuery({
     queryKey: ["library-overdue-books-report"],
     queryFn: libraryApi.getOverdueBooksReport,
-    enabled: activeTab === "reports",
+    enabled: canReadReports && activeTab === "reports",
   });
 
   const lostDamagedQuery = useQuery({
     queryKey: ["library-lost-damaged"],
     queryFn: () => libraryApi.getLostDamagedReport(),
-    enabled: activeTab === "reports",
+    enabled: canReadReports && activeTab === "reports",
   });
 
   const fineSummaryQuery = useQuery({
     queryKey: ["library-fine-summary"],
     queryFn: libraryApi.getFineSummary,
-    enabled: activeTab === "reports",
+    enabled: canReadReports && activeTab === "reports",
   });
 
   const historyQuery = useQuery<{ history: LibraryIssue[] }, Error>({
@@ -297,7 +357,9 @@ export function LibraryWorkspace({
       }
       return { history: [] };
     },
-    enabled: Boolean(viewingHistory),
+    enabled:
+      Boolean(viewingHistory) &&
+      (viewingHistory?.type === "book" ? canReadBooks : canReadCopies),
   });
 
   const createFineMutation = useMutation({
@@ -525,16 +587,16 @@ export function LibraryWorkspace({
 
   const stats = useMemo(() => {
     return {
-      activeLoans: activeLoansQuery.isError
+      activeLoans: !canReadIssues || activeLoansQuery.isError
         ? ("Unavailable" as const)
         : (activeLoansQuery.data?.meta.total ?? 0),
-      overdueIssues: overdueQuery.isError
+      overdueIssues: !canReadReports || overdueQuery.isError
         ? ("Unavailable" as const)
         : (overdueQuery.data?.meta.total ?? 0),
-      reservationsWaiting: reservationsQuery.isError
+      reservationsWaiting: !canReadIssues || reservationsQuery.isError
         ? ("Unavailable" as const)
         : (reservationsQuery.data?.meta.total ?? 0),
-      totalCopies: copiesQuery.isError
+      totalCopies: !canReadCopies || copiesQuery.isError
         ? ("Unavailable" as const)
         : (copiesQuery.data?.meta.total ?? 0),
     };
@@ -547,6 +609,9 @@ export function LibraryWorkspace({
     overdueQuery.isError,
     reservationsQuery.data?.meta.total,
     reservationsQuery.isError,
+    canReadCopies,
+    canReadIssues,
+    canReadReports,
   ]);
 
   const isLoading =
@@ -554,12 +619,29 @@ export function LibraryWorkspace({
     copiesQuery.isLoading ||
     overdueQuery.isLoading ||
     reservationsQuery.isLoading;
+  const overviewError = [
+    booksQuery.error,
+    copiesQuery.error,
+    issuesQuery.error,
+    activeLoansQuery.error,
+    overdueQuery.error,
+    reservationsQuery.error,
+    finesQuery.error,
+  ].find(Boolean);
+  const reportsError = [
+    popularBooksQuery.error,
+    issuedBooksReportQuery.error,
+    overdueBooksReportQuery.error,
+    lostDamagedQuery.error,
+    fineSummaryQuery.error,
+  ].find(Boolean);
   const error =
-    booksQuery.error ||
-    copiesQuery.error ||
-    issuesQuery.error ||
-    activeLoansQuery.error ||
-    overdueQuery.error;
+    historyQuery.error ||
+    (activeTab === "overview"
+      ? overviewError
+      : activeTab === "reports"
+        ? reportsError
+        : null);
 
   function handleBookSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -623,7 +705,7 @@ export function LibraryWorkspace({
           ? undefined
           : Number(book.purchasePrice),
     });
-    setActiveTab("books");
+    router.push("/dashboard/library/catalog");
   }
 
   function editCopy(copy: LibraryCopy) {
@@ -639,7 +721,22 @@ export function LibraryWorkspace({
           : Number(copy.replacementCost),
       purchasedAt: copy.purchasedAt?.slice(0, 10) ?? "",
     });
-    setActiveTab("copies");
+    router.push("/dashboard/library/copies");
+  }
+
+  if (access.resolution === "loading") {
+    return <LoadingState label="Checking library access..." />;
+  }
+
+  if (!canViewActiveTab) {
+    return (
+      <PermissionDenied
+        title="Library workspace restricted"
+        description="Your role does not include read access to this library workspace."
+        resource="Library"
+        action="Read"
+      />
+    );
   }
 
   return (
@@ -702,6 +799,8 @@ export function LibraryWorkspace({
           onRetryQuery={() => void booksQuery.refetch()}
           meta={booksQuery.data?.meta}
           onPageChange={setBookPage}
+          canCreate={canCreateBooks}
+          canUpdate={canUpdateBooks}
         />
       )}
 
@@ -760,6 +859,8 @@ export function LibraryWorkspace({
           onRetryQuery={() => void copiesQuery.refetch()}
           meta={copiesQuery.data?.meta}
           onPageChange={setCopyPage}
+          canCreate={canCreateCopies}
+          canUpdate={canUpdateCopies}
         />
       )}
 
@@ -808,8 +909,6 @@ export function LibraryWorkspace({
         <IssuesPanel
           copies={copies}
           issues={issues}
-          students={schoolStudentsQuery.data?.items ?? []}
-          staff={staffQuery.data ?? []}
           status={issueStatus}
           setStatus={(value) => {
             setIssueStatus(value);
@@ -835,6 +934,8 @@ export function LibraryWorkspace({
           onRetryQuery={() => void issuesQuery.refetch()}
           meta={issuesQuery.data?.meta}
           onPageChange={setIssuePage}
+          canIssue={canCreateIssues}
+          canReturn={canReturnIssues}
         />
       )}
 
@@ -843,8 +944,6 @@ export function LibraryWorkspace({
           books={books}
           copies={copies}
           reservations={reservations}
-          students={schoolStudentsQuery.data?.items ?? []}
-          staff={staffQuery.data ?? []}
           status={reservationStatus}
           setStatus={(value) => {
             setReservationStatus(value);
@@ -877,6 +976,7 @@ export function LibraryWorkspace({
           onRetryQuery={() => void reservationsQuery.refetch()}
           meta={reservationsQuery.data?.meta}
           onPageChange={setReservationPage}
+          canManage={canCreateIssues}
         />
       )}
 
@@ -913,6 +1013,9 @@ export function LibraryWorkspace({
           onRetryQuery={() => void finesQuery.refetch()}
           meta={finesQuery.data?.meta}
           onPageChange={setFinePage}
+          canCreate={canCreateFines}
+          canUpdate={canUpdateFines}
+          canPost={canPostFines}
         />
       )}
 
@@ -961,8 +1064,8 @@ function OverviewPanel({
           value={stats.activeLoans}
           icon={<ClipboardList size={18} />}
           loading={isLoading}
-          href="/dashboard/library/issues"
-          description="Backend circulation metadata"
+          href="/dashboard/library/issue-return"
+          description="Current circulation records"
         />
         <SummaryCard
           label="Overdue issues"
@@ -970,7 +1073,7 @@ function OverviewPanel({
           icon={<AlertCircle size={18} />}
           loading={isLoading}
           href="/dashboard/library/overdue"
-          description="Backend overdue metadata"
+          description="Current overdue records"
           tone={
             typeof stats.overdueIssues === "number" && stats.overdueIssues > 0
               ? "warning"
@@ -998,7 +1101,7 @@ function OverviewPanel({
           loading={isLoading}
           href="/dashboard/library/copies"
           tone="neutral"
-          description="Backend copy metadata"
+          description="Current catalogue records"
         />
       </SummaryGrid>
 
@@ -1027,18 +1130,6 @@ function OverviewPanel({
           )}
         </div>
       </WorkSurface>
-
-      <section className="rounded-2xl border border-warning-100 bg-warning-50 p-5">
-        <h2 className="text-sm font-black uppercase tracking-wide text-warning-800">
-          Remaining Issues
-        </h2>
-        <p className="mt-2 text-sm leading-6 text-warning-800">
-          Available-copy, lost/damaged, and fine-review totals need a
-          module-owned Library summary endpoint. This landing page uses bounded
-          backend pagination metadata for circulation and marks unsupported
-          official totals as needs summary API.
-        </p>
-      </section>
 
       <WorkSurface
         title="Library operations"
@@ -1069,7 +1160,7 @@ function OverviewPanel({
             </p>
           </Link>
           <Link
-            href="/dashboard/library/issues"
+            href="/dashboard/library/issue-return"
             className="group rounded-2xl border border-slate-100 bg-slate-50/50 p-5 transition hover:border-[var(--color-mod-library-border)] hover:bg-[var(--color-mod-library-bg)]"
           >
             <h3 className="font-bold text-slate-900 group-hover:text-[var(--color-mod-library-text)]">
@@ -1791,13 +1882,6 @@ function CopiesPanel(props: {
 function IssuesPanel(props: {
   copies: LibraryCopy[];
   issues: LibraryIssue[];
-  students: StudentProfile[];
-  staff: Array<{
-    id: string;
-    firstName?: string;
-    lastName?: string;
-    employeeId?: string;
-  }>;
   status: string;
   setStatus: (value: string) => void;
   form: LibraryIssuePayload;
@@ -1826,6 +1910,10 @@ function IssuesPanel(props: {
   >([]);
   const [resolvedBorrower, setResolvedBorrower] =
     useState<LibraryQrBorrower | null>(null);
+  const [selectedStudent, setSelectedStudent] =
+    useState<StudentLookupOption | null>(null);
+  const [selectedStaff, setSelectedStaff] =
+    useState<StaffLookupOption | null>(null);
   const [scannedCopy, setScannedCopy] = useState<LibraryCopy | null>(null);
   const availableCopies = [
     ...props.copies.filter((copy) => copy.status === "AVAILABLE"),
@@ -1838,12 +1926,6 @@ function IssuesPanel(props: {
   const selectedCopy =
     props.copies.find((copy) => copy.id === props.form.copyId) ??
     (scannedCopy?.id === props.form.copyId ? scannedCopy : undefined);
-  const selectedStudent = props.students.find(
-    (student) => student.id === props.form.borrowerStudentId,
-  );
-  const selectedStaff = props.staff.find(
-    (staff) => staff.id === props.form.borrowerStaffId,
-  );
 
   function recordCopyScan(scan: LibraryCopyScanResult) {
     setCopyScanResult(scan);
@@ -1904,6 +1986,8 @@ function IssuesPanel(props: {
     if (!studentId) return;
 
     setResolvedBorrower({ ...data, id: studentId });
+    setSelectedStudent(null);
+    setSelectedStaff(null);
     props.setForm({
       ...props.form,
       borrowerStudentId: studentId,
@@ -2095,10 +2179,17 @@ function IssuesPanel(props: {
               staff={selectedStaff}
             />
 
-            <StudentSelector
-              students={props.students}
-              selectedId={props.form.borrowerStudentId ?? ""}
-              onSelect={(studentId) => {
+            <RemoteStudentSelector
+              value={props.form.borrowerStudentId ?? ""}
+              selectedOption={selectedStudent}
+              selectedLabel={
+                resolvedBorrower?.id === props.form.borrowerStudentId
+                  ? resolvedBorrower?.name ?? resolvedBorrower?.studentCode
+                  : undefined
+              }
+              onChange={(studentId, option) => {
+                setSelectedStudent(option);
+                setSelectedStaff(null);
                 props.setForm({
                   ...props.form,
                   borrowerStudentId: studentId,
@@ -2109,7 +2200,8 @@ function IssuesPanel(props: {
                 }
               }}
               label="Student Borrower"
-              optional
+              placeholder="Search by student name or code"
+              clearable
             />
 
             <div className="relative py-2">
@@ -2124,32 +2216,27 @@ function IssuesPanel(props: {
               </div>
             </div>
 
-            <label className="block text-sm font-semibold text-slate-700">
-              Staff Borrower
-              <select
-                value={props.form.borrowerStaffId ?? ""}
-                onChange={(e) => {
-                  props.setForm({
-                    ...props.form,
-                    borrowerStaffId: e.target.value,
-                    borrowerStudentId: e.target.value
-                      ? ""
-                      : props.form.borrowerStudentId,
-                  });
-                  if (e.target.value) {
-                    setResolvedBorrower(null);
-                  }
-                }}
-                className="input-control mt-1"
-              >
-                <option value="">No staff borrower</option>
-                {props.staff.map((staff) => (
-                  <option key={staff.id} value={staff.id}>
-                    {staffName(staff)}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <RemoteStaffSelector
+              value={props.form.borrowerStaffId ?? ""}
+              selectedOption={selectedStaff}
+              onChange={(staffId, option) => {
+                setSelectedStaff(option);
+                setSelectedStudent(null);
+                props.setForm({
+                  ...props.form,
+                  borrowerStaffId: staffId,
+                  borrowerStudentId: staffId
+                    ? ""
+                    : props.form.borrowerStudentId,
+                });
+                if (staffId) {
+                  setResolvedBorrower(null);
+                }
+              }}
+              label="Staff Borrower"
+              placeholder="Search by staff name or employee ID"
+              clearable
+            />
 
             <TextInput
               label="Due date"
@@ -2187,13 +2274,6 @@ function ReservationsPanel(props: {
   books: LibraryBook[];
   copies: LibraryCopy[];
   reservations: LibraryReservation[];
-  students: StudentProfile[];
-  staff: Array<{
-    id: string;
-    firstName?: string;
-    lastName?: string;
-    employeeId?: string;
-  }>;
   status: string;
   setStatus: (value: string) => void;
   form: LibraryReservationPayload;
@@ -2218,6 +2298,10 @@ function ReservationsPanel(props: {
 }) {
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
   const [confirmFulfillId, setConfirmFulfillId] = useState<string | null>(null);
+  const [selectedStudent, setSelectedStudent] =
+    useState<StudentLookupOption | null>(null);
+  const [selectedStaff, setSelectedStaff] =
+    useState<StaffLookupOption | null>(null);
   const activeCopies = props.copies.filter(
     (copy) => copy.status === "AVAILABLE" || copy.status === "RESERVED",
   );
@@ -2227,7 +2311,7 @@ function ReservationsPanel(props: {
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <PanelHeader
           title="Reservation Queue"
-          description="Review queued holds and fulfill eligible reservations through the backend circulation policy."
+          description="Review queued holds and fulfill reservations that meet the circulation policy."
         />
         <div className="mt-5 max-w-xs">
           <select
@@ -2361,7 +2445,7 @@ function ReservationsPanel(props: {
                     setConfirmFulfillId(null);
                   }}
                   title="Fulfill reservation"
-                  description="This creates an issue record and lets the backend validate borrower eligibility, queue order, and copy availability."
+                  description="This creates an issue record after checking borrower eligibility, queue order, and copy availability."
                   confirmLabel="Fulfill reservation"
                   isConfirming={props.isSaving}
                 />
@@ -2414,20 +2498,23 @@ function ReservationsPanel(props: {
             label="Optional copy"
             placeholder="Reserve a specific barcode"
           />
-          <StudentSelector
-            students={props.students}
-            selectedId={props.form.borrowerStudentId ?? ""}
-            onSelect={(borrowerStudentId) =>
+          <RemoteStudentSelector
+            value={props.form.borrowerStudentId ?? ""}
+            selectedOption={selectedStudent}
+            onChange={(borrowerStudentId, option) => {
+              setSelectedStudent(option);
+              setSelectedStaff(null);
               props.setForm({
                 ...props.form,
                 borrowerStudentId,
                 borrowerStaffId: borrowerStudentId
                   ? ""
                   : props.form.borrowerStaffId,
-              })
-            }
+              });
+            }}
             label="Student borrower"
-            optional
+            placeholder="Search by student name or code"
+            clearable
           />
           <div className="relative py-2">
             <div
@@ -2440,29 +2527,24 @@ function ReservationsPanel(props: {
               <span className="bg-white px-2 text-slate-400 italic">or</span>
             </div>
           </div>
-          <label className="block text-sm font-semibold text-slate-700">
-            Staff borrower
-            <select
-              value={props.form.borrowerStaffId ?? ""}
-              onChange={(event) =>
-                props.setForm({
-                  ...props.form,
-                  borrowerStaffId: event.target.value,
-                  borrowerStudentId: event.target.value
-                    ? ""
-                    : props.form.borrowerStudentId,
-                })
-              }
-              className="input-control mt-1"
-            >
-              <option value="">No staff borrower</option>
-              {props.staff.map((staff) => (
-                <option key={staff.id} value={staff.id}>
-                  {staffName(staff)}
-                </option>
-              ))}
-            </select>
-          </label>
+          <RemoteStaffSelector
+            value={props.form.borrowerStaffId ?? ""}
+            selectedOption={selectedStaff}
+            onChange={(borrowerStaffId, option) => {
+              setSelectedStaff(option);
+              setSelectedStudent(null);
+              props.setForm({
+                ...props.form,
+                borrowerStaffId,
+                borrowerStudentId: borrowerStaffId
+                  ? ""
+                  : props.form.borrowerStudentId,
+              });
+            }}
+            label="Staff borrower"
+            placeholder="Search by staff name or employee ID"
+            clearable
+          />
           <TextInput
             label="Hold expires"
             type="date"
@@ -2659,13 +2741,8 @@ function IssueSelectionSummary({
   staff,
 }: {
   copy?: LibraryCopy;
-  student?: StudentProfile;
-  staff?: {
-    id: string;
-    firstName?: string;
-    lastName?: string;
-    employeeId?: string;
-  };
+  student?: StudentLookupOption | null;
+  staff?: StaffLookupOption | null;
 }) {
   if (!copy && !student && !staff) return null;
 
@@ -2910,7 +2987,7 @@ function PendingLibraryCard({ title }: { title: string }) {
     <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-4">
       <EmptyState
         title={title}
-        description="Backend endpoint pending."
+        description="This workflow is not available yet."
         className="min-h-[180px] border-0 bg-transparent p-0"
       />
     </div>
@@ -3114,11 +3191,13 @@ function borrowerName(issue: LibraryIssue) {
 }
 
 function studentName(student: {
+  fullNameEn?: string;
   firstNameEn?: string;
   lastNameEn?: string;
   studentSystemId?: string;
 }) {
   return (
+    student.fullNameEn ||
     `${student.firstNameEn ?? ""} ${student.lastNameEn ?? ""}`.trim() ||
     student.studentSystemId ||
     "Student"
@@ -3126,11 +3205,13 @@ function studentName(student: {
 }
 
 function staffName(staff: {
+  fullName?: string;
   firstName?: string;
   lastName?: string;
   employeeId?: string;
 }) {
   return (
+    staff.fullName ||
     `${staff.firstName ?? ""} ${staff.lastName ?? ""}`.trim() ||
     staff.employeeId ||
     "Staff"
@@ -3466,7 +3547,7 @@ function ReportsPanel({
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <PanelHeader
             title="Reports & Exports"
-            description="Review circulation, overdue, inventory health, and fine exposure from backend reports."
+            description="Review official circulation, overdue, inventory health, and fine reports."
           />
           <button
             type="button"

@@ -375,7 +375,7 @@ function MonthlySummary({ data }: { data: StudentAttendanceMonthlyRegister }) {
             Monthly summary
           </h3>
           <p className="text-sm text-muted-foreground">
-            Official backend-owned totals for {month.label}
+            Official totals for {month.label}
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -868,7 +868,7 @@ function MonthEmpty() {
         </EmptyMedia>
         <EmptyTitle>No attendance month available</EmptyTitle>
         <EmptyDescription>
-          The backend returned no calendar days for this academic month.
+          No calendar days are available for this academic month.
         </EmptyDescription>
       </EmptyHeader>
     </Empty>

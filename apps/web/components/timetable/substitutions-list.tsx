@@ -288,7 +288,7 @@ export function SubstitutionsList({ filters }: { filters: any }) {
           }
         }}
         title="Cancel substitution?"
-        description="This records a cancelled substitution through the backend and keeps the timetable audit trail intact."
+        description="This records the cancellation and keeps the timetable audit trail intact."
         confirmLabel="Cancel substitution"
         variant="destructive"
         isConfirming={cancelMutation.isPending}

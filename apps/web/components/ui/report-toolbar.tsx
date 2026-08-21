@@ -12,7 +12,7 @@ type ReportToolbarProps = {
 
 export function ReportToolbar({
   title = 'Report filters',
-  description = 'Choose filters and export from backend-generated report data.',
+  description = 'Choose filters and export the official report data.',
   filters,
   actions,
 }: ReportToolbarProps) {

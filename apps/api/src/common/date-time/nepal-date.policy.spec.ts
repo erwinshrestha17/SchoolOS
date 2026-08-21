@@ -8,8 +8,10 @@ import {
   getNepalSchoolDay,
   isSameNepalSchoolDay,
   parseBsDateInput,
+  shiftGregorianDateOnly,
   toBsDateFromGregorian,
   toGregorianDateFromBs,
+  zonedNepalDateTimeToUtc,
 } from '@schoolos/core';
 
 describe('SchoolOS Nepal BS date-time policy', () => {
@@ -69,5 +71,24 @@ describe('SchoolOS Nepal BS date-time policy', () => {
     // Asar 2083 has 32 days in the canonical BS dataset; day 33 is impossible.
     expect(() => parseBsDateInput('2083-03-33')).toThrow();
     expect(() => parseBsDateInput('2084-13-01')).toThrow();
+  });
+
+  it('steps Gregorian business dates without browser or server timezone drift', () => {
+    expect(shiftGregorianDateOnly('2026-08-21', -30)).toBe('2026-07-22');
+    expect(shiftGregorianDateOnly('2026-01-01', -1)).toBe('2025-12-31');
+    expect(shiftGregorianDateOnly('2024-02-28', 1)).toBe('2024-02-29');
+    expect(() => shiftGregorianDateOnly('2026-02-31', 1)).toThrow();
+  });
+
+  it('converts a Nepal civil attendance or delivery time to UTC', () => {
+    expect(
+      zonedNepalDateTimeToUtc({
+        year: 2026,
+        month: 8,
+        day: 21,
+        hour: 9,
+        minute: 0,
+      }).toISOString(),
+    ).toBe('2026-08-21T03:15:00.000Z');
   });
 });

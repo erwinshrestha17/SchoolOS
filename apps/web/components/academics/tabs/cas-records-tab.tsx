@@ -1,6 +1,6 @@
 'use client';
 
-import { formatBsDate } from '@schoolos/core';
+import { formatBsDate, getNepalSchoolDay } from '@schoolos/core';
 import type {
   AcademicYearSummary,
   CasRecordSummary,
@@ -62,7 +62,7 @@ type StudentRosterRow = Omit<StudentProfile, 'section'> & {
   section?: { id: string; name?: string | null } | string | null;
 };
 
-const today = new Date().toISOString().slice(0, 10);
+const today = getNepalSchoolDay().gregorianDate;
 
 const casTemplates = [
   { category: 'Classwork', maxScore: 20, note: 'Classwork completion and effort' },

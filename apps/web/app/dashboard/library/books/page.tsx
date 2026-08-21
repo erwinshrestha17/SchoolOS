@@ -1,7 +1,5 @@
-'use client';
-
-import { LibraryWorkspace } from '../../../../components/library/library-workspace';
+import { redirect } from 'next/navigation';
 
 export default function LibraryBooksPage() {
-  return <LibraryWorkspace initialTab="books" />;
+  redirect('/dashboard/library/catalog');
 }

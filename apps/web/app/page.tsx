@@ -56,13 +56,13 @@ const painPoints = [
   {
     problem: 'Fees tracked manually',
     solution: 'Fee dues, receipts, collections, cashier close, and ledger-ready records',
-    desc: 'Manual ledger books lead to tracking leaks and calculation errors. SchoolOS automates billing schedules and double-entry postings.',
+    desc: 'SchoolOS keeps fee records, receipts, cashier controls, and reviewed accounting handoffs connected without making the browser the source of financial truth.',
     icon: WalletCards
   },
   {
     problem: 'Parents miss updates',
-    solution: 'Notices, delivery tracking, parent portal, and communication history',
-    desc: 'Paper circulars and unorganized chat groups get ignored. SchoolOS centralizes communications with receipts.',
+    solution: 'Official notices, personal alerts, delivery status, and parent mobile access',
+    desc: 'SchoolOS keeps formal school notices separate from personal notification and delivery status.',
     icon: Megaphone
   },
   {
@@ -76,7 +76,7 @@ const painPoints = [
 const operatingLayers = [
   {
     title: 'Admin Command Center',
-    desc: 'The central hub for administrative oversight, student lifecycle control, and automated school operations.',
+    desc: 'A role-scoped hub for administrative oversight, student lifecycle work, and guided school operations.',
     bullets: [
       'Interactive school stats feed',
       'Unified student lifecycle & approvals',
@@ -91,7 +91,7 @@ const operatingLayers = [
     bullets: [
       'NPR fee billing customisation',
       'Cashier day-end closing audits',
-      'Automated double-entry ledgers'
+      'Controlled accounting postings'
     ],
     icon: WalletCards,
     visual: 'progress'
@@ -108,12 +108,12 @@ const operatingLayers = [
     visual: 'chips'
   },
   {
-    title: 'Parent & Campus Services',
-    desc: 'The external layer connecting guardians, transport fleets, library inventory, and school canteen services.',
+    title: 'Family & Campus Services',
+    desc: 'Enabled services connect linked guardians with school notices, transport status, library records, and canteen activity.',
     bullets: [
-      'Dedicated parent portal accounts',
-      'Real-time transport vehicle logs',
-      'Canteen meal planning & wallets'
+      'Linked-child parent mobile access',
+      'Timestamped transport updates',
+      'Canteen meal planning & wallets where enabled'
     ],
     icon: Bus,
     visual: 'list'
@@ -123,9 +123,10 @@ const operatingLayers = [
 const modulesList = [
   { initials: 'AD', title: 'Admissions', desc: 'Applicant intake, documentation, and enrollment workflows.', tag: 'Core' },
   { initials: 'SD', title: 'Students', desc: 'Centralized profile database, sibling linking, and active files.', tag: 'Core' },
-  { initials: 'AT', title: 'Attendance', desc: 'Student and staff attendance logs with real-time analytics.', tag: 'Core' },
+  { initials: 'AT', title: 'Smart Attendance', desc: 'Assigned-roster attendance, corrections, registers, and time-bound summaries.', tag: 'Core' },
   { initials: 'FR', title: 'Fees & Receipts', desc: 'Invoices, automated receipts, waivers, and dues tracking.', tag: 'Finance' },
-  { initials: 'NC', title: 'Notices', desc: 'Notice boards, SMS integration, and push alerts.', tag: 'Core' },
+  { initials: 'NA', title: 'Notices & Announcements', desc: 'Official drafts, audience preview, review, publication, and read follow-up.', tag: 'Core' },
+  { initials: 'ND', title: 'Notifications & Delivery', desc: 'Personal inboxes and honest channel status when delivery providers are enabled.', tag: 'Core' },
   { initials: 'AC', title: 'Academics', desc: 'Exam configurations, marks cards, and continuous grading.', tag: 'Academic' },
   { initials: 'TT', title: 'Timetable', desc: 'Class schedules, teacher allotments, and substitution views.', tag: 'Academic' },
   { initials: 'HP', title: 'HR & Payroll', desc: 'Staff directory, salary processing, and expense records.', tag: 'Finance' },
@@ -134,16 +135,16 @@ const modulesList = [
   { initials: 'LB', title: 'Library', desc: 'Catalog system, barcode scans, and overdue fees tracking.', tag: 'Operations' },
   { initials: 'CN', title: 'Canteen', desc: 'Menu setups, student wallet cards, and inventory levels.', tag: 'Operations' },
   { initials: 'RP', title: 'Reports', desc: 'Financial collections, enrollment graphs, and marks summaries.', tag: 'Core' },
-  { initials: 'PP', title: 'Parent Portal', desc: 'Private guardian access to academic progress and dues.', tag: 'Portal' }
+  { initials: 'PM', title: 'Parent Mobile Companion', desc: 'Linked-child visibility through the SchoolOS mobile app.', tag: 'Companion' }
 ];
 
 const nepalReadiness = [
   { title: 'NPR fee workflows', desc: 'Tailored specifically for local currency billing, cash collection receipts, and custom tax headers.' },
   { title: 'Nepali calendar readiness', desc: 'Supports both BS (Bikram Sambat) and AD calendars for class schedules, exams, and attendance.' },
-  { title: 'SMS/email communication', desc: 'Integrated with local telecommunication gateways to broadcast alerts directly to parent phones.' },
+  { title: 'Configurable delivery channels', desc: 'Supports in-app delivery and channel-ready SMS, email, or push modes when providers are configured and verified.' },
   { title: 'Local school roles', desc: 'Pre-configured roles matching Nepalese schools, including Principal, Accountant, and Section Coordinator.' },
-  { title: 'Multi-branch school readiness', desc: 'Enables unified management for institutions operating multiple branches across different locations.' },
-  { title: 'Parent-first communication', desc: 'Bypasses internet limitations via SMS alerts while providing a full web dashboard for online portals.' },
+  { title: 'Guided school setup', desc: 'School structure, roles, enabled modules, and data-import needs are reviewed during onboarding.' },
+  { title: 'Parent-first communication', desc: 'Linked guardians use the mobile companion for school notices, alerts, and enabled child records.' },
   { title: 'School-level data separation', desc: 'Ensures each institution operates in a distinct, protected workspace safeguarding student privacy.' },
   { title: 'Audit trail design', desc: 'Built-in audit logging tracks every financial edit, invoice override, and grade change for accountability.' }
 ];
@@ -151,19 +152,19 @@ const nepalReadiness = [
 const differentiators = [
   {
     title: 'School-level data separation',
-    desc: 'Each school operates in its own protected workspace. There is no shared storage risk, ensuring absolute privacy compliance.'
+    desc: 'School data is handled through tenant-scoped queries, role checks, module entitlements, and protected-file access.'
   },
   {
     title: 'Finance-connected operations',
-    desc: 'Fees collected, canteen balances topped up, and payroll disbursed flow directly into the school ledger, keeping books automatically reconciled.'
+    desc: 'Approved source records can create controlled accounting entries. Reconciliation remains a reviewed school-finance workflow, and salary settlement occurs outside SchoolOS.'
   },
   {
     title: 'Role-aware access',
-    desc: 'Admins, teachers, accountants, parents, and students log into the exact interface they need, hiding complex options from normal users.'
+    desc: 'Staff use role-scoped web workspaces, linked guardians use the mobile companion, and students only enter controlled Learning sessions when that module is enabled.'
   },
   {
     title: 'Guided onboarding',
-    desc: 'No automated self-registration forms. Every school workspace is individually configured, loaded with existing student sheets, and launch-tested.'
+    desc: 'No public school self-registration. Each workspace receives reviewed setup, role mapping, and an agreed data-import plan.'
   },
   {
     title: 'Full student lifecycle',
@@ -192,16 +193,16 @@ const onboardingSteps = [
   },
   {
     step: '04',
-    title: 'Pilot Launch',
-    desc: 'Admins, teachers, accountants, and parents start using SchoolOS with direct, hands-on guided support.',
+    title: 'Readiness Review',
+    desc: 'We agree the controlled-pilot scope only after the required configuration, data, access, and workflow checks.',
     icon: CheckCircle2
   }
 ];
 
 const plansList = [
   {
-    name: 'Starter School',
-    desc: 'For schools starting with admissions, students, attendance, notices, and basic fee workflows.',
+    name: 'Foundation scope',
+    desc: 'For a controlled rollout focused on essential student, attendance, notice, and fee workflows.',
     features: [
       'Student database & files',
       'Admissions pipeline',
@@ -211,10 +212,10 @@ const plansList = [
     ]
   },
   {
-    name: 'Growing School',
-    desc: 'For schools needing academics, timetable, HR, payroll, accounting, and advanced reporting.',
+    name: 'Extended operations',
+    desc: 'Additional academic, HR, payroll, accounting, and reporting modules after their readiness gates are met.',
     features: [
-      'Everything in Starter School',
+      'Foundation workflows where enabled',
       'Terminal exam builder & marks cards',
       'Subject timetables & substitutions',
       'HR profiles & payroll calculations',
@@ -224,11 +225,11 @@ const plansList = [
     highlighted: true
   },
   {
-    name: 'Full Operations',
-    desc: 'For schools needing parent portal, transport, library, canteen, and custom workflow operations.',
+    name: 'Enabled campus services',
+    desc: 'Optional parent mobile, transport, library, and canteen workflows selected during onboarding.',
     features: [
-      'Everything in Growing School',
-      'Dedicated Parent Portal accounts',
+      'Approved operational modules',
+      'Linked-child parent mobile access',
       'Library cataloguing & QR issue logs',
       'Transport routes & student mapping',
       'Canteen menus & prepaid student wallets',
@@ -238,12 +239,12 @@ const plansList = [
 ];
 
 const securityCards = [
-  { title: 'Secure login', desc: 'Equipped with robust session handling, cryptographic credentials, and access locks.' },
+  { title: 'Staff authentication', desc: 'Uses role-scoped sessions, password controls, and access checks.' },
   { title: 'Role-based access', desc: 'Allows coordinators, accountants, and teachers to see only data assigned to their roles.' },
-  { title: 'School-level data separation', desc: 'Each school workspace operates within separate query boundaries to ensure complete isolation.' },
-  { title: 'Audit trail design', desc: 'System automatically logs modifications to fee receipts, invoice lines, and academic grades.' },
-  { title: 'Private documents', desc: 'Secures scanned guardian registrations, student medical files, and payment invoices.' },
-  { title: 'Controlled onboarding', desc: 'Protects the system from public bot sign-ups and unverified school workspace setups.' }
+  { title: 'School-level data separation', desc: 'School records use tenant-scoped query, job, file, and cache boundaries.' },
+  { title: 'Audit trail design', desc: 'Sensitive workflows retain actor, time, state, and reason evidence where the workflow requires it.' },
+  { title: 'Protected documents', desc: 'Private school files use authenticated, role-scoped access paths.' },
+  { title: 'Controlled onboarding', desc: 'School workspaces are set up through guided onboarding; public self-service setup is not available.' }
 ];
 
 export default function RedesignedLandingPage() {
@@ -257,7 +258,7 @@ export default function RedesignedLandingPage() {
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-500 text-sm font-black text-white shadow-sm">S</span>
             <div className="flex flex-col">
               <span className="text-lg font-black tracking-tight leading-none text-slate-900">SchoolOS</span>
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">School ERP for Nepal</span>
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">School operating system for Nepal</span>
             </div>
           </div>
           <nav className="hidden lg:flex items-center gap-8 text-sm font-semibold text-slate-500">
@@ -303,7 +304,7 @@ export default function RedesignedLandingPage() {
             </h1>
 
             <p className="text-base sm:text-lg leading-relaxed text-slate-400 max-w-2xl">
-              SchoolOS brings admissions, attendance, fees, academics, notices, staff, accounting, transport, library, canteen, and parent communication into one secure workspace for Nepal-based schools.
+              SchoolOS brings admissions, attendance, fees, academics, notices, staff, accounting, transport, library, canteen, and parent communication into one tenant-scoped system for Nepal-based schools.
             </p>
 
             <div className="flex flex-wrap items-center gap-4 pt-2">
@@ -342,7 +343,7 @@ export default function RedesignedLandingPage() {
                   <span className="h-3 w-3 rounded-full bg-slate-700" />
                   <span className="h-3 w-3 rounded-full bg-slate-700" />
                 </div>
-                <div className="text-[10px] text-slate-500 tracking-widest uppercase">SchoolOS Admin Engine</div>
+                <div className="text-[10px] text-slate-500 tracking-widest uppercase">Illustrative product preview</div>
                 <div className="h-2 w-8 bg-transparent" />
               </div>
 
@@ -373,16 +374,16 @@ export default function RedesignedLandingPage() {
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="text-sm font-black tracking-tight text-white">Shree Janata Secondary School</span>
+                        <span className="text-sm font-black tracking-tight text-white">Example Secondary School</span>
                       </div>
                       <div className="flex items-center gap-1 text-slate-500 text-[11px] font-semibold">
                         <MapPin size={11} className="text-primary-500 shrink-0" />
-                        <span>Pokhara, Gandaki Province</span>
+                        <span>Example district, Nepal</span>
                       </div>
                     </div>
                     <Badge variant="success" className="text-[9px] font-bold py-0.5 px-2 flex items-center gap-1 shrink-0">
                       <CheckCircle2 size={10} />
-                      Verified school workspace
+                      Example data
                     </Badge>
                   </div>
 
@@ -503,7 +504,7 @@ export default function RedesignedLandingPage() {
               <div className="space-y-6">
                 <div className="space-y-2">
                   <h3 className="text-2xl font-black text-slate-900">Admin Command Center</h3>
-                  <p className="text-sm text-slate-500">Complete oversight of institutional structure, student files, notice boards, and staff assignments.</p>
+                  <p className="text-sm text-slate-500">Role-scoped oversight of institutional structure, student files, notice boards, and staff assignments.</p>
                 </div>
                 
                 <div className="space-y-3">
@@ -519,7 +520,7 @@ export default function RedesignedLandingPage() {
                     </li>
                     <li className="flex items-center gap-3 text-sm text-slate-700 font-semibold bg-white p-3.5 border border-slate-100 rounded-2xl shadow-sm">
                       <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
-                      <span>Global analytics, reporting, & audit logs</span>
+                      <span>Time-bound reports, exceptions, & audit history</span>
                     </li>
                   </ul>
                 </div>
@@ -528,7 +529,7 @@ export default function RedesignedLandingPage() {
               <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 text-white space-y-6 shadow-xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 h-40 w-40 rounded-full bg-primary-500 opacity-10 blur-2xl" />
                 <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-                  <span className="text-xs font-bold uppercase text-slate-500">Live Dashboard Preview</span>
+                  <span className="text-xs font-bold uppercase text-slate-500">Illustrative preview · Example data</span>
                   <Badge variant="phase2">Admin role</Badge>
                 </div>
                 {/* 3 KPI Cards */}
@@ -542,11 +543,11 @@ export default function RedesignedLandingPage() {
                   <span className="text-[9px] font-bold text-slate-500 uppercase block tracking-wider">Recent Registrations</span>
                   <div className="space-y-2">
                     <div className="flex justify-between items-center text-xs p-2 bg-slate-900 border border-slate-800/50 rounded-xl">
-                      <span className="font-semibold">Aarav Sharma (Class 3A)</span>
+                      <span className="font-semibold">Example Student A (Class 3A)</span>
                       <span className="text-[9px] text-slate-500 font-bold bg-slate-800 px-1.5 py-0.5 rounded uppercase">Pending Approval</span>
                     </div>
                     <div className="flex justify-between items-center text-xs p-2 bg-slate-900 border border-slate-800/50 rounded-xl">
-                      <span className="font-semibold">Nisha Adhikari (Class 8B)</span>
+                      <span className="font-semibold">Example Student B (Class 8B)</span>
                       <span className="text-[9px] text-emerald-500 font-bold bg-emerald-950/40 border border-emerald-900/30 px-1.5 py-0.5 rounded uppercase font-bold">Approved</span>
                     </div>
                   </div>
@@ -567,7 +568,7 @@ export default function RedesignedLandingPage() {
                   <ul className="space-y-3">
                     <li className="flex items-center gap-3 text-sm text-slate-700 font-semibold bg-white p-3.5 border border-slate-100 rounded-2xl shadow-sm">
                       <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
-                      <span>3-Tap daily attendance check-ins</span>
+                      <span>Assigned-roster daily attendance</span>
                     </li>
                     <li className="flex items-center gap-3 text-sm text-slate-700 font-semibold bg-white p-3.5 border border-slate-100 rounded-2xl shadow-sm">
                       <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
@@ -584,7 +585,7 @@ export default function RedesignedLandingPage() {
               <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 text-white space-y-6 shadow-xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 h-40 w-40 rounded-full bg-primary-500 opacity-10 blur-2xl" />
                 <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-                  <span className="text-xs font-bold uppercase text-slate-500">Live Dashboard Preview</span>
+                  <span className="text-xs font-bold uppercase text-slate-500">Illustrative preview · Example data</span>
                   <Badge variant="phase2">Teacher role</Badge>
                 </div>
                 {/* 3 KPI Cards */}
@@ -634,7 +635,7 @@ export default function RedesignedLandingPage() {
               <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 text-white space-y-6 shadow-xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 h-40 w-40 rounded-full bg-primary-500 opacity-10 blur-2xl" />
                 <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-                  <span className="text-xs font-bold uppercase text-slate-500">Live Dashboard Preview</span>
+                  <span className="text-xs font-bold uppercase text-slate-500">Illustrative preview · Example data</span>
                   <Badge variant="phase2">Accountant role</Badge>
                 </div>
                 {/* 3 KPI Cards */}
@@ -648,7 +649,7 @@ export default function RedesignedLandingPage() {
                   <span className="text-[9px] font-bold text-slate-500 uppercase block tracking-wider">Fee Receipt Feed</span>
                   <div className="space-y-2">
                     <div className="flex justify-between items-center text-xs p-2 bg-slate-900 border border-slate-800/50 rounded-xl">
-                      <span className="font-semibold">Receipt #10425 (Aditya B.)</span>
+                      <span className="font-semibold">Example receipt #10425</span>
                       <span className="text-[10px] text-slate-300 font-bold">NPR 12,500</span>
                     </div>
                   </div>
@@ -660,8 +661,8 @@ export default function RedesignedLandingPage() {
             <TabsContent value="parent" className="grid lg:grid-cols-[1.1fr_0.9fr] gap-8 focus-visible:ring-0">
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <h3 className="text-2xl font-black text-slate-900">Parent Portal</h3>
-                  <p className="text-sm text-slate-500">Clean, mobile-optimized hub keeping guardians fully connected to student progress and dues.</p>
+                  <h3 className="text-2xl font-black text-slate-900">Parent Mobile Companion</h3>
+                  <p className="text-sm text-slate-500">A linked-child mobile view for enabled school records, notices, and alerts.</p>
                 </div>
                 
                 <div className="space-y-3">
@@ -669,7 +670,7 @@ export default function RedesignedLandingPage() {
                   <ul className="space-y-3">
                     <li className="flex items-center gap-3 text-sm text-slate-700 font-semibold bg-white p-3.5 border border-slate-100 rounded-2xl shadow-sm">
                       <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
-                      <span>Notices board & real-time message feeds</span>
+                      <span>School notices & personal alerts</span>
                     </li>
                     <li className="flex items-center gap-3 text-sm text-slate-700 font-semibold bg-white p-3.5 border border-slate-100 rounded-2xl shadow-sm">
                       <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
@@ -677,7 +678,7 @@ export default function RedesignedLandingPage() {
                     </li>
                     <li className="flex items-center gap-3 text-sm text-slate-700 font-semibold bg-white p-3.5 border border-slate-100 rounded-2xl shadow-sm">
                       <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
-                      <span>Online fee summary & transit fleet updates</span>
+                      <span>Fee summary & timestamped trip updates where enabled</span>
                     </li>
                   </ul>
                 </div>
@@ -686,14 +687,14 @@ export default function RedesignedLandingPage() {
               <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 text-white space-y-6 shadow-xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 h-40 w-40 rounded-full bg-primary-500 opacity-10 blur-2xl" />
                 <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-                  <span className="text-xs font-bold uppercase text-slate-500">Live Dashboard Preview</span>
+                  <span className="text-xs font-bold uppercase text-slate-500">Illustrative preview · Example data</span>
                   <Badge variant="phase2">Parent view</Badge>
                 </div>
                 {/* 3 KPI Cards */}
                 <div className="grid grid-cols-3 gap-3">
                   <MetricCard label="Attendance Rate" value={98.4} formatter={(val) => val.toFixed(1) + '%'} textColor="text-emerald-400" className="p-3 text-xs" />
                   <MetricCard label="Pending Fees" value="NPR 0" className="p-3 text-xs" />
-                  <MetricCard label="Active Buses" value={1} className="p-3 text-xs" />
+                  <MetricCard label="Latest Trip Update" value="Recorded" className="p-3 text-xs" />
                 </div>
                 {/* Mini Panel */}
                 <div className="bg-slate-950/40 border border-slate-800 p-4 rounded-2xl space-y-3">
@@ -736,7 +737,7 @@ export default function RedesignedLandingPage() {
               <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 text-white space-y-6 shadow-xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 h-40 w-40 rounded-full bg-primary-500 opacity-10 blur-2xl" />
                 <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-                  <span className="text-xs font-bold uppercase text-slate-500">Live Dashboard Preview</span>
+                  <span className="text-xs font-bold uppercase text-slate-500">Illustrative preview · Example data</span>
                   <Badge variant="phase2">Operations role</Badge>
                 </div>
                 {/* 3 KPI Cards */}
@@ -747,10 +748,10 @@ export default function RedesignedLandingPage() {
                 </div>
                 {/* Mini Panel */}
                 <div className="bg-slate-950/40 border border-slate-800 p-4 rounded-2xl space-y-3">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase block tracking-wider">Transport Route Status</span>
+                  <span className="text-[9px] font-bold text-slate-500 uppercase block tracking-wider">Latest Transport Update</span>
                   <div className="flex justify-between items-center text-xs p-2 bg-slate-900 border border-slate-800/50 rounded-xl">
                     <span className="font-semibold">Bus Route 2 (Prithvi Chowk)</span>
-                    <span className="text-[9px] text-emerald-400 font-bold bg-emerald-950/40 border border-emerald-900/30 px-1.5 py-0.5 rounded uppercase font-bold">Transit</span>
+                    <span className="text-[9px] text-emerald-400 font-bold bg-emerald-950/40 border border-emerald-900/30 px-1.5 py-0.5 rounded uppercase font-bold">Recorded</span>
                   </div>
                 </div>
               </div>
@@ -811,7 +812,7 @@ export default function RedesignedLandingPage() {
             <MarketingSectionHeader
               tag="System Blueprint"
               title="One SchoolOS, four operating layers."
-              description="Our software structure is engineered to divide permissions and database entities into logical operational categories."
+              description="SchoolOS groups daily work into role-scoped operational areas with role-based access and module controls."
               dark
             />
           </BlurFade>
@@ -845,8 +846,8 @@ export default function RedesignedLandingPage() {
                     {layer.visual === 'activity' && (
                       <div className="bg-slate-900/60 border border-slate-800 p-3 rounded-2xl space-y-2">
                         <div className="flex items-center justify-between text-[10px]">
-                          <span className="text-slate-500 font-bold uppercase">System Uptime</span>
-                          <span className="text-emerald-400 font-bold">99.9%</span>
+                          <span className="text-slate-500 font-bold uppercase">Illustrative service state</span>
+                          <span className="text-emerald-400 font-bold">Available</span>
                         </div>
                         <div className="flex gap-1 h-3">
                           {Array.from({ length: 24 }).map((_, i) => (
@@ -859,7 +860,7 @@ export default function RedesignedLandingPage() {
                     {layer.visual === 'progress' && (
                       <div className="bg-slate-900/60 border border-slate-800 p-3.5 rounded-2xl space-y-2">
                         <div className="flex justify-between items-center text-[10px]">
-                          <span className="text-slate-500 font-bold uppercase">Fee billing collection progress</span>
+                          <span className="text-slate-500 font-bold uppercase">Example collection view</span>
                           <span className="text-primary-400 font-bold">81.4%</span>
                         </div>
                         <Progress value={81.4} className="h-2 bg-slate-800" />
@@ -896,7 +897,7 @@ export default function RedesignedLandingPage() {
           <MarketingSectionHeader
             tag="Integrated Capabilities"
             title="Modules built around real school workflows."
-            description="Each workspace can selectively toggle features, keeping interfaces simple for staff members who only handle core actions."
+            description="Enabled modules are selected during guided onboarding and remain permission- and entitlement-gated for each role."
           />
         </BlurFade>
 
@@ -915,7 +916,7 @@ export default function RedesignedLandingPage() {
                     ? 'info'
                     : m.tag === 'Operations'
                     ? 'neutral'
-                    : m.tag === 'Portal'
+                    : m.tag === 'Companion'
                     ? 'success'
                     : 'default'
                 }
@@ -932,7 +933,7 @@ export default function RedesignedLandingPage() {
             <MarketingSectionHeader
               tag="Local Integration"
               title="Designed for Nepal-school operations."
-              description="SchoolOS maps specifically to regional constraints, fee schemas, address contexts, and standard reporting structures."
+              description="SchoolOS supports Nepal school context, NPR records, BS-date presentation, and Grade 1–12 operational workflows."
             />
           </BlurFade>
 
@@ -959,7 +960,7 @@ export default function RedesignedLandingPage() {
             <MarketingSectionHeader
               tag="Key Distinctions"
               title="What makes SchoolOS different?"
-              description="Unlike legacy local databases or unverified software systems, our architecture is optimized for institutional data protection and financial integrity."
+              description="SchoolOS connects role-scoped operations, protected records, controlled finance workflows, and audit evidence in one system."
             />
           </BlurFade>
 
@@ -982,8 +983,8 @@ export default function RedesignedLandingPage() {
           <BlurFade delay={0.1}>
             <MarketingSectionHeader
               tag="Deployment Roadmap"
-              title="From demo to pilot launch."
-              description="We guide your team through each step of the rollout, handling data imports and role mapping."
+              title="From demo to controlled-pilot planning."
+              description="We review setup, data-import needs, role mapping, and required readiness checks before agreeing a pilot scope."
             />
           </BlurFade>
 
@@ -1023,9 +1024,9 @@ export default function RedesignedLandingPage() {
         <div className="max-w-6xl mx-auto space-y-16">
           <BlurFade delay={0.1}>
             <MarketingSectionHeader
-              tag="Licensing Structures"
-              title="Flexible plans for different school sizes."
-              description="Workspaces are licensed annually according to active student count and enabled operational layers."
+              tag="Guided Scope"
+              title="Configure the right operational scope."
+              description="Module availability is confirmed during onboarding and depends on entitlements, permissions, and release readiness."
               dark
             />
           </BlurFade>
@@ -1063,7 +1064,7 @@ export default function RedesignedLandingPage() {
                           : 'bg-slate-800 text-white hover:bg-slate-700'
                       }`}
                     >
-                      Request Pricing
+                      Discuss this scope
                     </Link>
                   </div>
                 </div>
@@ -1082,7 +1083,7 @@ export default function RedesignedLandingPage() {
               Built with school data boundaries in mind.
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
-              SchoolOS is designed around strict isolation limits, supports secure staff authentication, and is prepared for private file encryptions to protect academic and accounting operations.
+              SchoolOS uses tenant-scoped access controls, role-aware staff authentication, and protected-file paths for school records.
             </p>
           </BlurFade>
           
@@ -1109,7 +1110,7 @@ export default function RedesignedLandingPage() {
             Ready to bring SchoolOS to your school?
           </h2>
           <p className="text-sm text-slate-500 max-w-lg mx-auto">
-            Request a demo and the SchoolOS team will help you plan a verified pilot workspace.
+            Request a demo and the SchoolOS team will help assess fit, setup needs, and the checks required before a controlled pilot.
           </p>
           <div className="flex flex-wrap justify-center gap-4 pt-2">
             <Link
@@ -1134,15 +1135,13 @@ export default function RedesignedLandingPage() {
           <div className="flex items-center gap-2">
             <span className="flex h-6 w-6 items-center justify-center rounded bg-primary-500 text-[10px] font-black text-white">S</span>
             <span className="font-bold text-white">SchoolOS</span>
-            <span className="text-slate-650 font-medium">· School ERP for Nepal</span>
+            <span className="text-slate-650 font-medium">· School operating system for Nepal</span>
           </div>
           <div className="flex flex-wrap items-center gap-6 font-semibold">
             <a href="#product" className="hover:text-white transition-colors">Product</a>
             <a href="#modules" className="hover:text-white transition-colors">Modules</a>
             <Link href="/request-demo" className="hover:text-white transition-colors">Request Demo</Link>
             <Link href="/login" className="hover:text-white transition-colors">Login</Link>
-            <a href="#" className="hover:text-white transition-colors">Privacy</a>
-            <a href="#" className="hover:text-white transition-colors">Terms</a>
             <a href="mailto:support@schoolos.com.np" className="hover:text-white transition-colors">Contact</a>
           </div>
         </div>

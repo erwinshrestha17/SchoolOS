@@ -8,8 +8,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BS_MONTH_NAMES_EN,
   formatBsDateTime,
-  getNepalNow,
-  toBsDateFromGregorian,
+  getNepalSchoolDay,
+  shiftGregorianDateOnly,
   ATTENDANCE_SESSION_STATE_LABELS,
   type AttendanceCorrectionRequest,
   type AttendanceSessionState,
@@ -132,11 +132,8 @@ const correctionColumns: PaginatedDataTableColumn<AttendanceCorrectionRequest>[]
     },
   ];
 
-const nepalNow = getNepalNow();
-const today = `${nepalNow.year}-${String(nepalNow.month).padStart(2, "0")}-${String(nepalNow.day).padStart(2, "0")}`;
-const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-  .toISOString()
-  .slice(0, 10);
+const today = getNepalSchoolDay().gregorianDate;
+const thirtyDaysAgo = shiftGregorianDateOnly(today, -30);
 
 const attendanceTabs = [
   { href: "/dashboard/attendance", label: "Overview", icon: BarChart3 },
@@ -280,7 +277,7 @@ export function AttendanceOverviewWorkspace() {
       <div className="space-y-6">
         <WorkSurface
           title="Class Attendance Status"
-          description="Latest class sessions from the attendance analytics API."
+          description="Latest class sessions from the attendance overview."
           variant="monitoring"
         >
           {analyticsQuery.isLoading ? (
@@ -389,7 +386,7 @@ export function AttendanceSessionUnavailableWorkspace({
       <ModuleHeader
         eyebrow="Smart Attendance"
         title="Class Session Attendance"
-        description="Period/session attendance is not enabled until a tenant-safe timetable-period attendance contract exists."
+        description="Period and session attendance are not available for this school yet."
       />
       <ModuleTabs
         items={attendanceTabs}
@@ -397,8 +394,8 @@ export function AttendanceSessionUnavailableWorkspace({
         variant="light"
       />
       <EmptyState
-        title="Period session contract unavailable"
-        description={`Session ${sessionId} cannot be opened because the current backend persists daily class attendance only. No QR, biometric, or period authority is inferred in the browser.`}
+        title="Period session attendance unavailable"
+        description={`Session ${sessionId} cannot be opened because SchoolOS currently supports daily class attendance here. QR, biometric, and period attendance are not enabled.`}
         icon={<ShieldAlert size={32} />}
         action={
           <Link
@@ -423,7 +420,7 @@ export function AttendanceRegisterWorkspace({
   const [academicYearId, setAcademicYearId] = useState("");
   const [classId, setClassId] = useState("");
   const [sectionId, setSectionId] = useState("");
-  const [currentBsDate] = useState(() => toBsDateFromGregorian(new Date()));
+  const [currentBsDate] = useState(() => getNepalSchoolDay().bsDate);
   const [bsMonth, setBsMonth] = useState(currentBsDate.month);
   const [bsYear, setBsYear] = useState(currentBsDate.year);
   const [exportMessage, setExportMessage] = useState("");
@@ -553,7 +550,7 @@ export function AttendanceRegisterWorkspace({
       format,
     );
     setExportMessage(
-      `${format.toUpperCase()} export prepared by the attendance backend.`,
+      `${format.toUpperCase()} attendance export prepared.`,
     );
   }
 
@@ -614,7 +611,7 @@ export function AttendanceRegisterWorkspace({
             value="Policy gated"
             icon={<LockKeyhole size={20} />}
             tone="neutral"
-            description="Lock policy comes from backend session state."
+            description="Lock policy follows the saved attendance session."
           />
           <KpiCard
             title="Average attendance"
@@ -696,7 +693,7 @@ export function AttendanceRegisterWorkspace({
       ) : (
         <EmptyState
           title="Select a class"
-          description="Choose an academic year and class to load the backend BS monthly register."
+          description="Choose an academic year and class to load the official BS monthly register."
           icon={<FileText size={32} />}
         />
       )}
@@ -767,7 +764,7 @@ export function AttendanceCorrectionsQueueWorkspace() {
       {showAuditLog ? (
         <SectionCard
           title="Correction Audit Log"
-          description="Reviewed correction requests from the backend audit trail for the last 30 days."
+          description="Reviewed correction requests from the audit trail for the last 30 days."
           headerAction={
             <Badge variant="info">{auditQuery.data?.total ?? 0} rows</Badge>
           }
@@ -868,7 +865,7 @@ export function AttendanceCorrectionsQueueWorkspace() {
               ? "Reviewed Corrections"
               : "Escalated Corrections"
           }
-          description="Server-paginated correction requests scoped by tenant and backend permissions."
+          description="Correction requests available to your role and school."
           headerAction={
             <Badge variant="neutral">
               {correctionsQuery.data?.total ?? 0} requests
@@ -1378,7 +1375,7 @@ export function AttendanceAnomaliesWorkspace() {
     <DashboardPageShell>
       <ModuleHeader
         title="Anomaly Triage"
-        description="Triage backend-detected attendance anomalies without storing fake browser-only resolution state."
+        description="Review detected attendance anomalies and prioritize follow-up."
       />
       <ModuleTabs
         items={attendanceTabs}
@@ -1395,7 +1392,7 @@ export function AttendanceAnomaliesWorkspace() {
       ) : (
         <SectionCard
           title="Anomaly Queue"
-          description="Persisted triage is unavailable until backend triage records are added; actions remain read-only."
+          description="Resolution actions are not available yet, so this queue remains read-only."
         >
           <Table>
             <TableHeader>
@@ -1475,7 +1472,7 @@ export function AttendanceFollowUpsWorkspace() {
     <DashboardPageShell>
       <ModuleHeader
         title="Attendance Follow-ups"
-        description="Repeated absence and late follow-up queue from backend attendance policy."
+        description="Repeated absence and late follow-up queue based on the school attendance policy."
       />
       <ModuleTabs
         items={attendanceTabs}
@@ -1491,9 +1488,8 @@ export function AttendanceFollowUpsWorkspace() {
         </SectionCard>
         <SectionCard title="Dispatch Controls">
           <Notice tone="warning">
-            Provider mode, guardian consent, quiet hours, disabled providers,
-            retry, and duplicate suppression are backend-owned through M10
-            delivery records.
+            Delivery follows provider settings, guardian consent, quiet hours,
+            retry rules, and duplicate protection managed by M12.
           </Notice>
           <label className="mt-4 block text-xs font-black uppercase tracking-wide text-slate-500">
             Operational reason
@@ -1545,7 +1541,7 @@ export function AttendanceStudentProfileWorkspace({
     <DashboardPageShell>
       <ModuleHeader
         title="Student Attendance Profile"
-        description="Attendance-focused student profile with backend-scoped history and parent/teacher access enforcement."
+        description="Attendance-focused student profile with history limited to the current role and school."
       />
       <KpiGrid className="sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
@@ -1691,7 +1687,7 @@ export function AttendanceReportsWorkspace() {
           <TrendPanel analytics={analytics} />
           <SectionCard
             title="Report Results"
-            description="Server-side analytics result rows. Official PDF/CSV snapshots are retained by the attendance backend and protected through File Registry."
+            description="Official analytics results. PDF and CSV snapshots are retained as protected files."
           >
             <Table>
               <TableHeader>
@@ -1733,7 +1729,7 @@ export function AttendanceReportsWorkspace() {
             ) : exportHistoryQuery.isError ? (
               <ErrorState
                 title="Retained exports could not load"
-                message="Attendance export history remains unavailable until the backend responds."
+                message="Attendance export history is currently unavailable."
                 onRetry={() => void exportHistoryQuery.refetch()}
               />
             ) : retainedExports.length === 0 ? (
@@ -1842,7 +1838,7 @@ export function AttendanceSettingsWorkspace() {
     <DashboardPageShell>
       <SchoolSettingsPageHeader
         title="Attendance"
-        description="Configure attendance rules, lock windows, calendar policy, notifications, and role summaries from backend policy APIs."
+        description="Configure attendance rules, lock windows, calendar policy, notifications, and role summaries."
         access={canManage ? "can-manage" : "view-only"}
         actions={
           lateThreshold && canManage ? (
@@ -1910,7 +1906,7 @@ export function AttendanceSettingsWorkspace() {
                   "Override reason",
                   `${policy?.lockOverrideMinReasonLength ?? "--"} chars minimum`,
                 ],
-                ["Historical locked dates", "Backend session lockAt"],
+                ["Historical locked dates", "Recorded session lock time"],
               ]}
             />
           </SectionCard>
@@ -1957,7 +1953,7 @@ export function AttendanceSettingsWorkspace() {
               ],
               [
                 "Audit history",
-                "Policy updates recorded by backend audit service",
+                "Policy updates retained in the audit history",
               ],
               [
                 "Device configuration",
@@ -1979,7 +1975,7 @@ function MonthlyMatrix({ register }: { register: AttendanceMonthlyRegister }) {
   return (
     <SectionCard
       title={`${register.className}${register.sectionName ? ` / ${register.sectionName}` : ""}`}
-      description={`${register.periodLabel} · Compact monthly matrix from backend register data.`}
+      description={`${register.periodLabel} · Compact monthly matrix from the official register.`}
       noPadding
       className="attendance-register-print"
     >
@@ -2202,7 +2198,7 @@ function ActivityPanel({
           <p className="text-sm font-bold text-slate-900">
             {correctionsTotal} correction requests pending
           </p>
-          <p className="text-xs text-slate-500">From correction queue API</p>
+          <p className="text-xs text-slate-500">From the correction queue</p>
         </div>
       </div>
     </SectionCard>

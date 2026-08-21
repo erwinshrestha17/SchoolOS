@@ -74,7 +74,7 @@ export function AuditLogWorkspace({
     <div className="space-y-6 p-6 pb-24">
       <SchoolSettingsPageHeader
         title={includeExportDirectory ? 'Audit log & data export' : 'Audit log'}
-        description="Review tenant-scoped, backend-recorded configuration and sensitive operational activity. Private payloads are intentionally not exposed here."
+        description="Review school-scoped configuration and sensitive operational activity. Private payloads are intentionally not exposed here."
         access="view-only"
       />
       <SettingsPermissionNotice
@@ -85,7 +85,7 @@ export function AuditLogWorkspace({
         <div className="flex gap-3">
           <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
           <div>
-            <p className="font-bold">Audit trail is backend-authoritative</p>
+            <p className="font-bold">Audit trail records are authoritative</p>
             <p className="mt-1 leading-6">
               Each row is scoped to this school. The log shows safe actor,
               action, resource, and time metadata only—not raw request payloads,
@@ -100,11 +100,10 @@ export function AuditLogWorkspace({
             <div>
               <h2 className="font-bold text-slate-950">Protected exports</h2>
               <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
-                Exports remain in their owning modules with permission,
-                queued-job, and File Registry controls. A consolidated
-                export-history API is not currently confirmed.
+                Exports remain in their owning modules with permission and
+                protected-file controls. Use the export directory to find the
+                available export workflows.
               </p>
-              <p className="sr-only">needs API contract</p>
             </div>
             <Link
               href="/dashboard/settings/data-operations"

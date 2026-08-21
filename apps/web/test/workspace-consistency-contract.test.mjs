@@ -42,6 +42,7 @@ const routeSources = {
   hr: ["app/dashboard/hr/page.tsx"],
   payroll: ["app/dashboard/payroll/page.tsx"],
   library: [
+    "app/dashboard/library/layout.tsx",
     "app/dashboard/library/page.tsx",
     "components/library/library-workspace.tsx",
   ],
@@ -50,6 +51,7 @@ const routeSources = {
     "components/transport/transport-workspace.tsx",
   ],
   canteen: [
+    "app/dashboard/canteen/layout.tsx",
     "app/dashboard/canteen/page.tsx",
     "components/canteen/canteen-workspace.tsx",
   ],
@@ -200,7 +202,7 @@ describe("SchoolOS workspace consistency contract", () => {
       read("app/dashboard/activity/page.tsx"),
       read("app/dashboard/hr/page.tsx"),
       read("app/dashboard/payroll/page.tsx"),
-      read("app/dashboard/library/page.tsx"),
+      read("app/dashboard/library/layout.tsx"),
       read("app/dashboard/transport/layout.tsx"),
       read("app/dashboard/canteen/page.tsx"),
       read("app/dashboard/accounting/layout.tsx"),

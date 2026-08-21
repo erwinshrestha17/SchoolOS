@@ -293,7 +293,7 @@ export function NoticeListWorkspace({
         onRetry={() => void noticesQuery.refetch()}
         caption={
           <caption className="sr-only">
-            Server-paginated notices. Total records:{" "}
+            Notices matching the current filters. Total records:{" "}
             {noticesQuery.data?.total ?? 0}.
           </caption>
         }

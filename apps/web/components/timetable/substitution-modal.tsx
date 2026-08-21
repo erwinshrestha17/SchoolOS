@@ -11,6 +11,7 @@ import { Select } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { StaffSelector } from '@/components/staff/staff-selector';
+import { getNepalSchoolDay } from '@schoolos/core';
 
 interface TimetableSubstitutionModalProps {
   isOpen: boolean;
@@ -33,7 +34,7 @@ export function TimetableSubstitutionModal({
   const [substituteTeacherId, setSubstituteTeacherId] = useState(substitution?.substituteTeacherId ?? '');
   const [selectedSlotId, setSelectedSlotId] = useState(slot?.id ?? '');
   const [reason, setReason] = useState(substitution?.reason ?? '');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(getNepalSchoolDay().gregorianDate);
   const [error, setError] = useState<string | null>(null);
   const selectedSlot = slot ?? slots.find((item) => item.id === selectedSlotId);
   const selectedSubjectName = selectedSlot?.subject?.name?.trim() || 'Subject not set';
@@ -145,6 +146,16 @@ export function TimetableSubstitutionModal({
             label="Substitute Teacher"
             value={substituteTeacherId}
             onChange={setSubstituteTeacherId}
+            selectedLabel={
+              substitution?.substituteTeacher
+                ? [
+                    substitution.substituteTeacher.firstName,
+                    substitution.substituteTeacher.lastName,
+                  ]
+                    .filter(Boolean)
+                    .join(' ')
+                : undefined
+            }
             placeholder="Select a replacement teacher"
           />
 

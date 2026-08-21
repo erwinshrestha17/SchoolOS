@@ -1,5 +1,5 @@
-import { CanteenWorkspace } from '../../../../components/canteen/canteen-workspace';
+import { redirect } from "next/navigation";
 
 export default function CanteenVendorsPage() {
-  return <CanteenWorkspace initialTab="inventory" />;
+  redirect("/dashboard/canteen/stock");
 }

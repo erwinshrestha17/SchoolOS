@@ -20,6 +20,8 @@ describe('M12 and M15 rendered web workspaces', () => {
       'app/dashboard/notices/deliveries/page.tsx',
       'app/dashboard/notices/failures/page.tsx',
       'app/dashboard/notifications/page.tsx',
+      'app/dashboard/notifications/deliveries/page.tsx',
+      'app/dashboard/notifications/failures/page.tsx',
       'app/dashboard/notifications/preferences/page.tsx',
     ]) {
       assert.equal(
@@ -28,6 +30,38 @@ describe('M12 and M15 rendered web workspaces', () => {
         `Missing route: ${path}`,
       );
     }
+  });
+
+  it('uses canonical M12 delivery routes while preserving M15 legacy redirects', () => {
+    const logs = read('app/dashboard/notifications/deliveries/page.tsx');
+    const failures = read('app/dashboard/notifications/failures/page.tsx');
+    const legacyLogs = read('app/dashboard/notices/deliveries/page.tsx');
+    const legacyFailures = read('app/dashboard/notices/failures/page.tsx');
+    const delivery = read(
+      'components/notifications/delivery-operations-workspace.tsx',
+    );
+
+    assert.match(logs, /DeliveryOperationsWorkspace/);
+    assert.match(failures, /DeliveryOperationsWorkspace/);
+    assert.match(legacyLogs, /redirectWithSearchParams/);
+    assert.match(legacyLogs, /\/dashboard\/notifications\/deliveries/);
+    assert.match(legacyFailures, /redirectWithSearchParams/);
+    assert.match(legacyFailures, /\/dashboard\/notifications\/failures/);
+    assert.doesNotMatch(delivery, /\/dashboard\/notices\/(deliveries|failures)/);
+  });
+
+  it('gates the notification shell by M12 entitlement and routes unread state to Notifications', () => {
+    const header = read('components/layout/header.tsx');
+    const sidebar = read('components/layout/sidebar.tsx');
+    const bell = read('components/layout/notification-bell.tsx');
+
+    assert.match(header, /hasModule\(["']notifications["']\)/);
+    assert.match(header, /notifications:view_own/);
+    assert.match(sidebar, /hasModule\(["']notifications["']\)/);
+    assert.match(sidebar, /item\.href === ['"]\/dashboard\/notifications['"]/);
+    assert.doesNotMatch(sidebar, /unreadNoticesBadge/);
+    assert.match(bell, /href=["']\/dashboard\/notifications["']/);
+    assert.match(bell, /View all notifications/);
   });
 
   it('serializes server pagination and filters without deriving official totals from page length', () => {

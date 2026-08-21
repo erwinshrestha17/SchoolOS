@@ -22,6 +22,8 @@ export const MODULE_HREF_PREFIXES: ReadonlyArray<{
   { prefix: "/dashboard/settings/academic-structure", module: "students" },
   { prefix: "/dashboard/settings/classes-sections", module: "students" },
   { prefix: "/dashboard/communications", module: "notices" },
+  { prefix: "/dashboard/notifications/deliveries", module: "notifications" },
+  { prefix: "/dashboard/notifications/failures", module: "notifications" },
   { prefix: "/dashboard/notices/deliveries", module: "notifications" },
   { prefix: "/dashboard/notices/failures", module: "notifications" },
   { prefix: "/dashboard/notifications", module: "notifications" },

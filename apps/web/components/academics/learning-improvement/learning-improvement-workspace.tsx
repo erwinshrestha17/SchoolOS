@@ -318,7 +318,7 @@ export function LearningImprovementWorkspace() {
         ) : (
           <>
             <FilterBar
-              description="Filters are applied by the server. Counts and progress summaries remain backend-owned."
+              description="Filters apply to the full set of records. Counts and progress summaries are official."
               searchSlot={
                 view === 'attention' ? (
                   <div className="relative">
@@ -1033,7 +1033,7 @@ function CurriculumView({
       ) : (
         <WorkSurface
           title="Curriculum progress"
-          description="Pace is derived by the backend from the filtered progress records."
+          description="Pace is derived from the filtered curriculum progress records."
           flush
         >
           <Table>

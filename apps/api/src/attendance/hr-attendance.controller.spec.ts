@@ -1,5 +1,9 @@
 import type { AuthContext } from '../auth/auth.types';
+import { PERMISSIONS_KEY } from '../auth/decorators/permissions.decorator';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 import { HrAttendanceController } from './hr-attendance.controller';
+import { ListStaffAttendanceRosterDto } from './dto/list-staff-attendance-roster.dto';
 
 const actor: AuthContext = {
   userId: 'admin-1',
@@ -13,6 +17,7 @@ const actor: AuthContext = {
 
 function createController() {
   const service = {
+    listStaffAttendanceRoster: jest.fn(),
     reviewLeaveRequest: jest.fn(),
   };
 
@@ -23,6 +28,42 @@ function createController() {
 }
 
 describe('HrAttendanceController leave decision routes', () => {
+  it('delegates the paginated attendance roster behind the HR attendance write permission', () => {
+    const { controller, service } = createController();
+    const query = { page: 2, limit: 25 };
+    service.listStaffAttendanceRoster.mockReturnValue({ items: [], total: 0 });
+
+    expect(controller.listStaffAttendanceRoster(query, actor)).toEqual({
+      items: [],
+      total: 0,
+    });
+    expect(service.listStaffAttendanceRoster).toHaveBeenCalledWith(
+      query,
+      actor,
+    );
+    expect(
+      Reflect.getMetadata(
+        PERMISSIONS_KEY,
+        HrAttendanceController.prototype.listStaffAttendanceRoster,
+      ),
+    ).toEqual(['hr:attendance:write']);
+  });
+
+  it('validates and caps staff attendance roster pagination', async () => {
+    const valid = plainToInstance(ListStaffAttendanceRosterDto, {
+      page: '2',
+      limit: '100',
+    });
+    expect(await validate(valid)).toHaveLength(0);
+    expect(valid).toEqual(expect.objectContaining({ page: 2, limit: 100 }));
+
+    const invalid = plainToInstance(ListStaffAttendanceRosterDto, {
+      page: 0,
+      limit: 101,
+    });
+    expect(await validate(invalid)).not.toHaveLength(0);
+  });
+
   it('approves a pending leave request for an empty body', () => {
     const { controller, service } = createController();
     service.reviewLeaveRequest.mockReturnValue({ status: 'APPROVED' });

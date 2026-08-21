@@ -367,8 +367,8 @@ export function ApplicationReviewWorkspace({
           {!canReview ? (
             <div className="mt-4 rounded-xl border border-warning-100 bg-warning-50 p-3 text-xs leading-5 text-warning-800">
               <strong className="block">Read-only review</strong>
-              You can view this case, but the backend requires the student
-              lifecycle permission for review decisions.
+              You can view this case, but student lifecycle permission is
+              required for review decisions.
             </div>
           ) : availableActions.length === 0 ? (
             <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-700">

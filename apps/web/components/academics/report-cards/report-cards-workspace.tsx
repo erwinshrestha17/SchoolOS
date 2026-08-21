@@ -100,7 +100,7 @@ export function ReportCardsWorkspace() {
       setMessage(
         data.queued
           ? `Report-card generation queued as job ${data.jobId ?? 'pending'}. Refresh after the background job completes.`
-          : `${data.generated} report cards generated from locked backend marks.`,
+          : `${data.generated} report cards generated from locked marks.`,
       );
       setError(null);
       setGenerationStudentIds(null);
@@ -516,7 +516,7 @@ export function ReportCardsWorkspace() {
       <ConfirmDialog
         isOpen={Boolean(generationStudentIds)}
         title="Confirm locked report-card generation"
-        description={`Generate report cards for ${generationStudentIds?.length ?? 0} students from locked backend marks. This keeps prior generated artifacts auditable and refreshes this screen after completion.`}
+        description={`Generate report cards for ${generationStudentIds?.length ?? 0} students from locked marks. This keeps prior generated files auditable and refreshes this screen after completion.`}
         confirmLabel="Generate report cards"
         isConfirming={generateMutation.isPending}
         onClose={() => setGenerationStudentIds(null)}

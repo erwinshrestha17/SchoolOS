@@ -13,6 +13,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { useSession } from '../../../../components/session-provider';
+import { getNepalNow } from '@schoolos/core';
 import { PermissionDenied } from '../../../../components/ui/permission-denied';
 import { api } from '../../../../lib/api';
 import { cn } from '../../../../lib/utils';
@@ -100,7 +101,7 @@ const moneyFormatter = new Intl.NumberFormat('en-NP', {
 
 export default function PayrollReportsPage() {
   const { status, hasPermissions } = useSession();
-  const currentYear = new Date().getFullYear();
+  const currentYear = getNepalNow().year;
   const [filters, setFilters] = useState<PayrollReportFilters>({
     year: currentYear,
   });
@@ -190,7 +191,7 @@ export default function PayrollReportsPage() {
   const reportCards = [
     {
       title: 'Payroll Register',
-      description: 'Backend line-item payroll register for the selected period or run.',
+      description: 'Official line-item payroll register for the selected period or run.',
       icon: FileSpreadsheet,
       value: formatMoney(summaryQuery.data?.netPayable ?? 0),
       meta: `${summaryQuery.data?.staffCount ?? 0} staff lines`,
@@ -199,7 +200,7 @@ export default function PayrollReportsPage() {
     },
     {
       title: 'TDS Summary',
-      description: 'Backend-calculated Tax Deducted at Source summary.',
+      description: 'Official Tax Deducted at Source summary.',
       icon: ShieldCheck,
       value: formatMoney(tdsQuery.data?.totalTds ?? 0),
       meta: `${tdsQuery.data?.staffCount ?? 0} contributors`,
@@ -217,7 +218,7 @@ export default function PayrollReportsPage() {
     },
     {
       title: 'Leave Deductions',
-      description: 'Unpaid leave impact from backend payroll lines.',
+      description: 'Unpaid leave impact from the selected payroll lines.',
       icon: Wallet,
       value: formatMoney(leaveQuery.data?.leaveDeductions ?? 0),
       meta: `${leaveQuery.data?.unpaidDays ?? 0} unpaid days`,
@@ -246,7 +247,7 @@ export default function PayrollReportsPage() {
           <div>
             <h2 className="text-lg font-bold text-slate-900">Payroll Reports</h2>
             <p className="text-sm text-slate-500">
-              Totals come from payroll backend reports. Posted accounting remains controlled by M11.
+              Totals come from official payroll reports. Posted accounting remains controlled by M11.
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -362,7 +363,7 @@ export default function PayrollReportsPage() {
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-2 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="text-lg font-bold text-slate-900">Backend Totals</h3>
+            <h3 className="text-lg font-bold text-slate-900">Official Totals</h3>
             <p className="text-sm text-slate-500">
               Salary, deduction, PF, TDS, and net pay totals for the selected filters.
             </p>
@@ -401,7 +402,7 @@ export default function PayrollReportsPage() {
               </div>
               <div className="flex items-center gap-2 rounded-xl border border-[var(--color-mod-hr-border)] bg-white px-4 py-2 text-sm font-bold">
                 <BarChart3 size={18} className="text-[var(--color-mod-hr-text)]" />
-                Backend report totals
+                Official report totals
               </div>
             </div>
           </div>

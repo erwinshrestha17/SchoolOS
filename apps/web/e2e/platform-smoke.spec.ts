@@ -82,14 +82,16 @@ test.describe('Platform Control Plane Smoke Tests', () => {
     // Find Trial Academy and open details
     await page.click('text=Trial Academy');
     await expect(page).toHaveURL(/.*platform\/schools\/.*/);
+
+    await page.getByRole('link', { name: 'Access' }).click();
     
     // Click Suspend
-    await page.click('button:has-text("Suspend School")');
+    await page.getByRole('button', { name: /Suspend school/i }).click();
     
     // Verify Dialog and Audit Reason Requirement
-    await expect(page.locator('text=Audit Reason')).toBeVisible();
+    await expect(page.getByText(/Audit reason/i).first()).toBeVisible();
     
-    const confirmBtn = page.locator('button:has-text("Confirm Status Change")');
+    const confirmBtn = page.getByRole('button', { name: /Confirm status change/i });
     await expect(confirmBtn).toBeDisabled();
     
     // Fill reason
@@ -106,8 +108,8 @@ test.describe('Platform Control Plane Smoke Tests', () => {
     await page.goto('/platform/schools');
     await page.click('text=Trial Academy');
     
-    // Go to Billing tab
-    await page.click('button:has-text("SaaS Billing")');
+    await page.getByRole('link', { name: 'SaaS Billing' }).click();
+    await expect(page).toHaveURL(/.*platform\/schools\/.*\/billing/);
     
     // Check for invoice presence (from our seed)
     await expect(page.locator('text=SO-2024').first()).toBeVisible();
@@ -118,8 +120,9 @@ test.describe('Platform Control Plane Smoke Tests', () => {
     await page.goto('/platform/schools');
     await page.click('text=Trial Academy');
 
-    await expect(page.getByRole('button', { name: 'Change Plan' })).toBeVisible();
-    await page.getByRole('button', { name: 'Change Plan' }).click();
+    await page.getByRole('link', { name: 'Subscription' }).click();
+    await expect(page.getByRole('button', { name: /Change plan/i })).toBeVisible();
+    await page.getByRole('button', { name: /Change plan/i }).click();
 
     await expect(page).toHaveURL(/.*platform\/schools\/.*\/change-plan/);
     await expect(page.getByRole('heading', { level: 1 }).last()).toContainText('Change Subscription Plan');
@@ -127,7 +130,7 @@ test.describe('Platform Control Plane Smoke Tests', () => {
     await expect(page.getByText('Audit reason')).toBeVisible();
     await expect(page.getByText(/SchoolOS subscription billing only/i)).toBeVisible();
 
-    const submit = page.getByRole('button', { name: 'Change Plan' });
+    const submit = page.getByRole('button', { name: /Change plan/i });
     await expect(submit).toBeDisabled();
     await page.getByPlaceholder(/School upgraded/i).fill('Pilot upgrade approved');
     await expect(submit).toBeEnabled();
@@ -137,26 +140,26 @@ test.describe('Platform Control Plane Smoke Tests', () => {
     await page.goto('/platform/schools');
     await page.click('text=Trial Academy');
 
+    await page.getByRole('link', { name: 'Access' }).click();
     await page.getByTestId('support-mode-button').click();
-    await expect(page.getByRole('heading', { name: 'Enter Support Mode' })).toBeVisible();
-    const supportSubmit = page.getByRole('button', { name: 'Enter Support Mode' }).last();
+    await expect(page.getByRole('heading', { name: /Enter support mode/i })).toBeVisible();
+    const supportSubmit = page.getByRole('button', { name: /Enter support mode/i }).last();
     await expect(supportSubmit).toBeDisabled();
     await page.getByPlaceholder(/support case/i).fill('Support ticket verification');
     await expect(supportSubmit).toBeEnabled();
     await page.getByRole('button', { name: 'Cancel', exact: true }).first().click();
 
-    await page.click('button:has-text("SaaS Billing")');
+    await page.getByRole('link', { name: 'SaaS Billing' }).click();
     await page.getByTestId('new-saas-invoice-button').click();
-    await expect(page.getByRole('heading', { name: 'Create SchoolOS Subscription Invoice' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Create SchoolOS subscription invoice/i })).toBeVisible();
     await page.getByRole('button', { name: 'Cancel', exact: true }).first().click();
 
     await page.getByTestId('billing-profile-edit-button').click();
-    await expect(page.getByRole('heading', { name: 'Edit Billing Profile' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Edit billing profile/i })).toBeVisible();
     await page.getByRole('button', { name: 'Cancel', exact: true }).first().click();
 
-    await page.click('button:has-text("Overview")');
-    await page.getByTestId('onboarding-checklist-button').click();
-    await expect(page.getByRole('heading', { name: 'Onboarding Checklist' })).toBeVisible();
+    await page.getByRole('link', { name: 'Onboarding' }).click();
+    await expect(page.getByRole('heading', { name: 'Onboarding' })).toBeVisible();
   });
 
   test('Platform settings deep links and operator dialogs render', async ({ page }) => {
@@ -185,19 +188,18 @@ test.describe('Platform Control Plane Smoke Tests', () => {
     await page.goto('/platform/schools');
     await page.click('text=Trial Academy');
     
-    // Go to Entitlements tab
-    await page.click('button:has-text("Entitlements")');
+    await page.getByRole('link', { name: 'Modules' }).click();
     
     // Find a feature and toggle it
-    const transportToggle = page.getByText(/^transport$/i).locator('xpath=../..').getByRole('button');
+    const transportToggle = page.getByText(/M9 Transport/i).locator('xpath=../..').getByRole('button');
     const initialState = await transportToggle.innerText();
     
     await transportToggle.click();
     
     // Should see override dialog
-    await expect(page.locator('text=Confirm Feature Override')).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Confirm module override/i })).toBeVisible();
     await page.fill('textarea', 'Pilot program activation');
-    await page.click('button:has-text("Confirm Override")');
+    await page.getByRole('button', { name: /Confirm override/i }).click();
     
     // State should change
     const newState = await transportToggle.innerText();
@@ -221,4 +223,3 @@ test.describe('Platform Control Plane Smoke Tests', () => {
     await expect(page.locator('text=Sensitive data in payloads is masked')).toBeVisible();
   });
 });
-

@@ -2,7 +2,7 @@ import type {
   PayrollLineSummary,
   PayrollMoneyAmount,
   SalaryStructureSummary,
-} from './payroll.js';
+} from "./payroll.js";
 
 export type StaffSummary = {
   id: string;
@@ -26,6 +26,29 @@ export type StaffSummary = {
     userRoles: Array<{ role: { name: string } }>;
   };
   staffContracts?: StaffContractSummary[];
+};
+
+export type StaffLookupOption = {
+  id: string;
+  employeeId: string;
+  staffCode: string | null;
+  fullName: string;
+  department: string | null;
+  designation: string | null;
+};
+
+export type StaffAttendanceRosterItem = {
+  staffId: string;
+  employeeId: string;
+  fullName: string;
+};
+
+export type StaffAttendanceRosterPage = {
+  items: StaffAttendanceRosterItem[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
 };
 
 export type StaffDetail = StaffSummary & {

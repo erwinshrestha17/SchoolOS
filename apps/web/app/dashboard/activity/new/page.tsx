@@ -14,6 +14,7 @@ import { EmptyState } from '../../../../components/ui/empty-state';
 import { LoadingState } from '../../../../components/ui/loading-state';
 import { FormField, Input, Select, TextArea } from '../../../../components/ui/form-field';
 import type { ActivityAudiencePreview } from '../../../../lib/api/activity';
+import { getNepalSchoolDay } from '@schoolos/core';
 
 const activityCategories = [
   'CLASSROOM_LEARNING',
@@ -79,12 +80,6 @@ function newClientSubmissionId() {
   return `csid-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function todayIsoDate() {
-  const now = new Date();
-  const offsetMs = now.getTimezoneOffset() * 60 * 1000;
-  return new Date(now.getTime() - offsetMs).toISOString().slice(0, 10);
-}
-
 export default function ActivityComposerPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -95,7 +90,7 @@ export default function ActivityComposerPage() {
     title: '',
     caption: '',
     askAtHome: '',
-    activityDate: todayIsoDate(),
+    activityDate: getNepalSchoolDay().gregorianDate,
     parentVisible: true,
     language: 'ENGLISH',
     category: 'CLASSROOM_LEARNING',

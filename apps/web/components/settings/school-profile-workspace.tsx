@@ -259,11 +259,10 @@ export function SchoolProfileWorkspace() {
         </p>
         <p className="mt-1 leading-6">
           Short name, language preference, office hours, offered school levels,
-          and expanded principal or owner details need a tenant-scoped backend
-          contract before they can be saved here. Timezone remains fixed to
-          Asia/Kathmandu by the current SchoolOS Nepal operating standard.
+          and expanded principal or owner details are read-only here until
+          editing is supported. Timezone remains fixed to Asia/Kathmandu by the
+          current SchoolOS Nepal operating standard.
         </p>
-        <p className="sr-only">needs API contract</p>
       </section>
       <p className="text-xs text-slate-500">
         Last updated:{' '}

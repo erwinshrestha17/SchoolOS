@@ -8,7 +8,6 @@ import {
   type AcademicYearSummary,
   type ClassSummary,
   type SectionSummary,
-  type StaffSummary,
   type SubjectSummary,
   type TimetableSlotSummary,
   type TimetableValidationResult,
@@ -34,13 +33,13 @@ import {
   Zap,
   Clock,
 } from "lucide-react";
+import { RemoteStaffSelector } from "../../staff/remote-staff-selector";
 
 type Props = {
   academicYears: AcademicYearSummary[];
   classes: ClassSummary[];
   allSections: SectionSummary[];
   subjects: SubjectSummary[];
-  staff: StaffSummary[];
   timetable: TimetableSlotSummary[];
   isLoadingTimetable: boolean;
   classId: string;
@@ -85,7 +84,6 @@ export function TimetableBuilderTab({
   classes,
   allSections,
   subjects,
-  staff,
   timetable,
   isLoadingTimetable,
   classId,
@@ -249,7 +247,7 @@ export function TimetableBuilderTab({
     publish: {
       title: "Publish timetable version?",
       description:
-        "Publishing makes this timetable active for school operations. Backend validation remains the source of truth and will reject blocking conflicts.",
+        "Publishing makes this timetable active for school operations. Blocking conflicts will be checked again before publication.",
       confirmLabel: "Publish",
       variant: "default" as const,
     },
@@ -323,8 +321,8 @@ export function TimetableBuilderTab({
         <div className="space-y-6">
           <AuditInfo>
             Timetable conflicts, publish eligibility, and lock/archive rules are
-            validated by the backend. Frontend warnings are only a productivity
-            aid.
+            checked again when you save. On-screen warnings help you fix likely
+            conflicts earlier.
           </AuditInfo>
 
           {versionActionError && (
@@ -594,21 +592,14 @@ export function TimetableBuilderTab({
                   </Select>
                 </FormField>
 
-                <FormField label="Teacher">
-                  <Select
-                    value={slot.staffId}
-                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                      setSlot((c) => ({ ...c, staffId: e.target.value }))
-                    }
-                  >
-                    <option value="">Select Staff</option>
-                    {staff.map((member) => (
-                      <option key={member.id} value={member.id}>
-                        {member.firstName} {member.lastName}
-                      </option>
-                    ))}
-                  </Select>
-                </FormField>
+                <RemoteStaffSelector
+                  label="Teacher"
+                  value={slot.staffId}
+                  onChange={(staffId) =>
+                    setSlot((current) => ({ ...current, staffId }))
+                  }
+                  placeholder="Search for a teacher"
+                />
 
                 <FormField label="Day of Week">
                   <Select

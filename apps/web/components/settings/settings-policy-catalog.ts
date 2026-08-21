@@ -46,7 +46,7 @@ export const SCHOOL_SETTINGS_POLICIES: SchoolSettingsPolicy[] = [
         key: 'grading_scale',
         label: 'Grading scale bands',
         description:
-          'JSON array of grade bands (grade, minPercentage, maxPercentage, gradePoint, label, passed). Backend validates sort order and failing band.',
+          'JSON array of grade bands (grade, minPercentage, maxPercentage, gradePoint, label, passed). SchoolOS validates the band order and failing band.',
         type: 'json',
         defaultValue: [
           { grade: 'A+', minPercentage: 90, maxPercentage: 100, gradePoint: 4, label: 'Outstanding', passed: true },
@@ -86,21 +86,15 @@ export const SCHOOL_SETTINGS_POLICIES: SchoolSettingsPolicy[] = [
     ],
   },
   {
-    id: 'communication', eyebrow: 'School communication', title: 'Communication rules', description: 'Configure controlled notice delivery, quiet hours, and parent-teacher chat boundaries.', navigationItemId: 'communication', operationalImpact: 'These rules control how Notices (M15) and Delivery (M12) reach families. Sending and tracking messages stays in the Notices workspace.', operationalLink: { href: '/dashboard/notices', label: 'Open Notices' }, fields: [
+    id: 'communication', eyebrow: 'School communication', title: 'Communication rules', description: 'Configure notice delivery defaults, family notifications, and quiet hours.', navigationItemId: 'communication', operationalImpact: 'These rules control how Notices (M15) publish school announcements and how Notifications (M12) deliver enabled updates to families. Notice authoring stays in Notices; personal inboxes and delivery status stay in Notifications.', operationalLink: { href: '/dashboard/notices', label: 'Open Notices' }, fields: [
       { key: 'default_notice_channel', label: 'Default notice channel', type: 'select', defaultValue: 'EMAIL', options: [{ label: 'Email', value: 'EMAIL' }, { label: 'SMS', value: 'SMS' }, { label: 'Mobile app push', value: 'APP' }] },
       { key: 'parent_notification_enabled', label: 'Enable parent notifications', type: 'checkbox', defaultValue: true },
       { key: 'quiet_hours_enabled', label: 'Enable quiet hours', type: 'checkbox' },
-      { key: 'chat_availability_enabled', label: 'Allow parent-teacher chat', type: 'checkbox', defaultValue: true },
-      { key: 'chat_sunday_to_thursday_start', label: 'Sunday–Thursday chat start', type: 'time', defaultValue: '16:00' },
-      { key: 'chat_sunday_to_thursday_end', label: 'Sunday–Thursday chat end', type: 'time', defaultValue: '19:00' },
-      { key: 'chat_friday_start', label: 'Friday chat start', type: 'time', defaultValue: '14:00' },
-      { key: 'chat_friday_end', label: 'Friday chat end', type: 'time', defaultValue: '17:00' },
-      { key: 'chat_saturday_enabled', label: 'Enable Saturday chat', type: 'checkbox' },
       { key: 'emergency_override_requires_admin', label: 'Require administrator approval for emergency broadcasts', type: 'checkbox', defaultValue: true },
     ],
   },
   {
-    id: 'activity-consent', eyebrow: 'Student activity', title: 'Activity, media & consent', description: 'Control whether student media requires recorded consent before it can be published to families.', navigationItemId: 'activity-consent', operationalImpact: 'When consent is required, Activity Feed (M5) blocks publishing student media without recorded consent. Post moderation stays in the Activity workspace. More granular activity and media policies need backend verification before they can be edited here.', operationalLink: { href: '/dashboard/activity', label: 'Open Activity' }, fields: [
+    id: 'activity-consent', eyebrow: 'Student activity', title: 'Activity, media & consent', description: 'Control whether student media requires recorded consent before it can be published to families.', navigationItemId: 'activity-consent', operationalImpact: 'When consent is required, Activity Feed (M5) blocks publishing student media without recorded consent. Post moderation stays in the Activity workspace. Additional media policies are not available on this screen.', operationalLink: { href: '/dashboard/activity', label: 'Open Activity' }, fields: [
       { key: 'consent_required_for_media', label: 'Require media consent', description: 'Block publishing student photos and videos without recorded consent.', type: 'checkbox', defaultValue: true },
     ],
   },

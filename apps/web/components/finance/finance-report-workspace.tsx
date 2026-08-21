@@ -139,8 +139,7 @@ export function FinanceReportWorkspace() {
               Report catalog
             </label>
             <p className="mt-1 text-xs text-slate-500">
-              Choose one permission-safe backend report. Filters and pagination
-              stay in the URL.
+              Choose a report available to your role. Filters and pagination stay in the URL.
             </p>
           </div>
           <select
@@ -203,7 +202,7 @@ function CollectionReportPanel() {
     return (
       <ErrorState
         title="Collections report could not load"
-        message="No totals were calculated in the browser. Retry the backend report."
+        message="Official totals are unavailable. Retry the report."
         onRetry={() => void reportQuery.refetch()}
       />
     );
@@ -227,7 +226,7 @@ function CollectionReportPanel() {
       <ReportPeriodFilter />
       <SectionCard
         title="Collections"
-        description={`Backend totals generated ${formatBsDateTime(report.generatedAt)}${report.period ? ` · ${formatBsDate(report.period.fromDate)} to ${formatBsDate(report.period.toDate)}` : " · All recorded time"}`}
+        description={`Official totals generated ${formatBsDateTime(report.generatedAt)}${report.period ? ` · ${formatBsDate(report.period.fromDate)} to ${formatBsDate(report.period.toDate)}` : " · All recorded time"}`}
       >
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {summaries.map(([label, value]) => (
@@ -279,7 +278,7 @@ function PaymentMethodReportPanel() {
     return (
       <ErrorState
         title="Payment-method report could not load"
-        message="Backend method totals are unavailable. No browser reconciliation was attempted."
+        message="Official payment-method totals are unavailable. No reconciliation was attempted."
         onRetry={() => void reportQuery.refetch()}
       />
     );
@@ -291,7 +290,7 @@ function PaymentMethodReportPanel() {
       <ReportPeriodFilter />
       <SectionCard
         title="Payment methods"
-        description={`Gross, refund, and net totals grouped by the backend · As of ${formatBsDateTime(reportQuery.data.generatedAt)}`}
+        description={`Gross, refund, and net totals by payment method · As of ${formatBsDateTime(reportQuery.data.generatedAt)}`}
         noPadding
       >
         {reportQuery.data.rows.length ? (
@@ -336,7 +335,7 @@ function PaymentMethodReportPanel() {
         ) : (
           <EmptyState
             title="No payment-method activity"
-            description="No successful payments or refunds matched this backend report period."
+            description="No successful payments or refunds matched this report period."
             className="m-5 min-h-52"
           />
         )}
@@ -365,7 +364,7 @@ function UnallocatedPaymentReportPanel() {
     return (
       <ErrorState
         title="Advance and unallocated payment report could not load"
-        message="No balance was recalculated in the browser. Retry the tenant-scoped backend report."
+        message="Official balances are unavailable. Retry the school-scoped report."
         onRetry={() => void reportQuery.refetch()}
       />
     );
@@ -477,7 +476,7 @@ function CashierCloseReportPanel() {
   return (
     <SectionCard
       title="Cashier closes"
-      description="Finalized immutable close records from the backend."
+      description="Finalized, immutable cashier-close records."
       noPadding
     >
       {reportQuery.data.items.length ? (
@@ -856,7 +855,7 @@ function AdjustmentReportPanel() {
       </div>
       <SectionCard
         title="Adjustments"
-        description="Refund and reversal requests with backend workflow status."
+        description="Refund and reversal requests with their current workflow status."
         noPadding
       >
         {reportQuery.data.items.length ? (
@@ -906,7 +905,7 @@ function AdjustmentReportPanel() {
             title={
               status ? "No results for this status" : "No adjustment requests"
             }
-            description="No backend adjustment requests matched the current filters."
+            description="No adjustment requests matched the current filters."
             className="m-5 min-h-52"
           />
         )}
@@ -1021,7 +1020,7 @@ function BreakdownTable({
       ) : (
         <EmptyState
           title="No breakdown available"
-          description="No backend rows matched the report period."
+          description="No records matched the report period."
           className="m-5 min-h-44"
         />
       )}

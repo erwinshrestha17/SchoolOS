@@ -245,7 +245,7 @@ export function AccountingDashboardView() {
             <div className="space-y-4">
               <AuditInfo>
                 Ledger records are immutable. All calculated balances are
-                verified against backend double-entry constraints.
+                verified against double-entry controls.
               </AuditInfo>
               <div className="grid gap-4 sm:grid-cols-2">
                 {[
@@ -339,7 +339,7 @@ export function AccountingDashboardView() {
               <PageState
                 tone="loading"
                 title="Loading journal entries"
-                description="Fetching recent ledger postings from the backend."
+                description="Fetching recent ledger postings."
               />
             ) : summaryQuery.isError ? (
               <PageState

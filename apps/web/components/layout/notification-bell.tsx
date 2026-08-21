@@ -232,11 +232,11 @@ export function NotificationBell({ enabled }: NotificationBellProps) {
 
           <div className="border-t border-gray-100 bg-gray-50 px-4 py-3">
             <Link
-              href="/dashboard/notices"
+              href="/dashboard/notifications"
               className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-[var(--primary-dark)] shadow-sm ring-1 ring-gray-200 transition hover:bg-[var(--primary-soft)] hover:text-[var(--primary)]"
               onClick={() => setOpen(false)}
             >
-              View notices and deliveries
+              View all notifications
               <ExternalLink size={13} />
             </Link>
           </div>

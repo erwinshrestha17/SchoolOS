@@ -193,7 +193,7 @@ export function DocumentRequestCenter() {
           tone={
             (summary?.totalMissingDocuments ?? 0) > 0 ? "warning" : "neutral"
           }
-          description="Backend-counted missing requirements in the current filter."
+          description="Missing requirements in the current filter."
         />
         <KpiCard
           title="Before Review"

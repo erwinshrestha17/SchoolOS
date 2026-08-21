@@ -3,6 +3,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import {
+  getNepalSchoolDay,
+  shiftGregorianDateOnly,
+  toNepalLocalDateTime,
+} from '@schoolos/core';
+import {
   CalendarDays,
   Clock,
   MapPin,
@@ -20,7 +25,10 @@ import { LoadingState } from '@/components/ui/loading-state';
 import { SectionCard } from '@/components/ui/section-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { WorkspaceTabs } from '@/components/ui/module-tabs';
-import { formatLabelledSchoolDate, formatSchoolDate } from '@/lib/date-utils';
+import {
+  formatLabelledSchoolDate,
+  formatSchoolDate,
+} from '@/lib/date-utils';
 import { cn } from '@/lib/utils';
 
 const DAY_LABELS = [
@@ -32,13 +40,6 @@ const DAY_LABELS = [
   'Friday',
   'Saturday',
 ];
-
-/** Local YYYY-MM-DD, so "today" matches the school day, not UTC. */
-function toLocalDateKey(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
-    date.getDate(),
-  ).padStart(2, '0')}`;
-}
 
 function toMinutes(timeOfDay: string): number {
   const [hours, minutes] = timeOfDay.split(':').map(Number);
@@ -61,16 +62,24 @@ function slotStatusTone(status: TeacherScheduleSlot['status']) {
  */
 export function TeacherScheduleWorkspace() {
   const [view, setView] = useState<'today' | 'week'>('today');
-  const today = useMemo(() => new Date(), []);
-  const todayKey = toLocalDateKey(today);
+  const currentInstant = useMemo(() => new Date(), []);
+  const schoolNow = useMemo(
+    () => toNepalLocalDateTime(currentInstant),
+    [currentInstant],
+  );
+  const todayKey = useMemo(
+    () => getNepalSchoolDay(currentInstant).gregorianDate,
+    [currentInstant],
+  );
 
   // The week always starts on Sunday, matching the Nepali school week and
   // TimetableSlot.dayOfWeek.
   const weekStart = useMemo(() => {
-    const start = new Date(today);
-    start.setDate(start.getDate() - start.getDay());
-    return toLocalDateKey(start);
-  }, [today]);
+    const weekday = new Date(
+      Date.UTC(schoolNow.year, schoolNow.month - 1, schoolNow.day),
+    ).getUTCDay();
+    return shiftGregorianDateOnly(todayKey, -weekday);
+  }, [schoolNow.day, schoolNow.month, schoolNow.year, todayKey]);
 
   const scheduleQuery = useQuery({
     queryKey: ['teacher-schedule', view, view === 'today' ? todayKey : weekStart],
@@ -81,7 +90,7 @@ export function TeacherScheduleWorkspace() {
     staleTime: 60_000,
   });
 
-  const nowMinutes = today.getHours() * 60 + today.getMinutes();
+  const nowMinutes = schoolNow.hour * 60 + schoolNow.minute;
   const noStaffProfile =
     scheduleQuery.error instanceof ApiRequestError &&
     scheduleQuery.error.statusCode === 403;

@@ -24,7 +24,8 @@ export type PlatformTenantUsage = {
 };
 
 export type PlatformTenantDetail = PlatformTenantSummary & {
-  usage: PlatformTenantUsage;
+  /** Present only when the platform actor can read tenant usage. */
+  usage?: PlatformTenantUsage;
   panNumber?: string | null;
   subscription?: PlatformTenantSubscriptionSummary | null;
   billingProfile?: PlatformBillingProfile | null;

@@ -195,6 +195,8 @@ export type HomeworkListParams = {
   mine?: boolean;
   status?: string;
   search?: string;
+  /** Nepal-local school business date in YYYY-MM-DD format. */
+  assignedDate?: string;
   dueFrom?: string;
   dueTo?: string;
   sortBy?: 'dueDate' | 'assignedDate' | 'createdAt' | 'title';

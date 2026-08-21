@@ -7,11 +7,11 @@ import {
   formatBsDateForInput,
   parseBsDateInput,
   toGregorianDateFromBs,
+  type StaffLookupOption,
 } from '@schoolos/core';
 import { Plus, Search } from 'lucide-react';
 import { useDeferredValue, useState } from 'react';
 import { Input } from '../ui/input';
-import { Select } from '../ui/select';
 import { FormField } from '../ui/form-field';
 import { useSession } from '../session-provider';
 import { BsDateField } from '../ui/bs-date-field';
@@ -19,6 +19,7 @@ import {
   PaginatedDataTable,
   type PaginatedDataTableColumn,
 } from '../schoolos/data/paginated-data-table';
+import { RemoteStaffSelector } from '../staff/remote-staff-selector';
 
 type StaffContractRow = Awaited<ReturnType<typeof api.listStaffContractsPage>>['items'][number];
 
@@ -61,11 +62,8 @@ export function ContractList() {
     deductions: 0,
   });
   const [formError, setFormError] = useState<string | null>(null);
-
-  const staffQuery = useQuery({
-    queryKey: ['staff'],
-    queryFn: api.listStaff,
-  });
+  const [selectedStaffOption, setSelectedStaffOption] =
+    useState<StaffLookupOption | null>(null);
 
   const createMutation = useMutation({
     mutationFn: (body: Parameters<typeof api.createStaffContract>[0]) => api.createStaffContract(body),
@@ -82,6 +80,7 @@ export function ContractList() {
         allowances: 0,
         deductions: 0,
       });
+      setSelectedStaffOption(null);
       setFormError(null);
     },
     onError: (error) => {
@@ -209,19 +208,16 @@ export function ContractList() {
             <h3 className="mb-6 text-xl font-black uppercase tracking-tight text-slate-900">Create Staff Contract</h3>
             
             <div className="grid gap-6">
-              <FormField label="Staff Member">
-                <Select
-                  value={newContract.staffId}
-                  onChange={(e) => setNewContract({ ...newContract, staffId: e.target.value })}
-                >
-                  <option value="">Select Staff...</option>
-                  {(staffQuery.data ?? []).map((staff) => (
-                    <option key={staff.id} value={staff.id}>
-                      {staff.firstName} {staff.lastName} ({staff.employeeId})
-                    </option>
-                  ))}
-                </Select>
-              </FormField>
+              <RemoteStaffSelector
+                value={newContract.staffId}
+                selectedOption={selectedStaffOption}
+                onChange={(staffId, option) => {
+                  setNewContract((current) => ({ ...current, staffId }));
+                  setSelectedStaffOption(option);
+                }}
+                label="Staff member"
+                placeholder="Search staff member"
+              />
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField label="Contract #">

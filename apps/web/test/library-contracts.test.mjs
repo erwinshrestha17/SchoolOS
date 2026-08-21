@@ -94,7 +94,7 @@ describe('Phase 3B Library frontend contracts', () => {
 
   it('builds Library UI sections with real API calls and production states', () => {
     const workspace = read('components/library/library-workspace.tsx');
-    const page = read('app/dashboard/library/page.tsx');
+    const page = read('app/dashboard/library/layout.tsx');
     const reservationsPage = read('app/dashboard/library/reservations/page.tsx');
 
     assert.match(page, /<ModuleHeader/);
@@ -133,8 +133,8 @@ describe('Phase 3B Library frontend contracts', () => {
     assert.match(workspace, /status: "ISSUED"/);
     assert.match(workspace, /activeLoansQuery\.data\?\.meta\.total/);
     assert.match(workspace, /reservationsQuery\.data\?\.meta\.total/);
-    assert.match(workspace, /needs summary API/);
-    assert.match(workspace, /Remaining Issues/);
+    assert.doesNotMatch(workspace, /needs summary API/);
+    assert.doesNotMatch(workspace, /Remaining Issues/);
     assert.match(workspace, /listPageSize/);
     assert.match(workspace, /page: String\(bookPage\)/);
     assert.match(workspace, /page: String\(copyPage\)/);
@@ -179,7 +179,7 @@ describe('Phase 3B Library frontend contracts', () => {
     assert.match(workspace, /cleanFulfillmentPayload/);
     assert.match(workspace, /ReservationRow/);
     assert.match(workspace, /library-reservations/);
-    assert.match(reservationsPage, /initialTab="reservations"/);
+    assert.match(reservationsPage, /section="reservations"/);
     assert.match(workspace, /Audit reason/);
     assert.match(workspace, /onArchiveCopy/);
     assert.match(workspace, /Archive library copy/);
@@ -198,6 +198,28 @@ describe('Phase 3B Library frontend contracts', () => {
       /rounded-\[2rem\]|rounded-\[3rem\]|Unknown book|Unknown author|Unknown borrower|\bN\/A\b/,
     );
     assert.doesNotMatch(workspace, /demo-|fake-|placeholderId/i);
+  });
+
+  it('uses canonical Library routes and bounded remote borrower selectors', () => {
+    const workspace = read('components/library/library-workspace.tsx');
+    const layout = read('app/dashboard/library/layout.tsx');
+
+    assert.doesNotMatch(workspace, /useState<LibraryTab>|setActiveTab/);
+    assert.doesNotMatch(workspace, /limit:\s*1000|api\.listStaff/);
+    assert.match(workspace, /RemoteStudentSelector/);
+    assert.match(workspace, /RemoteStaffSelector/);
+    assert.match(workspace, /activeTab === "overview"[\s\S]*overviewError/);
+    assert.match(workspace, /activeTab === "reports"[\s\S]*reportsError/);
+    assert.match(layout, /\/dashboard\/library\/issue-return/);
+    assert.doesNotMatch(layout, /label: 'Borrowers'/);
+
+    for (const [path, destination] of [
+      ['app/dashboard/library/books/page.tsx', '/dashboard/library/catalog'],
+      ['app/dashboard/library/issues/page.tsx', '/dashboard/library/issue-return'],
+      ['app/dashboard/library/borrowers/page.tsx', '/dashboard/library/issue-return'],
+    ]) {
+      assert.match(read(path), new RegExp(`redirect\\(['\"]${destination}`));
+    }
   });
 
   it('keeps Library selector and report rows explicit about missing source data', () => {

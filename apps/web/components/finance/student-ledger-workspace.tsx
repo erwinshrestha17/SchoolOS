@@ -79,7 +79,7 @@ export function StudentLedgerWorkspace() {
     return (
       <SectionCard
         title="Find a student ledger"
-        description="Use the purpose-limited finance search to find a student, then open the backend-owned ledger projection."
+        description="Use the finance search to find a student, then open their official ledger."
       >
         <div className="mx-auto max-w-4xl space-y-5">
           <SearchInput
@@ -165,7 +165,7 @@ export function StudentLedgerWorkspace() {
     return (
       <ErrorState
         title="Student ledger could not load"
-        message="No balance has been calculated in the browser. Retry to load the backend ledger projection."
+        message="The official balance could not be loaded. Please retry."
         onRetry={() => void ledgerQuery.refetch()}
       />
     );
@@ -318,7 +318,7 @@ export function StudentLedgerWorkspace() {
 
       <SectionCard
         title="Ledger activity"
-        description="Chronological debit, credit, and running balance values from the backend ledger projection."
+        description="Chronological debit, credit, and official running balance values."
         noPadding
       >
         {ledger.rows.length ? (
@@ -401,7 +401,7 @@ export function StudentLedgerWorkspace() {
         ) : (
           <EmptyState
             title="No ledger activity"
-            description="This student does not have any backend ledger rows yet."
+            description="This student does not have any ledger entries yet."
             className="m-5 min-h-52"
           />
         )}

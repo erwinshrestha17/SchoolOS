@@ -36,7 +36,7 @@ export function CollectionStudentDiscovery({
   return (
     <SectionCard
       title="Find a student"
-      description="Search active fee accounts by student name, student ID, invoice number, or guardian phone. Results include backend-owned outstanding balances only."
+      description="Search active fee accounts by student name, student ID, invoice number, or guardian phone. Results show official outstanding balances."
     >
       <div className="mx-auto max-w-5xl space-y-5">
         <SearchInput

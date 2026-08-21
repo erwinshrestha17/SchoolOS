@@ -601,7 +601,7 @@ function UnreadRecipientsPanel({
           href="/dashboard/notices"
           className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
         >
-          Back to Delivery Records
+          Back to Notices
         </Link>
       </div>
 

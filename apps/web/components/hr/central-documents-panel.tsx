@@ -1,22 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '../../lib/api';
+import type { StaffLookupOption } from '@schoolos/core';
 import { FileText, User } from 'lucide-react';
 import { StaffDocumentsPanel } from './staff-documents-panel';
-import { Select } from '../ui/select';
+import { RemoteStaffSelector } from '../staff/remote-staff-selector';
 
 export function CentralDocumentsPanel() {
   const [selectedStaffId, setSelectedStaffId] = useState<string>('');
-
-  const staffQuery = useQuery({
-    queryKey: ['staff'],
-    queryFn: api.listStaff,
-  });
-
-  const staffList = staffQuery.data ?? [];
-  const selectedStaff = staffList.find((s) => s.id === selectedStaffId);
+  const [selectedStaff, setSelectedStaff] =
+    useState<StaffLookupOption | null>(null);
   const formatAssignedText = (value: string | null | undefined, fallback: string) =>
     value?.trim() || fallback;
 
@@ -32,21 +25,17 @@ export function CentralDocumentsPanel() {
             <p className="text-xs text-slate-500">Select a staff member to upload, verify, and manage their records.</p>
           </div>
           <div className="w-full sm:w-72">
-            <label className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400 block mb-1.5 ml-1">
-              Select Staff Member
-            </label>
-            <Select
+            <RemoteStaffSelector
               value={selectedStaffId}
-              onChange={(e) => setSelectedStaffId(e.target.value)}
+              selectedOption={selectedStaff}
+              onChange={(staffId, option) => {
+                setSelectedStaffId(staffId);
+                setSelectedStaff(option);
+              }}
+              label="Select staff member"
+              placeholder="Search staff member"
               className="w-full"
-            >
-              <option value="">Choose staff...</option>
-              {staffList.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.firstName} {s.lastName} ({s.employeeId})
-                </option>
-              ))}
-            </Select>
+            />
           </div>
         </div>
       </div>
@@ -55,12 +44,11 @@ export function CentralDocumentsPanel() {
         <div className="space-y-6">
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex items-center gap-4">
             <div className="h-12 w-12 rounded-xl bg-[var(--color-mod-hr-soft)] text-[var(--color-mod-hr-text)] flex items-center justify-center font-black">
-              {selectedStaff?.firstName[0]}
-              {selectedStaff?.lastName[0]}
+              {initials(selectedStaff?.fullName)}
             </div>
             <div>
               <h4 className="font-bold text-lg text-slate-900">
-                {selectedStaff?.firstName} {selectedStaff?.lastName}
+                {selectedStaff?.fullName}
               </h4>
               <p className="text-xs text-slate-500">
                 {selectedStaff?.employeeId} &bull; {formatAssignedText(selectedStaff?.designation, 'Designation not set')} &bull; {formatAssignedText(selectedStaff?.department, 'Department not set')}
@@ -80,4 +68,13 @@ export function CentralDocumentsPanel() {
       )}
     </div>
   );
+}
+
+function initials(fullName: string | undefined) {
+  return (fullName ?? '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
 }

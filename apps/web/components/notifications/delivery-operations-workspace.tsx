@@ -114,17 +114,17 @@ export function DeliveryOperationsWorkspace({
       <ModuleHeader
         eyebrow="Notifications"
         title={view === "logs" ? "Delivery logs" : "Failure and retry center"}
-        description="Investigate bounded delivery metadata without exposing message bodies, destinations, provider payloads, credentials, tokens, or stack traces."
+        description="Review delivery status and retry eligible failures. Message content and contact details remain protected."
         secondaryActions={
           <div className="flex gap-2">
             <Link
-              href="/dashboard/notices/deliveries"
+              href="/dashboard/notifications/deliveries"
               className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold"
             >
               Delivery logs
             </Link>
             <Link
-              href="/dashboard/notices/failures"
+              href="/dashboard/notifications/failures"
               className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold"
             >
               Retry center
@@ -196,7 +196,7 @@ export function DeliveryOperationsWorkspace({
         </p>
       ) : isLoading ? (
         <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
-          Loading server-paginated delivery records…
+          Loading delivery records…
         </p>
       ) : isError ? (
         <p
@@ -307,14 +307,14 @@ export function DeliveryOperationsWorkspace({
           className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"
         >
           <AlertTriangle size={16} /> Retry was rejected or could not be queued.
-          The delivery state was not changed in the browser.
+          No delivery status was changed.
         </p>
       ) : null}
 
       <ConfirmDialog
         isOpen={retryId !== null}
         title="Retry this delivery?"
-        description="The backend will re-check tenant state, recipient policy, and retry eligibility before queueing."
+        description="School access, recipient policy, and retry eligibility will be checked again before this delivery is queued."
         confirmLabel="Queue retry"
         confirmDisabled={!retryReason.trim()}
         isConfirming={retry.isPending}

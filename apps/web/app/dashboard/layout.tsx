@@ -112,13 +112,26 @@ const dashboardRouteGates: RouteGate[] = [
     permissions: ["notices:read", "notices:create"],
   },
   {
-    prefix: "/dashboard/notices/deliveries",
+    prefix: "/dashboard/notifications/deliveries",
     label: "Delivery logs",
     permissions: ["notifications:view_delivery_diagnostics"],
   },
   {
-    prefix: "/dashboard/notices/failures",
+    prefix: "/dashboard/notifications/failures",
     label: "Failure and retry center",
+    permissions: [
+      "notifications:view_delivery_diagnostics",
+      "notifications:retry_deliveries",
+    ],
+  },
+  {
+    prefix: "/dashboard/notices/deliveries",
+    label: "Legacy delivery logs",
+    permissions: ["notifications:view_delivery_diagnostics"],
+  },
+  {
+    prefix: "/dashboard/notices/failures",
+    label: "Legacy failure and retry center",
     permissions: [
       "notifications:view_delivery_diagnostics",
       "notifications:retry_deliveries",

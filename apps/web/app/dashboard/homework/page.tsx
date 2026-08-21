@@ -18,6 +18,7 @@ import Link from "next/link";
 import {
   formatBsDate,
   formatBsDateTime,
+  getNepalSchoolDay,
   type HomeworkAssignmentSummary,
 } from "@schoolos/core";
 
@@ -48,19 +49,14 @@ import { useHomeworkCapabilities } from "../../../lib/permissions-ui";
 import { TablePagination } from "../../../components/ui/table-pagination";
 import { Drawer } from "../../../components/ui/drawer";
 import { Toast, type ToastTone } from "../../../components/ui/toast";
+import { RemoteStaffSelector } from "../../../components/staff/remote-staff-selector";
 
 const HOMEWORK_PAGE_SIZE = 20;
-// When a specific day is selected we can't ask the backend to filter by
-// assignedDate (no such query param exists yet), so we pull a wider window
-// and filter/paginate client-side. This is a deliberate P0 simplification —
-// see the plan at fuzzy-gliding-hopper.md for the backend follow-up. Capped
-// at 100 to match HomeworkQueryDto's server-side @Max(100) on `limit`.
-const DATE_FILTER_FETCH_LIMIT = 100;
 
 type ActiveTab = "today" | "all" | "completion" | "templates";
 
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
+function todaySchoolDate() {
+  return getNepalSchoolDay().gregorianDate;
 }
 
 function formatDate(value?: string | Date | null, fallback = "Date not set") {
@@ -178,14 +174,6 @@ function HomeworkWorkspace() {
     queryKey: ["subjects", filters.classId],
     queryFn: () => api.listSubjects({ classId: filters.classId || undefined }),
   });
-  // The school-wide staff roster is only needed to populate the "All
-  // Teachers" filter, which teachers no longer get -- so they no longer
-  // request it either.
-  const staffQuery = useQuery({
-    queryKey: ["staff"],
-    queryFn: api.listStaff,
-    enabled: !assignmentScope.isScoped,
-  });
   const academicYearsQuery = useQuery({
     queryKey: ["academic-years"],
     queryFn: api.listAcademicYears,
@@ -193,16 +181,14 @@ function HomeworkWorkspace() {
 
   const isTodayTab = activeTab === "today";
   const effectiveDate = isTodayTab
-    ? filters.date || todayIso()
+    ? filters.date || todaySchoolDate()
     : filters.date || undefined;
-  const useClientDateFilter = Boolean(effectiveDate);
 
   const homeworkQuery = useQuery({
     queryKey: [
       "homework",
       "page",
       effectiveDate,
-      useClientDateFilter,
       filters.classId,
       filters.sectionId,
       filters.subjectId,
@@ -210,7 +196,7 @@ function HomeworkWorkspace() {
       filters.mine,
       filters.status,
       filters.search,
-      useClientDateFilter ? "client-paged" : filters.page,
+      filters.page,
     ],
     queryFn: () =>
       api.listHomeworkPage({
@@ -221,10 +207,11 @@ function HomeworkWorkspace() {
         mine: filters.mine === "1" ? true : undefined,
         status: filters.status || undefined,
         search: filters.search.trim() || undefined,
+        assignedDate: effectiveDate,
         sortBy: "assignedDate",
         sortOrder: "desc",
-        page: useClientDateFilter ? 1 : Math.max(1, filters.page),
-        limit: useClientDateFilter ? DATE_FILTER_FETCH_LIMIT : HOMEWORK_PAGE_SIZE,
+        page: Math.max(1, filters.page),
+        limit: HOMEWORK_PAGE_SIZE,
       }),
     enabled: activeTab === "today" || activeTab === "all",
   });
@@ -280,36 +267,15 @@ function HomeworkWorkspace() {
     );
   }
 
-  const rawItems = homeworkQuery.data?.items ?? [];
-  const dateFilteredItems = useClientDateFilter
-    ? rawItems.filter(
-        (item) => (item.assignedDate ?? "").slice(0, 10) === effectiveDate,
-      )
-    : rawItems;
-  const homeworkItems = useClientDateFilter
-    ? dateFilteredItems.slice(
-        (Math.max(1, filters.page) - 1) * HOMEWORK_PAGE_SIZE,
-        Math.max(1, filters.page) * HOMEWORK_PAGE_SIZE,
-      )
-    : dateFilteredItems;
-  const homeworkMeta = useClientDateFilter
+  const homeworkItems = homeworkQuery.data?.items ?? [];
+  const homeworkMeta = homeworkQuery.data?.meta
     ? {
-        page: Math.max(1, filters.page),
-        limit: HOMEWORK_PAGE_SIZE,
-        total: dateFilteredItems.length,
-        totalPages: Math.max(
-          1,
-          Math.ceil(dateFilteredItems.length / HOMEWORK_PAGE_SIZE),
-        ),
+        page: homeworkQuery.data.meta.page,
+        limit: homeworkQuery.data.meta.limit,
+        total: homeworkQuery.data.meta.total,
+        totalPages: homeworkQuery.data.meta.totalPages,
       }
-    : homeworkQuery.data?.meta
-      ? {
-          page: homeworkQuery.data.meta.page,
-          limit: homeworkQuery.data.meta.limit,
-          total: homeworkQuery.data.meta.total,
-          totalPages: homeworkQuery.data.meta.totalPages,
-        }
-      : undefined;
+    : undefined;
 
   const hasActiveHomeworkFilters = Boolean(
     filters.classId ||
@@ -586,7 +552,7 @@ function HomeworkWorkspace() {
 
               <Input
                 type="date"
-                value={filters.date || (activeTab === "today" ? todayIso() : "")}
+                value={filters.date || (activeTab === "today" ? todaySchoolDate() : "")}
                 onChange={(e) =>
                   setFilters({ date: e.target.value }, { resetPage: true })
                 }
@@ -677,20 +643,15 @@ function HomeworkWorkspace() {
                   Only homework I set
                 </label>
               ) : (
-                <Select
+                <RemoteStaffSelector
                   value={filters.teacherId}
-                  onChange={(e) =>
-                    setFilters({ teacherId: e.target.value }, { resetPage: true })
+                  onChange={(teacherId) =>
+                    setFilters({ teacherId }, { resetPage: true })
                   }
-                  aria-label="Filter by teacher"
-                >
-                  <option value="">All Teachers</option>
-                  {staffQuery.data?.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.firstName} {s.lastName}
-                    </option>
-                  ))}
-                </Select>
+                  label="Filter by teacher"
+                  placeholder="All teachers"
+                  hideLabel
+                />
               )}
 
               <Select
@@ -756,7 +717,7 @@ function HomeworkWorkspace() {
                     homeworkMeta && homeworkMeta.total > 0
                       ? "The shared link points past the available assignment pages. Return to the last available page."
                       : hasActiveHomeworkFilters
-                        ? "Clear or adjust the filters while keeping your assignment scope protected by the backend."
+                        ? "Clear or adjust the filters. You will continue to see only assignments within your role."
                         : canCreateHomework
                           ? "Give the first homework assignment for an assigned class and subject."
                           : "Homework assignments will appear here when an authorized teacher publishes them."
@@ -832,7 +793,7 @@ function HomeworkWorkspace() {
           ) : completionReportQuery.isError ? (
             <ErrorState
               title="Unable to load completion data"
-              message="The homework completion report could not be loaded from the backend."
+              message="The homework completion report could not be loaded."
               onRetry={() => void completionReportQuery.refetch()}
             />
           ) : needsFollowUpRows.length === 0 ? (
@@ -875,7 +836,7 @@ function HomeworkWorkspace() {
       {activeTab === "templates" ? (
         <SectionCard
           title="Template Library"
-          description="Browse metadata-backed homework templates with the filtered backend endpoint."
+          description="Browse reusable homework templates that match the current filters."
           headerAction={
             <div className="relative w-full max-w-xs">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />

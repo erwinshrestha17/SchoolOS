@@ -42,6 +42,8 @@ function createController() {
     listPosSales: jest.fn(),
     upsertSpendingControl: jest.fn(),
     getSpendingControl: jest.fn(),
+    listSuppliers: jest.fn(),
+    listInventoryItems: jest.fn(),
     getParentStudentCanteenStatus: jest.fn(),
     dailyMealCountReport: jest.fn(),
     itemWiseSalesReport: jest.fn(),
@@ -77,6 +79,30 @@ function createController() {
 }
 
 describe('CanteenController M8C contracts', () => {
+  it('delegates paginated stock directory search with the current actor', () => {
+    const { controller, canteenService } = createController();
+    canteenService.listSuppliers.mockReturnValue({ items: [] });
+    canteenService.listInventoryItems.mockReturnValue({ items: [] });
+
+    expect(controller.listSuppliers(actor, 'fresh', '2', '25')).toEqual({
+      items: [],
+    });
+    expect(
+      controller.listInventoryItems(actor, 'rice', 'dry goods', '3', '25'),
+    ).toEqual({ items: [] });
+    expect(canteenService.listSuppliers).toHaveBeenCalledWith(actor, {
+      query: 'fresh',
+      page: '2',
+      limit: '25',
+    });
+    expect(canteenService.listInventoryItems).toHaveBeenCalledWith(actor, {
+      query: 'rice',
+      category: 'dry goods',
+      page: '3',
+      limit: '25',
+    });
+  });
+
   it('delegates menu item create/list/update/status with current actor', () => {
     const { controller, canteenService } = createController();
     const createDto = {

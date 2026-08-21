@@ -16,12 +16,12 @@ import {
 import { cn } from '@/lib/utils';
 import { FormField, Input, Select } from '@/components/ui/form-field';
 import { Button } from '@/components/ui/button';
+import { RemoteStaffSelector } from '@/components/staff/remote-staff-selector';
 
 import {
   AcademicYearSummary,
   ClassSummary,
   SectionSummary,
-  StaffSummary,
   SubjectSummary,
   TeacherAssignmentSummary,
 } from '@schoolos/core';
@@ -30,12 +30,11 @@ type Props = {
   academicYears: AcademicYearSummary[];
   classes: ClassSummary[];
   allSections: SectionSummary[];
-  staff: StaffSummary[];
   subjects: SubjectSummary[];
   assignments: TeacherAssignmentSummary[];
 };
 
-export function SubjectsTab({ academicYears, classes, allSections, staff, subjects }: Props) {
+export function SubjectsTab({ academicYears, classes, allSections, subjects }: Props) {
   const queryClient = useQueryClient();
   const [subject, setSubject] = useState({ classId: '', code: '', name: '', type: 'CORE', theoryMarks: 100, passMarks: 35 });
   const [assign, setAssign] = useState({ academicYearId: '', classId: '', subjectId: '', staffId: '', sectionId: '' });
@@ -265,14 +264,12 @@ export function SubjectsTab({ academicYears, classes, allSections, staff, subjec
               </Select>
             </FormField>
 
-            <FormField label="Faculty">
-              <Select value={assign.staffId} onChange={(e) => setAssign((c) => ({ ...c, staffId: e.target.value }))}>
-                <option value="">Select faculty</option>
-                {staff.map((s: StaffSummary) => (
-                  <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>
-                ))}
-              </Select>
-            </FormField>
+            <RemoteStaffSelector
+              label="Faculty"
+              value={assign.staffId}
+              onChange={(staffId) => setAssign((current) => ({ ...current, staffId }))}
+              placeholder="Search for a teacher"
+            />
 
             <Button
               className="w-full"

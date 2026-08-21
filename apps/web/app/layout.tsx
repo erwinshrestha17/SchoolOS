@@ -16,9 +16,9 @@ const notoSansDevanagari = Noto_Sans_Devanagari({
 });
 
 export const metadata: Metadata = {
-  title: 'SchoolOS Admin',
+  title: 'SchoolOS',
   description:
-    'SchoolOS — Multi-tenant School Management SaaS for Nepal. Admissions, attendance, finance, academics, and communications.',
+    'SchoolOS — a Nepal-first, multi-tenant education operating system for Grade 1–12 school workflows.',
 };
 
 export default function RootLayout({

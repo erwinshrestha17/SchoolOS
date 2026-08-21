@@ -34,6 +34,47 @@ const actor = {
 };
 
 describe('CanteenService Phase 3C hardening', () => {
+  it('searches tenant-scoped stock directories with server pagination', async () => {
+    const { service, prisma } = buildService();
+
+    await service.listSuppliers(actor, {
+      query: ' fresh ',
+      page: '2',
+      limit: '25',
+    });
+    await service.listInventoryItems(actor, {
+      query: ' rice ',
+      category: 'Dry goods',
+      page: '3',
+      limit: '25',
+    });
+
+    expect(prisma.canteenSupplier.findMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        isActive: true,
+        name: { contains: 'fresh', mode: 'insensitive' },
+      },
+      skip: 25,
+      take: 25,
+      orderBy: { name: 'asc' },
+    });
+    expect(prisma.canteenInventoryItem.findMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        isActive: true,
+        category: 'Dry goods',
+        OR: [
+          { name: { contains: 'rice', mode: 'insensitive' } },
+          { sku: { contains: 'rice', mode: 'insensitive' } },
+        ],
+      },
+      skip: 50,
+      take: 25,
+      orderBy: { name: 'asc' },
+    });
+  });
+
   it('creates tenant-scoped menu items', async () => {
     const { service, prisma } = buildService();
 
@@ -955,6 +996,14 @@ function buildService(
           servedAt: new Date('2026-05-17T07:00:00.000Z'),
         },
       ]),
+    },
+    canteenSupplier: {
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
+    },
+    canteenInventoryItem: {
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
     },
     $transaction: jest.fn().mockImplementation(async (input: unknown) => {
       if (Array.isArray(input)) {

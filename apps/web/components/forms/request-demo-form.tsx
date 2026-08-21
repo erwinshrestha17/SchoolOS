@@ -28,20 +28,19 @@ import { api } from '../../lib/api';
 import { isValidEmail, isValidPersonName, normalizeEmail, normalizeNepalPhone, normalizePersonName, tryNormalizeNepalPhone } from '@schoolos/core';
 
 const MODULES = [
-  'Admissions',
-  'Students',
-  'Attendance',
+  'Admissions & Student Profiles',
+  'Smart Attendance',
   'Fees & Receipts',
-  'Notices',
-  'Academics',
-  'Timetable',
+  'Academics, Exams & Report Cards',
+  'Activity Feed & Milestones',
+  'Homework & Timetable',
   'HR & Payroll',
-  'Accounting',
-  'Transport',
   'Library',
+  'Transport',
   'Canteen',
-  'Parent Portal',
-  'Reports',
+  'Accounting & Finance',
+  'Notifications & Delivery',
+  'Notices & Announcements',
 ];
 
 export function RequestDemoForm() {
@@ -50,7 +49,6 @@ export function RequestDemoForm() {
     schoolType: '',
     location: '',
     studentsCount: '',
-    branchesCount: '',
     contactName: '',
     role: '',
     phone: '',
@@ -301,7 +299,6 @@ export function RequestDemoForm() {
                     <option value="Basic School">Basic School</option>
                     <option value="Secondary School">Secondary School</option>
                     <option value="Higher Secondary">Higher Secondary</option>
-                    <option value="Multi-branch Institution">Multi-branch Institution</option>
                     <option value="Other">Other</option>
                   </Select>
                   <div className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-slate-400">
@@ -338,28 +335,6 @@ export function RequestDemoForm() {
                 {errors.studentsCount && <p className="text-[10px] text-red-650 font-medium">{errors.studentsCount}</p>}
               </div>
 
-              <div className="space-y-1 sm:col-span-2">
-                <label htmlFor="branchesCount" className="text-xs font-semibold text-slate-700 block">
-                  Number of Branches
-                </label>
-                <div className="relative">
-                  <Select
-                    id="branchesCount"
-                    name="branchesCount"
-                    value={formData.branchesCount}
-                    onChange={handleInputChange}
-                    className="h-9 text-xs focus:ring-blue-600 focus:border-blue-600 border-slate-200"
-                  >
-                    <option value="" disabled>Select Branches</option>
-                    <option value="Single branch">Single branch</option>
-                    <option value="2–3 branches">2–3 branches</option>
-                    <option value="4+ branches">4+ branches</option>
-                  </Select>
-                  <div className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-slate-400">
-                    <ChevronDown className="h-3 w-3" />
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
 

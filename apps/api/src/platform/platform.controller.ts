@@ -15,6 +15,7 @@ import { PlatformService } from './platform.service';
 import { PlatformQueuesService } from './platform-queues.service';
 import { PlatformReportExportsService } from './platform-report-exports.service';
 import { PlatformApiKeysService } from './platform-api-keys.service';
+import { projectPlatformTenantDetail } from './platform-tenant-detail-projection';
 import { PlatformGuard } from '../auth/guards/platform.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../auth/auth-request.interface';
@@ -88,8 +89,14 @@ export class PlatformController {
   @Permissions('platform:tenants:read')
   async getTenantDetail(
     @Param('tenantId') tenantId: string,
+    @Req() req: AuthenticatedRequest,
   ): Promise<PlatformTenantDetail> {
-    return this.platformService.getTenantDetail(tenantId);
+    if (!req.auth) {
+      throw new UnauthorizedException('Authentication context required');
+    }
+
+    const detail = await this.platformService.getTenantDetail(tenantId);
+    return projectPlatformTenantDetail(detail, req.auth);
   }
 
   @Patch('tenants/:tenantId/status')

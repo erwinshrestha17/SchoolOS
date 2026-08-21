@@ -52,17 +52,17 @@ const sectionCopy: Record<FeesSection, { title: string; description: string }> =
     billing: {
       title: "Billing runs",
       description:
-        "Generate invoices from existing fee plans and follow each backend billing-run state.",
+        "Generate invoices from existing fee plans and follow each billing-run state.",
     },
     invoices: {
       title: "Invoices",
       description:
-        "Search the server-paginated invoice register and review current payment status.",
+        "Search the invoice register and review current payment status.",
     },
     ledgers: {
       title: "Student ledgers",
       description:
-        "Explain one student's billed, paid, waived, refunded, and outstanding position from backend ledger truth.",
+        "Explain one student's official billed, paid, waived, refunded, and outstanding position.",
     },
     receipts: {
       title: "Receipt center",
@@ -77,7 +77,7 @@ const sectionCopy: Record<FeesSection, { title: string; description: string }> =
     "cashier-close": {
       title: "Cashier close",
       description:
-        "Review backend totals, explain variance, and confirm an immutable school-day close.",
+        "Review official totals, explain variance, and confirm an immutable school-day close.",
     },
   reports: {
     title: "Fees reports",

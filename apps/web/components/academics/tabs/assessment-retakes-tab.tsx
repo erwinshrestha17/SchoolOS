@@ -473,7 +473,7 @@ function RetakeDetailDialog({
         <DialogHeader>
           <DialogTitle>Assessment retake detail</DialogTitle>
           <DialogDescription>
-            Current backend-owned lifecycle state and available commands.
+            Current lifecycle state and available actions.
           </DialogDescription>
         </DialogHeader>
 

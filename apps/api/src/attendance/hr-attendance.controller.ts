@@ -8,6 +8,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ApiOkResponse, ApiOperation } from '@nestjs/swagger';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
@@ -19,6 +20,10 @@ import { AdjustLeaveBalanceDto } from './dto/adjust-leave-balance.dto';
 import { CorrectStaffAttendanceDto } from './dto/correct-staff-attendance.dto';
 import { CreateStaffLeaveRequestDto } from './dto/create-staff-leave-request.dto';
 import { ListStaffAttendanceSummaryDto } from './dto/list-staff-attendance-summary.dto';
+import {
+  ListStaffAttendanceRosterDto,
+  StaffAttendanceRosterPageResponseDto,
+} from './dto/list-staff-attendance-roster.dto';
 import { ReviewStaffLeaveDecisionDto } from './dto/review-staff-leave-decision.dto';
 import { ReviewStaffLeaveRequestDto } from './dto/review-staff-leave-request.dto';
 import { SubmitStaffAttendanceDto } from './dto/submit-staff-attendance.dto';
@@ -29,6 +34,19 @@ import { AttendanceService } from './attendance.service';
 @Entitlement('module.hr')
 export class HrAttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
+
+  @Get('staff-attendance/roster')
+  @Permissions('hr:attendance:write')
+  @ApiOperation({
+    summary: 'List active staff identities for the bulk attendance workflow',
+  })
+  @ApiOkResponse({ type: StaffAttendanceRosterPageResponseDto })
+  listStaffAttendanceRoster(
+    @Query() query: ListStaffAttendanceRosterDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.listStaffAttendanceRoster(query, auth);
+  }
 
   @Get('staff-attendance')
   @Permissions('hr:attendance:read')

@@ -7,7 +7,7 @@ export default function AcademicReportCardsPage() {
   return (
     <AcademicsSectionPage
       title="Report Cards"
-      description="Generate, track, and manage student performance reports using backend-calculated data."
+      description="Generate, track, and manage student performance reports from reviewed academic records."
     >
       <ReportCardsWorkspace />
     </AcademicsSectionPage>

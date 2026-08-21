@@ -8,7 +8,7 @@ export default function TimetableWorkloadPage() {
     <div className="space-y-6">
       <PageHeader
         title="Teacher Workload"
-        description="Review weekly teaching load, assigned slots, and homework counts from the live timetable workload endpoint."
+        description="Review weekly teaching load, assigned slots, and homework counts from the current timetable."
       />
       <TimetableWorkspace initialSection="Teacher Workload" />
     </div>

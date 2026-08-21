@@ -63,9 +63,7 @@ test.describe('M0 Platform onboard browser E2E', () => {
     await page.getByRole('link', { name: schoolName }).click();
     await expect(page.getByRole('heading', { name: schoolName })).toBeVisible();
 
-    await page.getByTestId('onboarding-checklist-button').click();
-    await expect(
-      page.getByRole('heading', { name: 'Onboarding Checklist' }),
-    ).toBeVisible();
+    await page.getByRole('link', { name: 'Onboarding' }).click();
+    await expect(page.getByRole('heading', { name: 'Onboarding' })).toBeVisible();
   });
 });

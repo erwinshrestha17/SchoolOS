@@ -20,10 +20,7 @@ import { CreateHomeworkDto } from './dto/create-homework.dto';
 import { HomeworkQueryDto } from './dto/homework-query.dto';
 import { HomeworkTemplateQueryDto } from './dto/homework-template-query.dto';
 import { HomeworkSubmissionQueryDto } from './dto/homework-submission-query.dto';
-import {
-  LegacyReviewHomeworkSubmissionDto,
-  LegacySubmitHomeworkDto,
-} from './dto/legacy-submit-homework.dto';
+import { LegacySubmitHomeworkDto } from './dto/legacy-submit-homework.dto';
 import {
   CreateHomeworkSubmissionDto,
   RequestCorrectionDto,
@@ -31,10 +28,7 @@ import {
   UpdateHomeworkSubmissionDto,
   UpdateHomeworkSubmissionStatusDto,
 } from './dto/submission.dto';
-import {
-  HomeworkReminderQueryDto,
-  SendHomeworkReminderDto,
-} from './dto/reminder.dto';
+import { HomeworkReminderQueryDto } from './dto/reminder.dto';
 import { UpdateHomeworkDto } from './dto/update-homework.dto';
 import { PublishHomeworkDto } from './dto/publish-homework.dto';
 import { BulkCompleteRegisterDto } from './dto/register.dto';
@@ -44,6 +38,7 @@ import {
 } from './dto/homework-summary-query.dto';
 import { HomeworkAttachmentAccessService } from './homework-attachment-access.service';
 import { HomeworkService } from './homework.service';
+import { ApiQuery } from '@nestjs/swagger';
 
 @Controller('homework')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
@@ -58,6 +53,14 @@ export class HomeworkController {
 
   @Get()
   @Permissions('homework:read')
+  @ApiQuery({
+    name: 'assignedDate',
+    required: false,
+    type: String,
+    format: 'date',
+    example: '2026-08-21',
+    description: 'Nepal-local school business date in YYYY-MM-DD format.',
+  })
   listHomework(
     @CurrentAuth() auth: AuthContext,
     @Query() query: HomeworkQueryDto,

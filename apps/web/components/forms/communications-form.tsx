@@ -25,6 +25,10 @@ import { FilterBar } from "../ui/filter-bar";
 import { cn } from "../../lib/utils";
 import { estimateSmsSegments } from "../../lib/sms-segments";
 import {
+  formatNepalDateTimeLocalInput,
+  nepalDateTimeLocalInputToUtc,
+} from "../../lib/date-utils";
+import {
   RefreshCcw,
   AlertCircle,
   CheckCircle2,
@@ -169,7 +173,7 @@ export function CommunicationsForm({
     audienceType: "ALL",
     classId: "",
     sectionId: "",
-    startsAt: new Date().toISOString().slice(0, 16),
+    startsAt: formatNepalDateTimeLocalInput(),
     location: "",
   });
   const [eventError, setEventError] = useState<string | null>(null);
@@ -502,7 +506,7 @@ export function CommunicationsForm({
       classId: event.audienceType === "ALL" ? null : event.classId || null,
       sectionId:
         event.audienceType === "SECTION" ? event.sectionId || null : null,
-      startsAt: new Date(event.startsAt).toISOString(),
+      startsAt: nepalDateTimeLocalInputToUtc(event.startsAt),
       location: event.location.trim() || null,
     });
   }
@@ -892,7 +896,7 @@ function NoticesSection({
           {notice.priority === "EMERGENCY" ? (
             <InlineMessage
               tone="error"
-              message="Emergency notices use backend-selected high-impact delivery channels. Preview and confirm recipients before publishing."
+              message="Emergency notices use the configured high-impact delivery channels. Preview and confirm recipients before publishing."
             />
           ) : notice.audienceType === "ALL" ? (
             <InlineMessage
@@ -1308,7 +1312,7 @@ function DeliveryRecordsSection({
         <SectionHeader
           eyebrow="Delivery Records"
           title="Recent provider-neutral deliveries"
-          description="Delivery status is backend-owned. Disabled or unavailable providers remain explicit and cannot be treated as successful sends."
+          description="Delivery status is authoritative. Disabled or unavailable providers remain explicit and cannot be treated as successful sends."
         />
 
         <span className="w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
@@ -1319,7 +1323,7 @@ function DeliveryRecordsSection({
       <FilterBar
         className="mt-6"
         label="Delivery filters"
-        description="Filter the latest backend delivery records by status, channel, or source."
+        description="Filter the latest delivery records by status, channel, or source."
       >
         <select
           value={filters.status}
@@ -1750,7 +1754,7 @@ function buildNoticePayload(notice: NoticeState) {
     attachmentFileId: notice.attachmentFileId || null,
     scheduledFor:
       notice.scheduleMode === "LATER" && notice.scheduledFor
-        ? new Date(notice.scheduledFor).toISOString()
+        ? nepalDateTimeLocalInputToUtc(notice.scheduledFor)
         : null,
   };
 }
@@ -1783,7 +1787,7 @@ function RecipientPreviewPanel({
               Recipient preview
             </p>
             <p className="mt-1 text-sm leading-6 text-slate-600">
-              Confirm backend-resolved audience and channel counts before
+              Confirm resolved audience and channel counts before
               sending a high-impact notice.
             </p>
           </div>
@@ -1822,7 +1826,7 @@ function RecipientPreviewPanel({
           {preview.skippedRecipientCount > 0 ? (
             <InlineMessage
               tone="info"
-              message="Some recipients cannot be reached under current consent or contact rules. Backend delivery policy remains authoritative."
+              message="Some recipients cannot be reached under current consent or contact rules. Delivery policy remains authoritative."
             />
           ) : null}
           {isHighImpact ? (
@@ -1887,6 +1891,14 @@ function validateAudienceFields(input: {
 
   if (input.scheduledFor !== null && !input.scheduledFor) {
     return "Scheduled date and time is required.";
+  }
+
+  if (input.scheduledFor) {
+    try {
+      nepalDateTimeLocalInputToUtc(input.scheduledFor);
+    } catch {
+      return "Choose a valid Nepal date and time.";
+    }
   }
 
   return null;

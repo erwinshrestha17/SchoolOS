@@ -250,7 +250,7 @@ export class OperationalSummaryService {
     );
     if (module === 'm11_intelligence') {
       return this.emptySummary(module, day, 'locked', false, {
-        roadmapOnly: 'M11 Intelligence is roadmap-only.',
+        roadmapOnly: 'M14 Intelligence / AI is roadmap-only.',
       });
     }
     return this.getModuleSummaryInternal(
@@ -833,7 +833,7 @@ export class OperationalSummaryService {
             locationPings: { none: { recordedAt: { gte: staleGpsAt } } },
           },
           'Review GPS freshness',
-          '/dashboard/transport/live-status',
+          '/dashboard/transport/location',
         ),
         this.def(
           'vehicleDocumentRisks',
@@ -865,7 +865,7 @@ export class OperationalSummaryService {
           'canteenInventoryItem',
           { tenantId, currentStock: { lte: 0 }, isActive: true },
           'Review canteen stock',
-          '/dashboard/canteen/inventory',
+          '/dashboard/canteen/stock',
         ),
         this.def('availableMenuItems', 'canteenMenuItem', {
           tenantId,
@@ -910,14 +910,14 @@ export class OperationalSummaryService {
           'notificationDelivery',
           { tenantId, status: { in: ['FAILED', 'RETRY_PENDING'] } },
           'Review failed notice deliveries',
-          '/dashboard/notices/deliveries',
+          '/dashboard/notifications/deliveries',
         ),
         this.def(
           'unreadNoticeRecipients',
           'notificationDelivery',
           { tenantId, noticeId: { not: null }, readReceipts: { none: {} } },
           'Follow up on unread notices',
-          '/dashboard/notices/deliveries',
+          '/dashboard/notifications/deliveries',
         ),
         this.def(
           'highImpactNoticesAwaitingPublication',

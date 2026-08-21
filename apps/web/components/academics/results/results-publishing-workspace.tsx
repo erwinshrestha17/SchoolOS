@@ -136,7 +136,7 @@ export function ResultsPublishingWorkspace() {
 
       <FilterBar
         label="Preview Context"
-        description="Review backend-calculated results before locking or publishing"
+        description="Review calculated results before locking or publishing"
         actions={
           <Link
             href="/dashboard/academics/locks"
@@ -205,7 +205,7 @@ export function ResultsPublishingWorkspace() {
         <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
           <SectionCard
             title="Result Preview"
-            description="Calculated by the Academics backend. Use this view to find issues before lock."
+            description="Calculated from saved academic records. Use this view to find issues before lock."
           >
             <DataTable
               columns={columns}
@@ -224,7 +224,7 @@ export function ResultsPublishingWorkspace() {
               <WarningRow label="Failed subject threshold" value={failedCount} />
               <WarningRow label="Withheld results" value={withheldCount} />
               <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-xs font-medium leading-5 text-slate-600">
-                Results shown here are backend-calculated only. Lock marks after staff review, then generate report cards from the locked data.
+                Results shown here are calculated from saved academic records. Lock marks after staff review, then generate report cards from the locked data.
               </div>
               <Link
                 href="/dashboard/reports"

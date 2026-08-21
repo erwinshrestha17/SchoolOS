@@ -66,7 +66,7 @@ export function SourcePostingBatchesPanel({
   return (
     <WorkSurface
       title={sourceModule ? `${sourceModule} posting history` : "Source posting history"}
-      description="Backend-owned source totals, posted totals, journal lineage, retry state, and exact reconciliation differences."
+      description="Official source totals, posted totals, journal lineage, retry state, and exact reconciliation differences."
     >
       {retry.isError ? (
         <p role="alert" className="mb-3 text-sm font-medium text-rose-700">

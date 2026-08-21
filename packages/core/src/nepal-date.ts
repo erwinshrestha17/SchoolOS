@@ -447,6 +447,22 @@ export function getNepalSchoolDay(value: Date | string | number = new Date()): N
   };
 }
 
+/** Adds whole calendar days to a strict Gregorian YYYY-MM-DD business date. */
+export function shiftGregorianDateOnly(value: string, days: number): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match || !Number.isInteger(days)) {
+    throw new Error('A valid Gregorian date and whole-day offset are required.');
+  }
+
+  const date = {
+    year: Number(match[1]),
+    month: Number(match[2]),
+    day: Number(match[3]),
+  };
+  assertGregorianDate(date);
+  return toIsoDate(addGregorianDays(date, days));
+}
+
 /** Returns the UTC instant for a Nepal civil date/time via the IANA timezone database. */
 export function zonedNepalDateTimeToUtc(
   value: GregorianDate & { hour?: number; minute?: number; second?: number; millisecond?: number },

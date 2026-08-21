@@ -244,6 +244,18 @@ export const SETTINGS_NAVIGATION: SettingsNavigationDefinition[] = [
     status: 'platform-managed',
   },
   {
+    id: 'policy-communication',
+    groupId: 'policies',
+    label: 'Notices & notifications',
+    description: 'Notice delivery defaults, family notifications, and quiet hours.',
+    href: '/dashboard/settings/communication',
+    icon: BellRing,
+    scope: 'school',
+    backendItemId: 'communication',
+    searchKeywords: ['notices', 'notifications', 'announcements', 'quiet hours', 'email', 'sms'],
+    legacyHrefs: ['/dashboard/settings/notifications'],
+  },
+  {
     id: 'access-roles',
     groupId: 'access',
     label: 'Roles & permissions',

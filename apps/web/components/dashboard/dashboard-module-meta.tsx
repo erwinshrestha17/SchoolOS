@@ -124,15 +124,15 @@ export const MODULE_DEFINITIONS: Record<
       "text-[color:var(--color-mod-notices-text)] bg-[var(--color-mod-notices-soft)] border-[color:var(--color-mod-notices-border)]",
   },
   m11_intelligence: {
-    label: "Intelligence / AI",
-    shortLabel: "Intelligence",
+    label: "M14 Intelligence / AI",
+    shortLabel: "M14 Intelligence",
     icon: CircleAlert,
     accentClass:
       "text-[color:var(--color-mod-intelligence-text)] bg-[var(--color-mod-intelligence-soft)] border-[color:var(--color-mod-intelligence-border)]",
   },
   m12_learning: {
-    label: "Learning Layer",
-    shortLabel: "Learning",
+    label: "M13 Learning Layer",
+    shortLabel: "M13 Learning",
     icon: School,
     accentClass:
       "text-[color:var(--color-mod-learning-text)] bg-[var(--color-mod-learning-soft)] border-[color:var(--color-mod-learning-border)]",

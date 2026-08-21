@@ -5,6 +5,7 @@ import type {
   PayrollExceptionStatus,
   PayrollExceptionSummary,
 } from "@schoolos/core";
+import { getNepalNow } from "@schoolos/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -51,9 +52,9 @@ const severityTone: Record<
 export default function PayrollReadinessPage() {
   const queryClient = useQueryClient();
   const payrollCaps = usePayrollCapabilities();
-  const today = new Date();
-  const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth() + 1);
+  const [initialPeriod] = useState(() => getNepalNow());
+  const [year, setYear] = useState(initialPeriod.year);
+  const [month, setMonth] = useState(initialPeriod.month);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [severity, setSeverity] = useState<PayrollExceptionSeverity | "">("");
@@ -113,7 +114,7 @@ export default function PayrollReadinessPage() {
       <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--primary-dark)]">
-            Backend-owned readiness
+            Payroll readiness
           </p>
           <h1 className="mt-1 text-2xl font-black text-slate-950">
             Payroll readiness and exceptions
@@ -241,7 +242,7 @@ export default function PayrollReadinessPage() {
           description={
             readiness?.stale
               ? "Source data needs recheck"
-              : "Calculated by the backend"
+              : "Calculated from the current payroll records"
           }
         />
         <KpiCard
@@ -305,7 +306,7 @@ export default function PayrollReadinessPage() {
         ) : query.isError ? (
           <ErrorState
             title="Payroll readiness unavailable"
-            message="The backend-owned exception queue could not be loaded. Check your payroll permission and retry."
+            message="The payroll exception queue could not be loaded. Check your payroll access and retry."
             onRetry={() => void query.refetch()}
           />
         ) : query.data?.items.length ? (

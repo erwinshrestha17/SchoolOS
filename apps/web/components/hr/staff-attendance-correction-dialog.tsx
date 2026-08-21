@@ -9,6 +9,10 @@ import { Button } from '../ui/button';
 import { FormField, Input, Select, TextArea } from '../ui/form-field';
 import { Toast } from '../ui/toast';
 import { X, ClipboardCheck, AlertTriangle } from 'lucide-react';
+import {
+  formatNepalDateTimeLocalInput,
+  nepalDateTimeLocalInputToUtc,
+} from '../../lib/date-utils';
 
 type StaffAttendanceCorrectionDialogProps = {
   isOpen: boolean;
@@ -38,7 +42,7 @@ export function StaffAttendanceCorrectionDialog({
   const [status, setStatus] = useState(record.status);
   const [reason, setReason] = useState('');
   const [checkInTime, setCheckInTime] = useState(
-    record.checkIn ? new Date(record.checkIn).toISOString().slice(11, 16) : ''
+    record.checkIn ? formatNepalDateTimeLocalInput(record.checkIn).slice(11, 16) : ''
   );
   const [leaveType, setLeaveType] = useState(record.leaveType ?? '');
   const [note, setNote] = useState(record.note ?? '');
@@ -71,7 +75,7 @@ export function StaffAttendanceCorrectionDialog({
     let checkInAt: string | undefined = undefined;
     if (checkInTime) {
       const datePart = record.attendanceDate.slice(0, 10);
-      checkInAt = new Date(`${datePart}T${checkInTime}:00`).toISOString();
+      checkInAt = nepalDateTimeLocalInputToUtc(`${datePart}T${checkInTime}`);
     }
 
     correctMutation.mutate({

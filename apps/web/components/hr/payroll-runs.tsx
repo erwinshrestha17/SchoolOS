@@ -1,7 +1,11 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { PayrollPreviewResult, PayrollRunSummary } from '@schoolos/core';
+import {
+  getNepalNow,
+  type PayrollPreviewResult,
+  type PayrollRunSummary,
+} from '@schoolos/core';
 import {
   AlertTriangle,
   Calculator,
@@ -159,8 +163,9 @@ export function PayrollRuns() {
   const canReverseRun =
     hasPermissions(['payroll:run:reverse']) || canManagePayroll;
 
-  const currentMonth = new Date().getMonth() + 1;
-  const currentYear = new Date().getFullYear();
+  const [currentPeriod] = useState(() => getNepalNow());
+  const currentMonth = currentPeriod.month;
+  const currentYear = currentPeriod.year;
 
   const [month, setMonth] = useState(currentMonth);
   const [year, setYear] = useState(currentYear);
@@ -311,9 +316,9 @@ export function PayrollRuns() {
             <p className="text-xs leading-relaxed text-amber-800">
               Approval locks payroll calculations. Posting is a separate
               APPROVED-to-POSTED action that creates the M11 payroll accrual
-              journal through the backend accounting posting boundary. It does
+              journal through the accounting posting boundary. It does
               not disburse salaries or pay staff, and posted runs remain
-              immutable; reversal is a separate reasoned backend workflow.
+              immutable; reversal is a separate reasoned workflow.
             </p>
           </div>
         </div>
@@ -345,8 +350,8 @@ export function PayrollRuns() {
                 Create Draft from Preview
               </h3>
               <p className="text-xs text-gray-500">
-                Preview the period first, then save the exact backend
-                calculation as a DRAFT payroll run.
+                Preview the period first, then save the exact calculation as a
+                DRAFT payroll run.
               </p>
             </div>
             <div className="flex flex-wrap items-end gap-3">
@@ -459,7 +464,7 @@ export function PayrollRuns() {
                 Authoritative Totals
               </p>
               <p className="mt-1 text-sm font-bold text-[var(--color-mod-hr-text)]">
-                Saved on backend run creation
+                Saved when the payroll run is created
               </p>
             </div>
           </div>

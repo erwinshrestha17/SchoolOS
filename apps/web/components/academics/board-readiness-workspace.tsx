@@ -143,7 +143,7 @@ export function BoardReadinessWorkspace() {
                   value={readyCount}
                   icon={<CheckCircle2 />}
                   tone="success"
-                  description={`${readiness.indicators.length} backend-owned checks`}
+                  description={`${readiness.indicators.length} readiness checks`}
                 />
                 <SummaryCard
                   label="Need attention"

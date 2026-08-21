@@ -18,59 +18,67 @@ describe('Platform tenant SaaS billing page contracts', () => {
   });
 
   it('uses real platform APIs and no fake billing data', () => {
-    const page = read('app/platform/schools/[tenantId]/billing/page.tsx');
+    const page = read('components/platform/tenant-detail/tenant-billing.tsx');
 
-    assert.match(page, /api\.getPlatformTenantDetail\(tenantId\)/);
-    assert.match(page, /api\.listPlatformSaaSInvoices\(tenantId\)/);
+    assert.match(page, /platformApi\.listPlatformSaaSInvoices\(tenant\.id\)/);
+    assert.match(page, /platformApi\.createPlatformSaaSInvoice/);
+    assert.match(page, /platformApi\.recordPlatformSaaSPayment/);
+    assert.match(page, /platformApi\.cancelPlatformSaaSInvoice/);
     assert.doesNotMatch(page, /SO-2024-00124/);
     assert.doesNotMatch(page, /fake billing records/i);
   });
 
   it('uses shared platform operator state components', () => {
-    const page = read('app/platform/schools/[tenantId]/billing/page.tsx');
+    const page = read('components/platform/tenant-detail/tenant-billing.tsx');
 
     for (const expected of [
       'PlatformSectionSkeleton',
       'PlatformEmptyState',
       'PlatformInlineError',
       'PlatformBoundaryNote',
-      "from '../../../_components/platform-operator-states'",
+      'from "@/app/platform/_components/platform-operator-states"',
     ]) {
       assert.match(page, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
     }
   });
 
   it('keeps SaaS billing clearly separated from M3 and M11', () => {
-    const page = read('app/platform/schools/[tenantId]/billing/page.tsx');
+    const page = read('components/platform/tenant-detail/tenant-billing.tsx');
+    const normalizedPage = page.replace(/\s+/g, ' ');
 
     for (const expected of [
-      'SchoolOS SaaS Billing',
+      'SaaS billing',
       'SchoolOS-to-school subscription billing',
       'not M3 student fee collection',
       'M11 Accounting',
-      'Student fee invoices remain in M3 Fees',
+      'school fee invoice',
     ]) {
-      assert.match(page, new RegExp(expected));
+      assert.match(normalizedPage, new RegExp(expected));
     }
   });
 
   it('shows billing risk summaries and safe states', () => {
-    const page = read('app/platform/schools/[tenantId]/billing/page.tsx');
+    const page = read('components/platform/tenant-detail/tenant-billing.tsx');
 
     for (const expected of [
-      'Unpaid balance',
-      'Overdue invoices',
       'No SaaS invoices yet',
-      'Tenant billing unavailable',
-      'Back to tenant detail',
-      'Change plan',
-      'Synthetic billing records are never shown here',
+      'SaaS invoices unavailable',
+      'New invoice',
+      'Update profile',
+      'Audit reason',
       'Date not recorded',
-      'color-mod-platform-accent',
     ]) {
       assert.match(page, new RegExp(expected));
     }
 
-    assert.doesNotMatch(page, /bg-slate-900|bg-slate-950|shadow-xl|shadow-2xl|N\/A|Unknown failure/);
+    assert.doesNotMatch(page, /bg-slate-900|bg-slate-950|shadow-xl|shadow-2xl|N\/A|Unknown failure|SO-2024-00124/);
+  });
+
+  it('keeps billing writes behind the existing manage permission', () => {
+    const page = read('components/platform/tenant-detail/tenant-billing.tsx');
+
+    assert.match(page, /platform:billing:manage/);
+    assert.match(page, /!canManageBilling/);
+    assert.match(page, /canManageBilling \?/);
   });
 });

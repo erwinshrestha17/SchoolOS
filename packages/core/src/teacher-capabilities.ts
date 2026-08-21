@@ -350,6 +350,18 @@ export const TEACHER_RESTRICTED_ROUTES: TeacherRestrictedRoute[] = [
   },
   // --- M15 Notices / M12 Delivery ----------------------------------------
   {
+    prefix: "/dashboard/notifications/deliveries",
+    capability: TeacherCapability.NOTICE_DELIVERY_OPS,
+    label: "Delivery logs",
+    redirectTo: "/dashboard/notifications",
+  },
+  {
+    prefix: "/dashboard/notifications/failures",
+    capability: TeacherCapability.NOTICE_DELIVERY_OPS,
+    label: "Failure and retry centre",
+    redirectTo: "/dashboard/notifications",
+  },
+  {
     prefix: "/dashboard/notices/deliveries",
     capability: TeacherCapability.NOTICE_DELIVERY_OPS,
     label: "Delivery logs",

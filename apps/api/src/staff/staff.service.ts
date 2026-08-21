@@ -36,6 +36,7 @@ import {
   requireProfileEmail,
 } from '../common/validation/contact-profile';
 import { ListStaffQueryDto } from './dto/list-staff-query.dto';
+import { ListStaffOptionsDto } from './dto/list-staff-options.dto';
 
 @Injectable()
 export class StaffService {
@@ -528,38 +529,7 @@ export class StaffService {
   async listStaffDirectory(query: ListStaffQueryDto = {}, actor: AuthContext) {
     const page = clampPage(query.page, 1, 10_000);
     const limit = clampPage(query.limit, 25, 100);
-    const where: Prisma.StaffWhereInput = {
-      tenantId: actor.tenantId,
-    };
-
-    if (query.status) {
-      where.status = query.status;
-    }
-
-    if (query.contractType) {
-      where.contractType = query.contractType;
-    }
-
-    if (query.department) {
-      where.department = query.department.trim();
-    }
-
-    if (query.designation) {
-      where.designation = query.designation.trim();
-    }
-
-    const search = query.search?.trim();
-    if (search) {
-      where.OR = [
-        { employeeId: { contains: search, mode: 'insensitive' } },
-        { staffCode: { contains: search, mode: 'insensitive' } },
-        { firstName: { contains: search, mode: 'insensitive' } },
-        { lastName: { contains: search, mode: 'insensitive' } },
-        { department: { contains: search, mode: 'insensitive' } },
-        { designation: { contains: search, mode: 'insensitive' } },
-        { user: { email: { contains: search, mode: 'insensitive' } } },
-      ];
-    }
+    const where = this.buildStaffDirectoryWhere(query, actor);
 
     const [items, total] = await Promise.all([
       this.prisma.staff.findMany({
@@ -603,6 +573,99 @@ export class StaffService {
       limit,
       hasNextPage: page * limit < total,
     };
+  }
+
+  async listStaffOptions(query: ListStaffOptionsDto, actor: AuthContext) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 25;
+    const skip = (page - 1) * limit;
+    const tenantWhere = this.buildStaffDirectoryWhere(
+      { status: StaffStatus.ACTIVE },
+      actor,
+    );
+    const search = query.search.trim();
+    const where: Prisma.StaffWhereInput = {
+      AND: [tenantWhere, buildStaffOptionSearchWhere(search)],
+    };
+
+    const [items, total] = await Promise.all([
+      this.prisma.staff.findMany({
+        where,
+        select: {
+          id: true,
+          employeeId: true,
+          staffCode: true,
+          firstName: true,
+          lastName: true,
+          department: true,
+          designation: true,
+        },
+        orderBy: [
+          { firstName: 'asc' },
+          { lastName: 'asc' },
+          { employeeId: 'asc' },
+          { id: 'asc' },
+        ],
+        skip,
+        take: limit,
+      }),
+      this.prisma.staff.count({ where }),
+    ]);
+
+    return {
+      items: items.map((member) => ({
+        id: member.id,
+        employeeId: member.employeeId,
+        staffCode: member.staffCode,
+        fullName: `${member.firstName} ${member.lastName}`.trim(),
+        department: member.department,
+        designation: member.designation,
+      })),
+      total,
+      page,
+      limit,
+      hasNextPage: total > skip + items.length,
+    };
+  }
+
+  private buildStaffDirectoryWhere(
+    query: ListStaffQueryDto,
+    actor: AuthContext,
+  ): Prisma.StaffWhereInput {
+    const where: Prisma.StaffWhereInput = {
+      tenantId: actor.tenantId,
+    };
+
+    if (query.status) {
+      where.status = query.status;
+    }
+
+    if (query.contractType) {
+      where.contractType = query.contractType;
+    }
+
+    if (query.department) {
+      where.department = query.department.trim();
+    }
+
+    if (query.designation) {
+      where.designation = query.designation.trim();
+    }
+
+    const search = query.search?.trim();
+    if (search) {
+      where.OR = [
+        { employeeId: { contains: search, mode: 'insensitive' } },
+        { staffCode: { contains: search, mode: 'insensitive' } },
+        { firstName: { contains: search, mode: 'insensitive' } },
+        { lastName: { contains: search, mode: 'insensitive' } },
+        { department: { contains: search, mode: 'insensitive' } },
+        { designation: { contains: search, mode: 'insensitive' } },
+        { user: { email: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
+
+    return where;
   }
 
   async listContractExpiryReminders(
@@ -1371,6 +1434,21 @@ function daysBetween(from: Date, to: Date) {
 function clampReminderWindow(days: number | undefined) {
   if (!days || !Number.isFinite(days)) return 30;
   return Math.min(Math.max(Math.trunc(days), 1), 180);
+}
+
+function buildStaffOptionSearchWhere(search: string): Prisma.StaffWhereInput {
+  const termConditions = search.split(/\s+/).map((term) => ({
+    OR: [
+      { employeeId: { contains: term, mode: 'insensitive' as const } },
+      { staffCode: { contains: term, mode: 'insensitive' as const } },
+      { firstName: { contains: term, mode: 'insensitive' as const } },
+      { lastName: { contains: term, mode: 'insensitive' as const } },
+    ],
+  }));
+
+  return termConditions.length === 1
+    ? termConditions[0]
+    : { AND: termConditions };
 }
 
 function clampPage(value: number | undefined, fallback: number, max: number) {

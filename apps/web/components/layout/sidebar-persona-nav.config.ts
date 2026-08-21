@@ -419,7 +419,7 @@ export const teacherNavGroups: NavGroup[] = [
       },
       {
         href: '/dashboard/notices',
-        label: 'Messages & Announcements',
+        label: 'Notices & Announcements',
         icon: MessageSquare,
         permissions: ['notices:read'],
       },
@@ -890,7 +890,7 @@ export const librarianNavGroups: NavGroup[] = [
         permissions: ['library:manage', 'library:books:read'],
       },
       {
-        href: '/dashboard/library/issues',
+        href: '/dashboard/library/issue-return',
         label: 'Issues and Returns',
         icon: ClipboardList,
         permissions: ['library:manage', 'library:issues:read'],
@@ -906,12 +906,6 @@ export const librarianNavGroups: NavGroup[] = [
         label: 'Fines',
         icon: Wallet,
         permissions: ['library:fines:read'],
-      },
-      {
-        href: '/dashboard/library/borrowers',
-        label: 'Borrowers',
-        icon: Users,
-        permissions: ['library:read', 'students:read'],
       },
     ],
   },
@@ -987,8 +981,8 @@ export const transportOperatorNavGroups: NavGroup[] = [
         permissions: ['transport:operate'],
       },
       {
-        href: '/dashboard/transport/students',
-        label: 'Students',
+        href: '/dashboard/transport/assignments',
+        label: 'Assignments',
         icon: Users,
         permissions: ['transport:read', 'transport:operate'],
       },

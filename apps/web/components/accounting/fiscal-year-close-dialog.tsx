@@ -98,7 +98,7 @@ export function FiscalYearCloseDialog({ isOpen, onClose, fiscalYear, mode }: Fis
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Backend-owned close readiness
+                  Fiscal-year close readiness
                 </p>
                 <Button
                   type="button"
@@ -116,7 +116,7 @@ export function FiscalYearCloseDialog({ isOpen, onClose, fiscalYear, mode }: Fis
 
               {readinessQuery.isLoading && (
                 <p className="text-xs font-semibold text-slate-500">
-                  Running backend close-readiness checks...
+                  Checking fiscal-year close readiness...
                 </p>
               )}
               {readinessQuery.isError && (

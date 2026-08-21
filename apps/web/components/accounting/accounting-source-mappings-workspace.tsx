@@ -339,7 +339,7 @@ export function AccountingSourceMappingsWorkspace() {
         <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="source-mapping-title">
           <div className="my-8 w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl">
             <h3 id="source-mapping-title" className="text-xl font-black text-slate-950">Add source mapping</h3>
-            <p className="mt-2 text-sm text-slate-600">Create a reviewed effective-dated mapping. Existing overlapping mappings are rejected by the backend.</p>
+            <p className="mt-2 text-sm text-slate-600">Create a reviewed, effective-dated mapping. Overlapping date ranges are rejected.</p>
             {accountsQuery.isError ? (
               <PageState tone="danger" title="Chart accounts could not be loaded" actionLabel="Retry" onAction={() => void accountsQuery.refetch()} className="mt-5 min-h-40" />
             ) : (

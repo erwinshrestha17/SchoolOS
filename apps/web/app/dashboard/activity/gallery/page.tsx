@@ -1,60 +1,72 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { formatBsDateTime, type StudentProfile } from '@schoolos/core';
-import { Camera, Download, Eye } from 'lucide-react';
-import { api } from '../../../../lib/api';
-import { DashboardPageShell } from '../../../../components/dashboard/dashboard-page-shell';
-import { PageHeader } from '../../../../components/ui/page-header';
-import { FilterBar } from '../../../../components/ui/filter-bar';
-import { EmptyState } from '../../../../components/ui/empty-state';
-import { LoadingState } from '../../../../components/ui/loading-state';
-import { ErrorState } from '../../../../components/ui/error-state';
-import { Select } from '../../../../components/ui/form-field';
-import { Badge } from '../../../../components/ui/badge';
-import { ActivityThumbnail } from '../../../../components/activity/activity-thumbnail';
+import Link from "next/link";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { formatBsDateTime } from "@schoolos/core";
+import { Camera, Download, Eye } from "lucide-react";
+import { api } from "../../../../lib/api";
+import { DashboardPageShell } from "../../../../components/dashboard/dashboard-page-shell";
+import { PageHeader } from "../../../../components/ui/page-header";
+import { FilterBar } from "../../../../components/ui/filter-bar";
+import { EmptyState } from "../../../../components/ui/empty-state";
+import { LoadingState } from "../../../../components/ui/loading-state";
+import { ErrorState } from "../../../../components/ui/error-state";
+import { Select } from "../../../../components/ui/form-field";
+import { Badge } from "../../../../components/ui/badge";
+import { ActivityThumbnail } from "../../../../components/activity/activity-thumbnail";
+import { RemoteStudentSelector } from "../../../../components/students/remote-student-selector";
 
 const activityCategories = [
-  'CLASSROOM_LEARNING',
-  'ART_AND_CRAFT',
-  'MUSIC_AND_DANCE',
-  'SPORTS',
-  'SCIENCE_AND_PRACTICAL',
-  'PROJECT_WORK',
-  'EDUCATIONAL_TOUR',
-  'HEALTH_AND_HYGIENE',
-  'COMPETITION',
-  'ASSEMBLY',
-  'CLUB_ACTIVITY',
-  'COMMUNITY_SERVICE',
-  'FESTIVAL_AND_CULTURE',
-  'NATIONAL_PROGRAMME',
-  'ACHIEVEMENT',
-  'OTHER',
+  "CLASSROOM_LEARNING",
+  "ART_AND_CRAFT",
+  "MUSIC_AND_DANCE",
+  "SPORTS",
+  "SCIENCE_AND_PRACTICAL",
+  "PROJECT_WORK",
+  "EDUCATIONAL_TOUR",
+  "HEALTH_AND_HYGIENE",
+  "COMPETITION",
+  "ASSEMBLY",
+  "CLUB_ACTIVITY",
+  "COMMUNITY_SERVICE",
+  "FESTIVAL_AND_CULTURE",
+  "NATIONAL_PROGRAMME",
+  "ACHIEVEMENT",
+  "OTHER",
 ] as const;
 
-type SectionSummaryForUi = { id: string; name: string; classId?: string | null; class?: { id: string } | null };
+type SectionSummaryForUi = {
+  id: string;
+  name: string;
+  classId?: string | null;
+  class?: { id: string } | null;
+};
 
 export default function ActivityGalleryPage() {
   const [filters, setFilters] = useState({
-    classId: '',
-    sectionId: '',
-    studentId: '',
-    category: '',
+    classId: "",
+    sectionId: "",
+    studentId: "",
+    category: "",
   });
-  const [loadingAttachmentId, setLoadingAttachmentId] = useState<string | null>(null);
-  const [errorAttachmentId, setErrorAttachmentId] = useState<string | null>(null);
+  const [loadingAttachmentId, setLoadingAttachmentId] = useState<string | null>(
+    null,
+  );
+  const [errorAttachmentId, setErrorAttachmentId] = useState<string | null>(
+    null,
+  );
 
-  const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
-  const sectionsQuery = useQuery({ queryKey: ['sections'], queryFn: api.listSections });
-  const studentsQuery = useQuery({
-    queryKey: ['students-for-activity-gallery'],
-    queryFn: () => api.listStudents({ limit: 1000 }),
+  const classesQuery = useQuery({
+    queryKey: ["classes"],
+    queryFn: api.listClasses,
+  });
+  const sectionsQuery = useQuery({
+    queryKey: ["sections"],
+    queryFn: api.listSections,
   });
   const galleryQuery = useQuery({
-    queryKey: ['activity-gallery', filters],
+    queryKey: ["activity-gallery", filters],
     queryFn: () =>
       api.listActivityGallery({
         classId: filters.classId || null,
@@ -71,7 +83,6 @@ export default function ActivityGalleryPage() {
     () => (sectionsQuery.data ?? []) as SectionSummaryForUi[],
     [sectionsQuery.data],
   );
-  const students: StudentProfile[] = studentsQuery.data?.items ?? [];
   const filteredSections = useMemo(
     () =>
       sections.filter((section) => {
@@ -82,7 +93,10 @@ export default function ActivityGalleryPage() {
   );
   const items = galleryQuery.data ?? [];
   const hasActiveFilters = Boolean(
-    filters.classId || filters.sectionId || filters.studentId || filters.category,
+    filters.classId ||
+    filters.sectionId ||
+    filters.studentId ||
+    filters.category,
   );
 
   async function handlePreview(attachmentId: string) {
@@ -118,13 +132,18 @@ export default function ActivityGalleryPage() {
 
       <FilterBar
         label="Gallery filters"
-        description={`${items.length} media item${items.length === 1 ? '' : 's'} on this view`}
+        description={`${items.length} media item${items.length === 1 ? "" : "s"} on this view`}
         actions={
           hasActiveFilters ? (
             <button
               type="button"
               onClick={() =>
-                setFilters({ classId: '', sectionId: '', studentId: '', category: '' })
+                setFilters({
+                  classId: "",
+                  sectionId: "",
+                  studentId: "",
+                  category: "",
+                })
               }
               className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50"
             >
@@ -139,8 +158,8 @@ export default function ActivityGalleryPage() {
             setFilters((current) => ({
               ...current,
               classId: event.target.value,
-              sectionId: '',
-              studentId: '',
+              sectionId: "",
+              studentId: "",
             }))
           }
         >
@@ -157,7 +176,7 @@ export default function ActivityGalleryPage() {
             setFilters((current) => ({
               ...current,
               sectionId: event.target.value,
-              studentId: '',
+              studentId: "",
             }))
           }
         >
@@ -168,23 +187,24 @@ export default function ActivityGalleryPage() {
             </option>
           ))}
         </Select>
-        <Select
+        <RemoteStudentSelector
           value={filters.studentId}
-          onChange={(event) =>
-            setFilters((current) => ({ ...current, studentId: event.target.value }))
+          onChange={(studentId) =>
+            setFilters((current) => ({ ...current, studentId }))
           }
-        >
-          <option value="">All students</option>
-          {students.map((student) => (
-            <option key={student.id} value={student.id}>
-              {studentDisplayName(student)}
-            </option>
-          ))}
-        </Select>
+          classId={filters.classId || undefined}
+          sectionId={filters.sectionId || undefined}
+          label="Student"
+          placeholder="All students"
+          hideLabel
+        />
         <Select
           value={filters.category}
           onChange={(event) =>
-            setFilters((current) => ({ ...current, category: event.target.value }))
+            setFilters((current) => ({
+              ...current,
+              category: event.target.value,
+            }))
           }
         >
           <option value="">All categories</option>
@@ -226,7 +246,9 @@ export default function ActivityGalleryPage() {
                     <div className="flex h-full flex-col items-center justify-center p-4 text-center">
                       <Camera className="mb-2 h-6 w-6 text-slate-300" />
                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                        {item.accessBlockedReason ? 'Media hidden' : 'Private media'}
+                        {item.accessBlockedReason
+                          ? "Media hidden"
+                          : "Private media"}
                       </p>
                       {item.accessBlockedReason ? (
                         <p className="mt-2 text-xs font-semibold leading-relaxed text-slate-500">
@@ -254,7 +276,10 @@ export default function ActivityGalleryPage() {
                     <span className="min-w-0 truncate text-[11px] font-bold text-slate-600">
                       {item.fileName}
                     </span>
-                    <Badge variant="outline" className="shrink-0 text-[10px] font-black uppercase">
+                    <Badge
+                      variant="outline"
+                      className="shrink-0 text-[10px] font-black uppercase"
+                    >
                       {formatFileSize(item.sizeBytes)}
                     </Badge>
                   </div>
@@ -272,7 +297,9 @@ export default function ActivityGalleryPage() {
                     <button
                       type="button"
                       disabled={Boolean(item.accessBlockedReason) || isBusy}
-                      onClick={() => void handleDownload(item.id, item.fileName)}
+                      onClick={() =>
+                        void handleDownload(item.id, item.fileName)
+                      }
                       className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[var(--color-mod-activity-accent)] px-3 text-[10px] font-black uppercase tracking-widest text-white hover:bg-[var(--color-mod-activity-text)] disabled:opacity-50"
                     >
                       <Download className="h-3.5 w-3.5" />
@@ -292,11 +319,11 @@ export default function ActivityGalleryPage() {
         </div>
       ) : (
         <EmptyState
-          title={hasActiveFilters ? 'No results' : 'No media yet'}
+          title={hasActiveFilters ? "No results" : "No media yet"}
           description={
             hasActiveFilters
-              ? 'No activity media matches the selected filters.'
-              : 'Activity media will appear here once posts are published with photos.'
+              ? "No activity media matches the selected filters."
+              : "Activity media will appear here once posts are published with photos."
           }
         />
       )}
@@ -304,19 +331,11 @@ export default function ActivityGalleryPage() {
   );
 }
 
-function studentDisplayName(student: StudentProfile) {
-  return (
-    student.fullNameEn ??
-    `${student.firstNameEn ?? ''} ${student.lastNameEn ?? ''}`.trim() ??
-    student.studentSystemId
-  );
-}
-
 function formatEnumLabel(value: string) {
   return value
-    .split('_')
+    .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-    .join(' ');
+    .join(" ");
 }
 
 function formatFileSize(sizeBytes: number) {

@@ -136,15 +136,15 @@ export function FiscalPeriodActions({ periodId, status, label }: FiscalPeriodAct
         <div className="mt-4 space-y-2">
           {actionType === 'close' && readinessQuery.isPending && (
             <p className="text-xs font-semibold text-slate-500">
-              Running backend close-readiness checks...
+              Checking period-close readiness...
             </p>
           )}
           {actionType === 'close' && readinessQuery.data && (
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
               <p className="font-bold text-slate-800">
                 {readinessQuery.data.readyToClose
-                  ? 'Backend checks are ready to close'
-                  : `${readinessQuery.data.blockers.length} backend blocker(s) must be resolved`}
+                  ? 'This period is ready to close'
+                  : `${readinessQuery.data.blockers.length} blocker(s) must be resolved`}
               </p>
               {readinessQuery.data.blockers.map((blocker) => (
                 <p key={blocker.code} className="mt-1 text-rose-700">

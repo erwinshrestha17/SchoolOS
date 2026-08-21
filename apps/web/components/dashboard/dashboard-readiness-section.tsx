@@ -172,7 +172,7 @@ const READINESS_PANELS: ReadinessPanelDefinition[] = [
         metricKey: "failedDeliveries",
         label: (count) =>
           `${formatNumber(count)} notice deliver${count === 1 ? "y" : "ies"} failed`,
-        route: "/dashboard/notices/deliveries",
+        route: "/dashboard/notifications/deliveries",
       },
     ],
   },

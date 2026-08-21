@@ -121,6 +121,8 @@ describe('teacher capability matrix', () => {
       '/dashboard/academics/locks',
       '/dashboard/activity/moderation',
       '/dashboard/activity/reports',
+      '/dashboard/notifications/deliveries',
+      '/dashboard/notifications/failures',
       '/dashboard/notices/deliveries',
       '/dashboard/notices/failures',
       '/dashboard/library/catalog',
@@ -258,7 +260,7 @@ describe('teacher capability matrix', () => {
       ).toBeNull();
       expect(
         restrictionFor(
-          '/dashboard/notices/deliveries',
+          '/dashboard/notifications/deliveries',
           ['teacher'],
           teacherLibrarian,
         ),

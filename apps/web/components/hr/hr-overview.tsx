@@ -45,7 +45,7 @@ export function HROverview() {
         <StatCard
           title="Active Staff"
           value={summaryQuery.isError ? 'Unavailable' : summary?.activeStaffCount ?? 0}
-          description="Backend-owned staff count"
+          description="Active staff records"
           icon={<UserCheck className="h-5 w-5 text-emerald-500" />}
           loading={isLoading}
         />

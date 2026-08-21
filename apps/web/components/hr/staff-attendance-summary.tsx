@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import {
   formatBsDateRange,
+  getNepalNow,
   toBsDateFromGregorian,
   type StaffAttendanceMonthlySummary,
 } from '@schoolos/core';
@@ -11,18 +12,25 @@ import { ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import { useState } from 'react';
 
 export function StaffAttendanceSummary() {
-  const [date, setDate] = useState(new Date());
-  
-  const month = date.getMonth() + 1;
-  const year = date.getFullYear();
+  const [period, setPeriod] = useState(() => {
+    const current = getNepalNow();
+    return { month: current.month, year: current.year };
+  });
+  const { month, year } = period;
 
   const summaryQuery = useQuery({
     queryKey: ['staff-attendance-summary', month, year],
     queryFn: () => api.listStaffAttendanceSummary({ month, year }),
   });
 
-  const nextMonth = () => setDate(new Date(year, month, 1));
-  const prevMonth = () => setDate(new Date(year, month - 2, 1));
+  const nextMonth = () =>
+    setPeriod(
+      month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 },
+    );
+  const prevMonth = () =>
+    setPeriod(
+      month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 },
+    );
 
   const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
   const periodLabel = formatBsDateRange(

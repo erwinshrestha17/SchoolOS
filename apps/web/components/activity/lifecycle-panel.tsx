@@ -60,8 +60,8 @@ export function LifecyclePanel({
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-base font-black text-slate-900">Draft edit</h2>
         <p className="mt-1 text-sm text-slate-500">
-          Approved or archived posts are locked by the backend and require a
-          moderation decision instead of silent edits.
+          Approved or archived posts are locked and require a moderation
+          decision instead of silent edits.
         </p>
         <div className="mt-5 space-y-4">
           <label className="block">
@@ -102,7 +102,7 @@ export function LifecyclePanel({
           Moderation and removal
         </h2>
         <p className="mt-1 text-sm text-slate-500">
-          Backend permissions and audit logging enforce who can approve,
+          Role permissions and the audit history control who can approve,
           reject, archive, hide, or restore activity posts.
         </p>
         <label className="mt-5 block">

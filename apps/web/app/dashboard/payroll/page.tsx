@@ -95,7 +95,7 @@ export default function PayrollDashboardPage() {
       <ModuleHeader
         eyebrow="Staff & Finance"
         title="Payroll"
-        description="Review payroll runs, approve them, post approved runs to accounting, and open protected payslips and statutory reports from backend-owned payroll data."
+        description="Review payroll runs, approve them, post approved runs to accounting, and open protected payslips and statutory reports."
         primaryAction={
           <Link
             href="/dashboard/payroll/runs"
@@ -131,7 +131,7 @@ export default function PayrollDashboardPage() {
           icon={<Wallet className="h-5 w-5" />}
           loading={summaryQuery.isLoading}
           tone="module"
-          description="Selected run backend total"
+          description="Selected run total"
         />
         <SummaryCard
           label="Deductions"
@@ -147,7 +147,7 @@ export default function PayrollDashboardPage() {
           icon={<BadgeCheck className="h-5 w-5" />}
           loading={summaryQuery.isLoading}
           tone="success"
-          description="Backend-calculated run total"
+          description="Current run total"
         />
         <SummaryCard
           label="Approval Queue"
@@ -330,7 +330,7 @@ export default function PayrollDashboardPage() {
       {summaryQuery.isError ? (
         <ErrorState
           title="Payroll summary unavailable"
-          message="Official payroll summary totals could not be loaded. Report totals remain unavailable until the backend returns them."
+          message="Official payroll summary totals could not be loaded. Report totals remain unavailable; please retry."
           onRetry={() => void summaryQuery.refetch()}
         />
       ) : null}

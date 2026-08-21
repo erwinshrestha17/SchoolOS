@@ -238,7 +238,7 @@ export function AccountSecurityWorkspace({
                 Account &amp; Security
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                Change your SchoolOS password using the authenticated backend
+                Change your SchoolOS password
                 session. Other signed-in devices are signed out by default.
               </p>
             </div>

@@ -216,7 +216,7 @@ export function DeliveryRetryPanel() {
       {retryAllMutation.isError ? (
         <InlineRetryMessage
           tone="error"
-          message="Failed deliveries could not be retried. The backend may have blocked the provider or retry state."
+          message="Failed deliveries could not be retried. The provider may be unavailable or the deliveries may no longer be eligible."
         />
       ) : null}
       {retryMutation.isSuccess ? (

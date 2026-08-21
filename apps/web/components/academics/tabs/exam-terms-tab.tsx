@@ -1,6 +1,6 @@
 'use client';
 
-import { formatBsDate } from '@schoolos/core';
+import { formatBsDate, getNepalSchoolDay } from '@schoolos/core';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api } from '../../../lib/api';
@@ -28,7 +28,7 @@ type Props = {
   exams: any[];
 };
 
-const today = new Date().toISOString().slice(0, 10);
+const today = getNepalSchoolDay().gregorianDate;
 
 export function ExamTermsTab({ academicYears, subjects, exams }: Props) {
   const queryClient = useQueryClient();

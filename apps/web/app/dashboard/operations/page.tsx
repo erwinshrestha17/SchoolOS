@@ -120,11 +120,11 @@ export default function OperationsPage() {
       >
         <KpiGrid className="sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           <KpiCard title="Books Issued Today" value={canUseLibrary ? 'Unavailable' : 'Restricted'} icon={<BookOpen size={20} />} tone="neutral" description="A date-bounded issue summary is not available." />
-          <KpiCard title="Active Trips" value={canUseTransport ? safeValue(transportSummaryQuery.isError, transportSummaryQuery.data?.activeTrips) : 'Restricted'} loading={canUseTransport && transportSummaryQuery.isLoading} icon={<Bus size={20} />} tone="info" description="Backend transport report." />
-          <KpiCard title="Meals Served" value={canUseCanteen ? safeValue(mealCountQuery.isError, mealsServed) : 'Restricted'} loading={canUseCanteen && mealCountQuery.isLoading} icon={<Utensils size={20} />} tone="success" description="Backend daily meal-count report." />
-          <KpiCard title="Overdue Books" value={canUseLibrary ? safeValue(overdueQuery.isError, overdueQuery.data?.meta.total) : 'Restricted'} loading={canUseLibrary && overdueQuery.isLoading} icon={<Clock3 size={20} />} tone="warning" description="Backend overdue report total." />
+          <KpiCard title="Active Trips" value={canUseTransport ? safeValue(transportSummaryQuery.isError, transportSummaryQuery.data?.activeTrips) : 'Restricted'} loading={canUseTransport && transportSummaryQuery.isLoading} icon={<Bus size={20} />} tone="info" description="Active trip records." />
+          <KpiCard title="Meals Served" value={canUseCanteen ? safeValue(mealCountQuery.isError, mealsServed) : 'Restricted'} loading={canUseCanteen && mealCountQuery.isLoading} icon={<Utensils size={20} />} tone="success" description="Meals recorded today." />
+          <KpiCard title="Overdue Books" value={canUseLibrary ? safeValue(overdueQuery.isError, overdueQuery.data?.meta.total) : 'Restricted'} loading={canUseLibrary && overdueQuery.isLoading} icon={<Clock3 size={20} />} tone="warning" description="Current overdue total." />
           <KpiCard title="Stale GPS Alerts" value={canUseTransport ? safeValue(staleGpsQuery.isError, staleGpsAlerts) : 'Restricted'} loading={canUseTransport && staleGpsQuery.isLoading} icon={<MapPin size={20} />} tone="warning" description="Stale records are never presented as live." />
-          <KpiCard title="Low Wallets" value={canUseCanteen ? safeValue(lowWalletsQuery.isError, lowWalletsQuery.data?.length) : 'Restricted'} loading={canUseCanteen && lowWalletsQuery.isLoading} icon={<CreditCard size={20} />} tone="warning" description="Backend low-balance report." />
+          <KpiCard title="Low Wallets" value={canUseCanteen ? safeValue(lowWalletsQuery.isError, lowWalletsQuery.data?.length) : 'Restricted'} loading={canUseCanteen && lowWalletsQuery.isLoading} icon={<CreditCard size={20} />} tone="warning" description="Wallets below the configured threshold." />
         </KpiGrid>
       </ModuleHeader>
 
@@ -150,7 +150,7 @@ export default function OperationsPage() {
                 {safeValue(overdueQuery.isError, overdueQuery.data?.meta.total)}
               </p>
             )}
-            <p className="mt-1 text-sm text-slate-500">Overdue books from the backend report.</p>
+            <p className="mt-1 text-sm text-slate-500">Books currently recorded as overdue.</p>
             <Link href="/dashboard/library/issue-return" className="mt-5 inline-flex text-sm font-bold text-[var(--primary-dark)]">Open issue / return</Link>
           </SectionCard>
         ) : null}
@@ -163,8 +163,8 @@ export default function OperationsPage() {
                 {safeValue(transportSummaryQuery.isError, transportSummaryQuery.data?.activeTrips)}
               </p>
             )}
-            <p className="mt-1 text-sm text-slate-500">Active trips from the backend report.</p>
-            <Link href="/dashboard/transport/live-status" className="mt-5 inline-flex text-sm font-bold text-[var(--primary-dark)]">View trip status</Link>
+            <p className="mt-1 text-sm text-slate-500">Trips currently recorded as active.</p>
+            <Link href="/dashboard/transport/location" className="mt-5 inline-flex text-sm font-bold text-[var(--primary-dark)]">View trip status</Link>
           </SectionCard>
         ) : null}
         {canUseCanteen ? (
@@ -176,7 +176,7 @@ export default function OperationsPage() {
                 {safeValue(mealCountQuery.isError, mealsServed)}
               </p>
             )}
-            <p className="mt-1 text-sm text-slate-500">Meals served from the backend daily report.</p>
+            <p className="mt-1 text-sm text-slate-500">Meals recorded for this school day.</p>
             <Link href="/dashboard/canteen/pos" className="mt-5 inline-flex text-sm font-bold text-[var(--primary-dark)]">Open POS</Link>
           </SectionCard>
         ) : null}

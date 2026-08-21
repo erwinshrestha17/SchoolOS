@@ -62,6 +62,7 @@ import {
   OverrideAttendanceSessionDto,
 } from './dto/override-attendance-session.dto';
 import { ListStaffAttendanceSummaryDto } from './dto/list-staff-attendance-summary.dto';
+import { ListStaffAttendanceRosterDto } from './dto/list-staff-attendance-roster.dto';
 import { ReviewStaffLeaveRequestDto } from './dto/review-staff-leave-request.dto';
 import { SubmitStaffAttendanceDto } from './dto/submit-staff-attendance.dto';
 import {
@@ -3184,6 +3185,51 @@ export class AttendanceService {
     });
   }
 
+  async listStaffAttendanceRoster(
+    query: ListStaffAttendanceRosterDto,
+    actor: AuthContext,
+  ) {
+    if (!this.hasStaffAttendanceManagementAccess(actor)) {
+      throw new ForbiddenException(
+        'This workflow is limited to HR administrators',
+      );
+    }
+
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 100;
+    const where = {
+      tenantId: actor.tenantId,
+      status: StaffStatus.ACTIVE,
+    } as const;
+    const [staff, total] = await this.prisma.$transaction([
+      this.prisma.staff.findMany({
+        where,
+        select: {
+          id: true,
+          employeeId: true,
+          firstName: true,
+          lastName: true,
+        },
+        orderBy: [{ employeeId: 'asc' }, { id: 'asc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.staff.count({ where }),
+    ]);
+
+    return {
+      items: staff.map((item) => ({
+        staffId: item.id,
+        employeeId: item.employeeId,
+        fullName: `${item.firstName} ${item.lastName}`.trim(),
+      })),
+      total,
+      page,
+      limit,
+      hasNextPage: page * limit < total,
+    };
+  }
+
   async getStaffAttendanceHistory(staffId: string, actor: AuthContext) {
     const staff = await this.prisma.staff.findFirst({
       where: { id: staffId, tenantId: actor.tenantId },
@@ -5764,6 +5810,7 @@ export class AttendanceService {
     const permissions = actor.permissions ?? [];
     return (
       permissions.includes('hr:attendance:read') ||
+      permissions.includes('hr:attendance:write') ||
       permissions.includes('hr:manage') ||
       permissions.includes('attendance:manage_all')
     );

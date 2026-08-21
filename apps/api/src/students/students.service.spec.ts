@@ -43,6 +43,162 @@ const actor = {
 };
 
 describe('students lifecycle hardening', () => {
+  it('returns actor-scoped paginated student options without guardian data', async () => {
+    const prisma = buildPrisma({
+      studentFindManyResult: [
+        {
+          id: 'student-1',
+          studentSystemId: 'SCH-2026-0001',
+          admissionNumber: 'ADM-001',
+          firstNameEn: 'Maya',
+          lastNameEn: 'Shrestha',
+          classId: 'class-1',
+          class: { name: 'Grade 5' },
+          sectionId: 'section-1',
+          sectionRef: { name: 'A' },
+          section: 'A',
+        },
+      ],
+      studentCountQueue: [27],
+    });
+    const { service } = buildService(prisma);
+
+    const result = await service.listStudentOptions(
+      {
+        search: 'Maya',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        page: 2,
+        limit: 25,
+      },
+      actor,
+    );
+
+    const findManyQuery = prisma.student.findMany.mock.calls[0][0];
+    expect(findManyQuery).toEqual(
+      expect.objectContaining({
+        select: {
+          id: true,
+          studentSystemId: true,
+          admissionNumber: true,
+          firstNameEn: true,
+          lastNameEn: true,
+          classId: true,
+          class: { select: { name: true } },
+          sectionId: true,
+          sectionRef: { select: { name: true } },
+          section: true,
+        },
+        skip: 25,
+        take: 25,
+      }),
+    );
+    expect(JSON.stringify(findManyQuery)).not.toContain('guardian');
+    expect(findManyQuery.where.AND[0].AND).toEqual(
+      expect.arrayContaining([
+        { tenantId: actor.tenantId },
+        { lifecycleStatus: StudentLifecycleStatus.ACTIVE },
+      ]),
+    );
+    expect(result).toEqual({
+      items: [
+        {
+          id: 'student-1',
+          studentSystemId: 'SCH-2026-0001',
+          admissionNumber: 'ADM-001',
+          fullNameEn: 'Maya Shrestha',
+          classId: 'class-1',
+          className: 'Grade 5',
+          sectionId: 'section-1',
+          sectionName: 'A',
+        },
+      ],
+      total: 27,
+      page: 2,
+      limit: 25,
+      hasNextPage: true,
+    });
+  });
+
+  it("keeps student options limited to a parent's linked children", async () => {
+    const parentActor = {
+      ...actor,
+      userId: 'parent-user-options',
+      roles: ['parent'],
+      permissions: ['students:read'],
+    };
+    const prisma = buildPrisma({
+      studentFindManyResult: [],
+      studentCountQueue: [0],
+      guardianFindFirstQueue: [
+        {
+          id: 'guardian-options',
+          tenantId: parentActor.tenantId,
+          userId: parentActor.userId,
+          studentLinks: [{ studentId: 'student-own-options' }],
+        },
+      ],
+    });
+    const { service } = buildService(prisma);
+
+    await service.listStudentOptions({ search: 'Ma' }, parentActor);
+
+    expect(prisma.student.count).toHaveBeenCalledWith({
+      where: {
+        AND: [
+          {
+            AND: expect.arrayContaining([
+              { tenantId: parentActor.tenantId },
+              { id: { in: ['student-own-options'] } },
+              { lifecycleStatus: StudentLifecycleStatus.ACTIVE },
+            ]),
+          },
+          expect.objectContaining({ OR: expect.any(Array) }),
+        ],
+      },
+    });
+  });
+
+  it("keeps student options limited to a teacher's assigned sections", async () => {
+    const teacherActor = {
+      ...actor,
+      userId: 'teacher-user-options',
+      roles: ['subject_teacher'],
+      permissions: ['students:read'],
+    };
+    const prisma = buildPrisma({
+      studentFindManyResult: [],
+      studentCountQueue: [0],
+    });
+    const { service } = buildService(prisma, {
+      resolveReadableScope: jest.fn().mockResolvedValue({
+        assignments: [],
+        homeroomSectionIds: new Set<string>(),
+        subjectsBySection: new Map([
+          ['section-options', new Set(['subject-options'])],
+        ]),
+        allSectionIds: new Set(['section-options']),
+      }),
+    });
+
+    await service.listStudentOptions({ search: 'Ma' }, teacherActor);
+
+    expect(prisma.student.count).toHaveBeenCalledWith({
+      where: {
+        AND: [
+          {
+            AND: expect.arrayContaining([
+              { tenantId: teacherActor.tenantId },
+              { OR: [{ sectionId: 'section-options' }] },
+              { lifecycleStatus: StudentLifecycleStatus.ACTIVE },
+            ]),
+          },
+          expect.objectContaining({ OR: expect.any(Array) }),
+        ],
+      },
+    });
+  });
+
   it('lists students with academic-year, guardian, and admission filters without dropping pagination', async () => {
     const student = {
       ...buildStudent(),

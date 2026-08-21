@@ -1,18 +1,33 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { formatBsDate, moodLogFormSchema, type StudentProfile } from '@schoolos/core';
-import { api } from '../../../../lib/api';
-import { DashboardPageShell } from '../../../../components/dashboard/dashboard-page-shell';
-import { PageHeader } from '../../../../components/ui/page-header';
-import { EmptyState } from '../../../../components/ui/empty-state';
-import { FormField, Input, Select, TextArea } from '../../../../components/ui/form-field';
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  formatBsDate,
+  getNepalSchoolDay,
+  moodLogFormSchema,
+} from "@schoolos/core";
+import { api } from "../../../../lib/api";
+import { DashboardPageShell } from "../../../../components/dashboard/dashboard-page-shell";
+import { PageHeader } from "../../../../components/ui/page-header";
+import { EmptyState } from "../../../../components/ui/empty-state";
+import {
+  FormField,
+  Input,
+  Select,
+  TextArea,
+} from "../../../../components/ui/form-field";
+import { RemoteStudentSelector } from "../../../../components/students/remote-student-selector";
 
-const today = new Date().toISOString().slice(0, 10);
-const moods = ['CALM', 'ENGAGED', 'EXCITED', 'UNSETTLED', 'TIRED'] as const;
+const today = getNepalSchoolDay().gregorianDate;
+const moods = ["CALM", "ENGAGED", "EXCITED", "UNSETTLED", "TIRED"] as const;
 
-type SectionSummaryForUi = { id: string; name: string; classId?: string | null; class?: { id: string } | null };
+type SectionSummaryForUi = {
+  id: string;
+  name: string;
+  classId?: string | null;
+  class?: { id: string } | null;
+};
 type ObservationState = {
   classId: string;
   sectionId: string;
@@ -25,41 +40,42 @@ type ObservationState = {
 export default function ActivityObservationsPage() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<ObservationState>({
-    classId: '',
-    sectionId: '',
-    studentId: '',
-    mood: 'ENGAGED',
-    note: '',
+    classId: "",
+    sectionId: "",
+    studentId: "",
+    mood: "ENGAGED",
+    note: "",
     logDate: today,
   });
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
-  const sectionsQuery = useQuery({ queryKey: ['sections'], queryFn: api.listSections });
-  const studentsQuery = useQuery({
-    queryKey: ['students-for-observations'],
-    queryFn: () => api.listStudents({ limit: 1000 }),
+  const classesQuery = useQuery({
+    queryKey: ["classes"],
+    queryFn: api.listClasses,
   });
-  const logsQuery = useQuery({ queryKey: ['mood-logs'], queryFn: api.listMoodLogs });
+  const sectionsQuery = useQuery({
+    queryKey: ["sections"],
+    queryFn: api.listSections,
+  });
+  const logsQuery = useQuery({
+    queryKey: ["mood-logs"],
+    queryFn: api.listMoodLogs,
+  });
 
   const mutation = useMutation({
     mutationFn: api.createMoodLog,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['mood-logs'] });
-      setForm((current) => ({ ...current, note: '' }));
+      void queryClient.invalidateQueries({ queryKey: ["mood-logs"] });
+      setForm((current) => ({ ...current, note: "" }));
     },
   });
 
   const classes = classesQuery.data ?? [];
   const sections = (sectionsQuery.data ?? []) as SectionSummaryForUi[];
-  const students: StudentProfile[] = studentsQuery.data?.items ?? [];
   const filteredSections = sections.filter((section) => {
     const sectionClassId = section.classId ?? section.class?.id;
     return !form.classId || sectionClassId === form.classId;
   });
-  const filteredStudents = students.filter(
-    (student) => !form.classId || student.class?.id === form.classId,
-  );
   const logs = logsQuery.data ?? [];
 
   function save() {
@@ -73,7 +89,9 @@ export default function ActivityObservationsPage() {
     });
 
     if (!result.success) {
-      setValidationError(result.error.issues[0]?.message ?? 'Check the observation fields.');
+      setValidationError(
+        result.error.issues[0]?.message ?? "Check the observation fields.",
+      );
       return;
     }
 
@@ -98,10 +116,12 @@ export default function ActivityObservationsPage() {
       <div className="grid gap-8 xl:grid-cols-2">
         <div className="space-y-8 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
           <div>
-            <h2 className="text-lg font-black text-slate-950">New observation</h2>
+            <h2 className="text-lg font-black text-slate-950">
+              New observation
+            </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Leave the student field on &ldquo;Whole-class&rdquo; unless recording one child&rsquo;s
-              exception.
+              Leave the student field on &ldquo;Whole-class&rdquo; unless
+              recording one child&rsquo;s exception.
             </p>
           </div>
 
@@ -114,8 +134,8 @@ export default function ActivityObservationsPage() {
                     setForm((current) => ({
                       ...current,
                       classId: event.target.value,
-                      sectionId: '',
-                      studentId: '',
+                      sectionId: "",
+                      studentId: "",
                     }))
                   }
                 >
@@ -134,7 +154,7 @@ export default function ActivityObservationsPage() {
                     setForm((current) => ({
                       ...current,
                       sectionId: event.target.value,
-                      studentId: '',
+                      studentId: "",
                     }))
                   }
                 >
@@ -148,21 +168,19 @@ export default function ActivityObservationsPage() {
               </FormField>
             </div>
 
-            <FormField label="Student (optional exception)">
-              <Select
-                value={form.studentId}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, studentId: event.target.value }))
-                }
-              >
-                <option value="">Whole-class mood</option>
-                {filteredStudents.map((student) => (
-                  <option key={student.id} value={student.id}>
-                    {studentDisplayName(student)}
-                  </option>
-                ))}
-              </Select>
-            </FormField>
+            <RemoteStudentSelector
+              value={form.studentId}
+              onChange={(studentId) =>
+                setForm((current) => ({ ...current, studentId }))
+              }
+              classId={form.classId || undefined}
+              sectionId={form.sectionId || undefined}
+              label="Student (optional exception)"
+              placeholder={
+                form.classId ? "Whole-class mood" : "Select a class first"
+              }
+              disabled={!form.classId}
+            />
 
             <div className="grid gap-6 md:grid-cols-2">
               <FormField label="Mood">
@@ -171,7 +189,7 @@ export default function ActivityObservationsPage() {
                   onChange={(event) =>
                     setForm((current) => ({
                       ...current,
-                      mood: event.target.value as ObservationState['mood'],
+                      mood: event.target.value as ObservationState["mood"],
                     }))
                   }
                 >
@@ -187,7 +205,10 @@ export default function ActivityObservationsPage() {
                   type="date"
                   value={form.logDate}
                   onChange={(event) =>
-                    setForm((current) => ({ ...current, logDate: event.target.value }))
+                    setForm((current) => ({
+                      ...current,
+                      logDate: event.target.value,
+                    }))
                   }
                 />
               </FormField>
@@ -198,7 +219,10 @@ export default function ActivityObservationsPage() {
                 rows={4}
                 value={form.note}
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, note: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    note: event.target.value,
+                  }))
                 }
                 placeholder="Optional teacher observation..."
               />
@@ -221,7 +245,7 @@ export default function ActivityObservationsPage() {
                 onClick={save}
                 className="h-14 w-full rounded-2xl bg-[var(--color-mod-activity-accent)] text-xs font-black uppercase tracking-[0.2em] text-white shadow-sm transition-all hover:bg-[var(--color-mod-activity-text)] disabled:opacity-50"
               >
-                {mutation.isPending ? 'Saving...' : 'Save observation'}
+                {mutation.isPending ? "Saving..." : "Save observation"}
               </button>
             </div>
           </div>
@@ -245,7 +269,7 @@ export default function ActivityObservationsPage() {
                       <span className="ml-2 text-slate-600">
                         {log.student
                           ? `${log.student.firstNameEn} ${log.student.lastNameEn}`
-                          : 'Whole class'}
+                          : "Whole class"}
                       </span>
                     </p>
                     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
@@ -269,17 +293,9 @@ export default function ActivityObservationsPage() {
   );
 }
 
-function studentDisplayName(student: StudentProfile) {
-  return (
-    student.fullNameEn ??
-    `${student.firstNameEn ?? ''} ${student.lastNameEn ?? ''}`.trim() ??
-    student.studentSystemId
-  );
-}
-
 function formatEnumLabel(value: string) {
   return value
-    .split('_')
+    .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-    .join(' ');
+    .join(" ");
 }

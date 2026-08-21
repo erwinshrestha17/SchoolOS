@@ -631,7 +631,7 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
               />
               <div className="col-span-2 rounded-xl bg-slate-50 p-3">
                 <dt className="text-xs font-bold uppercase text-slate-500">
-                  Backend-selected channels
+                  Selected delivery channels
                 </dt>
                 <dd className="mt-1 font-semibold text-slate-800">
                   {preview.channels.join(", ") || "Unavailable"}
@@ -640,8 +640,8 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
             </dl>
           ) : (
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Preview uses the same backend audience resolver as publication.
-              The browser never constructs the official audience.
+              Preview and publication use the same saved audience rules. The
+              official audience is resolved when the notice is processed.
             </p>
           )}
         </section>

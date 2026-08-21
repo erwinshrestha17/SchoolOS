@@ -45,7 +45,7 @@ export function OperationalSummaryGrid({
     return (
       <ErrorState
         title={`${moduleName} summary unavailable`}
-        message="The operational workspace is still available. Retry to load its backend-owned summary."
+        message="The operational workspace is still available. Retry to load its official summary."
         onRetry={() => void summaryQuery.refetch()}
       />
     );

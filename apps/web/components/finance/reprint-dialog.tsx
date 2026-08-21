@@ -132,7 +132,7 @@ export function ReprintDialog({
                   Reprint audit history
                 </p>
                 <p className="mt-1 text-xs font-medium text-slate-500">
-                  Backend-recorded receipt copies for this tenant.
+                  Receipt copies recorded for this school.
                 </p>
               </div>
               {historyQuery.isLoading ? (

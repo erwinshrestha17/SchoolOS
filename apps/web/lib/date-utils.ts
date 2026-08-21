@@ -2,6 +2,7 @@ import {
   formatBsDate as coreFormatBsDate,
   toBsDateFromGregorian,
   toNepalLocalDateTime,
+  zonedNepalDateTimeToUtc,
 } from '@schoolos/core';
 
 /** Legacy values remain accepted for callers, but all school-facing output is BS. */
@@ -15,6 +16,48 @@ const monthNames = [
 export function normalizeActivityDate(item: any): string {
   if (!item) return '';
   return item.publishedAt || item.createdAt || item.timestamp || item.occurredAt || item.created_at || item.issuedAt || '';
+}
+
+/** Formats an instant for a datetime-local input using Nepal civil time. */
+export function formatNepalDateTimeLocalInput(
+  value: Date | string | number = new Date(),
+): string {
+  const local = toNepalLocalDateTime(value);
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return `${local.year}-${pad(local.month)}-${pad(local.day)}T${pad(local.hour)}:${pad(local.minute)}`;
+}
+
+/** Converts a Nepal-civil datetime-local value to an authoritative UTC instant. */
+export function nepalDateTimeLocalInputToUtc(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(
+    value.trim(),
+  );
+  if (!match) {
+    throw new Error('Date and time must use YYYY-MM-DDTHH:mm.');
+  }
+
+  const [, year, month, day, hour, minute, second = '00'] = match;
+  const timeParts = [Number(hour), Number(minute), Number(second)];
+  if (
+    timeParts.some((part) => !Number.isInteger(part)) ||
+    timeParts[0] < 0 ||
+    timeParts[0] > 23 ||
+    timeParts[1] < 0 ||
+    timeParts[1] > 59 ||
+    timeParts[2] < 0 ||
+    timeParts[2] > 59
+  ) {
+    throw new Error('Date and time must use a valid Nepal civil time.');
+  }
+
+  return zonedNepalDateTimeToUtc({
+    year: Number(year),
+    month: Number(month),
+    day: Number(day),
+    hour: timeParts[0],
+    minute: timeParts[1],
+    second: timeParts[2],
+  }).toISOString();
 }
 
 export function getBsDate(date: string | Date | null | undefined) {

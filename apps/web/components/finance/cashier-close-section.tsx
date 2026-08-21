@@ -312,7 +312,7 @@ export function CashierCloseSection() {
         <CollectionStat
           label="Bank / Digital"
           value="See breakdown"
-          sub="Backend method totals below"
+          sub="Official method totals below"
           icon={<CreditCard size={20} />}
           color="amber"
         />
@@ -506,7 +506,7 @@ export function CashierCloseSection() {
 
       <SectionCard
         title="Finalized Cashier Closes"
-        description="Backend-recorded immutable close sessions for this tenant."
+        description="Finalized, immutable close sessions for this school."
       >
         {closesQuery.isLoading ? (
           <LoadingState label="Loading cashier close history..." />

@@ -1,21 +1,36 @@
-'use client';
+"use client";
 
-import { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { formatBsDate, type StudentProfile } from '@schoolos/core';
-import { api } from '../../../../lib/api';
-import { DashboardPageShell } from '../../../../components/dashboard/dashboard-page-shell';
-import { PageHeader } from '../../../../components/ui/page-header';
-import { EmptyState } from '../../../../components/ui/empty-state';
-import { LoadingState } from '../../../../components/ui/loading-state';
-import { FormField, Input, Select, TextArea } from '../../../../components/ui/form-field';
-import { Badge } from '../../../../components/ui/badge';
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  formatBsDate,
+  getNepalSchoolDay,
+  type StudentLookupOption,
+} from "@schoolos/core";
+import { api } from "../../../../lib/api";
+import { DashboardPageShell } from "../../../../components/dashboard/dashboard-page-shell";
+import { PageHeader } from "../../../../components/ui/page-header";
+import { EmptyState } from "../../../../components/ui/empty-state";
+import { LoadingState } from "../../../../components/ui/loading-state";
+import {
+  FormField,
+  Input,
+  Select,
+  TextArea,
+} from "../../../../components/ui/form-field";
+import { Badge } from "../../../../components/ui/badge";
+import { RemoteStudentSelector } from "../../../../components/students/remote-student-selector";
 
-const today = new Date().toISOString().slice(0, 10);
-const statuses = ['EMERGING', 'PROGRESSING', 'ACHIEVED', 'NEEDS_SUPPORT'] as const;
+const today = getNepalSchoolDay().gregorianDate;
+const statuses = [
+  "EMERGING",
+  "PROGRESSING",
+  "ACHIEVED",
+  "NEEDS_SUPPORT",
+] as const;
 
 function newClientSubmissionId() {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
   }
   return `csid-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -23,24 +38,22 @@ function newClientSubmissionId() {
 
 export default function ActivityMilestonesPage() {
   const queryClient = useQueryClient();
-  const [studentSearch, setStudentSearch] = useState('');
-  const [selectedStudentId, setSelectedStudentId] = useState('');
-  const [monthFilter, setMonthFilter] = useState('');
-  const [domainFilter, setDomainFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [clientSubmissionId, setClientSubmissionId] = useState(newClientSubmissionId);
+  const [selectedStudent, setSelectedStudent] =
+    useState<StudentLookupOption | null>(null);
+  const [monthFilter, setMonthFilter] = useState("");
+  const [domainFilter, setDomainFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [clientSubmissionId, setClientSubmissionId] = useState(
+    newClientSubmissionId,
+  );
 
-  const studentsQuery = useQuery({
-    queryKey: ['students-for-milestones'],
-    queryFn: () => api.listStudents({ limit: 1000 }),
-  });
-  const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
   const templatesQuery = useQuery({
-    queryKey: ['milestone-templates'],
+    queryKey: ["milestone-templates"],
     queryFn: () => api.listMilestoneTemplates(),
   });
+  const selectedStudentId = selectedStudent?.id ?? "";
   const milestonesQuery = useQuery({
-    queryKey: ['developmental-milestones', selectedStudentId, monthFilter],
+    queryKey: ["developmental-milestones", selectedStudentId, monthFilter],
     queryFn: () =>
       api.listDevelopmentalMilestones({
         studentId: selectedStudentId || null,
@@ -49,54 +62,46 @@ export default function ActivityMilestonesPage() {
     enabled: Boolean(selectedStudentId),
   });
 
-  const students: StudentProfile[] = studentsQuery.data?.items ?? [];
-  const filteredStudents = students.filter((student) =>
-    studentDisplayName(student).toLowerCase().includes(studentSearch.toLowerCase()),
-  );
-  const selectedStudent = students.find((student) => student.id === selectedStudentId) ?? null;
-  const classes = useMemo(() => classesQuery.data ?? [], [classesQuery.data]);
   const templates = templatesQuery.data ?? [];
 
   const milestones = (milestonesQuery.data ?? []).filter((item) => {
     const matchesDomain =
-      !domainFilter || item.domain.toLowerCase().includes(domainFilter.toLowerCase());
+      !domainFilter ||
+      item.domain.toLowerCase().includes(domainFilter.toLowerCase());
     const matchesStatus = !statusFilter || item.status === statusFilter;
     return matchesDomain && matchesStatus;
   });
 
   const [form, setForm] = useState({
-    domain: '',
-    milestone: '',
-    status: 'PROGRESSING' as (typeof statuses)[number],
-    observationNote: '',
+    domain: "",
+    milestone: "",
+    status: "PROGRESSING" as (typeof statuses)[number],
+    observationNote: "",
     observedAt: today,
   });
 
   const mutation = useMutation({
     mutationFn: api.createDevelopmentalMilestone,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['developmental-milestones'] });
+      void queryClient.invalidateQueries({
+        queryKey: ["developmental-milestones"],
+      });
       setForm({
-        domain: '',
-        milestone: '',
-        status: 'PROGRESSING',
-        observationNote: '',
+        domain: "",
+        milestone: "",
+        status: "PROGRESSING",
+        observationNote: "",
         observedAt: today,
       });
       setClientSubmissionId(newClientSubmissionId());
     },
   });
 
-  const selectedStudentClass = useMemo(
-    () => classes.find((classroom) => classroom.id === selectedStudent?.class?.id) ?? null,
-    [classes, selectedStudent],
-  );
-
   function save() {
-    if (!selectedStudentId || !selectedStudentClass) return;
+    if (!selectedStudentId || !selectedStudent?.classId) return;
     mutation.mutate({
       clientSubmissionId,
-      classId: selectedStudentClass.id,
+      classId: selectedStudent.classId,
       studentId: selectedStudentId,
       domain: form.domain.trim(),
       milestone: form.milestone.trim(),
@@ -115,33 +120,17 @@ export default function ActivityMilestonesPage() {
 
       <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
         <aside className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <Input
-            value={studentSearch}
-            onChange={(event) => setStudentSearch(event.target.value)}
-            placeholder="Search students..."
+          <RemoteStudentSelector
+            value={selectedStudentId}
+            selectedOption={selectedStudent}
+            onChange={(_studentId, option) => setSelectedStudent(option)}
+            label="Student"
+            placeholder="Search students"
           />
-          <div className="max-h-[32rem] space-y-1 overflow-y-auto">
-            {studentsQuery.isLoading ? (
-              <LoadingState />
-            ) : filteredStudents.length > 0 ? (
-              filteredStudents.map((student) => (
-                <button
-                  key={student.id}
-                  type="button"
-                  onClick={() => setSelectedStudentId(student.id)}
-                  className={`w-full rounded-xl px-3 py-2.5 text-left text-sm font-bold transition-colors ${
-                    selectedStudentId === student.id
-                      ? 'bg-[var(--color-mod-activity-accent)] text-white'
-                      : 'text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  {studentDisplayName(student)}
-                </button>
-              ))
-            ) : (
-              <EmptyState title="No students" description="No students match this search." />
-            )}
-          </div>
+          <p className="text-xs leading-relaxed text-slate-500">
+            Search by name or student code. Results stay within your assigned
+            student scope.
+          </p>
         </aside>
 
         <div className="space-y-6">
@@ -155,9 +144,11 @@ export default function ActivityMilestonesPage() {
               <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-black text-slate-950">
-                    {studentDisplayName(selectedStudent!)}
+                    {selectedStudent?.fullNameEn}
                   </h2>
-                  <Badge variant="secondary">{milestones.length} recorded</Badge>
+                  <Badge variant="secondary">
+                    {milestones.length} recorded
+                  </Badge>
                 </div>
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -202,7 +193,9 @@ export default function ActivityMilestonesPage() {
                           <h4 className="font-black uppercase tracking-tight text-slate-900">
                             {item.milestone}
                           </h4>
-                          <Badge variant="outline">{formatEnumLabel(item.status)}</Badge>
+                          <Badge variant="outline">
+                            {formatEnumLabel(item.status)}
+                          </Badge>
                         </div>
                         <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
                           {item.domain} · {formatBsDate(item.observedAt)}
@@ -239,7 +232,8 @@ export default function ActivityMilestonesPage() {
                             ...current,
                             domain: template.domain,
                             milestone: template.milestone,
-                            status: template.suggestedStatus as (typeof statuses)[number],
+                            status:
+                              template.suggestedStatus as (typeof statuses)[number],
                             observationNote: template.observationPrompt,
                           }))
                         }
@@ -256,7 +250,10 @@ export default function ActivityMilestonesPage() {
                     <Input
                       value={form.domain}
                       onChange={(event) =>
-                        setForm((current) => ({ ...current, domain: event.target.value }))
+                        setForm((current) => ({
+                          ...current,
+                          domain: event.target.value,
+                        }))
                       }
                       placeholder="e.g. Motor skills"
                     />
@@ -267,7 +264,8 @@ export default function ActivityMilestonesPage() {
                       onChange={(event) =>
                         setForm((current) => ({
                           ...current,
-                          status: event.target.value as (typeof statuses)[number],
+                          status: event.target
+                            .value as (typeof statuses)[number],
                         }))
                       }
                     >
@@ -283,7 +281,10 @@ export default function ActivityMilestonesPage() {
                   <Input
                     value={form.milestone}
                     onChange={(event) =>
-                      setForm((current) => ({ ...current, milestone: event.target.value }))
+                      setForm((current) => ({
+                        ...current,
+                        milestone: event.target.value,
+                      }))
                     }
                     placeholder="e.g. Uses classroom materials independently"
                   />
@@ -306,7 +307,10 @@ export default function ActivityMilestonesPage() {
                     type="date"
                     value={form.observedAt}
                     onChange={(event) =>
-                      setForm((current) => ({ ...current, observedAt: event.target.value }))
+                      setForm((current) => ({
+                        ...current,
+                        observedAt: event.target.value,
+                      }))
                     }
                   />
                 </FormField>
@@ -316,10 +320,10 @@ export default function ActivityMilestonesPage() {
                     {mutation.error.message}
                   </p>
                 ) : null}
-                {!selectedStudentClass ? (
+                {!selectedStudent?.classId ? (
                   <p className="mt-4 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-700">
-                    This student has no active class assignment on record; milestone logging is
-                    unavailable.
+                    This student has no active class assignment on record;
+                    milestone logging is unavailable.
                   </p>
                 ) : null}
 
@@ -328,13 +332,13 @@ export default function ActivityMilestonesPage() {
                   disabled={
                     !form.domain.trim() ||
                     !form.milestone.trim() ||
-                    !selectedStudentClass ||
+                    !selectedStudent?.classId ||
                     mutation.isPending
                   }
                   onClick={save}
                   className="mt-4 h-12 w-full rounded-2xl bg-[var(--color-mod-activity-accent)] text-xs font-black uppercase tracking-[0.2em] text-white shadow-sm transition-all hover:bg-[var(--color-mod-activity-text)] disabled:opacity-50"
                 >
-                  {mutation.isPending ? 'Saving...' : 'Save milestone'}
+                  {mutation.isPending ? "Saving..." : "Save milestone"}
                 </button>
               </section>
             </>
@@ -345,17 +349,9 @@ export default function ActivityMilestonesPage() {
   );
 }
 
-function studentDisplayName(student: StudentProfile) {
-  return (
-    student.fullNameEn ??
-    `${student.firstNameEn ?? ''} ${student.lastNameEn ?? ''}`.trim() ??
-    student.studentSystemId
-  );
-}
-
 function formatEnumLabel(value: string) {
   return value
-    .split('_')
+    .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-    .join(' ');
+    .join(" ");
 }

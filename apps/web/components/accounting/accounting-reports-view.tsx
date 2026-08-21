@@ -954,8 +954,8 @@ export function AccountingReportsView({
         }
       >
         <AuditInfo>
-          Financial truth is derived from the backend ledger. Posted journals are
-          immutable; use reversal/correction workflows for any adjustments.
+          Financial truth comes from the official ledger. Posted journals are
+          immutable; use reversal or correction workflows for any adjustments.
         </AuditInfo>
       </SectionCard>
 

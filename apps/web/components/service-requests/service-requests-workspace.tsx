@@ -234,7 +234,7 @@ export function ServiceRequestsQueueWorkspace() {
 
       <SectionCard
         title="Request queue"
-        description="Server-paginated, tenant-scoped service requests from the backend queue API."
+        description="School service requests matching the current filters."
         headerAction={
           <Badge variant="neutral">{listQuery.data?.total ?? 0} requests</Badge>
         }
@@ -436,7 +436,7 @@ export function ServiceRequestDetailWorkspace({ requestId }: { requestId: string
       </div>
 
       {detailQuery.isLoading ? (
-        <SectionCard title="Loading request" description="Fetching case details from the backend.">
+        <SectionCard title="Loading request" description="Fetching case details.">
           <div className="h-24 animate-pulse rounded-xl bg-slate-100" />
         </SectionCard>
       ) : detailQuery.isError || !request ? (
@@ -600,7 +600,7 @@ export function ServiceRequestDetailWorkspace({ requestId }: { requestId: string
               <NotesSection title="Internal notes" notes={request.internalNotes} internal />
 
               {request.attachments.length > 0 ? (
-                <SectionCard title="Protected evidence" description="Downloads use authenticated service-request attachment endpoints.">
+                <SectionCard title="Protected evidence" description="Downloads require your signed-in SchoolOS access.">
                   <ul className="space-y-3">
                     {request.attachments.map((attachment) => (
                       <li
@@ -649,7 +649,7 @@ export function ServiceRequestDetailWorkspace({ requestId }: { requestId: string
       <ReasonDialog
         isOpen={dialogMode === 'resolve'}
         title="Resolve this request"
-        description="Explain the outcome the parent should see. Resolution is sent to the parent after backend confirmation."
+        description="Explain the outcome the parent should see. The resolution is sent after the request is successfully recorded."
         confirmLabel="Send resolution"
         destructive={false}
         minLength={8}

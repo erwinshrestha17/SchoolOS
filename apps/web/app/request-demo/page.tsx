@@ -26,7 +26,7 @@ export default function RequestDemoPage() {
                 SchoolOS
               </span>
               <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
-                School ERP for Nepal
+                School operating system for Nepal
               </span>
             </div>
           </div>
@@ -89,7 +89,7 @@ export default function RequestDemoPage() {
               <div>
                 <h4 className="text-xs font-bold text-slate-950">Guided onboarding</h4>
                 <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed">
-                  Our rollout engineers map your classes, fees schedules, and existing sheets.
+                  Our rollout team reviews classes, fee structures, roles, and agreed data-import needs.
                 </p>
               </div>
             </div>

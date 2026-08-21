@@ -747,7 +747,7 @@ export function CollectionCounter({
                 />
                 <PaymentReviewItem
                   label="Balance after confirmation"
-                  value="Available after backend confirmation"
+                  value="Available after payment confirmation"
                   className="border-t border-slate-200 sm:border-l"
                 />
               </div>

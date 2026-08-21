@@ -238,7 +238,7 @@ export function IemisReadinessWorkspace() {
           value={issueRows.length}
           icon={<AlertTriangle size={19} />}
           tone={issueRows.length ? "danger" : "success"}
-          description="Returned by backend rules"
+          description="Current readiness result"
         />
         <KpiCard
           title="Missing Fields"
@@ -252,7 +252,7 @@ export function IemisReadinessWorkspace() {
           value="—"
           icon={<FileSpreadsheet size={19} />}
           tone="neutral"
-          description="No iEMIS duplicate summary API"
+          description="Duplicate summary unavailable"
         />
         <KpiCard
           title="Last Export"
@@ -286,7 +286,7 @@ export function IemisReadinessWorkspace() {
                 Validation Issues
               </h2>
               <p className="mt-1 text-xs font-medium text-slate-500">
-                Rules and issue messages are returned by the backend.
+                Review each rule and issue before preparing an export.
               </p>
             </div>
             <select
@@ -425,7 +425,7 @@ export function IemisReadinessWorkspace() {
                   CSV Import History
                 </h3>
                 <p className="mt-1 text-xs text-slate-500">
-                  Tenant-scoped persisted batches from the admissions backend.
+                  Import and export batches recorded for this school.
                 </p>
               </div>
               <StatusBadge

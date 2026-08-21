@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle, Info } from 'lucide-react';
-import { formatBsDate } from '@schoolos/core';
+import { formatBsDate, getNepalSchoolDay } from '@schoolos/core';
 import { api } from '@/lib/api';
 import type { HomeworkPublishNotifyChoice } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -38,7 +38,7 @@ const NOTIFY_OPTIONS: { value: HomeworkPublishNotifyChoice; label: string; descr
 ];
 
 function todayDateInputValue() {
-  return new Date().toISOString().slice(0, 10);
+  return getNepalSchoolDay().gregorianDate;
 }
 
 export function HomeworkCreateForm() {
@@ -469,7 +469,7 @@ export function HomeworkCreateForm() {
           <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
             <div className="flex flex-col">
               <span className="text-sm font-bold text-slate-900">Repeat Assignment</span>
-              <span className="text-xs text-slate-500">Create a bounded recurring series through the backend recurrence contract.</span>
+              <span className="text-xs text-slate-500">Create a recurring series within the selected date range.</span>
             </div>
             <input
               type="checkbox"

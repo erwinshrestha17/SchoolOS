@@ -1,6 +1,6 @@
 'use client';
 
-import { formatBsDateForInput, isValidDateOfBirth, isValidEmail, isValidPersonName, normalizeEmail, normalizeNepalPhone, normalizePersonName, toGregorianDateFromBs, tryNormalizeNepalPhone, type AdmissionCase, type CreateAdmissionCasePayload } from '@schoolos/core';
+import { formatBsDateForInput, getNepalSchoolDay, isValidDateOfBirth, isValidEmail, isValidPersonName, normalizeEmail, normalizeNepalPhone, normalizePersonName, toGregorianDateFromBs, tryNormalizeNepalPhone, type AdmissionCase, type CreateAdmissionCasePayload } from '@schoolos/core';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, FileText, Loader2, Save, ShieldCheck, Upload, UsersRound } from 'lucide-react';
 import Link from 'next/link';
@@ -33,7 +33,7 @@ const EMPTY_FORM: CreateAdmissionCasePayload = {
   transferStudent: undefined,
   previousSchool: '',
   notes: '',
-  admissionDate: new Date().toISOString().slice(0, 10),
+  admissionDate: getNepalSchoolDay().gregorianDate,
   mediumOfInstruction: 'English',
 };
 
@@ -47,7 +47,9 @@ export function AdmissionCaseWizard({ initialCaseId }: { initialCaseId?: string 
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<CreateAdmissionCasePayload>(EMPTY_FORM);
   const [dateOfBirthBs, setDateOfBirthBs] = useState('');
-  const [admissionDateBs, setAdmissionDateBs] = useState(() => formatBsDateForInput(new Date()));
+  const [admissionDateBs, setAdmissionDateBs] = useState(() =>
+    formatBsDateForInput(getNepalSchoolDay().gregorianDate),
+  );
   const [caseId, setCaseId] = useState<string | null>(initialCaseId ?? null);
   const [caseData, setCaseData] = useState<AdmissionCase | null>(null);
   const [documentKind, setDocumentKind] = useState('BIRTH_CERTIFICATE');
@@ -158,7 +160,11 @@ export function AdmissionCaseWizard({ initialCaseId }: { initialCaseId?: string 
     const recoveredForm = formFromAdmissionCase(recovered);
     setForm(recoveredForm);
     setDateOfBirthBs(recoveredForm.dateOfBirth ? formatBsDateForInput(recoveredForm.dateOfBirth) : '');
-    setAdmissionDateBs(recoveredForm.admissionDate ? formatBsDateForInput(recoveredForm.admissionDate) : formatBsDateForInput(new Date()));
+    setAdmissionDateBs(
+      recoveredForm.admissionDate
+        ? formatBsDateForInput(recoveredForm.admissionDate)
+        : formatBsDateForInput(getNepalSchoolDay().gregorianDate),
+    );
     setStep(recoveryStepForCase(recovered));
     autosaveFingerprintRef.current = JSON.stringify(buildAdmissionCasePayload(recoveredForm));
   }, [recoveryQuery.data]);
@@ -252,7 +258,7 @@ export function AdmissionCaseWizard({ initialCaseId }: { initialCaseId?: string 
         <div className="flex flex-wrap gap-3">
           <Link href={admissionResult.redirectPath} className="inline-flex min-h-11 items-center rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 text-sm font-bold text-white">View student profile</Link>
           {caseData?.followUps.length ? <Link href={`${admissionResult.redirectPath}#admission-follow-ups`} className="inline-flex min-h-11 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50">Open follow-up checklist</Link> : null}
-          <Button type="button" variant="outline" onClick={() => { setStep(0); setForm({ ...EMPTY_FORM, admissionDate: new Date().toISOString().slice(0, 10) }); setDateOfBirthBs(''); setAdmissionDateBs(formatBsDateForInput(new Date())); setCaseId(null); setCaseData(null); setAdmissionResult(null); setLocalError(''); }}>Admit another student</Button>
+          <Button type="button" variant="outline" onClick={() => { setStep(0); setForm({ ...EMPTY_FORM, admissionDate: getNepalSchoolDay().gregorianDate }); setDateOfBirthBs(''); setAdmissionDateBs(formatBsDateForInput(getNepalSchoolDay().gregorianDate)); setCaseId(null); setCaseData(null); setAdmissionResult(null); setLocalError(''); }}>Admit another student</Button>
         </div>
       </SectionCard>
     );
@@ -587,7 +593,7 @@ function EarlyMatchNotice({ admissionCase }: { admissionCase: AdmissionCase }) {
           <p className="font-black">Possible existing record found</p>
           <p className="mt-1 text-sm">
             {duplicateCount > 0
-              ? `The backend found ${duplicateCount} possible student match${duplicateCount === 1 ? '' : 'es'}. Review before completing admission.`
+              ? `${duplicateCount} possible student match${duplicateCount === 1 ? '' : 'es'} found. Review before completing admission.`
               : `This guardian phone is already linked to ${relatedCount} student record${relatedCount === 1 ? '' : 's'}. No guardian or sibling link was changed.`}
           </p>
           {admissionCase.id ? <Link href={`/dashboard/admissions/cases/${admissionCase.id}`} className="mt-3 inline-flex text-sm font-black underline underline-offset-4">Review saved case</Link> : null}
@@ -698,7 +704,7 @@ function formFromAdmissionCase(admissionCase: AdmissionCase): CreateAdmissionCas
     transferStudent: admissionCase.transferStudent,
     previousSchool: admissionCase.previousSchool ?? '',
     notes: admissionCase.notes ?? '',
-    admissionDate: admissionCase.academic.admissionDate ?? new Date().toISOString().slice(0, 10),
+    admissionDate: admissionCase.academic.admissionDate ?? getNepalSchoolDay().gregorianDate,
     mediumOfInstruction: admissionCase.academic.mediumOfInstruction,
     rollNumber: admissionCase.academic.rollNumber ?? undefined,
     documents: admissionCase.documents.map((document) => ({

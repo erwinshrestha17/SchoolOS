@@ -70,19 +70,21 @@ export function Sidebar({
   const { session } = useSession();
   const { hasModule } = useEntitlements();
 
-  // A real, permission-gated unread count for the Notices nav badge — reuses
+  // A real, permission- and entitlement-gated unread count for Notifications — reuses
   // the same query key as the topbar's NotificationBell, so TanStack Query
   // dedupes the fetch instead of issuing a second network request. Badge
   // failure/loading must not block navigation, so it silently falls back to
   // "no badge" rather than surfacing an error state.
-  const canReadNotifications = hasAnyPermission(session, ['notices:read']);
+  const canReadNotifications =
+    hasModule('notifications') &&
+    hasAnyPermission(session, ['notifications:view_own']);
   const notificationCenterQuery = useQuery({
     queryKey: ['notification-center'],
     queryFn: api.getNotificationCenter,
     enabled: canReadNotifications,
     refetchInterval: 60_000,
   });
-  const unreadNoticesBadge = formatBadgeCount(
+  const unreadNotificationsBadge = formatBadgeCount(
     notificationCenterQuery.data?.unreadCount ?? 0,
   );
 
@@ -101,14 +103,10 @@ export function Sidebar({
       items: group.items
         .filter((item) => canDisplayNavItem(item, session, hasModule))
         .map((item) =>
-          item.href === '/dashboard/notices' ||
-          item.href === '/dashboard/notices/approvals'
+          item.href === '/dashboard/notifications'
             ? {
                 ...item,
-                badge:
-                  item.href === '/dashboard/notices'
-                    ? unreadNoticesBadge
-                    : item.badge,
+                badge: unreadNotificationsBadge,
               }
             : item,
         ),

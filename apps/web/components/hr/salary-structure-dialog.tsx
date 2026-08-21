@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
 import { Button } from '../ui/button';
@@ -9,6 +9,8 @@ import { FormField, Input, Select, TextArea } from '../ui/form-field';
 import { Checkbox } from '../ui/checkbox';
 import { Toast } from '../ui/toast';
 import { X, Plus, Trash2, Calculator, Percent } from 'lucide-react';
+import { getNepalSchoolDay, type StaffLookupOption } from '@schoolos/core';
+import { RemoteStaffSelector } from '../staff/remote-staff-selector';
 
 type ComponentRow = {
   name: string;
@@ -50,7 +52,9 @@ export function SalaryStructureDialog({
   const isEdit = !!existingStructure;
 
   const [staffId, setStaffId] = useState(lockedStaffId ?? '');
-  const [effectiveFrom, setEffectiveFrom] = useState(new Date().toISOString().slice(0, 10));
+  const [staffOption, setStaffOption] =
+    useState<StaffLookupOption | null>(null);
+  const [effectiveFrom, setEffectiveFrom] = useState(getNepalSchoolDay().gregorianDate);
   const [effectiveTo, setEffectiveTo] = useState('');
   const [basicSalary, setBasicSalary] = useState<number>(0);
   const [pfEnabled, setPfEnabled] = useState(false);
@@ -68,12 +72,6 @@ export function SalaryStructureDialog({
   const [newCompType, setNewCompType] = useState<'EARNING' | 'DEDUCTION'>('EARNING');
   const [newCompAmount, setNewCompAmount] = useState<number>(0);
   const [newCompTaxable, setNewCompTaxable] = useState(true);
-
-  const staffQuery = useQuery({
-    queryKey: ['staff'],
-    queryFn: api.listStaff,
-    enabled: isOpen && !lockedStaffId && !isEdit,
-  });
 
   useEffect(() => {
     if (existingStructure) {
@@ -96,7 +94,7 @@ export function SalaryStructureDialog({
       setComponents(loadedComponents);
     } else {
       // Defaults
-      setEffectiveFrom(new Date().toISOString().slice(0, 10));
+      setEffectiveFrom(getNepalSchoolDay().gregorianDate);
       setEffectiveTo('');
       setBasicSalary(0);
       setPfEnabled(false);
@@ -105,7 +103,10 @@ export function SalaryStructureDialog({
       setBankName('');
       setBankAccount('');
       setComponents([]);
-      if (!lockedStaffId) setStaffId('');
+      if (!lockedStaffId) {
+        setStaffId('');
+        setStaffOption(null);
+      }
     }
   }, [existingStructure, isOpen, lockedStaffId]);
 
@@ -207,8 +208,6 @@ export function SalaryStructureDialog({
     saveMutation.mutate(payload);
   };
 
-  const staffList = staffQuery.data ?? [];
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[85vh] rounded-2xl">
@@ -249,16 +248,16 @@ export function SalaryStructureDialog({
               </h4>
 
               {!lockedStaffId && !isEdit ? (
-                <FormField label="Staff Member">
-                  <Select value={staffId} onChange={(e) => setStaffId(e.target.value)}>
-                    <option value="">Choose staff...</option>
-                    {staffList.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.firstName} {s.lastName} ({s.employeeId})
-                      </option>
-                    ))}
-                  </Select>
-                </FormField>
+                <RemoteStaffSelector
+                  value={staffId}
+                  selectedOption={staffOption}
+                  onChange={(nextStaffId, option) => {
+                    setStaffId(nextStaffId);
+                    setStaffOption(option);
+                  }}
+                  label="Staff member"
+                  placeholder="Search staff member"
+                />
               ) : null}
 
               <FormField label="Basic Salary (Required)">

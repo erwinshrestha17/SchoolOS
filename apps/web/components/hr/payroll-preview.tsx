@@ -4,11 +4,12 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { Calculator, AlertTriangle, Loader2 } from 'lucide-react';
-import type { PayrollPreviewResult } from '@schoolos/core';
+import { getNepalNow, type PayrollPreviewResult } from '@schoolos/core';
 
 export function PayrollPreview() {
-  const currentMonth = new Date().getMonth() + 1;
-  const currentYear = new Date().getFullYear();
+  const [currentPeriod] = useState(() => getNepalNow());
+  const currentMonth = currentPeriod.month;
+  const currentYear = currentPeriod.year;
 
   const [month, setMonth] = useState(currentMonth);
   const [year, setYear] = useState(currentYear);

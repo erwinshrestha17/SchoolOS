@@ -53,7 +53,7 @@ export function AttendanceConflictReview({
         ) : !canReviewConflicts ? (
           <PermissionDenied
             title="Conflict review unavailable"
-            description="Attendance conflict resolution requires review authority from the backend permission model."
+            description="You need attendance review permission to resolve conflicts."
           />
         ) : null}
         {conflicts.map((conflict) => (

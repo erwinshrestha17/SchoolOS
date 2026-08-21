@@ -3,17 +3,12 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import { AlertTriangle, QrCode, Soup, Utensils, Wallet } from "lucide-react";
 import {
-  AlertTriangle,
-  Download,
-  Package,
-  QrCode,
-  Soup,
-  Utensils,
-  Wallet,
-} from "lucide-react";
-import { formatBsDateTime, type StudentProfile } from "@schoolos/core";
-import { api } from "../../lib/api";
+  formatBsDateTime,
+  getNepalSchoolDay,
+  type PermissionKey,
+} from "@schoolos/core";
 import {
   canteenApi,
   type CanteenEnrollmentPayload,
@@ -33,14 +28,16 @@ import {
 } from "../../lib/canteen-api";
 import { EmptyState } from "../ui/empty-state";
 import { LoadingState } from "../ui/loading-state";
-import { PageHeader } from "../ui/page-header";
 import { WorkSurface } from "../ui/work-surface";
 import { StatusBadge, type StatusTone } from "../ui/status-badge";
 import { cn } from "../../lib/utils";
-import { StudentSelector } from "../students/student-selector";
+import { RemoteStudentSelector } from "../students/remote-student-selector";
 import { MenuItemSelector } from "./menu-item-selector";
 import { QRResolver } from "../ui/qr-resolver";
 import { ConfirmDialog } from "../ui/confirm-dialog";
+import { CanteenReportsWorkspace } from "./canteen-reports-workspace";
+import { PermissionDenied } from "../ui/permission-denied";
+import { usePermissionAccess } from "../../lib/permissions-ui";
 
 type CanteenTab =
   | "overview"
@@ -51,10 +48,31 @@ type CanteenTab =
   | "wallets"
   | "pos"
   | "controls"
-  | "inventory"
+  | "stock"
   | "reports";
 
-type CanteenWorkspaceProps = { initialTab?: CanteenTab };
+type CanteenWorkspaceProps = { activeTab: CanteenTab };
+
+const canteenTabReadPermissions: Record<
+  Exclude<CanteenTab, "overview">,
+  PermissionKey
+> = {
+  menu: "canteen:menu:read",
+  plans: "canteen:plans:read",
+  enrollments: "canteen:enrollments:read",
+  serving: "canteen:serving:read",
+  wallets: "canteen:wallets:read",
+  pos: "canteen:pos:read",
+  controls: "canteen:controls:read",
+  stock: "canteen:inventory:read",
+  reports: "canteen:reports:read",
+};
+
+const canteenOverviewReadPermissions: PermissionKey[] = [
+  "canteen:serving:read",
+  "canteen:pos:read",
+  "canteen:reports:read",
+];
 
 type CanteenQrStudent = {
   id?: string;
@@ -69,28 +87,7 @@ type CanteenQrStudent = {
   canPurchase?: boolean;
 };
 
-const tabs: Array<{ key: CanteenTab; label: string; href: string }> = [
-  { key: "overview", label: "Overview", href: "/dashboard/canteen" },
-  { key: "menu", label: "Menu", href: "/dashboard/canteen/menu" },
-  { key: "plans", label: "Meal Plans", href: "/dashboard/canteen/plans" },
-  {
-    key: "enrollments",
-    label: "Enrollments",
-    href: "/dashboard/canteen/enrollments",
-  },
-  { key: "serving", label: "Serving", href: "/dashboard/canteen/serving" },
-  { key: "wallets", label: "Wallets", href: "/dashboard/canteen/wallets" },
-  { key: "pos", label: "POS", href: "/dashboard/canteen/pos" },
-  { key: "controls", label: "Controls", href: "/dashboard/canteen/controls" },
-  {
-    key: "inventory",
-    label: "Inventory",
-    href: "/dashboard/canteen/inventory",
-  },
-  { key: "reports", label: "Reports", href: "/dashboard/canteen/reports" },
-];
-
-const today = new Date().toISOString().slice(0, 10);
+const today = getNepalSchoolDay().gregorianDate;
 const servingAllergyAcknowledgementLabel =
   "I reviewed this student's allergy and medical warnings before";
 
@@ -192,10 +189,36 @@ function optionalNumber(value: string | number | null | undefined) {
   return Number.isFinite(numeric) ? numeric : undefined;
 }
 
-export function CanteenWorkspace({
-  initialTab = "overview",
-}: CanteenWorkspaceProps) {
-  const [activeTab, setActiveTab] = useState<CanteenTab>(initialTab);
+export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
+  const access = usePermissionAccess();
+  const canReadMenu = access.hasPermission("canteen:menu:read");
+  const canReadPlans = access.hasPermission("canteen:plans:read");
+  const canReadEnrollments = access.hasPermission("canteen:enrollments:read");
+  const canReadServings = access.hasPermission("canteen:serving:read");
+  const canReadWallets = access.hasPermission("canteen:wallets:read");
+  const canReadPos = access.hasPermission("canteen:pos:read");
+  const canReadControls = access.hasPermission("canteen:controls:read");
+  const canReadInventory = access.hasPermission("canteen:inventory:read");
+  const canReadReports = access.hasPermission("canteen:reports:read");
+  const canCreateMenu = access.hasPermission("canteen:menu:create");
+  const canCreatePlans = access.hasPermission("canteen:plans:create");
+  const canCreateEnrollments = access.hasPermission(
+    "canteen:enrollments:create",
+  );
+  const canUpdateEnrollments = access.hasPermission(
+    "canteen:enrollments:update",
+  );
+  const canServeMeals = access.hasPermission("canteen:serving:create");
+  const canCreateWallets = access.hasPermission("canteen:wallets:create");
+  const canUpdateWallets = access.hasPermission("canteen:wallets:update");
+  const canCreatePosSales = access.hasPermission("canteen:pos:create");
+  const canUpdatePosSales = access.hasPermission("canteen:pos:update");
+  const canUpdateInventory = access.hasPermission("canteen:inventory:update");
+  const canCreateControls = access.hasPermission("canteen:controls:create");
+  const canViewActiveTab =
+    activeTab === "overview"
+      ? access.hasAnyPermission(canteenOverviewReadPermissions)
+      : access.hasPermission(canteenTabReadPermissions[activeTab]);
   const [menuForm, setMenuForm] =
     useState<CanteenMenuItemPayload>(emptyMenuForm);
   const [planForm, setPlanForm] =
@@ -220,9 +243,6 @@ export function CanteenWorkspace({
     useState<CanteenWastagePayload>(emptyWastageForm);
   const [stockAdjustmentForm, setStockAdjustmentForm] =
     useState<CanteenStockAdjustmentPayload>(emptyStockAdjustmentForm);
-  const [reportDate, setReportDate] = useState(today);
-  const [reportFrom, setReportFrom] = useState("");
-  const [reportTo, setReportTo] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmingSaleId, setConfirmingSaleId] = useState<string | null>(null);
   const [confirmingEnrollmentId, setConfirmingEnrollmentId] = useState<
@@ -246,67 +266,62 @@ export function CanteenWorkspace({
   const menuQuery = useQuery({
     queryKey: ["canteen-menu"],
     queryFn: () => canteenApi.listMenuItems({ status: "" }),
+    enabled: canReadMenu && (activeTab === "menu" || activeTab === "pos"),
   });
   const plansQuery = useQuery({
     queryKey: ["canteen-plans"],
     queryFn: () => canteenApi.listMealPlans({ status: "" }),
+    enabled:
+      canReadPlans && (activeTab === "plans" || activeTab === "enrollments"),
   });
   const enrollmentsQuery = useQuery({
     queryKey: ["canteen-enrollments"],
     queryFn: () => canteenApi.listEnrollments(),
+    enabled: canReadEnrollments && activeTab === "enrollments",
   });
   const servingsQuery = useQuery({
-    queryKey: ["canteen-servings", reportDate],
-    queryFn: () => canteenApi.listServings({ date: reportDate }),
+    queryKey: ["canteen-servings", today],
+    queryFn: () => canteenApi.listServings({ date: today }),
+    enabled:
+      canReadServings &&
+      (activeTab === "overview" || activeTab === "serving"),
   });
   const salesQuery = useQuery({
     queryKey: ["canteen-pos-sales"],
     queryFn: () => canteenApi.listPosSales(),
+    enabled: canReadPos && (activeTab === "overview" || activeTab === "pos"),
   });
   const lowBalanceQuery = useQuery({
     queryKey: ["canteen-low-balance"],
     queryFn: () => canteenApi.getLowBalanceWallets(),
-  });
-  const mealCountQuery = useQuery({
-    queryKey: ["canteen-meal-count", reportDate],
-    queryFn: () => canteenApi.getDailyMealCountReport({ date: reportDate }),
-  });
-  const itemSalesQuery = useQuery({
-    queryKey: ["canteen-item-sales", reportFrom, reportTo],
-    queryFn: () =>
-      canteenApi.getItemWiseSalesReport({ from: reportFrom, to: reportTo }),
-  });
-  const spendingSummaryQuery = useQuery({
-    queryKey: ["canteen-spending-summary", reportFrom, reportTo],
-    queryFn: () =>
-      canteenApi.getStudentSpendingSummary({ from: reportFrom, to: reportTo }),
+    enabled: canReadReports && activeTab === "overview",
   });
   const suppliersQuery = useQuery({
     queryKey: ["canteen-suppliers"],
     queryFn: () => canteenApi.listSuppliers({ limit: 50 }),
+    enabled: canReadInventory && activeTab === "stock",
   });
   const inventoryItemsQuery = useQuery({
     queryKey: ["canteen-inventory-items"],
     queryFn: () => canteenApi.listInventoryItems({ limit: 50 }),
+    enabled: canReadInventory && activeTab === "stock",
   });
   const stockLedgerQuery = useQuery({
-    queryKey: ["canteen-stock-ledger", reportFrom, reportTo],
-    queryFn: () =>
-      canteenApi.getStockLedger({ from: reportFrom, to: reportTo }),
-  });
-  const studentsQuery = useQuery({
-    queryKey: ["students"],
-    queryFn: () => api.listStudents({ limit: 1000 }),
+    queryKey: ["canteen-stock-ledger", "stock"],
+    queryFn: () => canteenApi.getStockLedger(),
+    enabled: canReadReports && activeTab === "stock",
   });
   const walletQuery = useQuery({
     queryKey: ["canteen-wallet", walletStudentId],
     queryFn: () => canteenApi.getWalletBalance(walletStudentId),
-    enabled: Boolean(walletStudentId),
+    enabled:
+      canReadWallets && activeTab === "wallets" && Boolean(walletStudentId),
   });
   const transactionsQuery = useQuery({
     queryKey: ["canteen-wallet-transactions", walletStudentId],
     queryFn: () => canteenApi.listWalletTransactions(walletStudentId),
-    enabled: Boolean(walletStudentId),
+    enabled:
+      canReadWallets && activeTab === "wallets" && Boolean(walletStudentId),
   });
 
   const invalidateCanteen = () => {
@@ -436,16 +451,6 @@ export function CanteenWorkspace({
     mutationFn: canteenApi.openPosReceiptPdf,
     onSuccess: () => setNotice("Receipt PDF opened."),
   });
-  const dailyMealCsvMutation = useMutation({
-    mutationFn: () =>
-      canteenApi.downloadDailyMealCountCsv({ date: reportDate }),
-    onSuccess: () => setNotice("Daily meal count CSV downloaded."),
-  });
-  const itemSalesCsvMutation = useMutation({
-    mutationFn: () =>
-      canteenApi.downloadItemWiseSalesCsv({ from: reportFrom, to: reportTo }),
-    onSuccess: () => setNotice("Item-wise sales CSV downloaded."),
-  });
   const controlMutation = useMutation({
     mutationFn: canteenApi.upsertSpendingControl,
     onSuccess: () => {
@@ -465,7 +470,7 @@ export function CanteenWorkspace({
     mutationFn: canteenApi.createInventoryItem,
     onSuccess: () => {
       setInventoryItemForm(emptyInventoryItemForm);
-      setNotice("Inventory item saved.");
+      setNotice("Stock item saved.");
       invalidateCanteen();
     },
   });
@@ -529,27 +534,37 @@ export function CanteenWorkspace({
   const servingStudentControlQuery = useQuery({
     queryKey: ["canteen-serving-control-preview", selectedServingStudent],
     queryFn: () => canteenApi.getSpendingControl(selectedServingStudent!),
-    enabled: Boolean(selectedServingStudent),
+    enabled:
+      canReadControls &&
+      activeTab === "serving" &&
+      Boolean(selectedServingStudent),
   });
 
   const selectedPosStudent = posForm.studentId;
   const posStudentWalletQuery = useQuery({
     queryKey: ["canteen-wallet-preview", selectedPosStudent],
     queryFn: () => canteenApi.getWalletBalance(selectedPosStudent!),
-    enabled: Boolean(selectedPosStudent && posForm.paymentMethod === "WALLET"),
+    enabled:
+      canReadWallets &&
+      activeTab === "pos" &&
+      Boolean(selectedPosStudent && posForm.paymentMethod === "WALLET"),
   });
 
   const posStudentControlQuery = useQuery({
     queryKey: ["canteen-control-preview", selectedPosStudent],
     queryFn: () => canteenApi.getSpendingControl(selectedPosStudent!),
-    enabled: Boolean(selectedPosStudent),
+    enabled:
+      canReadControls && activeTab === "pos" && Boolean(selectedPosStudent),
   });
 
   const selectedControlStudent = controlForm.studentId;
   const controlStudentQuery = useQuery({
     queryKey: ["canteen-control", selectedControlStudent],
     queryFn: () => canteenApi.getSpendingControl(selectedControlStudent!),
-    enabled: activeTab === "controls" && Boolean(selectedControlStudent),
+    enabled:
+      canReadControls &&
+      activeTab === "controls" &&
+      Boolean(selectedControlStudent),
   });
 
   useEffect(() => {
@@ -577,22 +592,53 @@ export function CanteenWorkspace({
     controlStudentQuery.isSuccess,
   ]);
 
-  const firstError =
-    menuQuery.error ||
-    plansQuery.error ||
-    enrollmentsQuery.error ||
-    servingsQuery.error ||
-    salesQuery.error ||
-    lowBalanceQuery.error ||
-    suppliersQuery.error ||
-    inventoryItemsQuery.error ||
-    stockLedgerQuery.error;
+  const workspaceErrors: Record<CanteenTab, Array<Error | null>> = {
+    overview: [
+      servingsQuery.error,
+      salesQuery.error,
+      lowBalanceQuery.error,
+    ],
+    menu: [menuQuery.error],
+    plans: [plansQuery.error],
+    enrollments: [plansQuery.error, enrollmentsQuery.error],
+    serving: [servingsQuery.error, servingStudentControlQuery.error],
+    wallets: [walletQuery.error, transactionsQuery.error],
+    pos: [
+      menuQuery.error,
+      salesQuery.error,
+      posStudentWalletQuery.error,
+      posStudentControlQuery.error,
+    ],
+    controls: [controlStudentQuery.error],
+    stock: [
+      suppliersQuery.error,
+      inventoryItemsQuery.error,
+      stockLedgerQuery.error,
+    ],
+    reports: [],
+  };
+  const firstError = workspaceErrors[activeTab].find(Boolean);
 
   function normalizeScannedStudent(data: CanteenQrStudent) {
     const studentId = data.id ?? data.studentId;
     if (!studentId) return null;
 
     return { ...data, id: studentId };
+  }
+
+  if (access.resolution === "loading") {
+    return <LoadingState label="Checking canteen access..." />;
+  }
+
+  if (!canViewActiveTab) {
+    return (
+      <PermissionDenied
+        title="Canteen workspace restricted"
+        description="Your role does not include read access to this canteen workspace."
+        resource="Canteen"
+        action="Read"
+      />
+    );
   }
 
   return (
@@ -620,22 +666,24 @@ export function CanteenWorkspace({
           </div>
           <InfoCard
             lines={[
-              "All wallet, POS, and meal-plan fee totals come from backend responses; frontend does not calculate financial truth.",
-              "Canteen revenue and meal-plan fee effects stay backend-controlled through AccountingPostingService and FinanceService boundaries.",
-              "Allergy and dietary warnings are shown when backend serving responses include warning data.",
+              "SchoolOS confirms wallet balances, POS receipts, and meal-plan charges before they are shown here.",
+              "Canteen purchases and revenue follow the school’s accounting controls.",
+              "Review every allergy and dietary warning before serving a meal.",
             ]}
           />
-          <LowBalanceList wallets={lowBalanceWallets.slice(0, 5)} />
-          <WorkSurface
+          {canReadReports ? (
+            <LowBalanceList wallets={lowBalanceWallets.slice(0, 5)} />
+          ) : null}
+          {canReadPos ? <WorkSurface
             title="Recent POS sales"
-            description="Recent backend sale records; wallet balances and receipt totals remain backend-owned."
+            description="Review the most recently recorded sales, wallet payments, and receipt totals."
             variant="transaction"
           >
             <SaleList
               sales={sales.slice(0, 5)}
               emptyTitle="No recent POS sales"
             />
-          </WorkSurface>
+          </WorkSurface> : null}
         </div>
       )}
 
@@ -665,7 +713,7 @@ export function CanteenWorkspace({
               />
             ) : null}
           </Panel>
-          <Panel
+          {canCreateMenu ? <Panel
             title="Create menu item"
             description="Use allergen tags like peanut, dairy, gluten, egg."
           >
@@ -712,7 +760,7 @@ export function CanteenWorkspace({
                 {menuMutation.isPending ? "Saving..." : "Create item"}
               </button>
             </form>
-          </Panel>
+          </Panel> : null}
         </TwoColumn>
       )}
 
@@ -742,7 +790,7 @@ export function CanteenWorkspace({
               />
             ) : null}
           </Panel>
-          <Panel
+          {canCreatePlans ? <Panel
             title="Create meal plan"
             description="Duplicate serving prevention is enabled by default."
           >
@@ -794,7 +842,7 @@ export function CanteenWorkspace({
                 {planMutation.isPending ? "Saving..." : "Create plan"}
               </button>
             </form>
-          </Panel>
+          </Panel> : null}
         </TwoColumn>
       )}
 
@@ -825,7 +873,7 @@ export function CanteenWorkspace({
                             Open invoice
                           </Link>
                         ) : null}
-                        {enrollment.status === "ACTIVE" ? (
+                        {canUpdateEnrollments && enrollment.status === "ACTIVE" ? (
                           <button
                             type="button"
                             className="btn-secondary text-red-600"
@@ -849,9 +897,9 @@ export function CanteenWorkspace({
               />
             ) : null}
           </Panel>
-          <Panel
+          {canCreateEnrollments && canReadPlans ? <Panel
             title="Enroll student"
-            description="Meal enrollment is tenant-scoped and uses real student records."
+            description="Enroll a student in a meal plan and choose when it starts."
           >
             <form
               className="space-y-3"
@@ -860,10 +908,9 @@ export function CanteenWorkspace({
                 enrollmentMutation.mutate(cleanEnrollment(enrollmentForm));
               }}
             >
-              <StudentSelector
-                students={studentsQuery.data?.items ?? []}
-                selectedId={enrollmentForm.studentId}
-                onSelect={(studentId) =>
+              <RemoteStudentSelector
+                value={enrollmentForm.studentId}
+                onChange={(studentId) =>
                   setEnrollmentForm({ ...enrollmentForm, studentId })
                 }
                 label="Student"
@@ -899,7 +946,7 @@ export function CanteenWorkspace({
                   : "Enroll student"}
               </button>
             </form>
-          </Panel>
+          </Panel> : null}
         </TwoColumn>
       )}
 
@@ -907,7 +954,7 @@ export function CanteenWorkspace({
         <TwoColumn>
           <Panel
             title="Meal serving history"
-            description="Duplicate serving errors are returned by the backend and shown as readable errors."
+            description="SchoolOS stops a second serving when the same meal has already been recorded."
           >
             <div className="space-y-3">
               {servings.map((serving) => (
@@ -933,7 +980,7 @@ export function CanteenWorkspace({
               />
             ) : null}
           </Panel>
-          <Panel
+          {canServeMeals ? <Panel
             title="Student ID / QR Serving"
             description="Scan student QR to instantly serve enrolled meals."
           >
@@ -969,10 +1016,13 @@ export function CanteenWorkspace({
                 servingMutation.mutate(cleanServing(servingForm));
               }}
             >
-              <StudentSelector
-                students={studentsQuery.data?.items ?? []}
-                selectedId={servingForm.studentId}
-                onSelect={(studentId) => {
+              <RemoteStudentSelector
+                value={servingForm.studentId}
+                selectedLabel={
+                  resolvedServingStudent?.name ??
+                  resolvedServingStudent?.studentCode
+                }
+                onChange={(studentId) => {
                   setServingForm({ ...servingForm, studentId });
                   setServingAllergyAcknowledged(false);
                   if (studentId !== resolvedServingStudent?.id) {
@@ -1033,7 +1083,7 @@ export function CanteenWorkspace({
                 {servingMutation.isPending ? "Serving..." : "Serve meal now"}
               </button>
             </form>
-          </Panel>
+          </Panel> : null}
         </TwoColumn>
       )}
 
@@ -1043,13 +1093,12 @@ export function CanteenWorkspace({
             title="Wallet balance"
             description="Create wallet, view balance, and review transaction history."
           >
-            <StudentSelector
-              students={studentsQuery.data?.items ?? []}
-              selectedId={walletStudentId}
-              onSelect={setWalletStudentId}
+            <RemoteStudentSelector
+              value={walletStudentId}
+              onChange={setWalletStudentId}
               label="Student"
             />
-            <div className="mt-3 flex gap-2">
+            {canCreateWallets ? <div className="mt-3 flex gap-2">
               <button
                 type="button"
                 className="btn-secondary"
@@ -1058,7 +1107,7 @@ export function CanteenWorkspace({
               >
                 Create / load wallet
               </button>
-            </div>
+            </div> : null}
             {walletQuery.data ? (
               <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1086,7 +1135,7 @@ export function CanteenWorkspace({
                 description="Select a student to view or create a wallet."
               />
             )}
-            {walletReversal ? (
+            {canUpdateWallets && walletReversal ? (
               <form
                 className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4"
                 onSubmit={(event) => {
@@ -1149,6 +1198,7 @@ export function CanteenWorkspace({
                   title={`${tx.type} • ${money(tx.amount)}`}
                   subtitle={`Balance after: ${money(tx.balanceAfter)} • ${tx.note ?? "No note"}${tx.reversalOfId ? " (Reversal)" : ""}`}
                   action={
+                    canUpdateWallets &&
                     !tx.reversalOfId &&
                     (tx.type === "TOP_UP" || tx.type === "DEDUCTION") ? (
                       <button
@@ -1170,9 +1220,9 @@ export function CanteenWorkspace({
               ))}
             </div>
           </Panel>
-          <Panel
+          {canUpdateWallets ? <Panel
             title="Manual top-up"
-            description="Top-up writes are backend-controlled and audited."
+            description="Each top-up is recorded in wallet history for review."
           >
             <form
               className="space-y-3"
@@ -1218,7 +1268,7 @@ export function CanteenWorkspace({
                 {topUpMutation.isPending ? "Topping up..." : "Top up wallet"}
               </button>
             </form>
-          </Panel>
+          </Panel> : null}
         </TwoColumn>
       )}
 
@@ -1231,8 +1281,8 @@ export function CanteenWorkspace({
             <SaleList
               sales={sales}
               emptyTitle="No POS sales"
-              onComplete={(saleId) => setConfirmingSaleId(`complete:${saleId}`)}
-              onCancel={(saleId) => setConfirmingSaleId(`cancel:${saleId}`)}
+              onComplete={canUpdatePosSales ? (saleId) => setConfirmingSaleId(`complete:${saleId}`) : undefined}
+              onCancel={canUpdatePosSales ? (saleId) => setConfirmingSaleId(`cancel:${saleId}`) : undefined}
               onReceipt={(saleId) => receiptMutation.mutate(saleId)}
               onReceiptPdf={(saleId) => receiptPdfMutation.mutate(saleId)}
               receiptLoadingSaleId={
@@ -1255,9 +1305,9 @@ export function CanteenWorkspace({
               <ReceiptPreview receipt={receiptPreview} />
             ) : null}
           </Panel>
-          <Panel
+          {canCreatePosSales && canReadMenu ? <Panel
             title="Create POS sale"
-            description="Wallet spending limits and balance checks are enforced by backend."
+            description="SchoolOS checks wallet balances and spending limits before completing a sale."
           >
             <QRResolver
               purpose="CANTEEN_POS"
@@ -1291,17 +1341,19 @@ export function CanteenWorkspace({
                 posMutation.mutate(cleanPos(posForm));
               }}
             >
-              <StudentSelector
-                students={studentsQuery.data?.items ?? []}
-                selectedId={posForm.studentId ?? ""}
-                onSelect={(studentId) => {
+              <RemoteStudentSelector
+                value={posForm.studentId ?? ""}
+                selectedLabel={
+                  resolvedPosStudent?.name ?? resolvedPosStudent?.studentCode
+                }
+                onChange={(studentId) => {
                   setPosForm({ ...posForm, studentId });
                   if (studentId !== resolvedPosStudent?.id) {
                     setResolvedPosStudent(null);
                   }
                 }}
-                label="Or Select Student"
-                optional
+                label="Or select student"
+                clearable
               />
               <SelectInput
                 label="Payment method"
@@ -1384,26 +1436,26 @@ export function CanteenWorkspace({
                 {posMutation.isPending ? "Creating Sale..." : "Create POS sale"}
               </button>
             </form>
-          </Panel>
+          </Panel> : null}
         </TwoColumn>
       )}
 
-      {activeTab === "inventory" && (
+      {activeTab === "stock" && (
         <TwoColumn>
           <div className="space-y-6">
             <Panel
-              title="Inventory status"
+              title="Stock status"
               description="Track stocked items, supplier linkage, reorder levels, and stock ledger activity."
             >
               <InfoCard
                 lines={[
-                  "Inventory rows come from the backend supplier and inventory endpoints.",
-                  "Purchase bills, wastage, and manual stock corrections remain backend-owned and are reflected in the stock ledger.",
-                  "Financial posting for purchase bills stays behind the approved backend accounting boundary.",
+                  "Use the stock ledger to review purchase bills, wastage, and approved stock corrections.",
+                  "Supplier links and reorder levels help staff identify items that need attention.",
+                  "Purchase bills follow the school’s accounting approval controls.",
                 ]}
               />
               {inventoryItemsQuery.isLoading ? (
-                <LoadingState label="Loading inventory..." />
+                <LoadingState label="Loading stock..." />
               ) : null}
               <div className="mt-4 space-y-3">
                 {inventoryItems.map((item) => {
@@ -1431,7 +1483,7 @@ export function CanteenWorkspace({
                 {!inventoryItemsQuery.isLoading &&
                 inventoryItems.length === 0 ? (
                   <EmptyState
-                    title="No inventory items"
+                    title="No stock items"
                     description="Create the first stock item for purchase bills, wastage, and stock movement reports."
                   />
                 ) : null}
@@ -1478,7 +1530,7 @@ export function CanteenWorkspace({
               </div>
             </Panel>
 
-            <Panel
+            {canUpdateInventory ? <Panel
               title="Stock operations"
               description="Post purchase bills, record wastage, and make audited manual stock corrections."
             >
@@ -1786,13 +1838,13 @@ export function CanteenWorkspace({
                   />
                 ) : null}
               </form>
-            </Panel>
+            </Panel> : null}
           </div>
           <Panel
             title="Suppliers and stock items"
-            description="Create vendor records and inventory catalog entries through real canteen APIs."
+            description="Maintain supplier records and the canteen stock catalogue."
           >
-            <form
+            {canUpdateInventory ? <><form
               className="space-y-3"
               onSubmit={(event) => {
                 event.preventDefault();
@@ -1940,7 +1992,7 @@ export function CanteenWorkspace({
                   message={(inventoryItemMutation.error as Error).message}
                 />
               ) : null}
-            </form>
+            </form></> : null}
 
             <div className="mt-5 space-y-2">
               {suppliersQuery.isLoading ? (
@@ -1971,11 +2023,11 @@ export function CanteenWorkspace({
         <TwoColumn>
           <Panel
             title="Saved spending control"
-            description="Shows the tenant-scoped backend control for the selected student."
+            description="Review the saved canteen control for the selected student."
           >
             <InfoCard
               lines={[
-                "Controls are loaded from the backend and applied server-side during POS workflows.",
+                "Saved controls are checked before a POS sale can be completed.",
                 "Use comma-separated blocked categories for category rules.",
               ]}
             />
@@ -2039,9 +2091,9 @@ export function CanteenWorkspace({
               </div>
             ) : null}
           </Panel>
-          <Panel
+          {canCreateControls ? <Panel
             title="Save control"
-            description="Server-side controls protect canteen spending rules."
+            description="Set daily limits and restrictions for the selected student."
           >
             <form
               className="space-y-3"
@@ -2050,13 +2102,12 @@ export function CanteenWorkspace({
                 controlMutation.mutate(cleanControl(controlForm));
               }}
             >
-              <StudentSelector
-                students={studentsQuery.data?.items ?? []}
-                onSelect={(studentId) =>
+              <RemoteStudentSelector
+                onChange={(studentId) =>
                   setControlForm({ ...controlForm, studentId })
                 }
                 label="Student"
-                selectedId={controlForm.studentId}
+                value={controlForm.studentId}
               />
               <TextInput
                 label="Daily spending limit (NPR)"
@@ -2108,151 +2159,14 @@ export function CanteenWorkspace({
                 {controlMutation.isPending ? "Saving..." : "Save control"}
               </button>
             </form>
-          </Panel>
+          </Panel> : null}
         </TwoColumn>
       )}
 
-      {activeTab === "reports" && (
-        <div className="space-y-6">
-          <Panel
-            title="Report filters"
-            description="Reports are backend-generated; frontend displays returned totals and downloads audited CSV exports."
-          >
-            <div className="grid gap-4 lg:grid-cols-3">
-              <TextInput
-                label="Daily meal date"
-                type="date"
-                value={reportDate}
-                onChange={setReportDate}
-              />
-              <TextInput
-                label="Report range from"
-                type="date"
-                value={reportFrom}
-                onChange={setReportFrom}
-              />
-              <TextInput
-                label="Report range to"
-                type="date"
-                value={reportTo}
-                onChange={setReportTo}
-              />
-            </div>
-            <div className="mt-4 flex flex-wrap gap-3">
-              <button
-                type="button"
-                className="btn-secondary inline-flex items-center gap-2"
-                disabled={dailyMealCsvMutation.isPending}
-                onClick={() => dailyMealCsvMutation.mutate()}
-                data-testid="canteen-daily-meal-csv-export"
-              >
-                <Download className="h-4 w-4" />
-                {dailyMealCsvMutation.isPending
-                  ? "Exporting..."
-                  : "Export daily meal CSV"}
-              </button>
-              <button
-                type="button"
-                className="btn-secondary inline-flex items-center gap-2"
-                disabled={itemSalesCsvMutation.isPending}
-                onClick={() => itemSalesCsvMutation.mutate()}
-                data-testid="canteen-item-sales-csv-export"
-              >
-                <Download className="h-4 w-4" />
-                {itemSalesCsvMutation.isPending
-                  ? "Exporting..."
-                  : "Export item sales CSV"}
-              </button>
-            </div>
-            {dailyMealCsvMutation.error ? (
-              <InlineError message={dailyMealCsvMutation.error.message} />
-            ) : null}
-            {itemSalesCsvMutation.error ? (
-              <InlineError message={itemSalesCsvMutation.error.message} />
-            ) : null}
-          </Panel>
-          <div className="grid gap-6 xl:grid-cols-3">
-            <ReportPanel
-              title="Daily meal count"
-              loading={mealCountQuery.isLoading}
-              rows={(mealCountQuery.data ?? []).map(
-                (row) => `${row.mealType} • ${row.status}: ${row._count._all}`,
-              )}
-            />
-            <ReportPanel
-              title="Item-wise sales"
-              loading={itemSalesQuery.isLoading}
-              rows={(itemSalesQuery.data ?? []).map(
-                (row) =>
-                  `${row.itemName}: ${row._sum.quantity ?? 0} sold • ${money(row._sum.lineTotal ?? 0)}`,
-              )}
-            />
-            <ReportPanel
-              title="Student spending"
-              loading={spendingSummaryQuery.isLoading}
-              rows={(spendingSummaryQuery.data ?? []).map(
-                (row) =>
-                  `${row.studentId.slice(0, 8)}: ${money(row._sum.totalAmount ?? 0)} • ${row._count._all} sales`,
-              )}
-            />
-          </div>
-          <LowBalanceList wallets={lowBalanceWallets} />
-          <Panel
-            title="Stock ledger"
-            description="Recent stock movement report from the backend."
-          >
-            {stockLedgerQuery.isLoading ? (
-              <LoadingState label="Loading stock ledger..." />
-            ) : null}
-            {!stockLedgerQuery.isLoading && stockLedgerRows.length === 0 ? (
-              <EmptyState
-                title="No stock movement"
-                description="No stock movement rows returned for the selected range."
-              />
-            ) : null}
-            <div className="space-y-2">
-              {stockLedgerRows.slice(0, 10).map((row, index) => (
-                <div
-                  key={
-                    row.id ??
-                    `${row.inventoryItemId}-${row.movementDate}-${index}`
-                  }
-                  className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 text-sm"
-                >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <Package className="h-5 w-5 shrink-0 text-slate-500" />
-                    <div className="min-w-0">
-                      <p className="truncate font-bold text-slate-900">
-                        {row.inventoryItem?.name ??
-                          row.inventoryItemId ??
-                          "Inventory item"}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {row.type ?? "Movement"} -{" "}
-                        {row.reason ??
-                          row.referenceType ??
-                          "No reason recorded"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="shrink-0 text-right text-xs font-semibold text-slate-500">
-                    <p>
-                      {Number(row.quantity ?? 0).toLocaleString()}{" "}
-                      {row.inventoryItem?.unit ?? ""}
-                    </p>
-                    <p>
-                      Balance {Number(row.balanceAfter ?? 0).toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Panel>
-        </div>
-      )}
+      {activeTab === "reports" ? <CanteenReportsWorkspace /> : null}
 
       <ConfirmDialog
-        isOpen={Boolean(confirmingEnrollmentId)}
+        isOpen={canUpdateEnrollments && Boolean(confirmingEnrollmentId)}
         onClose={() => setConfirmingEnrollmentId(null)}
         onConfirm={() => {
           if (confirmingEnrollmentId)
@@ -2267,7 +2181,7 @@ export function CanteenWorkspace({
       />
 
       <ConfirmDialog
-        isOpen={Boolean(confirmingSaleId)}
+        isOpen={canUpdatePosSales && Boolean(confirmingSaleId)}
         onClose={() => setConfirmingSaleId(null)}
         onConfirm={() => {
           const [action, saleId] = confirmingSaleId?.split(":") ?? [];
@@ -2284,7 +2198,7 @@ export function CanteenWorkspace({
         description={
           confirmingSaleId?.startsWith("cancel:")
             ? "This marks the draft sale as cancelled. Use this only when the canteen transaction should not be collected."
-            : "This completes the sale using backend wallet, spending-limit, and payment checks. Review student warnings before continuing."
+            : "This completes the sale after wallet, spending-limit, and payment checks. Review student warnings before continuing."
         }
         confirmLabel={
           confirmingSaleId?.startsWith("cancel:")
@@ -2588,7 +2502,7 @@ function LowBalanceList({
   return (
     <Panel
       title="Low-balance wallets"
-      description="Students returned by the backend low-balance wallet report."
+      description="Students whose wallet balance is at or below their alert threshold."
     >
       <div className="space-y-3">
         {wallets.map((wallet) => (
@@ -2600,36 +2514,6 @@ function LowBalanceList({
           />
         ))}
       </div>
-    </Panel>
-  );
-}
-function ReportPanel({
-  title,
-  loading,
-  rows,
-}: {
-  title: string;
-  loading: boolean;
-  rows: string[];
-}) {
-  return (
-    <Panel title={title} description="Backend report result.">
-      {loading ? (
-        <LoadingState label="Loading report..." />
-      ) : rows.length ? (
-        <div className="space-y-2">
-          {rows.map((row) => (
-            <p
-              key={row}
-              className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700"
-            >
-              {row}
-            </p>
-          ))}
-        </div>
-      ) : (
-        <EmptyState title="No data" description="No report rows returned." />
-      )}
     </Panel>
   );
 }

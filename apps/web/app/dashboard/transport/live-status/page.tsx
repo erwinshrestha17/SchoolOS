@@ -1,5 +1,5 @@
-import { TransportWorkspace } from '../../../../components/transport/transport-workspace';
+import { redirect } from 'next/navigation';
 
 export default function TransportLiveStatusPage() {
-  return <TransportWorkspace initialTab="location" />;
+  redirect('/dashboard/transport/location');
 }

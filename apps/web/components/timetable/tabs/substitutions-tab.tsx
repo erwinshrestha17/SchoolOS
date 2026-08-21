@@ -10,14 +10,19 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { formatBsDate } from "@schoolos/core";
+import {
+  formatBsDate,
+  getNepalSchoolDay,
+  shiftGregorianDateOnly,
+} from "@schoolos/core";
 
 export function SubstitutionsTab() {
-  const [date, setDate] = useState<Date>(new Date());
-  const dateStr = toDateInputValue(date);
+  const [date, setDate] = useState(
+    () => getNepalSchoolDay().gregorianDate,
+  );
 
-  const nextDay = () => setDate(new Date(date.getTime() + 24 * 60 * 60 * 1000));
-  const prevDay = () => setDate(new Date(date.getTime() - 24 * 60 * 60 * 1000));
+  const nextDay = () => setDate((current) => shiftGregorianDateOnly(current, 1));
+  const prevDay = () => setDate((current) => shiftGregorianDateOnly(current, -1));
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -27,7 +32,7 @@ export function SubstitutionsTab() {
             Substitution Oversight
           </h3>
           <p className="text-sm font-medium text-slate-500">
-            Monitoring coverage for {formatDisplayDate(date)}
+            Monitoring coverage for {formatBsDate(date, { preset: "long" })}
           </p>
         </div>
 
@@ -50,10 +55,8 @@ export function SubstitutionsTab() {
               aria-label="Substitution date"
               className="w-full bg-transparent text-xs font-black uppercase outline-none"
               type="date"
-              value={dateStr}
-              onChange={(event) =>
-                setDate(fromDateInputValue(event.target.value))
-              }
+              value={date}
+              onChange={(event) => setDate(event.target.value)}
             />
           </label>
 
@@ -71,24 +74,11 @@ export function SubstitutionsTab() {
         </div>
       </div>
 
-      <SubstitutionSummaryPanel date={dateStr} />
+      <SubstitutionSummaryPanel date={date} />
 
       <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
-        <SubstitutionsList filters={{ date: dateStr }} />
+        <SubstitutionsList filters={{ date }} />
       </div>
     </div>
   );
-}
-
-function toDateInputValue(date: Date) {
-  return date.toISOString().slice(0, 10);
-}
-
-function fromDateInputValue(value: string) {
-  const next = new Date(`${value}T00:00:00`);
-  return Number.isNaN(next.getTime()) ? new Date() : next;
-}
-
-function formatDisplayDate(date: Date) {
-  return formatBsDate(date, { preset: "long" });
 }
