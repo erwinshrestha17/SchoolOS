@@ -121,7 +121,8 @@ class TeacherAssessmentComponent {
     return TeacherAssessmentComponent(
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? 'Assessment',
-      examTermId: json['examTermId'] as String? ?? examTerm['id'] as String? ?? '',
+      examTermId:
+          json['examTermId'] as String? ?? examTerm['id'] as String? ?? '',
       examTermName: examTerm['name'] as String? ?? 'Exam term',
       subjectId: json['subjectId'] as String? ?? subject['id'] as String? ?? '',
       subjectName: subject['name'] as String? ?? 'Subject',

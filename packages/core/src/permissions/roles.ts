@@ -327,7 +327,6 @@ export const systemRolePermissions: Record<string, string[]> = {
   ],
   support_staff: [
     "roles:read",
-    "students:read",
     "staff:read",
     "notices:read",
     "events:read",
@@ -498,15 +497,12 @@ export const systemRolePermissions: Record<string, string[]> = {
     "roles:read",
     "classes:read",
     "sections:read",
-    "students:read",
     "library:read",
     "library:manage",
-    "fees:manage",
     "settings:read_public",
   ],
   driver: [
     "roles:read",
-    "students:read",
     "events:read",
     "transport:read",
     "transport:operate",

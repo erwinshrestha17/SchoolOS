@@ -24,7 +24,8 @@ class _MemorySecureStore implements SecureKeyValueStore {
   Future<String?> read(String key) async => values[key];
 
   @override
-  Future<Map<String, String>> readAll() async => Map<String, String>.from(values);
+  Future<Map<String, String>> readAll() async =>
+      Map<String, String>.from(values);
 
   @override
   Future<void> delete(String key) async => values.remove(key);
@@ -179,24 +180,27 @@ void main() {
     );
   });
 
-  test('guardian access revocation clears caches and shows access-changed', () async {
-    when(
-      () => repository.getParentDashboardSummaryForChild(childA),
-    ).thenAnswer(
-      (_) async => throw const PermissionException(
-        'Your access to this school data changed. Cached information was cleared.',
-        'GUARDIAN_CAPABILITY_DENIED',
-      ),
-    );
+  test(
+    'guardian access revocation clears caches and shows access-changed',
+    () async {
+      when(
+        () => repository.getParentDashboardSummaryForChild(childA),
+      ).thenAnswer(
+        (_) async => throw const PermissionException(
+          'Your access to this school data changed. Cached information was cleared.',
+          'GUARDIAN_CAPABILITY_DENIED',
+        ),
+      );
 
-    final controller = buildController(isOnline: true);
-    await _waitForSettled(controller);
+      final controller = buildController(isOnline: true);
+      await _waitForSettled(controller);
 
-    expect(controller.state.status, ParentDataStatus.accessChanged);
-    expect(controller.state.children, isEmpty);
-    expect(controller.state.dashboard, isNull);
-    expect(controller.state.message, contains('access'));
-  });
+      expect(controller.state.status, ParentDataStatus.accessChanged);
+      expect(controller.state.children, isEmpty);
+      expect(controller.state.dashboard, isNull);
+      expect(controller.state.message, contains('access'));
+    },
+  );
 
   test('a late child response cannot replace the latest selection', () async {
     final controller = buildController(isOnline: true);

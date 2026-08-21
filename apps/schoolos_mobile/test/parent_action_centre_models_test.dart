@@ -3,60 +3,63 @@ import 'package:schoolos_mobile/features/parent/domain/parent_action_centre_mode
 
 void main() {
   group('ParentActionCentre', () {
-    test('maps live partial coverage without inventing unavailable actions', () {
-      final centre = ParentActionCentre.fromJson({
-        'generatedAt': '2026-07-26T10:00:00.000Z',
-        'dataState': 'LIVE',
-        'scope': {
-          'selectedStudentId': 'child-1',
-          'children': [
+    test(
+      'maps live partial coverage without inventing unavailable actions',
+      () {
+        final centre = ParentActionCentre.fromJson({
+          'generatedAt': '2026-07-26T10:00:00.000Z',
+          'dataState': 'LIVE',
+          'scope': {
+            'selectedStudentId': 'child-1',
+            'children': [
+              {
+                'id': 'child-1',
+                'name': 'Asha Rai',
+                'classSection': 'Grade 4 - A',
+              },
+            ],
+          },
+          'summary': {
+            'visibleActionCount': 2,
+            'urgentCount': 1,
+            'returnedCount': 2,
+            'isPartial': true,
+          },
+          'items': [
             {
-              'id': 'child-1',
-              'name': 'Asha Rai',
-              'classSection': 'Grade 4 - A',
+              'id': 'notice-ack:notice-1',
+              'source': 'notices',
+              'type': 'NOTICE_ACKNOWLEDGEMENT',
+              'priority': 'URGENT',
+              'title': 'Holiday notice',
+              'description': 'Review and confirm this school notice.',
+              'child': null,
+              'dueAt': null,
+              'isOverdue': false,
+              'action': {
+                'label': 'Review notice',
+                'route': '/notices/notification-1',
+              },
             },
           ],
-        },
-        'summary': {
-          'visibleActionCount': 2,
-          'urgentCount': 1,
-          'returnedCount': 2,
-          'isPartial': true,
-        },
-        'items': [
-          {
-            'id': 'notice-ack:notice-1',
-            'source': 'notices',
-            'type': 'NOTICE_ACKNOWLEDGEMENT',
-            'priority': 'URGENT',
-            'title': 'Holiday notice',
-            'description': 'Review and confirm this school notice.',
-            'child': null,
-            'dueAt': null,
-            'isOverdue': false,
-            'action': {
-              'label': 'Review notice',
-              'route': '/notices/notification-1',
+          'truncated': false,
+          'sources': {
+            'notices': {'status': 'available', 'reason': null},
+            'fees': {
+              'status': 'locked',
+              'reason': 'Fees are not enabled for this school.',
             },
           },
-        ],
-        'truncated': false,
-        'sources': {
-          'notices': {'status': 'available', 'reason': null},
-          'fees': {
-            'status': 'locked',
-            'reason': 'Fees are not enabled for this school.',
-          },
-        },
-      });
+        });
 
-      expect(centre.isLive, isTrue);
-      expect(centre.summary.visibleActionCount, 2);
-      expect(centre.summary.isPartial, isTrue);
-      expect(centre.items.single.route, '/notices/notification-1');
-      expect(centre.sources['fees']?.status, 'locked');
-      expect(centre.sources['fees']?.isAvailable, isFalse);
-    });
+        expect(centre.isLive, isTrue);
+        expect(centre.summary.visibleActionCount, 2);
+        expect(centre.summary.isPartial, isTrue);
+        expect(centre.items.single.route, '/notices/notification-1');
+        expect(centre.sources['fees']?.status, 'locked');
+        expect(centre.sources['fees']?.isAvailable, isFalse);
+      },
+    );
   });
 
   group('safeParentActionRoute', () {
