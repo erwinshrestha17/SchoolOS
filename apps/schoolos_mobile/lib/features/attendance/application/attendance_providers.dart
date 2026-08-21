@@ -276,6 +276,9 @@ class TeacherAttendanceController
     PrivateDataCleanupService? privateDataCleanup,
     this.draftSaveDelay = const Duration(milliseconds: 500),
   }) : _isOnline = isOnline,
+       // Preserve the public `privateDataCleanup:` constructor contract while
+       // keeping the stored cleanup dependency private to this controller.
+       // ignore: prefer_initializing_formals
        _privateDataCleanup = privateDataCleanup,
        super(
          TeacherAttendanceState(date: DateTime.now(), isOffline: !isOnline),

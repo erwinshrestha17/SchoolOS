@@ -530,8 +530,9 @@ class _EnrollmentStatusCard extends StatelessWidget {
                     'Opens Help & Support so the school can review a correction request.',
                   ),
                   trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () =>
-                      GoRouter.of(context).push(AppRoutes.parentServiceRequests),
+                  onTap: () => GoRouter.of(
+                    context,
+                  ).push(AppRoutes.parentServiceRequests),
                 ),
               ],
             ),

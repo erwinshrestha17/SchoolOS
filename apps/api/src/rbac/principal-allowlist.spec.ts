@@ -81,7 +81,9 @@ describe('Principal explicit permission allowlist (PPR-P0-01)', () => {
   ];
 
   it('uses the exported explicit allowlist as the principal preset', () => {
-    expect([...principal].sort()).toEqual([...PRINCIPAL_PERMISSION_KEYS].sort());
+    expect([...principal].sort()).toEqual(
+      [...PRINCIPAL_PERMISSION_KEYS].sort(),
+    );
   });
 
   it('does not inherit tenant permissions by default (anti-inheritance)', () => {
@@ -89,7 +91,8 @@ describe('Principal explicit permission allowlist (PPR-P0-01)', () => {
       buildPermissionKey(resource, action),
     );
     const inheritedOperational = allTenantKeys.filter(
-      (key) => PRINCIPAL_FORBIDDEN_KEYS.includes(key) && principal.includes(key),
+      (key) =>
+        PRINCIPAL_FORBIDDEN_KEYS.includes(key) && principal.includes(key),
     );
     expect(inheritedOperational).toEqual([]);
   });

@@ -65,8 +65,6 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -95,8 +93,66 @@ jobs:
         if: steps.changes.outputs.web == 'true'
         run: pnpm --filter @schoolos/web exec playwright install chromium
 
-      - name: Verify deploy gate
-        run: pnpm verify:deploy:core
+      - name: Verify API formatting
+        run: |
+          pnpm --filter @schoolos/api exec prettier --write "src/**/*.ts" "test/**/*.ts"
+          git diff --exit-code -- apps/api/src apps/api/test
+
+      # Keep the deploy gate fail-closed, but expose each canonical sub-gate as
+      # its own Actions step so release blockers cannot hide inside one chained
+      # shell command.
+      - name: Compile generated artifacts
+        run: pnpm compile:artifacts
+
+      - name: Verify deploy environment
+        run: pnpm verify:env:deploy
+
+      - name: Verify tracked artifacts
+        run: pnpm verify:tracked-artifacts
+
+      - name: Generate Prisma client
+        run: pnpm db:generate
+
+      - name: Validate Prisma schema
+        run: pnpm db:validate
+
+      - name: Verify OpenAPI contract
+        run: pnpm verify:openapi
+
+      - name: Lint
+        run: pnpm lint
+
+      # The root typecheck is intentionally expanded into its canonical
+      # subcommands so the first failing workspace is visible in Actions while
+      # retaining the same fail-closed ordering.
+      - name: Typecheck generated artifacts
+        run: pnpm compile:artifacts
+
+      - name: Typecheck core import boundaries
+        run: pnpm check:core-imports
+
+      - name: Typecheck core
+        run: pnpm --filter @schoolos/core typecheck
+
+      - name: Build and verify core dist
+        run: |
+          pnpm --filter @schoolos/core build
+          pnpm check:core-dist
+
+      - name: Typecheck API
+        run: pnpm --filter @schoolos/api typecheck
+
+      - name: Typecheck web
+        run: pnpm --filter @schoolos/web typecheck
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: API e2e tests
+        run: pnpm test:e2e
+
+      - name: Build
+        run: pnpm build
 
       - name: Migrate and seed e2e database
         if: steps.changes.outputs.web == 'true'
@@ -168,7 +224,9 @@ jobs:
 
       - name: Verify formatting
         if: steps.changes.outputs.mobile == 'true'
-        run: dart format --output=none --set-exit-if-changed lib test
+        run: |
+          dart format lib test
+          git diff --exit-code -- lib test
 
       - name: Analyze
         if: steps.changes.outputs.mobile == 'true'
@@ -181,5 +239,5 @@ jobs:
       # baselines stay pinned to the platform that generates them. See
       # apps/schoolos_mobile/dart_test.yaml.
       - name: Test
-        if: steps.changes.outputs.mobile == 'true'
+        if: always() && steps.changes.outputs.mobile == 'true'
         run: flutter test --exclude-tags golden
