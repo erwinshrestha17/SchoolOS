@@ -21,6 +21,7 @@ import {
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
+import { ListActiveStaffOptionsDto } from '../common/dto/list-active-staff-options.dto';
 import { CommunicationsService } from '../communications/communications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
@@ -436,6 +437,63 @@ export class TransportService {
     return vehicle;
   }
 
+  async listActiveStaffOptions(
+    query: ListActiveStaffOptionsDto,
+    actor: AuthContext,
+  ) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 25;
+    const skip = (page - 1) * limit;
+    const search = query.search.trim();
+
+    const where: Prisma.StaffWhereInput = {
+      tenantId: actor.tenantId,
+      status: StaffStatus.ACTIVE,
+      OR: [
+        { employeeId: { contains: search, mode: 'insensitive' } },
+        { staffCode: { contains: search, mode: 'insensitive' } },
+        { firstName: { contains: search, mode: 'insensitive' } },
+        { lastName: { contains: search, mode: 'insensitive' } },
+        { department: { contains: search, mode: 'insensitive' } },
+        { designation: { contains: search, mode: 'insensitive' } },
+      ],
+    };
+
+    const [staff, total] = await this.prisma.$transaction([
+      this.prisma.staff.findMany({
+        where,
+        select: {
+          id: true,
+          employeeId: true,
+          staffCode: true,
+          firstName: true,
+          lastName: true,
+          department: true,
+          designation: true,
+        },
+        orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+        skip,
+        take: limit,
+      }),
+      this.prisma.staff.count({ where }),
+    ]);
+
+    return {
+      items: staff.map((item) => ({
+        id: item.id,
+        employeeId: item.employeeId,
+        staffCode: item.staffCode,
+        fullName: `${item.firstName} ${item.lastName}`.trim(),
+        department: item.department,
+        designation: item.designation,
+      })),
+      total,
+      page,
+      limit,
+      hasNextPage: skip + staff.length < total,
+    };
+  }
+
   listDriverAssignments(
     actor: AuthContext,
     filters: { routeId?: string; vehicleId?: string },
@@ -450,6 +508,43 @@ export class TransportService {
         ...(isRestricted ? { staff: { userId: actor.userId } } : {}),
       },
       include: { vehicle: true, route: true, staff: true },
+      orderBy: [{ startsAt: 'desc' }],
+      take: 100,
+    });
+  }
+
+  listDriverOwnAssignments(actor: AuthContext) {
+    return this.prisma.transportDriverAssignment.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        staff: { userId: actor.userId },
+      },
+      select: {
+        id: true,
+        vehicleId: true,
+        routeId: true,
+        licenseNumber: true,
+        licenseExpires: true,
+        startsAt: true,
+        endsAt: true,
+        vehicle: {
+          select: {
+            id: true,
+            registrationNumber: true,
+            model: true,
+            capacity: true,
+            status: true,
+          },
+        },
+        route: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            isActive: true,
+          },
+        },
+      },
       orderBy: [{ startsAt: 'desc' }],
       take: 100,
     });
@@ -770,7 +865,6 @@ export class TransportService {
       'complete this trip',
     );
 
-    // Final check for un-dropped students
     const unDroppedCount = await this.prisma.transportTripStudentStatus.count({
       where: {
         tripId: trip.id,
@@ -1155,11 +1249,6 @@ export class TransportService {
     return this.readLatestTripLocation(actor.tenantId, tripId);
   }
 
-  /**
-   * Caller must already prove a scoped transport relationship, such as a
-   * guardian's own child active-trip status. This keeps the driver/admin
-   * public endpoint strict while allowing parent-safe latest-location display.
-   */
   async getLatestTripLocationForScopedTrip(tripId: string, actor: AuthContext) {
     await this.getTrip(actor.tenantId, tripId);
     return this.readLatestTripLocation(actor.tenantId, tripId);
@@ -1182,14 +1271,12 @@ export class TransportService {
           return this.enrichLocationPayload(payload, 'cache');
         }
       } catch {
-        // Corrupt cache is ignored below and replaced by persisted history.
       }
       try {
         await this.redisService
           .getClient()
           .del(this.latestLocationKey(tenantId, tripId));
       } catch {
-        // Redis cleanup failure must not block persisted-history fallback.
       }
     }
 
@@ -1397,7 +1484,6 @@ export class TransportService {
       requiredConsentTypes: [ConsentType.MESSAGING],
     });
 
-    // Mark current active trips on this route as delayed if not already
     await this.prisma.transportTrip.updateMany({
       where: {
         tenantId: actor.tenantId,
@@ -1608,11 +1694,6 @@ export class TransportService {
     };
   }
 
-  /**
-   * Retention strategy: Clean up location history older than 90 days.
-   * PostgreSQL remains source of truth for trip events, but high-volume pings
-   * can be rotated/partitioned or cleaned up.
-   */
   async cleanupLocationHistory(actor: AuthContext, daysToKeep = 90) {
     if (
       !actor.roles.includes('platform_super_admin') &&
@@ -1676,7 +1757,6 @@ export class TransportService {
       studentId,
     );
 
-    // Lifecycle enforcement
     if (status === 'BOARDED' && existing.status !== 'PENDING') {
       throw new ConflictException(
         `Cannot board student in ${existing.status} status`,
