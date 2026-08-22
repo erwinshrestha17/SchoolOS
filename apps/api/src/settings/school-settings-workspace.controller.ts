@@ -151,6 +151,11 @@ export class SchoolSettingsWorkspaceController {
   @AllowSupportOverrideRead('SCHOOL_PROFILE')
   getSchoolProfile(@CurrentAuth() auth: AuthContext) {
     if (!auth.isSupportOverride) {
+      if (!auth.permissions.includes('settings:read')) {
+        throw new ForbiddenException(
+          'School profile details require School Settings read access.',
+        );
+      }
       assertInstitutionalSettingsReadAllowed(auth);
     }
     return this.profileService.getProfile(auth.tenantId);
