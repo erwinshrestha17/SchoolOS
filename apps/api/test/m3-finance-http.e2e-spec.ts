@@ -158,7 +158,7 @@ describe('M3 Fees HTTP isolation hardening (E2E)', () => {
       .expect(201);
 
     expect(cashClose.body.paymentMethod).toBe(PaymentMethod.CASH);
-    expect(cashClose.body.grossCollected).toBe(1000);
+    expect(cashClose.body.grossCollected).toBe('1000.00');
 
     const bankClose = await request(app.getHttpServer())
       .post('/payments/cashier-close')
@@ -173,7 +173,7 @@ describe('M3 Fees HTTP isolation hardening (E2E)', () => {
       .expect(201);
 
     expect(bankClose.body.paymentMethod).toBe(PaymentMethod.BANK);
-    expect(bankClose.body.grossCollected).toBe(500);
+    expect(bankClose.body.grossCollected).toBe('500.00');
 
     await request(app.getHttpServer())
       .post('/payments/cashier-close')
