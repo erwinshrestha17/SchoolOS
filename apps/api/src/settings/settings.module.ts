@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { SettingsController } from './settings.controller';
+import { SettingsDomainController } from './settings-domain.controller';
 import { SchoolSettingsWorkspaceController } from './school-settings-workspace.controller';
 import { SettingsService } from './settings.service';
+import { SettingsDomainMutationService } from './settings-domain-mutation.service';
 import { SchoolSettingsNavigationV1Service } from './school-settings-navigation-v1.service';
 import { SchoolSettingsProfileService } from './school-settings-profile.service';
 import { BrandingDocumentsService } from './branding-documents.service';
@@ -21,9 +23,14 @@ import { FileRegistryModule } from '../file-registry/file-registry.module';
     StorageModule,
     FileRegistryModule,
   ],
-  controllers: [SettingsController, SchoolSettingsWorkspaceController],
+  controllers: [
+    SettingsController,
+    SettingsDomainController,
+    SchoolSettingsWorkspaceController,
+  ],
   providers: [
     SettingsService,
+    SettingsDomainMutationService,
     SchoolSettingsNavigationV1Service,
     SchoolSettingsProfileService,
     BrandingDocumentsService,
