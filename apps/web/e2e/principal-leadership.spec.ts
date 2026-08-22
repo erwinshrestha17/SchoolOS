@@ -75,6 +75,93 @@ test.describe.serial("Principal leadership web", () => {
     await context.close();
   });
 
+  test("keeps Principal Settings personal-only and blocks institutional direct URLs", async ({
+    authStateFor,
+    browser,
+  }) => {
+    const state = await authStateFor("principal");
+    const context = await browser.newContext({
+      baseURL: WEB_BASE_URL,
+      storageState: state,
+    });
+    const page = await context.newPage();
+
+    await page.goto("/dashboard/settings");
+    await expect(page.getByRole("heading", { name: "My Account" })).toBeVisible();
+    await expect(page.getByText("Profile", { exact: true })).toBeVisible();
+    await expect(page.getByText("Finance & administration", { exact: true })).toHaveCount(0);
+
+    for (const route of [
+      "/dashboard/settings/school/identity",
+      "/dashboard/settings/fees",
+      "/dashboard/settings/accounting",
+      "/dashboard/settings/hr-payroll",
+      "/dashboard/settings/security",
+      "/dashboard/settings/system/audit-log",
+    ]) {
+      await page.goto(route);
+      await expect(
+        page.getByText("School Settings access needed", { exact: true }),
+      ).toBeVisible();
+    }
+
+    await context.close();
+  });
+
+  test("rejects Principal tenant-policy reads and writes at the API boundary", async ({
+    authStateFor,
+    browser,
+  }) => {
+    const state = await authStateFor("principal");
+    const context = await browser.newContext({ storageState: state });
+    const csrf = csrfHeaders(state);
+
+    const settingsRead = await context.request.get(`${API_BASE_URL}/settings`);
+    expect(settingsRead.status()).toBe(403);
+
+    const settingsWrite = await context.request.patch(
+      `${API_BASE_URL}/settings/domains/identity`,
+      {
+        headers: csrf,
+        data: {
+          expectedVersion: "empty",
+          idempotencyKey: "22222222-2222-4222-8222-222222222222",
+          reason: "Principal boundary E2E regression check",
+          changes: [{ key: "school_name", value: "Must not change" }],
+        },
+      },
+    );
+    expect(settingsWrite.status()).toBe(403);
+    await context.close();
+  });
+
+  test("allows an explicitly seeded Principal + Configuration Owner to enter institutional Settings", async ({
+    authStateFor,
+    browser,
+  }) => {
+    test.skip(
+      !process.env.SCHOOLOS_E2E_PRINCIPAL_CONFIG_OWNER_EMAIL,
+      "Set SCHOOLOS_E2E_PRINCIPAL_CONFIG_OWNER_EMAIL to exercise the seeded dual-role browser contract.",
+    );
+
+    const context = await browser.newContext({
+      baseURL: WEB_BASE_URL,
+      storageState: await authStateFor("principalConfigOwner"),
+    });
+    const page = await context.newPage();
+
+    await page.goto("/dashboard/settings");
+    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+    await expect(page.getByText("School", { exact: true })).toBeVisible();
+
+    await page.goto("/dashboard/settings/school/identity");
+    await expect(
+      page.getByRole("heading", { name: "Identity & general" }),
+    ).toBeVisible();
+    await expect(page.getByText("School Settings access needed")).toHaveCount(0);
+    await context.close();
+  });
+
   test("returns purpose-limited operations summaries and not operator records", async ({
     authStateFor,
     browser,
