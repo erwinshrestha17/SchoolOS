@@ -38,9 +38,10 @@ const backendSettingsItemIds = [
 describe('Principal Settings hardening', () => {
   it('keeps institutional Settings out of the Principal sidebar shell', () => {
     const personaNav = read('components/layout/sidebar-persona-nav.config.ts');
+    assert.match(personaNav, /const principalLeadershipOnly/);
     assert.match(
       personaNav,
-      /isTeacherPersona \|\| personalOnly \|\| persona === 'principal'/,
+      /isTeacherPersona \|\| personalOnly \|\| principalLeadershipOnly/,
     );
     assert.match(personaNav, /School Configuration Owner\/Admin authority/);
   });
