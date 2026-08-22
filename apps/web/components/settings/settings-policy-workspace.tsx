@@ -1,18 +1,24 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle2,
   CircleAlert,
   FileClock,
+  Plus,
   RotateCcw,
   Save,
+  Trash2,
 } from 'lucide-react';
-import { formatBsDateTime } from '@schoolos/core';
-import type { TenantSettingSummary } from '@schoolos/core';
+import {
+  buildSchoolSettingsDomainVersion,
+  formatBsDateTime,
+  type TenantSettingSummary,
+} from '@schoolos/core';
 import { Button } from '../ui/button';
+import { ConfirmDialog } from '../ui/confirm-dialog';
 import { ErrorState } from '../ui/error-state';
 import { PermissionDenied } from '../ui/permission-denied';
 import { api } from '../../lib/api';
@@ -31,10 +37,15 @@ export function SettingsPolicyWorkspace({ policyId }: { policyId: string }) {
   const policy = getSchoolSettingsPolicy(policyId);
   const client = useQueryClient();
   const [form, setForm] = useState<Record<string, unknown>>({});
+  const [reason, setReason] = useState('');
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [notice, setNotice] = useState<{
     kind: 'success' | 'error';
     text: string;
   } | null>(null);
+  const lastAttemptRef = useRef<{ signature: string; idempotencyKey: string } | null>(
+    null,
+  );
 
   const settingsQuery = useQuery({
     queryKey: ['school-settings', 'all'],
@@ -63,6 +74,16 @@ export function SettingsPolicyWorkspace({ policyId }: { policyId: string }) {
     policy?.fields.filter(
       (field) => !sameValue(form[field.key], initialForm[field.key]),
     ) ?? [];
+  const expectedVersion = useMemo(
+    () =>
+      policy
+        ? buildSchoolSettingsDomainVersion(
+            settingsQuery.data ?? [],
+            policy.domain,
+          )
+        : 'empty',
+    [policy, settingsQuery.data],
+  );
   const lastUpdatedAt = useMemo(() => {
     if (!policy || !settingsQuery.data) return null;
     const stamps = settingsQuery.data
@@ -76,28 +97,54 @@ export function SettingsPolicyWorkspace({ policyId }: { policyId: string }) {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (!policy) return;
-      for (const field of changedFields) {
-        await api.updateTenantSetting(field.key, form[field.key]);
-      }
+      if (!policy || !changedFields.length) return null;
+      const changes = changedFields.map((field) => ({
+        key: field.key,
+        value: form[field.key],
+      }));
+      const signature = JSON.stringify({
+        domain: policy.domain,
+        expectedVersion,
+        reason: reason.trim(),
+        changes,
+      });
+      const prior = lastAttemptRef.current;
+      const idempotencyKey =
+        prior?.signature === signature ? prior.idempotencyKey : crypto.randomUUID();
+      lastAttemptRef.current = { signature, idempotencyKey };
+
+      return schoolSettingsApi.updateSchoolSettingsDomain(policy.domain, {
+        expectedVersion,
+        idempotencyKey,
+        reason: reason.trim(),
+        changes,
+      });
     },
     onSuccess: async () => {
+      lastAttemptRef.current = null;
+      setConfirmOpen(false);
+      setReason('');
       setNotice({
         kind: 'success',
         text: `${policy?.title ?? 'School policy'} saved for this school.`,
       });
-      await client.invalidateQueries({ queryKey: ['school-settings', 'all'] });
-      await client.invalidateQueries({
-        queryKey: ['school-settings', 'overview'],
-      });
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ['school-settings', 'all'] }),
+        client.invalidateQueries({ queryKey: ['school-settings', 'overview'] }),
+        client.invalidateQueries({ queryKey: ['school-settings', 'navigation'] }),
+      ]);
     },
-    onError: (error) =>
+    onError: (error) => {
+      setConfirmOpen(false);
       setNotice({
         kind: 'error',
         text: isForbidden(error)
           ? 'Save blocked: your role cannot change this school policy.'
-          : 'Save failed. Please review the policy values and try again.',
-      }),
+          : isConflict(error)
+            ? 'This school policy changed after you opened it. Reload the latest settings before saving again.'
+            : 'Save failed. Your changes were not confirmed. Review the values and retry.',
+      });
+    },
   });
 
   if (!policy) {
@@ -149,7 +196,9 @@ export function SettingsPolicyWorkspace({ policyId }: { policyId: string }) {
 
   const reset = () => {
     setForm(initialForm);
+    setReason('');
     setNotice(null);
+    lastAttemptRef.current = null;
   };
 
   return (
@@ -180,11 +229,12 @@ export function SettingsPolicyWorkspace({ policyId }: { policyId: string }) {
       {notice ? (
         <div
           className={`flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold ${notice.kind === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}
+          role={notice.kind === 'error' ? 'alert' : 'status'}
         >
           {notice.kind === 'success' ? (
-            <CheckCircle2 className="h-4 w-4" />
+            <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
           ) : (
-            <CircleAlert className="h-4 w-4" />
+            <CircleAlert className="h-4 w-4" aria-hidden="true" />
           )}
           {notice.text}
         </div>
@@ -219,9 +269,11 @@ export function SettingsPolicyWorkspace({ policyId }: { policyId: string }) {
               field={field}
               value={form[field.key]}
               disabled={!canManage || saveMutation.isPending}
-              onChange={(value) =>
-                setForm((current) => ({ ...current, [field.key]: value }))
-              }
+              onChange={(value) => {
+                setNotice(null);
+                lastAttemptRef.current = null;
+                setForm((current) => ({ ...current, [field.key]: value }));
+              }}
             />
           ))}
         </div>
@@ -243,28 +295,70 @@ export function SettingsPolicyWorkspace({ policyId }: { policyId: string }) {
             </Button>
             <Button
               type="button"
-              onClick={() => saveMutation.mutate()}
+              onClick={() => setConfirmOpen(true)}
               disabled={
                 !canManage || !changedFields.length || saveMutation.isPending
               }
             >
               <Save className="h-4 w-4" />
-              {saveMutation.isPending ? 'Saving…' : 'Save policy'}
+              Save policy
             </Button>
           </div>
         </div>
       </section>
+
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        title={`Save ${policy.title}?`}
+        description={`This changes ${changedFields.length} school-wide ${changedFields.length === 1 ? 'setting' : 'settings'}. The update is applied atomically and recorded in the school audit history.`}
+        confirmLabel="Confirm and save"
+        variant="warning"
+        isConfirming={saveMutation.isPending}
+        preventCloseWhileConfirming
+        confirmDisabled={reason.trim().length < 3}
+        onConfirm={() => saveMutation.mutate()}
+        onClose={() => {
+          if (!saveMutation.isPending) setConfirmOpen(false);
+        }}
+      >
+        <label className="block" htmlFor={`settings-change-reason-${policy.id}`}>
+          <span className="text-sm font-semibold text-slate-900">
+            Reason for change
+          </span>
+          <span className="mt-1 block text-sm leading-5 text-slate-600">
+            Explain why this school-wide policy is being changed. This reason is
+            retained with the audit record.
+          </span>
+          <textarea
+            id={`settings-change-reason-${policy.id}`}
+            rows={3}
+            value={reason}
+            disabled={saveMutation.isPending}
+            onChange={(event) => {
+              setReason(event.target.value);
+              lastAttemptRef.current = null;
+            }}
+            placeholder="Example: Updated for the 2083/84 academic year"
+            className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-900/5 disabled:bg-slate-100"
+          />
+        </label>
+      </ConfirmDialog>
     </div>
   );
 }
 
+function statusCodeOf(error: unknown): number | undefined {
+  return error && typeof error === 'object' && 'statusCode' in error
+    ? (error as { statusCode?: number }).statusCode
+    : undefined;
+}
+
 function isForbidden(error: unknown): boolean {
-  return Boolean(
-    error &&
-    typeof error === 'object' &&
-    'statusCode' in error &&
-    (error as { statusCode?: number }).statusCode === 403,
-  );
+  return statusCodeOf(error) === 403;
+}
+
+function isConflict(error: unknown): boolean {
+  return statusCodeOf(error) === 409;
 }
 
 function PolicyField({
@@ -279,6 +373,17 @@ function PolicyField({
   disabled: boolean;
 }) {
   const inputId = `setting-${field.key}`;
+
+  if (field.key === 'grading_scale') {
+    return (
+      <GradingScaleField
+        field={field}
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+      />
+    );
+  }
 
   if (field.type === 'checkbox') {
     return (
@@ -346,7 +451,7 @@ function PolicyField({
     const textValue =
       typeof value === 'string'
         ? value
-        : JSON.stringify(value ?? field.defaultValue ?? [], null, 2);
+        : JSON.stringify(value ?? field.defaultValue ?? {}, null, 2);
     return (
       <label className="block lg:col-span-2" htmlFor={inputId}>
         <span className="text-sm font-bold text-slate-900">{field.label}</span>
@@ -357,7 +462,7 @@ function PolicyField({
         ) : null}
         <textarea
           id={inputId}
-          rows={12}
+          rows={8}
           disabled={disabled}
           value={textValue}
           onChange={(event) => {
@@ -405,9 +510,7 @@ function PolicyField({
                 ? 'time'
                 : 'text'
           }
-          value={
-            field.type === 'number' ? String(value ?? '') : String(value ?? '')
-          }
+          value={String(value ?? '')}
           disabled={disabled}
           placeholder={field.placeholder}
           onChange={(event) =>
@@ -422,6 +525,180 @@ function PolicyField({
       )}
     </label>
   );
+}
+
+type GradingBand = {
+  grade: string;
+  minPercentage: number;
+  maxPercentage: number;
+  gradePoint: number;
+  label: string;
+  passed: boolean;
+};
+
+function GradingScaleField({
+  field,
+  value,
+  onChange,
+  disabled,
+}: {
+  field: SchoolSettingsPolicyField;
+  value: unknown;
+  onChange: (value: unknown) => void;
+  disabled: boolean;
+}) {
+  const rows = toGradingBands(value, field.defaultValue);
+  const update = (index: number, patch: Partial<GradingBand>) =>
+    onChange(rows.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)));
+
+  return (
+    <fieldset className="lg:col-span-2 rounded-xl border border-slate-200 p-4">
+      <legend className="px-1 text-sm font-bold text-slate-900">
+        {field.label}
+      </legend>
+      {field.description ? (
+        <p className="mt-1 text-sm leading-5 text-slate-600">
+          {field.description}
+        </p>
+      ) : null}
+      <div className="mt-4 overflow-x-auto">
+        <div className="min-w-[820px] space-y-2">
+          <div className="grid grid-cols-[90px_110px_110px_100px_minmax(160px,1fr)_90px_44px] gap-2 px-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+            <span>Grade</span>
+            <span>Min %</span>
+            <span>Max %</span>
+            <span>GPA</span>
+            <span>Label</span>
+            <span>Result</span>
+            <span className="sr-only">Remove</span>
+          </div>
+          {rows.map((row, index) => (
+            <div
+              key={`${row.grade}-${index}`}
+              className="grid grid-cols-[90px_110px_110px_100px_minmax(160px,1fr)_90px_44px] gap-2 rounded-lg bg-slate-50 p-2"
+            >
+              <input
+                aria-label={`Grade ${index + 1}`}
+                value={row.grade}
+                disabled={disabled}
+                onChange={(event) => update(index, { grade: event.target.value })}
+                className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm"
+              />
+              <input
+                aria-label={`Minimum percentage ${index + 1}`}
+                type="number"
+                min={0}
+                max={100}
+                value={row.minPercentage}
+                disabled={disabled}
+                onChange={(event) =>
+                  update(index, { minPercentage: Number(event.target.value) })
+                }
+                className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm"
+              />
+              <input
+                aria-label={`Maximum percentage ${index + 1}`}
+                type="number"
+                min={0}
+                max={100}
+                value={row.maxPercentage}
+                disabled={disabled}
+                onChange={(event) =>
+                  update(index, { maxPercentage: Number(event.target.value) })
+                }
+                className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm"
+              />
+              <input
+                aria-label={`Grade point ${index + 1}`}
+                type="number"
+                min={0}
+                max={4}
+                step="0.1"
+                value={row.gradePoint}
+                disabled={disabled}
+                onChange={(event) =>
+                  update(index, { gradePoint: Number(event.target.value) })
+                }
+                className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm"
+              />
+              <input
+                aria-label={`Grade label ${index + 1}`}
+                value={row.label}
+                disabled={disabled}
+                onChange={(event) => update(index, { label: event.target.value })}
+                className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm"
+              />
+              <select
+                aria-label={`Pass status ${index + 1}`}
+                value={row.passed ? 'PASS' : 'FAIL'}
+                disabled={disabled}
+                onChange={(event) =>
+                  update(index, { passed: event.target.value === 'PASS' })
+                }
+                className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm"
+              >
+                <option value="PASS">Pass</option>
+                <option value="FAIL">Fail</option>
+              </select>
+              <button
+                type="button"
+                aria-label={`Remove grade band ${index + 1}`}
+                disabled={disabled || rows.length <= 1}
+                onClick={() => onChange(rows.filter((_, rowIndex) => rowIndex !== index))}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+      <Button
+        type="button"
+        variant="outline"
+        className="mt-3"
+        disabled={disabled}
+        onClick={() =>
+          onChange([
+            ...rows,
+            {
+              grade: '',
+              minPercentage: 0,
+              maxPercentage: 0,
+              gradePoint: 0,
+              label: '',
+              passed: false,
+            },
+          ])
+        }
+      >
+        <Plus className="h-4 w-4" />
+        Add grade band
+      </Button>
+    </fieldset>
+  );
+}
+
+function toGradingBands(value: unknown, fallback: unknown): GradingBand[] {
+  const source = Array.isArray(value)
+    ? value
+    : Array.isArray(fallback)
+      ? fallback
+      : [];
+  return source.map((entry) => {
+    const item =
+      entry && typeof entry === 'object' && !Array.isArray(entry)
+        ? (entry as Record<string, unknown>)
+        : {};
+    return {
+      grade: String(item.grade ?? ''),
+      minPercentage: Number(item.minPercentage ?? 0),
+      maxPercentage: Number(item.maxPercentage ?? 0),
+      gradePoint: Number(item.gradePoint ?? 0),
+      label: String(item.label ?? ''),
+      passed: Boolean(item.passed),
+    };
+  });
 }
 
 function buildPolicyForm(
