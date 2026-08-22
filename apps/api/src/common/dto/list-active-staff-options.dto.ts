@@ -55,9 +55,7 @@ export class ActiveStaffLookupOptionResponseDto implements StaffLookupOption {
   designation!: string | null;
 }
 
-export class ActiveStaffLookupPageResponseDto
-  implements RemoteLookupPage<StaffLookupOption>
-{
+export class ActiveStaffLookupPageResponseDto implements RemoteLookupPage<StaffLookupOption> {
   @ApiProperty({ type: [ActiveStaffLookupOptionResponseDto] })
   items!: StaffLookupOption[];
 

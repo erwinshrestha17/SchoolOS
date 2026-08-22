@@ -1965,9 +1965,7 @@ export class CanteenService {
     const where: Prisma.CanteenSupplierWhereInput = {
       tenantId: actor.tenantId,
       isActive: true,
-      ...(search
-        ? { name: { contains: search, mode: 'insensitive' } }
-        : {}),
+      ...(search ? { name: { contains: search, mode: 'insensitive' } } : {}),
     };
     const [items, total] = await this.prisma.$transaction([
       this.prisma.canteenSupplier.findMany({

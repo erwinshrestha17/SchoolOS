@@ -1270,14 +1270,12 @@ export class TransportService {
         if (!Number.isNaN(new Date(payload.recordedAt).getTime())) {
           return this.enrichLocationPayload(payload, 'cache');
         }
-      } catch {
-      }
+      } catch {}
       try {
         await this.redisService
           .getClient()
           .del(this.latestLocationKey(tenantId, tripId));
-      } catch {
-      }
+      } catch {}
     }
 
     const latest = await this.prisma.transportLocationPing.findFirst({

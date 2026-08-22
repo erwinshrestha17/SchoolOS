@@ -400,7 +400,9 @@ describe('TransportController M8B contracts', () => {
     expect(
       controller.recordDriverLocationPing('trip-1', pingDto, actor),
     ).toEqual({ tripId: 'trip-1' });
-    expect(transportService.listDriverOwnAssignments).toHaveBeenCalledWith(actor);
+    expect(transportService.listDriverOwnAssignments).toHaveBeenCalledWith(
+      actor,
+    );
     expect(transportService.getDriverTripManifest).toHaveBeenCalledWith(
       'trip-1',
       actor,

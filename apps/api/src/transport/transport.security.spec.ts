@@ -132,7 +132,11 @@ describe('Transport Security Boundaries', () => {
 
       await expect(
         service.assignStudent(
-          { studentId: 'archived-student', routeId: 'route-1', stopId: 'stop-1' },
+          {
+            studentId: 'archived-student',
+            routeId: 'route-1',
+            stopId: 'stop-1',
+          },
           adminActor,
         ),
       ).rejects.toThrow(NotFoundException);

@@ -11,6 +11,5 @@ export const SUPPORT_OVERRIDE_READ_SCOPES_KEY =
  * route must be reviewed and annotated on its own before a Platform support
  * session can reach it.
  */
-export const AllowSupportOverrideRead = (
-  ...scopes: SupportOverrideScope[]
-) => SetMetadata(SUPPORT_OVERRIDE_READ_SCOPES_KEY, scopes);
+export const AllowSupportOverrideRead = (...scopes: SupportOverrideScope[]) =>
+  SetMetadata(SUPPORT_OVERRIDE_READ_SCOPES_KEY, scopes);
