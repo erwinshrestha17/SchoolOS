@@ -8,16 +8,14 @@ const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (path) => readFileSync(join(webRoot, path), 'utf8');
 
 describe('School Settings redesign', () => {
-  it('renders the control centre at the settings entry without changing the global sidebar', () => {
+  it('renders the role-aware control centre at the settings entry', () => {
     const layout = read('app/dashboard/settings/layout.tsx');
     const frame = read('components/settings/settings-route-frame.tsx');
     const hub = read('components/settings/settings-control-center.tsx');
     assert.match(layout, /SettingsRouteFrame/);
     assert.match(frame, /SettingsControlCenter/);
-    assert.match(
-      frame,
-      /Manage your personal preferences and school configuration/,
-    );
+    assert.match(frame, /school configuration available to your role/);
+    assert.match(frame, /Manage your profile, sign-in security/);
     assert.match(hub, /Choose a settings area/);
     assert.doesNotMatch(frame, /Applies only to this school/);
     assert.doesNotMatch(hub, /Upgrade Plan/);
@@ -49,15 +47,16 @@ describe('School Settings redesign', () => {
     assert.match(frame, /navigationQuery/);
     assert.match(frame, /backendItemsById/);
     assert.match(navigation, /SETTINGS_NAVIGATION_GROUPS/);
+    assert.match(navigation, /SETTINGS_BACKEND_ITEM_DISPOSITIONS/);
     assert.match(navigation, /backendItemId/);
-    assert.doesNotMatch(frame, /View only/);
   });
 
-  it('uses real settings APIs for policy configuration rather than browser-only state', () => {
+  it('uses a real atomic settings API for policy configuration rather than browser-only state', () => {
     const policy = read('components/settings/settings-policy-workspace.tsx');
     assert.match(policy, /api\.getTenantSettings/);
-    assert.match(policy, /api\.updateTenantSetting/);
+    assert.match(policy, /schoolSettingsApi\.updateSchoolSettingsDomain/);
     assert.match(policy, /schoolSettingsApi\.getSchoolSettingsNavigation/);
+    assert.doesNotMatch(policy, /api\.updateTenantSetting/);
   });
 
   it('uses shared sidebar tokens in the settings sub-navigation', () => {
@@ -68,9 +67,10 @@ describe('School Settings redesign', () => {
     assert.doesNotMatch(frame, /bg-blue-50 text-blue-700/);
   });
 
-  it('maps backend capabilities into the four user-facing access states', () => {
+  it('maps backend capabilities into visible user-facing access states', () => {
     const catalog = read('components/settings/school-settings-catalog.ts');
     const header = read('components/settings/settings-page-header.tsx');
+    const hub = read('components/settings/settings-control-center.tsx');
     for (const label of [
       'Can manage',
       'View-only',
@@ -78,6 +78,9 @@ describe('School Settings redesign', () => {
       'Platform managed',
     ]) {
       assert.match(header, new RegExp(label));
+    }
+    for (const label of ['Can manage', 'View-only', 'Platform managed', 'Personal']) {
+      assert.match(hub, new RegExp(label));
     }
     assert.match(catalog, /canEditSchoolSettings/);
   });
