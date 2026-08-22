@@ -96,8 +96,7 @@ describe('Transport Hardening (E2E)', () => {
   });
 
   describe('Driver Boundaries', () => {
-    it('filters routes for drivers to only show assigned ones', async () => {
-      // Setup: 2 routes, driver-1 assigned to route-1
+    it('denies drivers the tenant-wide route directory while admins retain access', async () => {
       const route1 = {
         id: 'route-1',
         tenantId,
@@ -118,14 +117,12 @@ describe('Transport Hardening (E2E)', () => {
         (a) => ({ ...a, id: 'assign-1', tenantId, routeId: 'route-1' }),
       );
 
-      // Admin sees all
       const adminRoutes = await transportController.listRoutes(adminActor);
       expect(adminRoutes).toHaveLength(2);
 
-      // Driver sees only route-1
-      const driverRoutes = await transportController.listRoutes(driverActor);
-      expect(driverRoutes).toHaveLength(1);
-      expect(driverRoutes[0].id).toBe('route-1');
+      expect(() => transportController.listRoutes(driverActor)).toThrow(
+        ForbiddenException,
+      );
     });
 
     it('prevents driver from updating a trip they are not assigned to', async () => {
@@ -172,7 +169,6 @@ describe('Transport Hardening (E2E)', () => {
         { id: 'assign-1', tenantId, staff: { userId: 'driver-1' } },
       ];
 
-      // Cannot drop if not boarded
       await expect(
         transportController.markStudentDropped(
           'trip-1',
@@ -181,14 +177,12 @@ describe('Transport Hardening (E2E)', () => {
         ),
       ).rejects.toThrow(ConflictException);
 
-      // Board first
       await transportController.markStudentBoarded(
         'trip-1',
         { studentId: 'stu-1' },
         driverActor,
       );
 
-      // Now can drop
       prisma.__state.transportTripStudentStatuses[0].status =
         TransportStudentTripStatus.BOARDED;
       await expect(
@@ -225,7 +219,6 @@ describe('Transport Hardening (E2E)', () => {
         transportController.completeTrip('trip-1', {}, driverActor),
       ).rejects.toThrow(ConflictException);
 
-      // Works with force complete note
       await expect(
         transportController.completeTrip(
           'trip-1',
@@ -255,13 +248,13 @@ describe('Transport Hardening (E2E)', () => {
           { latitude: 100, longitude: 50 },
           driverActor,
         ),
-      ).rejects.toThrow(); // Latitude > 90
+      ).rejects.toThrow();
     });
   });
 
   describe('Parent Boundaries', () => {
     it('prevents parent from tracking a student they do not own', async () => {
-      prisma.__state.studentGuardians = []; // No link
+      prisma.__state.studentGuardians = [];
 
       await expect(
         transportController.getParentStudentActiveTrip('stu-1', parentActor),
@@ -293,7 +286,6 @@ describe('Transport Hardening (E2E)', () => {
         },
       ];
 
-      // Also need a trip for it to return something interesting
       const route = { id: 'r-1', name: 'Route 1', code: 'R1' };
       const vehicle = {
         id: 'v-1',
