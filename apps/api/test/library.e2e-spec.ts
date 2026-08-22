@@ -5,6 +5,7 @@ import {
   AuthMethod,
   LibraryCopyStatus,
   LibraryIssueStatus,
+  StudentLifecycleStatus,
 } from '@prisma/client';
 import request from 'supertest';
 import type { AuthContext } from '../src/auth/auth.types';
@@ -280,6 +281,7 @@ function seedCirculationFixtures(prisma: PrismaMock) {
     studentSystemId: 'M8-E2E-01',
     firstNameEn: 'M8',
     lastNameEn: 'E2E Student',
+    lifecycleStatus: StudentLifecycleStatus.ACTIVE,
   });
 
   prisma.__state.libraryBooks.push({
