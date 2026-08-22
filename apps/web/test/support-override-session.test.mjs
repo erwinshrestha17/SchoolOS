@@ -236,7 +236,7 @@ describe("structured read-only support override", () => {
       layout,
       /prefix: ["']\/dashboard\/homework\/new["'][\s\S]{0,120}permissions: \[["']homework:create["']\]/,
     );
-    assert.match(attendance, /visibleAttendanceTabs\(canMark/);
+    assert.match(attendance, /visibleAttendanceTabs\(\s*canMark/);
     assert.match(attendance, /attendance\.canMark \?/);
     assert.match(attendance, /canManageAll \?/);
 
