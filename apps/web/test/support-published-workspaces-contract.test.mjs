@@ -154,7 +154,7 @@ describe('purpose-limited published support workspaces', () => {
     assert.match(route, /<SupportPublishedTimetable/);
     assert.match(
       supportTimetable,
-      /api\.listTimetable\(\{ page, limit: PAGE_SIZE \}\)/,
+      /api\.listSupportPublishedTimetable\(\{ page, limit: PAGE_SIZE \}\)/,
     );
     assert.match(supportTimetable, /<TablePagination/);
     assert.match(supportTimetable, /<caption className="sr-only">/);
