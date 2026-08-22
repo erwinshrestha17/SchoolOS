@@ -169,6 +169,7 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
       userId: platformAdmin.id,
       roleId: platformRole?.id ?? '',
       tenantId: platformId,
+      scopeId: 'global',
     } as Record<string, unknown>);
 
     // 5. Login as platform admin
@@ -231,6 +232,7 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
       userId: platformSupport.id,
       roleId: supportRole?.id ?? '',
       tenantId: platformId,
+      scopeId: 'global',
     } as Record<string, unknown>);
 
     const sLoginRes = (await authController.login(
@@ -289,6 +291,7 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
       userId: platformBilling.id,
       roleId: billingRole?.id ?? '',
       tenantId: platformId,
+      scopeId: 'global',
     } as Record<string, unknown>);
 
     const bLoginRes = (await authController.login(
