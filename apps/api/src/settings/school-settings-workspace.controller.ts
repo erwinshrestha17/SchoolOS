@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Param,
   Patch,
@@ -9,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { SchoolSettingsOverview } from '@schoolos/core';
+import { isPrincipalRestrictedFromInstitutionalSettings } from '@schoolos/core';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { AllowSupportOverrideRead } from '../auth/decorators/allow-support-override-read.decorator';
 import type { AuthContext } from '../auth/auth.types';
@@ -42,6 +44,15 @@ export class SchoolSettingsWorkspaceController {
   @Get('navigation')
   @Permissions('settings:read_public')
   getNavigation(@CurrentAuth() auth: AuthContext) {
+    if (
+      !auth.isSupportOverride &&
+      isPrincipalRestrictedFromInstitutionalSettings(auth.roles)
+    ) {
+      return {
+        generatedAt: new Date().toISOString(),
+        groups: [],
+      };
+    }
     return this.navigationService.getNavigation(auth);
   }
 
@@ -50,6 +61,7 @@ export class SchoolSettingsWorkspaceController {
   async getOverview(
     @CurrentAuth() auth: AuthContext,
   ): Promise<SchoolSettingsOverview> {
+    assertInstitutionalSettingsReadAllowed(auth);
     const [settings, navigation, academicCalendar, schoolName, recentChanges] =
       await Promise.all([
         this.settingsService.getSettings(auth.tenantId),
@@ -130,6 +142,7 @@ export class SchoolSettingsWorkspaceController {
   @Get('integrations')
   @Permissions('settings:read')
   getIntegrations(@CurrentAuth() auth: AuthContext) {
+    assertInstitutionalSettingsReadAllowed(auth);
     return this.integrationsService.getIntegrationsStatus(auth.tenantId);
   }
 
@@ -137,6 +150,9 @@ export class SchoolSettingsWorkspaceController {
   @Permissions('settings:read_public')
   @AllowSupportOverrideRead('SCHOOL_PROFILE')
   getSchoolProfile(@CurrentAuth() auth: AuthContext) {
+    if (!auth.isSupportOverride) {
+      assertInstitutionalSettingsReadAllowed(auth);
+    }
     return this.profileService.getProfile(auth.tenantId);
   }
 
@@ -212,6 +228,14 @@ export class SchoolSettingsWorkspaceController {
       auth.tenantId,
       dto,
       auth.userId,
+    );
+  }
+}
+
+function assertInstitutionalSettingsReadAllowed(auth: AuthContext) {
+  if (isPrincipalRestrictedFromInstitutionalSettings(auth.roles)) {
+    throw new ForbiddenException(
+      'Institutional settings require School Configuration Owner access.',
     );
   }
 }
