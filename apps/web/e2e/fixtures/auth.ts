@@ -10,6 +10,7 @@ export type StorageState = Awaited<ReturnType<BrowserContext["storageState"]>>;
 export type SchoolE2eRole =
   | "schoolAdmin"
   | "principal"
+  | "principalConfigOwner"
   | "accountant"
   | "hrManager"
   | "staff"
@@ -125,6 +126,12 @@ function credentialsFor(role: SchoolE2eRole) {
       email:
         process.env.SCHOOLOS_E2E_PRINCIPAL_EMAIL ?? "principal@schoolos.com",
       passwordEnv: "SCHOOLOS_E2E_PRINCIPAL_PASSWORD",
+    },
+    principalConfigOwner: {
+      email: requiredEnvironmentValue(
+        "SCHOOLOS_E2E_PRINCIPAL_CONFIG_OWNER_EMAIL",
+      ),
+      passwordEnv: "SCHOOLOS_E2E_PRINCIPAL_CONFIG_OWNER_PASSWORD",
     },
     accountant: {
       email:
