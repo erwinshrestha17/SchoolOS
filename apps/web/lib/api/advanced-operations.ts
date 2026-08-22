@@ -51,9 +51,31 @@ export type ApprovalRequestSummary = {
   }>;
 };
 
+export type PrincipalApprovalQueueItem = Omit<
+  ApprovalRequestSummary,
+  'decisions' | 'comments'
+>;
+
+export type PrincipalApprovalQueuePage = {
+  items: PrincipalApprovalQueueItem[];
+  nextCursor: string | null;
+  limit: number;
+  generatedAt: string;
+};
+
 export const advancedOperationsApi = {
   listApprovalRequests: () =>
     request<ApprovalRequestSummary[]>('/advanced/approvals'),
+
+  listPrincipalApprovalQueue: (input: { cursor?: string; limit?: number } = {}) => {
+    const search = new URLSearchParams();
+    if (input.cursor) search.set('cursor', input.cursor);
+    if (input.limit) search.set('limit', String(input.limit));
+    const suffix = search.size ? `?${search.toString()}` : '';
+    return request<PrincipalApprovalQueuePage>(
+      `/advanced/approvals/principal/queue${suffix}`,
+    );
+  },
 
   decideApprovalRequest: (
     approvalRequestId: string,
