@@ -23,6 +23,8 @@ function createController() {
     createVehicle: jest.fn(),
     updateVehicle: jest.fn(),
     listDriverAssignments: jest.fn(),
+    listDriverOwnAssignments: jest.fn(),
+    listActiveStaffOptions: jest.fn(),
     assignDriver: jest.fn(),
     listStudentAssignments: jest.fn(),
     assignStudent: jest.fn(),
@@ -354,7 +356,7 @@ describe('TransportController M8B contracts', () => {
     const markDto = { studentId: 'student-1' };
     const pingDto = { latitude: 27.7172, longitude: 85.324 };
     transportService.getDriverDashboard.mockReturnValue({ activeTrips: [] });
-    transportService.listDriverAssignments.mockReturnValue([
+    transportService.listDriverOwnAssignments.mockReturnValue([
       { id: 'driver-assignment-1' },
     ]);
     transportService.listActiveTrips.mockReturnValue([{ id: 'trip-1' }]);
@@ -398,6 +400,7 @@ describe('TransportController M8B contracts', () => {
     expect(
       controller.recordDriverLocationPing('trip-1', pingDto, actor),
     ).toEqual({ tripId: 'trip-1' });
+    expect(transportService.listDriverOwnAssignments).toHaveBeenCalledWith(actor);
     expect(transportService.getDriverTripManifest).toHaveBeenCalledWith(
       'trip-1',
       actor,
