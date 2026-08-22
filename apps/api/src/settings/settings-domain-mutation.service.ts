@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   BadRequestException,
   ConflictException,
@@ -79,6 +80,12 @@ export class SettingsDomainMutationService {
       };
     });
 
+    const requestFingerprint = this.buildRequestFingerprint(
+      domain,
+      dto.expectedVersion,
+      reason,
+      changes,
+    );
     const domainKeys = [...getSchoolSettingsKeysForDomain(domain)];
     const lockKey = `${auth.tenantId}:settings:${dto.idempotencyKey}`;
 
@@ -105,10 +112,14 @@ export class SettingsDomainMutationService {
             'This settings request key was already used for another policy update.',
           );
         }
-        const replay = this.parseReplay(prior.after, domain);
+        const replay = this.parseReplay(
+          prior.after,
+          domain,
+          requestFingerprint,
+        );
         if (!replay) {
           throw new ConflictException(
-            'This settings request was already processed. Refresh before trying again.',
+            'This settings request key was already used with a different payload. Refresh before trying again.',
           );
         }
         return replay;
@@ -174,6 +185,7 @@ export class SettingsDomainMutationService {
             version: nextVersion,
             changedKeys,
             reason,
+            requestFingerprint,
           },
         },
       });
@@ -209,15 +221,39 @@ export class SettingsDomainMutationService {
     }));
   }
 
+  private buildRequestFingerprint(
+    domain: SchoolSettingsDomain,
+    expectedVersion: string,
+    reason: string,
+    changes: Array<{ key: TenantSettingKey; value: Prisma.InputJsonValue }>,
+  ): string {
+    const canonicalChanges = [...changes].sort((left, right) =>
+      left.key.localeCompare(right.key),
+    );
+    return createHash('sha256')
+      .update(
+        JSON.stringify({
+          domain,
+          expectedVersion,
+          reason,
+          changes: canonicalChanges,
+        }),
+      )
+      .digest('hex');
+  }
+
   private parseReplay(
     value: Prisma.JsonValue | null,
     domain: SchoolSettingsDomain,
+    requestFingerprint: string,
   ): UpdateSchoolSettingsDomainResult | null {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
     const record = value as Record<string, Prisma.JsonValue>;
     const version = record.version;
     const changedKeys = record.changedKeys;
+    const priorFingerprint = record.requestFingerprint;
     if (
+      priorFingerprint !== requestFingerprint ||
       typeof version !== 'string' ||
       !Array.isArray(changedKeys) ||
       !changedKeys.every((key) => typeof key === 'string')
