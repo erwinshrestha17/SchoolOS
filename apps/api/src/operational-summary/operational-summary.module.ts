@@ -8,6 +8,8 @@ import {
   OperationalMobileSummaryController,
 } from './operational-summary.controller';
 import { OperationalSummaryService } from './operational-summary.service';
+import { PrincipalOperationsSummaryController } from './principal-operations-summary.controller';
+import { PrincipalOperationsSummaryService } from './principal-operations-summary.service';
 import { TeacherScopeModule } from '../teacher-scope/teacher-scope.module';
 
 @Module({
@@ -16,8 +18,9 @@ import { TeacherScopeModule } from '../teacher-scope/teacher-scope.module';
     OperationalPlatformSummaryController,
     OperationalDashboardSummaryController,
     OperationalMobileSummaryController,
+    PrincipalOperationsSummaryController,
   ],
-  providers: [OperationalSummaryService],
+  providers: [OperationalSummaryService, PrincipalOperationsSummaryService],
   exports: [OperationalSummaryService],
 })
 export class OperationalSummaryModule {}
