@@ -229,13 +229,101 @@ Biometrics for Parent/Teacher/Principal:
 - Biometrics are device-local unlock only; never store raw biometric templates.
 - Logout/session revocation/account recovery/device replacement/permission loss must invalidate protected local access appropriately.
 
-### Offline P0 boundary
+### Offline features and synchronization
 
-Allowed: attendance drafts, homework drafts, activity drafts, cached timetable/assigned roster, read-only notices/notifications.
+SchoolOS mobile must remain useful on unstable/low-bandwidth Nepal networks without making the device authoritative. **The server/database is always the source of truth.** Offline mode is a bounded resilience capability, not an alternate backend.
 
-Not allowed: payments, cashier close, payroll finalization, accounting journals, result publication, marks unlock, guardian changes, role/permission changes, institution configuration, compliance activation, government-export approval.
+#### Allowed offline during P0
 
-Offline authoritative writes require client-operation/idempotency IDs, fresh server-side authorization, version/conflict checks, and visible resolution. No silent last-write-wins for attendance, marks, or protected records.
+- M2 attendance: cache the currently authorized assigned roster; create/edit a local attendance draft; queue an explicitly supported idempotent submission for later sync.
+- M5 activities: create/edit local activity drafts and queue approved draft/media uploads. Publication/moderation remains server-authoritative.
+- M6 homework: create/edit teacher homework drafts and preserve unsent attachment metadata; publication/submission acceptance is server-authoritative.
+- Read-only cache: published timetable, assigned roster, notices, notifications, and other explicitly approved purpose-limited projections.
+- User-visible sync state: `local/draft`, `queued`, `syncing`, `synced`, `stale`, `conflict`, `rejected`, `revoked`, `failed`. Do not label locally queued data as successfully submitted.
+
+No other workflow becomes offline-capable merely because a local database/cache exists. Offline marks entry, official academic publication, and additional write domains require explicit owner approval plus a dedicated conflict/idempotency design.
+
+#### Online-only / forbidden offline authoritative actions
+
+- Fees/payments, refunds, reversals, cashier close, reconciliation, receipt issuance.
+- Payroll calculation/finalization/payment and M11 journals/vouchers/period locks.
+- Result publication/withdrawal, marks unlock/reopen, official report-card generation/publication.
+- Guardian relationship/custody/capability changes.
+- Roles, permissions, teacher assignments, entitlements, tenant or institution configuration.
+- Compliance-profile activation and IEMIS/government export approval/submission.
+- Platform-control-plane writes, support overrides, provider secrets/configuration.
+- Safeguarding-record changes unless a future explicitly approved secure offline design exists.
+
+When offline, these surfaces must show an honest connection-required state; never simulate success or create an unofficial local financial/academic record.
+
+#### Required offline operation envelope
+
+Every queued write must carry the existing canonical equivalents of:
+
+```text
+clientOperationId
+deviceId
+tenantId
+userId
+persona/context
+assignmentVersion or authorizationVersion where relevant
+entityId
+baseEntityVersion / expectedVersion
+createdAtClient
+lastModifiedAtClient
+syncAttemptCount
+syncStatus
+```
+
+Client timestamps are diagnostic only; they do not override server time, academic periods, locks, deadlines, or authorization. Never trust a client-supplied `tenantId`, user, assignment, child relation, lifecycle state, or official total merely because it was captured offline.
+
+#### Sync acceptance rules
+
+When connectivity returns, the API must re-evaluate the operation as if it were a new online request:
+
+1. Authenticate the current session/device.
+2. Resolve trusted `tenantId` and user context server-side.
+3. Re-check tenant status, module entitlement, persona permission, teacher assignment/guardian scope, record lock, and applicable deadline/policy.
+4. Deduplicate by `clientOperationId`/idempotency key.
+5. Compare the submitted base/entity version with the current authoritative version.
+6. Accept atomically, reject safely, or return an explicit conflict.
+7. Emit audit/notification events only after authoritative acceptance.
+8. Return the authoritative server record/version so local state can converge.
+
+Never auto-convert an authorization failure or conflict into success. Never use silent last-write-wins for attendance, marks, student identity, protected records, or any authoritative school record.
+
+#### Conflict behavior
+
+- **Same operation replay:** return the original result; do not create duplicates.
+- **Server record changed:** mark `conflict`; retain the local draft and the server version; require the defined domain resolution flow.
+- **Assignment/guardian access removed:** mark `revoked`; do not retry; immediately remove unauthorized cached projections.
+- **Tenant suspended/module disabled:** stop queued writes for that scope and fail closed.
+- **Session expired/network/provider unavailable:** preserve safe drafts; retry only transient failures with bounded backoff after re-authentication where required.
+- **Permanent validation/business-rule failure:** mark `rejected`; show the reason in safe user-facing language; do not retry forever.
+
+#### Local data security and cache isolation
+
+- Store only the minimum data required for the approved offline workflow.
+- Use platform secure storage for credentials/refresh material and encrypted/protected application storage for sensitive cached data where supported by the existing mobile architecture.
+- Partition cached/queued data by tenant + authenticated user + persona/context; child/assignment-specific projections must not bleed across switches.
+- Logout, account recovery, device/session revocation, school switch, guardian revocation, teacher-assignment removal, tenant suspension, or permission loss must invalidate affected protected local data and queued writes.
+- Do not cache provider secrets, platform data, unrestricted finance records, safeguarding dossiers, full HR/payroll datasets, or unrelated student records for offline convenience.
+- Cached data must carry freshness/last-synced metadata; stale data is visually distinguishable from current server data.
+
+#### Queue and retry discipline
+
+- Persist approved queues across app restart without losing idempotency IDs.
+- Keep ordering only where the domain requires it; do not assume all queued operations can be replayed blindly in creation order.
+- Use bounded retry/backoff for transient transport/server failures; avoid retry storms.
+- Do not repeatedly retry `403`, revoked access, validation failures, or deterministic conflicts.
+- Large media uploads may resume/retry only through the approved protected-file/upload architecture; never embed large base64 payloads in the queue/database.
+- Expose a user-visible pending/failed count and per-item recovery path for actionable queued work.
+
+#### Offline verification
+
+Any touched offline workflow must test, as applicable: airplane-mode creation, app kill/restart, duplicate replay, server-side concurrent change, expired session, assignment/guardian revocation before sync, tenant/module disable before sync, conflict presentation, successful convergence, cache purge, and no cross-tenant/user leakage.
+
+A feature is not “offline ready” because data is cached. It is complete only when authorization revalidation, idempotency, conflict handling, revocation cleanup, persistence across restart, UI status, and focused tests are implemented end-to-end.
 
 ## 9. Missing API decision rule
 
