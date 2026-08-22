@@ -190,7 +190,8 @@ export function shouldShowSettingsHub(
   personalOnly: boolean,
   persona: SchoolWebPersona,
 ): boolean {
-  if (isTeacherPersona || personalOnly || persona === 'principal') return false;
+  const principalLeadershipOnly = ['principal'].includes(persona);
+  if (isTeacherPersona || personalOnly || principalLeadershipOnly) return false;
   return (
     settingsCaps.institutionalNavEnabled &&
     settingsCaps.canAccessInstitutionalSettings
