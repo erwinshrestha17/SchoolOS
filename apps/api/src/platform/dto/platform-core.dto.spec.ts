@@ -30,11 +30,41 @@ describe('Platform control-plane DTOs', () => {
     const dto = plainToInstance(EnterSupportOverrideDto, {
       tenantId: 'tenant-1',
       reason: 'Investigating support ticket',
+      scopes: ['ATTENDANCE'],
       durationMinutes: '30',
     });
 
     expect(validateSync(dto)).toHaveLength(0);
     expect(dto.durationMinutes).toBe(30);
+  });
+
+  it('rejects unscoped, unknown, and overlong support overrides', () => {
+    const unscoped = plainToInstance(EnterSupportOverrideDto, {
+      tenantId: 'tenant-1',
+      reason: 'Investigating support ticket',
+      scopes: [],
+    });
+    const unknown = plainToInstance(EnterSupportOverrideDto, {
+      tenantId: 'tenant-1',
+      reason: 'Investigating support ticket',
+      scopes: ['FINANCE_WRITE'],
+    });
+    const overlong = plainToInstance(EnterSupportOverrideDto, {
+      tenantId: 'tenant-1',
+      reason: 'Investigating support ticket',
+      scopes: ['ATTENDANCE'],
+      durationMinutes: 61,
+    });
+
+    expect(validateSync(unscoped).map((error) => error.property)).toContain(
+      'scopes',
+    );
+    expect(validateSync(unknown).map((error) => error.property)).toContain(
+      'scopes',
+    );
+    expect(validateSync(overlong).map((error) => error.property)).toContain(
+      'durationMinutes',
+    );
   });
 
   it('requires a concrete reason for billing suspension changes', () => {

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpException,
   Injectable,
   NotFoundException,
@@ -160,10 +161,12 @@ export class AdmissionsService {
             },
             orderBy: { createdAt: 'desc' },
           },
-          invoices: {
-            orderBy: { issuedAt: 'desc' },
-            take: 1,
-          },
+          invoices: actor.isSupportOverride
+            ? false
+            : {
+                orderBy: { issuedAt: 'desc' },
+                take: 1,
+              },
           _count: {
             select: {
               documents: true,
@@ -203,14 +206,15 @@ export class AdmissionsService {
               status: student.enrollments[0].status,
             }
           : null,
-        latestInvoice: student.invoices[0]
-          ? {
-              id: student.invoices[0].id,
-              invoiceNumber: student.invoices[0].invoiceNumber,
-              status: student.invoices[0].status,
-              totalAmount: Number(student.invoices[0].totalAmount),
-            }
-          : null,
+        latestInvoice:
+          !actor.isSupportOverride && student.invoices[0]
+            ? {
+                id: student.invoices[0].id,
+                invoiceNumber: student.invoices[0].invoiceNumber,
+                status: student.invoices[0].status,
+                totalAmount: Number(student.invoices[0].totalAmount),
+              }
+            : null,
       })),
       total,
       page,
@@ -1026,6 +1030,12 @@ export class AdmissionsService {
   }
 
   async getImportBatch(batchId: string, actor: AuthContext) {
+    if (actor.isSupportOverride) {
+      throw new ForbiddenException(
+        'Raw admission import batch details are unavailable during support override',
+      );
+    }
+
     const batch = await this.prisma.admissionImportBatch.findFirst({
       where: { id: batchId, tenantId: actor.tenantId },
       include: {

@@ -7,6 +7,10 @@ describe('canonical development seed', () => {
     join(__dirname, 'platform-seed.ts'),
     'utf8',
   );
+  const platformE2eSource = readFileSync(
+    join(__dirname, 'seed-m0-platform-e2e.ts'),
+    'utf8',
+  );
 
   it('keeps the Everest Academy Class 1-12 distribution deterministic', () => {
     const expectedCounts = [
@@ -81,6 +85,46 @@ describe('canonical development seed', () => {
     expect(source).toContain('...(resetDemoCredentialsOnSeed');
     expect(platformSource).toContain('PLATFORM_SEED_RESET_CREDENTIALS_ON_SEED');
     expect(platformSource).toContain('resetPlatformCredentialsOnSeed');
-    expect(platformSource).toContain('...(resetPlatformCredentialsOnSeed');
+    expect(platformSource).toContain('? resetPlatformCredentialsOnSeed');
+    expect(platformSource).toContain('await prisma.user.update');
+  });
+
+  it('requires explicit non-default credentials for the Platform bootstrap', () => {
+    expect(platformSource).toContain(
+      "requirePlatformSeedValue('PLATFORM_SEED_EMAIL')",
+    );
+    expect(platformSource).toContain(
+      "requirePlatformSeedValue('PLATFORM_SEED_PASSWORD')",
+    );
+    expect(platformSource).toContain(
+      'No default Platform credentials are provided.',
+    );
+    expect(platformSource).not.toContain('admin@schoolos.io');
+    expect(platformSource).not.toContain('SchoolOS@2026');
+  });
+
+  it('does not reactivate a suspended operator or revoked Platform grant on reseed', () => {
+    expect(platformSource).toContain('const existingOperator');
+    expect(platformSource).not.toContain('prisma.user.upsert');
+    expect(platformSource).toContain('const existingAdminGrant');
+    expect(platformSource).toContain('if (!existingAdminGrant)');
+    expect(platformSource).not.toContain('revokedAt: null');
+    expect(platformSource).not.toContain('revokedById: null');
+    expect(platformSource).not.toContain('revokeReason: null');
+    expect(platformSource).not.toContain('expiresAt: null');
+  });
+
+  it('keeps school and Platform bootstrap roles in separate security domains', () => {
+    expect(source).toContain('SCHOOL_ROLE_DEFINITIONS');
+    expect(source).toContain('SCHOOL_ROLE_PERMISSIONS');
+    expect(source).not.toContain('seedPlatformUser');
+
+    for (const dedicatedSource of [platformSource, platformE2eSource]) {
+      expect(dedicatedSource).toContain('PLATFORM_ROLE_DEFINITIONS');
+      expect(dedicatedSource).toContain('PLATFORM_ROLE_PERMISSIONS');
+      expect(dedicatedSource).toContain('SecurityDomain.PLATFORM');
+      expect(dedicatedSource).toContain("scopeId: 'global'");
+      expect(dedicatedSource).toContain('const action = parts.pop()');
+    }
   });
 });

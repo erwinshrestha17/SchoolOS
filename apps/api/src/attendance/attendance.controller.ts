@@ -14,6 +14,7 @@ import {
   ApiOperation,
 } from '@nestjs/swagger';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
+import { AllowSupportOverrideRead } from '../auth/decorators/allow-support-override-read.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
@@ -83,6 +84,7 @@ export class AttendanceController {
 
   @Get('analytics')
   @Permissions('attendance:read')
+  @AllowSupportOverrideRead('ATTENDANCE')
   getAnalytics(@CurrentAuth() auth: AuthContext) {
     return this.attendanceService.getAnalytics(auth);
   }
@@ -118,7 +120,7 @@ export class AttendanceController {
   }
 
   @Get('register/export')
-  @Permissions('attendance:read')
+  @Permissions('attendance:read', 'reports:export')
   async exportMonthlyRegister(
     @Query() query: GetMonthlyRegisterDto,
     @Query('format') format: 'csv' | 'pdf' = 'csv',
@@ -152,6 +154,7 @@ export class AttendanceController {
 
   @Get('conflicts')
   @Permissions('attendance:read')
+  @AllowSupportOverrideRead('ATTENDANCE')
   listConflicts(@CurrentAuth() auth: AuthContext) {
     return this.attendanceService.listConflicts(auth);
   }
@@ -329,6 +332,13 @@ export class AttendanceController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.attendanceService.listCorrectionRequests(auth, query);
+  }
+
+  @Get('corrections/summary')
+  @Permissions('attendance:read')
+  @AllowSupportOverrideRead('ATTENDANCE')
+  getCorrectionSummary(@CurrentAuth() auth: AuthContext) {
+    return this.attendanceService.getCorrectionSummary(auth);
   }
 
   @Get('corrections/:id')

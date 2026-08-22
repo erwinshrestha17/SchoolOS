@@ -30,7 +30,11 @@ describe("shared icon accessibility primitives", () => {
     assert.match(protectedFile, /aria-label=\{accessibleName\}/);
     assert.match(
       protectedFile,
-      /size === 'icon' \? <Tooltip content=\{accessibleName\}>\{button\}<\/Tooltip> : button/,
+      /size === 'icon' \|\| blockedBySupportOverride[\s\S]{0,100}<Tooltip content=\{accessibleName\}>\{button\}<\/Tooltip>/,
+    );
+    assert.match(
+      protectedFile,
+      /Protected files are unavailable during read-only support access/,
     );
   });
 
@@ -46,15 +50,24 @@ describe("shared icon accessibility primitives", () => {
       /size="icon"[\s\S]{0,120}onClick=\{\(\) => setDeleteTarget\(row\)\}/,
     );
     assert.match(weeklyRequirements, />\s*Delete\s*</);
-    assert.match(weeklyRequirements, /<Tooltip content="Edit weekly requirement">/);
+    assert.match(
+      weeklyRequirements,
+      /<Tooltip content="Edit weekly requirement">/,
+    );
   });
 
   it("shows visible text on the homework attachment preview action instead of a bare icon", () => {
     const detailPage = read("components/homework/homework-detail-page.tsx");
     const reviewModal = read("components/homework/homework-review-modal.tsx");
 
-    assert.doesNotMatch(detailPage, /Download className="h-4 w-4" \/>\s*<\/Button>/);
-    assert.doesNotMatch(reviewModal, /Download className="h-4 w-4" \/>\s*<\/Button>/);
+    assert.doesNotMatch(
+      detailPage,
+      /Download className="h-4 w-4" \/>\s*<\/Button>/,
+    );
+    assert.doesNotMatch(
+      reviewModal,
+      /Download className="h-4 w-4" \/>\s*<\/Button>/,
+    );
     assert.match(detailPage, />\s*View\s*</);
     assert.match(reviewModal, />\s*View\s*</);
   });
@@ -64,8 +77,14 @@ describe("shared icon accessibility primitives", () => {
 
     assert.match(summary, /export function RefreshSummaryButton/);
     assert.match(summary, /<RefreshCw[\s\S]{0,80}size=\{18\}/);
-    assert.match(summary, /aria-label=\{isLoading \? "Refreshing dashboard" : "Refresh dashboard"\}/);
-    assert.match(summary, /title=\{isLoading \? "Refreshing dashboard" : "Refresh dashboard"\}/);
+    assert.match(
+      summary,
+      /aria-label=\{isLoading \? "Refreshing dashboard" : "Refresh dashboard"\}/,
+    );
+    assert.match(
+      summary,
+      /title=\{isLoading \? "Refreshing dashboard" : "Refresh dashboard"\}/,
+    );
     assert.match(summary, /disabled=\{isLoading\}/);
   });
 

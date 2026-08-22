@@ -1,5 +1,6 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
+import { AllowSupportOverrideRead } from '../auth/decorators/allow-support-override-read.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
@@ -17,6 +18,7 @@ export class StudentSearchController {
 
   @Get()
   @Permissions('students:read')
+  @AllowSupportOverrideRead('STUDENT_RECORDS')
   searchStudents(
     @Query() query: StudentSearchQueryDto,
     @CurrentAuth() auth: AuthContext,

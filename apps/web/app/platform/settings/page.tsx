@@ -1134,8 +1134,8 @@ export default function PlatformSettings() {
                   Failed Jobs: {inspectingQueue}
                 </DialogTitle>
                 <DialogDescription>
-                  Showing recently failed jobs. Sensitive data in payloads is
-                  masked.
+                  Showing bounded diagnostics for recently failed jobs. Job
+                  payloads and raw provider errors are never exposed here.
                 </DialogDescription>
               </DialogHeader>
               <div className="py-6 space-y-4">
@@ -1159,11 +1159,15 @@ export default function PlatformSettings() {
                             </span>
                           </div>
                           <p className="text-sm font-bold text-rose-700">
-                            {job.failedReason || 'Failure reason not recorded'}
+                            {job.failureSummary}
                           </p>
-                          <div className="rounded-xl bg-[var(--color-mod-platform-text)] p-4 text-[10px] font-mono text-[var(--color-mod-platform-bg)] overflow-x-auto">
-                            <pre>{JSON.stringify(job.data, null, 2)}</pre>
-                          </div>
+                          <p className="text-xs font-semibold text-slate-500">
+                            Category: {job.failureCategory.replaceAll('_', ' ')}
+                            {' · '}
+                            {job.retryable
+                              ? 'May be retryable after verification'
+                              : 'Requires investigation before retry'}
+                          </p>
                           <div className="flex justify-end gap-2">
                             <Button
                               variant="ghost"
@@ -1735,8 +1739,8 @@ export default function PlatformSettings() {
               Failed Job Detail
             </DialogTitle>
             <DialogDescription>
-              {jobDetail?.queueName}:{jobDetail?.id}. Payload fields matching
-              secret patterns are masked.
+              {jobDetail?.queueName}:{jobDetail?.id}. Payloads, message bodies,
+              raw provider errors, and stack traces are intentionally excluded.
             </DialogDescription>
           </DialogHeader>
           {jobDetail && (
@@ -1764,15 +1768,13 @@ export default function PlatformSettings() {
                 />
               </div>
               <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm font-bold text-rose-700">
-                {jobDetail.failedReason || 'Failure reason not recorded'}
+                {jobDetail.failureSummary}
               </div>
-              <div>
-                <Label className="text-xs font-black uppercase tracking-widest text-slate-500">
-                  Sanitized payload
-                </Label>
-                <pre className="mt-2 max-h-56 overflow-auto rounded-2xl bg-[var(--color-mod-platform-text)] p-4 text-xs text-[var(--color-mod-platform-bg)]">
-                  {JSON.stringify(jobDetail.data, null, 2)}
-                </pre>
+              <div className="rounded-2xl border border-slate-100 p-4 text-sm text-slate-700">
+                <p className="font-bold">
+                  {jobDetail.failureCategory.replaceAll('_', ' ')}
+                </p>
+                <p className="mt-1">{jobDetail.recommendedAction}</p>
               </div>
               <div>
                 <Label className="text-xs font-black uppercase tracking-widest text-slate-500">

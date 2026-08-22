@@ -246,6 +246,44 @@ describe('CasRecordsService', () => {
     });
   });
 
+  describe('findOne', () => {
+    it('returns CAS detail with only the narrow student identity projection', async () => {
+      const student = {
+        id: 'student-1',
+        firstNameEn: 'Asha',
+        lastNameEn: 'Tamang',
+        studentSystemId: 'STD-001',
+      };
+      (prisma.casRecord.findFirst as jest.Mock).mockResolvedValue({
+        id: 'cas-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        student,
+      });
+
+      const result = await service.findOne('cas-1', mockActor);
+
+      expect(prisma.casRecord.findFirst).toHaveBeenCalledWith({
+        where: { id: 'cas-1', tenantId: mockActor.tenantId },
+        include: {
+          student: {
+            select: {
+              id: true,
+              firstNameEn: true,
+              lastNameEn: true,
+              studentSystemId: true,
+            },
+          },
+          subject: true,
+          class: true,
+          section: true,
+          academicYear: true,
+        },
+      });
+      expect(result.student).toEqual(student);
+    });
+  });
+
   describe('teacher scoping (confirmed gap: previously tenant-wide for any cas-records:read holder)', () => {
     it('scopes list() to the teacher own assigned class/section', async () => {
       (prisma.staff.findFirst as jest.Mock).mockResolvedValue({

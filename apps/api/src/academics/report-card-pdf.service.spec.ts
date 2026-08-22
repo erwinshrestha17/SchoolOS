@@ -1,6 +1,8 @@
+import { ForbiddenException } from '@nestjs/common';
 import { AuthMethod, FileStatus } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { loadSchoolLogoForPdf } from '../common/pdf/school-logo-loader';
+import { ReportCardPdfService } from './report-card-pdf.service';
 
 describe('ReportCardPdfService logo loading boundary', () => {
   const actor: AuthContext = {
@@ -28,6 +30,27 @@ describe('ReportCardPdfService logo loading boundary', () => {
 
     return { prisma, fileRegistryService };
   }
+
+  it('denies report card PDF content during a support override before report lookup', async () => {
+    const prisma = {
+      reportCard: { findFirst: jest.fn() },
+    };
+    const service = new ReportCardPdfService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(
+      service.getReportCardPdf('report-card-1', {
+        ...actor,
+        isSupportOverride: true,
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.reportCard.findFirst).not.toHaveBeenCalled();
+  });
 
   it('does not load report card logos from non-branding file references', async () => {
     const { prisma, fileRegistryService } = buildService();

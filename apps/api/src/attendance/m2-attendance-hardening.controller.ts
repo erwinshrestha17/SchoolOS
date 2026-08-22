@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
+import { AllowSupportOverrideRead } from '../auth/decorators/allow-support-override-read.decorator';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
@@ -119,6 +120,7 @@ export class M2AttendanceHardeningController {
 
   @Get('follow-ups/queue')
   @Permissions('attendance:read')
+  @AllowSupportOverrideRead('ATTENDANCE')
   @ApiOperation({ summary: 'List repeated absence and late follow-up queue' })
   getFollowUpQueue(
     @Query() query: RepeatedAbsenceFollowUpDto,

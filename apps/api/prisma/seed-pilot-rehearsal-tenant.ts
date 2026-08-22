@@ -21,14 +21,17 @@ import {
 } from '../src/finance/finance.defaults';
 import {
   PERMISSION_CATALOG,
-  SYSTEM_ROLE_DEFINITIONS,
-  SYSTEM_ROLE_PERMISSIONS,
+  SCHOOL_ROLE_DEFINITIONS,
+  SCHOOL_ROLE_PERMISSIONS,
 } from '../src/rbac/rbac.defaults';
 
-const PILOT_SLUG = process.env.PILOT_REHEARSAL_TENANT_SLUG ?? 'pilot-rehearsal-1';
-const PILOT_NAME = process.env.PILOT_REHEARSAL_TENANT_NAME ?? 'Pilot Rehearsal School';
+const PILOT_SLUG =
+  process.env.PILOT_REHEARSAL_TENANT_SLUG ?? 'pilot-rehearsal-1';
+const PILOT_NAME =
+  process.env.PILOT_REHEARSAL_TENANT_NAME ?? 'Pilot Rehearsal School';
 const PILOT_ADMIN_EMAIL =
-  process.env.PILOT_REHEARSAL_ADMIN_EMAIL ?? 'admin@pilot-rehearsal.schoolos.test';
+  process.env.PILOT_REHEARSAL_ADMIN_EMAIL ??
+  'admin@pilot-rehearsal.schoolos.test';
 const PILOT_ADMIN_PASSWORD =
   process.env.PILOT_REHEARSAL_ADMIN_PASSWORD ?? 'PilotRehearsal1!';
 
@@ -50,8 +53,7 @@ const WAVE1_DISABLED_FEATURES = [
   'feature.accounting.basic_finance',
 ] as const;
 
-const OVERRIDE_REASON =
-  'Wave 1 controlled pilot — disabled until wave exit';
+const OVERRIDE_REASON = 'Wave 1 controlled pilot — disabled until wave exit';
 
 const adapter = new PrismaPg({
   connectionString:
@@ -78,7 +80,7 @@ async function provisionTenantDefaults(
     });
   }
 
-  for (const role of SYSTEM_ROLE_DEFINITIONS) {
+  for (const role of SCHOOL_ROLE_DEFINITIONS) {
     await tx.role.upsert({
       where: { tenantId_name: { tenantId, name: role.name } },
       update: { description: role.description, isSystem: true },
@@ -92,7 +94,7 @@ async function provisionTenantDefaults(
   }
 
   for (const [roleName, permissionKeys] of Object.entries(
-    SYSTEM_ROLE_PERMISSIONS,
+    SCHOOL_ROLE_PERMISSIONS,
   )) {
     const role = await tx.role.findUnique({
       where: { tenantId_name: { tenantId, name: roleName } },
@@ -372,7 +374,9 @@ async function main() {
     console.log('Admin password: (from PILOT_REHEARSAL_ADMIN_PASSWORD env)');
   }
   console.log('');
-  console.log('Wave 1 modules enabled; wave-gated modules forced OFF via overrides.');
+  console.log(
+    'Wave 1 modules enabled; wave-gated modules forced OFF via overrides.',
+  );
   console.log('Next: complete Day-0 setup at /dashboard/settings/onboarding');
 
   await prisma.$disconnect();

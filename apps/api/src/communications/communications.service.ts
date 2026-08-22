@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -179,12 +180,25 @@ export class CommunicationsService {
     // published, tenant-wide/own-class/own-section notices (or anything
     // they have an actual delivery record for), matching getNoticeDetail's
     // trust model.
-    const canAdministerNotices = actor.permissions.some((permission) =>
-      NOTICE_ADMINISTRATION_PERMISSIONS.has(permission),
-    );
+    const canAdministerNotices =
+      !actor.isSupportOverride &&
+      actor.permissions.some((permission) =>
+        NOTICE_ADMINISTRATION_PERMISSIONS.has(permission),
+      );
     const audienceScope = canAdministerNotices
       ? []
-      : await this.buildActorNoticeVisibilityScope(actor);
+      : actor.isSupportOverride
+        ? [
+            {
+              lifecycleStatus: {
+                in: [
+                  NoticeLifecycleStatus.PUBLISHED,
+                  NoticeLifecycleStatus.EXPIRED,
+                ],
+              },
+            },
+          ]
+        : await this.buildActorNoticeVisibilityScope(actor);
     const where: Prisma.NoticeWhereInput = {
       AND: [
         { tenantId: actor.tenantId },
@@ -206,6 +220,55 @@ export class CommunicationsService {
         ...audienceScope,
       ],
     };
+    if (actor.isSupportOverride) {
+      const [items, total] = await Promise.all([
+        this.prisma.notice.findMany({
+          where,
+          select: {
+            id: true,
+            title: true,
+            titleNe: true,
+            body: true,
+            bodyNe: true,
+            category: true,
+            isPinned: true,
+            requiresAcknowledgement: true,
+            priority: true,
+            audienceType: true,
+            classId: true,
+            sectionId: true,
+            lifecycleStatus: true,
+            publishedAt: true,
+            expiresAt: true,
+            createdAt: true,
+            updatedAt: true,
+            class: { select: { name: true } },
+            section: { select: { name: true } },
+            _count: { select: { deliveries: true, acknowledgements: true } },
+          },
+          orderBy: [{ createdAt: 'desc' }],
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+        this.prisma.notice.count({ where }),
+      ]);
+
+      return {
+        items: items.map(({ class: classRef, section, _count, ...notice }) => ({
+          ...notice,
+          createdBy: null,
+          className: classRef?.name ?? null,
+          sectionName: section?.name ?? null,
+          deliveryCount: _count.deliveries,
+          acknowledgementCount: _count.acknowledgements,
+        })),
+        total,
+        page,
+        limit,
+        hasNextPage: page * limit < total,
+      };
+    }
+
     const [items, total] = await Promise.all([
       this.prisma.notice.findMany({
         where,
@@ -1110,6 +1173,12 @@ export class CommunicationsService {
     actor: AuthContext,
     filters: ListNotificationDeliveriesQueryDto = { page: 1, limit: 25 },
   ) {
+    if (actor.isSupportOverride) {
+      throw new ForbiddenException(
+        'Raw delivery records are unavailable during support override',
+      );
+    }
+
     const page = Math.max(1, filters.page ?? 1);
     const limit = Math.min(100, Math.max(1, filters.limit ?? 25));
     const where: Prisma.NotificationDeliveryWhereInput = {
@@ -1138,6 +1207,15 @@ export class CommunicationsService {
     actor: AuthContext,
     filters: ListNotificationDeliveriesQueryDto = { page: 1, limit: 25 },
   ) {
+    if (
+      actor.isSupportOverride &&
+      (filters.sourceType || filters.activityPostId)
+    ) {
+      throw new BadRequestException(
+        'Source-level delivery filters are unavailable during support override',
+      );
+    }
+
     const page = Math.max(1, filters.page ?? 1);
     const limit = Math.min(100, Math.max(1, filters.limit ?? 25));
     const where: Prisma.NotificationDeliveryWhereInput = {
@@ -1181,8 +1259,10 @@ export class CommunicationsService {
         id: delivery.id,
         channel: delivery.channel,
         status: delivery.status,
-        sourceType: delivery.sourceType,
-        sourceId: delivery.sourceId,
+        sourceType: actor.isSupportOverride
+          ? 'notification'
+          : delivery.sourceType,
+        sourceId: actor.isSupportOverride ? null : delivery.sourceId,
         recipientType: delivery.recipientUserId
           ? 'user'
           : delivery.guardianId
@@ -1281,6 +1361,60 @@ export class CommunicationsService {
         escalatedChatCount: null,
         providerStatus: null,
         providerHealth: null,
+      };
+    }
+
+    if (actor.isSupportOverride) {
+      const [sentToday, failedDeliveries, providerDiagnostics] =
+        await Promise.all([
+          this.prisma.notificationDelivery.count({
+            where: {
+              tenantId: actor.tenantId,
+              status: {
+                in: [NotificationStatus.SENT, NotificationStatus.DELIVERED],
+              },
+              OR: [
+                {
+                  sentAt: {
+                    gte: day.startUtc,
+                    lt: day.endExclusiveUtc,
+                  },
+                },
+                {
+                  deliveredAt: {
+                    gte: day.startUtc,
+                    lt: day.endExclusiveUtc,
+                  },
+                },
+              ],
+            },
+          }),
+          this.prisma.notificationDelivery.count({
+            where: {
+              tenantId: actor.tenantId,
+              status: {
+                in: [
+                  NotificationStatus.FAILED,
+                  NotificationStatus.RETRY_PENDING,
+                ],
+              },
+            },
+          }),
+          this.getCommunicationProviderDiagnostics(actor),
+        ]);
+
+      return {
+        generatedAt: now.toISOString(),
+        schoolDay: day.gregorianDate,
+        myUnreadNotices,
+        myUnreadHighImpactNotices,
+        sentToday,
+        scheduledNotices: null,
+        failedDeliveries,
+        unreadHighImpactNotices: null,
+        escalatedChatCount: null,
+        providerStatus: providerDiagnostics.overallMode,
+        providerHealth: providerDiagnostics.health,
       };
     }
 

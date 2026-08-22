@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import type {
-  CommunicationTemplateCategory,
+import {
   NoticeLifecycleStatus,
+  type CommunicationTemplateCategory,
 } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { FileRegistryService } from '../file-registry/file-registry.service';
@@ -79,14 +79,28 @@ export class NoticeDetailService {
     noticeId: string,
     actor: AuthContext,
   ): Promise<NoticeDetail> {
-    const canAdministerNotice = actor.permissions.some((permission) =>
-      NOTICE_ADMINISTRATION_PERMISSIONS.has(permission),
-    );
-    const canViewReports = actor.permissions.includes('notices:read_reports');
+    const canAdministerNotice =
+      !actor.isSupportOverride &&
+      actor.permissions.some((permission) =>
+        NOTICE_ADMINISTRATION_PERMISSIONS.has(permission),
+      );
+    const canViewReports =
+      !actor.isSupportOverride &&
+      actor.permissions.includes('notices:read_reports');
     const notice = await this.prisma.notice.findFirst({
       where: {
         id: noticeId,
         tenantId: actor.tenantId,
+        ...(!canAdministerNotice
+          ? {
+              lifecycleStatus: {
+                in: [
+                  NoticeLifecycleStatus.PUBLISHED,
+                  NoticeLifecycleStatus.EXPIRED,
+                ],
+              },
+            }
+          : {}),
       },
       include: {
         class: {
@@ -114,7 +128,7 @@ export class NoticeDetailService {
       throw new NotFoundException('Notice not found');
     }
 
-    if (!canAdministerNotice) {
+    if (!canAdministerNotice && !actor.isSupportOverride) {
       const recipientDelivery =
         await this.prisma.notificationDelivery.findFirst({
           where: {
@@ -179,16 +193,18 @@ export class NoticeDetailService {
               },
             })
           : Promise.resolve(null),
-        this.prisma.noticeAcknowledgement.findUnique({
-          where: {
-            tenantId_noticeId_recipientUserId: {
-              tenantId: actor.tenantId,
-              noticeId: notice.id,
-              recipientUserId: actor.userId,
-            },
-          },
-          select: { firstAcknowledgedAt: true },
-        }),
+        actor.isSupportOverride
+          ? Promise.resolve(null)
+          : this.prisma.noticeAcknowledgement.findUnique({
+              where: {
+                tenantId_noticeId_recipientUserId: {
+                  tenantId: actor.tenantId,
+                  noticeId: notice.id,
+                  recipientUserId: actor.userId,
+                },
+              },
+              select: { firstAcknowledgedAt: true },
+            }),
       ]);
 
     const deliveryCounts = new Map(
@@ -205,21 +221,23 @@ export class NoticeDetailService {
       bodyNe: notice.bodyNe,
       category: notice.category,
       isPinned: notice.isPinned,
-      requiresAcknowledgement: notice.requiresAcknowledgement,
+      requiresAcknowledgement: actor.isSupportOverride
+        ? false
+        : notice.requiresAcknowledgement,
       acknowledgedAt:
         acknowledgement?.firstAcknowledgedAt.toISOString() ?? null,
-      templateId: notice.templateId,
+      templateId: actor.isSupportOverride ? null : notice.templateId,
       priority: notice.priority,
       audienceType: notice.audienceType,
       classId: notice.classId,
       className: notice.class?.name ?? null,
       sectionId: notice.sectionId,
       sectionName: notice.section?.name ?? null,
-      roleNames: notice.roleNames,
-      staffIds: notice.staffIds,
-      studentIds: notice.studentIds,
-      guardianIds: notice.guardianIds,
-      recipientUserIds: notice.recipientUserIds,
+      roleNames: actor.isSupportOverride ? [] : notice.roleNames,
+      staffIds: actor.isSupportOverride ? [] : notice.staffIds,
+      studentIds: actor.isSupportOverride ? [] : notice.studentIds,
+      guardianIds: actor.isSupportOverride ? [] : notice.guardianIds,
+      recipientUserIds: actor.isSupportOverride ? [] : notice.recipientUserIds,
       createdBy:
         canAdministerNotice && notice.createdBy
           ? {
@@ -230,15 +248,27 @@ export class NoticeDetailService {
       attachmentUrl: attachment.url,
       attachmentFileId: attachment.fileId,
       lifecycleStatus: notice.lifecycleStatus,
-      approvalRequestId: notice.approvalRequestId,
-      scheduledFor: notice.scheduledFor?.toISOString() ?? null,
+      approvalRequestId: actor.isSupportOverride
+        ? null
+        : notice.approvalRequestId,
+      scheduledFor: actor.isSupportOverride
+        ? null
+        : (notice.scheduledFor?.toISOString() ?? null),
       publishedAt: notice.publishedAt?.toISOString() ?? null,
       expiresAt: notice.expiresAt?.toISOString() ?? null,
-      cancelledAt: notice.cancelledAt?.toISOString() ?? null,
-      cancellationReason: notice.cancellationReason,
-      archivedAt: notice.archivedAt?.toISOString() ?? null,
-      archiveReason: notice.archiveReason,
-      archivedFromStatus: notice.archivedFromStatus,
+      cancelledAt: actor.isSupportOverride
+        ? null
+        : (notice.cancelledAt?.toISOString() ?? null),
+      cancellationReason: actor.isSupportOverride
+        ? null
+        : notice.cancellationReason,
+      archivedAt: actor.isSupportOverride
+        ? null
+        : (notice.archivedAt?.toISOString() ?? null),
+      archiveReason: actor.isSupportOverride ? null : notice.archiveReason,
+      archivedFromStatus: actor.isSupportOverride
+        ? null
+        : notice.archivedFromStatus,
       createdAt: notice.createdAt.toISOString(),
       updatedAt: notice.updatedAt.toISOString(),
       deliverySummary: {
@@ -271,6 +301,13 @@ export class NoticeDetailService {
     notice: { id: string; attachmentUrl: string | null },
     actor: AuthContext,
   ) {
+    if (actor.isSupportOverride) {
+      return {
+        fileId: null,
+        url: null,
+      };
+    }
+
     const [linkedFile] = await this.fileRegistryService.listFilesByEntity(
       actor.tenantId,
       'notices',

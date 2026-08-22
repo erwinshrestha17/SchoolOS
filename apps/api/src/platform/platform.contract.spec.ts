@@ -137,7 +137,9 @@ describe('M0 Platform Control Plane contracts', () => {
     expect(service).toContain('saas_invoice_created');
     expect(service).toContain('provider_config_updated');
     expect(service).toContain("'********'");
-    expect(service).toContain('queue_failed_job_retry_requested');
+    expect(read('src/platform/platform-queues.service.ts')).toContain(
+      'queue_failed_job_retry_requested',
+    );
     expect(service).toContain('onboarding_override_updated');
     expect(service).not.toContain('AccountingPostingService');
   });

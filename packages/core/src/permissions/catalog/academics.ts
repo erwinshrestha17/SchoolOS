@@ -62,7 +62,8 @@ export const academicsPermissions = [
   {
     resource: "academics",
     action: "create",
-    description: "Create academic entities like terms and assessment components",
+    description:
+      "Create academic entities like terms and assessment components",
   },
   {
     resource: "academics",
@@ -87,7 +88,8 @@ export const academicsPermissions = [
   {
     resource: "exam-terms",
     action: "unlock",
-    description: "Unlock exam terms for controlled correction after leadership review",
+    description:
+      "Unlock exam terms for controlled correction after leadership review",
   },
   {
     resource: "assessment-components",
@@ -152,7 +154,13 @@ export const academicsPermissions = [
   {
     resource: "timetable",
     action: "manage",
-    description: "Manage teacher availability, workload limits, and setup workflows",
+    description:
+      "Manage teacher availability, workload limits, and setup workflows",
+  },
+  {
+    resource: "timetable",
+    action: "read_published",
+    description: "Read published or locked timetable slots",
   },
   {
     resource: "timetable",
@@ -188,6 +196,11 @@ export const academicsPermissions = [
     resource: "homework",
     action: "create",
     description: "Publish homework assignments to class and student audiences",
+  },
+  {
+    resource: "homework",
+    action: "read_published",
+    description: "Read published homework assignments without submissions",
   },
   {
     resource: "homework",

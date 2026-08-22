@@ -124,14 +124,30 @@ export default function HomeworkPage() {
 /* ------------------------------------------------------------------ */
 
 const VALID_TABS: ActiveTab[] = ["today", "all", "completion", "templates"];
+const HOMEWORK_WORKSPACE_TABS = [
+  { value: "today", label: "Today", icon: Calendar },
+  { value: "all", label: "All Homework", icon: BookOpen },
+  { value: "completion", label: "Completion", icon: CheckCircle2 },
+  { value: "templates", label: "Templates", icon: FileText },
+] as const;
+const SUPPORT_HOMEWORK_TABS = HOMEWORK_WORKSPACE_TABS.filter(
+  (tab) => tab.value === "today" || tab.value === "all",
+).map((tab) =>
+  tab.value === "all" ? { ...tab, label: "Published homework" } : tab,
+);
 
 function HomeworkWorkspace() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { session } = useSession();
+  const isSupportOverride = session?.user.isSupportOverride === true;
   const requestedTab = searchParams.get("tab") as ActiveTab | null;
   const [activeTab, setActiveTab] = useState<ActiveTab>(
-    requestedTab && VALID_TABS.includes(requestedTab) ? requestedTab : "today",
+    requestedTab &&
+      VALID_TABS.includes(requestedTab) &&
+      (!isSupportOverride || requestedTab === "today" || requestedTab === "all")
+      ? requestedTab
+      : "today",
   );
   const [templateSearch, setTemplateSearch] = useState("");
   const [selectedHomework, setSelectedHomework] =
@@ -154,7 +170,6 @@ function HomeworkWorkspace() {
     page: 1,
   });
 
-
   // Class / section / subject options come from the shared assignment-scope
   // resolver so a teacher is only ever offered their own (P0.4 / P1.6).
   const assignmentScope = useTeacherAssignmentScope();
@@ -163,20 +178,25 @@ function HomeworkWorkspace() {
   });
   const canCreateHomework = homeworkCaps.canCreate;
   const canReviewHomework = homeworkCaps.canReview;
+  const canManageHomework = homeworkCaps.canUpdate;
+  const canOpenProtectedFiles = !session?.user.isSupportOverride;
 
   const summaryQuery = useQuery({
     queryKey: ["homework-summary-today"],
     queryFn: () => api.getHomeworkSummaryToday(),
+    enabled: !isSupportOverride,
   });
   const summary = summaryQuery.data;
 
   const subjectsQuery = useQuery({
     queryKey: ["subjects", filters.classId],
     queryFn: () => api.listSubjects({ classId: filters.classId || undefined }),
+    enabled: !isSupportOverride,
   });
   const academicYearsQuery = useQuery({
     queryKey: ["academic-years"],
     queryFn: api.listAcademicYears,
+    enabled: !isSupportOverride,
   });
 
   const isTodayTab = activeTab === "today";
@@ -202,10 +222,18 @@ function HomeworkWorkspace() {
       api.listHomeworkPage({
         classId: filters.classId || undefined,
         sectionId: filters.sectionId || undefined,
-        subjectId: filters.subjectId || undefined,
-        teacherId: filters.teacherId || undefined,
-        mine: filters.mine === "1" ? true : undefined,
-        status: filters.status || undefined,
+        subjectId: isSupportOverride
+          ? undefined
+          : filters.subjectId || undefined,
+        teacherId: isSupportOverride
+          ? undefined
+          : filters.teacherId || undefined,
+        mine: !isSupportOverride && filters.mine === "1" ? true : undefined,
+        status: isSupportOverride
+          ? filters.status === "ASSIGNED" || filters.status === "CLOSED"
+            ? filters.status
+            : undefined
+          : filters.status || undefined,
         search: filters.search.trim() || undefined,
         assignedDate: effectiveDate,
         sortBy: "assignedDate",
@@ -234,7 +262,10 @@ function HomeworkWorkspace() {
         classId: filters.classId || undefined,
         sectionId: filters.sectionId || undefined,
       }),
-    enabled: activeTab === "completion" && Boolean(currentAcademicYearId),
+    enabled:
+      !isSupportOverride &&
+      activeTab === "completion" &&
+      Boolean(currentAcademicYearId),
   });
 
   const templatesQuery = useQuery({
@@ -251,7 +282,7 @@ function HomeworkWorkspace() {
         search: templateSearch.trim() || undefined,
         limit: 12,
       }),
-    enabled: activeTab === "templates",
+    enabled: !isSupportOverride && activeTab === "templates",
   });
 
   if (
@@ -279,17 +310,20 @@ function HomeworkWorkspace() {
 
   const hasActiveHomeworkFilters = Boolean(
     filters.classId ||
-      filters.sectionId ||
-      filters.subjectId ||
-      filters.teacherId ||
-      filters.mine ||
-      filters.status ||
-      filters.search.trim() ||
-      (activeTab === "all" && filters.date),
+    filters.sectionId ||
+    filters.subjectId ||
+    filters.teacherId ||
+    filters.mine ||
+    filters.status ||
+    filters.search.trim() ||
+    (activeTab === "all" && filters.date),
   );
 
   const needsFollowUpRows = (completionReportQuery.data ?? [])
-    .filter((row: HomeworkCompletionReportRow) => row.completed < row.totalSubmissions)
+    .filter(
+      (row: HomeworkCompletionReportRow) =>
+        row.completed < row.totalSubmissions,
+    )
     .sort((a, b) => a.completionRate - b.completionRate);
 
   async function openHomeworkAttachment(attachmentId: string) {
@@ -388,7 +422,10 @@ function HomeworkWorkspace() {
       header: "Status",
       accessorKey: "status",
       cell: (row: HomeworkAssignmentSummary) => (
-        <StatusBadge status={row.status || "DRAFT"} label={statusLabel(row.status)} />
+        <StatusBadge
+          status={row.status || "DRAFT"}
+          label={statusLabel(row.status)}
+        />
       ),
     },
     {
@@ -402,7 +439,9 @@ function HomeworkWorkspace() {
               icon: <BookOpen className="h-4 w-4" />,
             },
             {
-              label: "Manage Assignment",
+              label: canManageHomework
+                ? "Manage Assignment"
+                : "View Assignment",
               onClick: () => router.push(`/dashboard/homework/${row.id}`),
               icon: <CheckCircle2 className="h-4 w-4" />,
             },
@@ -450,84 +489,95 @@ function HomeworkWorkspace() {
       <ModuleHeader
         eyebrow="Homework & Timetable"
         title="Homework"
-        description={`Give homework, track completion, and follow up on incomplete students${session?.tenant.name ? ` for ${session.tenant.name}` : ""}.`}
+        description={
+          isSupportOverride
+            ? `Read-only support view of published and closed homework${session?.tenant.name ? ` for ${session.tenant.name}` : ""}. Submission registers and protected files remain unavailable.`
+            : `Give homework, track completion, and follow up on incomplete students${session?.tenant.name ? ` for ${session.tenant.name}` : ""}.`
+        }
         primaryAction={primaryAction}
-        moreActionItems={[
-          {
-            label: "Use template",
-            icon: <FileText size={16} />,
-            onClick: () => setActiveTab("templates"),
-          },
-          {
-            label: "View homework calendar",
-            icon: <Calendar size={16} />,
-            disabled: true,
-            onClick: () => {},
-          },
-          {
-            label: "View incomplete students",
-            icon: <Users size={16} />,
-            onClick: () => setActiveTab("completion"),
-          },
-          {
-            label: "Export homework report",
-            icon: <BarChart3 size={16} />,
-            onClick: () => setActiveTab("completion"),
-          },
-        ]}
+        moreActionItems={
+          isSupportOverride
+            ? []
+            : [
+                {
+                  label: "Use template",
+                  icon: <FileText size={16} />,
+                  onClick: () => setActiveTab("templates"),
+                },
+                {
+                  label: "View homework calendar",
+                  icon: <Calendar size={16} />,
+                  disabled: true,
+                  onClick: () => {},
+                },
+                {
+                  label: "View incomplete students",
+                  icon: <Users size={16} />,
+                  onClick: () => setActiveTab("completion"),
+                },
+                {
+                  label: "Export homework report",
+                  icon: <BarChart3 size={16} />,
+                  onClick: () => setActiveTab("completion"),
+                },
+              ]
+        }
       >
         <WorkspaceTabs
-          items={[
-            { value: "today", label: "Today", icon: Calendar },
-            { value: "all", label: "All Homework", icon: BookOpen },
-            { value: "completion", label: "Completion", icon: CheckCircle2 },
-            { value: "templates", label: "Templates", icon: FileText },
-          ]}
+          items={
+            isSupportOverride
+              ? [...SUPPORT_HOMEWORK_TABS]
+              : [...HOMEWORK_WORKSPACE_TABS]
+          }
           activeValue={activeTab}
           onValueChange={(value) => setActiveTab(value as ActiveTab)}
         />
 
-        <SummaryGrid className="mt-5">
-          <SummaryCard
-            label="Due Today"
-            value={summary?.dueToday ?? "Unavailable"}
-            loading={summaryQuery.isLoading}
-            icon={<Calendar size={20} />}
-            tone="module"
-            description="Published homework due by end of today."
-          />
-          <SummaryCard
-            label="Not Checked"
-            value={summary?.notChecked ?? "Unavailable"}
-            loading={summaryQuery.isLoading}
-            icon={<ClipboardList size={20} />}
-            tone={Number(summary?.notChecked) > 0 ? "warning" : "module"}
-            description="Overdue homework with unchecked student rows."
-          />
-          <SummaryCard
-            label="Incomplete Students"
-            value={summary?.incompleteStudents ?? "Unavailable"}
-            loading={summaryQuery.isLoading}
-            icon={<AlertCircle size={20} />}
-            tone={Number(summary?.incompleteStudents) > 0 ? "warning" : "module"}
-            description="Students with incomplete or missing homework due."
-          />
-          {/* "Classes Without Homework" as a warning implies every class must
+        {!isSupportOverride ? (
+          <SummaryGrid className="mt-5">
+            <SummaryCard
+              label="Due Today"
+              value={summary?.dueToday ?? "Unavailable"}
+              loading={summaryQuery.isLoading}
+              icon={<Calendar size={20} />}
+              tone="module"
+              description="Published homework due by end of today."
+            />
+            <SummaryCard
+              label="Not Checked"
+              value={summary?.notChecked ?? "Unavailable"}
+              loading={summaryQuery.isLoading}
+              icon={<ClipboardList size={20} />}
+              tone={Number(summary?.notChecked) > 0 ? "warning" : "module"}
+              description="Overdue homework with unchecked student rows."
+            />
+            <SummaryCard
+              label="Incomplete Students"
+              value={summary?.incompleteStudents ?? "Unavailable"}
+              loading={summaryQuery.isLoading}
+              icon={<AlertCircle size={20} />}
+              tone={
+                Number(summary?.incompleteStudents) > 0 ? "warning" : "module"
+              }
+              description="Students with incomplete or missing homework due."
+            />
+            {/* "Classes Without Homework" as a warning implies every class must
               receive homework every day -- no school policy in SchoolOS says
               that, so for a teacher it is a standing reprimand they cannot
               act on. It stays for administrators (who do plan coverage), in a
               neutral tone, and is stated as an observation not a fault. */}
-          {assignmentScope.isScoped ? null : (
-            <SummaryCard
-              label="Sections With No Homework Today"
-              value={summary?.classesWithoutHomework ?? "Unavailable"}
-              loading={summaryQuery.isLoading}
-              icon={<Users size={20} />}
-              tone="module"
-              description="Sections with nothing assigned today. Not every section needs daily homework."
-            />
-          )}
-        </SummaryGrid>
+            {assignmentScope.isScoped ? null : (
+              <SummaryCard
+                label="Sections With No Homework Today"
+                value={summary?.classesWithoutHomework ?? "Unavailable"}
+                loading={summaryQuery.isLoading}
+                icon={<Users size={20} />}
+                tone="module"
+                description="Sections with nothing assigned today. Not every section needs daily homework."
+              />
+            )}
+          </SummaryGrid>
+        ) : null}
       </ModuleHeader>
 
       {isListTab ? (
@@ -552,7 +602,10 @@ function HomeworkWorkspace() {
 
               <Input
                 type="date"
-                value={filters.date || (activeTab === "today" ? todaySchoolDate() : "")}
+                value={
+                  filters.date ||
+                  (activeTab === "today" ? todaySchoolDate() : "")
+                }
                 onChange={(e) =>
                   setFilters({ date: e.target.value }, { resetPage: true })
                 }
@@ -600,34 +653,39 @@ function HomeworkWorkspace() {
                 ))}
               </Select>
 
-              <Select
-                value={filters.subjectId}
-                onChange={(e) =>
-                  setFilters({ subjectId: e.target.value }, { resetPage: true })
-                }
-                aria-label="Filter by subject"
-              >
-                <option value="">
-                  {assignmentScope.isScoped ? "My subjects" : "All Subjects"}
-                </option>
-                {(subjectsQuery.data ?? [])
-                  .filter(
-                    (s) =>
-                      !assignmentScope.isScoped ||
-                      assignmentScope.assignedSubjectIds.size === 0 ||
-                      assignmentScope.assignedSubjectIds.has(s.id),
-                  )
-                  .map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-              </Select>
+              {!isSupportOverride ? (
+                <Select
+                  value={filters.subjectId}
+                  onChange={(e) =>
+                    setFilters(
+                      { subjectId: e.target.value },
+                      { resetPage: true },
+                    )
+                  }
+                  aria-label="Filter by subject"
+                >
+                  <option value="">
+                    {assignmentScope.isScoped ? "My subjects" : "All Subjects"}
+                  </option>
+                  {(subjectsQuery.data ?? [])
+                    .filter(
+                      (s) =>
+                        !assignmentScope.isScoped ||
+                        assignmentScope.assignedSubjectIds.size === 0 ||
+                        assignmentScope.assignedSubjectIds.has(s.id),
+                    )
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                </Select>
+              ) : null}
 
               {/* "All Teachers" is a school-wide selector. A teacher works on
                   their own homework, so it is replaced by a self-scope toggle
                   the backend resolves from the caller's own staff row (P1.6). */}
-              {assignmentScope.isScoped ? (
+              {isSupportOverride ? null : assignmentScope.isScoped ? (
                 <label className="flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
                   <input
                     type="checkbox"
@@ -661,18 +719,26 @@ function HomeworkWorkspace() {
                 }
                 aria-label="Filter by homework status"
               >
-                <option value="">All Statuses</option>
-                <option value="DRAFT">Draft</option>
+                <option value="">
+                  {isSupportOverride ? "Published and closed" : "All Statuses"}
+                </option>
+                {!isSupportOverride ? (
+                  <option value="DRAFT">Draft</option>
+                ) : null}
                 <option value="ASSIGNED">Published</option>
                 <option value="CLOSED">Closed</option>
-                <option value="CANCELLED">Cancelled</option>
+                {!isSupportOverride ? (
+                  <option value="CANCELLED">Cancelled</option>
+                ) : null}
               </Select>
             </div>
           </FilterBar>
 
           <div className="space-y-6">
             <WorkSurface
-              title={activeTab === "today" ? "Today's homework" : "All homework"}
+              title={
+                activeTab === "today" ? "Today's homework" : "All homework"
+              }
               description={
                 activeTab === "today"
                   ? "Homework assigned on the selected date."
@@ -899,6 +965,8 @@ function HomeworkWorkspace() {
       <HomeworkQuickViewDrawer
         homework={selectedHomework}
         canReview={canReviewHomework}
+        canManage={canManageHomework}
+        canOpenProtectedFiles={canOpenProtectedFiles}
         onClose={() => setSelectedHomework(null)}
         onOpenAttachment={openHomeworkAttachment}
       />
@@ -909,11 +977,15 @@ function HomeworkWorkspace() {
 function HomeworkQuickViewDrawer({
   homework,
   canReview,
+  canManage,
+  canOpenProtectedFiles,
   onClose,
   onOpenAttachment,
 }: {
   homework: HomeworkAssignmentSummary | null;
   canReview: boolean;
+  canManage: boolean;
+  canOpenProtectedFiles: boolean;
   onClose: () => void;
   onOpenAttachment: (attachmentId: string) => Promise<void>;
 }) {
@@ -928,16 +1000,16 @@ function HomeworkQuickViewDrawer({
         homework ? (
           <div className="flex flex-wrap justify-end gap-2">
             {canReview ? (
-              <Link
-                href={`/dashboard/homework/${homework.id}?tab=submissions`}
-              >
+              <Link href={`/dashboard/homework/${homework.id}?tab=submissions`}>
                 <Button type="button" variant="outline">
                   Review submissions
                 </Button>
               </Link>
             ) : null}
             <Link href={`/dashboard/homework/${homework.id}`}>
-              <Button type="button">Manage assignment</Button>
+              <Button type="button">
+                {canManage ? "Manage assignment" : "View assignment"}
+              </Button>
             </Link>
           </div>
         ) : undefined
@@ -970,7 +1042,10 @@ function HomeworkQuickViewDrawer({
               label="Subject"
               value={homework.subject?.name?.trim() || "Subject not set"}
             />
-            <QuickViewField label="Due" value={formatDateTime(homework.dueAt)} />
+            <QuickViewField
+              label="Due"
+              value={formatDateTime(homework.dueAt)}
+            />
             <QuickViewField label="Teacher" value={teacherName(homework)} />
             <QuickViewField
               label="Submission records"
@@ -1025,7 +1100,7 @@ function HomeworkQuickViewDrawer({
                             : "File details unavailable"}
                         </p>
                       </div>
-                      {isAvailable ? (
+                      {isAvailable && canOpenProtectedFiles ? (
                         <Button
                           type="button"
                           variant="outline"
@@ -1036,11 +1111,17 @@ function HomeworkQuickViewDrawer({
                         </Button>
                       ) : (
                         <StatusBadge
-                          status={file?.status || "UNAVAILABLE"}
+                          status={
+                            isAvailable && !canOpenProtectedFiles
+                              ? "READ_ONLY"
+                              : file?.status || "UNAVAILABLE"
+                          }
                           label={
-                            file?.status === "PENDING"
-                              ? "Processing"
-                              : "Unavailable"
+                            isAvailable && !canOpenProtectedFiles
+                              ? "Unavailable in support access"
+                              : file?.status === "PENDING"
+                                ? "Processing"
+                                : "Unavailable"
                           }
                         />
                       )}
@@ -1166,9 +1247,7 @@ function StudentHomeworkView() {
     {
       header: "Due date",
       cell: (row: HomeworkAssignmentSummary) => (
-        <span className="text-sm text-slate-700">
-          {formatDate(row.dueAt)}
-        </span>
+        <span className="text-sm text-slate-700">{formatDate(row.dueAt)}</span>
       ),
     },
     {
@@ -1180,7 +1259,10 @@ function StudentHomeworkView() {
     {
       header: "Status",
       cell: (row: HomeworkAssignmentSummary) => (
-        <StatusBadge status={row.status || "DRAFT"} label={statusLabel(row.status)} />
+        <StatusBadge
+          status={row.status || "DRAFT"}
+          label={statusLabel(row.status)}
+        />
       ),
     },
     {

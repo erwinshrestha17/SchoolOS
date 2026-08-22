@@ -204,7 +204,7 @@ export function getAttendanceCapabilities(
     "attendance:review_conflicts",
   );
   const canOverrideLock = hasPermission(session, "attendance:override_lock");
-  const canExport = canView;
+  const canExport = canView && hasPermission(session, "reports:export");
 
   return {
     canView,
@@ -396,11 +396,9 @@ export function getHomeworkCapabilities(
 ): HomeworkCapabilities {
   const teacherScoped =
     options.isTeacherPersona && options.hasAssignmentScope === false;
-  const canView = hasPermission(session, "homework:read");
-  const canCreate =
-    hasPermission(session, "homework:create") && !teacherScoped;
-  const canReview =
-    hasPermission(session, "homework:review") && !teacherScoped;
+  const canView = hasPermission(session, "homework:read_published");
+  const canCreate = hasPermission(session, "homework:create") && !teacherScoped;
+  const canReview = hasPermission(session, "homework:review") && !teacherScoped;
   const canUpdate = hasPermission(session, "homework:update") && !teacherScoped;
   const canDelete = hasPermission(session, "homework:delete") && !teacherScoped;
   const canNotify = hasPermission(session, "homework:notify") && !teacherScoped;

@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
+import { AllowSupportOverrideRead } from '../auth/decorators/allow-support-override-read.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
@@ -28,6 +29,13 @@ export class SectionsController {
 
   @Get()
   @Permissions('sections:read')
+  @AllowSupportOverrideRead(
+    'SCHOOL_PROFILE',
+    'STUDENT_RECORDS',
+    'ATTENDANCE',
+    'ACADEMICS',
+    'HOMEWORK_TIMETABLE',
+  )
   listSections(@CurrentAuth() auth: AuthContext) {
     return this.sectionsService.listSections(auth);
   }

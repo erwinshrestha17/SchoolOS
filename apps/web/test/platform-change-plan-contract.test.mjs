@@ -16,12 +16,14 @@ function readMany(relativePaths) {
 
 describe('Platform tenant subscription change workflow contracts', () => {
   it('wires the tenant detail Change Plan action to the change-plan route', () => {
-    const detailPage = read('app/platform/schools/[tenantId]/page.tsx');
+    const subscription = read(
+      'components/platform/tenant-detail/tenant-subscription.tsx',
+    );
 
-    assert.match(detailPage, /Change Plan/);
+    assert.match(subscription, />Change plan</);
     assert.match(
-      detailPage,
-      /router\.push\(`\/platform\/schools\/\$\{tenant\.id\}\/change-plan`\)/,
+      subscription,
+      /href=\{`\/platform\/schools\/\$\{encodeURIComponent\(tenant\.id\)\}\/change-plan`\}/,
     );
   });
 
@@ -88,57 +90,90 @@ describe('Platform tenant subscription change workflow contracts', () => {
   });
 
   it('wires remaining tenant detail M0 workflows to real dialogs and helpers', () => {
-    const page = read('app/platform/schools/[tenantId]/page.tsx');
+    const access = read(
+      'components/platform/tenant-detail/tenant-access.tsx',
+    );
+    const billing = read(
+      'components/platform/tenant-detail/tenant-billing.tsx',
+    );
+    const onboarding = read(
+      'components/platform/tenant-detail/tenant-onboarding.tsx',
+    );
+    const audit = read('components/platform/tenant-detail/tenant-audit.tsx');
 
-    for (const expected of [
-      'Enter Support Mode',
-      'api.enterPlatformSupportOverride',
-      'Create SchoolOS Subscription Invoice',
-      'api.createPlatformSaaSInvoice',
-      'Record SaaS Payment',
-      'api.recordPlatformSaaSPayment',
-      'Cancel SaaS Invoice',
-      'api.cancelPlatformSaaSInvoice',
-      'Edit Billing Profile',
-      'api.updatePlatformBillingProfile',
-      'Onboarding Checklist',
-      'api.setTenantOnboardingOverride',
-      'Export current page CSV',
-      'api.listPlatformAuditLogs',
-    ]) {
-      assert.match(
-        page,
-        new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
-      );
-    }
+    assert.match(access, /Enter support mode/);
+    assert.match(access, /platformApi\.enterPlatformSupportOverride/);
+
+    assert.match(billing, /Create SchoolOS subscription invoice/);
+    assert.match(billing, /platformApi\.createPlatformSaaSInvoice/);
+    assert.match(billing, /Record SaaS payment/);
+    assert.match(billing, /platformApi\.recordPlatformSaaSPayment/);
+    assert.match(billing, /Cancel SaaS invoice/);
+    assert.match(billing, /platformApi\.cancelPlatformSaaSInvoice/);
+    assert.match(billing, /Edit billing profile/);
+    assert.match(billing, /platformApi\.updatePlatformBillingProfile/);
+
+    assert.match(onboarding, /Checklist progress/);
+    assert.match(onboarding, /platformApi\.setTenantOnboardingOverride/);
+
+    assert.match(audit, /Export current page CSV/);
+    assert.match(audit, /platformApi\.listPlatformAuditLogs/);
   });
 
   it('keeps tenant detail purpose tabs and support access audit cues visible', () => {
-    const page = read('app/platform/schools/[tenantId]/page.tsx');
+    const routes = read(
+      'components/platform/tenant-detail/tenant-detail-routes.ts',
+    );
+    const detailPage = read(
+      'components/platform/tenant-detail/tenant-detail-page.tsx',
+    );
+    const access = read(
+      'components/platform/tenant-detail/tenant-access.tsx',
+    );
+    const subscription = read(
+      'components/platform/tenant-detail/tenant-subscription.tsx',
+    );
+    const billing = read(
+      'components/platform/tenant-detail/tenant-billing.tsx',
+    );
+    const integrations = read(
+      'components/platform/tenant-detail/tenant-integrations.tsx',
+    );
+    const routeBackedTenantDetail = readMany([
+      'components/platform/tenant-detail/tenant-detail-routes.ts',
+      'components/platform/tenant-detail/tenant-detail-page.tsx',
+      'components/platform/tenant-detail/tenant-access.tsx',
+      'components/platform/tenant-detail/tenant-subscription.tsx',
+      'components/platform/tenant-detail/tenant-billing.tsx',
+      'components/platform/tenant-detail/tenant-integrations.tsx',
+    ]);
 
-    for (const expected of [
+    for (const label of [
       'Overview',
+      'Access',
+      'Modules',
+      'Subscription',
       'SaaS Billing',
-      'Entitlements',
-      'Audit Trail',
-      'Support Override History',
-      'Provider Readiness Summary',
-      'Usage Limit Warnings',
-      'Audit Reason',
-      'time-bound support override',
-      'This creates a platform SaaS invoice only',
-      'color-mod-platform-accent',
-      'color-mod-platform-text',
-      'Date not recorded',
+      'Onboarding',
+      'Integrations',
+      'API Keys',
+      'Audit',
     ]) {
-      assert.match(
-        page,
-        new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
-      );
+      assert.match(routes, new RegExp(`label: "${label}"`));
     }
 
+    assert.match(detailPage, /TENANT_SECTIONS/);
+    assert.match(detailPage, /color-mod-platform-text/);
+    assert.match(access, /Support override history/);
+    assert.match(access, /time-bound support access controls/);
+    assert.match(access, /scoped, read-only override/);
+    assert.match(access, /Date not recorded/);
+    assert.match(subscription, /Usage and limits/);
+    assert.match(billing, /Create a platform SaaS invoice only/);
+    assert.match(integrations, /Provider readiness/);
+
     assert.doesNotMatch(
-      page,
+      routeBackedTenantDetail,
       /bg-slate-900|bg-slate-950|shadow-xl|shadow-2xl|N\/A|Unknown failure|fake|mock|Coming soon/,
     );
   });
@@ -175,7 +210,8 @@ describe('Platform tenant subscription change workflow contracts', () => {
       'color-mod-platform-text',
       'Date not recorded',
       'Resource ID not recorded',
-      'Failure reason not recorded',
+      'raw provider errors are never exposed here',
+      'job.failureSummary',
       'Export file unavailable',
       'downloadProtectedFile',
     ]) {

@@ -1,5 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   AuthMethod,
   FileStatus,
@@ -31,6 +35,7 @@ describe('StudentRecordsService', () => {
       },
       studentDocumentHistory: {
         create: jest.fn(),
+        findMany: jest.fn(),
       },
       siblingGroup: {
         create: jest.fn(),
@@ -70,6 +75,106 @@ describe('StudentRecordsService', () => {
       auditService,
       fileRegistryService,
     );
+  });
+
+  it('denies student document URLs during a support override before reading file metadata', async () => {
+    await expect(
+      service.getSignedUrl(
+        { ...actor, isSupportOverride: true },
+        'asset-1',
+        'preview',
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.fileAsset.findFirst).not.toHaveBeenCalled();
+    expect(fileRegistryService.getSignedUrl).not.toHaveBeenCalled();
+    expect(fileRegistryService.auditAccess).not.toHaveBeenCalled();
+  });
+
+  it('denies document metadata during support override before document reads', async () => {
+    await expect(
+      service.listDocuments({ ...actor, isSupportOverride: true }, 'student-1'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.studentDocument.findMany).not.toHaveBeenCalled();
+  });
+
+  it('denies document history during support override before history reads', async () => {
+    await expect(
+      service.listDocumentHistory(
+        { ...actor, isSupportOverride: true },
+        'student-1',
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.studentDocumentHistory.findMany).not.toHaveBeenCalled();
+  });
+
+  it('denies expiring document metadata during support override before document reads', async () => {
+    await expect(
+      service.getExpiringDocuments(
+        { ...actor, isSupportOverride: true },
+        { days: 30 },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.studentDocument.findMany).not.toHaveBeenCalled();
+  });
+
+  it('returns sibling groups with only student identity and class/section display fields', async () => {
+    const student = {
+      id: 'student-1',
+      studentSystemId: 'STU-0001',
+      firstNameEn: 'Asha',
+      lastNameEn: 'Tamang',
+      firstNameNp: 'आशा',
+      lastNameNp: 'तामाङ',
+      class: { id: 'class-1', name: 'Class 1' },
+      sectionRef: { id: 'section-1', name: 'A' },
+    };
+    prisma.siblingGroup.findMany.mockResolvedValue([
+      {
+        id: 'sibling-group-1',
+        members: [{ id: 'member-1', student }],
+      },
+    ]);
+
+    const result = await service.listSiblingGroups(actor);
+
+    expect(prisma.siblingGroup.findMany).toHaveBeenCalledWith({
+      where: { tenantId: actor.tenantId },
+      include: {
+        members: {
+          include: {
+            student: {
+              select: {
+                id: true,
+                studentSystemId: true,
+                firstNameEn: true,
+                lastNameEn: true,
+                firstNameNp: true,
+                lastNameNp: true,
+                class: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+                sectionRef: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: [{ createdAt: 'desc' }],
+      take: 100,
+    });
+    expect(result[0]?.members[0]?.student).toEqual(student);
   });
 
   it('attaches File Registry admission documents to the admitted student inside the caller transaction', async () => {

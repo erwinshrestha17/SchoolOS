@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -271,6 +272,12 @@ export class M1AdmissionsHardeningService {
     query: RecoverAdmissionDraftsDto,
     actor: AuthContext,
   ) {
+    if (actor.isSupportOverride) {
+      throw new ForbiddenException(
+        'Admission autosave drafts are unavailable during support override',
+      );
+    }
+
     const where: Prisma.AdmissionApplicationWhereInput = {
       tenantId: actor.tenantId,
       status: { in: ['INQUIRY', 'APPLICATION', 'DOCUMENT_PENDING'] },
@@ -743,6 +750,12 @@ export class M1AdmissionsHardeningService {
   }
 
   async listImportReviewQueue(query: ImportReviewQueueDto, actor: AuthContext) {
+    if (actor.isSupportOverride) {
+      throw new ForbiddenException(
+        'Admission import review payloads are unavailable during support override',
+      );
+    }
+
     const where: Prisma.AdmissionImportRowWhereInput = {
       tenantId: actor.tenantId,
       ...(query.status

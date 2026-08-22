@@ -18,6 +18,7 @@ import {
 } from '../teacher-scope/teacher-capability';
 import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 import { buildActiveGuardianRelationshipWhere } from '../common/security/parent-scope';
+import { assertProtectedFileAccessAllowed } from '../common/security/support-override-file-access';
 
 type FullAttachment = Prisma.HomeworkAttachmentGetPayload<{
   include: {
@@ -45,6 +46,7 @@ export class HomeworkAttachmentAccessService {
     actor: AuthContext,
     action: 'preview' | 'download',
   ) {
+    assertProtectedFileAccessAllowed(actor);
     const attachment = await this.prisma.homeworkAttachment.findFirst({
       where: {
         id: attachmentId,

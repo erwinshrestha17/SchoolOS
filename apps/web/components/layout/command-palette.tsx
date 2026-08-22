@@ -1,6 +1,12 @@
 'use client';
 
-import { FileText, Megaphone, Search, UserRound, type LucideIcon } from 'lucide-react';
+import {
+  FileText,
+  Megaphone,
+  Search,
+  UserRound,
+  type LucideIcon,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -13,6 +19,7 @@ import {
   navGroupsForPersona,
   settingsNavItem,
   shouldShowSettingsHub,
+  buildSupportOverrideNavGroups,
   type NavItem,
 } from './sidebar-persona-nav.config';
 import { useSchoolWebPersona } from '../../lib/school-web-persona';
@@ -48,6 +55,7 @@ const MAX_RECENT_ROWS = 5;
 export function CommandPalette() {
   const router = useRouter();
   const { session } = useSession();
+  const isSupportOverride = session?.user.isSupportOverride === true;
   const { hasModule } = useEntitlements();
   const { entries: recentlyViewed } = useRecentlyViewed();
   const schoolWebPersona = useSchoolWebPersona();
@@ -60,12 +68,16 @@ export function CommandPalette() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const navItems = useMemo(() => {
-    const flattened: NavItem[] = navGroupsForPersona(
-      schoolWebPersona,
-      capabilities,
+    const flattened: NavItem[] = (
+      isSupportOverride
+        ? buildSupportOverrideNavGroups(
+            session?.user.supportOverrideScopes ?? [],
+          )
+        : navGroupsForPersona(schoolWebPersona, capabilities)
     ).flatMap((group) => group.items);
 
     if (
+      !isSupportOverride &&
       shouldShowSettingsHub(
         settingsCaps,
         isTeacherPersona,
@@ -76,16 +88,31 @@ export function CommandPalette() {
       flattened.push(settingsNavItem);
     }
 
-    return flattened.filter((item) => canDisplayNavItem(item, session, hasModule));
-  }, [session, hasModule, schoolWebPersona, capabilities, isTeacherPersona, settingsCaps, personalOnly]);
+    return flattened.filter((item) =>
+      canDisplayNavItem(item, session, hasModule),
+    );
+  }, [
+    capabilities,
+    hasModule,
+    isSupportOverride,
+    isTeacherPersona,
+    personalOnly,
+    schoolWebPersona,
+    session,
+    settingsCaps,
+  ]);
 
   const results = useMemo(() => {
     const normalized = query.trim().toLowerCase();
 
     const recentRows: PaletteRow[] = (
-      normalized
-        ? recentlyViewed.filter((entry) => entry.label.toLowerCase().includes(normalized))
-        : recentlyViewed
+      isSupportOverride
+        ? []
+        : normalized
+          ? recentlyViewed.filter((entry) =>
+              entry.label.toLowerCase().includes(normalized),
+            )
+          : recentlyViewed
     )
       .slice(0, MAX_RECENT_ROWS)
       .map((entry) => ({
@@ -98,7 +125,9 @@ export function CommandPalette() {
 
     const workspaceRows: PaletteRow[] = (
       normalized
-        ? navItems.filter((item) => item.label.toLowerCase().includes(normalized))
+        ? navItems.filter((item) =>
+            item.label.toLowerCase().includes(normalized),
+          )
         : navItems
     ).map((item) => ({
       key: `nav-${item.href}`,
@@ -109,7 +138,7 @@ export function CommandPalette() {
     }));
 
     return [...recentRows, ...workspaceRows];
-  }, [navItems, recentlyViewed, query]);
+  }, [isSupportOverride, navItems, recentlyViewed, query]);
 
   useEffect(() => {
     function handleGlobalKeyDown(event: KeyboardEvent) {
@@ -155,13 +184,19 @@ export function CommandPalette() {
 
       if (event.key === 'ArrowDown') {
         event.preventDefault();
-        setActiveIndex((current) => (results.length ? (current + 1) % results.length : 0));
+        setActiveIndex((current) =>
+          results.length ? (current + 1) % results.length : 0,
+        );
       }
 
       if (event.key === 'ArrowUp') {
         event.preventDefault();
         setActiveIndex((current) =>
-          results.length ? (current === 0 ? results.length - 1 : current - 1) : 0,
+          results.length
+            ? current === 0
+              ? results.length - 1
+              : current - 1
+            : 0,
         );
       }
 
@@ -201,7 +236,11 @@ export function CommandPalette() {
         className="relative flex max-h-[70vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg animate-scale-in"
       >
         <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-3">
-          <Search size={16} className="shrink-0 text-slate-400" aria-hidden="true" />
+          <Search
+            size={16}
+            className="shrink-0 text-slate-400"
+            aria-hidden="true"
+          />
           <input
             ref={inputRef}
             value={query}
@@ -307,7 +346,9 @@ function PaletteRowButton({
       onMouseEnter={onHover}
       onClick={onSelect}
       className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition-colors ${
-        active ? 'bg-[var(--sidebar-active-bg)] text-[var(--sidebar-active-label)]' : 'text-[var(--sidebar-label)] hover:bg-[var(--sidebar-hover)]'
+        active
+          ? 'bg-[var(--sidebar-active-bg)] text-[var(--sidebar-active-label)]'
+          : 'text-[var(--sidebar-label)] hover:bg-[var(--sidebar-hover)]'
       }`}
     >
       <Icon size={16} className="shrink-0" aria-hidden="true" />

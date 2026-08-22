@@ -581,7 +581,14 @@ export class ReportCardsService {
       include: {
         reportCard: {
           include: {
-            student: true,
+            student: {
+              select: {
+                id: true,
+                firstNameEn: true,
+                lastNameEn: true,
+                studentSystemId: true,
+              },
+            },
             class: true,
             section: true,
             examTerm: true,

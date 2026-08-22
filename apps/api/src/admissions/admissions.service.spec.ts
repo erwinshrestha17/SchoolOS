@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -38,6 +39,65 @@ const classroom = { id: 'class-1', name: 'Class 1' };
 const section = { id: 'section-1', name: 'A', classId: 'class-1' };
 
 describe('AdmissionsService production hardening', () => {
+  it('does not query or return latest invoice data during support override', async () => {
+    const prisma = buildPrisma({
+      studentFindManyResult: [buildAdmissionListStudent()],
+    });
+    const { service } = buildService(prisma);
+
+    const result = await service.listAdmissions(
+      {},
+      { ...actor, isSupportOverride: true },
+    );
+
+    expect(prisma.student.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({ invoices: false }),
+      }),
+    );
+    expect(result.items[0]?.latestInvoice).toBeNull();
+  });
+
+  it('preserves latest invoice data for an ordinary school actor', async () => {
+    const prisma = buildPrisma({
+      studentFindManyResult: [buildAdmissionListStudent()],
+    });
+    const { service } = buildService(prisma);
+
+    const result = await service.listAdmissions({}, actor);
+
+    expect(prisma.student.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          invoices: {
+            orderBy: { issuedAt: 'desc' },
+            take: 1,
+          },
+        }),
+      }),
+    );
+    expect(result.items[0]?.latestInvoice).toEqual({
+      id: 'invoice-1',
+      invoiceNumber: 'INV-0001',
+      status: 'ISSUED',
+      totalAmount: 1000,
+    });
+  });
+
+  it('denies raw import batch details during support override before row lookup', async () => {
+    const prisma = buildPrisma();
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.getImportBatch('import-batch-1', {
+        ...actor,
+        isSupportOverride: true,
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.admissionImportBatch.findFirst).not.toHaveBeenCalled();
+  });
+
   it('creates the core admission in one tenant-scoped transaction', async () => {
     const prisma = buildPrisma();
     const tx = buildTransaction();
@@ -887,6 +947,32 @@ function buildApplication() {
   };
 }
 
+function buildAdmissionListStudent() {
+  return {
+    id: 'student-1',
+    studentSystemId: 'SCH-2026-0001',
+    firstNameEn: 'Asha',
+    lastNameEn: 'Tamang',
+    firstNameNp: null,
+    lastNameNp: null,
+    class: { name: 'Class 1' },
+    sectionRef: { name: 'A' },
+    section: null,
+    rollNumber: 4,
+    _count: { documents: 0 },
+    guardianLinks: [],
+    enrollments: [],
+    invoices: [
+      {
+        id: 'invoice-1',
+        invoiceNumber: 'INV-0001',
+        status: 'ISSUED',
+        totalAmount: 1000,
+      },
+    ],
+  };
+}
+
 function buildService(prisma = buildPrisma()) {
   const usersService = { createManagedUser: jest.fn() };
 
@@ -989,6 +1075,9 @@ function buildPrisma(overrides: Partial<PrismaMockOptions> = {}) {
         ),
     },
     student: {
+      count: jest
+        .fn()
+        .mockResolvedValue(overrides.studentFindManyResult?.length ?? 0),
       findMany: jest
         .fn()
         .mockResolvedValue(overrides.studentFindManyResult ?? []),

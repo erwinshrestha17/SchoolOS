@@ -170,6 +170,59 @@ describe('SchoolSettingsNavigationV1Service', () => {
     expect(navigation.groups).toEqual([]);
   });
 
+  it('returns only the safe school-profile item during support override', async () => {
+    const { service, entitlementsService } = buildService([
+      'library',
+      'transport',
+      'canteen',
+    ]);
+    const navigation = await service.getNavigation(
+      context(
+        [
+          'settings:read_public',
+          'settings:read',
+          'settings:manage',
+          'settings:audit:read',
+          'roles:read',
+          'roles:assign',
+          'users:read',
+          'library:read',
+        ],
+        {
+          isSupportOverride: true,
+          roles: [],
+        },
+      ),
+    );
+
+    expect(navigation.groups).toHaveLength(1);
+    expect(navigation.groups[0]).toMatchObject({
+      id: 'school-setup',
+      label: 'School Setup',
+      items: [
+        {
+          id: 'school-profile',
+          href: '/dashboard/settings/school/identity',
+          access: 'view',
+        },
+      ],
+    });
+    expect(entitlementsService.getEntitlements).not.toHaveBeenCalled();
+  });
+
+  it('returns no support navigation without the exact public-settings permission', async () => {
+    const { service, entitlementsService } = buildService(['library']);
+    const navigation = await service.getNavigation(
+      context(['settings:read', 'settings:manage'], {
+        isSupportOverride: true,
+        roles: [],
+      }),
+    );
+
+    expect(navigation.groups).toEqual([]);
+    expect(entitlementsService.getEntitlements).not.toHaveBeenCalled();
+  });
+
   it('shows module settings only when the module is enabled and permitted', async () => {
     const { service: withLibrary } = buildService(['library']);
     const withLibraryItems = await itemsOf(withLibrary, [

@@ -13,6 +13,7 @@ import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { AUTH_RATE_LIMIT, AUTH_RATE_TTL_MS } from './auth.constants';
 import { CurrentAuth } from './decorators/current-auth.decorator';
+import { AllowSupportOverrideRead } from './decorators/allow-support-override-read.decorator';
 import { AuthService } from './auth.service';
 import type { AuthenticatedRequest } from './auth-request.interface';
 import type { AuthContext } from './auth.types';
@@ -163,6 +164,14 @@ export class AuthController {
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @SkipMustChangePassword()
+  @AllowSupportOverrideRead(
+    'SCHOOL_PROFILE',
+    'STUDENT_RECORDS',
+    'ATTENDANCE',
+    'ACADEMICS',
+    'HOMEWORK_TIMETABLE',
+    'NOTICES_DELIVERY',
+  )
   me(@CurrentAuth() auth: AuthContext) {
     return this.authService.getProfile(auth);
   }

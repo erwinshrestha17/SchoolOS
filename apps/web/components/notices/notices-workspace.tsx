@@ -12,23 +12,40 @@ import { SummaryCard, SummaryGrid } from '../ui/summary-card';
 import { WorkSurface } from '../ui/work-surface';
 import { ModuleHeader } from '../ui/module-header';
 import { WorkspaceTabs } from '../ui/module-tabs';
-import { useNoticeCapabilities, useHasPermission } from '../../lib/permissions-ui';
+import {
+  useNoticeCapabilities,
+  useHasPermission,
+} from '../../lib/permissions-ui';
 import { NoticeListWorkspace } from './notice-list-workspace';
 import { NoticeComposerWorkspace } from './notice-composer-workspace';
+import { useSession } from '../session-provider';
+import { SupportNoticesWorkspace } from './support-notices-workspace';
 
 type NoticeWorkspaceSection = 'Notices' | 'Delivery Records';
 
-export function NoticesWorkspace({
-  initialSection = 'Notices',
-  variant = 'overview',
-}: {
+type NoticesWorkspaceProps = {
   initialSection?: NoticeWorkspaceSection;
   /**
    * 'composer' is the dedicated "New notice" route. Per the M12 KPI design
    * rule, KPIs never appear on the notice composer — only the overview does.
    */
   variant?: 'overview' | 'composer';
-}) {
+};
+
+export function NoticesWorkspace(props: NoticesWorkspaceProps) {
+  const { session } = useSession();
+
+  if (session?.user.isSupportOverride) {
+    return <SupportNoticesWorkspace />;
+  }
+
+  return <SchoolNoticesWorkspace {...props} />;
+}
+
+function SchoolNoticesWorkspace({
+  initialSection = 'Notices',
+  variant = 'overview',
+}: NoticesWorkspaceProps) {
   const router = useRouter();
   const noticeCaps = useNoticeCapabilities();
   const canCreateNotices = noticeCaps.canCreate;

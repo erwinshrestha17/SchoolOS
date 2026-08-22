@@ -31,7 +31,8 @@ export default function PlatformLayout({
     if (status === "authenticated" && session) {
       const isPlatformAdmin = session.user.roles.some((role) =>
         PLATFORM_ROLES.includes(role),
-      );
+      ) && session.user.securityDomain === "PLATFORM" &&
+        !session.user.isSupportOverride;
 
       if (!isPlatformAdmin) {
         router.push("/dashboard");
@@ -57,7 +58,8 @@ export default function PlatformLayout({
 
   const isPlatformAdmin = session.user.roles.some((role) =>
     PLATFORM_ROLES.includes(role),
-  );
+  ) && session.user.securityDomain === "PLATFORM" &&
+    !session.user.isSupportOverride;
 
   if (!isPlatformAdmin) {
     return (

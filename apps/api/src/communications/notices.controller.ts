@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { AudienceType, NoticePriority } from '@prisma/client';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
+import { AllowSupportOverrideRead } from '../auth/decorators/allow-support-override-read.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
@@ -39,6 +40,7 @@ export class NoticesController {
 
   @Get()
   @Permissions('notices:read')
+  @AllowSupportOverrideRead('NOTICES_DELIVERY')
   listNotices(
     @Query() query: ListNoticesQueryDto,
     @CurrentAuth() auth: AuthContext,

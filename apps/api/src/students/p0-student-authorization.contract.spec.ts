@@ -1,4 +1,5 @@
 import { systemRolePermissions } from '@schoolos/core';
+import { AdmissionsController } from '../admissions/admissions.controller';
 import { PERMISSIONS_KEY } from '../auth/decorators/permissions.decorator';
 import { StudentsController } from './students.controller';
 
@@ -25,6 +26,12 @@ describe('P0 student authorization contract', () => {
       'students:manage_lifecycle',
       'reports:export',
     ]);
+    expect(
+      Reflect.getMetadata(
+        PERMISSIONS_KEY,
+        AdmissionsController.prototype.exportIemis,
+      ),
+    ).toEqual(['students:manage_lifecycle', 'reports:export']);
   });
 
   it.each([

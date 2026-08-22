@@ -73,7 +73,8 @@ export const permissionCatalog = [
   {
     resource: "academics",
     action: "create",
-    description: "Create academic entities like terms and assessment components",
+    description:
+      "Create academic entities like terms and assessment components",
   },
   {
     resource: "academics",
@@ -98,7 +99,8 @@ export const permissionCatalog = [
   {
     resource: "exam-terms",
     action: "unlock",
-    description: "Unlock exam terms for controlled correction after leadership review",
+    description:
+      "Unlock exam terms for controlled correction after leadership review",
   },
   {
     resource: "assessment-components",
@@ -163,7 +165,13 @@ export const permissionCatalog = [
   {
     resource: "timetable",
     action: "manage",
-    description: "Manage teacher availability, workload limits, and setup workflows",
+    description:
+      "Manage teacher availability, workload limits, and setup workflows",
+  },
+  {
+    resource: "timetable",
+    action: "read_published",
+    description: "Read published or locked timetable slots",
   },
   {
     resource: "timetable",
@@ -199,6 +207,11 @@ export const permissionCatalog = [
     resource: "homework",
     action: "create",
     description: "Publish homework assignments to class and student audiences",
+  },
+  {
+    resource: "homework",
+    action: "read_published",
+    description: "Read published homework assignments without submissions",
   },
   {
     resource: "homework",
@@ -1734,11 +1747,37 @@ export const systemRoleDefinitions = [
   { name: "driver", description: "System preset role for driver" },
 ] as const;
 
+/**
+ * Platform identities are a separate security domain from school identities.
+ * Reserve the whole `platform_*` namespace so a school cannot manufacture a
+ * look-alike role that later becomes authoritative when a new Platform role is
+ * introduced.
+ */
+export const PLATFORM_ROLE_NAMES = [
+  "platform_super_admin",
+  "platform_support",
+  "platform_billing_admin",
+] as const;
+
+export type PlatformRoleName = (typeof PLATFORM_ROLE_NAMES)[number];
+
+export function isPlatformRoleName(value: string): boolean {
+  return value.trim().toLowerCase().startsWith("platform_");
+}
+
+export const SCHOOL_SYSTEM_ROLE_DEFINITIONS = systemRoleDefinitions.filter(
+  ({ name }) => !isPlatformRoleName(name),
+);
+
+export const PLATFORM_SYSTEM_ROLE_DEFINITIONS = systemRoleDefinitions.filter(
+  ({ name }) => isPlatformRoleName(name),
+);
+
 const ALL_PERMISSION_KEYS = permissionCatalog.map(({ resource, action }) =>
   buildPermissionKey(resource, action),
 );
 
-const PLATFORM_PERMISSION_KEYS = [
+export const PLATFORM_PERMISSION_KEYS = [
   "platform:read",
   "platform:manage",
   "platform:dashboard:read",
@@ -1764,8 +1803,14 @@ const PLATFORM_PERMISSION_KEYS = [
   "platform:reports:read",
   "platform:onboarding:read",
   "platform:onboarding:manage",
+  "platform:demo-requests:read",
+  "platform:demo-requests:manage",
   "tenants:manage",
-];
+] as const;
+
+export function isPlatformPermissionKey(value: string): boolean {
+  return value === "tenants:manage" || value.startsWith("platform:");
+}
 
 const REMOVED_CHAT_WRITE_PERMISSION_KEYS = [
   "messaging:create",
@@ -1774,7 +1819,7 @@ const REMOVED_CHAT_WRITE_PERMISSION_KEYS = [
 
 const TENANT_PERMISSION_KEYS = ALL_PERMISSION_KEYS.filter(
   (key) =>
-    !PLATFORM_PERMISSION_KEYS.includes(key) &&
+    !isPlatformPermissionKey(key) &&
     !REMOVED_CHAT_WRITE_PERMISSION_KEYS.includes(key),
 );
 
@@ -2013,7 +2058,6 @@ export const systemRolePermissions: Record<string, string[]> = {
   ],
   support_staff: [
     "roles:read",
-    "students:read",
     "staff:read",
     "notices:read",
     "events:read",
@@ -2184,24 +2228,19 @@ export const systemRolePermissions: Record<string, string[]> = {
     "roles:read",
     "classes:read",
     "sections:read",
-    "students:read",
     "library:read",
     "library:manage",
-    "fees:manage",
     "settings:read_public",
   ],
   driver: [
     "roles:read",
-    "students:read",
     "events:read",
     "transport:read",
     "transport:operate",
     "settings:read_public",
   ],
   platform_super_admin: [
-    ...permissionCatalog.map(({ resource, action }) =>
-      buildPermissionKey(resource, action),
-    ),
+    ...PLATFORM_PERMISSION_KEYS,
   ],
   platform_support: [
     "platform:read",
@@ -2214,9 +2253,6 @@ export const systemRolePermissions: Record<string, string[]> = {
     "platform:reports:read",
     "platform:onboarding:read",
     "platform:demo-requests:read",
-    "students:read",
-    "staff:read",
-    "tenants:read",
   ],
   platform_billing_admin: [
     "platform:read",
@@ -2228,7 +2264,20 @@ export const systemRolePermissions: Record<string, string[]> = {
     "platform:usage:read",
     "platform:billing:read",
     "platform:billing:manage",
-    "tenants:read",
   ],
 };
+
+export const SCHOOL_SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> =
+  Object.fromEntries(
+    Object.entries(systemRolePermissions).filter(
+      ([roleName]) => !isPlatformRoleName(roleName),
+    ),
+  );
+
+export const PLATFORM_SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> =
+  Object.fromEntries(
+    Object.entries(systemRolePermissions).filter(([roleName]) =>
+      isPlatformRoleName(roleName),
+    ),
+  );
 

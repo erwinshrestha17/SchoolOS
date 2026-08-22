@@ -46,6 +46,7 @@ import {
   ListTeacherAvailabilityQueryDto,
   ListTeacherWorkloadQueryDto,
   ListSubjectWeeklyRequirementQueryDto,
+  PaginatedQueryDto,
   UpsertTeacherWorkloadLimitDto,
   CreateSubjectWeeklyRequirementDto,
   UpdateSubjectWeeklyRequirementDto,
@@ -68,7 +69,46 @@ export class TimetableService {
     private readonly teacherScopeService: TeacherScopeService,
   ) {}
 
+  async listSupportPublishedTimetable(
+    actor: AuthContext,
+    query: PaginatedQueryDto,
+  ) {
+    if (
+      !actor.isSupportOverride ||
+      !actor.supportOverrideScopes?.includes('HOMEWORK_TIMETABLE')
+    ) {
+      throw new ForbiddenException(
+        'Published timetable support projection requires an active support override',
+      );
+    }
+
+    const page = query.page ?? 1;
+    const limit = Math.min(query.limit ?? 25, 100);
+    const where: Prisma.TimetableSlotWhereInput = {
+      tenantId: actor.tenantId,
+      AND: [publishedTimetableScope()],
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.timetableSlot.findMany({
+        where,
+        select: supportPublishedTimetableSlotSelect(),
+        orderBy: [{ dayOfWeek: 'asc' }, { startsAt: 'asc' }, { id: 'asc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.timetableSlot.count({ where }),
+    ]);
+
+    return { items, meta: buildPageMeta(total, page, limit) };
+  }
+
   async listTimetable(actor: AuthContext, query: TimetableQueryDto) {
+    if (actor.isSupportOverride) {
+      throw new ForbiddenException(
+        'Use the purpose-limited published timetable support projection',
+      );
+    }
+
     const page = query.page ?? 1;
     const limit = Math.min(query.limit ?? 50, 100);
     const and: Prisma.TimetableSlotWhereInput[] = [];
@@ -2237,6 +2277,21 @@ function timetableSlotInclude() {
     roomRef: true,
     version: true,
   } satisfies Prisma.TimetableSlotInclude;
+}
+
+function supportPublishedTimetableSlotSelect() {
+  return {
+    id: true,
+    dayOfWeek: true,
+    startsAt: true,
+    endsAt: true,
+    room: true,
+    class: { select: { name: true } },
+    section: { select: { name: true } },
+    subject: { select: { name: true } },
+    staff: { select: { firstName: true, lastName: true } },
+    roomRef: { select: { name: true } },
+  } satisfies Prisma.TimetableSlotSelect;
 }
 
 function substitutionInclude() {

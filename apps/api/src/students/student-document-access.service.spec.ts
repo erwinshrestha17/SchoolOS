@@ -36,6 +36,23 @@ function createServiceMocks() {
 }
 
 describe('StudentDocumentAccessService', () => {
+  it('denies document access URLs during a support override before student lookup', async () => {
+    const { service, prisma, fileRegistryService } = createServiceMocks();
+
+    await expect(
+      service.getDocumentAccessUrl(
+        { ...actor, isSupportOverride: true },
+        'student-1',
+        'document-1',
+        'preview',
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.student.findFirst).not.toHaveBeenCalled();
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    expect(fileRegistryService.getSignedUrl).not.toHaveBeenCalled();
+  });
+
   it('rejects when the student is outside the current tenant', async () => {
     const { service, prisma, fileRegistryService } = createServiceMocks();
     prisma.student.findFirst.mockResolvedValue(null);

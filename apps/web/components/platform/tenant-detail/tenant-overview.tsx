@@ -1,5 +1,6 @@
 "use client";
 
+import { formatBsDate } from "@schoolos/core";
 import { AlertTriangle, ArrowRight, Database, Users } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "@/components/session-provider";
@@ -244,7 +245,7 @@ function formatDate(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? "Date not recorded"
-    : date.toLocaleDateString();
+    : formatBsDate(date);
 }
 
 function formatBytes(value: number) {

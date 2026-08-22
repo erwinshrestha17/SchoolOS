@@ -1,4 +1,8 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { AuthMethod } from '@prisma/client';
 import { UsersService } from './users.service';
 import { AuthContext } from '../auth/auth.types';
@@ -197,6 +201,26 @@ describe('UsersService', () => {
       }),
     );
     expect(prisma.user.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a same-tenant Platform role before managed user creation', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.role.findMany.mockResolvedValue([
+      { id: 'legacy-platform-role', name: 'platform_super_admin' },
+    ]);
+
+    await expect(
+      service.createManagedUser({
+        tenantId: actor.tenantId,
+        email: 'operator@school.com',
+        password: 'StrongPass1!',
+        roleIds: ['legacy-platform-role'],
+        assignedById: actor.userId,
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.user.create).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
   });
 
   it('resets password inside the actor tenant and requires change on next login', async () => {

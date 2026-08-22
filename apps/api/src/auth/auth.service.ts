@@ -2,6 +2,7 @@ import {
   AuthMethod,
   OtpPurpose,
   UserStatus,
+  type SecurityDomain,
   type Tenant,
   type User,
 } from '@prisma/client';
@@ -16,6 +17,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { isPlatformRoleName } from '@schoolos/core';
 import * as bcrypt from 'bcrypt';
 import type { CookieOptions, Response } from 'express';
 import { AuditService } from '../audit/audit.service';
@@ -562,6 +564,7 @@ export class AuthService {
       const authContext = this.buildAuthContext(
         existingSession.user,
         tenant.slug,
+        tenant.securityDomain,
       );
 
       const userAgent = requestMeta?.userAgent?.toLowerCase();
@@ -782,42 +785,46 @@ export class AuthService {
       ? (auth.originalTenantId ?? auth.tenantId)
       : auth.tenantId;
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: auth.userId },
-      include: {
-        tenant: true,
-        staff: true,
-        // Guardians had no profile block at all, so a parent account resolved
-        // to a nameless `user` and every client fell back to the email local
-        // part - the mobile app greeted guardians as "guardian.c01a001".
-        // Selected, not `true`: a guardian row also carries phone numbers and
-        // a home address, none of which a session profile needs.
-        guardian: {
-          select: { id: true, fullName: true, relation: true },
-        },
-        student: {
+    const user = await this.prisma.runWithoutTenantScope(
+      'authentication: read home identity while presenting an effective support tenant',
+      () =>
+        this.prisma.user.findFirst({
+          where: { id: auth.userId, tenantId: homeTenantId },
           include: {
-            class: true,
-          },
-        },
-        userRoles: {
-          where: auth.isSupportOverride
-            ? { tenantId: homeTenantId }
-            : undefined,
-          include: {
-            role: {
+            tenant: true,
+            staff: true,
+            // Guardians had no profile block at all, so a parent account resolved
+            // to a nameless `user` and every client fell back to the email local
+            // part - the mobile app greeted guardians as "guardian.c01a001".
+            // Selected, not `true`: a guardian row also carries phone numbers and
+            // a home address, none of which a session profile needs.
+            guardian: {
+              select: { id: true, fullName: true, relation: true },
+            },
+            student: {
               include: {
-                rolePermissions: {
+                class: true,
+              },
+            },
+            userRoles: {
+              where: auth.isSupportOverride
+                ? { tenantId: homeTenantId }
+                : undefined,
+              include: {
+                role: {
                   include: {
-                    permission: true,
+                    rolePermissions: {
+                      include: {
+                        permission: true,
+                      },
+                    },
                   },
                 },
               },
             },
           },
-        },
-      },
-    });
+        }),
+    );
 
     if (!user || user.tenantId !== homeTenantId) {
       throw new NotFoundException('Authenticated user was not found');
@@ -833,13 +840,25 @@ export class AuthService {
       throw new NotFoundException('Authenticated tenant was not found');
     }
 
-    const currentAuth = this.buildAuthContext(user, auth.tenantSlug);
+    const currentAuth = this.buildAuthContext(
+      user,
+      user.tenant.slug,
+      user.tenant.securityDomain,
+    );
 
     return {
       ...currentAuth,
       tenantId: auth.tenantId,
       originalTenantId: auth.originalTenantId,
       isSupportOverride: auth.isSupportOverride,
+      supportOverrideScopes: auth.supportOverrideScopes,
+      supportOverrideReadOnly: auth.supportOverrideReadOnly,
+      securityDomain: auth.securityDomain,
+      roles: auth.isSupportOverride ? auth.roles : currentAuth.roles,
+      permissions: auth.isSupportOverride
+        ? auth.permissions
+        : currentAuth.permissions,
+      tenantSlug: effectiveTenant.slug,
       tenant: {
         id: effectiveTenant.id,
         name: effectiveTenant.name,
@@ -898,7 +917,11 @@ export class AuthService {
       }),
     );
 
-    const authContext = this.buildAuthContext(user, tenant.slug);
+    const authContext = this.buildAuthContext(
+      user,
+      tenant.slug,
+      tenant.securityDomain,
+    );
     const session = await this.issueSession(authContext, requestMeta);
     this.attachRefreshCookie(response, session.refreshToken);
     this.attachAccessCookie(response, session.accessToken);
@@ -1317,7 +1340,12 @@ export class AuthService {
       authMethod: AuthMethod;
       mustChangePassword: boolean;
       userRoles: Array<{
+        tenantId: string;
+        scopeId: string | null;
+        expiresAt: Date | null;
+        revokedAt: Date | null;
         role: {
+          tenantId: string;
           name: string;
           rolePermissions: Array<{
             permission: {
@@ -1329,13 +1357,25 @@ export class AuthService {
       }>;
     },
     tenantSlug: string,
+    securityDomain: SecurityDomain,
   ): AuthContext {
+    const now = Date.now();
+    const eligibleAssignments = user.userRoles.filter(
+      ({ tenantId, role, scopeId, expiresAt, revokedAt }) =>
+        tenantId === user.tenantId &&
+        role.tenantId === user.tenantId &&
+        !revokedAt &&
+        (!expiresAt || expiresAt.getTime() > now) &&
+        (securityDomain === 'PLATFORM'
+          ? isPlatformRoleName(role.name) && scopeId === 'global'
+          : !isPlatformRoleName(role.name)),
+    );
     const roles = Array.from(
-      new Set(user.userRoles.map(({ role }) => role.name)),
+      new Set(eligibleAssignments.map(({ role }) => role.name)),
     );
     const permissions = Array.from(
       new Set(
-        user.userRoles.flatMap(({ role }) =>
+        eligibleAssignments.flatMap(({ role }) =>
           role.rolePermissions.map(
             ({ permission }) => `${permission.resource}:${permission.action}`,
           ),
@@ -1347,6 +1387,7 @@ export class AuthService {
       userId: user.id,
       tenantId: user.tenantId,
       tenantSlug,
+      securityDomain,
       email: user.email,
       authMethod: user.authMethod,
       mustChangePassword: user.mustChangePassword,
@@ -1372,6 +1413,7 @@ export class AuthService {
       sub: authContext.userId,
       tenantId: authContext.tenantId,
       tenantSlug: authContext.tenantSlug,
+      securityDomain: authContext.securityDomain,
       email: authContext.email,
       authMethod: authContext.authMethod,
       mustChangePassword: authContext.mustChangePassword ?? false,
@@ -1452,6 +1494,9 @@ export class AuthService {
         tenantId: authContext.tenantId,
         originalTenantId: authContext.originalTenantId,
         isSupportOverride: authContext.isSupportOverride,
+        supportOverrideScopes: authContext.supportOverrideScopes,
+        supportOverrideReadOnly: authContext.supportOverrideReadOnly,
+        securityDomain: authContext.securityDomain,
         tenantSlug: authContext.tenantSlug,
         email: authContext.email,
         authMethod: authContext.authMethod,
@@ -1611,7 +1656,12 @@ type UserWithRoles = User & {
     fullName: string;
   } | null;
   userRoles: Array<{
+    tenantId: string;
+    scopeId: string | null;
+    expiresAt: Date | null;
+    revokedAt: Date | null;
     role: {
+      tenantId: string;
       name: string;
       rolePermissions: Array<{
         permission: {

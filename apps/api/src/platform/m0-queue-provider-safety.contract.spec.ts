@@ -86,7 +86,7 @@ describe('M0 Queue & Provider safety contracts', () => {
       );
       expect(service).toContain('listFailedJobGroups');
       expect(service).toContain('buildFailureDiagnostic');
-      expect(service).toContain('affectedTenantIds');
+      expect(service).toContain('affectedTenantCount');
       expect(service).toContain('sampleJobIds');
     });
 
@@ -104,20 +104,21 @@ describe('M0 Queue & Provider safety contracts', () => {
   // ─── 3. Failed Job & Retry Safety ─────────────────────────────────────
 
   describe('Failed job & retry safety', () => {
-    it('listFailedJobs sanitizes data to prevent secret leakage in UI', () => {
+    it('listFailedJobs omits payloads and raw failure diagnostics', () => {
       const service = read('src/platform/platform-queues.service.ts');
 
-      expect(service).toContain('sanitizeJobData(job.data)');
-      expect(service).toContain('SECRET_KEY_PATTERN.test(key)');
-      expect(service).toContain("'********'");
+      expect(service).toContain('describeFailureCategory');
+      expect(service).not.toContain('data: sanitizeJobData');
+      expect(service).not.toContain('stacktrace: Array.isArray');
+      expect(service).not.toContain('failedReason: job.failedReason');
     });
 
-    it('sanitizeJobData truncates long strings and deep objects', () => {
+    it('job detail is limited to jobs that are still failed', () => {
       const service = read('src/platform/platform-queues.service.ts');
 
-      expect(service).toContain('MAX_STRING_LENGTH = 500');
-      expect(service).toContain('depth > 4');
-      expect(service).toContain("'[Truncated]'");
+      expect(service).toContain("typeof job.isFailed !== 'function'");
+      expect(service).toContain('!(await job.isFailed())');
+      expect(service).toContain('Failed job ${jobId} not found');
     });
 
     it('retryFailedJob validates job is actually failed before retry', () => {

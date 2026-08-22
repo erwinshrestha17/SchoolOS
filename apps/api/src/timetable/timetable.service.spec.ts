@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import {
   AuthMethod,
   TeacherAssignmentType,
@@ -27,6 +27,112 @@ describe('timesOverlap', () => {
 });
 
 describe('TimetableService lifecycle behavior', () => {
+  it('returns only the purpose-limited published timetable projection for support', async () => {
+    const prisma = {
+      timetableSlot: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+    };
+    const service = new TimetableService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await service.listSupportPublishedTimetable(
+      {
+        tenantId: 'tenant-1',
+        userId: 'platform-operator-1',
+        roles: [],
+        permissions: ['timetable:read_published'],
+        authMethod: AuthMethod.PASSWORD,
+        isSupportOverride: true,
+        supportOverrideScopes: ['HOMEWORK_TIMETABLE'],
+      } as never,
+      { page: 1, limit: 25 },
+    );
+
+    const where = prisma.timetableSlot.findMany.mock.calls[0]?.[0].where;
+    expect(where).toEqual(
+      expect.objectContaining({
+        tenantId: 'tenant-1',
+        AND: [
+          {
+            OR: [
+              { versionId: null },
+              {
+                version: {
+                  status: {
+                    in: [
+                      TimetableVersionStatus.PUBLISHED,
+                      TimetableVersionStatus.LOCKED,
+                    ],
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    expect(prisma.timetableSlot.count).toHaveBeenCalledWith({ where });
+    expect(prisma.timetableSlot.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: {
+          id: true,
+          dayOfWeek: true,
+          startsAt: true,
+          endsAt: true,
+          room: true,
+          class: { select: { name: true } },
+          section: { select: { name: true } },
+          subject: { select: { name: true } },
+          staff: { select: { firstName: true, lastName: true } },
+          roomRef: { select: { name: true } },
+        },
+      }),
+    );
+    const supportSelect = prisma.timetableSlot.findMany.mock.calls[0][0].select;
+    expect(JSON.stringify(supportSelect)).not.toContain('employeeId');
+    expect(JSON.stringify(supportSelect)).not.toContain('version');
+  });
+
+  it('denies the general timetable service path to support overrides', async () => {
+    const prisma = {
+      timetableSlot: {
+        findMany: jest.fn(),
+        count: jest.fn(),
+      },
+    };
+    const service = new TimetableService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(
+      service.listTimetable(
+        {
+          tenantId: 'tenant-1',
+          userId: 'platform-operator-1',
+          roles: [],
+          permissions: ['timetable:read_published'],
+          authMethod: AuthMethod.PASSWORD,
+          isSupportOverride: true,
+        } as never,
+        {},
+      ),
+    ).rejects.toThrow(ForbiddenException);
+    expect(prisma.timetableSlot.findMany).not.toHaveBeenCalled();
+  });
+
   it('blocks archiving locked timetable versions through the service path', async () => {
     const prisma = {
       timetableVersion: {

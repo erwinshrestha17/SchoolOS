@@ -98,7 +98,17 @@ export class HomeworkService {
       ...(query.sectionId ? { sectionId: query.sectionId } : {}),
       ...(query.subjectId ? { subjectId: query.subjectId } : {}),
       ...(query.teacherId ? { assignedByStaffId: query.teacherId } : {}),
-      ...(query.status ? { status: query.status } : {}),
+      ...(actor.isSupportOverride
+        ? {
+            status:
+              query.status &&
+              FAMILY_VISIBLE_ASSIGNMENT_STATUSES.includes(query.status)
+                ? query.status
+                : { in: [...FAMILY_VISIBLE_ASSIGNMENT_STATUSES] },
+          }
+        : query.status
+          ? { status: query.status }
+          : {}),
       ...(assignedSchoolDay
         ? {
             assignedDate: {
@@ -193,6 +203,12 @@ export class HomeworkService {
       and.push({ OR: scope });
     }
 
+    if (actor.isSupportOverride && (query.mine || query.studentId)) {
+      throw new ForbiddenException(
+        'Student and staff submission filters are unavailable during support override',
+      );
+    }
+
     // "My homework only". Resolved from the caller's own Staff row rather
     // than a client-supplied id, so it always narrows and can never be
     // pointed at somebody else (P1.6).
@@ -219,6 +235,25 @@ export class HomeworkService {
 
     const sortBy = query.sortBy ?? 'dueDate';
     const sortOrder = query.sortOrder ?? 'desc';
+
+    if (actor.isSupportOverride) {
+      const [items, total] = await Promise.all([
+        this.prisma.homeworkAssignment.findMany({
+          where,
+          select: homeworkAssignmentSupportSelect(),
+          orderBy: [{ [sortBy]: sortOrder }, { id: 'asc' }],
+          skip,
+          take,
+        }),
+        this.prisma.homeworkAssignment.count({ where }),
+      ]);
+
+      return {
+        items: items.map(mapSupportHomeworkAssignment),
+        meta: buildPageMeta(total, page, limit),
+      };
+    }
+
     const [items, total] = await Promise.all([
       this.prisma.homeworkAssignment.findMany({
         where,
@@ -472,6 +507,21 @@ export class HomeworkService {
   }
 
   async getAssignment(actor: AuthContext, id: string) {
+    if (actor.isSupportOverride) {
+      const assignment = await this.prisma.homeworkAssignment.findFirst({
+        where: {
+          id,
+          tenantId: actor.tenantId,
+          status: { in: [...FAMILY_VISIBLE_ASSIGNMENT_STATUSES] },
+        },
+        select: homeworkAssignmentSupportSelect(),
+      });
+      if (!assignment) {
+        throw new NotFoundException('Homework assignment not found');
+      }
+      return mapSupportHomeworkAssignment(assignment);
+    }
+
     const assignment = await this.findAssignmentOrThrow(actor, id);
     await this.ensureAssignmentVisibleToActor(actor, assignment);
     await this.ensureSubjectTeacherScopeForRead(actor, assignment);
@@ -479,6 +529,11 @@ export class HomeworkService {
   }
 
   async getHomeworkSummaryToday(actor: AuthContext, query: { date?: string }) {
+    if (actor.isSupportOverride) {
+      throw new ForbiddenException(
+        'Homework submission summaries are unavailable during support override',
+      );
+    }
     if (actor.roles.includes('student') || actor.roles.includes('parent')) {
       throw new ForbiddenException(
         'Homework summary is limited to authorized staff',
@@ -513,7 +568,9 @@ export class HomeworkService {
         where: {
           tenantId: actor.tenantId,
           assignedDate: { gte: dayStart, lt: dayEndExclusive },
-          status: { not: HomeworkAssignmentStatus.CANCELLED },
+          status: actor.isSupportOverride
+            ? { in: [...FAMILY_VISIBLE_ASSIGNMENT_STATUSES] }
+            : { not: HomeworkAssignmentStatus.CANCELLED },
           ...scopeFilter,
         },
       }),
@@ -556,7 +613,9 @@ export class HomeworkService {
         where: {
           tenantId: actor.tenantId,
           assignedDate: { gte: dayStart, lt: dayEndExclusive },
-          status: { not: HomeworkAssignmentStatus.CANCELLED },
+          status: actor.isSupportOverride
+            ? { in: [...FAMILY_VISIBLE_ASSIGNMENT_STATUSES] }
+            : { not: HomeworkAssignmentStatus.CANCELLED },
           ...scopeFilter,
         },
         select: { classId: true, sectionId: true },
@@ -598,6 +657,11 @@ export class HomeworkService {
     actor: AuthContext,
     query: { classId: string; sectionId?: string; date?: string },
   ) {
+    if (actor.isSupportOverride) {
+      throw new ForbiddenException(
+        'Homework workload reporting is unavailable during support override',
+      );
+    }
     const schoolDay = getNepalSchoolDay(
       query.date ? parseRequiredDate(query.date, 'date') : new Date(),
     );
@@ -608,7 +672,9 @@ export class HomeworkService {
       where: {
         tenantId: actor.tenantId,
         classId: query.classId,
-        status: { not: HomeworkAssignmentStatus.CANCELLED },
+        status: actor.isSupportOverride
+          ? { in: [...FAMILY_VISIBLE_ASSIGNMENT_STATUSES] }
+          : { not: HomeworkAssignmentStatus.CANCELLED },
         dueDate: { gte: dayStart, lt: dayEndExclusive },
         ...(query.sectionId
           ? { OR: [{ sectionId: query.sectionId }, { sectionId: null }] }
@@ -2762,7 +2828,9 @@ export class HomeworkService {
     },
   ) {
     if (
-      (actor.roles.includes('student') || actor.roles.includes('parent')) &&
+      (actor.isSupportOverride ||
+        actor.roles.includes('student') ||
+        actor.roles.includes('parent')) &&
       assignment.status &&
       !FAMILY_VISIBLE_ASSIGNMENT_STATUSES.includes(assignment.status)
     ) {
@@ -3114,6 +3182,64 @@ function isRecurringHomeworkCreateResult(value: unknown): value is {
     value !== null &&
     Array.isArray((value as { items?: unknown }).items)
   );
+}
+
+function homeworkAssignmentSupportSelect() {
+  return {
+    id: true,
+    academicYearId: true,
+    classId: true,
+    sectionId: true,
+    subjectId: true,
+    assignedByStaffId: true,
+    title: true,
+    description: true,
+    instructions: true,
+    assignedDate: true,
+    dueDate: true,
+    dueAt: true,
+    status: true,
+    submissionRequired: true,
+    submissionMethod: true,
+    maxScore: true,
+    createdAt: true,
+    updatedAt: true,
+    class: {
+      select: {
+        id: true,
+        name: true,
+      },
+    },
+    section: {
+      select: {
+        id: true,
+        name: true,
+        classId: true,
+        capacity: true,
+      },
+    },
+    subject: {
+      select: {
+        id: true,
+        name: true,
+      },
+    },
+    assignedByStaff: {
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+      },
+    },
+  } satisfies Prisma.HomeworkAssignmentSelect;
+}
+
+function mapSupportHomeworkAssignment(
+  assignment: Prisma.HomeworkAssignmentGetPayload<{
+    select: ReturnType<typeof homeworkAssignmentSupportSelect>;
+  }>,
+) {
+  return assignment;
 }
 
 function homeworkAssignmentInclude() {

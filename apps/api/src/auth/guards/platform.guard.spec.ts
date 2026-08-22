@@ -1,4 +1,5 @@
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { SecurityDomain } from '@prisma/client';
 import { PlatformGuard } from './platform.guard';
 
 const makeExecutionContext = (auth: any) =>
@@ -38,6 +39,8 @@ describe('PlatformGuard', () => {
         makeExecutionContext({
           userId: 'school-user-1',
           tenantId: 'tenant-1',
+          securityDomain: SecurityDomain.SCHOOL,
+          isSupportOverride: false,
           roles: ['school_admin'],
           permissions: ['platform:dashboard:read', 'students:read'],
         }),
@@ -45,15 +48,33 @@ describe('PlatformGuard', () => {
     ).toThrow(ForbiddenException);
   });
 
-  it('allows platform super admin regardless of explicit route permission metadata', () => {
+  it('does not give platform super admins a permission bypass', () => {
+    reflector.getAllAndOverride.mockReturnValue(['platform:billing:manage']);
+
+    expect(() =>
+      guard.canActivate(
+        makeExecutionContext({
+          userId: 'platform-super-admin-1',
+          securityDomain: SecurityDomain.PLATFORM,
+          isSupportOverride: false,
+          roles: ['platform_super_admin'],
+          permissions: [],
+        }),
+      ),
+    ).toThrow(ForbiddenException);
+  });
+
+  it('allows platform super admins only with the explicit route permission', () => {
     reflector.getAllAndOverride.mockReturnValue(['platform:billing:manage']);
 
     expect(
       guard.canActivate(
         makeExecutionContext({
           userId: 'platform-super-admin-1',
+          securityDomain: SecurityDomain.PLATFORM,
+          isSupportOverride: false,
           roles: ['platform_super_admin'],
-          permissions: [],
+          permissions: ['platform:billing:manage'],
         }),
       ),
     ).toBe(true);
@@ -66,6 +87,8 @@ describe('PlatformGuard', () => {
       guard.canActivate(
         makeExecutionContext({
           userId: 'platform-support-1',
+          securityDomain: SecurityDomain.PLATFORM,
+          isSupportOverride: false,
           roles: ['platform_support'],
           permissions: ['platform:queues:read'],
         }),
@@ -80,6 +103,8 @@ describe('PlatformGuard', () => {
       guard.canActivate(
         makeExecutionContext({
           userId: 'platform-support-1',
+          securityDomain: SecurityDomain.PLATFORM,
+          isSupportOverride: false,
           roles: ['platform_support'],
           permissions: ['platform:queues:read'],
         }),
@@ -94,10 +119,28 @@ describe('PlatformGuard', () => {
       guard.canActivate(
         makeExecutionContext({
           userId: 'platform-billing-1',
+          securityDomain: SecurityDomain.PLATFORM,
+          isSupportOverride: false,
           roles: ['platform_billing_admin'],
           permissions: ['platform:billing:manage'],
         }),
       ),
     ).toBe(true);
+  });
+
+  it('rejects a support override from returning to platform routes', () => {
+    reflector.getAllAndOverride.mockReturnValue(['platform:dashboard:read']);
+
+    expect(() =>
+      guard.canActivate(
+        makeExecutionContext({
+          userId: 'platform-super-admin-1',
+          securityDomain: SecurityDomain.PLATFORM,
+          isSupportOverride: true,
+          roles: [],
+          permissions: ['platform:dashboard:read'],
+        }),
+      ),
+    ).toThrow(ForbiddenException);
   });
 });

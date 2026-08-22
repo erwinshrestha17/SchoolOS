@@ -48,8 +48,8 @@ export interface DeliveryFailureDashboardItem {
   status: NotificationStatus;
   channel: NotificationChannel;
   sourceType: string;
-  sourceId: string;
-  title: string;
+  sourceId: string | null;
+  title: string | null;
   lastFailureReason: string | null;
   retryCount: number;
   retryStatus: 'retryable' | 'pending' | 'not_retryable';
@@ -229,6 +229,12 @@ export class DeliveryRetryService {
     limit: number;
     hasNextPage: boolean;
   }> {
+    if (actor.isSupportOverride && (query.sourceType || query.activityPostId)) {
+      throw new BadRequestException(
+        'Source-level delivery filters are unavailable during support override',
+      );
+    }
+
     const page = Math.max(1, query.page ?? 1);
     const limit = Math.min(100, Math.max(1, query.limit ?? 25));
     const failureStatuses: NotificationStatus[] = [
@@ -284,15 +290,22 @@ export class DeliveryRetryService {
         id: delivery.id,
         status: delivery.status,
         channel: delivery.channel,
-        sourceType: delivery.sourceType,
-        sourceId: delivery.sourceId,
-        title: delivery.title,
-        lastFailureReason: sanitizeFailureReason(
-          delivery.failureReason ??
-            delivery.errorMessage ??
-            delivery.failureCode ??
-            null,
-        ),
+        sourceType: actor.isSupportOverride
+          ? 'notification'
+          : delivery.sourceType,
+        sourceId: actor.isSupportOverride ? null : delivery.sourceId,
+        title: actor.isSupportOverride ? null : delivery.title,
+        lastFailureReason: actor.isSupportOverride
+          ? classifySupportFailureReason(
+              delivery.failureCode,
+              delivery.failureReason ?? delivery.errorMessage,
+            )
+          : sanitizeFailureReason(
+              delivery.failureReason ??
+                delivery.errorMessage ??
+                delivery.failureCode ??
+                null,
+            ),
         retryCount: delivery.retryCount,
         retryStatus:
           delivery.status === NotificationStatus.RETRY_PENDING
@@ -305,9 +318,11 @@ export class DeliveryRetryService {
         createdAt: delivery.createdAt.toISOString(),
         recipientSummary: {
           audienceType: delivery.audienceType,
-          recipientUserId: delivery.recipientUserId,
-          guardianId: delivery.guardianId,
-          studentId: delivery.studentId,
+          recipientUserId: actor.isSupportOverride
+            ? null
+            : delivery.recipientUserId,
+          guardianId: actor.isSupportOverride ? null : delivery.guardianId,
+          studentId: actor.isSupportOverride ? null : delivery.studentId,
           destinationMasked:
             delivery.destination &&
             delivery.destination === delivery.recipientUserId
@@ -498,4 +513,30 @@ function sanitizeFailureReason(reason: string | null | undefined) {
     )
     .replace(/Bearer\s+[^\s,;]+/gi, 'Bearer ***')
     .slice(0, 240);
+}
+
+function classifySupportFailureReason(
+  failureCode: string | null | undefined,
+  providerDetail: string | null | undefined,
+) {
+  const diagnostic =
+    `${failureCode ?? ''} ${providerDetail ?? ''}`.toLowerCase();
+
+  if (/auth|credential|forbidden|unauthor|secret|token/.test(diagnostic)) {
+    return 'Provider authentication failed.';
+  }
+  if (/rate.?limit|throttl|quota/.test(diagnostic)) {
+    return 'Provider rate limit was reached.';
+  }
+  if (/timeout|timed.?out/.test(diagnostic)) {
+    return 'Provider request timed out.';
+  }
+  if (/destination|recipient|address|phone|email/.test(diagnostic)) {
+    return 'Recipient destination could not be used.';
+  }
+  if (/disabled|not.?ready|unavailable|configuration|config/.test(diagnostic)) {
+    return 'Provider is not ready.';
+  }
+
+  return 'Delivery failed; detailed provider output is restricted.';
 }

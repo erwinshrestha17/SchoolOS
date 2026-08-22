@@ -89,8 +89,14 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const focusTarget = searchParams.get("focus");
-  const { hasPermissions } = useSession();
+  const { session, hasPermissions } = useSession();
   const canEditStudent = hasPermissions(["students:update"]);
+  const canViewAttendance = hasPermissions(["attendance:read"]);
+  const canViewFees = hasPermissions(["fees:read"]);
+  const canManageDocuments = hasPermissions(["student_documents:manage"]);
+  const canViewQr = hasPermissions(["students:qr:read"]);
+  const canManageLifecycle = hasPermissions(["students:manage_lifecycle"]);
+  const isSupportOverride = session?.user.isSupportOverride === true;
   const { record: recordRecentlyViewed } = useRecentlyViewed();
 
   useEffect(() => {
@@ -102,10 +108,25 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
     if (!requestedTab) return;
 
     const normalizedTab = requestedTabAliases[requestedTab] ?? requestedTab;
-    if (detailTabs.includes(normalizedTab as DetailTab)) {
+    const isAvailable =
+      detailTabs.includes(normalizedTab as DetailTab) &&
+      (normalizedTab !== "Attendance" || canViewAttendance) &&
+      (normalizedTab !== "Fees" || canViewFees) &&
+      (normalizedTab !== "Documents" || canManageDocuments) &&
+      (normalizedTab !== "Health" || !isSupportOverride) &&
+      (normalizedTab !== "Activity" || !isSupportOverride) &&
+      (normalizedTab !== "History" || !isSupportOverride);
+    if (isAvailable) {
       setActiveDetailTab(normalizedTab as DetailTab);
     }
-  }, [canEditStudent, searchParams]);
+  }, [
+    canEditStudent,
+    canManageDocuments,
+    canViewAttendance,
+    canViewFees,
+    isSupportOverride,
+    searchParams,
+  ]);
 
   const profileQuery = useQuery({
     queryKey: ["student-profile", studentId],
@@ -138,7 +159,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
   const feeClearanceQuery = useQuery({
     queryKey: ["student-fee-clearance", studentId],
     queryFn: () => api.getStudentFeeClearance(studentId),
-    enabled: Boolean(studentId),
+    enabled: Boolean(studentId) && canViewFees,
   });
 
   const studentUpdateMutation = useMutation({
@@ -268,12 +289,25 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
   const activeOverflowTab = overflowTabs.find(
     (tab) => tab.value === activeDetailTab,
   );
+  const visiblePrimaryTabs = primaryTabs.filter(
+    (tab) =>
+      (tab.value !== "Attendance" || canViewAttendance) &&
+      (tab.value !== "Fees" || canViewFees) &&
+      (tab.value !== "Documents" || canManageDocuments) &&
+      (tab.value !== "History" || !isSupportOverride),
+  );
+  const visibleOverflowTabs = isSupportOverride ? [] : overflowTabs;
 
   return (
     <div className="space-y-8 animate-fade-in pb-12">
       <ProfileHeader
         profile={profile}
         canEdit={canEditStudent}
+        canViewAttendance={canViewAttendance}
+        canViewFees={canViewFees}
+        canManageDocuments={canManageDocuments}
+        canViewQr={canViewQr}
+        canManageLifecycle={canManageLifecycle}
         onEdit={() => setIsEditingStudent(true)}
         onOpenIdCard={() => void openStudentPdf("id-card")}
         onSelectTab={(tab) => setActiveDetailTab(tab)}
@@ -333,7 +367,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
       >
         <div className="border-b border-slate-200">
           <TabsList className="flex h-auto w-full items-center gap-1 overflow-x-auto rounded-none border-0 bg-transparent p-0 shadow-none">
-            {primaryTabs.map((tab) => (
+            {visiblePrimaryTabs.map((tab) => (
               <TabsTrigger
                 key={tab.value}
                 value={tab.value}
@@ -342,40 +376,48 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
                 {tab.label}
               </TabsTrigger>
             ))}
-            <ActionMenu
-              align="right"
-              label="More student profile sections"
-              trigger={
-                <button
-                  type="button"
-                  className={`flex min-h-11 flex-none items-center gap-1 rounded-t-lg border-b-2 px-4 text-sm font-bold transition ${
-                    activeOverflowTab
-                      ? "border-[var(--color-mod-admissions-accent)] text-[var(--color-mod-admissions-text)]"
-                      : "border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-                  }`}
-                >
-                  <MoreHorizontal size={17} aria-hidden="true" />
-                  {activeOverflowTab?.label ?? "More"}
-                </button>
-              }
-              items={overflowTabs
-                .map((tab) => ({
-                  label: tab.label,
-                  icon:
-                    tab.value === "Health" ? (
-                      <ShieldCheck size={16} />
-                    ) : undefined,
-                  onClick: () => setActiveDetailTab(tab.value),
-                }))
-                .concat({
-                  label: "Identity & QR",
-                  icon: <QrCode size={16} />,
-                  onClick: () =>
-                    router.push(
-                      `/dashboard/students/${encodeURIComponent(studentId)}/identity`,
-                    ),
-                })}
-            />
+            {visibleOverflowTabs.length > 0 || canViewQr ? (
+              <ActionMenu
+                align="right"
+                label="More student profile sections"
+                trigger={
+                  <button
+                    type="button"
+                    className={`flex min-h-11 flex-none items-center gap-1 rounded-t-lg border-b-2 px-4 text-sm font-bold transition ${
+                      activeOverflowTab
+                        ? "border-[var(--color-mod-admissions-accent)] text-[var(--color-mod-admissions-text)]"
+                        : "border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                    }`}
+                  >
+                    <MoreHorizontal size={17} aria-hidden="true" />
+                    {activeOverflowTab?.label ?? "More"}
+                  </button>
+                }
+                items={visibleOverflowTabs
+                  .map((tab) => ({
+                    label: tab.label,
+                    icon:
+                      tab.value === "Health" ? (
+                        <ShieldCheck size={16} />
+                      ) : undefined,
+                    onClick: () => setActiveDetailTab(tab.value),
+                  }))
+                  .concat(
+                    canViewQr
+                      ? [
+                          {
+                            label: "Identity & QR",
+                            icon: <QrCode size={16} />,
+                            onClick: () =>
+                              router.push(
+                                `/dashboard/students/${encodeURIComponent(studentId)}/identity`,
+                              ),
+                          },
+                        ]
+                      : [],
+                  )}
+              />
+            ) : null}
           </TabsList>
         </div>
 
@@ -418,33 +460,45 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
               onOpenPdf={openStudentPdf}
             />
           </TabsContent>
-          <TabsContent value="Documents" className="mt-0">
-            <ProfileTabs.DocumentsTab
-              studentId={studentId}
-              documents={profile.documents}
-              generatedDocuments={profile.generatedDocuments}
-              onOpenPdf={openStudentPdf}
-              generationError={pdfError}
-            />
-          </TabsContent>
-          <TabsContent value="Fees" className="mt-0">
-            <ProfileTabs.FeesTab
-              studentId={studentId}
-              invoices={profile.invoices}
-            />
-          </TabsContent>
-          <TabsContent value="Health" className="mt-0">
-            <ProfileTabs.HealthTab profile={profile} />
-          </TabsContent>
-          <TabsContent value="Attendance" className="mt-0">
-            <ProfileTabs.AttendanceTab profile={profile} />
-          </TabsContent>
-          <TabsContent value="Activity" className="mt-0">
-            <ProfileTabs.ActivityTab posts={profile.activityPosts} />
-          </TabsContent>
-          <TabsContent value="History" className="mt-0">
-            <ProfileTabs.HistoryTab profile={profile} />
-          </TabsContent>
+          {canManageDocuments ? (
+            <TabsContent value="Documents" className="mt-0">
+              <ProfileTabs.DocumentsTab
+                studentId={studentId}
+                documents={profile.documents}
+                generatedDocuments={profile.generatedDocuments}
+                onOpenPdf={openStudentPdf}
+                generationError={pdfError}
+              />
+            </TabsContent>
+          ) : null}
+          {canViewFees ? (
+            <TabsContent value="Fees" className="mt-0">
+              <ProfileTabs.FeesTab
+                studentId={studentId}
+                invoices={profile.invoices}
+              />
+            </TabsContent>
+          ) : null}
+          {!isSupportOverride ? (
+            <TabsContent value="Health" className="mt-0">
+              <ProfileTabs.HealthTab profile={profile} />
+            </TabsContent>
+          ) : null}
+          {canViewAttendance ? (
+            <TabsContent value="Attendance" className="mt-0">
+              <ProfileTabs.AttendanceTab profile={profile} />
+            </TabsContent>
+          ) : null}
+          {!isSupportOverride ? (
+            <TabsContent value="Activity" className="mt-0">
+              <ProfileTabs.ActivityTab posts={profile.activityPosts} />
+            </TabsContent>
+          ) : null}
+          {!isSupportOverride ? (
+            <TabsContent value="History" className="mt-0">
+              <ProfileTabs.HistoryTab profile={profile} />
+            </TabsContent>
+          ) : null}
         </div>
       </Tabs>
     </div>

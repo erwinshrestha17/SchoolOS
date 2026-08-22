@@ -8,8 +8,11 @@ import {
   Shield,
   ShieldOff,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
+import {
+  SUPPORT_OVERRIDE_SCOPE_DEFINITIONS,
+  type SupportOverrideScope,
+} from "@schoolos/core";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,13 +47,15 @@ export function TenantAccess() {
     "platform:support:override",
   );
   const canReadAudit = hasPermission(session, "platform:audit:read");
-  const router = useRouter();
   const queryClient = useQueryClient();
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [statusReason, setStatusReason] = useState("");
   const [supportDialogOpen, setSupportDialogOpen] = useState(false);
   const [supportReason, setSupportReason] = useState("");
   const [supportDuration, setSupportDuration] = useState("30");
+  const [supportScopes, setSupportScopes] = useState<SupportOverrideScope[]>(
+    [],
+  );
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -82,7 +87,12 @@ export function TenantAccess() {
   }
 
   async function enterSupportMode() {
-    if (!canEnterSupportMode || supportReason.trim().length < 5) return;
+    if (
+      !canEnterSupportMode ||
+      supportReason.trim().length < 5 ||
+      supportScopes.length === 0
+    )
+      return;
     setSaving(true);
     setError(null);
     setMessage(null);
@@ -90,6 +100,7 @@ export function TenantAccess() {
       const result = await platformApi.enterPlatformSupportOverride({
         tenantId: tenant.id,
         reason: supportReason.trim(),
+        scopes: supportScopes,
         durationMinutes: Number(supportDuration),
       });
       queryClient.clear();
@@ -97,7 +108,10 @@ export function TenantAccess() {
         `Support override is active until ${formatDateTime(result.expiresAt)}.`,
       );
       setSupportDialogOpen(false);
-      router.push(`/dashboard?tenantOverride=${encodeURIComponent(tenant.id)}`);
+      const entryPath = SUPPORT_OVERRIDE_SCOPE_DEFINITIONS.find(
+        ({ key }) => key === supportScopes[0],
+      )?.entryPath;
+      window.location.assign(entryPath ?? "/platform/schools");
     } catch (caught) {
       setError(getErrorMessage(caught));
     } finally {
@@ -206,6 +220,9 @@ export function TenantAccess() {
                       Reason
                     </th>
                     <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      Access
+                    </th>
+                    <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
                       Expires
                     </th>
                     <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
@@ -217,20 +234,35 @@ export function TenantAccess() {
                   {(tenant.supportOverrideHistory ?? []).length ? (
                     tenant.supportOverrideHistory?.map((item) => (
                       <tr key={item.id}>
-                        <td className="px-5 py-4 font-mono text-xs font-bold text-slate-900">
+                        <td className="px-5 py-4 text-xs font-bold text-slate-900">
                           {item.platformUserEmail ?? item.platformUserId}
                         </td>
                         <td className="px-5 py-4 text-slate-600">
                           {item.reason}
                         </td>
                         <td className="px-5 py-4 text-slate-600">
+                          <span className="font-semibold">Read only</span>
+                          <span className="mt-1 block text-xs text-slate-500">
+                            {item.permissionScopes
+                              .map(
+                                (scope) =>
+                                  SUPPORT_OVERRIDE_SCOPE_DEFINITIONS.find(
+                                    ({ key }) => key === scope,
+                                  )?.label ?? scope,
+                              )
+                              .join(", ") || "Legacy unscoped session"}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4 text-slate-600">
                           {formatDateTime(item.expiresAt)}
                         </td>
                         <td className="px-5 py-4">
-                          <Badge
-                            variant={item.isActive ? "success" : "neutral"}
-                          >
-                            {item.isActive ? "ACTIVE" : "EXPIRED"}
+                          <Badge variant={item.isActive ? "success" : "neutral"}>
+                            {item.isActive
+                              ? "ACTIVE"
+                              : new Date(item.expiresAt).getTime() <= Date.now()
+                                ? "EXPIRED"
+                                : "ENDED"}
                           </Badge>
                         </td>
                       </tr>
@@ -238,7 +270,7 @@ export function TenantAccess() {
                   ) : (
                     <tr>
                       <td
-                        colSpan={4}
+                        colSpan={5}
                         className="px-5 py-12 text-center font-semibold text-slate-400"
                       >
                         No support overrides recorded.
@@ -304,8 +336,8 @@ export function TenantAccess() {
             <DialogHeader>
               <DialogTitle>Enter support mode</DialogTitle>
               <DialogDescription>
-                The backend creates a time-bound override for {tenant.name}. The
-                reason and expiry are audited.
+                The backend creates a scoped, read-only override for {tenant.name}.
+                The reason, scope, and expiry are audited.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
@@ -321,6 +353,48 @@ export function TenantAccess() {
                   <option value="60">1 hour</option>
                 </Select>
               </div>
+              <fieldset className="space-y-3">
+                <legend className="text-sm font-semibold text-slate-900">
+                  Approved support scope
+                </legend>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {SUPPORT_OVERRIDE_SCOPE_DEFINITIONS.map((scope) => {
+                    const checked = supportScopes.includes(scope.key);
+                    return (
+                      <label
+                        key={scope.key}
+                        className="flex cursor-pointer gap-3 rounded-xl border border-slate-200 p-3 focus-within:ring-2 focus-within:ring-blue-600"
+                      >
+                        <input
+                          type="checkbox"
+                          className="mt-1 h-4 w-4 accent-blue-600"
+                          checked={checked}
+                          onChange={(event) =>
+                            setSupportScopes((current) =>
+                              event.target.checked
+                                ? [...current, scope.key]
+                                : current.filter((key) => key !== scope.key),
+                            )
+                          }
+                        />
+                        <span>
+                          <span className="block text-sm font-semibold text-slate-900">
+                            {scope.label}
+                          </span>
+                          <span className="mt-1 block text-xs leading-5 text-slate-600">
+                            {scope.description}
+                          </span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
+              <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                Read-only support excludes finance, payroll, security
+                administration, and protected files. No school write will be
+                accepted during this session.
+              </p>
               <div className="space-y-2">
                 <Label htmlFor="support-reason">Audit reason</Label>
                 <Textarea
@@ -339,7 +413,11 @@ export function TenantAccess() {
                 Cancel
               </Button>
               <Button
-                disabled={saving || supportReason.trim().length < 5}
+                disabled={
+                  saving ||
+                  supportReason.trim().length < 5 ||
+                  supportScopes.length === 0
+                }
                 onClick={() => void enterSupportMode()}
               >
                 {saving ? (

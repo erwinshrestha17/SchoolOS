@@ -8,6 +8,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
+import { AllowSupportOverrideRead } from '../auth/decorators/allow-support-override-read.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -37,6 +38,7 @@ export class NoticeDetailController {
 
   @Get(':noticeId')
   @Permissions('notices:read')
+  @AllowSupportOverrideRead('NOTICES_DELIVERY')
   getNoticeDetail(
     @Param('noticeId') noticeId: string,
     @CurrentAuth() auth: AuthContext,

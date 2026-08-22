@@ -7,6 +7,7 @@ import { Prisma } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { assertProtectedFileAccessAllowed } from '../common/security/support-override-file-access';
 
 interface StudentDocumentAccessRow {
   id: string;
@@ -41,6 +42,7 @@ export class StudentDocumentAccessService {
     documentId: string,
     action: 'preview' | 'download',
   ): Promise<StudentDocumentAccessUrl> {
+    assertProtectedFileAccessAllowed(actor);
     const student = await this.prisma.student.findFirst({
       where: { id: studentId, tenantId: actor.tenantId },
       select: { id: true },

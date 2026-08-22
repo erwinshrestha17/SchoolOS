@@ -118,6 +118,16 @@ export const studentsApi = {
     search?: string;
   }) =>
     request<StudentModuleSummary>(withQuery("/students/summary", params ?? {})),
+  getSupportStudentModuleSummary: (params?: {
+    classId?: string;
+    sectionId?: string;
+    status?: string;
+    academicYearId?: string;
+    search?: string;
+  }) =>
+    request<StudentModuleSummary>(
+      withQuery("/students/support/summary", params ?? {}),
+    ),
   getStudentProfile: (studentId: string) =>
     request<StudentProfileDetail>(`/students/${encodeURIComponent(studentId)}`),
   updateStudent: (studentId: string, body: UpdateStudentProfilePayload) =>

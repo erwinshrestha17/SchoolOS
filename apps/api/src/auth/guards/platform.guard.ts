@@ -8,6 +8,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { AuthenticatedRequest } from '../auth-request.interface';
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
+import { SecurityDomain } from '@prisma/client';
 
 @Injectable()
 export class PlatformGuard implements CanActivate {
@@ -22,6 +23,15 @@ export class PlatformGuard implements CanActivate {
     }
 
     const roles = auth.roles;
+    if (
+      auth.securityDomain !== SecurityDomain.PLATFORM ||
+      auth.isSupportOverride
+    ) {
+      throw new ForbiddenException(
+        'Access restricted to the Platform security domain',
+      );
+    }
+
     const isPlatformAdmin = roles.includes('platform_super_admin');
     const isPlatformSupport = roles.includes('platform_support');
     const isPlatformBilling = roles.includes('platform_billing_admin');
@@ -30,11 +40,6 @@ export class PlatformGuard implements CanActivate {
       throw new ForbiddenException(
         'Access restricted to platform administrators only',
       );
-    }
-
-    // Platform Super Admin has full bypass
-    if (isPlatformAdmin) {
-      return true;
     }
 
     const requiredPermissions =

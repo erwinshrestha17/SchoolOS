@@ -17,6 +17,7 @@ import { ConfigService } from '../src/config/config.service';
 import { AuditService } from '../src/audit/audit.service';
 import { createPrismaMock, PrismaMock } from './test-helpers';
 import { AuthenticatedRequest } from '../src/auth/auth-request.interface';
+import { SecurityDomain } from '@prisma/client';
 
 describe('Auth Security Hardening (Regression)', () => {
   let guard: JwtAuthGuard;
@@ -139,7 +140,11 @@ describe('Auth Security Hardening (Regression)', () => {
     };
     // AuthzCacheService resolves roles from these two reads.
     prisma.userRole.findMany.mockResolvedValue([
-      { role: { name: 'platform_super_admin' } },
+      {
+        scopeId: 'global',
+        expiresAt: null,
+        role: { name: 'platform_super_admin', rolePermissions: [] },
+      },
     ]);
     prisma.rolePermission.findMany.mockResolvedValue([]);
     (jwtService.verifyAsync as jest.Mock).mockResolvedValue(payload);
@@ -148,7 +153,14 @@ describe('Auth Security Hardening (Regression)', () => {
       id: 'platform-user',
       tenantId: 'platform-tenant',
       status: 'ACTIVE',
-      tenant: { isActive: true },
+      email: 'operator@schoolos.local',
+      mustChangePassword: false,
+      tenant: {
+        id: 'platform-tenant',
+        slug: 'platform',
+        isActive: true,
+        securityDomain: SecurityDomain.PLATFORM,
+      },
     });
 
     // No active override in DB
@@ -158,7 +170,10 @@ describe('Auth Security Hardening (Regression)', () => {
       headers: {
         authorization: 'Bearer valid-token',
         'x-schoolos-tenant-id': 'school-tenant-1',
+        'x-schoolos-tenant-override-reason': 'Support ticket #123',
+        'x-schoolos-support-override-id': 'override-1',
       },
+      method: 'GET',
     } as any;
 
     const context = {
@@ -177,7 +192,11 @@ describe('Auth Security Hardening (Regression)', () => {
     const payload = { sub: 'platform-user', tenantId: 'platform-tenant' };
     // AuthzCacheService resolves roles from these two reads.
     prisma.userRole.findMany.mockResolvedValue([
-      { role: { name: 'platform_super_admin' } },
+      {
+        scopeId: 'global',
+        expiresAt: null,
+        role: { name: 'platform_super_admin', rolePermissions: [] },
+      },
     ]);
     prisma.rolePermission.findMany.mockResolvedValue([]);
     (jwtService.verifyAsync as jest.Mock).mockResolvedValue(payload);
@@ -186,15 +205,27 @@ describe('Auth Security Hardening (Regression)', () => {
       id: 'platform-user',
       tenantId: 'platform-tenant',
       status: 'ACTIVE',
-      tenant: { isActive: true },
+      email: 'operator@schoolos.local',
+      mustChangePassword: false,
+      tenant: {
+        id: 'platform-tenant',
+        slug: 'platform',
+        isActive: true,
+        securityDomain: SecurityDomain.PLATFORM,
+      },
     });
 
     prisma.tenant.findUnique.mockResolvedValue({
       id: 'school-tenant-1',
+      slug: 'school-one',
       isActive: true,
+      securityDomain: SecurityDomain.SCHOOL,
     });
     prisma.supportOverride.findFirst.mockResolvedValue({
       id: 'override-1',
+      reason: 'Support ticket #123',
+      permissionScopes: ['ATTENDANCE'],
+      readOnly: true,
       isActive: true,
       expiresAt: new Date(Date.now() + 3600000),
     });
@@ -204,7 +235,9 @@ describe('Auth Security Hardening (Regression)', () => {
         authorization: 'Bearer valid-token',
         'x-schoolos-tenant-id': 'school-tenant-1',
         'x-schoolos-tenant-override-reason': 'shrt',
+        'x-schoolos-support-override-id': 'override-1',
       },
+      method: 'GET',
     } as any;
 
     const context = {
@@ -215,7 +248,7 @@ describe('Auth Security Hardening (Regression)', () => {
       ForbiddenException,
     );
     await expect(guard.canActivate(context)).rejects.toThrow(
-      'Tenant override requires an explicit reason of at least 5 characters',
+      'Tenant override reason does not match the active support session',
     );
   });
 
@@ -223,7 +256,11 @@ describe('Auth Security Hardening (Regression)', () => {
     const payload = { sub: 'platform-user', tenantId: 'platform-tenant' };
     // AuthzCacheService resolves roles from these two reads.
     prisma.userRole.findMany.mockResolvedValue([
-      { role: { name: 'platform_super_admin' } },
+      {
+        scopeId: 'global',
+        expiresAt: null,
+        role: { name: 'platform_super_admin', rolePermissions: [] },
+      },
     ]);
     prisma.rolePermission.findMany.mockResolvedValue([]);
     (jwtService.verifyAsync as jest.Mock).mockResolvedValue(payload);
@@ -232,15 +269,27 @@ describe('Auth Security Hardening (Regression)', () => {
       id: 'platform-user',
       tenantId: 'platform-tenant',
       status: 'ACTIVE',
-      tenant: { isActive: true },
+      email: 'operator@schoolos.local',
+      mustChangePassword: false,
+      tenant: {
+        id: 'platform-tenant',
+        slug: 'platform',
+        isActive: true,
+        securityDomain: SecurityDomain.PLATFORM,
+      },
     });
 
     prisma.tenant.findUnique.mockResolvedValue({
       id: 'school-tenant-1',
+      slug: 'school-one',
       isActive: true,
+      securityDomain: SecurityDomain.SCHOOL,
     });
     prisma.supportOverride.findFirst.mockResolvedValue({
       id: 'override-1',
+      reason: 'Support ticket #123',
+      permissionScopes: ['ATTENDANCE'],
+      readOnly: true,
       isActive: true,
       expiresAt: new Date(Date.now() + 3600000),
     });
@@ -250,7 +299,9 @@ describe('Auth Security Hardening (Regression)', () => {
         authorization: 'Bearer valid-token',
         'x-schoolos-tenant-id': 'school-tenant-1',
         'x-schoolos-tenant-override-reason': 'Support ticket #123',
+        'x-schoolos-support-override-id': 'override-1',
       },
+      method: 'GET',
     } as any;
 
     const context = {
@@ -260,6 +311,18 @@ describe('Auth Security Hardening (Regression)', () => {
     const result = await guard.canActivate(context);
     expect(result).toBe(true);
     expect(request.auth.tenantId).toBe('school-tenant-1');
+    expect(request.auth.roles).toEqual([]);
+    expect(request.auth.permissions).toEqual([
+      'settings:read_public',
+      'attendance:read',
+      'academic_years:read',
+      'classes:read',
+      'sections:read',
+    ]);
+    expect(request.auth.permissions).not.toContain('roles:read');
+    expect(request.auth.permissions).not.toContain('settings:read');
+    expect(request.auth.supportOverrideScopes).toEqual(['ATTENDANCE']);
+    expect(request.auth.supportOverrideReadOnly).toBe(true);
     expect(mockAudit.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'tenant_override',

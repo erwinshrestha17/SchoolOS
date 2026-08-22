@@ -822,6 +822,52 @@ export class AcademicsService {
       status?: string;
     } = {},
   ) {
+    if (actor.isSupportOverride) {
+      return this.prisma.reportCard.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          ...(filters.academicYearId
+            ? { academicYearId: filters.academicYearId }
+            : {}),
+          ...(filters.examTermId ? { examTermId: filters.examTermId } : {}),
+          ...(filters.classId ? { classId: filters.classId } : {}),
+          ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
+          ...(filters.status ? { status: filters.status as never } : {}),
+        },
+        select: {
+          id: true,
+          academicYearId: true,
+          examTermId: true,
+          studentId: true,
+          classId: true,
+          sectionId: true,
+          totalMarks: true,
+          maxMarks: true,
+          percentage: true,
+          grade: true,
+          gpa: true,
+          status: true,
+          lockedAt: true,
+          createdAt: true,
+          updatedAt: true,
+          academicYear: { select: { id: true, name: true } },
+          examTerm: { select: { id: true, name: true } },
+          student: {
+            select: {
+              id: true,
+              firstNameEn: true,
+              lastNameEn: true,
+              studentSystemId: true,
+            },
+          },
+          class: { select: { id: true, name: true } },
+          section: { select: { id: true, name: true } },
+        },
+        orderBy: [{ updatedAt: 'desc' }],
+        take: 100,
+      });
+    }
+
     return this.prisma.reportCard.findMany({
       where: {
         tenantId: actor.tenantId,
@@ -836,7 +882,14 @@ export class AcademicsService {
       include: {
         academicYear: true,
         examTerm: true,
-        student: true,
+        student: {
+          select: {
+            id: true,
+            firstNameEn: true,
+            lastNameEn: true,
+            studentSystemId: true,
+          },
+        },
         class: true,
         section: true,
         history: { orderBy: { version: 'desc' }, take: 3 },

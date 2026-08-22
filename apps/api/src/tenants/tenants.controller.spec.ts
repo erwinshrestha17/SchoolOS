@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { Reflector } from '@nestjs/core';
+import { SecurityDomain } from '@prisma/client';
 import { PERMISSIONS_KEY } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PlatformGuard } from '../auth/guards/platform.guard';
@@ -54,6 +55,7 @@ describe('TenantsController tenant provisioning authorization (DEF-01)', () => {
           makeExecutionContext({
             userId: 'school-admin-1',
             tenantId: 'tenant-1',
+            securityDomain: SecurityDomain.SCHOOL,
             roles: ['admin', 'school_config_owner'],
             permissions: ['users:create', 'settings:manage'],
           }),
@@ -67,6 +69,7 @@ describe('TenantsController tenant provisioning authorization (DEF-01)', () => {
           makeExecutionContext({
             userId: 'platform-support-1',
             tenantId: 'platform-tenant',
+            securityDomain: SecurityDomain.PLATFORM,
             roles: ['platform_support'],
             permissions: ['platform:tenants:read'],
           }),
@@ -80,8 +83,9 @@ describe('TenantsController tenant provisioning authorization (DEF-01)', () => {
           makeExecutionContext({
             userId: 'platform-super-admin-1',
             tenantId: 'platform-tenant',
+            securityDomain: SecurityDomain.PLATFORM,
             roles: ['platform_super_admin'],
-            permissions: [],
+            permissions: ['tenants:manage'],
           }),
         ),
       ).toBe(true);

@@ -2577,6 +2577,12 @@ export class AttendanceService {
     actor: AuthContext,
     query: ListAttendanceCorrectionRequestsDto = {},
   ) {
+    if (actor.isSupportOverride) {
+      throw new ForbiddenException(
+        'Attendance correction details are unavailable during support override',
+      );
+    }
+
     const page = query.page ?? 1;
     const limit = query.limit ?? 25;
     const where = {
@@ -2621,6 +2627,14 @@ export class AttendanceService {
       limit,
       hasNextPage: page * limit < total,
     };
+  }
+
+  async getCorrectionSummary(actor: AuthContext) {
+    const pending = await this.prisma.attendanceCorrectionRequest.count({
+      where: { tenantId: actor.tenantId, status: 'PENDING' },
+    });
+
+    return { pending };
   }
 
   async getCorrectionRequest(id: string, actor: AuthContext) {
@@ -3264,6 +3278,12 @@ export class AttendanceService {
     query: ListStaffAttendanceSummaryDto,
     actor: AuthContext,
   ) {
+    if (!this.hasStaffAttendanceManagementAccess(actor)) {
+      throw new ForbiddenException(
+        'This report is limited to HR administrators',
+      );
+    }
+
     const now = new Date();
     const month = query.month ?? now.getMonth() + 1;
     const year = query.year ?? now.getFullYear();
@@ -4941,6 +4961,12 @@ export class AttendanceService {
     format: 'csv' | 'pdf',
     actor: AuthContext,
   ) {
+    if (actor.isSupportOverride) {
+      throw new ForbiddenException(
+        'Attendance exports are unavailable during support override',
+      );
+    }
+
     const data = await this.getMonthlyRegister(dto, actor);
 
     const headers = [

@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { ApiCreatedResponse, ApiOkResponse } from '@nestjs/swagger';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
+import { AllowSupportOverrideRead } from '../auth/decorators/allow-support-override-read.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
@@ -27,6 +28,13 @@ export class ClassesController {
 
   @Get()
   @Permissions('classes:read')
+  @AllowSupportOverrideRead(
+    'SCHOOL_PROFILE',
+    'STUDENT_RECORDS',
+    'ATTENDANCE',
+    'ACADEMICS',
+    'HOMEWORK_TIMETABLE',
+  )
   @ApiOkResponse({
     description: 'Tenant-scoped classes with backend-owned program labels.',
     schema: { type: 'array', items: classSummarySchema(true) },

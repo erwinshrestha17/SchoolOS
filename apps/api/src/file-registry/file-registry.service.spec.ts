@@ -137,6 +137,26 @@ describe('FileRegistryService tenant scoping', () => {
     );
   });
 
+  it('denies protected file access during a support override before tenant or owner checks', async () => {
+    await expect(
+      service.assertFileAccessForAuth(
+        asset as any,
+        {
+          tenantId: 'tenant-1',
+          userId: 'platform-user-1',
+          roles: [],
+          permissions: ['students:read'],
+          isSupportOverride: true,
+        } as any,
+      ),
+    ).rejects.toThrow(
+      'Protected files are unavailable during support override',
+    );
+
+    expect(plansService.assertTenantActive).not.toHaveBeenCalled();
+    expect(teacherScopeService.requireActorAccess).not.toHaveBeenCalled();
+  });
+
   it('registers file metadata under the authenticated tenant and audits registration', async () => {
     prisma.fileAsset.create.mockResolvedValue({
       ...asset,

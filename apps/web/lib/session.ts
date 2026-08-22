@@ -1,5 +1,9 @@
-import type { AuthSession, PermissionKey } from "@schoolos/core";
-import { hasEffectivePermission } from "@schoolos/core";
+import type {
+  AuthSession,
+  PermissionKey,
+  SupportOverrideBrowserContext,
+} from "@schoolos/core";
+import { hasEffectivePermission, isSupportOverrideScope } from "@schoolos/core";
 import {
   clearRecentlyViewed as clearRecentlyViewedEntries,
   readRecentlyViewed as readRecentlyViewedEntries,
@@ -11,6 +15,9 @@ import { canStorePendingAttendanceDraft } from "./offline-policy";
 export const SESSION_STORAGE_KEY = "schoolos.auth-session";
 const ATTENDANCE_DRAFT_KEY_PREFIX = "schoolos.attendance-draft:";
 export const SESSION_CLEARED_EVENT = "schoolos:session-cleared";
+export const SUPPORT_OVERRIDE_STORAGE_KEY = "schoolos.support-override.v1";
+const LEGACY_SUPPORT_OVERRIDE_TENANT_KEY = "x-schoolos-tenant-id";
+const LEGACY_SUPPORT_OVERRIDE_REASON_KEY = "x-schoolos-tenant-override-reason";
 
 // Pilot note: browser-persisted session state is metadata-only. API auth is
 // backed by httpOnly cookies; future BFF work should also remove access tokens
@@ -251,19 +258,22 @@ export function createAttendanceDraftSubmissionId() {
 }
 
 /**
- * Permission check that evaluates the *same* rule the backend guard applies,
- * aliases included (see PERMISSION_ALIASES in @schoolos/core).
- *
- * A raw `includes()` here is what made Notification Preferences render a
- * full "no access" page for every teacher: the backend aliases
- * `notifications:view_own` to the near-universal `notices:read` and would
- * have served the request, but the UI refused to ask (P1.13).
+ * Permission check that evaluates the same rule as the backend guard.
+ * Ordinary school sessions keep compatibility aliases, while support
+ * overrides are restricted to the exact permissions projected for their
+ * approved scopes.
  */
 export function hasPermission(
   session: BrowserSession | null,
   permission: PermissionKey,
 ) {
-  return hasEffectivePermission(session?.user.permissions ?? [], permission);
+  const grantedPermissions = session?.user.permissions ?? [];
+
+  if (session?.user.isSupportOverride) {
+    return grantedPermissions.includes(permission);
+  }
+
+  return hasEffectivePermission(grantedPermissions, permission);
 }
 
 export function hasAllPermissions(
@@ -287,26 +297,76 @@ export function hasAnyPermission(
   return permissions.some((permission) => hasPermission(session, permission));
 }
 
-export function getSupportOverrideTenantId(): string | null {
+export function readSupportOverrideContext(): SupportOverrideBrowserContext | null {
   if (typeof window === "undefined") return null;
-  return window.sessionStorage.getItem("x-schoolos-tenant-id");
+  const raw = window.sessionStorage.getItem(SUPPORT_OVERRIDE_STORAGE_KEY);
+  if (!raw) return null;
+
+  try {
+    const candidate = JSON.parse(raw) as Partial<SupportOverrideBrowserContext>;
+    const scopes = candidate.scopes;
+    const expiresAt =
+      typeof candidate.expiresAt === "string"
+        ? Date.parse(candidate.expiresAt)
+        : Number.NaN;
+    const validScopes =
+      Array.isArray(scopes) &&
+      scopes.length > 0 &&
+      new Set(scopes).size === scopes.length &&
+      scopes.every(
+        (scope) => typeof scope === "string" && isSupportOverrideScope(scope),
+      );
+
+    if (
+      candidate.version !== 1 ||
+      typeof candidate.overrideId !== "string" ||
+      !candidate.overrideId.trim() ||
+      typeof candidate.tenantId !== "string" ||
+      !candidate.tenantId.trim() ||
+      typeof candidate.reason !== "string" ||
+      candidate.reason.trim().length < 5 ||
+      candidate.reason !== candidate.reason.trim() ||
+      candidate.readOnly !== true ||
+      !validScopes ||
+      !Number.isFinite(expiresAt) ||
+      expiresAt <= Date.now()
+    ) {
+      clearSupportOverride();
+      return null;
+    }
+
+    return candidate as SupportOverrideBrowserContext;
+  } catch {
+    clearSupportOverride();
+    return null;
+  }
+}
+
+export function getSupportOverrideTenantId(): string | null {
+  return readSupportOverrideContext()?.tenantId ?? null;
 }
 
 export function getSupportOverrideReason(): string | null {
-  if (typeof window === "undefined") return null;
-  return window.sessionStorage.getItem("x-schoolos-tenant-override-reason");
+  return readSupportOverrideContext()?.reason ?? null;
 }
 
-export function setSupportOverride(tenantId: string, reason: string) {
+export function setSupportOverride(
+  context: Omit<SupportOverrideBrowserContext, "version">,
+) {
   if (typeof window === "undefined") return;
-  window.sessionStorage.setItem("x-schoolos-tenant-id", tenantId);
-  window.sessionStorage.setItem("x-schoolos-tenant-override-reason", reason);
+  window.sessionStorage.setItem(
+    SUPPORT_OVERRIDE_STORAGE_KEY,
+    JSON.stringify({ version: 1, ...context }),
+  );
+  window.sessionStorage.removeItem(LEGACY_SUPPORT_OVERRIDE_TENANT_KEY);
+  window.sessionStorage.removeItem(LEGACY_SUPPORT_OVERRIDE_REASON_KEY);
 }
 
 export function clearSupportOverride() {
   if (typeof window === "undefined") return;
-  window.sessionStorage.removeItem("x-schoolos-tenant-id");
-  window.sessionStorage.removeItem("x-schoolos-tenant-override-reason");
+  window.sessionStorage.removeItem(SUPPORT_OVERRIDE_STORAGE_KEY);
+  window.sessionStorage.removeItem(LEGACY_SUPPORT_OVERRIDE_TENANT_KEY);
+  window.sessionStorage.removeItem(LEGACY_SUPPORT_OVERRIDE_REASON_KEY);
 }
 
 const ATTENDANCE_DRAFT_DB_NAME = "schoolos-attendance-drafts";

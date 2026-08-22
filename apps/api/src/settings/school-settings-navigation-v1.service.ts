@@ -215,6 +215,10 @@ export class SchoolSettingsNavigationV1Service {
   constructor(private readonly entitlementsService: EntitlementsService) {}
 
   async getNavigation(auth: AuthContext): Promise<SchoolSettingsNavigation> {
+    if (auth.isSupportOverride) {
+      return this.getSupportOverrideNavigation(auth);
+    }
+
     const has = (permission: string) => auth.permissions.includes(permission);
     const canRead = has('settings:read');
     const canManageAll = has('settings:manage');
@@ -367,6 +371,40 @@ export class SchoolSettingsNavigationV1Service {
     return {
       generatedAt: new Date().toISOString(),
       groups,
+    };
+  }
+
+  private getSupportOverrideNavigation(
+    auth: AuthContext,
+  ): SchoolSettingsNavigation {
+    const generatedAt = new Date().toISOString();
+    if (!auth.permissions.includes('settings:read_public')) {
+      return { generatedAt, groups: [] };
+    }
+
+    const definition = DOMAIN_ITEMS.find(({ id }) => id === 'school-profile');
+    if (!definition) {
+      return { generatedAt, groups: [] };
+    }
+
+    return {
+      generatedAt,
+      groups: [
+        {
+          id: definition.groupId,
+          label: GROUP_LABELS[definition.groupId],
+          items: [
+            {
+              id: definition.id,
+              groupId: definition.groupId,
+              label: definition.label,
+              description: definition.description,
+              href: definition.href,
+              access: 'view',
+            },
+          ],
+        },
+      ],
     };
   }
 

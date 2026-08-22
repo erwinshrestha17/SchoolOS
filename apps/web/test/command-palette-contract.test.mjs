@@ -25,7 +25,7 @@ describe("global command palette (Ctrl/Cmd+K)", () => {
     assert.match(palette, /from '\.\/sidebar-persona-nav\.config'/);
     assert.match(
       palette,
-      /\.filter\(\(item\) => canDisplayNavItem\(item, session, hasModule\)\)/,
+      /\.filter\(\s*\(item\) =>\s*canDisplayNavItem\(item, session, hasModule\),?\s*\)/,
     );
     assert.match(palette, /shouldShowSettingsHub\([\s\S]*schoolWebPersona/);
   });

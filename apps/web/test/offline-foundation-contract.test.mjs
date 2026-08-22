@@ -197,14 +197,20 @@ describe("offline-safe web foundation", () => {
 
   it("clears tenant query data across support override transitions", () => {
     const supportBanner = read("components/platform/SupportOverrideBanner.tsx");
-    const tenantPage = read("app/platform/schools/[tenantId]/page.tsx");
+    const tenantAccess = read(
+      "components/platform/tenant-detail/tenant-access.tsx",
+    );
+    const sessionProvider = read("components/session-provider.tsx");
 
     assert.match(supportBanner, /useQueryClient/);
     assert.match(supportBanner, /exitPlatformSupportOverride\(\)/);
     assert.match(supportBanner, /queryClient\.clear\(\)/);
-    assert.match(tenantPage, /useQueryClient/);
-    assert.match(tenantPage, /enterPlatformSupportOverride/);
-    assert.match(tenantPage, /queryClient\.clear\(\)/);
+    assert.match(tenantAccess, /useQueryClient/);
+    assert.match(tenantAccess, /enterPlatformSupportOverride/);
+    assert.match(tenantAccess, /queryClient\.clear\(\)/);
+    assert.match(sessionProvider, /clearPrivateBrowserState/);
+    assert.match(sessionProvider, /queryClient\.clear\(\)/);
+    assert.match(sessionProvider, /clearSupportOverride\(\)/);
   });
 
   it("enables attendance sync only for a pending scoped local draft", () => {

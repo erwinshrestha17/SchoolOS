@@ -1,4 +1,9 @@
-import { AuthMethod, OtpPurpose, UserStatus } from '@prisma/client';
+import {
+  AuthMethod,
+  OtpPurpose,
+  SecurityDomain,
+  UserStatus,
+} from '@prisma/client';
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
@@ -23,7 +28,12 @@ describe('AuthService', () => {
     status: UserStatus.ACTIVE,
     userRoles: [
       {
+        tenantId: 'tenant-1',
+        scopeId: null,
+        expiresAt: null,
+        revokedAt: null,
         role: {
+          tenantId: 'tenant-1',
           name: 'admin',
           rolePermissions: [
             {
@@ -171,6 +181,93 @@ describe('AuthService', () => {
         maxAge: 15 * 60 * 1000,
       }),
     );
+  });
+
+  it('issues Platform authority only from an active global Platform assignment', async () => {
+    prisma.tenant.findUnique.mockResolvedValue({
+      id: 'platform-tenant',
+      slug: 'platform',
+      name: 'SchoolOS Platform',
+      isActive: true,
+      securityDomain: SecurityDomain.PLATFORM,
+    });
+    prisma.user.findUnique.mockResolvedValue({
+      ...authUser,
+      tenantId: 'platform-tenant',
+      userRoles: [
+        {
+          tenantId: 'platform-tenant',
+          scopeId: 'global',
+          expiresAt: null,
+          revokedAt: null,
+          role: {
+            tenantId: 'platform-tenant',
+            name: 'platform_super_admin',
+            rolePermissions: [
+              { permission: { resource: 'platform', action: 'manage' } },
+            ],
+          },
+        },
+        {
+          tenantId: 'platform-tenant',
+          scopeId: 'global',
+          expiresAt: null,
+          revokedAt: new Date(),
+          role: {
+            tenantId: 'platform-tenant',
+            name: 'platform_support',
+            rolePermissions: [
+              { permission: { resource: 'platform', action: 'read' } },
+            ],
+          },
+        },
+        {
+          tenantId: 'platform-tenant',
+          scopeId: 'platform-tenant',
+          expiresAt: null,
+          revokedAt: null,
+          role: {
+            tenantId: 'platform-tenant',
+            name: 'platform_billing_admin',
+            rolePermissions: [
+              {
+                permission: { resource: 'platform:billing', action: 'manage' },
+              },
+            ],
+          },
+        },
+        {
+          tenantId: 'platform-tenant',
+          scopeId: null,
+          expiresAt: null,
+          revokedAt: null,
+          role: {
+            tenantId: 'platform-tenant',
+            name: 'admin',
+            rolePermissions: [
+              { permission: { resource: 'users', action: 'create' } },
+            ],
+          },
+        },
+      ],
+    });
+    prisma.user.update.mockResolvedValue({});
+    prisma.refreshToken.create.mockResolvedValue({});
+
+    const result = asSession(
+      await service.login(
+        {
+          tenantSlug: 'platform',
+          email: authUser.email,
+          password: 'password123',
+        },
+        response,
+      ),
+    );
+
+    expect(result.user.securityDomain).toBe(SecurityDomain.PLATFORM);
+    expect(result.user.roles).toEqual(['platform_super_admin']);
+    expect(result.user.permissions).toEqual(['platform:manage']);
   });
 
   it('returns an MFA challenge for BOTH auth mode', async () => {
@@ -772,7 +869,7 @@ describe('AuthService', () => {
       // Without this block a guardian account has no name anywhere in the
       // session payload, and the mobile app greeted parents with their login
       // handle ("guardian.c01a004").
-      prisma.user.findUnique.mockResolvedValue({
+      prisma.user.findFirst.mockResolvedValue({
         ...authUser,
         tenant: {
           id: 'tenant-1',
@@ -803,7 +900,7 @@ describe('AuthService', () => {
     });
 
     it('leaves guardian null for non-guardian accounts', async () => {
-      prisma.user.findUnique.mockResolvedValue({
+      prisma.user.findFirst.mockResolvedValue({
         ...authUser,
         tenant: {
           id: 'tenant-1',
@@ -828,7 +925,7 @@ describe('AuthService', () => {
     });
 
     it('never selects a guardian home address or phone number', async () => {
-      prisma.user.findUnique.mockResolvedValue({
+      prisma.user.findFirst.mockResolvedValue({
         ...authUser,
         tenant: {
           id: 'tenant-1',
@@ -847,14 +944,14 @@ describe('AuthService', () => {
         tenantSlug: 'default-school',
       } as any);
 
-      const include = prisma.user.findUnique.mock.calls.at(-1)[0].include;
+      const include = prisma.user.findFirst.mock.calls.at(-1)[0].include;
       expect(include.guardian).toEqual({
         select: { id: true, fullName: true, relation: true },
       });
     });
 
     it('returns the effective school tenant during platform support override', async () => {
-      prisma.user.findUnique.mockResolvedValue({
+      prisma.user.findFirst.mockResolvedValue({
         ...authUser,
         tenantId: 'platform-tenant',
         tenant: {

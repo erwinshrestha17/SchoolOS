@@ -22,9 +22,9 @@ export interface EntitlementsResponse {
 }
 
 /**
- * Internal shape stored in Redis. `hasActiveSubscription` lets `PlansService`
- * report `subscription_missing` without a second subscription query; it is
- * stripped before the public `EntitlementsResponse` is returned.
+ * Internal authoritative projection. `hasActiveSubscription` lets
+ * `PlansService` report `subscription_missing` without a second subscription
+ * query; it is stripped before the public response is returned.
  */
 export interface CachedPlanEntitlements extends EntitlementsResponse {
   hasActiveSubscription: boolean;
@@ -36,12 +36,6 @@ const EMPTY_ENTITLEMENTS: EntitlementsResponse = {
   features: [],
   addOns: [],
 };
-
-/**
- * TTL is a backstop for a missed invalidation, not the invalidation mechanism.
- * Suspension is unaffected by it — that check is live, outside this cache.
- */
-const PLAN_ENTITLEMENTS_TTL_SECONDS = 300;
 
 export function planEntitlementsKey(tenantId: string) {
   return `entitlements:plan:${tenantId}`;
@@ -82,7 +76,7 @@ export class EntitlementsService {
   ) {}
 
   /**
-   * Drop the cached plan projection for one tenant.
+   * Drop any compatibility cache projection for one tenant.
    *
    * Must be called after any write to that tenant's subscription, plan
    * assignment, or feature overrides. Writes to `Tenant.isActive` do **not**
@@ -96,7 +90,7 @@ export class EntitlementsService {
   }
 
   /**
-   * Drop the cached plan projection for **every** tenant.
+   * Drop any compatibility cache projection for **every** tenant.
    *
    * Editing a `PlatformPlanFeature` changes what every tenant on that plan is
    * entitled to, and the cache is keyed by tenant, so there is no narrower
@@ -141,8 +135,8 @@ export class EntitlementsService {
   }
 
   /**
-   * Entitlement resolution, split into a **live** suspension check and a
-   * **cached** plan projection.
+   * Entitlement resolution, with both suspension and plan authority resolved
+   * live for each request.
    *
    * The suspension check must never be cached: `AGENTS.md` requires suspended
    * tenants to fail closed, and caching a response that encodes `isActive`
@@ -151,10 +145,10 @@ export class EntitlementsService {
    * seeded it into the request cache from its own liveness read) and only the
    * plan-derived half goes to Redis.
    *
-   * The cached half depends solely on `TenantSubscription`, `PlatformPlan`,
-   * `PlatformPlanFeature` and `TenantFeatureOverride`. None of those encode
-   * tenant suspension, so a stale entry can never widen access for a suspended
-   * tenant — the live check above rejects first.
+   * Redis invalidation is best-effort, so it cannot safely bound revocation of
+   * a module, subscription, or tenant feature override. The request cache may
+   * deduplicate repeated checks inside one request, but the next request always
+   * reads PostgreSQL authority again.
    *
    * `hasActiveSubscription` is carried internally so `PlansService` can
    * distinguish "no subscription" from "feature not in plan" without issuing
@@ -183,11 +177,7 @@ export class EntitlementsService {
         return { ...EMPTY_ENTITLEMENTS, hasActiveSubscription: false };
       }
 
-      return this.redisCache.resolve(
-        planEntitlementsKey(tenantId),
-        PLAN_ENTITLEMENTS_TTL_SECONDS,
-        () => this.loadPlanEntitlements(tenantId),
-      );
+      return this.loadPlanEntitlements(tenantId);
     });
   }
 

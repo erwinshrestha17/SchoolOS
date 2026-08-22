@@ -81,7 +81,11 @@ describe('PrismaService', () => {
 
   it('should delegate queries to the extended client and apply tenant isolation when tenantId is set', async () => {
     // 1. Set tenantId in CLS mock
-    jest.spyOn(clsService, 'get').mockReturnValue('tenant-test-123');
+    jest
+      .spyOn(clsService, 'get')
+      .mockImplementation((key?: string | symbol) =>
+        key === TENANT_ID_KEY ? 'tenant-test-123' : undefined,
+      );
 
     // 2. Call findMany on the proxy delegate
     const result = (await service.student.findMany({
@@ -143,6 +147,42 @@ describe('PrismaService', () => {
     await expect(
       service.student.findMany({ where: { firstNameEn: 'Student' } }),
     ).rejects.toThrow(MissingTenantScopeError);
+  });
+
+  it('should preserve explicit predicates in a bypass region even when CLS already has a tenant', async () => {
+    const store = new Map<string, unknown>([
+      [TENANT_ID_KEY, 'platform-tenant'],
+    ]);
+    jest
+      .spyOn(clsService, 'get')
+      .mockImplementation((key?: string | symbol) => store.get(String(key)));
+    jest
+      .spyOn(clsService, 'set')
+      .mockImplementation((key: string | symbol, value: unknown) => {
+        store.set(String(key), value);
+      });
+    jest.spyOn(clsService, 'isActive').mockReturnValue(true);
+
+    const result = (await service.runWithoutTenantScope(
+      'support override target lookup',
+      () =>
+        service.student.findMany({
+          where: { tenantId: 'school-tenant', firstNameEn: 'Student' },
+        }),
+    )) as any;
+
+    expect(result.success).toBe(true);
+    expect(result.args).toEqual({
+      where: { tenantId: 'school-tenant', firstNameEn: 'Student' },
+    });
+    expect(store.get(TENANT_ID_KEY)).toBe('platform-tenant');
+
+    const scopedResult = (await service.student.findMany({
+      where: { firstNameEn: 'Student' },
+    })) as any;
+    expect(scopedResult.args).toEqual({
+      where: { firstNameEn: 'Student', tenantId: 'platform-tenant' },
+    });
   });
 
   it('should delegate lifecycle methods to the native PrismaClient instance', async () => {

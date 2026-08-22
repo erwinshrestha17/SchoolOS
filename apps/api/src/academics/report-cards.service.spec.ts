@@ -458,4 +458,44 @@ describe('ReportCardsService', () => {
       }),
     );
   });
+
+  it('returns correction rows with only the narrow student identity projection', async () => {
+    const student = {
+      id: 'student-1',
+      firstNameEn: 'Asha',
+      lastNameEn: 'Tamang',
+      studentSystemId: 'STD-001',
+    };
+    prisma.reportCardCorrectionRequest.findMany.mockResolvedValue([
+      {
+        id: 'correction-1',
+        reportCard: { id: 'report-card-1', student },
+      },
+    ]);
+
+    const result = await service.listCorrections(actor);
+
+    expect(prisma.reportCardCorrectionRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          reportCard: {
+            include: {
+              student: {
+                select: {
+                  id: true,
+                  firstNameEn: true,
+                  lastNameEn: true,
+                  studentSystemId: true,
+                },
+              },
+              class: true,
+              section: true,
+              examTerm: true,
+            },
+          },
+        }),
+      }),
+    );
+    expect(result[0]?.reportCard.student).toEqual(student);
+  });
 });

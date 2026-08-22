@@ -940,7 +940,9 @@ describe('SchoolOS web production contracts', () => {
     assert.match(layout, /const dashboardRouteGates/);
     assert.match(layout, /const settingsRouteGates/);
     assert.match(layout, /getRouteGateForHref/);
-    assert.match(layout, /hasRoutePermission\(session\.user\.permissions/);
+    assert.match(layout, /hasRoutePermission\(session, routeGate\)/);
+    assert.match(layout, /hasAnyPermission\(session, routeGate\.permissions\)/);
+    assert.match(layout, /supportOverrideRouteAllowed/);
     assert.match(layout, /<PermissionDenied/);
 
     for (const route of requiredRoutes) {
@@ -1783,10 +1785,7 @@ describe('SchoolOS web production contracts', () => {
     // Submit is disabled once locked (unless override authority is active), and
     // roster edits are disabled too (also disabled once submitted).
     assert.match(attendanceForm, /rosterEditingDisabled/);
-    assert.match(
-      attendanceForm,
-      /disabled=\{rosterEditingDisabled\}/,
-    );
+    assert.match(attendanceForm, /disabled=\{rosterEditingDisabled\}/);
     assert.match(attendanceForm, /disabled\?: boolean/);
 
     // Locked state points the user at the corrections workflow instead of a
@@ -2295,11 +2294,7 @@ describe('SchoolOS web production contracts', () => {
       assert.ok(transportLayout.includes(marker), `Missing marker: ${marker}`);
     }
 
-    for (const marker of [
-      'SummaryGrid',
-      'SummaryCard',
-      'WorkSurface',
-    ]) {
+    for (const marker of ['SummaryGrid', 'SummaryCard', 'WorkSurface']) {
       assert.ok(
         transportWorkspace.includes(marker),
         `Missing marker: ${marker}`,
@@ -2837,7 +2832,11 @@ describe('SchoolOS web production contracts', () => {
       'dashboard/messaging',
     ]) {
       const page = read(`app/${route}/page.tsx`);
-      assert.match(page, /ChatRemovedState/, `${route} must render ChatRemovedState`);
+      assert.match(
+        page,
+        /ChatRemovedState/,
+        `${route} must render ChatRemovedState`,
+      );
     }
 
     assert.ok(

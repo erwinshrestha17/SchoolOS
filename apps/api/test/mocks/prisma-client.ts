@@ -175,6 +175,11 @@ export const AuthMethod = {
   BOTH: 'BOTH',
 } as const;
 
+export const SecurityDomain = {
+  SCHOOL: 'SCHOOL',
+  PLATFORM: 'PLATFORM',
+} as const;
+
 export const OtpPurpose = {
   LOGIN: 'LOGIN',
   RESET: 'RESET',

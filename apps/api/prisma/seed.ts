@@ -52,8 +52,8 @@ import * as bcrypt from 'bcrypt';
 import 'dotenv/config';
 import {
   PERMISSION_CATALOG,
-  SYSTEM_ROLE_DEFINITIONS,
-  SYSTEM_ROLE_PERMISSIONS,
+  SCHOOL_ROLE_DEFINITIONS,
+  SCHOOL_ROLE_PERMISSIONS,
 } from '../src/rbac/rbac.defaults';
 import {
   DEFAULT_CHART_ACCOUNTS,
@@ -130,11 +130,6 @@ const hrManagerPassword =
   process.env.SCHOOLOS_DEMO_HR_PASSWORD ?? localDemoPassword;
 const canonicalStudentPassword =
   process.env.SCHOOLOS_DEMO_STUDENT_PASSWORD ?? localDemoPassword;
-const platformSeedPassword =
-  process.env.PLATFORM_SEED_PASSWORD ??
-  process.env.SCHOOLOS_DEMO_PLATFORM_PASSWORD ??
-  localDemoPassword;
-
 const seedUsers: SeedUser[] = [
   {
     roleName: 'principal',
@@ -345,14 +340,15 @@ async function main() {
   await seedAcademicData(tenant.id, academicYear.id);
   await seedGuardianConsent(tenant.id);
   await seedTenantSettings(tenant.id);
-  await seedPlatformUser(tenant.id);
   await seedLibraryData(tenant.id);
   await seedTransportData(tenant.id);
   await seedCanteenData(tenant.id);
   await seedPlatformInfrastructure();
   await seedM7M11E2eIdentities(tenant.id);
 
-  console.log('Backfilling canonical TeacherAssignment rows for smoke fixtures...');
+  console.log(
+    'Backfilling canonical TeacherAssignment rows for smoke fixtures...',
+  );
   const { execSync } = await import('node:child_process');
   const { join } = await import('node:path');
   execSync('pnpm exec tsx prisma/seed-teacher-assignment-backfill.ts', {
@@ -560,7 +556,7 @@ async function seedAcademicYear(tenantId: string) {
 async function seedRoles(tenantId: string) {
   console.log('Seeding system roles...');
 
-  for (const role of SYSTEM_ROLE_DEFINITIONS) {
+  for (const role of SCHOOL_ROLE_DEFINITIONS) {
     await prisma.role.upsert({
       where: {
         tenantId_name: {
@@ -605,7 +601,7 @@ async function seedRolePermissions(tenantId: string) {
   console.log('Seeding role permissions...');
 
   for (const [roleName, permissionKeys] of Object.entries(
-    SYSTEM_ROLE_PERMISSIONS,
+    SCHOOL_ROLE_PERMISSIONS,
   )) {
     const role = await prisma.role.findUnique({
       where: {
@@ -4590,34 +4586,6 @@ async function seedAcademicData(tenantId: string, academicYearId: string) {
       maxScore: new Prisma.Decimal(10),
       submissionRequired: true,
     },
-  });
-}
-
-async function seedPlatformUser(tenantId: string) {
-  console.log('Seeding platform operator user...');
-  const platformEmail =
-    process.env.PLATFORM_SEED_EMAIL ?? 'platform@schoolos.com';
-  const roleName = 'platform_super_admin';
-
-  const role = await prisma.role.findUnique({
-    where: {
-      tenantId_name: {
-        tenantId,
-        name: roleName,
-      },
-    },
-  });
-
-  if (!role) {
-    console.warn(`Role ${roleName} not found, skipping platform user seed.`);
-    return;
-  }
-
-  await ensureSeedUserWithRole({
-    tenantId,
-    email: platformEmail,
-    password: platformSeedPassword,
-    roleId: role.id,
   });
 }
 

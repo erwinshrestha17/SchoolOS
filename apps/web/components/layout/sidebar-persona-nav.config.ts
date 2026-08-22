@@ -1,5 +1,12 @@
-import type { PermissionKey, SchoolWebPersona } from '@schoolos/core';
-import { TeacherCapability } from '@schoolos/core';
+import type {
+  PermissionKey,
+  SchoolWebPersona,
+  SupportOverrideScope,
+} from '@schoolos/core';
+import {
+  SUPPORT_OVERRIDE_SCOPE_DEFINITIONS,
+  TeacherCapability,
+} from '@schoolos/core';
 import {
   Bell,
   BookOpen,
@@ -52,8 +59,8 @@ export const academicPermissions: PermissionKey[] = [
   'academics:manage',
 ];
 
-const homeworkPermissions: PermissionKey[] = ['homework:read'];
-const timetablePermissions: PermissionKey[] = ['timetable:read'];
+const homeworkPermissions: PermissionKey[] = ['homework:read_published'];
+const timetablePermissions: PermissionKey[] = ['timetable:read_published'];
 
 const learningPermissions: PermissionKey[] = [
   'learning:read',
@@ -355,7 +362,11 @@ export const adminNavGroups: NavGroup[] = [
         href: '/dashboard/settings/system/audit-log',
         label: 'Audit',
         icon: ShieldCheck,
-        permissions: ['settings:manage', 'settings:audit:read', 'settings:read'],
+        permissions: [
+          'settings:manage',
+          'settings:audit:read',
+          'settings:read',
+        ],
       },
     ],
   },
@@ -1057,3 +1068,55 @@ export const settingsNavItem: NavItem = {
   label: 'Settings',
   icon: Settings,
 };
+
+const supportOverrideScopeIcons: Record<SupportOverrideScope, LucideIcon> = {
+  SCHOOL_PROFILE: School,
+  STUDENT_RECORDS: Users,
+  ATTENDANCE: CalendarCheck,
+  ACADEMICS: GraduationCap,
+  HOMEWORK_TIMETABLE: ClipboardList,
+  NOTICES_DELIVERY: MessageSquare,
+};
+
+/**
+ * Purpose-limited navigation for a Platform operator inside an audited school
+ * support override. It never inherits the admin Home or Settings trees.
+ */
+export function buildSupportOverrideNavGroups(
+  scopes: readonly SupportOverrideScope[],
+): NavGroup[] {
+  const activeScopes = new Set(scopes);
+  const items = SUPPORT_OVERRIDE_SCOPE_DEFINITIONS.filter((definition) =>
+    activeScopes.has(definition.key),
+  ).flatMap((definition) => {
+    const entry: NavItem = {
+      href: definition.entryPath,
+      label: definition.label,
+      icon: supportOverrideScopeIcons[definition.key],
+      permissions: [...definition.permissions],
+    };
+
+    if (definition.key !== 'HOMEWORK_TIMETABLE') {
+      return [entry];
+    }
+
+    const timetableEntry: NavItem = {
+      href: '/dashboard/timetable',
+      label: 'Published timetable',
+      icon: CalendarDays,
+      permissions: ['timetable:read_published'],
+    };
+
+    return [entry, timetableEntry];
+  });
+
+  return items.length
+    ? [
+        {
+          label: 'Read-only support',
+          icon: ShieldCheck,
+          items,
+        },
+      ]
+    : [];
+}

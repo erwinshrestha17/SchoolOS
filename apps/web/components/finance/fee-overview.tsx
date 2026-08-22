@@ -164,7 +164,7 @@ export function FeeOverview() {
       {summaryQuery.isError ? (
         <ErrorState
           title="Fees overview could not refresh"
-          message="Unavailable finance values are not shown as zero. Retry to load the latest summary."
+          message="No finance value has been replaced with zero. Retry to load the latest summary."
           onRetry={() => void summaryQuery.refetch()}
           className="min-h-48"
         />

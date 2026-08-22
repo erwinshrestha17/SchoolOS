@@ -126,7 +126,14 @@ export class CasRecordsService {
     const record = await this.prisma.casRecord.findFirst({
       where: { id, tenantId: actor.tenantId },
       include: {
-        student: true,
+        student: {
+          select: {
+            id: true,
+            firstNameEn: true,
+            lastNameEn: true,
+            studentSystemId: true,
+          },
+        },
         subject: true,
         class: true,
         section: true,

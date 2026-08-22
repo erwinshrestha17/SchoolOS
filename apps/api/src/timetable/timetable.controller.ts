@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
+import { AllowSupportOverrideRead } from '../auth/decorators/allow-support-override-read.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -32,6 +33,7 @@ import {
   SubstitutionQueryDto,
   SubstituteCandidateQueryDto,
   TeacherAvailabilityDto,
+  PaginatedQueryDto,
   TimetableVersionQueryDto,
   TimetableQueryDto,
   UpdateRoomDto,
@@ -67,8 +69,18 @@ export class TimetableController {
     private readonly replacementService: TeacherReplacementService,
   ) {}
 
+  @Get('support/published')
+  @Permissions('timetable:read_published')
+  @AllowSupportOverrideRead('HOMEWORK_TIMETABLE')
+  listSupportPublishedTimetable(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: PaginatedQueryDto,
+  ) {
+    return this.timetableService.listSupportPublishedTimetable(auth, query);
+  }
+
   @Get()
-  @Permissions('timetable:read')
+  @Permissions('timetable:read_published')
   listTimetable(
     @CurrentAuth() auth: AuthContext,
     @Query() query: TimetableQueryDto,

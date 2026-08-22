@@ -77,6 +77,16 @@ export function applyTenantScopeToArgs<TArgs>(
     return args;
   }
 
+  // An explicit bypass must win even when the surrounding request already has
+  // a CLS tenant. Platform control-plane requests and support overrides run
+  // inside an authenticated Platform tenant context; injecting that tenant
+  // here would silently replace the call site's explicit school tenant on
+  // reads and creates. The bypass flag is set only by the bounded
+  // runWithoutTenantScope region below and is restored in finally.
+  if (bypassTenantScope) {
+    return args;
+  }
+
   const isReadWrite = TENANT_SCOPED_READ_WRITE_OPERATIONS.includes(operation);
   const isCreate = TENANT_SCOPED_CREATE_OPERATIONS.includes(operation);
 
@@ -87,9 +97,6 @@ export function applyTenantScopeToArgs<TArgs>(
   if (!tenantId) {
     // Fail closed. Previously this returned `args` untouched, so any entry
     // point that forgot to populate CLS silently queried across every tenant.
-    if (bypassTenantScope) {
-      return args;
-    }
     throw new MissingTenantScopeError(model, operation);
   }
 

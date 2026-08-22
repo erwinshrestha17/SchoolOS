@@ -9,6 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
+import { AllowSupportOverrideRead } from '../auth/decorators/allow-support-override-read.decorator';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { EntitlementGuard } from '../auth/guards/entitlement.guard';
@@ -30,12 +31,14 @@ export class CommunicationsOperationsController {
 
   @Get('summary')
   @Permissions('notices:read')
+  @AllowSupportOverrideRead('NOTICES_DELIVERY')
   getSummary(@CurrentAuth() auth: AuthContext) {
     return this.communicationsService.getCommunicationsSummary(auth);
   }
 
   @Get('provider-diagnostics')
   @Permissions('notifications:view_delivery_diagnostics')
+  @AllowSupportOverrideRead('NOTICES_DELIVERY')
   getProviderDiagnostics(@CurrentAuth() auth: AuthContext) {
     return this.communicationsService.getCommunicationProviderDiagnostics(auth);
   }
