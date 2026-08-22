@@ -1,4 +1,8 @@
-import { expect, test } from "./fixtures/auth";
+import {
+  expect,
+  test,
+  type StorageState,
+} from "./fixtures/auth";
 
 const API_BASE_URL =
   process.env.SCHOOLOS_E2E_API_BASE_URL ??
@@ -96,11 +100,13 @@ test.describe.serial("Principal leadership web", () => {
   });
 });
 
-function csrfHeaders(state: Awaited<ReturnType<Parameters<typeof test>[0]>> extends never ? never : any) {
+function csrfHeaders(state: StorageState) {
   const csrfCookie = state.cookies.find(
-    (cookie: { name: string }) =>
+    (cookie) =>
       cookie.name === "__Host-schoolos_csrf" || cookie.name === "schoolos_csrf",
   );
-  if (!csrfCookie) throw new Error("Authenticated E2E state is missing its CSRF cookie.");
+  if (!csrfCookie) {
+    throw new Error("Authenticated E2E state is missing its CSRF cookie.");
+  }
   return { "X-CSRF-Token": csrfCookie.value };
 }
