@@ -1198,6 +1198,8 @@ function BooksPanel(props: {
   onRetryQuery: () => void;
   meta?: LibraryPaginationMeta;
   onPageChange: (page: number) => void;
+  canCreate: boolean;
+  canUpdate: boolean;
 }) {
   const [pendingArchiveBook, setPendingArchiveBook] =
     useState<LibraryBook | null>(null);
@@ -1526,6 +1528,8 @@ function CopiesPanel(props: {
   onRetryQuery: () => void;
   meta?: LibraryPaginationMeta;
   onPageChange: (page: number) => void;
+  canCreate: boolean;
+  canUpdate: boolean;
 }) {
   const [pendingStatusChange, setPendingStatusChange] = useState<{
     copy: LibraryCopy;
@@ -1900,6 +1904,8 @@ function IssuesPanel(props: {
   scanError: Error | null;
   meta?: LibraryPaginationMeta;
   onPageChange: (page: number) => void;
+  canIssue: boolean;
+  canReturn: boolean;
 }) {
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [copyScanValue, setCopyScanValue] = useState("");
@@ -2295,6 +2301,7 @@ function ReservationsPanel(props: {
   onRetryQuery: () => void;
   meta?: LibraryPaginationMeta;
   onPageChange: (page: number) => void;
+  canManage: boolean;
 }) {
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
   const [confirmFulfillId, setConfirmFulfillId] = useState<string | null>(null);
@@ -3250,6 +3257,9 @@ function FinesPanel({
   onRetryQuery: () => void;
   meta?: LibraryPaginationMeta;
   onPageChange: (page: number) => void;
+  canCreate: boolean;
+  canUpdate: boolean;
+  canPost: boolean;
 }) {
   const [waivingId, setWaivingId] = useState<string | null>(null);
   const [waiveReason, setWaiveReason] = useState("");
