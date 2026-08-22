@@ -3,10 +3,10 @@ import {
   ConflictException,
   ForbiddenException,
 } from '@nestjs/common';
+import type { AuthMethod } from '@prisma/client';
 import {
   PRINCIPAL_PERMISSION_KEYS,
   buildSchoolSettingsDomainVersion,
-  type AuthMethod,
   type TenantSettingSummary,
 } from '@schoolos/core';
 import type { AuthContext } from '../auth/auth.types';
