@@ -45,6 +45,7 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
   let financeService: FinanceService;
   let postingService: AccountingPostingService;
   let auditService: AuditService;
+  let paymentAllocationSequence = 0;
 
   const tenantId = 'tenant-finance-integration';
   const actor = createAuthContextMock({
@@ -62,6 +63,27 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
 
   beforeEach(async () => {
     prisma = createPrismaMock() as unknown as PrismaMock;
+    paymentAllocationSequence = 0;
+
+    // Payment allocations became the authoritative fee-payment linkage. Keep
+    // this focused integration mock aligned with the current Prisma contract
+    // rather than falling back to the legacy direct invoice/payment shape.
+    (prisma as any).paymentAllocation = {
+      create: jest.fn(({ data }: any) =>
+        Promise.resolve({
+          id: `allocation-${++paymentAllocationSequence}`,
+          ...data,
+          createdAt: new Date(),
+        }),
+      ),
+      aggregate: jest.fn().mockResolvedValue({
+        _sum: { amount: new Prisma.Decimal(0) },
+      }),
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    };
 
     (prisma.fiscalPeriod.findFirst as jest.Mock).mockResolvedValue(
       openFiscalPeriod(),
@@ -138,7 +160,7 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
     it('posts fee payment through AccountingPostingService and creates one finance journal', async () => {
       const postingSpy = jest.spyOn(postingService, 'postFeePayment');
       seedInvoice();
-      (prisma.payment.create as jest.Mock).mockResolvedValue({ id: 'pay-1' });
+      mockCreatedPayment();
 
       await collectCashPayment();
 
@@ -169,7 +191,7 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
 
     it('creates a balanced double-entry journal for fee payment', async () => {
       seedInvoice();
-      (prisma.payment.create as jest.Mock).mockResolvedValue({ id: 'pay-1' });
+      mockCreatedPayment();
 
       await collectCashPayment();
 
@@ -184,7 +206,7 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
 
     it('stores payment source document linkage on the posted journal', async () => {
       seedInvoice();
-      (prisma.payment.create as jest.Mock).mockResolvedValue({ id: 'pay-1' });
+      mockCreatedPayment();
 
       await collectCashPayment();
 
@@ -205,6 +227,7 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
         method: PaymentMethod.CASH,
         paidAt: new Date(),
         receipt: { receiptNumber: 'RCP-123' },
+        allocations: [],
       });
 
       const result = await collectCashPayment({ idempotencyKey: 'idem-key-1' });
@@ -281,7 +304,7 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
           status,
         });
         seedInvoice();
-        (prisma.payment.create as jest.Mock).mockResolvedValue({ id: 'pay-1' });
+        mockCreatedPayment();
 
         await expect(collectCashPayment()).rejects.toThrow(ConflictException);
         expect(prisma.journalEntry.create).not.toHaveBeenCalled();
@@ -289,7 +312,7 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
     );
 
     it('rejects cross-tenant invoice source access before payment or journal creation', async () => {
-      (prisma.invoice.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.invoice.findMany as jest.Mock).mockResolvedValue([]);
 
       await expect(
         collectCashPayment({ invoiceId: 'inv-other-tenant' }),
@@ -301,7 +324,7 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
     it('writes audit records for payment posting and reversal', async () => {
       const auditSpy = jest.spyOn(auditService, 'record');
       seedInvoice();
-      (prisma.payment.create as jest.Mock).mockResolvedValue({ id: 'pay-1' });
+      mockCreatedPayment();
 
       await collectCashPayment();
 
@@ -336,12 +359,10 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
 
   describe('Overpayment protection', () => {
     it('rejects payment if it exceeds remaining balance', async () => {
-      (prisma.invoice.findFirst as jest.Mock).mockResolvedValue({
-        id: 'inv-1',
-        tenantId,
-        totalAmount: new Prisma.Decimal(1000),
+      const invoice = buildInvoice({
         payments: [{ amount: new Prisma.Decimal(800), refunds: [] }],
       });
+      (prisma.invoice.findMany as jest.Mock).mockResolvedValue([invoice]);
 
       await expect(collectCashPayment({ amount: 300 })).rejects.toThrow(
         /exceeds the remaining balance/i,
@@ -442,16 +463,22 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
     });
   });
 
-  function seedInvoice() {
-    (prisma.invoice.findFirst as jest.Mock).mockResolvedValue({
+  function buildInvoice(
+    overrides: Record<string, unknown> = {},
+  ): Record<string, any> {
+    return {
       id: 'inv-1',
       tenantId,
       totalAmount: new Prisma.Decimal(1000),
       vatAmount: new Prisma.Decimal(0),
       payments: [],
+      paymentAllocations: [],
       invoiceNumber: 'INV-001',
       fiscalYear: '2026',
       studentId: 'student-1',
+      status: InvoiceStatus.ISSUED,
+      paidAt: null,
+      student: { id: 'student-1' },
       lines: [
         {
           id: 'line-1',
@@ -460,35 +487,70 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
           description: 'Tuition',
         },
       ],
+      ...overrides,
+    };
+  }
+
+  function seedInvoice() {
+    const invoice = buildInvoice();
+    prisma.__state.invoices.push(invoice);
+    (prisma.invoice.findFirst as jest.Mock).mockResolvedValue(invoice);
+    (prisma.invoice.findMany as jest.Mock).mockResolvedValue([invoice]);
+  }
+
+  function mockCreatedPayment() {
+    (prisma.payment.create as jest.Mock).mockResolvedValue({
+      id: 'pay-1',
+      tenantId,
+      studentId: 'student-1',
+      invoiceId: 'inv-1',
+      amount: new Prisma.Decimal(1000),
+      method: PaymentMethod.CASH,
+      status: PaymentStatus.SUCCESS,
+      paidAt: new Date(),
+      referenceNumber: null,
+      receipt: { receiptNumber: 'RCP-001' },
     });
   }
 
   function seedPaymentForReversal() {
-    (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
-      id: 'pay-1',
-      invoiceId: 'inv-1',
-      amount: new Prisma.Decimal(1000),
-      refunds: [],
-      receipt: { receiptNumber: 'RCP-1' },
-      invoice: { id: 'inv-1', paidAt: new Date() },
+    const invoice = buildInvoice({
+      status: InvoiceStatus.PAID,
+      paidAt: new Date(),
     });
-    // The optimistic reversal claim runs a state-backed updateMany against
-    // prisma.payment, so the payment must also exist in mock state (not just
-    // the overridden findFirst response) for the claim to find and update it.
-    prisma.__state.payments.push({
+    if (!prisma.__state.invoices.some((item) => item.id === invoice.id)) {
+      prisma.__state.invoices.push(invoice);
+    }
+
+    const payment = {
       id: 'pay-1',
       tenantId,
       invoiceId: 'inv-1',
+      studentId: 'student-1',
+      collectedById: actor.userId,
+      method: PaymentMethod.CASH,
       amount: new Prisma.Decimal(1000),
       status: PaymentStatus.SUCCESS,
       reversedAt: null,
-    });
+      reversalIdempotencyKey: null,
+      reversalReason: null,
+      paidAt: new Date(),
+      refunds: [],
+      allocations: [],
+      receipt: { receiptNumber: 'RCP-1' },
+      invoice,
+    };
+
+    (prisma.payment.findFirst as jest.Mock).mockResolvedValue(payment);
+    prisma.__state.payments.push(payment);
   }
 
   function seedOriginalPaymentJournal() {
-    (prisma.journalEntry.findFirst as jest.Mock).mockResolvedValue({
+    const journal = {
       id: 'je-1',
+      tenantId,
       entryNumber: 'JE-1',
+      status: 'POSTED',
       lines: [
         {
           chartAccountId: 'acc-cash',
@@ -501,7 +563,11 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
           amount: new Prisma.Decimal(1000),
         },
       ],
-    });
+    };
+    (prisma.journalEntry.findFirst as jest.Mock).mockResolvedValue(journal);
+    if (!prisma.__state.journalEntries.some((item) => item.id === journal.id)) {
+      prisma.__state.journalEntries.push(journal);
+    }
   }
 
   async function collectCashPayment(
