@@ -12,6 +12,7 @@ export * from './school-settings-navigation.js';
 export * from './school-settings-access.js';
 export * from './school-settings-overview.js';
 export * from './school-settings-domains.js';
+export * from './school-settings-domain-mutation.js';
 export * from './school-settings-integrations.js';
 export * from './school-academic-calendar.js';
 export * from './admission-cases.js';
