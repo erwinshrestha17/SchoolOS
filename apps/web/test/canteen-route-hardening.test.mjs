@@ -55,23 +55,36 @@ describe("M10 canteen route hardening", () => {
     );
     assert.match(
       workspace,
-      /enabled: activeTab === "menu" \|\| activeTab === "pos"/,
+      /enabled: canReadMenu && \(activeTab === "menu" \|\| activeTab === "pos"\)/,
     );
     assert.match(
       workspace,
-      /enabled: activeTab === "plans" \|\| activeTab === "enrollments"/,
-    );
-    assert.match(workspace, /enabled: activeTab === "enrollments"/);
-    assert.match(
-      workspace,
-      /enabled: activeTab === "overview" \|\| activeTab === "serving"/,
+      /enabled:\s*canReadPlans && \(activeTab === "plans" \|\| activeTab === "enrollments"\)/,
     );
     assert.match(
       workspace,
-      /enabled: activeTab === "overview" \|\| activeTab === "pos"/,
+      /enabled: canReadEnrollments && activeTab === "enrollments"/,
     );
-    assert.match(workspace, /enabled: activeTab === "overview"/);
-    assert.match(workspace, /enabled: activeTab === "stock"/);
+    assert.match(
+      workspace,
+      /enabled:\s*canReadServings &&\s*\(activeTab === "overview" \|\| activeTab === "serving"\)/,
+    );
+    assert.match(
+      workspace,
+      /enabled: canReadPos && \(activeTab === "overview" \|\| activeTab === "pos"\)/,
+    );
+    assert.match(
+      workspace,
+      /enabled: canReadReports && activeTab === "overview"/,
+    );
+    assert.match(
+      workspace,
+      /enabled: canReadInventory && activeTab === "stock"/,
+    );
+    assert.match(
+      workspace,
+      /enabled: canReadReports && activeTab === "stock"/,
+    );
     assert.match(workspace, /activeTab === "stock"/);
     assert.match(
       workspace,
