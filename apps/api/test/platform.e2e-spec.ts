@@ -1,5 +1,6 @@
 import { ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { SecurityDomain } from '@prisma/client';
 import { AppModule } from '../src/app.module';
 import { AuthController } from '../src/auth/auth.controller';
 import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
@@ -76,6 +77,7 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
       name: 'School 1',
       isActive: true,
       plan: 'standard',
+      securityDomain: SecurityDomain.SCHOOL,
       createdAt: new Date(),
     } as Record<string, unknown>);
     ensureTenantDefaultsWithState(prisma.__state, tenantId);
@@ -143,6 +145,7 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
       name: 'Platform',
       isActive: true,
       plan: 'platform',
+      securityDomain: SecurityDomain.PLATFORM,
       createdAt: new Date(),
     } as Record<string, unknown>);
     ensureTenantDefaultsWithState(prisma.__state, platformId);
