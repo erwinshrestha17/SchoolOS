@@ -1,8 +1,8 @@
 # SchoolOS Agent Instructions
 
-Repository-wide rules for human and AI contributors. Keep work production-oriented, scoped, evidence-based, and Nepal-only.
+Repository-wide rules for human and AI contributors. Keep work production-oriented, Nepal-only, scoped, evidence-based, and safe under offline operation.
 
-**Current posture:** P0 production-safety execution for a controlled real-school pilot, with offline-first operation as a repository-wide product invariant. School web and mobile must remain usable through poor connectivity and internet outages without weakening authorization, financial integrity, or academic integrity.
+**Current posture:** P0 production-safety execution for a controlled real-school pilot. Offline-first operation, financial immutability, and Nepal fiscal compliance are repository-wide product invariants.
 
 **Active P0 modules:** M0–M7, M11, M12, M15 as required by current P0 workflows.
 
@@ -13,14 +13,14 @@ Repository-wide rules for human and AI contributors. Keep work production-orient
 1. Explicit project-owner instruction for the current task.
 2. This root `AGENTS.md`.
 3. Scoped `AGENTS.md` in the touched app/package.
-4. Canonical product, requirements, architecture, security, and release documents.
+4. Canonical product, requirements, architecture, security, compliance, and release documents.
 5. Existing contracts, migrations, tests, and code conventions.
 
-Latest explicit owner decisions override stale roadmap assumptions. Update canonical docs when a conflict is confirmed; do not silently preserve contradictions.
+Latest explicit owner decisions override stale roadmap assumptions. When a confirmed conflict exists, update the canonical source rather than silently preserving contradictory behavior.
 
 ## 2. Canonical sources
 
-Start with `README.md`, `docs/README.md`, and `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`. Then read only the focused source required for the task.
+Start with `README.md`, `docs/README.md`, and `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`. Then read only focused material required for the task.
 
 | Area | Canonical source |
 |---|---|
@@ -32,9 +32,9 @@ Start with `README.md`, `docs/README.md`, and `docs/production/SCHOOLOS_GA_RELEA
 | Mobile | `apps/schoolos_mobile/AGENTS.md`, `apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md` |
 | Production/operations | `docs/production/SCHOOLOS_PRODUCTION_RUNBOOK.md` |
 
-Do not create duplicate PRDs/SRSs/SDDs/runbooks or ad hoc roadmap Markdown when content belongs in a canonical document. Track work/blockers in GitHub Issues, Milestones, or Projects where available.
+Do not create duplicate PRDs/SRSs/SDDs/runbooks or ad hoc roadmap Markdown when content belongs in a canonical document. Track active work/blockers in GitHub Issues, Milestones, or Projects where available.
 
-## 3. Module taxonomy and current execution status
+## 3. Module taxonomy and current status
 
 | Module | Name | Status |
 |---|---|---|
@@ -60,16 +60,16 @@ Do not create duplicate PRDs/SRSs/SDDs/runbooks or ad hoc roadmap Markdown when 
 - Chat/conversations are removed from active product scope. Preserve legacy data only where required for compatibility/retention; add no navigation or new writes.
 - A broad standalone Student App is not active scope.
 
-## 4. Nepal-only product boundary
+## 4. Nepal-only product boundary and P0 order
 
 SchoolOS is a Nepal-first multi-tenant school operating SaaS for:
 
 - `SCHOOL`: Grades 1–10.
 - `HIGHER_SECONDARY`: Grades 11–12 / +2.
 
-Do not introduce international expansion, Cambridge/IB/British/American curriculum execution, OneRoster/LTI, foreign accreditation/compliance, cross-country localization, preschool, Bachelor’s/Master’s management, public rankings, or social/open-chat features without a new explicit owner decision.
+Do not introduce international expansion, Cambridge/IB/British/American curriculum execution, OneRoster/LTI, foreign accreditation/compliance, cross-country localization, preschool, Bachelor’s/Master’s institution management, public rankings, or social/open-chat features without a new explicit owner decision.
 
-Release claims must follow evidence:
+Release claims require evidence:
 
 ```text
 Development complete
@@ -82,18 +82,16 @@ Development complete
 
 Local tests/builds/demos are not staging, pilot, RC, or GA evidence.
 
-### P0 is the default implementation scope
-
-Do not start P1/P2 feature expansion while unresolved P0 blockers remain unless explicitly instructed.
+P0 is the default implementation scope. Do not start P1/P2 feature expansion while unresolved P0 blockers remain unless explicitly instructed.
 
 P0 execution order:
 
-1. P0-01 — fail-closed entitlements, tenant isolation, teacher assignment authorization, guardian scoping, mobile cache invalidation, authorization matrix.
+1. P0-01 — fail-closed entitlements, tenant isolation, teacher assignment authorization, guardian scoping, cache invalidation, authorization matrix.
 2. P0-02 — attendance correctness, locking, idempotency, correction history.
 3. P0-03 — marks authorization, review/lock/publish/unlock/correction/versioning.
 4. P0-04 — versioned Nepal School Education Compliance Profile.
 5. P0-05 — reproducible IEMIS validation/export; no direct-sync claim without an authorized interface.
-6. P0-06 — fee/receipt/reconciliation integrity and idempotent M3→M11 posting.
+6. P0-06 — fee/receipt/immutable-ledger/IRD fiscal integrity, versioned tax policy, CBMS applicability where required, reconciliation, and idempotent M3/M7→M11 posting.
 7. P0-07 — privacy, safeguarding, consent, protected files, sensitive-access audit.
 8. P0-08 — offline-first web/mobile operation, School Edge continuity, synchronization, conflict recovery, and no-internet resilience.
 9. Nepal localization correctness: Nepali Unicode, NPR, Nepal timezone, Nepal address hierarchy, BS/AD presentation with canonical date storage.
@@ -101,7 +99,7 @@ P0 execution order:
 
 ## 5. Platform control plane and school application are separate security domains
 
-The **SchoolOS Platform** and the **School Management System** must not be one application where a hidden `DEVELOPER` role simply sees more school menus.
+The **SchoolOS Platform** and **School Management System** must not be one application where a hidden `DEVELOPER` role simply sees more school menus.
 
 They may share the monorepo, backend infrastructure, PostgreSQL, Redis, storage abstractions, common packages, and deployment pipeline, but must remain separate in identity, authorization, routing, UI surface, audit semantics, and support access.
 
@@ -112,13 +110,13 @@ School personas operate only inside trusted tenant scope: Principal, Admin, Teac
 - `/dashboard/*` = school operations.
 - `/dashboard/settings/*` = school configuration.
 
-A Principal/Admin may be highly privileged inside one school but must never receive platform capabilities, provider secrets, global flags, SaaS plan controls, infrastructure controls, or other tenants’ data.
+A Principal/Admin may be highly privileged inside one school but never receives platform capabilities, provider secrets, global flags, SaaS plan controls, infrastructure controls, or access to other tenants.
 
 ### Platform control plane
 
-`/platform/*` is SchoolOS-internal SaaS control plane for tenant lifecycle, entitlements, SaaS subscriptions, platform operators, provider configuration, release/feature controls, system health, support tooling, cross-tenant audit, and centrally managed compliance-profile publishing.
+`/platform/*` is the SchoolOS-internal SaaS control plane for tenant lifecycle, entitlements, SaaS subscriptions, platform operators, provider configuration, releases/feature controls, system health, support tooling, cross-tenant audit, and centrally managed compliance-profile publishing.
 
-Use distinct trusted contexts conceptually:
+Conceptually keep:
 
 ```text
 SchoolAuthorizationContext: tenantId + schoolUserId + roles + permissions
@@ -131,8 +129,8 @@ Rules:
 - School sessions/JWTs cannot become platform sessions by adding a role.
 - Platform capabilities cannot be assigned by a school Admin/Principal.
 - Platform sessions do not carry a tenant as permanent authority scope.
-- Prefer a distinct internal platform frontend (for example `apps/platform-web`) rather than platform menus embedded in the school web app. If migration is incomplete, move incrementally and do not duplicate functionality.
-- Separate frontend/security domains do **not** require microservices or a second database. Do not add new infrastructure units without approval.
+- Prefer a distinct internal platform frontend such as `apps/platform-web` rather than embedding platform menus in the school web app.
+- Separate frontend/security domains do not require microservices or a second primary database.
 
 ### Controlled support access
 
@@ -149,7 +147,9 @@ Keep:
 - Flutter companion app.
 - `packages/core` where appropriate.
 
-Do not introduce microservices, a different primary database technology/search cluster, GPU infrastructure, Kubernetes, or unrelated frameworks without explicit approval. **Owner-approved offline exception:** an Edge-enabled school may run a tenant-bound local deployment of the same SchoolOS modular monolith with local PostgreSQL, Redis/BullMQ where required, and a local StorageAdapter so the school can continue operating without internet. This is an offline deployment mode of existing architecture, not a forked product or new microservice architecture.
+Do not introduce microservices, a different primary database technology/search cluster, GPU infrastructure, Kubernetes, or unrelated frameworks without explicit approval.
+
+**Owner-approved offline exception:** an Edge-enabled school may run a tenant-bound local deployment of the same SchoolOS modular monolith with local PostgreSQL, Redis/BullMQ where required, and a local `StorageAdapter`. This is an offline deployment mode of existing architecture, not a forked product or microservice split.
 
 Mandatory boundaries:
 
@@ -160,26 +160,26 @@ Mandatory boundaries:
 - Source modules emit normalized events; M12 owns notification delivery.
 - M15 owns notice authoring/publishing and hands normalized events to M12.
 - M13 remains frozen and logically separate; preserve existing data/contracts.
-- Offline-first is cross-cutting: cloud, School Edge, web PWA/cache, and Flutter local stores must use the same domain contracts, authorization rules, lifecycle semantics, idempotency rules, and audit model.
-- For Edge-enabled tenants, prevent split-brain with an explicit tenant/site write-authority model and authority epoch/lease/failover semantics; never allow cloud and Edge to silently finalize conflicting authoritative writes.
+- Cloud, School Edge, web local cache/PWA, and Flutter local stores use the same domain contracts, lifecycle semantics, authorization rules, idempotency rules, audit model, and fiscal rules.
+- Edge-enabled tenants must prevent split-brain with an explicit tenant/site write-authority model and authority epoch/lease/fencing semantics.
 
 ## 7. Security, authorization, and isolation
 
-Never trust client-supplied `tenantId`, roles, permissions, guardian relations, teacher assignments, totals, approval states, or lifecycle states.
+Never trust client-supplied `tenantId`, roles, permissions, guardian relations, teacher assignments, totals, approval states, tax treatment, fiscal status, or lifecycle states.
 
-Fail closed when a tenant is suspended, entitlement is disabled/missing/invalid/unavailable, required capability/assignment cannot be verified, guardian relationship is not active/verified/authorized, or protected-file authorization fails.
+Fail closed when tenant status, entitlement, required capability/assignment, guardian scope, fiscal policy, or protected-file authorization cannot be verified.
 
 Persona scope:
 
 - Parent: active linked children only, with per-relationship permissions/restrictions.
 - Teacher: active assigned class/section/subject/period/component only.
-- Class teacher: cross-subject visibility does not grant another subject teacher’s write access.
+- Class teacher: cross-subject visibility does not grant another subject teacher’s write authority.
 - Staff self-service: own records only unless explicitly permitted.
 - Platform operator: SaaS control-plane authority; tenant-record access only through controlled support paths.
 
-Authoritative teacher writes require explicit capabilities, not generic Teacher role. Use existing canonical capabilities; equivalents include `HOMEROOM_ATTENDANCE_MARK`, `PERIOD_ATTENDANCE_MARK`, `SUBJECT_HOMEWORK_WRITE`, `SUBJECT_MARKS_WRITE`, `CLASS_ACADEMIC_OVERVIEW`, `CLASS_TEACHER_REMARK_WRITE`, `RESULT_REVIEW`, `RESULT_PUBLISH`, `MARKS_UNLOCK`.
+Authoritative teacher writes require explicit capabilities, not generic Teacher role. Reuse canonical capabilities; equivalents include `HOMEROOM_ATTENDANCE_MARK`, `PERIOD_ATTENDANCE_MARK`, `SUBJECT_HOMEWORK_WRITE`, `SUBJECT_MARKS_WRITE`, `CLASS_ACADEMIC_OVERVIEW`, `CLASS_TEACHER_REMARK_WRITE`, `RESULT_REVIEW`, `RESULT_PUBLISH`, `MARKS_UNLOCK`.
 
-Sensitive writes/support overrides are audited. Never expose secrets, raw stack traces, provider/storage internals, callback secrets, object keys, private URLs, unrelated student data, safeguarding records, salary/bank data, or private finance/staff data.
+Sensitive writes/support overrides are audited. Never expose secrets, raw stack traces, provider/storage internals, CBMS/provider credentials, callback secrets, private object keys/URLs, unrelated student data, safeguarding records, salary/bank data, or private finance/staff data.
 
 Never place production credentials, real student data, database backups, secrets, or private school records in prompts, logs, fixtures, screenshots, issues, PR text, or commits.
 
@@ -200,7 +200,114 @@ Use `Feature module → FileRegistryService → StorageService → StorageAdapte
 
 ### Money
 
-Authoritative SchoolOS runtime totals are authoritative. Money writes are idempotent and audited. Confirmed payments, receipts, accounting, payroll, refunds, and adjustments use reversal/correction, never silent deletion/mutation. Official totals are never independently recomputed in browser/mobile clients. High-risk financial workflows may continue without **internet** only through the trusted School Edge authority; an isolated browser/phone may draft or queue but must not independently finalize shared financial records. External payment-provider actions still require connectivity and must remain pending/queued until the provider can be reached.
+Authoritative SchoolOS runtime totals are authoritative. Money writes are idempotent and audited. Official totals are never independently recomputed in browser/mobile clients. External payment-provider actions require connectivity and remain pending/queued until verified by the provider.
+
+### Immutable financial ledger and fiscal documents
+
+M3 Fees & Receipts, M7 Payroll, and M11 Accounting & Finance must preserve an immutable authoritative financial history. M3/M7 own business transactions; M11 owns accounting truth.
+
+- Once a financial document/transaction is authoritative (`ISSUED`, `CONFIRMED`, `APPROVED`, `POSTED`, or canonical equivalent), ordinary application flows must not destructively update or delete historical financial facts.
+- Draft/unposted records may be edited only inside their defined lifecycle and authorization rules.
+- Corrections after the immutable boundary use explicit linked records: credit note, debit note, refund, reversal, adjustment, reclassification, or replacement transaction as appropriate.
+- Preserve `original → correction/reversal → replacement` lineage, reason, actor, approval, timestamps, source module, fiscal period, supporting document, and audit events.
+- Issued invoice/receipt/voucher numbers are never reused for a different transaction. Reprints preserve the original document identity and are auditable.
+- Posted journals remain double-entry balanced. Source-module posting to M11 is idempotent; duplicate event/callback/queue replay returns the existing result rather than posting again.
+- Closed fiscal periods fail closed. Reopening requires capability, reason, approval where required, audit evidence, and re-locking.
+- Platform/support access does not create a hidden ability to rewrite posted financial history.
+- Protect posted ledger facts at API, service, and database layers. Application-only `if (status === POSTED)` checks are insufficient for high-risk records.
+
+Do not use blockchain merely to call the ledger immutable. PostgreSQL transactions, append-only posted facts, constraints, idempotency, correction/reversal records, audit history, backups, and optional later tamper-evident hashing are the preferred architecture.
+
+### Nepal IRD / fiscal compliance
+
+SchoolOS is Nepal-only. M3, M7, M11, School Edge, fiscal documents, and the Nepal Compliance Profile must treat Nepal IRD/Ministry of Finance requirements as **versioned external policy**, not hard-coded constants.
+
+#### Authority and evidence
+
+- Before implementing/changing any tax, levy, VAT, TDS, payroll deduction, invoice format, CBMS, electronic-billing, fiscal-year, or reporting rule, verify the current requirement against official Nepal sources: IRD, Ministry of Finance, Nepal Gazette/Department of Printing, and the controlling Act/Rule/Procedure/notice.
+- Record legal/official source, publication/effective date, applicability, reviewer, and evidence location in the compliance policy/version.
+- A blog, vendor article, accountant memory, old PDF, prompt, fixture, or previous implementation is not sufficient authority when a current official source exists.
+- Never label SchoolOS, a tenant, invoice, statutory schedule, payroll calculation, or connector `IRD compliant`, `VAT compliant`, `TDS compliant`, `CBMS compliant`, or equivalent without current evidence/approval for that exact behavior.
+- If a fiscal rule is uncertain or recently changed, preserve the transaction but block false fiscal-final status and surface `needs IRD verification`/canonical equivalent.
+
+#### Effective-dated fiscal policy
+
+Do not scatter Nepal tax/levy rates or invoice rules through feature code. Use the existing Nepal Compliance Profile/canonical equivalents for evidence-backed, effective-dated policy such as:
+
+```text
+TaxAuthorityRule / FiscalPolicyVersion
+authority = IRD / Ministry of Finance
+legalReference / gazetteReference
+ruleType
+appliesTo / taxpayerThreshold
+effectiveFrom / effectiveTo
+rate / exemption / treatment
+invoiceRequirement
+cbmsRequirement
+documentTemplateVersion
+status = DRAFT | REVIEWED | ACTIVE | EXEMPTED | SUPERSEDED
+evidence
+```
+
+Reuse existing canonical names/statuses when available; do not create parallel models merely to match this example. Historical transactions retain the fiscal-policy version used. Later legal changes never rewrite historical facts.
+
+**2083/84 volatility is a mandatory design test:** the Economic Act 2083 introduced an Education Equity Fee for private educational institutions, followed by a Nepal Gazette notice granting full exemption. SchoolOS must represent introduce/change/exempt/supersede behavior without code edits or destructive receipt changes. Any amount already collected is handled through the legally valid refund/reversal/adjustment workflow while preserving the original document.
+
+#### Billing and fiscal documents
+
+- Every fee collection must be traceable: `charge/invoice → payment → receipt/fiscal document → M11 posting → audit history`.
+- Fiscal identity/configuration supports legal school/entity name, PAN, registration/tax treatment, approved invoice series, fiscal year, branch/site where applicable, and fields required by the active policy.
+- Already-issued fiscal documents are not deletable. Post-issue corrections use credit/debit notes or the legally required equivalent and remain linked to the original.
+- Do not let an unregistered/not-applicable tenant collect/display VAT merely because a generic template has a tax field.
+- VAT-exempt treatment of an education transaction does not imply exemption from PAN, income-tax, payroll/TDS, billing, recordkeeping, CBMS, or other obligations. Resolve each obligation independently from current verified policy.
+- Keep business payment state separate from fiscalization state. `PAYMENT_CONFIRMED` does not automatically mean `IRD/CBMS_CONFIRMED`.
+
+#### Electronic billing, software enlistment, and CBMS
+
+Current official 2083/84 baseline to treat as **versioned policy, not a permanent constant**: IRD's 4 Baisakh 2083 notice states that, except specified taxpayers whose business nature does not directly issue invoices to consumers/customers, taxpayers with annual turnover above **NPR 20 crore** must issue invoices electronically and connect the invoice to CBMS at the time of issuance. Re-verify threshold and applicability before implementation, tenant activation, or release.
+
+- Determine CBMS applicability per tenant/legal entity/fiscal period from verified policy and turnover/applicability evidence; never infer it solely from `institutionType === SCHOOL`.
+- Keep CBMS credentials/secrets in the approved protected configuration boundary; never expose them to school clients/mobile, logs, exports, prompts, or general support views.
+- Electronic-billing software/tenant approval or IRD software-enlistment status must be explicit. Installing SchoolOS does not itself prove authorization to issue IRD electronic/fiscal invoices.
+- Provider/government responses are external truth. Store request/idempotency IDs, attempts, acknowledgement/reference, rejection code, timestamps, and reconciliation state without fabricating success.
+- CBMS submission is idempotent and retry-safe. Never create a second fiscal document because a submission was retried.
+
+#### Offline-first / School Edge fiscal behavior
+
+Offline-first SchoolOS does not make external IRD obligations disappear. Separate **local business/accounting authority** from **external fiscalization/CBMS confirmation**.
+
+- When School Edge is authoritative and internet is unavailable, internal fee, cash, accounting, and receipt workflows may continue only to the extent allowed by the tenant's current verified fiscal policy.
+- If current policy requires CBMS connection/confirmation at invoice issuance, do **not** assume `issue now, upload later` is lawful. Implement only an official/approved outage procedure for that taxpayer/software.
+- If the legal outage procedure is unknown, keep the business transaction safely recorded but hold the affected fiscal document in a truthful pending/blocked state such as `PENDING_FISCALIZATION`/canonical equivalent; never claim final IRD/CBMS acceptance.
+- Edge must preserve fiscal-number uniqueness across cloud/Edge failover using approved sequence allocation/authority fencing so two authorities cannot issue the same invoice/receipt number.
+- Reconnect reconciliation compares local fiscal documents, M11 postings, CBMS acknowledgements, payment-provider evidence, and sequence continuity. Mismatches require explicit resolution; never silently renumber or rewrite issued documents.
+
+#### Payroll/TDS and statutory deductions
+
+- M7 may calculate payroll and M11 may post payroll, but TDS, SSF, PF/EPF, CIT, gratuity, festival allowance, and other Nepal statutory behavior remain versioned/configurable and require current qualified Nepal accounting/legal verification before compliance claims.
+- Preserve taxable/non-taxable components, effective policy version, calculation inputs, manual overrides, approval, posting, payment, correction/reversal, and statutory-report evidence.
+- Never hide a statutory calculation difference by editing a posted payroll run. Use adjustment/reversal and preserve the original.
+
+#### Minimum P0 fiscal controls
+
+For active M3/M7/M11 fiscal workflows, P0 includes where applicable:
+
+1. Immutable issued invoice/receipt/fiscal-document records.
+2. Credit/debit-note, refund, reversal, and replacement lineage.
+3. Invoice/receipt sequence uniqueness and sequence-exception reporting.
+4. Versioned Nepal tax/levy/exemption policy with official-source evidence.
+5. PAN/legal-entity/fiscal identity configuration.
+6. Explicit VAT/tax treatment; no generic tax assumptions.
+7. CBMS applicability and tenant activation evidence.
+8. CBMS connector boundary, idempotency, acknowledgement/rejection, and reconciliation states when applicable.
+9. Explicit electronic-billing/software-enlistment/tenant-approval status where required.
+10. Offline/School-Edge fiscalization and numbering rules with no false success.
+11. Idempotent M3/M7→M11 posting and complete fiscal audit trail.
+12. Qualified review/evidence for statutory payroll/TDS schedules before compliance claims.
+
+Any touched fiscal workflow must test applicable cases: duplicate issuance/replay, issued-document update/delete rejection, credit/debit-note lineage, sequence uniqueness, wrong PAN/tax configuration, effective-date boundary, policy supersession/exemption, CBMS required/not-required tenancy, CBMS timeout/retry/rejection/duplicate acknowledgement, Edge outage/reconnect, numbering across authority failover, duplicate M3/M7→M11 posting prevention, period close/reopen, refund/reversal accounting, and audit/export traceability.
+
+Docs/code must distinguish **implemented behavior**, **officially verified requirement**, **IRD/software approval/enlistment evidence**, and **tenant-specific activation evidence**.
 
 ### Notifications / notices
 
@@ -210,22 +317,22 @@ Feature modules emit normalized events; they do not call providers directly. M12
 
 - One screen = one primary job.
 - Real APIs only; no fake production data.
-- The school web application must be **offline-first/installable where practical**: cache the application shell and approved tenant/user projections, persist approved local drafts/queues, survive reload/app restart, and reconnect automatically to School Edge or cloud.
-- When internet is unavailable but School Edge is reachable on the local network, the web system should continue normal tenant operations against Edge using the same contracts and authorization behavior as cloud.
-- When neither cloud nor Edge is reachable, the browser may continue from protected local cache and local operation queue; shared authoritative finalization waits for an authority connection.
-- Paginate growing lists at the authoritative runtime; never preload an entire tenant merely to support offline.
+- The school web app is offline-first/installable where practical: cache the application shell and approved tenant/user projections, persist approved local drafts/queues, survive reload/app restart, and reconnect automatically to Edge/cloud.
+- With internet unavailable but School Edge reachable, continue normal tenant operations against Edge using the same contracts/authorization as cloud.
+- With neither cloud nor Edge reachable, continue from protected local cache/queue; shared authoritative finalization waits for an authority connection.
+- Paginate growing lists at the authoritative runtime; never preload an entire tenant merely for offline use.
 - Handle loading, empty, success, error, permission, module-locked, local-only, queued, syncing, stale, conflict, rejected, revoked, partial-failure, and file-unavailable states where applicable.
-- High-risk actions require confirmation/reason where required, including when executed through School Edge.
+- High-risk actions require confirmation/reason where required, including through Edge.
 - KPIs are authoritative-runtime-owned, time-bound, actionable, and honest; never fake `0` for unavailable/stale data.
 
 ### Mobile
 
 - Companion app; persona-first, purpose-limited APIs; no admin-shaped payloads.
-- Mobile is **local-first**: approved user data, workflow state, drafts, files/thumbnails, and operation queues required for the persona must be available from a protected local store after first successful provisioning/sync.
-- The app must support cloud-online, School-Edge/LAN, intermittent-network, and fully disconnected device modes without crashing or presenting fake success.
-- Approved writes are recorded locally first with stable operation IDs and synchronized to the active authority when available.
+- Mobile is local-first: approved persona data, workflow state, drafts, files/thumbnails, and queues remain available from protected local storage after provisioning/sync.
+- Support cloud-online, School-Edge/LAN, intermittent-network, and fully disconnected device modes without crashing or presenting fake success.
+- Approved writes receive stable operation IDs and synchronize to the active authority when available.
 - Show `local`, `queued`, `syncing`, `synced`, `stale`, `conflict`, `rejected`, `revoked`, and `failed` states where relevant.
-- Tenant/child/assignment/access changes must invalidate no-longer-authorized local data and queued writes when the app learns of the change.
+- Tenant/child/assignment/access changes invalidate no-longer-authorized local data and queued writes when learned.
 - Do not require a network round trip merely to open the app, switch among already provisioned children/schools, inspect cached data, create an approved draft, or review queued work.
 
 Biometrics for Parent/Teacher/Principal:
@@ -235,13 +342,11 @@ Biometrics for Parent/Teacher/Principal:
 - Optional; user may skip and enable later in Settings.
 - Credential/password fallback remains available.
 - Biometrics are device-local unlock only; never store raw biometric templates.
-- Logout/session revocation/account recovery/device replacement/permission loss must invalidate protected local access appropriately.
+- Logout/session revocation/account recovery/device replacement/permission loss invalidates protected local access appropriately.
 
 ### Offline-first operation and synchronization
 
-**Offline-first is a required product capability for both the School Management System and the mobile app.** SchoolOS must tolerate slow, intermittent, high-latency, or unavailable internet without losing work or corrupting authoritative records.
-
-"Fully offline" means SchoolOS provides three explicit operating modes rather than pretending every device can safely become an independent server:
+Offline-first is required for both School Management System and mobile. SchoolOS must tolerate slow, intermittent, high-latency, or unavailable internet without losing work or corrupting authoritative records.
 
 ```text
 Mode A — Cloud online
@@ -249,102 +354,85 @@ Mode A — Cloud online
 
 Mode B — Internet unavailable, school LAN available
     Web/mobile → School Edge authority → local PostgreSQL/Redis/storage
-    Edge queues replication/delivery work for cloud reconnect
+    Edge queues replication/provider work for cloud reconnect
 
 Mode C — Device fully isolated: no internet and no LAN/Edge
     Web/mobile → protected local cache + local operation queue
-    User can continue approved work; shared finalization waits for authority
+    User continues approved work; shared finalization waits for authority
 ```
 
-The UI must clearly show the active connectivity/authority state. A network outage must not be presented as a generic fatal error.
+The UI must clearly show connectivity/authority state. Network loss is not a generic fatal error.
 
 #### School Edge runtime
 
-To support real whole-school operation during internet outages, SchoolOS may provide a **School Edge** deployment profile for a tenant/site.
-
-Requirements:
-
 - Reuse the same NestJS modules/domain services/contracts as cloud; do not build separate offline business logic.
-- Use tenant-bound local PostgreSQL as the authoritative operational database while that Edge authority is active.
-- Use local Redis/BullMQ only where current jobs/queues require it; jobs that need internet wait safely.
-- Use a local `StorageAdapter` under the existing File Registry/StorageService boundary for protected files created during outage; replicate by stable file ID/content hash when connectivity returns.
-- Bind an Edge node to explicitly provisioned tenant/site identity; it must not become a cross-tenant platform node.
-- Encrypt secrets and local sensitive data at rest; Edge administration is not ordinary school-user access.
-- Expose local health, disk/capacity, backup, queue, replication lag, and last-cloud-sync status.
-- Edge upgrades/migrations must use the same schema/contracts and be rollback-aware; never create an incompatible local schema fork.
+- Use tenant-bound local PostgreSQL as authoritative operational DB while that Edge authority is active.
+- Use local Redis/BullMQ where current jobs/queues require it; internet-dependent jobs wait safely.
+- Use a local `StorageAdapter` under File Registry/StorageService for protected files created during outage; replicate using stable file identity/content hash.
+- Bind Edge to explicit tenant/site identity; never make it a cross-tenant platform node.
+- Encrypt secrets/sensitive local data at rest.
+- Expose local health, capacity, backup, queue, replication lag, and last-cloud-sync state.
+- Edge upgrades/migrations use the same schema/contracts and remain rollback-aware.
 
 #### Write authority and split-brain prevention
 
-For each Edge-enabled tenant/site, authoritative writes must have a single active authority model.
+For each Edge-enabled tenant/site, authoritative writes use a single active authority model.
 
-- Track `authorityNodeId` and an `authorityEpoch`/equivalent fencing token for authoritative operation streams.
+- Track `authorityNodeId` and an `authorityEpoch`/equivalent fencing token for authoritative streams.
 - Cloud and Edge must not silently finalize the same aggregate under different authority epochs.
-- Failover/promotion must be explicit, audited, and fenced; stale nodes cannot resume writes after a newer authority epoch exists.
-- Operations carry stable IDs and aggregate/entity versions. Replays are idempotent.
-- Conflicting authoritative histories are never auto-merged for money, attendance finalization, marks/results, guardian/custody, payroll, permissions, or accounting.
-- If an authority conflict is detected after reconnect, quarantine the affected aggregate/workflow and require the defined reconciliation/correction path.
+- Failover/promotion is explicit, audited, and fenced; stale nodes cannot resume writes after a newer epoch.
+- Operations carry stable IDs and aggregate/entity versions; replay is idempotent.
+- Never auto-merge conflicting authoritative histories for money, fiscal documents, attendance finalization, marks/results, guardian/custody, payroll, permissions, or accounting.
+- Quarantine detected authority conflicts and use defined reconciliation/correction paths.
 
-#### Core school workflows during internet outage
+#### Core workflows during internet outage
 
-When **School Edge is reachable**, active tenant workflows should continue locally as far as they do not depend on an external provider. This includes, subject to normal permissions/locks/entitlements:
+When Edge is reachable, active tenant workflows continue locally as far as external providers are not required and normal permission/lock/entitlement/fiscal rules permit:
 
-- M0 school-side identity/session support, school configuration reads, audit capture, local job/file operations; Platform control-plane operations remain cloud/internal.
-- M1 admissions/student/guardian operational records and protected documents.
-- M2 attendance capture, submit/finalize/lock/correction workflows.
-- M3 fee invoicing, cash/manual-bank collection, receipts, cashier operations, refunds/reversals, reconciliation against locally available evidence.
-- M4 marks entry/review/lock/result calculation/publication/report-card generation where all required data/policies are local.
+- M0 school-side identity/session support, school configuration reads, audit, local files/jobs; Platform control-plane remains cloud/internal.
+- M1 admissions/student/guardian operations and protected documents.
+- M2 attendance capture/submit/finalize/lock/correction.
+- M3 invoicing, permitted cash/manual-bank collection, receipts, cashier work, refunds/reversals, reconciliation against local evidence, subject to IRD/fiscal rules above.
+- M4 marks entry/review/lock/result calculation/publication/report-card generation when required data/policies are local.
 - M5 activity/milestone capture and local media processing where available.
-- M6 homework/timetable operations.
-- M7 HR/attendance/leave/payroll workflows.
+- M6 homework/timetable.
+- M7 HR/attendance/leave/payroll.
 - M11 journals/vouchers/ledger/reporting/period operations.
 - M12 local in-app notification state and delivery queue creation.
-- M15 notice drafting/approval/publishing to locally reachable SchoolOS users.
+- M15 notice drafting/approval/local publication.
 
-All of these still use normal authorization, audit, idempotency, lifecycle, and correction/reversal rules. "Offline" is never permission bypass.
+Offline is never an authorization, audit, accounting, or fiscal-compliance bypass.
 
-#### External dependencies during outage
+External dependencies that remain pending during outage include payment-gateway initiation/callback verification/settlement, CBMS/IRD external submission where connectivity is required, SMS/email/push/voice providers, direct IEMIS/government APIs, remote webhooks, cloud-only Platform support, remote storage replication, and cloud telemetry/backups.
 
-Some operations are physically impossible without external connectivity. SchoolOS must degrade cleanly and queue/reconcile instead of failing the surrounding workflow.
+Use explicit truthful states such as `pending-connectivity`, `pending-fiscalization`, `queued-for-provider`, `awaiting-verification`, `delivery-deferred`, or canonical equivalents. Never mark an external action successful before provider/government confirmation.
 
-Examples:
+#### Fully isolated device behavior
 
-- Digital-wallet/card/payment-gateway initiation, callback verification, and provider settlement.
-- SMS, email, push-provider delivery, voice providers, remote webhooks.
-- Direct IEMIS/government submission or any external API sync.
-- Cloud-only Platform Operator/support operations.
-- Remote object-storage replication when the school is using Edge-local storage.
-- Cloud backups/telemetry/observability export.
+With no cloud and no Edge/LAN, a provisioned client still opens from its last authorized snapshot and may:
 
-Use explicit states such as `pending-connectivity`, `queued-for-provider`, `awaiting-verification`, `delivery-deferred`, or the canonical existing equivalents. Never mark an external action successful before provider confirmation.
+- browse authorized cached records required by its persona;
+- create/edit supported local drafts/queued operations;
+- capture attendance, homework, activities, notes/remarks, forms, requests, and file/media references where supported;
+- prepare high-risk work only as local pending operations when a dedicated offline contract exists;
+- review queue/sync/conflict/freshness state.
 
-#### Fully isolated web/mobile device behavior
+An isolated client never claims a shared high-risk/fiscal/financial/academic record is officially finalized until an authoritative runtime accepts it.
 
-When a device has **no cloud and no School Edge/LAN connection**, it must still open and remain useful from the last authorized local snapshot.
+#### Offline authentication and local scope
 
-Allowed locally:
-
-- Browse already authorized cached records needed by the persona.
-- Create/edit local drafts for workflows the user is authorized to perform.
-- Capture attendance, homework, activity, notes/remarks, forms, requests, and file/media references as queued operations where the module supports it.
-- Prepare marks, fee/cashier entries, approvals, accounting entries, payroll changes, result actions, or other high-risk work as **local pending operations** only when a dedicated offline contract exists.
-- Review queue status, prior sync history, local conflicts, and last-known data freshness.
-
-An isolated device must not claim that a shared high-risk record is officially finalized when no authoritative SchoolOS runtime has accepted it. Once cloud/Edge returns, the queued operation is re-authorized and either accepted, rejected, or conflicted.
-
-#### Offline authentication and authorization
-
-- First provisioning/sign-in requires a trusted authority unless the device/user was already provisioned for offline use.
-- Edge can authenticate locally provisioned school users using approved local auth material/verification flow; do not depend on cloud availability for ordinary on-campus sign-in after provisioning.
-- Mobile may unlock an existing protected local session using configured biometric/device credential fallback.
-- Cache a signed/versioned offline authorization snapshot containing only required tenant/persona/relationship/assignment/capability scope and its issuance/freshness metadata.
+- First provisioning/sign-in requires a trusted authority unless already provisioned for offline use.
+- Edge can authenticate locally provisioned school users through the approved local auth flow.
+- Mobile may unlock a protected local session using configured biometric/device fallback.
+- Cache only a signed/versioned offline authorization snapshot with required tenant/persona/relationship/assignment/capability scope and freshness metadata.
 - Local authorization never grants more scope than the last trusted snapshot.
-- Edge-side role/guardian/assignment revocation applies immediately on Edge and propagates to connected clients.
-- Fully isolated clients purge/restrict data when they next learn of revocation. For especially sensitive capabilities, use a bounded offline authorization lease/grace policy rather than unlimited stale authority.
-- Never allow offline mode to manufacture a new Platform Operator, tenant, entitlement, permission, guardian relation, or teacher assignment.
+- Edge-side revocation applies immediately on Edge and propagates to connected clients.
+- Fully isolated clients restrict/purge when they next learn of revocation; sensitive capabilities should use bounded offline authorization leases rather than unlimited stale authority.
+- Offline mode cannot manufacture Platform Operators, tenants, entitlements, permissions, guardian relations, or teacher assignments.
 
-#### Required operation/sync envelope
+#### Sync envelope and rules
 
-Queued or replicated writes must use canonical equivalents of:
+Queued/replicated writes use canonical equivalents of:
 
 ```text
 operationId / clientOperationId
@@ -355,136 +443,98 @@ deviceId
 tenantId
 userId
 persona/context
-assignmentVersion / authorizationVersion where relevant
+authorizationVersion / assignmentVersion
 aggregate/entityId
 baseEntityVersion / expectedVersion
-occurredAtClient
-acceptedAtAuthority
-localSequence / authoritySequence where relevant
+createdAtClient
+lastModifiedAtClient
 syncAttemptCount
 syncStatus
-payloadVersion
 ```
 
-Client timestamps are diagnostic. They do not override authoritative time, fiscal/academic period rules, locks, deadlines, sequence allocation, or permissions.
+Client timestamps are diagnostic; they do not override server/Edge time, periods, locks, deadlines, fiscal dates, or authorization.
 
-#### IDs, numbering, and financial integrity offline
+Synchronization must:
 
-- Use globally collision-resistant internal IDs for offline-created records.
-- Any human-facing sequential numbers that must be generated during an internet outage—such as receipts/vouchers—must use an approved Edge allocation strategy that guarantees tenant/site uniqueness, for example preallocated sequence blocks or an Edge-owned sequence namespace.
-- Never let two isolated clients independently invent the same official receipt/invoice/voucher sequence.
-- Cash/manual-bank transactions may be accepted through Edge and posted locally; digital provider payments remain pending until provider verification.
-- Reconnect must preserve original transaction IDs and audit history; do not delete/recreate transactions simply to make cloud IDs match.
-- M3→M11 and M7→M11 postings remain idempotent across Edge/cloud replication.
+1. discover the active trusted authority;
+2. authenticate node/device and tenant binding;
+3. exchange cursors/checkpoints and schema/contract versions;
+4. push immutable outbox operations/events;
+5. deduplicate by stable operation/event ID;
+6. validate authority epoch, authorization snapshot, versions, locks, entitlements, fiscal/business invariants;
+7. accept atomically or return explicit rejection/conflict;
+8. pull authoritative changes/revocations;
+9. reconcile local projections;
+10. synchronize protected files by stable identity/content hash;
+11. resume provider/government jobs only when connectivity/readiness exists;
+12. persist checkpoints so restarts resume safely.
 
-#### Sync and replication rules
+No silent last-write-wins for attendance, marks/results, finance, fiscal documents, payroll, accounting, guardian/custody, permissions, or protected student records.
 
-When connectivity changes, synchronization is automatic but never blind:
+#### Local storage, queues, backup, recovery
 
-1. Discover the active trusted authority: local Edge first when configured/reachable, otherwise cloud according to tenant routing policy.
-2. Authenticate node/device and validate tenant binding.
-3. Exchange cursors/checkpoints and schema/contract versions.
-4. Push immutable outbox operations/events in deterministic order where the domain requires ordering.
-5. Deduplicate by operation/event ID.
-6. Validate authority epoch, authorization snapshot, entity/aggregate version, locks, entitlements, and business invariants.
-7. Accept atomically or return explicit reject/conflict results.
-8. Pull authoritative changes and tombstone/revocation events.
-9. Reconcile local cache/materialized projections.
-10. Upload/download protected files by stable file identity/content hash.
-11. Resume deferred provider jobs only after connectivity/provider readiness is confirmed.
-12. Persist checkpoints so app/Edge restarts resume without replay corruption.
-
-Sync must be resumable, chunked/batched, bandwidth-aware, and safe under repeated disconnect/reconnect cycles.
-
-#### Conflict handling
-
-- **Duplicate replay:** return the original accepted result; no duplicate records.
-- **Non-overlapping safe changes:** merge only when the domain explicitly defines a deterministic merge.
-- **Server/Edge record changed from submitted base version:** mark conflict and retain both authoritative and local intent.
-- **Attendance/marks/result/finance/payroll/accounting conflict:** never last-write-wins; use explicit correction/reversal/review flow.
-- **Guardian/assignment/permission revoked:** mark operation `revoked`/`rejected`; do not keep retrying; purge unauthorized projections.
-- **Tenant suspended/module disabled:** stop affected writes immediately when the active authority knows the state.
-- **Contract/schema mismatch:** stop incompatible replication and surface upgrade-required/blocked state; never coerce unknown payloads.
-
-#### Local cache/storage rules
-
-- Store only data required by the user's persona and configured offline scope; offline-first does not mean "download the whole tenant to every device."
-- Partition local data by tenant + user + persona/context and, where applicable, school/site/child/assignment.
-- Protect credentials/refresh material with platform secure storage and sensitive local datasets with the existing encrypted/protected storage design.
-- Cache protected files only when explicitly allowed; enforce local access checks and expiry/retention rules.
-- Track `lastSyncedAt`, source authority, snapshot/version, and stale state for locally displayed data.
-- Logout, school/account switch, device/session revocation, guardian revocation, teacher-assignment removal, or permission loss must clear or quarantine affected cached data/queues.
-- Preserve safe unsynced user work before destructive cache cleanup only when doing so does not retain data the user is no longer authorized to possess.
-
-#### Queue, jobs, and provider behavior
-
+- Store only data required by persona/offline scope; never download the whole tenant to every device.
+- Partition local data by tenant + user + persona/context and applicable school/site/child/assignment.
+- Protect auth material with platform secure storage and sensitive datasets with approved encrypted/protected storage.
+- Track source authority, snapshot/version, `lastSyncedAt`, and stale state.
+- Logout/school switch/device-session revocation/guardian revocation/assignment removal/permission loss clears or quarantines affected cached data/queues.
 - Persist outbox/queue state across browser/app/Edge restart.
-- Use bounded retry with jitter/backoff for transient failures; do not create retry storms after a long outage.
-- Permanent `4xx`/validation/authz failures are not retried forever.
-- Background jobs declare whether they are `LOCAL_OK`, `CONNECTIVITY_REQUIRED`, or `CLOUD_ONLY` (or canonical equivalents).
-- Provider-dependent jobs remain pending until provider connectivity/readiness exists.
-- User-facing queue dashboards show pending, failed, conflicted, revoked, and completed work with recoverable actions.
-
-#### Offline backups and recovery
-
-- Edge must support local encrypted backup/restore while internet is unavailable.
-- Cloud replication is not a substitute for a valid local backup, and local backup is not a substitute for cloud/DR replication after reconnect.
-- Protect outbox/inbox/authority metadata in backups so restoring an Edge node cannot silently reuse stale authority and create split-brain.
-- A restored node must validate its authority epoch/replication position before accepting new authoritative writes.
+- Use bounded retry/backoff; permanent validation/authz/fiscal failures are not retried forever.
+- Background jobs declare whether they are local-safe, connectivity-required, or cloud-only using existing canonical classification.
+- Edge supports local encrypted backup/restore during internet loss; restored nodes must validate authority epoch/replication position before accepting authoritative writes.
 
 #### Offline verification gates
 
-Any feature claiming offline support must test applicable cases across **web, mobile, and Edge**:
+A feature claiming offline support tests applicable cases across web/mobile/Edge:
 
 - throttled/high-latency/intermittent network;
-- internet loss with LAN/Edge still reachable;
-- total device isolation with no internet/LAN;
+- internet loss with LAN/Edge reachable;
+- total device isolation;
 - browser refresh/app kill/device reboot/Edge restart;
-- queue persistence and resume;
-- duplicate operation replay;
-- large backlog synchronization;
-- out-of-order/partial batch delivery;
+- queue persistence/resume;
+- duplicate replay and out-of-order/partial delivery;
 - concurrent authoritative change;
-- authority failover/fencing and stale-node rejection;
+- authority failover/fencing/stale-node rejection;
 - expired session/offline unlock;
 - guardian/teacher/role revocation before sync;
 - tenant suspension/module disable before sync;
-- financial/receipt numbering uniqueness;
-- marks/attendance/accounting conflict handling;
-- protected-file upload/download replication;
-- provider outage while core workflow continues;
+- fiscal/invoice/receipt numbering uniqueness;
+- marks/attendance/finance/accounting conflict handling;
+- protected-file replication;
+- external provider/CBMS outage while core safe workflow continues;
 - no cross-tenant/user/child leakage;
 - successful convergence and audit consistency after reconnect.
 
-A feature is not **offline complete** because it has cached pages. It is complete only when the usable workflow, local persistence, authority model, authorization, idempotency, conflict handling, queue recovery, files, security, UI state, restart behavior, and reconnect convergence are implemented and verified end-to-end.
+A feature is not **offline complete** because pages are cached. Completion requires usable workflow, local persistence, authority model, authorization, idempotency, conflict handling, queue recovery, files, security, UI state, restart behavior, and reconnect convergence end-to-end.
 
 ## 9. Missing API decision rule
 
 If a web/mobile/platform surface needs data and no safe backend API exists:
 
 1. Inspect current code, OpenAPI/contracts, permissions, DTOs, Prisma, services, and tests.
-2. Confirm the need is real, repeatable, module-owned, tenant-scopable, entitlement/RBAC-gatable, and needed for the active P0 workflow.
+2. Confirm the need is real, repeatable, module-owned, tenant-scopable, entitlement/RBAC-gatable, and required for the active P0 workflow.
 3. If yes, implement the smallest purpose-limited module-owned API and connect it.
-4. If no, show a safe unavailable/locked/permission state and record the gap.
+4. If no, show a safe unavailable/locked/permission state and record the exact gap.
 
 Never invent endpoint contracts, guess response shapes, derive authoritative totals from list APIs, or show developer-facing “Needs backend API” text in school UI.
 
-Use explicit uncertainty labels when needed: `needs backend verification`, `needs OpenAPI confirmation`, `needs mobile DTO`, `needs idempotency confirmation`, `needs offline sync confirmation`, `needs authorization confirmation`.
+Use explicit uncertainty labels when needed: `needs backend verification`, `needs OpenAPI confirmation`, `needs mobile DTO`, `needs idempotency confirmation`, `needs offline sync confirmation`, `needs authorization confirmation`, `needs IRD verification`.
 
 ## 10. Before coding
 
 1. Read focused instructions/canonical docs/current implementation.
 2. Inspect OpenAPI/contracts, Prisma, DTOs, permissions, audit, API clients, migrations, focused tests.
-3. Identify the smallest safe P0 change.
-4. Reuse architecture; do not duplicate services/endpoints/DTOs/models/components/docs.
-5. Do not rewrite working modules without a verified defect or approved reason.
-6. Do not modify unrelated files or weaken tests/validation.
-7. Update focused tests for behavior changes.
-8. Paginate growing lists, avoid unbounded `findMany`, use selective/aggregate queries, review tenant-scoped indexes.
-9. Return safe error envelopes; never surface raw technical errors to web/mobile.
-10. Run relevant checks and report exact commands/results.
+3. For Nepal tax/fiscal/statutory changes, verify current official IRD/MoF/Gazette evidence before coding.
+4. Identify the smallest safe P0 change.
+5. Reuse architecture; do not duplicate services/endpoints/DTOs/models/components/docs.
+6. Do not rewrite working modules without a verified defect or approved reason.
+7. Do not modify unrelated files or weaken tests/validation.
+8. Update focused tests for behavior changes.
+9. Paginate growing lists, avoid unbounded `findMany`, use selective/aggregate queries, review tenant-scoped indexes.
+10. Return safe error envelopes; never surface raw technical errors to web/mobile.
+11. Run relevant checks and report exact commands/results.
 
-If a security/finance/privacy/academic-integrity requirement remains unresolved after canonical-source inspection, mark that slice PARTIAL/BLOCKED rather than inventing behavior; continue independent safe work where possible.
+If a security, finance, fiscal, privacy, or academic-integrity requirement remains unresolved after canonical-source inspection, mark that slice PARTIAL/BLOCKED rather than inventing behavior; continue independent safe work where possible.
 
 ## 11. Definition of done
 
@@ -494,17 +544,20 @@ Development complete requires, where applicable:
 - Server-side tenant/RBAC/entitlement/persona/assignment/guardian enforcement.
 - Suspended tenants/disabled modules fail closed.
 - Sensitive writes/support overrides audited.
-- Money writes idempotent; confirmed records corrected/reversed, not deleted.
+- Money writes idempotent; issued/posted financial facts immutable and corrected through linked credit/debit notes, refunds, reversals, adjustments, or replacements.
+- Applicable IRD/fiscal policy effective-dated and evidence-backed; PAN/tax treatment/document sequence/CBMS state honest, tenant-scoped, auditable, and never hard-coded from stale rules.
+- Required electronic-billing/software-enlistment/CBMS evidence and tenant activation status recorded before compliance claims.
+- Offline fiscalization never fabricates IRD/CBMS success and preserves numbering/reconciliation integrity.
 - Attendance/marks preserve lifecycle and correction history.
 - Honest notification state.
 - Protected-file architecture respected.
 - Growing lists paginated.
-- Complete applicable web/mobile states.
-- Mobile cache/access revocation handled.
-- Focused regression, cross-tenant, role, assignment, guardian, and idempotency tests updated.
+- Complete applicable web/mobile/offline states.
+- Local cache/access revocation handled.
+- Focused regression, cross-tenant, role, assignment, guardian, idempotency, fiscal, and offline tests updated.
 - Relevant checks pass or failures are reported exactly.
 
-Staging/pilot/RC/GA claims additionally require the evidence in `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`, including applicable staging migration/configuration, provider/storage checks, authenticated browser E2E, mobile device QA, backup/restore proof, monitoring/alerts, rollback readiness, and controlled-pilot evidence.
+Staging/pilot/RC/GA claims additionally require evidence in `docs/production/SCHOOLOS_GA_RELEASE_POLICY.md`, including applicable staging migration/configuration, provider/storage/CBMS readiness where relevant, authenticated browser E2E, mobile/Edge QA, backup/restore proof, monitoring/alerts, rollback readiness, and controlled-pilot evidence.
 
 ## 12. Verification
 
@@ -527,7 +580,7 @@ pnpm test:web:e2e
 cd apps/schoolos_mobile && flutter pub get && dart format . && flutter analyze && flutter test
 ```
 
-Run platform-web checks only if that app exists/is touched, using its real package scripts. `pnpm smoke:learning` is relevant only for an allowed M13 security/regression fix; it is not a current P0 pilot gate while M13 is frozen.
+Run platform-web/Edge/fiscal connector checks only if those apps/profiles exist or are touched, using their real package scripts. `pnpm smoke:learning` is relevant only for an allowed M13 security/regression fix; it is not a current P0 pilot gate while M13 is frozen.
 
 Docs-only changes need no runtime checks unless they alter executable commands/configuration/contracts/release procedures.
 
@@ -542,9 +595,11 @@ Remaining P0 blockers:
 Risks:
 Verification run:
 Verification result:
+IRD/fiscal evidence (if applicable):
+Offline/Edge evidence (if applicable):
 Staging/pilot evidence:
 Deferred/not touched:
 Next release action:
 ```
 
-Report verified facts only. Distinguish implementation completion, local verification, staging evidence, pilot evidence, and unresolved blockers.
+Report verified facts only. Distinguish implementation completion, local verification, official fiscal evidence, tenant activation evidence, offline/Edge evidence, staging evidence, pilot evidence, and unresolved blockers.
