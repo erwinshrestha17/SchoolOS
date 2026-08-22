@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ArrowRight, CheckCircle2, LockKeyhole } from 'lucide-react';
 import { useEntitlements } from '../entitlements-provider';
+import { useSchoolWebPersona } from '../../lib/school-web-persona';
 import { ErrorState } from '../ui/error-state';
 import { LoadingState } from '../ui/loading-state';
 import { ModuleLockedState } from '../ui/module-locked-state';
@@ -21,8 +22,7 @@ const modules = [
     label: 'Academics & Report Cards',
     href: '/dashboard/academics',
   },
-  { key: 'homework', label: 'Homework', href: '/dashboard/homework' },
-  { key: 'timetable', label: 'Timetable', href: '/dashboard/timetable' },
+  { key: 'homework', label: 'Homework & Timetable', href: '/dashboard/homework' },
   { key: 'activity', label: 'Activity Feed', href: '/dashboard/activity' },
   { key: 'hr', label: 'HR & Payroll', href: '/dashboard/hr' },
   { key: 'library', label: 'Library', href: '/dashboard/library' },
@@ -34,11 +34,13 @@ const modules = [
     label: 'Notices & Announcements',
     href: '/dashboard/notices',
   },
-  { key: 'learning', label: 'Learning', href: '/dashboard/learning' },
 ] as const;
+
+type ModuleDefinition = (typeof modules)[number];
 
 export function SchoolModulesSettingsWorkspace() {
   const { entitlements, loading, error, hasModule } = useEntitlements();
+  const persona = useSchoolWebPersona();
   if (loading)
     return (
       <div className="p-6">
@@ -63,35 +65,54 @@ export function SchoolModulesSettingsWorkspace() {
     <div className="space-y-6 p-5 pb-20 lg:p-7">
       <SchoolSettingsPageHeader
         title="School Modules"
-        description="View this school’s enabled modules and open module-owned setup. Entitlements can only be changed through authorized Platform workflows."
+        description="View this school’s enabled modules and open only the workspaces appropriate to your current school role. Entitlements can only be changed through authorized Platform workflows."
         access="platform-managed"
       />
       <section className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-950">
         <p className="font-bold">School-visible status only</p>
         <p className="mt-1 leading-6">
-          This page does not expose subscription plans, SaaS billing, or
-          entitlement mutation controls.
+          This page does not expose subscription plans, SaaS billing, frozen
+          Learning scope, or entitlement mutation controls.
         </p>
       </section>
       <section>
         <h2 className="font-bold text-slate-950">Enabled modules</h2>
         <div className="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {enabled.map((item) => (
-            <Link
-              key={item.key}
-              href={item.href}
-              className="group flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-blue-200"
-            >
-              <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
-              <div className="min-w-0 flex-1">
-                <p className="font-bold text-slate-950">{item.label}</p>
-                <p className="mt-1 text-xs font-semibold text-emerald-700">
-                  Enabled for this school
-                </p>
+          {enabled.map((item) => {
+            const href = moduleWorkspaceHref(item, persona, hasModule);
+            const content = (
+              <>
+                <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold text-slate-950">{item.label}</p>
+                  <p className="mt-1 text-xs font-semibold text-emerald-700">
+                    {href
+                      ? 'Enabled for this school'
+                      : 'Enabled · no role-safe setup link from this page'}
+                  </p>
+                </div>
+                {href ? (
+                  <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-blue-700" />
+                ) : null}
+              </>
+            );
+            return href ? (
+              <Link
+                key={item.key}
+                href={href}
+                className="group flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-blue-200"
+              >
+                {content}
+              </Link>
+            ) : (
+              <div
+                key={item.key}
+                className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+              >
+                {content}
               </div>
-              <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-blue-700" />
-            </Link>
-          ))}
+            );
+          })}
         </div>
       </section>
       {enabled.length === 0 ? (
@@ -121,4 +142,39 @@ export function SchoolModulesSettingsWorkspace() {
       ) : null}
     </div>
   );
+}
+
+function moduleWorkspaceHref(
+  item: ModuleDefinition,
+  persona: ReturnType<typeof useSchoolWebPersona>,
+  hasModule: (module: string) => boolean,
+): string | null {
+  if (persona !== 'principal') return item.href;
+
+  switch (item.key) {
+    case 'students':
+      return '/dashboard/students/overview';
+    case 'attendance':
+      return '/dashboard/attendance/overview';
+    case 'exams':
+      return '/dashboard/academics/readiness';
+    case 'hr':
+      return '/dashboard/hr/overview';
+    case 'accounting':
+      return '/dashboard/finance-overview';
+    case 'fees':
+      return hasModule('accounting') ? '/dashboard/finance-overview' : null;
+    case 'activity':
+      return '/dashboard/activity/oversight';
+    case 'notices':
+      return '/dashboard/communications/oversight';
+    case 'library':
+    case 'transport':
+    case 'canteen':
+      return '/dashboard/operations/overview';
+    case 'homework':
+      return null;
+    default:
+      return null;
+  }
 }

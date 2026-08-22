@@ -8,6 +8,7 @@ import {
   UseGuards,
   Req,
   UnauthorizedException,
+  ForbiddenException,
   Post,
   Delete,
 } from '@nestjs/common';
@@ -23,6 +24,7 @@ import type {
   TenantSettingSummary,
   UpdateTenantSettingPayload,
 } from '@schoolos/core';
+import { isPrincipalRestrictedFromInstitutionalSettings } from '@schoolos/core';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { UploadTenantLogoDto } from './dto/upload-tenant-logo.dto';
@@ -43,6 +45,7 @@ export class SettingsController {
     if (!req.auth) {
       throw new UnauthorizedException('Authentication context required');
     }
+    assertInstitutionalSettingsReadAllowed(req.auth);
     return this.settingsService.getSettings(req.auth.tenantId);
   }
 
@@ -63,6 +66,7 @@ export class SettingsController {
     if (!req.auth) {
       throw new UnauthorizedException('Authentication context required');
     }
+    assertInstitutionalSettingsReadAllowed(req.auth);
     return this.platformService.getOnboardingChecklist(req.auth.tenantId);
   }
 
@@ -107,12 +111,14 @@ export class SettingsController {
   @Get('branding/logo/preview')
   @Permissions('settings:read')
   previewSchoolLogo(@CurrentAuth() auth: AuthContext) {
+    assertInstitutionalSettingsReadAllowed(auth);
     return this.settingsService.getSchoolLogoAccess(auth, 'preview');
   }
 
   @Get('branding/logo/download')
   @Permissions('settings:read')
   downloadSchoolLogo(@CurrentAuth() auth: AuthContext) {
+    assertInstitutionalSettingsReadAllowed(auth);
     return this.settingsService.getSchoolLogoAccess(auth, 'download');
   }
 
@@ -137,5 +143,13 @@ export class SettingsController {
       payload.value as Prisma.InputJsonValue,
     );
     return { success: true };
+  }
+}
+
+function assertInstitutionalSettingsReadAllowed(auth: AuthContext) {
+  if (isPrincipalRestrictedFromInstitutionalSettings(auth.roles)) {
+    throw new ForbiddenException(
+      'Institutional settings require School Configuration Owner access.',
+    );
   }
 }

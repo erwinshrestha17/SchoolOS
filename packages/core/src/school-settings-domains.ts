@@ -39,7 +39,10 @@ const FULL_MANAGE_ONLY_KEYS: TenantSettingKey[] = [
   "school_logo",
 ];
 
-const DOMAIN_KEYS: Record<SchoolSettingsDomain, TenantSettingKey[]> = {
+export const SCHOOL_SETTINGS_DOMAIN_KEYS: Record<
+  SchoolSettingsDomain,
+  readonly TenantSettingKey[]
+> = {
   identity: [
     "branding_primary_color",
     "timezone",
@@ -146,12 +149,18 @@ const DOMAIN_KEYS: Record<SchoolSettingsDomain, TenantSettingKey[]> = {
 };
 
 const KEY_TO_DOMAIN = new Map<TenantSettingKey, SchoolSettingsDomain>();
-for (const [domain, keys] of Object.entries(DOMAIN_KEYS) as Array<
-  [SchoolSettingsDomain, TenantSettingKey[]]
+for (const [domain, keys] of Object.entries(SCHOOL_SETTINGS_DOMAIN_KEYS) as Array<
+  [SchoolSettingsDomain, readonly TenantSettingKey[]]
 >) {
   for (const key of keys) {
     KEY_TO_DOMAIN.set(key, domain);
   }
+}
+
+export function getSchoolSettingsKeysForDomain(
+  domain: SchoolSettingsDomain,
+): readonly TenantSettingKey[] {
+  return SCHOOL_SETTINGS_DOMAIN_KEYS[domain];
 }
 
 export function getSchoolSettingsDomainForKey(

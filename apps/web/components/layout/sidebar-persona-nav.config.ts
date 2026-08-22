@@ -174,10 +174,12 @@ export const principalNavGroups: NavGroup[] = [
 ];
 
 /**
- * Institutional Settings is capability-driven, not role-name-driven. A
- * Principal with no delegated settings capability still sees no Settings hub;
- * a Principal who is explicitly granted the required capability may reach it.
- * Backend settings authorization remains authoritative.
+ * Institutional Settings is capability-driven for operational personas, but a
+ * Principal-only shell intentionally stays leadership-focused. When the same
+ * user also holds School Configuration Owner/Admin authority, persona
+ * resolution promotes that session to the admin/configuration shell and this
+ * function can expose Settings there. Backend settings authorization remains
+ * authoritative for every destination and mutation.
  */
 export function shouldShowSettingsHub(
   settingsCaps: {
@@ -186,9 +188,10 @@ export function shouldShowSettingsHub(
   },
   isTeacherPersona: boolean,
   personalOnly: boolean,
-  _persona: SchoolWebPersona,
+  persona: SchoolWebPersona,
 ): boolean {
-  if (isTeacherPersona || personalOnly) return false;
+  const principalLeadershipOnly = ['principal'].includes(persona);
+  if (isTeacherPersona || personalOnly || principalLeadershipOnly) return false;
   return (
     settingsCaps.institutionalNavEnabled &&
     settingsCaps.canAccessInstitutionalSettings

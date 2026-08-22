@@ -5,8 +5,11 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, LockKeyhole, Menu, RotateCcw } from 'lucide-react';
-import type { SchoolSettingsAccess } from '@schoolos/core';
-import type { PermissionKey } from '@schoolos/core';
+import {
+  isPrincipalRestrictedFromInstitutionalSettings,
+  type SchoolSettingsAccess,
+  type PermissionKey,
+} from '@schoolos/core';
 import { cn } from '../../lib/utils';
 import { schoolSettingsApi } from '../../lib/api/school-settings';
 import { useEntitlements } from '../entitlements-provider';
@@ -15,10 +18,9 @@ import { TeacherCapability, useTeacherAccess } from '../../lib/teacher-access';
 import { hasPermission } from '../../lib/session';
 import { useSettingsCapabilities } from '../../lib/permissions-ui';
 import { Drawer } from '../ui/drawer';
+import { PermissionDenied } from '../ui/permission-denied';
 import { SearchInput } from '../ui/search-input';
-import {
-  SidebarNavLink,
-} from '../layout/sidebar-nav-link';
+import { SidebarNavLink } from '../layout/sidebar-nav-link';
 import { SettingsControlCenter } from './settings-control-center';
 import {
   SETTINGS_NAVIGATION,
@@ -72,23 +74,32 @@ export function SettingsRouteFrame({ children }: { children: ReactNode }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { session } = useSession();
-  const { hasModule } = useEntitlements();
+  const { hasModule, loading: entitlementsLoading } = useEntitlements();
   const settingsCaps = useSettingsCapabilities();
   const [query, setQuery] = useState('');
   const [navigationOpen, setNavigationOpen] = useState(false);
   const browseButtonRef = useRef<HTMLButtonElement>(null);
   const { isRestricted } = useTeacherAccess();
   const personalOnly = isRestricted(TeacherCapability.SCHOOL_SETTINGS_ADMIN);
+  const principalInstitutionalRestricted =
+    isPrincipalRestrictedFromInstitutionalSettings(session?.user.roles);
+  const accountOnly = personalOnly || principalInstitutionalRestricted;
+  const isInstitutionalSettingsRoute =
+    pathname.startsWith('/dashboard/settings/') &&
+    !pathname.startsWith('/dashboard/settings/personal/');
   const mayLoadSchoolSettings =
-    !personalOnly &&
+    !accountOnly &&
     settingsCaps.resolution === 'granted' &&
     settingsCaps.canAccessInstitutionalSettings;
 
   const navigationQuery = useQuery({
     queryKey: ['school-settings', 'navigation'],
     queryFn: schoolSettingsApi.getSchoolSettingsNavigation,
-    enabled: mayLoadSchoolSettings,
+    enabled: mayLoadSchoolSettings && !entitlementsLoading,
   });
+  const navigationLoading =
+    !accountOnly &&
+    (entitlementsLoading || (mayLoadSchoolSettings && navigationQuery.isLoading));
 
   const backendItemsById = useMemo(() => {
     const items =
@@ -98,13 +109,13 @@ export function SettingsRouteFrame({ children }: { children: ReactNode }) {
 
   const visibleItems = useMemo(() => {
     return SETTINGS_NAVIGATION.flatMap((definition) => {
-      // School and platform configuration is not a teacher's job. Filtering
-      // here (rather than only in the route guard) keeps the settings hub,
-      // its search, and its drawer consistent with what the guard allows.
-      if (personalOnly && definition.scope !== 'personal') {
+      if (accountOnly && definition.scope !== 'personal') {
         return [];
       }
-      if (definition.requiredModule && !hasModule(definition.requiredModule)) {
+      if (
+        definition.requiredModule &&
+        (entitlementsLoading || !hasModule(definition.requiredModule))
+      ) {
         return [];
       }
       if (definition.backendItemId) {
@@ -121,7 +132,13 @@ export function SettingsRouteFrame({ children }: { children: ReactNode }) {
       }
       return [definition];
     });
-  }, [backendItemsById, hasModule, personalOnly, session]);
+  }, [
+    accountOnly,
+    backendItemsById,
+    entitlementsLoading,
+    hasModule,
+    session,
+  ]);
 
   const filteredItems = useMemo(
     () =>
@@ -159,6 +176,19 @@ export function SettingsRouteFrame({ children }: { children: ReactNode }) {
     setNavigationOpen(false);
   }, [pathname]);
 
+  if (principalInstitutionalRestricted && isInstitutionalSettingsRoute) {
+    return (
+      <div className="p-4 sm:p-6 lg:p-7">
+        <PermissionDenied
+          title="School Settings access needed"
+          description="Principal accounts use the leadership workspaces for school oversight. Institutional configuration requires the School Configuration Owner role. Personal profile, security, and notification preferences remain available from Personal Settings."
+          resource="School Settings"
+          action="school configuration authority"
+        />
+      </div>
+    );
+  }
+
   if (migratedDestination) {
     return (
       <div className="flex min-h-[420px] items-center justify-center">
@@ -172,11 +202,15 @@ export function SettingsRouteFrame({ children }: { children: ReactNode }) {
 
   const content =
     pathname === '/dashboard/settings' ? (
-      <SettingsControlCenter
-        items={filteredItems}
-        canLoadSchoolOverview={backendItemsById.has('overview')}
-        searchQuery={query}
-      />
+      navigationLoading ? (
+        <SettingsControlCenterSkeleton />
+      ) : (
+        <SettingsControlCenter
+          items={filteredItems}
+          canLoadSchoolOverview={backendItemsById.has('overview')}
+          searchQuery={query}
+        />
+      )
     ) : (
       children
     );
@@ -187,12 +221,12 @@ export function SettingsRouteFrame({ children }: { children: ReactNode }) {
         <div className="mx-auto flex max-w-[1560px] flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
-              {personalOnly ? 'My Account' : 'Settings'}
+              {accountOnly ? 'My Account' : 'Settings'}
             </h1>
             <p className="mt-1 text-sm leading-6 text-slate-600">
-              {personalOnly
+              {accountOnly
                 ? 'Manage your profile, sign-in security, and notification preferences.'
-                : 'Manage your personal preferences and school configuration.'}
+                : 'Manage your personal preferences and the school configuration available to your role.'}
             </p>
           </div>
           <div className="flex w-full items-center gap-2 lg:max-w-md">
@@ -202,12 +236,14 @@ export function SettingsRouteFrame({ children }: { children: ReactNode }) {
               label="Search settings"
               placeholder="Search settings"
               className="min-w-0 flex-1"
+              disabled={navigationLoading}
             />
             <button
               ref={browseButtonRef}
               type="button"
               onClick={() => setNavigationOpen(true)}
-              className="inline-flex h-11 shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 xl:hidden"
+              disabled={navigationLoading}
+              className="inline-flex h-11 shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 disabled:cursor-wait disabled:opacity-60 xl:hidden"
               aria-label="Browse settings"
             >
               <Menu className="h-4 w-4" aria-hidden="true" />
@@ -226,7 +262,7 @@ export function SettingsRouteFrame({ children }: { children: ReactNode }) {
             groups={groups}
             activeItemId={activeItem?.id}
             query={query}
-            loading={navigationQuery.isLoading}
+            loading={navigationLoading}
             schoolNavigationError={
               mayLoadSchoolSettings && navigationQuery.isError
             }
@@ -242,7 +278,7 @@ export function SettingsRouteFrame({ children }: { children: ReactNode }) {
                 className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 transition hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
               >
                 <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-                Settings
+                {accountOnly ? 'My Account' : 'Settings'}
               </Link>
             </div>
           ) : null}
@@ -253,8 +289,12 @@ export function SettingsRouteFrame({ children }: { children: ReactNode }) {
       <Drawer
         isOpen={navigationOpen}
         onClose={() => setNavigationOpen(false)}
-        title="Settings"
-        description={personalOnly ? 'Choose a personal setting.' : 'Choose a personal or school setting.'}
+        title={accountOnly ? 'My Account' : 'Settings'}
+        description={
+          accountOnly
+            ? 'Choose a personal setting.'
+            : 'Choose a personal or school setting.'
+        }
         width="sm"
         returnFocusRef={browseButtonRef}
       >
@@ -262,13 +302,35 @@ export function SettingsRouteFrame({ children }: { children: ReactNode }) {
           groups={groups}
           activeItemId={activeItem?.id}
           query={query}
-          loading={navigationQuery.isLoading}
+          loading={navigationLoading}
           schoolNavigationError={
             mayLoadSchoolSettings && navigationQuery.isError
           }
           onRetry={() => void navigationQuery.refetch()}
         />
       </Drawer>
+    </div>
+  );
+}
+
+function SettingsControlCenterSkeleton() {
+  return (
+    <div
+      className="space-y-6 p-4 pb-20 sm:p-6 lg:p-7"
+      aria-label="Loading settings"
+    >
+      <div className="space-y-2">
+        <div className="h-6 w-52 animate-pulse rounded bg-slate-200" />
+        <div className="h-4 w-80 max-w-full animate-pulse rounded bg-slate-100" />
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        {Array.from({ length: 4 }, (_, index) => (
+          <div
+            key={index}
+            className="h-40 animate-pulse rounded-2xl border border-slate-200 bg-white"
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -294,41 +356,49 @@ function SettingsNavigation({
 }) {
   return (
     <nav className="space-y-5 p-3" aria-label="Settings navigation">
-      {groups.map((group) => (
-        <section key={group.id} aria-labelledby={`settings-group-${group.id}`}>
-          <h2
-            id={`settings-group-${group.id}`}
-            className="sidebar-nav-heading px-3 pb-1 pt-0 text-[11px] tracking-[0.12em]"
-          >
-            {group.label}
-          </h2>
-          <div className="space-y-0.5">
-            {group.items.map((item) => {
-              const selected = activeItemId === item.id;
-              return (
-                <SidebarNavLink
-                  key={item.id}
-                  href={item.href}
-                  label={item.label}
-                  icon={item.icon}
-                  active={selected}
-                  trailing={
-                    item.status === 'platform-managed' ? (
-                      <span
-                        className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-[var(--sidebar-heading)]"
-                        aria-label="Platform managed"
-                        title="Platform managed"
-                      >
-                        <LockKeyhole className="h-3.5 w-3.5" aria-hidden="true" />
-                      </span>
-                    ) : null
-                  }
-                />
-              );
-            })}
-          </div>
-        </section>
-      ))}
+      {!loading
+        ? groups.map((group) => (
+            <section
+              key={group.id}
+              aria-labelledby={`settings-group-${group.id}`}
+            >
+              <h2
+                id={`settings-group-${group.id}`}
+                className="sidebar-nav-heading px-3 pb-1 pt-0 text-[11px] tracking-[0.12em]"
+              >
+                {group.label}
+              </h2>
+              <div className="space-y-0.5">
+                {group.items.map((item) => {
+                  const selected = activeItemId === item.id;
+                  return (
+                    <SidebarNavLink
+                      key={item.id}
+                      href={item.href}
+                      label={item.label}
+                      icon={item.icon}
+                      active={selected}
+                      trailing={
+                        item.status === 'platform-managed' ? (
+                          <span
+                            className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-[var(--sidebar-heading)]"
+                            aria-label="Platform managed"
+                            title="Platform managed"
+                          >
+                            <LockKeyhole
+                              className="h-3.5 w-3.5"
+                              aria-hidden="true"
+                            />
+                          </span>
+                        ) : null
+                      }
+                    />
+                  );
+                })}
+              </div>
+            </section>
+          ))
+        : null}
 
       {loading ? (
         <div className="space-y-2 px-1" aria-label="Loading school settings">

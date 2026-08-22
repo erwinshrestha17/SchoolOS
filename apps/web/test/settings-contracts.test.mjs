@@ -41,6 +41,7 @@ describe('SchoolOS Settings Page Contracts', () => {
     assert.match(navigation, /searchKeywords/);
     assert.match(navigation, /backendItemId/);
     assert.match(navigation, /requiredPermission/);
+    assert.match(navigation, /SETTINGS_BACKEND_ITEM_DISPOSITIONS/);
     assert.doesNotMatch(frame, /Applies only to this school|View only/);
   });
 
@@ -52,7 +53,8 @@ describe('SchoolOS Settings Page Contracts', () => {
     assert.match(hub, /SETTINGS_NAVIGATION_GROUPS/);
     assert.match(hub, /Only settings supported for your account/);
     assert.match(hub, /Platform managed/i);
-    assert.doesNotMatch(hub, /Your access|SCHOOL_SETTINGS_ACCESS_LABELS/);
+    assert.match(hub, /View-only/);
+    assert.match(hub, /Can manage/);
     assert.doesNotMatch(hub, /min-h-44/, 'no large card wall on the overview');
     assert.doesNotMatch(hub, /Upgrade Plan/);
   });
@@ -96,6 +98,8 @@ describe('SchoolOS Settings Page Contracts', () => {
     assert.doesNotMatch(policy, /Not configured yet/);
     assert.match(policy, /Change history/);
     assert.match(policy, /operationalImpact/);
+    assert.match(policy, /buildSchoolSettingsDomainVersion/);
+    assert.match(catalog, /domain: 'academic'/);
     assert.match(catalog, /navigationItemId:/);
     assert.match(catalog, /operationalImpact:/);
   });
@@ -112,13 +116,16 @@ describe('SchoolOS Settings Page Contracts', () => {
     assert.match(navigation, /backendItemId: ['"]communication['"]/);
   });
 
-  it('maintains tenant scoping for all settings updates', () => {
+  it('uses a tenant-scoped atomic backend contract for school policy updates', () => {
     const policy = read('components/settings/settings-policy-workspace.tsx');
+    const client = read('lib/api/school-settings.ts');
 
-    assert.match(
-      policy,
-      /api\.updateTenantSetting\(field\.key, form\[field\.key\]\)/,
-    );
+    assert.match(policy, /schoolSettingsApi\.updateSchoolSettingsDomain/);
+    assert.match(policy, /expectedVersion/);
+    assert.match(policy, /idempotencyKey/);
+    assert.match(policy, /Reason for change/);
+    assert.match(client, /\/settings\/domains\/\$\{domain\}/);
+    assert.doesNotMatch(policy, /api\.updateTenantSetting/);
     assert.doesNotMatch(policy, /api\.updateGlobalSetting/);
     assert.doesNotMatch(policy, /tenantId: ['"]all['"]/);
   });
@@ -271,6 +278,11 @@ describe('SchoolOS Settings Page Contracts', () => {
       'school/academic-year',
       'school/academic-structure',
       'school/modules',
+      'admissions',
+      'fees',
+      'accounting',
+      'hr-payroll',
+      'security',
       'policies/attendance',
       'policies/activity-consent',
       'access/users',
