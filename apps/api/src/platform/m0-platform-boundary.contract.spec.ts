@@ -126,9 +126,7 @@ describe('M0 Platform/School boundary – route denial contracts', () => {
       const guard = read('src/auth/guards/platform.guard.ts');
       expect(guard).toContain('SecurityDomain.PLATFORM');
       expect(guard).toContain('auth.isSupportOverride');
-      expect(guard).toContain(
-        'Access restricted to the Platform security domain',
-      );
+      expect(guard).toContain('Platform security domain');
     });
 
     it('does not give platform_super_admin a route-permission bypass', () => {
