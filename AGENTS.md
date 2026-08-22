@@ -2,7 +2,7 @@
 
 Repository-wide rules for human and AI contributors. Keep work production-oriented, scoped, evidence-based, and Nepal-only.
 
-**Current posture:** P0 production-safety execution for a controlled real-school pilot. Do not expand scope to create an appearance of readiness.
+**Current posture:** P0 production-safety execution for a controlled real-school pilot, with offline-first operation as a repository-wide product invariant. School web and mobile must remain usable through poor connectivity and internet outages without weakening authorization, financial integrity, or academic integrity.
 
 **Active P0 modules:** M0–M7, M11, M12, M15 as required by current P0 workflows.
 
@@ -95,7 +95,7 @@ P0 execution order:
 5. P0-05 — reproducible IEMIS validation/export; no direct-sync claim without an authorized interface.
 6. P0-06 — fee/receipt/reconciliation integrity and idempotent M3→M11 posting.
 7. P0-07 — privacy, safeguarding, consent, protected files, sensitive-access audit.
-8. P0-08 — bounded offline/synchronization correctness.
+8. P0-08 — offline-first web/mobile operation, School Edge continuity, synchronization, conflict recovery, and no-internet resilience.
 9. Nepal localization correctness: Nepali Unicode, NPR, Nepal timezone, Nepal address hierarchy, BS/AD presentation with canonical date storage.
 10. Backup/restore, clean migrations, observability, provider/storage readiness, and controlled-pilot evidence.
 
@@ -149,7 +149,7 @@ Keep:
 - Flutter companion app.
 - `packages/core` where appropriate.
 
-Do not introduce microservices, another primary database/search cluster, GPU infrastructure, Kubernetes, or unrelated frameworks without explicit approval.
+Do not introduce microservices, a different primary database technology/search cluster, GPU infrastructure, Kubernetes, or unrelated frameworks without explicit approval. **Owner-approved offline exception:** an Edge-enabled school may run a tenant-bound local deployment of the same SchoolOS modular monolith with local PostgreSQL, Redis/BullMQ where required, and a local StorageAdapter so the school can continue operating without internet. This is an offline deployment mode of existing architecture, not a forked product or new microservice architecture.
 
 Mandatory boundaries:
 
@@ -160,6 +160,8 @@ Mandatory boundaries:
 - Source modules emit normalized events; M12 owns notification delivery.
 - M15 owns notice authoring/publishing and hands normalized events to M12.
 - M13 remains frozen and logically separate; preserve existing data/contracts.
+- Offline-first is cross-cutting: cloud, School Edge, web PWA/cache, and Flutter local stores must use the same domain contracts, authorization rules, lifecycle semantics, idempotency rules, and audit model.
+- For Edge-enabled tenants, prevent split-brain with an explicit tenant/site write-authority model and authority epoch/lease/failover semantics; never allow cloud and Edge to silently finalize conflicting authoritative writes.
 
 ## 7. Security, authorization, and isolation
 
@@ -198,7 +200,7 @@ Use `Feature module → FileRegistryService → StorageService → StorageAdapte
 
 ### Money
 
-Backend/database totals are authoritative. Money writes are idempotent and audited. Confirmed payments, receipts, accounting, payroll, refunds, and adjustments use reversal/correction, never silent deletion/mutation. Official totals are never recomputed in web/mobile. High-risk financial writes remain online-only unless explicitly approved with backend reconciliation.
+Authoritative SchoolOS runtime totals are authoritative. Money writes are idempotent and audited. Confirmed payments, receipts, accounting, payroll, refunds, and adjustments use reversal/correction, never silent deletion/mutation. Official totals are never independently recomputed in browser/mobile clients. High-risk financial workflows may continue without **internet** only through the trusted School Edge authority; an isolated browser/phone may draft or queue but must not independently finalize shared financial records. External payment-provider actions still require connectivity and must remain pending/queued until the provider can be reached.
 
 ### Notifications / notices
 
@@ -208,17 +210,23 @@ Feature modules emit normalized events; they do not call providers directly. M12
 
 - One screen = one primary job.
 - Real APIs only; no fake production data.
-- Paginate growing lists server-side.
-- Handle loading, empty, success, error, permission, module-locked, validation, queued, conflict, partial-failure, and file-unavailable states where applicable.
-- High-risk actions require confirmation/reason where required.
-- KPIs are backend-owned, time-bound, actionable, and honest; never fake `0` for unavailable data.
+- The school web application must be **offline-first/installable where practical**: cache the application shell and approved tenant/user projections, persist approved local drafts/queues, survive reload/app restart, and reconnect automatically to School Edge or cloud.
+- When internet is unavailable but School Edge is reachable on the local network, the web system should continue normal tenant operations against Edge using the same contracts and authorization behavior as cloud.
+- When neither cloud nor Edge is reachable, the browser may continue from protected local cache and local operation queue; shared authoritative finalization waits for an authority connection.
+- Paginate growing lists at the authoritative runtime; never preload an entire tenant merely to support offline.
+- Handle loading, empty, success, error, permission, module-locked, local-only, queued, syncing, stale, conflict, rejected, revoked, partial-failure, and file-unavailable states where applicable.
+- High-risk actions require confirmation/reason where required, including when executed through School Edge.
+- KPIs are authoritative-runtime-owned, time-bound, actionable, and honest; never fake `0` for unavailable/stale data.
 
 ### Mobile
 
 - Companion app; persona-first, purpose-limited APIs; no admin-shaped payloads.
-- Safe offline reads plus only approved idempotent writes.
-- Show queued/synced/conflict/stale/revoked/failed states where relevant.
-- Tenant/child/assignment/access changes must invalidate no-longer-authorized local data.
+- Mobile is **local-first**: approved user data, workflow state, drafts, files/thumbnails, and operation queues required for the persona must be available from a protected local store after first successful provisioning/sync.
+- The app must support cloud-online, School-Edge/LAN, intermittent-network, and fully disconnected device modes without crashing or presenting fake success.
+- Approved writes are recorded locally first with stable operation IDs and synchronized to the active authority when available.
+- Show `local`, `queued`, `syncing`, `synced`, `stale`, `conflict`, `rejected`, `revoked`, and `failed` states where relevant.
+- Tenant/child/assignment/access changes must invalidate no-longer-authorized local data and queued writes when the app learns of the change.
+- Do not require a network round trip merely to open the app, switch among already provisioned children/schools, inspect cached data, create an approved draft, or review queued work.
 
 Biometrics for Parent/Teacher/Principal:
 
@@ -229,101 +237,226 @@ Biometrics for Parent/Teacher/Principal:
 - Biometrics are device-local unlock only; never store raw biometric templates.
 - Logout/session revocation/account recovery/device replacement/permission loss must invalidate protected local access appropriately.
 
-### Offline features and synchronization
+### Offline-first operation and synchronization
 
-SchoolOS mobile must remain useful on unstable/low-bandwidth Nepal networks without making the device authoritative. **The server/database is always the source of truth.** Offline mode is a bounded resilience capability, not an alternate backend.
+**Offline-first is a required product capability for both the School Management System and the mobile app.** SchoolOS must tolerate slow, intermittent, high-latency, or unavailable internet without losing work or corrupting authoritative records.
 
-#### Allowed offline during P0
-
-- M2 attendance: cache the currently authorized assigned roster; create/edit a local attendance draft; queue an explicitly supported idempotent submission for later sync.
-- M5 activities: create/edit local activity drafts and queue approved draft/media uploads. Publication/moderation remains server-authoritative.
-- M6 homework: create/edit teacher homework drafts and preserve unsent attachment metadata; publication/submission acceptance is server-authoritative.
-- Read-only cache: published timetable, assigned roster, notices, notifications, and other explicitly approved purpose-limited projections.
-- User-visible sync state: `local/draft`, `queued`, `syncing`, `synced`, `stale`, `conflict`, `rejected`, `revoked`, `failed`. Do not label locally queued data as successfully submitted.
-
-No other workflow becomes offline-capable merely because a local database/cache exists. Offline marks entry, official academic publication, and additional write domains require explicit owner approval plus a dedicated conflict/idempotency design.
-
-#### Online-only / forbidden offline authoritative actions
-
-- Fees/payments, refunds, reversals, cashier close, reconciliation, receipt issuance.
-- Payroll calculation/finalization/payment and M11 journals/vouchers/period locks.
-- Result publication/withdrawal, marks unlock/reopen, official report-card generation/publication.
-- Guardian relationship/custody/capability changes.
-- Roles, permissions, teacher assignments, entitlements, tenant or institution configuration.
-- Compliance-profile activation and IEMIS/government export approval/submission.
-- Platform-control-plane writes, support overrides, provider secrets/configuration.
-- Safeguarding-record changes unless a future explicitly approved secure offline design exists.
-
-When offline, these surfaces must show an honest connection-required state; never simulate success or create an unofficial local financial/academic record.
-
-#### Required offline operation envelope
-
-Every queued write must carry the existing canonical equivalents of:
+"Fully offline" means SchoolOS provides three explicit operating modes rather than pretending every device can safely become an independent server:
 
 ```text
-clientOperationId
+Mode A — Cloud online
+    Web/mobile → Cloud SchoolOS authority
+
+Mode B — Internet unavailable, school LAN available
+    Web/mobile → School Edge authority → local PostgreSQL/Redis/storage
+    Edge queues replication/delivery work for cloud reconnect
+
+Mode C — Device fully isolated: no internet and no LAN/Edge
+    Web/mobile → protected local cache + local operation queue
+    User can continue approved work; shared finalization waits for authority
+```
+
+The UI must clearly show the active connectivity/authority state. A network outage must not be presented as a generic fatal error.
+
+#### School Edge runtime
+
+To support real whole-school operation during internet outages, SchoolOS may provide a **School Edge** deployment profile for a tenant/site.
+
+Requirements:
+
+- Reuse the same NestJS modules/domain services/contracts as cloud; do not build separate offline business logic.
+- Use tenant-bound local PostgreSQL as the authoritative operational database while that Edge authority is active.
+- Use local Redis/BullMQ only where current jobs/queues require it; jobs that need internet wait safely.
+- Use a local `StorageAdapter` under the existing File Registry/StorageService boundary for protected files created during outage; replicate by stable file ID/content hash when connectivity returns.
+- Bind an Edge node to explicitly provisioned tenant/site identity; it must not become a cross-tenant platform node.
+- Encrypt secrets and local sensitive data at rest; Edge administration is not ordinary school-user access.
+- Expose local health, disk/capacity, backup, queue, replication lag, and last-cloud-sync status.
+- Edge upgrades/migrations must use the same schema/contracts and be rollback-aware; never create an incompatible local schema fork.
+
+#### Write authority and split-brain prevention
+
+For each Edge-enabled tenant/site, authoritative writes must have a single active authority model.
+
+- Track `authorityNodeId` and an `authorityEpoch`/equivalent fencing token for authoritative operation streams.
+- Cloud and Edge must not silently finalize the same aggregate under different authority epochs.
+- Failover/promotion must be explicit, audited, and fenced; stale nodes cannot resume writes after a newer authority epoch exists.
+- Operations carry stable IDs and aggregate/entity versions. Replays are idempotent.
+- Conflicting authoritative histories are never auto-merged for money, attendance finalization, marks/results, guardian/custody, payroll, permissions, or accounting.
+- If an authority conflict is detected after reconnect, quarantine the affected aggregate/workflow and require the defined reconciliation/correction path.
+
+#### Core school workflows during internet outage
+
+When **School Edge is reachable**, active tenant workflows should continue locally as far as they do not depend on an external provider. This includes, subject to normal permissions/locks/entitlements:
+
+- M0 school-side identity/session support, school configuration reads, audit capture, local job/file operations; Platform control-plane operations remain cloud/internal.
+- M1 admissions/student/guardian operational records and protected documents.
+- M2 attendance capture, submit/finalize/lock/correction workflows.
+- M3 fee invoicing, cash/manual-bank collection, receipts, cashier operations, refunds/reversals, reconciliation against locally available evidence.
+- M4 marks entry/review/lock/result calculation/publication/report-card generation where all required data/policies are local.
+- M5 activity/milestone capture and local media processing where available.
+- M6 homework/timetable operations.
+- M7 HR/attendance/leave/payroll workflows.
+- M11 journals/vouchers/ledger/reporting/period operations.
+- M12 local in-app notification state and delivery queue creation.
+- M15 notice drafting/approval/publishing to locally reachable SchoolOS users.
+
+All of these still use normal authorization, audit, idempotency, lifecycle, and correction/reversal rules. "Offline" is never permission bypass.
+
+#### External dependencies during outage
+
+Some operations are physically impossible without external connectivity. SchoolOS must degrade cleanly and queue/reconcile instead of failing the surrounding workflow.
+
+Examples:
+
+- Digital-wallet/card/payment-gateway initiation, callback verification, and provider settlement.
+- SMS, email, push-provider delivery, voice providers, remote webhooks.
+- Direct IEMIS/government submission or any external API sync.
+- Cloud-only Platform Operator/support operations.
+- Remote object-storage replication when the school is using Edge-local storage.
+- Cloud backups/telemetry/observability export.
+
+Use explicit states such as `pending-connectivity`, `queued-for-provider`, `awaiting-verification`, `delivery-deferred`, or the canonical existing equivalents. Never mark an external action successful before provider confirmation.
+
+#### Fully isolated web/mobile device behavior
+
+When a device has **no cloud and no School Edge/LAN connection**, it must still open and remain useful from the last authorized local snapshot.
+
+Allowed locally:
+
+- Browse already authorized cached records needed by the persona.
+- Create/edit local drafts for workflows the user is authorized to perform.
+- Capture attendance, homework, activity, notes/remarks, forms, requests, and file/media references as queued operations where the module supports it.
+- Prepare marks, fee/cashier entries, approvals, accounting entries, payroll changes, result actions, or other high-risk work as **local pending operations** only when a dedicated offline contract exists.
+- Review queue status, prior sync history, local conflicts, and last-known data freshness.
+
+An isolated device must not claim that a shared high-risk record is officially finalized when no authoritative SchoolOS runtime has accepted it. Once cloud/Edge returns, the queued operation is re-authorized and either accepted, rejected, or conflicted.
+
+#### Offline authentication and authorization
+
+- First provisioning/sign-in requires a trusted authority unless the device/user was already provisioned for offline use.
+- Edge can authenticate locally provisioned school users using approved local auth material/verification flow; do not depend on cloud availability for ordinary on-campus sign-in after provisioning.
+- Mobile may unlock an existing protected local session using configured biometric/device credential fallback.
+- Cache a signed/versioned offline authorization snapshot containing only required tenant/persona/relationship/assignment/capability scope and its issuance/freshness metadata.
+- Local authorization never grants more scope than the last trusted snapshot.
+- Edge-side role/guardian/assignment revocation applies immediately on Edge and propagates to connected clients.
+- Fully isolated clients purge/restrict data when they next learn of revocation. For especially sensitive capabilities, use a bounded offline authorization lease/grace policy rather than unlimited stale authority.
+- Never allow offline mode to manufacture a new Platform Operator, tenant, entitlement, permission, guardian relation, or teacher assignment.
+
+#### Required operation/sync envelope
+
+Queued or replicated writes must use canonical equivalents of:
+
+```text
+operationId / clientOperationId
+originNodeId
+authorityNodeId
+authorityEpoch
 deviceId
 tenantId
 userId
 persona/context
-assignmentVersion or authorizationVersion where relevant
-entityId
+assignmentVersion / authorizationVersion where relevant
+aggregate/entityId
 baseEntityVersion / expectedVersion
-createdAtClient
-lastModifiedAtClient
+occurredAtClient
+acceptedAtAuthority
+localSequence / authoritySequence where relevant
 syncAttemptCount
 syncStatus
+payloadVersion
 ```
 
-Client timestamps are diagnostic only; they do not override server time, academic periods, locks, deadlines, or authorization. Never trust a client-supplied `tenantId`, user, assignment, child relation, lifecycle state, or official total merely because it was captured offline.
+Client timestamps are diagnostic. They do not override authoritative time, fiscal/academic period rules, locks, deadlines, sequence allocation, or permissions.
 
-#### Sync acceptance rules
+#### IDs, numbering, and financial integrity offline
 
-When connectivity returns, the API must re-evaluate the operation as if it were a new online request:
+- Use globally collision-resistant internal IDs for offline-created records.
+- Any human-facing sequential numbers that must be generated during an internet outage—such as receipts/vouchers—must use an approved Edge allocation strategy that guarantees tenant/site uniqueness, for example preallocated sequence blocks or an Edge-owned sequence namespace.
+- Never let two isolated clients independently invent the same official receipt/invoice/voucher sequence.
+- Cash/manual-bank transactions may be accepted through Edge and posted locally; digital provider payments remain pending until provider verification.
+- Reconnect must preserve original transaction IDs and audit history; do not delete/recreate transactions simply to make cloud IDs match.
+- M3→M11 and M7→M11 postings remain idempotent across Edge/cloud replication.
 
-1. Authenticate the current session/device.
-2. Resolve trusted `tenantId` and user context server-side.
-3. Re-check tenant status, module entitlement, persona permission, teacher assignment/guardian scope, record lock, and applicable deadline/policy.
-4. Deduplicate by `clientOperationId`/idempotency key.
-5. Compare the submitted base/entity version with the current authoritative version.
-6. Accept atomically, reject safely, or return an explicit conflict.
-7. Emit audit/notification events only after authoritative acceptance.
-8. Return the authoritative server record/version so local state can converge.
+#### Sync and replication rules
 
-Never auto-convert an authorization failure or conflict into success. Never use silent last-write-wins for attendance, marks, student identity, protected records, or any authoritative school record.
+When connectivity changes, synchronization is automatic but never blind:
 
-#### Conflict behavior
+1. Discover the active trusted authority: local Edge first when configured/reachable, otherwise cloud according to tenant routing policy.
+2. Authenticate node/device and validate tenant binding.
+3. Exchange cursors/checkpoints and schema/contract versions.
+4. Push immutable outbox operations/events in deterministic order where the domain requires ordering.
+5. Deduplicate by operation/event ID.
+6. Validate authority epoch, authorization snapshot, entity/aggregate version, locks, entitlements, and business invariants.
+7. Accept atomically or return explicit reject/conflict results.
+8. Pull authoritative changes and tombstone/revocation events.
+9. Reconcile local cache/materialized projections.
+10. Upload/download protected files by stable file identity/content hash.
+11. Resume deferred provider jobs only after connectivity/provider readiness is confirmed.
+12. Persist checkpoints so app/Edge restarts resume without replay corruption.
 
-- **Same operation replay:** return the original result; do not create duplicates.
-- **Server record changed:** mark `conflict`; retain the local draft and the server version; require the defined domain resolution flow.
-- **Assignment/guardian access removed:** mark `revoked`; do not retry; immediately remove unauthorized cached projections.
-- **Tenant suspended/module disabled:** stop queued writes for that scope and fail closed.
-- **Session expired/network/provider unavailable:** preserve safe drafts; retry only transient failures with bounded backoff after re-authentication where required.
-- **Permanent validation/business-rule failure:** mark `rejected`; show the reason in safe user-facing language; do not retry forever.
+Sync must be resumable, chunked/batched, bandwidth-aware, and safe under repeated disconnect/reconnect cycles.
 
-#### Local data security and cache isolation
+#### Conflict handling
 
-- Store only the minimum data required for the approved offline workflow.
-- Use platform secure storage for credentials/refresh material and encrypted/protected application storage for sensitive cached data where supported by the existing mobile architecture.
-- Partition cached/queued data by tenant + authenticated user + persona/context; child/assignment-specific projections must not bleed across switches.
-- Logout, account recovery, device/session revocation, school switch, guardian revocation, teacher-assignment removal, tenant suspension, or permission loss must invalidate affected protected local data and queued writes.
-- Do not cache provider secrets, platform data, unrestricted finance records, safeguarding dossiers, full HR/payroll datasets, or unrelated student records for offline convenience.
-- Cached data must carry freshness/last-synced metadata; stale data is visually distinguishable from current server data.
+- **Duplicate replay:** return the original accepted result; no duplicate records.
+- **Non-overlapping safe changes:** merge only when the domain explicitly defines a deterministic merge.
+- **Server/Edge record changed from submitted base version:** mark conflict and retain both authoritative and local intent.
+- **Attendance/marks/result/finance/payroll/accounting conflict:** never last-write-wins; use explicit correction/reversal/review flow.
+- **Guardian/assignment/permission revoked:** mark operation `revoked`/`rejected`; do not keep retrying; purge unauthorized projections.
+- **Tenant suspended/module disabled:** stop affected writes immediately when the active authority knows the state.
+- **Contract/schema mismatch:** stop incompatible replication and surface upgrade-required/blocked state; never coerce unknown payloads.
 
-#### Queue and retry discipline
+#### Local cache/storage rules
 
-- Persist approved queues across app restart without losing idempotency IDs.
-- Keep ordering only where the domain requires it; do not assume all queued operations can be replayed blindly in creation order.
-- Use bounded retry/backoff for transient transport/server failures; avoid retry storms.
-- Do not repeatedly retry `403`, revoked access, validation failures, or deterministic conflicts.
-- Large media uploads may resume/retry only through the approved protected-file/upload architecture; never embed large base64 payloads in the queue/database.
-- Expose a user-visible pending/failed count and per-item recovery path for actionable queued work.
+- Store only data required by the user's persona and configured offline scope; offline-first does not mean "download the whole tenant to every device."
+- Partition local data by tenant + user + persona/context and, where applicable, school/site/child/assignment.
+- Protect credentials/refresh material with platform secure storage and sensitive local datasets with the existing encrypted/protected storage design.
+- Cache protected files only when explicitly allowed; enforce local access checks and expiry/retention rules.
+- Track `lastSyncedAt`, source authority, snapshot/version, and stale state for locally displayed data.
+- Logout, school/account switch, device/session revocation, guardian revocation, teacher-assignment removal, or permission loss must clear or quarantine affected cached data/queues.
+- Preserve safe unsynced user work before destructive cache cleanup only when doing so does not retain data the user is no longer authorized to possess.
 
-#### Offline verification
+#### Queue, jobs, and provider behavior
 
-Any touched offline workflow must test, as applicable: airplane-mode creation, app kill/restart, duplicate replay, server-side concurrent change, expired session, assignment/guardian revocation before sync, tenant/module disable before sync, conflict presentation, successful convergence, cache purge, and no cross-tenant/user leakage.
+- Persist outbox/queue state across browser/app/Edge restart.
+- Use bounded retry with jitter/backoff for transient failures; do not create retry storms after a long outage.
+- Permanent `4xx`/validation/authz failures are not retried forever.
+- Background jobs declare whether they are `LOCAL_OK`, `CONNECTIVITY_REQUIRED`, or `CLOUD_ONLY` (or canonical equivalents).
+- Provider-dependent jobs remain pending until provider connectivity/readiness exists.
+- User-facing queue dashboards show pending, failed, conflicted, revoked, and completed work with recoverable actions.
 
-A feature is not “offline ready” because data is cached. It is complete only when authorization revalidation, idempotency, conflict handling, revocation cleanup, persistence across restart, UI status, and focused tests are implemented end-to-end.
+#### Offline backups and recovery
+
+- Edge must support local encrypted backup/restore while internet is unavailable.
+- Cloud replication is not a substitute for a valid local backup, and local backup is not a substitute for cloud/DR replication after reconnect.
+- Protect outbox/inbox/authority metadata in backups so restoring an Edge node cannot silently reuse stale authority and create split-brain.
+- A restored node must validate its authority epoch/replication position before accepting new authoritative writes.
+
+#### Offline verification gates
+
+Any feature claiming offline support must test applicable cases across **web, mobile, and Edge**:
+
+- throttled/high-latency/intermittent network;
+- internet loss with LAN/Edge still reachable;
+- total device isolation with no internet/LAN;
+- browser refresh/app kill/device reboot/Edge restart;
+- queue persistence and resume;
+- duplicate operation replay;
+- large backlog synchronization;
+- out-of-order/partial batch delivery;
+- concurrent authoritative change;
+- authority failover/fencing and stale-node rejection;
+- expired session/offline unlock;
+- guardian/teacher/role revocation before sync;
+- tenant suspension/module disable before sync;
+- financial/receipt numbering uniqueness;
+- marks/attendance/accounting conflict handling;
+- protected-file upload/download replication;
+- provider outage while core workflow continues;
+- no cross-tenant/user/child leakage;
+- successful convergence and audit consistency after reconnect.
+
+A feature is not **offline complete** because it has cached pages. It is complete only when the usable workflow, local persistence, authority model, authorization, idempotency, conflict handling, queue recovery, files, security, UI state, restart behavior, and reconnect convergence are implemented and verified end-to-end.
 
 ## 9. Missing API decision rule
 
