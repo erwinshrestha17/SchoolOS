@@ -2,7 +2,6 @@ import type { PermissionKey, SchoolWebPersona } from '@schoolos/core';
 import { TeacherCapability } from '@schoolos/core';
 import {
   AlertTriangle,
-  Bell,
   BriefcaseBusiness,
   CalendarCheck,
   FileCheck2,
@@ -40,13 +39,17 @@ const principalFinanceRead: PermissionKey[] = [
 ];
 const principalCommunicationRead: PermissionKey[] = [
   'notices:read',
-  'communications:deliveries:read',
+  'communications:read_deliveries',
 ];
 
 /**
  * Principal navigation is leadership-shaped rather than operator-shaped.
  * Permission and entitlement filtering remains UX-only; backend guards are
  * still authoritative for every destination and request.
+ *
+ * Entitlement ownership stays in nav-module-map.ts. Only the cross-module
+ * Operations Overview declares moduleKeys because it intentionally appears
+ * when any of Library, Transport, or Canteen is enabled.
  */
 export const principalNavGroups: NavGroup[] = [
   {
@@ -80,14 +83,12 @@ export const principalNavGroups: NavGroup[] = [
         label: 'Enrollment Overview',
         icon: Users,
         permissions: principalStudentRead,
-        moduleKeys: ['students'],
       },
       {
         href: '/dashboard/admissions/overview',
         label: 'Admissions Overview',
         icon: UserPlus,
         permissions: principalStudentRead,
-        moduleKeys: ['students'],
       },
     ],
   },
@@ -100,28 +101,31 @@ export const principalNavGroups: NavGroup[] = [
         label: 'Attendance Oversight',
         icon: CalendarCheck,
         permissions: principalAttendanceRead,
-        moduleKeys: ['attendance'],
       },
       {
         href: '/dashboard/academics/readiness',
         label: 'Academic Readiness',
         icon: GraduationCap,
         permissions: principalAcademicRead,
-        moduleKeys: ['academics'],
       },
       {
         href: '/dashboard/hr/overview',
         label: 'Staff Overview',
         icon: BriefcaseBusiness,
         permissions: principalStaffRead,
-        moduleKeys: ['hr'],
       },
       {
         href: '/dashboard/finance-overview',
         label: 'Finance Overview',
         icon: Wallet,
         permissions: principalFinanceRead,
-        moduleKeys: ['accounting'],
+      },
+      {
+        href: '/dashboard/operations/overview',
+        label: 'Operations Overview',
+        icon: School,
+        permissions: ['reports:read'],
+        moduleKeys: ['library', 'transport', 'canteen'],
       },
     ],
   },
@@ -134,46 +138,23 @@ export const principalNavGroups: NavGroup[] = [
         label: 'Communication Oversight',
         icon: MessageSquare,
         permissions: principalCommunicationRead,
-        moduleKeys: ['notices'],
-      },
-      {
-        href: '/dashboard/activity/oversight',
-        label: 'Activity Oversight',
-        icon: Images,
-        permissions: ['activity_feed:read'],
-        moduleKeys: ['activity'],
       },
       {
         href: '/dashboard/notices',
         label: 'Notices',
         icon: MessageSquare,
         permissions: ['notices:read'],
-        moduleKeys: ['notices'],
       },
       {
-        href: '/dashboard/notifications',
-        label: 'Notifications',
-        icon: Bell,
-        permissions: ['notifications:view_own'],
-        moduleKeys: ['notifications'],
+        href: '/dashboard/activity/oversight',
+        label: 'Activity Oversight',
+        icon: Images,
+        permissions: ['activity_feed:read'],
       },
     ],
   },
   {
-    label: 'School Operations',
-    icon: School,
-    items: [
-      {
-        href: '/dashboard/operations/overview',
-        label: 'Operations Overview',
-        icon: School,
-        permissions: ['reports:read'],
-        moduleKeys: ['library', 'transport', 'canteen'],
-      },
-    ],
-  },
-  {
-    label: 'Evidence',
+    label: 'Reports & Audit',
     icon: FileCheck2,
     items: [
       {
@@ -181,7 +162,6 @@ export const principalNavGroups: NavGroup[] = [
         label: 'Reports',
         icon: FileCheck2,
         permissions: ['reports:read'],
-        moduleKeys: ['reports'],
       },
       {
         href: '/dashboard/audit',
@@ -192,6 +172,28 @@ export const principalNavGroups: NavGroup[] = [
     ],
   },
 ];
+
+/**
+ * Institutional Settings is capability-driven, not role-name-driven. A
+ * Principal with no delegated settings capability still sees no Settings hub;
+ * a Principal who is explicitly granted the required capability may reach it.
+ * Backend settings authorization remains authoritative.
+ */
+export function shouldShowSettingsHub(
+  settingsCaps: {
+    institutionalNavEnabled: boolean;
+    canAccessInstitutionalSettings: boolean;
+  },
+  isTeacherPersona: boolean,
+  personalOnly: boolean,
+  _persona: SchoolWebPersona,
+): boolean {
+  if (isTeacherPersona || personalOnly) return false;
+  return (
+    settingsCaps.institutionalNavEnabled &&
+    settingsCaps.canAccessInstitutionalSettings
+  );
+}
 
 /** Picks the persona nav tree before permission/entitlement filtering. */
 export function navGroupsForPersona(
