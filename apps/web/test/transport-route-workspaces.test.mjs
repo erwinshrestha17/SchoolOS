@@ -53,11 +53,11 @@ test("Transport uses bounded remote people selectors and route-scoped queries", 
   assert.match(workspace, /RemoteStudentSelector/);
   assert.match(workspace, /RemoteStaffSelector/);
   assert.doesNotMatch(workspace, /listStudents\s*\(|listStaff\s*\(|limit:\s*1000/);
-  assert.match(workspace, /enabled: isWorkspace\(/);
-  assert.match(workspace, /enabled: activeTab === "reports"/);
+  assert.match(workspace, /enabled: canReadRoutes && isWorkspace\(/);
+  assert.match(workspace, /enabled: canReadReports && activeTab === "reports"/);
   assert.match(
     workspace,
-    /enabled: activeTab === "location" && Boolean\(selectedTripId\)/,
+    /enabled:\s*canReadLocation && activeTab === "location" && Boolean\(selectedTripId\)/,
   );
   assert.match(
     workspace,
