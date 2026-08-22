@@ -1,7 +1,11 @@
 "use client";
 
 import { formatBsDateTime } from "@schoolos/core";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { CheckCircle2, Clock3, ShieldCheck, XCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ModuleHeader } from "../../../components/ui/module-header";
@@ -11,7 +15,7 @@ import { ErrorState } from "../../../components/ui/error-state";
 import { LoadingState } from "../../../components/ui/loading-state";
 import { PermissionDenied } from "../../../components/ui/permission-denied";
 import { SectionCard } from "../../../components/ui/section-card";
-import { api, type ApprovalDecision, type ApprovalRequestSummary } from "../../../lib/api";
+import { api, type ApprovalDecision } from "../../../lib/api";
 import { usePermissionAccess } from "../../../lib/permissions-ui";
 import { useSchoolWebPersona } from "../../../lib/school-web-persona";
 
@@ -21,28 +25,29 @@ export default function PrincipalApprovalCentrePage() {
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [reason, setReason] = useState("");
-  const [confirmDecision, setConfirmDecision] = useState<ApprovalDecision | null>(null);
+  const [confirmDecision, setConfirmDecision] =
+    useState<ApprovalDecision | null>(null);
   const isPrincipal = schoolWebPersona === "principal";
   const canRead = access.hasPermission("advanced:approvals:read");
   const canDecide = access.hasPermission("advanced:approvals:decide");
 
-  const approvalQuery = useQuery({
+  const approvalQuery = useInfiniteQuery({
     queryKey: ["principal-approval-centre"],
-    queryFn: api.listApprovalRequests,
+    queryFn: ({ pageParam }) =>
+      api.listPrincipalApprovalQueue({
+        cursor: pageParam ?? undefined,
+        limit: 25,
+      }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled: isPrincipal && canRead,
     staleTime: 20_000,
   });
 
   const reviewable = useMemo(
-    () =>
-      (approvalQuery.data ?? []).filter(
-        (request) =>
-          request.status === "PENDING" &&
-          canActorReviewRequest(request, access.session),
-      ),
-    [approvalQuery.data, access.session],
+    () => approvalQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [approvalQuery.data],
   );
-
   const selected =
     reviewable.find((request) => request.id === selectedId) ??
     reviewable[0] ??
@@ -64,15 +69,18 @@ export default function PrincipalApprovalCentrePage() {
       setReason("");
       setConfirmDecision(null);
       setSelectedId(null);
-      await queryClient.invalidateQueries({ queryKey: ["principal-approval-centre"] });
-      await queryClient.invalidateQueries({ queryKey: ["operational-dashboard-summary"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["principal-approval-centre"],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["operational-dashboard-summary"],
+      });
     },
   });
 
   if (access.resolution === "loading") {
     return <LoadingState variant="page" label="Checking approval access…" />;
   }
-
   if (!isPrincipal || !canRead) {
     return (
       <PermissionDenied
@@ -100,7 +108,6 @@ export default function PrincipalApprovalCentrePage() {
           onRetry={() => void approvalQuery.refetch()}
         />
       ) : null}
-
       {approvalQuery.isSuccess && reviewable.length === 0 ? (
         <EmptyState
           title="No approvals waiting"
@@ -112,7 +119,7 @@ export default function PrincipalApprovalCentrePage() {
         <div className="grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
           <SectionCard
             title="Waiting for your decision"
-            description={`${reviewable.length} pending request${reviewable.length === 1 ? "" : "s"} matched your current role and permissions.`}
+            description={`${reviewable.length} loaded request${reviewable.length === 1 ? "" : "s"} assigned to your current role, permission, or delegation.`}
           >
             <div className="space-y-2">
               {reviewable.map((request) => {
@@ -157,6 +164,19 @@ export default function PrincipalApprovalCentrePage() {
                 );
               })}
             </div>
+
+            {approvalQuery.hasNextPage ? (
+              <div className="mt-4 flex justify-center border-t border-slate-100 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  isLoading={approvalQuery.isFetchingNextPage}
+                  onClick={() => void approvalQuery.fetchNextPage()}
+                >
+                  Load more approvals
+                </Button>
+              </div>
+            ) : null}
           </SectionCard>
 
           {selected ? (
@@ -176,12 +196,25 @@ export default function PrincipalApprovalCentrePage() {
                     {selected.reason}
                   </p>
                   <dl className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <ReviewFact label="Workflow" value={workflowLabel(selected.workflowType)} />
-                    <ReviewFact label="Module" value={moduleLabel(selected.targetModule)} />
-                    <ReviewFact label="Record type" value={humanize(selected.targetType)} />
+                    <ReviewFact
+                      label="Workflow"
+                      value={workflowLabel(selected.workflowType)}
+                    />
+                    <ReviewFact
+                      label="Module"
+                      value={moduleLabel(selected.targetModule)}
+                    />
+                    <ReviewFact
+                      label="Record type"
+                      value={humanize(selected.targetType)}
+                    />
                     <ReviewFact
                       label="Deadline"
-                      value={selected.deadlineAt ? formatBsDateTime(selected.deadlineAt) : "No deadline set"}
+                      value={
+                        selected.deadlineAt
+                          ? formatBsDateTime(selected.deadlineAt)
+                          : "No deadline set"
+                      }
                     />
                   </dl>
                 </div>
@@ -189,7 +222,10 @@ export default function PrincipalApprovalCentrePage() {
                 <SafeContext context={selected.safeContext} />
 
                 <div>
-                  <label htmlFor="approval-reason" className="text-sm font-bold text-slate-900">
+                  <label
+                    htmlFor="approval-reason"
+                    className="text-sm font-bold text-slate-900"
+                  >
                     Decision note
                   </label>
                   <p className="mt-1 text-xs leading-5 text-slate-500">
@@ -207,7 +243,10 @@ export default function PrincipalApprovalCentrePage() {
                 </div>
 
                 {decisionMutation.isError ? (
-                  <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-medium text-rose-800" role="alert">
+                  <div
+                    className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-medium text-rose-800"
+                    role="alert"
+                  >
                     {confirmDecision === "REJECT" && !reason.trim()
                       ? "Enter a rejection reason before confirming."
                       : "The decision could not be saved. Nothing was changed. Please retry."}
@@ -218,9 +257,15 @@ export default function PrincipalApprovalCentrePage() {
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <div className="flex items-start gap-3">
                       {confirmDecision === "APPROVE" ? (
-                        <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" aria-hidden="true" />
+                        <CheckCircle2
+                          className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700"
+                          aria-hidden="true"
+                        />
                       ) : (
-                        <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-700" aria-hidden="true" />
+                        <XCircle
+                          className="mt-0.5 h-5 w-5 shrink-0 text-rose-700"
+                          aria-hidden="true"
+                        />
                       )}
                       <div>
                         <p className="font-bold text-slate-950">
@@ -244,9 +289,15 @@ export default function PrincipalApprovalCentrePage() {
                       </Button>
                       <Button
                         type="button"
-                        variant={confirmDecision === "REJECT" ? "destructive" : "default"}
+                        variant={
+                          confirmDecision === "REJECT"
+                            ? "destructive"
+                            : "default"
+                        }
                         isLoading={decisionMutation.isPending}
-                        disabled={confirmDecision === "REJECT" && !reason.trim()}
+                        disabled={
+                          confirmDecision === "REJECT" && !reason.trim()
+                        }
                         onClick={() => decisionMutation.mutate(confirmDecision)}
                       >
                         Confirm {confirmDecision === "APPROVE" ? "approval" : "rejection"}
@@ -272,7 +323,10 @@ export default function PrincipalApprovalCentrePage() {
                         setConfirmDecision("APPROVE");
                       }}
                     >
-                      <ShieldCheck className="mr-2 h-4 w-4" aria-hidden="true" />
+                      <ShieldCheck
+                        className="mr-2 h-4 w-4"
+                        aria-hidden="true"
+                      />
                       Approve
                     </Button>
                   </div>
@@ -288,27 +342,6 @@ export default function PrincipalApprovalCentrePage() {
       ) : null}
     </div>
   );
-}
-
-function canActorReviewRequest(
-  request: ApprovalRequestSummary,
-  session: ReturnType<typeof usePermissionAccess>["session"],
-) {
-  if (!session) return false;
-  if (request.delegatedToId && request.delegatedToId !== session.user.id) {
-    return false;
-  }
-  const step = [...request.steps]
-    .sort((left, right) => left.sequence - right.sequence)
-    .find((item) => item.status === "PENDING");
-  if (!step) return false;
-
-  const roles = new Set(session.user.roles.map((role) => role.toLowerCase()));
-  const permissions = new Set(session.user.permissions);
-  const roleMatches = !step.approverRole || roles.has(step.approverRole.toLowerCase());
-  const permissionMatches =
-    !step.approverPermission || permissions.has(step.approverPermission as never);
-  return roleMatches && permissionMatches;
 }
 
 function SafeContext({ context }: { context: Record<string, unknown> | null }) {
@@ -335,7 +368,11 @@ function SafeContext({ context }: { context: Record<string, unknown> | null }) {
       <p className="text-sm font-bold text-slate-900">Decision context</p>
       <dl className="mt-3 grid gap-3 sm:grid-cols-2">
         {entries.slice(0, 8).map(([key, value]) => (
-          <ReviewFact key={key} label={humanize(key)} value={String(value ?? "Not provided")} />
+          <ReviewFact
+            key={key}
+            label={humanize(key)}
+            value={String(value ?? "Not provided")}
+          />
         ))}
       </dl>
     </div>
@@ -345,7 +382,9 @@ function SafeContext({ context }: { context: Record<string, unknown> | null }) {
 function ReviewFact({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</dt>
+      <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">
+        {label}
+      </dt>
       <dd className="mt-1 text-sm font-semibold text-slate-800">{value}</dd>
     </div>
   );
