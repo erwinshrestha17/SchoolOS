@@ -219,7 +219,9 @@ describe('Configuration Owner safeguards', () => {
       options.ownerAssignment?.assignmentId ?? 'assignment-owner';
     const prisma = {
       role: {
-        findMany: jest.fn().mockResolvedValue([{ id: 'role-other' }]),
+        findMany: jest
+          .fn()
+          .mockResolvedValue([{ id: 'role-other', name: 'admin' }]),
         findFirst: jest.fn(),
         findUnique: jest.fn(),
       },
