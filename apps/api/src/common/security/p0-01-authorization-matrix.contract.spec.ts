@@ -92,9 +92,7 @@ describe('P0-01 authorization matrix contract', () => {
     expect(controller).toContain(
       "@Permissions('academics:manage_report_cards')",
     );
-    expect(controller).toContain(
-      "@Permissions('exam-terms:manage', 'academics:manage')",
-    );
+    expect(controller).toContain("@Permissions('exam-terms:unlock')");
     expect(controller).toContain('unlockExamTerm');
   });
 
