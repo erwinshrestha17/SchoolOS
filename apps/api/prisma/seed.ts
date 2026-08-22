@@ -2086,7 +2086,6 @@ async function seedCanonicalStudents(
           },
         });
 
-        // P1-05: at most one ACTIVE primary guardian per student within a tenant.
         await prisma.studentGuardian.updateMany({
           where: {
             tenantId,
@@ -2201,9 +2200,6 @@ async function linkSiblingFamilies(
     ]),
   );
 
-  // Fixed, non-overlapping sibling pairs (each grade used at most once as an
-  // anchor and at most once as a child) so families stay 2 children, not a
-  // chain of every grade 2 apart sharing one guardian.
   const siblingGradePairs: Array<[number, number]> = [
     [1, 3],
     [2, 4],
@@ -3330,16 +3326,11 @@ async function seedCanonicalPayslip(
       status: PayrollLineStatus.POSTED,
     },
   });
+  const payslipNumber = `PAYSLIP-${period.year}-${String(period.month).padStart(2, '0')}-${staff.employeeId}`;
   await prisma.payslip.upsert({
-    where: {
-      tenantId_payslipNumber: {
-        tenantId,
-        payslipNumber: `PAYSLIP-${period.year}-${String(period.month).padStart(2, '0')}-${staff.employeeId}`,
-      },
-    },
+    where: { payrollLineId: line.id },
     update: {
       payrollRunId: run.id,
-      payrollLineId: line.id,
       staffId: staff.id,
       status: PayslipStatus.ISSUED,
       grossSalary: new Prisma.Decimal(50000),
@@ -3353,7 +3344,7 @@ async function seedCanonicalPayslip(
       payrollRunId: run.id,
       payrollLineId: line.id,
       staffId: staff.id,
-      payslipNumber: `PAYSLIP-${period.year}-${String(period.month).padStart(2, '0')}-${staff.employeeId}`,
+      payslipNumber,
       status: PayslipStatus.ISSUED,
       grossSalary: new Prisma.Decimal(50000),
       deductionAmount: new Prisma.Decimal(4500),
@@ -3979,9 +3970,6 @@ function uniqueStudentName(globalIndex: number) {
       `Name pool exhausted: ${firstNames.length} first names x ${lastNames.length} last names cannot cover ${globalIndex + 1} students uniquely.`,
     );
   }
-  // Scatter via a coprime multiplier so adjacent students don't cluster on
-  // the same surname (a plain mixed-radix index repeats the same last name
-  // for firstNames.length consecutive students in a row).
   const permuted = (globalIndex * 131) % capacity;
   const firstIdx = permuted % firstNames.length;
   const lastIdx = Math.floor(permuted / firstNames.length) % lastNames.length;
@@ -4829,9 +4817,6 @@ async function seedDemoTenantFeatureOverrides(tenantId: string) {
     'module.accounting',
     'module.notifications',
     'module.notices',
-    // Gates /dashboard/reports and the whole report export registry via
-    // @Entitlement('module.reports'). Without it every report export, including
-    // FEE-01, is unreachable in a seeded environment.
     'module.reports',
     'feature.mobile.parent_basic',
     'feature.mobile.teacher_parent',
@@ -4903,7 +4888,6 @@ async function seedDemoTenantFeatureOverrides(tenantId: string) {
 async function seedPlatformInfrastructure() {
   console.log('Seeding platform infrastructure...');
 
-  // 2. Create Platform Plans
   const plans = [
     { key: 'free', name: 'Free Tier', priceNpr: 0, billingCycle: 'ANNUAL' },
     {
@@ -4946,9 +4930,6 @@ async function seedPlatformInfrastructure() {
     });
     createdPlans.push(plan);
 
-    // Seed features for each plan. library / transport / canteen are STANDARD
-    // add-ons (and PROFESSIONAL+ base modules) — not base STANDARD entitlements.
-    // Keep this aligned with packages/core ENTITLEMENT_MATRIX.
     const features = [
       'academics',
       'finance',
@@ -4957,7 +4938,6 @@ async function seedPlatformInfrastructure() {
       'library',
       'transport',
       'canteen',
-      // Gates the cross-module report/export centre (`module.reports`).
       'reports',
     ];
     const deferredAddOnModules = new Set(['library', 'transport', 'canteen']);
@@ -4980,7 +4960,6 @@ async function seedPlatformInfrastructure() {
       });
     }
 
-    // Seed limits
     const limits = [
       {
         usageKey: 'students',
@@ -5025,7 +5004,6 @@ async function seedPlatformInfrastructure() {
     }
   }
 
-  // 3. Assign Subscriptions
   const defaultTenant = await prisma.tenant.findUnique({
     where: { slug: 'default-school' },
   });
@@ -5050,7 +5028,6 @@ async function seedPlatformInfrastructure() {
       });
       await seedDemoTenantFeatureOverrides(defaultTenant.id);
 
-      // Seed some usage counters
       await prisma.usageCounter.upsert({
         where: {
           tenantId_usageKey_period_periodStart: {
@@ -5080,7 +5057,6 @@ async function seedPlatformInfrastructure() {
     }
   }
 
-  // 4. Seed Provider Configs
   const providers = [
     {
       type: ProviderType.SMS,
@@ -5124,7 +5100,6 @@ async function seedPlatformInfrastructure() {
   }
 
   if (defaultTenant) {
-    // 5. Seed SaaS Invoices
     const invoiceId = `inv-${defaultTenant.slug}-001`;
     await prisma.saaSInvoice.upsert({
       where: { id: invoiceId },
@@ -5163,7 +5138,7 @@ async function seedPlatformInfrastructure() {
         amount: new Prisma.Decimal(12000),
         currency: 'NPR',
         issueDate: new Date('2024-04-01'),
-        dueDate: new Date('2024-04-15'), // Overdue
+        dueDate: new Date('2024-04-15'),
         status: SaaSInvoiceStatus.ISSUED,
         lines: {
           create: [
@@ -5179,7 +5154,6 @@ async function seedPlatformInfrastructure() {
       },
     });
 
-    // 6. Seed Audit Logs
     const auditActions = [
       {
         action: 'TENANT_STATUS_CHANGE',
