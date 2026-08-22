@@ -1,4 +1,8 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 import {
   AssessmentRetakeStatus,
   AudienceType,
@@ -67,6 +71,12 @@ export class ResultPublishingService {
     actor: AuthContext,
     filters: PublishingFilters,
   ): Promise<PublishingReadinessRow[]> {
+    if (actor.isSupportOverride) {
+      throw new ForbiddenException(
+        'Result publishing readiness is unavailable during support override',
+      );
+    }
+
     const page = Math.max(1, filters.page ?? 1);
     const limit = Math.min(100, Math.max(1, filters.limit ?? 50));
     const skip = (page - 1) * limit;

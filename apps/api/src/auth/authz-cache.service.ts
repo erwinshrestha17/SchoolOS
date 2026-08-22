@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import { isPlatformRoleName } from '@schoolos/core';
+import type { SecurityDomain } from '@prisma/client';
 import { RedisCacheService } from '../common/cache/redis-cache.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -9,6 +11,7 @@ export interface ResolvedAuthz {
 
 interface CachedRoleGrant {
   role: string;
+  scopeId: string | null;
   expiresAt: string | null;
   permissions: string[];
 }
@@ -18,30 +21,20 @@ interface CachedAuthz {
 }
 
 /**
- * TTL is a backstop for a missed invalidation, not the invalidation mechanism.
- * Five minutes bounds how long a stale permission set could survive if a write
- * site is ever added without calling {@link AuthzCacheService.invalidateUser}.
- */
-const AUTHZ_TTL_SECONDS = 300;
-
-/**
- * Resolves a user's role and permission set, cached across requests.
+ * Resolves a user's role and permission set from authoritative storage.
  *
  * ## Why
  *
- * `JwtAuthGuard` rebuilt this on every request through a four-level nested
- * `include` (`UserRole → Role → RolePermission → Permission`). Prisma emits one
- * round-trip per relation, so that was four database queries on **every
- * authenticated request across all 1,345 routes** — to reproduce a string array
- * that only changes when an administrator edits a role.
+ * Authorization revocation must fail closed. Redis invalidation is best-effort
+ * in the shared cache service, so a cached grant could otherwise survive a
+ * failed DEL and authorize writes after revocation. Until a database-backed
+ * version/fencing contract exists, every effective grant is resolved live.
  *
  * ## What is and is not cached here
  *
- * Only the derived role/permission set. The caller still reads `User.status`
- * and `Tenant.isActive` live on every request, so deactivating a user or
- * suspending a tenant still fails closed immediately. This cache can only ever
- * be stale about *which permissions a still-active user holds*, and every write
- * that changes that is enumerated below.
+ * The caller also reads `User.status` and `Tenant.isActive` live on every
+ * request. Redis invalidation methods remain for compatibility and cleanup,
+ * but cache state is never consulted for an authorization decision.
  *
  * ## Invalidation contract
  *
@@ -67,23 +60,27 @@ export class AuthzCacheService {
   ) {}
 
   private key(tenantId: string, userId: string) {
-    return `authz:${tenantId}:${userId}`;
+    return `authz:v2:${tenantId}:${userId}`;
   }
 
   /** Roles and `resource:action` permission keys for one user in one tenant. */
-  async resolve(tenantId: string, userId: string): Promise<ResolvedAuthz> {
-    const cached = await this.cache.resolve(
-      this.key(tenantId, userId),
-      AUTHZ_TTL_SECONDS,
-      () => this.load(tenantId, userId),
-    );
+  async resolve(
+    tenantId: string,
+    userId: string,
+    securityDomain: SecurityDomain = 'SCHOOL',
+  ): Promise<ResolvedAuthz> {
+    const cached = await this.load(tenantId, userId);
 
     // Expiry is evaluated on every request rather than only on cache fill. A
     // time-bounded auditor therefore loses access at the exact expiry even if
     // the Redis entry remains warm.
     const now = Date.now();
     const active = cached.grants.filter(
-      ({ expiresAt }) => expiresAt === null || Date.parse(expiresAt) > now,
+      ({ role, scopeId, expiresAt }) =>
+        (securityDomain === 'PLATFORM'
+          ? isPlatformRoleName(role) && scopeId === 'global'
+          : !isPlatformRoleName(role)) &&
+        (expiresAt === null || Date.parse(expiresAt) > now),
     );
 
     return {
@@ -105,8 +102,14 @@ export class AuthzCacheService {
       'authorize: resolve role/permission set while establishing tenant context',
       async () => {
         const assignments = await this.prisma.userRole.findMany({
-          where: { tenantId, userId, revokedAt: null },
+          where: {
+            tenantId,
+            userId,
+            revokedAt: null,
+            role: { tenantId },
+          },
           select: {
+            scopeId: true,
             expiresAt: true,
             role: {
               select: {
@@ -124,8 +127,9 @@ export class AuthzCacheService {
         });
 
         return {
-          grants: assignments.map(({ role, expiresAt }) => ({
+          grants: assignments.map(({ role, scopeId, expiresAt }) => ({
             role: role.name,
+            scopeId,
             expiresAt: expiresAt?.toISOString() ?? null,
             permissions: role.rolePermissions.map(
               ({ permission }) => `${permission.resource}:${permission.action}`,
@@ -147,6 +151,6 @@ export class AuthzCacheService {
    * the whole tenant namespace is dropped.
    */
   async invalidateTenant(tenantId: string): Promise<void> {
-    await this.cache.invalidatePrefix(`authz:${tenantId}:`);
+    await this.cache.invalidatePrefix(`authz:v2:${tenantId}:`);
   }
 }

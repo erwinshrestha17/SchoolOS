@@ -1,4 +1,4 @@
-import { AuthMethod } from '@prisma/client';
+import { AuthMethod, NoticeLifecycleStatus } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { NoticeDetailService } from './notice-detail.service';
 
@@ -80,6 +80,106 @@ describe('NoticeDetailService', () => {
     expect(detail.attachmentFileId).toBe('file-1');
     expect(detail.auditHistory).toEqual([]);
     expect(detail.approvalHistory).toEqual([]);
+  });
+
+  it('returns a published support projection without recipient, history, or file metadata reads', async () => {
+    const { service, prisma, fileRegistry } = buildService();
+    prisma.notice.findFirst.mockResolvedValue(
+      noticeRecord({
+        attachmentUrl: 'https://expired.example/notice.pdf',
+      }),
+    );
+    fileRegistry.listFilesByEntity.mockResolvedValue([
+      { id: 'file-1', status: 'UPLOADED' },
+    ]);
+
+    const detail = await service.getNoticeDetail('notice-1', {
+      ...actor,
+      isSupportOverride: true,
+    });
+
+    expect(detail.attachmentFileId).toBeNull();
+    expect(detail.attachmentUrl).toBeNull();
+    expect(detail.createdBy).toBeNull();
+    expect(detail.requiresAcknowledgement).toBe(false);
+    expect(detail.templateId).toBeNull();
+    expect(detail.roleNames).toEqual([]);
+    expect(detail.staffIds).toEqual([]);
+    expect(detail.studentIds).toEqual([]);
+    expect(detail.guardianIds).toEqual([]);
+    expect(detail.recipientUserIds).toEqual([]);
+    expect(detail.approvalRequestId).toBeNull();
+    expect(detail.auditHistory).toEqual([]);
+    expect(detail.approvalHistory).toEqual([]);
+    expect(prisma.notice.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: 'notice-1',
+          tenantId: actor.tenantId,
+          lifecycleStatus: {
+            in: [
+              NoticeLifecycleStatus.PUBLISHED,
+              NoticeLifecycleStatus.EXPIRED,
+            ],
+          },
+        },
+      }),
+    );
+    expect(prisma.auditLog.findMany).not.toHaveBeenCalled();
+    expect(prisma.approvalRequest.findFirst).not.toHaveBeenCalled();
+    expect(prisma.notificationDelivery.findFirst).not.toHaveBeenCalled();
+    expect(prisma.noticeAcknowledgement.findUnique).not.toHaveBeenCalled();
+    expect(fileRegistry.listFilesByEntity).not.toHaveBeenCalled();
+    expect(fileRegistry.getSignedUrl).not.toHaveBeenCalled();
+  });
+
+  it('keeps stale support report permission outside draft notice details', async () => {
+    const { service, prisma, fileRegistry } = buildService();
+    prisma.notice.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.getNoticeDetail('draft-notice', {
+        ...actor,
+        isSupportOverride: true,
+      }),
+    ).rejects.toThrow('Notice not found');
+
+    expect(prisma.notice.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: 'draft-notice',
+          tenantId: actor.tenantId,
+          lifecycleStatus: {
+            in: [
+              NoticeLifecycleStatus.PUBLISHED,
+              NoticeLifecycleStatus.EXPIRED,
+            ],
+          },
+        },
+      }),
+    );
+    expect(prisma.notificationDelivery.findFirst).not.toHaveBeenCalled();
+    expect(prisma.auditLog.findMany).not.toHaveBeenCalled();
+    expect(prisma.approvalRequest.findFirst).not.toHaveBeenCalled();
+    expect(fileRegistry.listFilesByEntity).not.toHaveBeenCalled();
+  });
+
+  it('suppresses legacy notice attachment URLs during support override', async () => {
+    const { service, prisma, fileRegistry } = buildService();
+    prisma.notice.findFirst.mockResolvedValue(
+      noticeRecord({
+        attachmentUrl: 'https://legacy.example/notice.pdf',
+      }),
+    );
+
+    const detail = await service.getNoticeDetail('notice-1', {
+      ...actor,
+      isSupportOverride: true,
+    });
+
+    expect(detail.attachmentFileId).toBeNull();
+    expect(detail.attachmentUrl).toBeNull();
+    expect(fileRegistry.getSignedUrl).not.toHaveBeenCalled();
   });
 
   it('falls back to legacy attachmentUrl when no linked File Registry asset exists', async () => {

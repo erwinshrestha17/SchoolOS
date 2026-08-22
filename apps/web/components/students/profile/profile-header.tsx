@@ -20,11 +20,21 @@ import {
   Wallet,
 } from 'lucide-react';
 
-type StudentProfileTabShortcut = 'Overview' | 'Attendance' | 'Fees' | 'Documents' | 'Guardians';
+type StudentProfileTabShortcut =
+  | 'Overview'
+  | 'Attendance'
+  | 'Fees'
+  | 'Documents'
+  | 'Guardians';
 
 type ProfileHeaderProps = {
   profile: StudentProfileDetail;
   canEdit: boolean;
+  canViewAttendance: boolean;
+  canViewFees: boolean;
+  canManageDocuments: boolean;
+  canViewQr: boolean;
+  canManageLifecycle: boolean;
   onEdit: () => void;
   onOpenIdCard: () => void;
   onSelectTab: (tab: StudentProfileTabShortcut) => void;
@@ -38,6 +48,11 @@ type ProfileHeaderProps = {
 export function ProfileHeader({
   profile,
   canEdit,
+  canViewAttendance,
+  canViewFees,
+  canManageDocuments,
+  canViewQr,
+  canManageLifecycle,
   onEdit,
   onOpenIdCard,
   onSelectTab,
@@ -49,12 +64,21 @@ export function ProfileHeader({
 }: ProfileHeaderProps) {
   const router = useRouter();
   const { student } = profile;
-  const studentName = student.fullNameEn || `${student.firstNameEn ?? ''} ${student.lastNameEn ?? ''}`.trim() || 'Student';
-  const primaryGuardian = profile.guardians.find((guardian) => guardian.isPrimary) ?? profile.guardians[0];
+  const studentName =
+    student.fullNameEn ||
+    `${student.firstNameEn ?? ''} ${student.lastNameEn ?? ''}`.trim() ||
+    'Student';
+  const primaryGuardian =
+    profile.guardians.find((guardian) => guardian.isPrimary) ??
+    profile.guardians[0];
   const className = formatClassLabel(student.className ?? student.class?.name);
-  const sectionName = student.sectionName ?? student.section ?? 'Section not assigned';
+  const sectionName =
+    student.sectionName ?? student.section ?? 'Section not assigned';
   const supportNoteExists = Boolean(
-    student.medicalConditions || student.severeAllergies || student.medications || student.specialNeeds,
+    student.medicalConditions ||
+    student.severeAllergies ||
+    student.medications ||
+    student.specialNeeds,
   );
   const hasOutstandingFees = Boolean(
     feeClearance && !feeClearance.cleared && feeClearance.outstandingAmount > 0,
@@ -86,6 +110,12 @@ export function ProfileHeader({
             icon: <Wallet size={16} />,
             onClick: () => onSelectTab('Fees'),
           };
+  const hasProfileActions =
+    canViewFees ||
+    canViewAttendance ||
+    canManageDocuments ||
+    canViewQr ||
+    canManageLifecycle;
 
   return (
     <SectionCard className="overflow-hidden border-[var(--color-mod-admissions-border)] bg-white shadow-sm">
@@ -117,25 +147,46 @@ export function ProfileHeader({
 
           <div className="min-w-0">
             <div className="mb-2 flex flex-wrap items-center gap-2">
-              <Badge variant="phase2" className="border-[var(--color-mod-admissions-border)] bg-[var(--color-mod-admissions-bg)] text-[var(--color-mod-admissions-text)]">
+              <Badge
+                variant="phase2"
+                className="border-[var(--color-mod-admissions-border)] bg-[var(--color-mod-admissions-bg)] text-[var(--color-mod-admissions-text)]"
+              >
                 Student profile
               </Badge>
               <Badge className="border-success-200 bg-success-50 text-success-700">
                 {formatLifecycleStatus(student.lifecycleStatus ?? 'ACTIVE')}
               </Badge>
               {supportNoteExists ? (
-                <Badge className="border-warning-200 bg-warning-50 text-warning-700">Support note on file</Badge>
+                <Badge className="border-warning-200 bg-warning-50 text-warning-700">
+                  Support note on file
+                </Badge>
               ) : null}
             </div>
-            <h1 className="truncate text-3xl font-black tracking-tight text-slate-950">{studentName}</h1>
+            <h1 className="truncate text-3xl font-black tracking-tight text-slate-950">
+              {studentName}
+            </h1>
             <p className="mt-2 text-sm font-semibold text-slate-600">
               {className} <span aria-hidden="true">•</span> {sectionName}
-              {student.rollNumber ? <><span aria-hidden="true"> • </span>Roll {student.rollNumber}</> : null}
+              {student.rollNumber ? (
+                <>
+                  <span aria-hidden="true"> • </span>Roll {student.rollNumber}
+                </>
+              ) : null}
             </p>
             <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
-              <span className="rounded-lg bg-slate-50 px-3 py-2">ID: {student.studentSystemId}</span>
-              {student.admissionNumber ? <span className="rounded-lg bg-slate-50 px-3 py-2">Admission: {student.admissionNumber}</span> : null}
-              {student.gender ? <span className="rounded-lg bg-slate-50 px-3 py-2">{student.gender}</span> : null}
+              <span className="rounded-lg bg-slate-50 px-3 py-2">
+                ID: {student.studentSystemId}
+              </span>
+              {student.admissionNumber ? (
+                <span className="rounded-lg bg-slate-50 px-3 py-2">
+                  Admission: {student.admissionNumber}
+                </span>
+              ) : null}
+              {student.gender ? (
+                <span className="rounded-lg bg-slate-50 px-3 py-2">
+                  {student.gender}
+                </span>
+              ) : null}
             </div>
           </div>
         </div>
@@ -148,16 +199,26 @@ export function ProfileHeader({
           {primaryGuardian ? (
             <div className="space-y-3">
               <div>
-                <p className="font-bold text-slate-950">{primaryGuardian.fullName}</p>
+                <p className="font-bold text-slate-950">
+                  {primaryGuardian.fullName}
+                </p>
                 <p className="mt-1 text-xs font-semibold text-slate-500">
                   {formatGuardianRelation(primaryGuardian.relation)}
                 </p>
               </div>
-              <p className="text-sm font-medium text-slate-600">{primaryGuardian.primaryPhone || 'Phone not recorded'}</p>
-              {primaryGuardian.email ? <p className="truncate text-sm text-slate-500">{primaryGuardian.email}</p> : null}
+              <p className="text-sm font-medium text-slate-600">
+                {primaryGuardian.primaryPhone || 'Phone not recorded'}
+              </p>
+              {primaryGuardian.email ? (
+                <p className="truncate text-sm text-slate-500">
+                  {primaryGuardian.email}
+                </p>
+              ) : null}
             </div>
           ) : (
-            <p className="text-sm text-slate-500">No guardian is linked to this student yet.</p>
+            <p className="text-sm text-slate-500">
+              No guardian is linked to this student yet.
+            </p>
           )}
         </div>
 
@@ -176,47 +237,65 @@ export function ProfileHeader({
               Profile changes require authorized student records staff.
             </p>
           )}
-          <ActionMenu
-            align="right"
-            label="Student profile actions"
-            trigger={
-              <button
-                type="button"
-                className="flex h-11 w-11 items-center justify-center self-end rounded-xl border border-slate-200 bg-white p-0 text-slate-700 shadow-sm transition hover:border-[var(--color-mod-admissions-accent)] hover:bg-[var(--color-mod-admissions-bg)] hover:text-[var(--color-mod-admissions-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2"
-                title="More actions"
-              >
-                <MoreHorizontal size={18} aria-hidden="true" />
-              </button>
-            }
-            items={[
-              collectFeeAction,
-              {
-                label: 'View attendance',
-                icon: <CalendarCheck size={16} />,
-                onClick: () => onSelectTab('Attendance'),
-              },
-              {
-                label: 'Manage documents',
-                icon: <FolderOpen size={16} />,
-                onClick: () => onSelectTab('Documents'),
-              },
-              {
-                label: 'View QR identity',
-                icon: <QrCode size={16} />,
-                onClick: () => onSelectTab('Overview'),
-              },
-              {
-                label: 'Generate / print ID card',
-                icon: <FileText size={16} />,
-                onClick: onOpenIdCard,
-              },
-              {
-                label: 'Manage lifecycle',
-                icon: <Archive size={16} />,
-                onClick: onManageLifecycle,
-              },
-            ]}
-          />
+          {hasProfileActions ? (
+            <ActionMenu
+              align="right"
+              label="Student profile actions"
+              trigger={
+                <button
+                  type="button"
+                  className="flex h-11 w-11 items-center justify-center self-end rounded-xl border border-slate-200 bg-white p-0 text-slate-700 shadow-sm transition hover:border-[var(--color-mod-admissions-accent)] hover:bg-[var(--color-mod-admissions-bg)] hover:text-[var(--color-mod-admissions-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-admissions-border)] focus:ring-offset-2"
+                  title="More actions"
+                >
+                  <MoreHorizontal size={18} aria-hidden="true" />
+                </button>
+              }
+              items={[
+                ...(canViewFees ? [collectFeeAction] : []),
+                ...(canViewAttendance
+                  ? [
+                      {
+                        label: 'View attendance',
+                        icon: <CalendarCheck size={16} />,
+                        onClick: () => onSelectTab('Attendance'),
+                      },
+                    ]
+                  : []),
+                ...(canManageDocuments
+                  ? [
+                      {
+                        label: 'Manage documents',
+                        icon: <FolderOpen size={16} />,
+                        onClick: () => onSelectTab('Documents'),
+                      },
+                      {
+                        label: 'Generate / print ID card',
+                        icon: <FileText size={16} />,
+                        onClick: onOpenIdCard,
+                      },
+                    ]
+                  : []),
+                ...(canViewQr
+                  ? [
+                      {
+                        label: 'View QR identity',
+                        icon: <QrCode size={16} />,
+                        onClick: () => onSelectTab('Overview'),
+                      },
+                    ]
+                  : []),
+                ...(canManageLifecycle
+                  ? [
+                      {
+                        label: 'Manage lifecycle',
+                        icon: <Archive size={16} />,
+                        onClick: onManageLifecycle,
+                      },
+                    ]
+                  : []),
+              ]}
+            />
+          ) : null}
         </div>
       </div>
 

@@ -1,4 +1,8 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { GradeLockStatus, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
@@ -92,6 +96,23 @@ describe('PromotionReadinessService', () => {
       ...overrides,
     };
   }
+
+  it('denies support override readiness before any database or finance read', async () => {
+    await expect(
+      service.listPromotionReadiness(
+        { ...actor, isSupportOverride: true },
+        { academicYearId: 'year-1' },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.academicYear.findFirst).not.toHaveBeenCalled();
+    expect(prisma.examTerm.findFirst).not.toHaveBeenCalled();
+    expect(prisma.class.findFirst).not.toHaveBeenCalled();
+    expect(prisma.section.findFirst).not.toHaveBeenCalled();
+    expect(prisma.student.findMany).not.toHaveBeenCalled();
+    expect(prisma.reportCard.findMany).not.toHaveBeenCalled();
+    expect(financeService.getStudentFeeLedger).not.toHaveBeenCalled();
+  });
 
   it('rejects readiness when academic year is outside tenant', async () => {
     prisma.academicYear.findFirst.mockResolvedValue(null);

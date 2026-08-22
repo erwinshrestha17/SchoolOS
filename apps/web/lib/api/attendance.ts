@@ -289,6 +289,8 @@ export const attendanceApi = {
     request<PaginatedResponse<AttendanceCorrectionRequest>>(
       withQuery("/attendance/corrections", params ?? {}),
     ),
+  getAttendanceCorrectionSummary: () =>
+    request<{ pending: number }>("/attendance/corrections/summary"),
   submitAttendance: (body: JsonBody) =>
     request("/attendance/sessions", { method: "POST", json: body }),
   syncAttendance: (body: JsonBody) =>

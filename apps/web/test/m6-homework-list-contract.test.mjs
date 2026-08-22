@@ -42,7 +42,10 @@ describe("M6 homework list contract", () => {
     assert.match(page, /getNepalSchoolDay\(\)\.gregorianDate/);
     assert.match(createForm, /getNepalSchoolDay\(\)\.gregorianDate/);
     assert.doesNotMatch(page, /new Date\(\)\.toISOString\(\)\.slice\(0, 10\)/);
-    assert.doesNotMatch(createForm, /new Date\(\)\.toISOString\(\)\.slice\(0, 10\)/);
+    assert.doesNotMatch(
+      createForm,
+      /new Date\(\)\.toISOString\(\)\.slice\(0, 10\)/,
+    );
   });
 
   it("keeps quick inspection in a drawer and protected files behind the helper", () => {
@@ -99,8 +102,11 @@ describe("M6 homework list contract", () => {
     const page = read("app/dashboard/homework/page.tsx");
 
     assert.equal(
-      (page.match(/\{ value: "(?:today|all|completion|templates)", label: /g) ?? [])
-        .length,
+      (
+        page.match(
+          /\{ value: "(?:today|all|completion|templates)", label: /g,
+        ) ?? []
+      ).length,
       4,
     );
     assert.equal((page.match(/<SummaryCard/g) ?? []).length, 4);
@@ -116,8 +122,14 @@ describe("M6 homework list contract", () => {
   it("gates the Templates and Completion tabs' queries behind the active tab", () => {
     const page = read("app/dashboard/homework/page.tsx");
 
-    assert.match(page, /enabled: activeTab === "templates"/);
-    assert.match(page, /enabled: activeTab === "completion"/);
+    assert.match(
+      page,
+      /enabled:\s*!isSupportOverride && activeTab === "templates"/,
+    );
+    assert.match(
+      page,
+      /enabled:[\s\S]{0,80}!isSupportOverride &&[\s\S]{0,40}activeTab === "completion"/,
+    );
     assert.match(page, /api\.listHomeworkTemplates/);
     assert.match(page, /api\.getHomeworkCompletionReport/);
   });

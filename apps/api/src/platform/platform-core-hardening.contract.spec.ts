@@ -151,8 +151,10 @@ describe('M0 Platform Core hardening contracts', () => {
     expect(queuesService).toContain('job.isFailed()');
     expect(queuesService).toContain('job.retry()');
     expect(queuesService).toContain('queue_failed_job_retry_requested');
-    expect(queuesService).toContain('sanitizeJobData');
-    expect(queuesService).toContain("'********'");
+    expect(queuesService).toContain('describeFailureCategory');
+    expect(queuesService).toContain('Failed job ${jobId} not found');
+    expect(queuesService).not.toContain('data: sanitizeJobData');
+    expect(queuesService).not.toContain('stacktrace:');
   });
 
   it('keeps platform report export and audit history paginated', () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { formatBsDateTime, type PermissionKey } from "@schoolos/core";
+import { formatBsDateTime } from "@schoolos/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, RefreshCcw, ShieldCheck } from "lucide-react";
 import Link from "next/link";
@@ -27,6 +27,7 @@ export function DeliveryOperationsWorkspace({
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { session, hasPermissions } = useSession();
+  const isSupportOverride = session?.user.isSupportOverride === true;
   // Alias-aware, matching the guard: delivery diagnostics is also satisfied
   // by `communications:read_deliveries`, and retry by
   // `communications:retry_deliveries`.
@@ -37,6 +38,7 @@ export function DeliveryOperationsWorkspace({
   const status = searchParams.get("status") ?? "";
   const channel = searchParams.get("channel") ?? "";
   const sourceType = searchParams.get("sourceType") ?? "";
+  const effectiveSourceType = isSupportOverride ? "" : sourceType;
   const [retryId, setRetryId] = useState<string | null>(null);
   const [retryReason, setRetryReason] = useState("");
 
@@ -48,7 +50,7 @@ export function DeliveryOperationsWorkspace({
   const logs = useQuery({
     queryKey: [
       "notification-deliveries",
-      { page, status, channel, sourceType },
+      { page, status, channel, sourceType: effectiveSourceType },
     ],
     queryFn: () =>
       communicationsApi.listNotificationDeliveryOperationPage({
@@ -56,14 +58,14 @@ export function DeliveryOperationsWorkspace({
         limit: PAGE_SIZE,
         status: status || undefined,
         channel: channel || undefined,
-        sourceType: sourceType || undefined,
+        sourceType: effectiveSourceType || undefined,
       }),
     enabled: canView && view === "logs",
   });
   const failures = useQuery({
     queryKey: [
       "notification-delivery-failures",
-      { page, status, channel, sourceType },
+      { page, status, channel, sourceType: effectiveSourceType },
     ],
     queryFn: () =>
       communicationsApi.listNotificationDeliveryFailurePage({
@@ -71,7 +73,7 @@ export function DeliveryOperationsWorkspace({
         limit: PAGE_SIZE,
         status: status || undefined,
         channel: channel || undefined,
-        sourceType: sourceType || undefined,
+        sourceType: effectiveSourceType || undefined,
       }),
     enabled: canView && view === "failures",
   });
@@ -114,7 +116,11 @@ export function DeliveryOperationsWorkspace({
       <ModuleHeader
         eyebrow="Notifications"
         title={view === "logs" ? "Delivery logs" : "Failure and retry center"}
-        description="Review delivery status and retry eligible failures. Message content and contact details remain protected."
+        description={
+          isSupportOverride
+            ? "Read-only masked delivery diagnostics. Message content, full destinations, retry actions, and provider credentials remain protected."
+            : "Review delivery status and retry eligible failures. Message content and contact details remain protected."
+        }
         secondaryActions={
           <div className="flex gap-2">
             <Link
@@ -172,20 +178,22 @@ export function DeliveryOperationsWorkspace({
               options={["", "IN_APP", "PUSH", "SMS", "EMAIL"]}
               onChange={(value) => setFilters({ channel: value, page: null })}
             />
-            <FilterSelect
-              label="Source"
-              value={sourceType}
-              options={[
-                "",
-                "notice",
-                "notice_acknowledgement_follow_up",
-                "event",
-                "activity_post",
-              ]}
-              onChange={(value) =>
-                setFilters({ sourceType: value, page: null })
-              }
-            />
+            {!isSupportOverride ? (
+              <FilterSelect
+                label="Source"
+                value={sourceType}
+                options={[
+                  "",
+                  "notice",
+                  "notice_acknowledgement_follow_up",
+                  "event",
+                  "activity_post",
+                ]}
+                onChange={(value) =>
+                  setFilters({ sourceType: value, page: null })
+                }
+              />
+            ) : null}
           </>
         }
       />
@@ -377,7 +385,7 @@ function positiveNumber(value: string | null, fallback: number) {
 }
 
 function allFilterLabel(filterLabel: string) {
-  if (filterLabel === 'Status') return 'All statuses';
+  if (filterLabel === "Status") return "All statuses";
   return `All ${filterLabel.toLowerCase()}s`;
 }
 

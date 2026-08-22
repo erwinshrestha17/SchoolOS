@@ -70,13 +70,4 @@ export class UsersController {
   forceLogout(@Param('id') userId: string, @CurrentAuth() auth: AuthContext) {
     return this.usersService.forceLogout(userId, auth);
   }
-
-  @Post('tenants/:id/deactivate')
-  @Permissions('tenants:manage')
-  deactivateTenant(
-    @Param('id') tenantId: string,
-    @CurrentAuth() auth: AuthContext,
-  ) {
-    return this.usersService.deactivateTenant(tenantId, auth);
-  }
 }

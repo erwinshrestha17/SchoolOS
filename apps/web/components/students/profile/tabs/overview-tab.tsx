@@ -9,6 +9,7 @@ import {
   type StudentProfileDetail,
 } from '@schoolos/core';
 import Link from 'next/link';
+import { useSession } from '@/components/session-provider';
 import { api } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { ErrorState } from '@/components/ui/error-state';
@@ -52,7 +53,13 @@ type StudentLifecycleTimelineItem = {
 };
 
 export function OverviewTab({ profile, onSelectTab }: OverviewTabProps) {
+  const { session, hasPermissions } = useSession();
   const studentId = profile.student.id;
+  const canViewAttendance = hasPermissions(['attendance:read']);
+  const canViewFees = hasPermissions(['fees:read']);
+  const canManageDocuments = hasPermissions(['student_documents:manage']);
+  const canViewQr = hasPermissions(['students:qr:read']);
+  const canViewActivity = session?.user.isSupportOverride !== true;
   const primaryGuardian =
     profile.guardians.find((guardian) => guardian.isPrimary) ??
     profile.guardians[0];
@@ -60,34 +67,36 @@ export function OverviewTab({ profile, onSelectTab }: OverviewTabProps) {
     profile.enrollments.find(
       (enrollment) => enrollment.status.toUpperCase() === 'ACTIVE',
     ) ?? null;
-  const documentIssues = getDocumentAttention(profile.documents);
+  const documentIssues = canManageDocuments
+    ? getDocumentAttention(profile.documents)
+    : [];
 
   const attendanceQuery = useQuery({
     queryKey: ['student-attendance-history', studentId],
     queryFn: () => api.getStudentAttendanceHistory(studentId),
-    enabled: Boolean(studentId),
+    enabled: Boolean(studentId) && canViewAttendance,
   });
 
   const feeClearanceQuery = useQuery({
     queryKey: ['student-fee-clearance', studentId],
     queryFn: () => api.getStudentFeeClearance(studentId),
-    enabled: Boolean(studentId),
+    enabled: Boolean(studentId) && canViewFees,
   });
 
   const iemisQuery = useQuery({
     queryKey: ['student-iemis-readiness', studentId],
     queryFn: () => api.getIemisReadiness(studentId),
-    enabled: Boolean(studentId),
+    enabled: Boolean(studentId) && canViewActivity,
   });
 
   const timelineQuery = useQuery<StudentLifecycleTimelineItem[]>({
     queryKey: ['student-lifecycle-timeline', studentId],
     queryFn: () => api.getStudentLifecycleTimeline(studentId),
-    enabled: Boolean(studentId),
+    enabled: Boolean(studentId) && canViewActivity,
   });
 
   const attentionItems = [
-    feeClearanceQuery.data && !feeClearanceQuery.data.cleared
+    canViewFees && feeClearanceQuery.data && !feeClearanceQuery.data.cleared
       ? {
           key: 'fees',
           tone: 'danger' as const,
@@ -97,7 +106,7 @@ export function OverviewTab({ profile, onSelectTab }: OverviewTabProps) {
           onClick: () => onSelectTab('Fees'),
         }
       : null,
-    documentIssues.length > 0
+    canManageDocuments && documentIssues.length > 0
       ? {
           key: 'documents',
           tone: 'warning' as const,
@@ -116,9 +125,9 @@ export function OverviewTab({ profile, onSelectTab }: OverviewTabProps) {
           title="Attention needed"
           description="Information that should be completed or reviewed."
         >
-          {feeClearanceQuery.isLoading ? (
+          {canViewFees && feeClearanceQuery.isLoading ? (
             <LoadingState label="Checking profile attention items..." />
-          ) : feeClearanceQuery.isError ? (
+          ) : canViewFees && feeClearanceQuery.isError ? (
             <div className="grid gap-3">
               {feeClearanceQuery.isError ? (
                 <InlineError
@@ -145,8 +154,9 @@ export function OverviewTab({ profile, onSelectTab }: OverviewTabProps) {
                   No profile issues need attention right now.
                 </p>
                 <p className="mt-1 text-xs font-medium leading-5">
-                  Fee clearance and uploaded document status do not currently
-                  show blockers.
+                  {canViewFees || canManageDocuments
+                    ? 'The profile checks available to you do not currently show blockers.'
+                    : 'No scoped student-record issue is currently reported.'}
                 </p>
               </div>
             </div>
@@ -166,38 +176,42 @@ export function OverviewTab({ profile, onSelectTab }: OverviewTabProps) {
           description="Key information from this student's current school record."
         >
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <GlanceCard
-              icon={<CalendarCheck size={18} />}
-              label="Attendance"
-              value={
-                attendanceQuery.data
-                  ? `${attendanceQuery.data.summary.attendancePercentage}%`
-                  : attendanceQuery.isLoading
-                    ? 'Checking'
-                    : 'Unavailable'
-              }
-              detail={
-                attendanceQuery.data
-                  ? `${attendanceQuery.data.summary.totalRecords} recorded day${attendanceQuery.data.summary.totalRecords === 1 ? '' : 's'}`
-                  : 'Attendance record is unavailable'
-              }
-              onClick={() => onSelectTab('Attendance')}
-            />
-            <GlanceCard
-              icon={<Wallet size={18} />}
-              label="Fee clearance"
-              value={
-                feeClearanceQuery.data
-                  ? feeClearanceQuery.data.cleared
-                    ? 'Cleared'
-                    : formatMoney(feeClearanceQuery.data.outstandingAmount)
-                  : feeClearanceQuery.isLoading
-                    ? 'Checking'
-                    : 'Unavailable'
-              }
-              detail="Current fee status"
-              onClick={() => onSelectTab('Fees')}
-            />
+            {canViewAttendance ? (
+              <GlanceCard
+                icon={<CalendarCheck size={18} />}
+                label="Attendance"
+                value={
+                  attendanceQuery.data
+                    ? `${attendanceQuery.data.summary.attendancePercentage}%`
+                    : attendanceQuery.isLoading
+                      ? 'Checking'
+                      : 'Unavailable'
+                }
+                detail={
+                  attendanceQuery.data
+                    ? `${attendanceQuery.data.summary.totalRecords} recorded day${attendanceQuery.data.summary.totalRecords === 1 ? '' : 's'}`
+                    : 'Attendance record is unavailable'
+                }
+                onClick={() => onSelectTab('Attendance')}
+              />
+            ) : null}
+            {canViewFees ? (
+              <GlanceCard
+                icon={<Wallet size={18} />}
+                label="Fee clearance"
+                value={
+                  feeClearanceQuery.data
+                    ? feeClearanceQuery.data.cleared
+                      ? 'Cleared'
+                      : formatMoney(feeClearanceQuery.data.outstandingAmount)
+                    : feeClearanceQuery.isLoading
+                      ? 'Checking'
+                      : 'Unavailable'
+                }
+                detail="Current fee status"
+                onClick={() => onSelectTab('Fees')}
+              />
+            ) : null}
             <GlanceCard
               icon={<Users size={18} />}
               label="Guardians"
@@ -209,59 +223,68 @@ export function OverviewTab({ profile, onSelectTab }: OverviewTabProps) {
               }
               onClick={() => onSelectTab('Guardians')}
             />
-            <GlanceCard
-              icon={<FileText size={18} />}
-              label="Documents"
-              value={profile.documents.length.toString()}
-              detail={
-                documentIssues.length > 0
-                  ? `${documentIssues.length} need review`
-                  : 'Uploaded documents'
-              }
-              onClick={() => onSelectTab('Documents')}
-            />
+            {canManageDocuments ? (
+              <GlanceCard
+                icon={<FileText size={18} />}
+                label="Documents"
+                value={profile.documents.length.toString()}
+                detail={
+                  documentIssues.length > 0
+                    ? `${documentIssues.length} need review`
+                    : 'Uploaded documents'
+                }
+                onClick={() => onSelectTab('Documents')}
+              />
+            ) : null}
           </div>
         </SectionCard>
 
-        <IemisReadinessCard query={iemisQuery} studentId={studentId} />
+        {canViewActivity ? (
+          <IemisReadinessCard query={iemisQuery} studentId={studentId} />
+        ) : null}
       </section>
 
       <SectionCard
         title="Related records"
-        description="Current enrollment and recent student activity."
+        description={
+          canViewActivity
+            ? 'Current enrollment and recent student activity.'
+            : 'Current enrollment from the school record.'
+        }
       >
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
-            <div className="mb-3 flex items-center gap-2 text-[0.68rem] font-black uppercase tracking-widest text-slate-400">
-              <GraduationCap size={15} aria-hidden="true" />
-              Current enrollment
-            </div>
-            {currentEnrollment ? (
-              <div>
-                <p className="text-lg font-black text-slate-950">
-                  {formatClassLabel(currentEnrollment.className)}
-                  {currentEnrollment.sectionName
-                    ? ` • Section ${currentEnrollment.sectionName}`
-                    : ''}
-                </p>
-                <p className="mt-1 text-sm font-semibold text-slate-600">
-                  {currentEnrollment.academicYear}
-                  {currentEnrollment.rollNumber
-                    ? ` • Roll ${currentEnrollment.rollNumber}`
-                    : ''}
-                </p>
-                <Badge className="mt-3 border-[var(--color-mod-admissions-border)] bg-white text-[var(--color-mod-admissions-text)]">
-                  {formatStatus(currentEnrollment.status)}
-                </Badge>
+              <div className="mb-3 flex items-center gap-2 text-[0.68rem] font-black uppercase tracking-widest text-slate-400">
+                <GraduationCap size={15} aria-hidden="true" />
+                Current enrollment
               </div>
-            ) : (
-              <p className="text-sm font-semibold text-slate-500">
-                No enrollment record is available.
-              </p>
-            )}
+              {currentEnrollment ? (
+                <div>
+                  <p className="text-lg font-black text-slate-950">
+                    {formatClassLabel(currentEnrollment.className)}
+                    {currentEnrollment.sectionName
+                      ? ` • Section ${currentEnrollment.sectionName}`
+                      : ''}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-slate-600">
+                    {currentEnrollment.academicYear}
+                    {currentEnrollment.rollNumber
+                      ? ` • Roll ${currentEnrollment.rollNumber}`
+                      : ''}
+                  </p>
+                  <Badge className="mt-3 border-[var(--color-mod-admissions-border)] bg-white text-[var(--color-mod-admissions-text)]">
+                    {formatStatus(currentEnrollment.status)}
+                  </Badge>
+                </div>
+              ) : (
+                <p className="text-sm font-semibold text-slate-500">
+                  No enrollment record is available.
+                </p>
+              )}
           </div>
 
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+          {canViewActivity ? (
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
             <div className="mb-3 flex items-center gap-2 text-[0.68rem] font-black uppercase tracking-widest text-slate-400">
               <Clock size={15} aria-hidden="true" />
               Recent student activity
@@ -293,17 +316,22 @@ export function OverviewTab({ profile, onSelectTab }: OverviewTabProps) {
                 No recent student activity is available in this profile.
               </p>
             )}
-          </div>
+            </div>
+          ) : null}
         </div>
       </SectionCard>
 
-      <section className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
-        <RecentTimelineCard
-          query={timelineQuery}
-          onViewTimeline={() => onSelectTab('History')}
-        />
-        <StudentIdentitySummary profile={profile} />
-      </section>
+      {canViewActivity || canViewQr ? (
+        <section className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+          {canViewActivity ? (
+            <RecentTimelineCard
+              query={timelineQuery}
+              onViewTimeline={() => onSelectTab('History')}
+            />
+          ) : null}
+          {canViewQr ? <StudentIdentitySummary profile={profile} /> : null}
+        </section>
+      ) : null}
     </div>
   );
 }

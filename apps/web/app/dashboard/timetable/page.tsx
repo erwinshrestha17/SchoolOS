@@ -2,7 +2,15 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Plus, Calendar, Settings, FileWarning, Users, LayoutGrid, ClipboardList } from 'lucide-react';
+import {
+  Plus,
+  Calendar,
+  Settings,
+  FileWarning,
+  Users,
+  LayoutGrid,
+  ClipboardList,
+} from 'lucide-react';
 import Link from 'next/link';
 
 import { api } from '@/lib/api';
@@ -21,9 +29,17 @@ import { SubstitutionsList } from '@/components/timetable/substitutions-list';
 import { TeacherScheduleWorkspace } from '@/components/timetable/teacher-schedule-workspace';
 import { TeacherCapability, useTeacherAccess } from '@/lib/teacher-access';
 import { RemoteStaffSelector } from '@/components/staff/remote-staff-selector';
+import { useSession } from '@/components/session-provider';
+import { SupportPublishedTimetable } from '@/components/timetable/support-published-timetable';
 
 export default function TimetablePage() {
+  const { session } = useSession();
   const { isRestricted } = useTeacherAccess();
+
+  if (session?.user.isSupportOverride) {
+    return <SupportPublishedTimetable />;
+  }
+
   // An ordinary teacher gets My Schedule, not the school timetable console.
   // A delegated timetable coordinator holds TIMETABLE_ADMIN and keeps the
   // full builder/versions/conflicts workspace (P0.5).
@@ -72,11 +88,16 @@ function SchoolTimetableConsole() {
 
   const versionsQuery = useQuery({
     queryKey: ['timetable-versions', filters.academicYearId],
-    queryFn: () => api.listTimetableVersions({ academicYearId: filters.academicYearId }),
+    queryFn: () =>
+      api.listTimetableVersions({ academicYearId: filters.academicYearId }),
   });
 
-  const activeVersion = versionsQuery.data?.items.find(v => v.status === 'PUBLISHED');
-  const draftVersions = versionsQuery.data?.items.filter(v => v.status === 'DRAFT');
+  const activeVersion = versionsQuery.data?.items.find(
+    (v) => v.status === 'PUBLISHED',
+  );
+  const draftVersions = versionsQuery.data?.items.filter(
+    (v) => v.status === 'DRAFT',
+  );
   const validationQuery = useQuery({
     queryKey: ['timetable-validation-summary', activeVersion?.id],
     queryFn: () => api.validateTimetableVersion(activeVersion!.id),
@@ -127,7 +148,9 @@ function SchoolTimetableConsole() {
       value: conflictCount,
       icon: <FileWarning className="h-5 w-5" />,
       loading: validationQuery.isLoading,
-      tone: validationQuery.data?.errors.length ? 'danger' as const : 'warning' as const,
+      tone: validationQuery.data?.errors.length
+        ? ('danger' as const)
+        : ('warning' as const),
       description: 'Schedule conflicts and warnings that need review',
     },
     {
@@ -151,7 +174,10 @@ function SchoolTimetableConsole() {
   const headerActions = (
     <div className="flex flex-wrap gap-2">
       <Link href="/dashboard/timetable/conflicts">
-        <Button variant="outline" className="rounded-xl border-info-100 text-info-700 hover:border-info-100 hover:bg-info-50">
+        <Button
+          variant="outline"
+          className="rounded-xl border-info-100 text-info-700 hover:border-info-100 hover:bg-info-50"
+        >
           <FileWarning className="mr-2 h-4 w-4" />
           Conflict Review
         </Button>
@@ -210,9 +236,12 @@ function SchoolTimetableConsole() {
       <div className="shell-card border-info-100 bg-info-50/40 p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-sm font-bold text-slate-950">Timetable operations</h2>
+            <h2 className="text-sm font-bold text-slate-950">
+              Timetable operations
+            </h2>
             <p className="mt-1 text-sm leading-6 text-slate-600">
-              Published timetable view stays separate from builder, conflict validation, and substitution coverage workflows.
+              Published timetable view stays separate from builder, conflict
+              validation, and substitution coverage workflows.
             </p>
           </div>
           {workflowLinks}
@@ -223,27 +252,40 @@ function SchoolTimetableConsole() {
         <div className="flex-1 grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <Select
             value={filters.academicYearId}
-            onChange={(e) => setFilters(prev => ({ ...prev, academicYearId: e.target.value }))}
+            onChange={(e) =>
+              setFilters((prev) => ({
+                ...prev,
+                academicYearId: e.target.value,
+              }))
+            }
           >
             <option value="">All Years</option>
-            {academicYearsQuery.data?.map(y => (
-              <option key={y.id} value={y.id}>{y.name}</option>
+            {academicYearsQuery.data?.map((y) => (
+              <option key={y.id} value={y.id}>
+                {y.name}
+              </option>
             ))}
           </Select>
 
           <Select
             value={filters.classId}
-            onChange={(e) => setFilters(prev => ({ ...prev, classId: e.target.value }))}
+            onChange={(e) =>
+              setFilters((prev) => ({ ...prev, classId: e.target.value }))
+            }
           >
             <option value="">All Classes</option>
-            {classesQuery.data?.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
+            {classesQuery.data?.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
             ))}
           </Select>
 
           <RemoteStaffSelector
             value={filters.teacherId}
-            onChange={(teacherId) => setFilters(prev => ({ ...prev, teacherId }))}
+            onChange={(teacherId) =>
+              setFilters((prev) => ({ ...prev, teacherId }))
+            }
             label="Filter by teacher"
             placeholder="All teachers"
             hideLabel
@@ -251,11 +293,15 @@ function SchoolTimetableConsole() {
 
           <Select
             value={filters.roomId}
-            onChange={(e) => setFilters(prev => ({ ...prev, roomId: e.target.value }))}
+            onChange={(e) =>
+              setFilters((prev) => ({ ...prev, roomId: e.target.value }))
+            }
           >
             <option value="">All Rooms</option>
-            {roomsQuery.data?.map(r => (
-              <option key={r.id} value={r.id}>{r.name}</option>
+            {roomsQuery.data?.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
             ))}
           </Select>
         </div>
@@ -273,7 +319,10 @@ function SchoolTimetableConsole() {
         <div className="min-h-[400px]">
           {activeTab === 'grid' && (
             <div className="animate-in fade-in duration-300">
-              <TimetableGrid filters={filters} activeVersionId={activeVersion?.id} />
+              <TimetableGrid
+                filters={filters}
+                activeVersionId={activeVersion?.id}
+              />
             </div>
           )}
 

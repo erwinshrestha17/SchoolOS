@@ -8,6 +8,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
+import { AllowSupportOverrideRead } from '../auth/decorators/allow-support-override-read.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -45,6 +46,7 @@ export class DeliveriesController {
 
   @Get('operations')
   @Permissions('notifications:view_delivery_diagnostics')
+  @AllowSupportOverrideRead('NOTICES_DELIVERY')
   operations(
     @CurrentAuth() auth: AuthContext,
     @Query() query: ListNotificationDeliveriesQueryDto,
@@ -54,6 +56,7 @@ export class DeliveriesController {
 
   @Get('failures')
   @Permissions('notifications:view_delivery_diagnostics')
+  @AllowSupportOverrideRead('NOTICES_DELIVERY')
   failures(
     @Query() query: ListNotificationDeliveriesQueryDto,
     @CurrentAuth() auth: AuthContext,

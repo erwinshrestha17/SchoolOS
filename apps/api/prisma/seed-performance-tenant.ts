@@ -67,8 +67,8 @@ import {
 } from '../src/finance/finance.defaults';
 import {
   PERMISSION_CATALOG,
-  SYSTEM_ROLE_DEFINITIONS,
-  SYSTEM_ROLE_PERMISSIONS,
+  SCHOOL_ROLE_DEFINITIONS,
+  SCHOOL_ROLE_PERMISSIONS,
 } from '../src/rbac/rbac.defaults';
 
 // ---------------------------------------------------------------------------
@@ -163,18 +163,60 @@ function makeRng(seed: number) {
   };
 }
 const rng = makeRng(20260731);
-const pick = <T>(items: readonly T[]) => items[Math.floor(rng() * items.length)];
+const pick = <T>(items: readonly T[]) =>
+  items[Math.floor(rng() * items.length)];
 
 const FIRST_NAMES = [
-  'Aarav', 'Anisha', 'Bibek', 'Bina', 'Chetan', 'Deepa', 'Dipesh', 'Gita',
-  'Hari', 'Ishwor', 'Kabita', 'Kiran', 'Laxmi', 'Manish', 'Nabin', 'Nisha',
-  'Prakash', 'Pratima', 'Rajesh', 'Rekha', 'Sabin', 'Samir', 'Sarita', 'Suman',
-  'Sunita', 'Trishna', 'Umesh', 'Yubraj',
+  'Aarav',
+  'Anisha',
+  'Bibek',
+  'Bina',
+  'Chetan',
+  'Deepa',
+  'Dipesh',
+  'Gita',
+  'Hari',
+  'Ishwor',
+  'Kabita',
+  'Kiran',
+  'Laxmi',
+  'Manish',
+  'Nabin',
+  'Nisha',
+  'Prakash',
+  'Pratima',
+  'Rajesh',
+  'Rekha',
+  'Sabin',
+  'Samir',
+  'Sarita',
+  'Suman',
+  'Sunita',
+  'Trishna',
+  'Umesh',
+  'Yubraj',
 ];
 const LAST_NAMES = [
-  'Adhikari', 'Bhattarai', 'Chaudhary', 'Dahal', 'Gurung', 'Joshi', 'Karki',
-  'Khadka', 'Lama', 'Magar', 'Maharjan', 'Nepali', 'Pandey', 'Poudel', 'Rai',
-  'Sharma', 'Shrestha', 'Subedi', 'Tamang', 'Thapa',
+  'Adhikari',
+  'Bhattarai',
+  'Chaudhary',
+  'Dahal',
+  'Gurung',
+  'Joshi',
+  'Karki',
+  'Khadka',
+  'Lama',
+  'Magar',
+  'Maharjan',
+  'Nepali',
+  'Pandey',
+  'Poudel',
+  'Rai',
+  'Sharma',
+  'Shrestha',
+  'Subedi',
+  'Tamang',
+  'Thapa',
 ];
 
 const SUBJECT_DEFS = [
@@ -256,7 +298,7 @@ async function provisionTenantDefaults(
     });
   }
 
-  for (const role of SYSTEM_ROLE_DEFINITIONS) {
+  for (const role of SCHOOL_ROLE_DEFINITIONS) {
     await tx.role.upsert({
       where: { tenantId_name: { tenantId, name: role.name } },
       update: { description: role.description, isSystem: true },
@@ -270,7 +312,7 @@ async function provisionTenantDefaults(
   }
 
   for (const [roleName, permissionKeys] of Object.entries(
-    SYSTEM_ROLE_PERMISSIONS,
+    SCHOOL_ROLE_PERMISSIONS,
   )) {
     const role = await tx.role.findUnique({
       where: { tenantId_name: { tenantId, name: roleName } },
@@ -295,7 +337,9 @@ async function provisionTenantDefaults(
     }
   }
 
-  const yearStart = new Date(`${new Date().getUTCFullYear()}-04-01T00:00:00.000Z`);
+  const yearStart = new Date(
+    `${new Date().getUTCFullYear()}-04-01T00:00:00.000Z`,
+  );
   const yearEnd = new Date(
     `${new Date().getUTCFullYear() + 1}-03-31T23:59:59.999Z`,
   );
@@ -409,7 +453,9 @@ async function assignSubscription(tenantId: string) {
   // Wave 1 / one-school concurrency program: STANDARD without library,
   // transport, or canteen add-ons. PROFESSIONAL includes M8–M10 by default and
   // would inflate the parent dashboard SQL baseline with deferred modules.
-  const plan = await prisma.platformPlan.findUnique({ where: { key: 'standard' } });
+  const plan = await prisma.platformPlan.findUnique({
+    where: { key: 'standard' },
+  });
 
   if (!plan) {
     throw new Error(
@@ -424,7 +470,11 @@ async function assignSubscription(tenantId: string) {
 
   await prisma.tenantSubscription.upsert({
     where: { id: `sub-${SLUG}` },
-    update: { planId: plan.id, status: TenantSubscriptionStatus.ACTIVE, addOns: [] },
+    update: {
+      planId: plan.id,
+      status: TenantSubscriptionStatus.ACTIVE,
+      addOns: [],
+    },
     create: {
       id: `sub-${SLUG}`,
       tenantId,
@@ -451,13 +501,15 @@ async function assignSubscription(tenantId: string) {
       },
       update: {
         enabled: false,
-        reason: 'Wave 1 deferred — excluded from one-school concurrency program',
+        reason:
+          'Wave 1 deferred — excluded from one-school concurrency program',
       },
       create: {
         tenantId,
         featureKey: `module.${featureKey}`,
         enabled: false,
-        reason: 'Wave 1 deferred — excluded from one-school concurrency program',
+        reason:
+          'Wave 1 deferred — excluded from one-school concurrency program',
       },
     });
   }
@@ -474,7 +526,9 @@ async function purgeBulkData(tenantId: string) {
   await prisma.onlinePaymentIntent.deleteMany({ where: { tenantId } });
   await prisma.receiptReprintHistory.deleteMany({ where: { tenantId } });
   await prisma.receipt.deleteMany({ where: { tenantId } });
-  await prisma.financeApprovalRequestHistory.deleteMany({ where: { tenantId } });
+  await prisma.financeApprovalRequestHistory.deleteMany({
+    where: { tenantId },
+  });
   await prisma.financeApprovalRequest.deleteMany({ where: { tenantId } });
   await prisma.paymentRefund.deleteMany({ where: { tenantId } });
   await prisma.payment.deleteMany({ where: { tenantId } });
@@ -511,7 +565,12 @@ async function seedStructure(tenantId: string) {
   if (!academicYear) throw new Error('No current academic year provisioned');
 
   const classes: { id: string; level: number }[] = [];
-  const sections: { id: string; classId: string; level: number; name: string }[] = [];
+  const sections: {
+    id: string;
+    classId: string;
+    level: number;
+    name: string;
+  }[] = [];
   const subjects: { id: string; classId: string }[] = [];
 
   for (let level = 1; level <= CLASSES; level += 1) {
@@ -543,7 +602,11 @@ async function seedStructure(tenantId: string) {
       const sectionName = String.fromCharCode(65 + s);
       const section = await prisma.section.upsert({
         where: {
-          tenantId_classId_name: { tenantId, classId: cls.id, name: sectionName },
+          tenantId_classId_name: {
+            tenantId,
+            classId: cls.id,
+            name: sectionName,
+          },
         },
         update: {},
         create: { tenantId, classId: cls.id, name: sectionName, capacity: 50 },
@@ -589,7 +652,11 @@ async function seedStaff(
     const email = `teacher${pad(i + 1, 3)}@${SLUG}.test`;
     const user = await prisma.user.upsert({
       where: { tenantId_email: { tenantId, email } },
-      update: { passwordHash, status: UserStatus.ACTIVE, mustChangePassword: false },
+      update: {
+        passwordHash,
+        status: UserStatus.ACTIVE,
+        mustChangePassword: false,
+      },
       create: {
         tenantId,
         email,
@@ -601,7 +668,9 @@ async function seedStaff(
     });
 
     const staff = await prisma.staff.upsert({
-      where: { tenantId_employeeId: { tenantId, employeeId: `T${pad(i + 1, 4)}` } },
+      where: {
+        tenantId_employeeId: { tenantId, employeeId: `T${pad(i + 1, 4)}` },
+      },
       update: { userId: user.id, status: StaffStatus.ACTIVE },
       create: {
         tenantId,
@@ -621,11 +690,21 @@ async function seedStaff(
     });
 
     const existingRole = await prisma.userRole.findFirst({
-      where: { tenantId, userId: user.id, roleId: teacherRole.id, scopeId: null },
+      where: {
+        tenantId,
+        userId: user.id,
+        roleId: teacherRole.id,
+        scopeId: null,
+      },
     });
     if (!existingRole) {
       await prisma.userRole.create({
-        data: { tenantId, userId: user.id, roleId: teacherRole.id, scopeId: null },
+        data: {
+          tenantId,
+          userId: user.id,
+          roleId: teacherRole.id,
+          scopeId: null,
+        },
       });
     }
 
@@ -636,7 +715,11 @@ async function seedStaff(
     const email = `admin${pad(i + 1, 3)}@${SLUG}.test`;
     const user = await prisma.user.upsert({
       where: { tenantId_email: { tenantId, email } },
-      update: { passwordHash, status: UserStatus.ACTIVE, mustChangePassword: false },
+      update: {
+        passwordHash,
+        status: UserStatus.ACTIVE,
+        mustChangePassword: false,
+      },
       create: {
         tenantId,
         email,
@@ -647,7 +730,8 @@ async function seedStaff(
       },
     });
 
-    const roleIds = i === 0 ? [adminRole.id, configOwnerRole.id] : [adminRole.id];
+    const roleIds =
+      i === 0 ? [adminRole.id, configOwnerRole.id] : [adminRole.id];
     for (const roleId of roleIds) {
       const existing = await prisma.userRole.findFirst({
         where: { tenantId, userId: user.id, roleId, scopeId: null },
@@ -686,9 +770,12 @@ async function seedStaff(
       effectiveFrom,
     });
 
-    const sectionSubjects = subjects.filter((s) => s.classId === section.classId);
+    const sectionSubjects = subjects.filter(
+      (s) => s.classId === section.classId,
+    );
     for (const [subjectIndex, subject] of sectionSubjects.entries()) {
-      const subjectTeacher = teachers[(index + subjectIndex + 1) % teachers.length];
+      const subjectTeacher =
+        teachers[(index + subjectIndex + 1) % teachers.length];
       assignments.push({
         tenantId,
         academicYearId,
@@ -744,7 +831,11 @@ async function seedStudentsAndParents(
       firstNameEn: pick(FIRST_NAMES),
       lastNameEn: pick(LAST_NAMES),
       dateOfBirth: new Date(
-        Date.UTC(2026 - 5 - section.level, Math.floor(rng() * 12), 1 + Math.floor(rng() * 28)),
+        Date.UTC(
+          2026 - 5 - section.level,
+          Math.floor(rng() * 12),
+          1 + Math.floor(rng() * 28),
+        ),
       ),
       gender: rng() < 0.5 ? Gender.FEMALE : Gender.MALE,
       admissionDate,
@@ -778,7 +869,8 @@ async function seedStudentsAndParents(
       effectiveFrom: admissionDate,
       effectiveUntil: null,
     })),
-    (chunk) => prisma.enrollment.createMany({ data: chunk, skipDuplicates: true }),
+    (chunk) =>
+      prisma.enrollment.createMany({ data: chunk, skipDuplicates: true }),
   );
 
   // --- parent user accounts ----------------------------------------------
@@ -819,7 +911,8 @@ async function seedStudentsAndParents(
       roleId: parentRole.id,
       scopeId: null,
     })),
-    (chunk) => prisma.userRole.createMany({ data: chunk, skipDuplicates: true }),
+    (chunk) =>
+      prisma.userRole.createMany({ data: chunk, skipDuplicates: true }),
   );
 
   // --- guardians ----------------------------------------------------------
@@ -834,7 +927,8 @@ async function seedStudentsAndParents(
       email: user.email ?? undefined,
       receivesAlerts: true,
     })),
-    (chunk) => prisma.guardian.createMany({ data: chunk, skipDuplicates: true }),
+    (chunk) =>
+      prisma.guardian.createMany({ data: chunk, skipDuplicates: true }),
   );
 
   const guardians = await prisma.guardian.findMany({
@@ -894,9 +988,13 @@ async function seedAttendance(
 ) {
   if (ATTENDANCE_DAYS === 0) return;
 
-  const alreadySeeded = await prisma.attendanceSession.count({ where: { tenantId } });
+  const alreadySeeded = await prisma.attendanceSession.count({
+    where: { tenantId },
+  });
   if (alreadySeeded >= sections.length * ATTENDANCE_DAYS) {
-    console.log(`  attendance: ${alreadySeeded} sessions already present, skipping`);
+    console.log(
+      `  attendance: ${alreadySeeded} sessions already present, skipping`,
+    );
     return;
   }
 
@@ -966,7 +1064,9 @@ async function seedAttendance(
 async function seedNotifications(tenantId: string, guardianUserIds: string[]) {
   if (NOTIFICATIONS_PER_PARENT === 0) return;
 
-  const already = await prisma.notificationDelivery.count({ where: { tenantId } });
+  const already = await prisma.notificationDelivery.count({
+    where: { tenantId },
+  });
   if (already >= guardianUserIds.length * NOTIFICATIONS_PER_PARENT) {
     console.log(`  notifications: ${already} already present, skipping`);
     return;
@@ -993,7 +1093,10 @@ async function seedNotifications(tenantId: string, guardianUserIds: string[]) {
   }
 
   await insertInBatches('notifications', rows, (chunk) =>
-    prisma.notificationDelivery.createMany({ data: chunk, skipDuplicates: true }),
+    prisma.notificationDelivery.createMany({
+      data: chunk,
+      skipDuplicates: true,
+    }),
   );
 }
 
@@ -1053,7 +1156,9 @@ async function seedActivityAndMilestones(
 
   const already = await prisma.activityPost.count({ where: { tenantId } });
   if (already >= ACTIVITY_POSTS) {
-    console.log(`  activity: ${already} posts already present, skipping bulk seed`);
+    console.log(
+      `  activity: ${already} posts already present, skipping bulk seed`,
+    );
   } else {
     const teacher = teachers[0];
     if (!teacher) return;
@@ -1076,14 +1181,20 @@ async function seedActivityAndMilestones(
     for (const section of sections) {
       if (section.id === excludeSectionId) continue;
 
-      const sectionStudents = students.filter((s) => s.sectionId === section.id);
+      const sectionStudents = students.filter(
+        (s) => s.sectionId === section.id,
+      );
       const count = Math.min(
         ACTIVITY_POSTS_PER_SECTION,
-        Math.max(1, Math.floor(ACTIVITY_POSTS / Math.max(sections.length - 1, 1))),
+        Math.max(
+          1,
+          Math.floor(ACTIVITY_POSTS / Math.max(sections.length - 1, 1)),
+        ),
       );
 
       for (let n = 0; n < count; n += 1) {
-        const audienceType = audienceCycle[(postIndex + n) % audienceCycle.length];
+        const audienceType =
+          audienceCycle[(postIndex + n) % audienceCycle.length];
         // CLASS posts reach every section in the class. The empty-path fixture
         // student lives in excludeClassId, so skip CLASS audience there.
         if (
@@ -1122,7 +1233,10 @@ async function seedActivityAndMilestones(
           activityDate: publishedAt,
         });
 
-        if (audienceType === AudienceType.STUDENT && sectionStudents.length > 0) {
+        if (
+          audienceType === AudienceType.STUDENT &&
+          sectionStudents.length > 0
+        ) {
           const tagged = sectionStudents.slice(
             0,
             rng() < 0.3 ? Math.min(2, sectionStudents.length) : 1,
@@ -1134,7 +1248,10 @@ async function seedActivityAndMilestones(
               studentId: student.id,
             });
           }
-        } else if (rng() < ACTIVITY_TAGGED_RATIO && sectionStudents.length > 0) {
+        } else if (
+          rng() < ACTIVITY_TAGGED_RATIO &&
+          sectionStudents.length > 0
+        ) {
           tagRows.push({
             tenantId,
             activityPostId: postId,
@@ -1171,7 +1288,8 @@ async function seedActivityAndMilestones(
         sectionId: null,
         createdById: teacher.userId,
         title: 'Class-wide celebration',
-        caption: 'Shared class-level activity visible to every section in the class.',
+        caption:
+          'Shared class-level activity visible to every section in the class.',
         category: ActivityCategory.CELEBRATION,
         audienceType: AudienceType.CLASS,
         status: ActivityPostStatus.APPROVED,
@@ -1287,11 +1405,17 @@ async function seedActivityAndMilestones(
       );
     }
 
-    await insertInBatches('activity posts', [...postRows, ...hiddenPostRows], (chunk) =>
-      prisma.activityPost.createMany({ data: chunk, skipDuplicates: true }),
+    await insertInBatches(
+      'activity posts',
+      [...postRows, ...hiddenPostRows],
+      (chunk) =>
+        prisma.activityPost.createMany({ data: chunk, skipDuplicates: true }),
     );
     await insertInBatches('activity student tags', tagRows, (chunk) =>
-      prisma.activityPostStudent.createMany({ data: chunk, skipDuplicates: true }),
+      prisma.activityPostStudent.createMany({
+        data: chunk,
+        skipDuplicates: true,
+      }),
     );
 
     if (students[1]) {
@@ -1308,7 +1432,10 @@ async function seedActivityAndMilestones(
     }
 
     await insertInBatches('activity attachments', attachmentRows, (chunk) =>
-      prisma.activityAttachment.createMany({ data: chunk, skipDuplicates: true }),
+      prisma.activityAttachment.createMany({
+        data: chunk,
+        skipDuplicates: true,
+      }),
     );
 
     // One SEEN reaction on the newest school-wide post for populated-path realism.
@@ -1372,7 +1499,10 @@ async function seedActivityAndMilestones(
   }
 
   await insertInBatches('developmental milestones', milestoneRows, (chunk) =>
-    prisma.developmentalMilestone.createMany({ data: chunk, skipDuplicates: true }),
+    prisma.developmentalMilestone.createMany({
+      data: chunk,
+      skipDuplicates: true,
+    }),
   );
 }
 
@@ -1452,7 +1582,8 @@ async function seedCanteen(
     let walletId: string | null = null;
     if (withWallet) {
       walletId = `perf-wallet-${student.id}`;
-      const balance = student.id === fixtureStudentIds.one ? 450 : 50 + (index % 20) * 25;
+      const balance =
+        student.id === fixtureStudentIds.one ? 450 : 50 + (index % 20) * 25;
       const threshold = 100;
       walletRows.push({
         id: walletId,
@@ -1518,13 +1649,22 @@ async function seedCanteen(
     prisma.canteenWallet.createMany({ data: chunk, skipDuplicates: true }),
   );
   await insertInBatches('canteen enrollments', enrollmentRows, (chunk) =>
-    prisma.canteenStudentEnrollment.createMany({ data: chunk, skipDuplicates: true }),
+    prisma.canteenStudentEnrollment.createMany({
+      data: chunk,
+      skipDuplicates: true,
+    }),
   );
   await insertInBatches('canteen servings', servingRows, (chunk) =>
     prisma.canteenMealServing.createMany({ data: chunk, skipDuplicates: true }),
   );
-  await insertInBatches('canteen wallet transactions', transactionRows, (chunk) =>
-    prisma.canteenWalletTransaction.createMany({ data: chunk, skipDuplicates: true }),
+  await insertInBatches(
+    'canteen wallet transactions',
+    transactionRows,
+    (chunk) =>
+      prisma.canteenWalletTransaction.createMany({
+        data: chunk,
+        skipDuplicates: true,
+      }),
   );
 
   console.log(
@@ -1550,7 +1690,8 @@ async function seedFees(
     where: { tenantId },
     select: { id: true, code: true },
   });
-  const tuition = feeHeads.find((head) => head.code === 'TUITION') ?? feeHeads[0];
+  const tuition =
+    feeHeads.find((head) => head.code === 'TUITION') ?? feeHeads[0];
   const exam = feeHeads.find((head) => head.code === 'EXAM') ?? feeHeads[0];
   if (!tuition) {
     console.log('  fees: no fee heads provisioned, skipping');
@@ -1650,7 +1791,10 @@ async function seedFees(
   });
 
   for (const student of students) {
-    if (student.id === fixtureStudentIds.empty || student.id === fixtureStudentIds.one) {
+    if (
+      student.id === fixtureStudentIds.empty ||
+      student.id === fixtureStudentIds.one
+    ) {
       continue;
     }
     if (rng() >= FEE_INVOICE_RATIO) continue;
@@ -1753,7 +1897,11 @@ async function seedMeasurementFixtures(
   ) {
     const user = await prisma.user.upsert({
       where: { tenantId_email: { tenantId, email } },
-      update: { passwordHash, status: UserStatus.ACTIVE, mustChangePassword: false },
+      update: {
+        passwordHash,
+        status: UserStatus.ACTIVE,
+        mustChangePassword: false,
+      },
       create: {
         tenantId,
         email,
@@ -1769,7 +1917,12 @@ async function seedMeasurementFixtures(
     });
     if (!existingRole) {
       await prisma.userRole.create({
-        data: { tenantId, userId: user.id, roleId: parentRoleId, scopeId: null },
+        data: {
+          tenantId,
+          userId: user.id,
+          roleId: parentRoleId,
+          scopeId: null,
+        },
       });
     }
 
@@ -1813,7 +1966,11 @@ async function seedMeasurementFixtures(
       })),
     });
 
-    return { email, guardianId: guardian.id, studentIds: linkedStudents.map((s) => s.id) };
+    return {
+      email,
+      guardianId: guardian.id,
+      studentIds: linkedStudents.map((s) => s.id),
+    };
   }
 
   const fixtures = {
@@ -1822,9 +1979,11 @@ async function seedMeasurementFixtures(
       'Perf Empty Parent',
       [emptyStudent],
     ),
-    one: await upsertFixtureParent(FIXTURE_PARENT_EMAILS.one, 'Perf One Child Parent', [
-      oneChild,
-    ]),
+    one: await upsertFixtureParent(
+      FIXTURE_PARENT_EMAILS.one,
+      'Perf One Child Parent',
+      [oneChild],
+    ),
     multi: await upsertFixtureParent(
       FIXTURE_PARENT_EMAILS.multi,
       'Perf Multi Child Parent',
@@ -1833,8 +1992,12 @@ async function seedMeasurementFixtures(
   };
 
   console.log('  measurement fixtures:');
-  console.log(`    empty path:  ${fixtures.empty.email} -> ${fixtures.empty.studentIds.join(', ')}`);
-  console.log(`    one child:   ${fixtures.one.email} -> ${fixtures.one.studentIds.join(', ')}`);
+  console.log(
+    `    empty path:  ${fixtures.empty.email} -> ${fixtures.empty.studentIds.join(', ')}`,
+  );
+  console.log(
+    `    one child:   ${fixtures.one.email} -> ${fixtures.one.studentIds.join(', ')}`,
+  );
   console.log(
     `    multi child: ${fixtures.multi.email} -> ${fixtures.multi.studentIds.join(', ')}`,
   );
@@ -1864,7 +2027,13 @@ async function main() {
   const passwordHash = await bcrypt.hash(PASSWORD, SEED_BCRYPT_ROUNDS);
 
   const { academicYear, sections, subjects } = await seedStructure(tenant.id);
-  const { teachers } = await seedStaff(tenant.id, academicYear.id, sections, subjects, passwordHash);
+  const { teachers } = await seedStaff(
+    tenant.id,
+    academicYear.id,
+    sections,
+    subjects,
+    passwordHash,
+  );
   const { students, guardianUserIds } = await seedStudentsAndParents(
     tenant.id,
     academicYear.id,
@@ -1886,7 +2055,12 @@ async function main() {
     emptySectionId,
     emptyClassId,
   );
-  const fixtures = await seedMeasurementFixtures(tenant.id, passwordHash, students, sections);
+  const fixtures = await seedMeasurementFixtures(
+    tenant.id,
+    passwordHash,
+    students,
+    sections,
+  );
   if (fixtures) {
     await seedCanteen(tenant.id, students, {
       empty: fixtures.empty.studentIds[0],
@@ -1909,9 +2083,15 @@ async function main() {
   console.log(`Elapsed:     ${elapsed}s`);
   console.log('');
   console.log('Load-test credentials (synthetic fixture tenant only):');
-  console.log(`  parent:  parent00001@${SLUG}.test .. parent${pad(STUDENTS * 2, 5)}@${SLUG}.test`);
-  console.log(`  teacher: teacher001@${SLUG}.test .. teacher${pad(TEACHERS, 3)}@${SLUG}.test`);
-  console.log(`  admin:   admin001@${SLUG}.test .. admin${pad(ADMINS, 3)}@${SLUG}.test`);
+  console.log(
+    `  parent:  parent00001@${SLUG}.test .. parent${pad(STUDENTS * 2, 5)}@${SLUG}.test`,
+  );
+  console.log(
+    `  teacher: teacher001@${SLUG}.test .. teacher${pad(TEACHERS, 3)}@${SLUG}.test`,
+  );
+  console.log(
+    `  admin:   admin001@${SLUG}.test .. admin${pad(ADMINS, 3)}@${SLUG}.test`,
+  );
   console.log(`  password: ${PASSWORD}`);
   console.log('');
   console.log('Measurement fixture parents (synthetic tenant only):');

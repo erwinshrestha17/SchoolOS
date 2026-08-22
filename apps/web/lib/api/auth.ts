@@ -1,4 +1,8 @@
-import type { AuthSession, PermissionKey } from '@schoolos/core';
+import type {
+  AuthSession,
+  PermissionKey,
+  SupportOverrideScope,
+} from '@schoolos/core';
 import {
   AuthChallengeResponse,
   JsonBody,
@@ -11,6 +15,9 @@ export type AuthProfile = {
   tenantId: string;
   originalTenantId?: string;
   isSupportOverride?: boolean;
+  supportOverrideScopes?: SupportOverrideScope[];
+  supportOverrideReadOnly?: boolean;
+  securityDomain?: 'SCHOOL' | 'PLATFORM';
   tenantSlug: string;
   email: string | null;
   authMethod: string;
@@ -46,12 +53,14 @@ export const authApi = {
       method: 'POST',
       json: {},
       auth: false,
+      supportOverride: 'omit',
     }),
   logout: () =>
     request<{ success: true }>('/auth/logout', {
       method: 'POST',
       json: {},
       auth: false,
+      supportOverride: 'omit',
     }),
   getProfile: (options?: RequestOptions) =>
     request<AuthProfile>('/auth/me', options),

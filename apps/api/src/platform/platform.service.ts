@@ -7,9 +7,10 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, SecurityDomain } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import type { AuthContext } from '../auth/auth.types';
 import {
   PaginatedResponse,
   PlatformAuditLog,
@@ -21,13 +22,14 @@ import {
   PlatformProviderConfigSummary,
   PlatformProviderReadinessDetail,
   PlatformQueueSummary,
-  PlatformFailedJobSummary,
   PlatformSaaSInvoiceSummary,
   PlatformTenantDetail,
   PlatformTenantSummary,
   PlatformTenantSubscriptionSummary,
   PlatformTenantUsage,
   PlatformUsageCounterSummary,
+  isSupportOverrideScope,
+  type SupportOverrideScope,
 } from '@schoolos/core';
 import { ListPlatformTenantsDto } from './dto/list-platform-tenants.dto';
 import { UsageService } from '../usage/usage.service';
@@ -39,7 +41,6 @@ import {
   CreateSaaSInvoiceDto,
   RecordPlatformWebhookDeliveryDto,
   RecordSaaSPaymentDto,
-  RetryFailedJobDto,
   TenantFeatureOverrideDto,
   UpdateBillingProfileDto,
   UpdatePlatformPlanDto,
@@ -301,151 +302,189 @@ export class PlatformService {
     ]);
   }
 
-  async getDashboardSummary(): Promise<PlatformDashboardSummary> {
-    const [
-      totalTenants,
-      activeTenants,
-      usage,
-      health,
-      failedJobs,
-      onboarding,
-      audit,
-      activeSubs,
-      graceSubs,
-      expiredSubs,
-      unpaidInvoices,
-      activeSubscriptions,
-    ] = await Promise.all([
+  async getDashboardSummary(
+    actor: AuthContext,
+  ): Promise<PlatformDashboardSummary> {
+    const permissions = new Set(actor.permissions);
+    const canReadUsage = permissions.has('platform:usage:read');
+    const canReadHealth = permissions.has('platform:health:read');
+    const canReadQueues = permissions.has('platform:queues:read');
+    const canReadOnboarding = permissions.has('platform:onboarding:read');
+    const canReadAudit = permissions.has('platform:audit:read');
+    const canReadSubscriptions = permissions.has('platform:subscriptions:read');
+    const canReadBilling = permissions.has('platform:billing:read');
+    const canReadProviders = permissions.has('platform:providers:read');
+
+    const [totalTenants, activeTenants] = await Promise.all([
       this.prisma.tenant.count(),
       this.prisma.tenant.count({ where: { isActive: true } }),
-      this.usageService.getGlobalUsageStats(),
-      this.getPlatformHealth(),
-      this.listFailedJobs(),
-      this.getOnboardingCounts(),
-      this.listAuditLogs({ limit: 10 }),
-      this.prisma.tenantSubscription.count({ where: { status: 'ACTIVE' } }),
-      this.prisma.tenantSubscription.count({ where: { status: 'GRACE' } }),
-      this.prisma.tenantSubscription.count({ where: { status: 'EXPIRED' } }),
-      this.prisma.saaSInvoice.findMany({
-        where: { status: { in: ['ISSUED', 'PARTIAL', 'OVERDUE'] } },
-        select: {
-          amount: true,
-          status: true,
-          payments: { select: { amount: true } },
-        },
-      }),
-      this.prisma.tenantSubscription.findMany({
-        where: { status: { in: ['ACTIVE', 'TRIAL', 'GRACE'] } },
-        include: {
-          tenant: { select: { id: true, name: true } },
-          plan: {
-            include: {
-              usageLimits: true,
-            },
-          },
-        },
-      }),
     ]);
-    const suspendedTenants = totalTenants - activeTenants;
 
-    let totalUnpaidAmount = 0;
-    let overdueCount = 0;
-    for (const inv of unpaidInvoices) {
-      const paidAmount = (inv.payments || []).reduce(
-        (sum: number, p: { amount: unknown }) => sum + Number(p.amount),
-        0,
-      );
-      totalUnpaidAmount += Number(inv.amount) - paidAmount;
-      if (inv.status === 'OVERDUE') {
-        overdueCount++;
-      }
-    }
-
-    const warningsPromises = activeSubscriptions.flatMap((sub) =>
-      (sub.plan?.usageLimits || []).map(async (limit) => {
-        const current = await this.usageService.getCurrentUsageCount(
-          sub.tenantId,
-          limit.usageKey,
-        );
-        if (current >= limit.limit * 0.9) {
-          return {
-            tenantId: sub.tenantId,
-            tenantName: sub.tenant.name,
-            usageKey: limit.usageKey,
-            value: current,
-            limit: limit.limit,
-          };
-        }
-        return null;
-      }),
-    );
-    const usageWarnings = (await Promise.all(warningsPromises)).filter(
-      Boolean,
-    ) as Array<{
-      tenantId: string;
-      tenantName: string;
-      usageKey: string;
-      value: number;
-      limit: number;
-    }>;
-
-    // Fetch provider statuses
-    const [redisHealth, storageProvider, emailProvider, smsProvider] =
-      await Promise.all([
-        this.checkRedis(),
-        this.prisma.providerConfig.findFirst({
-          where: { type: 'OBJECT_STORAGE', enabled: true },
-        }),
-        this.prisma.providerConfig.findFirst({
-          where: { type: 'EMAIL', enabled: true },
-        }),
-        this.prisma.providerConfig.findFirst({
-          where: { type: 'SMS', enabled: true },
-        }),
-      ]);
-
-    const queueStatus = redisHealth.status === 'ok' ? 'ready' : 'failed';
-
-    const getStatus = (
-      provider: Record<string, unknown> | null | undefined,
-    ) => {
-      if (!provider) return 'not_configured' as const;
-      const readiness = this.buildProviderReadinessDetail(
-        provider,
-        new Date(),
-        [],
-      );
-      return readiness.status;
-    };
-
-    const providerReadinessStatus = {
-      queue: queueStatus as 'ready' | 'failed' | 'not_configured' | 'degraded',
-      storage: getStatus(storageProvider),
-      email: getStatus(emailProvider),
-      sms: getStatus(smsProvider),
-    };
-
-    return {
+    const summary: PlatformDashboardSummary = {
       totalTenants,
       activeTenants,
-      suspendedTenants,
-      pendingOnboarding: onboarding.pending,
-      usage,
-      healthStatus: health.status,
-      failedJobsCount: failedJobs.length,
-      recentAudit: audit.items,
-      providerReadinessStatus,
-      subscriptionSummary: {
-        activeSubscriptions: activeSubs,
-        graceSubscriptions: graceSubs,
-        expiredSubscriptions: expiredSubs,
-      },
-      invoiceSummary: {
+      suspendedTenants: totalTenants - activeTenants,
+    };
+
+    const [usage, healthStatus, failedJobsCount, onboarding, audit] =
+      await Promise.all([
+        canReadUsage ? this.usageService.getGlobalUsageStats() : undefined,
+        canReadHealth
+          ? canReadProviders
+            ? this.getPlatformHealth().then((health) => health.status)
+            : this.getCorePlatformHealthStatus()
+          : undefined,
+        canReadQueues ? this.countFailedJobs() : undefined,
+        canReadOnboarding ? this.getOnboardingCounts() : undefined,
+        canReadAudit ? this.listAuditLogs({ limit: 10 }) : undefined,
+      ]);
+
+    if (usage) summary.usage = usage;
+    if (healthStatus) summary.healthStatus = healthStatus;
+    if (failedJobsCount !== undefined) {
+      summary.failedJobsCount = failedJobsCount;
+    }
+    if (onboarding) summary.pendingOnboarding = onboarding.pending;
+    if (audit) summary.recentAudit = audit.items;
+
+    if (canReadSubscriptions) {
+      const [activeSubscriptions, graceSubscriptions, expiredSubscriptions] =
+        await this.prisma.runWithoutTenantScope(
+          'platform dashboard: aggregate authorized subscription lifecycle counts',
+          () =>
+            Promise.all([
+              this.prisma.tenantSubscription.count({
+                where: { status: 'ACTIVE' },
+              }),
+              this.prisma.tenantSubscription.count({
+                where: { status: 'GRACE' },
+              }),
+              this.prisma.tenantSubscription.count({
+                where: { status: 'EXPIRED' },
+              }),
+            ]),
+        );
+      summary.subscriptionSummary = {
+        activeSubscriptions,
+        graceSubscriptions,
+        expiredSubscriptions,
+      };
+    }
+
+    if (canReadBilling) {
+      const unpaidInvoices = await this.prisma.runWithoutTenantScope(
+        'platform dashboard: aggregate authorized SaaS invoice balances',
+        () =>
+          this.prisma.saaSInvoice.findMany({
+            where: { status: { in: ['ISSUED', 'PARTIAL', 'OVERDUE'] } },
+            select: {
+              amount: true,
+              status: true,
+              payments: { select: { amount: true } },
+            },
+          }),
+      );
+      let totalUnpaidAmount = 0;
+      let overdueCount = 0;
+      for (const invoice of unpaidInvoices) {
+        const paidAmount = (invoice.payments || []).reduce(
+          (sum: number, payment: { amount: unknown }) =>
+            sum + Number(payment.amount),
+          0,
+        );
+        totalUnpaidAmount += Number(invoice.amount) - paidAmount;
+        if (invoice.status === 'OVERDUE') overdueCount += 1;
+      }
+      summary.invoiceSummary = {
         totalUnpaidAmount,
         overdueCount,
-      },
-      usageWarnings,
-    };
+      };
+    }
+
+    if (canReadUsage && canReadSubscriptions) {
+      const subscriptions = await this.prisma.runWithoutTenantScope(
+        'platform dashboard: correlate authorized tenant usage with subscription limits',
+        () =>
+          this.prisma.tenantSubscription.findMany({
+            where: { status: { in: ['ACTIVE', 'TRIAL', 'GRACE'] } },
+            include: {
+              tenant: { select: { id: true, name: true } },
+              plan: { include: { usageLimits: true } },
+            },
+          }),
+      );
+      const warningRows = await Promise.all(
+        subscriptions.flatMap((subscription) =>
+          (subscription.plan?.usageLimits || []).map(async (limit) => {
+            const current = await this.usageService.getCurrentUsageCount(
+              subscription.tenantId,
+              limit.usageKey,
+            );
+            return current >= limit.limit * 0.9
+              ? {
+                  tenantId: subscription.tenantId,
+                  tenantName: subscription.tenant.name,
+                  usageKey: limit.usageKey,
+                  value: current,
+                  limit: limit.limit,
+                }
+              : null;
+          }),
+        ),
+      );
+      summary.usageWarnings = warningRows.filter(
+        (warning): warning is NonNullable<typeof warning> => warning !== null,
+      );
+    }
+
+    if (canReadProviders) {
+      const [redisHealth, storageProvider, emailProvider, smsProvider] =
+        await Promise.all([
+          this.checkRedis(),
+          this.prisma.providerConfig.findFirst({
+            where: { type: 'OBJECT_STORAGE', enabled: true },
+          }),
+          this.prisma.providerConfig.findFirst({
+            where: { type: 'EMAIL', enabled: true },
+          }),
+          this.prisma.providerConfig.findFirst({
+            where: { type: 'SMS', enabled: true },
+          }),
+        ]);
+      const getStatus = (
+        provider: Record<string, unknown> | null | undefined,
+      ) =>
+        provider
+          ? this.buildProviderReadinessDetail(provider, new Date(), []).status
+          : ('not_configured' as const);
+      summary.providerReadinessStatus = {
+        queue: redisHealth.status === 'ok' ? 'ready' : 'failed',
+        storage: getStatus(storageProvider),
+        email: getStatus(emailProvider),
+        sms: getStatus(smsProvider),
+      };
+    }
+
+    return summary;
+  }
+
+  private async countFailedJobs(): Promise<number> {
+    let total = 0;
+    for (const queue of this.queues.values()) {
+      const counts = await queue.getJobCounts('failed');
+      total += Number(counts.failed ?? 0);
+    }
+    return total;
+  }
+
+  private async getCorePlatformHealthStatus(): Promise<'ready' | 'degraded'> {
+    const [database, redis] = await Promise.all([
+      this.checkDatabase(),
+      this.checkRedis(),
+    ]);
+    return database.status === 'ok' && redis.status === 'ok'
+      ? 'ready'
+      : 'degraded';
   }
 
   async listTenants(): Promise<PlatformTenantSummary[]> {
@@ -512,19 +551,23 @@ export class PlatformService {
       this.getTenantFeatureOverrides(tenantId),
       this.listUsageCounters(tenantId),
       this.prisma.providerConfig.findMany({ where: { enabled: true } }),
-      this.prisma.supportOverride.findMany({
-        where: { tenantId },
-        orderBy: { createdAt: 'desc' },
-        take: 20,
-        include: {
-          platformUser: {
-            select: {
-              id: true,
-              email: true,
+      this.prisma.runWithoutTenantScope(
+        'platform: read purpose-limited support override history',
+        () =>
+          this.prisma.supportOverride.findMany({
+            where: { tenantId },
+            orderBy: { createdAt: 'desc' },
+            take: 20,
+            include: {
+              platformUser: {
+                select: {
+                  id: true,
+                  email: true,
+                },
+              },
             },
-          },
-        },
-      }),
+          }),
+      ),
     ]);
 
     const enabledFeatures: string[] = [];
@@ -555,6 +598,8 @@ export class PlatformService {
       platformUserId: over.platformUserId,
       platformUserEmail: over.platformUser?.email || null,
       reason: over.reason,
+      permissionScopes: over.permissionScopes.filter(isSupportOverrideScope),
+      readOnly: over.readOnly,
       startsAt: over.startsAt.toISOString(),
       expiresAt: over.expiresAt.toISOString(),
       isActive: over.isActive,
@@ -2491,73 +2536,129 @@ export class PlatformService {
     tenantId: string,
     platformUserId: string,
     reason: string,
+    scopes: readonly SupportOverrideScope[],
     durationMinutes = 60,
   ) {
-    if (!reason?.trim() || reason.trim().length < 5) {
+    const normalizedReason = reason?.trim();
+    if (!normalizedReason || normalizedReason.length < 5) {
       throw new BadRequestException('Support override requires a reason');
     }
 
-    await this.ensureTenant(tenantId);
+    const permissionScopes = [...new Set(scopes)];
+    if (
+      permissionScopes.length === 0 ||
+      permissionScopes.some((scope) => !isSupportOverrideScope(scope))
+    ) {
+      throw new BadRequestException(
+        'Support override requires at least one approved read-only scope',
+      );
+    }
 
-    // Expire existing active overrides for this user
-    await this.prisma.supportOverride.updateMany({
-      where: { platformUserId, isActive: true },
-      data: { isActive: false },
-    });
+    if (
+      !Number.isInteger(durationMinutes) ||
+      durationMinutes < 1 ||
+      durationMinutes > 60
+    ) {
+      throw new BadRequestException(
+        'Support override duration must be between 1 and 60 minutes',
+      );
+    }
+
+    const targetTenant = await this.ensureTenant(tenantId);
+    if (
+      !targetTenant.isActive ||
+      targetTenant.securityDomain !== SecurityDomain.SCHOOL
+    ) {
+      throw new BadRequestException(
+        'Support override target must be an active school tenant',
+      );
+    }
 
     const expiresAt = new Date();
     expiresAt.setMinutes(expiresAt.getMinutes() + durationMinutes);
 
-    const override = await this.prisma.supportOverride.create({
-      data: {
-        platformUserId,
-        tenantId,
-        reason,
-        expiresAt,
-        isActive: true,
-      },
-    });
+    const override = await this.prisma.runWithoutTenantScope(
+      'platform: issue purpose-limited support override for target tenant',
+      () =>
+        this.prisma.$transaction(async (tx) => {
+          // One active tenant context per Platform operator. The transaction
+          // prevents two concurrent issue requests from leaving both active.
+          await tx.supportOverride.updateMany({
+            where: { platformUserId, isActive: true },
+            data: { isActive: false },
+          });
 
-    await this.auditService.record({
-      action: 'support_override_entered',
-      resource: 'support',
-      resourceId: tenantId,
-      tenantId: 'platform',
-      userId: platformUserId,
-      after: {
-        overrideId: override.id,
-        reason,
-        expiresAt: expiresAt.toISOString(),
-      },
-    });
+          const override = await tx.supportOverride.create({
+            data: {
+              platformUserId,
+              tenantId,
+              reason: normalizedReason,
+              permissionScopes,
+              readOnly: true,
+              expiresAt,
+              isActive: true,
+            },
+          });
+
+          await this.auditService.record(
+            {
+              action: 'support_override_entered',
+              resource: 'support',
+              resourceId: tenantId,
+              tenantId: 'platform',
+              userId: platformUserId,
+              after: {
+                overrideId: override.id,
+                reason: normalizedReason,
+                permissionScopes,
+                readOnly: true,
+                expiresAt: expiresAt.toISOString(),
+              },
+            },
+            tx,
+          );
+
+          return override;
+        }),
+    );
 
     return {
       success: true,
       overrideId: override.id,
       expiresAt: expiresAt.toISOString(),
+      scopes: permissionScopes,
+      readOnly: true,
     };
   }
 
   async exitSupportOverride(platformUserId: string) {
-    const override = await this.prisma.supportOverride.findFirst({
-      where: { platformUserId, isActive: true },
-    });
+    await this.prisma.runWithoutTenantScope(
+      'platform: revoke purpose-limited support override with audit',
+      () =>
+        this.prisma.$transaction(async (tx) => {
+          const override = await tx.supportOverride.findFirst({
+            where: { platformUserId, isActive: true },
+          });
+          if (!override) return;
 
-    if (override) {
-      await this.prisma.supportOverride.update({
-        where: { id: override.id },
-        data: { isActive: false },
-      });
+          await tx.supportOverride.update({
+            where: { id: override.id },
+            data: { isActive: false },
+          });
 
-      await this.auditService.record({
-        action: 'support_override_exited',
-        resource: 'support',
-        resourceId: override.tenantId,
-        tenantId: 'platform',
-        userId: platformUserId,
-        after: { overrideId: override.id },
-      });
-    }
+          await this.auditService.record(
+            {
+              action: 'support_override_exited',
+              resource: 'support',
+              resourceId: override.tenantId,
+              tenantId: 'platform',
+              userId: platformUserId,
+              after: { overrideId: override.id },
+            },
+            tx,
+          );
+        }),
+    );
 
     return { success: true };
   }
@@ -2591,63 +2692,6 @@ export class PlatformService {
     }
 
     return summaries;
-  }
-
-  async listFailedJobs(): Promise<PlatformFailedJobSummary[]> {
-    const allFailed: PlatformFailedJobSummary[] = [];
-
-    for (const [name, queue] of this.queues.entries()) {
-      const failedJobs = await queue.getFailed(0, 50);
-      for (const job of failedJobs) {
-        allFailed.push({
-          id: String(job.id),
-          queueName: name,
-          name: job.name,
-          failedReason: job.failedReason,
-          attemptsMade: job.attemptsMade,
-          timestamp: job.timestamp,
-          data: job.data,
-        });
-      }
-    }
-
-    return allFailed.sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0));
-  }
-
-  async retryFailedJob(dto: RetryFailedJobDto, actorUserId: string) {
-    const queue = this.queues.get(dto.queueName);
-    if (!queue) {
-      throw new NotFoundException(`Queue ${dto.queueName} not found`);
-    }
-
-    const job = await queue.getJob(dto.jobId);
-    if (!job) {
-      throw new NotFoundException(
-        `Job ${dto.jobId} not found in queue ${dto.queueName}`,
-      );
-    }
-
-    const isFailed = await job.isFailed();
-    if (!isFailed) {
-      throw new BadRequestException(`Job ${dto.jobId} is not in failed state`);
-    }
-
-    await job.retry();
-
-    await this.platformAudit(
-      actorUserId,
-      'queue_failed_job_retry_requested',
-      'queues',
-      `${dto.queueName}:${dto.jobId}`,
-      { status: 'failed', failedReason: job.failedReason },
-      {
-        queueName: dto.queueName,
-        jobId: dto.jobId,
-        reason: dto.reason ?? 'manual_retry',
-      },
-    );
-
-    return { success: true };
   }
 
   async getPlatformHealth(): Promise<PlatformHealthSummary> {

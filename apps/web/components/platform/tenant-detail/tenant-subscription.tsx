@@ -1,5 +1,6 @@
 "use client";
 
+import { formatBsDate } from "@schoolos/core";
 import { AlertTriangle, CreditCard, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -294,5 +295,5 @@ function formatDate(value: string | null | undefined) {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? "Not recorded"
-    : date.toLocaleDateString();
+    : formatBsDate(date);
 }

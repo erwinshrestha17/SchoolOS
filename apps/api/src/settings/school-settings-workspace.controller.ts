@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import type { SchoolSettingsOverview } from '@schoolos/core';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
+import { AllowSupportOverrideRead } from '../auth/decorators/allow-support-override-read.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantActiveGuard } from '../auth/guards/tenant-active.guard';
@@ -39,6 +40,7 @@ export class SchoolSettingsWorkspaceController {
   ) {}
 
   @Get('navigation')
+  @Permissions('settings:read_public')
   getNavigation(@CurrentAuth() auth: AuthContext) {
     return this.navigationService.getNavigation(auth);
   }
@@ -132,7 +134,8 @@ export class SchoolSettingsWorkspaceController {
   }
 
   @Get('school-profile')
-  @Permissions('settings:identity:manage')
+  @Permissions('settings:read_public')
+  @AllowSupportOverrideRead('SCHOOL_PROFILE')
   getSchoolProfile(@CurrentAuth() auth: AuthContext) {
     return this.profileService.getProfile(auth.tenantId);
   }

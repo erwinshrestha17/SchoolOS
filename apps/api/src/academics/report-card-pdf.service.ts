@@ -14,6 +14,7 @@ import {
 } from './grade-calculator.service';
 import { buildReportCardPdf } from '../common/pdf/simple-pdf';
 import { loadSchoolLogoForPdf } from '../common/pdf/school-logo-loader';
+import { assertProtectedFileAccessAllowed } from '../common/security/support-override-file-access';
 
 type ReportCardWithRelations = Prisma.ReportCardGetPayload<{
   include: {
@@ -66,6 +67,7 @@ export class ReportCardPdfService {
   ) {}
 
   async getReportCardPdf(reportCardId: string, actor: AuthContext) {
+    assertProtectedFileAccessAllowed(actor);
     const reportCard = await this.prisma.reportCard.findFirst({
       where: {
         id: reportCardId,

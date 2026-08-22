@@ -241,6 +241,25 @@ describe('P0-01 tenant isolation (real database)', () => {
       expect(rows).toHaveLength(2);
     });
 
+    it('preserves explicit target predicates when the surrounding request already has a tenant', async () => {
+      cls.setTenant(tenantAId);
+
+      const rows = await prisma.runWithoutTenantScope(
+        'test: platform request reads an explicit target tenant',
+        () =>
+          prisma.class.findMany({
+            where: { tenantId: tenantBId, name: { contains: SUFFIX } },
+          }),
+      );
+
+      expect(rows.map((row) => row.id)).toEqual([classBId]);
+
+      const restoredRows = await prisma.class.findMany({
+        where: { name: { contains: SUFFIX } },
+      });
+      expect(restoredRows.map((row) => row.id)).toEqual([classAId]);
+    });
+
     it('restores fail-closed behaviour after the region exits', async () => {
       await prisma.runWithoutTenantScope('test: sweep', async () => {
         await prisma.class.findMany({ where: { name: { contains: SUFFIX } } });

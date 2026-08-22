@@ -3,6 +3,7 @@ import {
   NotificationChannel,
   NotificationStatus,
 } from '@prisma/client';
+import { BadRequestException } from '@nestjs/common';
 import type { AuthContext } from '../auth/auth.types';
 import { DeliveryRetryService } from './delivery-retry.service';
 
@@ -76,6 +77,92 @@ describe('DeliveryRetryService failure dashboard', () => {
         take: 25,
       }),
     );
+  });
+
+  it('returns only bounded diagnostics for support and rejects source probing', async () => {
+    const supportActor: AuthContext = {
+      ...actor,
+      userId: 'platform-operator-1',
+      roles: [],
+      permissions: ['notifications:view_delivery_diagnostics'],
+      isSupportOverride: true,
+      supportOverrideReadOnly: true,
+      supportOverrideScopes: ['NOTICES_DELIVERY'],
+    };
+    const prisma = {
+      notificationDelivery: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'delivery-1',
+            status: NotificationStatus.FAILED,
+            channel: NotificationChannel.EMAIL,
+            sourceType: 'payroll',
+            sourceId: 'payroll-run-1',
+            title: 'Private payroll delivery',
+            errorMessage:
+              'authorization=https://internal.example/token?secret=raw',
+            failureReason: null,
+            failureCode: 'PROVIDER_AUTH_FAILED',
+            retryCount: 2,
+            lastRetryAt: null,
+            failedAt: new Date('2026-05-17T09:01:00.000Z'),
+            createdAt: new Date('2026-05-17T08:00:00.000Z'),
+            audienceType: 'STAFF',
+            recipientUserId: 'staff-user-1',
+            guardianId: null,
+            studentId: null,
+            destination: 'staff@example.edu',
+          },
+        ]),
+        count: jest.fn().mockResolvedValue(1),
+      },
+    };
+    const service = new DeliveryRetryService(
+      prisma as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(service.listFailureDashboard(supportActor)).resolves.toEqual({
+      total: 1,
+      page: 1,
+      limit: 25,
+      hasNextPage: false,
+      items: [
+        expect.objectContaining({
+          id: 'delivery-1',
+          sourceType: 'notification',
+          sourceId: null,
+          title: null,
+          lastFailureReason: 'Provider authentication failed.',
+          recipientSummary: {
+            audienceType: 'STAFF',
+            recipientUserId: null,
+            guardianId: null,
+            studentId: null,
+            destinationMasked: 'st***@example.edu',
+          },
+        }),
+      ],
+    });
+
+    expect(
+      JSON.stringify(await service.listFailureDashboard(supportActor)),
+    ).not.toContain('payroll-run-1');
+    expect(
+      JSON.stringify(await service.listFailureDashboard(supportActor)),
+    ).not.toContain('internal.example');
+
+    prisma.notificationDelivery.findMany.mockClear();
+    prisma.notificationDelivery.count.mockClear();
+    await expect(
+      service.listFailureDashboard(supportActor, {
+        page: 1,
+        limit: 25,
+        sourceType: 'payroll',
+      }),
+    ).rejects.toThrow(BadRequestException);
+    expect(prisma.notificationDelivery.findMany).not.toHaveBeenCalled();
   });
 
   it('stores the operator reason when failed deliveries are retried in bulk', async () => {

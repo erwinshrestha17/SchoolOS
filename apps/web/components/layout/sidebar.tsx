@@ -22,12 +22,10 @@ import { TeacherCapability, useTeacherAccess } from '../../lib/teacher-access';
 import { useSettingsCapabilities } from '../../lib/permissions-ui';
 import { useSchoolWebPersona } from '../../lib/school-web-persona';
 import { cn } from '../../lib/utils';
-import {
-  SidebarNavHeading,
-  SidebarNavLink,
-} from './sidebar-nav-link';
+import { SidebarNavHeading, SidebarNavLink } from './sidebar-nav-link';
 import {
   navGroupsForPersona,
+  buildSupportOverrideNavGroups,
   settingsNavItem,
   shouldShowSettingsHub,
   type NavGroup,
@@ -39,6 +37,7 @@ export {
   adminNavGroups,
   accountantNavGroups,
   buildTeacherNavGroups,
+  buildSupportOverrideNavGroups,
   cashierNavGroups,
   canteenOperatorNavGroups,
   dashboardNavGroups,
@@ -68,6 +67,7 @@ export function Sidebar({
   const pathname = usePathname();
   const [locationHash, setLocationHash] = useState('');
   const { session } = useSession();
+  const isSupportOverride = session?.user.isSupportOverride === true;
   const { hasModule } = useEntitlements();
 
   // A real, permission- and entitlement-gated unread count for Notifications — reuses
@@ -97,7 +97,10 @@ export function Sidebar({
   const settingsCaps = useSettingsCapabilities();
   const personalOnly = isRestricted(TeacherCapability.SCHOOL_SETTINGS_ADMIN);
 
-  const groupsToRender = navGroupsForPersona(schoolWebPersona, capabilities)
+  const personaGroups = isSupportOverride
+    ? buildSupportOverrideNavGroups(session?.user.supportOverrideScopes ?? [])
+    : navGroupsForPersona(schoolWebPersona, capabilities);
+  const groupsToRender = personaGroups
     .map((group) => ({
       ...group,
       items: group.items
@@ -123,7 +126,9 @@ export function Sidebar({
     schoolWebPersona,
   );
   const visibleSettings =
-    showSettingsHub && canDisplayNavItem(settingsNavItem, session, hasModule)
+    !isSupportOverride &&
+    showSettingsHub &&
+    canDisplayNavItem(settingsNavItem, session, hasModule)
       ? settingsNavItem
       : null;
 
@@ -141,7 +146,9 @@ export function Sidebar({
   }, [pathname]);
 
   const schoolName = session?.tenant.name ?? 'School workspace';
-  const roleLabel = formatRole(session?.user.roles[0] ?? 'school_user');
+  const roleLabel = isSupportOverride
+    ? 'Read-only support'
+    : formatRole(session?.user.roles[0] ?? 'school_user');
   const userLabel = session?.user.email ?? 'Signed-in school user';
 
   const mobilePanelRef = useRef<HTMLDivElement>(null);
@@ -365,7 +372,9 @@ function SidebarContent({
       <footer className="border-t border-[var(--line)] px-3 py-3">
         {settingsItem ? (
           <section className="mb-2">
-            <SidebarNavHeading collapsed={collapsed}>Settings</SidebarNavHeading>
+            <SidebarNavHeading collapsed={collapsed}>
+              Settings
+            </SidebarNavHeading>
             <NavEntry
               collapsed={collapsed}
               item={settingsItem}

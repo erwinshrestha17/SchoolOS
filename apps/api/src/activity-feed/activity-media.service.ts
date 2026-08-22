@@ -23,6 +23,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { TeacherCapability } from '../teacher-scope/teacher-capability';
 import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
+import { assertProtectedFileAccessAllowed } from '../common/security/support-override-file-access';
 
 export interface ActivityMediaFile {
   stream?: NodeJS.ReadableStream;
@@ -60,6 +61,7 @@ export class ActivityMediaService {
     attachmentId: string,
     action: 'thumbnail' | 'preview' | 'download',
   ): Promise<ActivityMediaFile> {
+    assertProtectedFileAccessAllowed(actor);
     const attachment = await this.findVisibleAttachmentOrThrow(
       actor,
       attachmentId,
@@ -120,6 +122,7 @@ export class ActivityMediaService {
     attachmentId: string,
     action: 'preview' | 'download',
   ): Promise<ActivityMediaAccessUrl> {
+    assertProtectedFileAccessAllowed(actor);
     const attachment = await this.findVisibleAttachmentOrThrow(
       actor,
       attachmentId,

@@ -1,6 +1,7 @@
 import {
   AuthMethod,
   PrismaClient,
+  SecurityDomain,
   UserStatus,
 } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -8,7 +9,8 @@ import * as bcrypt from 'bcrypt';
 import 'dotenv/config';
 import {
   PERMISSION_CATALOG,
-  SYSTEM_ROLE_PERMISSIONS,
+  PLATFORM_ROLE_DEFINITIONS,
+  PLATFORM_ROLE_PERMISSIONS,
 } from '../src/rbac/rbac.defaults';
 
 const PLATFORM_EMAIL =
@@ -31,7 +33,9 @@ const prisma = new PrismaClient({ adapter });
 
 function assertE2eFixtureAllowed() {
   if (process.env.NODE_ENV === 'production') {
-    throw new Error('Refusing to seed M0 platform onboard fixtures in production.');
+    throw new Error(
+      'Refusing to seed M0 platform onboard fixtures in production.',
+    );
   }
   if (process.env.SCHOOLOS_E2E_M0_PLATFORM_ONBOARD_FIXTURES !== 'true') {
     throw new Error(
@@ -41,29 +45,31 @@ function assertE2eFixtureAllowed() {
 }
 
 async function syncRolePermissions(roleId: string, roleName: string) {
-  const permissionKeys = SYSTEM_ROLE_PERMISSIONS[roleName] ?? [];
+  const permissionKeys = PLATFORM_ROLE_PERMISSIONS[roleName] ?? [];
+  await prisma.rolePermission.deleteMany({ where: { roleId } });
+
   for (const key of permissionKeys) {
-    const [resource, action] = key.split(':');
-    const permission = await prisma.permission.upsert({
-      where: { resource_action: { resource, action } },
-      update: {},
-      create: { resource, action, description: key },
-    });
-    await prisma.rolePermission.upsert({
+    const parts = key.split(':');
+    const action = parts.pop();
+    const resource = parts.join(':');
+    if (!resource || !action) {
+      throw new Error(`Invalid Platform permission key: ${key}`);
+    }
+    const permission = await prisma.permission.findUnique({
       where: {
-        roleId_permissionId: {
-          roleId,
-          permissionId: permission.id,
-        },
+        resource_action: { resource, action },
       },
-      update: {},
-      create: {
-        roleId,
-        permissionId: permission.id,
-      },
+    });
+    if (!permission) {
+      throw new Error(`Platform permission ${key} was not seeded.`);
+    }
+    await prisma.rolePermission.create({
+      data: { roleId, permissionId: permission.id },
     });
   }
+}
 
+async function seedPermissions() {
   for (const entry of PERMISSION_CATALOG) {
     await prisma.permission.upsert({
       where: {
@@ -72,18 +78,16 @@ async function syncRolePermissions(roleId: string, roleName: string) {
           action: entry.action,
         },
       },
-      update: {},
-      create: {
-        resource: entry.resource,
-        action: entry.action,
-        description: entry.description,
-      },
+      update: { description: entry.description },
+      create: entry,
     });
   }
 }
 
 async function main() {
   assertE2eFixtureAllowed();
+
+  await seedPermissions();
 
   let platformTenant = await prisma.tenant.findUnique({
     where: { slug: PLATFORM_TENANT_SLUG },
@@ -94,9 +98,17 @@ async function main() {
         name: 'SchoolOS Platform',
         slug: PLATFORM_TENANT_SLUG,
         plan: 'platform',
+        securityDomain: SecurityDomain.PLATFORM,
         isActive: true,
       },
     });
+  } else if (
+    platformTenant.securityDomain !== SecurityDomain.PLATFORM ||
+    platformTenant.plan !== 'platform'
+  ) {
+    throw new Error(
+      'Existing platform fixture tenant is not in the PLATFORM security domain.',
+    );
   }
 
   const passwordHash = await bcrypt.hash(PLATFORM_PASSWORD, 12);
@@ -122,23 +134,34 @@ async function main() {
     },
   });
 
-  const adminRole = await prisma.role.upsert({
-    where: {
-      tenantId_name: {
-        tenantId: platformTenant.id,
-        name: PLATFORM_ROLE,
+  const platformRoles = new Map<string, { id: string }>();
+  for (const roleDefinition of PLATFORM_ROLE_DEFINITIONS) {
+    const role = await prisma.role.upsert({
+      where: {
+        tenantId_name: {
+          tenantId: platformTenant.id,
+          name: roleDefinition.name,
+        },
       },
-    },
-    update: {},
-    create: {
-      tenantId: platformTenant.id,
-      name: PLATFORM_ROLE,
-      description: 'Global platform administrator',
-      isSystem: true,
-    },
-  });
+      update: {
+        description: roleDefinition.description,
+        isSystem: true,
+      },
+      create: {
+        tenantId: platformTenant.id,
+        name: roleDefinition.name,
+        description: roleDefinition.description,
+        isSystem: true,
+      },
+    });
+    await syncRolePermissions(role.id, roleDefinition.name);
+    platformRoles.set(roleDefinition.name, role);
+  }
 
-  await syncRolePermissions(adminRole.id, PLATFORM_ROLE);
+  const adminRole = platformRoles.get(PLATFORM_ROLE);
+  if (!adminRole) {
+    throw new Error(`Platform role ${PLATFORM_ROLE} was not provisioned.`);
+  }
 
   await prisma.userRole.upsert({
     where: {
@@ -148,7 +171,13 @@ async function main() {
         scopeId: 'global',
       },
     },
-    update: {},
+    update: {
+      tenantId: platformTenant.id,
+      revokedAt: null,
+      revokedById: null,
+      revokeReason: null,
+      expiresAt: null,
+    },
     create: {
       userId: operator.id,
       roleId: adminRole.id,

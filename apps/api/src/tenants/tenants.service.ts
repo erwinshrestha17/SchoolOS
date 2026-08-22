@@ -17,8 +17,8 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import {
   PERMISSION_CATALOG,
-  SYSTEM_ROLE_DEFINITIONS,
-  SYSTEM_ROLE_PERMISSIONS,
+  SCHOOL_ROLE_DEFINITIONS,
+  SCHOOL_ROLE_PERMISSIONS,
 } from '../rbac/rbac.defaults';
 import { UsersService } from '../users/users.service';
 import { RegisterTenantDto } from './dto/register-tenant.dto';
@@ -35,13 +35,14 @@ export class TenantsService {
   async register(dto: RegisterTenantDto, actor: AuthContext) {
     const requestId = this.cls.get<string | undefined>(REQUEST_ID_KEY);
 
-    // Provisioning reads and writes rows belonging to the tenant being
-    // created, while the authenticated platform operator's CLS tenantId
-    // points at the platform tenant. Run in a fresh CLS context so the
-    // Prisma tenant-scope extension does not inject the operator's tenantId
-    // into these cross-tenant queries; every query below carries an
-    // explicit tenantId.
-    return this.cls.run(() => this.provisionTenant(dto, actor, requestId));
+    // Provisioning reads and writes rows for a not-yet-established school
+    // tenant while the authenticated operator remains scoped to the Platform
+    // tenant. Use the explicit, auditable bypass region; an empty CLS context
+    // would fail closed and is not itself authority to cross tenants.
+    return this.prisma.runWithoutTenantScope(
+      'platform: provision a new school tenant and its first administrator',
+      () => this.provisionTenant(dto, actor, requestId),
+    );
   }
 
   private async provisionTenant(
@@ -110,27 +111,33 @@ export class TenantsService {
         );
       }
 
-      const adminUser = await this.usersService.createManagedUser({
-        tenantId: tenant.id,
-        email: normalizedEmail,
-        password: dto.adminPassword,
-        roleIds: [adminRole.id, configOwnerRole.id],
-        assignedById: null,
-      });
-
-      await this.auditService.record({
-        action: 'register',
-        resource: 'tenant',
-        tenantId: tenant.id,
-        userId: actor.userId,
-        resourceId: tenant.id,
-        requestId,
-        after: {
-          slug: tenant.slug,
-          adminEmail: adminUser.email,
-          adminUserId: adminUser.id,
+      const adminUser = await this.usersService.createManagedUser(
+        {
+          tenantId: tenant.id,
+          email: normalizedEmail,
+          password: dto.adminPassword,
+          roleIds: [adminRole.id, configOwnerRole.id],
+          assignedById: null,
         },
-      });
+        tx,
+      );
+
+      await this.auditService.record(
+        {
+          action: 'register',
+          resource: 'tenant',
+          tenantId: tenant.id,
+          userId: actor.userId,
+          resourceId: tenant.id,
+          requestId,
+          after: {
+            slug: tenant.slug,
+            adminEmail: adminUser.email,
+            adminUserId: adminUser.id,
+          },
+        },
+        tx,
+      );
 
       return {
         tenant: {
@@ -200,7 +207,7 @@ export class TenantsService {
       });
     }
 
-    for (const role of SYSTEM_ROLE_DEFINITIONS) {
+    for (const role of SCHOOL_ROLE_DEFINITIONS) {
       await tx.role.upsert({
         where: {
           tenantId_name: {
@@ -222,7 +229,7 @@ export class TenantsService {
     }
 
     for (const [roleName, permissionKeys] of Object.entries(
-      SYSTEM_ROLE_PERMISSIONS,
+      SCHOOL_ROLE_PERMISSIONS,
     )) {
       const role = await tx.role.findUnique({
         where: {

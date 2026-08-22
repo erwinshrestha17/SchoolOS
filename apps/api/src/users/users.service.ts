@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { SCHOOL_CONFIG_OWNER_ROLE } from '@schoolos/core';
+import { isPlatformRoleName, SCHOOL_CONFIG_OWNER_ROLE } from '@schoolos/core';
 import { AuthMethod, UserStatus } from '@prisma/client';
 import type { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
@@ -77,6 +77,11 @@ export class UsersService {
     if (roles.length !== input.roleIds.length) {
       throw new NotFoundException(
         'One or more roles do not exist in this tenant',
+      );
+    }
+    if (roles.some((role) => isPlatformRoleName(role.name))) {
+      throw new ForbiddenException(
+        'Platform roles cannot be assigned through school user management',
       );
     }
     const expiresAtByRole = resolveRoleAssignmentExpiries(
@@ -311,48 +316,6 @@ export class UsersService {
     if (existingUser) {
       throw new ConflictException('Email is already registered in this tenant');
     }
-  }
-
-  async deactivateTenant(tenantId: string, actor: AuthContext) {
-    // Only platform_super_admin can deactivate a tenant
-    if (!actor.roles.includes('platform_super_admin')) {
-      throw new ConflictException(
-        'Only platform super admins can deactivate tenants',
-      );
-    }
-
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
-    });
-
-    if (!tenant) {
-      throw new NotFoundException('Tenant not found');
-    }
-
-    await this.prisma.tenant.update({
-      where: { id: tenantId },
-      data: { isActive: false },
-    });
-
-    // Revoke all sessions for all users in this tenant
-    await this.prisma.refreshToken.updateMany({
-      where: {
-        user: { tenantId },
-        revokedAt: null,
-      },
-      data: { revokedAt: new Date() },
-    });
-
-    await this.auditService.record({
-      action: 'deactivate',
-      resource: 'tenant',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: tenantId,
-      after: { isActive: false },
-    });
-
-    return { success: true, tenantId, isActive: false };
   }
 
   private async revokeUserSessions(userId: string) {

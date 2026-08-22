@@ -454,6 +454,19 @@ describe('MarksService', () => {
               },
             ],
           }),
+          include: {
+            student: {
+              select: {
+                id: true,
+                firstNameEn: true,
+                lastNameEn: true,
+                studentSystemId: true,
+              },
+            },
+            subject: true,
+            assessmentComponent: true,
+            examTerm: true,
+          },
         }),
       );
     });

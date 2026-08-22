@@ -22,6 +22,7 @@ import {
   clearAllAttendanceDrafts,
   clearRecentlyViewed,
   clearSupportOverride,
+  readSupportOverrideContext,
   hasAllPermissions,
   isSessionStorageEvent,
   readStoredSession,
@@ -75,6 +76,9 @@ function browserSessionFromProfile(
       tenantId: profile.tenantId,
       originalTenantId: profile.originalTenantId,
       isSupportOverride: profile.isSupportOverride,
+      supportOverrideScopes: profile.supportOverrideScopes,
+      supportOverrideReadOnly: profile.supportOverrideReadOnly,
+      securityDomain: profile.securityDomain,
       tenantSlug: profile.tenantSlug,
       email: profile.email,
       authMethod: profile.authMethod,
@@ -84,6 +88,30 @@ function browserSessionFromProfile(
     },
     tenant: profile.tenant,
   };
+}
+
+export function isConfirmedSupportOverrideTransition(
+  currentSession: BrowserSession | null,
+  nextSession: BrowserSession,
+) {
+  const context = readSupportOverrideContext();
+  if (!context || !currentSession || !nextSession.user.isSupportOverride) {
+    return false;
+  }
+
+  const projectedScopes = [...(nextSession.user.supportOverrideScopes ?? [])]
+    .sort()
+    .join("|");
+  const storedScopes = [...context.scopes].sort().join("|");
+
+  return (
+    nextSession.user.id === currentSession.user.id &&
+    nextSession.user.securityDomain === "PLATFORM" &&
+    nextSession.user.supportOverrideReadOnly === true &&
+    nextSession.user.originalTenantId === currentSession.tenant.id &&
+    nextSession.tenant.id === context.tenantId &&
+    projectedScopes === storedScopes
+  );
 }
 
 export function SessionProvider({ children }: PropsWithChildren) {
@@ -137,7 +165,22 @@ export function SessionProvider({ children }: PropsWithChildren) {
       generation: number,
       isCancelled?: () => boolean,
     ) => {
-      if (!hasSameBrowserSessionIdentity(currentSession, nextSession)) {
+      const confirmedSupportTransition = isConfirmedSupportOverrideTransition(
+        currentSession,
+        nextSession,
+      );
+
+      if (nextSession.user.isSupportOverride && !confirmedSupportTransition) {
+        clearSupportOverride();
+        setCurrentSession(null);
+        setStatus("verification_failed");
+        return null;
+      }
+
+      if (
+        !hasSameBrowserSessionIdentity(currentSession, nextSession) &&
+        !confirmedSupportTransition
+      ) {
         const cleanupPromise = clearPrivateBrowserState();
         setCurrentSession(null);
         setStatus("loading");
@@ -151,7 +194,11 @@ export function SessionProvider({ children }: PropsWithChildren) {
         return null;
       }
 
-      storeSession(nextSession);
+      // An effective support tenant is tab-local and must never replace the
+      // Platform home session cached in the cross-tab browser session store.
+      if (!confirmedSupportTransition) {
+        storeSession(nextSession);
+      }
       setCurrentSession(nextSession);
       setStatus("authenticated");
       return nextSession;
@@ -205,6 +252,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
           return;
         }
 
+        clearSupportOverride();
         setCurrentSession(null);
         setStatus("anonymous");
       } catch (error) {
@@ -315,6 +363,17 @@ export function SessionProvider({ children }: PropsWithChildren) {
         return;
       }
 
+      const activeSupportContext = readSupportOverrideContext();
+      const currentSession = sessionRef.current;
+      if (
+        activeSupportContext &&
+        currentSession?.user.isSupportOverride &&
+        externalSession?.user.id === currentSession.user.id &&
+        externalSession.tenant.id === currentSession.user.originalTenantId
+      ) {
+        return;
+      }
+
       // Storage is only an identity-change signal. Never copy its roles or
       // permissions into authenticated state without a server profile check.
       if (hasSameBrowserSessionIdentity(sessionRef.current, externalSession)) {
@@ -363,6 +422,10 @@ export function SessionProvider({ children }: PropsWithChildren) {
   }, [revalidateSession, status]);
 
   async function refreshSession() {
+    if (readSupportOverrideContext()) {
+      return revalidateSession();
+    }
+
     const existingSession = readStoredSession();
     const generation = invalidatePendingSessionWork();
 

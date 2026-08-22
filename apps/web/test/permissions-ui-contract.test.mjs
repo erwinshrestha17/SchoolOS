@@ -23,7 +23,10 @@ describe('canonical permissions UI layer', () => {
     const permissionsUi = read('lib/permissions-ui.ts');
     const dashboardPage = read('app/dashboard/page.tsx');
 
-    assert.match(permissionsUi, /export type PermissionResolution = "loading" \| "denied" \| "granted"/);
+    assert.match(
+      permissionsUi,
+      /export type PermissionResolution = "loading" \| "denied" \| "granted"/,
+    );
     assert.match(permissionsUi, /if \(sessionStatus === "loading"\)/);
     assert.match(permissionsUi, /if \(access\.resolution !== "granted"\)/);
     assert.match(dashboardPage, /permissionResolution === "loading"/);
@@ -43,7 +46,7 @@ describe('canonical permissions UI layer', () => {
     assert.match(permissionsUi, /TEACHER_NOTICE_AUDIENCE/);
   });
 
-  it('models attendance read, mark, manage, conflict, and override capabilities', () => {
+  it('models attendance read, mark, manage, conflict, override, and export capabilities', () => {
     const permissionsUi = read('lib/permissions-ui.ts');
 
     assert.match(permissionsUi, /canView:/);
@@ -52,5 +55,9 @@ describe('canonical permissions UI layer', () => {
     assert.match(permissionsUi, /canReviewConflicts:/);
     assert.match(permissionsUi, /canOverrideLock:/);
     assert.match(permissionsUi, /"attendance:override_lock"/);
+    assert.match(
+      permissionsUi,
+      /const canExport = canView && hasPermission\(session, "reports:export"\)/,
+    );
   });
 });

@@ -180,7 +180,7 @@ export class AdmissionsController {
   }
 
   @Get('iemis-export')
-  @Permissions('students:read')
+  @Permissions('students:manage_lifecycle', 'reports:export')
   exportIemis(@CurrentAuth() auth: AuthContext) {
     return this.admissionsService.exportIemis(auth);
   }

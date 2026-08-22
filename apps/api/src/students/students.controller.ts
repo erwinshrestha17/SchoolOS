@@ -16,6 +16,7 @@ import {
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
+import { AllowSupportOverrideRead } from '../auth/decorators/allow-support-override-read.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
@@ -74,6 +75,7 @@ export class StudentsController {
 
   @Get()
   @Permissions('students:read')
+  @AllowSupportOverrideRead('STUDENT_RECORDS')
   listStudents(
     @Query() query: ListStudentsDto,
     @CurrentAuth() auth: AuthContext,
@@ -101,6 +103,16 @@ export class StudentsController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.studentsService.getStudentModuleSummary(query, auth);
+  }
+
+  @Get('support/summary')
+  @Permissions('students:read')
+  @AllowSupportOverrideRead('STUDENT_RECORDS')
+  getSupportStudentModuleSummary(
+    @Query() query: ListStudentsDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.getSupportStudentModuleSummary(query, auth);
   }
 
   @Get('duplicates/candidates')
@@ -136,6 +148,7 @@ export class StudentsController {
 
   @Get(':id')
   @Permissions('students:read')
+  @AllowSupportOverrideRead('STUDENT_RECORDS')
   async getStudentProfile(
     @Param('id') studentId: string,
     @CurrentAuth() auth: AuthContext,

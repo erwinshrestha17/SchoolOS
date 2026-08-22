@@ -724,6 +724,127 @@ describe('Homework Hardening', () => {
     });
   });
 
+  describe('Support override published-only projection', () => {
+    const supportActor: AuthContext = {
+      ...actor,
+      userId: 'platform-operator-1',
+      roles: [],
+      permissions: ['homework:read_published'],
+      isSupportOverride: true,
+      supportOverrideReadOnly: true,
+      supportOverrideScopes: ['HOMEWORK_TIMETABLE'],
+    };
+
+    it('lists only published/closed assignment fields without submissions or attachments', async () => {
+      const p = prisma as any;
+      p.homeworkAssignment.findMany.mockResolvedValue([
+        {
+          id: 'homework-1',
+          title: 'Fractions practice',
+          status: HomeworkAssignmentStatus.ASSIGNED,
+          class: { id: 'class-1', name: 'Class 5' },
+          section: null,
+          subject: { id: 'subject-1', name: 'Mathematics' },
+          assignedByStaff: {
+            id: 'staff-1',
+            firstName: 'Sita',
+            lastName: 'Karki',
+          },
+        },
+      ]);
+      p.homeworkAssignment.count.mockResolvedValue(1);
+
+      const result = await homeworkService.listAssignments(supportActor, {
+        status: HomeworkAssignmentStatus.DRAFT,
+      });
+
+      const args = p.homeworkAssignment.findMany.mock.calls.at(-1)[0];
+      expect(args.where).toEqual(
+        expect.objectContaining({
+          tenantId: 'tenant-a',
+          status: {
+            in: [
+              HomeworkAssignmentStatus.ASSIGNED,
+              HomeworkAssignmentStatus.CLOSED,
+            ],
+          },
+        }),
+      );
+      expect(args.select).toEqual(
+        expect.objectContaining({
+          title: true,
+          instructions: true,
+          class: expect.any(Object),
+          section: expect.any(Object),
+          subject: expect.any(Object),
+          assignedByStaff: expect.any(Object),
+        }),
+      );
+      expect(args.select).not.toHaveProperty('submissions');
+      expect(args.select).not.toHaveProperty('attachments');
+      expect(args.select).not.toHaveProperty('attachmentMetadata');
+      expect(args).not.toHaveProperty('include');
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]).not.toHaveProperty('submissionSummary');
+      expect(result.items[0]).not.toHaveProperty('attachments');
+    });
+
+    it('reads assignment detail through the same narrow published projection', async () => {
+      const p = prisma as any;
+      p.homeworkAssignment.findFirst.mockResolvedValue({
+        id: 'homework-1',
+        title: 'Fractions practice',
+        status: HomeworkAssignmentStatus.CLOSED,
+        class: { id: 'class-1', name: 'Class 5' },
+        section: null,
+        subject: { id: 'subject-1', name: 'Mathematics' },
+        assignedByStaff: null,
+      });
+
+      const result = await homeworkService.getAssignment(
+        supportActor,
+        'homework-1',
+      );
+
+      const args = p.homeworkAssignment.findFirst.mock.calls.at(-1)[0];
+      expect(args.where).toEqual({
+        id: 'homework-1',
+        tenantId: 'tenant-a',
+        status: {
+          in: [
+            HomeworkAssignmentStatus.ASSIGNED,
+            HomeworkAssignmentStatus.CLOSED,
+          ],
+        },
+      });
+      expect(args.select).not.toHaveProperty('submissions');
+      expect(args.select).not.toHaveProperty('attachments');
+      expect(result).not.toHaveProperty('submissionSummary');
+    });
+
+    it('denies submission-derived filters and reports before database reads', async () => {
+      const p = prisma as any;
+
+      await expect(
+        homeworkService.listAssignments(supportActor, {
+          studentId: 'student-1',
+        }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(
+        homeworkService.getHomeworkSummaryToday(supportActor, {}),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(
+        homeworkService.getHomeworkWorkload(supportActor, {
+          classId: 'class-1',
+        }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(p.homeworkAssignment.findMany).not.toHaveBeenCalled();
+      expect(p.homeworkAssignment.count).not.toHaveBeenCalled();
+      expect(p.homeworkSubmission.findMany).not.toHaveBeenCalled();
+    });
+  });
+
   describe('Parent and student list scoping', () => {
     it('returns an empty homework list instead of tenant-wide rows when a parent has no linked student', async () => {
       const p = prisma as any;

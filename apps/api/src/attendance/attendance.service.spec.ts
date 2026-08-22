@@ -463,6 +463,35 @@ describe('attendance production hardening', () => {
     );
   });
 
+  it('denies support override exports before register reads or artifact writes', async () => {
+    const fileRegistryService = {
+      registerGeneratedFile: jest.fn(),
+    };
+    const { service, prisma, auditService } = buildService({
+      fileRegistryService,
+    });
+
+    await expect(
+      service.exportMonthlyRegister(
+        {
+          academicYearId: 'ay-1',
+          classId: 'class-1',
+          bsMonth: 1,
+          bsYear: 2081,
+        },
+        'csv',
+        { ...adminActor, isSupportOverride: true },
+      ),
+    ).rejects.toThrow(
+      'Attendance exports are unavailable during support override',
+    );
+
+    expect(prisma.academicYear.findFirst).not.toHaveBeenCalled();
+    expect(fileRegistryService.registerGeneratedFile).not.toHaveBeenCalled();
+    expect(prisma.reportExport.create).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
   it('rejects an incomplete BS monthly register period', async () => {
     const { service } = buildService({
       classroom: { id: 'class-1', name: 'Grade 1' },
@@ -3232,7 +3261,7 @@ describe('attendance production hardening', () => {
 
     const result = await service.listStaffAttendanceSummary(
       { month: 4, year: 2026 },
-      adminActor,
+      hrActor,
     );
 
     expect(result.items[0]).toEqual(
@@ -3565,6 +3594,51 @@ describe('staff-attendance and leave confirmed-gap fixes (2026-07-19)', () => {
     await expect(
       service.listStaffAttendanceRoster({ page: 1, limit: 25 }, teacherActor),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('blocks support override staff summaries before attendance or leave reads', async () => {
+    const { service, prisma } = buildService({});
+    const supportActor = {
+      ...adminActor,
+      roles: [],
+      permissions: ['attendance:read'],
+      isSupportOverride: true,
+    };
+
+    await expect(
+      service.listStaffAttendanceSummary(
+        { month: 4, year: 2026 },
+        supportActor,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+
+    expect(prisma.staffAttendance.findMany).not.toHaveBeenCalled();
+    expect(prisma.staffLeaveRequest.findMany).not.toHaveBeenCalled();
+  });
+
+  it('limits support correction visibility to a tenant-scoped pending count', async () => {
+    const { service, prisma } = buildService({});
+    prisma.attendanceCorrectionRequest.count.mockResolvedValueOnce(4);
+    const supportActor = {
+      ...adminActor,
+      roles: [],
+      permissions: ['attendance:read'],
+      isSupportOverride: true,
+      supportOverrideReadOnly: true,
+      supportOverrideScopes: ['ATTENDANCE' as const],
+    };
+
+    await expect(service.getCorrectionSummary(supportActor)).resolves.toEqual({
+      pending: 4,
+    });
+    expect(prisma.attendanceCorrectionRequest.count).toHaveBeenCalledWith({
+      where: { tenantId: supportActor.tenantId, status: 'PENDING' },
+    });
+
+    await expect(
+      service.listCorrectionRequests(supportActor, { page: 1, limit: 25 }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.attendanceCorrectionRequest.findMany).not.toHaveBeenCalled();
   });
 
   it('returns a tenant-scoped paginated active-staff attendance roster with minimal fields', async () => {

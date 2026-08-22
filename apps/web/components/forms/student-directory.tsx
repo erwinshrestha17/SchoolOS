@@ -62,6 +62,11 @@ type StudentDirectoryProps = {
   summaryLoading: boolean;
   summaryUnavailable: boolean;
   canCreateAdmission: boolean;
+  canEditStudents: boolean;
+  canEditGuardians: boolean;
+  canManageStudentDocuments: boolean;
+  canViewStudentFees: boolean;
+  isSupportOverride?: boolean;
   classes: ClassSummary[];
   isError: boolean;
   isLoading: boolean;
@@ -78,14 +83,17 @@ type StudentDirectoryProps = {
     search: string;
     page: number;
   };
-  onFilterChange: (filters: {
-    academicYearId?: string;
-    classId?: string;
-    sectionId?: string;
-    status?: string;
-    search?: string;
-    page?: number;
-  }, options?: { history?: 'push' | 'replace' }) => void;
+  onFilterChange: (
+    filters: {
+      academicYearId?: string;
+      classId?: string;
+      sectionId?: string;
+      status?: string;
+      search?: string;
+      page?: number;
+    },
+    options?: { history?: 'push' | 'replace' },
+  ) => void;
 };
 
 export function StudentDirectory({
@@ -95,6 +103,11 @@ export function StudentDirectory({
   summaryLoading,
   summaryUnavailable,
   canCreateAdmission,
+  canEditStudents,
+  canEditGuardians,
+  canManageStudentDocuments,
+  canViewStudentFees,
+  isSupportOverride = false,
   classes,
   isError,
   isLoading,
@@ -123,10 +136,10 @@ export function StudentDirectory({
   });
   const hasActiveFilters = Boolean(
     classId ||
-      sectionId ||
-      status ||
-      search ||
-      (academicYearId && academicYearId !== currentAcademicYear?.id),
+    sectionId ||
+    status ||
+    search ||
+    (academicYearId && academicYearId !== currentAcademicYear?.id),
   );
 
   useEffect(() => {
@@ -144,13 +157,16 @@ export function StudentDirectory({
   }, [admissions]);
 
   const filteredStudents = students;
-  const selectedStudent = students.find((student) => student.id === selectedStudentId) ?? null;
+  const selectedStudent =
+    students.find((student) => student.id === selectedStudentId) ?? null;
 
   function updateSelectedStudent(studentId?: string) {
     const params = new URLSearchParams(searchParams.toString());
     if (studentId) params.set('student', studentId);
     else params.delete('student');
-    router.replace(`${pathname}${params.size ? `?${params.toString()}` : ''}`, { scroll: false });
+    router.replace(`${pathname}${params.size ? `?${params.toString()}` : ''}`, {
+      scroll: false,
+    });
   }
 
   if (isLoading) return <LoadingState label="Loading student directory..." />;
@@ -173,6 +189,7 @@ export function StudentDirectory({
         description="Set up academic years and classes before managing students."
         icon={<BookOpenText aria-hidden size={28} />}
         action={
+          !isSupportOverride ? (
           <Button
             type="button"
             variant="outline"
@@ -180,6 +197,7 @@ export function StudentDirectory({
           >
             Configure School Settings
           </Button>
+          ) : undefined
         }
       />
     );
@@ -188,38 +206,58 @@ export function StudentDirectory({
   return (
     <div className="flex flex-col gap-5">
       <SummaryGrid>
-          <SummaryCard
-            label="Active Students"
-            value={summaryUnavailable ? 'Unavailable' : (summary?.activeStudents ?? 'Unavailable')}
-            icon={<Users aria-hidden />}
-            loading={summaryLoading}
-            href="/dashboard/students?status=ACTIVE"
-            description="Currently active student records."
-          />
-          <SummaryCard
-            label="Document Issues"
-            value={summaryUnavailable ? 'Unavailable' : (summary?.missingDocuments ?? 'Unavailable')}
-            icon={<FolderOpen aria-hidden />}
-            loading={summaryLoading}
-            href="/dashboard/admissions/documents"
-            description="Records with missing documents."
-          />
-          <SummaryCard
-            label="Duplicate Candidates"
-            value={summaryUnavailable ? 'Unavailable' : (summary?.duplicateCandidates ?? 'Unavailable')}
-            icon={<UserCheck aria-hidden />}
-            loading={summaryLoading}
-            href="/dashboard/admissions/duplicates"
-            description="Possible matching student records."
-          />
-          <SummaryCard
-            label="iEMIS Issues"
-            value={summaryUnavailable ? 'Unavailable' : (summary?.iemisIssues ?? 'Unavailable')}
-            icon={<AlertTriangle aria-hidden />}
-            loading={summaryLoading}
-            href="/dashboard/admissions/iemis"
-            description="Student records with iEMIS issues."
-          />
+        <SummaryCard
+          label="Active Students"
+          value={
+            summaryUnavailable
+              ? 'Unavailable'
+              : (summary?.activeStudents ?? 'Unavailable')
+          }
+          icon={<Users aria-hidden />}
+          loading={summaryLoading}
+          href="/dashboard/students?status=ACTIVE"
+          description="Currently active student records."
+        />
+        {!isSupportOverride ? (
+          <>
+            <SummaryCard
+              label="Document Issues"
+              value={
+                summaryUnavailable
+                  ? 'Unavailable'
+                  : (summary?.missingDocuments ?? 'Unavailable')
+              }
+              icon={<FolderOpen aria-hidden />}
+              loading={summaryLoading}
+              href="/dashboard/admissions/documents"
+              description="Records with missing documents."
+            />
+            <SummaryCard
+              label="Duplicate Candidates"
+              value={
+                summaryUnavailable
+                  ? 'Unavailable'
+                  : (summary?.duplicateCandidates ?? 'Unavailable')
+              }
+              icon={<UserCheck aria-hidden />}
+              loading={summaryLoading}
+              href="/dashboard/admissions/duplicates"
+              description="Possible matching student records."
+            />
+            <SummaryCard
+              label="iEMIS Issues"
+              value={
+                summaryUnavailable
+                  ? 'Unavailable'
+                  : (summary?.iemisIssues ?? 'Unavailable')
+              }
+              icon={<AlertTriangle aria-hidden />}
+              loading={summaryLoading}
+              href="/dashboard/admissions/iemis"
+              description="Student records with iEMIS issues."
+            />
+          </>
+        ) : null}
       </SummaryGrid>
 
       <WorkspaceTabs
@@ -251,202 +289,220 @@ export function StudentDirectory({
         flush
         data-testid="student-roster-workspace"
       >
-          <div
-            className="grid gap-3 border-b border-border bg-muted/20 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[minmax(9rem,1fr)_minmax(8rem,0.8fr)_minmax(8rem,0.8fr)_minmax(8rem,0.8fr)_minmax(15rem,1.7fr)_auto]"
-            aria-label="Directory filters"
-            role="group"
-          >
-            <div className="flex flex-col gap-1.5">
-              <label
-                htmlFor="student-academic-year"
-                className="text-xs font-medium text-muted-foreground"
-              >
-                Academic Year
-              </label>
-              <Select
-                value={academicYearId || 'ALL'}
-                onValueChange={(value) =>
-                  onFilterChange({
-                    academicYearId: value === 'ALL' ? '' : value,
-                    page: 1,
-                  })
-                }
-              >
-                <SelectTrigger id="student-academic-year">
-                  <SelectValue placeholder="All years" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>Academic years</SelectLabel>
-                    <SelectItem value="ALL">All Years</SelectItem>
-                    {academicYears.map((year) => (
-                      <SelectItem key={year.id} value={year.id}>
-                        {year.name}{year.isCurrent ? ' (Current)' : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label
-                htmlFor="student-class"
-                className="text-xs font-medium text-muted-foreground"
-              >
-                Class
-              </label>
-              <Select
-                value={classId || 'ALL'}
-                onValueChange={(value) =>
-                  onFilterChange({
-                    classId: value === 'ALL' ? '' : value,
-                    sectionId: '',
-                    page: 1,
-                  })
-                }
-              >
-                <SelectTrigger id="student-class">
-                  <SelectValue placeholder="All classes" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>Classes</SelectLabel>
-                    <SelectItem value="ALL">All Classes</SelectItem>
-                    {classes.map((item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.name}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label
-                htmlFor="student-section"
-                className="text-xs font-medium text-muted-foreground"
-              >
-                Section
-              </label>
-              <Select
-                value={sectionId || 'ALL'}
-                onValueChange={(value) =>
-                  onFilterChange({
-                    sectionId: value === 'ALL' ? '' : value,
-                    page: 1,
-                  })
-                }
-                disabled={!classId}
-              >
-                <SelectTrigger id="student-section">
-                  <SelectValue placeholder="All sections" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>Sections</SelectLabel>
-                    <SelectItem value="ALL">All Sections</SelectItem>
-                    {availableSections.map((item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.name}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label
-                htmlFor="student-status"
-                className="text-xs font-medium text-muted-foreground"
-              >
-                Status
-              </label>
-              <Select
-                value={status || 'ALL'}
-                onValueChange={(value) =>
-                  onFilterChange({
-                    status: value === 'ALL' ? '' : value,
-                    page: 1,
-                  })
-                }
-              >
-                <SelectTrigger id="student-status">
-                  <SelectValue placeholder="All statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>Student status</SelectLabel>
-                    <SelectItem value="ALL">All Statuses</SelectItem>
-                    <SelectItem value="ACTIVE">Active</SelectItem>
-                    <SelectItem value="TRANSFERRED">Transferred</SelectItem>
-                    <SelectItem value="EXITED">Exited</SelectItem>
-                    <SelectItem value="ALUMNI">Alumni</SelectItem>
-                    <SelectItem value="ARCHIVED">Archived</SelectItem>
-                    <SelectItem value="MERGED">Merged</SelectItem>
-                    <SelectItem value="DELETED">Deleted</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-2 xl:col-span-1">
-              <label
-                htmlFor="student-search"
-                className="text-xs font-medium text-muted-foreground"
-              >
-                Quick Search
-              </label>
-              <InputGroup>
-                <InputGroupAddon>
-                  <Search aria-hidden />
-                </InputGroupAddon>
-                <InputGroupInput
-                  id="student-search"
-                  value={search}
-                  onChange={(event) =>
-                    onFilterChange({ search: event.target.value, page: 1 })
-                  }
-                  placeholder="Name, student ID, guardian, or phone"
-                  aria-label="Search students by name, student code, guardian name, or phone"
-                />
-              </InputGroup>
-            </div>
-
-            {hasActiveFilters ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="self-end"
-                onClick={() =>
-                  onFilterChange({
-                    academicYearId: currentAcademicYear?.id ?? '',
-                    classId: '',
-                    sectionId: '',
-                    status: '',
-                    search: '',
-                    page: 1,
-                  })
-                }
-              >
-                <RotateCcw data-icon="inline-start" />
-                Reset
-              </Button>
-            ) : null}
+        <div
+          className="grid gap-3 border-b border-border bg-muted/20 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[minmax(9rem,1fr)_minmax(8rem,0.8fr)_minmax(8rem,0.8fr)_minmax(8rem,0.8fr)_minmax(15rem,1.7fr)_auto]"
+          aria-label="Directory filters"
+          role="group"
+        >
+          <div className="flex flex-col gap-1.5">
+            <label
+              htmlFor="student-academic-year"
+              className="text-xs font-medium text-muted-foreground"
+            >
+              Academic Year
+            </label>
+            <Select
+              value={academicYearId || 'ALL'}
+              onValueChange={(value) =>
+                onFilterChange({
+                  academicYearId: value === 'ALL' ? '' : value,
+                  page: 1,
+                })
+              }
+            >
+              <SelectTrigger id="student-academic-year">
+                <SelectValue placeholder="All years" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectLabel>Academic years</SelectLabel>
+                  <SelectItem value="ALL">All Years</SelectItem>
+                  {academicYears.map((year) => (
+                    <SelectItem key={year.id} value={year.id}>
+                      {year.name}
+                      {year.isCurrent ? ' (Current)' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
 
-          {filteredStudents.length > 0 ? (
-          <div className="divide-y divide-border" data-testid="student-directory-results">
+          <div className="flex flex-col gap-1.5">
+            <label
+              htmlFor="student-class"
+              className="text-xs font-medium text-muted-foreground"
+            >
+              Class
+            </label>
+            <Select
+              value={classId || 'ALL'}
+              onValueChange={(value) =>
+                onFilterChange({
+                  classId: value === 'ALL' ? '' : value,
+                  sectionId: '',
+                  page: 1,
+                })
+              }
+            >
+              <SelectTrigger id="student-class">
+                <SelectValue placeholder="All classes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectLabel>Classes</SelectLabel>
+                  <SelectItem value="ALL">All Classes</SelectItem>
+                  {classes.map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label
+              htmlFor="student-section"
+              className="text-xs font-medium text-muted-foreground"
+            >
+              Section
+            </label>
+            <Select
+              value={sectionId || 'ALL'}
+              onValueChange={(value) =>
+                onFilterChange({
+                  sectionId: value === 'ALL' ? '' : value,
+                  page: 1,
+                })
+              }
+              disabled={!classId}
+            >
+              <SelectTrigger id="student-section">
+                <SelectValue placeholder="All sections" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectLabel>Sections</SelectLabel>
+                  <SelectItem value="ALL">All Sections</SelectItem>
+                  {availableSections.map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label
+              htmlFor="student-status"
+              className="text-xs font-medium text-muted-foreground"
+            >
+              Status
+            </label>
+            <Select
+              value={status || 'ALL'}
+              onValueChange={(value) =>
+                onFilterChange({
+                  status: value === 'ALL' ? '' : value,
+                  page: 1,
+                })
+              }
+            >
+              <SelectTrigger id="student-status">
+                <SelectValue placeholder="All statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectLabel>Student status</SelectLabel>
+                  <SelectItem value="ALL">All Statuses</SelectItem>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="TRANSFERRED">Transferred</SelectItem>
+                  <SelectItem value="EXITED">Exited</SelectItem>
+                  <SelectItem value="ALUMNI">Alumni</SelectItem>
+                  <SelectItem value="ARCHIVED">Archived</SelectItem>
+                  <SelectItem value="MERGED">Merged</SelectItem>
+                  <SelectItem value="DELETED">Deleted</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-2 xl:col-span-1">
+            <label
+              htmlFor="student-search"
+              className="text-xs font-medium text-muted-foreground"
+            >
+              Quick Search
+            </label>
+            <InputGroup>
+              <InputGroupAddon>
+                <Search aria-hidden />
+              </InputGroupAddon>
+              <InputGroupInput
+                id="student-search"
+                value={search}
+                onChange={(event) =>
+                  onFilterChange({ search: event.target.value, page: 1 })
+                }
+                placeholder="Name, student ID, guardian, or phone"
+                aria-label="Search students by name, student code, guardian name, or phone"
+              />
+            </InputGroup>
+          </div>
+
+          {hasActiveFilters ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="self-end"
+              onClick={() =>
+                onFilterChange({
+                  academicYearId: currentAcademicYear?.id ?? '',
+                  classId: '',
+                  sectionId: '',
+                  status: '',
+                  search: '',
+                  page: 1,
+                })
+              }
+            >
+              <RotateCcw data-icon="inline-start" />
+              Reset
+            </Button>
+          ) : null}
+        </div>
+
+        {filteredStudents.length > 0 ? (
+          <div
+            className="divide-y divide-border"
+            data-testid="student-directory-results"
+          >
             {filteredStudents.map((student) => {
-              const admission = admissionBySystemId.get(student.studentSystemId);
+              const admission = admissionBySystemId.get(
+                student.studentSystemId,
+              );
               const studentName = getStudentName(student, admission);
-              const className = student.className ?? student.class?.name ?? admission?.className ?? 'Not assigned';
-              const sectionName = student.sectionName ?? student.section ?? admission?.sectionName ?? 'No section';
-              const rollNumber = student.rollNumber ?? admission?.rollNumber ?? null;
-              const primaryGuardian = (student.guardians ?? admission?.guardians ?? []).find(g => g.isPrimary) ?? (student.guardians ?? admission?.guardians ?? [])[0];
+              const className =
+                student.className ??
+                student.class?.name ??
+                admission?.className ??
+                'Not assigned';
+              const sectionName =
+                student.sectionName ??
+                student.section ??
+                admission?.sectionName ??
+                'No section';
+              const rollNumber =
+                student.rollNumber ?? admission?.rollNumber ?? null;
+              const primaryGuardian =
+                (student.guardians ?? admission?.guardians ?? []).find(
+                  (g) => g.isPrimary,
+                ) ?? (student.guardians ?? admission?.guardians ?? [])[0];
 
               return (
                 <div
@@ -470,12 +526,21 @@ export function StudentDirectory({
                         >
                           {studentName}
                         </Link>
-                        <StatusBadge status={student.lifecycleStatus || 'ACTIVE'} />
+                        <StatusBadge
+                          status={student.lifecycleStatus || 'ACTIVE'}
+                        />
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                        <span className="font-medium text-primary">{student.studentSystemId}</span>
+                        <span className="font-medium text-primary">
+                          {student.studentSystemId}
+                        </span>
                         <span className="size-1 rounded-full bg-border" />
-                        <span className="text-foreground">{className} {sectionName !== 'No section' ? `• ${sectionName}` : ''}</span>
+                        <span className="text-foreground">
+                          {className}{' '}
+                          {sectionName !== 'No section'
+                            ? `• ${sectionName}`
+                            : ''}
+                        </span>
                         {rollNumber && (
                           <>
                             <span className="size-1 rounded-full bg-border" />
@@ -484,7 +549,11 @@ export function StudentDirectory({
                         )}
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">
-                         Guardian: <span className="font-medium text-foreground">{primaryGuardian?.fullName || 'Not recorded'}</span> • {primaryGuardian?.primaryPhone || 'No phone'}
+                        Guardian:{' '}
+                        <span className="font-medium text-foreground">
+                          {primaryGuardian?.fullName || 'Not recorded'}
+                        </span>{' '}
+                        • {primaryGuardian?.primaryPhone || 'No phone'}
                       </p>
                     </div>
                   </div>
@@ -510,43 +579,57 @@ export function StudentDirectory({
                       View Profile
                       <ChevronRight className="ml-1 h-4 w-4" aria-hidden />
                     </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        router.push(
-                          `/dashboard/fees/collect?studentId=${encodeURIComponent(student.id)}`,
-                        )
-                      }
-                    >
-                      <Wallet className="mr-1.5 h-4 w-4" aria-hidden />
-                      Fees Ledger
-                    </Button>
+                    {canViewStudentFees ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          router.push(
+                            `/dashboard/fees/collect?studentId=${encodeURIComponent(student.id)}`,
+                          )
+                        }
+                      >
+                        <Wallet className="mr-1.5 h-4 w-4" aria-hidden />
+                        Fees Ledger
+                      </Button>
+                    ) : null}
                     <ActionMenu
                       label={`Open actions for ${studentName}`}
                       items={[
-                        {
-                          label: 'Edit Student',
-                          icon: <UserPlus size={14} />,
-                          onClick: () =>
-                            router.push(
-                              `/dashboard/students/${encodeURIComponent(student.id)}?edit=true`,
-                            ),
-                        },
-                        {
-                          label: 'Edit Guardian',
-                          icon: <ContactRound size={14} />,
-                          onClick: () =>
-                            router.push(
-                              `/dashboard/students/${encodeURIComponent(student.id)}?tab=Guardians`,
-                            ),
-                        },
-                        {
-                          label: 'ID Card',
-                          icon: <FileText size={14} />,
-                          onClick: () => onOpenPdf(student.id, 'id-card'),
-                        },
+                        ...(canEditStudents
+                          ? [
+                              {
+                                label: 'Edit Student',
+                                icon: <UserPlus size={14} />,
+                                onClick: () =>
+                                  router.push(
+                                    `/dashboard/students/${encodeURIComponent(student.id)}?edit=true`,
+                                  ),
+                              },
+                            ]
+                          : []),
+                        ...(canEditGuardians
+                          ? [
+                              {
+                                label: 'Edit Guardian',
+                                icon: <ContactRound size={14} />,
+                                onClick: () =>
+                                  router.push(
+                                    `/dashboard/students/${encodeURIComponent(student.id)}?tab=Guardians`,
+                                  ),
+                              },
+                            ]
+                          : []),
+                        ...(canManageStudentDocuments
+                          ? [
+                              {
+                                label: 'ID Card',
+                                icon: <FileText size={14} />,
+                                onClick: () => onOpenPdf(student.id, 'id-card'),
+                              },
+                            ]
+                          : []),
                         {
                           label: 'Documents',
                           icon: <FolderOpen size={14} />,
@@ -565,7 +648,12 @@ export function StudentDirectory({
                         },
                       ]}
                       trigger={
-                        <Button type="button" variant="outline" size="icon" aria-label={`More actions for ${studentName}`}>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          aria-label={`More actions for ${studentName}`}
+                        >
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       }
@@ -638,6 +726,7 @@ export function StudentDirectory({
             student={selectedStudent}
             admission={admissionBySystemId.get(selectedStudent.studentSystemId)}
             onOpenPdf={onOpenPdf}
+            canManageStudentDocuments={canManageStudentDocuments}
           />
         ) : null}
       </Drawer>
@@ -645,11 +734,22 @@ export function StudentDirectory({
   );
 }
 
-function StudentInspector({ student, admission, onOpenPdf }: { student: StudentProfile; admission?: AdmissionSummary; onOpenPdf: (studentId: string, kind: string) => void }) {
+function StudentInspector({
+  student,
+  admission,
+  onOpenPdf,
+  canManageStudentDocuments,
+}: {
+  student: StudentProfile;
+  admission?: AdmissionSummary;
+  onOpenPdf: (studentId: string, kind: string) => void;
+  canManageStudentDocuments: boolean;
+}) {
   const router = useRouter();
   const name = getStudentName(student, admission);
   const guardians = student.guardians ?? admission?.guardians ?? [];
-  const primaryGuardian = guardians.find((guardian) => guardian.isPrimary) ?? guardians[0];
+  const primaryGuardian =
+    guardians.find((guardian) => guardian.isPrimary) ?? guardians[0];
   const guardianEmail =
     primaryGuardian &&
     'email' in primaryGuardian &&
@@ -659,13 +759,33 @@ function StudentInspector({ student, admission, onOpenPdf }: { student: StudentP
   return (
     <div className="space-y-5 pt-5">
       <div className="text-center">
-        <StudentAvatar studentId={student.id} photoVersion={student.photoVersion} initials={initials(name)} alt={name} size="xl" className="mx-auto" />
+        <StudentAvatar
+          studentId={student.id}
+          photoVersion={student.photoVersion}
+          initials={initials(name)}
+          alt={name}
+          size="xl"
+          className="mx-auto"
+        />
         <div className="mt-3 flex items-center justify-center gap-2">
           <h3 className="text-lg font-black text-slate-950">{name}</h3>
           <StatusBadge status={student.lifecycleStatus ?? 'ACTIVE'} />
         </div>
-        <p className="mt-1 text-xs font-bold text-[var(--color-mod-admissions-text)]">{student.studentSystemId}</p>
-        <p className="mt-2 text-xs text-slate-500">{student.className ?? student.class?.name ?? admission?.className ?? 'No class'} / {student.sectionName ?? student.section ?? admission?.sectionName ?? 'No section'} · Roll {student.rollNumber ?? admission?.rollNumber ?? '—'}</p>
+        <p className="mt-1 text-xs font-bold text-[var(--color-mod-admissions-text)]">
+          {student.studentSystemId}
+        </p>
+        <p className="mt-2 text-xs text-slate-500">
+          {student.className ??
+            student.class?.name ??
+            admission?.className ??
+            'No class'}{' '}
+          /{' '}
+          {student.sectionName ??
+            student.section ??
+            admission?.sectionName ??
+            'No section'}{' '}
+          · Roll {student.rollNumber ?? admission?.rollNumber ?? '—'}
+        </p>
       </div>
       <Button
         type="button"
@@ -677,11 +797,20 @@ function StudentInspector({ student, admission, onOpenPdf }: { student: StudentP
         View Full Profile
       </Button>
       <section className="border-t border-slate-100 pt-4">
-        <h4 className="text-xs font-black uppercase tracking-wide text-slate-500">Guardian</h4>
+        <h4 className="text-xs font-black uppercase tracking-wide text-slate-500">
+          Guardian
+        </h4>
         {primaryGuardian ? (
           <div className="mt-3 space-y-1 text-sm">
-            <p className="font-bold text-slate-900">{primaryGuardian.fullName} <span className="font-medium text-slate-500">({primaryGuardian.relation})</span></p>
-            <p className="text-xs text-slate-600">{primaryGuardian.primaryPhone}</p>
+            <p className="font-bold text-slate-900">
+              {primaryGuardian.fullName}{' '}
+              <span className="font-medium text-slate-500">
+                ({primaryGuardian.relation})
+              </span>
+            </p>
+            <p className="text-xs text-slate-600">
+              {primaryGuardian.primaryPhone}
+            </p>
             <p className="text-xs text-slate-600">{guardianEmail}</p>
           </div>
         ) : (
@@ -690,38 +819,63 @@ function StudentInspector({ student, admission, onOpenPdf }: { student: StudentP
       </section>
       <section className="border-t border-slate-100 pt-4">
         <div className="flex items-center justify-between">
-          <h4 className="text-xs font-black uppercase tracking-wide text-slate-500">Document Checklist</h4>
+          <h4 className="text-xs font-black uppercase tracking-wide text-slate-500">
+            Document Checklist
+          </h4>
           <span className="text-xs font-bold text-slate-400">Open profile</span>
         </div>
-        <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">Open the protected document workspace for the current checklist.</p>
-        <Link href={`/dashboard/admissions/documents?student=${encodeURIComponent(student.id)}`} className="mt-3 inline-flex text-xs font-bold text-[var(--color-mod-admissions-text)]">Review documents</Link>
+        <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
+          Open the protected document workspace for the current checklist.
+        </p>
+        <Link
+          href={`/dashboard/admissions/documents?student=${encodeURIComponent(student.id)}`}
+          className="mt-3 inline-flex text-xs font-bold text-[var(--color-mod-admissions-text)]"
+        >
+          Review documents
+        </Link>
       </section>
       <section className="border-t border-slate-100 pt-4">
         <div className="flex items-center justify-between">
-          <h4 className="text-xs font-black uppercase tracking-wide text-slate-500">QR / ID Card</h4>
-          <StatusBadge status={student.qrCredential?.status ?? 'NOT_GENERATED'} tone={student.qrCredential?.status === 'ACTIVE' ? 'active' : 'inactive'} />
+          <h4 className="text-xs font-black uppercase tracking-wide text-slate-500">
+            QR / ID Card
+          </h4>
+          <StatusBadge
+            status={student.qrCredential?.status ?? 'NOT_GENERATED'}
+            tone={
+              student.qrCredential?.status === 'ACTIVE' ? 'active' : 'inactive'
+            }
+          />
         </div>
         <div className="mt-4 flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
           <QrCode className="h-12 w-12 text-slate-400" aria-hidden />
           <div>
-            <p className="text-xs font-bold text-slate-800">Secure QR credential</p>
-            <p className="mt-1 text-[0.68rem] text-slate-500">QR security details stay protected.</p>
+            <p className="text-xs font-bold text-slate-800">
+              Secure QR credential
+            </p>
+            <p className="mt-1 text-[0.68rem] text-slate-500">
+              QR security details stay protected.
+            </p>
           </div>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          className="mt-3 w-full"
-          onClick={() => onOpenPdf(student.id, 'id-card')}
-        >
-          View / Print ID Card
-        </Button>
+        {canManageStudentDocuments ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-3 w-full"
+            onClick={() => onOpenPdf(student.id, 'id-card')}
+          >
+            View / Print ID Card
+          </Button>
+        ) : null}
       </section>
     </div>
   );
 }
 
-function getStudentName(student: StudentProfile, admission: AdmissionSummary | undefined | null) {
+function getStudentName(
+  student: StudentProfile,
+  admission: AdmissionSummary | undefined | null,
+) {
   return (
     student.fullNameEn ||
     [student.firstNameEn, student.lastNameEn].filter(Boolean).join(' ') ||

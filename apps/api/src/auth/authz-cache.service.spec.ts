@@ -1,11 +1,12 @@
 import { AuthzCacheService } from './authz-cache.service';
+import { SecurityDomain } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisCacheService } from '../common/cache/redis-cache.service';
 
 /**
  * These tests pin the security contract of the cross-request authorization
- * cache. It is the one cache in the codebase that can be stale about *what a
- * user is allowed to do*, so each guarantee is asserted explicitly:
+ * resolver. Effective grants are deliberately live until a versioned,
+ * fail-closed cache contract exists, so each guarantee is asserted explicitly:
  *
  *  - the tenant predicate is present on every underlying read;
  *  - entries are namespaced per tenant and per user;
@@ -58,6 +59,7 @@ describe('AuthzCacheService', () => {
       userRole: {
         findMany: jest.fn().mockResolvedValue([
           {
+            scopeId: null,
             expiresAt: null,
             role: {
               name: 'teacher',
@@ -89,8 +91,10 @@ describe('AuthzCacheService', () => {
         tenantId: 'tenant-1',
         userId: 'user-1',
         revokedAt: null,
+        role: { tenantId: 'tenant-1' },
       },
       select: {
+        scopeId: true,
         expiresAt: true,
         role: {
           select: {
@@ -119,11 +123,12 @@ describe('AuthzCacheService', () => {
     );
   });
 
-  it('serves a second request for the same user from cache', async () => {
+  it('re-reads a second request for the same user from authoritative storage', async () => {
     await service.resolve('tenant-1', 'user-1');
     await service.resolve('tenant-1', 'user-1');
 
-    expect(prisma.userRole.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.userRole.findMany).toHaveBeenCalledTimes(2);
+    expect(store.size).toBe(0);
   });
 
   it('never serves one user the permissions cached for another', async () => {
@@ -168,7 +173,7 @@ describe('AuthzCacheService', () => {
     );
   });
 
-  it('invalidating one user leaves other users cached', async () => {
+  it('invalidating one user remains bounded to its compatibility cache key', async () => {
     await service.resolve('tenant-1', 'user-1');
     await service.resolve('tenant-1', 'user-2');
     prisma.userRole.findMany.mockClear();
@@ -178,7 +183,8 @@ describe('AuthzCacheService', () => {
     await service.resolve('tenant-1', 'user-1');
     await service.resolve('tenant-1', 'user-2');
 
-    expect(prisma.userRole.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.userRole.findMany).toHaveBeenCalledTimes(2);
+    expect(cache.invalidate).toHaveBeenCalledWith('authz:v2:tenant-1:user-1');
   });
 
   it('invalidating a tenant drops every user in that tenant only', async () => {
@@ -195,13 +201,13 @@ describe('AuthzCacheService', () => {
     await service.resolve('tenant-1', 'user-2');
     await service.resolve('tenant-2', 'user-3');
 
-    expect(prisma.userRole.findMany).toHaveBeenCalledTimes(2);
+    expect(prisma.userRole.findMany).toHaveBeenCalledTimes(3);
   });
 
   it('uses a tenant-scoped key prefix so invalidation cannot span tenants', async () => {
     await service.invalidateTenant('tenant-1');
 
-    expect(cache.invalidatePrefix).toHaveBeenCalledWith('authz:tenant-1:');
+    expect(cache.invalidatePrefix).toHaveBeenCalledWith('authz:v2:tenant-1:');
   });
 
   it('deduplicates roles and permissions granted by several roles', async () => {
@@ -223,6 +229,88 @@ describe('AuthzCacheService', () => {
       roles: [],
       permissions: [],
     });
+  });
+
+  it('ignores reserved platform roles in the school security domain', async () => {
+    prisma.userRole.findMany.mockResolvedValue([
+      roleGrant(
+        'platform_super_admin',
+        'platform:dashboard',
+        'read',
+        null,
+        'global',
+      ),
+      roleGrant('admin', 'students', 'read'),
+    ]);
+
+    await expect(
+      service.resolve('tenant-1', 'user-1', SecurityDomain.SCHOOL),
+    ).resolves.toEqual({
+      roles: ['admin'],
+      permissions: ['students:read'],
+    });
+  });
+
+  it('requires a global platform-role assignment in the platform security domain', async () => {
+    prisma.userRole.findMany.mockResolvedValue([
+      roleGrant(
+        'platform_support',
+        'platform:queues',
+        'read',
+        null,
+        'tenant-2',
+      ),
+      roleGrant('admin', 'students', 'read', null, 'global'),
+    ]);
+
+    await expect(
+      service.resolve('tenant-1', 'user-1', SecurityDomain.PLATFORM),
+    ).resolves.toEqual({
+      roles: [],
+      permissions: [],
+    });
+  });
+
+  it('accepts only global reserved roles in the platform security domain', async () => {
+    prisma.userRole.findMany.mockResolvedValue([
+      roleGrant('platform_support', 'platform:queues', 'read', null, 'global'),
+      roleGrant('admin', 'students', 'read', null, 'global'),
+    ]);
+
+    await expect(
+      service.resolve('tenant-1', 'user-1', SecurityDomain.PLATFORM),
+    ).resolves.toEqual({
+      roles: ['platform_support'],
+      permissions: ['platform:queues:read'],
+    });
+  });
+
+  it('always re-reads platform grants instead of trusting Redis', async () => {
+    prisma.userRole.findMany
+      .mockResolvedValueOnce([
+        roleGrant(
+          'platform_super_admin',
+          'platform:support_override',
+          'manage',
+          null,
+          'global',
+        ),
+      ])
+      .mockResolvedValueOnce([]);
+
+    await expect(
+      service.resolve('platform-tenant', 'operator-1', SecurityDomain.PLATFORM),
+    ).resolves.toEqual({
+      roles: ['platform_super_admin'],
+      permissions: ['platform:support_override:manage'],
+    });
+
+    await expect(
+      service.resolve('platform-tenant', 'operator-1', SecurityDomain.PLATFORM),
+    ).resolves.toEqual({ roles: [], permissions: [] });
+
+    expect(prisma.userRole.findMany).toHaveBeenCalledTimes(2);
+    expect(store.size).toBe(0);
   });
 
   it('removes a time-bounded grant at expiry even while the cache is warm', async () => {
@@ -249,8 +337,10 @@ function roleGrant(
   resource = 'students',
   action = 'read',
   expiresAt: Date | null = null,
+  scopeId: string | null = null,
 ) {
   return {
+    scopeId,
     expiresAt,
     role: {
       name,

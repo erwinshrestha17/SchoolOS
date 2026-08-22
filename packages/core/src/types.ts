@@ -497,7 +497,7 @@ export type NotificationDeliveryOperationSummary = {
   channel: string;
   status: string;
   sourceType: string;
-  sourceId: string;
+  sourceId: string | null;
   recipientType: "user" | "guardian" | "student" | "audience";
   recipientLabel: string;
   queuedAt: string;
@@ -512,8 +512,8 @@ export type NotificationDeliveryFailureSummary = {
   status: string;
   channel: string;
   sourceType: string;
-  sourceId: string;
-  title: string;
+  sourceId: string | null;
+  title: string | null;
   lastFailureReason: string | null;
   retryCount: number;
   retryStatus: "retryable" | "pending" | "not_retryable";
@@ -2306,11 +2306,22 @@ export type StudentAttendanceMonthlyRegister = {
 
 // ─── Compiled from types/auth.ts ───
 
+export type SupportOverrideScope =
+  | 'SCHOOL_PROFILE'
+  | 'STUDENT_RECORDS'
+  | 'ATTENDANCE'
+  | 'ACADEMICS'
+  | 'HOMEWORK_TIMETABLE'
+  | 'NOTICES_DELIVERY';
+
 export type AuthSessionUser = {
   id: string;
   tenantId: string;
   originalTenantId?: string;
   isSupportOverride?: boolean;
+  supportOverrideScopes?: SupportOverrideScope[];
+  supportOverrideReadOnly?: boolean;
+  securityDomain?: 'SCHOOL' | 'PLATFORM';
   tenantSlug: string;
   email: string | null;
   authMethod: string;
@@ -4840,7 +4851,7 @@ export type PlatformTenantDetail = PlatformTenantSummary & {
     providerId: string;
     type: string;
     name: string;
-    status: "ready" | "degraded" | "not_configured" | "failed";
+    status: 'ready' | 'degraded' | 'not_configured' | 'failed';
     message: string;
   }>;
   supportOverrideHistory?: Array<{
@@ -4848,6 +4859,8 @@ export type PlatformTenantDetail = PlatformTenantSummary & {
     platformUserId: string;
     platformUserEmail: string | null;
     reason: string;
+    permissionScopes: SupportOverrideScope[];
+    readOnly: boolean;
     startsAt: string;
     expiresAt: string;
     isActive: boolean;
@@ -4859,20 +4872,17 @@ export type PlatformDashboardSummary = {
   totalTenants: number;
   activeTenants: number;
   suspendedTenants: number;
-  pendingOnboarding: number;
-  usage: {
+  pendingOnboarding?: number;
+  usage?: {
     totalActiveStudents: number;
     totalActiveStaff: number;
     totalUsers: number;
     totalStorageBytes: number;
   };
-  healthStatus: "ready" | "degraded";
-  failedJobsCount: number;
-  recentAudit: PlatformAuditLog[];
-  providerReadinessStatus: Record<
-    string,
-    "ready" | "degraded" | "not_configured" | "failed"
-  >;
+  healthStatus?: 'ready' | 'degraded';
+  failedJobsCount?: number;
+  recentAudit?: PlatformAuditLog[];
+  providerReadinessStatus?: Record<string, 'ready' | 'degraded' | 'not_configured' | 'failed'>;
   subscriptionSummary?: {
     activeSubscriptions: number;
     graceSubscriptions: number;
@@ -4896,7 +4906,7 @@ export type PlatformPlanSummary = {
   key: string;
   name: string;
   description?: string | null;
-  status: "ACTIVE" | "ARCHIVED";
+  status: 'ACTIVE' | 'ARCHIVED';
   priceNpr: string;
   billingCycle: string;
   features: Array<{ featureKey: string; enabled: boolean }>;
@@ -4909,7 +4919,7 @@ export type PlatformTenantSubscriptionSummary = {
   planId: string;
   planKey: string;
   planName: string;
-  status: "TRIAL" | "ACTIVE" | "GRACE" | "SUSPENDED" | "EXPIRED" | "CANCELLED";
+  status: 'TRIAL' | 'ACTIVE' | 'GRACE' | 'SUSPENDED' | 'EXPIRED' | 'CANCELLED';
   startsAt: string;
   endsAt?: string | null;
   renewsAt?: string | null;
@@ -4922,12 +4932,12 @@ export type PlatformEntitlementCheck = {
   tenantId: string;
   featureKey: string;
   reason:
-    | "allowed"
-    | "tenant_inactive"
-    | "no_subscription"
-    | "subscription_inactive"
-    | "feature_locked";
-  source?: "plan" | "override" | "none";
+    | 'allowed'
+    | 'tenant_inactive'
+    | 'no_subscription'
+    | 'subscription_inactive'
+    | 'feature_locked';
+  source?: 'plan' | 'override' | 'none';
   subscriptionStatus?: string | null;
   limit?: number | null;
   currentValue?: number | null;
@@ -4964,7 +4974,7 @@ export type PlatformSaaSInvoiceSummary = {
   currency: string;
   issueDate: string;
   dueDate: string;
-  status: "DRAFT" | "ISSUED" | "PAID" | "PARTIAL" | "OVERDUE" | "CANCELLED";
+  status: 'DRAFT' | 'ISSUED' | 'PAID' | 'PARTIAL' | 'OVERDUE' | 'CANCELLED';
   lines: Array<{
     id: string;
     lineType: string;
@@ -4982,7 +4992,7 @@ export type PlatformApiKeySummary = {
   prefix: string;
   keyPreview: string;
   scopes: string[];
-  status: "ACTIVE" | "REVOKED";
+  status: 'ACTIVE' | 'REVOKED';
   expiresAt?: string | null;
   lastUsedAt?: string | null;
   revokedAt?: string | null;
@@ -5010,8 +5020,8 @@ export type PlatformProviderConfigSummary = {
 
 export type PlatformProviderReadinessDetail = {
   provider: PlatformProviderConfigSummary;
-  status: "ready" | "degraded" | "not_configured" | "failed";
-  mode: "disabled" | "dry_run" | "sandbox_probe";
+  status: 'ready' | 'degraded' | 'not_configured' | 'failed';
+  mode: 'disabled' | 'dry_run' | 'sandbox_probe';
   message: string;
   missingKeys: string[];
   paidExternalCallSkipped: boolean;
@@ -5028,11 +5038,11 @@ export type PlatformProviderReadinessDetail = {
 
 export type PlatformWebhookEndpointSummary = {
   id: string;
-  ownerType: "PLATFORM" | "TENANT";
+  ownerType: 'PLATFORM' | 'TENANT';
   tenantId?: string | null;
   url: string;
   eventTypes: string[];
-  status: "ACTIVE" | "DISABLED";
+  status: 'ACTIVE' | 'DISABLED';
   createdAt: string;
   updatedAt: string;
 };
@@ -5043,7 +5053,7 @@ export type PlatformWebhookDeliverySummary = {
   tenantId?: string | null;
   eventType: string;
   payloadChecksum: string;
-  status: "PENDING" | "DELIVERED" | "FAILED" | "RETRYING";
+  status: 'PENDING' | 'DELIVERED' | 'FAILED' | 'RETRYING';
   retryCount: number;
   responseCode?: number | null;
   responseMessageSummary?: string | null;
@@ -5060,7 +5070,7 @@ export type PlatformQueueSummary = {
   failed: number;
   delayed: number;
   paused: boolean;
-  workerHealth: "healthy" | "degraded" | "unknown";
+  workerHealth: 'healthy' | 'degraded' | 'unknown';
   error?: string;
 };
 
@@ -5068,13 +5078,21 @@ export type PlatformFailedJobSummary = {
   id: string;
   queueName: string;
   name: string;
-  failedReason?: string | null;
+  failureCategory:
+    | 'provider'
+    | 'storage'
+    | 'tenant_state'
+    | 'entitlement'
+    | 'data_validation'
+    | 'transient'
+    | 'unknown';
+  failureSummary: string;
+  retryable: boolean;
+  recommendedAction: string;
   attemptsMade: number;
   timestamp?: number;
-  data: Record<string, unknown>;
   processedOn?: number | null;
   finishedOn?: number | null;
-  stacktrace?: string[];
   retryHistory?: Array<{
     id: string;
     userId?: string | null;
@@ -5087,30 +5105,38 @@ export type PlatformFailedJobSummary = {
 export type PlatformFailedJobGroup = {
   queueName: string;
   name: string;
-  failedReason: string;
+  failureCategory:
+    | 'provider'
+    | 'storage'
+    | 'tenant_state'
+    | 'entitlement'
+    | 'data_validation'
+    | 'transient'
+    | 'unknown';
+  failureSummary: string;
   count: number;
   firstFailedAt?: number;
   latestFailedAt?: number;
   maxAttemptsMade: number;
   sampleJobIds: string[];
-  affectedTenantIds: string[];
+  affectedTenantCount: number;
   diagnostic: {
     category:
-      | "provider"
-      | "storage"
-      | "tenant_state"
-      | "entitlement"
-      | "data_validation"
-      | "transient"
-      | "unknown";
+      | 'provider'
+      | 'storage'
+      | 'tenant_state'
+      | 'entitlement'
+      | 'data_validation'
+      | 'transient'
+      | 'unknown';
     retryable: boolean;
     recommendedAction: string;
   };
 };
 
 export type PlatformHealthSummary = {
-  status: "ready" | "degraded";
-  checks: Record<string, { status: "ok" | "error"; message?: string }>;
+  status: 'ready' | 'degraded';
+  checks: Record<string, { status: 'ok' | 'error'; message?: string }>;
   timestamp: string;
 };
 
@@ -5123,7 +5149,7 @@ export type PlatformOnboardingChecklist = {
     key: string;
     label: string;
     completed: boolean;
-    source: "computed" | "manual";
+    source: 'computed' | 'manual';
     href: string;
     required: boolean;
   }>;
@@ -5764,14 +5790,14 @@ export type StudentModuleSummary = {
   archivedStudents: number;
   mergedStudents: number;
   deletedStudents: number;
-  newAdmissions: number;
-  pendingApplications: number;
-  missingDocuments: number;
-  duplicateCandidates: number;
-  iemisReady: number;
-  iemisIssues: number;
-  qrActive: number;
-  qrMissing: number;
+  newAdmissions: number | null;
+  pendingApplications: number | null;
+  missingDocuments: number | null;
+  duplicateCandidates: number | null;
+  iemisReady: number | null;
+  iemisIssues: number | null;
+  qrActive: number | null;
+  qrMissing: number | null;
   byStatus: Array<{ status: StudentLifecycleStatus; count: number }>;
   filters: {
     academicYearId: string | null;

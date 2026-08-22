@@ -20,6 +20,7 @@ import { assertSchoolLogoFileAsset } from '../common/files/school-logo-file.poli
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { StorageService } from '../storage/storage.service';
 import { UploadTenantLogoDto } from './dto/upload-tenant-logo.dto';
+import { assertProtectedFileAccessAllowed } from '../common/security/support-override-file-access';
 
 const MAX_TENANT_LOGO_BYTES = 1024 * 1024;
 const UUID_PATTERN =
@@ -450,6 +451,7 @@ export class SettingsService {
     actor: AuthContext,
     action: 'preview' | 'download',
   ) {
+    assertProtectedFileAccessAllowed(actor);
     const setting = await this.prisma.tenantSetting.findUnique({
       where: { tenantId_key: { tenantId: actor.tenantId, key: 'school_logo' } },
     });

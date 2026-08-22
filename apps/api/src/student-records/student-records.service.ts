@@ -12,6 +12,7 @@ import { StorageService } from '../storage/storage.service';
 import { CreateSiblingGroupDto } from './dto/create-sibling-group.dto';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { UploadStudentDocumentDto } from './dto/upload-student-document.dto';
+import { assertProtectedFileAccessAllowed } from '../common/security/support-override-file-access';
 
 @Injectable()
 export class StudentRecordsService {
@@ -23,6 +24,7 @@ export class StudentRecordsService {
   ) {}
 
   async listDocuments(actor: AuthContext, studentId?: string) {
+    assertProtectedFileAccessAllowed(actor);
     const documents = await this.prisma.studentDocument.findMany({
       where: {
         tenantId: actor.tenantId,
@@ -71,6 +73,7 @@ export class StudentRecordsService {
   }
 
   async listDocumentHistory(actor: AuthContext, studentId?: string) {
+    assertProtectedFileAccessAllowed(actor);
     return this.prisma.studentDocumentHistory.findMany({
       where: {
         tenantId: actor.tenantId,
@@ -296,9 +299,25 @@ export class StudentRecordsService {
         members: {
           include: {
             student: {
-              include: {
-                class: true,
-                sectionRef: true,
+              select: {
+                id: true,
+                studentSystemId: true,
+                firstNameEn: true,
+                lastNameEn: true,
+                firstNameNp: true,
+                lastNameNp: true,
+                class: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+                sectionRef: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
               },
             },
           },
@@ -367,6 +386,7 @@ export class StudentRecordsService {
     assetId: string,
     action: 'preview' | 'download',
   ) {
+    assertProtectedFileAccessAllowed(actor);
     const asset = await this.prisma.fileAsset.findFirst({
       where: {
         id: assetId,
@@ -562,6 +582,7 @@ export class StudentRecordsService {
     actor: AuthContext,
     options: { days?: number; excludeExpired?: boolean },
   ) {
+    assertProtectedFileAccessAllowed(actor);
     const days = options.days ?? 30;
     const excludeExpired = options.excludeExpired ?? false;
     const now = new Date();

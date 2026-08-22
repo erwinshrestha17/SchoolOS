@@ -15,6 +15,9 @@ describe('TenantsService.register (platform-operator provisioning)', () => {
 
   function createMocks() {
     const prisma = {
+      runWithoutTenantScope: jest.fn(
+        async (_reason: string, callback: () => unknown) => callback(),
+      ),
       $transaction: jest.fn(async (callback: (tx: unknown) => unknown) =>
         callback(prisma),
       ),
@@ -81,12 +84,8 @@ describe('TenantsService.register (platform-operator provisioning)', () => {
       record: jest.fn().mockResolvedValue(undefined),
     };
 
-    // Fresh-context escape hatch: register must run provisioning through
-    // cls.run so the operator's platform tenantId is not injected into the
-    // new tenant's queries by the Prisma tenant-scope extension.
     const cls = {
       get: jest.fn().mockReturnValue('req-123'),
-      run: jest.fn((callback: () => unknown) => callback()),
     };
 
     const service = new TenantsService(
@@ -106,12 +105,15 @@ describe('TenantsService.register (platform-operator provisioning)', () => {
     adminPassword: 'RootAccess1!',
   };
 
-  it('provisions the tenant inside a fresh CLS context', async () => {
-    const { service, cls } = createMocks();
+  it('provisions the tenant inside an explicit cross-tenant scope', async () => {
+    const { service, prisma } = createMocks();
 
     await service.register(dto, platformActor);
 
-    expect(cls.run).toHaveBeenCalledTimes(1);
+    expect(prisma.runWithoutTenantScope).toHaveBeenCalledWith(
+      expect.stringContaining('provision'),
+      expect.any(Function),
+    );
   });
 
   it('creates the tenant and first admin with the config-owner role pair', async () => {
@@ -127,35 +129,57 @@ describe('TenantsService.register (platform-operator provisioning)', () => {
         plan: 'standard',
       },
     });
-    expect(usersService.createManagedUser).toHaveBeenCalledWith({
-      tenantId: 'tenant-new',
-      email: dto.adminEmail.toLowerCase(),
-      password: dto.adminPassword,
-      roleIds: ['role-admin', 'role-school_config_owner'],
-      assignedById: null,
-    });
+    expect(usersService.createManagedUser).toHaveBeenCalledWith(
+      {
+        tenantId: 'tenant-new',
+        email: dto.adminEmail.toLowerCase(),
+        password: dto.adminPassword,
+        roleIds: ['role-admin', 'role-school_config_owner'],
+        assignedById: null,
+      },
+      prisma,
+    );
     expect(result.tenant.slug).toBe('green-valley');
     expect(result.admin.email).toBe('admin@greenvalley.com');
   });
 
-  it('audits provisioning against the acting platform operator', async () => {
-    const { service, auditService } = createMocks();
+  it('never provisions reserved Platform roles into a school tenant', async () => {
+    const { service, prisma } = createMocks();
 
     await service.register(dto, platformActor);
 
-    expect(auditService.record).toHaveBeenCalledWith({
-      action: 'register',
-      resource: 'tenant',
-      tenantId: 'tenant-new',
-      userId: 'platform-operator-1',
-      resourceId: 'tenant-new',
-      requestId: 'req-123',
-      after: {
-        slug: 'green-valley',
-        adminEmail: 'admin@greenvalley.com',
-        adminUserId: 'user-admin-new',
+    const provisionedRoleNames = prisma.role.upsert.mock.calls.map(
+      ([call]: [{ create: { name: string } }]) => call.create.name,
+    );
+    expect(provisionedRoleNames.length).toBeGreaterThan(0);
+    expect(
+      provisionedRoleNames.some((name: string) =>
+        name.trim().toLowerCase().startsWith('platform_'),
+      ),
+    ).toBe(false);
+  });
+
+  it('audits provisioning against the acting platform operator', async () => {
+    const { service, prisma, auditService } = createMocks();
+
+    await service.register(dto, platformActor);
+
+    expect(auditService.record).toHaveBeenCalledWith(
+      {
+        action: 'register',
+        resource: 'tenant',
+        tenantId: 'tenant-new',
+        userId: 'platform-operator-1',
+        resourceId: 'tenant-new',
+        requestId: 'req-123',
+        after: {
+          slug: 'green-valley',
+          adminEmail: 'admin@greenvalley.com',
+          adminUserId: 'user-admin-new',
+        },
       },
-    });
+      prisma,
+    );
   });
 
   it('rejects duplicate slugs with a conflict', async () => {

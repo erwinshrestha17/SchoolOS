@@ -1,4 +1,8 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   AuthMethod,
   EnrollmentStatus,
@@ -21,6 +25,40 @@ const actor: AuthContext = {
 };
 
 describe('M1AdmissionsHardeningService', () => {
+  it('denies admission draft recovery during support override before reading autosave PII', async () => {
+    const prisma = buildPrisma();
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.recoverAdmissionDrafts(
+        {},
+        {
+          ...actor,
+          isSupportOverride: true,
+        },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.admissionApplication.findMany).not.toHaveBeenCalled();
+  });
+
+  it('denies import review payloads during support override before reading raw rows', async () => {
+    const prisma = buildPrisma();
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.listImportReviewQueue(
+        {},
+        {
+          ...actor,
+          isSupportOverride: true,
+        },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.admissionImportRow.findMany).not.toHaveBeenCalled();
+  });
+
   it('returns ownership audit data only through tenant and student scoped lookups without QR token hashes', async () => {
     const prisma = buildPrisma();
     const { service, auditService } = buildService(prisma);

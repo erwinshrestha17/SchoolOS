@@ -72,6 +72,12 @@ export class M10HardeningService {
     actor: AuthContext,
     query: CommunicationPageQueryDto = { page: 1, limit: 25 },
   ) {
+    if (actor.isSupportOverride) {
+      throw new ForbiddenException(
+        'Legacy notice routes are unavailable during support override',
+      );
+    }
+
     const page = Math.max(1, query.page ?? 1);
     const limit = Math.min(100, Math.max(1, query.limit ?? 25));
     const [rows, totals] = await Promise.all([
@@ -120,6 +126,12 @@ export class M10HardeningService {
   }
 
   async getNoticeDetailWithReadStatus(noticeId: string, actor: AuthContext) {
+    if (actor.isSupportOverride) {
+      throw new ForbiddenException(
+        'Legacy notice routes are unavailable during support override',
+      );
+    }
+
     const rows = await this.prisma.$queryRaw<NoticeRow[]>(Prisma.sql`
       SELECT
         n."id",
@@ -335,6 +347,12 @@ export class M10HardeningService {
     query: CommunicationAuditQueryDto,
     actor: AuthContext,
   ) {
+    if (actor.isSupportOverride) {
+      throw new ForbiddenException(
+        'Communication audit records are unavailable during support override',
+      );
+    }
+
     const page = Math.max(1, query.page ?? 1);
     const limit = Math.min(100, Math.max(1, query.limit ?? 25));
     const resource = query.resource?.trim();

@@ -89,6 +89,8 @@ const detail: PlatformTenantDetail = {
       platformUserId: 'operator-1',
       platformUserEmail: 'operator@example.test',
       reason: 'Investigating attendance incident',
+      permissionScopes: ['ATTENDANCE'],
+      readOnly: true,
       startsAt: '2026-08-21T00:00:00.000Z',
       expiresAt: '2026-08-21T00:30:00.000Z',
       isActive: true,

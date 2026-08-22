@@ -1,7 +1,6 @@
 "use client";
 
-import type { PermissionKey } from "@schoolos/core";
-import { hasEffectivePermission } from "@schoolos/core";
+import type { PermissionKey, SupportOverrideScope } from "@schoolos/core";
 import { ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -17,6 +16,11 @@ import {
   settingsDefinitionMatchesPath,
 } from "../../components/settings/settings-navigation.config";
 import { getRequiredModuleForHref } from "../../lib/nav-module-map";
+import {
+  hasAllPermissions,
+  hasAnyPermission,
+  type BrowserSession,
+} from "../../lib/session";
 
 type RouteGate = {
   prefix: string;
@@ -26,6 +30,32 @@ type RouteGate = {
 };
 
 const dashboardRouteGates: RouteGate[] = [
+  {
+    prefix: "/dashboard/attendance/mark",
+    label: "Attendance marking",
+    permissions: ["attendance:mark"],
+  },
+  {
+    prefix: "/dashboard/attendance/offline-drafts",
+    label: "Attendance drafts",
+    permissions: ["attendance:mark"],
+  },
+  {
+    prefix: "/dashboard/homework/new",
+    label: "Homework creation",
+    permissions: ["homework:create"],
+  },
+  {
+    prefix: "/dashboard/homework/review",
+    label: "Homework review",
+    permissions: ["homework:review"],
+  },
+  {
+    prefix: "/dashboard/admissions/new",
+    label: "New admission",
+    permissions: ["enrollments:create", "students:create", "guardians:create"],
+    permissionMode: "all",
+  },
   {
     prefix: "/dashboard/students",
     label: "Students",
@@ -49,7 +79,7 @@ const dashboardRouteGates: RouteGate[] = [
   {
     prefix: "/dashboard/homework",
     label: "Homework",
-    permissions: ["homework:read"],
+    permissions: ["homework:read_published"],
   },
   {
     prefix: "/dashboard/learning",
@@ -63,9 +93,39 @@ const dashboardRouteGates: RouteGate[] = [
     ],
   },
   {
+    prefix: "/dashboard/timetable/builder",
+    label: "Timetable builder",
+    permissions: ["timetable:create", "timetable:update"],
+  },
+  {
+    prefix: "/dashboard/timetable/conflicts",
+    label: "Timetable conflict review",
+    permissions: ["timetable:read"],
+  },
+  {
+    prefix: "/dashboard/timetable/substitutions",
+    label: "Timetable substitutions",
+    permissions: ["timetable:read"],
+  },
+  {
+    prefix: "/dashboard/timetable/replacements",
+    label: "Teacher replacements",
+    permissions: ["timetable:read"],
+  },
+  {
+    prefix: "/dashboard/timetable/versions",
+    label: "Timetable versions",
+    permissions: ["timetable:read"],
+  },
+  {
+    prefix: "/dashboard/timetable/workload",
+    label: "Timetable workload",
+    permissions: ["timetable:read"],
+  },
+  {
     prefix: "/dashboard/timetable",
     label: "Timetable",
-    permissions: ["timetable:read"],
+    permissions: ["timetable:read_published"],
   },
   {
     prefix: "/dashboard/fees",
@@ -136,6 +196,21 @@ const dashboardRouteGates: RouteGate[] = [
       "notifications:view_delivery_diagnostics",
       "notifications:retry_deliveries",
     ],
+  },
+  {
+    prefix: "/dashboard/notices/new",
+    label: "New notice",
+    permissions: ["notices:create"],
+  },
+  {
+    prefix: "/dashboard/notices/scheduled",
+    label: "Scheduled notices",
+    permissions: ["notices:schedule", "notices:read_reports"],
+  },
+  {
+    prefix: "/dashboard/notices/approvals",
+    label: "Notice approvals",
+    permissions: ["notices:approve"],
   },
   {
     prefix: "/dashboard/notices",
@@ -256,7 +331,11 @@ const settingsRouteGates: RouteGate[] = [
   {
     prefix: "/dashboard/settings/school/identity",
     label: "School identity settings",
-    permissions: ["settings:identity:manage", "settings:manage"],
+    permissions: [
+      "settings:read_public",
+      "settings:identity:manage",
+      "settings:manage",
+    ],
   },
   {
     prefix: "/dashboard/settings/school/branding",
@@ -334,6 +413,21 @@ const settingsRouteGates: RouteGate[] = [
 ];
 
 function getRouteGateForHref(href: string): RouteGate | null {
+  if (/^\/dashboard\/notices\/[^/]+\/edit$/.test(href)) {
+    return {
+      prefix: href,
+      label: "Notice editing",
+      permissions: ["notices:edit"],
+    };
+  }
+  if (/^\/dashboard\/notices\/[^/]+\/review$/.test(href)) {
+    return {
+      prefix: href,
+      label: "Notice review and publication",
+      permissions: ["notices:publish", "notices:schedule"],
+    };
+  }
+
   // Personal settings are available to every authenticated school user.
   // Each purpose-limited API (password, profile, notification preferences)
   // remains the backend authorization authority for its own data.
@@ -364,8 +458,73 @@ function routeMatchesPrefix(href: string, prefix: string) {
   return href === prefix || href.startsWith(`${prefix}/`);
 }
 
+function isResourceDetailPath(
+  pathname: string,
+  collectionPath: string,
+  reservedSegments: readonly string[],
+) {
+  if (!pathname.startsWith(`${collectionPath}/`)) return false;
+  const remainder = pathname.slice(collectionPath.length + 1);
+  return (
+    remainder.length > 0 &&
+    !remainder.includes("/") &&
+    !reservedSegments.includes(remainder)
+  );
+}
+
+/**
+ * Support sessions are intentionally narrower than ordinary permission-based
+ * school navigation. Each approved scope maps to a reviewed read-only route;
+ * arbitrary dashboard URLs fail closed before their page component can issue
+ * a request.
+ */
+function supportOverrideRouteAllowed(
+  pathname: string,
+  scopes: readonly SupportOverrideScope[],
+) {
+  return scopes.some((scope) => {
+    switch (scope) {
+      case "SCHOOL_PROFILE":
+        return pathname === "/dashboard/settings/school/identity";
+      case "STUDENT_RECORDS":
+        return (
+          pathname === "/dashboard/students" ||
+          isResourceDetailPath(pathname, "/dashboard/students", ["new"])
+        );
+      case "ATTENDANCE":
+        return pathname === "/dashboard/attendance";
+      case "ACADEMICS":
+        return pathname === "/dashboard/academics";
+      case "HOMEWORK_TIMETABLE":
+        return (
+          pathname === "/dashboard/homework" ||
+          isResourceDetailPath(pathname, "/dashboard/homework", [
+            "new",
+            "review",
+          ]) ||
+          pathname === "/dashboard/timetable"
+        );
+      case "NOTICES_DELIVERY":
+        return (
+          pathname === "/dashboard/notices" ||
+          pathname === "/dashboard/notifications/deliveries" ||
+          pathname === "/dashboard/notifications/failures" ||
+          pathname === "/dashboard/notices/deliveries" ||
+          pathname === "/dashboard/notices/failures" ||
+          isResourceDetailPath(pathname, "/dashboard/notices", [
+            "new",
+            "scheduled",
+            "approvals",
+            "deliveries",
+            "failures",
+          ])
+        );
+    }
+  });
+}
+
 function hasRoutePermission(
-  grantedPermissions: readonly PermissionKey[],
+  session: BrowserSession | null,
   routeGate: RouteGate,
 ) {
   if (routeGate.permissions.length === 0) {
@@ -373,12 +532,8 @@ function hasRoutePermission(
   }
 
   return routeGate.permissionMode === "all"
-    ? routeGate.permissions.every((permission) =>
-        hasEffectivePermission(grantedPermissions, permission),
-      )
-    : routeGate.permissions.some((permission) =>
-        hasEffectivePermission(grantedPermissions, permission),
-      );
+    ? hasAllPermissions(session, routeGate.permissions)
+    : hasAnyPermission(session, routeGate.permissions);
 }
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
@@ -578,6 +733,39 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   // Enforce frontend entitlement gating on direct URL access
+  const isPlatformUser = session.user.securityDomain === "PLATFORM";
+  if (isPlatformUser && !session.user.isSupportOverride) {
+    return (
+      <DashboardShell>
+        <PermissionDenied
+          title="Access restricted"
+          description="Platform administrator accounts cannot access school operations directly. Please use the Support Override console to access a school workspace."
+          resource="School Operations"
+          action="support_override"
+        />
+      </DashboardShell>
+    );
+  }
+
+  if (
+    session.user.isSupportOverride &&
+    !supportOverrideRouteAllowed(
+      pathname || "",
+      session.user.supportOverrideScopes ?? [],
+    )
+  ) {
+    return (
+      <DashboardShell>
+        <PermissionDenied
+          title="Outside the approved support scope"
+          description="This support session can open only the reviewed read-only workspaces selected when the override was created. Exit support access and start a new audited override if a different scope is required."
+          resource="School support workspace"
+          action="approved support scope"
+        />
+      </DashboardShell>
+    );
+  }
+
   const requiredModule = getRequiredModuleForHref(pathname || "");
   if (requiredModule && entitlementsLoading) {
     return (
@@ -607,30 +795,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     );
   }
 
-  const PLATFORM_ROLES = [
-    "platform_super_admin",
-    "platform_support",
-    "platform_billing_admin",
-  ];
-  const isPlatformUser = session.user.roles.some((role) =>
-    PLATFORM_ROLES.includes(role),
-  );
-
-  if (isPlatformUser && !session.user.isSupportOverride) {
-    return (
-      <DashboardShell>
-        <PermissionDenied
-          title="Access restricted"
-          description="Platform administrator accounts cannot access school operations directly. Please use the Support Override console to access a school workspace."
-          resource="School Operations"
-          action="support_override"
-        />
-      </DashboardShell>
-    );
-  }
-
   const routeGate = getRouteGateForHref(pathname || "");
-  if (routeGate && !hasRoutePermission(session.user.permissions, routeGate)) {
+  if (routeGate && !hasRoutePermission(session, routeGate)) {
     return (
       <DashboardShell>
         <PermissionDenied

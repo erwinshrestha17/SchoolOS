@@ -1,4 +1,4 @@
-import { AuthMethod } from '@prisma/client';
+import { AuthMethod, SecurityDomain } from '@prisma/client';
 import { ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { RolesPermissionsGuard } from './roles-permissions.guard';
@@ -21,6 +21,8 @@ describe('RolesPermissionsGuard', () => {
         tenantSlug: 'school-a',
         email: 'admin@school.com',
         authMethod: AuthMethod.PASSWORD,
+        securityDomain: SecurityDomain.SCHOOL,
+        isSupportOverride: false,
         roles: [],
         permissions: [],
       },
@@ -52,6 +54,108 @@ describe('RolesPermissionsGuard', () => {
       .mockReturnValueOnce(['roles:assign']);
     request.auth.roles = ['teacher'];
     request.auth.permissions = ['roles:read'];
+
+    await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
+  it('denies ambient platform identities on school routes', async () => {
+    (reflector.getAllAndOverride as jest.Mock)
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce(['students:read']);
+    request.auth.securityDomain = SecurityDomain.PLATFORM;
+    request.auth.isSupportOverride = false;
+    request.auth.roles = ['platform_super_admin'];
+    request.auth.permissions = ['students:read'];
+
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      new ForbiddenException(
+        'Platform identities require an active support override on school routes',
+      ),
+    );
+  });
+
+  it('allows a scoped support override only through an explicit matching permission', async () => {
+    (reflector.getAllAndOverride as jest.Mock)
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce(['students:read']);
+    request.auth.securityDomain = SecurityDomain.PLATFORM;
+    request.auth.isSupportOverride = true;
+    request.auth.supportOverrideReadOnly = true;
+    request.auth.supportOverrideScopes = ['STUDENT_RECORDS'];
+    request.auth.roles = [];
+    request.auth.permissions = ['students:read'];
+
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+  });
+
+  it('does not expand permission aliases for a support override', async () => {
+    (reflector.getAllAndOverride as jest.Mock)
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce(['advanced:approvals:read']);
+    request.auth.securityDomain = SecurityDomain.PLATFORM;
+    request.auth.isSupportOverride = true;
+    request.auth.supportOverrideReadOnly = true;
+    request.auth.supportOverrideScopes = ['SCHOOL_PROFILE'];
+    request.auth.roles = [];
+    request.auth.permissions = ['settings:read'];
+
+    await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
+  it('retains permission alias semantics for ordinary school sessions', async () => {
+    (reflector.getAllAndOverride as jest.Mock)
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce(['advanced:approvals:read']);
+    request.auth.permissions = ['settings:read'];
+
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+  });
+
+  it('does not let a support override satisfy a role-gated school route', async () => {
+    (reflector.getAllAndOverride as jest.Mock)
+      .mockReturnValueOnce(['admin'])
+      .mockReturnValueOnce([]);
+    request.auth.securityDomain = SecurityDomain.PLATFORM;
+    request.auth.isSupportOverride = true;
+    request.auth.supportOverrideReadOnly = true;
+    request.auth.supportOverrideScopes = ['SCHOOL_PROFILE'];
+    request.auth.roles = ['admin'];
+
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      new ForbiddenException(
+        'Support override requires an explicitly permissioned read route',
+      ),
+    );
+  });
+
+  it('denies a support override on school routes without explicit authorization metadata', async () => {
+    (reflector.getAllAndOverride as jest.Mock)
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce([]);
+    request.auth.securityDomain = SecurityDomain.PLATFORM;
+    request.auth.isSupportOverride = true;
+    request.auth.supportOverrideReadOnly = true;
+    request.auth.supportOverrideScopes = ['SCHOOL_PROFILE'];
+    request.auth.roles = [];
+    request.auth.permissions = ['settings:read'];
+
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      new ForbiddenException(
+        'Support override requires an explicitly permissioned read route',
+      ),
+    );
+  });
+
+  it('does not give a platform_super_admin role a school permission bypass', async () => {
+    (reflector.getAllAndOverride as jest.Mock)
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce(['students:read']);
+    request.auth.roles = ['platform_super_admin'];
+    request.auth.permissions = [];
 
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
       ForbiddenException,

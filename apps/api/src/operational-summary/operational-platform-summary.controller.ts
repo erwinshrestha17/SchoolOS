@@ -1,6 +1,8 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Permissions } from '../auth/decorators/permissions.decorator';
+import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
+import type { AuthContext } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PlatformGuard } from '../auth/guards/platform.guard';
 import { PlatformService } from '../platform/platform.service';
@@ -21,7 +23,7 @@ export class OperationalPlatformSummaryController {
     description:
       'Uses the existing platform dashboard service. Platform billing is kept separate from school fee collection.',
   })
-  getSummary() {
-    return this.platformService.getDashboardSummary();
+  getSummary(@CurrentAuth() auth: AuthContext) {
+    return this.platformService.getDashboardSummary(auth);
   }
 }

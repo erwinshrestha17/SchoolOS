@@ -25,6 +25,7 @@ import {
   getStudentOwnId,
   isParentOnly,
 } from '../common/security/parent-scope';
+import { assertProtectedFileAccessAllowed } from '../common/security/support-override-file-access';
 import { MAX_SIGNED_URL_TTL_SECONDS } from '../storage/storage.types';
 import { buildObjectKey } from '../storage/storage.utils';
 import { TeacherCapability } from '../teacher-scope/teacher-capability';
@@ -419,6 +420,7 @@ export class FileRegistryService {
     asset: Awaited<ReturnType<FileRegistryService['getFileMetadata']>>,
     auth: AuthContext,
   ) {
+    assertProtectedFileAccessAllowed(auth);
     await this.plansService.assertTenantActive(auth.tenantId);
     if (asset.tenantId !== auth.tenantId) {
       throw new ForbiddenException('Access denied');

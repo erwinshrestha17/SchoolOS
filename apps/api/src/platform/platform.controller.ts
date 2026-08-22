@@ -20,6 +20,8 @@ import { PlatformGuard } from '../auth/guards/platform.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../auth/auth-request.interface';
 import { Permissions } from '../auth/decorators/permissions.decorator';
+import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
+import type { AuthContext } from '../auth/auth.types';
 import type {
   PaginatedResponse,
   PlatformTenantSummary,
@@ -67,8 +69,10 @@ export class PlatformController {
 
   @Get('dashboard')
   @Permissions('platform:dashboard:read')
-  async getDashboard(): Promise<PlatformDashboardSummary> {
-    return this.platformService.getDashboardSummary();
+  async getDashboard(
+    @CurrentAuth() auth: AuthContext,
+  ): Promise<PlatformDashboardSummary> {
+    return this.platformService.getDashboardSummary(auth);
   }
 
   @Get('tenants')
@@ -566,6 +570,7 @@ export class PlatformController {
       body.tenantId,
       this.requireUser(req),
       body.reason,
+      body.scopes,
       body.durationMinutes,
     );
   }

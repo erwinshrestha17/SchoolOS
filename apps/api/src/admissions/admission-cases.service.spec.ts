@@ -206,6 +206,28 @@ function buildService(prisma: any, dependencies: Record<string, any> = {}) {
 }
 
 describe('AdmissionCasesService', () => {
+  it('denies admission case, assessment, and document-request reads during support override', async () => {
+    const prisma = buildPrisma();
+    const service = buildService(prisma);
+    const supportActor = { ...actor, isSupportOverride: true };
+    const operations = [
+      () => service.getCase('case-a', supportActor),
+      () => service.evaluateCase('case-a', supportActor),
+      () => service.listAssessmentSessions({}, supportActor),
+      () => service.listAssessmentCandidates({}, supportActor),
+      () => service.listDocumentRequests({}, supportActor),
+    ];
+
+    for (const operation of operations) {
+      await expect(operation()).rejects.toThrow(
+        'Admission case and assessment records are unavailable during support override',
+      );
+    }
+    expect(prisma.admissionApplication.findFirst).not.toHaveBeenCalled();
+    expect(prisma.admissionApplication.findMany).not.toHaveBeenCalled();
+    expect(prisma.admissionAssessmentSession.findMany).not.toHaveBeenCalled();
+  });
+
   it('creates the M1 student, guardian, enrollment, lifecycle, and audit atomically without finance writes', async () => {
     const prisma = buildPrisma();
     const service = buildService(prisma);

@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import type { AuthContext } from '../auth/auth.types';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
+import { AllowSupportOverrideRead } from '../auth/decorators/allow-support-override-read.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
@@ -52,7 +53,8 @@ export class HomeworkController {
   // --- Assignments ---
 
   @Get()
-  @Permissions('homework:read')
+  @Permissions('homework:read_published')
+  @AllowSupportOverrideRead('HOMEWORK_TIMETABLE')
   @ApiQuery({
     name: 'assignedDate',
     required: false,
@@ -105,7 +107,8 @@ export class HomeworkController {
   }
 
   @Get(':id')
-  @Permissions('homework:read')
+  @Permissions('homework:read_published')
+  @AllowSupportOverrideRead('HOMEWORK_TIMETABLE')
   getHomework(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
     return this.homeworkService.getAssignment(auth, id);
   }

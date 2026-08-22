@@ -38,6 +38,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { SecurityDomain } from '@prisma/client';
 
 describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
   let app: INestApplication;
@@ -97,6 +98,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
       name: 'Platform',
       isActive: true,
       plan: 'platform',
+      securityDomain: SecurityDomain.PLATFORM,
     });
 
     freeTenantId = 'free-school-id';
@@ -106,6 +108,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         name: 'Free School',
         slug: 'free-school',
         plan: 'free',
+        securityDomain: SecurityDomain.SCHOOL,
       },
     });
 
@@ -116,6 +119,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         name: 'Premium School',
         slug: 'premium-school',
         plan: 'premium',
+        securityDomain: SecurityDomain.SCHOOL,
       },
     });
 
@@ -426,6 +430,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
           getRequest: () => ({
             auth: {
               tenantId: 'platform',
+              securityDomain: SecurityDomain.PLATFORM,
               roles: ['platform_support'],
               permissions: ['platform:tenants:read'],
             },
@@ -445,8 +450,9 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
           getRequest: () => ({
             auth: {
               tenantId: 'platform',
+              securityDomain: SecurityDomain.PLATFORM,
               roles: ['platform_super_admin'],
-              permissions: [],
+              permissions: ['platform:tenants:status'],
             },
           }),
         }),
@@ -470,7 +476,12 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
 
     it('platform support override requires explicit reason', async () => {
       await expect(
-        platformService.enterSupportOverride(premiumTenantId, 'admin-user', ''),
+        platformService.enterSupportOverride(
+          premiumTenantId,
+          'admin-user',
+          '',
+          ['ATTENDANCE'],
+        ),
       ).rejects.toThrow(BadRequestException);
 
       await expect(
@@ -478,6 +489,69 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
           premiumTenantId,
           'admin-user',
           'shrt',
+          ['ATTENDANCE'],
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('platform support override requires an approved scope and bounded expiry', async () => {
+      await expect(
+        platformService.enterSupportOverride(
+          premiumTenantId,
+          'admin-user',
+          'Investigating attendance issue',
+          [],
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        platformService.enterSupportOverride(
+          premiumTenantId,
+          'admin-user',
+          'Investigating attendance issue',
+          ['NOT_APPROVED' as never],
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        platformService.enterSupportOverride(
+          premiumTenantId,
+          'admin-user',
+          'Investigating attendance issue',
+          ['ATTENDANCE'],
+          61,
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects Platform-domain and inactive support targets', async () => {
+      await expect(
+        platformService.enterSupportOverride(
+          'platform',
+          'admin-user',
+          'Attempting an invalid Platform target',
+          ['ATTENDANCE'],
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      const inactiveTenantId = 'inactive-support-target';
+      await prisma.tenant.create({
+        data: {
+          id: inactiveTenantId,
+          name: 'Inactive Support Target',
+          slug: 'inactive-support-target',
+          plan: 'free',
+          isActive: false,
+          securityDomain: SecurityDomain.SCHOOL,
+        },
+      });
+
+      await expect(
+        platformService.enterSupportOverride(
+          inactiveTenantId,
+          'admin-user',
+          'Attempting an inactive school target',
+          ['ATTENDANCE'],
         ),
       ).rejects.toThrow(BadRequestException);
     });
@@ -487,8 +561,12 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         premiumTenantId,
         'admin-user',
         'Investigating attendance issue',
+        ['ATTENDANCE'],
       );
       expect(res.success).toBe(true);
+      expect(res.scopes).toEqual(['ATTENDANCE']);
+      expect(res.readOnly).toBe(true);
+      expect(res.overrideId).toEqual(expect.any(String));
 
       const latestLog =
         prisma.__state.auditLogs[prisma.__state.auditLogs.length - 1];
@@ -497,12 +575,35 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
       expect(latestLog.userId).toBe('admin-user');
     });
 
+    it('keeps only the newest support override active per operator', async () => {
+      await platformService.enterSupportOverride(
+        freeTenantId,
+        'admin-user',
+        'Investigating the first school issue',
+        ['SCHOOL_PROFILE'],
+      );
+      await platformService.enterSupportOverride(
+        premiumTenantId,
+        'admin-user',
+        'Investigating the second school issue',
+        ['ATTENDANCE'],
+      );
+
+      const activeOverrides = await prisma.supportOverride.findMany({
+        where: { platformUserId: 'admin-user', isActive: true },
+      });
+      expect(activeOverrides).toHaveLength(1);
+      expect(activeOverrides[0].tenantId).toBe(premiumTenantId);
+      expect(activeOverrides[0].permissionScopes).toEqual(['ATTENDANCE']);
+    });
+
     it('tenant override rejects invalid tenantId', async () => {
       await expect(
         platformService.enterSupportOverride(
           'invalid-tenant-id',
           'admin-user',
           'Investigating bug',
+          ['ATTENDANCE'],
         ),
       ).rejects.toThrow(NotFoundException);
     });
@@ -1061,7 +1162,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
       expect(queueNames).toContain('canteen-alerts');
     });
 
-    it('failed job inspection returns redacted/safe sanitized data', async () => {
+    it('failed job inspection never returns payloads or raw diagnostics', async () => {
       const queuesService = app.get(PlatformQueuesService);
 
       const notificationsQueue = app.get(getQueueToken('notifications'));
@@ -1102,22 +1203,37 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
       const firstJob = failedList.find((j) => j.id === 'failed-job-1');
 
       expect(firstJob).toBeDefined();
-      const sanitizedData = firstJob?.data as any;
-      expect(sanitizedData.apiKey).toBe('********');
-      expect(sanitizedData.secret).toBe('********');
-      expect(sanitizedData.cookie).toBe('********');
-      expect(sanitizedData.phone).toBe('********');
-      expect(sanitizedData.email).toBe('********');
+      expect(firstJob).toEqual(
+        expect.objectContaining({
+          failureCategory: 'provider',
+          failureSummary: 'External provider delivery failed.',
+        }),
+      );
+      expect(firstJob).not.toHaveProperty('data');
+      expect(firstJob).not.toHaveProperty('failedReason');
+      expect(firstJob).not.toHaveProperty('stacktrace');
 
       const jobDetail = await queuesService.getJobDetail(
         'notifications',
         'failed-job-1',
       );
-      const strictSanitized = jobDetail.data as any;
-      expect(strictSanitized.nested.auth_token).toBe('********');
-      expect(strictSanitized.nested.normalField).toBe('hello');
-      expect(strictSanitized.hugeArray).toHaveLength(25);
-      expect(strictSanitized.longText).toMatch(/…$/);
+      const serialized = JSON.stringify({ failedList, jobDetail });
+      for (const sensitive of [
+        'api-key-xyz-12345',
+        'shh-very-secret',
+        'session=123',
+        '9800000000',
+        'test@example.com',
+        'token-abc',
+        'hello',
+        'Error: unauthorized',
+        'API key rejected',
+      ]) {
+        expect(serialized).not.toContain(sensitive);
+      }
+      expect(jobDetail).not.toHaveProperty('data');
+      expect(jobDetail).not.toHaveProperty('failedReason');
+      expect(jobDetail).not.toHaveProperty('stacktrace');
     });
 
     it('retry action is permission-guarded and audited', async () => {
@@ -1422,13 +1538,65 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         },
       });
 
-      const summary = await platformService.getDashboardSummary();
+      const summary = await platformService.getDashboardSummary({
+        userId: 'platform-admin',
+        tenantId: 'platform',
+        tenantSlug: 'platform',
+        email: 'admin@schoolos.test',
+        authMethod: 'PASSWORD' as any,
+        roles: ['platform_super_admin'],
+        permissions: [
+          'platform:dashboard:read',
+          'platform:usage:read',
+          'platform:health:read',
+          'platform:queues:read',
+          'platform:onboarding:read',
+          'platform:audit:read',
+          'platform:subscriptions:read',
+          'platform:billing:read',
+          'platform:providers:read',
+        ],
+      });
       expect(summary.providerReadinessStatus).toBeDefined();
-      expect(summary.providerReadinessStatus.sms).toBe('ready');
+      expect(summary.providerReadinessStatus?.sms).toBe('ready');
       expect(summary.subscriptionSummary?.activeSubscriptions).toBe(1);
       expect(summary.invoiceSummary?.totalUnpaidAmount).toBe(1000);
       expect(summary.usageWarnings).toHaveLength(1);
       expect(summary.usageWarnings?.[0].tenantId).toBe(premiumTenantId);
+    });
+
+    it('projects the platform dashboard by exact operator permissions', async () => {
+      prisma.saaSInvoice.findMany.mockClear();
+      prisma.tenantSubscription.count.mockClear();
+      prisma.tenantSubscription.findMany.mockClear();
+      prisma.providerConfig.findFirst.mockClear();
+
+      const summary = await platformService.getDashboardSummary({
+        userId: 'platform-support',
+        tenantId: 'platform',
+        tenantSlug: 'platform',
+        email: 'support@schoolos.test',
+        authMethod: 'PASSWORD' as any,
+        roles: ['platform_support'],
+        permissions: [
+          'platform:dashboard:read',
+          'platform:tenants:read',
+          'platform:usage:read',
+          'platform:audit:read',
+          'platform:queues:read',
+          'platform:health:read',
+          'platform:onboarding:read',
+        ],
+      });
+
+      expect(summary.subscriptionSummary).toBeUndefined();
+      expect(summary.invoiceSummary).toBeUndefined();
+      expect(summary.providerReadinessStatus).toBeUndefined();
+      expect(summary.usageWarnings).toBeUndefined();
+      expect(prisma.saaSInvoice.findMany).not.toHaveBeenCalled();
+      expect(prisma.tenantSubscription.count).not.toHaveBeenCalled();
+      expect(prisma.tenantSubscription.findMany).not.toHaveBeenCalled();
+      expect(prisma.providerConfig.findFirst).not.toHaveBeenCalled();
     });
 
     it('getTenantDetail returns overrides, enabled features, usage counters, support logs, and provider readiness', async () => {
@@ -1456,6 +1624,8 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
           reason: 'Testing support logs',
           startsAt: new Date(),
           expiresAt: new Date(Date.now() + 60000),
+          permissionScopes: ['ATTENDANCE'],
+          readOnly: true,
           isActive: true,
         },
       });

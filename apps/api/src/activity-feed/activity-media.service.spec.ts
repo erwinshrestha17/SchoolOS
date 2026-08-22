@@ -1,3 +1,4 @@
+import { ForbiddenException } from '@nestjs/common';
 import { AuthMethod } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { ActivityMediaService } from './activity-media.service';
@@ -125,6 +126,33 @@ describe('ActivityMediaService protected thumbnails', () => {
       audit,
       teacherScope as never,
     );
+  });
+
+  it('denies activity media bytes during a support override before attachment lookup', async () => {
+    await expect(
+      service.getAttachmentMedia(
+        { ...parent, isSupportOverride: true },
+        'attachment-1',
+        'preview',
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.activityAttachment.findFirst).not.toHaveBeenCalled();
+    expect(storage.getObjectBuffer).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
+  });
+
+  it('denies activity media access URLs during a support override before attachment lookup', async () => {
+    await expect(
+      service.getAttachmentAccessUrl(
+        { ...parent, isSupportOverride: true },
+        'attachment-1',
+        'preview',
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.activityAttachment.findFirst).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
   });
 
   it('serves the registered thumbnail variant to a linked consented parent', async () => {

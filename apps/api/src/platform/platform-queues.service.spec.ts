@@ -67,7 +67,7 @@ describe('PlatformQueuesService', () => {
     };
   };
 
-  it('masks secret-like failed job payload fields before returning them to platform users', async () => {
+  it('never returns failed-job payloads, message bodies, or raw failures to platform users', async () => {
     const { service } = buildService({
       notifications: {
         getFailed: jest.fn().mockResolvedValue([
@@ -99,17 +99,19 @@ describe('PlatformQueuesService', () => {
         id: 'job-1',
         queueName: 'notifications',
         name: 'send-sms',
+        failureCategory: 'provider',
+        failureSummary: 'External provider delivery failed.',
       }),
     );
-    expect(jobs[0].data).toEqual({
-      tenantId: 'tenant-1',
-      phone: '********',
-      apiKey: '********',
-      nested: {
-        accessToken: '********',
-        message: 'Hello guardian',
-      },
-    });
+    const serialized = JSON.stringify(jobs);
+    expect(serialized).not.toContain('tenant-1');
+    expect(serialized).not.toContain('9800000000');
+    expect(serialized).not.toContain('raw-api-key');
+    expect(serialized).not.toContain('raw-token');
+    expect(serialized).not.toContain('Hello guardian');
+    expect(jobs[0]).not.toHaveProperty('data');
+    expect(jobs[0]).not.toHaveProperty('failedReason');
+    expect(jobs[0]).not.toHaveProperty('stacktrace');
   });
 
   it('keeps queue health visible when one queue check fails', async () => {
@@ -135,7 +137,7 @@ describe('PlatformQueuesService', () => {
         expect.objectContaining({
           name: 'notifications',
           workerHealth: 'unknown',
-          error: 'Redis connection refused',
+          error: 'Queue health unavailable',
         }),
         expect.objectContaining({
           name: 'finance',
@@ -205,7 +207,7 @@ describe('PlatformQueuesService', () => {
     );
   });
 
-  it('groups failed jobs by queue, job name, and bounded failure reason with safe diagnostics', async () => {
+  it('groups failed jobs by queue, job name, and bounded category without raw tenant identifiers', async () => {
     const { service } = buildService({
       notifications: {
         getFailed: jest.fn().mockResolvedValue([
@@ -272,13 +274,14 @@ describe('PlatformQueuesService', () => {
       expect.objectContaining({
         queueName: 'notifications',
         name: 'send-sms',
-        failedReason: 'SMS provider timeout',
+        failureCategory: 'provider',
+        failureSummary: 'External provider delivery failed.',
         count: 2,
         firstFailedAt: 100,
         latestFailedAt: 200,
         maxAttemptsMade: 4,
         sampleJobIds: ['job-1', 'job-2'],
-        affectedTenantIds: ['tenant-1', 'tenant-2'],
+        affectedTenantCount: 2,
         diagnostic: expect.objectContaining({
           category: 'provider',
           retryable: true,
@@ -288,7 +291,7 @@ describe('PlatformQueuesService', () => {
         queueName: 'accounting-reports',
         name: 'generate-accounting-report',
         count: 1,
-        affectedTenantIds: ['tenant-4'],
+        affectedTenantCount: 1,
         diagnostic: expect.objectContaining({
           category: 'storage',
           retryable: true,
@@ -298,7 +301,7 @@ describe('PlatformQueuesService', () => {
         queueName: 'reports',
         name: 'generate-report',
         count: 1,
-        affectedTenantIds: ['tenant-3'],
+        affectedTenantCount: 1,
         diagnostic: expect.objectContaining({
           category: 'tenant_state',
           retryable: false,
@@ -311,6 +314,8 @@ describe('PlatformQueuesService', () => {
     expect(serialized).not.toContain('raw-token');
     expect(serialized).not.toContain('raw-secret');
     expect(serialized).not.toContain('9800000000');
+    expect(serialized).not.toContain('tenant-1');
+    expect(serialized).not.toContain('SMS provider timeout');
   });
 
   it('audits failed-job discard with the required reason', async () => {
@@ -429,7 +434,7 @@ describe('PlatformQueuesService', () => {
         before: expect.objectContaining({
           queueName: 'notifications',
           jobId: 'job-1',
-          failedReason: 'Timeout',
+          failureCategory: 'transient',
           attemptsMade: 3,
         }),
         after: expect.objectContaining({
@@ -471,7 +476,7 @@ describe('PlatformQueuesService', () => {
     expect(auditService.record).not.toHaveBeenCalled();
   });
 
-  it('returns failed job detail with sanitized payload, stacktrace, timings, and retry audit history', async () => {
+  it('returns only bounded failed-job detail and retry audit history', async () => {
     const job = {
       id: 'job-1',
       name: 'send-provider-message',
@@ -481,6 +486,7 @@ describe('PlatformQueuesService', () => {
       processedOn: 110,
       finishedOn: 120,
       stacktrace: ['Error: rejected'],
+      isFailed: jest.fn().mockResolvedValue(true),
       data: {
         tenantId: 'tenant-1',
         apiToken: 'raw-token',
@@ -511,12 +517,8 @@ describe('PlatformQueuesService', () => {
         queueName: 'notifications',
         processedOn: 110,
         finishedOn: 120,
-        stacktrace: ['Error: rejected'],
-        data: {
-          tenantId: 'tenant-1',
-          apiToken: '********',
-          nested: { password: '********', body: 'Hello' },
-        },
+        failureCategory: 'provider',
+        failureSummary: 'External provider delivery failed.',
         retryHistory: [
           {
             id: 'audit-1',
@@ -528,6 +530,16 @@ describe('PlatformQueuesService', () => {
         ],
       }),
     );
+    const detail = await service.getJobDetail('notifications', 'job-1');
+    const serialized = JSON.stringify(detail);
+    expect(serialized).not.toContain('tenant-1');
+    expect(serialized).not.toContain('raw-token');
+    expect(serialized).not.toContain('raw-password');
+    expect(serialized).not.toContain('Error: rejected');
+    expect(serialized).not.toContain('Provider rejected request');
+    expect(detail).not.toHaveProperty('data');
+    expect(detail).not.toHaveProperty('stacktrace');
+    expect(detail).not.toHaveProperty('failedReason');
     expect(prisma.auditLog.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
@@ -539,6 +551,27 @@ describe('PlatformQueuesService', () => {
         take: 10,
       }),
     );
+  });
+
+  it('does not expose details for live, waiting, or completed jobs', async () => {
+    const { service } = buildService({
+      notifications: {
+        getJob: jest.fn().mockResolvedValue({
+          id: 'live-auth-job',
+          name: 'send-email',
+          isFailed: jest.fn().mockResolvedValue(false),
+          data: {
+            to: 'guardian@example.com',
+            text: 'Your login code is 123456',
+          },
+        }),
+      },
+    });
+
+    await expect(
+      service.getJobDetail('notifications', 'live-auth-job'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.auditLog.findMany).not.toHaveBeenCalled();
   });
 
   it('rejects retry for unknown queues and non-failed jobs', async () => {

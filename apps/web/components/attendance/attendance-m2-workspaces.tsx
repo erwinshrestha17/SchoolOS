@@ -155,16 +155,70 @@ const attendanceTabs = [
   { href: "/dashboard/attendance/reports", label: "Reports", icon: Download },
 ];
 
+function visibleAttendanceTabs(
+  canMark: boolean,
+  isSupportOverride: boolean,
+) {
+  if (isSupportOverride) {
+    return attendanceTabs.slice(0, 1);
+  }
+
+  return canMark
+    ? attendanceTabs
+    : attendanceTabs.filter(
+        ({ href }) => href !== "/dashboard/attendance/mark",
+      );
+}
+
+function AttendanceWorkspaceTabs() {
+  const { canMark } = useAttendanceCapabilities();
+  const { session } = useSession();
+  return (
+    <WorkspaceTabs
+      items={visibleAttendanceTabs(
+        canMark,
+        session?.user.isSupportOverride === true,
+      )}
+    />
+  );
+}
+
+function AttendanceModuleTabs() {
+  const { canMark } = useAttendanceCapabilities();
+  const { session } = useSession();
+  return (
+    <ModuleTabs
+      items={visibleAttendanceTabs(
+        canMark,
+        session?.user.isSupportOverride === true,
+      )}
+      accentColor="emerald"
+      variant="light"
+    />
+  );
+}
+
 export function AttendanceOverviewWorkspace() {
   const router = useRouter();
+  const attendance = useAttendanceCapabilities();
+  const { session } = useSession();
+  const isSupportOverride = session?.user.isSupportOverride === true;
   const analyticsQuery = useQuery({
     queryKey: ["attendance-analytics"],
     queryFn: api.listAttendanceAnalytics,
   });
-  const correctionsQuery = useQuery({
-    queryKey: ["attendance-corrections", "PENDING", 1],
-    queryFn: () =>
-      api.listAttendanceCorrections({ status: "PENDING", limit: 10 }),
+  const correctionsSummaryQuery = useQuery({
+    queryKey: ["attendance-corrections-summary", isSupportOverride],
+    queryFn: async () => {
+      if (isSupportOverride) {
+        return api.getAttendanceCorrectionSummary();
+      }
+      const page = await api.listAttendanceCorrections({
+        status: "PENDING",
+        limit: 1,
+      });
+      return { pending: page.total };
+    },
   });
   const conflictsQuery = useQuery({
     queryKey: ["attendance-conflicts"],
@@ -183,29 +237,45 @@ export function AttendanceOverviewWorkspace() {
       <ModuleHeader
         eyebrow="Daily Operations"
         title="Smart Attendance"
-        description="Track daily attendance, late arrivals, corrections, and alerts across the school."
-        primaryAction={
-          <Button onClick={() => router.push("/dashboard/attendance/mark")}>
-            <CalendarCheck className="h-4 w-4" />
-            Mark Attendance
-          </Button>
+        description={
+          isSupportOverride
+            ? "Inspect submitted attendance and bounded operational evidence in this read-only support session."
+            : "Track daily attendance, late arrivals, corrections, and alerts across the school."
         }
-        moreActionItems={[
-          {
-            label: "Bulk actions",
-            icon: <Users size={16} />,
-            onClick: () => router.push("/dashboard/attendance/register"),
-          },
+        primaryAction={
+          attendance.canMark ? (
+            <Button onClick={() => router.push("/dashboard/attendance/mark")}>
+              <CalendarCheck className="h-4 w-4" />
+              Mark Attendance
+            </Button>
+          ) : undefined
+        }
+        moreActionItems={isSupportOverride ? [] : [
+          ...(attendance.canMark
+            ? [
+                {
+                  label: "Bulk actions",
+                  icon: <Users size={16} />,
+                  onClick: () =>
+                    router.push("/dashboard/attendance/register"),
+                },
+              ]
+            : []),
           {
             label: "Exports and reports",
             icon: <Download size={16} />,
             onClick: () => router.push("/dashboard/attendance/reports"),
           },
-          {
-            label: "Offline drafts",
-            icon: <Save size={16} />,
-            onClick: () => router.push("/dashboard/attendance/offline-drafts"),
-          },
+          ...(attendance.canMark
+            ? [
+                {
+                  label: "Offline drafts",
+                  icon: <Save size={16} />,
+                  onClick: () =>
+                    router.push("/dashboard/attendance/offline-drafts"),
+                },
+              ]
+            : []),
           {
             label: "Attendance anomalies",
             icon: <ShieldAlert size={16} />,
@@ -233,7 +303,13 @@ export function AttendanceOverviewWorkspace() {
             }
             icon={<CheckCircle2 size={20} />}
             tone="success"
-            href="/dashboard/attendance/mark"
+            href={
+              isSupportOverride
+                ? undefined
+                : attendance.canMark
+                  ? "/dashboard/attendance/mark"
+                  : "/dashboard/attendance/register"
+            }
             description="Submitted class sessions today."
           />
           <SummaryCard
@@ -248,7 +324,13 @@ export function AttendanceOverviewWorkspace() {
                 ? "warning"
                 : "module"
             }
-            href="/dashboard/attendance/mark"
+            href={
+              isSupportOverride
+                ? undefined
+                : attendance.canMark
+                  ? "/dashboard/attendance/mark"
+                  : "/dashboard/attendance/register"
+            }
             description="Active class scopes awaiting submission today."
           />
           <SummaryCard
@@ -257,22 +339,30 @@ export function AttendanceOverviewWorkspace() {
             value={totals?.absent ?? "Unavailable"}
             icon={<XCircle size={20} />}
             tone="danger"
-            href="/dashboard/attendance/reports"
+            href={
+              isSupportOverride ? undefined : "/dashboard/attendance/reports"
+            }
           />
           <SummaryCard
             label="Pending corrections"
-            loading={correctionsQuery.isLoading}
-            value={correctionsQuery.data?.total ?? "Unavailable"}
+            loading={correctionsSummaryQuery.isLoading}
+            value={correctionsSummaryQuery.data?.pending ?? "Unavailable"}
             icon={<ClipboardCheck size={20} />}
             tone={
-              (correctionsQuery.data?.total ?? 0) > 0 ? "warning" : "module"
+              (correctionsSummaryQuery.data?.pending ?? 0) > 0
+                ? "warning"
+                : "module"
             }
-            href="/dashboard/attendance/corrections"
+            href={
+              isSupportOverride
+                ? undefined
+                : "/dashboard/attendance/corrections"
+            }
           />
         </SummaryGrid>
       </ModuleHeader>
 
-      <WorkspaceTabs items={attendanceTabs} />
+      <AttendanceWorkspaceTabs />
 
       <div className="space-y-6">
         <WorkSurface
@@ -366,11 +456,7 @@ export function AttendanceMarkWorkspace() {
           </Link>
         }
       />
-      <ModuleTabs
-        items={attendanceTabs}
-        accentColor="emerald"
-        variant="light"
-      />
+      <AttendanceModuleTabs />
       <AttendanceForm />
     </DashboardPageShell>
   );
@@ -388,11 +474,7 @@ export function AttendanceSessionUnavailableWorkspace({
         title="Class Session Attendance"
         description="Period and session attendance are not available for this school yet."
       />
-      <ModuleTabs
-        items={attendanceTabs}
-        accentColor="emerald"
-        variant="light"
-      />
+      <AttendanceModuleTabs />
       <EmptyState
         title="Period session attendance unavailable"
         description={`Session ${sessionId} cannot be opened because SchoolOS currently supports daily class attendance here. QR, biometric, and period attendance are not enabled.`}
@@ -416,7 +498,7 @@ export function AttendanceRegisterWorkspace({
   monthly?: boolean;
 }) {
   const router = useRouter();
-  const { session } = useSession();
+  const { canExport } = useAttendanceCapabilities();
   const [academicYearId, setAcademicYearId] = useState("");
   const [classId, setClassId] = useState("");
   const [sectionId, setSectionId] = useState("");
@@ -538,7 +620,7 @@ export function AttendanceRegisterWorkspace({
       : []);
 
   async function exportRegister(format: "csv" | "pdf") {
-    if (!academicYearId || !classId) return;
+    if (!canExport || !academicYearId || !classId) return;
     await api.exportAttendanceRegister(
       {
         academicYearId,
@@ -567,20 +649,26 @@ export function AttendanceRegisterWorkspace({
             : "Review attendance records by date, class, and section."
         }
         primaryAction={
-          <Button
-            onClick={() => void exportRegister("csv")}
-            disabled={!register?.matrix.length}
-          >
-            <Download className="h-4 w-4" />
-            Export CSV
-          </Button>
+          canExport ? (
+            <Button
+              onClick={() => void exportRegister("csv")}
+              disabled={!register?.matrix.length}
+            >
+              <Download className="h-4 w-4" />
+              Export CSV
+            </Button>
+          ) : undefined
         }
         moreActionItems={[
-          {
-            label: "Download PDF",
-            icon: <FileText size={16} />,
-            onClick: () => void exportRegister("pdf"),
-          },
+          ...(canExport
+            ? [
+                {
+                  label: "Download PDF",
+                  icon: <FileText size={16} />,
+                  onClick: () => void exportRegister("pdf"),
+                },
+              ]
+            : []),
           {
             label: "Review corrections",
             icon: <ClipboardCheck size={16} />,
@@ -625,11 +713,7 @@ export function AttendanceRegisterWorkspace({
           />
         </KpiGrid>
       </ModuleHeader>
-      <ModuleTabs
-        items={attendanceTabs}
-        accentColor="emerald"
-        variant="light"
-      />
+      <AttendanceModuleTabs />
       <FilterBar
         label="Register Filters"
         description="Server-side class, section, academic year, and BS month filters."
@@ -706,6 +790,7 @@ const AUDIT_LOG_VIEW = "AUDIT" as const;
 const CORRECTIONS_PAGE_SIZE = 25;
 
 export function AttendanceCorrectionsQueueWorkspace() {
+  const { canReviewConflicts } = useAttendanceCapabilities();
   const [status, setStatus] = useState("PENDING");
   const [page, setPage] = useState(1);
   const showAuditLog = status === AUDIT_LOG_VIEW;
@@ -748,17 +833,15 @@ export function AttendanceCorrectionsQueueWorkspace() {
           </Tooltip>
         }
       />
-      <ModuleTabs
-        items={attendanceTabs}
-        accentColor="emerald"
-        variant="light"
-      />
+      <AttendanceModuleTabs />
       <Tabs value={status} onValueChange={handleStatusChange}>
         <TabsList aria-label="Correction queue view">
           <TabsTrigger value="PENDING">Inbox</TabsTrigger>
           <TabsTrigger value="APPROVED">Reviewed</TabsTrigger>
           <TabsTrigger value="ESCALATED">Escalated</TabsTrigger>
-          <TabsTrigger value={AUDIT_LOG_VIEW}>Audit log</TabsTrigger>
+          {canReviewConflicts ? (
+            <TabsTrigger value={AUDIT_LOG_VIEW}>Audit log</TabsTrigger>
+          ) : null}
         </TabsList>
       </Tabs>
       {showAuditLog ? (
@@ -1166,11 +1249,7 @@ export function AttendanceOfflineDraftsWorkspace() {
         title="Offline Draft Sync"
         description="Review local draft state, server draft records, sync conflicts, rejected submissions, and sync audit."
       />
-      <ModuleTabs
-        items={attendanceTabs}
-        accentColor="emerald"
-        variant="light"
-      />
+      <AttendanceModuleTabs />
       <Notice tone="info">
         Browser drafts are account-scoped, size-limited, expire after 48 hours,
         and are cleared on logout or confirmed session expiry. Rejected or
@@ -1377,11 +1456,7 @@ export function AttendanceAnomaliesWorkspace() {
         title="Anomaly Triage"
         description="Review detected attendance anomalies and prioritize follow-up."
       />
-      <ModuleTabs
-        items={attendanceTabs}
-        accentColor="emerald"
-        variant="light"
-      />
+      <AttendanceModuleTabs />
       {anomaliesQuery.isLoading ? (
         <LoadingState label="Loading anomaly checks..." />
       ) : anomaliesQuery.isError ? (
@@ -1439,6 +1514,7 @@ export function AttendanceAnomaliesWorkspace() {
 }
 
 export function AttendanceFollowUpsWorkspace() {
+  const { canManageAll } = useAttendanceCapabilities();
   const [reason, setReason] = useState("");
   const queryClient = useQueryClient();
   const queueQuery = useQuery({
@@ -1474,11 +1550,7 @@ export function AttendanceFollowUpsWorkspace() {
         title="Attendance Follow-ups"
         description="Repeated absence and late follow-up queue based on the school attendance policy."
       />
-      <ModuleTabs
-        items={attendanceTabs}
-        accentColor="emerald"
-        variant="light"
-      />
+      <AttendanceModuleTabs />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <SectionCard title="Follow-up Queue">
           <FollowUpTable
@@ -1486,33 +1558,45 @@ export function AttendanceFollowUpsWorkspace() {
             isLoading={queueQuery.isLoading}
           />
         </SectionCard>
-        <SectionCard title="Dispatch Controls">
-          <Notice tone="warning">
-            Delivery follows provider settings, guardian consent, quiet hours,
-            retry rules, and duplicate protection managed by M12.
-          </Notice>
-          <label className="mt-4 block text-xs font-black uppercase tracking-wide text-slate-500">
-            Operational reason
-          </label>
-          <textarea
-            className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 p-3 text-sm"
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-          />
-          <div className="mt-4 grid gap-2">
-            <Button variant="outline" onClick={() => previewMutation.mutate()}>
-              <Search className="h-4 w-4" />
-              Preview follow-up
-            </Button>
-            <Button
-              onClick={() => dispatchMutation.mutate()}
-              disabled={reason.trim().length < 8}
-            >
-              <MessageSquare className="h-4 w-4" />
-              Dispatch selected queue
-            </Button>
-          </div>
-        </SectionCard>
+        {canManageAll ? (
+          <SectionCard title="Dispatch Controls">
+            <Notice tone="warning">
+              Delivery follows provider settings, guardian consent, quiet
+              hours, retry rules, and duplicate protection managed by M12.
+            </Notice>
+            <label className="mt-4 block text-xs font-black uppercase tracking-wide text-slate-500">
+              Operational reason
+            </label>
+            <textarea
+              className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 p-3 text-sm"
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+            />
+            <div className="mt-4 grid gap-2">
+              <Button
+                variant="outline"
+                onClick={() => previewMutation.mutate()}
+              >
+                <Search className="h-4 w-4" />
+                Preview follow-up
+              </Button>
+              <Button
+                onClick={() => dispatchMutation.mutate()}
+                disabled={reason.trim().length < 8}
+              >
+                <MessageSquare className="h-4 w-4" />
+                Dispatch selected queue
+              </Button>
+            </div>
+          </SectionCard>
+        ) : (
+          <SectionCard title="Read-only follow-up evidence">
+            <Notice tone="info">
+              This session can inspect the queue. Previewing or dispatching
+              follow-ups requires attendance management authority.
+            </Notice>
+          </SectionCard>
+        )}
       </div>
     </DashboardPageShell>
   );
@@ -1677,11 +1761,7 @@ export function AttendanceReportsWorkspace() {
           />
         </KpiGrid>
       </ModuleHeader>
-      <ModuleTabs
-        items={attendanceTabs}
-        accentColor="emerald"
-        variant="light"
-      />
+      <AttendanceModuleTabs />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-6">
           <TrendPanel analytics={analytics} />

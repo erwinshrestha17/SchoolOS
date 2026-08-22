@@ -111,4 +111,25 @@ describe("M2 attendance workspace contract", () => {
     assert.match(styles, /@page[\s\S]*size: A4 landscape/);
     assert.match(styles, /attendance-register-print/);
   });
+
+  it("shows write-producing register exports only with report export authority", () => {
+    const workspaces = read("components/attendance/attendance-m2-workspaces.tsx");
+
+    assert.match(
+      workspaces,
+      /const \{ canExport \} = useAttendanceCapabilities\(\)/,
+    );
+    assert.match(
+      workspaces,
+      /if \(!canExport \|\| !academicYearId \|\| !classId\) return/,
+    );
+    assert.match(
+      workspaces,
+      /primaryAction=\{[\s\S]{0,80}canExport \? \([\s\S]{0,360}Export CSV/,
+    );
+    assert.match(
+      workspaces,
+      /moreActionItems=\{\[[\s\S]{0,100}\.\.\.\(canExport[\s\S]{0,300}Download PDF/,
+    );
+  });
 });

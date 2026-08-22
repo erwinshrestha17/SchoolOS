@@ -11,6 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
+import { AllowSupportOverrideRead } from '../auth/decorators/allow-support-override-read.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -101,6 +102,7 @@ export class AcademicsController {
 
   @Get('exam-terms')
   @Permissions('exam-terms:read', 'academics:read')
+  @AllowSupportOverrideRead('ACADEMICS')
   listExamTerms(
     @CurrentAuth() auth: AuthContext,
     @Query() dto: ListExamTermsDto,
@@ -262,6 +264,7 @@ export class AcademicsController {
 
   @Get('marks')
   @Permissions('marks:read', 'academics:read')
+  @AllowSupportOverrideRead('ACADEMICS')
   listMarks(@CurrentAuth() auth: AuthContext, @Query() dto: ListMarksDto) {
     return this.marksService.listMarks(auth, dto);
   }
@@ -486,6 +489,7 @@ export class AcademicsController {
 
   @Get('report-cards')
   @Permissions('academics:read')
+  @AllowSupportOverrideRead('ACADEMICS')
   listReportCards(
     @CurrentAuth() auth: AuthContext,
     @Query('academicYearId') academicYearId?: string,

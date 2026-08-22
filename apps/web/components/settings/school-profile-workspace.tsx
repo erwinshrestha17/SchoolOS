@@ -18,6 +18,8 @@ import { SchoolSettingsPageHeader } from './settings-page-header';
 import { Button } from '../ui/button';
 import { ErrorState } from '../ui/error-state';
 import { schoolSettingsApi } from '../../lib/api/school-settings';
+import { useSession } from '../session-provider';
+import { hasPermission } from '../../lib/session';
 
 type ProfileForm = Omit<SchoolProfileSettings, 'updatedAt'>;
 const emptyProfile: ProfileForm = {
@@ -38,6 +40,8 @@ const emptyProfile: ProfileForm = {
 };
 
 export function SchoolProfileWorkspace() {
+  const { session } = useSession();
+  const canManage = hasPermission(session, 'settings:identity:manage');
   const client = useQueryClient();
   const profileQuery = useQuery({
     queryKey: ['school-settings', 'school-profile'],
@@ -125,8 +129,15 @@ export function SchoolProfileWorkspace() {
       <SchoolSettingsPageHeader
         title="Identity & general"
         description="Official school information used in records, receipts, certificates, and reports."
-        access="can-manage"
+        access={canManage ? 'can-manage' : 'view-only'}
       />
+      {!canManage ? (
+        <section className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+          {session?.user.isSupportOverride
+            ? 'This support session is read-only. School identity changes and save controls are unavailable.'
+            : 'This workspace is view-only for your current role. School identity changes and save controls are unavailable.'}
+        </section>
+      ) : null}
       <section className="rounded-2xl border border-sky-100 bg-sky-50 p-5 text-sm text-sky-900">
         <p className="font-bold">SchoolOS Nepal operating standard</p>
         <p className="mt-1">
@@ -154,7 +165,10 @@ export function SchoolProfileWorkspace() {
           className="min-h-[180px]"
         />
       ) : null}
-      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <fieldset
+        disabled={!canManage}
+        className="rounded-2xl border border-slate-200 bg-white shadow-sm disabled:opacity-80"
+      >
         <Section
           title="Official identity"
           description="Legal school information. Changes are audited."
@@ -252,7 +266,7 @@ export function SchoolProfileWorkspace() {
             onChange={(value) => setValue('province', value)}
           />
         </Section>
-      </section>
+      </fieldset>
       <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-950">
         <p className="font-bold">
           Additional school profile preferences are not editable yet
@@ -270,7 +284,7 @@ export function SchoolProfileWorkspace() {
           ? formatBsDateTime(profile.updatedAt)
           : 'Not yet configured'}
       </p>
-      {changed ? (
+      {canManage && changed ? (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 px-6 py-4 shadow-lg backdrop-blur">
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
             <p className="text-sm font-semibold text-slate-700">

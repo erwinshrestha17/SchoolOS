@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   AudienceType,
@@ -97,6 +97,37 @@ describe('ResultPublishingService', () => {
       ...overrides,
     };
   }
+
+  it('denies support override readiness before any database or finance read', async () => {
+    await expect(
+      service.listPublishingReadiness(
+        { ...actor, isSupportOverride: true },
+        {},
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.reportCard.findMany).not.toHaveBeenCalled();
+    expect(prisma.tenantSetting.findFirst).not.toHaveBeenCalled();
+    expect(prisma.assessmentRetake.findMany).not.toHaveBeenCalled();
+    expect(financeService.getStudentFeeLedger).not.toHaveBeenCalled();
+  });
+
+  it('preserves publishing readiness for an ordinary school actor', async () => {
+    prisma.reportCard.findMany.mockResolvedValue([reportCard()]);
+    prisma.tenantSetting.findFirst.mockResolvedValue(null);
+
+    const result = await service.listPublishingReadiness(actor, {});
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual(
+      expect.objectContaining({
+        reportCardId: 'rc-1',
+        studentId: 'student-1',
+        blockedReasons: [],
+      }),
+    );
+    expect(financeService.getStudentFeeLedger).not.toHaveBeenCalled();
+  });
 
   it('rejects duplicate report card IDs during publish', async () => {
     await expect(

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import type {
   AdmissionCaseDisplayStatus,
   AdmissionCaseQueueName,
@@ -128,6 +128,12 @@ export class AdmissionCaseQueuesService {
       search?: string;
     },
   ): Promise<AdmissionCaseQueuePage> {
+    if (actor.isSupportOverride) {
+      throw new ForbiddenException(
+        'Admission case queues are unavailable during support override',
+      );
+    }
+
     const page = Math.max(1, query.page ?? 1);
     const limit = Math.min(100, Math.max(1, query.limit ?? 25));
     const skip = (page - 1) * limit;

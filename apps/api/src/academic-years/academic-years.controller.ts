@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
+import { AllowSupportOverrideRead } from '../auth/decorators/allow-support-override-read.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -17,6 +18,13 @@ export class AcademicYearsController {
 
   @Get()
   @Permissions('academic_years:read')
+  @AllowSupportOverrideRead(
+    'SCHOOL_PROFILE',
+    'STUDENT_RECORDS',
+    'ATTENDANCE',
+    'ACADEMICS',
+    'HOMEWORK_TIMETABLE',
+  )
   listAcademicYears(@CurrentAuth() auth: AuthContext) {
     return this.academicYearsService.listAcademicYears(auth);
   }

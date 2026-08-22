@@ -6,7 +6,7 @@ import {
   Inject,
   forwardRef,
 } from '@nestjs/common';
-import { AuthMethod } from '@prisma/client';
+import { AuthMethod, SecurityDomain } from '@prisma/client';
 import { ClsService } from 'nestjs-cls';
 import { PlatformApiKeysService } from '../../platform/platform-api-keys.service';
 import { TENANT_ID_KEY } from '../../prisma/prisma.service';
@@ -38,6 +38,7 @@ export class ApiKeyAuthGuard implements CanActivate {
       tenantId: validated.tenantId,
       originalTenantId: validated.tenantId,
       isSupportOverride: false,
+      securityDomain: SecurityDomain.SCHOOL,
       tenantSlug: '',
       email: null,
       authMethod: AuthMethod.PASSWORD,

@@ -28,6 +28,24 @@ function record(
 }
 
 describe('AdmissionCaseQueuesService', () => {
+  it('denies support override before reading admission case queues', async () => {
+    const prisma = {
+      admissionApplication: {
+        count: jest.fn(),
+        findMany: jest.fn(),
+      },
+    } as any;
+    const service = new AdmissionCaseQueuesService(prisma);
+
+    await expect(
+      service.list({ ...actor, isSupportOverride: true }, {}),
+    ).rejects.toThrow(
+      'Admission case queues are unavailable during support override',
+    );
+    expect(prisma.admissionApplication.count).not.toHaveBeenCalled();
+    expect(prisma.admissionApplication.findMany).not.toHaveBeenCalled();
+  });
+
   it('applies duplicate metadata and search filters before database pagination', async () => {
     const prisma = {
       admissionApplication: {

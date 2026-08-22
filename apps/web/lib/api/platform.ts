@@ -22,6 +22,7 @@ import type {
   PlatformWebhookDeliverySummary,
   PlatformWebhookEndpointSummary,
   TenantSettingSummary,
+  EnterSupportOverrideResult,
 } from '@schoolos/core';
 import {
   AssignPlatformTenantSubscriptionPayload,
@@ -34,10 +35,7 @@ import {
   request,
   withQuery,
 } from './client';
-import {
-  clearSupportOverride,
-  setSupportOverride,
-} from '../session';
+import { clearSupportOverride, setSupportOverride } from '../session';
 
 export const platformApi = {
   listPlatformTenants: () =>
@@ -83,12 +81,22 @@ export const platformApi = {
   enterPlatformSupportOverride: async (
     body: PlatformSupportOverridePayload,
   ) => {
-    const res = await request<{
-      success: true;
-      overrideId: string;
-      expiresAt: string;
-    }>('/platform/support/override/enter', { method: 'POST', json: body });
-    setSupportOverride(body.tenantId, body.reason);
+    const res = await request<EnterSupportOverrideResult>(
+      '/platform/support/override/enter',
+      {
+        method: 'POST',
+        json: body,
+        supportOverride: 'omit',
+      },
+    );
+    setSupportOverride({
+      overrideId: res.overrideId,
+      tenantId: body.tenantId,
+      reason: body.reason.trim(),
+      scopes: res.scopes,
+      readOnly: res.readOnly,
+      expiresAt: res.expiresAt,
+    });
     return res;
   },
   exitPlatformSupportOverride: async () => {
@@ -96,6 +104,7 @@ export const platformApi = {
       '/platform/support/override/exit',
       {
         method: 'POST',
+        supportOverride: 'omit',
       },
     );
     clearSupportOverride();
@@ -300,9 +309,7 @@ export const platformApi = {
     request<TenantSettingSummary[]>('/settings/public'),
   getSchoolOnboardingChecklist: () =>
     request<PlatformOnboardingChecklist>('/settings/onboarding'),
-  listTenantAuditLogs: (
-    params?: Omit<PlatformAuditLogFilters, 'tenantId'>,
-  ) =>
+  listTenantAuditLogs: (params?: Omit<PlatformAuditLogFilters, 'tenantId'>) =>
     request<PaginatedResult<PlatformAuditLog>>(
       withQuery('/settings/audit-logs', {
         ...params,

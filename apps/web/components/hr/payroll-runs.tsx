@@ -316,9 +316,9 @@ export function PayrollRuns() {
             <p className="text-xs leading-relaxed text-amber-800">
               Approval locks payroll calculations. Posting is a separate
               APPROVED-to-POSTED action that creates the M11 payroll accrual
-              journal through the accounting posting boundary. It does
+              journal through the backend accounting posting boundary. It does
               not disburse salaries or pay staff, and posted runs remain
-              immutable; reversal is a separate reasoned workflow.
+              immutable; reversal is a separate reasoned backend workflow.
             </p>
           </div>
         </div>

@@ -24,8 +24,8 @@ export class RolesController {
 
   @Get('permissions')
   @Permissions('roles:read')
-  listPermissions() {
-    return this.rolesService.listPermissions();
+  listPermissions(@CurrentAuth() auth: AuthContext) {
+    return this.rolesService.listPermissions(auth);
   }
 
   @Post()

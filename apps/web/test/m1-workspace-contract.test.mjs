@@ -457,12 +457,9 @@ test("M1 high-risk workflows remain server controlled and protected", () => {
   assert.match(qr, /summary\.period\.bsDate/);
   assert.doesNotMatch(qr, /Print queue API is not available/);
   assert.doesNotMatch(qr, /no aggregate endpoint/);
-  assert.match(studentsApi, /'\/students\/qr\/summary'/);
+  assert.match(studentsApi, /["']\/students\/qr\/summary["']/);
   assert.match(qrCard, /student-qr-workspace-summary/);
-  assert.match(
-    qrCard,
-    /\[['"]students['"],\s*['"]qr-workspace['"]\]/,
-  );
+  assert.match(qrCard, /\[['"]students['"],\s*['"]qr-workspace['"]\]/);
   assert.match(qrCard, /ConfirmDialog/);
   assert.match(qrCard, /Rotate student QR credential\?/);
   assert.match(qrCard, /Revoke student QR credential\?/);
@@ -521,7 +518,7 @@ test("M1 student roster uses a focused backend summary, safe filters, and pagina
   assert.match(directory, /summary\?\.duplicateCandidates/);
   assert.match(directory, /summary\?\.iemisIssues/);
   assert.equal((directory.match(/<SummaryCard/g) ?? []).length, 4);
-  assert.match(directory, /summaryUnavailable \? 'Unavailable'/);
+  assert.match(directory, /summaryUnavailable\s*\?\s*'Unavailable'/);
   assert.doesNotMatch(directory, /title="Pending Applications"/);
   assert.doesNotMatch(directory, /title="QR Active"/);
   assert.match(directory, /value: 'ACTIVE', label: 'Active'/);

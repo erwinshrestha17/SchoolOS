@@ -89,6 +89,20 @@ describe('HomeworkAttachmentAccessService', () => {
     );
   });
 
+  it('denies homework attachment URLs during a support override before attachment lookup', async () => {
+    await expect(
+      service.getAttachmentAccessUrl(
+        'attachment-1',
+        { ...studentActor, isSupportOverride: true },
+        'preview',
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.homeworkAttachment.findFirst).not.toHaveBeenCalled();
+    expect(fileRegistry.auditAccess).not.toHaveBeenCalled();
+    expect(fileRegistry.getSignedUrl).not.toHaveBeenCalled();
+  });
+
   it('authorizes a subject teacher attachment through canonical exact-subject scope', async () => {
     prisma.homeworkAttachment.findFirst.mockResolvedValue(baseAttachment);
     teacherScope.canActorAccess.mockResolvedValue({

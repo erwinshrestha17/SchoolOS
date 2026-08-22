@@ -642,11 +642,13 @@ export class AdmissionCasesService implements OnModuleInit {
   }
 
   async getCase(caseId: string, actor: AuthContext) {
+    this.assertSupportOverrideUnavailable(actor);
     const record = await this.findTenantCase(caseId, actor);
     return this.formatCase(record, actor);
   }
 
   async evaluateCase(caseId: string, actor: AuthContext) {
+    this.assertSupportOverrideUnavailable(actor);
     const record = await this.findTenantCase(caseId, actor);
     const evaluation = await this.evaluate(record, actor);
     return {
@@ -660,6 +662,7 @@ export class AdmissionCasesService implements OnModuleInit {
     query: ListAdmissionAssessmentSessionsDto,
     actor: AuthContext,
   ) {
+    this.assertSupportOverrideUnavailable(actor);
     const page = query.page ?? 1;
     const limit = query.limit ?? 25;
     const tab = query.tab ?? 'TODAY';
@@ -720,6 +723,7 @@ export class AdmissionCasesService implements OnModuleInit {
     query: ListAdmissionAssessmentCandidatesDto,
     actor: AuthContext,
   ) {
+    this.assertSupportOverrideUnavailable(actor);
     const page = query.page ?? 1;
     const limit = query.limit ?? 25;
     const cases = await this.prisma.admissionApplication.findMany({
@@ -990,6 +994,7 @@ export class AdmissionCasesService implements OnModuleInit {
     query: ListDocumentRequestsDto,
     actor: AuthContext,
   ) {
+    this.assertSupportOverrideUnavailable(actor);
     const page = query.page ?? 1;
     const limit = query.limit ?? 25;
     const cases = await this.prisma.admissionApplication.findMany({
@@ -2138,6 +2143,14 @@ export class AdmissionCasesService implements OnModuleInit {
       actor,
       result.alreadyAdmitted,
     );
+  }
+
+  private assertSupportOverrideUnavailable(actor: AuthContext): void {
+    if (actor.isSupportOverride) {
+      throw new ForbiddenException(
+        'Admission case and assessment records are unavailable during support override',
+      );
+    }
   }
 
   private async formatCase(record: AdmissionCaseRecord, actor: AuthContext) {

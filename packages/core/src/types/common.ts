@@ -502,7 +502,7 @@ export type NotificationDeliveryOperationSummary = {
   channel: string;
   status: string;
   sourceType: string;
-  sourceId: string;
+  sourceId: string | null;
   recipientType: "user" | "guardian" | "student" | "audience";
   recipientLabel: string;
   queuedAt: string;
@@ -517,8 +517,8 @@ export type NotificationDeliveryFailureSummary = {
   status: string;
   channel: string;
   sourceType: string;
-  sourceId: string;
-  title: string;
+  sourceId: string | null;
+  title: string | null;
   lastFailureReason: string | null;
   retryCount: number;
   retryStatus: "retryable" | "pending" | "not_retryable";

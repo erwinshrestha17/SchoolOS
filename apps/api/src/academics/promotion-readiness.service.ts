@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -77,6 +78,12 @@ export class PromotionReadinessService {
     actor: AuthContext,
     filters: PromotionFilters,
   ): Promise<PromotionReadinessRow[]> {
+    if (actor.isSupportOverride) {
+      throw new ForbiddenException(
+        'Promotion readiness with fee balances is unavailable during support override',
+      );
+    }
+
     await this.ensureAcademicYear(actor, filters.academicYearId);
 
     if (filters.examTermId) {

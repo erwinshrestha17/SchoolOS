@@ -69,6 +69,22 @@ export type AcademicGradingPolicy = {
   };
 };
 
+export type SupportPublishedTimetablePage = {
+  items: Array<{
+    id: string;
+    dayOfWeek: number;
+    startsAt: string;
+    endsAt: string;
+    room: string | null;
+    class: { name: string };
+    section: { name: string } | null;
+    subject: { name: string };
+    staff: { firstName: string; lastName: string };
+    roomRef: { name: string } | null;
+  }>;
+  meta: TimetableSlotPage['meta'];
+};
+
 export type TeacherReplacementSummary = {
   id: string;
   status: string;
@@ -234,10 +250,7 @@ export const academicsApi = {
       `/sections/${encodeURIComponent(sectionId)}/class-teacher`,
       { method: 'PUT', json: body },
     ),
-  removeSectionClassTeacher: (
-    sectionId: string,
-    academicYearId?: string,
-  ) =>
+  removeSectionClassTeacher: (sectionId: string, academicYearId?: string) =>
     request<{ removed: true; sectionId: string }>(
       withQuery(
         `/sections/${encodeURIComponent(sectionId)}/class-teacher`,
@@ -257,8 +270,9 @@ export const academicsApi = {
       json: body,
     }),
   listExamTerms: () =>
-    request<PaginatedResponse<ExamTermSummary> | ExamTermSummary[]>('/academics/exam-terms')
-      .then((result) => (Array.isArray(result) ? result : result.items)),
+    request<PaginatedResponse<ExamTermSummary> | ExamTermSummary[]>(
+      '/academics/exam-terms',
+    ).then((result) => (Array.isArray(result) ? result : result.items)),
   createExamTerm: (body: JsonBody) =>
     request<ExamTermSummary>('/academics/exam-terms', {
       method: 'POST',
@@ -296,6 +310,26 @@ export const academicsApi = {
     request<PaginatedResponse<MarkEntrySummary> | MarkEntrySummary[]>(
       withQuery('/academics/marks', params ?? {}),
     ).then((result) => (Array.isArray(result) ? result : result.items)),
+  listMarksPage: (params?: {
+    examTermId?: string | null;
+    assessmentComponentId?: string | null;
+    classId?: string | null;
+    sectionId?: string | null;
+    subjectId?: string | null;
+    status?: string | null;
+    search?: string | null;
+    page?: number;
+    limit?: number;
+  }) =>
+    request<{
+      items: MarkEntrySummary[];
+      meta: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+      };
+    }>(withQuery('/academics/marks', params ?? {})),
   enterMark: (body: JsonBody) =>
     request<MarkEntrySummary>('/academics/marks', {
       method: 'POST',
@@ -411,13 +445,10 @@ export const academicsApi = {
       json: body,
     }),
   batchGenerateReportCards: (body: JsonBody) =>
-    request<BatchReportCardGenerationResult>(
-      '/academics/report-cards/batch',
-      {
-        method: 'POST',
-        json: body,
-      },
-    ),
+    request<BatchReportCardGenerationResult>('/academics/report-cards/batch', {
+      method: 'POST',
+      json: body,
+    }),
   requestReportCardCorrection: (id: string, body: JsonBody) =>
     request<any>(
       `/academics/report-cards/${encodeURIComponent(id)}/corrections`,
@@ -444,9 +475,17 @@ export const academicsApi = {
 
     await openPdfBlob(response);
   },
-  listReportCardCorrections: (params?: { examTermId?: string; status?: string }) =>
-    request<any[]>(withQuery('/academics/report-cards/corrections', params ?? {})),
-  reviewReportCardCorrection: (id: string, body: { status: 'APPROVED' | 'REJECTED'; reviewNote?: string }) =>
+  listReportCardCorrections: (params?: {
+    examTermId?: string;
+    status?: string;
+  }) =>
+    request<any[]>(
+      withQuery('/academics/report-cards/corrections', params ?? {}),
+    ),
+  reviewReportCardCorrection: (
+    id: string,
+    body: { status: 'APPROVED' | 'REJECTED'; reviewNote?: string },
+  ) =>
     request<any>(
       `/academics/report-cards/corrections/${encodeURIComponent(id)}/review`,
       {
@@ -537,8 +576,16 @@ export const academicsApi = {
   listTimetable: (params?: {
     classId?: string | null;
     dayOfWeek?: number;
+    page?: number;
     limit?: number;
   }) => request<TimetableSlotPage>(withQuery('/timetable', params ?? {})),
+  listSupportPublishedTimetable: (params?: {
+    page?: number;
+    limit?: number;
+  }) =>
+    request<SupportPublishedTimetablePage>(
+      withQuery('/timetable/support/published', params ?? {}),
+    ),
   getTeacherTimetable: (
     teacherId: string,
     params?: { dayOfWeek?: number; academicYearId?: string },
@@ -558,7 +605,9 @@ export const academicsApi = {
     page?: number;
     limit?: number;
   }) =>
-    request<TeacherWorkloadPage>(withQuery('/timetable/workload', params ?? {})),
+    request<TeacherWorkloadPage>(
+      withQuery('/timetable/workload', params ?? {}),
+    ),
   createTimetableSlot: (body: JsonBody) =>
     request<TimetableSlotSummary>('/timetable', { method: 'POST', json: body }),
   listTimetablePeriods: (params?: { academicYearId?: string }) =>
@@ -1016,9 +1065,9 @@ export const academicsApi = {
       | PaginatedResponse<MarkLockRequestSummary>
       | { items: MarkLockRequestSummary[] }
       | MarkLockRequestSummary[]
-    >(
-      withQuery('/academics/marks/lock-requests', filters ?? {}),
-    ).then((result) => (Array.isArray(result) ? result : result.items)),
+    >(withQuery('/academics/marks/lock-requests', filters ?? {})).then(
+      (result) => (Array.isArray(result) ? result : result.items),
+    ),
   createMarkLockRequest: (body: { examTermId: string; reason: string }) =>
     request<MarkLockRequestSummary>('/academics/marks/lock-requests', {
       method: 'POST',

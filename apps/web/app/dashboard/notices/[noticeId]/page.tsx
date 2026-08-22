@@ -20,6 +20,7 @@ import { useNoticeCapabilities } from "@/lib/permissions-ui";
 import { NoticeAcknowledgementPanel } from "@/components/notices/notice-acknowledgement-panel";
 import { NoticeApprovalDecisionPanel } from "@/components/notices/notice-approval-decision-panel";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { useSession } from "@/components/session-provider";
 import {
   ArrowLeft,
   Archive,
@@ -40,6 +41,8 @@ export default function NoticeDetailPage() {
   const router = useRouter();
   const noticeId = params.noticeId;
   const queryClient = useQueryClient();
+  const { session } = useSession();
+  const isSupportOverride = session?.user.isSupportOverride === true;
   const noticeCaps = useNoticeCapabilities();
   const [pendingAction, setPendingAction] =
     useState<NoticeLifecycleAction | null>(null);
@@ -53,6 +56,7 @@ export default function NoticeDetailPage() {
   });
 
   const showPublicationReporting = hasPublicationReporting(noticeQuery.data);
+  const showRecipientReporting = showPublicationReporting && !isSupportOverride;
 
   const unreadRecipientsQuery = useQuery({
     queryKey: ["notice-unread-recipients", noticeId, unreadPage],
@@ -93,7 +97,7 @@ export default function NoticeDetailPage() {
   const { record: recordRecentlyViewed } = useRecentlyViewed();
 
   useEffect(() => {
-    if (!noticeQuery.data) return;
+    if (!noticeQuery.data || isSupportOverride) return;
     recordRecentlyViewed({
       kind: "notice",
       id: noticeId,
@@ -101,7 +105,7 @@ export default function NoticeDetailPage() {
       href: `/dashboard/notices/${noticeId}`,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [noticeId, noticeQuery.data?.title]);
+  }, [isSupportOverride, noticeId, noticeQuery.data?.title]);
 
   if (noticeCaps.resolution === "loading") {
     return (
@@ -118,7 +122,9 @@ export default function NoticeDetailPage() {
     return (
       <NoticePageShell>
         <div className="rounded-2xl border border-[var(--line)] bg-white p-8 text-center shadow-sm">
-          <h1 className="text-2xl font-bold text-gray-950">Notice unavailable</h1>
+          <h1 className="text-2xl font-bold text-gray-950">
+            Notice unavailable
+          </h1>
           <p className="mt-2 text-sm text-gray-500">
             You do not have permission to view this notice.
           </p>
@@ -185,8 +191,7 @@ export default function NoticeDetailPage() {
     noticeCaps.canArchive && notice.lifecycleStatus !== "ARCHIVED";
   const canRestore =
     noticeCaps.canArchive && notice.lifecycleStatus === "ARCHIVED";
-  const canEdit =
-    noticeCaps.canEdit && notice.lifecycleStatus === "DRAFT";
+  const canEdit = noticeCaps.canEdit && notice.lifecycleStatus === "DRAFT";
   const canPublish =
     noticeCaps.canPublish &&
     ["DRAFT", "APPROVED", "SCHEDULED"].includes(notice.lifecycleStatus);
@@ -376,7 +381,7 @@ export default function NoticeDetailPage() {
         </aside>
       </section>
 
-      {showPublicationReporting ? (
+      {showRecipientReporting ? (
         <>
           <UnreadRecipientsPanel
             result={unreadRecipientsQuery.data}
@@ -396,30 +401,32 @@ export default function NoticeDetailPage() {
         </>
       ) : null}
 
-      <section className="grid gap-6 lg:grid-cols-2">
-        <HistoryCard
-          title="Approval history"
-          empty="No approval decisions are recorded for this notice."
-          items={notice.approvalHistory.map((item) => ({
-            id: `${item.decision}-${item.createdAt}`,
-            label: formatEnumLabel(item.decision),
-            detail: item.reason ?? "No reason recorded",
-            actor: item.actorEmail,
-            createdAt: item.createdAt,
-          }))}
-        />
-        <HistoryCard
-          title="Audit history"
-          empty="No lifecycle audit entries are available."
-          items={notice.auditHistory.map((item) => ({
-            id: item.id,
-            label: formatEnumLabel(item.action),
-            detail: "Tenant-scoped lifecycle audit entry",
-            actor: item.actorEmail,
-            createdAt: item.createdAt,
-          }))}
-        />
-      </section>
+      {!isSupportOverride ? (
+        <section className="grid gap-6 lg:grid-cols-2">
+          <HistoryCard
+            title="Approval history"
+            empty="No approval decisions are recorded for this notice."
+            items={notice.approvalHistory.map((item) => ({
+              id: `${item.decision}-${item.createdAt}`,
+              label: formatEnumLabel(item.decision),
+              detail: item.reason ?? "No reason recorded",
+              actor: item.actorEmail,
+              createdAt: item.createdAt,
+            }))}
+          />
+          <HistoryCard
+            title="Audit history"
+            empty="No lifecycle audit entries are available."
+            items={notice.auditHistory.map((item) => ({
+              id: item.id,
+              label: formatEnumLabel(item.action),
+              detail: "Tenant-scoped lifecycle audit entry",
+              actor: item.actorEmail,
+              createdAt: item.createdAt,
+            }))}
+          />
+        </section>
+      ) : null}
 
       <ConfirmDialog
         isOpen={pendingAction !== null}

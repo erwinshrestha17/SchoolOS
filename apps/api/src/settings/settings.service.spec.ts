@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { FileStatus } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { SettingsService } from './settings.service';
@@ -62,6 +62,20 @@ function buildService() {
 }
 
 describe('SettingsService school logo uploads', () => {
+  it('denies school logo URLs during a support override before settings lookup', async () => {
+    const { service, prisma, fileRegistryService } = buildService();
+
+    await expect(
+      service.getSchoolLogoAccess(
+        { ...actor, isSupportOverride: true },
+        'preview',
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.tenantSetting.findUnique).not.toHaveBeenCalled();
+    expect(fileRegistryService.getSignedUrl).not.toHaveBeenCalled();
+  });
+
   it('accepts normalized chat-hour settings and rejects malformed times', async () => {
     const { service, prisma, auditService } = buildService();
     prisma.tenantSetting.findUnique.mockResolvedValue(null);

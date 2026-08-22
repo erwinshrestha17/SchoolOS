@@ -7,6 +7,7 @@ import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { UploadStudentPhotoDto } from './dto/upload-student-photo.dto';
+import { assertProtectedFileAccessAllowed } from '../common/security/support-override-file-access';
 
 const MAX_STUDENT_PHOTO_BYTES = 2 * 1024 * 1024;
 
@@ -106,6 +107,7 @@ export class StudentPhotoService {
     actor: AuthContext,
     action: 'preview' | 'download',
   ) {
+    assertProtectedFileAccessAllowed(actor);
     const { student, asset } = await this.findPhotoAssetOrThrow(
       studentId,
       actor,
@@ -131,6 +133,7 @@ export class StudentPhotoService {
   }
 
   async getPhotoContent(studentId: string, actor: AuthContext) {
+    assertProtectedFileAccessAllowed(actor);
     const { student, asset } = await this.findPhotoAssetOrThrow(
       studentId,
       actor,

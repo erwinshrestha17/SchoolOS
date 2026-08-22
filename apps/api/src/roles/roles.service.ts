@@ -6,6 +6,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  isPlatformPermissionKey,
+  isPlatformRoleName,
   SCHOOL_CONFIG_OWNER_ROLE,
   systemRolePermissions,
 } from '@schoolos/core';
@@ -30,6 +32,7 @@ export class RolesService {
   ) {}
 
   async listRoles(actor: AuthContext) {
+    this.assertSchoolSecurityDomain(actor);
     const roles = await this.prisma.role.findMany({
       where: { tenantId: actor.tenantId },
       include: {
@@ -42,39 +45,56 @@ export class RolesService {
       orderBy: { name: 'asc' },
     });
 
-    return roles.map((role) => ({
-      id: role.id,
-      name: role.name,
-      description: role.description,
-      isSystem: role.isSystem,
-      permissions: [...role.rolePermissions]
-        .sort((left, right) => {
-          const leftKey = `${left.permission.resource}:${left.permission.action}`;
-          const rightKey = `${right.permission.resource}:${right.permission.action}`;
-          return leftKey.localeCompare(rightKey);
-        })
-        .map(({ permission }) => ({
-          id: permission.id,
-          key: `${permission.resource}:${permission.action}`,
-        })),
-    }));
+    return roles
+      .filter((role) => !isPlatformRoleName(role.name))
+      .map((role) => ({
+        id: role.id,
+        name: role.name,
+        description: role.description,
+        isSystem: role.isSystem,
+        permissions: [...role.rolePermissions]
+          .sort((left, right) => {
+            const leftKey = `${left.permission.resource}:${left.permission.action}`;
+            const rightKey = `${right.permission.resource}:${right.permission.action}`;
+            return leftKey.localeCompare(rightKey);
+          })
+          .map(({ permission }) => ({
+            id: permission.id,
+            key: `${permission.resource}:${permission.action}`,
+          })),
+      }));
   }
 
-  async listPermissions() {
+  async listPermissions(actor: AuthContext) {
+    this.assertSchoolSecurityDomain(actor);
     const permissions = await this.prisma.permission.findMany({
       orderBy: [{ resource: 'asc' }, { action: 'asc' }],
     });
 
-    return permissions.map((permission) => ({
-      id: permission.id,
-      resource: permission.resource,
-      action: permission.action,
-      key: `${permission.resource}:${permission.action}`,
-      description: permission.description,
-    }));
+    return permissions
+      .filter(
+        (permission) =>
+          !isPlatformPermissionKey(
+            `${permission.resource}:${permission.action}`,
+          ),
+      )
+      .map((permission) => ({
+        id: permission.id,
+        resource: permission.resource,
+        action: permission.action,
+        key: `${permission.resource}:${permission.action}`,
+        description: permission.description,
+      }));
   }
 
   async createRole(dto: CreateRoleDto, actor: AuthContext) {
+    this.assertSchoolSecurityDomain(actor);
+    if (isPlatformRoleName(dto.name)) {
+      throw new ForbiddenException(
+        'Platform role names cannot be created in a school tenant',
+      );
+    }
+
     const existingRole = await this.prisma.role.findUnique({
       where: {
         tenantId_name: {
@@ -113,6 +133,7 @@ export class RolesService {
     dto: AssignPermissionsDto,
     actor: AuthContext,
   ) {
+    this.assertSchoolSecurityDomain(actor);
     const role = await this.prisma.role.findFirst({
       where: {
         id: roleId,
@@ -124,12 +145,28 @@ export class RolesService {
       throw new NotFoundException('Role not found in this tenant');
     }
 
+    if (isPlatformRoleName(role.name)) {
+      throw new ForbiddenException(
+        'Platform role permissions cannot be managed from a school tenant',
+      );
+    }
+
     const permissions = await this.prisma.permission.findMany({
       where: { id: { in: dto.permissionIds } },
     });
 
     if (permissions.length !== dto.permissionIds.length) {
       throw new NotFoundException('One or more permissions do not exist');
+    }
+
+    if (
+      permissions.some((permission) =>
+        isPlatformPermissionKey(`${permission.resource}:${permission.action}`),
+      )
+    ) {
+      throw new ForbiddenException(
+        'Platform permissions cannot be granted in a school tenant',
+      );
     }
 
     await this.prisma.rolePermission.deleteMany({
@@ -170,6 +207,7 @@ export class RolesService {
   }
 
   async assignRoles(dto: AssignRoleDto, actor: AuthContext) {
+    this.assertSchoolSecurityDomain(actor);
     const roleIds = Array.from(new Set(dto.roleIds));
     const user = await this.prisma.user.findFirst({
       where: {
@@ -192,6 +230,12 @@ export class RolesService {
     if (roles.length !== roleIds.length) {
       throw new NotFoundException(
         'One or more roles do not exist in this tenant',
+      );
+    }
+
+    if (roles.some((role) => isPlatformRoleName(role.name))) {
+      throw new ForbiddenException(
+        'Platform roles cannot be assigned in a school tenant',
       );
     }
 
@@ -312,6 +356,7 @@ export class RolesService {
   }
 
   async previewFinancePermissionReconciliation(actor: AuthContext) {
+    this.assertSchoolSecurityDomain(actor);
     const presetNames = FINANCE_RECONCILIATION_ROLE_PRESETS;
     const roles = await this.prisma.role.findMany({
       where: { tenantId: actor.tenantId, name: { in: [...presetNames] } },
@@ -373,6 +418,7 @@ export class RolesService {
   }
 
   async reconcileFinancePermissions(reason: string, actor: AuthContext) {
+    this.assertSchoolSecurityDomain(actor);
     const trimmedReason = reason.trim();
     if (trimmedReason.length < 3) {
       throw new BadRequestException(
@@ -447,6 +493,14 @@ export class RolesService {
     });
 
     return this.previewFinancePermissionReconciliation(actor);
+  }
+
+  private assertSchoolSecurityDomain(actor: AuthContext): void {
+    if (actor.securityDomain === 'PLATFORM' || actor.isSupportOverride) {
+      throw new ForbiddenException(
+        'School role management is unavailable to Platform identities',
+      );
+    }
   }
 
   private async wouldRemoveConfigOwnerRole(

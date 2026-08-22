@@ -94,6 +94,7 @@ async function bootstrap() {
       'X-CSRF-Token',
       'X-SchoolOS-Tenant-Id',
       'X-SchoolOS-Tenant-Override-Reason',
+      'X-SchoolOS-Support-Override-Id',
     ],
   });
 

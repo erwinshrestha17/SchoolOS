@@ -1,4 +1,5 @@
 import type { AuthContext } from '../auth/auth.types';
+import { PERMISSIONS_KEY } from '../auth/decorators/permissions.decorator';
 import { AttendanceController } from './attendance.controller';
 
 const actor: AuthContext = {
@@ -182,6 +183,20 @@ describe('AttendanceController M2 contracts', () => {
       actor,
     );
     expect(result).toBe('csv');
+  });
+
+  it('requires report export authority for the write-producing GET export', () => {
+    const exportPermissions: unknown = Reflect.getMetadata(
+      PERMISSIONS_KEY,
+      AttendanceController.prototype.exportMonthlyRegister,
+    );
+    const historyPermissions: unknown = Reflect.getMetadata(
+      PERMISSIONS_KEY,
+      AttendanceController.prototype.listMonthlyRegisterExports,
+    );
+
+    expect(exportPermissions).toEqual(['attendance:read', 'reports:export']);
+    expect(historyPermissions).toEqual(['attendance:read']);
   });
 
   it('delegates retained monthly register exports with current actor', () => {

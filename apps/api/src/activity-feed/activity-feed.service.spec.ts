@@ -1432,6 +1432,21 @@ describe('ActivityFeedService', () => {
     },
   );
 
+  it('denies direct activity attachment previews during a support override before lookup', async () => {
+    prisma.activityAttachment = { findFirst: jest.fn() };
+
+    await expect(
+      service.getAttachmentPreview(
+        { ...actor, isSupportOverride: true },
+        'attachment-1',
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.activityAttachment.findFirst).not.toHaveBeenCalled();
+    expect(fileRegistry.auditAccess).not.toHaveBeenCalled();
+    expect(fileRegistry.getSignedUrl).not.toHaveBeenCalled();
+  });
+
   describe('teacher scoping for mood logs, milestones, and posts (confirmed gap: previously tenant-wide)', () => {
     beforeEach(() => {
       teacherScopeService.resolveReadableScope.mockResolvedValue({

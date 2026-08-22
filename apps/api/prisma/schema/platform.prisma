@@ -246,6 +246,8 @@ model SupportOverride {
   tenantId       String
   platformUserId String
   reason         String
+  permissionScopes String[] @default([])
+  readOnly       Boolean  @default(true)
   startsAt       DateTime @default(now())
   expiresAt      DateTime
   isActive       Boolean  @default(true)
@@ -257,6 +259,7 @@ model SupportOverride {
 
   @@index([tenantId, isActive])
   @@index([platformUserId, isActive])
+  @@index([platformUserId, tenantId, isActive, expiresAt])
   @@index([expiresAt])
 }
 

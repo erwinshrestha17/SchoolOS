@@ -34,13 +34,14 @@ export interface PlatformFailedJobSummary {
   id: string;
   queueName: string;
   name: string;
-  failedReason?: string;
+  failureCategory: PlatformQueueFailureCategory;
+  failureSummary: string;
+  retryable: boolean;
+  recommendedAction: string;
   attemptsMade: number;
   timestamp?: number;
-  data: unknown;
   processedOn?: number | null;
   finishedOn?: number | null;
-  stacktrace?: string[];
   retryHistory?: Array<{
     id: string;
     userId?: string | null;
@@ -53,32 +54,29 @@ export interface PlatformFailedJobSummary {
 export interface PlatformFailedJobGroup {
   queueName: string;
   name: string;
-  failedReason: string;
+  failureCategory: PlatformQueueFailureCategory;
+  failureSummary: string;
   count: number;
   firstFailedAt?: number;
   latestFailedAt?: number;
   maxAttemptsMade: number;
   sampleJobIds: string[];
-  affectedTenantIds: string[];
+  affectedTenantCount: number;
   diagnostic: {
-    category:
-      | 'provider'
-      | 'storage'
-      | 'tenant_state'
-      | 'entitlement'
-      | 'data_validation'
-      | 'transient'
-      | 'unknown';
+    category: PlatformQueueFailureCategory;
     retryable: boolean;
     recommendedAction: string;
   };
 }
 
-const SECRET_KEY_PATTERN =
-  /(api[-_]?key|token|secret|password|credential|authorization|private[-_]?key|cookie|phone|email)/i;
-const MAX_STRING_LENGTH = 500;
-const MAX_ARRAY_LENGTH = 25;
-const MAX_OBJECT_KEYS = 50;
+type PlatformQueueFailureCategory =
+  | 'provider'
+  | 'storage'
+  | 'tenant_state'
+  | 'entitlement'
+  | 'data_validation'
+  | 'transient'
+  | 'unknown';
 
 @Injectable()
 export class PlatformQueuesService {
@@ -175,7 +173,7 @@ export class PlatformQueuesService {
           delayed: 0,
           paused: false,
           workerHealth: 'unknown',
-          error: message,
+          error: 'Queue health unavailable',
         });
       }
     }
@@ -190,14 +188,22 @@ export class PlatformQueuesService {
       const jobs = await queue.getFailed(0, 50);
 
       for (const job of jobs) {
+        const diagnostic = buildFailureDiagnostic(
+          queueName,
+          job.name,
+          job.failedReason,
+          job.data,
+        );
         failedJobs.push({
           id: String(job.id),
           queueName,
-          name: job.name,
-          failedReason: job.failedReason,
+          name: normalizeJobName(job.name),
+          failureCategory: diagnostic.category,
+          failureSummary: describeFailureCategory(diagnostic.category),
+          retryable: diagnostic.retryable,
+          recommendedAction: diagnostic.recommendedAction,
           attemptsMade: job.attemptsMade,
           timestamp: job.timestamp,
-          data: sanitizeJobData(job.data),
         });
       }
     }
@@ -215,32 +221,35 @@ export class PlatformQueuesService {
       const jobs = await queue.getFailed(0, 100);
 
       for (const job of jobs) {
-        const failedReason = normalizeFailureReason(job.failedReason);
-        const groupKey = [queueName, job.name, failedReason].join('\u0000');
+        const diagnostic = buildFailureDiagnostic(
+          queueName,
+          job.name,
+          job.failedReason,
+          job.data,
+        );
+        const jobName = normalizeJobName(job.name);
+        const groupKey = [queueName, jobName, diagnostic.category].join(
+          '\u0000',
+        );
         const timestamp = Number(job.timestamp ?? 0) || undefined;
         const existing = groups.get(groupKey);
 
         if (!existing) {
-          const diagnostic = buildFailureDiagnostic(
-            queueName,
-            job.name,
-            failedReason,
-            job.data,
-          );
           const tenantIds = new Set<string>();
           const tenantId = extractTenantId(job.data);
           if (tenantId) tenantIds.add(tenantId);
 
           groups.set(groupKey, {
             queueName,
-            name: job.name,
-            failedReason,
+            name: jobName,
+            failureCategory: diagnostic.category,
+            failureSummary: describeFailureCategory(diagnostic.category),
             count: 1,
             firstFailedAt: timestamp,
             latestFailedAt: timestamp,
             maxAttemptsMade: Number(job.attemptsMade ?? 0),
             sampleJobIds: [String(job.id)],
-            affectedTenantIds: [],
+            affectedTenantCount: 0,
             diagnostic,
             tenantIds,
           });
@@ -273,7 +282,7 @@ export class PlatformQueuesService {
     return Array.from(groups.values())
       .map(({ tenantIds, ...group }) => ({
         ...group,
-        affectedTenantIds: Array.from(tenantIds).sort().slice(0, 20),
+        affectedTenantCount: tenantIds.size,
       }))
       .sort((a, b) => {
         if (b.count !== a.count) return b.count - a.count;
@@ -291,17 +300,29 @@ export class PlatformQueuesService {
     const job = await queue.getJob(jobId);
     if (!job) throw new NotFoundException(`Job ${jobId} not found`);
 
+    if (typeof job.isFailed !== 'function' || !(await job.isFailed())) {
+      throw new NotFoundException(`Failed job ${jobId} not found`);
+    }
+
+    const diagnostic = buildFailureDiagnostic(
+      queueName,
+      job.name,
+      job.failedReason,
+      job.data,
+    );
+
     return {
       id: String(job.id),
       queueName,
-      name: job.name,
-      failedReason: job.failedReason,
+      name: normalizeJobName(job.name),
+      failureCategory: diagnostic.category,
+      failureSummary: describeFailureCategory(diagnostic.category),
+      retryable: diagnostic.retryable,
+      recommendedAction: diagnostic.recommendedAction,
       attemptsMade: job.attemptsMade,
       timestamp: job.timestamp,
-      data: sanitizeJobData(job.data, 0, true),
       processedOn: job.processedOn ?? null,
       finishedOn: job.finishedOn ?? null,
-      stacktrace: Array.isArray(job.stacktrace) ? job.stacktrace : [],
       retryHistory: await this.listRetryHistory(queueName, jobId),
     };
   }
@@ -362,12 +383,18 @@ export class PlatformQueuesService {
 
     try {
       await job.retry();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+    } catch {
       throw new BadRequestException(
-        `Job ${dto.jobId} could not be retried: ${message}`,
+        `Job ${dto.jobId} could not be retried because its state changed or the queue rejected the request`,
       );
     }
+
+    const diagnostic = buildFailureDiagnostic(
+      dto.queueName,
+      job.name,
+      job.failedReason,
+      job.data,
+    );
 
     await this.auditService.record({
       action: 'queue_failed_job_retry_requested',
@@ -378,7 +405,7 @@ export class PlatformQueuesService {
       before: {
         queueName: dto.queueName,
         jobId: dto.jobId,
-        failedReason: job.failedReason ?? null,
+        failureCategory: diagnostic.category,
         attemptsMade: job.attemptsMade,
       },
       after: {
@@ -447,14 +474,6 @@ function asRecord(value: unknown): Record<string, unknown> {
     : {};
 }
 
-function normalizeFailureReason(reason: unknown) {
-  if (typeof reason !== 'string' || reason.trim().length === 0) {
-    return 'Unknown failure';
-  }
-
-  return reason.trim().replace(/\s+/g, ' ').slice(0, 180);
-}
-
 function extractTenantId(data: unknown): string | null {
   const record = asRecord(data);
   const direct = record.tenantId;
@@ -483,12 +502,7 @@ function buildFailureDiagnostic(
   failedReason: string,
   data: unknown,
 ): PlatformFailedJobGroup['diagnostic'] {
-  const haystack = [
-    queueName,
-    jobName,
-    failedReason,
-    JSON.stringify(sanitizeJobData(data)),
-  ]
+  const haystack = [queueName, jobName, failedReason, JSON.stringify(data)]
     .join(' ')
     .toLowerCase();
 
@@ -552,55 +566,28 @@ function buildFailureDiagnostic(
     category: 'unknown',
     retryable: false,
     recommendedAction:
-      'Inspect a sample job detail and retry only after tenant, feature, and provider state are verified.',
+      'Inspect aggregate queue health and dependency readiness before retrying this group.',
   };
 }
 
-function sanitizeJobData(value: unknown, depth = 0, strict = false): unknown {
-  if (depth > 4) {
-    return '[Truncated]';
-  }
+function normalizeJobName(value: unknown): string {
+  if (typeof value !== 'string') return 'unknown-job';
+  const normalized = value.trim();
+  return /^[a-z0-9:_-]{1,100}$/i.test(normalized) ? normalized : 'unknown-job';
+}
 
-  if (value === null || typeof value === 'undefined') {
-    return value;
-  }
+function describeFailureCategory(
+  category: PlatformQueueFailureCategory,
+): string {
+  const descriptions: Record<PlatformQueueFailureCategory, string> = {
+    provider: 'External provider delivery failed.',
+    storage: 'Storage operation failed.',
+    tenant_state: 'Tenant state blocked this job.',
+    entitlement: 'Entitlement state blocked this job.',
+    data_validation: 'Job data did not pass validation.',
+    transient: 'A temporary dependency failure interrupted this job.',
+    unknown: 'The job failed for an unclassified reason.',
+  };
 
-  if (typeof value === 'string') {
-    if (strict && SECRET_KEY_PATTERN.test(value)) {
-      return '********';
-    }
-    return value.length > MAX_STRING_LENGTH
-      ? `${value.slice(0, MAX_STRING_LENGTH)}…`
-      : value;
-  }
-
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return value;
-  }
-
-  if (Array.isArray(value)) {
-    return value
-      .slice(0, MAX_ARRAY_LENGTH)
-      .map((item) => sanitizeJobData(item, depth + 1, strict));
-  }
-
-  if (typeof value === 'object') {
-    const output: Record<string, unknown> = {};
-    const entries = Object.entries(value as Record<string, unknown>).slice(
-      0,
-      MAX_OBJECT_KEYS,
-    );
-
-    for (const [key, nestedValue] of entries) {
-      if (SECRET_KEY_PATTERN.test(key)) {
-        output[key] = '********';
-      } else {
-        output[key] = sanitizeJobData(nestedValue, depth + 1, strict);
-      }
-    }
-
-    return output;
-  }
-
-  return String(value);
+  return descriptions[category];
 }

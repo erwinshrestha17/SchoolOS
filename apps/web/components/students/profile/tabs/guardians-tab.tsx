@@ -125,7 +125,7 @@ export function GuardiansTab({
   onCancelAdd,
   onCreateGuardian,
 }: GuardiansTabProps) {
-  const { hasPermissions } = useSession();
+  const { session, hasPermissions } = useSession();
   const canCreate = hasPermissions(["guardians:create"]);
   const canUpdate = hasPermissions(["guardians:update"]);
   const canVerify = hasPermissions(["guardians:verify"]);
@@ -139,6 +139,9 @@ export function GuardiansTab({
     "guardians:verify",
     "users:create",
   ]);
+  const canViewAccessAdministration =
+    session?.user.isSupportOverride !== true &&
+    (canAdministerRecovery || canProvisionAccount || canVerify);
   const sortedGuardians = [...guardians].sort(
     (a, b) =>
       guardianStatusOrder(a.status) - guardianStatusOrder(b.status) ||
@@ -240,13 +243,15 @@ export function GuardiansTab({
                 ) : (
                   <div className="space-y-5">
                     <GuardianSummary guardian={guardian} />
-                    <GuardianAccessPanel
-                      studentId={studentId}
-                      guardian={guardian}
-                      canAdministerRecovery={canAdministerRecovery}
-                      canProvisionAccount={canProvisionAccount}
-                      canVerify={canVerify}
-                    />
+                    {canViewAccessAdministration ? (
+                      <GuardianAccessPanel
+                        studentId={studentId}
+                        guardian={guardian}
+                        canAdministerRecovery={canAdministerRecovery}
+                        canProvisionAccount={canProvisionAccount}
+                        canVerify={canVerify}
+                      />
+                    ) : null}
                   </div>
                 )}
               </SectionCard>

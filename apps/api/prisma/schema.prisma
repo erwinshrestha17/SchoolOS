@@ -19,6 +19,11 @@ enum Mode {
   MULTI
 }
 
+enum SecurityDomain {
+  SCHOOL
+  PLATFORM
+}
+
 enum UserStatus {
   PENDING
   ACTIVE
@@ -7102,6 +7107,8 @@ model SupportOverride {
   tenantId       String
   platformUserId String
   reason         String
+  permissionScopes String[] @default([])
+  readOnly       Boolean  @default(true)
   startsAt       DateTime @default(now())
   expiresAt      DateTime
   isActive       Boolean  @default(true)
@@ -7113,6 +7120,7 @@ model SupportOverride {
 
   @@index([tenantId, isActive])
   @@index([platformUserId, isActive])
+  @@index([platformUserId, tenantId, isActive, expiresAt])
   @@index([expiresAt])
 }
 
@@ -8299,6 +8307,7 @@ model Tenant {
   name      String
   slug      String   @unique
   mode      Mode     @default(SINGLE)
+  securityDomain SecurityDomain @default(SCHOOL)
   plan      String   @default("free")
   panNumber String?
   isActive  Boolean  @default(true)

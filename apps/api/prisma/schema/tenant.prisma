@@ -3,6 +3,7 @@ model Tenant {
   name      String
   slug      String   @unique
   mode      Mode     @default(SINGLE)
+  securityDomain SecurityDomain @default(SCHOOL)
   plan      String   @default("free")
   panNumber String?
   isActive  Boolean  @default(true)

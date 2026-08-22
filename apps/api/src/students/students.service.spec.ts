@@ -310,6 +310,90 @@ describe('students lifecycle hardening', () => {
     );
   });
 
+  it('uses a minimal support directory projection without protected-file, QR, login, or extra guardian metadata', async () => {
+    const student = {
+      ...buildStudent(),
+      guardianLinks: [
+        {
+          guardian: {
+            id: 'guardian-1',
+            fullName: 'Maya Shrestha',
+            primaryPhone: '9800000000',
+            secondaryPhone: '9800000001',
+            email: 'private@example.com',
+            occupation: 'Private occupation',
+            wardNumber: '5',
+            privacyConsentAt: new Date('2026-01-01T00:00:00.000Z'),
+          },
+          relation: 'mother',
+          isPrimary: true,
+          capabilities: [GuardianCapability.ACADEMICS_VIEW],
+          verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
+          status: GuardianRelationshipStatus.ACTIVE,
+          effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+          effectiveUntil: null,
+          emergencyContactPriority: 1,
+          approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+          restrictionReasonRef: 'SAFEGUARD-PRIVATE-1',
+        },
+      ],
+      qrCredentials: [{ id: 'private-qr', status: 'ACTIVE' }],
+      _count: { documents: 7 },
+      user: { email: 'student-private@example.com' },
+      userId: 'student-user-private',
+      photoFileId: 'private-photo',
+    };
+    const prisma = buildPrisma({
+      studentFindManyResult: [student],
+      studentCountQueue: [1],
+    });
+    const { service } = buildService(prisma);
+    const supportActor = {
+      ...actor,
+      roles: [],
+      permissions: ['students:read'],
+      isSupportOverride: true,
+      supportOverrideReadOnly: true,
+      supportOverrideScopes: ['STUDENT_RECORDS' as const],
+    };
+
+    const result = await service.listStudents({}, supportActor);
+    const query = prisma.student.findMany.mock.calls[0][0];
+
+    expect(query.select._count).toBe(false);
+    expect(query.select.qrCredentials).toBe(false);
+    expect(query.select.photoFileId).toBe(false);
+    expect(query.select.userId).toBe(false);
+    expect(query.select.user).toBe(false);
+    expect(query.select.guardianLinks.select.guardian.select).toEqual(
+      expect.objectContaining({
+        primaryPhone: true,
+        secondaryPhone: false,
+        email: false,
+        occupation: false,
+        wardNumber: false,
+        privacyConsentAt: false,
+      }),
+    );
+    expect(result.items[0]).not.toHaveProperty('documentCount');
+    expect(result.items[0]).not.toHaveProperty('qrCredential.id');
+    expect(result.items[0]).not.toHaveProperty('email');
+    expect(result.items[0]).not.toHaveProperty('hasLogin');
+    expect(result.items[0].photoVersion).toBeNull();
+    expect(result.items[0].guardians[0]).toEqual(
+      expect.objectContaining({
+        fullName: 'Maya Shrestha',
+        primaryPhone: '9800000000',
+        secondaryPhone: null,
+        email: null,
+        occupation: null,
+        wardNumber: null,
+        consentedAt: null,
+        restrictionReasonRef: null,
+      }),
+    );
+  });
+
   it('matches a full student name across separate first-name and last-name fields', async () => {
     const prisma = buildPrisma({
       studentFindManyResult: [],
@@ -451,6 +535,48 @@ describe('students lifecycle hardening', () => {
         }),
       }),
     );
+  });
+
+  it('builds support summary only from student rows and never queries admissions, files, QR, or duplicate candidates', async () => {
+    const prisma = buildPrisma({
+      studentCountQueue: [4],
+      studentGroupByResult: [
+        { lifecycleStatus: StudentLifecycleStatus.ACTIVE, _count: { _all: 4 } },
+      ],
+    });
+    const { service } = buildService(prisma);
+    const supportActor = {
+      ...actor,
+      roles: [],
+      permissions: ['students:read'],
+      isSupportOverride: true,
+      supportOverrideReadOnly: true,
+      supportOverrideScopes: ['STUDENT_RECORDS' as const],
+    };
+
+    const result = await service.getSupportStudentModuleSummary(
+      { search: '9800000000' },
+      supportActor,
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        totalStudents: 4,
+        activeStudents: 4,
+        newAdmissions: null,
+        pendingApplications: null,
+        missingDocuments: null,
+        duplicateCandidates: null,
+        iemisReady: null,
+        iemisIssues: null,
+        qrActive: null,
+        qrMissing: null,
+      }),
+    );
+    expect(prisma.admissionApplication.count).not.toHaveBeenCalled();
+    expect(prisma.studentQrCredential.count).not.toHaveBeenCalled();
+    expect(prisma.student.findMany).not.toHaveBeenCalled();
+    expect(prisma.studentDocument.findMany).not.toHaveBeenCalled();
   });
 
   describe('student directory actor scoping (confirmed gap: previously tenant-wide for any students:read holder)', () => {
@@ -2663,6 +2789,135 @@ describe('students lifecycle hardening', () => {
     );
     expect(profile.invoices[0].outstandingAmount).toBe(1000);
     expect(profile.attendanceRecords[0].attendanceDate).toBe('2026-04-27');
+  });
+
+  it('projects support student records without financial, health, credential, file, attendance, or activity data', async () => {
+    const student = {
+      ...buildStudent({
+        guardianLinks: [
+          {
+            guardian: {
+              id: 'guardian-support',
+              fullName: 'Maya Shrestha',
+              relation: 'mother',
+              primaryPhone: '9800000000',
+              email: 'maya@example.com',
+              wardNumber: null,
+            },
+            relation: 'mother',
+            isPrimary: true,
+            capabilities: [GuardianCapability.ACADEMICS_VIEW],
+            verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
+            status: GuardianRelationshipStatus.ACTIVE,
+            effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+            effectiveUntil: null,
+            emergencyContactPriority: 1,
+            approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+            restrictionReasonRef: 'SAFEGUARD-PRIVATE-1',
+          },
+        ],
+        documents: [{ id: 'private-document' }],
+        generatedDocuments: [{ id: 'generated-private-document' }],
+        invoices: [{ id: 'private-invoice' }],
+        attendanceRecords: [{ id: 'private-attendance' }],
+        identities: [{ identityCode: 'PRIVATE-CREDENTIAL', status: 'ACTIVE' }],
+      }),
+      medicalConditions: 'Private condition',
+      severeAllergies: 'Private allergy',
+      medications: 'Private medication',
+      specialNeeds: 'Private support note',
+      emergencyName: 'Private contact',
+      emergencyPhone: '9800000001',
+      doctorName: 'Private doctor',
+      doctorPhone: '9800000002',
+      studentIdentityCode: 'PRIVATE-CREDENTIAL',
+      photoFileId: 'private-photo',
+      qrCredentials: [
+        {
+          id: 'private-qr',
+          status: 'ACTIVE',
+          createdAt: new Date('2026-04-27T00:00:00.000Z'),
+          rotatedAt: null,
+          lastScannedAt: null,
+          fileAssetId: 'private-id-card',
+        },
+      ],
+    };
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      activityPostFindManyResult: [{ id: 'private-activity' }],
+    });
+    const { service, fileRegistryService } = buildService(prisma);
+
+    const profile = await service.getStudentProfile(student.id, {
+      ...actor,
+      isSupportOverride: true,
+      supportOverrideReadOnly: true,
+      supportOverrideScopes: ['STUDENT_RECORDS' as const],
+    });
+
+    expect(profile.invoices).toEqual([]);
+    expect(profile.documents).toEqual([]);
+    expect(profile.generatedDocuments).toEqual([]);
+    expect(profile.attendanceRecords).toEqual([]);
+    expect(profile.activityPosts).toEqual([]);
+    expect(profile.student).toEqual(
+      expect.objectContaining({
+        medicalConditions: null,
+        severeAllergies: null,
+        medications: null,
+        specialNeeds: null,
+        studentIdentityCode: null,
+        activeIdentity: null,
+        photoVersion: null,
+        qrCredential: null,
+      }),
+    );
+    expect(profile.guardians[0].restrictionReasonRef).toBeNull();
+    const supportSelect = prisma.student.findFirst.mock.calls[0][0].select;
+    const serializedSelect = JSON.stringify(supportSelect);
+    expect(serializedSelect).not.toContain('documents');
+    expect(serializedSelect).not.toContain('generatedDocuments');
+    expect(serializedSelect).not.toContain('invoices');
+    expect(serializedSelect).not.toContain('attendanceRecords');
+    expect(serializedSelect).not.toContain('medicalConditions');
+    expect(serializedSelect).not.toContain('severeAllergies');
+    expect(serializedSelect).not.toContain('studentIdentityCode');
+    expect(serializedSelect).not.toContain('identities');
+    expect(serializedSelect).not.toContain('qrCredentials');
+    expect(serializedSelect).not.toContain('photoFileId');
+    expect(serializedSelect).not.toContain('restrictionReasonRef');
+    expect(prisma.activityPost.findMany).not.toHaveBeenCalled();
+    expect(fileRegistryService.listFilesByEntity).not.toHaveBeenCalled();
+  });
+
+  it('denies sensitive student read helpers during support override', async () => {
+    const prisma = buildPrisma({});
+    const { service } = buildService(prisma);
+    const supportActor = {
+      ...actor,
+      isSupportOverride: true,
+      supportOverrideReadOnly: true,
+      supportOverrideScopes: ['STUDENT_RECORDS' as const],
+    };
+
+    await expect(
+      service.getFeeClearance('student-1', supportActor),
+    ).rejects.toThrow(ForbiddenException);
+    await expect(
+      service.getStudentIdentity('student-1', supportActor),
+    ).rejects.toThrow(ForbiddenException);
+    await expect(
+      service.getGuardianAccessAdministration(
+        'student-1',
+        'guardian-1',
+        supportActor,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+    await expect(
+      service.listGuardianIdentityVerifications('guardian-1', supportActor),
+    ).rejects.toThrow(ForbiddenException);
+    expect(prisma.student.findFirst).not.toHaveBeenCalled();
   });
 
   it('blocks revoking generated documents before retention expiry', async () => {

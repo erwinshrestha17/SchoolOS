@@ -431,7 +431,14 @@ export class MarksService {
       this.prisma.markEntry.findMany({
         where,
         include: {
-          student: true,
+          student: {
+            select: {
+              id: true,
+              firstNameEn: true,
+              lastNameEn: true,
+              studentSystemId: true,
+            },
+          },
           subject: true,
           assessmentComponent: true,
           examTerm: true,

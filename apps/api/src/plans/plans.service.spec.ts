@@ -334,12 +334,7 @@ describe('PlansService entitlement and usage enforcement', () => {
   });
 });
 
-/**
- * The plan-entitlement cache is cross-request, so these tests pin the one
- * property that makes it safe: the tenant suspension check is evaluated LIVE
- * on every call and is never served from the cache.
- */
-describe('EntitlementsService suspension is never cached', () => {
+describe('EntitlementsService authority is resolved live', () => {
   function build() {
     const store = new Map<string, unknown>();
     const redisCache = {
@@ -383,19 +378,18 @@ describe('EntitlementsService suspension is never cached', () => {
     return { service, prisma, redisCache, store };
   }
 
-  it('caches the plan projection across calls', async () => {
-    const { service, prisma } = build();
+  it('re-reads the plan projection across requests', async () => {
+    const { service, prisma, store } = build();
 
     await service.getEntitlements('tenant-1');
     await service.getEntitlements('tenant-1');
 
-    // The plan half is resolved once...
-    expect(prisma.tenantSubscription.findFirst).toHaveBeenCalledTimes(1);
-    // ...but the suspension check is re-read every time.
+    expect(prisma.tenantSubscription.findFirst).toHaveBeenCalledTimes(2);
     expect(prisma.tenant.findUnique).toHaveBeenCalledTimes(2);
+    expect(store.size).toBe(0);
   });
 
-  it('fails closed the moment a tenant is suspended, with the cache warm', async () => {
+  it('fails closed the moment a tenant is suspended', async () => {
     const { service, prisma } = build();
 
     await expect(service.getEntitlements('tenant-1')).resolves.toEqual(
@@ -404,8 +398,7 @@ describe('EntitlementsService suspension is never cached', () => {
       }),
     );
 
-    // Suspend, with no invalidation call at all — the cached plan entry is
-    // deliberately left in place.
+    // Suspend with no invalidation call at all.
     prisma.tenant.findUnique.mockResolvedValue({ isActive: false });
 
     await expect(service.getEntitlements('tenant-1')).resolves.toEqual({
@@ -432,7 +425,7 @@ describe('EntitlementsService suspension is never cached', () => {
     );
   });
 
-  it('re-reads the plan after invalidation', async () => {
+  it('observes a downgraded plan without relying on Redis invalidation', async () => {
     const { service, prisma } = build();
 
     await service.getEntitlements('tenant-1');
@@ -441,18 +434,9 @@ describe('EntitlementsService suspension is never cached', () => {
       plan: { key: 'starter', features: [] },
     });
 
-    // Without invalidation the old projection stands...
-    await expect(service.getEntitlements('tenant-1')).resolves.toEqual(
-      expect.objectContaining({
-        modules: expect.arrayContaining(['students']),
-      }),
-    );
-
-    await service.invalidateTenantEntitlements('tenant-1');
-
-    // ...and after it, the new plan is visible.
     const after = await service.getEntitlements('tenant-1');
     expect(after.tier).toBe('STARTER');
+    expect(prisma.tenantSubscription.findFirst).toHaveBeenCalledTimes(2);
   });
 
   it('scopes invalidation to one tenant', async () => {

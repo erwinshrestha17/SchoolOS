@@ -44,6 +44,7 @@ import {
 } from '../common/security/parent-scope';
 import { TeacherCapability } from '../teacher-scope/teacher-capability';
 import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
+import { assertProtectedFileAccessAllowed } from '../common/security/support-override-file-access';
 
 const MAX_ACTIVITY_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 const ACTIVITY_MEDIA_CONSENT_BLOCK_REASON = 'PHOTO_USAGE_CONSENT_REQUIRED';
@@ -1393,6 +1394,7 @@ export class ActivityFeedService {
   }
 
   async getAttachmentPreview(actor: AuthContext, attachmentId: string) {
+    assertProtectedFileAccessAllowed(actor);
     const attachment = await this.prisma.activityAttachment.findFirst({
       where: { id: attachmentId, tenantId: actor.tenantId },
       include: { activityPost: true },

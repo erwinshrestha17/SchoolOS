@@ -11,6 +11,7 @@ import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import { AuthenticatedRequest } from '../auth-request.interface';
 import { hasEffectivePermission } from '@schoolos/core';
+import { SecurityDomain } from '@prisma/client';
 
 /**
  * The alias table now lives in `@schoolos/core` (PERMISSION_ALIASES) so the
@@ -43,19 +44,36 @@ export class RolesPermissionsGuard implements CanActivate {
         context.getClass(),
       ]) ?? [];
 
-    if (requiredRoles.length === 0 && requiredPermissions.length === 0) {
-      return true;
-    }
-
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const auth = request.auth;
+
+    if (requiredRoles.length === 0 && requiredPermissions.length === 0) {
+      if (auth?.securityDomain === SecurityDomain.PLATFORM) {
+        throw new ForbiddenException(
+          auth.isSupportOverride
+            ? 'Support override requires an explicitly permissioned read route'
+            : 'Platform identities require an active support override on school routes',
+        );
+      }
+      return true;
+    }
 
     if (!auth) {
       throw new UnauthorizedException('Authentication required');
     }
 
-    if (auth.roles.includes('platform_super_admin')) {
-      return true;
+    if (auth.securityDomain === SecurityDomain.PLATFORM) {
+      if (!auth.isSupportOverride) {
+        throw new ForbiddenException(
+          'Platform identities require an active support override on school routes',
+        );
+      }
+
+      if (requiredRoles.length > 0 || requiredPermissions.length === 0) {
+        throw new ForbiddenException(
+          'Support override requires an explicitly permissioned read route',
+        );
+      }
     }
 
     const hasRole =
@@ -64,7 +82,9 @@ export class RolesPermissionsGuard implements CanActivate {
     const hasPermission =
       requiredPermissions.length === 0 ||
       requiredPermissions.every((permission) =>
-        hasRequiredPermission(auth.permissions, permission),
+        auth.isSupportOverride
+          ? auth.permissions.includes(permission)
+          : hasRequiredPermission(auth.permissions, permission),
       );
 
     if (!hasRole || !hasPermission) {

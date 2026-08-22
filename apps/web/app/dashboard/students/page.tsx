@@ -27,14 +27,28 @@ export default function StudentsPage() {
   const router = useRouter();
   const [pdfError, setPdfError] = useState('');
   const [isExportingIemis, setIsExportingIemis] = useState(false);
-  const { hasPermissions } = useSession();
-  const canManageStudentLifecycle = hasPermissions(['students:manage_lifecycle']);
+  const { hasPermissions, session } = useSession();
+  const canManageStudentLifecycle = hasPermissions([
+    'students:manage_lifecycle',
+  ]);
   const canReadStudents = hasPermissions(['students:read']);
+  const canEditStudents = hasPermissions(['students:update']);
+  const canEditGuardians = hasPermissions(['guardians:update']);
+  const canManageStudentDocuments =
+    hasPermissions(['student_documents:manage']) &&
+    !session?.user.isSupportOverride;
+  const canViewStudentFees =
+    hasPermissions(['fees:manage']) ||
+    hasPermissions(['receipts:read']) ||
+    hasPermissions(['ledger:read']);
+  const canReadStudentQr = hasPermissions(['students:qr:read']);
+  const canExportStudents = hasPermissions(['reports:export']);
   const canCreateAdmission = hasPermissions([
     'enrollments:create',
     'students:create',
     'guardians:create',
   ]);
+  const isSupportOverride = session?.user.isSupportOverride === true;
 
   // URL-backed so refreshing, using browser back/forward, or sharing a link
   // to a filtered roster (e.g. "Grade 6, Section A, page 2") preserves it.
@@ -59,6 +73,7 @@ export default function StudentsPage() {
   const admissionsQuery = useQuery({
     queryKey: ['admissions'],
     queryFn: () => api.listAdmissions({ limit: 100 }),
+    enabled: !isSupportOverride,
   });
   const academicYearsQuery = useQuery({
     queryKey: ['academic-years'],
@@ -79,11 +94,14 @@ export default function StudentsPage() {
         ...serverFilters,
         limit: STUDENT_ROSTER_PAGE_SIZE,
       });
-    }
+    },
   });
   const studentSummaryQuery = useQuery({
     queryKey: ['students', 'module-summary', summaryFilters],
-    queryFn: () => api.getStudentModuleSummary(summaryFilters),
+    queryFn: () =>
+      isSupportOverride
+        ? api.getSupportStudentModuleSummary(summaryFilters)
+        : api.getStudentModuleSummary(summaryFilters),
   });
   async function openStudentPdf(studentId: string, kind: string) {
     setPdfError('');
@@ -161,7 +179,11 @@ export default function StudentsPage() {
     <DashboardPageShell className="gap-5">
       <M1PageHeader
         title="Students"
-        description="Manage enrolled students, guardians, documents, identity records, and enrollment history."
+        description={
+          isSupportOverride
+            ? 'Inspect enrolled student, guardian, and enrollment records in this read-only support session.'
+            : 'Manage enrolled students, guardians, documents, identity records, and enrollment history.'
+        }
         primaryAction={
           canCreateAdmission ? (
             <Button asChild>
@@ -172,48 +194,69 @@ export default function StudentsPage() {
             </Button>
           ) : undefined
         }
-        moreActionItems={[
-          {
-            label: 'Document issues',
-            icon: <FolderOpen size={16} />,
-            onClick: () => router.push('/dashboard/admissions/documents'),
-          },
-          ...(canManageStudentLifecycle
-            ? [
+        moreActionItems={
+          isSupportOverride
+            ? []
+            : [
                 {
-                  label: 'Duplicate review',
-                  icon: <ScanSearch size={16} />,
-                  onClick: () => router.push('/dashboard/admissions/duplicates'),
+                  label: 'Document issues',
+                  icon: <FolderOpen size={16} />,
+                  onClick: () =>
+                    router.push('/dashboard/admissions/documents'),
                 },
+                ...(canManageStudentLifecycle
+                  ? [
+                      {
+                        label: 'Duplicate review',
+                        icon: <ScanSearch size={16} />,
+                        onClick: () =>
+                          router.push('/dashboard/admissions/duplicates'),
+                      },
+                    ]
+                  : []),
+                {
+                  label: 'iEMIS readiness',
+                  icon: <FileCheck2 size={16} />,
+                  onClick: () => router.push('/dashboard/admissions/iemis'),
+                },
+                ...(canReadStudentQr
+                  ? [
+                      {
+                        label: 'QR / ID cards',
+                        icon: <QrCode size={16} />,
+                        onClick: () =>
+                          router.push('/dashboard/admissions/qr'),
+                      },
+                    ]
+                  : []),
+                ...(canExportStudents
+                  ? [
+                      {
+                        label: 'Export directory',
+                        icon: <Download size={16} />,
+                        onClick: () =>
+                          void handleExportRoster('csv', {
+                            academicYearId: filters.academicYearId,
+                            classId: filters.classId,
+                            sectionId: filters.sectionId,
+                          }),
+                      },
+                    ]
+                  : []),
+                ...(canManageStudentLifecycle && canExportStudents
+                  ? [
+                      {
+                        label: isExportingIemis
+                          ? 'Preparing iEMIS export'
+                          : 'Export iEMIS',
+                        icon: <Download size={16} />,
+                        disabled: !canReadStudents || isExportingIemis,
+                        onClick: () => void handleExportIemis(),
+                      },
+                    ]
+                  : []),
               ]
-            : []),
-          {
-            label: 'iEMIS readiness',
-            icon: <FileCheck2 size={16} />,
-            onClick: () => router.push('/dashboard/admissions/iemis'),
-          },
-          {
-            label: 'QR / ID cards',
-            icon: <QrCode size={16} />,
-            onClick: () => router.push('/dashboard/admissions/qr'),
-          },
-          {
-            label: 'Export directory',
-            icon: <Download size={16} />,
-            onClick: () =>
-              void handleExportRoster('csv', {
-                academicYearId: filters.academicYearId,
-                classId: filters.classId,
-                sectionId: filters.sectionId,
-              }),
-          },
-          {
-            label: isExportingIemis ? 'Preparing iEMIS export' : 'Export iEMIS',
-            icon: <Download size={16} />,
-            disabled: !canReadStudents || isExportingIemis,
-            onClick: () => void handleExportIemis(),
-          },
-        ]}
+        }
       />
 
       <StudentDirectory
@@ -223,20 +266,25 @@ export default function StudentsPage() {
         summaryLoading={studentSummaryQuery.isLoading}
         summaryUnavailable={studentSummaryQuery.isError}
         canCreateAdmission={canCreateAdmission}
+        canEditStudents={canEditStudents}
+        canEditGuardians={canEditGuardians}
+        canManageStudentDocuments={canManageStudentDocuments}
+        canViewStudentFees={canViewStudentFees}
+        isSupportOverride={isSupportOverride}
         classes={classesQuery.data ?? []}
         isError={
           academicYearsQuery.isError ||
           classesQuery.isError ||
           sectionsQuery.isError ||
           studentsQuery.isError ||
-          admissionsQuery.isError
+          (!isSupportOverride && admissionsQuery.isError)
         }
         isLoading={
           academicYearsQuery.isLoading ||
           classesQuery.isLoading ||
           sectionsQuery.isLoading ||
           studentsQuery.isLoading ||
-          admissionsQuery.isLoading
+          (!isSupportOverride && admissionsQuery.isLoading)
         }
         pdfError={pdfError}
         onRetry={() => {
@@ -244,7 +292,9 @@ export default function StudentsPage() {
           void classesQuery.refetch();
           void sectionsQuery.refetch();
           void studentsQuery.refetch();
-          void admissionsQuery.refetch();
+          if (!isSupportOverride) {
+            void admissionsQuery.refetch();
+          }
           void studentSummaryQuery.refetch();
         }}
         sections={sectionsQuery.data ?? []}

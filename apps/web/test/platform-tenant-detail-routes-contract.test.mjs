@@ -192,12 +192,22 @@ describe("Platform tenant detail route contracts", () => {
     for (const expected of [
       "updatePlatformTenantStatus",
       "enterPlatformSupportOverride",
+      "SUPPORT_OVERRIDE_SCOPE_DEFINITIONS",
       "durationMinutes",
+      "scopes: supportScopes",
       "expiresAt",
+      "entryPath",
       "queryClient.clear",
     ]) {
       assert.match(access, new RegExp(expected.replace(".", "\\.")));
     }
+    assert.match(
+      access,
+      /useState<SupportOverrideScope\[\]>\(\s*\[\],?\s*\)/,
+    );
+    assert.match(access, /supportScopes\.length === 0/);
+    assert.match(access, /item\.permissionScopes/);
+    assert.match(access, /Read-only support excludes finance, payroll/);
     assert.match(modules, /setPlatformFeatureOverride/);
     assert.match(subscription, /updatePlatformSubscriptionStatus/);
     assert.match(billing, /cancelPlatformSaaSInvoice/);

@@ -1,3 +1,4 @@
+import { ForbiddenException } from '@nestjs/common';
 import { RolesService } from './roles.service';
 
 /** Invalidation is asserted where it matters; elsewhere it is a no-op. */
@@ -36,6 +37,13 @@ describe('RolesService role inspection', () => {
                 },
               },
             ],
+          },
+          {
+            id: 'legacy-platform-role',
+            name: 'platform_super_admin',
+            description: 'Legacy school-local platform role',
+            isSystem: true,
+            rolePermissions: [],
           },
         ]),
       },
@@ -87,6 +95,18 @@ describe('RolesService role inspection', () => {
             action: 'read',
             description: 'View roles',
           },
+          {
+            id: 'perm-platform',
+            resource: 'platform',
+            action: 'manage',
+            description: 'Manage Platform',
+          },
+          {
+            id: 'perm-tenants-manage',
+            resource: 'tenants',
+            action: 'manage',
+            description: 'Manage tenants',
+          },
         ]),
       },
     };
@@ -96,7 +116,12 @@ describe('RolesService role inspection', () => {
       authzCacheDouble(),
     );
 
-    await expect(service.listPermissions()).resolves.toEqual([
+    await expect(
+      service.listPermissions({
+        tenantId: 'tenant-1',
+        userId: 'user-1',
+      } as never),
+    ).resolves.toEqual([
       {
         id: 'perm-1',
         resource: 'roles',
@@ -110,6 +135,32 @@ describe('RolesService role inspection', () => {
       orderBy: [{ resource: 'asc' }, { action: 'asc' }],
     });
   });
+
+  it.each(['platform_operator', ' PLATFORM_FUTURE_ROLE '])(
+    'rejects reserved Platform role name %p before creating a school role',
+    async (name) => {
+      const prisma = {
+        role: {
+          findUnique: jest.fn(),
+          create: jest.fn(),
+        },
+      };
+      const service = new RolesService(
+        prisma as never,
+        auditService as never,
+        authzCacheDouble(),
+      );
+
+      await expect(
+        service.createRole(
+          { name, description: 'Reserved role' } as never,
+          { tenantId: 'tenant-1', userId: 'admin-1' } as never,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prisma.role.findUnique).not.toHaveBeenCalled();
+      expect(prisma.role.create).not.toHaveBeenCalled();
+    },
+  );
 });
 
 /**
@@ -126,9 +177,11 @@ describe('RolesService authorization cache invalidation', () => {
     };
     const prisma = {
       role: {
-        findFirst: jest
-          .fn()
-          .mockResolvedValue({ id: 'role-1', isSystem: false }),
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'role-1',
+          name: 'teacher',
+          isSystem: false,
+        }),
         findUnique: jest.fn().mockResolvedValue({ id: 'role-1' }),
         create: jest.fn().mockResolvedValue({ id: 'role-1' }),
         findMany: jest
@@ -136,9 +189,10 @@ describe('RolesService authorization cache invalidation', () => {
           .mockResolvedValue([{ id: 'role-1', name: 'teacher' }]),
       },
       permission: {
-        findMany: jest
-          .fn()
-          .mockResolvedValue([{ id: 'perm-1' }, { id: 'perm-2' }]),
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'perm-1', resource: 'students', action: 'read' },
+          { id: 'perm-2', resource: 'attendance', action: 'read' },
+        ]),
       },
       rolePermission: {
         deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
@@ -205,6 +259,42 @@ describe('RolesService authorization cache invalidation', () => {
       'tenant-1',
       'user-9',
     );
+    expect(authzCache.invalidateTenant).not.toHaveBeenCalled();
+  });
+
+  it('rejects a legacy school-local Platform role assignment before mutation', async () => {
+    const { service, prisma, authzCache } = buildService();
+    prisma.role.findMany.mockResolvedValue([
+      { id: 'legacy-platform-role', name: 'platform_super_admin' },
+    ]);
+
+    await expect(
+      service.assignRoles(
+        { userId: 'user-9', roleIds: ['legacy-platform-role'] } as never,
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(authzCache.invalidateUser).not.toHaveBeenCalled();
+  });
+
+  it('rejects a Platform permission grant before replacing school grants', async () => {
+    const { service, prisma, authzCache } = buildService();
+    prisma.permission.findMany.mockResolvedValue([
+      { id: 'perm-platform', resource: 'platform', action: 'manage' },
+    ]);
+
+    await expect(
+      service.assignPermissions(
+        'role-1',
+        { permissionIds: ['perm-platform'] } as never,
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.rolePermission.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.rolePermission.createMany).not.toHaveBeenCalled();
     expect(authzCache.invalidateTenant).not.toHaveBeenCalled();
   });
 

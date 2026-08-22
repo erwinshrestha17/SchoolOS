@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { createHmac } from 'node:crypto';
 import { NotificationStatus } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
@@ -34,6 +34,7 @@ describe('M10HardeningService operations depth', () => {
         findMany: jest.fn(),
         count: jest.fn(),
       },
+      $queryRaw: jest.fn(),
     };
     const auditService = {
       record: jest.fn(),
@@ -86,6 +87,75 @@ describe('M10HardeningService operations depth', () => {
         thread: { status: 'CLOSED' },
       }),
     });
+  });
+
+  it('preserves ordinary legacy notice list and detail behavior', async () => {
+    const { service, prisma } = createService();
+    const publishedAt = new Date('2026-05-31T09:00:00.000Z');
+    const createdAt = new Date('2026-05-30T09:00:00.000Z');
+    const notice = {
+      id: 'notice-1',
+      title: 'School closure',
+      body: 'The school will remain closed tomorrow.',
+      priority: 'URGENT',
+      audienceType: 'ALL',
+      classId: null,
+      sectionId: null,
+      publishedAt,
+      createdAt,
+      readAt: null,
+    };
+    prisma.$queryRaw
+      .mockResolvedValueOnce([notice])
+      .mockResolvedValueOnce([{ total: 1n }])
+      .mockResolvedValueOnce([{ ...notice, readAt: publishedAt }]);
+
+    await expect(
+      service.listNoticesWithReadStatus(actor, { page: 1, limit: 25 }),
+    ).resolves.toEqual({
+      items: [
+        expect.objectContaining({
+          id: 'notice-1',
+          publishedAt: publishedAt.toISOString(),
+          createdAt: createdAt.toISOString(),
+          readAt: null,
+          isRead: false,
+        }),
+      ],
+      total: 1,
+      page: 1,
+      limit: 25,
+      hasNextPage: false,
+    });
+    await expect(
+      service.getNoticeDetailWithReadStatus('notice-1', actor),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        id: 'notice-1',
+        readAt: publishedAt.toISOString(),
+        isRead: true,
+      }),
+    );
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(3);
+  });
+
+  it('denies support overrides before legacy notice list or detail queries', async () => {
+    const { service, prisma } = createService();
+    const supportActor: AuthContext = {
+      ...actor,
+      roles: [],
+      permissions: ['notices:read'],
+      isSupportOverride: true,
+    };
+
+    await expect(
+      service.listNoticesWithReadStatus(supportActor),
+    ).rejects.toThrow(ForbiddenException);
+    await expect(
+      service.getNoticeDetailWithReadStatus('notice-1', supportActor),
+    ).rejects.toThrow(ForbiddenException);
+
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
   });
 
   it('returns a paginated communication audit trail scoped to allowed resources', async () => {
@@ -141,6 +211,23 @@ describe('M10HardeningService operations depth', () => {
     await expect(
       service.listCommunicationAuditTrail({ resource: 'journal_entry' }, actor),
     ).rejects.toThrow(BadRequestException);
+  });
+
+  it('denies support overrides before communication audit records are read', async () => {
+    const { service, prisma } = createService();
+    const supportActor: AuthContext = {
+      ...actor,
+      roles: [],
+      permissions: ['communications:read_deliveries'],
+      isSupportOverride: true,
+    };
+
+    await expect(
+      service.listCommunicationAuditTrail({}, supportActor),
+    ).rejects.toThrow(ForbiddenException);
+
+    expect(prisma.auditLog.findMany).not.toHaveBeenCalled();
+    expect(prisma.auditLog.count).not.toHaveBeenCalled();
   });
 
   it('rejects forged provider callbacks with mismatched provider message ids', async () => {

@@ -9,6 +9,7 @@ import { useNoticeCapabilities } from '@/lib/permissions-ui';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { TablePagination } from '@/components/ui/table-pagination';
+import { useSession } from '@/components/session-provider';
 
 const PAGE_SIZE = 25;
 
@@ -20,11 +21,13 @@ export function NoticeAcknowledgementPanel({
   lifecycleStatus: string;
 }) {
   const queryClient = useQueryClient();
+  const { session } = useSession();
   const noticeCaps = useNoticeCapabilities();
   const canReadReport =
     noticeCaps.resolution === 'granted' && noticeCaps.canReadReports;
   const canAcknowledge =
     noticeCaps.resolution === 'granted' &&
+    !session?.user.isSupportOverride &&
     noticeCaps.canView &&
     lifecycleStatus === 'PUBLISHED';
   const [status, setStatus] = useState<'PENDING' | 'ACKNOWLEDGED'>('PENDING');

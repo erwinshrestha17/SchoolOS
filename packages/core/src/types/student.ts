@@ -255,14 +255,14 @@ export type StudentModuleSummary = {
   archivedStudents: number;
   mergedStudents: number;
   deletedStudents: number;
-  newAdmissions: number;
-  pendingApplications: number;
-  missingDocuments: number;
-  duplicateCandidates: number;
-  iemisReady: number;
-  iemisIssues: number;
-  qrActive: number;
-  qrMissing: number;
+  newAdmissions: number | null;
+  pendingApplications: number | null;
+  missingDocuments: number | null;
+  duplicateCandidates: number | null;
+  iemisReady: number | null;
+  iemisIssues: number | null;
+  qrActive: number | null;
+  qrMissing: number | null;
   byStatus: Array<{ status: StudentLifecycleStatus; count: number }>;
   filters: {
     academicYearId: string | null;

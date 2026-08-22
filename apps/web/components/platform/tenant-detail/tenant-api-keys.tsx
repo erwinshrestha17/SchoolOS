@@ -1,8 +1,9 @@
 "use client";
 
-import type {
-  PlatformApiKeyCreated,
-  PlatformApiKeySummary,
+import {
+  formatBsDate,
+  type PlatformApiKeyCreated,
+  type PlatformApiKeySummary,
 } from "@schoolos/core";
 import { Copy, KeyRound, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -425,10 +426,11 @@ function makeDefaultForm() {
 }
 
 function formatDate(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? "Date not recorded"
-    : date.toLocaleDateString();
+  try {
+    return formatBsDate(value);
+  } catch {
+    return "Date not recorded";
+  }
 }
 
 function getErrorMessage(error: unknown) {

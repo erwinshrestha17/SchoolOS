@@ -27,32 +27,37 @@ import { WorkspaceTabs } from '@/components/ui/module-tabs';
 import { WorkSurface } from '@/components/ui/work-surface';
 import { Button } from '@/components/ui/primitives/button';
 import { api } from '@/lib/api';
+import { SupportAcademicsOverview } from '@/components/academics/support-academics-overview';
 
 const workflowSections = [
   {
     title: 'Exam setup',
-    description: 'Configure exam terms, assessment components, and subject structures before marks entry.',
+    description:
+      'Configure exam terms, assessment components, and subject structures before marks entry.',
     href: '/dashboard/academics/exam-terms',
     action: 'Open exam setup',
     icon: Settings,
   },
   {
     title: 'Marks and CAS',
-    description: 'Work inside assigned class, section, subject, term, and component scope.',
+    description:
+      'Work inside assigned class, section, subject, term, and component scope.',
     href: '/dashboard/academics/marks',
     action: 'Enter marks',
     icon: PencilLine,
   },
   {
     title: 'Report cards',
-    description: 'Generate and monitor job-backed report cards, corrections, history, and protected PDFs.',
+    description:
+      'Generate and monitor job-backed report cards, corrections, history, and protected PDFs.',
     href: '/dashboard/academics/report-cards',
     action: 'Open report cards',
     icon: FileText,
   },
   {
     title: 'Results and publishing',
-    description: 'Review calculated results before controlling visibility for approved audiences.',
+    description:
+      'Review calculated results before controlling visibility for approved audiences.',
     href: '/dashboard/academics/results',
     action: 'Review results',
     icon: Megaphone,
@@ -60,6 +65,16 @@ const workflowSections = [
 ];
 
 export default function AcademicsOverviewPage() {
+  const { session } = useSession();
+
+  if (session?.user.isSupportOverride) {
+    return <SupportAcademicsOverview />;
+  }
+
+  return <SchoolAcademicsOverviewPage />;
+}
+
+function SchoolAcademicsOverviewPage() {
   const router = useRouter();
   const { hasPermissions, session } = useSession();
   const canManageAcademics = hasPermissions(['academics:manage']);
@@ -86,7 +101,7 @@ export default function AcademicsOverviewPage() {
       <ModuleHeader
         eyebrow="Academics & Exams"
         title="Academics"
-        description={`Manage exam terms, marks, CAS, report cards, and result publishing${session?.tenant.name ? ` for ${session.tenant.name}` : ''}. Official readiness is confirmed from saved school records.`}
+        description={`Manage exam terms, marks, CAS, report cards, and result publishing${session?.tenant.name ? ` for ${session.tenant.name}` : ''}. Official readiness remains backend-owned and is confirmed from saved school records.`}
         primaryAction={
           canManageAcademics ? (
             <Button asChild>
@@ -110,7 +125,8 @@ export default function AcademicsOverviewPage() {
                 {
                   label: 'Assessment Components',
                   icon: <Layers3 size={16} />,
-                  onClick: () => router.push('/dashboard/academics/assessment-components'),
+                  onClick: () =>
+                    router.push('/dashboard/academics/assessment-components'),
                 },
                 {
                   label: 'Retest Queue',
@@ -190,7 +206,7 @@ export default function AcademicsOverviewPage() {
 
         <WorkSurface
           title="Core academic workspaces"
-          description="Open the next focused job. Marks, locks, grading, promotion, publishing, and protected report cards remain permission-controlled across M4 workspaces."
+          description="Open the next focused job. Marks, locks, grading, promotion, publishing, and protected PDF access remain permission-controlled in tenant-scoped and permissioned M4 workspaces."
           flush
         >
           <div className="divide-y divide-slate-100">
@@ -206,8 +222,12 @@ export default function AcademicsOverviewPage() {
                     <Icon size={19} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h2 className="text-base font-bold text-slate-950">{section.title}</h2>
-                    <p className="mt-1 text-sm leading-6 text-slate-500">{section.description}</p>
+                    <h2 className="text-base font-bold text-slate-950">
+                      {section.title}
+                    </h2>
+                    <p className="mt-1 text-sm leading-6 text-slate-500">
+                      {section.description}
+                    </p>
                   </div>
                   <span className="hidden shrink-0 text-sm font-bold text-[var(--color-mod-academics-text)] sm:block">
                     {section.action}
@@ -217,7 +237,6 @@ export default function AcademicsOverviewPage() {
             })}
           </div>
         </WorkSurface>
-
       </div>
     </DashboardPageShell>
   );

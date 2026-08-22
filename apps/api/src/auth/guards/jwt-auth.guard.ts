@@ -6,16 +6,27 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { Reflector } from '@nestjs/core';
 import { ClsService } from 'nestjs-cls';
 import { AuditService } from '../../audit/audit.service';
 import { ConfigService } from '../../config/config.service';
 import { PrismaService, TENANT_ID_KEY } from '../../prisma/prisma.service';
 import { AuthenticatedRequest } from '../auth-request.interface';
-import { JwtAccessPayload } from '../auth.types';
+import { AuthContext, JwtAccessPayload } from '../auth.types';
 import { parseCookie } from '../auth.utils';
 import { MustChangePasswordGuard } from './must-change-password.guard';
 import { AuthzCacheService } from '../authz-cache.service';
 import { RequestCacheService } from '../../common/cache/request-cache.service';
+import {
+  isPlatformRoleName,
+  isSupportOverrideScope,
+  resolveSupportOverridePermissions,
+  type SupportOverrideScope,
+} from '@schoolos/core';
+import { SecurityDomain } from '@prisma/client';
+import { SUPPORT_OVERRIDE_READ_SCOPES_KEY } from '../decorators/allow-support-override-read.decorator';
+
+const READ_ONLY_HTTP_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -28,6 +39,7 @@ export class JwtAuthGuard implements CanActivate {
     private readonly mustChangePasswordGuard: MustChangePasswordGuard,
     private readonly authzCache: AuthzCacheService,
     private readonly requestCache: RequestCacheService,
+    private readonly reflector: Reflector,
   ) {}
 
   async canActivate(context: ExecutionContext) {
@@ -80,7 +92,14 @@ export class JwtAuthGuard implements CanActivate {
             status: true,
             tenantId: true,
             mustChangePassword: true,
-            tenant: { select: { id: true, isActive: true } },
+            tenant: {
+              select: {
+                id: true,
+                slug: true,
+                isActive: true,
+                securityDomain: true,
+              },
+            },
           },
         }),
     );
@@ -96,31 +115,71 @@ export class JwtAuthGuard implements CanActivate {
     // Roles and permissions are derived, slow-changing data with an explicit
     // invalidation contract (see AuthzCacheService). Resolving them here
     // replaces four nested-include round-trips on every authenticated request.
-    const { roles, permissions: permissionKeys } =
-      await this.authzCache.resolve(payload.tenantId, user.id);
+    let { roles, permissions: permissionKeys } = await this.authzCache.resolve(
+      payload.tenantId,
+      user.id,
+      user.tenant.securityDomain,
+    );
+
+    if (
+      user.tenant.securityDomain === SecurityDomain.SCHOOL &&
+      roles.some(isPlatformRoleName)
+    ) {
+      throw new ForbiddenException(
+        'Platform roles are invalid in the school security domain',
+      );
+    }
 
     const overrideTenantId = resolveHeader(
       request.headers['x-schoolos-tenant-id'],
     );
-    const isPlatformUser = roles.includes('platform_super_admin');
+    const overrideReason = resolveHeader(
+      request.headers['x-schoolos-tenant-override-reason'],
+    );
+    const overrideId = resolveHeader(
+      request.headers['x-schoolos-support-override-id'],
+    );
+    const isPlatformUser =
+      user.tenant.securityDomain === SecurityDomain.PLATFORM &&
+      roles.includes('platform_super_admin');
 
     let effectiveTenantId = payload.tenantId;
+    let effectiveTenantSlug = user.tenant.slug;
+    let supportOverrideScopes: AuthContext['supportOverrideScopes'];
+    let supportOverrideReadOnly: boolean | undefined;
 
     if (overrideTenantId) {
+      if (!overrideId) {
+        throw new ForbiddenException(
+          'Tenant override requires the active support session identifier',
+        );
+      }
       if (!isPlatformUser) {
         throw new ForbiddenException(
           'Tenant override requires platform super admin',
         );
       }
 
-      const activeOverride = await this.prisma.supportOverride.findFirst({
-        where: {
-          platformUserId: user.id,
-          tenantId: overrideTenantId,
-          isActive: true,
-          expiresAt: { gt: new Date() },
-        },
-      });
+      const activeOverride = await this.prisma.runWithoutTenantScope(
+        'authenticate: resolve a purpose-limited support override before target tenant context exists',
+        () =>
+          this.prisma.supportOverride.findFirst({
+            where: {
+              id: overrideId,
+              platformUserId: user.id,
+              tenantId: overrideTenantId,
+              isActive: true,
+              expiresAt: { gt: new Date() },
+            },
+            select: {
+              id: true,
+              reason: true,
+              permissionScopes: true,
+              readOnly: true,
+              expiresAt: true,
+            },
+          }),
+      );
 
       if (!activeOverride) {
         throw new ForbiddenException(
@@ -128,15 +187,71 @@ export class JwtAuthGuard implements CanActivate {
         );
       }
 
-      const reason = resolveHeader(
-        request.headers['x-schoolos-tenant-override-reason'],
-      );
-
-      if (!reason || reason.trim().length < 5) {
+      const reason = overrideReason?.trim();
+      if (
+        !reason ||
+        reason.length < 5 ||
+        reason !== activeOverride.reason.trim()
+      ) {
         throw new ForbiddenException(
-          'Tenant override requires an explicit reason of at least 5 characters',
+          'Tenant override reason does not match the active support session',
         );
       }
+
+      const approvedScopes = activeOverride.permissionScopes.filter(
+        isSupportOverrideScope,
+      );
+      if (
+        !activeOverride.readOnly ||
+        approvedScopes.length === 0 ||
+        approvedScopes.length !== activeOverride.permissionScopes.length
+      ) {
+        throw new ForbiddenException(
+          'Support override is missing an approved read-only scope',
+        );
+      }
+
+      if (
+        !READ_ONLY_HTTP_METHODS.has((request.method ?? 'GET').toUpperCase())
+      ) {
+        throw new ForbiddenException('Support override is read-only');
+      }
+
+      const effectiveTenant =
+        await this.resolveOverrideTenant(overrideTenantId);
+      const routeScopes =
+        this.reflector.getAllAndOverride<SupportOverrideScope[]>(
+          SUPPORT_OVERRIDE_READ_SCOPES_KEY,
+          [context.getHandler()],
+        ) ?? [];
+      if (!routeScopes.some((scope) => approvedScopes.includes(scope))) {
+        await this.auditService.record({
+          action: 'tenant_override_denied',
+          resource: 'auth',
+          tenantId: payload.tenantId,
+          userId: user.id,
+          after: {
+            originalTenantId: payload.tenantId,
+            requestedTenantId: overrideTenantId,
+            reason,
+            permissionScopes: approvedScopes,
+            readOnly: true,
+            overrideId: activeOverride.id,
+            requestMethod: (request.method ?? 'GET').toUpperCase(),
+            routeController: context.getClass().name || 'anonymous',
+            routeHandler: context.getHandler().name || 'anonymous',
+            denialReason: 'route_not_approved_for_support_override',
+          },
+        });
+        throw new ForbiddenException(
+          'Support override is not approved for this route',
+        );
+      }
+
+      supportOverrideScopes = approvedScopes;
+      supportOverrideReadOnly = true;
+      roles = [];
+      permissionKeys = resolveSupportOverridePermissions(supportOverrideScopes);
 
       await this.auditService.record({
         action: 'tenant_override',
@@ -147,10 +262,21 @@ export class JwtAuthGuard implements CanActivate {
           originalTenantId: payload.tenantId,
           effectiveTenantId: overrideTenantId,
           reason,
+          permissionScopes: supportOverrideScopes,
+          readOnly: true,
+          overrideId: activeOverride.id,
+          requestMethod: (request.method ?? 'GET').toUpperCase(),
+          routeController: context.getClass().name || 'anonymous',
+          routeHandler: context.getHandler().name || 'anonymous',
         },
       });
 
-      effectiveTenantId = await this.resolveOverrideTenantId(overrideTenantId);
+      effectiveTenantId = effectiveTenant.id;
+      effectiveTenantSlug = effectiveTenant.slug;
+    } else if (overrideReason || overrideId) {
+      throw new ForbiddenException(
+        'Support override headers require an active target tenant header',
+      );
     }
 
     request.auth = {
@@ -158,7 +284,10 @@ export class JwtAuthGuard implements CanActivate {
       tenantId: effectiveTenantId,
       originalTenantId: payload.tenantId,
       isSupportOverride: effectiveTenantId !== payload.tenantId,
-      tenantSlug: payload.tenantSlug,
+      supportOverrideScopes,
+      supportOverrideReadOnly,
+      securityDomain: user.tenant.securityDomain,
+      tenantSlug: effectiveTenantSlug,
       email: user.email,
       authMethod: payload.authMethod,
       mustChangePassword: user.mustChangePassword,
@@ -211,17 +340,22 @@ export class JwtAuthGuard implements CanActivate {
     throw new UnauthorizedException('Missing access token');
   }
 
-  private async resolveOverrideTenantId(tenantId: string) {
+  private async resolveOverrideTenant(tenantId: string) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
-      select: { id: true, isActive: true },
+      select: {
+        id: true,
+        slug: true,
+        isActive: true,
+        securityDomain: true,
+      },
     });
 
-    if (!tenant?.isActive) {
+    if (!tenant?.isActive || tenant.securityDomain !== SecurityDomain.SCHOOL) {
       throw new ForbiddenException('Tenant override is not allowed');
     }
 
-    return tenant.id;
+    return tenant;
   }
 }
 

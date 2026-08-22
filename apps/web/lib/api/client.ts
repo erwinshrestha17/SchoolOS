@@ -132,14 +132,9 @@ import type {
   AttendanceRoster,
   CashierClosePreview,
   InvoiceDetail,
+  EnterSupportOverridePayload,
 } from "@schoolos/core";
-import {
-  clearStoredSession,
-  getSupportOverrideTenantId,
-  getSupportOverrideReason,
-  setSupportOverride,
-  clearSupportOverride,
-} from "../session";
+import { clearStoredSession, readSupportOverrideContext } from "../session";
 import { assertOnlineForMutation } from "../offline-policy";
 
 export const API_BASE_URL =
@@ -202,6 +197,7 @@ export type RequestOptions = RequestInit & {
   auth?: boolean;
   json?: JsonBody;
   retryOnUnauthorized?: boolean;
+  supportOverride?: "include" | "omit";
 };
 
 export type AssignPlatformTenantSubscriptionPayload = Record<
@@ -217,11 +213,8 @@ export type AssignPlatformTenantSubscriptionPayload = Record<
   notes?: string;
 };
 
-export type PlatformSupportOverridePayload = Record<string, unknown> & {
-  tenantId: string;
-  reason: string;
-  durationMinutes?: number;
-};
+export type PlatformSupportOverridePayload = EnterSupportOverridePayload &
+  Record<string, unknown>;
 
 export type PlatformAuditLogFilters = {
   page?: number;
@@ -282,13 +275,19 @@ export async function request<T>(path: string, init?: RequestOptions) {
     }
   }
 
-  const overrideTenantId = getSupportOverrideTenantId();
-  const overrideReason = getSupportOverrideReason();
-  if (overrideTenantId) {
-    headers["X-SchoolOS-Tenant-Id"] = overrideTenantId;
+  const supportOverride =
+    init?.supportOverride === "omit" ? null : readSupportOverrideContext();
+  if (supportOverride && unsafeMethods.includes(method)) {
+    throw new ApiRequestError(
+      "This support session is read-only. No school change was sent.",
+      403,
+      requestId,
+    );
   }
-  if (overrideReason) {
-    headers["X-SchoolOS-Tenant-Override-Reason"] = overrideReason;
+  if (supportOverride) {
+    headers["X-SchoolOS-Tenant-Id"] = supportOverride.tenantId;
+    headers["X-SchoolOS-Tenant-Override-Reason"] = supportOverride.reason;
+    headers["X-SchoolOS-Support-Override-Id"] = supportOverride.overrideId;
   }
 
   const response = await fetch(`${API_BASE_URL}${path}`, {

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  formatBsDate,
   getNepalSchoolDay,
   type PlatformSaaSInvoiceSummary,
 } from "@schoolos/core";
@@ -933,7 +934,7 @@ function formatDate(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? "Date not recorded"
-    : date.toLocaleDateString();
+    : formatBsDate(date);
 }
 
 function formatMoney(currency: string, value: string) {

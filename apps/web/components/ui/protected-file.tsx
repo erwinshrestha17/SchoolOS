@@ -3,13 +3,11 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { useState } from 'react';
 import { CheckCircle2, Download, ExternalLink, Loader2 } from 'lucide-react';
-import {
-  downloadProtectedFile,
-  openProtectedFile,
-} from '../../lib/api/client';
+import { downloadProtectedFile, openProtectedFile } from '../../lib/api/client';
 import { cn } from '../../lib/utils';
 import { Button, type ButtonProps } from './button';
 import { Tooltip } from './tooltip';
+import { useSession } from '../session-provider';
 
 type ProtectedFileAction = 'preview' | 'download';
 type ProtectedFileStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -168,6 +166,8 @@ export function ProtectedFileButton({
   size = 'sm',
   ...buttonProps
 }: ProtectedFileButtonProps) {
+  const { session } = useSession();
+  const blockedBySupportOverride = Boolean(session?.user.isSupportOverride);
   const protectedFile = useProtectedFileAction({
     action,
     fileAssetId,
@@ -180,7 +180,11 @@ export function ProtectedFileButton({
   });
   const Icon = action === 'download' ? Download : ExternalLink;
   const text = label || actionText(action);
-  const accessibleName = ariaLabel || text;
+  const supportOverrideLabel =
+    'Protected files are unavailable during read-only support access';
+  const accessibleName = blockedBySupportOverride
+    ? supportOverrideLabel
+    : ariaLabel || text;
 
   const button = (
     <Button
@@ -188,7 +192,7 @@ export function ProtectedFileButton({
       type="button"
       variant={variant}
       size={size}
-      disabled={disabled || !fileAssetId}
+      disabled={disabled || !fileAssetId || blockedBySupportOverride}
       onClick={() => void protectedFile.run()}
       aria-label={accessibleName}
     >
@@ -197,18 +201,24 @@ export function ProtectedFileButton({
           <Loader2 className="h-4 w-4 animate-spin" />
           {size === 'icon' ? null : loadingLabel || loadingText(action)}
         </>
-      ) : children || (
-        <>
-          <Icon className="h-4 w-4" />
-          {text}
-        </>
+      ) : (
+        children || (
+          <>
+            <Icon className="h-4 w-4" />
+            {text}
+          </>
+        )
       )}
     </Button>
   );
 
   return (
     <span className="inline-flex flex-col">
-      {size === 'icon' ? <Tooltip content={accessibleName}>{button}</Tooltip> : button}
+      {size === 'icon' || blockedBySupportOverride ? (
+        <Tooltip content={accessibleName}>{button}</Tooltip>
+      ) : (
+        button
+      )}
       {showStatus ? (
         <ProtectedFileStatusText
           message={protectedFile.message}
@@ -244,6 +254,8 @@ export function ProtectedFileLink({
   className,
   ...buttonProps
 }: ProtectedFileLinkProps) {
+  const { session } = useSession();
+  const blockedBySupportOverride = Boolean(session?.user.isSupportOverride);
   const protectedFile = useProtectedFileAction({
     action,
     fileAssetId,
@@ -263,15 +275,25 @@ export function ProtectedFileLink({
           ? Download
           : ExternalLink;
   const text = label || actionText(action);
+  const supportOverrideLabel =
+    'Protected files are unavailable during read-only support access';
+  const accessibleName = blockedBySupportOverride
+    ? supportOverrideLabel
+    : ariaLabel || text;
 
   return (
     <span className="inline-flex flex-col">
       <button
         {...buttonProps}
         type="button"
-        disabled={disabled || !fileAssetId || protectedFile.isLoading}
+        disabled={
+          disabled ||
+          !fileAssetId ||
+          protectedFile.isLoading ||
+          blockedBySupportOverride
+        }
         onClick={() => void protectedFile.run()}
-        aria-label={ariaLabel || text}
+        aria-label={accessibleName}
         className={cn(
           'inline-flex items-center gap-2 text-sm font-bold text-[var(--primary)] underline-offset-4 transition hover:text-[var(--primary-dark)] hover:underline disabled:cursor-not-allowed disabled:text-slate-400',
           className,

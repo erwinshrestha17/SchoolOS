@@ -3,6 +3,11 @@ enum Mode {
   MULTI
 }
 
+enum SecurityDomain {
+  SCHOOL
+  PLATFORM
+}
+
 enum UserStatus {
   PENDING
   ACTIVE

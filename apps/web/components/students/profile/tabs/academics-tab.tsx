@@ -4,6 +4,7 @@ import { StudentProfileDetail } from '@schoolos/core';
 import { SectionCard } from '@/components/ui/section-card';
 import { FileText, Download, Award, Calendar, BookOpen } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { useSession } from '@/components/session-provider';
 
 type AcademicsTabProps = {
   profile: StudentProfileDetail;
@@ -11,13 +12,17 @@ type AcademicsTabProps = {
 };
 
 export function AcademicsTab({ profile, onOpenPdf }: AcademicsTabProps) {
+  const { session } = useSession();
+  const canViewReportCards = session?.user.isSupportOverride !== true;
   const reportCards = (profile.generatedDocuments || []).filter(
     (doc) => doc.kind.toLowerCase() === 'report-card' || doc.kind.toLowerCase() === 'report_card'
   );
 
   return (
     <div className="space-y-8 animate-fade-in">
-      <div className="grid gap-8 lg:grid-cols-2">
+      <div
+        className={canViewReportCards ? 'grid gap-8 lg:grid-cols-2' : 'grid gap-8'}
+      >
         <SectionCard
           title="Enrollment History"
           description="Historic and current academic placements for this student."
@@ -71,10 +76,11 @@ export function AcademicsTab({ profile, onOpenPdf }: AcademicsTabProps) {
           )}
         </SectionCard>
 
-        <SectionCard
-          title="Generated Report Cards"
-          description="Download official term results and continuous assessments."
-        >
+        {canViewReportCards ? (
+          <SectionCard
+            title="Generated Report Cards"
+            description="Download official term results and continuous assessments."
+          >
           {reportCards.length > 0 ? (
             <div className="space-y-3">
               {reportCards.map((doc) => (
@@ -123,7 +129,8 @@ export function AcademicsTab({ profile, onOpenPdf }: AcademicsTabProps) {
               </p>
             </div>
           )}
-        </SectionCard>
+          </SectionCard>
+        ) : null}
       </div>
     </div>
   );

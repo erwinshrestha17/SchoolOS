@@ -1,5 +1,7 @@
 import {
+  ArrayMaxSize,
   ArrayMinSize,
+  ArrayUnique,
   IsArray,
   IsBoolean,
   IsDateString,
@@ -14,12 +16,17 @@ import {
   IsString,
   IsUrl,
   Matches,
+  Max,
   Min,
   MinLength,
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import {
+  SUPPORT_OVERRIDE_SCOPES,
+  type SupportOverrideScope,
+} from '@schoolos/core';
 
 const SAAS_INVOICE_STATUSES = [
   'DRAFT',
@@ -443,10 +450,18 @@ export class EnterSupportOverrideDto {
   @MinLength(5)
   reason!: string;
 
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(6)
+  @ArrayUnique()
+  @IsIn(SUPPORT_OVERRIDE_SCOPES, { each: true })
+  scopes!: SupportOverrideScope[];
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(60)
   durationMinutes?: number;
 }
 

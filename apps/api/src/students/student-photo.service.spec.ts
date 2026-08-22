@@ -1,4 +1,8 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { FileStatus } from '@prisma/client';
 import { StudentPhotoService } from './student-photo.service';
 import type { AuthContext } from '../auth/auth.types';
@@ -28,6 +32,7 @@ function createServiceMocks() {
 
   const storageService = {
     saveBufferObject: jest.fn(),
+    getObjectBuffer: jest.fn(),
   };
 
   const fileRegistryService = {
@@ -54,6 +59,26 @@ function createServiceMocks() {
 }
 
 describe('StudentPhotoService', () => {
+  it.each(['access', 'content'] as const)(
+    'denies student photo %s during a support override before student lookup',
+    async (operation) => {
+      const { service, prisma, storageService, fileRegistryService } =
+        createServiceMocks();
+      const overrideActor = { ...actor, isSupportOverride: true };
+
+      const result =
+        operation === 'access'
+          ? service.getPhotoAccess('student-1', overrideActor, 'preview')
+          : service.getPhotoContent('student-1', overrideActor);
+
+      await expect(result).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prisma.student.findFirst).not.toHaveBeenCalled();
+      expect(fileRegistryService.auditAccess).not.toHaveBeenCalled();
+      expect(fileRegistryService.getSignedUrl).not.toHaveBeenCalled();
+      expect(storageService.getObjectBuffer).not.toHaveBeenCalled();
+    },
+  );
+
   it('rejects cross-tenant or missing students before uploading a photo', async () => {
     const { service, prisma, storageService } = createServiceMocks();
     prisma.student.findFirst.mockResolvedValue(null);

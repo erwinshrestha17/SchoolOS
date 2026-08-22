@@ -13,6 +13,7 @@ import {
   ProviderType,
   StudentLifecycleStatus,
 } from '@prisma/client';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from './communications.service';
 import { UsageService } from '../usage/usage.service';
@@ -1532,6 +1533,48 @@ describe('CommunicationsService', () => {
     }
   });
 
+  it('projects only delivery diagnostics for support without scheduled notices or chat state', async () => {
+    const supportActor: AuthContext = {
+      ...actor,
+      userId: 'platform-operator-1',
+      roles: [],
+      permissions: ['notices:read', 'notifications:view_delivery_diagnostics'],
+      isSupportOverride: true,
+      supportOverrideReadOnly: true,
+      supportOverrideScopes: ['NOTICES_DELIVERY'],
+    };
+    prisma.notificationDelivery.count
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(11)
+      .mockResolvedValueOnce(2);
+    jest
+      .spyOn(service, 'getCommunicationProviderDiagnostics')
+      .mockResolvedValue({
+        generatedAt: new Date().toISOString(),
+        overallMode: 'configured',
+        health: 'degraded',
+        channels: [],
+      });
+
+    const summary = await service.getCommunicationsSummary(supportActor);
+
+    expect(summary).toEqual(
+      expect.objectContaining({
+        sentToday: 11,
+        failedDeliveries: 2,
+        scheduledNotices: null,
+        unreadHighImpactNotices: null,
+        escalatedChatCount: null,
+        providerStatus: 'configured',
+        providerHealth: 'degraded',
+      }),
+    );
+    expect(prisma.notice.count).not.toHaveBeenCalled();
+    expect(prisma.parentTeacherThread.count).not.toHaveBeenCalled();
+    expect(prisma.notificationDelivery.count).toHaveBeenCalledTimes(4);
+  });
+
   it('returns provider diagnostics without leaking secrets or recipient destinations', async () => {
     const previousMode = process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE;
     process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE = 'configured';
@@ -1816,6 +1859,22 @@ describe('CommunicationsService', () => {
     );
   });
 
+  it('denies support overrides before raw delivery records are read', async () => {
+    const supportActor: AuthContext = {
+      ...actor,
+      roles: [],
+      permissions: ['communications:read_deliveries'],
+      isSupportOverride: true,
+    };
+
+    await expect(service.listDeliveries(supportActor)).rejects.toThrow(
+      ForbiddenException,
+    );
+
+    expect(prisma.notificationDelivery.findMany).not.toHaveBeenCalled();
+    expect(prisma.notificationDelivery.count).not.toHaveBeenCalled();
+  });
+
   it('paginates and filters scheduled and approval notice queues on the server', async () => {
     prisma.notice.findMany.mockResolvedValue([{ id: 'notice-1' }]);
     prisma.notice.count.mockResolvedValue(26);
@@ -1963,6 +2022,90 @@ describe('CommunicationsService', () => {
       ).toBe(false);
     });
 
+    it('treats a stale support report permission as a published safe projection', async () => {
+      const supportActor: AuthContext = {
+        ...actor,
+        roles: [],
+        permissions: ['notices:read', 'notices:read_reports'],
+        isSupportOverride: true,
+      };
+      prisma.notice.findMany.mockResolvedValue([
+        {
+          id: 'notice-1',
+          title: 'Published circular',
+          body: 'School will close at 3 PM.',
+          priority: NoticePriority.NORMAL,
+          audienceType: AudienceType.CLASS,
+          classId: 'class-1',
+          sectionId: null,
+          lifecycleStatus: NoticeLifecycleStatus.PUBLISHED,
+          publishedAt: new Date('2026-08-20T00:00:00.000Z'),
+          expiresAt: null,
+          createdAt: new Date('2026-08-19T00:00:00.000Z'),
+          updatedAt: new Date('2026-08-20T00:00:00.000Z'),
+          class: { name: 'Class 5' },
+          section: null,
+          _count: { deliveries: 12, acknowledgements: 4 },
+        },
+      ]);
+      prisma.notice.count.mockResolvedValue(0);
+
+      const result = await service.listNotices(supportActor, {
+        page: 1,
+        limit: 25,
+        lifecycleStatus: NoticeLifecycleStatus.DRAFT,
+      });
+
+      const call = (prisma.notice.findMany as jest.Mock).mock.calls[0][0];
+      expect(call.where.AND).toEqual(
+        expect.arrayContaining([
+          {
+            lifecycleStatus: {
+              in: [
+                NoticeLifecycleStatus.PUBLISHED,
+                NoticeLifecycleStatus.EXPIRED,
+              ],
+            },
+          },
+        ]),
+      );
+      expect(call.where.AND).not.toContainEqual({
+        lifecycleStatus: NoticeLifecycleStatus.DRAFT,
+      });
+      expect(call.where.AND).not.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ deliveries: expect.anything() }),
+        ]),
+      );
+      expect(call.select).toEqual(
+        expect.objectContaining({
+          id: true,
+          title: true,
+          body: true,
+          lifecycleStatus: true,
+          class: { select: { name: true } },
+          section: { select: { name: true } },
+          _count: { select: { deliveries: true, acknowledgements: true } },
+        }),
+      );
+      expect(call.select).not.toHaveProperty('createdBy');
+      expect(call.select).not.toHaveProperty('staffIds');
+      expect(call.select).not.toHaveProperty('studentIds');
+      expect(call.select).not.toHaveProperty('guardianIds');
+      expect(call.select).not.toHaveProperty('recipientUserIds');
+      expect(call.select).not.toHaveProperty('attachmentUrl');
+      expect(call).not.toHaveProperty('include');
+      expect(result.items[0]).toEqual(
+        expect.objectContaining({
+          id: 'notice-1',
+          createdBy: null,
+          className: 'Class 5',
+          deliveryCount: 12,
+          acknowledgementCount: 4,
+        }),
+      );
+    });
+
     it('scopes listEvents to ALL-audience, own-class/section, or actually-delivered events', async () => {
       mockTeacherAssignment();
       prisma.event.findMany.mockResolvedValue([]);
@@ -2043,6 +2186,12 @@ describe('CommunicationsService', () => {
   });
 
   it('returns purpose-limited delivery operations without message bodies or raw destinations', async () => {
+    const supportActor: AuthContext = {
+      ...actor,
+      roles: [],
+      permissions: ['communications:read_deliveries'],
+      isSupportOverride: true,
+    };
     prisma.notificationDelivery.findMany.mockResolvedValue([
       {
         id: 'delivery-1',
@@ -2064,7 +2213,7 @@ describe('CommunicationsService', () => {
     ]);
     prisma.notificationDelivery.count.mockResolvedValue(1);
 
-    const result = await service.listDeliveryOperations(actor, {
+    const result = await service.listDeliveryOperations(supportActor, {
       page: 1,
       limit: 25,
       status: NotificationStatus.FAILED,
@@ -2073,6 +2222,8 @@ describe('CommunicationsService', () => {
     expect(result.items).toEqual([
       expect.objectContaining({
         id: 'delivery-1',
+        sourceType: 'notification',
+        sourceId: null,
         recipientType: 'user',
         recipientLabel: 'gu***@example.test',
         retryCount: 2,
@@ -2083,12 +2234,34 @@ describe('CommunicationsService', () => {
     expect(prisma.notificationDelivery.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          tenantId: actor.tenantId,
+          tenantId: supportActor.tenantId,
           status: NotificationStatus.FAILED,
         }),
         select: expect.not.objectContaining({ body: true, title: true }),
       }),
     );
+  });
+
+  it('rejects source-level delivery probing during support override', async () => {
+    const supportActor: AuthContext = {
+      ...actor,
+      roles: [],
+      permissions: ['communications:read_deliveries'],
+      isSupportOverride: true,
+    };
+    prisma.notificationDelivery.findMany.mockClear();
+    prisma.notificationDelivery.count.mockClear();
+
+    await expect(
+      service.listDeliveryOperations(supportActor, {
+        page: 1,
+        limit: 25,
+        sourceType: 'payroll',
+      }),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(prisma.notificationDelivery.findMany).not.toHaveBeenCalled();
+    expect(prisma.notificationDelivery.count).not.toHaveBeenCalled();
   });
 
   it('normalizes absent student references for direct user follow-up deliveries', async () => {

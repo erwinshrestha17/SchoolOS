@@ -35,15 +35,17 @@ export function NoticeListWorkspace({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { session } = useSession();
+  const isSupportOverride = session?.user.isSupportOverride === true;
   const canRead = hasAnyPermission(session, ["notices:read"]);
   const page = positiveNumber(searchParams.get("page"), 1);
   const search = searchParams.get("search") ?? "";
   const priority = searchParams.get("priority") ?? "";
   const audienceType = searchParams.get("audienceType") ?? "";
-  const lifecycleStatus =
-    fixedLifecycleStatus ??
-    (searchParams.get("lifecycleStatus") as NoticeLifecycleStatus | null) ??
-    "";
+  const lifecycleStatus = isSupportOverride
+    ? ""
+    : (fixedLifecycleStatus ??
+      (searchParams.get("lifecycleStatus") as NoticeLifecycleStatus | null) ??
+      "");
   const [searchDraft, setSearchDraft] = useState(search);
 
   const noticesQuery = useQuery({
@@ -116,12 +118,17 @@ export function NoticeListWorkspace({
           />
         ),
       },
-      {
-        id: "author",
-        header: "Author",
-        hideBelow: "md",
-        cell: (notice) => notice.createdBy?.email ?? "Author unavailable",
-      },
+      ...(!isSupportOverride
+        ? [
+            {
+              id: "author",
+              header: "Author",
+              hideBelow: "md" as const,
+              cell: (notice: NoticeSummary) =>
+                notice.createdBy?.email ?? "Author unavailable",
+            },
+          ]
+        : []),
       {
         id: "delivery",
         header: "Delivery / acknowledgements",
@@ -140,14 +147,14 @@ export function NoticeListWorkspace({
         cell: (notice) => formatNoticeTime(notice),
       },
     ],
-    [],
+    [isSupportOverride],
   );
 
   const hasActiveFilters = Boolean(
     search ||
     priority ||
     audienceType ||
-    (!fixedLifecycleStatus && lifecycleStatus),
+    (!fixedLifecycleStatus && !isSupportOverride && lifecycleStatus),
   );
 
   const activeFilterChips = [
@@ -177,7 +184,7 @@ export function NoticeListWorkspace({
           onRemove: () => setFilters({ audienceType: null, page: null }),
         }
       : null,
-    !fixedLifecycleStatus && lifecycleStatus
+    !fixedLifecycleStatus && !isSupportOverride && lifecycleStatus
       ? {
           key: "lifecycleStatus",
           label: `Lifecycle: ${label(lifecycleStatus)}`,
@@ -190,7 +197,11 @@ export function NoticeListWorkspace({
     <div className="space-y-4" data-testid="notice-list-workspace">
       <FilterBar
         label="Notice filters"
-        description="The server applies these filters to the full notice record set."
+        description={
+          isSupportOverride
+            ? "The server applies these filters only to published or expired notices in the selected school."
+            : "The server applies these filters to the full notice record set."
+        }
         searchSlot={
           <form onSubmit={submitSearch} className="flex min-w-0 gap-2">
             <label className="sr-only" htmlFor="notice-search">
@@ -227,7 +238,7 @@ export function NoticeListWorkspace({
                 setFilters({ audienceType: value, page: null })
               }
             />
-            {!fixedLifecycleStatus ? (
+            {!fixedLifecycleStatus && !isSupportOverride ? (
               <FilterSelect
                 label="Lifecycle"
                 value={lifecycleStatus}
@@ -286,7 +297,11 @@ export function NoticeListWorkspace({
         onPageChange={(nextPage) => setFilters({ page: nextPage })}
         hasActiveFilters={hasActiveFilters}
         emptyTitle="No notices yet"
-        emptyDescription="Create a draft to begin the school notice workflow."
+        emptyDescription={
+          isSupportOverride
+            ? "No published notices are available in this support scope."
+            : "Create a draft to begin the school notice workflow."
+        }
         noResultsTitle="No notices match these filters"
         noResultsDescription="Clear one or more filters to widen the result set."
         errorMessage="Notices could not be loaded. Your current filters have been preserved."
