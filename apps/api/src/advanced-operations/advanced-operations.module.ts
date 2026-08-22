@@ -5,6 +5,8 @@ import { AuditModule } from '../audit/audit.module';
 import { FileRegistryModule } from '../file-registry/file-registry.module';
 import { ApprovalWorkflowController } from './approval-workflow.controller';
 import { ApprovalWorkflowService } from './approval-workflow.service';
+import { PrincipalApprovalQueueController } from './principal-approval-queue.controller';
+import { PrincipalApprovalQueueService } from './principal-approval-queue.service';
 import { AutomationEngineController } from './automation-engine.controller';
 import { AutomationEngineService } from './automation-engine.service';
 import { DescriptiveAnalyticsController } from './descriptive-analytics.controller';
@@ -24,6 +26,7 @@ import { AdvancedOperationsProcessor } from './advanced-operations.processor';
   ],
   controllers: [
     ApprovalWorkflowController,
+    PrincipalApprovalQueueController,
     AutomationEngineController,
     DescriptiveAnalyticsController,
     DocumentTemplateController,
@@ -31,6 +34,7 @@ import { AdvancedOperationsProcessor } from './advanced-operations.processor';
   ],
   providers: [
     ApprovalWorkflowService,
+    PrincipalApprovalQueueService,
     AutomationEngineService,
     DescriptiveAnalyticsService,
     DocumentTemplateService,

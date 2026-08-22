@@ -35,6 +35,9 @@ export const MODULE_HREF_PREFIXES: ReadonlyArray<{
   { prefix: "/dashboard/homework", module: "homework" },
   { prefix: "/dashboard/learning", module: "learning" },
   { prefix: "/dashboard/fees", module: "fees" },
+  // Principal leadership finance is accounting-backed and must not inherit the
+  // legacy /dashboard/finance -> fees entitlement alias below.
+  { prefix: "/dashboard/finance-overview", module: "accounting" },
   // Legacy alias for Fees & Receipts — same entitlement as /dashboard/fees.
   { prefix: "/dashboard/finance", module: "fees" },
   { prefix: "/dashboard/accounting", module: "accounting" },

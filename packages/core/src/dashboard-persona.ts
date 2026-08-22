@@ -20,11 +20,18 @@ export const ADMIN_DASHBOARD_MODULES: OperationalSummaryModule[] = [
   "m7_hr_payroll",
 ];
 
+/**
+ * Principal home stays purpose-limited to leadership-safe summaries. Fees are
+ * intentionally not queried here because the default Principal role owns the
+ * narrower finance:principal:read capability rather than cashier/fee-ledger
+ * read access. Accounting supplies finance-readiness signals without widening
+ * operational permissions.
+ */
 export const PRINCIPAL_DASHBOARD_MODULES: OperationalSummaryModule[] = [
   "m10_communications",
   "m2_attendance",
   "m4_academics",
-  "m3_fees",
+  "m11_accounting",
   "m7_hr_payroll",
 ];
 
@@ -93,7 +100,10 @@ function attentionKindFromKey(
     normalized.includes("failed") ||
     normalized.includes("overdue") ||
     normalized.includes("missing") ||
-    normalized.includes("anomal")
+    normalized.includes("anomal") ||
+    normalized.includes("unreconciled") ||
+    normalized.includes("unposted") ||
+    normalized.includes("blocker")
   ) {
     return "warning";
   }
@@ -115,7 +125,8 @@ export function filterAttentionItemsForPersona(
     if (
       item.module === "m4_academics" ||
       item.module === "m10_communications" ||
-      item.module === "m2_attendance"
+      item.module === "m2_attendance" ||
+      item.module === "m11_accounting"
     ) {
       return item.severity !== "info";
     }
@@ -178,7 +189,9 @@ export function projectDashboardForPersona(
 export function operationsModulesForPersona(
   persona: DashboardCompositionPersona,
 ): OperationalSummaryModule[] {
-  if (persona === "principal") return PRINCIPAL_DASHBOARD_MODULES;
+  if (persona === "principal") {
+    return ["m2_attendance", "m10_communications", "m7_hr_payroll"];
+  }
   if (persona === "hr") return HR_DASHBOARD_MODULES;
   if (persona === "accountant") return ACCOUNTANT_DASHBOARD_MODULES;
   return ADMIN_DASHBOARD_MODULES;

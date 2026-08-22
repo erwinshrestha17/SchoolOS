@@ -9,6 +9,7 @@ import {
   ArrowRight,
   CalendarClock,
   ClipboardCheck,
+  Landmark,
   UserCheck,
   Wallet,
   type LucideIcon,
@@ -110,7 +111,8 @@ function buildSummaryCards(
   const cards: SummaryCardModel[] = [];
 
   const includeFees = persona === "admin" || persona === "accountant";
-  const includeStaff = persona === "admin" || persona === "hr";
+  const includeStaff =
+    persona === "admin" || persona === "hr" || persona === "principal";
 
   const attendance = visibleModule(moduleMap, "m2_attendance");
   if (attendance) {
@@ -120,7 +122,10 @@ function buildSummaryCards(
       label: "Attendance",
       icon: CalendarClock,
       iconClass: "border-teal-100 bg-teal-50 text-teal-700",
-      href: moduleWorkspaceRoute("m2_attendance"),
+      href:
+        persona === "principal"
+          ? "/dashboard/attendance/overview"
+          : moduleWorkspaceRoute("m2_attendance"),
     };
     if (progress.kind === "unavailable") {
       cards.push({
@@ -148,6 +153,43 @@ function buildSummaryCards(
         ...attendanceCard,
         value: `${formatNumber(progress.submitted)} of ${formatNumber(progress.total)}`,
         description: "Registers submitted so far today.",
+      });
+    }
+  }
+
+  if (persona === "principal") {
+    const accounting = visibleModule(moduleMap, "m11_accounting");
+    if (accounting) {
+      const unreconciled = metricNumber(accounting, "unreconciledStatements");
+      const unposted = metricNumber(accounting, "unpostedJournals");
+      const knownCounts = [unreconciled, unposted].filter(
+        (value): value is number => value !== null,
+      );
+      const issueCount = knownCounts.length
+        ? knownCounts.reduce((sum, value) => sum + value, 0)
+        : null;
+      const breakdown = [
+        unreconciled !== null ? `${formatNumber(unreconciled)} unreconciled` : null,
+        unposted !== null ? `${formatNumber(unposted)} unposted` : null,
+      ].filter(Boolean);
+      cards.push({
+        key: "finance-health",
+        label: "Finance health",
+        icon: Landmark,
+        iconClass: "border-amber-100 bg-amber-50 text-amber-700",
+        href: "/dashboard/finance-overview",
+        value:
+          issueCount === null
+            ? "Unavailable"
+            : issueCount === 0
+              ? "All clear"
+              : `${formatNumber(issueCount)} issue${issueCount === 1 ? "" : "s"}`,
+        description:
+          issueCount === null
+            ? "Information is not available yet."
+            : issueCount === 0
+              ? "No reconciliation or posting exceptions reported."
+              : breakdown.join(" · "),
       });
     }
   }
@@ -183,7 +225,10 @@ function buildSummaryCards(
       label: "Staff availability",
       icon: UserCheck,
       iconClass: "border-slate-200 bg-slate-50 text-slate-700",
-      href: moduleWorkspaceRoute("m7_hr_payroll"),
+      href:
+        persona === "principal"
+          ? "/dashboard/hr/overview"
+          : moduleWorkspaceRoute("m7_hr_payroll"),
       value: present !== null ? `${formatNumber(present)} present` : "Unavailable",
       description:
         present === null
@@ -197,7 +242,7 @@ function buildSummaryCards(
   // Counts categories of real review queues, with approvals kept separate
   // from warnings and follow-ups — never a merged sum of every pending
   // record (a thousand unread notice recipients is not a thousand
-  // approvals). Links to the attention list on this page.
+  // approvals).
   const attentionItems = dashboard.attentionItems.filter(
     (item) => item.count > 0,
   );
@@ -222,7 +267,11 @@ function buildSummaryCards(
     iconClass: attentionItems.length
       ? "border-warning-100 bg-warning-50 text-warning-700"
       : "border-success-100 bg-success-50 text-success-600",
-    href: attentionItems.length ? "#needs-attention" : null,
+    href: attentionItems.length
+      ? persona === "principal"
+        ? "/dashboard/attention"
+        : "#needs-attention"
+      : null,
     value: attentionItems.length
       ? `${formatNumber(attentionItems.length)} item${attentionItems.length === 1 ? "" : "s"}`
       : "All clear",

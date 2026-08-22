@@ -9,10 +9,17 @@ const sidebar = readFileSync(
   join(webRoot, 'components/layout/sidebar.tsx'),
   'utf8',
 );
-const personaNavConfig = readFileSync(
+const personaNavEntry = readFileSync(
   join(webRoot, 'components/layout/sidebar-persona-nav.config.ts'),
   'utf8',
 );
+const personaNavBase = readFileSync(
+  join(webRoot, 'components/layout/sidebar-persona-nav.base.ts'),
+  'utf8',
+);
+// The active wrapper comes first so explicit Principal overrides win source
+// inspection just as they do in the module export surface.
+const personaNavConfig = `${personaNavEntry}\n${personaNavBase}`;
 const sidebarNavLink = readFileSync(
   join(webRoot, 'components/layout/sidebar-nav-link.tsx'),
   'utf8',
@@ -42,8 +49,7 @@ function sliceNavGroupsExport(source, navGroupsName) {
   assert.notEqual(start, -1, `${navGroupsName} not found`);
   const afterStart = source.slice(start + 1);
   const nextExport = afterStart.search(/\nexport (const|function) /);
-  const end =
-    nextExport === -1 ? source.length : start + 1 + nextExport;
+  const end = nextExport === -1 ? source.length : start + 1 + nextExport;
   return source.slice(start, end);
 }
 
@@ -73,13 +79,13 @@ describe('school operations sidebar', () => {
     assert.doesNotMatch(personaNavConfig, /label: 'Operations Hub'/);
   });
 
-  it('extracts persona nav trees into sidebar-persona-nav.config.ts', () => {
-    assert.match(personaNavConfig, /export const adminNavGroups/);
-    assert.match(personaNavConfig, /export const principalNavGroups/);
-    assert.match(personaNavConfig, /export const teacherNavGroups/);
-    assert.match(personaNavConfig, /export const hrNavGroups/);
-    assert.match(personaNavConfig, /export const accountantNavGroups/);
-    assert.match(personaNavConfig, /export function navGroupsForPersona/);
+  it('keeps shared persona trees in the base and Principal overrides in the active config', () => {
+    assert.match(personaNavBase, /export const adminNavGroups/);
+    assert.match(personaNavEntry, /export const principalNavGroups/);
+    assert.match(personaNavBase, /export const teacherNavGroups/);
+    assert.match(personaNavBase, /export const hrNavGroups/);
+    assert.match(personaNavBase, /export const accountantNavGroups/);
+    assert.match(personaNavEntry, /export function navGroupsForPersona/);
     assert.match(sidebar, /from '\.\/sidebar-persona-nav\.config'/);
     assert.doesNotMatch(sidebar, /export const principalNavGroups: NavGroup/);
   });
@@ -121,10 +127,7 @@ describe('school operations sidebar', () => {
   });
 
   it('resolves exactly one active nav item when routes overlap', () => {
-    const navHash = readFileSync(
-      join(webRoot, 'lib/nav-hash.ts'),
-      'utf8',
-    );
+    const navHash = readFileSync(join(webRoot, 'lib/nav-hash.ts'), 'utf8');
     assert.match(navHash, /export function computeActiveNavHref/);
     assert.match(sidebar, /computeActiveNavHref/);
     assert.match(
@@ -168,16 +171,16 @@ describe('school operations sidebar', () => {
     assert.match(commandPalette, /shouldShowSettingsHub/);
     assert.match(commandPalette, /isTeacherPersona/);
     assert.match(commandPalette, /from '\.\/sidebar-persona-nav\.config'/);
-    assert.doesNotMatch(
-      commandPalette,
-      /settingsNavItem,\s*\n\s*\];/,
-    );
+    assert.doesNotMatch(commandPalette, /settingsNavItem,\s*\n\s*\];/);
   });
 
   it('keeps collapsed navigation and the footer accessible', () => {
     assert.match(sidebarNavLink, /aria-label=\{collapsed \? label : undefined\}/);
     assert.match(sidebarNavLink, /title=\{collapsed \? label : undefined\}/);
-    assert.match(sidebar, /aria-label=\{collapsed \? 'Expand sidebar' : 'Collapse sidebar'\}/);
+    assert.match(
+      sidebar,
+      /aria-label=\{collapsed \? 'Expand sidebar' : 'Collapse sidebar'\}/,
+    );
     assert.match(sidebar, /School workspace/);
     assert.match(sidebar, /CircleUserRound/);
   });
@@ -213,33 +216,43 @@ describe('school operations sidebar', () => {
 });
 
 describe('persona sidebar contracts', () => {
-  it('principal nav uses accounting read finance and operations hub, not fee collection', () => {
+  it('principal nav points to leadership compositions instead of operator workspaces', () => {
     const entries = collectNavEntries(personaNavConfig, 'principalNavGroups');
-    const finance = entries.find((entry) => entry.label === 'Finance Overview');
-    assert.ok(finance);
-    assert.equal(finance.href, '/dashboard/accounting');
-
-    const operations = entries.find((entry) => entry.label === 'Operations');
-    assert.ok(operations);
-    assert.equal(operations.href, '/dashboard/operations');
+    const expected = new Map([
+      ['Principal Home', '/dashboard'],
+      ['Attention Centre', '/dashboard/attention'],
+      ['Approval Centre', '/dashboard/approvals'],
+      ['Enrollment Overview', '/dashboard/students/overview'],
+      ['Admissions Overview', '/dashboard/admissions/overview'],
+      ['Attendance Oversight', '/dashboard/attendance/overview'],
+      ['Academic Readiness', '/dashboard/academics/readiness'],
+      ['Staff Overview', '/dashboard/hr/overview'],
+      ['Finance Overview', '/dashboard/finance-overview'],
+      ['Communication Oversight', '/dashboard/communications/oversight'],
+      ['Activity Oversight', '/dashboard/activity/oversight'],
+      ['Operations Overview', '/dashboard/operations/overview'],
+      ['Leadership Audit', '/dashboard/audit'],
+    ]);
+    for (const [label, href] of expected) {
+      const entry = entries.find((candidate) => candidate.label === label);
+      assert.ok(entry, `principal nav missing ${label}`);
+      assert.equal(entry.href, href);
+    }
 
     const principalSlice = sliceNavGroupsExport(
       personaNavConfig,
       'principalNavGroups',
     );
-    const oversightSlice = principalSlice.slice(
-      principalSlice.indexOf("label: 'Oversight'"),
-      principalSlice.indexOf("label: 'Communication'"),
-    );
-    assert.match(oversightSlice, /href: '\/dashboard\/operations'/);
+    for (const oldHref of [
+      '/dashboard#needs-attention',
+      '/dashboard/accounting/audit',
+    ]) {
+      assert.doesNotMatch(principalSlice, new RegExp(oldHref.replace(/[/#]/g, '\\$&')));
+    }
     assert.doesNotMatch(
       principalSlice,
-      /label: 'Operations',\s*\n\s*icon: School,\s*\n\s*items:/,
+      /href: '\/dashboard\/accounting'[\s\S]*label: 'Finance Overview'/,
     );
-
-    const audit = entries.find((entry) => entry.label === 'Audit');
-    assert.ok(audit);
-    assert.equal(audit.href, '/dashboard/accounting/audit');
 
     const permissions = collectPermissionStrings(
       personaNavConfig,
@@ -249,11 +262,6 @@ describe('persona sidebar contracts', () => {
       assert.ok(
         !permissions.includes(excluded),
         `principal nav must not require ${excluded}`,
-      );
-      assert.doesNotMatch(
-        principalSlice,
-        new RegExp(`'${excluded.replace(/:/g, '\\:')}'`),
-        `principal nav must not reference ${excluded}`,
       );
     }
   });
@@ -289,19 +297,15 @@ describe('persona sidebar contracts', () => {
     assert.doesNotMatch(permissions.join(','), /settings:manage/);
   });
 
-  it('principal nav omits attention-items dashboard activeWhen and settings hub', () => {
+  it('principal nav uses durable attention and approval routes and keeps settings out', () => {
     const principalSlice = sliceNavGroupsExport(
       personaNavConfig,
       'principalNavGroups',
     );
-    assert.match(
-      principalSlice,
-      /href: '\/dashboard#needs-attention'[\s\S]*label: 'Attention Items'/,
-    );
-    assert.doesNotMatch(
-      principalSlice,
-      /label: 'Attention Items'[\s\S]*activeWhen: \['\/dashboard'\]/,
-    );
+    assert.match(principalSlice, /href: '\/dashboard\/attention'/);
+    assert.match(principalSlice, /href: '\/dashboard\/approvals'/);
+    assert.doesNotMatch(principalSlice, /\/dashboard#needs-attention/);
+    assert.doesNotMatch(principalSlice, /href: '\/dashboard\/settings'/);
     assert.match(personaNavConfig, /persona === 'principal'/);
   });
 });

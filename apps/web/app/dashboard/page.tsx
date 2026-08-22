@@ -78,11 +78,15 @@ export default function DashboardPage() {
     (item) => item.count > 0,
   ).length;
   const [firstNextAction, ...remainingNextActions] = safeNextActions;
+  const attentionHref =
+    compositionPersona === "principal"
+      ? "/dashboard/attention"
+      : "#needs-attention";
   const primaryAction =
     attentionCount > 0
       ? {
           label: `Review ${attentionCount} attention item${attentionCount === 1 ? "" : "s"}`,
-          href: "#needs-attention",
+          href: attentionHref,
         }
       : firstNextAction
         ? { label: firstNextAction.action.label, href: firstNextAction.href }
@@ -100,10 +104,10 @@ export default function DashboardPage() {
   const headerCopy =
     compositionPersona === "principal"
       ? {
-          eyebrow: "Executive oversight",
-          title: "Executive Dashboard",
+          eyebrow: "School leadership",
+          title: "Principal Home",
           description:
-            "Critical attention items, approvals, and school readiness for leadership decisions.",
+            "See what needs your attention, what is waiting for a decision, and whether the school day is on track.",
         }
       : compositionPersona === "admin"
         ? {
