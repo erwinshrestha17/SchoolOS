@@ -1,13 +1,69 @@
 import { request } from './client';
 
 export type ApprovalDecision = 'APPROVE' | 'REJECT';
+export type ApprovalRequestStatus =
+  | 'DRAFT'
+  | 'PENDING'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'CANCELLED'
+  | 'APPLIED'
+  | 'APPLY_FAILED';
+
+export type ApprovalStepSummary = {
+  id: string;
+  sequence: number;
+  name: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SKIPPED';
+  approverRole: string | null;
+  approverPermission: string | null;
+  decidedAt: string | null;
+};
+
+export type ApprovalRequestSummary = {
+  id: string;
+  workflowType: string;
+  status: ApprovalRequestStatus;
+  title: string;
+  reason: string;
+  targetModule: string;
+  targetType: string;
+  targetId: string;
+  safeContext: Record<string, unknown> | null;
+  finalActionStatus: 'NOT_READY' | 'READY' | 'APPLIED' | 'FAILED';
+  deadlineAt: string | null;
+  delegatedToId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  steps: ApprovalStepSummary[];
+  decisions: Array<{
+    id: string;
+    decision: ApprovalDecision;
+    reason: string | null;
+    decidedById: string;
+    createdAt: string;
+  }>;
+  comments: Array<{
+    id: string;
+    body: string;
+    createdById: string;
+    createdAt: string;
+  }>;
+};
 
 export const advancedOperationsApi = {
+  listApprovalRequests: () =>
+    request<ApprovalRequestSummary[]>('/advanced/approvals'),
+
   decideApprovalRequest: (
     approvalRequestId: string,
-    body: { decision: ApprovalDecision; reason?: string },
+    body: {
+      decision: ApprovalDecision;
+      reason?: string;
+      idempotencyKey?: string;
+    },
   ) =>
-    request<{ success: boolean }>(
+    request<ApprovalRequestSummary>(
       `/advanced/approvals/${encodeURIComponent(approvalRequestId)}/decisions`,
       { method: 'POST', json: body },
     ),
