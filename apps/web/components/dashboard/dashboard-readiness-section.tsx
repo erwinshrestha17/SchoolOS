@@ -7,6 +7,7 @@ import type {
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "../../lib/utils";
+import { useHasPermission } from "../../lib/permissions-ui";
 import {
   shouldShowReadinessPanel,
   type DashboardCompositionPersona,
@@ -20,6 +21,12 @@ import {
 } from "./dashboard-module-meta";
 
 const MAX_ROWS_PER_PANEL = 4;
+const PRINCIPAL_READINESS_MODULES = new Set<OperationalSummaryModule>([
+  "m4_academics",
+  "m11_accounting",
+  "m7_hr_payroll",
+  "m10_communications",
+]);
 
 type ReadinessRow = {
   key: string;
@@ -185,6 +192,8 @@ export function SchoolReadinessSection({
   moduleMap: Map<OperationalSummaryModule, OperationalModuleSummary>;
   persona?: DashboardCompositionPersona;
 }) {
+  const canViewTimetable = useHasPermission("timetable:read_published");
+
   return (
     <section aria-label="School readiness">
       <div className="grid gap-4 md:grid-cols-3">
@@ -196,6 +205,7 @@ export function SchoolReadinessSection({
             panel={panel}
             moduleMap={moduleMap}
             persona={persona}
+            canViewTimetable={canViewTimetable}
           />
         ))}
       </div>
@@ -207,12 +217,17 @@ function ReadinessPanel({
   panel,
   moduleMap,
   persona,
+  canViewTimetable,
 }: {
   panel: ReadinessPanelDefinition;
   moduleMap: Map<OperationalSummaryModule, OperationalModuleSummary>;
   persona: DashboardCompositionPersona;
+  canViewTimetable: boolean;
 }) {
-  const sourceModules = [...new Set(panel.rows.map((row) => row.module))];
+  const panelRows = panel.rows.filter(
+    (row) => persona !== "principal" || PRINCIPAL_READINESS_MODULES.has(row.module),
+  );
+  const sourceModules = [...new Set(panelRows.map((row) => row.module))];
   const visibleModules = sourceModules
     .map((module) => moduleMap.get(module))
     .filter(
@@ -223,17 +238,10 @@ function ReadinessPanel({
     (summary) => summary.status === "partial",
   );
 
-  const rows: ReadinessRow[] = panel.rows
+  const rows: ReadinessRow[] = panelRows
     .map((definition) => {
       const summary = moduleMap.get(definition.module);
       if (!summary || summary.status === "locked") return null;
-      if (
-        persona === "principal" &&
-        panel.key === "people-operations" &&
-        definition.metricKey === "applicationsNeedingReview"
-      ) {
-        return null;
-      }
       const count = metricNumber(summary, definition.metricKey);
       if (count === null || count <= 0) return null;
       return {
@@ -259,7 +267,7 @@ function ReadinessPanel({
     <article className="rounded-2xl border border-slate-200 bg-white p-5">
       <div className="flex items-start justify-between gap-3">
         <h3 className="text-sm font-bold text-slate-950">{panel.title}</h3>
-        {panel.key === "academic" ? (
+        {panel.key === "academic" && canViewTimetable ? (
           <Link
             href="/dashboard/timetable"
             className="shrink-0 text-xs font-bold text-[var(--primary)] transition hover:text-[var(--primary-dark)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-soft)] focus-visible:ring-offset-2"
