@@ -28,7 +28,7 @@ export class PlatformGuard implements CanActivate {
       auth.isSupportOverride
     ) {
       throw new ForbiddenException(
-        'Access restricted to the Platform security domain',
+        'Access restricted to platform administrators only: account is outside the Platform security domain',
       );
     }
 
