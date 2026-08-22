@@ -9,6 +9,7 @@ export * from './nepal-date.js';
 export * from './operational-summary.js';
 export * from './dashboard-persona.js';
 export * from './school-settings-navigation.js';
+export * from './school-settings-access.js';
 export * from './school-settings-overview.js';
 export * from './school-settings-domains.js';
 export * from './school-settings-integrations.js';
