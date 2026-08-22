@@ -15,6 +15,7 @@ import { MustChangePasswordGuard } from '../src/auth/guards/must-change-password
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ConfigService } from '../src/config/config.service';
 import { AuditService } from '../src/audit/audit.service';
+import { AttendanceController } from '../src/attendance/attendance.controller';
 import { createPrismaMock, PrismaMock } from './test-helpers';
 import { AuthenticatedRequest } from '../src/auth/auth-request.interface';
 import { SecurityDomain } from '@prisma/client';
@@ -306,6 +307,8 @@ describe('Auth Security Hardening (Regression)', () => {
 
     const context = {
       switchToHttp: () => ({ getRequest: () => request }),
+      getHandler: () => AttendanceController.prototype.getAnalytics,
+      getClass: () => AttendanceController,
     } as any;
 
     const result = await guard.canActivate(context);
