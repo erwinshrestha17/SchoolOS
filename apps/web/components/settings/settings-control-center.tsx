@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { formatBsDateTime } from '@schoolos/core';
 import { schoolSettingsApi } from '../../lib/api/school-settings';
+import { canEditSchoolSettings } from './school-settings-catalog';
 import {
   SETTINGS_NAVIGATION_GROUPS,
   type SettingsNavigationGroupId,
@@ -49,6 +50,8 @@ export function SettingsControlCenter({
         </h2>
         <p className="mt-1 text-sm leading-6 text-slate-600">
           Only settings supported for your account and current school are shown.
+          Access labels tell you whether the area is personal, view-only,
+          manageable by your role, or Platform managed.
         </p>
 
         {groups.length === 0 ? (
@@ -118,6 +121,7 @@ function SettingsGroupCard({
       <div className="divide-y divide-slate-100">
         {group.items.map((item) => {
           const Icon = item.icon;
+          const access = accessLabel(item);
           return (
             <Link
               key={item.id}
@@ -128,8 +132,15 @@ function SettingsGroupCard({
                 <Icon className="h-4 w-4" aria-hidden="true" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-slate-900">
-                  {item.label}
+                <span className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-semibold text-slate-900">
+                    {item.label}
+                  </span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[0.68rem] font-bold ${access.className}`}
+                  >
+                    {access.label}
+                  </span>
                 </span>
                 <span className="mt-0.5 block text-xs leading-5 text-slate-500">
                   {item.description}
@@ -155,6 +166,31 @@ function SettingsGroupCard({
       </div>
     </section>
   );
+}
+
+function accessLabel(item: ResolvedSettingsNavigationItem) {
+  if (item.status === 'platform-managed') {
+    return {
+      label: 'Platform managed',
+      className: 'bg-slate-100 text-slate-600',
+    };
+  }
+  if (!item.backendItemId) {
+    return {
+      label: 'Personal',
+      className: 'bg-blue-50 text-blue-700',
+    };
+  }
+  if (canEditSchoolSettings(item.access)) {
+    return {
+      label: 'Can manage',
+      className: 'bg-emerald-50 text-emerald-700',
+    };
+  }
+  return {
+    label: 'View-only',
+    className: 'bg-amber-50 text-amber-800',
+  };
 }
 
 function SchoolSetupSummary({
@@ -215,8 +251,8 @@ function SchoolSetupSummary({
               aria-hidden="true"
             />
             <p className="leading-6">
-              Confirmed setup items are complete. This covers school
-              identity, branding, and the academic calendar only.
+              Confirmed setup items are complete. This covers school identity,
+              branding, and the academic calendar only.
             </p>
           </div>
         ) : (
