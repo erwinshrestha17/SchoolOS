@@ -167,11 +167,19 @@ describe('school operations sidebar', () => {
   });
 
   it('aligns command palette settings visibility with the sidebar hub rules', () => {
-    assert.match(personaNavConfig, /export function shouldShowSettingsHub/);
+    assert.match(personaNavEntry, /export function shouldShowSettingsHub/);
     assert.match(commandPalette, /shouldShowSettingsHub/);
     assert.match(commandPalette, /isTeacherPersona/);
     assert.match(commandPalette, /from '\.\/sidebar-persona-nav\.config'/);
     assert.doesNotMatch(commandPalette, /settingsNavItem,\s*\n\s*\];/);
+  });
+
+  it('holds the menu stable and fail-closed until entitlements resolve', () => {
+    assert.match(sidebar, /loading: entitlementsLoading/);
+    assert.match(sidebar, /const groupsToRender = entitlementsLoading\s*\? \[\]/);
+    assert.match(sidebar, /SidebarNavigationSkeleton/);
+    assert.match(sidebar, /aria-busy=\{navigationLoading \|\| undefined\}/);
+    assert.match(sidebar, /disabled=\{navigationLoading\}/);
   });
 
   it('keeps collapsed navigation and the footer accessible', () => {
@@ -185,7 +193,7 @@ describe('school operations sidebar', () => {
     assert.match(sidebar, /CircleUserRound/);
   });
 
-  it('badges Notices with the real unread count instead of a hardcoded number', () => {
+  it('badges Notifications with the real unread count instead of a hardcoded number', () => {
     assert.match(sidebar, /queryKey: \['notification-center'\]/);
     assert.match(sidebar, /queryFn: api\.getNotificationCenter/);
     assert.match(sidebar, /function formatBadgeCount/);
@@ -217,7 +225,7 @@ describe('school operations sidebar', () => {
 
 describe('persona sidebar contracts', () => {
   it('principal nav points to leadership compositions instead of operator workspaces', () => {
-    const entries = collectNavEntries(personaNavConfig, 'principalNavGroups');
+    const entries = collectNavEntries(personaNavEntry, 'principalNavGroups');
     const expected = new Map([
       ['Principal Home', '/dashboard'],
       ['Attention Centre', '/dashboard/attention'],
@@ -228,9 +236,11 @@ describe('persona sidebar contracts', () => {
       ['Academic Readiness', '/dashboard/academics/readiness'],
       ['Staff Overview', '/dashboard/hr/overview'],
       ['Finance Overview', '/dashboard/finance-overview'],
-      ['Communication Oversight', '/dashboard/communications/oversight'],
-      ['Activity Oversight', '/dashboard/activity/oversight'],
       ['Operations Overview', '/dashboard/operations/overview'],
+      ['Communication Oversight', '/dashboard/communications/oversight'],
+      ['Notices', '/dashboard/notices'],
+      ['Activity Oversight', '/dashboard/activity/oversight'],
+      ['Reports', '/dashboard/reports'],
       ['Leadership Audit', '/dashboard/audit'],
     ]);
     for (const [label, href] of expected) {
@@ -240,14 +250,18 @@ describe('persona sidebar contracts', () => {
     }
 
     const principalSlice = sliceNavGroupsExport(
-      personaNavConfig,
+      personaNavEntry,
       'principalNavGroups',
     );
     for (const oldHref of [
       '/dashboard#needs-attention',
       '/dashboard/accounting/audit',
+      '/dashboard/notifications',
     ]) {
-      assert.doesNotMatch(principalSlice, new RegExp(oldHref.replace(/[/#]/g, '\\$&')));
+      assert.doesNotMatch(
+        principalSlice,
+        new RegExp(oldHref.replace(/[/#]/g, '\\$&')),
+      );
     }
     assert.doesNotMatch(
       principalSlice,
@@ -255,7 +269,7 @@ describe('persona sidebar contracts', () => {
     );
 
     const permissions = collectPermissionStrings(
-      personaNavConfig,
+      personaNavEntry,
       'principalNavGroups',
     );
     for (const excluded of PRINCIPAL_EXCLUDED_PERMISSIONS) {
@@ -264,6 +278,53 @@ describe('persona sidebar contracts', () => {
         `principal nav must not require ${excluded}`,
       );
     }
+  });
+
+  it('keeps Principal entitlement ownership canonical except for the multi-module operations aggregate', () => {
+    const principalSlice = sliceNavGroupsExport(
+      personaNavEntry,
+      'principalNavGroups',
+    );
+    const moduleKeyDeclarations = [...principalSlice.matchAll(/moduleKeys:/g)];
+    assert.equal(moduleKeyDeclarations.length, 1);
+    assert.match(
+      principalSlice,
+      /moduleKeys: \['library', 'transport', 'canteen'\]/,
+    );
+    assert.doesNotMatch(principalSlice, /moduleKeys: \['academics'\]/);
+    assert.match(navModuleMap, /prefix: "\/dashboard\/academics", module: "exams"/);
+  });
+
+  it('uses canonical communication permission names for Principal oversight', () => {
+    assert.match(personaNavEntry, /'communications:read_deliveries'/);
+    assert.doesNotMatch(personaNavEntry, /'communications:deliveries:read'/);
+  });
+
+  it('keeps Operations inside School Readiness and uses school-friendly Reports & Audit wording', () => {
+    const principalSlice = sliceNavGroupsExport(
+      personaNavEntry,
+      'principalNavGroups',
+    );
+    const readinessStart = principalSlice.indexOf("label: 'School Readiness'");
+    const communicationStart = principalSlice.indexOf("label: 'Communication'");
+    const readinessSlice = principalSlice.slice(readinessStart, communicationStart);
+    assert.match(readinessSlice, /label: 'Operations Overview'/);
+    assert.doesNotMatch(principalSlice, /label: 'School Operations'/);
+    assert.match(principalSlice, /label: 'Reports & Audit'/);
+  });
+
+  it('keeps Principal Settings capability-driven rather than hard-denied by persona name', () => {
+    const settingsStart = personaNavEntry.indexOf(
+      'export function shouldShowSettingsHub',
+    );
+    const settingsEnd = personaNavEntry.indexOf(
+      '/** Picks the persona nav tree',
+      settingsStart,
+    );
+    const settingsSlice = personaNavEntry.slice(settingsStart, settingsEnd);
+    assert.match(settingsSlice, /settingsCaps\.institutionalNavEnabled/);
+    assert.match(settingsSlice, /settingsCaps\.canAccessInstitutionalSettings/);
+    assert.doesNotMatch(settingsSlice, /persona === 'principal'/);
   });
 
   it('accountant nav includes cashier close, reconciliation, and module postings', () => {
@@ -297,15 +358,13 @@ describe('persona sidebar contracts', () => {
     assert.doesNotMatch(permissions.join(','), /settings:manage/);
   });
 
-  it('principal nav uses durable attention and approval routes and keeps settings out', () => {
+  it('principal nav uses durable attention and approval routes', () => {
     const principalSlice = sliceNavGroupsExport(
-      personaNavConfig,
+      personaNavEntry,
       'principalNavGroups',
     );
     assert.match(principalSlice, /href: '\/dashboard\/attention'/);
     assert.match(principalSlice, /href: '\/dashboard\/approvals'/);
     assert.doesNotMatch(principalSlice, /\/dashboard#needs-attention/);
-    assert.doesNotMatch(principalSlice, /href: '\/dashboard\/settings'/);
-    assert.match(personaNavConfig, /persona === 'principal'/);
   });
 });
