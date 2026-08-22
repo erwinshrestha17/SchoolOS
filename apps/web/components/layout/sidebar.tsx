@@ -68,7 +68,7 @@ export function Sidebar({
   const [locationHash, setLocationHash] = useState('');
   const { session } = useSession();
   const isSupportOverride = session?.user.isSupportOverride === true;
-  const { hasModule } = useEntitlements();
+  const { hasModule, loading: entitlementsLoading } = useEntitlements();
 
   // A real, permission- and entitlement-gated unread count for Notifications — reuses
   // the same query key as the topbar's NotificationBell, so TanStack Query
@@ -76,6 +76,7 @@ export function Sidebar({
   // failure/loading must not block navigation, so it silently falls back to
   // "no badge" rather than surfacing an error state.
   const canReadNotifications =
+    !entitlementsLoading &&
     hasModule('notifications') &&
     hasAnyPermission(session, ['notifications:view_own']);
   const notificationCenterQuery = useQuery({
@@ -100,25 +101,28 @@ export function Sidebar({
   const personaGroups = isSupportOverride
     ? buildSupportOverrideNavGroups(session?.user.supportOverrideScopes ?? [])
     : navGroupsForPersona(schoolWebPersona, capabilities);
-  const groupsToRender = personaGroups
-    .map((group) => ({
-      ...group,
-      items: group.items
-        .filter((item) => canDisplayNavItem(item, session, hasModule))
-        .map((item) =>
-          item.href === '/dashboard/notifications'
-            ? {
-                ...item,
-                badge: unreadNotificationsBadge,
-              }
-            : item,
-        ),
-    }))
-    .filter((group) => group.items.length > 0);
 
-  // Teachers reach Profile/Preferences/Security from "My Account"; principals
-  // use the header profile menu. The institutional Settings hub is for admin,
-  // HR, and other configuration personas only.
+  // Fail closed while entitlements are unresolved. SidebarContent renders a
+  // stable skeleton instead of first showing a partial menu and then popping
+  // module workspaces into place after login.
+  const groupsToRender = entitlementsLoading
+    ? []
+    : personaGroups
+        .map((group) => ({
+          ...group,
+          items: group.items
+            .filter((item) => canDisplayNavItem(item, session, hasModule))
+            .map((item) =>
+              item.href === '/dashboard/notifications'
+                ? {
+                    ...item,
+                    badge: unreadNotificationsBadge,
+                  }
+                : item,
+            ),
+        }))
+        .filter((group) => group.items.length > 0);
+
   const showSettingsHub = shouldShowSettingsHub(
     settingsCaps,
     isTeacherPersona,
@@ -126,6 +130,7 @@ export function Sidebar({
     schoolWebPersona,
   );
   const visibleSettings =
+    !entitlementsLoading &&
     !isSupportOverride &&
     showSettingsHub &&
     canDisplayNavItem(settingsNavItem, session, hasModule)
@@ -202,6 +207,7 @@ export function Sidebar({
           roleLabel={roleLabel}
           settingsItem={visibleSettings}
           userLabel={userLabel}
+          navigationLoading={entitlementsLoading}
           onMobileClose={onMobileClose}
         />
       </aside>
@@ -215,6 +221,7 @@ export function Sidebar({
           roleLabel={roleLabel}
           settingsItem={visibleSettings}
           userLabel={userLabel}
+          navigationLoading={entitlementsLoading}
           onMobileClose={onMobileClose}
           onToggle={onToggle}
         />
@@ -231,6 +238,7 @@ function SidebarContent({
   roleLabel,
   settingsItem,
   userLabel,
+  navigationLoading,
   onMobileClose,
   onToggle,
 }: {
@@ -241,12 +249,13 @@ function SidebarContent({
   roleLabel: string;
   settingsItem: NavItem | null;
   userLabel: string;
+  navigationLoading: boolean;
   onMobileClose: () => void;
   onToggle?: () => void;
 }) {
   const [query, setQuery] = useState('');
   const normalizedQuery = query.trim().toLowerCase();
-  const isSearching = normalizedQuery.length > 0;
+  const isSearching = !navigationLoading && normalizedQuery.length > 0;
 
   const visibleGroups = useMemo(() => {
     if (!isSearching) return groups;
@@ -320,10 +329,11 @@ function SidebarContent({
               type="text"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Find a workspace..."
-              className="h-9 w-full rounded-lg border border-[var(--line)] bg-[var(--sidebar-hover)] pl-8 pr-7 text-[0.8rem] font-medium text-[var(--sidebar-label)] outline-none transition-colors placeholder:text-[var(--sidebar-heading)] focus:border-[var(--primary)] focus:bg-[var(--surface)] focus:ring-2 focus:ring-[var(--primary-soft)]"
+              placeholder={navigationLoading ? 'Loading workspaces...' : 'Find a workspace...'}
+              disabled={navigationLoading}
+              className="h-9 w-full rounded-lg border border-[var(--line)] bg-[var(--sidebar-hover)] pl-8 pr-7 text-[0.8rem] font-medium text-[var(--sidebar-label)] outline-none transition-colors placeholder:text-[var(--sidebar-heading)] focus:border-[var(--primary)] focus:bg-[var(--surface)] focus:ring-2 focus:ring-[var(--primary-soft)] disabled:cursor-wait disabled:opacity-70"
             />
-            {query ? (
+            {query && !navigationLoading ? (
               <button
                 type="button"
                 onClick={() => setQuery('')}
@@ -340,32 +350,39 @@ function SidebarContent({
       <nav
         className="flex-1 overflow-y-auto px-3 py-3 scrollbar-hide"
         aria-label="School operations navigation"
+        aria-busy={navigationLoading || undefined}
       >
-        {isSearching && visibleGroups.length === 0 ? (
-          <p className="px-2.5 py-6 text-center text-xs font-semibold text-[var(--sidebar-heading)]">
-            No workspace matches &ldquo;{query.trim()}&rdquo;.
-          </p>
-        ) : null}
+        {navigationLoading ? (
+          <SidebarNavigationSkeleton collapsed={collapsed} />
+        ) : (
+          <>
+            {isSearching && visibleGroups.length === 0 ? (
+              <p className="px-2.5 py-6 text-center text-xs font-semibold text-[var(--sidebar-heading)]">
+                No workspace matches &ldquo;{query.trim()}&rdquo;.
+              </p>
+            ) : null}
 
-        {visibleGroups.map((group) =>
-          group.items.length === 1 ? (
-            <div key={group.label} className="mb-1 last:mb-0">
-              <NavEntry
-                collapsed={collapsed}
-                item={group.items[0]}
-                activeHref={activeHref}
-                onMobileClose={onMobileClose}
-              />
-            </div>
-          ) : (
-            <NavGroupSection
-              key={group.label}
-              collapsed={collapsed}
-              group={group}
-              activeHref={activeHref}
-              onMobileClose={onMobileClose}
-            />
-          ),
+            {visibleGroups.map((group) =>
+              group.items.length === 1 ? (
+                <div key={group.label} className="mb-1 last:mb-0">
+                  <NavEntry
+                    collapsed={collapsed}
+                    item={group.items[0]}
+                    activeHref={activeHref}
+                    onMobileClose={onMobileClose}
+                  />
+                </div>
+              ) : (
+                <NavGroupSection
+                  key={group.label}
+                  collapsed={collapsed}
+                  group={group}
+                  activeHref={activeHref}
+                  onMobileClose={onMobileClose}
+                />
+              ),
+            )}
+          </>
         )}
       </nav>
 
@@ -435,6 +452,23 @@ function SidebarContent({
           )}
         </div>
       </footer>
+    </div>
+  );
+}
+
+function SidebarNavigationSkeleton({ collapsed }: { collapsed: boolean }) {
+  return (
+    <div className="space-y-2" role="status" aria-label="Loading workspaces">
+      {[0, 1, 2, 3, 4, 5].map((item) => (
+        <div
+          key={item}
+          className={cn(
+            'h-9 animate-pulse rounded-lg bg-[var(--sidebar-hover)]',
+            collapsed ? 'mx-auto w-9' : 'w-full',
+          )}
+        />
+      ))}
+      <span className="sr-only">Loading workspaces...</span>
     </div>
   );
 }
