@@ -11,17 +11,22 @@ import {
   LayoutGrid,
   Link2,
   Palette,
+  ReceiptText,
   School,
   ShieldCheck,
   UserCog,
+  UserPlus,
   UserRound,
   UsersRound,
+  Wallet,
+  WalletCards,
 } from 'lucide-react';
 
 export type SettingsNavigationGroupId =
   | 'personal'
   | 'school'
   | 'policies'
+  | 'administration'
   | 'access'
   | 'system';
 
@@ -53,18 +58,29 @@ export const SETTINGS_NAVIGATION_GROUPS: Array<{
   { id: 'personal', label: 'Personal' },
   { id: 'school', label: 'School' },
   { id: 'policies', label: 'Academic & student policy' },
+  { id: 'administration', label: 'Finance & administration' },
   { id: 'access', label: 'People & access' },
   { id: 'system', label: 'System' },
 ];
 
 /**
+ * Backend navigation items that intentionally do not get their own Settings
+ * destination in this catalog. Keeping these dispositions explicit prevents a
+ * hidden-but-reachable drift between backend navigation and the web IA.
+ */
+export const SETTINGS_BACKEND_ITEM_DISPOSITIONS = {
+  overview: 'rendered-by-control-center',
+  'documents-templates': 'consolidated-into-school-branding',
+  'library-settings': 'module-owned-workspace',
+  'transport-settings': 'module-owned-workspace',
+  'canteen-settings': 'module-owned-workspace',
+  'learning-settings': 'frozen-hidden',
+} as const;
+
+/**
  * Presentation metadata only. School-setting visibility and access remain
  * backend-authoritative through `backendItemId`; personal visibility is
  * derived from the authenticated session and module entitlement.
- *
- * Unsupported destinations from the target IA (appearance/language,
- * persona-specific parent/student access, billing, and consolidated data
- * operations) are intentionally absent until purpose-limited contracts exist.
  */
 export const SETTINGS_NAVIGATION: SettingsNavigationDefinition[] = [
   {
@@ -191,6 +207,18 @@ export const SETTINGS_NAVIGATION: SettingsNavigationDefinition[] = [
     status: 'platform-managed',
   },
   {
+    id: 'policy-admissions',
+    groupId: 'policies',
+    label: 'Admissions',
+    description: 'Admission requirements, documents, and approval policies.',
+    href: '/dashboard/settings/admissions',
+    icon: UserPlus,
+    scope: 'school',
+    backendItemId: 'admissions',
+    requiredModule: 'students',
+    searchKeywords: ['admission', 'documents', 'approval', 'applicant'],
+  },
+  {
     id: 'policy-attendance',
     groupId: 'policies',
     label: 'Attendance',
@@ -247,13 +275,57 @@ export const SETTINGS_NAVIGATION: SettingsNavigationDefinition[] = [
     id: 'policy-communication',
     groupId: 'policies',
     label: 'Notices & notifications',
-    description: 'Notice delivery defaults, family notifications, and quiet hours.',
+    description:
+      'Notice delivery defaults, family notifications, and quiet hours.',
     href: '/dashboard/settings/communication',
     icon: BellRing,
     scope: 'school',
     backendItemId: 'communication',
-    searchKeywords: ['notices', 'notifications', 'announcements', 'quiet hours', 'email', 'sms'],
+    searchKeywords: [
+      'notices',
+      'notifications',
+      'announcements',
+      'quiet hours',
+      'email',
+      'sms',
+    ],
     legacyHrefs: ['/dashboard/settings/notifications'],
+  },
+  {
+    id: 'administration-fees',
+    groupId: 'administration',
+    label: 'Fees & receipts',
+    description: 'Receipt numbering, approvals, cashier close, and methods.',
+    href: '/dashboard/settings/fees',
+    icon: ReceiptText,
+    scope: 'school',
+    backendItemId: 'fees',
+    requiredModule: 'fees',
+    searchKeywords: ['fees', 'receipt', 'cashier', 'payment', 'discount', 'waiver'],
+  },
+  {
+    id: 'administration-accounting',
+    groupId: 'administration',
+    label: 'Accounting & fiscal policy',
+    description: 'Fiscal defaults, account labels, and numbering prefixes.',
+    href: '/dashboard/settings/accounting',
+    icon: WalletCards,
+    scope: 'school',
+    backendItemId: 'accounting',
+    requiredModule: 'accounting',
+    searchKeywords: ['accounting', 'fiscal', 'journal', 'voucher', 'account'],
+  },
+  {
+    id: 'administration-hr-payroll',
+    groupId: 'administration',
+    label: 'HR & payroll',
+    description: 'Leave approval and payroll policy defaults.',
+    href: '/dashboard/settings/hr-payroll',
+    icon: Wallet,
+    scope: 'school',
+    backendItemId: 'hr-payroll',
+    requiredModule: 'hr',
+    searchKeywords: ['hr', 'payroll', 'leave', 'pf', 'tds', 'salary'],
   },
   {
     id: 'access-roles',
@@ -281,6 +353,17 @@ export const SETTINGS_NAVIGATION: SettingsNavigationDefinition[] = [
     backendItemId: 'users-access',
     searchKeywords: ['staff', 'accounts', 'users', 'activate', 'suspend'],
     legacyHrefs: ['/dashboard/settings/users-access'],
+  },
+  {
+    id: 'system-security',
+    groupId: 'system',
+    label: 'Security & privacy',
+    description: 'Session, masking, reveal-reason, and export policy.',
+    href: '/dashboard/settings/security',
+    icon: ShieldCheck,
+    scope: 'school',
+    backendItemId: 'security',
+    searchKeywords: ['session', 'privacy', 'masking', 'export', 'security'],
   },
   {
     id: 'system-integrations',
