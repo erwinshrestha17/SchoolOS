@@ -38,6 +38,12 @@ void main() {
 
   setUp(() {
     repository = MockAttendanceRepository();
+    when(
+      () => repository.refreshTeacherAttendanceScope(),
+    ).thenAnswer((_) async => TeacherAttendanceScopeRefresh.unchanged);
+    when(
+      () => repository.assertTeacherAttendanceScopeReadableOffline(),
+    ).thenAnswer((_) async {});
     when(() => repository.getTeacherToday(any())).thenAnswer(
       (_) async => TeacherTodaySnapshot(
         date: DateTime(2026, 6, 18),
@@ -81,6 +87,112 @@ void main() {
 
       expect(controller.state.error, isA<PermissionException>());
       expect(controller.state.entries, isEmpty);
+    },
+  );
+
+  test(
+    'scope purge completes before any attendance read and never submits',
+    () async {
+      when(
+        () => repository.refreshTeacherAttendanceScope(),
+      ).thenAnswer((_) async => TeacherAttendanceScopeRefresh.localDataPurged);
+      final controller = TeacherAttendanceController(
+        repository: repository,
+        isOnline: true,
+      );
+      await _waitForLoad(controller);
+
+      verifyInOrder([
+        () => repository.refreshTeacherAttendanceScope(),
+        () => repository.getTeacherToday(any()),
+        () => repository.loadDraftAttendance(any(), any()),
+        () => repository.getClassAttendanceSheet(any(), any()),
+      ]);
+      verifyNever(
+        () => repository.submitAttendance(any(), any(), any(), any(), any()),
+      );
+      expect(
+        controller.state.message,
+        contains('Any older local attendance data'),
+      );
+    },
+  );
+
+  test(
+    'malformed online guard failure blanks previously loaded state',
+    () async {
+      final controller = TeacherAttendanceController(
+        repository: repository,
+        isOnline: true,
+      );
+      await _waitForLoad(controller);
+      expect(controller.state.entries, isNotEmpty);
+      clearInteractions(repository);
+      when(
+        () => repository.refreshTeacherAttendanceScope(),
+      ).thenThrow(const ServerException(code: 'INVALID_TEACHER_SCOPE_VERSION'));
+
+      await controller.load();
+
+      expect(controller.state.error, isA<ServerException>());
+      expect(controller.state.classes, isEmpty);
+      expect(controller.state.entries, isEmpty);
+      expect(controller.state.originalEntries, isEmpty);
+      expect(controller.state.draftClientSubmissionId, isNull);
+      verifyNever(() => repository.getTeacherToday(any()));
+      verifyNever(() => repository.loadDraftAttendance(any(), any()));
+      verifyNever(() => repository.getClassAttendanceSheet(any(), any()));
+    },
+  );
+
+  test(
+    'persisted offline quarantine blanks state before cached reads',
+    () async {
+      final controller = TeacherAttendanceController(
+        repository: repository,
+        isOnline: false,
+      );
+      await _waitForLoad(controller);
+      expect(controller.state.entries, isNotEmpty);
+      clearInteractions(repository);
+      when(
+        () => repository.assertTeacherAttendanceScopeReadableOffline(),
+      ).thenThrow(const CacheException('Reconnect to verify access.'));
+
+      await controller.load();
+
+      expect(controller.state.error, isA<CacheException>());
+      expect(controller.state.classes, isEmpty);
+      expect(controller.state.entries, isEmpty);
+      verifyNever(() => repository.getTeacherToday(any()));
+      verifyNever(() => repository.loadDraftAttendance(any(), any()));
+      verifyNever(() => repository.getClassAttendanceSheet(any(), any()));
+    },
+  );
+
+  test(
+    'online reconstruction after an offline load never auto-submits',
+    () async {
+      final offlineController = TeacherAttendanceController(
+        repository: repository,
+        isOnline: false,
+      );
+      await _waitForLoad(offlineController);
+      when(
+        () => repository.refreshTeacherAttendanceScope(),
+      ).thenAnswer((_) async => TeacherAttendanceScopeRefresh.localDataPurged);
+
+      final reconnectedController = TeacherAttendanceController(
+        repository: repository,
+        isOnline: true,
+      );
+      await _waitForLoad(reconnectedController);
+
+      verify(() => repository.refreshTeacherAttendanceScope()).called(1);
+      verifyNever(
+        () => repository.submitAttendance(any(), any(), any(), any(), any()),
+      );
+      expect(reconnectedController.state.entries, entries);
     },
   );
 
@@ -527,6 +639,12 @@ void main() {
     'module lock and expired session errors remain typed for safe UI states',
     () async {
       when(
+        () => repository.clearTeacherAttendanceScopeStrict(
+          clearVersion: true,
+          quarantine: true,
+        ),
+      ).thenAnswer((_) async {});
+      when(
         () => repository.getTeacherToday(any()),
       ).thenThrow(const ModuleLockedException());
       final lockedController = TeacherAttendanceController(
@@ -535,6 +653,14 @@ void main() {
       );
       await _waitForLoad(lockedController);
       expect(lockedController.state.error, isA<ModuleLockedException>());
+      expect(lockedController.state.classes, isEmpty);
+      expect(lockedController.state.entries, isEmpty);
+      verify(
+        () => repository.clearTeacherAttendanceScopeStrict(
+          clearVersion: true,
+          quarantine: true,
+        ),
+      ).called(1);
 
       when(
         () => repository.getTeacherToday(any()),
@@ -547,6 +673,54 @@ void main() {
       expect(expiredController.state.error, isA<SessionExpiredException>());
     },
   );
+
+  for (final denial in <AppException>[
+    const PermissionException(),
+    const ModuleLockedException(),
+  ]) {
+    test(
+      '${denial.runtimeType} learned during sync strictly purges local scope',
+      () async {
+        when(
+          () => repository.saveDraftAttendanceLocally(any(), any(), any()),
+        ).thenAnswer(
+          (_) async => TeacherAttendanceDraft(
+            clientSubmissionId: 'mobile-denied-1',
+            savedAt: DateTime(2026, 6, 18, 8),
+            entries: entries,
+          ),
+        );
+        when(
+          () => repository.submitAttendance(any(), any(), any(), any(), any()),
+        ).thenThrow(denial);
+        when(
+          () => repository.clearTeacherAttendanceScopeStrict(
+            clearVersion: true,
+            quarantine: true,
+          ),
+        ).thenAnswer((_) async {});
+        final controller = TeacherAttendanceController(
+          repository: repository,
+          isOnline: true,
+        );
+        await _waitForLoad(controller);
+        controller.markStudent('student-1', AttendanceStatus.absent);
+
+        await controller.submit();
+
+        verify(
+          () => repository.clearTeacherAttendanceScopeStrict(
+            clearVersion: true,
+            quarantine: true,
+          ),
+        ).called(1);
+        expect(controller.state.error, same(denial));
+        expect(controller.state.classes, isEmpty);
+        expect(controller.state.entries, isEmpty);
+        expect(controller.state.draftClientSubmissionId, isNull);
+      },
+    );
+  }
 }
 
 Future<void> _waitForLoad(TeacherAttendanceController controller) async {

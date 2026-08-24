@@ -81,6 +81,8 @@ void main() {
         ..values['schoolos.private_read_cache.1.record'] = 'encrypted-record'
         ..values['schoolos.teacher_attendance_draft.secure.1.record'] =
             'encrypted-draft'
+        ..values['schoolos.teacher_attendance_scope_version.secure.1.record'] =
+            'encrypted-version'
         ..values['school_os_access_token'] = 'token';
       final cleanup = PrivateDataCleanupService(preferences, secureStorage);
 
@@ -99,6 +101,12 @@ void main() {
       expect(
         secureStorage.values.containsKey(
           'schoolos.teacher_attendance_draft.secure.1.record',
+        ),
+        isFalse,
+      );
+      expect(
+        secureStorage.values.containsKey(
+          'schoolos.teacher_attendance_scope_version.secure.1.record',
         ),
         isFalse,
       );
@@ -145,6 +153,8 @@ void main() {
         ..values['schoolos.private_read_cache.1.record'] = 'encrypted-record'
         ..values['schoolos.teacher_attendance_draft.secure.1.record'] =
             'encrypted-draft'
+        ..values['schoolos.teacher_attendance_scope_version.secure.1.record'] =
+            'encrypted-version'
         ..values['school_os_access_token'] = 'token';
 
       await PrivateDataCleanupService(
@@ -163,6 +173,12 @@ void main() {
       expect(
         secureStorage.values.containsKey(
           'schoolos.teacher_attendance_draft.secure.1.record',
+        ),
+        isFalse,
+      );
+      expect(
+        secureStorage.values.containsKey(
+          'schoolos.teacher_attendance_scope_version.secure.1.record',
         ),
         isFalse,
       );

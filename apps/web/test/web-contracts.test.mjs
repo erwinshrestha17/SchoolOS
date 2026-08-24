@@ -1652,6 +1652,7 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('keeps attendance screen wired to real roster, submit, sync, analytics, and conflict APIs', () => {
+    const markingForm = read('components/forms/attendance-form.tsx');
     const attendanceForm = readMany([
       'components/forms/attendance-form.tsx',
       'app/dashboard/attendance/page.tsx',
@@ -1667,7 +1668,6 @@ describe('SchoolOS web production contracts', () => {
       'api.listClasses',
       'api.listSections',
       'api.getAttendanceRoster',
-      'api.submitAttendance',
       'api.syncAttendance',
       'api.listAttendanceAnalytics',
       'api.listAttendanceConflicts',
@@ -1688,6 +1688,13 @@ describe('SchoolOS web production contracts', () => {
     for (const apiCall of requiredApis) {
       assert.match(attendanceForm, new RegExp(apiCall.replace('.', '\\.')));
     }
+
+    assert.doesNotMatch(markingForm, /api\.submitAttendance/);
+    assert.match(markingForm, /mutationFn: api\.syncAttendance/);
+    assert.match(
+      markingForm,
+      /isOpen=\{isConfirmOpen\}[\s\S]{0,2200}void syncDraftSubmission\(\)/,
+    );
 
     assert.match(attendanceForm, /AttendanceCorrectionReview/);
     assert.match(attendanceForm, /Correction Review Queue/);

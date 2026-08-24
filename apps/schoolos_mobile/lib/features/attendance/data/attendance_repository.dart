@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
@@ -7,14 +8,316 @@ import '../../../core/errors/app_exception.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/storage/private_read_cache.dart';
 import '../../../core/storage/teacher_attendance_draft_store.dart';
+import '../../../core/storage/teacher_attendance_scope_version_store.dart';
 import '../domain/attendance_models.dart';
 
+enum TeacherAttendanceScopeRefresh {
+  unchanged,
+  localDataPurged,
+  transportUnavailable;
+
+  bool get purgedLocalData => this == localDataPurged;
+}
+
 class AttendanceRepository {
-  const AttendanceRepository(this._client, {this.cache, this.draftStore});
+  AttendanceRepository(
+    this._client, {
+    this.cache,
+    this.draftStore,
+    this.scopeVersionStore,
+  });
 
   final ApiClient _client;
   final PrivateReadCache? cache;
   final TeacherAttendanceDraftStore? draftStore;
+  final TeacherAttendanceScopeVersionStore? scopeVersionStore;
+  Future<void> _scopeFence = Future<void>.value();
+  int _scopeEpoch = 0;
+
+  /// Verifies the server-owned teacher assignment version before any
+  /// attendance cache or draft is read on an online load.
+  Future<TeacherAttendanceScopeRefresh> refreshTeacherAttendanceScope() async {
+    final dependencies = _requireTeacherAttendanceScopeDependencies();
+
+    late final Response<dynamic> response;
+    try {
+      response = await _client.get('/mobile/teacher/attendance/scope-version');
+    } on AppException catch (error, stackTrace) {
+      if (error is NetworkException || error is TimeoutException) {
+        return _withScopeFence(() async {
+          if (await dependencies.scopeVersionStore.isQuarantined()) {
+            throw const CacheException(
+              'Teacher attendance access must be reverified before local data can be opened.',
+            );
+          }
+          return TeacherAttendanceScopeRefresh.transportUnavailable;
+        });
+      }
+      if (error is PermissionException || error is ModuleLockedException) {
+        await clearTeacherAttendanceScopeStrict(
+          clearVersion: true,
+          quarantine: true,
+        );
+      } else {
+        await _quarantineTeacherAttendanceScope(clearVersion: false);
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+
+    final data = response.data;
+    final scopeVersion = data is Map<String, dynamic>
+        ? data['scopeVersion']
+        : null;
+    if (scopeVersion is! String ||
+        !isValidTeacherAttendanceScopeVersion(scopeVersion)) {
+      await _quarantineTeacherAttendanceScope(clearVersion: false);
+      throw const ServerException(
+        message:
+            'SchoolOS could not verify this teacher attendance access state.',
+        code: 'INVALID_TEACHER_SCOPE_VERSION',
+      );
+    }
+
+    return _withScopeFence(() async {
+      final storedState = await dependencies.scopeVersionStore.readState();
+      if (storedState?.scopeVersion == scopeVersion &&
+          storedState?.quarantined != true) {
+        return TeacherAttendanceScopeRefresh.unchanged;
+      }
+
+      final storedVersion = storedState?.scopeVersion;
+      if (storedVersion != null &&
+          BigInt.parse(storedVersion) > BigInt.parse(scopeVersion)) {
+        if (storedState?.quarantined == true) {
+          throw const CacheException(
+            'Teacher attendance access must be reverified before local data can be opened.',
+          );
+        }
+        // A slower, older verification response must not roll back a newer
+        // scope version already accepted by another load.
+        return TeacherAttendanceScopeRefresh.unchanged;
+      }
+
+      // The first verified observation also purges legacy, unversioned local
+      // data. Invalidate in-flight persistence and persist quarantine before
+      // either purge. The verified version clears quarantine only after both
+      // strict purges succeed.
+      _scopeEpoch += 1;
+      await dependencies.scopeVersionStore.quarantine(clearVersion: false);
+      await _clearTeacherAttendanceScopeStrictUnlocked(
+        dependencies,
+        clearVersion: false,
+      );
+      await dependencies.scopeVersionStore.write(scopeVersion);
+      return TeacherAttendanceScopeRefresh.localDataPurged;
+    });
+  }
+
+  Future<void> clearTeacherAttendanceScopeStrict({
+    required bool clearVersion,
+    bool quarantine = false,
+  }) async {
+    final dependencies = _requireTeacherAttendanceScopeDependencies();
+    await _withScopeFence(() async {
+      _scopeEpoch += 1;
+      await _clearTeacherAttendanceScopeStrictUnlocked(
+        dependencies,
+        clearVersion: clearVersion,
+        quarantine: quarantine,
+      );
+    });
+  }
+
+  Future<void> _clearTeacherAttendanceScopeStrictUnlocked(
+    _TeacherAttendanceScopeDependencies dependencies, {
+    required bool clearVersion,
+    bool quarantine = false,
+  }) async {
+    var failed = false;
+
+    try {
+      await dependencies.cache.clearTeacherAttendanceScopeStrict();
+    } catch (_) {
+      failed = true;
+    }
+    try {
+      await dependencies.draftStore.clearCurrentScopeStrict();
+    } catch (_) {
+      failed = true;
+    }
+    if (clearVersion) {
+      try {
+        if (quarantine) {
+          await dependencies.scopeVersionStore.quarantine(clearVersion: true);
+        } else {
+          await dependencies.scopeVersionStore.clear();
+        }
+      } catch (_) {
+        failed = true;
+      }
+    }
+
+    if (failed) {
+      throw const CacheException(
+        'Teacher attendance data could not be cleared securely.',
+      );
+    }
+  }
+
+  Future<void> assertTeacherAttendanceScopeReadableOffline() async {
+    final dependencies = _requireTeacherAttendanceScopeDependencies();
+    await _withScopeFence(() async {
+      if (await dependencies.scopeVersionStore.isQuarantined()) {
+        throw const CacheException(
+          'Teacher attendance access must be reverified while connected before local data can be opened.',
+        );
+      }
+    });
+  }
+
+  Future<void> _quarantineTeacherAttendanceScope({
+    required bool clearVersion,
+  }) async {
+    final dependencies = _requireTeacherAttendanceScopeDependencies();
+    await _withScopeFence(() async {
+      _scopeEpoch += 1;
+      await dependencies.scopeVersionStore.quarantine(
+        clearVersion: clearVersion,
+      );
+    });
+  }
+
+  _TeacherAttendanceScopeDependencies
+  _requireTeacherAttendanceScopeDependencies() {
+    final activeCache = cache;
+    final activeDraftStore = draftStore;
+    final activeVersionStore = scopeVersionStore;
+    if (activeCache == null ||
+        activeDraftStore == null ||
+        activeVersionStore == null) {
+      throw const CacheException(
+        'Teacher attendance access verification is unavailable for this session.',
+      );
+    }
+    return _TeacherAttendanceScopeDependencies(
+      cache: activeCache,
+      draftStore: activeDraftStore,
+      scopeVersionStore: activeVersionStore,
+    );
+  }
+
+  Future<_TeacherAttendanceScopeTicket?>
+  _captureTeacherAttendanceScopeTicket() {
+    final activeVersionStore = scopeVersionStore;
+    if (activeVersionStore == null) {
+      return Future<_TeacherAttendanceScopeTicket?>.value();
+    }
+    return _withScopeFence(() async {
+      final state = await activeVersionStore.readState();
+      if (state?.quarantined == true) {
+        throw const CacheException(
+          'Teacher attendance access must be reverified before local data can be opened.',
+        );
+      }
+      return _TeacherAttendanceScopeTicket(
+        epoch: _scopeEpoch,
+        scopeVersion: state?.scopeVersion,
+      );
+    });
+  }
+
+  Future<bool> _isScopeTicketCurrentUnlocked(
+    _TeacherAttendanceScopeTicket ticket,
+  ) async {
+    final activeVersionStore = scopeVersionStore;
+    if (activeVersionStore == null || ticket.epoch != _scopeEpoch) return false;
+    final state = await activeVersionStore.readState();
+    return state?.quarantined != true &&
+        state?.scopeVersion == ticket.scopeVersion;
+  }
+
+  Future<void> _assertScopeTicketCurrent(_TeacherAttendanceScopeTicket ticket) {
+    return _withScopeFence(() async {
+      if (!await _isScopeTicketCurrentUnlocked(ticket)) {
+        throw const CacheException(
+          'Teacher attendance access changed before local data could be used.',
+        );
+      }
+    });
+  }
+
+  Future<void> _writeTeacherAttendanceCache(
+    String resourceKey,
+    Map<String, dynamic> data,
+    _TeacherAttendanceScopeTicket? ticket,
+  ) async {
+    final activeCache = cache;
+    if (activeCache == null) return;
+    if (ticket == null) {
+      await activeCache.write(resourceKey, data);
+      return;
+    }
+
+    await _withScopeFence(() async {
+      if (!await _isScopeTicketCurrentUnlocked(ticket)) {
+        throw const CacheException(
+          'Teacher attendance access changed before local data could be stored.',
+        );
+      }
+      await activeCache.write(
+        resourceKey,
+        data,
+        authorizationScopeVersion: ticket.scopeVersion,
+        beforeCommit: () => _isScopeTicketCurrentUnlocked(ticket),
+      );
+      if (!await _isScopeTicketCurrentUnlocked(ticket)) {
+        throw const CacheException(
+          'Teacher attendance access changed before local data could be stored.',
+        );
+      }
+    });
+  }
+
+  Future<CachedPrivateRead?> _readTeacherAttendanceCache(
+    String resourceKey,
+    _TeacherAttendanceScopeTicket? ticket,
+  ) async {
+    final activeCache = cache;
+    if (activeCache == null) return null;
+    if (ticket == null) return activeCache.read(resourceKey);
+
+    return _withScopeFence(() async {
+      if (!await _isScopeTicketCurrentUnlocked(ticket)) {
+        throw const CacheException(
+          'Teacher attendance access changed before local data could be opened.',
+        );
+      }
+      final cached = await activeCache.read(
+        resourceKey,
+        expectedAuthorizationScopeVersion: ticket.scopeVersion,
+        enforceAuthorizationScopeVersion: true,
+        beforeReturn: () => _isScopeTicketCurrentUnlocked(ticket),
+      );
+      if (!await _isScopeTicketCurrentUnlocked(ticket)) {
+        throw const CacheException(
+          'Teacher attendance access changed before local data could be opened.',
+        );
+      }
+      return cached;
+    });
+  }
+
+  Future<T> _withScopeFence<T>(Future<T> Function() action) {
+    final completer = Completer<T>();
+    _scopeFence = _scopeFence.then((_) async {
+      try {
+        completer.complete(await action());
+      } catch (error, stackTrace) {
+        completer.completeError(error, stackTrace);
+      }
+    });
+    return completer.future;
+  }
 
   Future<AttendanceSnapshot> getParentAttendanceSnapshot(
     String studentId,
@@ -162,16 +465,17 @@ class AttendanceRepository {
   }
 
   Future<TeacherClassesSnapshot> getTeacherAssignedClasses() async {
+    final scopeTicket = await _captureTeacherAttendanceScopeTicket();
     const cacheKey = 'teacher_assigned_classes';
     late Map<String, dynamic> data;
     try {
       final response = await _client.get('/mobile/teacher/attendance/classes');
       data = Map<String, dynamic>.from(response.data as Map<String, dynamic>);
       data['_mobileLastUpdated'] = DateTime.now().toIso8601String();
-      await cache?.write(cacheKey, data);
+      await _writeTeacherAttendanceCache(cacheKey, data, scopeTicket);
     } on AppException catch (error) {
       if (error is! NetworkException && error is! TimeoutException) rethrow;
-      final cached = await cache?.read(cacheKey);
+      final cached = await _readTeacherAttendanceCache(cacheKey, scopeTicket);
       if (cached == null) rethrow;
       data = cached.withMetadata();
     }
@@ -188,6 +492,7 @@ class AttendanceRepository {
   }
 
   Future<TeacherTodaySnapshot> getTeacherToday(DateTime date) async {
+    final scopeTicket = await _captureTeacherAttendanceScopeTicket();
     final dateKey = _dateOnly(date);
     final cacheKey = 'teacher_today_$dateKey';
     late Map<String, dynamic> data;
@@ -198,10 +503,10 @@ class AttendanceRepository {
       );
       data = Map<String, dynamic>.from(response.data as Map<String, dynamic>);
       data['_mobileLastUpdated'] = DateTime.now().toIso8601String();
-      await cache?.write(cacheKey, data);
+      await _writeTeacherAttendanceCache(cacheKey, data, scopeTicket);
     } on AppException catch (error) {
       if (error is! NetworkException && error is! TimeoutException) rethrow;
-      final cached = await cache?.read(cacheKey);
+      final cached = await _readTeacherAttendanceCache(cacheKey, scopeTicket);
       if (cached == null) rethrow;
       data = cached.withMetadata();
     }
@@ -227,6 +532,7 @@ class AttendanceRepository {
     TeacherClassSection classSection,
     DateTime date,
   ) async {
+    final scopeTicket = await _captureTeacherAttendanceScopeTicket();
     final cacheKey = 'teacher_roster_${classSection.id}_${_dateOnly(date)}';
     late Map<String, dynamic> data;
     try {
@@ -242,10 +548,10 @@ class AttendanceRepository {
       );
       data = Map<String, dynamic>.from(response.data as Map<String, dynamic>);
       data['_mobileLastUpdated'] = DateTime.now().toIso8601String();
-      await cache?.write(cacheKey, data);
+      await _writeTeacherAttendanceCache(cacheKey, data, scopeTicket);
     } on AppException catch (error) {
       if (error is! NetworkException && error is! TimeoutException) rethrow;
-      final cached = await cache?.read(cacheKey);
+      final cached = await _readTeacherAttendanceCache(cacheKey, scopeTicket);
       if (cached == null) rethrow;
       data = cached.withMetadata();
     }
@@ -300,7 +606,12 @@ class AttendanceRepository {
     String clientSubmissionId,
     DateTime deviceTimestamp,
   ) async {
-    final existing = await loadDraftAttendance(classSection.id, date);
+    final scopeTicket = await _captureTeacherAttendanceScopeTicket();
+    final existing = await _loadDraftAttendanceWithTicket(
+      classSection.id,
+      date,
+      scopeTicket,
+    );
     if (existing == null ||
         existing.clientSubmissionId != clientSubmissionId ||
         !_sameAttendanceContent(existing.entries, entries)) {
@@ -309,12 +620,13 @@ class AttendanceRepository {
 
     final priorReceiptState = existing.receiptState;
     if (!priorReceiptState.locksContent) {
-      await markDraftReceiptState(
+      await _markDraftReceiptStateWithTicket(
         classSection.id,
         date,
         entries,
         clientSubmissionId: clientSubmissionId,
         receiptState: AttendanceDraftReceiptState.transportAmbiguous,
+        scopeTicket: scopeTicket,
       );
     }
 
@@ -343,12 +655,13 @@ class AttendanceRepository {
     } on AppException catch (error) {
       if (!priorReceiptState.locksContent && !_isAmbiguousSubmission(error)) {
         try {
-          await markDraftReceiptState(
+          await _markDraftReceiptStateWithTicket(
             classSection.id,
             date,
             entries,
             clientSubmissionId: clientSubmissionId,
             receiptState: priorReceiptState,
+            scopeTicket: scopeTicket,
           );
         } catch (_) {
           throw const UnknownException(
@@ -377,15 +690,16 @@ class AttendanceRepository {
       );
     }
     if (result.canClearDeviceDraft) {
-      await _removeDraft(classSection.id, date);
+      await _removeDraft(classSection.id, date, scopeTicket: scopeTicket);
     } else {
       try {
-        await markDraftReceiptState(
+        await _markDraftReceiptStateWithTicket(
           classSection.id,
           date,
           entries,
           clientSubmissionId: clientSubmissionId,
           receiptState: result.draftReceiptState,
+          scopeTicket: scopeTicket,
         );
       } catch (_) {
         result = TeacherAttendanceSubmitResult(
@@ -396,6 +710,9 @@ class AttendanceRepository {
         );
       }
     }
+    if (scopeTicket != null) {
+      await _assertScopeTicketCurrent(scopeTicket);
+    }
     return result;
   }
 
@@ -404,7 +721,12 @@ class AttendanceRepository {
     DateTime date,
     List<AttendanceStudentEntry> entries,
   ) async {
-    final existing = await loadDraftAttendance(classSectionId, date);
+    final scopeTicket = await _captureTeacherAttendanceScopeTicket();
+    final existing = await _loadDraftAttendanceWithTicket(
+      classSectionId,
+      date,
+      scopeTicket,
+    );
     final contentChanged =
         existing != null && !_sameAttendanceContent(existing.entries, entries);
     if (contentChanged && existing.receiptState.locksContent) {
@@ -426,7 +748,7 @@ class AttendanceRepository {
           ? AttendanceDraftReceiptState.local
           : existing?.receiptState ?? AttendanceDraftReceiptState.local,
     );
-    await _writeDraft(classSectionId, date, draft);
+    await _writeDraft(classSectionId, date, draft, scopeTicket);
     return draft;
   }
 
@@ -437,7 +759,30 @@ class AttendanceRepository {
     required String clientSubmissionId,
     required AttendanceDraftReceiptState receiptState,
   }) async {
-    final existing = await loadDraftAttendance(classSectionId, date);
+    final scopeTicket = await _captureTeacherAttendanceScopeTicket();
+    return _markDraftReceiptStateWithTicket(
+      classSectionId,
+      date,
+      entries,
+      clientSubmissionId: clientSubmissionId,
+      receiptState: receiptState,
+      scopeTicket: scopeTicket,
+    );
+  }
+
+  Future<TeacherAttendanceDraft> _markDraftReceiptStateWithTicket(
+    String classSectionId,
+    DateTime date,
+    List<AttendanceStudentEntry> entries, {
+    required String clientSubmissionId,
+    required AttendanceDraftReceiptState receiptState,
+    required _TeacherAttendanceScopeTicket? scopeTicket,
+  }) async {
+    final existing = await _loadDraftAttendanceWithTicket(
+      classSectionId,
+      date,
+      scopeTicket,
+    );
     if (existing == null ||
         existing.clientSubmissionId != clientSubmissionId ||
         !_sameAttendanceContent(existing.entries, entries)) {
@@ -450,7 +795,7 @@ class AttendanceRepository {
       entries: existing.entries,
       receiptState: receiptState,
     );
-    await _writeDraft(classSectionId, date, draft);
+    await _writeDraft(classSectionId, date, draft, scopeTicket);
     return draft;
   }
 
@@ -458,9 +803,29 @@ class AttendanceRepository {
     String classSectionId,
     DateTime date,
     TeacherAttendanceDraft draft,
+    _TeacherAttendanceScopeTicket? scopeTicket,
   ) async {
-    final stored =
-        await draftStore?.write(
+    final activeDraftStore = draftStore;
+    var stored = false;
+    if (activeDraftStore != null && scopeTicket == null) {
+      stored = await activeDraftStore.write(
+        classSectionId: classSectionId,
+        date: _dateOnly(date),
+        payload: {
+          'clientSubmissionId': draft.clientSubmissionId,
+          'savedAt': draft.savedAt.toIso8601String(),
+          'entries': [for (final entry in draft.entries) entry.toJson()],
+          'receiptState': draft.receiptState.name,
+        },
+      );
+    } else if (activeDraftStore != null && scopeTicket != null) {
+      stored = await _withScopeFence(() async {
+        if (!await _isScopeTicketCurrentUnlocked(scopeTicket)) {
+          throw const CacheException(
+            'Teacher attendance access changed before the draft could be stored.',
+          );
+        }
+        final didStore = await activeDraftStore.write(
           classSectionId: classSectionId,
           date: _dateOnly(date),
           payload: {
@@ -469,8 +834,17 @@ class AttendanceRepository {
             'entries': [for (final entry in draft.entries) entry.toJson()],
             'receiptState': draft.receiptState.name,
           },
-        ) ??
-        false;
+          authorizationScopeVersion: scopeTicket.scopeVersion,
+          beforeCommit: () => _isScopeTicketCurrentUnlocked(scopeTicket),
+        );
+        if (!await _isScopeTicketCurrentUnlocked(scopeTicket)) {
+          throw const CacheException(
+            'Teacher attendance access changed before the draft could be stored.',
+          );
+        }
+        return didStore;
+      });
+    }
     if (!stored) {
       throw const CacheException(
         'Attendance draft could not be stored securely for this teacher session.',
@@ -482,11 +856,59 @@ class AttendanceRepository {
     String classSectionId,
     DateTime date,
   ) async {
-    final data = await draftStore?.read(
-      classSectionId: classSectionId,
-      date: _dateOnly(date),
-    );
+    final scopeTicket = await _captureTeacherAttendanceScopeTicket();
+    return _loadDraftAttendanceWithTicket(classSectionId, date, scopeTicket);
+  }
+
+  Future<TeacherAttendanceDraft?> _loadDraftAttendanceWithTicket(
+    String classSectionId,
+    DateTime date,
+    _TeacherAttendanceScopeTicket? scopeTicket,
+  ) async {
+    final activeDraftStore = draftStore;
+    Map<String, dynamic>? data;
+    if (activeDraftStore != null && scopeTicket == null) {
+      data = await activeDraftStore.read(
+        classSectionId: classSectionId,
+        date: _dateOnly(date),
+      );
+    } else if (activeDraftStore != null && scopeTicket != null) {
+      data = await _withScopeFence(() async {
+        if (!await _isScopeTicketCurrentUnlocked(scopeTicket)) {
+          throw const CacheException(
+            'Teacher attendance access changed before the draft could be opened.',
+          );
+        }
+        final storedDraft = await activeDraftStore.read(
+          classSectionId: classSectionId,
+          date: _dateOnly(date),
+          expectedAuthorizationScopeVersion: scopeTicket.scopeVersion,
+          enforceAuthorizationScopeVersion: true,
+          beforeReturn: () => _isScopeTicketCurrentUnlocked(scopeTicket),
+        );
+        if (!await _isScopeTicketCurrentUnlocked(scopeTicket)) {
+          throw const CacheException(
+            'Teacher attendance access changed before the draft could be opened.',
+          );
+        }
+        return storedDraft;
+      });
+    }
     if (data == null) return null;
+    final draft = _decodeTeacherAttendanceDraft(data);
+    if (draft == null) {
+      await _removeDraft(classSectionId, date, scopeTicket: scopeTicket);
+      return null;
+    }
+    if (scopeTicket != null) {
+      await _assertScopeTicketCurrent(scopeTicket);
+    }
+    return draft;
+  }
+
+  TeacherAttendanceDraft? _decodeTeacherAttendanceDraft(
+    Map<String, dynamic> data,
+  ) {
     try {
       final entries = _asList(data['entries'])
           .whereType<Map<String, dynamic>>()
@@ -498,7 +920,6 @@ class AttendanceRepository {
           clientSubmissionId == null ||
           clientSubmissionId.trim().isEmpty ||
           savedAt == null) {
-        await _removeDraft(classSectionId, date);
         return null;
       }
       return TeacherAttendanceDraft(
@@ -508,20 +929,71 @@ class AttendanceRepository {
         receiptState: _parseDraftReceiptState(data['receiptState']),
       );
     } catch (_) {
-      await _removeDraft(classSectionId, date);
       return null;
     }
   }
 
-  Future<void> _removeDraft(String classSectionId, DateTime date) async {
-    await draftStore?.delete(
-      classSectionId: classSectionId,
-      date: _dateOnly(date),
-    );
+  Future<void> _removeDraft(
+    String classSectionId,
+    DateTime date, {
+    _TeacherAttendanceScopeTicket? scopeTicket,
+  }) async {
+    final activeDraftStore = draftStore;
+    if (activeDraftStore == null) return;
+    if (scopeTicket == null) {
+      await activeDraftStore.delete(
+        classSectionId: classSectionId,
+        date: _dateOnly(date),
+      );
+      return;
+    }
+    await _withScopeFence(() async {
+      if (!await _isScopeTicketCurrentUnlocked(scopeTicket)) {
+        throw const CacheException(
+          'Teacher attendance access changed before the draft could be removed.',
+        );
+      }
+      await activeDraftStore.delete(
+        classSectionId: classSectionId,
+        date: _dateOnly(date),
+      );
+      if (!await _isScopeTicketCurrentUnlocked(scopeTicket)) {
+        throw const CacheException(
+          'Teacher attendance access changed before the draft could be removed.',
+        );
+      }
+    });
   }
 
-  Future<void> discardDraftAttendance(String classSectionId, DateTime date) =>
-      _removeDraft(classSectionId, date);
+  Future<void> discardDraftAttendance(
+    String classSectionId,
+    DateTime date,
+  ) async {
+    final scopeTicket = await _captureTeacherAttendanceScopeTicket();
+    await _removeDraft(classSectionId, date, scopeTicket: scopeTicket);
+  }
+}
+
+class _TeacherAttendanceScopeDependencies {
+  const _TeacherAttendanceScopeDependencies({
+    required this.cache,
+    required this.draftStore,
+    required this.scopeVersionStore,
+  });
+
+  final PrivateReadCache cache;
+  final TeacherAttendanceDraftStore draftStore;
+  final TeacherAttendanceScopeVersionStore scopeVersionStore;
+}
+
+class _TeacherAttendanceScopeTicket {
+  const _TeacherAttendanceScopeTicket({
+    required this.epoch,
+    required this.scopeVersion,
+  });
+
+  final int epoch;
+  final String? scopeVersion;
 }
 
 String _newClientSubmissionId() {

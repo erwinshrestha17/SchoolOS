@@ -17,6 +17,9 @@ class PrivateDataCleanupService {
     try {
       await _secureStorage?.deleteByPrefix(privateReadCacheStoragePrefix);
       await _secureStorage?.deleteByPrefix(teacherAttendanceDraftStoragePrefix);
+      await _secureStorage?.deleteByPrefix(
+        teacherAttendanceScopeVersionStoragePrefix,
+      );
     } catch (_) {
       try {
         // If selective deletion fails, remove every secure record rather than
@@ -40,6 +43,9 @@ class PrivateDataCleanupService {
     try {
       await _secureStorage?.deleteByPrefix(privateReadCacheStoragePrefix);
       await _secureStorage?.deleteByPrefix(teacherAttendanceDraftStoragePrefix);
+      await _secureStorage?.deleteByPrefix(
+        teacherAttendanceScopeVersionStoragePrefix,
+      );
     } catch (_) {
       // Best effort: access-change cleanup must not block the UI state update.
     }

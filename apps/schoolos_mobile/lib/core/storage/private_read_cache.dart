@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/auth_provider.dart';
 import '../auth/mobile_role.dart';
+import '../errors/app_exception.dart';
 import 'app_preferences_service.dart';
 import 'private_storage_keys.dart';
 import 'secure_storage_service.dart';
@@ -95,7 +96,12 @@ class PrivateReadCache {
   Future<void> _pendingOperation = Future<void>.value();
   bool _legacyPurged = false;
 
-  Future<bool> write(String resourceKey, Map<String, dynamic> data) {
+  Future<bool> write(
+    String resourceKey,
+    Map<String, dynamic> data, {
+    String? authorizationScopeVersion,
+    Future<bool> Function()? beforeCommit,
+  }) {
     return _synchronized(() async {
       try {
         await _purgeLegacyPreferences();
@@ -117,6 +123,7 @@ class PrivateReadCache {
           'schemaVersion': schemaVersion,
           'namespace': activeScope.namespace,
           'resourceKey': resourceKey,
+          'authorizationScopeVersion': ?authorizationScopeVersion,
           'savedAt': savedAt.toIso8601String(),
           'expiresAt': savedAt.add(policy).toIso8601String(),
           'data': payload,
@@ -132,6 +139,9 @@ class PrivateReadCache {
           await _storage.delete(storageKey);
           return false;
         }
+        if (beforeCommit != null && !await beforeCommit()) {
+          return false;
+        }
         await _storage.write(storageKey, serialized);
         return true;
       } catch (_) {
@@ -140,7 +150,12 @@ class PrivateReadCache {
     });
   }
 
-  Future<CachedPrivateRead?> read(String resourceKey) {
+  Future<CachedPrivateRead?> read(
+    String resourceKey, {
+    String? expectedAuthorizationScopeVersion,
+    bool enforceAuthorizationScopeVersion = false,
+    Future<bool> Function()? beforeReturn,
+  }) {
     return _synchronized(() async {
       try {
         await _purgeLegacyPreferences();
@@ -161,6 +176,12 @@ class PrivateReadCache {
           await _storage.delete(storageKey);
           return null;
         }
+        if (enforceAuthorizationScopeVersion &&
+            decoded.authorizationScopeVersion !=
+                expectedAuthorizationScopeVersion) {
+          await _storage.delete(storageKey);
+          return null;
+        }
 
         final policyExpiry = decoded.savedAt.add(policy);
         final effectiveExpiry = decoded.expiresAt.isBefore(policyExpiry)
@@ -168,6 +189,9 @@ class PrivateReadCache {
             : policyExpiry;
         if (!_now().toUtc().isBefore(effectiveExpiry)) {
           await _storage.delete(storageKey);
+          return null;
+        }
+        if (beforeReturn != null && !await beforeReturn()) {
           return null;
         }
 
@@ -207,6 +231,59 @@ class PrivateReadCache {
         }
       } catch (_) {
         // Best effort: a failed prune must not break the caller's load.
+      }
+    });
+  }
+
+  /// Strictly removes only teacher-attendance reads in the current secure
+  /// tenant/user namespace. Authorization invalidation must observe failures;
+  /// unlike [deleteWhere], this operation never degrades to best effort.
+  Future<void> clearTeacherAttendanceScopeStrict() {
+    return _synchronized(() async {
+      final activeScope = scope;
+      if (activeScope == null ||
+          !activeScope.isValid ||
+          activeScope.role != MobileRole.teacher) {
+        throw const CacheException(
+          'Teacher attendance cache scope is unavailable for this session.',
+        );
+      }
+
+      late final Map<String, String> values;
+      try {
+        values = await _storage.readAll();
+      } catch (_) {
+        throw const CacheException(
+          'Teacher attendance cache could not be inspected securely.',
+        );
+      }
+
+      var deletionFailed = false;
+      for (final entry in values.entries) {
+        if (!entry.key.startsWith(_recordPrefix)) continue;
+        final decoded = _decodeRecord(entry.value);
+        final identity = decoded == null
+            ? _decodeStorageKeyIdentity(entry.key)
+            : _PrivateReadCacheIdentity(
+                namespace: decoded.namespace,
+                resourceKey: decoded.resourceKey,
+              );
+        if (identity == null ||
+            identity.namespace != activeScope.namespace ||
+            !_isTeacherAttendanceResourceKey(identity.resourceKey)) {
+          continue;
+        }
+        try {
+          await _storage.delete(entry.key);
+        } catch (_) {
+          deletionFailed = true;
+        }
+      }
+
+      if (deletionFailed) {
+        throw const CacheException(
+          'Teacher attendance cache could not be cleared securely.',
+        );
       }
     });
   }
@@ -330,11 +407,18 @@ class PrivateReadCache {
       }
       final savedAt = DateTime.tryParse(value['savedAt'] as String? ?? '');
       final expiresAt = DateTime.tryParse(value['expiresAt'] as String? ?? '');
-      if (savedAt == null || expiresAt == null) return null;
+      final rawAuthorizationScopeVersion = value['authorizationScopeVersion'];
+      if (savedAt == null ||
+          expiresAt == null ||
+          (rawAuthorizationScopeVersion != null &&
+              rawAuthorizationScopeVersion is! String)) {
+        return null;
+      }
 
       return _StoredRecord(
         namespace: value['namespace'] as String,
         resourceKey: value['resourceKey'] as String,
+        authorizationScopeVersion: rawAuthorizationScopeVersion as String?,
         data: Map<String, dynamic>.from(value['data'] as Map<String, dynamic>),
         savedAt: savedAt.toUtc(),
         expiresAt: expiresAt.toUtc(),
@@ -349,6 +433,24 @@ class PrivateReadCache {
         .encode(utf8.encode('${activeScope.namespace}\u001f$resourceKey'))
         .replaceAll('=', '');
     return '$_recordPrefix$encoded';
+  }
+
+  _PrivateReadCacheIdentity? _decodeStorageKeyIdentity(String storageKey) {
+    if (!storageKey.startsWith(_recordPrefix)) return null;
+    try {
+      final encoded = storageKey.substring(_recordPrefix.length);
+      final decoded = utf8.decode(
+        base64Url.decode(base64Url.normalize(encoded)),
+      );
+      final separator = decoded.indexOf('\u001f');
+      if (separator <= 0 || separator == decoded.length - 1) return null;
+      return _PrivateReadCacheIdentity(
+        namespace: decoded.substring(0, separator),
+        resourceKey: decoded.substring(separator + 1),
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _purgeLegacyPreferences() async {
@@ -373,6 +475,21 @@ class PrivateReadCache {
   }
 }
 
+bool _isTeacherAttendanceResourceKey(String resourceKey) =>
+    resourceKey == 'teacher_assigned_classes' ||
+    resourceKey.startsWith('teacher_today_') ||
+    resourceKey.startsWith('teacher_roster_');
+
+class _PrivateReadCacheIdentity {
+  const _PrivateReadCacheIdentity({
+    required this.namespace,
+    required this.resourceKey,
+  });
+
+  final String namespace;
+  final String resourceKey;
+}
+
 class CachedPrivateRead {
   const CachedPrivateRead({
     required this.data,
@@ -395,6 +512,7 @@ class _StoredRecord {
   const _StoredRecord({
     required this.namespace,
     required this.resourceKey,
+    required this.authorizationScopeVersion,
     required this.data,
     required this.savedAt,
     required this.expiresAt,
@@ -402,6 +520,7 @@ class _StoredRecord {
 
   final String namespace;
   final String resourceKey;
+  final String? authorizationScopeVersion;
   final Map<String, dynamic> data;
   final DateTime savedAt;
   final DateTime expiresAt;

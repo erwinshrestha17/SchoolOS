@@ -37,6 +37,12 @@ import 'package:schoolos_mobile/shared/widgets/app_card.dart';
 
 class _MockAttendanceRepository extends Mock implements AttendanceRepository {}
 
+void _stubTeacherAttendanceScope(_MockAttendanceRepository repository) {
+  when(
+    () => repository.refreshTeacherAttendanceScope(),
+  ).thenAnswer((_) async => TeacherAttendanceScopeRefresh.unchanged);
+}
+
 class _MockConnectivity extends Mock implements Connectivity {}
 
 class _FakeTokenStorage extends Fake implements TokenStorageService {
@@ -676,6 +682,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final repository = _MockAttendanceRepository();
+    _stubTeacherAttendanceScope(repository);
     when(() => repository.getTeacherToday(any())).thenAnswer(
       (_) async => TeacherTodaySnapshot(
         date: DateTime(2026, 6, 19),
@@ -731,6 +738,7 @@ void main() {
     tester,
   ) async {
     final repository = _MockAttendanceRepository();
+    _stubTeacherAttendanceScope(repository);
     when(() => repository.getTeacherToday(any())).thenAnswer(
       (_) async => TeacherTodaySnapshot(
         date: DateTime(2026, 6, 19),
@@ -793,6 +801,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    _stubTeacherAttendanceScope(repository);
     when(() => repository.getTeacherToday(any())).thenAnswer(
       (_) async => TeacherTodaySnapshot(
         date: DateTime(2026, 6, 19),
@@ -894,6 +903,7 @@ void main() {
     tester,
   ) async {
     final repository = _MockAttendanceRepository();
+    _stubTeacherAttendanceScope(repository);
     when(() => repository.getTeacherToday(any())).thenAnswer(
       (_) async => TeacherTodaySnapshot(
         date: DateTime(2026, 6, 19),
@@ -1471,6 +1481,7 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       final sharedPrefs = await SharedPreferences.getInstance();
       final repository = _MockAttendanceRepository();
+      _stubTeacherAttendanceScope(repository);
       when(() => repository.getTeacherToday(any())).thenAnswer(
         (_) async => TeacherTodaySnapshot(
           date: DateTime(2026, 6, 19),

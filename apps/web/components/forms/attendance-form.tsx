@@ -24,6 +24,7 @@ import { LockedRecordBanner } from "@/components/ui/locked-record-banner";
 import { formatSchoolDate } from "@/lib/date-utils";
 import {
   canRestoreEditableAttendanceDraftAfterSyncError,
+  OfflineMutationError,
   shouldClearLocalAttendanceDraft,
 } from "@/lib/offline-policy";
 import { SectionCard } from "@/components/ui/section-card";
@@ -65,9 +66,11 @@ type AttendanceStatus =
 type DraftSyncState =
   | "idle"
   | "saved_local"
+  | "queued"
   | "syncing"
   | "retrying"
   | "synced"
+  | "accepted"
   | "conflict"
   | "recorded_conflict"
   | "rejected"
@@ -84,6 +87,12 @@ const persistedAttendanceStatuses: AttendanceStatus[] = [
   "EXCUSED_LEAVE",
   "UNEXCUSED_LEAVE",
 ];
+
+const receiptProtectedFinalSubmissionStatuses = [
+  "QUEUED",
+  "PROCESSING",
+  "TRANSPORT_AMBIGUOUS",
+] as const;
 
 export function AttendanceForm() {
   const { session } = useSession();
@@ -119,11 +128,18 @@ export function AttendanceForm() {
   const [baselineExceptions, setBaselineExceptions] = useState<
     Record<string, AttendanceStatus>
   >({});
-  const [baselineRemarks, setBaselineRemarks] = useState<Record<string, string>>(
-    {},
-  );
+  const [baselineRemarks, setBaselineRemarks] = useState<
+    Record<string, string>
+  >({});
   const [isReceiptSyncPending, setIsReceiptSyncPending] = useState(false);
+  const [
+    shouldReplayRecoveredFinalSubmission,
+    setShouldReplayRecoveredFinalSubmission,
+  ] = useState(false);
   const receiptSyncInFlightRef = useRef(false);
+  const reconnectActionRef = useRef<() => void>(() => undefined);
+  const submissionFeedbackRef = useRef<HTMLDivElement>(null);
+  const activeDraftKeyRef = useRef<string | null>(null);
 
   const academicYearsQuery = useQuery({
     queryKey: ["academic-years"],
@@ -216,6 +232,7 @@ export function AttendanceForm() {
       attendanceDate,
     ].join(":");
   }, [academicYearId, attendanceDate, classId, sectionId, session]);
+  activeDraftKeyRef.current = draftKey;
   const hasPendingLocalDraft = Boolean(
     draftKey && draftClientSubmissionId && draftSavedAt,
   );
@@ -224,8 +241,7 @@ export function AttendanceForm() {
     () =>
       (isTeacherPersona ? assignedSections : (sectionsQuery.data ?? [])).filter(
         (section) =>
-          !classId ||
-          (section.classId ?? section.class?.id) === classId,
+          !classId || (section.classId ?? section.class?.id) === classId,
       ),
     [assignedSections, classId, isTeacherPersona, sectionsQuery.data],
   );
@@ -312,10 +328,19 @@ export function AttendanceForm() {
           localDraft.lastSyncStatus ?? "",
         ).toUpperCase();
         setLastServerSyncStatus(storedSyncStatus || null);
+        setShouldReplayRecoveredFinalSubmission(
+          isReceiptProtectedFinalSubmissionStatus(storedSyncStatus) &&
+            navigator.onLine !== false,
+        );
         if (storedSyncStatus === "REJECTED") {
           setDraftSyncState("rejected");
           setSyncResultMessage(
             "SchoolOS did not accept this attendance. Review and change the local draft before sending a revised submission.",
+          );
+        } else if (storedSyncStatus === "QUEUED") {
+          setDraftSyncState("queued");
+          setSyncResultMessage(
+            "Final submission queued on this browser. It is not submitted yet and will be sent when connectivity returns.",
           );
         } else if (
           storedSyncStatus &&
@@ -339,6 +364,7 @@ export function AttendanceForm() {
       setDraftSyncState("idle");
       setSyncResultMessage("");
       setLastServerSyncStatus(null);
+      setShouldReplayRecoveredFinalSubmission(false);
 
       const nextExceptions: Record<string, AttendanceStatus> = {};
       const nextRemarks: Record<string, string> = {};
@@ -414,6 +440,7 @@ export function AttendanceForm() {
             "rejected",
             "server_check",
             "failed",
+            "queued",
             "syncing",
             "retrying",
           ].includes(draftSyncState)
@@ -455,33 +482,6 @@ export function AttendanceForm() {
     sectionId,
   ]);
 
-  useEffect(() => {
-    function handleOnline() {
-      void saveDraftToServer();
-    }
-
-    window.addEventListener("online", handleOnline);
-    return () => window.removeEventListener("online", handleOnline);
-  });
-
-  const mutation = useMutation({
-    mutationFn: api.submitAttendance,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["attendance-roster"] });
-      void clearAttendanceDraft(draftKey);
-      setDraftClientSubmissionId(null);
-      setDraftSavedAt(null);
-      setHasDraftChanges(false);
-      setSyncResultMessage("");
-      setLastServerSyncStatus(null);
-      setDraftSyncState("synced");
-      setSubmitMessage(
-        `Attendance submitted successfully at ${formatNepalTime(new Date())}.`,
-      );
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    },
-  });
-
   const overrideMutation = useMutation({
     mutationFn: ({
       sessionId,
@@ -503,7 +503,9 @@ export function AttendanceForm() {
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["attendance-roster"] });
-      void queryClient.invalidateQueries({ queryKey: ["attendance-analytics"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["attendance-analytics"],
+      });
       setOverrideReason("");
       setSubmitMessage(
         `Locked attendance updated at ${formatNepalTime(new Date())}. Records remain locked under school policy.`,
@@ -526,57 +528,6 @@ export function AttendanceForm() {
 
   const syncMutation = useMutation({
     mutationFn: api.syncAttendance,
-    onSuccess: (result) => {
-      void queryClient.invalidateQueries({
-        queryKey: ["attendance-analytics"],
-      });
-      void queryClient.invalidateQueries({
-        queryKey: ["attendance-conflicts"],
-      });
-      void queryClient.invalidateQueries({ queryKey: ["attendance-roster"] });
-
-      const syncStatus = String(result?.syncStatus ?? "").toUpperCase();
-      if (shouldClearLocalAttendanceDraft(syncStatus)) {
-        void clearAttendanceDraft(draftKey);
-        setDraftClientSubmissionId(null);
-        setDraftSavedAt(null);
-        setHasDraftChanges(false);
-        setSyncResultMessage("");
-        setLastServerSyncStatus(null);
-
-        if (syncStatus === "CONFLICTED") {
-          setDraftSyncState("recorded_conflict");
-          setSubmitMessage("");
-          setSyncResultMessage(
-            "SchoolOS received this attendance and recorded a conflict for office review.",
-          );
-          return;
-        }
-
-        setDraftSyncState("synced");
-        setSubmitMessage(
-          `Attendance submitted and confirmed at ${formatNepalTime(new Date())}.`,
-        );
-        window.scrollTo({ top: 0, behavior: "smooth" });
-        return;
-      }
-
-      setHasDraftChanges(true);
-      setSubmitMessage("");
-      setLastServerSyncStatus(syncStatus || "UNKNOWN");
-      if (syncStatus === "REJECTED") {
-        setDraftSyncState("rejected");
-        setSyncResultMessage(
-          "SchoolOS did not accept this attendance. Review and change the local draft before sending a revised submission.",
-        );
-        return;
-      }
-
-      setDraftSyncState("server_check");
-      setSyncResultMessage(
-        "SchoolOS has not confirmed this attendance yet. Keep the draft and check the official roster before trying again.",
-      );
-    },
   });
 
   const futureDateBlocked = isFutureDate(attendanceDate);
@@ -613,7 +564,14 @@ export function AttendanceForm() {
     Boolean(existingSessionId) &&
     (isLocked || isSubmitted) &&
     !hasPendingLocalDraft;
-  const awaitingServerReceipt = draftSyncState === "server_check";
+  const awaitingServerReceipt =
+    isReceiptSyncPending || ["queued", "server_check"].includes(draftSyncState);
+  const finalizationReadOnly =
+    isReceiptSyncPending ||
+    ["queued", "server_check", "accepted", "recorded_conflict"].includes(
+      draftSyncState,
+    );
+  const scopeSelectionDisabled = isReceiptSyncPending || syncMutation.isPending;
   const overrideChanges = useMemo(
     () =>
       isOverrideMode
@@ -635,26 +593,47 @@ export function AttendanceForm() {
     ],
   );
   const rosterEditingDisabled =
-    (!isOverrideMode && (isLocked || isSubmitted)) || awaitingServerReceipt;
+    (!isOverrideMode && (isLocked || isSubmitted)) || finalizationReadOnly;
   const hasConflict = Boolean(
     attendanceState?.conflictStatus &&
     attendanceState.conflictStatus !== "NONE",
   );
   const submissionStatus = hasConflict
     ? "NEEDS_CORRECTION"
-    : isLocked
-      ? "LOCKED"
-      : attendanceState?.isSubmitted
-        ? "SUBMITTED"
-        : hasDraftChanges || draftSyncState === "saved_local"
-          ? "DRAFT"
-          : "NOT_MARKED";
+    : draftSyncState === "recorded_conflict"
+      ? "NEEDS_CORRECTION"
+      : isLocked
+        ? "LOCKED"
+        : attendanceState?.isSubmitted || draftSyncState === "accepted"
+          ? "SUBMITTED"
+          : draftSyncState === "queued" || draftSyncState === "server_check"
+            ? "QUEUED"
+            : hasDraftChanges || draftSyncState === "saved_local"
+              ? "DRAFT"
+              : "NOT_MARKED";
   const submissionStatusTone =
     submissionStatus === "NEEDS_CORRECTION"
       ? "conflict"
       : submissionStatus === "NOT_MARKED"
         ? "inactive"
         : undefined;
+  const submissionFeedbackIsAlert =
+    ["failed", "rejected", "conflict", "recorded_conflict"].includes(
+      draftSyncState,
+    ) ||
+    (draftSyncState === "server_check" &&
+      !isReceiptSyncPending &&
+      !syncMutation.isPending);
+
+  useEffect(() => {
+    if (!submissionFeedbackIsAlert) return;
+    submissionFeedbackRef.current?.focus();
+  }, [
+    conflictMessage,
+    draftSyncState,
+    submissionFeedbackIsAlert,
+    syncResultMessage,
+  ]);
 
   const beginDraftEdit = () => {
     if (draftSyncState === "rejected") {
@@ -724,7 +703,17 @@ export function AttendanceForm() {
       roster.length === 0
     )
       return;
-    if (hasReconnectConflict(rosterQuery.data?.existingSession, draftSavedAt)) {
+    const submissionDraftKey = draftKey;
+    const isSubmissionScopeCurrent = () =>
+      activeDraftKeyRef.current === submissionDraftKey;
+    const previousLastServerSyncStatus = lastServerSyncStatus;
+    const isReceiptReplay = isReceiptProtectedFinalSubmissionStatus(
+      previousLastServerSyncStatus,
+    );
+    if (
+      !isReceiptReplay &&
+      hasReconnectConflict(rosterQuery.data?.existingSession, draftSavedAt)
+    ) {
       setDraftSyncState("conflict");
       setConflictMessage(
         "Server attendance was submitted after this local draft. Review before syncing.",
@@ -735,8 +724,9 @@ export function AttendanceForm() {
     receiptSyncInFlightRef.current = true;
     setIsReceiptSyncPending(true);
 
-    const previousDraftSyncState = draftSyncState;
-    const previousLastServerSyncStatus = lastServerSyncStatus;
+    const hadUnresolvedReceipt = ["PROCESSING", "TRANSPORT_AMBIGUOUS"].includes(
+      previousLastServerSyncStatus ?? "",
+    );
     const receiptSavedAt = draftSavedAt ?? new Date().toISOString();
     const receiptProtectedDraft: AttendanceDraftStorageValue = {
       clientSubmissionId: draftClientSubmissionId,
@@ -758,25 +748,82 @@ export function AttendanceForm() {
       remarks,
       savedAt: receiptSavedAt,
       serverSessionId: rosterQuery.data?.existingSession?.id ?? null,
-      serverSubmittedAt:
-        rosterQuery.data?.existingSession?.submittedAt ?? null,
+      serverSubmittedAt: rosterQuery.data?.existingSession?.submittedAt ?? null,
       lastSyncStatus: "PROCESSING",
     };
 
-    try {
-      // The receipt marker must commit before the POST. If browser storage is
-      // unavailable, nothing is sent and the roster remains editable.
-      await storeAttendanceDraft(draftKey, receiptProtectedDraft);
-    } catch {
-      setDraftSyncState("failed");
+    const persistQueuedFinalSubmission = async () => {
+      try {
+        await storeAttendanceDraft(submissionDraftKey, {
+          ...receiptProtectedDraft,
+          lastSyncStatus: "QUEUED",
+        });
+      } catch {
+        if (isSubmissionScopeCurrent()) {
+          setDraftSyncState("failed");
+          setSyncResultMessage(
+            "This attendance could not be queued safely on this browser, so nothing was sent. Free browser storage and try again.",
+          );
+        }
+        return false;
+      }
+
+      if (!isSubmissionScopeCurrent()) return true;
+      setDraftSavedAt(receiptSavedAt);
+      setHasDraftChanges(true);
+      setLastServerSyncStatus("QUEUED");
+      setDraftSyncState("queued");
+      setSubmitMessage("");
       setSyncResultMessage(
-        "This attendance could not be protected on this browser, so nothing was sent. Free browser storage and try again.",
+        "Final submission queued on this browser. It is not submitted yet and will be sent when connectivity returns.",
       );
+      return true;
+    };
+
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      if (hadUnresolvedReceipt) {
+        setLastServerSyncStatus(previousLastServerSyncStatus);
+        setDraftSyncState("server_check");
+        setSyncResultMessage(
+          "The earlier attendance receipt is still unconfirmed. Reconnect and check the same submission ID before editing.",
+        );
+      } else {
+        await persistQueuedFinalSubmission();
+      }
       receiptSyncInFlightRef.current = false;
       setIsReceiptSyncPending(false);
       return;
     }
 
+    try {
+      // The receipt marker must commit before the POST. If browser storage is
+      // unavailable, nothing is sent and the roster remains editable.
+      await storeAttendanceDraft(submissionDraftKey, receiptProtectedDraft);
+    } catch {
+      if (isSubmissionScopeCurrent()) {
+        setDraftSyncState("failed");
+        setSyncResultMessage(
+          "This attendance could not be protected on this browser, so nothing was sent. Free browser storage and try again.",
+        );
+      }
+      receiptSyncInFlightRef.current = false;
+      setIsReceiptSyncPending(false);
+      return;
+    }
+
+    if (!isSubmissionScopeCurrent()) {
+      try {
+        await storeAttendanceDraft(submissionDraftKey, {
+          ...receiptProtectedDraft,
+          lastSyncStatus: "QUEUED",
+        });
+      } catch {
+        // PROCESSING remains fail-closed and preserves the confirmed stable ID.
+      }
+      receiptSyncInFlightRef.current = false;
+      setIsReceiptSyncPending(false);
+      return;
+    }
     setDraftSavedAt(receiptSavedAt);
     setHasDraftChanges(true);
     setLastServerSyncStatus("PROCESSING");
@@ -787,7 +834,7 @@ export function AttendanceForm() {
     );
 
     try {
-      await syncMutation.mutateAsync({
+      const result = await syncMutation.mutateAsync({
         clientSubmissionId: draftClientSubmissionId,
         deviceTimestamp: new Date().toISOString(),
         academicYearId,
@@ -800,6 +847,72 @@ export function AttendanceForm() {
           remark: remarks[studentId]?.trim() || null,
         })),
       });
+
+      const syncStatus = String(result?.syncStatus ?? "").toUpperCase();
+      if (shouldClearLocalAttendanceDraft(syncStatus)) {
+        try {
+          await clearAttendanceDraft(submissionDraftKey);
+        } catch {
+          // The durable receipt marker retains the same submission ID, so a
+          // later replay remains idempotent even if browser cleanup fails.
+        }
+
+        if (!isSubmissionScopeCurrent()) return;
+        setDraftClientSubmissionId(null);
+        setDraftSavedAt(null);
+        setHasDraftChanges(false);
+        setLastServerSyncStatus(null);
+        setSubmitMessage("");
+
+        if (syncStatus === "CONFLICTED") {
+          setDraftSyncState("recorded_conflict");
+          setSyncResultMessage(
+            `SchoolOS received this attendance at ${formatNepalTime(result.serverReceivedAt)} and recorded a conflict for office review. The official record was not overwritten.`,
+          );
+        } else {
+          setDraftSyncState("accepted");
+          setSyncResultMessage(
+            `Attendance accepted by SchoolOS at ${formatNepalTime(result.serverReceivedAt)}.`,
+          );
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+      } else {
+        const retainedDraft = {
+          ...receiptProtectedDraft,
+          lastSyncStatus: syncStatus || "UNKNOWN",
+        };
+
+        try {
+          await storeAttendanceDraft(submissionDraftKey, retainedDraft);
+        } catch {
+          // PROCESSING was committed before the request, so failure to update
+          // the local marker still fails closed on the next load.
+        }
+
+        if (!isSubmissionScopeCurrent()) return;
+        setHasDraftChanges(true);
+        setSubmitMessage("");
+        setLastServerSyncStatus(syncStatus || "UNKNOWN");
+        if (syncStatus === "REJECTED") {
+          setDraftSyncState("rejected");
+          setSyncResultMessage(
+            "SchoolOS rejected this final submission. No authoritative attendance was accepted. Review and change the local draft before sending a revised submission.",
+          );
+        } else {
+          setDraftSyncState("server_check");
+          setSyncResultMessage(
+            `SchoolOS received this submission at ${formatNepalTime(result.serverReceivedAt)} but has not confirmed final acceptance. Keep the same submission ID and check again.`,
+          );
+        }
+      }
+
+      void queryClient.invalidateQueries({
+        queryKey: ["attendance-analytics"],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["attendance-conflicts"],
+      });
+      void queryClient.invalidateQueries({ queryKey: ["attendance-roster"] });
     } catch (error) {
       // A final 401 triggers the SessionProvider's real teardown. Do not race
       // that cleanup by recreating this account-scoped draft here.
@@ -807,32 +920,59 @@ export function AttendanceForm() {
         return;
       }
 
-      if (canRestoreEditableAttendanceDraftAfterSyncError(error)) {
-        const restoredDraft = {
-          ...receiptProtectedDraft,
-          lastSyncStatus: previousLastServerSyncStatus ?? undefined,
-        };
-
-        try {
-          await storeAttendanceDraft(draftKey, restoredDraft);
-        } catch {
-          setLastServerSyncStatus("PROCESSING");
-          setDraftSyncState("server_check");
-          setSyncResultMessage(
-            "SchoolOS did not receive this check, but the browser could not safely restore the earlier draft marker. Keep the same submission and check again.",
-          );
+      if (error instanceof OfflineMutationError) {
+        if (hadUnresolvedReceipt) {
+          if (isSubmissionScopeCurrent()) {
+            setLastServerSyncStatus(previousLastServerSyncStatus);
+            setDraftSyncState("server_check");
+            setSyncResultMessage(
+              "The earlier attendance receipt is still unconfirmed. Reconnect and check the same submission ID before editing.",
+            );
+          }
           return;
         }
 
-        setLastServerSyncStatus(previousLastServerSyncStatus);
-        setDraftSyncState(
-          previousDraftSyncState === "idle"
-            ? "saved_local"
-            : previousDraftSyncState,
-        );
-        setSyncResultMessage(
-          "SchoolOS did not receive this submission. The local draft is still editable and nothing was queued.",
-        );
+        await persistQueuedFinalSubmission();
+        return;
+      }
+
+      if (canRestoreEditableAttendanceDraftAfterSyncError(error)) {
+        const restoredDraft = {
+          ...receiptProtectedDraft,
+          lastSyncStatus: hadUnresolvedReceipt
+            ? (previousLastServerSyncStatus ?? undefined)
+            : undefined,
+        };
+
+        try {
+          await storeAttendanceDraft(submissionDraftKey, restoredDraft);
+        } catch {
+          if (isSubmissionScopeCurrent()) {
+            setLastServerSyncStatus("PROCESSING");
+            setDraftSyncState("server_check");
+            setSyncResultMessage(
+              "SchoolOS did not receive this check, but the browser could not safely restore the earlier draft marker. Keep the same submission and check again.",
+            );
+          }
+          return;
+        }
+
+        if (!isSubmissionScopeCurrent()) return;
+        if (hadUnresolvedReceipt) {
+          setLastServerSyncStatus(previousLastServerSyncStatus);
+          setDraftSyncState("server_check");
+          setSyncResultMessage(
+            "SchoolOS could not complete this receipt check. The earlier submission remains unconfirmed; keep the same submission ID and check again.",
+          );
+        } else {
+          setLastServerSyncStatus(null);
+          setDraftSyncState("failed");
+          setSyncResultMessage(
+            error instanceof ApiRequestError
+              ? `${error.message} The local draft remains editable and was not queued.`
+              : "SchoolOS rejected this request before final acceptance. The local draft remains editable and was not queued.",
+          );
+        }
         return;
       }
 
@@ -841,14 +981,16 @@ export function AttendanceForm() {
         lastSyncStatus: "TRANSPORT_AMBIGUOUS",
       };
 
+      let persistedAmbiguousStatus = "PROCESSING";
       try {
-        await storeAttendanceDraft(draftKey, ambiguousDraft);
-        setLastServerSyncStatus("TRANSPORT_AMBIGUOUS");
+        await storeAttendanceDraft(submissionDraftKey, ambiguousDraft);
+        persistedAmbiguousStatus = "TRANSPORT_AMBIGUOUS";
       } catch {
         // The already committed PROCESSING marker remains the durable fallback.
-        setLastServerSyncStatus("PROCESSING");
       }
 
+      if (!isSubmissionScopeCurrent()) return;
+      setLastServerSyncStatus(persistedAmbiguousStatus);
       setDraftSyncState("server_check");
       setSyncResultMessage(
         "SchoolOS may have received this attendance, but the receipt did not return. Keep the same submission ID and check the server again before editing.",
@@ -869,10 +1011,46 @@ export function AttendanceForm() {
     void queryClient.invalidateQueries({ queryKey: ["attendance-roster"] });
   };
 
+  reconnectActionRef.current = () => {
+    if (
+      isReceiptProtectedFinalSubmissionStatus(lastServerSyncStatus) &&
+      hasPendingLocalDraft
+    ) {
+      void syncDraftSubmission();
+      return;
+    }
+
+    void saveDraftToServer().catch(() => undefined);
+  };
+
+  useEffect(() => {
+    const handleOnline = () => reconnectActionRef.current();
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+  }, []);
+
+  useEffect(() => {
+    if (
+      !shouldReplayRecoveredFinalSubmission ||
+      !hasPendingLocalDraft ||
+      navigator.onLine === false
+    ) {
+      return;
+    }
+
+    setShouldReplayRecoveredFinalSubmission(false);
+    reconnectActionRef.current();
+  }, [hasPendingLocalDraft, shouldReplayRecoveredFinalSubmission]);
+
   return (
     <div className="space-y-8 animate-fade-in pb-24">
       {submitMessage && (
-        <div className="animate-in slide-in-from-top-4 flex items-center gap-4 rounded-xl border border-success-100 bg-success-50 p-4 text-sm font-bold text-success-800 duration-500">
+        <div
+          className="animate-in slide-in-from-top-4 flex items-center gap-4 rounded-xl border border-success-100 bg-success-50 p-4 text-sm font-bold text-success-800 duration-500"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success-500 text-white shadow-lg shadow-success-500/20">
             <CheckCircle2 size={20} />
           </div>
@@ -882,27 +1060,48 @@ export function AttendanceForm() {
 
       {draftSyncState !== "idle" && (
         <div
+          ref={submissionFeedbackRef}
+          role={submissionFeedbackIsAlert ? "alert" : "status"}
+          aria-live={submissionFeedbackIsAlert ? "assertive" : "polite"}
+          aria-atomic="true"
+          tabIndex={submissionFeedbackIsAlert ? -1 : undefined}
           className={cn(
             "flex items-center justify-between gap-4 rounded-xl border px-5 py-4 text-sm font-bold",
-            ["conflict", "recorded_conflict", "server_check"].includes(
-              draftSyncState,
-            )
+            [
+              "conflict",
+              "recorded_conflict",
+              "server_check",
+              "queued",
+            ].includes(draftSyncState)
               ? "border-warning-200 bg-warning-50 text-warning-900"
               : ["failed", "rejected"].includes(draftSyncState)
                 ? "border-danger-100 bg-danger-50 text-danger-800"
-                : "border-info-100 bg-info-50 text-info-800",
+                : draftSyncState === "accepted"
+                  ? "border-success-100 bg-success-50 text-success-800"
+                  : "border-info-100 bg-info-50 text-info-800",
           )}
         >
           <div className="flex items-center gap-3">
-            <WifiOff size={18} />
-            <span>
-              {getDraftSyncLabel(
-                draftSyncState,
-                draftSavedAt,
-                conflictMessage,
-                syncResultMessage,
-              )}
-            </span>
+            {draftSyncState === "accepted" ? (
+              <CheckCircle2 size={18} aria-hidden />
+            ) : submissionFeedbackIsAlert ? (
+              <AlertCircle size={18} aria-hidden />
+            ) : (
+              <WifiOff size={18} aria-hidden />
+            )}
+            <div>
+              <p className="text-xs font-black uppercase tracking-wide">
+                {getDraftSyncHeading(draftSyncState)}
+              </p>
+              <p className="mt-0.5 font-semibold">
+                {getDraftSyncLabel(
+                  draftSyncState,
+                  draftSavedAt,
+                  conflictMessage,
+                  syncResultMessage,
+                )}
+              </p>
+            </div>
           </div>
           {draftSyncState === "conflict" ? (
             <div className="flex items-center gap-2">
@@ -937,11 +1136,13 @@ export function AttendanceForm() {
               variant="outline"
               size="sm"
               onClick={() => void syncDraftSubmission()}
-              disabled={syncMutation.isPending}
+              disabled={syncMutation.isPending || isReceiptSyncPending}
             >
               {draftSyncState === "server_check"
                 ? "Check server again"
-                : "Sync now"}
+                : draftSyncState === "queued"
+                  ? "Try queued submission"
+                  : "Sync now"}
             </Button>
           ) : null}
         </div>
@@ -970,6 +1171,7 @@ export function AttendanceForm() {
               <input
                 type="text"
                 readOnly
+                disabled={scopeSelectionDisabled}
                 value={
                   rosterQuery.data?.academicYear?.name ??
                   "Current academic year"
@@ -981,6 +1183,7 @@ export function AttendanceForm() {
             ) : (
               <select
                 value={academicYearId}
+                disabled={scopeSelectionDisabled}
                 onChange={(e) => setAcademicYearId(e.target.value)}
                 className="premium-input bg-white focus:border-[var(--color-mod-attendance-accent)] focus:ring-[var(--color-mod-attendance-border)]"
                 aria-label="Academic Year"
@@ -1002,6 +1205,7 @@ export function AttendanceForm() {
             </label>
             <select
               value={classId}
+              disabled={scopeSelectionDisabled}
               onChange={(e) => {
                 setClassId(e.target.value);
                 setSectionId("");
@@ -1024,6 +1228,7 @@ export function AttendanceForm() {
             </label>
             <select
               value={sectionId}
+              disabled={scopeSelectionDisabled}
               onChange={(e) => setSectionId(e.target.value)}
               className="premium-input bg-white focus:border-[var(--color-mod-attendance-accent)] focus:ring-[var(--color-mod-attendance-border)]"
               aria-label="Section"
@@ -1044,6 +1249,7 @@ export function AttendanceForm() {
             <input
               type="date"
               value={attendanceDate}
+              disabled={scopeSelectionDisabled}
               max={today}
               onChange={(e) => setAttendanceDate(e.target.value)}
               className="premium-input bg-white focus:border-[var(--color-mod-attendance-accent)] focus:ring-[var(--color-mod-attendance-border)]"
@@ -1321,7 +1527,8 @@ export function AttendanceForm() {
               setIsConfirmOpen(true);
             }}
             disabled={
-              mutation.isPending ||
+              syncMutation.isPending ||
+              isReceiptSyncPending ||
               overrideMutation.isPending ||
               roster.length === 0 ||
               futureDateBlocked ||
@@ -1329,40 +1536,43 @@ export function AttendanceForm() {
                 ? overrideChanges.length === 0 ||
                   overrideReason.trim().length < lockOverrideMinReasonLength
                 : isLocked || isSubmitted) ||
-              awaitingServerReceipt ||
+              finalizationReadOnly ||
               draftSyncState === "rejected"
             }
-            isLoading={mutation.isPending || overrideMutation.isPending}
+            isLoading={
+              syncMutation.isPending ||
+              isReceiptSyncPending ||
+              overrideMutation.isPending
+            }
           >
-            {!mutation.isPending && !overrideMutation.isPending ? (
+            {!syncMutation.isPending &&
+            !isReceiptSyncPending &&
+            !overrideMutation.isPending ? (
               <Save size={20} />
             ) : null}
             {isOverrideMode
               ? "Apply Override"
               : isLocked
                 ? "Day Locked"
-                : isSubmitted
+                : isSubmitted || draftSyncState === "accepted"
                   ? "Attendance Submitted"
-                  : "Submit Attendance"}
+                  : draftSyncState === "recorded_conflict"
+                    ? "Conflict Recorded"
+                    : draftSyncState === "queued"
+                      ? "Submission Queued"
+                      : draftSyncState === "server_check"
+                        ? "Checking Server"
+                        : "Submit Attendance"}
           </Button>
         </div>
       )}
 
-      {mutation.isError && !isOverrideMode ? (
-        <div className="animate-fade-in flex items-center gap-4 rounded-xl border border-danger-100 bg-danger-50 p-6 text-sm font-bold text-danger-800 shadow-lg">
-          <AlertCircle size={24} className="text-danger-500" />
-          <div className="flex flex-col">
-            <span className="text-[0.65rem] uppercase tracking-widest text-danger-600 mb-1">
-              Submission Error
-            </span>
-            Attendance could not be submitted. Check the selected class, date,
-            and attendance status, then try again.
-          </div>
-        </div>
-      ) : null}
-
       {overrideMutation.isError ? (
-        <div className="animate-fade-in flex items-center gap-4 rounded-xl border border-danger-100 bg-danger-50 p-6 text-sm font-bold text-danger-800 shadow-lg">
+        <div
+          className="animate-fade-in flex items-center gap-4 rounded-xl border border-danger-100 bg-danger-50 p-6 text-sm font-bold text-danger-800 shadow-lg"
+          role="alert"
+          aria-live="assertive"
+        >
           <AlertCircle size={24} className="text-danger-500" />
           <div className="flex flex-col">
             <span className="text-[0.65rem] uppercase tracking-widest text-danger-600 mb-1">
@@ -1410,13 +1620,18 @@ export function AttendanceForm() {
             onClick={() => void syncDraftSubmission()}
             disabled={
               syncMutation.isPending ||
+              isReceiptSyncPending ||
               roster.length === 0 ||
               !hasPendingLocalDraft ||
               draftSyncState === "rejected"
             }
           >
             <CheckCircle2 size={14} />
-            {awaitingServerReceipt ? "Check Server" : "Sync Draft"}
+            {draftSyncState === "queued"
+              ? "Try Queued Submission"
+              : awaitingServerReceipt
+                ? "Check Server"
+                : "Submit Saved Draft"}
           </Button>
         </div>
       </div>
@@ -1477,26 +1692,14 @@ export function AttendanceForm() {
               `No exceptions were marked, so all ${roster.length} student${roster.length === 1 ? "" : "s"} in ${className} will be recorded present for ${formatSchoolDate(attendanceDate)}. This becomes the official record.`
             : `Submitting attendance for ${className}: ${totals.absent} absent, ${totals.late} late, ${totals.leave} on leave, ${totals.present} present. This becomes the official record for ${formatSchoolDate(attendanceDate)}.`
         }
-        confirmLabel={mutation.isPending ? "Submitting..." : "Submit"}
+        confirmLabel={isReceiptSyncPending ? "Submitting..." : "Submit"}
         cancelLabel="Review roster"
         variant={isAllPresentSubmission ? "warning" : "default"}
-        isConfirming={mutation.isPending}
+        isConfirming={isReceiptSyncPending}
         confirmDisabled={isAllPresentSubmission && !allPresentAcknowledged}
         onConfirm={() => {
-          mutation.mutate({
-            academicYearId,
-            classId,
-            sectionId: sectionId || null,
-            attendanceDate: new Date(attendanceDate).toISOString(),
-            exceptions: Object.entries(exceptions).map(
-              ([studentId, status]) => ({
-                studentId,
-                status,
-                remark: remarks[studentId]?.trim() || null,
-              }),
-            ),
-          });
           setIsConfirmOpen(false);
+          void syncDraftSubmission();
         }}
         onClose={() => {
           setIsConfirmOpen(false);
@@ -1632,6 +1835,12 @@ function isFutureDate(value: string) {
   return value > today;
 }
 
+function isReceiptProtectedFinalSubmissionStatus(status: string | null) {
+  return receiptProtectedFinalSubmissionStatuses.includes(
+    status as (typeof receiptProtectedFinalSubmissionStatuses)[number],
+  );
+}
+
 function hasReconnectConflict(
   existingSession: { submittedAt: string | null } | null | undefined,
   localSavedAt: string | null,
@@ -1649,9 +1858,16 @@ function getDraftSyncLabel(
   conflictMessage: string,
   syncResultMessage: string,
 ) {
+  if (state === "queued")
+    return (
+      syncResultMessage ||
+      "Final submission queued on this browser. It is not submitted yet."
+    );
   if (state === "syncing") return "Syncing attendance draft...";
   if (state === "retrying") return "Retrying attendance sync...";
   if (state === "synced") return "Draft synced with SchoolOS.";
+  if (state === "accepted")
+    return syncResultMessage || "Attendance accepted by SchoolOS.";
   if (state === "recorded_conflict")
     return (
       syncResultMessage ||
@@ -1674,4 +1890,17 @@ function getDraftSyncLabel(
   if (!savedAt) return "Not synced. Draft saved locally.";
 
   return `Not synced. Draft saved locally at ${formatNepalTime(savedAt)}.`;
+}
+
+function getDraftSyncHeading(state: DraftSyncState) {
+  if (state === "accepted") return "Attendance submitted";
+  if (state === "queued") return "Queued on this browser";
+  if (state === "server_check") return "Server confirmation required";
+  if (state === "recorded_conflict" || state === "conflict")
+    return "Attendance conflict";
+  if (state === "rejected") return "Submission rejected";
+  if (state === "failed") return "Attendance sync failed";
+  if (state === "syncing" || state === "retrying") return "Sync in progress";
+  if (state === "synced") return "Draft saved to SchoolOS";
+  return "Local attendance draft";
 }

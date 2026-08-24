@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/auth_provider.dart';
 import '../auth/mobile_role.dart';
+import '../errors/app_exception.dart';
 import 'app_preferences_service.dart';
 import 'private_storage_keys.dart';
 import 'secure_storage_service.dart';
@@ -98,6 +99,8 @@ class TeacherAttendanceDraftStore {
     required String classSectionId,
     required String date,
     required Map<String, dynamic> payload,
+    String? authorizationScopeVersion,
+    Future<bool> Function()? beforeCommit,
   }) {
     return _synchronized(() async {
       try {
@@ -111,6 +114,7 @@ class TeacherAttendanceDraftStore {
           'namespace': activeScope!.namespace,
           'classSectionId': classSectionId,
           'date': date,
+          'authorizationScopeVersion': ?authorizationScopeVersion,
           'savedAt': savedAt.toIso8601String(),
           'expiresAt': savedAt.add(ttl).toIso8601String(),
           'payload': payload,
@@ -121,6 +125,9 @@ class TeacherAttendanceDraftStore {
           return false;
         }
         if (!await _makeRoomFor(storageKey, recordBytes, savedAt)) {
+          return false;
+        }
+        if (beforeCommit != null && !await beforeCommit()) {
           return false;
         }
 
@@ -135,6 +142,9 @@ class TeacherAttendanceDraftStore {
   Future<Map<String, dynamic>?> read({
     required String classSectionId,
     required String date,
+    String? expectedAuthorizationScopeVersion,
+    bool enforceAuthorizationScopeVersion = false,
+    Future<bool> Function()? beforeReturn,
   }) {
     return _synchronized(() async {
       try {
@@ -153,8 +163,17 @@ class TeacherAttendanceDraftStore {
           await _storage.delete(storageKey);
           return null;
         }
+        if (enforceAuthorizationScopeVersion &&
+            decoded.authorizationScopeVersion !=
+                expectedAuthorizationScopeVersion) {
+          await _storage.delete(storageKey);
+          return null;
+        }
         if (!_now().toUtc().isBefore(decoded.expiresAt)) {
           await _storage.delete(storageKey);
+          return null;
+        }
+        if (beforeReturn != null && !await beforeReturn()) {
           return null;
         }
         return decoded.payload;
@@ -172,6 +191,48 @@ class TeacherAttendanceDraftStore {
         await _storage.delete(_storageKey(activeScope!, classSectionId, date));
       } catch (_) {
         // A later logout still performs prefix cleanup.
+      }
+    });
+  }
+
+  /// Strictly deletes every attendance draft in the current teacher's secure
+  /// tenant/user namespace while preserving drafts belonging to other scopes.
+  Future<void> clearCurrentScopeStrict() {
+    return _synchronized(() async {
+      final activeScope = scope;
+      if (activeScope == null || !activeScope.isValid) {
+        throw const CacheException(
+          'Teacher attendance draft scope is unavailable for this session.',
+        );
+      }
+
+      late final Map<String, String> values;
+      try {
+        values = await _storage.readAll();
+      } catch (_) {
+        throw const CacheException(
+          'Teacher attendance drafts could not be inspected securely.',
+        );
+      }
+
+      var deletionFailed = false;
+      for (final entry in values.entries) {
+        if (!entry.key.startsWith(_recordPrefix)) continue;
+        final decoded = _decode(entry.value);
+        final namespace =
+            decoded?.namespace ?? _decodeStorageKeyNamespace(entry.key);
+        if (namespace != activeScope.namespace) continue;
+        try {
+          await _storage.delete(entry.key);
+        } catch (_) {
+          deletionFailed = true;
+        }
+      }
+
+      if (deletionFailed) {
+        throw const CacheException(
+          'Teacher attendance drafts could not be cleared securely.',
+        );
       }
     });
   }
@@ -222,11 +283,18 @@ class TeacherAttendanceDraftStore {
       }
       final savedAt = DateTime.tryParse(value['savedAt'] as String? ?? '');
       final expiresAt = DateTime.tryParse(value['expiresAt'] as String? ?? '');
-      if (savedAt == null || expiresAt == null) return null;
+      final rawAuthorizationScopeVersion = value['authorizationScopeVersion'];
+      if (savedAt == null ||
+          expiresAt == null ||
+          (rawAuthorizationScopeVersion != null &&
+              rawAuthorizationScopeVersion is! String)) {
+        return null;
+      }
       return _DraftRecord(
         namespace: value['namespace'] as String,
         classSectionId: value['classSectionId'] as String,
         date: value['date'] as String,
+        authorizationScopeVersion: rawAuthorizationScopeVersion as String?,
         payload: Map<String, dynamic>.from(
           value['payload'] as Map<String, dynamic>,
         ),
@@ -251,6 +319,21 @@ class TeacherAttendanceDraftStore {
         )
         .replaceAll('=', '');
     return '$_recordPrefix$encoded';
+  }
+
+  String? _decodeStorageKeyNamespace(String storageKey) {
+    if (!storageKey.startsWith(_recordPrefix)) return null;
+    try {
+      final encoded = storageKey.substring(_recordPrefix.length);
+      final decoded = utf8.decode(
+        base64Url.decode(base64Url.normalize(encoded)),
+      );
+      final separator = decoded.indexOf('\u001f');
+      if (separator <= 0) return null;
+      return decoded.substring(0, separator);
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _purgeLegacyPreferences() async {
@@ -280,6 +363,7 @@ class _DraftRecord {
     required this.namespace,
     required this.classSectionId,
     required this.date,
+    required this.authorizationScopeVersion,
     required this.payload,
     required this.savedAt,
     required this.expiresAt,
@@ -288,6 +372,7 @@ class _DraftRecord {
   final String namespace;
   final String classSectionId;
   final String date;
+  final String? authorizationScopeVersion;
   final Map<String, dynamic> payload;
   final DateTime savedAt;
   final DateTime expiresAt;

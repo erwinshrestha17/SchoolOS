@@ -20,7 +20,7 @@ import { MobileTeacherAttendanceSyncReceiptDto } from './dto/mobile-teacher-atte
 @Controller('mobile/teacher/attendance')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
 @Entitlement('module.attendance')
-@Roles('teacher')
+@Roles('teacher', 'subject_teacher')
 export class MobileTeacherAttendanceController {
   constructor(
     private readonly attendanceService: AttendanceService,

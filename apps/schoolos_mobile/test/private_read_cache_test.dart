@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:schoolos_mobile/core/auth/mobile_role.dart';
+import 'package:schoolos_mobile/core/errors/app_exception.dart';
 import 'package:schoolos_mobile/core/storage/app_preferences_service.dart';
 import 'package:schoolos_mobile/core/storage/private_read_cache.dart';
 import 'package:schoolos_mobile/core/storage/secure_storage_service.dart';
@@ -32,6 +33,21 @@ void main() {
       now: () => now,
       maxRecordBytes: maxRecordBytes,
       maxTotalBytes: maxTotalBytes,
+    );
+  }
+
+  PrivateReadCache teacherCache({
+    String tenantId = 'tenant-1',
+    String userId = 'teacher-1',
+  }) {
+    return PrivateReadCache(
+      storage,
+      scope: PrivateReadCacheScope(
+        tenantId: tenantId,
+        userId: userId,
+        role: MobileRole.teacher,
+      ),
+      now: () => now,
     );
   }
 
@@ -151,6 +167,114 @@ void main() {
   });
 
   test(
+    'strict teacher attendance purge preserves notices, other modules, and other scopes',
+    () async {
+      final teacher = teacherCache();
+      final otherTeacher = teacherCache(userId: 'teacher-2');
+      await teacher.write('teacher_assigned_classes', {'items': []});
+      await teacher.write('teacher_today_2026-07-16', {'classes': []});
+      await teacher.write('teacher_roster_class-1_2026-07-16', {
+        'students': [],
+      });
+      await teacher.write('teacher_homework_all', {'items': []});
+      await teacher.write('teacher_timetable_week', {'items': []});
+      await teacher.write('notice_feed', {'items': []});
+      await otherTeacher.write('teacher_roster_class-2_2026-07-16', {
+        'students': [],
+      });
+
+      await teacher.clearTeacherAttendanceScopeStrict();
+
+      expect(await teacher.read('teacher_assigned_classes'), isNull);
+      expect(await teacher.read('teacher_today_2026-07-16'), isNull);
+      expect(await teacher.read('teacher_roster_class-1_2026-07-16'), isNull);
+      expect(await teacher.read('teacher_homework_all'), isNotNull);
+      expect(await teacher.read('teacher_timetable_week'), isNotNull);
+      expect(await teacher.read('notice_feed'), isNotNull);
+      expect(
+        await otherTeacher.read('teacher_roster_class-2_2026-07-16'),
+        isNotNull,
+      );
+    },
+  );
+
+  test('strict teacher attendance purge propagates deletion failure', () async {
+    final teacher = teacherCache();
+    await teacher.write('teacher_assigned_classes', {'items': []});
+    storage.failDelete = true;
+
+    await expectLater(
+      teacher.clearTeacherAttendanceScopeStrict(),
+      throwsA(isA<CacheException>()),
+    );
+  });
+
+  test(
+    'teacher attendance records are readable only for their verified scope version',
+    () async {
+      final teacher = teacherCache();
+      expect(
+        await teacher.write('teacher_today_2026-07-16', {
+          'classes': const [],
+        }, authorizationScopeVersion: '6'),
+        isTrue,
+      );
+
+      expect(
+        await teacher.read(
+          'teacher_today_2026-07-16',
+          expectedAuthorizationScopeVersion: '6',
+          enforceAuthorizationScopeVersion: true,
+        ),
+        isNotNull,
+      );
+      expect(
+        await teacher.read(
+          'teacher_today_2026-07-16',
+          expectedAuthorizationScopeVersion: '7',
+          enforceAuthorizationScopeVersion: true,
+        ),
+        isNull,
+      );
+    },
+  );
+
+  test(
+    'first-run attendance reads preserve an unversioned record within its normal TTL',
+    () async {
+      final teacher = teacherCache();
+      await teacher.write('teacher_today_2026-07-16', {'classes': const []});
+
+      expect(
+        await teacher.read(
+          'teacher_today_2026-07-16',
+          expectedAuthorizationScopeVersion: null,
+          enforceAuthorizationScopeVersion: true,
+        ),
+        isNotNull,
+      );
+    },
+  );
+
+  test(
+    'serialized attendance write rechecks authorization before commit',
+    () async {
+      final teacher = teacherCache();
+
+      expect(
+        await teacher.write(
+          'teacher_today_2026-07-16',
+          {'classes': const []},
+          authorizationScopeVersion: '6',
+          beforeCommit: () async => false,
+        ),
+        isFalse,
+      );
+      expect(await teacher.read('teacher_today_2026-07-16'), isNull);
+    },
+  );
+
+  test(
     'enforces per-record quota and rejects protected file references',
     () async {
       final cache = parentCache(maxRecordBytes: 300, maxTotalBytes: 600);
@@ -233,6 +357,7 @@ void main() {
 
 class _MemorySecureStore implements SecureKeyValueStore {
   final Map<String, String> values = {};
+  bool failDelete = false;
 
   @override
   Future<void> write(String key, String value) async {
@@ -247,6 +372,7 @@ class _MemorySecureStore implements SecureKeyValueStore {
 
   @override
   Future<void> delete(String key) async {
+    if (failDelete) throw StateError('delete failed');
     values.remove(key);
   }
 

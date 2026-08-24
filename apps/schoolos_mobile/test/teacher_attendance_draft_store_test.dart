@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:schoolos_mobile/core/auth/mobile_role.dart';
+import 'package:schoolos_mobile/core/errors/app_exception.dart';
 import 'package:schoolos_mobile/core/storage/app_preferences_service.dart';
 import 'package:schoolos_mobile/core/storage/secure_storage_service.dart';
 import 'package:schoolos_mobile/core/storage/teacher_attendance_draft_store.dart';
@@ -114,6 +115,123 @@ void main() {
       isNull,
     );
     expect(storage.values, isEmpty);
+  });
+
+  test(
+    'strict scope purge preserves drafts belonging to another teacher',
+    () async {
+      final first = store();
+      final second = store(userId: 'teacher-2');
+      await first.write(
+        classSectionId: 'class-1',
+        date: '2026-07-16',
+        payload: const {'clientSubmissionId': 'submission-1'},
+      );
+      await second.write(
+        classSectionId: 'class-2',
+        date: '2026-07-16',
+        payload: const {'clientSubmissionId': 'submission-2'},
+      );
+
+      await first.clearCurrentScopeStrict();
+
+      expect(
+        await first.read(classSectionId: 'class-1', date: '2026-07-16'),
+        isNull,
+      );
+      expect(
+        await second.read(classSectionId: 'class-2', date: '2026-07-16'),
+        containsPair('clientSubmissionId', 'submission-2'),
+      );
+    },
+  );
+
+  test('strict scope purge propagates secure deletion failure', () async {
+    final drafts = store();
+    await drafts.write(
+      classSectionId: 'class-1',
+      date: '2026-07-16',
+      payload: const {'clientSubmissionId': 'submission-1'},
+    );
+    storage.failDelete = true;
+
+    await expectLater(
+      drafts.clearCurrentScopeStrict(),
+      throwsA(isA<CacheException>()),
+    );
+  });
+
+  test('drafts are readable only for their verified scope version', () async {
+    final drafts = store();
+    expect(
+      await drafts.write(
+        classSectionId: 'class-1',
+        date: '2026-07-16',
+        payload: const {'clientSubmissionId': 'submission-1'},
+        authorizationScopeVersion: '6',
+      ),
+      isTrue,
+    );
+
+    expect(
+      await drafts.read(
+        classSectionId: 'class-1',
+        date: '2026-07-16',
+        expectedAuthorizationScopeVersion: '6',
+        enforceAuthorizationScopeVersion: true,
+      ),
+      isNotNull,
+    );
+    expect(
+      await drafts.read(
+        classSectionId: 'class-1',
+        date: '2026-07-16',
+        expectedAuthorizationScopeVersion: '7',
+        enforceAuthorizationScopeVersion: true,
+      ),
+      isNull,
+    );
+  });
+
+  test(
+    'first-run draft reads preserve an unversioned record within its TTL',
+    () async {
+      final drafts = store();
+      await drafts.write(
+        classSectionId: 'class-1',
+        date: '2026-07-16',
+        payload: const {'clientSubmissionId': 'submission-1'},
+      );
+
+      expect(
+        await drafts.read(
+          classSectionId: 'class-1',
+          date: '2026-07-16',
+          expectedAuthorizationScopeVersion: null,
+          enforceAuthorizationScopeVersion: true,
+        ),
+        isNotNull,
+      );
+    },
+  );
+
+  test('serialized draft write rechecks authorization before commit', () async {
+    final drafts = store();
+
+    expect(
+      await drafts.write(
+        classSectionId: 'class-1',
+        date: '2026-07-16',
+        payload: const {'clientSubmissionId': 'submission-1'},
+        authorizationScopeVersion: '6',
+        beforeCommit: () async => false,
+      ),
+      isFalse,
+    );
+    expect(
+      await drafts.read(classSectionId: 'class-1', date: '2026-07-16'),
+      isNull,
+    );
   });
 
   test('rejects a draft that exceeds the per-record quota', () async {
@@ -235,6 +353,7 @@ void main() {
 
 class _MemorySecureStore implements SecureKeyValueStore {
   final Map<String, String> values = {};
+  bool failDelete = false;
 
   @override
   Future<void> write(String key, String value) async {
@@ -249,6 +368,7 @@ class _MemorySecureStore implements SecureKeyValueStore {
 
   @override
   Future<void> delete(String key) async {
+    if (failDelete) throw StateError('delete failed');
     values.remove(key);
   }
 

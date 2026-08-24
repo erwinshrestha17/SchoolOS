@@ -5,11 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/network/connectivity_provider.dart';
-import '../../../core/storage/app_preferences_service.dart';
-import '../../../core/storage/private_data_cleanup_service.dart';
 import '../../../core/storage/private_read_cache.dart';
-import '../../../core/storage/secure_storage_service.dart';
 import '../../../core/storage/teacher_attendance_draft_store.dart';
+import '../../../core/storage/teacher_attendance_scope_version_store.dart';
 import '../data/attendance_repository.dart';
 import '../domain/attendance_models.dart';
 
@@ -18,6 +16,7 @@ final attendanceRepositoryProvider = Provider<AttendanceRepository>((ref) {
     ref.watch(apiClientProvider),
     cache: ref.watch(privateReadCacheProvider),
     draftStore: ref.watch(teacherAttendanceDraftStoreProvider),
+    scopeVersionStore: ref.watch(teacherAttendanceScopeVersionStoreProvider),
   );
 });
 
@@ -119,10 +118,6 @@ final teacherAttendanceControllerProvider =
       return TeacherAttendanceController(
         repository: ref.watch(attendanceRepositoryProvider),
         isOnline: ref.watch(connectivityProvider),
-        privateDataCleanup: PrivateDataCleanupService(
-          ref.watch(appPreferencesServiceProvider),
-          ref.watch(secureStorageServiceProvider),
-        ),
       );
     });
 
@@ -234,6 +229,8 @@ class TeacherAttendanceState {
     int? pendingAttendanceCount,
     Object? error,
     bool clearError = false,
+    bool clearSelectedClassId = false,
+    bool clearLastUpdated = false,
     String? draftClientSubmissionId,
     bool clearDraftClientSubmissionId = false,
     AttendanceDraftReceiptState? draftReceiptState,
@@ -242,7 +239,9 @@ class TeacherAttendanceState {
     return TeacherAttendanceState(
       isLoading: isLoading ?? this.isLoading,
       classes: classes ?? this.classes,
-      selectedClassId: selectedClassId ?? this.selectedClassId,
+      selectedClassId: clearSelectedClassId
+          ? null
+          : selectedClassId ?? this.selectedClassId,
       date: date ?? this.date,
       entries: entries ?? this.entries,
       originalEntries: originalEntries ?? this.originalEntries,
@@ -253,7 +252,7 @@ class TeacherAttendanceState {
       isSubmitting: isSubmitting ?? this.isSubmitting,
       attendance: attendance ?? this.attendance,
       isWorkingDay: isWorkingDay ?? this.isWorkingDay,
-      lastUpdated: lastUpdated ?? this.lastUpdated,
+      lastUpdated: clearLastUpdated ? null : lastUpdated ?? this.lastUpdated,
       todayPeriods: todayPeriods ?? this.todayPeriods,
       pendingAttendanceCount:
           pendingAttendanceCount ?? this.pendingAttendanceCount,
@@ -273,13 +272,8 @@ class TeacherAttendanceController
   TeacherAttendanceController({
     required this._repository,
     required bool isOnline,
-    PrivateDataCleanupService? privateDataCleanup,
     this.draftSaveDelay = const Duration(milliseconds: 500),
   }) : _isOnline = isOnline,
-       // Preserve the public `privateDataCleanup:` constructor contract while
-       // keeping the stored cleanup dependency private to this controller.
-       // ignore: prefer_initializing_formals
-       _privateDataCleanup = privateDataCleanup,
        super(
          TeacherAttendanceState(date: DateTime.now(), isOffline: !isOnline),
        ) {
@@ -288,20 +282,74 @@ class TeacherAttendanceController
 
   final AttendanceRepository _repository;
   final bool _isOnline;
-  final PrivateDataCleanupService? _privateDataCleanup;
   final Duration draftSaveDelay;
   Timer? _draftSaveTimer;
+  int _loadGeneration = 0;
 
   Future<void> load({String? requestedClassSectionId}) async {
+    final generation = ++_loadGeneration;
+    if (_isOnline) {
+      _draftSaveTimer?.cancel();
+    }
     state = state.copyWith(
       isLoading: true,
       isOffline: !_isOnline,
       clearError: true,
       clearMessage: true,
     );
+    var scopeRefresh = TeacherAttendanceScopeRefresh.unchanged;
+    if (_isOnline) {
+      try {
+        scopeRefresh = await _repository.refreshTeacherAttendanceScope();
+        if (generation != _loadGeneration) return;
+        if (scopeRefresh.purgedLocalData) {
+          state = _withoutSensitiveAttendanceData(
+            state,
+            isLoading: true,
+            message:
+                'Any older local attendance data was cleared after your teaching access was revalidated. Refreshing assigned classes now.',
+          );
+        }
+      } on AppException catch (error) {
+        if (generation != _loadGeneration) return;
+        state = _withoutSensitiveAttendanceData(
+          state,
+          isLoading: false,
+          error: error,
+          message: error.message,
+        );
+        return;
+      } catch (error) {
+        if (generation != _loadGeneration) return;
+        state = _withoutSensitiveAttendanceData(
+          state,
+          isLoading: false,
+          error: error,
+          message:
+              'SchoolOS could not verify this teacher attendance access state.',
+        );
+        return;
+      }
+    } else {
+      try {
+        await _repository.assertTeacherAttendanceScopeReadableOffline();
+        if (generation != _loadGeneration) return;
+      } on AppException catch (error) {
+        if (generation != _loadGeneration) return;
+        state = _withoutSensitiveAttendanceData(
+          state,
+          isLoading: false,
+          error: error,
+          message: error.message,
+        );
+        return;
+      }
+    }
+
     try {
       final date = state.date ?? DateTime.now();
       final today = await _repository.getTeacherToday(date);
+      if (generation != _loadGeneration) return;
       final classes = today.classes;
       if (classes.isEmpty) {
         state = state.copyWith(
@@ -313,8 +361,9 @@ class TeacherAttendanceController
           todayPeriods: today.periods,
           pendingAttendanceCount: 0,
           lastUpdated: today.lastUpdated,
-          message:
-              'No classes are assigned to you for the current school year.',
+          message: scopeRefresh.purgedLocalData
+              ? 'Any older local attendance data was cleared after your teaching access was revalidated. No classes are currently assigned to you.'
+              : 'No classes are assigned to you for the current school year.',
         );
         return;
       }
@@ -341,6 +390,7 @@ class TeacherAttendanceController
         selectedClassId,
         date,
       );
+      if (generation != _loadGeneration) return;
       final selectedClass = classes.firstWhere(
         (item) => item.id == selectedClassId,
         orElse: () => classes.first,
@@ -349,6 +399,7 @@ class TeacherAttendanceController
         selectedClass,
         date,
       );
+      if (generation != _loadGeneration) return;
       final sheet = draft?.entries ?? roster.entries;
 
       state = state.copyWith(
@@ -371,7 +422,9 @@ class TeacherAttendanceController
         clearDraftClientSubmissionId: draft == null,
         draftReceiptState: draft?.receiptState,
         clearDraftReceiptState: draft == null,
-        message: draft != null
+        message: scopeRefresh.purgedLocalData
+            ? 'Any older local attendance data was cleared after your teaching access was revalidated. The current assigned roster is now shown.'
+            : draft != null
             ? _draftLoadMessage(draft, isOnline: _isOnline)
             : (!_isOnline || roster.fromCache || today.fromCache)
             ? 'You are offline. Showing the last saved roster.'
@@ -384,6 +437,42 @@ class TeacherAttendanceController
             : null,
       );
     } on AppException catch (error) {
+      if (generation != _loadGeneration) return;
+      if (error is PermissionException || error is ModuleLockedException) {
+        try {
+          await _repository.clearTeacherAttendanceScopeStrict(
+            clearVersion: true,
+            quarantine: true,
+          );
+        } on AppException catch (cleanupError) {
+          if (generation != _loadGeneration) return;
+          state = _withoutSensitiveAttendanceData(
+            state,
+            isLoading: false,
+            error: cleanupError,
+            message: cleanupError.message,
+          );
+          return;
+        }
+        if (generation != _loadGeneration) return;
+        state = _withoutSensitiveAttendanceData(
+          state,
+          isLoading: false,
+          error: error,
+          message: error.message,
+        );
+        return;
+      }
+      if (scopeRefresh.purgedLocalData) {
+        state = _withoutSensitiveAttendanceData(
+          state,
+          isLoading: false,
+          error: error,
+          message:
+              'Any older local attendance data was cleared after your teaching access was revalidated, but the current roster could not be refreshed yet.',
+        );
+        return;
+      }
       state = state.copyWith(
         isLoading: false,
         syncStatus: AttendanceSyncStatus.failed,
@@ -391,6 +480,17 @@ class TeacherAttendanceController
         message: error.message,
       );
     } catch (error) {
+      if (generation != _loadGeneration) return;
+      if (scopeRefresh.purgedLocalData) {
+        state = _withoutSensitiveAttendanceData(
+          state,
+          isLoading: false,
+          error: error,
+          message:
+              'Any older local attendance data was cleared after your teaching access was revalidated, but the current roster could not be refreshed yet.',
+        );
+        return;
+      }
       state = state.copyWith(
         isLoading: false,
         syncStatus: AttendanceSyncStatus.failed,
@@ -580,26 +680,25 @@ class TeacherAttendanceController
             : 'Attendance submitted successfully.',
       );
     } on AppException catch (error) {
-      if (error is PermissionException && error.isAccessChanged) {
-        // Assignment/scope revocation: discard the unauthorized queued draft
-        // and purge tenant/assignment-scoped private caches (P0-03).
+      if (error is PermissionException || error is ModuleLockedException) {
         try {
-          await _repository.discardDraftAttendance(classId, date);
-        } catch (_) {
-          // Best effort; UI still moves to the access-changed failure state.
+          await _repository.clearTeacherAttendanceScopeStrict(
+            clearVersion: true,
+            quarantine: true,
+          );
+        } on AppException catch (cleanupError) {
+          state = _withoutSensitiveAttendanceData(
+            state,
+            isLoading: false,
+            error: cleanupError,
+            message: cleanupError.message,
+          );
+          return;
         }
-        try {
-          await _privateDataCleanup?.clearAccessScopedCaches();
-        } catch (_) {
-          // Best effort purge.
-        }
-        state = state.copyWith(
-          isSubmitting: false,
-          hasUnsavedChanges: false,
-          syncStatus: AttendanceSyncStatus.failed,
-          clearDraftClientSubmissionId: true,
-          clearDraftReceiptState: true,
-          entries: state.originalEntries,
+        state = _withoutSensitiveAttendanceData(
+          state,
+          isLoading: false,
+          error: error,
           message: error.message,
         );
         return;
@@ -700,9 +799,42 @@ class TeacherAttendanceController
 
   @override
   void dispose() {
+    _loadGeneration += 1;
     _draftSaveTimer?.cancel();
     super.dispose();
   }
+}
+
+TeacherAttendanceState _withoutSensitiveAttendanceData(
+  TeacherAttendanceState current, {
+  required bool isLoading,
+  required String message,
+  Object? error,
+}) {
+  return current.copyWith(
+    isLoading: isLoading,
+    classes: const [],
+    clearSelectedClassId: true,
+    entries: const [],
+    originalEntries: const [],
+    hasUnsavedChanges: false,
+    syncStatus: AttendanceSyncStatus.failed,
+    isSubmitting: false,
+    attendance: const TeacherAttendanceMeta(
+      isSubmitted: false,
+      isLocked: false,
+      conflictStatus: 'NONE',
+    ),
+    isWorkingDay: true,
+    clearLastUpdated: true,
+    todayPeriods: const [],
+    pendingAttendanceCount: 0,
+    error: error,
+    clearError: error == null,
+    clearDraftClientSubmissionId: true,
+    clearDraftReceiptState: true,
+    message: message,
+  );
 }
 
 String _draftLoadMessage(

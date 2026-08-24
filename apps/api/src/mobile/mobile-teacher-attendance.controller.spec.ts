@@ -1,5 +1,6 @@
 import { AuthMethod } from '@prisma/client';
 import { AttendanceService } from '../attendance/attendance.service';
+import { ROLES_KEY } from '../auth/decorators/roles.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 import { MobileTeacherAttendanceController } from './mobile-teacher-attendance.controller';
@@ -65,6 +66,12 @@ describe('MobileTeacherAttendanceController', () => {
       actor,
       '2026-06-02',
     );
+  });
+
+  it('allows subject teachers while attendance permission checks remain separate', () => {
+    expect(
+      Reflect.getMetadata(ROLES_KEY, MobileTeacherAttendanceController),
+    ).toEqual(['teacher', 'subject_teacher']);
   });
 
   it('lists assigned teacher mobile attendance classes', async () => {

@@ -10,6 +10,15 @@ function read(relativePath) {
   return readFileSync(join(webRoot, relativePath), "utf8");
 }
 
+function sourceBetween(source, startMarker, endMarker) {
+  const start = source.indexOf(startMarker);
+  const end = source.indexOf(endMarker, start + startMarker.length);
+
+  assert.notEqual(start, -1, `Missing source marker: ${startMarker}`);
+  assert.notEqual(end, -1, `Missing source marker: ${endMarker}`);
+  return source.slice(start, end);
+}
+
 describe("offline-safe web foundation", () => {
   it("uses a bounded stable secure replay id for attendance drafts", () => {
     const session = read("lib/session.ts");
@@ -110,10 +119,7 @@ describe("offline-safe web foundation", () => {
     assert.match(session, /AttendanceDraftCapacityError/);
     assert.match(session, /isInvalidStoredAttendanceDraft/);
     assert.doesNotMatch(session, /trimIndexedDbDrafts/);
-    assert.doesNotMatch(
-      session,
-      /slice\(0,\s*ATTENDANCE_DRAFT_MAX_RECORDS\)/,
-    );
+    assert.doesNotMatch(session, /slice\(0,\s*ATTENDANCE_DRAFT_MAX_RECORDS\)/);
     assert.match(workspace, /listAttendanceDraftsForCurrentBrowser/);
     assert.match(workspace, /tenantId,/);
     assert.match(workspace, /userId,/);
@@ -243,5 +249,151 @@ describe("offline-safe web foundation", () => {
     assert.match(attendance, /setDraftSyncState\("server_check"\)/);
     assert.match(attendance, /lastSyncStatus: lastServerSyncStatus/);
     assert.match(attendance, /createAttendanceDraftSubmissionId\(\)/);
+  });
+
+  it("routes the primary attendance confirmation through receipt-safe sync with one stable id", () => {
+    const attendance = read("components/forms/attendance-form.tsx");
+    const submissionFlow = sourceBetween(
+      attendance,
+      "const syncDraftSubmission = async () =>",
+      "const keepServerVersion = () =>",
+    );
+    const primaryConfirmation = sourceBetween(
+      attendance,
+      "<ConfirmDialog\n        isOpen={isConfirmOpen}",
+      "<ConfirmDialog\n        isOpen={isOverrideConfirmOpen}",
+    );
+
+    assert.doesNotMatch(attendance, /api\.submitAttendance/);
+    assert.match(attendance, /mutationFn: api\.syncAttendance/);
+    assert.match(primaryConfirmation, /void syncDraftSubmission\(\)/);
+    assert.doesNotMatch(primaryConfirmation, /\.mutate\(/);
+    const receiptDraft = sourceBetween(
+      submissionFlow,
+      "const receiptProtectedDraft: AttendanceDraftStorageValue =",
+      "const persistQueuedFinalSubmission = async () =>",
+    );
+    const syncRequest = sourceBetween(
+      submissionFlow,
+      "const result = await syncMutation.mutateAsync({",
+      "const syncStatus =",
+    );
+    assert.match(receiptDraft, /clientSubmissionId: draftClientSubmissionId/);
+    assert.match(syncRequest, /clientSubmissionId: draftClientSubmissionId/);
+    const receiptPersistIndex = submissionFlow.indexOf(
+      "await storeAttendanceDraft(submissionDraftKey, receiptProtectedDraft);",
+    );
+    const requestIndex = submissionFlow.indexOf(
+      "const result = await syncMutation.mutateAsync({",
+    );
+    assert.ok(
+      receiptPersistIndex >= 0,
+      "the durable receipt write is required",
+    );
+    assert.ok(requestIndex >= 0, "the final sync request is required");
+    assert.ok(
+      receiptPersistIndex < requestIndex,
+      "the durable receipt must be stored before the final sync request",
+    );
+    assert.match(
+      submissionFlow,
+      /await storeAttendanceDraft\(submissionDraftKey, receiptProtectedDraft\);[\s\S]{0,260}} catch \{[\s\S]{0,320}so nothing was sent[\s\S]{0,180}return;/,
+    );
+    assert.match(
+      submissionFlow,
+      /const ambiguousDraft = \{[\s\S]{0,120}\.\.\.receiptProtectedDraft,[\s\S]{0,120}lastSyncStatus: "TRANSPORT_AMBIGUOUS"/,
+    );
+    assert.match(
+      submissionFlow,
+      /!isReceiptReplay &&[\s\S]{0,120}hasReconnectConflict/,
+    );
+    assert.doesNotMatch(submissionFlow, /createAttendanceDraftSubmissionId/);
+  });
+
+  it("queues confirmed offline attendance and replays only receipt-protected final intent", () => {
+    const attendance = read("components/forms/attendance-form.tsx");
+    const submissionFlow = sourceBetween(
+      attendance,
+      "const syncDraftSubmission = async () =>",
+      "const keepServerVersion = () =>",
+    );
+    const reconnectFlow = sourceBetween(
+      attendance,
+      "reconnectActionRef.current = () =>",
+      "useEffect(() => {\n    const handleOnline",
+    );
+
+    assert.match(
+      attendance,
+      /const receiptProtectedFinalSubmissionStatuses = \[[\s\S]{0,100}"QUEUED",[\s\S]{0,100}"PROCESSING",[\s\S]{0,100}"TRANSPORT_AMBIGUOUS"/,
+    );
+    assert.match(
+      submissionFlow,
+      /navigator\.onLine === false[\s\S]{0,400}await persistQueuedFinalSubmission\(\)/,
+    );
+    assert.match(
+      submissionFlow,
+      /\.\.\.receiptProtectedDraft,[\s\S]{0,80}lastSyncStatus: "QUEUED"/,
+    );
+    assert.match(
+      reconnectFlow,
+      /isReceiptProtectedFinalSubmissionStatus\(lastServerSyncStatus\)\s*&&\s*hasPendingLocalDraft[\s\S]{0,160}void syncDraftSubmission\(\)[\s\S]{0,160}return;[\s\S]{0,160}void saveDraftToServer\(\)/,
+    );
+    assert.match(
+      attendance,
+      /isReceiptProtectedFinalSubmissionStatus\(storedSyncStatus\)\s*&&\s*navigator\.onLine !== false/,
+    );
+  });
+
+  it("fences receipt results to the captured attendance scope", () => {
+    const attendance = read("components/forms/attendance-form.tsx");
+    const submissionFlow = sourceBetween(
+      attendance,
+      "const syncDraftSubmission = async () =>",
+      "const keepServerVersion = () =>",
+    );
+    const scopeControls = sourceBetween(
+      attendance,
+      '<FilterBar\n        label="Attendance Filters"',
+      '<SectionCard\n        title="Attendance Roster"',
+    );
+
+    assert.match(submissionFlow, /const submissionDraftKey = draftKey/);
+    assert.match(
+      submissionFlow,
+      /activeDraftKeyRef\.current === submissionDraftKey/,
+    );
+    assert.match(submissionFlow, /clearAttendanceDraft\(submissionDraftKey\)/);
+    assert.ok(
+      (submissionFlow.match(/isSubmissionScopeCurrent\(\)/g) ?? []).length >= 6,
+      "all awaited receipt outcomes must be fenced to the captured draft key",
+    );
+    assert.ok(
+      (scopeControls.match(/disabled=\{scopeSelectionDisabled\}/g) ?? [])
+        .length >= 4,
+      "year, class, section, and date must be frozen during receipt sync",
+    );
+  });
+
+  it("announces authoritative attendance outcomes and focuses actionable failures", () => {
+    const attendance = read("components/forms/attendance-form.tsx");
+
+    assert.match(
+      attendance,
+      /role=\{submissionFeedbackIsAlert \? "alert" : "status"\}/,
+    );
+    assert.match(
+      attendance,
+      /aria-live=\{submissionFeedbackIsAlert \? "assertive" : "polite"\}/,
+    );
+    assert.match(attendance, /aria-atomic="true"/);
+    assert.match(
+      attendance,
+      /tabIndex=\{submissionFeedbackIsAlert \? -1 : undefined\}/,
+    );
+    assert.match(attendance, /submissionFeedbackRef\.current\?\.focus\(\)/);
+    assert.match(attendance, /Attendance accepted by SchoolOS at/);
+    assert.match(attendance, /recorded a conflict for office review/);
+    assert.match(attendance, /No authoritative attendance was accepted/);
   });
 });

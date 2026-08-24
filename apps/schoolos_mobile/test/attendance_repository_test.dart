@@ -1,15 +1,27 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:schoolos_mobile/core/auth/mobile_role.dart';
 import 'package:schoolos_mobile/core/errors/app_exception.dart';
 import 'package:schoolos_mobile/core/network/api_client.dart';
+import 'package:schoolos_mobile/core/storage/private_read_cache.dart';
 import 'package:schoolos_mobile/core/storage/secure_storage_service.dart';
 import 'package:schoolos_mobile/core/storage/teacher_attendance_draft_store.dart';
+import 'package:schoolos_mobile/core/storage/teacher_attendance_scope_version_store.dart';
 import 'package:schoolos_mobile/features/attendance/data/attendance_repository.dart';
 import 'package:schoolos_mobile/features/attendance/domain/attendance_models.dart';
 
 class MockApiClient extends Mock implements ApiClient {}
+
+class MockPrivateReadCache extends Mock implements PrivateReadCache {}
+
+class MockTeacherAttendanceDraftStore extends Mock
+    implements TeacherAttendanceDraftStore {}
+
+class MockTeacherAttendanceScopeVersionStore extends Mock
+    implements TeacherAttendanceScopeVersionStore {}
 
 void main() {
   group('AttendanceRepository', () {
@@ -32,6 +44,628 @@ void main() {
         ),
       );
     });
+
+    test(
+      'keeps attendance data when the verified scope version is unchanged',
+      () async {
+        final cache = MockPrivateReadCache();
+        final drafts = MockTeacherAttendanceDraftStore();
+        final versions = MockTeacherAttendanceScopeVersionStore();
+        final scopedRepository = AttendanceRepository(
+          apiClient,
+          cache: cache,
+          draftStore: drafts,
+          scopeVersionStore: versions,
+        );
+        when(
+          () => apiClient.get<dynamic>(
+            '/mobile/teacher/attendance/scope-version',
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(
+              path: '/mobile/teacher/attendance/scope-version',
+            ),
+            data: {'scopeVersion': '7'},
+          ),
+        );
+        when(() => versions.readState()).thenAnswer(
+          (_) async => const TeacherAttendanceScopeVersionState(
+            scopeVersion: '7',
+            quarantined: false,
+          ),
+        );
+
+        expect(
+          await scopedRepository.refreshTeacherAttendanceScope(),
+          TeacherAttendanceScopeRefresh.unchanged,
+        );
+        verifyNever(() => cache.clearTeacherAttendanceScopeStrict());
+        verifyNever(() => drafts.clearCurrentScopeStrict());
+        verifyNever(() => versions.write(any()));
+      },
+    );
+
+    for (final storedVersion in <String?>[null, '6']) {
+      test(
+        '${storedVersion == null ? 'bootstrap' : 'mismatch'} purges before persisting the verified scope version',
+        () async {
+          final cache = MockPrivateReadCache();
+          final drafts = MockTeacherAttendanceDraftStore();
+          final versions = MockTeacherAttendanceScopeVersionStore();
+          final scopedRepository = AttendanceRepository(
+            apiClient,
+            cache: cache,
+            draftStore: drafts,
+            scopeVersionStore: versions,
+          );
+          when(
+            () => apiClient.get<dynamic>(
+              '/mobile/teacher/attendance/scope-version',
+            ),
+          ).thenAnswer(
+            (_) async => Response(
+              requestOptions: RequestOptions(
+                path: '/mobile/teacher/attendance/scope-version',
+              ),
+              data: {'scopeVersion': '7'},
+            ),
+          );
+          when(() => versions.readState()).thenAnswer(
+            (_) async => TeacherAttendanceScopeVersionState(
+              scopeVersion: storedVersion,
+              quarantined: false,
+            ),
+          );
+          when(
+            () => versions.quarantine(clearVersion: false),
+          ).thenAnswer((_) async {});
+          when(
+            () => cache.clearTeacherAttendanceScopeStrict(),
+          ).thenAnswer((_) async {});
+          when(() => drafts.clearCurrentScopeStrict()).thenAnswer((_) async {});
+          when(() => versions.write('7')).thenAnswer((_) async {});
+
+          expect(
+            await scopedRepository.refreshTeacherAttendanceScope(),
+            TeacherAttendanceScopeRefresh.localDataPurged,
+          );
+          verifyInOrder([
+            () => versions.readState(),
+            () => versions.quarantine(clearVersion: false),
+            () => cache.clearTeacherAttendanceScopeStrict(),
+            () => drafts.clearCurrentScopeStrict(),
+            () => versions.write('7'),
+          ]);
+        },
+      );
+    }
+
+    test(
+      'scope mismatch stays quarantined when only part of the strict purge succeeds',
+      () async {
+        final cache = MockPrivateReadCache();
+        final drafts = MockTeacherAttendanceDraftStore();
+        final versions = TeacherAttendanceScopeVersionStore(
+          secureStore,
+          scope: TeacherAttendanceScopeVersionScope(
+            tenantId: 'tenant-1',
+            userId: 'teacher-1',
+            role: MobileRole.teacher,
+          ),
+        );
+        await versions.write('6');
+        final scopedRepository = AttendanceRepository(
+          apiClient,
+          cache: cache,
+          draftStore: drafts,
+          scopeVersionStore: versions,
+        );
+        when(
+          () => apiClient.get<dynamic>(
+            '/mobile/teacher/attendance/scope-version',
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(
+              path: '/mobile/teacher/attendance/scope-version',
+            ),
+            data: {'scopeVersion': '7'},
+          ),
+        );
+        when(
+          () => cache.clearTeacherAttendanceScopeStrict(),
+        ).thenThrow(const CacheException());
+        when(() => drafts.clearCurrentScopeStrict()).thenAnswer((_) async {});
+
+        await expectLater(
+          scopedRepository.refreshTeacherAttendanceScope(),
+          throwsA(isA<CacheException>()),
+        );
+        expect((await versions.readState())?.scopeVersion, '6');
+        expect(await versions.isQuarantined(), isTrue);
+        await expectLater(
+          scopedRepository.assertTeacherAttendanceScopeReadableOffline(),
+          throwsA(isA<CacheException>()),
+        );
+      },
+    );
+
+    test(
+      'an older in-flight today response cannot repopulate cache after a newer scope purge',
+      () async {
+        final todayRequested = Completer<void>();
+        final staleTodayResponse = Completer<Response<dynamic>>();
+        final cache = PrivateReadCache(
+          secureStore,
+          scope: PrivateReadCacheScope(
+            tenantId: 'tenant-1',
+            userId: 'teacher-1',
+            role: MobileRole.teacher,
+          ),
+        );
+        final drafts = TeacherAttendanceDraftStore(
+          secureStore,
+          scope: TeacherAttendanceDraftScope(
+            tenantId: 'tenant-1',
+            userId: 'teacher-1',
+            role: MobileRole.teacher,
+          ),
+        );
+        final versions = TeacherAttendanceScopeVersionStore(
+          secureStore,
+          scope: TeacherAttendanceScopeVersionScope(
+            tenantId: 'tenant-1',
+            userId: 'teacher-1',
+            role: MobileRole.teacher,
+          ),
+        );
+        await versions.write('6');
+        final scopedRepository = AttendanceRepository(
+          apiClient,
+          cache: cache,
+          draftStore: drafts,
+          scopeVersionStore: versions,
+        );
+        when(
+          () => apiClient.get<dynamic>(
+            '/mobile/teacher/attendance/today',
+            queryParameters: {'date': '2026-06-18'},
+          ),
+        ).thenAnswer((_) {
+          todayRequested.complete();
+          return staleTodayResponse.future;
+        });
+        when(
+          () => apiClient.get<dynamic>(
+            '/mobile/teacher/attendance/scope-version',
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(
+              path: '/mobile/teacher/attendance/scope-version',
+            ),
+            data: {'scopeVersion': '7'},
+          ),
+        );
+
+        final staleLoad = scopedRepository.getTeacherToday(
+          DateTime(2026, 6, 18),
+        );
+        await todayRequested.future;
+        expect(
+          await scopedRepository.refreshTeacherAttendanceScope(),
+          TeacherAttendanceScopeRefresh.localDataPurged,
+        );
+        final staleExpectation = expectLater(
+          staleLoad,
+          throwsA(isA<CacheException>()),
+        );
+        staleTodayResponse.complete(
+          Response(
+            requestOptions: RequestOptions(
+              path: '/mobile/teacher/attendance/today',
+            ),
+            data: {
+              'date': '2026-06-18T00:00:00.000Z',
+              'periods': const [],
+              'classes': const [],
+              'pendingAttendanceCount': 0,
+            },
+          ),
+        );
+
+        await staleExpectation;
+        expect(await versions.read(), '7');
+        expect(
+          await cache.read(
+            'teacher_today_2026-06-18',
+            expectedAuthorizationScopeVersion: '7',
+            enforceAuthorizationScopeVersion: true,
+          ),
+          isNull,
+        );
+      },
+    );
+
+    test(
+      'a scope purge waits for an older serialized draft write and then removes it',
+      () async {
+        final cache = PrivateReadCache(
+          secureStore,
+          scope: PrivateReadCacheScope(
+            tenantId: 'tenant-1',
+            userId: 'teacher-1',
+            role: MobileRole.teacher,
+          ),
+        );
+        final drafts = TeacherAttendanceDraftStore(
+          secureStore,
+          scope: TeacherAttendanceDraftScope(
+            tenantId: 'tenant-1',
+            userId: 'teacher-1',
+            role: MobileRole.teacher,
+          ),
+        );
+        final versions = TeacherAttendanceScopeVersionStore(
+          secureStore,
+          scope: TeacherAttendanceScopeVersionScope(
+            tenantId: 'tenant-1',
+            userId: 'teacher-1',
+            role: MobileRole.teacher,
+          ),
+        );
+        await versions.write('6');
+        final scopedRepository = AttendanceRepository(
+          apiClient,
+          cache: cache,
+          draftStore: drafts,
+          scopeVersionStore: versions,
+        );
+        when(
+          () => apiClient.get<dynamic>(
+            '/mobile/teacher/attendance/scope-version',
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(
+              path: '/mobile/teacher/attendance/scope-version',
+            ),
+            data: {'scopeVersion': '7'},
+          ),
+        );
+        final draftWriteStarted = Completer<void>();
+        final releaseDraftWrite = Completer<void>();
+        secureStore.blockNextDraftWrite(
+          started: draftWriteStarted,
+          release: releaseDraftWrite.future,
+        );
+
+        final staleSave = scopedRepository.saveDraftAttendanceLocally(
+          'year-1:class-1:section-1',
+          DateTime(2026, 6, 18),
+          const [
+            AttendanceStudentEntry(
+              studentId: 'student-1',
+              studentName: 'Asha Sharma',
+              rollNumber: '7',
+              status: AttendanceStatus.absent,
+            ),
+          ],
+        );
+        await draftWriteStarted.future;
+        var refreshCompleted = false;
+        final refresh = scopedRepository.refreshTeacherAttendanceScope().then((
+          result,
+        ) {
+          refreshCompleted = true;
+          return result;
+        });
+        await Future<void>.delayed(Duration.zero);
+        expect(refreshCompleted, isFalse);
+        expect(await versions.read(), '6');
+
+        releaseDraftWrite.complete();
+        await staleSave;
+        expect(await refresh, TeacherAttendanceScopeRefresh.localDataPurged);
+        expect(await versions.read(), '7');
+        expect(
+          await scopedRepository.loadDraftAttendance(
+            'year-1:class-1:section-1',
+            DateTime(2026, 6, 18),
+          ),
+          isNull,
+        );
+      },
+    );
+
+    test(
+      'a valid online version purges quarantined data before clearing quarantine',
+      () async {
+        final cache = MockPrivateReadCache();
+        final drafts = MockTeacherAttendanceDraftStore();
+        final versions = MockTeacherAttendanceScopeVersionStore();
+        final scopedRepository = AttendanceRepository(
+          apiClient,
+          cache: cache,
+          draftStore: drafts,
+          scopeVersionStore: versions,
+        );
+        when(
+          () => apiClient.get<dynamic>(
+            '/mobile/teacher/attendance/scope-version',
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(
+              path: '/mobile/teacher/attendance/scope-version',
+            ),
+            data: {'scopeVersion': '7'},
+          ),
+        );
+        when(() => versions.readState()).thenAnswer(
+          (_) async => const TeacherAttendanceScopeVersionState(
+            scopeVersion: null,
+            quarantined: true,
+          ),
+        );
+        when(
+          () => versions.quarantine(clearVersion: false),
+        ).thenAnswer((_) async {});
+        when(
+          () => cache.clearTeacherAttendanceScopeStrict(),
+        ).thenAnswer((_) async {});
+        when(() => drafts.clearCurrentScopeStrict()).thenAnswer((_) async {});
+        when(() => versions.write('7')).thenAnswer((_) async {});
+
+        expect(
+          await scopedRepository.refreshTeacherAttendanceScope(),
+          TeacherAttendanceScopeRefresh.localDataPurged,
+        );
+        verifyInOrder([
+          () => versions.readState(),
+          () => versions.quarantine(clearVersion: false),
+          () => cache.clearTeacherAttendanceScopeStrict(),
+          () => drafts.clearCurrentScopeStrict(),
+          () => versions.write('7'),
+        ]);
+      },
+    );
+
+    test(
+      'transport failure preserves the existing TTL fallback path',
+      () async {
+        final cache = MockPrivateReadCache();
+        final drafts = MockTeacherAttendanceDraftStore();
+        final versions = MockTeacherAttendanceScopeVersionStore();
+        final scopedRepository = AttendanceRepository(
+          apiClient,
+          cache: cache,
+          draftStore: drafts,
+          scopeVersionStore: versions,
+        );
+        when(
+          () => apiClient.get<dynamic>(
+            '/mobile/teacher/attendance/scope-version',
+          ),
+        ).thenThrow(const NetworkException());
+        when(() => versions.isQuarantined()).thenAnswer((_) async => false);
+
+        expect(
+          await scopedRepository.refreshTeacherAttendanceScope(),
+          TeacherAttendanceScopeRefresh.transportUnavailable,
+        );
+        verifyNever(() => versions.readState());
+        verifyNever(() => cache.clearTeacherAttendanceScopeStrict());
+      },
+    );
+
+    test(
+      'transport failure cannot bypass an already persisted quarantine',
+      () async {
+        final cache = MockPrivateReadCache();
+        final drafts = MockTeacherAttendanceDraftStore();
+        final versions = MockTeacherAttendanceScopeVersionStore();
+        final scopedRepository = AttendanceRepository(
+          apiClient,
+          cache: cache,
+          draftStore: drafts,
+          scopeVersionStore: versions,
+        );
+        when(
+          () => apiClient.get<dynamic>(
+            '/mobile/teacher/attendance/scope-version',
+          ),
+        ).thenThrow(const TimeoutException());
+        when(() => versions.isQuarantined()).thenAnswer((_) async => true);
+
+        await expectLater(
+          scopedRepository.refreshTeacherAttendanceScope(),
+          throwsA(isA<CacheException>()),
+        );
+        verifyNever(() => cache.clearTeacherAttendanceScopeStrict());
+      },
+    );
+
+    test(
+      'malformed scope version blocks cache access without purging',
+      () async {
+        final cache = MockPrivateReadCache();
+        final drafts = MockTeacherAttendanceDraftStore();
+        final versions = MockTeacherAttendanceScopeVersionStore();
+        final scopedRepository = AttendanceRepository(
+          apiClient,
+          cache: cache,
+          draftStore: drafts,
+          scopeVersionStore: versions,
+        );
+        when(
+          () => apiClient.get<dynamic>(
+            '/mobile/teacher/attendance/scope-version',
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(
+              path: '/mobile/teacher/attendance/scope-version',
+            ),
+            data: {'scopeVersion': '-1'},
+          ),
+        );
+        when(
+          () => versions.quarantine(clearVersion: false),
+        ).thenAnswer((_) async {});
+
+        await expectLater(
+          scopedRepository.refreshTeacherAttendanceScope(),
+          throwsA(
+            isA<ServerException>().having(
+              (error) => error.code,
+              'code',
+              'INVALID_TEACHER_SCOPE_VERSION',
+            ),
+          ),
+        );
+        verifyNever(() => versions.readState());
+        verifyNever(() => cache.clearTeacherAttendanceScopeStrict());
+        verify(() => versions.quarantine(clearVersion: false)).called(1);
+      },
+    );
+
+    test(
+      'non-transport scope failure persists quarantine and blocks cache reads',
+      () async {
+        final cache = MockPrivateReadCache();
+        final drafts = MockTeacherAttendanceDraftStore();
+        final versions = MockTeacherAttendanceScopeVersionStore();
+        final scopedRepository = AttendanceRepository(
+          apiClient,
+          cache: cache,
+          draftStore: drafts,
+          scopeVersionStore: versions,
+        );
+        const failure = ServerException(code: 'SCOPE_LOOKUP_FAILED');
+        when(
+          () => apiClient.get<dynamic>(
+            '/mobile/teacher/attendance/scope-version',
+          ),
+        ).thenThrow(failure);
+        when(
+          () => versions.quarantine(clearVersion: false),
+        ).thenAnswer((_) async {});
+
+        await expectLater(
+          scopedRepository.refreshTeacherAttendanceScope(),
+          throwsA(same(failure)),
+        );
+        verify(() => versions.quarantine(clearVersion: false)).called(1);
+        verifyNever(() => cache.clearTeacherAttendanceScopeStrict());
+      },
+    );
+
+    test('offline reads fail closed while the scope is quarantined', () async {
+      final cache = MockPrivateReadCache();
+      final drafts = MockTeacherAttendanceDraftStore();
+      final versions = MockTeacherAttendanceScopeVersionStore();
+      final scopedRepository = AttendanceRepository(
+        apiClient,
+        cache: cache,
+        draftStore: drafts,
+        scopeVersionStore: versions,
+      );
+      when(() => versions.isQuarantined()).thenAnswer((_) async => true);
+
+      await expectLater(
+        scopedRepository.assertTeacherAttendanceScopeReadableOffline(),
+        throwsA(isA<CacheException>()),
+      );
+      verifyNever(() => cache.read(any()));
+    });
+
+    test(
+      'permission denial purges caches, drafts, and version before rethrow',
+      () async {
+        final cache = MockPrivateReadCache();
+        final drafts = MockTeacherAttendanceDraftStore();
+        final versions = MockTeacherAttendanceScopeVersionStore();
+        final scopedRepository = AttendanceRepository(
+          apiClient,
+          cache: cache,
+          draftStore: drafts,
+          scopeVersionStore: versions,
+        );
+        when(
+          () => apiClient.get<dynamic>(
+            '/mobile/teacher/attendance/scope-version',
+          ),
+        ).thenThrow(const PermissionException());
+        when(
+          () => cache.clearTeacherAttendanceScopeStrict(),
+        ).thenAnswer((_) async {});
+        when(() => drafts.clearCurrentScopeStrict()).thenAnswer((_) async {});
+        when(
+          () => versions.quarantine(clearVersion: true),
+        ).thenAnswer((_) async {});
+
+        await expectLater(
+          scopedRepository.refreshTeacherAttendanceScope(),
+          throwsA(isA<PermissionException>()),
+        );
+        verifyInOrder([
+          () => cache.clearTeacherAttendanceScopeStrict(),
+          () => drafts.clearCurrentScopeStrict(),
+          () => versions.quarantine(clearVersion: true),
+        ]);
+      },
+    );
+
+    test(
+      'strict purge failure blocks denial fallback and still attempts all cleanup',
+      () async {
+        final cache = MockPrivateReadCache();
+        final drafts = MockTeacherAttendanceDraftStore();
+        final versions = MockTeacherAttendanceScopeVersionStore();
+        final scopedRepository = AttendanceRepository(
+          apiClient,
+          cache: cache,
+          draftStore: drafts,
+          scopeVersionStore: versions,
+        );
+        when(
+          () => apiClient.get<dynamic>(
+            '/mobile/teacher/attendance/scope-version',
+          ),
+        ).thenThrow(const ModuleLockedException());
+        when(
+          () => cache.clearTeacherAttendanceScopeStrict(),
+        ).thenThrow(const CacheException());
+        when(() => drafts.clearCurrentScopeStrict()).thenAnswer((_) async {});
+        when(
+          () => versions.quarantine(clearVersion: true),
+        ).thenAnswer((_) async {});
+
+        await expectLater(
+          scopedRepository.refreshTeacherAttendanceScope(),
+          throwsA(isA<CacheException>()),
+        );
+        verify(() => drafts.clearCurrentScopeStrict()).called(1);
+        verify(() => versions.quarantine(clearVersion: true)).called(1);
+      },
+    );
+
+    test(
+      'scope verification fails closed when secure dependencies are absent',
+      () async {
+        await expectLater(
+          repository.refreshTeacherAttendanceScope(),
+          throwsA(isA<CacheException>()),
+        );
+        verifyNever(
+          () => apiClient.get<dynamic>(
+            '/mobile/teacher/attendance/scope-version',
+          ),
+        );
+      },
+    );
 
     test('uses the parent-safe mobile attendance endpoint', () async {
       when(
@@ -1053,12 +1687,30 @@ void main() {
 class _MemorySecureStore implements SecureKeyValueStore {
   final Map<String, String> values = {};
   int failNextWrites = 0;
+  Completer<void>? _draftWriteStarted;
+  Future<void>? _draftWriteRelease;
+
+  void blockNextDraftWrite({
+    required Completer<void> started,
+    required Future<void> release,
+  }) {
+    _draftWriteStarted = started;
+    _draftWriteRelease = release;
+  }
 
   @override
   Future<void> write(String key, String value) async {
     if (failNextWrites > 0) {
       failNextWrites -= 1;
       throw StateError('Simulated secure-storage write failure.');
+    }
+    final draftWriteRelease = _draftWriteRelease;
+    if (draftWriteRelease != null &&
+        key.startsWith('schoolos.teacher_attendance_draft.secure.')) {
+      _draftWriteRelease = null;
+      _draftWriteStarted?.complete();
+      _draftWriteStarted = null;
+      await draftWriteRelease;
     }
     values[key] = value;
   }
