@@ -76,7 +76,6 @@ import {
   getParentStudentIds,
   getStudentOwnId,
   isParentOnly,
-  isTeacherOnly,
   requireGuardianCapability,
 } from '../common/security/parent-scope';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -5969,7 +5968,13 @@ export class AttendanceService {
       return;
     }
 
-    if (isTeacherOnly(actor)) {
+    const hasTeachingRole = actor.roles.some((role) =>
+      ['teacher', 'subject_teacher'].includes(role),
+    );
+    const hasAttendanceAdministrativeRole = actor.roles.some((role) =>
+      ['admin', 'principal', 'platform_super_admin'].includes(role),
+    );
+    if (hasTeachingRole && !hasAttendanceAdministrativeRole) {
       await this.checkTeacherAssignment(
         actor,
         scope?.classId ?? student.classId,

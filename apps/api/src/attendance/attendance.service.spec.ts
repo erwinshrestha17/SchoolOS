@@ -3959,6 +3959,37 @@ describe('staff-attendance and leave confirmed-gap fixes (2026-07-19)', () => {
     expect(prisma.attendanceRecord.findMany).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps a teacher and librarian dual role assignment-scoped for attendance reads', async () => {
+    const { service, prisma } = buildService({
+      canonicalAssignments: [],
+      studentFindFirst: {
+        id: 'student-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+      },
+    });
+
+    const denial = await service
+      .getStudentHistory(
+        'student-1',
+        {},
+        {
+          ...teacherActor,
+          roles: ['teacher', 'librarian'],
+        },
+      )
+      .then(() => null)
+      .catch((error: unknown) => error);
+    expect(denial).toBeInstanceOf(ForbiddenException);
+    if (!(denial instanceof ForbiddenException)) {
+      throw new Error('Expected teacher-scope denial');
+    }
+    expect(denial.getResponse()).toMatchObject({
+      code: TEACHER_SCOPE_DENIED_CODE,
+    });
+    expect(prisma.attendanceRecord.findMany).not.toHaveBeenCalled();
+  });
+
   it('preserves direct student attendance history for an admin and subject-teacher dual role', async () => {
     const { service, prisma } = buildService({
       canonicalAssignments: [],
