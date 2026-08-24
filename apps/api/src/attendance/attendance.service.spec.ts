@@ -54,6 +54,14 @@ const teacherActor = {
   permissions: ['attendance:mark', 'attendance:read'],
 };
 
+const subjectTeacherActor = {
+  ...adminActor,
+  userId: 'subject-teacher-user-1',
+  email: 'subject-teacher@schoolos.test',
+  roles: ['subject_teacher'],
+  permissions: ['attendance:read'],
+};
+
 const parentActor = {
   ...adminActor,
   userId: 'parent-user-1',
@@ -3898,6 +3906,81 @@ describe('staff-attendance and leave confirmed-gap fixes (2026-07-19)', () => {
       orderBy: expect.anything(),
       take: 100,
     });
+  });
+
+  it('denies an unassigned subject teacher direct student attendance history', async () => {
+    const { service, prisma } = buildService({
+      canonicalAssignments: [],
+      studentFindFirst: {
+        id: 'student-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+      },
+    });
+
+    const denial = await service
+      .getStudentHistory('student-1', {}, subjectTeacherActor)
+      .then(() => null)
+      .catch((error: unknown) => error);
+    expect(denial).toBeInstanceOf(ForbiddenException);
+    if (!(denial instanceof ForbiddenException)) {
+      throw new Error('Expected teacher-scope denial');
+    }
+    expect(denial.getResponse()).toMatchObject({
+      code: TEACHER_SCOPE_DENIED_CODE,
+    });
+    expect(prisma.attendanceRecord.findMany).not.toHaveBeenCalled();
+  });
+
+  it('allows an assigned subject teacher direct student attendance history', async () => {
+    const { service, prisma } = buildService({
+      canonicalAssignments: [
+        teacherAssignmentFixture({
+          tenantId: subjectTeacherActor.tenantId,
+          staffId: 'staff-1',
+          academicYearId: 'year-1',
+          assignmentType: TeacherAssignmentType.SUBJECT_TEACHER,
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: 'subject-1',
+        }),
+      ],
+      studentFindFirst: {
+        id: 'student-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+      },
+      attendanceRecords: [],
+    });
+
+    await expect(
+      service.getStudentHistory('student-1', {}, subjectTeacherActor),
+    ).resolves.toEqual([]);
+    expect(prisma.attendanceRecord.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves direct student attendance history for an admin and subject-teacher dual role', async () => {
+    const { service, prisma } = buildService({
+      canonicalAssignments: [],
+      studentFindFirst: {
+        id: 'student-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+      },
+      attendanceRecords: [],
+    });
+
+    await expect(
+      service.getStudentHistory(
+        'student-1',
+        {},
+        {
+          ...subjectTeacherActor,
+          roles: ['admin', 'subject_teacher'],
+        },
+      ),
+    ).resolves.toEqual([]);
+    expect(prisma.attendanceRecord.findMany).toHaveBeenCalledTimes(1);
   });
 
   it('scopes attendance anomalies to the teacher own sections', async () => {

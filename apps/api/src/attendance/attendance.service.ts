@@ -76,6 +76,7 @@ import {
   getParentStudentIds,
   getStudentOwnId,
   isParentOnly,
+  isTeacherOnly,
   requireGuardianCapability,
 } from '../common/security/parent-scope';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -5968,7 +5969,7 @@ export class AttendanceService {
       return;
     }
 
-    if (actor.roles.includes('teacher')) {
+    if (isTeacherOnly(actor)) {
       await this.checkTeacherAssignment(
         actor,
         scope?.classId ?? student.classId,
