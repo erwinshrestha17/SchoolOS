@@ -174,6 +174,7 @@ describe('MobileTeacherAttendanceController', () => {
       conflictId: null,
       syncStatus: 'ACCEPTED',
       replayed: false,
+      rejectionReason: null,
       serverReceivedAt: '2026-06-02T08:00:01.000Z',
       deviceId: 'private-device-id',
     } as Awaited<ReturnType<AttendanceService['syncAttendance']>>);
@@ -184,8 +185,40 @@ describe('MobileTeacherAttendanceController', () => {
       conflictId: null,
       syncStatus: 'ACCEPTED',
       replayed: false,
+      rejectionReason: null,
       serverReceivedAt: '2026-06-02T08:00:01.000Z',
     });
     expect(attendanceService.syncAttendance).toHaveBeenCalledWith(dto, actor);
+  });
+
+  it('projects the safe assignment-revocation reason in a rejected receipt', async () => {
+    const dto = {
+      academicYearId: 'year-1',
+      classId: 'class-1',
+      sectionId: 'section-1',
+      attendanceDate: '2026-06-02',
+      exceptions: [],
+      clientSubmissionId: 'mobile-revoked-1',
+      deviceTimestamp: '2026-06-02T08:00:00.000Z',
+    };
+    attendanceService.syncAttendance.mockResolvedValue({
+      clientSubmissionId: 'mobile-revoked-1',
+      attendanceSessionId: null,
+      conflictId: null,
+      syncStatus: 'REJECTED',
+      replayed: false,
+      rejectionReason: 'UNASSIGNED_TEACHER',
+      serverReceivedAt: '2026-06-02T08:00:01.000Z',
+    } as Awaited<ReturnType<AttendanceService['syncAttendance']>>);
+
+    await expect(controller.sync(dto, actor)).resolves.toEqual({
+      clientSubmissionId: 'mobile-revoked-1',
+      attendanceSessionId: null,
+      conflictId: null,
+      syncStatus: 'REJECTED',
+      replayed: false,
+      rejectionReason: 'UNASSIGNED_TEACHER',
+      serverReceivedAt: '2026-06-02T08:00:01.000Z',
+    });
   });
 });

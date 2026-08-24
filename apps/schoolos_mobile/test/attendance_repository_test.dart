@@ -582,7 +582,7 @@ void main() {
     });
 
     test(
-      'permission denial purges caches, drafts, and version before rethrow',
+      'permission denial quarantines before purging caches and drafts',
       () async {
         final cache = MockPrivateReadCache();
         final drafts = MockTeacherAttendanceDraftStore();
@@ -611,10 +611,59 @@ void main() {
           throwsA(isA<PermissionException>()),
         );
         verifyInOrder([
+          () => versions.quarantine(clearVersion: true),
           () => cache.clearTeacherAttendanceScopeStrict(),
           () => drafts.clearCurrentScopeStrict(),
-          () => versions.quarantine(clearVersion: true),
         ]);
+      },
+    );
+
+    test(
+      'partial denial purge remains quarantined after a simulated restart',
+      () async {
+        final cache = MockPrivateReadCache();
+        final drafts = MockTeacherAttendanceDraftStore();
+        final versions = MockTeacherAttendanceScopeVersionStore();
+        final scopedRepository = AttendanceRepository(
+          apiClient,
+          cache: cache,
+          draftStore: drafts,
+          scopeVersionStore: versions,
+        );
+        when(
+          () => apiClient.get<dynamic>(
+            '/mobile/teacher/attendance/scope-version',
+          ),
+        ).thenThrow(const PermissionException());
+        when(
+          () => versions.quarantine(clearVersion: true),
+        ).thenAnswer((_) async {});
+        when(
+          () => cache.clearTeacherAttendanceScopeStrict(),
+        ).thenThrow(const CacheException());
+        when(() => drafts.clearCurrentScopeStrict()).thenAnswer((_) async {});
+        when(() => versions.isQuarantined()).thenAnswer((_) async => true);
+
+        await expectLater(
+          scopedRepository.refreshTeacherAttendanceScope(),
+          throwsA(isA<CacheException>()),
+        );
+        verifyInOrder([
+          () => versions.quarantine(clearVersion: true),
+          () => cache.clearTeacherAttendanceScopeStrict(),
+          () => drafts.clearCurrentScopeStrict(),
+        ]);
+
+        final restartedRepository = AttendanceRepository(
+          apiClient,
+          cache: cache,
+          draftStore: drafts,
+          scopeVersionStore: versions,
+        );
+        await expectLater(
+          restartedRepository.assertTeacherAttendanceScopeReadableOffline(),
+          throwsA(isA<CacheException>()),
+        );
       },
     );
 
@@ -1265,6 +1314,68 @@ void main() {
       expect(rotatedDraft.receiptState, AttendanceDraftReceiptState.local);
       expect(rotatedDraft.entries.single.status, AttendanceStatus.late);
     });
+
+    test(
+      'turns an assignment-revocation receipt into a permission denial',
+      () async {
+        const classSection = TeacherClassSection(
+          id: 'year-1:class-1:section-1',
+          academicYearId: 'year-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          name: 'Grade 3 - A',
+          subject: 'Mathematics',
+        );
+        final date = DateTime(2026, 6, 2);
+        const draftEntries = [
+          AttendanceStudentEntry(
+            studentId: 'student-1',
+            studentName: 'Asha Sharma',
+            rollNumber: '7',
+            status: AttendanceStatus.absent,
+          ),
+        ];
+        when(
+          () => apiClient.post<dynamic>(
+            '/mobile/teacher/attendance/sync',
+            data: any(named: 'data'),
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(
+              path: '/mobile/teacher/attendance/sync',
+            ),
+            data: {
+              'syncStatus': 'REJECTED',
+              'replayed': false,
+              'rejectionReason': 'UNASSIGNED_TEACHER',
+            },
+          ),
+        );
+        final draft = await repository.saveDraftAttendanceLocally(
+          classSection.id,
+          date,
+          draftEntries,
+        );
+
+        await expectLater(
+          repository.submitAttendance(
+            classSection,
+            date,
+            draftEntries,
+            draft.clientSubmissionId,
+            draft.savedAt,
+          ),
+          throwsA(
+            isA<PermissionException>().having(
+              (error) => error.code,
+              'code',
+              'TEACHER_SCOPE_DENIED',
+            ),
+          ),
+        );
+      },
+    );
 
     test('keeps the secure draft while a 2xx receipt is PROCESSING', () async {
       const classSection = TeacherClassSection(

@@ -1,5 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { AttendanceSyncStatus } from '@prisma/client';
+import {
+  AttendanceSyncRejectionReason,
+  AttendanceSyncStatus,
+} from '@prisma/client';
 
 export class MobileTeacherAttendanceSyncReceiptDto {
   @ApiProperty({ maxLength: 128 })
@@ -16,6 +19,13 @@ export class MobileTeacherAttendanceSyncReceiptDto {
 
   @ApiProperty()
   replayed!: boolean;
+
+  @ApiProperty({
+    enum: AttendanceSyncRejectionReason,
+    enumName: 'AttendanceSyncRejectionReason',
+    nullable: true,
+  })
+  rejectionReason!: AttendanceSyncRejectionReason | null;
 
   @ApiProperty({ format: 'date-time' })
   serverReceivedAt!: string;

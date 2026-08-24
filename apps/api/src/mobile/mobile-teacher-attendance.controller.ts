@@ -93,6 +93,7 @@ export class MobileTeacherAttendanceController {
       conflictId: result.conflictId,
       syncStatus: result.syncStatus,
       replayed: result.replayed,
+      rejectionReason: result.rejectionReason,
       serverReceivedAt: result.serverReceivedAt,
     };
   }

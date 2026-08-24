@@ -135,6 +135,16 @@ class AttendanceRepository {
   }) async {
     var failed = false;
 
+    // Persist the denial/quarantine marker before touching either data store.
+    // A process kill between the two purges must leave the next offline launch
+    // blocked even if one of the old attendance stores still contains data.
+    if (clearVersion && quarantine) {
+      try {
+        await dependencies.scopeVersionStore.quarantine(clearVersion: true);
+      } catch (_) {
+        failed = true;
+      }
+    }
     try {
       await dependencies.cache.clearTeacherAttendanceScopeStrict();
     } catch (_) {
@@ -145,13 +155,9 @@ class AttendanceRepository {
     } catch (_) {
       failed = true;
     }
-    if (clearVersion) {
+    if (clearVersion && !quarantine) {
       try {
-        if (quarantine) {
-          await dependencies.scopeVersionStore.quarantine(clearVersion: true);
-        } else {
-          await dependencies.scopeVersionStore.clear();
-        }
+        await dependencies.scopeVersionStore.clear();
       } catch (_) {
         failed = true;
       }
