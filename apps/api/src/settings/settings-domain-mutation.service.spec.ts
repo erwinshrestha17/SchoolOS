@@ -42,41 +42,69 @@ function buildService(options?: {
   prior?: { resourceId: string; after: unknown } | null;
   after?: TenantSettingSummary[];
 }) {
+  interface AuditCreateInput {
+    data: {
+      tenantId: string;
+      userId: string;
+      action: string;
+      resource: string;
+      resourceId: string;
+      requestId: string;
+      before: { changedKeys: string[]; [key: string]: unknown };
+      after: {
+        changedKeys: string[];
+        reason: string;
+        [key: string]: unknown;
+      };
+    };
+  }
+  interface TenantSettingFindManyInput {
+    where?: { tenantId?: string };
+  }
+  let createdAudit: AuditCreateInput | null = null;
   const beforeRows = existing.map((item) => ({
     ...item,
     updatedAt: new Date(item.updatedAt),
   }));
-  const afterRows = (options?.after ?? [
-    {
-      ...existing[0],
-      value: 'REC-',
-      updatedAt: '2026-08-22T01:00:00.000Z',
-    },
-    existing[1],
-  ]).map((item) => ({ ...item, updatedAt: new Date(item.updatedAt) }));
+  const afterRows = (
+    options?.after ?? [
+      {
+        ...existing[0],
+        value: 'REC-',
+        updatedAt: '2026-08-22T01:00:00.000Z',
+      },
+      existing[1],
+    ]
+  ).map((item) => ({ ...item, updatedAt: new Date(item.updatedAt) }));
+  const findMany = jest
+    .fn((input: TenantSettingFindManyInput) => {
+      void input;
+      return Promise.resolve(beforeRows);
+    })
+    .mockResolvedValueOnce(beforeRows)
+    .mockResolvedValueOnce(afterRows);
   const tx = {
     $executeRaw: jest.fn().mockResolvedValue(1),
     auditLog: {
       findFirst: jest.fn().mockResolvedValue(options?.prior ?? null),
-      create: jest.fn().mockResolvedValue({}),
+      create: jest.fn((input: AuditCreateInput) => {
+        createdAudit = input;
+        return Promise.resolve({});
+      }),
     },
     tenantSetting: {
-      findMany: jest
-        .fn()
-        .mockResolvedValueOnce(beforeRows)
-        .mockResolvedValueOnce(afterRows),
+      findMany,
       upsert: jest.fn().mockResolvedValue({}),
     },
   };
   const prisma = {
-    $transaction: jest.fn(async (work: (client: typeof tx) => unknown) =>
-      work(tx),
-    ),
+    $transaction: jest.fn((work: (client: typeof tx) => unknown) => work(tx)),
   };
   return {
     service: new SettingsDomainMutationService(prisma as never),
     prisma,
     tx,
+    createdAudit: () => createdAudit,
   };
 }
 
@@ -105,17 +133,16 @@ describe('SettingsDomainMutationService', () => {
     await expect(
       service.updateDomain(
         'finance',
-        { ...payload, changes: [{ key: 'default_notice_channel', value: 'SMS' }] },
+        {
+          ...payload,
+          changes: [{ key: 'default_notice_channel', value: 'SMS' }],
+        },
         auth(['settings:read', 'settings:finance:manage']),
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
 
     await expect(
-      service.updateDomain(
-        'finance',
-        payload,
-        auth(['settings:read']),
-      ),
+      service.updateDomain('finance', payload, auth(['settings:read'])),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
@@ -140,11 +167,8 @@ describe('SettingsDomainMutationService', () => {
       auth(['settings:read', 'settings:finance:manage']),
     );
 
-    expect(tx.tenantSetting.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ tenantId: 'tenant-1' }),
-      }),
-    );
+    const firstFindManyCall = tx.tenantSetting.findMany.mock.calls[0]?.[0];
+    expect(firstFindManyCall?.where?.tenantId).toBe('tenant-1');
     expect(tx.tenantSetting.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
@@ -156,22 +180,21 @@ describe('SettingsDomainMutationService', () => {
       }),
     );
     expect(tx.auditLog.create).toHaveBeenCalledTimes(1);
-    expect(tx.auditLog.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        tenantId: 'tenant-1',
-        userId: 'owner-1',
-        action: 'settings_domain_updated',
-        resource: 'settings_domain',
-        resourceId: 'finance',
-        requestId: payload.idempotencyKey,
-        before: expect.objectContaining({
-          changedKeys: ['receipt_number_prefix'],
-        }),
-        after: expect.objectContaining({
-          changedKeys: ['receipt_number_prefix'],
-          reason: payload.reason,
-        }),
-      }),
+    const auditCall = tx.auditLog.create.mock.calls[0]?.[0];
+    expect(auditCall?.data).toMatchObject({
+      tenantId: 'tenant-1',
+      userId: 'owner-1',
+      action: 'settings_domain_updated',
+      resource: 'settings_domain',
+      resourceId: 'finance',
+      requestId: payload.idempotencyKey,
+      before: {
+        changedKeys: ['receipt_number_prefix'],
+      },
+      after: {
+        changedKeys: ['receipt_number_prefix'],
+        reason: payload.reason,
+      },
     });
     expect(result).toMatchObject({
       success: true,
@@ -182,14 +205,20 @@ describe('SettingsDomainMutationService', () => {
   });
 
   it('replays a committed idempotency key without performing duplicate writes', async () => {
+    const initial = buildService();
+    await initial.service.updateDomain(
+      'finance',
+      payload,
+      auth(['settings:read', 'settings:finance:manage']),
+    );
+    const committed = initial.createdAudit();
+    expect(committed).not.toBeNull();
+    if (!committed) throw new Error('Expected a committed settings audit row');
+
     const { service, tx } = buildService({
       prior: {
         resourceId: 'finance',
-        after: {
-          version: 'receipt_number_prefix@2026-08-22T01:00:00.000Z',
-          changedKeys: ['receipt_number_prefix'],
-          reason: payload.reason,
-        },
+        after: committed.data.after,
       },
     });
     const result = await service.updateDomain(
@@ -202,4 +231,59 @@ describe('SettingsDomainMutationService', () => {
     expect(tx.tenantSetting.upsert).not.toHaveBeenCalled();
     expect(tx.auditLog.create).not.toHaveBeenCalled();
   });
+
+  it.each([
+    {
+      changedPart: 'reason',
+      replayPayload: {
+        ...payload,
+        reason: 'A materially different settings update',
+      },
+    },
+    {
+      changedPart: 'setting value',
+      replayPayload: {
+        ...payload,
+        changes: [{ key: 'receipt_number_prefix', value: 'ALT-' }],
+      },
+    },
+    {
+      changedPart: 'expected version',
+      replayPayload: {
+        ...payload,
+        expectedVersion: 'receipt_number_prefix@2099-01-01T00:00:00.000Z',
+      },
+    },
+  ])(
+    'rejects reuse of an idempotency key with a different $changedPart',
+    async ({ replayPayload }) => {
+      const initial = buildService();
+      await initial.service.updateDomain(
+        'finance',
+        payload,
+        auth(['settings:read', 'settings:finance:manage']),
+      );
+      const committed = initial.createdAudit();
+      expect(committed).not.toBeNull();
+      if (!committed)
+        throw new Error('Expected a committed settings audit row');
+      const replay = buildService({
+        prior: {
+          resourceId: 'finance',
+          after: committed.data.after,
+        },
+      });
+
+      await expect(
+        replay.service.updateDomain(
+          'finance',
+          replayPayload,
+          auth(['settings:read', 'settings:finance:manage']),
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(replay.tx.tenantSetting.findMany).not.toHaveBeenCalled();
+      expect(replay.tx.tenantSetting.upsert).not.toHaveBeenCalled();
+      expect(replay.tx.auditLog.create).not.toHaveBeenCalled();
+    },
+  );
 });

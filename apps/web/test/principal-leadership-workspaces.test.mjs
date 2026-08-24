@@ -12,6 +12,7 @@ const summaryStrip = read('components/dashboard/dashboard-summary-strip.tsx');
 const readiness = read('components/dashboard/dashboard-readiness-section.tsx');
 const principalSummary = read('components/principal/principal-summary-workspace.tsx');
 const approvals = read('app/dashboard/approvals/page.tsx');
+const advancedOperationsApi = read('lib/api/advanced-operations.ts');
 const attention = read('app/dashboard/attention/page.tsx');
 const operations = read('app/dashboard/operations/overview/page.tsx');
 
@@ -34,13 +35,13 @@ describe('Principal leadership workspaces', () => {
   });
 
   it('keeps Principal readiness inside the server projection and permission-gates timetable navigation', () => {
-    for (const module of [
+    for (const moduleKey of [
       'm4_academics',
       'm11_accounting',
       'm7_hr_payroll',
       'm10_communications',
     ]) {
-      assert.match(readiness, new RegExp(`"${module}"`));
+      assert.match(readiness, new RegExp(`"${moduleKey}"`));
     }
     assert.match(readiness, /persona !== "principal" \|\| PRINCIPAL_READINESS_MODULES\.has/);
     assert.match(readiness, /useHasPermission\("timetable:read_published"\)/);
@@ -51,15 +52,29 @@ describe('Principal leadership workspaces', () => {
     assert.match(principalSummary, /summary\.status === "locked"/);
     assert.match(principalSummary, /summary\.status === "permissionDenied"/);
     assert.match(principalSummary, /summary\.status === "partial"/);
+    assert.match(principalSummary, /variant="spinner"/);
+    assert.match(principalSummary, /label=\{`Loading \$\{definition\.moduleName/);
+    assert.doesNotMatch(principalSummary, /variant="skeleton"/);
     assert.doesNotMatch(principalSummary, /POST|PUT|PATCH|DELETE/);
   });
 
   it('uses the audited advanced approval workflow with confirmation and idempotency', () => {
-    assert.match(approvals, /api\.listApprovalRequests/);
+    assert.match(approvals, /useInfiniteQuery/);
+    assert.match(approvals, /api\.listPrincipalApprovalQueue/);
+    assert.match(approvals, /getNextPageParam/);
+    assert.doesNotMatch(approvals, /api\.listApprovalRequests/);
+    assert.match(
+      advancedOperationsApi,
+      /\/advanced\/approvals\/principal\/queue/,
+    );
     assert.match(approvals, /api\.decideApprovalRequest/);
     assert.match(approvals, /crypto\.randomUUID\(\)/);
-    assert.match(approvals, /Confirm approval/);
-    assert.match(approvals, /Confirm rejection/);
+    assert.match(approvals, /setConfirmDecision\("APPROVE"\)/);
+    assert.match(approvals, /setConfirmDecision\("REJECT"\)/);
+    assert.match(
+      approvals,
+      /Confirm \{confirmDecision === "APPROVE" \? "approval" : "rejection"\}/,
+    );
     assert.match(approvals, /Rejection reason is required/);
   });
 

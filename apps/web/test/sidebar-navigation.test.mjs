@@ -313,7 +313,7 @@ describe('persona sidebar contracts', () => {
     assert.match(principalSlice, /label: 'Reports & Audit'/);
   });
 
-  it('keeps Principal Settings capability-driven rather than hard-denied by persona name', () => {
+  it('keeps institutional Settings out of the Principal leadership-only shell', () => {
     const settingsStart = personaNavEntry.indexOf(
       'export function shouldShowSettingsHub',
     );
@@ -322,9 +322,16 @@ describe('persona sidebar contracts', () => {
       settingsStart,
     );
     const settingsSlice = personaNavEntry.slice(settingsStart, settingsEnd);
+    assert.match(
+      settingsSlice,
+      /const principalLeadershipOnly = \['principal'\]\.includes\(persona\)/,
+    );
+    assert.match(
+      settingsSlice,
+      /isTeacherPersona \|\| personalOnly \|\| principalLeadershipOnly/,
+    );
     assert.match(settingsSlice, /settingsCaps\.institutionalNavEnabled/);
     assert.match(settingsSlice, /settingsCaps\.canAccessInstitutionalSettings/);
-    assert.doesNotMatch(settingsSlice, /persona === 'principal'/);
   });
 
   it('accountant nav includes cashier close, reconciliation, and module postings', () => {

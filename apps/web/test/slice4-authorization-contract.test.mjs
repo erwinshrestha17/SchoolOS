@@ -151,6 +151,13 @@ describe('Slice 4 institutional settings hub visibility', () => {
     assert.match(sidebar, /useSettingsCapabilities/);
     assert.match(sidebar, /shouldShowSettingsHub\([\s\S]*schoolWebPersona/);
     assert.match(palette, /shouldShowSettingsHub\([\s\S]*schoolWebPersona/);
-    assert.match(personaNavConfig, /persona === 'principal'/);
+    assert.match(
+      personaNavConfig,
+      /const principalLeadershipOnly = \['principal'\]\.includes\(persona\)/,
+    );
+    assert.match(
+      personaNavConfig,
+      /isTeacherPersona \|\| personalOnly \|\| principalLeadershipOnly/,
+    );
   });
 });

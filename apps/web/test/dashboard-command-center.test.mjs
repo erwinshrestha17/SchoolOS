@@ -186,9 +186,14 @@ describe('principal dashboard command center', () => {
     const page = read('app/dashboard/page.tsx');
 
     assert.match(page, /title: "Operations Dashboard"/);
-    assert.match(page, /title: "Executive Dashboard"/);
+    assert.match(page, /title: "Principal Home"/);
+    assert.match(page, /eyebrow: "School leadership"/);
+    assert.doesNotMatch(page, /title: "Executive Dashboard"/);
     assert.match(page, /Review \$\{attentionCount\} attention item/);
-    assert.match(page, /href: "#needs-attention"/);
+    assert.match(
+      page,
+      /compositionPersona === "principal"\s*\? "\/dashboard\/attention"\s*: "#needs-attention"/,
+    );
     assert.match(page, /firstNextAction/);
     assert.doesNotMatch(page, /primaryAction=\{\s*<RefreshSummaryButton/);
     // Secondary actions stay in the shared More Actions menu.

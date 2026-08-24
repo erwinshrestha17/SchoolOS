@@ -35,6 +35,7 @@ type ProfileHeaderProps = {
   canManageDocuments: boolean;
   canViewQr: boolean;
   canManageLifecycle: boolean;
+  isSupportOverride: boolean;
   onEdit: () => void;
   onOpenIdCard: () => void;
   onSelectTab: (tab: StudentProfileTabShortcut) => void;
@@ -53,6 +54,7 @@ export function ProfileHeader({
   canManageDocuments,
   canViewQr,
   canManageLifecycle,
+  isSupportOverride,
   onEdit,
   onOpenIdCard,
   onSelectTab,
@@ -74,12 +76,14 @@ export function ProfileHeader({
   const className = formatClassLabel(student.className ?? student.class?.name);
   const sectionName =
     student.sectionName ?? student.section ?? 'Section not assigned';
-  const supportNoteExists = Boolean(
-    student.medicalConditions ||
-    student.severeAllergies ||
-    student.medications ||
-    student.specialNeeds,
-  );
+  const supportNoteExists =
+    !isSupportOverride &&
+    Boolean(
+      student.medicalConditions ||
+      student.severeAllergies ||
+      student.medications ||
+      student.specialNeeds,
+    );
   const hasOutstandingFees = Boolean(
     feeClearance && !feeClearance.cleared && feeClearance.outstandingAmount > 0,
   );
@@ -234,7 +238,9 @@ export function ProfileHeader({
             </button>
           ) : (
             <p className="max-w-60 rounded-xl bg-slate-50 px-4 py-3 text-xs font-semibold leading-5 text-slate-600">
-              Profile changes require authorized student records staff.
+              {isSupportOverride
+                ? 'Read-only support view. Protected records and change actions remain unavailable.'
+                : 'Profile changes require authorized student records staff.'}
             </p>
           )}
           {hasProfileActions ? (

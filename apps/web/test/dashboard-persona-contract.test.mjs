@@ -37,13 +37,14 @@ describe('admin and principal dashboard separation', () => {
     assert.match(page, /assertServerDashboardProjection/);
   });
 
-  it('uses distinct executive and operations headings for principal and admin', () => {
+  it('uses distinct leadership and operations headings for principal and admin', () => {
     const page = read('app/dashboard/page.tsx');
 
-    assert.match(page, /title: "Executive Dashboard"/);
+    assert.match(page, /title: "Principal Home"/);
     assert.match(page, /title: "Operations Dashboard"/);
-    assert.match(page, /eyebrow: "Executive oversight"/);
+    assert.match(page, /eyebrow: "School leadership"/);
     assert.match(page, /eyebrow: "School operations"/);
+    assert.doesNotMatch(page, /title: "Executive Dashboard"/);
   });
 
   it('scopes operations and readiness panels by persona', () => {
@@ -55,6 +56,9 @@ describe('admin and principal dashboard separation', () => {
     assert.match(operations, /Operations oversight/);
     assert.match(readiness, /shouldShowReadinessPanel/);
     assert.match(summary, /includeFees = persona === "admin" \|\| persona === "accountant"/);
-    assert.match(summary, /includeStaff = persona === "admin" \|\| persona === "hr"/);
+    assert.match(
+      summary,
+      /includeStaff =\s*persona === "admin" \|\| persona === "hr" \|\| persona === "principal"/,
+    );
   });
 });

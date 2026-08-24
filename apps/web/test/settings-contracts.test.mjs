@@ -16,13 +16,23 @@ describe('SchoolOS Settings Page Contracts', () => {
     const frame = read('components/settings/settings-route-frame.tsx');
     const sidebar = read('components/layout/sidebar.tsx');
     const personaNav = read('components/layout/sidebar-persona-nav.config.ts');
+    const personaNavBase = read(
+      'components/layout/sidebar-persona-nav.base.ts',
+    );
 
     assert.ok(page.length < 600, 'settings index must stay a thin page');
     assert.match(frame, /SettingsControlCenter/);
     assert.match(frame, /getSchoolSettingsNavigation/);
     assert.doesNotMatch(page, /SETTINGS_SECTIONS|SettingsSidebar|UnsavedBar/);
+    assert.match(
+      personaNav,
+      /export \* from ['"]\.\/sidebar-persona-nav\.base['"]/,
+      'the role-aware wrapper must re-export the shared navigation catalog',
+    );
     assert.equal(
-      personaNav.match(/href: ['"]\/dashboard\/settings['"]/g)?.length,
+      `${personaNav}\n${personaNavBase}`.match(
+        /href: ['"]\/dashboard\/settings['"]/g,
+      )?.length,
       1,
       'the global sidebar must contain one Settings destination',
     );

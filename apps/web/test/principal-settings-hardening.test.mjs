@@ -60,7 +60,13 @@ describe('Principal Settings hardening', () => {
     const navigation = read('components/settings/settings-navigation.config.ts');
     for (const id of backendSettingsItemIds) {
       const hasDefinition = navigation.includes(`backendItemId: '${id}'`);
-      const hasDisposition = navigation.includes(`'${id}':`);
+      const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const dispositionKey = /^[A-Za-z_$][\w$]*$/.test(id)
+        ? `(?:${escapedId}|['"]${escapedId}['"])`
+        : `['"]${escapedId}['"]`;
+      const hasDisposition = new RegExp(`${dispositionKey}\\s*:`).test(
+        navigation,
+      );
       assert.ok(
         hasDefinition || hasDisposition,
         `Backend Settings item ${id} must have frontend metadata or an explicit disposition`,

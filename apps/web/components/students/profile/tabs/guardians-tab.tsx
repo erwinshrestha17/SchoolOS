@@ -126,22 +126,22 @@ export function GuardiansTab({
   onCreateGuardian,
 }: GuardiansTabProps) {
   const { session, hasPermissions } = useSession();
-  const canCreate = hasPermissions(["guardians:create"]);
-  const canUpdate = hasPermissions(["guardians:update"]);
-  const canVerify = hasPermissions(["guardians:verify"]);
-  const canAdministerRecovery = hasPermissions([
-    "guardians:update",
-    "guardians:verify",
-    "users:reset_password",
-  ]);
-  const canProvisionAccount = hasPermissions([
-    "guardians:update",
-    "guardians:verify",
-    "users:create",
-  ]);
+  const isSupportOverride = session?.user.isSupportOverride === true;
+  const canCreate = !isSupportOverride && hasPermissions(["guardians:create"]);
+  const canUpdate = !isSupportOverride && hasPermissions(["guardians:update"]);
+  const canVerify = !isSupportOverride && hasPermissions(["guardians:verify"]);
+  const canAdministerRecovery =
+    !isSupportOverride &&
+    hasPermissions([
+      "guardians:update",
+      "guardians:verify",
+      "users:reset_password",
+    ]);
+  const canProvisionAccount =
+    !isSupportOverride &&
+    hasPermissions(["guardians:update", "guardians:verify", "users:create"]);
   const canViewAccessAdministration =
-    session?.user.isSupportOverride !== true &&
-    (canAdministerRecovery || canProvisionAccount || canVerify);
+    canAdministerRecovery || canProvisionAccount || canVerify;
   const sortedGuardians = [...guardians].sort(
     (a, b) =>
       guardianStatusOrder(a.status) - guardianStatusOrder(b.status) ||

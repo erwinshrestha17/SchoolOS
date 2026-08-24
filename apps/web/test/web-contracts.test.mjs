@@ -875,7 +875,10 @@ describe('SchoolOS web production contracts', () => {
 
   it('keeps Phase 1 pilot navigation permission-gated and prominent', () => {
     const sidebar = read('components/layout/sidebar.tsx');
-    const personaNav = read('components/layout/sidebar-persona-nav.config.ts');
+    const personaNav = [
+      read('components/layout/sidebar-persona-nav.config.ts'),
+      read('components/layout/sidebar-persona-nav.base.ts'),
+    ].join('\n');
     const requiredPhaseOneLabels = [
       'Students',
       'Admissions',
@@ -2851,7 +2854,10 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('provides a dedicated HR & Payroll workspace with contract and leave management', () => {
-    const personaNav = read('components/layout/sidebar-persona-nav.config.ts');
+    const personaNav = [
+      read('components/layout/sidebar-persona-nav.config.ts'),
+      read('components/layout/sidebar-persona-nav.base.ts'),
+    ].join('\n');
     const hrWorkspace = read('components/hr/hr-workspace.tsx');
     const hrOverview = read('components/hr/hr-overview.tsx');
     const contractList = read('components/hr/contract-list.tsx');

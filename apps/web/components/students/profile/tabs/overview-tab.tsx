@@ -55,11 +55,15 @@ type StudentLifecycleTimelineItem = {
 export function OverviewTab({ profile, onSelectTab }: OverviewTabProps) {
   const { session, hasPermissions } = useSession();
   const studentId = profile.student.id;
-  const canViewAttendance = hasPermissions(['attendance:read']);
-  const canViewFees = hasPermissions(['fees:read']);
-  const canManageDocuments = hasPermissions(['student_documents:manage']);
-  const canViewQr = hasPermissions(['students:qr:read']);
-  const canViewActivity = session?.user.isSupportOverride !== true;
+  const isSupportOverride = session?.user.isSupportOverride === true;
+  const canViewAttendance =
+    !isSupportOverride && hasPermissions(['attendance:read']);
+  const canViewFees = !isSupportOverride && hasPermissions(['fees:read']);
+  const canManageDocuments =
+    !isSupportOverride && hasPermissions(['student_documents:manage']);
+  const canViewQr =
+    !isSupportOverride && hasPermissions(['students:qr:read']);
+  const canViewActivity = !isSupportOverride;
   const primaryGuardian =
     profile.guardians.find((guardian) => guardian.isPrimary) ??
     profile.guardians[0];
@@ -141,6 +145,14 @@ export function OverviewTab({ profile, onSelectTab }: OverviewTabProps) {
               {attentionItems.map((item) => (
                 <AttentionCard key={item.key} item={item} />
               ))}
+            </div>
+          ) : isSupportOverride ? (
+            <div className="rounded-2xl border border-info-100 bg-info-50 p-4 text-info-800">
+              <p className="text-sm font-bold">Scoped support projection</p>
+              <p className="mt-1 text-xs font-medium leading-5">
+                Fee, document, attendance, identity, health, and activity checks
+                are not included in this student-record support view.
+              </p>
             </div>
           ) : (
             <div className="flex items-start gap-3 rounded-2xl border border-success-100 bg-success-50 p-4 text-success-800">

@@ -240,10 +240,18 @@ describe("structured read-only support override", () => {
     assert.match(attendance, /attendance\.canMark \?/);
     assert.match(attendance, /canManageAll \?/);
 
-    assert.match(students, /canEditStudents=\{canEditStudents\}/);
-    assert.match(students, /canManageStudentDocuments/);
-    assert.match(directory, /canEditStudents\s*\?/);
-    assert.match(directory, /canViewStudentFees\s*\?/);
+    assert.match(students, /const isSupportOverride =/);
+    assert.match(
+      students,
+      /canEditStudents =[\s\S]{0,100}!isSupportOverride && hasPermissions/,
+    );
+    assert.match(
+      students,
+      /canViewStudentFees =[\s\S]{0,140}!isSupportOverride &&/,
+    );
+    assert.match(directory, /!isSupportOverride && canViewStudentFees/);
+    assert.match(directory, /isSupportOverride=\{isSupportOverride\}/);
+    assert.match(directory, /active read-only support session/);
 
     assert.match(protectedFile, /blockedBySupportOverride/);
     assert.match(
@@ -257,10 +265,19 @@ describe("structured read-only support override", () => {
       /tab\.value !== ["']Documents["'] \|\| canManageDocuments/,
     );
     assert.match(
+      studentDetail,
+      /canViewAttendance =[\s\S]{0,100}!isSupportOverride && hasPermissions/,
+    );
+    assert.match(
+      studentDetail,
+      /canManageDocuments =[\s\S]{0,100}!isSupportOverride && hasPermissions/,
+    );
+    assert.match(
       studentHeader,
       /\.\.\.\(canViewFees \? \[collectFeeAction\] : \[\]\)/,
     );
     assert.match(studentHeader, /\.\.\.\(canManageDocuments/);
+    assert.match(studentHeader, /Read-only support view/);
     assert.match(
       studentOverview,
       /enabled: Boolean\(studentId\) && canViewFees/,
@@ -269,6 +286,14 @@ describe("structured read-only support override", () => {
       studentOverview,
       /enabled: Boolean\(studentId\) && canViewAttendance/,
     );
-    assert.match(guardiansTab, /session\?\.user\.isSupportOverride !== true/);
+    assert.match(studentOverview, /Scoped support projection/);
+    assert.match(
+      guardiansTab,
+      /canCreate =[\s\S]{0,100}!isSupportOverride && hasPermissions/,
+    );
+    assert.match(
+      guardiansTab,
+      /canUpdate =[\s\S]{0,100}!isSupportOverride && hasPermissions/,
+    );
   });
 });

@@ -5,7 +5,7 @@ import type {
   OperationalSummaryMetricValue,
   OperationalSummaryRouteModule,
 } from "@schoolos/core";
-import { useQueries } from "@tanstack/react-query";
+import { useQueries, type UseQueryResult } from "@tanstack/react-query";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { api } from "../../lib/api";
@@ -87,11 +87,16 @@ function PrincipalSummarySection({
   attentionHref,
 }: {
   definition: PrincipalSummaryDefinition;
-  query: ReturnType<typeof useQueries>[number];
+  query: UseQueryResult<OperationalModuleSummary, Error>;
   attentionHref: string | null;
 }) {
   if (query.isLoading) {
-    return <LoadingState variant="section" label={`Loading ${definition.moduleName.toLowerCase()} summary…`} />;
+    return (
+      <LoadingState
+        variant="spinner"
+        label={`Loading ${definition.moduleName.toLowerCase()} summary…`}
+      />
+    );
   }
 
   if (query.isError || !query.data) {

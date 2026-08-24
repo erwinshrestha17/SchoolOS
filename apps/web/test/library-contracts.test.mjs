@@ -25,7 +25,10 @@ describe('Phase 3B Library frontend contracts', () => {
   });
 
   it('enables Library and implemented operations modules in the dashboard sidebar', () => {
-    const personaNav = read('components/layout/sidebar-persona-nav.config.ts');
+    const personaNav = [
+      read('components/layout/sidebar-persona-nav.config.ts'),
+      read('components/layout/sidebar-persona-nav.base.ts'),
+    ].join('\n');
 
     assert.match(personaNav, /label: 'Library'/);
     assert.match(personaNav, /href: '\/dashboard\/library'/);

@@ -579,7 +579,7 @@ export function StudentDirectory({
                       View Profile
                       <ChevronRight className="ml-1 h-4 w-4" aria-hidden />
                     </Button>
-                    {canViewStudentFees ? (
+                    {!isSupportOverride && canViewStudentFees ? (
                       <Button
                         type="button"
                         variant="outline"
@@ -594,70 +594,73 @@ export function StudentDirectory({
                         Fees Ledger
                       </Button>
                     ) : null}
-                    <ActionMenu
-                      label={`Open actions for ${studentName}`}
-                      items={[
-                        ...(canEditStudents
-                          ? [
-                              {
-                                label: 'Edit Student',
-                                icon: <UserPlus size={14} />,
-                                onClick: () =>
-                                  router.push(
-                                    `/dashboard/students/${encodeURIComponent(student.id)}?edit=true`,
-                                  ),
-                              },
-                            ]
-                          : []),
-                        ...(canEditGuardians
-                          ? [
-                              {
-                                label: 'Edit Guardian',
-                                icon: <ContactRound size={14} />,
-                                onClick: () =>
-                                  router.push(
-                                    `/dashboard/students/${encodeURIComponent(student.id)}?tab=Guardians`,
-                                  ),
-                              },
-                            ]
-                          : []),
-                        ...(canManageStudentDocuments
-                          ? [
-                              {
-                                label: 'ID Card',
-                                icon: <FileText size={14} />,
-                                onClick: () => onOpenPdf(student.id, 'id-card'),
-                              },
-                            ]
-                          : []),
-                        {
-                          label: 'Documents',
-                          icon: <FolderOpen size={14} />,
-                          onClick: () =>
-                            router.push(
-                              `/dashboard/students/${encodeURIComponent(student.id)}?tab=Documents`,
-                            ),
-                        },
-                        {
-                          label: 'Attendance',
-                          icon: <BookOpenText size={14} />,
-                          onClick: () =>
-                            router.push(
-                              `/dashboard/students/${encodeURIComponent(student.id)}?tab=Attendance`,
-                            ),
-                        },
-                      ]}
-                      trigger={
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          aria-label={`More actions for ${studentName}`}
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      }
-                    />
+                    {!isSupportOverride ? (
+                      <ActionMenu
+                        label={`Open actions for ${studentName}`}
+                        items={[
+                          ...(canEditStudents
+                            ? [
+                                {
+                                  label: 'Edit Student',
+                                  icon: <UserPlus size={14} />,
+                                  onClick: () =>
+                                    router.push(
+                                      `/dashboard/students/${encodeURIComponent(student.id)}?edit=true`,
+                                    ),
+                                },
+                              ]
+                            : []),
+                          ...(canEditGuardians
+                            ? [
+                                {
+                                  label: 'Edit Guardian',
+                                  icon: <ContactRound size={14} />,
+                                  onClick: () =>
+                                    router.push(
+                                      `/dashboard/students/${encodeURIComponent(student.id)}?tab=Guardians`,
+                                    ),
+                                },
+                              ]
+                            : []),
+                          ...(canManageStudentDocuments
+                            ? [
+                                {
+                                  label: 'ID Card',
+                                  icon: <FileText size={14} />,
+                                  onClick: () =>
+                                    onOpenPdf(student.id, 'id-card'),
+                                },
+                              ]
+                            : []),
+                          {
+                            label: 'Documents',
+                            icon: <FolderOpen size={14} />,
+                            onClick: () =>
+                              router.push(
+                                `/dashboard/students/${encodeURIComponent(student.id)}?tab=Documents`,
+                              ),
+                          },
+                          {
+                            label: 'Attendance',
+                            icon: <BookOpenText size={14} />,
+                            onClick: () =>
+                              router.push(
+                                `/dashboard/students/${encodeURIComponent(student.id)}?tab=Attendance`,
+                              ),
+                          },
+                        ]}
+                        trigger={
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            aria-label={`More actions for ${studentName}`}
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        }
+                      />
+                    ) : null}
                   </div>
                 </div>
               );
@@ -727,6 +730,7 @@ export function StudentDirectory({
             admission={admissionBySystemId.get(selectedStudent.studentSystemId)}
             onOpenPdf={onOpenPdf}
             canManageStudentDocuments={canManageStudentDocuments}
+            isSupportOverride={isSupportOverride}
           />
         ) : null}
       </Drawer>
@@ -739,11 +743,13 @@ function StudentInspector({
   admission,
   onOpenPdf,
   canManageStudentDocuments,
+  isSupportOverride,
 }: {
   student: StudentProfile;
   admission?: AdmissionSummary;
   onOpenPdf: (studentId: string, kind: string) => void;
   canManageStudentDocuments: boolean;
+  isSupportOverride: boolean;
 }) {
   const router = useRouter();
   const name = getStudentName(student, admission);
@@ -817,57 +823,73 @@ function StudentInspector({
           <p className="mt-3 text-sm text-slate-500">No guardian linked.</p>
         )}
       </section>
-      <section className="border-t border-slate-100 pt-4">
-        <div className="flex items-center justify-between">
-          <h4 className="text-xs font-black uppercase tracking-wide text-slate-500">
-            Document Checklist
-          </h4>
-          <span className="text-xs font-bold text-slate-400">Open profile</span>
-        </div>
-        <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
-          Open the protected document workspace for the current checklist.
-        </p>
-        <Link
-          href={`/dashboard/admissions/documents?student=${encodeURIComponent(student.id)}`}
-          className="mt-3 inline-flex text-xs font-bold text-[var(--color-mod-admissions-text)]"
-        >
-          Review documents
-        </Link>
-      </section>
-      <section className="border-t border-slate-100 pt-4">
-        <div className="flex items-center justify-between">
-          <h4 className="text-xs font-black uppercase tracking-wide text-slate-500">
-            QR / ID Card
-          </h4>
-          <StatusBadge
-            status={student.qrCredential?.status ?? 'NOT_GENERATED'}
-            tone={
-              student.qrCredential?.status === 'ACTIVE' ? 'active' : 'inactive'
-            }
-          />
-        </div>
-        <div className="mt-4 flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
-          <QrCode className="h-12 w-12 text-slate-400" aria-hidden />
-          <div>
-            <p className="text-xs font-bold text-slate-800">
-              Secure QR credential
+      {isSupportOverride ? (
+        <section className="border-t border-slate-100 pt-4">
+          <p className="rounded-xl border border-info-100 bg-info-50 p-3 text-xs font-medium leading-5 text-info-700">
+            This inspector shows only the student-record projection approved for
+            the active read-only support session. Protected documents and
+            identity credentials remain unavailable.
+          </p>
+        </section>
+      ) : (
+        <>
+          <section className="border-t border-slate-100 pt-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-black uppercase tracking-wide text-slate-500">
+                Document Checklist
+              </h4>
+              <span className="text-xs font-bold text-slate-400">
+                Open profile
+              </span>
+            </div>
+            <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
+              Open the protected document workspace for the current checklist.
             </p>
-            <p className="mt-1 text-[0.68rem] text-slate-500">
-              QR security details stay protected.
-            </p>
-          </div>
-        </div>
-        {canManageStudentDocuments ? (
-          <Button
-            type="button"
-            variant="outline"
-            className="mt-3 w-full"
-            onClick={() => onOpenPdf(student.id, 'id-card')}
-          >
-            View / Print ID Card
-          </Button>
-        ) : null}
-      </section>
+            <Link
+              href={`/dashboard/admissions/documents?student=${encodeURIComponent(student.id)}`}
+              className="mt-3 inline-flex text-xs font-bold text-[var(--color-mod-admissions-text)]"
+            >
+              Review documents
+            </Link>
+          </section>
+          <section className="border-t border-slate-100 pt-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-black uppercase tracking-wide text-slate-500">
+                QR / ID Card
+              </h4>
+              <StatusBadge
+                status={student.qrCredential?.status ?? 'NOT_GENERATED'}
+                tone={
+                  student.qrCredential?.status === 'ACTIVE'
+                    ? 'active'
+                    : 'inactive'
+                }
+              />
+            </div>
+            <div className="mt-4 flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
+              <QrCode className="h-12 w-12 text-slate-400" aria-hidden />
+              <div>
+                <p className="text-xs font-bold text-slate-800">
+                  Secure QR credential
+                </p>
+                <p className="mt-1 text-[0.68rem] text-slate-500">
+                  QR security details stay protected.
+                </p>
+              </div>
+            </div>
+            {canManageStudentDocuments ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-3 w-full"
+                onClick={() => onOpenPdf(student.id, 'id-card')}
+              >
+                View / Print ID Card
+              </Button>
+            ) : null}
+          </section>
+        </>
+      )}
     </div>
   );
 }

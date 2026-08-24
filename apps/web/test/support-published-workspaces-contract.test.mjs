@@ -69,7 +69,10 @@ describe('purpose-limited published support workspaces', () => {
 
   it('uses exact session-aware route gates and keeps setup subroutes broad-only', () => {
     const layout = readWeb('app/dashboard/layout.tsx');
-    const nav = readWeb('components/layout/sidebar-persona-nav.config.ts');
+    const nav = [
+      readWeb('components/layout/sidebar-persona-nav.config.ts'),
+      readWeb('components/layout/sidebar-persona-nav.base.ts'),
+    ].join('\n');
 
     assert.match(
       layout,

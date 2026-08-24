@@ -32,7 +32,10 @@ describe('Service requests Action Centre contracts', () => {
 
   it('registers Action Centre routes, navigation, and permission gates', () => {
     const layout = read('app/dashboard/layout.tsx');
-    const personaNav = read('components/layout/sidebar-persona-nav.config.ts');
+    const personaNav = [
+      read('components/layout/sidebar-persona-nav.config.ts'),
+      read('components/layout/sidebar-persona-nav.base.ts'),
+    ].join('\n');
     const listPage = read('app/dashboard/service-requests/page.tsx');
     const detailPage = read('app/dashboard/service-requests/[requestId]/page.tsx');
 

@@ -90,13 +90,17 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
   const searchParams = useSearchParams();
   const focusTarget = searchParams.get("focus");
   const { session, hasPermissions } = useSession();
-  const canEditStudent = hasPermissions(["students:update"]);
-  const canViewAttendance = hasPermissions(["attendance:read"]);
-  const canViewFees = hasPermissions(["fees:read"]);
-  const canManageDocuments = hasPermissions(["student_documents:manage"]);
-  const canViewQr = hasPermissions(["students:qr:read"]);
-  const canManageLifecycle = hasPermissions(["students:manage_lifecycle"]);
   const isSupportOverride = session?.user.isSupportOverride === true;
+  const canEditStudent =
+    !isSupportOverride && hasPermissions(["students:update"]);
+  const canViewAttendance =
+    !isSupportOverride && hasPermissions(["attendance:read"]);
+  const canViewFees = !isSupportOverride && hasPermissions(["fees:read"]);
+  const canManageDocuments =
+    !isSupportOverride && hasPermissions(["student_documents:manage"]);
+  const canViewQr = !isSupportOverride && hasPermissions(["students:qr:read"]);
+  const canManageLifecycle =
+    !isSupportOverride && hasPermissions(["students:manage_lifecycle"]);
   const { record: recordRecentlyViewed } = useRecentlyViewed();
 
   useEffect(() => {
@@ -308,6 +312,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
         canManageDocuments={canManageDocuments}
         canViewQr={canViewQr}
         canManageLifecycle={canManageLifecycle}
+        isSupportOverride={isSupportOverride}
         onEdit={() => setIsEditingStudent(true)}
         onOpenIdCard={() => void openStudentPdf("id-card")}
         onSelectTab={(tab) => setActiveDetailTab(tab)}

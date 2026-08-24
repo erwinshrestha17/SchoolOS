@@ -28,27 +28,32 @@ export default function StudentsPage() {
   const [pdfError, setPdfError] = useState('');
   const [isExportingIemis, setIsExportingIemis] = useState(false);
   const { hasPermissions, session } = useSession();
-  const canManageStudentLifecycle = hasPermissions([
-    'students:manage_lifecycle',
-  ]);
-  const canReadStudents = hasPermissions(['students:read']);
-  const canEditStudents = hasPermissions(['students:update']);
-  const canEditGuardians = hasPermissions(['guardians:update']);
-  const canManageStudentDocuments =
-    hasPermissions(['student_documents:manage']) &&
-    !session?.user.isSupportOverride;
-  const canViewStudentFees =
-    hasPermissions(['fees:manage']) ||
-    hasPermissions(['receipts:read']) ||
-    hasPermissions(['ledger:read']);
-  const canReadStudentQr = hasPermissions(['students:qr:read']);
-  const canExportStudents = hasPermissions(['reports:export']);
-  const canCreateAdmission = hasPermissions([
-    'enrollments:create',
-    'students:create',
-    'guardians:create',
-  ]);
   const isSupportOverride = session?.user.isSupportOverride === true;
+  const canManageStudentLifecycle =
+    !isSupportOverride && hasPermissions(['students:manage_lifecycle']);
+  const canReadStudents = hasPermissions(['students:read']);
+  const canEditStudents =
+    !isSupportOverride && hasPermissions(['students:update']);
+  const canEditGuardians =
+    !isSupportOverride && hasPermissions(['guardians:update']);
+  const canManageStudentDocuments =
+    !isSupportOverride && hasPermissions(['student_documents:manage']);
+  const canViewStudentFees =
+    !isSupportOverride &&
+    (hasPermissions(['fees:manage']) ||
+      hasPermissions(['receipts:read']) ||
+      hasPermissions(['ledger:read']));
+  const canReadStudentQr =
+    !isSupportOverride && hasPermissions(['students:qr:read']);
+  const canExportStudents =
+    !isSupportOverride && hasPermissions(['reports:export']);
+  const canCreateAdmission =
+    !isSupportOverride &&
+    hasPermissions([
+      'enrollments:create',
+      'students:create',
+      'guardians:create',
+    ]);
 
   // URL-backed so refreshing, using browser back/forward, or sharing a link
   // to a filtered roster (e.g. "Grade 6, Section A, page 2") preserves it.
@@ -201,8 +206,7 @@ export default function StudentsPage() {
                 {
                   label: 'Document issues',
                   icon: <FolderOpen size={16} />,
-                  onClick: () =>
-                    router.push('/dashboard/admissions/documents'),
+                  onClick: () => router.push('/dashboard/admissions/documents'),
                 },
                 ...(canManageStudentLifecycle
                   ? [
@@ -224,8 +228,7 @@ export default function StudentsPage() {
                       {
                         label: 'QR / ID cards',
                         icon: <QrCode size={16} />,
-                        onClick: () =>
-                          router.push('/dashboard/admissions/qr'),
+                        onClick: () => router.push('/dashboard/admissions/qr'),
                       },
                     ]
                   : []),

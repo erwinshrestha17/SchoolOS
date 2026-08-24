@@ -9,7 +9,10 @@ const read = (path) => readFileSync(join(webRoot, path), "utf8");
 
 describe("M1 Students and Admissions workspace navigation", () => {
   const sidebar = read("components/layout/sidebar.tsx");
-  const personaNav = read("components/layout/sidebar-persona-nav.config.ts");
+  const personaNav = [
+    read("components/layout/sidebar-persona-nav.config.ts"),
+    read("components/layout/sidebar-persona-nav.base.ts"),
+  ].join("\n");
   const studentsPage = read("app/dashboard/students/page.tsx");
   const admissionsPage = read("app/dashboard/admissions/page.tsx");
   const pageHeader = read("components/m1/m1-page-header.tsx");
