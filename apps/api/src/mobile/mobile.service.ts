@@ -169,6 +169,16 @@ interface ParentDigestSourceState {
   reason: string | null;
 }
 
+interface ParentNotificationStudentScope {
+  schoolCommunicationStudentIds: string[];
+  emergencyAlertStudentIds: string[];
+}
+
+const EMERGENCY_NOTIFICATION_SOURCE_FILTER = {
+  contains: 'emergency',
+  mode: 'insensitive' as const,
+};
+
 @Injectable()
 export class MobileService {
   constructor(
@@ -1032,13 +1042,13 @@ export class MobileService {
     query: { limit?: number; cursor?: string; unreadOnly?: boolean } = {},
     scopedStudentIds?: string[],
   ) {
-    const studentIds =
-      scopedStudentIds ?? (await this.getNotificationStudentScope(actor));
-    const childScoped = scopedStudentIds !== undefined;
+    const notificationScope = await this.getNotificationStudentScope(
+      actor,
+      scopedStudentIds,
+    );
     const visibility = this.parentNotificationVisibility(
       actor,
-      studentIds,
-      childScoped,
+      notificationScope,
     );
     const limit = Math.min(Math.max(query.limit ?? 30, 1), 100);
     const notifications = await this.prisma.notificationDelivery.findMany({
@@ -1142,8 +1152,7 @@ export class MobileService {
     return {
       unreadCount: await this.countUnreadNotifications(
         actor,
-        studentIds,
-        childScoped,
+        notificationScope,
       ),
       items,
       nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
@@ -1151,17 +1160,20 @@ export class MobileService {
   }
 
   async getNotificationUnreadCount(actor: AuthContext) {
-    const studentIds = await this.getNotificationStudentScope(actor);
+    const notificationScope = await this.getNotificationStudentScope(actor);
     return {
-      unreadCount: await this.countUnreadNotifications(actor, studentIds),
+      unreadCount: await this.countUnreadNotifications(
+        actor,
+        notificationScope,
+      ),
     };
   }
 
   async markAllNotificationsRead(actor: AuthContext) {
-    const studentIds = await this.getNotificationStudentScope(actor);
+    const notificationScope = await this.getNotificationStudentScope(actor);
     const unread = await this.prisma.notificationDelivery.findMany({
       where: {
-        ...this.parentNotificationVisibility(actor, studentIds),
+        ...this.parentNotificationVisibility(actor, notificationScope),
         readReceipts: {
           none: { tenantId: actor.tenantId, userId: actor.userId },
         },
@@ -1186,11 +1198,11 @@ export class MobileService {
   }
 
   async markNotificationRead(notificationId: string, actor: AuthContext) {
-    const studentIds = await this.getNotificationStudentScope(actor);
+    const notificationScope = await this.getNotificationStudentScope(actor);
     const notification = await this.prisma.notificationDelivery.findFirst({
       where: {
         id: notificationId,
-        ...this.parentNotificationVisibility(actor, studentIds),
+        ...this.parentNotificationVisibility(actor, notificationScope),
       },
       select: { id: true },
     });
@@ -1297,11 +1309,11 @@ export class MobileService {
     notificationId: string,
     actor: AuthContext,
   ) {
-    const studentIds = await this.getNotificationStudentScope(actor);
+    const notificationScope = await this.getNotificationStudentScope(actor);
     const notification = await this.prisma.notificationDelivery.findFirst({
       where: {
         id: notificationId,
-        ...this.parentNotificationVisibility(actor, studentIds),
+        ...this.parentNotificationVisibility(actor, notificationScope),
       },
       include: {
         readReceipts: {
@@ -3367,18 +3379,35 @@ export class MobileService {
 
   private parentNotificationVisibility(
     actor: AuthContext,
-    studentIds: string[],
-    childScoped = false,
-  ) {
-    void childScoped;
+    scope: ParentNotificationStudentScope,
+  ): Prisma.NotificationDeliveryWhereInput {
     return {
       tenantId: actor.tenantId,
       AND: [
         {
           OR: [
             { recipientUserId: actor.userId, studentId: null },
-            ...(studentIds.length > 0
-              ? [{ studentId: { in: studentIds } }]
+            ...(scope.schoolCommunicationStudentIds.length > 0
+              ? [
+                  {
+                    recipientUserId: actor.userId,
+                    studentId: {
+                      in: scope.schoolCommunicationStudentIds,
+                    },
+                    NOT: {
+                      sourceType: EMERGENCY_NOTIFICATION_SOURCE_FILTER,
+                    },
+                  },
+                ]
+              : []),
+            ...(scope.emergencyAlertStudentIds.length > 0
+              ? [
+                  {
+                    recipientUserId: actor.userId,
+                    studentId: { in: scope.emergencyAlertStudentIds },
+                    sourceType: EMERGENCY_NOTIFICATION_SOURCE_FILTER,
+                  },
+                ]
               : []),
           ],
         },
@@ -3394,12 +3423,11 @@ export class MobileService {
 
   private countUnreadNotifications(
     actor: AuthContext,
-    studentIds: string[],
-    childScoped = false,
+    scope: ParentNotificationStudentScope,
   ) {
     return this.prisma.notificationDelivery.count({
       where: {
-        ...this.parentNotificationVisibility(actor, studentIds, childScoped),
+        ...this.parentNotificationVisibility(actor, scope),
         readReceipts: {
           none: { tenantId: actor.tenantId, userId: actor.userId },
         },
@@ -3408,19 +3436,49 @@ export class MobileService {
   }
 
   /**
-   * Notification visibility is the union of "addressed to me" and "about one
-   * of my children". Only the second half is parent-specific, so a teacher or
-   * principal has a legitimate, non-empty answer here: their own deliveries.
-   * Resolving the child fan-out through `getAllowedStudentIds` made every
-   * notification route 403 for staff, which broke the unread count on the
-   * teacher dashboard. Non-parents simply get no child fan-out.
+   * Notification visibility is the union of direct global deliveries and
+   * direct child deliveries that remain authorized on this request. Child
+   * rows must match both the signed-in recipient and the relationship
+   * capability: ordinary communication uses SCHOOL_COMMUNICATE while an
+   * emergency source uses EMERGENCY_ALERT_RECEIVE. A requested dashboard child
+   * is intersected with those live sets rather than trusted as authority.
+   *
+   * Non-parents receive no child fan-out, preserving legitimate staff inboxes
+   * through their own direct global deliveries.
    */
-  private async getNotificationStudentScope(actor: AuthContext) {
+  private async getNotificationStudentScope(
+    actor: AuthContext,
+    requestedStudentIds?: string[],
+  ): Promise<ParentNotificationStudentScope> {
     if (!isParentOnly(actor)) {
-      return [];
+      return {
+        schoolCommunicationStudentIds: [],
+        emergencyAlertStudentIds: [],
+      };
     }
 
-    return this.getAllowedStudentIds(actor);
+    const [schoolCommunicationStudentIds, emergencyAlertStudentIds] =
+      await Promise.all([
+        this.getAllowedStudentIds(actor, GuardianCapability.SCHOOL_COMMUNICATE),
+        this.getAllowedStudentIds(
+          actor,
+          GuardianCapability.EMERGENCY_ALERT_RECEIVE,
+        ),
+      ]);
+
+    if (requestedStudentIds === undefined) {
+      return { schoolCommunicationStudentIds, emergencyAlertStudentIds };
+    }
+
+    const requested = new Set(requestedStudentIds);
+    return {
+      schoolCommunicationStudentIds: schoolCommunicationStudentIds.filter(
+        (studentId) => requested.has(studentId),
+      ),
+      emergencyAlertStudentIds: emergencyAlertStudentIds.filter((studentId) =>
+        requested.has(studentId),
+      ),
+    };
   }
 
   private async getAllowedStudentIds(

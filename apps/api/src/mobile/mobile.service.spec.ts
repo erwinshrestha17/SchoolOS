@@ -14,6 +14,57 @@ import { createPassThroughRequestCache } from '../../test/helpers/request-cache'
  */
 const ALL_GUARDIAN_CAPABILITIES = Object.values(GuardianCapability);
 
+const EMERGENCY_NOTIFICATION_SOURCE_FILTER = {
+  contains: 'emergency',
+  mode: 'insensitive',
+};
+
+function expectedNotificationRecipientScope(
+  userId: string,
+  schoolCommunicationStudentIds: string[] = [],
+  emergencyAlertStudentIds: string[] = [],
+) {
+  return [
+    { recipientUserId: userId, studentId: null },
+    ...(schoolCommunicationStudentIds.length > 0
+      ? [
+          {
+            recipientUserId: userId,
+            studentId: { in: schoolCommunicationStudentIds },
+            NOT: { sourceType: EMERGENCY_NOTIFICATION_SOURCE_FILTER },
+          },
+        ]
+      : []),
+    ...(emergencyAlertStudentIds.length > 0
+      ? [
+          {
+            recipientUserId: userId,
+            studentId: { in: emergencyAlertStudentIds },
+            sourceType: EMERGENCY_NOTIFICATION_SOURCE_FILTER,
+          },
+        ]
+      : []),
+  ];
+}
+
+interface NotificationVisibilityWhere {
+  AND: { OR?: unknown[] }[];
+}
+
+function notificationVisibilityWhere(
+  mock: jest.Mock,
+  callIndex = 0,
+): NotificationVisibilityWhere {
+  const calls = mock.mock.calls as unknown as {
+    where: NotificationVisibilityWhere;
+  }[][];
+  const query = calls[callIndex]?.[0];
+  if (!query) {
+    throw new Error(`Expected notification query call ${String(callIndex)}`);
+  }
+  return query.where;
+}
+
 describe('MobileService', () => {
   type MockModel<TMethods extends string> = Record<TMethods, jest.Mock>;
   interface MobileServicePrismaMock {
@@ -1418,10 +1469,11 @@ describe('MobileService', () => {
           tenantId: 'tenant-1',
           AND: [
             {
-              OR: [
-                { recipientUserId: 'parent-1', studentId: null },
-                { studentId: { in: ['student-1'] } },
-              ],
+              OR: expectedNotificationRecipientScope(
+                'parent-1',
+                ['student-1'],
+                ['student-1'],
+              ),
             },
             {
               OR: [
@@ -1470,7 +1522,7 @@ describe('MobileService', () => {
           tenantId: 'tenant-1',
           AND: [
             {
-              OR: [{ recipientUserId: 'parent-1', studentId: null }],
+              OR: expectedNotificationRecipientScope('parent-1'),
             },
             {
               OR: [
@@ -1484,7 +1536,172 @@ describe('MobileService', () => {
     );
   });
 
+  it("does not let recipient A see recipient B's delivery for the same child and requires live capabilities", async () => {
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [
+        {
+          studentId: 'student-communication',
+          guardianId: 'guardian-1',
+          capabilities: [GuardianCapability.SCHOOL_COMMUNICATE],
+        },
+        {
+          studentId: 'student-emergency',
+          guardianId: 'guardian-1',
+          capabilities: [GuardianCapability.EMERGENCY_ALERT_RECEIVE],
+        },
+        {
+          studentId: 'student-academics-only',
+          guardianId: 'guardian-1',
+          capabilities: [GuardianCapability.ACADEMICS_VIEW],
+        },
+      ],
+    });
+    prisma.notificationDelivery.findMany.mockResolvedValue([]);
+    prisma.notificationDelivery.count.mockResolvedValue(0);
+
+    await service.listNotifications(actor);
+
+    const recipientScope =
+      notificationVisibilityWhere(prisma.notificationDelivery.findMany).AND[0]
+        ?.OR ?? [];
+    expect(recipientScope).toEqual(
+      expectedNotificationRecipientScope(
+        'parent-1',
+        ['student-communication'],
+        ['student-emergency'],
+      ),
+    );
+    for (const branch of recipientScope) {
+      expect(branch).toEqual(
+        expect.objectContaining({ recipientUserId: 'parent-1' }),
+      );
+    }
+    expect(recipientScope).not.toContainEqual(
+      expect.objectContaining({ recipientUserId: 'parent-2' }),
+    );
+    expect(JSON.stringify(recipientScope)).not.toContain(
+      'student-academics-only',
+    );
+  });
+
+  it('intersects a dashboard child request with live communication and emergency scope', async () => {
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [
+        {
+          studentId: 'student-communication',
+          guardianId: 'guardian-1',
+          capabilities: [GuardianCapability.SCHOOL_COMMUNICATE],
+        },
+        {
+          studentId: 'student-emergency',
+          guardianId: 'guardian-1',
+          capabilities: [GuardianCapability.EMERGENCY_ALERT_RECEIVE],
+        },
+      ],
+    });
+    prisma.notificationDelivery.findMany.mockResolvedValue([]);
+    prisma.notificationDelivery.count.mockResolvedValue(0);
+
+    await service.listNotifications(actor, {}, [
+      'student-emergency',
+      'student-not-linked',
+    ]);
+
+    expect(
+      notificationVisibilityWhere(prisma.notificationDelivery.findMany).AND[0]
+        ?.OR,
+    ).toEqual(
+      expectedNotificationRecipientScope('parent-1', [], ['student-emergency']),
+    );
+  });
+
+  it('applies capability revocation to list, count, detail, read, and attachment paths on the next request', async () => {
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [
+        {
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          capabilities: [GuardianCapability.ACADEMICS_VIEW],
+        },
+      ],
+    });
+    prisma.notificationDelivery.findMany.mockResolvedValue([]);
+    prisma.notificationDelivery.count.mockResolvedValue(0);
+    prisma.notificationDelivery.findFirst.mockResolvedValue(null);
+
+    await service.listNotifications(actor);
+    await service.getNotificationUnreadCount(actor);
+    await service.markAllNotificationsRead(actor);
+    await expect(
+      service.markNotificationRead('delivery-other-guardian', actor),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      service.getNotificationDetail('delivery-other-guardian', actor),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      service.getNotificationAttachment('delivery-other-guardian', actor),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    const assertGlobalRecipientOnly = (where: NotificationVisibilityWhere) => {
+      expect(where.AND[0]?.OR).toEqual(
+        expectedNotificationRecipientScope('parent-1'),
+      );
+    };
+    for (
+      let callIndex = 0;
+      callIndex < prisma.notificationDelivery.findMany.mock.calls.length;
+      callIndex += 1
+    ) {
+      assertGlobalRecipientOnly(
+        notificationVisibilityWhere(
+          prisma.notificationDelivery.findMany,
+          callIndex,
+        ),
+      );
+    }
+    for (
+      let callIndex = 0;
+      callIndex < prisma.notificationDelivery.count.mock.calls.length;
+      callIndex += 1
+    ) {
+      assertGlobalRecipientOnly(
+        notificationVisibilityWhere(
+          prisma.notificationDelivery.count,
+          callIndex,
+        ),
+      );
+    }
+    for (
+      let callIndex = 0;
+      callIndex < prisma.notificationDelivery.findFirst.mock.calls.length;
+      callIndex += 1
+    ) {
+      assertGlobalRecipientOnly(
+        notificationVisibilityWhere(
+          prisma.notificationDelivery.findFirst,
+          callIndex,
+        ),
+      );
+    }
+    expect(prisma.notificationReadReceipt.upsert).not.toHaveBeenCalled();
+    expect(fileRegistryService.listFilesByEntity).not.toHaveBeenCalled();
+    expect(storageService.getObjectBuffer).not.toHaveBeenCalled();
+  });
+
   it('scopes parent dashboard notifications to the active child and global parent items', async () => {
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [
+        {
+          studentId: 'student-1',
+          guardianId: 'guardian-1',
+          capabilities: ALL_GUARDIAN_CAPABILITIES,
+        },
+      ],
+    });
     prisma.notificationDelivery.findMany.mockResolvedValue([]);
     prisma.notificationDelivery.count.mockResolvedValue(0);
 
@@ -1496,10 +1713,11 @@ describe('MobileService', () => {
           tenantId: 'tenant-1',
           AND: [
             {
-              OR: [
-                { recipientUserId: 'parent-1', studentId: null },
-                { studentId: { in: ['student-1'] } },
-              ],
+              OR: expectedNotificationRecipientScope(
+                'parent-1',
+                ['student-1'],
+                ['student-1'],
+              ),
             },
             {
               OR: [
@@ -1516,10 +1734,11 @@ describe('MobileService', () => {
         tenantId: 'tenant-1',
         AND: [
           {
-            OR: [
-              { recipientUserId: 'parent-1', studentId: null },
-              { studentId: { in: ['student-1'] } },
-            ],
+            OR: expectedNotificationRecipientScope(
+              'parent-1',
+              ['student-1'],
+              ['student-1'],
+            ),
           },
           {
             OR: [
@@ -1553,10 +1772,11 @@ describe('MobileService', () => {
         tenantId: 'tenant-1',
         AND: [
           {
-            OR: [
-              { recipientUserId: 'parent-1', studentId: null },
-              { studentId: { in: ['student-1'] } },
-            ],
+            OR: expectedNotificationRecipientScope(
+              'parent-1',
+              ['student-1'],
+              ['student-1'],
+            ),
           },
           {
             OR: [
@@ -1592,7 +1812,7 @@ describe('MobileService', () => {
       where: {
         tenantId: 'tenant-1',
         AND: [
-          { OR: [{ recipientUserId: 'teacher-user', studentId: null }] },
+          { OR: expectedNotificationRecipientScope('teacher-user') },
           {
             OR: [
               { noticeId: null },
@@ -1687,10 +1907,11 @@ describe('MobileService', () => {
         tenantId: 'tenant-1',
         AND: [
           {
-            OR: [
-              { recipientUserId: 'parent-1', studentId: null },
-              { studentId: { in: ['student-1'] } },
-            ],
+            OR: expectedNotificationRecipientScope(
+              'parent-1',
+              ['student-1'],
+              ['student-1'],
+            ),
           },
           {
             OR: [
@@ -1759,10 +1980,11 @@ describe('MobileService', () => {
           tenantId: 'tenant-1',
           AND: [
             {
-              OR: [
-                { recipientUserId: 'parent-1', studentId: null },
-                { studentId: { in: ['student-1'] } },
-              ],
+              OR: expectedNotificationRecipientScope(
+                'parent-1',
+                ['student-1'],
+                ['student-1'],
+              ),
             },
             {
               OR: [
