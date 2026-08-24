@@ -32,6 +32,12 @@ class TeacherDashboard extends ConsumerWidget {
     );
     final teacherName = _firstName(user?.name ?? 'Teacher');
     final roleLabel = _roleLabel(user?.roles ?? const [], user?.role);
+    final currentPeriod = _currentOrNextPeriod(state.todayPeriods);
+    final canOpenCurrentAttendance =
+        currentPeriod != null &&
+        state.classes.any(
+          (classSection) => classSection.id == currentPeriod.classSectionId,
+        );
 
     return RoleShellScaffold(
       role: 'TEACHER',
@@ -69,7 +75,9 @@ class TeacherDashboard extends ConsumerWidget {
                       error: state.error!,
                       onRetry: controller.load,
                     )
-                  else if (state.classes.isEmpty)
+                  else if (!state.hasTeachingScope &&
+                      state.classes.isEmpty &&
+                      state.todayPeriods.isEmpty)
                     AppEmptyState(
                       title: 'No classes are assigned',
                       message:
@@ -81,20 +89,15 @@ class TeacherDashboard extends ConsumerWidget {
                   else ...[
                     _CurrentPeriodCard(
                       periods: state.todayPeriods,
-                      onOpenAttendance: () {
-                        final current = _currentOrNextPeriod(
-                          state.todayPeriods,
-                        );
-                        if (current == null) {
-                          context.go(AppRoutes.teacherAttendance);
-                        } else {
-                          context.go(
-                            AppRoutes.teacherAttendanceFor(
-                              current.classSectionId,
-                            ),
-                          );
-                        }
-                      },
+                      onOpenAttendance: canOpenCurrentAttendance
+                          ? () {
+                              context.go(
+                                AppRoutes.teacherAttendanceFor(
+                                  currentPeriod.classSectionId,
+                                ),
+                              );
+                            }
+                          : null,
                     ),
                     const SizedBox(height: AppSpacing.md),
                     if (state.pendingAttendanceCount > 0) ...[
@@ -135,14 +138,15 @@ class TeacherDashboard extends ConsumerWidget {
                       onTap: () => context.go(AppRoutes.teacherActivity),
                     ),
                     const SizedBox(height: AppSpacing.md),
-                    TeacherTaskCard(
-                      title: 'Assigned classes',
-                      subtitle:
-                          '${state.classes.length} active class/subject assignment(s)',
-                      icon: Icons.school_rounded,
-                      iconColor: AppColors.success,
-                      onTap: () => context.go(AppRoutes.teacherClasses),
-                    ),
+                    if (state.classes.isNotEmpty)
+                      TeacherTaskCard(
+                        title: 'Attendance classes',
+                        subtitle:
+                            '${state.classes.length} class(es) available for homeroom attendance',
+                        icon: Icons.school_rounded,
+                        iconColor: AppColors.success,
+                        onTap: () => context.go(AppRoutes.teacherClasses),
+                      ),
                     const SizedBox(height: AppSpacing.xl),
                     Text(
                       'Today\'s timetable',
@@ -175,7 +179,7 @@ class _CurrentPeriodCard extends StatelessWidget {
   });
 
   final List<TeacherTodayPeriod> periods;
-  final VoidCallback onOpenAttendance;
+  final VoidCallback? onOpenAttendance;
 
   @override
   Widget build(BuildContext context) {

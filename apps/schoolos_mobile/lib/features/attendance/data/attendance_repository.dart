@@ -31,13 +31,23 @@ class AttendanceRepository {
   final PrivateReadCache? cache;
   final TeacherAttendanceDraftStore? draftStore;
   final TeacherAttendanceScopeVersionStore? scopeVersionStore;
+  Future<void> _scopeRefreshFence = Future<void>.value();
   Future<void> _scopeFence = Future<void>.value();
   int _scopeEpoch = 0;
 
   /// Verifies the server-owned teacher assignment version before any
   /// attendance cache or draft is read on an online load.
-  Future<TeacherAttendanceScopeRefresh> refreshTeacherAttendanceScope() async {
+  Future<TeacherAttendanceScopeRefresh> refreshTeacherAttendanceScope() {
+    // The version is an opaque fingerprint, not a sortable revision. Keep the
+    // request itself in this queue so concurrent loads cannot receive scope
+    // snapshots in one order and commit them to secure storage in another.
+    return _withScopeRefreshFence(_refreshTeacherAttendanceScopeSerialized);
+  }
+
+  Future<TeacherAttendanceScopeRefresh>
+  _refreshTeacherAttendanceScopeSerialized() async {
     final dependencies = _requireTeacherAttendanceScopeDependencies();
+    final refreshEpoch = await _withScopeFence(() async => _scopeEpoch);
 
     late final Response<dynamic> response;
     try {
@@ -79,22 +89,14 @@ class AttendanceRepository {
     }
 
     return _withScopeFence(() async {
+      if (refreshEpoch != _scopeEpoch) {
+        throw const CacheException(
+          'Teacher attendance access changed while it was being reverified.',
+        );
+      }
       final storedState = await dependencies.scopeVersionStore.readState();
       if (storedState?.scopeVersion == scopeVersion &&
           storedState?.quarantined != true) {
-        return TeacherAttendanceScopeRefresh.unchanged;
-      }
-
-      final storedVersion = storedState?.scopeVersion;
-      if (storedVersion != null &&
-          BigInt.parse(storedVersion) > BigInt.parse(scopeVersion)) {
-        if (storedState?.quarantined == true) {
-          throw const CacheException(
-            'Teacher attendance access must be reverified before local data can be opened.',
-          );
-        }
-        // A slower, older verification response must not roll back a newer
-        // scope version already accepted by another load.
         return TeacherAttendanceScopeRefresh.unchanged;
       }
 
@@ -325,6 +327,18 @@ class AttendanceRepository {
     return completer.future;
   }
 
+  Future<T> _withScopeRefreshFence<T>(Future<T> Function() action) {
+    final completer = Completer<T>();
+    _scopeRefreshFence = _scopeRefreshFence.then((_) async {
+      try {
+        completer.complete(await action());
+      } catch (error, stackTrace) {
+        completer.completeError(error, stackTrace);
+      }
+    });
+    return completer.future;
+  }
+
   Future<AttendanceSnapshot> getParentAttendanceSnapshot(
     String studentId,
     DateTime month,
@@ -516,20 +530,25 @@ class AttendanceRepository {
       if (cached == null) rethrow;
       data = cached.withMetadata();
     }
+    final periods = _asList(data['periods'])
+        .whereType<Map<String, dynamic>>()
+        .map(TeacherTodayPeriod.fromJson)
+        .toList();
+    final classes = _asList(data['classes'])
+        .whereType<Map<String, dynamic>>()
+        .map(TeacherClassSection.fromJson)
+        .toList();
     return TeacherTodaySnapshot(
       date: DateTime.tryParse(data['date'] as String? ?? '') ?? date,
-      periods: _asList(data['periods'])
-          .whereType<Map<String, dynamic>>()
-          .map(TeacherTodayPeriod.fromJson)
-          .toList(),
-      classes: _asList(data['classes'])
-          .whereType<Map<String, dynamic>>()
-          .map(TeacherClassSection.fromJson)
-          .toList(),
+      periods: periods,
+      classes: classes,
       pendingAttendanceCount: _asInt(data['pendingAttendanceCount']),
       lastUpdated:
           DateTime.tryParse(data['_mobileLastUpdated'] as String? ?? '') ??
           DateTime.now(),
+      hasTeachingScope:
+          data['hasTeachingScope'] as bool? ??
+          (classes.isNotEmpty || periods.isNotEmpty),
       fromCache: data['_mobileFromCache'] as bool? ?? false,
     );
   }
@@ -591,6 +610,7 @@ class AttendanceRepository {
     TeacherClassSection classSection,
     String studentId,
   ) async {
+    final scopeTicket = await _captureTeacherAttendanceScopeTicket();
     final response = await _client.get(
       '/mobile/teacher/students/$studentId/summary',
       queryParameters: {
@@ -602,6 +622,9 @@ class AttendanceRepository {
     final data = response.data is Map<String, dynamic>
         ? response.data as Map<String, dynamic>
         : const <String, dynamic>{};
+    if (scopeTicket != null) {
+      await _assertScopeTicketCurrent(scopeTicket);
+    }
     return TeacherStudentSummary.fromJson(data);
   }
 

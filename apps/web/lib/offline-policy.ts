@@ -4,7 +4,7 @@ const CLEARABLE_ATTENDANCE_SYNC_STATUSES = new Set([
   "SYNCED",
   "CONFLICTED",
 ]);
-const EDITABLE_ATTENDANCE_SYNC_HTTP_STATUSES = new Set([400, 403, 404, 422]);
+const EDITABLE_ATTENDANCE_SYNC_HTTP_STATUSES = new Set([400, 404, 422]);
 
 export const OFFLINE_MUTATION_MESSAGE =
   "This action needs an internet connection. Nothing was sent or queued.";
@@ -46,9 +46,9 @@ export function hasSameBrowserSessionIdentity(left: unknown, right: unknown) {
 
   return Boolean(
     leftIdentity &&
-      rightIdentity &&
-      leftIdentity.tenantId === rightIdentity.tenantId &&
-      leftIdentity.userId === rightIdentity.userId,
+    rightIdentity &&
+    leftIdentity.tenantId === rightIdentity.tenantId &&
+    leftIdentity.userId === rightIdentity.userId,
   );
 }
 

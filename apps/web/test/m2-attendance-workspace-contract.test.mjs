@@ -119,7 +119,7 @@ describe("M2 attendance workspace contract", () => {
     assert.match(form, /disabled=\{rosterEditingDisabled\}/);
     assert.match(
       form,
-      /const rosterEditingDisabled =[\s\S]{0,160}\|\| finalizationReadOnly;/,
+      /const rosterEditingDisabled =[\s\S]{0,200}finalizationReadOnly[\s\S]{0,80}saveDraftMutation\.isPending;/,
     );
     assert.match(form, /Attendance Submitted/);
     assert.match(form, /Request a correction/);
@@ -137,12 +137,16 @@ describe("M2 attendance workspace contract", () => {
     assert.match(form, /No authoritative attendance was accepted/);
     assert.match(
       finalizationGuard,
-      /\["queued", "server_check", "accepted", "recorded_conflict"\]\.includes/,
+      /unresolvedFinalizationReadOnly[\s\S]{0,120}\["accepted", "recorded_conflict"\]\.includes/,
+    );
+    assert.match(
+      form,
+      /const unresolvedFinalizationReadOnly = \[[\s\S]{0,120}"queued",[\s\S]{0,120}"server_check",[\s\S]{0,120}"authorization_denied"/,
     );
     assert.doesNotMatch(finalizationGuard, /=\s*false/);
     assert.match(
       form,
-      /disabled=\{[\s\S]{0,600}finalizationReadOnly[\s\S]{0,160}draftSyncState === "rejected"/,
+      /disabled=\{[\s\S]{0,600}finalizationReadOnly[\s\S]{0,160}visibleDraftSyncState === "rejected"/,
     );
   });
 

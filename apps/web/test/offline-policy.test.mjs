@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   OFFLINE_MUTATION_MESSAGE,
+  canRestoreEditableAttendanceDraftAfterSyncError,
   canStorePendingAttendanceDraft,
   getBrowserSessionIdentity,
   hasSameBrowserSessionIdentity,
@@ -46,6 +47,20 @@ describe("offline request policy", () => {
       "",
     ]) {
       assert.equal(shouldClearLocalAttendanceDraft(status), false);
+    }
+  });
+
+  it("never restores an editable roster after an authorization denial", () => {
+    assert.equal(
+      canRestoreEditableAttendanceDraftAfterSyncError({ statusCode: 403 }),
+      false,
+    );
+
+    for (const statusCode of [400, 404, 422]) {
+      assert.equal(
+        canRestoreEditableAttendanceDraftAfterSyncError({ statusCode }),
+        true,
+      );
     }
   });
 

@@ -367,6 +367,7 @@ class TeacherTodaySnapshot {
     required this.classes,
     required this.pendingAttendanceCount,
     required this.lastUpdated,
+    this.hasTeachingScope = false,
     this.fromCache = false,
   });
 
@@ -375,6 +376,7 @@ class TeacherTodaySnapshot {
   final List<TeacherClassSection> classes;
   final int pendingAttendanceCount;
   final DateTime lastUpdated;
+  final bool hasTeachingScope;
   final bool fromCache;
 }
 

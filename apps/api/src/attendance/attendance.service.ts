@@ -38,6 +38,7 @@ import {
   StaffStatus,
   StudentLifecycleStatus,
   TeacherAssignmentType,
+  TimetableSubstitutionStatus,
   TimetableVersionStatus,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
@@ -111,6 +112,26 @@ const DEFAULT_M2_ATTENDANCE_POLICY = {
 
 type AttendanceTeacherAccess = 'READ' | 'WRITE';
 
+interface TeacherTodayAttendanceSessionRow {
+  classId: string;
+  sectionId: string | null;
+  submittedAt: Date | null;
+  lockAt: Date;
+  conflictStatus: AttendanceConflictStatus;
+}
+
+interface TeacherTodayTimetablePeriodRow {
+  id: string;
+  academicYearId: string;
+  classId: string;
+  sectionId: string | null;
+  startsAt: string;
+  endsAt: string;
+  class: { name: string };
+  section: { name: string } | null;
+  subject: { name: string };
+}
+
 @Injectable()
 export class AttendanceService {
   constructor(
@@ -124,7 +145,10 @@ export class AttendanceService {
     private readonly fileRegistryService?: FileRegistryService,
   ) {}
 
-  async listTeacherMobileClassSections(actor: AuthContext) {
+  async listTeacherMobileClassSections(
+    actor: AuthContext,
+    options: { effectiveOn?: Date } = {},
+  ) {
     const limit = 200;
     const currentAcademicYear = await this.prisma.academicYear.findFirst({
       where: { tenantId: actor.tenantId, isCurrent: true },
@@ -138,6 +162,7 @@ export class AttendanceService {
     const assignments = (
       await this.teacherScopeService.listActiveAssignments(actor, {
         academicYearId: currentAcademicYear.id,
+        effectiveOn: options.effectiveOn,
       })
     ).slice(0, limit);
     const homeroomAssignments = assignments.filter(
@@ -258,18 +283,62 @@ export class AttendanceService {
   }
 
   async getTeacherMobileToday(actor: AuthContext, dateInput?: string) {
-    const date = stripTime(dateInput ? new Date(dateInput) : new Date());
-    const classesResult = await this.listTeacherMobileClassSections(actor);
-    const staff = await this.prisma.staff.findFirst({
-      where: { userId: actor.userId, tenantId: actor.tenantId },
+    const now = new Date();
+    const requestedInstant = dateInput ? new Date(dateInput) : now;
+    const date = stripTime(requestedInstant);
+    // `date` is the attendance/timetable business day, not the instant at
+    // which a time-bounded assignment should be evaluated. For the current
+    // Nepal school day, use the real current instant so an assignment that
+    // starts during the day is not incorrectly evaluated only at midnight.
+    // Explicit timestamps for another day retain their requested instant.
+    const effectiveOn =
+      date.getTime() === stripTime(now).getTime() ? now : requestedInstant;
+    const currentAcademicYear = await this.prisma.academicYear.findFirst({
+      where: { tenantId: actor.tenantId, isCurrent: true },
       select: { id: true },
     });
 
-    if (!staff || classesResult.items.length === 0) {
+    if (!currentAcademicYear) {
       return {
         date: date.toISOString(),
         periods: [],
         classes: [],
+        hasTeachingScope: false,
+        pendingAttendanceCount: 0,
+      };
+    }
+
+    const [
+      classesResult,
+      staffId,
+      homeroomAttendanceAssignments,
+      attendancePeriodAssignments,
+    ] = await Promise.all([
+      this.listTeacherMobileClassSections(actor, { effectiveOn }),
+      this.teacherScopeService.resolveActiveStaffId(actor),
+      this.teacherScopeService.listActiveAssignmentsForCapability(
+        actor,
+        TeacherCapability.HOMEROOM_ATTENDANCE_MARK,
+        {
+          academicYearId: currentAcademicYear.id,
+          effectiveOn,
+        },
+      ),
+      this.teacherScopeService.listActiveAssignmentsForCapability(
+        actor,
+        TeacherCapability.PERIOD_ATTENDANCE_MARK,
+        {
+          academicYearId: currentAcademicYear.id,
+          effectiveOn,
+        },
+      ),
+    ]);
+    if (!staffId) {
+      return {
+        date: date.toISOString(),
+        periods: [],
+        classes: [],
+        hasTeachingScope: false,
         pendingAttendanceCount: 0,
       };
     }
@@ -278,65 +347,119 @@ export class AttendanceService {
       classId: item.classId,
       sectionId: item.sectionId,
     }));
-    const [sessions, periods] = await Promise.all([
-      this.prisma.attendanceSession.findMany({
-        where: {
-          tenantId: actor.tenantId,
-          attendanceDate: getNepalBusinessDateRange(date),
-          OR: classScopes,
+    const periodScopeByKey = new Map<
+      string,
+      { classId: string; sectionId: string; subjectId?: string }
+    >();
+    for (const assignment of homeroomAttendanceAssignments) {
+      periodScopeByKey.set(`${assignment.classId}:${assignment.sectionId}:*`, {
+        classId: assignment.classId,
+        sectionId: assignment.sectionId,
+      });
+    }
+    for (const assignment of attendancePeriodAssignments) {
+      const homeroomKey = `${assignment.classId}:${assignment.sectionId}:*`;
+      if (periodScopeByKey.has(homeroomKey) || !assignment.subjectId) {
+        continue;
+      }
+      periodScopeByKey.set(
+        `${assignment.classId}:${assignment.sectionId}:${assignment.subjectId}`,
+        {
+          classId: assignment.classId,
+          sectionId: assignment.sectionId,
+          subjectId: assignment.subjectId,
         },
-        select: {
-          classId: true,
-          sectionId: true,
-          submittedAt: true,
-          lockAt: true,
-          conflictStatus: true,
-        },
-        take: 100,
-      }),
-      this.prisma.timetableSlot.findMany({
-        where: {
-          tenantId: actor.tenantId,
-          staffId: staff.id,
-          academicYearId: classesResult.items[0].academicYearId,
-          dayOfWeek: toIsoWeekday(date),
-          OR: [
-            { versionId: null },
-            {
-              version: {
-                status: {
-                  in: [
-                    TimetableVersionStatus.PUBLISHED,
-                    TimetableVersionStatus.LOCKED,
+      );
+    }
+    const periodScopes = [...periodScopeByKey.values()];
+    const sessionsPromise: Promise<TeacherTodayAttendanceSessionRow[]> =
+      classScopes.length === 0
+        ? Promise.resolve([])
+        : this.prisma.attendanceSession.findMany({
+            where: {
+              tenantId: actor.tenantId,
+              attendanceDate: getNepalBusinessDateRange(date),
+              OR: classScopes,
+            },
+            select: {
+              classId: true,
+              sectionId: true,
+              submittedAt: true,
+              lockAt: true,
+              conflictStatus: true,
+            },
+            take: 100,
+          });
+    const periodsPromise: Promise<TeacherTodayTimetablePeriodRow[]> =
+      periodScopes.length === 0
+        ? Promise.resolve([])
+        : this.prisma.timetableSlot.findMany({
+            where: {
+              tenantId: actor.tenantId,
+              academicYearId: currentAcademicYear.id,
+              dayOfWeek: toIsoWeekday(date),
+              AND: [
+                { OR: periodScopes },
+                {
+                  OR: [
+                    { staffId },
+                    {
+                      substitutions: {
+                        some: {
+                          tenantId: actor.tenantId,
+                          substituteTeacherId: staffId,
+                          date: getNepalBusinessDateRange(date),
+                          status: TimetableSubstitutionStatus.ASSIGNED,
+                        },
+                      },
+                    },
                   ],
                 },
-              },
+                {
+                  OR: [
+                    { versionId: null },
+                    {
+                      version: {
+                        status: {
+                          in: [
+                            TimetableVersionStatus.PUBLISHED,
+                            TimetableVersionStatus.LOCKED,
+                          ],
+                        },
+                      },
+                    },
+                  ],
+                },
+              ],
             },
-          ],
-        },
-        select: {
-          id: true,
-          academicYearId: true,
-          classId: true,
-          sectionId: true,
-          startsAt: true,
-          endsAt: true,
-          class: { select: { name: true } },
-          section: { select: { name: true } },
-          subject: { select: { name: true } },
-        },
-        orderBy: [{ startsAt: 'asc' }],
-        take: 30,
-      }),
+            select: {
+              id: true,
+              academicYearId: true,
+              classId: true,
+              sectionId: true,
+              startsAt: true,
+              endsAt: true,
+              class: { select: { name: true } },
+              section: { select: { name: true } },
+              subject: { select: { name: true } },
+            },
+            orderBy: [{ startsAt: 'asc' }],
+            take: 30,
+          });
+    const [sessions, periods] = await Promise.all([
+      sessionsPromise,
+      periodsPromise,
     ]);
 
     const sessionByScope = new Map(
-      sessions.map((session) => [
-        `${session.classId}:${session.sectionId ?? 'none'}`,
-        session,
-      ]),
+      sessions.map(
+        (session) =>
+          [
+            `${session.classId}:${session.sectionId ?? 'none'}`,
+            session,
+          ] as const,
+      ),
     );
-    const now = new Date();
     const classes = classesResult.items.map((item) => {
       const session = sessionByScope.get(
         `${item.classId}:${item.sectionId ?? 'none'}`,
@@ -368,6 +491,7 @@ export class AttendanceService {
         endsAt: period.endsAt,
       })),
       classes,
+      hasTeachingScope: classes.length > 0 || periodScopes.length > 0,
       pendingAttendanceCount: classes.filter((item) => {
         const isClassTeacher = item.subject.includes('Class teacher');
         return (

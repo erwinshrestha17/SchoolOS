@@ -91,6 +91,42 @@ void main() {
   );
 
   test(
+    'subject-only teaching scope preserves today periods without a homeroom roster',
+    () async {
+      const subjectPeriod = TeacherTodayPeriod(
+        id: 'period-1',
+        classSectionId: 'year-1:class-2:section-2',
+        className: 'Grade 8 - B',
+        subjectName: 'Science',
+        startsAt: '09:00',
+        endsAt: '09:45',
+      );
+      when(() => repository.getTeacherToday(any())).thenAnswer(
+        (_) async => TeacherTodaySnapshot(
+          date: DateTime(2026, 6, 18),
+          periods: const [subjectPeriod],
+          classes: const [],
+          pendingAttendanceCount: 0,
+          lastUpdated: DateTime(2026, 6, 18, 8),
+          hasTeachingScope: true,
+        ),
+      );
+
+      final controller = TeacherAttendanceController(
+        repository: repository,
+        isOnline: true,
+      );
+      await _waitForLoad(controller);
+
+      expect(controller.state.hasTeachingScope, isTrue);
+      expect(controller.state.classes, isEmpty);
+      expect(controller.state.todayPeriods, const [subjectPeriod]);
+      verifyNever(() => repository.loadDraftAttendance(any(), any()));
+      verifyNever(() => repository.getClassAttendanceSheet(any(), any()));
+    },
+  );
+
+  test(
     'scope purge completes before any attendance read and never submits',
     () async {
       when(

@@ -106,6 +106,7 @@ describe("offline-safe web foundation", () => {
     const workspace = read(
       "components/attendance/attendance-m2-workspaces.tsx",
     );
+    const markPage = read("app/dashboard/attendance/mark/page.tsx");
 
     assert.match(session, /authenticatedKeyPrefix/);
     assert.match(session, /scope\.tenantId/);
@@ -126,6 +127,19 @@ describe("offline-safe web foundation", () => {
     assert.match(workspace, /This Browser/);
     assert.match(workspace, /Server Drafts/);
     assert.match(workspace, /Sync Queue and Conflicts/);
+    assert.match(workspace, /attendanceDraftRecoveryHref/);
+    assert.match(workspace, /academicYearId: draft\.academicYearId/);
+    assert.match(workspace, /classId: draft\.classId/);
+    assert.match(workspace, /attendanceDate: draft\.attendanceDate/);
+    assert.match(workspace, /search\.set\("sectionId", draft\.sectionId\)/);
+    assert.match(workspace, /Open saved scope/);
+    assert.match(workspace, /draft\.academicYearLabel/);
+    assert.match(workspace, /Final submission queued/);
+    assert.match(workspace, /Pending confirmation/);
+    assert.match(workspace, /Access denied/);
+    assert.match(workspace, /Saved locally/);
+    assert.match(markPage, /initialDraftScope/);
+    assert.match(markPage, /<AttendanceMarkWorkspace initialDraftScope=/);
   });
 
   it("mounts one shared offline banner and keeps unsafe actions online-only", () => {
@@ -225,11 +239,67 @@ describe("offline-safe web foundation", () => {
     assert.match(attendance, /const hasPendingLocalDraft = Boolean/);
     assert.match(
       attendance,
-      /draftKey && draftClientSubmissionId && draftSavedAt/,
+      /draftScopeHydrated[\s\S]{0,120}draftKey[\s\S]{0,120}draftClientSubmissionId[\s\S]{0,120}draftSavedAt/,
     );
     assert.match(attendance, /!hasPendingLocalDraft/);
     assert.match(attendance, /setDraftClientSubmissionId\(null\)/);
     assert.match(attendance, /setDraftSavedAt\(null\)/);
+  });
+
+  it("waits for the selected draft scope to hydrate before saving or submitting", () => {
+    const attendance = read("components/forms/attendance-form.tsx");
+    const autosaveFlow = sourceBetween(
+      attendance,
+      "useEffect(() => {\n    if (\n      !draftKey ||\n      !draftScopeHydrated",
+      "const overrideMutation = useMutation",
+    );
+    const submissionFlow = sourceBetween(
+      attendance,
+      "const syncDraftSubmission = async () =>",
+      "const keepServerVersion = () =>",
+    );
+
+    assert.match(attendance, /const draftScopeHydrated = Boolean/);
+    assert.match(autosaveFlow, /!draftScopeHydrated/);
+    assert.match(submissionFlow, /!draftScopeHydrated/);
+    assert.match(
+      attendance,
+      /const visibleDraftSyncState:[\s\S]{0,120}draftScopeHydrated/,
+    );
+    assert.match(
+      attendance,
+      /roster\.length > 0 &&[\s\S]{0,80}draftScopeHydrated/,
+    );
+  });
+
+  it("serializes server draft saves against final receipt submission", () => {
+    const attendance = read("components/forms/attendance-form.tsx");
+    const saveFlow = sourceBetween(
+      attendance,
+      "const saveDraftToServer = async () =>",
+      "const syncDraftSubmission = async () =>",
+    );
+    const submissionFlow = sourceBetween(
+      attendance,
+      "const syncDraftSubmission = async () =>",
+      "const keepServerVersion = () =>",
+    );
+
+    assert.match(saveFlow, /serverDraftSaveInFlightRef\.current/);
+    assert.match(saveFlow, /receiptSyncInFlightRef\.current/);
+    assert.match(saveFlow, /serverDraftSaveInFlightRef\.current = true/);
+    assert.match(saveFlow, /!receiptSyncInFlightRef\.current/);
+    assert.match(saveFlow, /activeDraftKeyRef\.current === serverDraftKey/);
+    assert.match(saveFlow, /isAttendanceDraftStorageTicketCurrent/);
+    assert.match(submissionFlow, /serverDraftSaveInFlightRef\.current/);
+    assert.match(
+      attendance,
+      /scopeSelectionDisabled =[\s\S]{0,180}saveDraftMutation\.isPending/,
+    );
+    assert.match(
+      attendance,
+      /requestFinalSubmission = \(\) => \{[\s\S]{0,120}serverDraftSaveInFlightRef\.current/,
+    );
   });
 
   it("retains uncertain or rejected attendance receipts for safe review", () => {
@@ -280,8 +350,8 @@ describe("offline-safe web foundation", () => {
     );
     assert.match(receiptDraft, /clientSubmissionId: draftClientSubmissionId/);
     assert.match(syncRequest, /clientSubmissionId: draftClientSubmissionId/);
-    const receiptPersistIndex = submissionFlow.indexOf(
-      "await storeAttendanceDraft(submissionDraftKey, receiptProtectedDraft);",
+    const receiptPersistIndex = submissionFlow.search(
+      /await storeAttendanceDraft\(submissionDraftKey, receiptProtectedDraft, \{[\s\S]{0,100}ticket: submissionStorageTicket/,
     );
     const requestIndex = submissionFlow.indexOf(
       "const result = await syncMutation.mutateAsync({",
@@ -297,7 +367,7 @@ describe("offline-safe web foundation", () => {
     );
     assert.match(
       submissionFlow,
-      /await storeAttendanceDraft\(submissionDraftKey, receiptProtectedDraft\);[\s\S]{0,260}} catch \{[\s\S]{0,320}so nothing was sent[\s\S]{0,180}return;/,
+      /await storeAttendanceDraft\(submissionDraftKey, receiptProtectedDraft, \{[\s\S]{0,120}ticket: submissionStorageTicket[\s\S]{0,120}} catch \{[\s\S]{0,320}so nothing was sent[\s\S]{0,180}return;/,
     );
     assert.match(
       submissionFlow,
@@ -354,7 +424,7 @@ describe("offline-safe web foundation", () => {
     );
     const scopeControls = sourceBetween(
       attendance,
-      '<FilterBar\n        label="Attendance Filters"',
+      '<FilterBar\n          label="Attendance Filters"',
       '<SectionCard\n        title="Attendance Roster"',
     );
 
@@ -363,7 +433,10 @@ describe("offline-safe web foundation", () => {
       submissionFlow,
       /activeDraftKeyRef\.current === submissionDraftKey/,
     );
-    assert.match(submissionFlow, /clearAttendanceDraft\(submissionDraftKey\)/);
+    assert.match(
+      submissionFlow,
+      /clearAttendanceDraft\(submissionDraftKey, \{[\s\S]{0,80}ticket: submissionStorageTicket/,
+    );
     assert.ok(
       (submissionFlow.match(/isSubmissionScopeCurrent\(\)/g) ?? []).length >= 6,
       "all awaited receipt outcomes must be fenced to the captured draft key",
@@ -373,6 +446,128 @@ describe("offline-safe web foundation", () => {
         .length >= 4,
       "year, class, section, and date must be frozen during receipt sync",
     );
+  });
+
+  it("invalidates and serializes browser draft writes across session teardown", () => {
+    const session = read("lib/session.ts");
+    const fence = read("lib/attendance-draft-storage-fence.ts");
+    const attendance = read("components/forms/attendance-form.tsx");
+    const clearAll = sourceBetween(
+      session,
+      "export async function clearAllAttendanceDrafts()",
+      "export async function listAttendanceDraftsForCurrentBrowser",
+    );
+
+    assert.match(clearAll, /attendanceDraftStorageFence\.invalidate\(\)/);
+    assert.ok(
+      clearAll.indexOf("attendanceDraftStorageFence.invalidate()") <
+        clearAll.indexOf('typeof window === "undefined"'),
+      "identity invalidation must happen synchronously before cleanup awaits",
+    );
+    assert.match(session, /attendanceDraftStorageFence\.run\(ticket/);
+    assert.match(fence, /private operationQueue: Promise<void>/);
+    assert.match(fence, /this\.assertCurrent\(ticket\)/);
+    assert.match(attendance, /captureAttendanceDraftStorageTicket\(\)/);
+    assert.match(attendance, /componentMountedRef\.current/);
+    assert.match(
+      attendance,
+      /draftStorageAuthorityRef\.current\?\.ticket === submissionStorageTicket/,
+    );
+  });
+
+  it("requires review for new final intent and directly retries only confirmed intent", () => {
+    const attendance = read("components/forms/attendance-form.tsx");
+    const requestFlow = sourceBetween(
+      attendance,
+      "const requestFinalSubmission = () =>",
+      "reconnectActionRef.current = () =>",
+    );
+
+    assert.match(
+      requestFlow,
+      /\["queued", "server_check", "authorization_denied"\]\.includes/,
+    );
+    assert.match(requestFlow, /void syncDraftSubmission\(\)/);
+    assert.match(requestFlow, /setIsConfirmOpen\(true\)/);
+    assert.ok(
+      (attendance.match(/onClick=\{requestFinalSubmission\}/g) ?? []).length >=
+        2,
+      "banner and saved-draft final actions must share the confirmation gate",
+    );
+  });
+
+  it("locks authorization denials and labels unconfirmed receipts truthfully", () => {
+    const attendance = read("components/forms/attendance-form.tsx");
+    const submissionFlow = sourceBetween(
+      attendance,
+      "const syncDraftSubmission = async () =>",
+      "const keepServerVersion = () =>",
+    );
+    const denialIndex = submissionFlow.indexOf(
+      "error instanceof ApiRequestError && error.statusCode === 403",
+    );
+    const editableIndex = submissionFlow.indexOf(
+      "canRestoreEditableAttendanceDraftAfterSyncError(error)",
+    );
+
+    assert.ok(denialIndex >= 0 && denialIndex < editableIndex);
+    assert.match(
+      submissionFlow,
+      /createAccessRevocationReceipt\([\s\S]{0,120}"AUTHORIZATION_DENIED"/,
+    );
+    assert.match(submissionFlow, /setDraftSyncState\("authorization_denied"\)/);
+    assert.match(attendance, /\? "PENDING_CONFIRMATION"/);
+    assert.doesNotMatch(
+      attendance,
+      /draftSyncState === "queued" \|\| draftSyncState === "server_check"[\s\S]{0,80}\? "QUEUED"/,
+    );
+    assert.match(attendance, /return to this saved draft later/);
+    assert.match(
+      attendance,
+      /scopeSelectionDisabled =[\s\S]{0,160}unresolvedFinalizationReadOnly/,
+    );
+  });
+
+  it("hydrates a cold local receipt before server roster data is available", () => {
+    const attendance = read("components/forms/attendance-form.tsx");
+    const hydrationStart = attendance.indexOf(
+      "const draftRead = await readAttendanceDraft",
+    );
+    const rosterFallback = attendance.indexOf(
+      "if (!rosterQuery.data) return;",
+      hydrationStart,
+    );
+
+    assert.ok(hydrationStart >= 0);
+    assert.ok(
+      rosterFallback > hydrationStart,
+      "browser receipt hydration must run before the server-roster fallback",
+    );
+    assert.match(
+      attendance.slice(hydrationStart, rosterFallback),
+      /setHydratedDraftKey\(draftKey\)/,
+    );
+  });
+
+  it("keeps recovered scope in the route and hides revoked scope state", () => {
+    const attendance = read("components/forms/attendance-form.tsx");
+    const workspace = read(
+      "components/attendance/attendance-m2-workspaces.tsx",
+    );
+
+    assert.match(attendance, /new URLSearchParams\(\{/);
+    assert.match(attendance, /academicYearId,/);
+    assert.match(attendance, /classId,/);
+    assert.match(attendance, /attendanceDate,/);
+    assert.match(attendance, /search\.set\("sectionId", sectionId\)/);
+    assert.match(attendance, /router\.replace\(nextHref/);
+    assert.match(attendance, /router\.replace\(pathname/);
+    assert.match(attendance, /const rosterDisclosureBlocked/);
+    assert.match(attendance, /Student details were cleared from this browser/);
+    assert.match(workspace, /isAccessRestrictedBrowserDraft/);
+    assert.match(workspace, /Recovery unavailable/);
+    assert.match(workspace, /Student details cleared from this browser/);
+    assert.match(workspace, /Access revalidation required/);
   });
 
   it("announces authoritative attendance outcomes and focuses actionable failures", () => {

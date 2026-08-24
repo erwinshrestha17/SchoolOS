@@ -251,107 +251,140 @@ Future<void> _showStudentSummary(
     context: context,
     showDragHandle: true,
     builder: (context) {
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            0,
-            AppSpacing.lg,
-            AppSpacing.xl,
-          ),
-          child: FutureBuilder<TeacherStudentSummary>(
-            future: future,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState != ConnectionState.done) {
-                return const SizedBox(
-                  height: 180,
-                  child: Center(child: CircularProgressIndicator()),
-                );
-              }
-              if (snapshot.hasError || !snapshot.hasData) {
-                return const AppCard(
-                  child: Text('Student summary is unavailable.'),
-                );
-              }
+      return Consumer(
+        builder: (context, modalRef, _) {
+          final attendanceState = modalRef.watch(
+            teacherAttendanceControllerProvider,
+          );
+          final scopeIsCurrent =
+              !attendanceState.isLoading &&
+              attendanceState.error == null &&
+              attendanceState.selectedClass?.id == classSection.id;
+          final studentIsStillAssigned = attendanceState.originalEntries.any(
+            (currentEntry) => currentEntry.studentId == entry.studentId,
+          );
 
-              final summary = snapshot.data!;
-              final attendance = summary.attendance;
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    summary.student.name,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w900,
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                0,
+                AppSpacing.lg,
+                AppSpacing.xl,
+              ),
+              child: !scopeIsCurrent
+                  ? const AppCard(
+                      child: Text(
+                        'Student summary is unavailable while teaching access is being revalidated.',
+                      ),
+                    )
+                  : !studentIsStillAssigned
+                  ? const AppCard(
+                      child: Text(
+                        'Student summary is no longer available for this assigned roster.',
+                      ),
+                    )
+                  : FutureBuilder<TeacherStudentSummary>(
+                      future: future,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState != ConnectionState.done) {
+                          return const SizedBox(
+                            height: 180,
+                            child: Center(child: CircularProgressIndicator()),
+                          );
+                        }
+                        if (snapshot.hasError || !snapshot.hasData) {
+                          return const AppCard(
+                            child: Text('Student summary is unavailable.'),
+                          );
+                        }
+
+                        final summary = snapshot.data!;
+                        final attendance = summary.attendance;
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              summary.student.name,
+                              style: Theme.of(context).textTheme.titleLarge
+                                  ?.copyWith(fontWeight: FontWeight.w900),
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                            Text(
+                              [
+                                summary.student.className,
+                                if (summary.student.sectionName != null)
+                                  summary.student.sectionName!,
+                                if (summary.student.rollNumber != null)
+                                  'Roll ${summary.student.rollNumber}',
+                              ].join(' • '),
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(color: AppColors.slate500),
+                            ),
+                            const SizedBox(height: AppSpacing.lg),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _SummaryMetric(
+                                    label: 'Present',
+                                    value: '${attendance.present}',
+                                    color: AppColors.success,
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.sm),
+                                Expanded(
+                                  child: _SummaryMetric(
+                                    label: 'Absent',
+                                    value: '${attendance.absent}',
+                                    color: AppColors.danger,
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.sm),
+                                Expanded(
+                                  child: _SummaryMetric(
+                                    label: 'Late',
+                                    value: '${attendance.late}',
+                                    color: AppColors.warning,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: AppSpacing.md),
+                            AppCard(
+                              hasShadow: false,
+                              color: AppColors.slate50,
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      'Recent register window',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                    ),
+                                  ),
+                                  StatusChip(
+                                    status: _studentSummaryStatus(
+                                      attendance.lastStatus,
+                                    ),
+                                    label: _studentStatusLabel(
+                                      attendance.lastStatus,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    [
-                      summary.student.className,
-                      if (summary.student.sectionName != null)
-                        summary.student.sectionName!,
-                      if (summary.student.rollNumber != null)
-                        'Roll ${summary.student.rollNumber}',
-                    ].join(' • '),
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodyMedium?.copyWith(color: AppColors.slate500),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _SummaryMetric(
-                          label: 'Present',
-                          value: '${attendance.present}',
-                          color: AppColors.success,
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: _SummaryMetric(
-                          label: 'Absent',
-                          value: '${attendance.absent}',
-                          color: AppColors.danger,
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: _SummaryMetric(
-                          label: 'Late',
-                          value: '${attendance.late}',
-                          color: AppColors.warning,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  AppCard(
-                    hasShadow: false,
-                    color: AppColors.slate50,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Recent register window',
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                        StatusChip(
-                          status: _studentSummaryStatus(attendance.lastStatus),
-                          label: _studentStatusLabel(attendance.lastStatus),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
+            ),
+          );
+        },
       );
     },
   );

@@ -51,6 +51,7 @@ describe('MobileTeacherAttendanceController', () => {
       date: '2026-06-02T00:00:00.000Z',
       periods: [],
       classes: [],
+      hasTeachingScope: false,
       pendingAttendanceCount: 0,
     });
 
@@ -60,6 +61,7 @@ describe('MobileTeacherAttendanceController', () => {
       date: '2026-06-02T00:00:00.000Z',
       periods: [],
       classes: [],
+      hasTeachingScope: false,
       pendingAttendanceCount: 0,
     });
     expect(attendanceService.getTeacherMobileToday).toHaveBeenCalledWith(

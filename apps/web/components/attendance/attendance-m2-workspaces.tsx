@@ -38,7 +38,10 @@ import type {
   AttendanceRegisterExportSummary,
   M2FollowUpQueue,
 } from "@/lib/api/attendance";
-import { AttendanceForm } from "@/components/forms/attendance-form";
+import {
+  AttendanceForm,
+  type AttendanceDraftRecoveryScope,
+} from "@/components/forms/attendance-form";
 import { AttendanceConflictReview } from "./attendance-conflict-review";
 import { AttendanceCorrectionReview } from "./attendance-correction-review";
 import { useSession } from "@/components/session-provider";
@@ -155,10 +158,7 @@ const attendanceTabs = [
   { href: "/dashboard/attendance/reports", label: "Reports", icon: Download },
 ];
 
-function visibleAttendanceTabs(
-  canMark: boolean,
-  isSupportOverride: boolean,
-) {
+function visibleAttendanceTabs(canMark: boolean, isSupportOverride: boolean) {
   if (isSupportOverride) {
     return attendanceTabs.slice(0, 1);
   }
@@ -250,49 +250,54 @@ export function AttendanceOverviewWorkspace() {
             </Button>
           ) : undefined
         }
-        moreActionItems={isSupportOverride ? [] : [
-          ...(attendance.canMark
-            ? [
+        moreActionItems={
+          isSupportOverride
+            ? []
+            : [
+                ...(attendance.canMark
+                  ? [
+                      {
+                        label: "Bulk actions",
+                        icon: <Users size={16} />,
+                        onClick: () =>
+                          router.push("/dashboard/attendance/register"),
+                      },
+                    ]
+                  : []),
                 {
-                  label: "Bulk actions",
-                  icon: <Users size={16} />,
+                  label: "Exports and reports",
+                  icon: <Download size={16} />,
+                  onClick: () => router.push("/dashboard/attendance/reports"),
+                },
+                ...(attendance.canMark
+                  ? [
+                      {
+                        label: "Offline drafts",
+                        icon: <Save size={16} />,
+                        onClick: () =>
+                          router.push("/dashboard/attendance/offline-drafts"),
+                      },
+                    ]
+                  : []),
+                {
+                  label: "Attendance anomalies",
+                  icon: <ShieldAlert size={16} />,
+                  onClick: () => router.push("/dashboard/attendance/anomalies"),
+                },
+                {
+                  label: "Follow-up queue",
+                  icon: <MessageSquare size={16} />,
                   onClick: () =>
-                    router.push("/dashboard/attendance/register"),
+                    router.push("/dashboard/attendance/follow-ups"),
+                },
+                {
+                  label: "Settings",
+                  icon: <Settings size={16} />,
+                  onClick: () =>
+                    router.push("/dashboard/settings/policies/attendance"),
                 },
               ]
-            : []),
-          {
-            label: "Exports and reports",
-            icon: <Download size={16} />,
-            onClick: () => router.push("/dashboard/attendance/reports"),
-          },
-          ...(attendance.canMark
-            ? [
-                {
-                  label: "Offline drafts",
-                  icon: <Save size={16} />,
-                  onClick: () =>
-                    router.push("/dashboard/attendance/offline-drafts"),
-                },
-              ]
-            : []),
-          {
-            label: "Attendance anomalies",
-            icon: <ShieldAlert size={16} />,
-            onClick: () => router.push("/dashboard/attendance/anomalies"),
-          },
-          {
-            label: "Follow-up queue",
-            icon: <MessageSquare size={16} />,
-            onClick: () => router.push("/dashboard/attendance/follow-ups"),
-          },
-          {
-            label: "Settings",
-            icon: <Settings size={16} />,
-            onClick: () =>
-              router.push("/dashboard/settings/policies/attendance"),
-          },
-        ]}
+        }
       >
         <SummaryGrid>
           <SummaryCard
@@ -439,7 +444,11 @@ export function AttendanceOverviewWorkspace() {
   );
 }
 
-export function AttendanceMarkWorkspace() {
+export function AttendanceMarkWorkspace({
+  initialDraftScope,
+}: {
+  initialDraftScope?: AttendanceDraftRecoveryScope;
+}) {
   return (
     <DashboardPageShell>
       <ModuleHeader
@@ -457,7 +466,7 @@ export function AttendanceMarkWorkspace() {
         }
       />
       <AttendanceModuleTabs />
-      <AttendanceForm />
+      <AttendanceForm initialDraftScope={initialDraftScope} />
     </DashboardPageShell>
   );
 }
@@ -631,9 +640,7 @@ export function AttendanceRegisterWorkspace({
       },
       format,
     );
-    setExportMessage(
-      `${format.toUpperCase()} attendance export prepared.`,
-    );
+    setExportMessage(`${format.toUpperCase()} attendance export prepared.`);
   }
 
   return (
@@ -1251,13 +1258,16 @@ export function AttendanceOfflineDraftsWorkspace() {
       />
       <AttendanceModuleTabs />
       <Notice tone="info">
-        Browser drafts are account-scoped, size-limited, expire after 48 hours,
-        and are cleared on logout or confirmed session expiry. Rejected or
-        still-checking submissions stay on the browser for safe review while the
-        session remains active.
+        Browser drafts are account-scoped and size-limited. Editable drafts
+        expire after 48 hours; unresolved final receipts remain until SchoolOS
+        confirms an outcome or the session is cleared. Rejected submissions stay
+        available for safe review. Access-denied records retain only a
+        purpose-limited receipt; their student details and recovery link are
+        removed. For other drafts, use Open saved scope to return to the exact
+        class, academic year, section, and date before retrying.
       </Notice>
       <div className="grid gap-6 xl:grid-cols-3">
-        <SectionCard title="This Browser">
+        <SectionCard title="This Browser" className="xl:col-span-3">
           {localDraftsLoading ? (
             <LoadingState label="Loading browser drafts..." />
           ) : localDraftsError ? (
@@ -1277,32 +1287,67 @@ export function AttendanceOfflineDraftsWorkspace() {
                   <TableHead>Class</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {localDrafts.map((draft) => (
-                  <TableRow key={draft.key}>
-                    <TableCell>
-                      <div className="font-semibold text-slate-900">
-                        {draft.classLabel ?? "Selected class"}
-                      </div>
-                      {draft.sectionLabel ? (
-                        <div className="text-xs text-slate-500">
-                          {draft.sectionLabel}
+                {localDrafts.map((draft) => {
+                  const accessRestricted = isAccessRestrictedBrowserDraft(
+                    draft.lastSyncStatus,
+                  );
+                  return (
+                    <TableRow key={draft.key}>
+                      <TableCell>
+                        <div className="font-semibold text-slate-900">
+                          {accessRestricted
+                            ? "Attendance access removed"
+                            : (draft.classLabel ?? "Selected class")}
                         </div>
-                      ) : null}
-                    </TableCell>
-                    <TableCell>
-                      <div>{formatDate(draft.attendanceDate)}</div>
-                      <div className="text-xs text-slate-500">
-                        Saved {formatDateTime(draft.savedAt)}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="warning">Queued on browser</Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                        {!accessRestricted && draft.sectionLabel ? (
+                          <div className="text-xs text-slate-500">
+                            {draft.sectionLabel}
+                          </div>
+                        ) : null}
+                        <div className="text-xs text-slate-500">
+                          {accessRestricted
+                            ? "Student details cleared from this browser"
+                            : (draft.academicYearLabel ??
+                              "Academic year label unavailable")}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          {accessRestricted
+                            ? "Scope hidden"
+                            : formatDate(draft.attendanceDate)}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          Saved {formatDateTime(draft.savedAt)}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <BrowserAttendanceDraftStatus
+                          status={draft.lastSyncStatus}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        {accessRestricted ? (
+                          <span className="text-xs font-semibold text-slate-500">
+                            Recovery unavailable
+                          </span>
+                        ) : (
+                          <Link
+                            href={attendanceDraftRecoveryHref(draft)}
+                            aria-label={`Open saved attendance scope for ${draft.classLabel ?? "selected class"} on ${formatDate(draft.attendanceDate)}`}
+                            className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
+                          >
+                            Open saved scope
+                          </Link>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
@@ -1342,7 +1387,7 @@ export function AttendanceOfflineDraftsWorkspace() {
             </Table>
           )}
         </SectionCard>
-        <SectionCard title="Sync Queue and Conflicts">
+        <SectionCard title="Sync Queue and Conflicts" className="xl:col-span-2">
           {conflictsQuery.isLoading ? (
             <LoadingState label="Loading sync audit..." />
           ) : conflictsQuery.isError ? (
@@ -1561,8 +1606,8 @@ export function AttendanceFollowUpsWorkspace() {
         {canManageAll ? (
           <SectionCard title="Dispatch Controls">
             <Notice tone="warning">
-              Delivery follows provider settings, guardian consent, quiet
-              hours, retry rules, and duplicate protection managed by M12.
+              Delivery follows provider settings, guardian consent, quiet hours,
+              retry rules, and duplicate protection managed by M12.
             </Notice>
             <label className="mt-4 block text-xs font-black uppercase tracking-wide text-slate-500">
               Operational reason
@@ -2031,10 +2076,7 @@ export function AttendanceSettingsWorkspace() {
                 "Rule highlights",
                 statesQuery.data?.supportPolicy ?? "Unavailable",
               ],
-              [
-                "Audit history",
-                "Policy updates retained in the audit history",
-              ],
+              ["Audit history", "Policy updates retained in the audit history"],
               [
                 "Device configuration",
                 "Biometric/device setup is not part of M2",
@@ -2526,6 +2568,54 @@ function ComparisonCard({
  * (`AttendanceSessionState`). Every attendance surface uses this rather than
  * re-deriving a label from whichever timestamps it happened to fetch.
  */
+function attendanceDraftRecoveryHref(draft: StoredAttendanceDraft) {
+  const search = new URLSearchParams({
+    academicYearId: draft.academicYearId,
+    classId: draft.classId,
+    attendanceDate: draft.attendanceDate,
+  });
+  if (draft.sectionId) search.set("sectionId", draft.sectionId);
+
+  return `/dashboard/attendance/mark?${search.toString()}`;
+}
+
+function BrowserAttendanceDraftStatus({ status }: { status?: string }) {
+  const normalizedStatus = status?.toUpperCase() ?? "";
+
+  if (normalizedStatus === "AUTHORIZATION_DENIED") {
+    return <Badge variant="destructive">Access denied — details cleared</Badge>;
+  }
+  if (normalizedStatus === "ACCESS_REVALIDATION_REQUIRED") {
+    return <Badge variant="destructive">Access revalidation required</Badge>;
+  }
+  if (normalizedStatus === "REJECTED") {
+    return <Badge variant="destructive">Rejected — review</Badge>;
+  }
+  if (normalizedStatus === "FAILED") {
+    return <Badge variant="destructive">Sync failed — saved locally</Badge>;
+  }
+  if (["ACCEPTED", "SYNCED"].includes(normalizedStatus)) {
+    return <Badge variant="success">Accepted — local receipt retained</Badge>;
+  }
+  if (normalizedStatus === "CONFLICTED") {
+    return <Badge variant="warning">Conflict recorded</Badge>;
+  }
+  if (normalizedStatus === "QUEUED") {
+    return <Badge variant="warning">Final submission queued</Badge>;
+  }
+  if (normalizedStatus) {
+    return <Badge variant="warning">Pending confirmation</Badge>;
+  }
+
+  return <Badge variant="neutral">Saved locally</Badge>;
+}
+
+function isAccessRestrictedBrowserDraft(status?: string) {
+  return ["AUTHORIZATION_DENIED", "ACCESS_REVALIDATION_REQUIRED"].includes(
+    status?.toUpperCase() ?? "",
+  );
+}
+
 function AttendanceStateBadge({
   state,
 }: {

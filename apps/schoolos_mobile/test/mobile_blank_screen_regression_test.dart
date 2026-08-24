@@ -9,6 +9,7 @@ import 'package:schoolos_mobile/app/constants/app_routes.dart';
 import 'package:schoolos_mobile/core/auth/auth_provider.dart';
 import 'package:schoolos_mobile/core/auth/data/auth_repository.dart';
 import 'package:schoolos_mobile/core/auth/models/auth_user.dart';
+import 'package:schoolos_mobile/core/errors/app_exception.dart';
 import 'package:schoolos_mobile/core/network/api_client.dart';
 import 'package:schoolos_mobile/core/network/connectivity_provider.dart';
 import 'package:schoolos_mobile/core/storage/app_preferences_service.dart';
@@ -19,6 +20,7 @@ import 'package:schoolos_mobile/features/attendance/domain/attendance_models.dar
 import 'package:schoolos_mobile/features/attendance/presentation/screens/teacher_attendance_screen.dart';
 import 'package:schoolos_mobile/features/dashboard/presentation/role_dashboards/admin_dashboard.dart';
 import 'package:schoolos_mobile/features/dashboard/presentation/role_dashboards/staff_dashboard.dart';
+import 'package:schoolos_mobile/features/dashboard/presentation/role_dashboards/teacher_dashboard.dart';
 import 'package:schoolos_mobile/features/operational_summary/application/operational_summary_providers.dart';
 import 'package:schoolos_mobile/features/operational_summary/domain/operational_summary_models.dart';
 import 'package:schoolos_mobile/features/principal/application/principal_providers.dart';
@@ -992,6 +994,221 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'teacher class hub blanks an open student summary during scope invalidation',
+    (tester) async {
+      final repository = _MockAttendanceRepository();
+      _stubTeacherAttendanceScope(repository);
+      when(() => repository.getTeacherToday(any())).thenAnswer(
+        (_) async => TeacherTodaySnapshot(
+          date: DateTime(2026, 6, 19),
+          periods: const [],
+          classes: const [assignedClass],
+          pendingAttendanceCount: 1,
+          lastUpdated: DateTime(2026, 6, 19, 8),
+        ),
+      );
+      when(
+        () => repository.loadDraftAttendance(any(), any()),
+      ).thenAnswer((_) async => null);
+      when(() => repository.getClassAttendanceSheet(any(), any())).thenAnswer(
+        (_) async => TeacherRosterSnapshot(
+          entries: const [student],
+          attendance: const TeacherAttendanceMeta(
+            isSubmitted: false,
+            isLocked: false,
+            conflictStatus: 'NONE',
+          ),
+          isWorkingDay: true,
+          lastUpdated: DateTime(2026, 6, 19, 8),
+        ),
+      );
+      when(() => repository.getTeacherStudentSummary(any(), any())).thenAnswer(
+        (_) async => const TeacherStudentSummary(
+          student: TeacherStudentIdentity(
+            id: 'student-1',
+            name: 'Sensitive Student Detail',
+            lifecycleStatus: 'ACTIVE',
+            className: 'Grade 3',
+            sectionName: 'A',
+          ),
+          attendance: TeacherStudentAttendance(
+            recentWindow: 2,
+            present: 1,
+            absent: 1,
+            late: 0,
+            leave: 0,
+            lastStatus: 'ABSENT',
+          ),
+        ),
+      );
+      final controller = TeacherAttendanceController(
+        repository: repository,
+        isOnline: true,
+      );
+      final router = GoRouter(
+        initialLocation: '/',
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (context, state) => const TeacherClassHubScreen(
+              classSectionId: 'year-1:class-1:section-1',
+            ),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            attendanceRepositoryProvider.overrideWithValue(repository),
+            teacherAttendanceControllerProvider.overrideWith(
+              (ref) => controller,
+            ),
+          ],
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Student summaries'),
+        220,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.ensureVisible(find.text('Asha Sharma'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ListTile, 'Asha Sharma'));
+      await tester.pumpAndSettle();
+      expect(find.text('Sensitive Student Detail'), findsOneWidget);
+
+      when(
+        () => repository.refreshTeacherAttendanceScope(),
+      ).thenThrow(const PermissionException());
+      final invalidation = controller.load(
+        requestedClassSectionId: assignedClass.id,
+      );
+      await tester.pump();
+      await invalidation;
+      await tester.pump();
+
+      expect(find.text('Sensitive Student Detail'), findsNothing);
+      expect(
+        find.text(
+          'Student summary is unavailable while teaching access is being revalidated.',
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'teacher class hub keeps a removed student summary hidden after same-class revalidation',
+    (tester) async {
+      final repository = _MockAttendanceRepository();
+      _stubTeacherAttendanceScope(repository);
+      when(() => repository.getTeacherToday(any())).thenAnswer(
+        (_) async => TeacherTodaySnapshot(
+          date: DateTime(2026, 6, 19),
+          periods: const [],
+          classes: const [assignedClass],
+          pendingAttendanceCount: 1,
+          lastUpdated: DateTime(2026, 6, 19, 8),
+        ),
+      );
+      when(
+        () => repository.loadDraftAttendance(any(), any()),
+      ).thenAnswer((_) async => null);
+      var rosterContainsStudent = true;
+      when(() => repository.getClassAttendanceSheet(any(), any())).thenAnswer((
+        _,
+      ) async {
+        return TeacherRosterSnapshot(
+          entries: rosterContainsStudent ? const [student] : const [],
+          attendance: const TeacherAttendanceMeta(
+            isSubmitted: false,
+            isLocked: false,
+            conflictStatus: 'NONE',
+          ),
+          isWorkingDay: true,
+          lastUpdated: DateTime(2026, 6, 19, 8),
+        );
+      });
+      when(() => repository.getTeacherStudentSummary(any(), any())).thenAnswer(
+        (_) async => const TeacherStudentSummary(
+          student: TeacherStudentIdentity(
+            id: 'student-1',
+            name: 'Sensitive Student Detail',
+            lifecycleStatus: 'ACTIVE',
+            className: 'Grade 3',
+            sectionName: 'A',
+          ),
+          attendance: TeacherStudentAttendance(
+            recentWindow: 2,
+            present: 1,
+            absent: 1,
+            late: 0,
+            leave: 0,
+            lastStatus: 'ABSENT',
+          ),
+        ),
+      );
+      final controller = TeacherAttendanceController(
+        repository: repository,
+        isOnline: true,
+      );
+      final router = GoRouter(
+        initialLocation: '/',
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (context, state) => const TeacherClassHubScreen(
+              classSectionId: 'year-1:class-1:section-1',
+            ),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            attendanceRepositoryProvider.overrideWithValue(repository),
+            teacherAttendanceControllerProvider.overrideWith(
+              (ref) => controller,
+            ),
+          ],
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Student summaries'),
+        220,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.ensureVisible(find.text('Asha Sharma'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ListTile, 'Asha Sharma'));
+      await tester.pumpAndSettle();
+      expect(find.text('Sensitive Student Detail'), findsOneWidget);
+
+      rosterContainsStudent = false;
+      final revalidation = controller.load(
+        requestedClassSectionId: assignedClass.id,
+      );
+      await tester.pump();
+      await revalidation;
+      await tester.pump();
+
+      expect(find.text('Sensitive Student Detail'), findsNothing);
+      expect(
+        find.text(
+          'Student summary is no longer available for this assigned roster.',
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
   testWidgets('teacher homework paints real assignment content', (
     tester,
   ) async {
@@ -1468,6 +1685,82 @@ void main() {
 
       expect(find.text('Fees Snapshot'), findsOneWidget);
       expect(find.textContaining('Rs. 1,23,45,678.50'), findsWidgets);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'teacher dashboard shows subject-only periods without exposing an attendance route',
+    (tester) async {
+      final sharedPrefs = await SharedPreferences.getInstance();
+      final repository = _MockAttendanceRepository();
+      _stubTeacherAttendanceScope(repository);
+      when(() => repository.getTeacherToday(any())).thenAnswer(
+        (_) async => TeacherTodaySnapshot(
+          date: DateTime(2026, 6, 19),
+          periods: const [
+            TeacherTodayPeriod(
+              id: 'period-1',
+              classSectionId: 'year-1:class-8:section-b',
+              className: 'Grade 8 - B',
+              subjectName: 'Science',
+              startsAt: '09:00',
+              endsAt: '09:45',
+            ),
+          ],
+          classes: const [],
+          pendingAttendanceCount: 0,
+          lastUpdated: DateTime(2026, 6, 19, 8),
+          hasTeachingScope: true,
+        ),
+      );
+      final controller = TeacherAttendanceController(
+        repository: repository,
+        isOnline: true,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appPreferencesServiceProvider.overrideWithValue(
+              AppPreferencesService(sharedPrefs),
+            ),
+            tokenStorageServiceProvider.overrideWithValue(_FakeTokenStorage()),
+            authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+            authProvider.overrideWith((ref) {
+              return _FakeTeacherAuthNotifier(
+                ref.watch(tokenStorageServiceProvider),
+                ref.watch(authRepositoryProvider),
+                ref.watch(appPreferencesServiceProvider),
+              );
+            }),
+            teacherAttendanceControllerProvider.overrideWith(
+              (ref) => controller,
+            ),
+            teacherNoticeSummaryProvider.overrideWith(
+              (ref) async => TeacherNoticeSummary(
+                unreadCount: 0,
+                lastUpdated: DateTime(2026, 6, 19, 8),
+              ),
+            ),
+            teacherHomeworkProvider(const TeacherHomeworkQuery()).overrideWith(
+              (ref) async => TeacherHomeworkSnapshot(
+                items: const [],
+                scopes: const [],
+                total: 0,
+                lastUpdated: DateTime(2026, 6, 19, 8),
+              ),
+            ),
+          ],
+          child: const MaterialApp(home: TeacherDashboard()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Grade 8 - B'), findsWidgets);
+      expect(find.textContaining('Science'), findsWidgets);
+      expect(find.text('No classes are assigned'), findsNothing);
+      expect(find.text('Attendance classes'), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );

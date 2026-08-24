@@ -155,6 +155,7 @@ class TeacherAttendanceState {
     this.lastUpdated,
     this.todayPeriods = const [],
     this.pendingAttendanceCount = 0,
+    this.hasTeachingScope = false,
     this.error,
     this.draftClientSubmissionId,
     this.draftReceiptState,
@@ -176,6 +177,7 @@ class TeacherAttendanceState {
   final DateTime? lastUpdated;
   final List<TeacherTodayPeriod> todayPeriods;
   final int pendingAttendanceCount;
+  final bool hasTeachingScope;
   final Object? error;
   final String? draftClientSubmissionId;
   final AttendanceDraftReceiptState? draftReceiptState;
@@ -227,6 +229,7 @@ class TeacherAttendanceState {
     DateTime? lastUpdated,
     List<TeacherTodayPeriod>? todayPeriods,
     int? pendingAttendanceCount,
+    bool? hasTeachingScope,
     Object? error,
     bool clearError = false,
     bool clearSelectedClassId = false,
@@ -256,6 +259,7 @@ class TeacherAttendanceState {
       todayPeriods: todayPeriods ?? this.todayPeriods,
       pendingAttendanceCount:
           pendingAttendanceCount ?? this.pendingAttendanceCount,
+      hasTeachingScope: hasTeachingScope ?? this.hasTeachingScope,
       error: clearError ? null : error ?? this.error,
       draftClientSubmissionId: clearDraftClientSubmissionId
           ? null
@@ -357,11 +361,16 @@ class TeacherAttendanceController
           classes: const [],
           entries: const [],
           originalEntries: const [],
-          isOffline: !_isOnline,
+          isOffline: !_isOnline || today.fromCache,
           todayPeriods: today.periods,
-          pendingAttendanceCount: 0,
+          pendingAttendanceCount: today.pendingAttendanceCount,
+          hasTeachingScope: today.hasTeachingScope,
           lastUpdated: today.lastUpdated,
-          message: scopeRefresh.purgedLocalData
+          message: today.hasTeachingScope
+              ? scopeRefresh.purgedLocalData
+                    ? 'Any older local attendance data was cleared after your teaching access was revalidated. No homeroom attendance classes are currently assigned to you.'
+                    : 'No homeroom attendance classes are assigned to you for the current school year.'
+              : scopeRefresh.purgedLocalData
               ? 'Any older local attendance data was cleared after your teaching access was revalidated. No classes are currently assigned to you.'
               : 'No classes are assigned to you for the current school year.',
         );
@@ -378,6 +387,7 @@ class TeacherAttendanceController
           originalEntries: const [],
           todayPeriods: today.periods,
           pendingAttendanceCount: today.pendingAttendanceCount,
+          hasTeachingScope: today.hasTeachingScope,
           lastUpdated: today.lastUpdated,
           error: const PermissionException(
             'This class is not assigned to you.',
@@ -418,6 +428,7 @@ class TeacherAttendanceController
         lastUpdated: roster.lastUpdated,
         todayPeriods: today.periods,
         pendingAttendanceCount: today.pendingAttendanceCount,
+        hasTeachingScope: today.hasTeachingScope,
         draftClientSubmissionId: draft?.clientSubmissionId,
         clearDraftClientSubmissionId: draft == null,
         draftReceiptState: draft?.receiptState,
@@ -829,6 +840,7 @@ TeacherAttendanceState _withoutSensitiveAttendanceData(
     clearLastUpdated: true,
     todayPeriods: const [],
     pendingAttendanceCount: 0,
+    hasTeachingScope: false,
     error: error,
     clearError: error == null,
     clearDraftClientSubmissionId: true,

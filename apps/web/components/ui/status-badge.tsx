@@ -29,6 +29,7 @@ const statusToneMap: Record<string, StatusTone> = {
   CANCELLED: 'inactive',
   PENDING: 'pending',
   QUEUED: 'pending',
+  PENDING_CONFIRMATION: 'pending',
   RETRYING: 'pending',
   RETRIED: 'pending',
   SUBMITTED: 'pending',
@@ -41,6 +42,9 @@ const statusToneMap: Record<string, StatusTone> = {
   REVIEWED: 'approved',
   ACTION_TAKEN: 'approved',
   REJECTED: 'rejected',
+  ACCESS_DENIED: 'rejected',
+  ACCESS_REVOKED: 'rejected',
+  LOCAL_DRAFT_UNAVAILABLE: 'rejected',
   NEEDS_CORRECTION: 'partial',
   PARTIALLY_SUCCEEDED: 'partial',
   PARTIALLY_DELIVERED: 'partial',
@@ -84,7 +88,8 @@ const toneClasses: Record<StatusTone, string> = {
   approved: 'border-success-100 bg-success-50 text-success-700',
   rejected: 'border-danger-100 bg-danger-50 text-danger-700',
   draft: 'border-slate-200 bg-slate-50 text-slate-600',
-  published: 'border-[var(--primary-soft)] bg-[var(--primary-soft)] text-[var(--primary-dark)]',
+  published:
+    'border-[var(--primary-soft)] bg-[var(--primary-soft)] text-[var(--primary-dark)]',
   locked: 'border-slate-200 bg-slate-100 text-slate-700',
   paid: 'border-success-100 bg-success-50 text-success-700',
   partial: 'border-warning-100 bg-warning-50 text-warning-700',
@@ -103,7 +108,12 @@ type StatusBadgeProps = {
   className?: string;
 };
 
-export function StatusBadge({ status, label, tone, className }: StatusBadgeProps) {
+export function StatusBadge({
+  status,
+  label,
+  tone,
+  className,
+}: StatusBadgeProps) {
   const normalized = status.trim().toUpperCase();
   const resolvedTone = tone ?? statusToneMap[normalized] ?? 'info';
   const displayLabel = label ?? normalized.replace(/_/g, ' ');

@@ -86,7 +86,7 @@ void main() {
       },
     );
 
-    for (final storedVersion in <String?>[null, '6']) {
+    for (final storedVersion in <String?>[null, '6', '8']) {
       test(
         '${storedVersion == null ? 'bootstrap' : 'mismatch'} purges before persisting the verified scope version',
         () async {
@@ -140,6 +140,159 @@ void main() {
         },
       );
     }
+
+    test(
+      'serializes concurrent refreshes and accepts the later opaque fingerprint',
+      () async {
+        final firstRequestStarted = Completer<void>();
+        final firstResponse = Completer<Response<dynamic>>();
+        final cache = PrivateReadCache(
+          secureStore,
+          scope: PrivateReadCacheScope(
+            tenantId: 'tenant-1',
+            userId: 'teacher-1',
+            role: MobileRole.teacher,
+          ),
+        );
+        final drafts = TeacherAttendanceDraftStore(
+          secureStore,
+          scope: TeacherAttendanceDraftScope(
+            tenantId: 'tenant-1',
+            userId: 'teacher-1',
+            role: MobileRole.teacher,
+          ),
+        );
+        final versions = TeacherAttendanceScopeVersionStore(
+          secureStore,
+          scope: TeacherAttendanceScopeVersionScope(
+            tenantId: 'tenant-1',
+            userId: 'teacher-1',
+            role: MobileRole.teacher,
+          ),
+        );
+        await versions.write('8');
+        final scopedRepository = AttendanceRepository(
+          apiClient,
+          cache: cache,
+          draftStore: drafts,
+          scopeVersionStore: versions,
+        );
+        var requestCount = 0;
+        when(
+          () => apiClient.get<dynamic>(
+            '/mobile/teacher/attendance/scope-version',
+          ),
+        ).thenAnswer((_) {
+          requestCount += 1;
+          if (requestCount == 1) {
+            firstRequestStarted.complete();
+            return firstResponse.future;
+          }
+          return Future.value(
+            Response(
+              requestOptions: RequestOptions(
+                path: '/mobile/teacher/attendance/scope-version',
+              ),
+              data: {'scopeVersion': '7'},
+            ),
+          );
+        });
+
+        final firstRefresh = scopedRepository.refreshTeacherAttendanceScope();
+        await firstRequestStarted.future;
+        final secondRefresh = scopedRepository.refreshTeacherAttendanceScope();
+        await Future<void>.delayed(Duration.zero);
+        expect(requestCount, 1);
+
+        firstResponse.complete(
+          Response(
+            requestOptions: RequestOptions(
+              path: '/mobile/teacher/attendance/scope-version',
+            ),
+            data: {'scopeVersion': '9'},
+          ),
+        );
+
+        expect(
+          await firstRefresh,
+          TeacherAttendanceScopeRefresh.localDataPurged,
+        );
+        expect(
+          await secondRefresh,
+          TeacherAttendanceScopeRefresh.localDataPurged,
+        );
+        expect(requestCount, 2);
+        expect(await versions.read(), '7');
+      },
+    );
+
+    test(
+      'a stale scope refresh cannot clear a newer strict quarantine',
+      () async {
+        final requestStarted = Completer<void>();
+        final response = Completer<Response<dynamic>>();
+        final cache = PrivateReadCache(
+          secureStore,
+          scope: PrivateReadCacheScope(
+            tenantId: 'tenant-1',
+            userId: 'teacher-1',
+            role: MobileRole.teacher,
+          ),
+        );
+        final drafts = TeacherAttendanceDraftStore(
+          secureStore,
+          scope: TeacherAttendanceDraftScope(
+            tenantId: 'tenant-1',
+            userId: 'teacher-1',
+            role: MobileRole.teacher,
+          ),
+        );
+        final versions = TeacherAttendanceScopeVersionStore(
+          secureStore,
+          scope: TeacherAttendanceScopeVersionScope(
+            tenantId: 'tenant-1',
+            userId: 'teacher-1',
+            role: MobileRole.teacher,
+          ),
+        );
+        await versions.write('6');
+        final scopedRepository = AttendanceRepository(
+          apiClient,
+          cache: cache,
+          draftStore: drafts,
+          scopeVersionStore: versions,
+        );
+        when(
+          () => apiClient.get<dynamic>(
+            '/mobile/teacher/attendance/scope-version',
+          ),
+        ).thenAnswer((_) {
+          requestStarted.complete();
+          return response.future;
+        });
+
+        final staleRefresh = scopedRepository.refreshTeacherAttendanceScope();
+        await requestStarted.future;
+        await scopedRepository.clearTeacherAttendanceScopeStrict(
+          clearVersion: true,
+          quarantine: true,
+        );
+
+        response.complete(
+          Response(
+            requestOptions: RequestOptions(
+              path: '/mobile/teacher/attendance/scope-version',
+            ),
+            data: {'scopeVersion': '7'},
+          ),
+        );
+
+        await expectLater(staleRefresh, throwsA(isA<CacheException>()));
+        final persistedState = await versions.readState();
+        expect(persistedState?.scopeVersion, isNull);
+        expect(persistedState?.quarantined, isTrue);
+      },
+    );
 
     test(
       'scope mismatch stays quarantined when only part of the strict purge succeeds',
@@ -944,6 +1097,7 @@ void main() {
             data: {
               'date': '2026-06-18T00:00:00.000Z',
               'pendingAttendanceCount': 1,
+              'hasTeachingScope': true,
               'periods': [
                 {
                   'id': 'slot-1',
@@ -978,6 +1132,7 @@ void main() {
         final today = await repository.getTeacherToday(DateTime(2026, 6, 18));
 
         expect(today.pendingAttendanceCount, 1);
+        expect(today.hasTeachingScope, isTrue);
         expect(today.periods.single.subjectName, 'Mathematics');
         expect(today.classes.single.attendance?.isSubmitted, isFalse);
       },
@@ -1154,6 +1309,76 @@ void main() {
             },
           ),
         ).called(1);
+      },
+    );
+
+    test(
+      'a late student summary response is rejected after scope invalidation',
+      () async {
+        const classSection = TeacherClassSection(
+          id: 'year-1:class-1:section-1',
+          academicYearId: 'year-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          name: 'Grade 3 - A',
+          subject: 'Mathematics',
+        );
+        final cache = MockPrivateReadCache();
+        final drafts = MockTeacherAttendanceDraftStore();
+        final versions = MockTeacherAttendanceScopeVersionStore();
+        final response = Completer<Response<dynamic>>();
+        final scopedRepository = AttendanceRepository(
+          apiClient,
+          cache: cache,
+          draftStore: drafts,
+          scopeVersionStore: versions,
+        );
+        when(() => versions.readState()).thenAnswer(
+          (_) async => const TeacherAttendanceScopeVersionState(
+            scopeVersion: '7',
+            quarantined: false,
+          ),
+        );
+        when(
+          () => apiClient.get<dynamic>(
+            '/mobile/teacher/students/student-1/summary',
+            queryParameters: {
+              'academicYearId': 'year-1',
+              'classId': 'class-1',
+              'sectionId': 'section-1',
+            },
+          ),
+        ).thenAnswer((_) => response.future);
+        when(
+          () => versions.quarantine(clearVersion: true),
+        ).thenAnswer((_) async {});
+        when(
+          () => cache.clearTeacherAttendanceScopeStrict(),
+        ).thenAnswer((_) async {});
+        when(() => drafts.clearCurrentScopeStrict()).thenAnswer((_) async {});
+
+        final staleSummary = scopedRepository.getTeacherStudentSummary(
+          classSection,
+          'student-1',
+        );
+        await Future<void>.delayed(Duration.zero);
+        await scopedRepository.clearTeacherAttendanceScopeStrict(
+          clearVersion: true,
+          quarantine: true,
+        );
+        response.complete(
+          Response(
+            requestOptions: RequestOptions(
+              path: '/mobile/teacher/students/student-1/summary',
+            ),
+            data: {
+              'student': {'id': 'student-1', 'name': 'Asha Sharma'},
+              'attendance': {'recentWindow': 1},
+            },
+          ),
+        );
+
+        await expectLater(staleSummary, throwsA(isA<CacheException>()));
       },
     );
 

@@ -20,6 +20,7 @@ import {
   StaffStatus,
   StudentLifecycleStatus,
   TeacherAssignmentType,
+  TimetableSubstitutionStatus,
 } from '@prisma/client';
 import sharp from 'sharp';
 import { toGregorianDateFromBs } from '@schoolos/core';
@@ -29,6 +30,7 @@ import {
   TEACHER_SCOPE_DENIED_CODE,
   TeacherScopeService,
 } from '../teacher-scope/teacher-scope.service';
+import { TeacherCapability } from '../teacher-scope/teacher-capability';
 import {
   createTeacherScopeServiceForTests,
   teacherAssignmentFixture,
@@ -667,6 +669,7 @@ describe('attendance production hardening', () => {
 
     const result = await service.getTeacherMobileToday(teacherActor, dateInput);
 
+    expect(result.hasTeachingScope).toBe(true);
     expect(result.pendingAttendanceCount).toBe(0);
     expect(result.periods).toEqual([
       expect.objectContaining({
@@ -679,12 +682,336 @@ describe('attendance production hardening', () => {
       expect.objectContaining({
         where: expect.objectContaining({
           tenantId: teacherActor.tenantId,
-          staffId: 'staff-1',
           academicYearId: 'ay-current',
           dayOfWeek: expectedIsoWeekday,
+          AND: expect.arrayContaining([
+            expect.objectContaining({
+              OR: expect.arrayContaining([{ staffId: 'staff-1' }]),
+            }),
+          ]),
         }),
       }),
     );
+  });
+
+  it('preserves timetable periods for a pure homeroom teacher', async () => {
+    const today = new Date();
+    const dateInput = `${String(today.getFullYear())}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const { service, prisma } = buildService({
+      academicYear: { id: 'ay-current', name: '2082' },
+      classroom: { id: 'class-1', name: 'Grade 3', level: 3 },
+      section: { id: 'section-1', name: 'A', classId: 'class-1' },
+      canonicalAssignments: [
+        teacherAssignmentFixture({
+          id: 'homeroom-assignment-1',
+          tenantId: teacherActor.tenantId,
+          academicYearId: 'ay-current',
+          staffId: 'staff-1',
+          assignmentType: TeacherAssignmentType.CLASS_TEACHER,
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: null,
+          effectiveFrom: new Date('2020-01-01T00:00:00.000Z'),
+          effectiveUntil: new Date('2099-12-31T23:59:59.999Z'),
+        }),
+      ],
+      timetableSlots: [
+        {
+          id: 'slot-homeroom-1',
+          academicYearId: 'ay-current',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          startsAt: '09:00',
+          endsAt: '09:45',
+          class: { name: 'Grade 3' },
+          section: { name: 'A' },
+          subject: { name: 'Math' },
+        },
+      ],
+    });
+
+    const result = await service.getTeacherMobileToday(teacherActor, dateInput);
+
+    expect(result.classes).toEqual([
+      expect.objectContaining({
+        classId: 'class-1',
+        sectionId: 'section-1',
+        subject: 'Class teacher',
+      }),
+    ]);
+    expect(result.periods).toEqual([
+      expect.objectContaining({ id: 'slot-homeroom-1' }),
+    ]);
+    expect(prisma.timetableSlot.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          AND: expect.arrayContaining([
+            {
+              OR: [{ classId: 'class-1', sectionId: 'section-1' }],
+            },
+          ]),
+        }),
+      }),
+    );
+  });
+
+  it('shows a pure subject teacher only their assigned timetable periods', async () => {
+    const today = new Date();
+    const dateInput = `${String(today.getFullYear())}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const { service, prisma } = buildService({
+      staffFindFirst: { id: 'staff-1' },
+      academicYear: { id: 'ay-current', name: '2082' },
+      classroom: { id: 'class-1', name: 'Grade 3', level: 3 },
+      section: { id: 'section-1', name: 'A', classId: 'class-1' },
+      teacherAssignments: [
+        {
+          id: 'subject-assignment-1',
+          academicYearId: 'ay-current',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: 'subject-math',
+          subject: { id: 'subject-math', name: 'Math' },
+        },
+      ],
+      classTeacherSections: [],
+      timetableSlots: [
+        {
+          id: 'slot-subject-1',
+          academicYearId: 'ay-current',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          startsAt: '09:00',
+          endsAt: '09:45',
+          class: { name: 'Grade 3' },
+          section: { name: 'A' },
+          subject: { name: 'Math' },
+        },
+      ],
+    });
+
+    const result = await service.getTeacherMobileToday(teacherActor, dateInput);
+
+    expect(result.classes).toEqual([]);
+    expect(result.hasTeachingScope).toBe(true);
+    expect(result.pendingAttendanceCount).toBe(0);
+    expect(result.periods).toEqual([
+      expect.objectContaining({
+        id: 'slot-subject-1',
+        className: 'Grade 3 - A',
+        subjectName: 'Math',
+      }),
+    ]);
+    expect(prisma.attendanceSession.findMany).not.toHaveBeenCalled();
+    expect(prisma.timetableSlot.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: teacherActor.tenantId,
+          academicYearId: 'ay-current',
+          AND: expect.arrayContaining([
+            {
+              OR: [
+                {
+                  classId: 'class-1',
+                  sectionId: 'section-1',
+                  subjectId: 'subject-math',
+                },
+              ],
+            },
+            expect.objectContaining({
+              OR: expect.arrayContaining([{ staffId: 'staff-1' }]),
+            }),
+          ]),
+        }),
+      }),
+    );
+  });
+
+  it('does not project timetable periods from a read-only delegation', async () => {
+    const today = new Date();
+    const dateInput = `${String(today.getFullYear())}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const { service, prisma } = buildService({
+      staffFindFirst: { id: 'staff-1' },
+      academicYear: { id: 'ay-current', name: '2082' },
+      canonicalAssignments: [],
+      canonicalDelegations: [
+        {
+          id: 'marks-delegation-1',
+          tenantId: teacherActor.tenantId,
+          academicYearId: 'ay-current',
+          recipientStaffId: 'staff-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: 'subject-math',
+          componentScope: null,
+          allowedCapabilities: [TeacherCapability.CLASS_ROSTER_READ],
+          status: 'ACTIVE',
+          effectiveFrom: new Date('2020-01-01T00:00:00.000Z'),
+          effectiveUntil: new Date('2099-12-31T23:59:59.999Z'),
+        },
+      ],
+      timetableSlots: [
+        {
+          id: 'slot-marks-only',
+          academicYearId: 'ay-current',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          startsAt: '09:00',
+          endsAt: '09:45',
+          class: { name: 'Grade 3' },
+          section: { name: 'A' },
+          subject: { name: 'Math' },
+        },
+      ],
+    });
+
+    const result = await service.getTeacherMobileToday(teacherActor, dateInput);
+
+    expect(result).toEqual({
+      date: expect.any(String),
+      periods: [],
+      classes: [],
+      hasTeachingScope: false,
+      pendingAttendanceCount: 0,
+    });
+    expect(prisma.timetableSlot.findMany).not.toHaveBeenCalled();
+  });
+
+  it('projects an assigned substitution period only through its active write delegation', async () => {
+    const today = new Date();
+    const dateInput = `${String(today.getFullYear())}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const { service, prisma } = buildService({
+      academicYear: { id: 'ay-current', name: '2082' },
+      canonicalAssignments: [],
+      canonicalDelegations: [
+        {
+          id: 'substitution-delegation-1',
+          tenantId: teacherActor.tenantId,
+          academicYearId: 'ay-current',
+          recipientStaffId: 'staff-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: 'subject-math',
+          componentScope: null,
+          allowedCapabilities: [TeacherCapability.PERIOD_ATTENDANCE_MARK],
+          status: 'ACTIVE',
+          effectiveFrom: new Date('2020-01-01T00:00:00.000Z'),
+          effectiveUntil: new Date('2099-12-31T23:59:59.999Z'),
+        },
+      ],
+      timetableSlots: [
+        {
+          id: 'slot-substitution-1',
+          academicYearId: 'ay-current',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          startsAt: '09:00',
+          endsAt: '09:45',
+          class: { name: 'Grade 3' },
+          section: { name: 'A' },
+          subject: { name: 'Math' },
+        },
+      ],
+    });
+
+    await expect(
+      service.getTeacherMobileToday(teacherActor, dateInput),
+    ).resolves.toMatchObject({
+      classes: [],
+      hasTeachingScope: true,
+      periods: [expect.objectContaining({ id: 'slot-substitution-1' })],
+    });
+    expect(prisma.timetableSlot.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          AND: expect.arrayContaining([
+            {
+              OR: [
+                { staffId: 'staff-1' },
+                {
+                  substitutions: {
+                    some: expect.objectContaining({
+                      tenantId: teacherActor.tenantId,
+                      substituteTeacherId: 'staff-1',
+                      status: TimetableSubstitutionStatus.ASSIGNED,
+                    }),
+                  },
+                },
+              ],
+            },
+          ]),
+        }),
+      }),
+    );
+  });
+
+  it('evaluates current-day timed scopes at the current instant with inclusive boundaries', async () => {
+    const now = new Date('2026-08-24T10:00:00.000Z');
+    const timetableSlots = [
+      {
+        id: 'slot-timed-1',
+        academicYearId: 'ay-current',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        startsAt: '09:00',
+        endsAt: '09:45',
+        class: { name: 'Grade 3' },
+        section: { name: 'A' },
+        subject: { name: 'Math' },
+      },
+    ];
+    const buildTimedService = (overrides: Record<string, unknown>) =>
+      buildService({
+        academicYear: { id: 'ay-current', name: '2082' },
+        canonicalAssignments: [
+          teacherAssignmentFixture({
+            id: 'timed-subject-assignment',
+            tenantId: teacherActor.tenantId,
+            academicYearId: 'ay-current',
+            staffId: 'staff-1',
+            assignmentType: TeacherAssignmentType.SUBJECT_TEACHER,
+            classId: 'class-1',
+            sectionId: 'section-1',
+            subjectId: 'subject-math',
+            ...overrides,
+          }),
+        ],
+        timetableSlots,
+      });
+
+    jest.useFakeTimers();
+    try {
+      jest.setSystemTime(now);
+
+      const boundary = buildTimedService({
+        effectiveFrom: now,
+        effectiveUntil: now,
+      });
+      await expect(
+        boundary.service.getTeacherMobileToday(teacherActor, '2026-08-24'),
+      ).resolves.toMatchObject({
+        periods: [expect.objectContaining({ id: 'slot-timed-1' })],
+      });
+
+      const expired = buildTimedService({
+        effectiveFrom: new Date('2026-08-24T09:00:00.000Z'),
+        effectiveUntil: new Date(now.getTime() - 1),
+      });
+      await expect(
+        expired.service.getTeacherMobileToday(teacherActor, '2026-08-24'),
+      ).resolves.toMatchObject({ periods: [] });
+      expect(expired.prisma.timetableSlot.findMany).not.toHaveBeenCalled();
+
+      const future = buildTimedService({
+        effectiveFrom: new Date(now.getTime() + 1),
+        effectiveUntil: null,
+      });
+      await expect(
+        future.service.getTeacherMobileToday(teacherActor, '2026-08-24'),
+      ).resolves.toMatchObject({ periods: [] });
+      expect(future.prisma.timetableSlot.findMany).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('returns a bounded teacher-scoped mobile student summary', async () => {
@@ -4066,6 +4393,7 @@ function buildService(options: {
    * SubjectTeacherAssignment mock.
    */
   canonicalAssignments?: Array<Record<string, unknown>>;
+  canonicalDelegations?: Array<Record<string, unknown>>;
   scopeStaffId?: string | null;
   academicYear?: unknown;
   classroom?: unknown;
@@ -4401,64 +4729,95 @@ function buildService(options: {
       };
     }),
   ];
-  const teacherScope = options.canonicalAssignments
-    ? (() => {
-        const deps = createTeacherScopeServiceForTests({
-          assignments: options.canonicalAssignments,
-          staffId:
-            options.scopeStaffId === undefined
-              ? 'staff-1'
-              : options.scopeStaffId,
-        });
-        return new TeacherScopeService(
-          deps.prisma as never,
-          deps.audit as never,
-        );
-      })()
-    : ({
-        resolveActiveStaffId: jest.fn().mockResolvedValue('staff-1'),
-        listActiveAssignments: jest
-          .fn()
-          .mockResolvedValue(stubTeacherAssignments),
-        resolveReadableScope: jest.fn().mockResolvedValue({
-          assignments: stubTeacherAssignments,
-          homeroomSectionIds: new Set(
-            stubTeacherAssignments
-              .filter(
-                (assignment) =>
-                  assignment.assignmentType ===
-                  TeacherAssignmentType.CLASS_TEACHER,
-              )
-              .map((assignment) => assignment.sectionId),
-          ),
-          subjectsBySection: new Map(),
-          allSectionIds: new Set(
-            stubTeacherAssignments.map((assignment) => assignment.sectionId),
-          ),
-        }),
-        canAccess: jest.fn().mockResolvedValue({
-          source: 'ASSIGNMENT',
-          assignmentId: 'assignment-stub',
-          componentScope: null,
-          assignmentType: 'CLASS_TEACHER',
-        }),
-        canActorAccess: jest.fn().mockResolvedValue({
-          source: 'ASSIGNMENT',
-          assignmentId: 'assignment-stub',
-          componentScope: null,
-          assignmentType: 'CLASS_TEACHER',
-        }),
-        canAccessAnySectionOfClass: jest.fn().mockResolvedValue(null),
-        denyActorAccess: jest
-          .fn()
-          .mockRejectedValue(new ForbiddenException('Teacher scope denied')),
-        requireAccess: jest.fn().mockResolvedValue({
-          source: 'ASSIGNMENT',
-          assignmentId: 'assignment-stub',
-          componentScope: null,
-          assignmentType: 'CLASS_TEACHER',
-        }),
-      } as unknown as TeacherScopeService);
+  const teacherScope =
+    options.canonicalAssignments !== undefined ||
+    options.canonicalDelegations !== undefined
+      ? (() => {
+          const deps = createTeacherScopeServiceForTests({
+            assignments: options.canonicalAssignments ?? [],
+            delegations: options.canonicalDelegations ?? [],
+            staffId:
+              options.scopeStaffId === undefined
+                ? 'staff-1'
+                : options.scopeStaffId,
+          });
+          return new TeacherScopeService(
+            deps.prisma as never,
+            deps.audit as never,
+          );
+        })()
+      : ({
+          resolveActiveStaffId: jest.fn().mockResolvedValue('staff-1'),
+          listActiveAssignments: jest
+            .fn()
+            .mockResolvedValue(stubTeacherAssignments),
+          listActiveAssignmentsForCapability: jest
+            .fn()
+            .mockImplementation(
+              (_actor: unknown, capability: TeacherCapability) =>
+                Promise.resolve(
+                  stubTeacherAssignments.filter((assignment) => {
+                    if (
+                      capability === TeacherCapability.HOMEROOM_ATTENDANCE_MARK
+                    ) {
+                      return (
+                        assignment.assignmentType ===
+                          TeacherAssignmentType.CLASS_TEACHER &&
+                        assignment.subjectId === null
+                      );
+                    }
+                    if (
+                      capability === TeacherCapability.PERIOD_ATTENDANCE_MARK
+                    ) {
+                      return (
+                        assignment.assignmentType ===
+                          TeacherAssignmentType.SUBJECT_TEACHER &&
+                        Boolean(assignment.subjectId)
+                      );
+                    }
+                    return true;
+                  }),
+                ),
+            ),
+          resolveReadableScope: jest.fn().mockResolvedValue({
+            assignments: stubTeacherAssignments,
+            homeroomSectionIds: new Set(
+              stubTeacherAssignments
+                .filter(
+                  (assignment) =>
+                    assignment.assignmentType ===
+                    TeacherAssignmentType.CLASS_TEACHER,
+                )
+                .map((assignment) => assignment.sectionId),
+            ),
+            subjectsBySection: new Map(),
+            allSectionIds: new Set(
+              stubTeacherAssignments.map((assignment) => assignment.sectionId),
+            ),
+          }),
+          canAccess: jest.fn().mockResolvedValue({
+            source: 'ASSIGNMENT',
+            assignmentId: 'assignment-stub',
+            componentScope: null,
+            assignmentType: 'CLASS_TEACHER',
+          }),
+          canActorAccess: jest.fn().mockResolvedValue({
+            source: 'ASSIGNMENT',
+            assignmentId: 'assignment-stub',
+            componentScope: null,
+            assignmentType: 'CLASS_TEACHER',
+          }),
+          canAccessAnySectionOfClass: jest.fn().mockResolvedValue(null),
+          denyActorAccess: jest
+            .fn()
+            .mockRejectedValue(new ForbiddenException('Teacher scope denied')),
+          requireAccess: jest.fn().mockResolvedValue({
+            source: 'ASSIGNMENT',
+            assignmentId: 'assignment-stub',
+            componentScope: null,
+            assignmentType: 'CLASS_TEACHER',
+          }),
+        } as unknown as TeacherScopeService);
 
   return {
     service: new AttendanceService(

@@ -6,15 +6,21 @@ import {
   getNepalNow,
   toBsDateFromGregorian,
 } from "@schoolos/core";
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { ApiRequestError } from "@/lib/api/client";
 import {
+  captureAttendanceDraftStorageTicket,
   clearAttendanceDraft,
   createAttendanceDraftSubmissionId,
+  isAttendanceDraftReceiptBarrierStorageEvent,
+  isAttendanceDraftStorageTicketCurrent,
   readAttendanceDraft,
+  sanitizeAttendanceDraftForAccessRevocation,
   storeAttendanceDraft,
+  type AttendanceDraftStorageTicket,
   type AttendanceDraftStorageValue,
 } from "@/lib/session";
 import { useSession } from "@/components/session-provider";
@@ -27,6 +33,10 @@ import {
   OfflineMutationError,
   shouldClearLocalAttendanceDraft,
 } from "@/lib/offline-policy";
+import {
+  createAccessRevocationReceipt,
+  createPurposeLimitedAttendanceReceipt,
+} from "@/lib/attendance-draft-access-revocation";
 import { SectionCard } from "@/components/ui/section-card";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { AttendanceHeader } from "@/components/attendance/attendance-header";
@@ -74,10 +84,20 @@ type DraftSyncState =
   | "conflict"
   | "recorded_conflict"
   | "rejected"
+  | "authorization_denied"
+  | "access_revoked"
+  | "storage_unavailable"
   | "server_check"
   | "failed";
 
 type AttendanceStatusFilter = "ALL" | "PRESENT" | "ABSENT" | "LATE" | "LEAVE";
+
+export interface AttendanceDraftRecoveryScope {
+  academicYearId: string;
+  classId: string;
+  sectionId?: string;
+  attendanceDate: string;
+}
 
 const persistedAttendanceStatuses: AttendanceStatus[] = [
   "PRESENT",
@@ -94,13 +114,27 @@ const receiptProtectedFinalSubmissionStatuses = [
   "TRANSPORT_AMBIGUOUS",
 ] as const;
 
-export function AttendanceForm() {
+export function AttendanceForm({
+  initialDraftScope,
+}: {
+  initialDraftScope?: AttendanceDraftRecoveryScope;
+}) {
   const { session } = useSession();
   const queryClient = useQueryClient();
-  const [academicYearId, setAcademicYearId] = useState("");
-  const [classId, setClassId] = useState("");
-  const [sectionId, setSectionId] = useState("");
-  const [attendanceDate, setAttendanceDate] = useState(today);
+  const pathname = usePathname();
+  const router = useRouter();
+  const [academicYearId, setAcademicYearId] = useState(
+    () => normalizeDraftScopeId(initialDraftScope?.academicYearId) ?? "",
+  );
+  const [classId, setClassId] = useState(
+    () => normalizeDraftScopeId(initialDraftScope?.classId) ?? "",
+  );
+  const [sectionId, setSectionId] = useState(
+    () => normalizeDraftScopeId(initialDraftScope?.sectionId) ?? "",
+  );
+  const [attendanceDate, setAttendanceDate] = useState(() =>
+    normalizeDraftRecoveryDate(initialDraftScope?.attendanceDate),
+  );
   const [statusFilter, setStatusFilter] =
     useState<AttendanceStatusFilter>("ALL");
   const [exceptions, setExceptions] = useState<
@@ -122,6 +156,8 @@ export function AttendanceForm() {
     string | null
   >(null);
   const [hasDraftChanges, setHasDraftChanges] = useState(false);
+  const [hydratedDraftKey, setHydratedDraftKey] = useState<string | null>(null);
+  const [draftHydrationAttempt, setDraftHydrationAttempt] = useState(0);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isOverrideConfirmOpen, setIsOverrideConfirmOpen] = useState(false);
   const [overrideReason, setOverrideReason] = useState("");
@@ -132,14 +168,35 @@ export function AttendanceForm() {
     Record<string, string>
   >({});
   const [isReceiptSyncPending, setIsReceiptSyncPending] = useState(false);
+  const [isKeepingServerVersion, setIsKeepingServerVersion] = useState(false);
   const [
     shouldReplayRecoveredFinalSubmission,
     setShouldReplayRecoveredFinalSubmission,
   ] = useState(false);
   const receiptSyncInFlightRef = useRef(false);
+  const serverDraftSaveInFlightRef = useRef(false);
+  const keepServerVersionInFlightRef = useRef(false);
+  const rosterAccessDeniedHandledKeyRef = useRef<string | null>(null);
   const reconnectActionRef = useRef<() => void>(() => undefined);
   const submissionFeedbackRef = useRef<HTMLDivElement>(null);
   const activeDraftKeyRef = useRef<string | null>(null);
+  const componentMountedRef = useRef(false);
+  const sessionIdentityKey = session
+    ? `${session.tenant.id}:${session.user.id}`
+    : "anonymous";
+  const draftStorageAuthorityRef = useRef<{
+    identityKey: string;
+    ticket: AttendanceDraftStorageTicket;
+  } | null>(null);
+  if (
+    !draftStorageAuthorityRef.current ||
+    draftStorageAuthorityRef.current.identityKey !== sessionIdentityKey
+  ) {
+    draftStorageAuthorityRef.current = {
+      identityKey: sessionIdentityKey,
+      ticket: captureAttendanceDraftStorageTicket(),
+    };
+  }
 
   const academicYearsQuery = useQuery({
     queryKey: ["academic-years"],
@@ -233,8 +290,17 @@ export function AttendanceForm() {
     ].join(":");
   }, [academicYearId, attendanceDate, classId, sectionId, session]);
   activeDraftKeyRef.current = draftKey;
+  const draftScopeHydrated = Boolean(draftKey && hydratedDraftKey === draftKey);
   const hasPendingLocalDraft = Boolean(
-    draftKey && draftClientSubmissionId && draftSavedAt,
+    draftScopeHydrated && draftKey && draftClientSubmissionId && draftSavedAt,
+  );
+  const rosterAccessDenied =
+    rosterQuery.error instanceof ApiRequestError &&
+    rosterQuery.error.statusCode === 403;
+  const routeScopeDisclosureBlocked = Boolean(
+    rosterAccessDenied ||
+      (draftScopeHydrated &&
+        ["authorization_denied", "access_revoked"].includes(draftSyncState)),
   );
 
   const availableSections = useMemo(
@@ -249,6 +315,16 @@ export function AttendanceForm() {
     () => rosterQuery.data?.students ?? [],
     [rosterQuery.data?.students],
   );
+  const purgeRevokedRosterData = useCallback(() => {
+    setExceptions({});
+    setRemarks({});
+    setBaselineExceptions({});
+    setBaselineRemarks({});
+    setHasDraftChanges(false);
+    setAllPresentAcknowledged(false);
+    setOverrideReason("");
+    queryClient.removeQueries({ queryKey: ["attendance-roster"] });
+  }, [queryClient]);
   const visibleRoster = useMemo(() => {
     if (statusFilter === "ALL") return roster;
     return roster.filter((student) => {
@@ -258,6 +334,43 @@ export function AttendanceForm() {
         : status === statusFilter;
     });
   }, [exceptions, roster, statusFilter]);
+
+  useEffect(() => {
+    if (routeScopeDisclosureBlocked) {
+      if (`${window.location.pathname}${window.location.search}` !== pathname) {
+        router.replace(pathname, { scroll: false });
+      }
+      return;
+    }
+    if (!academicYearId || !classId) return;
+
+    const search = new URLSearchParams({
+      academicYearId,
+      classId,
+      attendanceDate,
+    });
+    if (sectionId) search.set("sectionId", sectionId);
+    const nextHref = `${pathname}?${search.toString()}`;
+    if (`${window.location.pathname}${window.location.search}` !== nextHref) {
+      router.replace(nextHref, { scroll: false });
+    }
+  }, [
+    academicYearId,
+    attendanceDate,
+    classId,
+    pathname,
+    routeScopeDisclosureBlocked,
+    router,
+    sectionId,
+  ]);
+
+  useEffect(() => {
+    componentMountedRef.current = true;
+    return () => {
+      componentMountedRef.current = false;
+      activeDraftKeyRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     const currentAcademicYear = academicYearsQuery.data?.find(
@@ -310,23 +423,129 @@ export function AttendanceForm() {
   ]);
 
   useEffect(() => {
-    if (!rosterQuery.data) return;
+    if (!draftKey) return;
     let cancelled = false;
 
     async function loadDraftOrRoster() {
-      const localDraft = await readAttendanceDraft(draftKey);
+      const storageTicket = draftStorageAuthorityRef.current!.ticket;
+      const draftRead = await readAttendanceDraft(draftKey, {
+        ticket: storageTicket,
+      });
       if (cancelled) return;
 
+      if (draftRead.status === "unavailable") {
+        if (
+          !isAttendanceDraftStorageTicketCurrent(storageTicket) ||
+          draftStorageAuthorityRef.current?.ticket !== storageTicket
+        ) {
+          return;
+        }
+
+        setDraftClientSubmissionId(null);
+        setExceptions({});
+        setRemarks({});
+        setBaselineExceptions({});
+        setBaselineRemarks({});
+        setDraftSavedAt(null);
+        setLastServerSyncStatus(null);
+        setShouldReplayRecoveredFinalSubmission(false);
+        setDraftSyncState("storage_unavailable");
+        setSyncResultMessage(
+          "SchoolOS could not read this browser's saved attendance state. The roster stays hidden because an unconfirmed receipt may be stored here.",
+        );
+        setHasDraftChanges(false);
+        setSubmitMessage("");
+        setConflictMessage("");
+        setHydratedDraftKey(draftKey);
+        return;
+      }
+
+      const localDraft = draftRead.status === "found" ? draftRead.draft : null;
+
       if (localDraft) {
+        const storedSyncStatus = String(
+          localDraft.lastSyncStatus ?? "",
+        ).toUpperCase();
+        const accessRevocationStatus =
+          storedSyncStatus === "AUTHORIZATION_DENIED"
+            ? "AUTHORIZATION_DENIED"
+            : storedSyncStatus === "ACCESS_REVALIDATION_REQUIRED"
+              ? "ACCESS_REVALIDATION_REQUIRED"
+              : null;
+        if (accessRevocationStatus) {
+          let sanitizedReceipt = createAccessRevocationReceipt(
+            localDraft,
+            accessRevocationStatus,
+          );
+          try {
+            sanitizedReceipt = await sanitizeAttendanceDraftForAccessRevocation(
+              draftKey,
+              sanitizedReceipt,
+              accessRevocationStatus,
+              { ticket: storageTicket },
+            );
+          } catch {
+            // Keep the roster hidden even when this browser cannot rewrite an
+            // older denial record. A later read will attempt sanitization again.
+          }
+          if (cancelled) return;
+          setDraftClientSubmissionId(sanitizedReceipt.clientSubmissionId);
+          setExceptions({});
+          setRemarks({});
+          setBaselineExceptions({});
+          setBaselineRemarks({});
+          setDraftSavedAt(sanitizedReceipt.savedAt);
+          setLastServerSyncStatus(storedSyncStatus);
+          setShouldReplayRecoveredFinalSubmission(false);
+          setDraftSyncState(
+            storedSyncStatus === "AUTHORIZATION_DENIED"
+              ? "authorization_denied"
+              : "access_revoked",
+          );
+          setSyncResultMessage(
+            storedSyncStatus === "AUTHORIZATION_DENIED"
+              ? "SchoolOS denied this final submission. No attendance was accepted, and student details were cleared from this browser. Ask a school administrator to restore attendance access before starting again."
+              : "SchoolOS denied saving this attendance draft. Student details were cleared from this browser while attendance access is revalidated.",
+          );
+          setHasDraftChanges(false);
+          setSubmitMessage("");
+          setConflictMessage("");
+          setHydratedDraftKey(draftKey);
+          return;
+        }
+
+        if (["ACCEPTED", "SYNCED", "CONFLICTED"].includes(storedSyncStatus)) {
+          setDraftClientSubmissionId(null);
+          setExceptions({});
+          setRemarks({});
+          setBaselineExceptions({});
+          setBaselineRemarks({});
+          setDraftSavedAt(null);
+          setLastServerSyncStatus(storedSyncStatus);
+          setShouldReplayRecoveredFinalSubmission(false);
+          setDraftSyncState(
+            storedSyncStatus === "CONFLICTED"
+              ? "recorded_conflict"
+              : "accepted",
+          );
+          setSyncResultMessage(
+            storedSyncStatus === "CONFLICTED"
+              ? "SchoolOS recorded this submission as a conflict for office review. The local roster is no longer editable."
+              : "SchoolOS already accepted this attendance. The local final-intent receipt is retained to prevent stale-tab resubmission.",
+          );
+          setHasDraftChanges(false);
+          setSubmitMessage("");
+          setConflictMessage("");
+          setHydratedDraftKey(draftKey);
+          return;
+        }
+
         setDraftClientSubmissionId(localDraft.clientSubmissionId);
         setExceptions(
           localDraft.exceptions as Record<string, AttendanceStatus>,
         );
         setRemarks(localDraft.remarks);
         setDraftSavedAt(localDraft.savedAt);
-        const storedSyncStatus = String(
-          localDraft.lastSyncStatus ?? "",
-        ).toUpperCase();
         setLastServerSyncStatus(storedSyncStatus || null);
         setShouldReplayRecoveredFinalSubmission(
           isReceiptProtectedFinalSubmissionStatus(storedSyncStatus) &&
@@ -340,7 +559,7 @@ export function AttendanceForm() {
         } else if (storedSyncStatus === "QUEUED") {
           setDraftSyncState("queued");
           setSyncResultMessage(
-            "Final submission queued on this browser. It is not submitted yet and will be sent when connectivity returns.",
+            "Final submission queued on this browser. It is not submitted yet. Keep this class and date open for automatic retry, or return to this saved draft later.",
           );
         } else if (
           storedSyncStatus &&
@@ -356,6 +575,14 @@ export function AttendanceForm() {
         }
         setHasDraftChanges(true);
         setSubmitMessage("Recovered a locally saved attendance draft.");
+        setHydratedDraftKey(draftKey);
+        return;
+      }
+
+      if (!rosterQuery.data) {
+        if (rosterQuery.isError) {
+          setHydratedDraftKey(draftKey);
+        }
         return;
       }
 
@@ -381,6 +608,7 @@ export function AttendanceForm() {
       setHasDraftChanges(false);
       setSubmitMessage("");
       setConflictMessage("");
+      setHydratedDraftKey(draftKey);
     }
 
     void loadDraftOrRoster();
@@ -388,11 +616,115 @@ export function AttendanceForm() {
     return () => {
       cancelled = true;
     };
-  }, [draftKey, rosterQuery.data]);
+  }, [
+    draftHydrationAttempt,
+    draftKey,
+    rosterQuery.data,
+    rosterQuery.isError,
+  ]);
+
+  useEffect(() => {
+    if (!draftKey) return;
+
+    const handleReceiptBarrier = (event: StorageEvent) => {
+      if (!isAttendanceDraftReceiptBarrierStorageEvent(event, draftKey)) {
+        return;
+      }
+
+      purgeRevokedRosterData();
+      setDraftClientSubmissionId(null);
+      setDraftSavedAt(null);
+      setLastServerSyncStatus(null);
+      setShouldReplayRecoveredFinalSubmission(false);
+      setDraftSyncState("storage_unavailable");
+      setSyncResultMessage(
+        "Attendance state changed in another tab. SchoolOS is rechecking the protected receipt before showing this roster.",
+      );
+      setHydratedDraftKey(null);
+      setDraftHydrationAttempt((attempt) => attempt + 1);
+    };
+
+    window.addEventListener("storage", handleReceiptBarrier);
+    return () => window.removeEventListener("storage", handleReceiptBarrier);
+  }, [draftKey, purgeRevokedRosterData]);
+
+  useEffect(() => {
+    if (!rosterAccessDenied || !draftKey) return;
+    if (rosterAccessDeniedHandledKeyRef.current === draftKey) return;
+    rosterAccessDeniedHandledKeyRef.current = draftKey;
+
+    const storageTicket = draftStorageAuthorityRef.current!.ticket;
+    const fallbackDraft: AttendanceDraftStorageValue = {
+      clientSubmissionId:
+        draftClientSubmissionId ?? createAttendanceDraftSubmissionId(),
+      academicYearId,
+      classId,
+      sectionId,
+      attendanceDate,
+      exceptions,
+      remarks,
+      savedAt: draftSavedAt ?? new Date().toISOString(),
+      serverSessionId: rosterQuery.data?.existingSession?.id ?? null,
+      serverSubmittedAt:
+        rosterQuery.data?.existingSession?.submittedAt ?? null,
+      lastSyncStatus: "ACCESS_REVALIDATION_REQUIRED",
+    };
+
+    setLastServerSyncStatus("ACCESS_REVALIDATION_REQUIRED");
+    setDraftSyncState("access_revoked");
+    setSubmitMessage("");
+    setSyncResultMessage(
+      "SchoolOS denied access to this roster. Student details were cleared from this tab while a purpose-limited access marker is retained.",
+    );
+    setShouldReplayRecoveredFinalSubmission(false);
+    setHydratedDraftKey(draftKey);
+    purgeRevokedRosterData();
+
+    void sanitizeAttendanceDraftForAccessRevocation(
+      draftKey,
+      fallbackDraft,
+      "ACCESS_REVALIDATION_REQUIRED",
+      { ticket: storageTicket },
+    )
+      .then((storedReceipt) => {
+        if (
+          activeDraftKeyRef.current !== draftKey ||
+          draftStorageAuthorityRef.current?.ticket !== storageTicket ||
+          !isAttendanceDraftStorageTicketCurrent(storageTicket)
+        ) {
+          return;
+        }
+        setDraftClientSubmissionId(storedReceipt.clientSubmissionId);
+        setDraftSavedAt(storedReceipt.savedAt);
+      })
+      .catch(() => {
+        if (activeDraftKeyRef.current !== draftKey) return;
+        setSyncResultMessage(
+          "SchoolOS denied access to this roster. This tab remains locked because browser storage could not finish sanitizing the saved record; sign out to clear private browser state.",
+        );
+      });
+  }, [
+    academicYearId,
+    attendanceDate,
+    classId,
+    draftClientSubmissionId,
+    draftKey,
+    draftSavedAt,
+    exceptions,
+    purgeRevokedRosterData,
+    remarks,
+    rosterAccessDenied,
+    rosterQuery.data?.existingSession?.id,
+    rosterQuery.data?.existingSession?.submittedAt,
+    sectionId,
+  ]);
 
   useEffect(() => {
     if (
       !draftKey ||
+      !draftScopeHydrated ||
+      serverDraftSaveInFlightRef.current ||
+      isReceiptSyncPending ||
       !academicYearId ||
       !classId ||
       !draftClientSubmissionId ||
@@ -404,6 +736,7 @@ export function AttendanceForm() {
     }
 
     const savedAt = new Date().toISOString();
+    const storageTicket = draftStorageAuthorityRef.current!.ticket;
     const draft: AttendanceDraftStorageValue = {
       clientSubmissionId: draftClientSubmissionId,
       academicYearId,
@@ -429,15 +762,23 @@ export function AttendanceForm() {
     };
 
     let cancelled = false;
-    void storeAttendanceDraft(draftKey, draft)
+    void storeAttendanceDraft(draftKey, draft, { ticket: storageTicket })
       .then(() => {
-        if (cancelled) return;
+        if (
+          cancelled ||
+          !isAttendanceDraftStorageTicketCurrent(storageTicket) ||
+          draftStorageAuthorityRef.current?.ticket !== storageTicket
+        )
+          return;
         setDraftSavedAt(savedAt);
         if (
           ![
             "conflict",
             "recorded_conflict",
             "rejected",
+            "authorization_denied",
+            "access_revoked",
+            "storage_unavailable",
             "server_check",
             "failed",
             "queued",
@@ -449,7 +790,20 @@ export function AttendanceForm() {
         }
       })
       .catch(() => {
-        if (cancelled) return;
+        if (
+          cancelled ||
+          !isAttendanceDraftStorageTicketCurrent(storageTicket) ||
+          draftStorageAuthorityRef.current?.ticket !== storageTicket
+        )
+          return;
+        if (
+          ["authorization_denied", "access_revoked"].includes(draftSyncState)
+        ) {
+          setSyncResultMessage(
+            "Attendance access remains locked, but this browser could not update its saved access marker. Do not edit or resubmit this roster.",
+          );
+          return;
+        }
         setDraftSyncState("failed");
         setSyncResultMessage(
           "This attendance draft could not be saved safely on this browser.",
@@ -468,9 +822,11 @@ export function AttendanceForm() {
     classId,
     draftKey,
     draftClientSubmissionId,
+    draftScopeHydrated,
     draftSyncState,
     exceptions,
     hasDraftChanges,
+    isReceiptSyncPending,
     lastServerSyncStatus,
     remarks,
     roster.length,
@@ -516,14 +872,6 @@ export function AttendanceForm() {
 
   const saveDraftMutation = useMutation({
     mutationFn: api.saveAttendanceDraft,
-    onSuccess: () => {
-      setDraftSyncState("synced");
-      setHasDraftChanges(false);
-      setSubmitMessage(`Draft saved at ${formatNepalTime(new Date())}.`);
-    },
-    onError: () => {
-      setDraftSyncState("failed");
-    },
   });
 
   const syncMutation = useMutation({
@@ -564,14 +912,43 @@ export function AttendanceForm() {
     Boolean(existingSessionId) &&
     (isLocked || isSubmitted) &&
     !hasPendingLocalDraft;
+  const visibleDraftSyncState: DraftSyncState = draftScopeHydrated
+    ? draftSyncState
+    : "idle";
+  const rosterDisclosureBlocked = Boolean(
+    rosterAccessDenied ||
+      (draftKey &&
+        [
+          "authorization_denied",
+          "access_revoked",
+          "storage_unavailable",
+        ].includes(draftSyncState)),
+  );
   const awaitingServerReceipt =
-    isReceiptSyncPending || ["queued", "server_check"].includes(draftSyncState);
+    isReceiptSyncPending ||
+    [
+      "queued",
+      "server_check",
+      "authorization_denied",
+      "access_revoked",
+      "storage_unavailable",
+    ].includes(visibleDraftSyncState);
+  const unresolvedFinalizationReadOnly = [
+    "queued",
+    "server_check",
+    "authorization_denied",
+    "access_revoked",
+    "storage_unavailable",
+  ].includes(visibleDraftSyncState);
   const finalizationReadOnly =
     isReceiptSyncPending ||
-    ["queued", "server_check", "accepted", "recorded_conflict"].includes(
-      draftSyncState,
-    );
-  const scopeSelectionDisabled = isReceiptSyncPending || syncMutation.isPending;
+    unresolvedFinalizationReadOnly ||
+    ["accepted", "recorded_conflict"].includes(visibleDraftSyncState);
+  const scopeSelectionDisabled =
+    isReceiptSyncPending ||
+    syncMutation.isPending ||
+    saveDraftMutation.isPending ||
+    unresolvedFinalizationReadOnly;
   const overrideChanges = useMemo(
     () =>
       isOverrideMode
@@ -593,24 +970,34 @@ export function AttendanceForm() {
     ],
   );
   const rosterEditingDisabled =
-    (!isOverrideMode && (isLocked || isSubmitted)) || finalizationReadOnly;
+    (!isOverrideMode && (isLocked || isSubmitted)) ||
+    finalizationReadOnly ||
+    saveDraftMutation.isPending;
   const hasConflict = Boolean(
     attendanceState?.conflictStatus &&
     attendanceState.conflictStatus !== "NONE",
   );
   const submissionStatus = hasConflict
     ? "NEEDS_CORRECTION"
-    : draftSyncState === "recorded_conflict"
+    : visibleDraftSyncState === "recorded_conflict"
       ? "NEEDS_CORRECTION"
       : isLocked
         ? "LOCKED"
-        : attendanceState?.isSubmitted || draftSyncState === "accepted"
+        : attendanceState?.isSubmitted || visibleDraftSyncState === "accepted"
           ? "SUBMITTED"
-          : draftSyncState === "queued" || draftSyncState === "server_check"
-            ? "QUEUED"
-            : hasDraftChanges || draftSyncState === "saved_local"
-              ? "DRAFT"
-              : "NOT_MARKED";
+          : visibleDraftSyncState === "authorization_denied"
+            ? "ACCESS_DENIED"
+            : visibleDraftSyncState === "access_revoked"
+              ? "ACCESS_REVOKED"
+              : visibleDraftSyncState === "storage_unavailable"
+                ? "LOCAL_DRAFT_UNAVAILABLE"
+                : visibleDraftSyncState === "queued"
+                  ? "QUEUED"
+                  : visibleDraftSyncState === "server_check"
+                    ? "PENDING_CONFIRMATION"
+                    : hasDraftChanges || visibleDraftSyncState === "saved_local"
+                      ? "DRAFT"
+                      : "NOT_MARKED";
   const submissionStatusTone =
     submissionStatus === "NEEDS_CORRECTION"
       ? "conflict"
@@ -618,10 +1005,16 @@ export function AttendanceForm() {
         ? "inactive"
         : undefined;
   const submissionFeedbackIsAlert =
-    ["failed", "rejected", "conflict", "recorded_conflict"].includes(
-      draftSyncState,
-    ) ||
-    (draftSyncState === "server_check" &&
+    [
+      "failed",
+      "rejected",
+      "authorization_denied",
+      "access_revoked",
+      "storage_unavailable",
+      "conflict",
+      "recorded_conflict",
+    ].includes(visibleDraftSyncState) ||
+    (visibleDraftSyncState === "server_check" &&
       !isReceiptSyncPending &&
       !syncMutation.isPending);
 
@@ -630,12 +1023,15 @@ export function AttendanceForm() {
     submissionFeedbackRef.current?.focus();
   }, [
     conflictMessage,
-    draftSyncState,
+    visibleDraftSyncState,
     submissionFeedbackIsAlert,
     syncResultMessage,
   ]);
 
   const beginDraftEdit = () => {
+    if (serverDraftSaveInFlightRef.current || finalizationReadOnly) {
+      return false;
+    }
     if (draftSyncState === "rejected") {
       setDraftClientSubmissionId(createAttendanceDraftSubmissionId());
       setDraftSyncState("saved_local");
@@ -643,17 +1039,18 @@ export function AttendanceForm() {
       setLastServerSyncStatus(null);
     }
     setHasDraftChanges(true);
+    return true;
   };
 
   const markAllPresent = () => {
+    if (!beginDraftEdit()) return;
     setExceptions({});
-    beginDraftEdit();
   };
 
   const clearAll = () => {
+    if (!beginDraftEdit()) return;
     setExceptions({});
     setRemarks({});
-    beginDraftEdit();
   };
 
   const buildDraftPayload = () => ({
@@ -674,13 +1071,26 @@ export function AttendanceForm() {
 
   const saveDraftToServer = async () => {
     if (
+      serverDraftSaveInFlightRef.current ||
+      receiptSyncInFlightRef.current ||
+      !draftScopeHydrated ||
+      !draftKey ||
       !academicYearId ||
       !classId ||
       !draftClientSubmissionId ||
       !draftSavedAt ||
-      roster.length === 0
+      roster.length === 0 ||
+      finalizationReadOnly
     )
       return;
+    const serverDraftKey = draftKey;
+    const serverDraftStorageTicket = draftStorageAuthorityRef.current!.ticket;
+    const isServerDraftScopeCurrent = () =>
+      componentMountedRef.current &&
+      !receiptSyncInFlightRef.current &&
+      activeDraftKeyRef.current === serverDraftKey &&
+      draftStorageAuthorityRef.current?.ticket === serverDraftStorageTicket &&
+      isAttendanceDraftStorageTicketCurrent(serverDraftStorageTicket);
     if (hasReconnectConflict(rosterQuery.data?.existingSession, draftSavedAt)) {
       setDraftSyncState("conflict");
       setConflictMessage(
@@ -689,13 +1099,79 @@ export function AttendanceForm() {
       return;
     }
 
+    serverDraftSaveInFlightRef.current = true;
     setDraftSyncState(draftSyncState === "failed" ? "retrying" : "syncing");
-    await saveDraftMutation.mutateAsync(buildDraftPayload());
+    try {
+      await saveDraftMutation.mutateAsync(buildDraftPayload());
+      if (!isServerDraftScopeCurrent()) return;
+      setDraftSyncState("synced");
+      setHasDraftChanges(false);
+      setSubmitMessage(`Draft saved at ${formatNepalTime(new Date())}.`);
+    } catch (error) {
+      if (!isServerDraftScopeCurrent()) return;
+      if (error instanceof ApiRequestError && error.statusCode === 401) {
+        return;
+      }
+      if (error instanceof ApiRequestError && error.statusCode === 403) {
+        const accessDeniedDraft = createAccessRevocationReceipt(
+          {
+            clientSubmissionId: draftClientSubmissionId,
+            academicYearId,
+            classId,
+            sectionId,
+            attendanceDate,
+            exceptions: {},
+            remarks: {},
+            savedAt: draftSavedAt,
+            serverSessionId: null,
+            serverSubmittedAt: null,
+          },
+          "ACCESS_REVALIDATION_REQUIRED",
+        );
+        setLastServerSyncStatus("ACCESS_REVALIDATION_REQUIRED");
+        setDraftSyncState("access_revoked");
+        setSubmitMessage("");
+        setSyncResultMessage(
+          "SchoolOS denied saving this attendance draft. Student details were cleared from this browser while attendance access is revalidated.",
+        );
+        purgeRevokedRosterData();
+
+        try {
+          const storedAccessDeniedDraft =
+            await sanitizeAttendanceDraftForAccessRevocation(
+              serverDraftKey,
+              accessDeniedDraft,
+              "ACCESS_REVALIDATION_REQUIRED",
+              { ticket: serverDraftStorageTicket },
+            );
+          if (!isServerDraftScopeCurrent()) return;
+          setDraftClientSubmissionId(
+            storedAccessDeniedDraft.clientSubmissionId,
+          );
+          setDraftSavedAt(storedAccessDeniedDraft.savedAt);
+        } catch {
+          if (isServerDraftScopeCurrent()) {
+            setSyncResultMessage(
+              "SchoolOS denied saving this attendance draft, and the browser could not update its saved access marker. Do not edit or resubmit this roster.",
+            );
+          }
+        }
+        return;
+      }
+      setDraftSyncState("failed");
+      setSyncResultMessage(
+        "SchoolOS could not save this draft. The browser copy remains available.",
+      );
+    } finally {
+      serverDraftSaveInFlightRef.current = false;
+    }
   };
 
   const syncDraftSubmission = async () => {
     if (
       receiptSyncInFlightRef.current ||
+      serverDraftSaveInFlightRef.current ||
+      !draftScopeHydrated ||
       !draftKey ||
       !academicYearId ||
       !classId ||
@@ -704,8 +1180,12 @@ export function AttendanceForm() {
     )
       return;
     const submissionDraftKey = draftKey;
+    const submissionStorageTicket = draftStorageAuthorityRef.current!.ticket;
     const isSubmissionScopeCurrent = () =>
-      activeDraftKeyRef.current === submissionDraftKey;
+      componentMountedRef.current &&
+      activeDraftKeyRef.current === submissionDraftKey &&
+      draftStorageAuthorityRef.current?.ticket === submissionStorageTicket &&
+      isAttendanceDraftStorageTicketCurrent(submissionStorageTicket);
     const previousLastServerSyncStatus = lastServerSyncStatus;
     const isReceiptReplay = isReceiptProtectedFinalSubmissionStatus(
       previousLastServerSyncStatus,
@@ -753,11 +1233,16 @@ export function AttendanceForm() {
     };
 
     const persistQueuedFinalSubmission = async () => {
+      if (!isSubmissionScopeCurrent()) return false;
       try {
-        await storeAttendanceDraft(submissionDraftKey, {
-          ...receiptProtectedDraft,
-          lastSyncStatus: "QUEUED",
-        });
+        await storeAttendanceDraft(
+          submissionDraftKey,
+          {
+            ...receiptProtectedDraft,
+            lastSyncStatus: "QUEUED",
+          },
+          { ticket: submissionStorageTicket },
+        );
       } catch {
         if (isSubmissionScopeCurrent()) {
           setDraftSyncState("failed");
@@ -775,7 +1260,7 @@ export function AttendanceForm() {
       setDraftSyncState("queued");
       setSubmitMessage("");
       setSyncResultMessage(
-        "Final submission queued on this browser. It is not submitted yet and will be sent when connectivity returns.",
+        "Final submission queued on this browser. It is not submitted yet. Keep this class and date open for automatic retry, or return to this saved draft later.",
       );
       return true;
     };
@@ -798,7 +1283,9 @@ export function AttendanceForm() {
     try {
       // The receipt marker must commit before the POST. If browser storage is
       // unavailable, nothing is sent and the roster remains editable.
-      await storeAttendanceDraft(submissionDraftKey, receiptProtectedDraft);
+      await storeAttendanceDraft(submissionDraftKey, receiptProtectedDraft, {
+        ticket: submissionStorageTicket,
+      });
     } catch {
       if (isSubmissionScopeCurrent()) {
         setDraftSyncState("failed");
@@ -812,14 +1299,6 @@ export function AttendanceForm() {
     }
 
     if (!isSubmissionScopeCurrent()) {
-      try {
-        await storeAttendanceDraft(submissionDraftKey, {
-          ...receiptProtectedDraft,
-          lastSyncStatus: "QUEUED",
-        });
-      } catch {
-        // PROCESSING remains fail-closed and preserves the confirmed stable ID.
-      }
       receiptSyncInFlightRef.current = false;
       setIsReceiptSyncPending(false);
       return;
@@ -850,29 +1329,40 @@ export function AttendanceForm() {
 
       const syncStatus = String(result?.syncStatus ?? "").toUpperCase();
       if (shouldClearLocalAttendanceDraft(syncStatus)) {
+        if (!isSubmissionScopeCurrent()) return;
+        let terminalReceiptPersisted = true;
         try {
-          await clearAttendanceDraft(submissionDraftKey);
+          const terminalReceipt = createPurposeLimitedAttendanceReceipt(
+            receiptProtectedDraft,
+            syncStatus as "ACCEPTED" | "SYNCED" | "CONFLICTED",
+          );
+          await storeAttendanceDraft(submissionDraftKey, terminalReceipt, {
+            ticket: submissionStorageTicket,
+            authoritativeReceipt: {
+              clientSubmissionId: draftClientSubmissionId,
+              syncStatus,
+            },
+          });
         } catch {
-          // The durable receipt marker retains the same submission ID, so a
-          // later replay remains idempotent even if browser cleanup fails.
+          terminalReceiptPersisted = false;
         }
 
         if (!isSubmissionScopeCurrent()) return;
         setDraftClientSubmissionId(null);
         setDraftSavedAt(null);
         setHasDraftChanges(false);
-        setLastServerSyncStatus(null);
+        setLastServerSyncStatus(syncStatus);
         setSubmitMessage("");
 
         if (syncStatus === "CONFLICTED") {
           setDraftSyncState("recorded_conflict");
           setSyncResultMessage(
-            `SchoolOS received this attendance at ${formatNepalTime(result.serverReceivedAt)} and recorded a conflict for office review. The official record was not overwritten.`,
+            `SchoolOS received this attendance at ${formatNepalTime(result.serverReceivedAt)} and recorded a conflict for office review. The official record was not overwritten.${terminalReceiptPersisted ? "" : " Browser receipt storage still needs rechecking before this scope can be reused."}`,
           );
         } else {
           setDraftSyncState("accepted");
           setSyncResultMessage(
-            `Attendance accepted by SchoolOS at ${formatNepalTime(result.serverReceivedAt)}.`,
+            `Attendance accepted by SchoolOS at ${formatNepalTime(result.serverReceivedAt)}.${terminalReceiptPersisted ? "" : " Browser receipt storage still needs rechecking before this scope can be reused."}`,
           );
           window.scrollTo({ top: 0, behavior: "smooth" });
         }
@@ -882,8 +1372,19 @@ export function AttendanceForm() {
           lastSyncStatus: syncStatus || "UNKNOWN",
         };
 
+        if (!isSubmissionScopeCurrent()) return;
         try {
-          await storeAttendanceDraft(submissionDraftKey, retainedDraft);
+          await storeAttendanceDraft(submissionDraftKey, retainedDraft, {
+            ticket: submissionStorageTicket,
+            ...(syncStatus === "REJECTED"
+              ? {
+                  authoritativeReceipt: {
+                    clientSubmissionId: draftClientSubmissionId,
+                    syncStatus,
+                  },
+                }
+              : {}),
+          });
         } catch {
           // PROCESSING was committed before the request, so failure to update
           // the local marker still fails closed on the next load.
@@ -936,6 +1437,52 @@ export function AttendanceForm() {
         return;
       }
 
+      if (error instanceof ApiRequestError && error.statusCode === 403) {
+        if (!isSubmissionScopeCurrent()) return;
+        const deniedDraft = createAccessRevocationReceipt(
+          receiptProtectedDraft,
+          "AUTHORIZATION_DENIED",
+        );
+        setLastServerSyncStatus("AUTHORIZATION_DENIED");
+        setDraftSyncState("authorization_denied");
+        setSyncResultMessage(
+          "SchoolOS denied this final submission. No attendance was accepted. Student details were cleared while the browser saves a purpose-limited denial receipt.",
+        );
+        purgeRevokedRosterData();
+
+        try {
+          const storedDeniedDraft =
+            await sanitizeAttendanceDraftForAccessRevocation(
+              submissionDraftKey,
+              deniedDraft,
+              "AUTHORIZATION_DENIED",
+              { ticket: submissionStorageTicket },
+            );
+          if (!isSubmissionScopeCurrent()) return;
+          setDraftClientSubmissionId(storedDeniedDraft.clientSubmissionId);
+          setDraftSavedAt(storedDeniedDraft.savedAt);
+        } catch {
+          if (isSubmissionScopeCurrent()) {
+            setLastServerSyncStatus("AUTHORIZATION_DENIED");
+            setDraftSyncState("authorization_denied");
+            setSyncResultMessage(
+              "SchoolOS denied this final submission. No attendance was accepted, but the browser could not safely retain the purpose-limited denial receipt. Do not edit or resubmit this roster.",
+            );
+          }
+          return;
+        }
+
+        if (!isSubmissionScopeCurrent()) return;
+        setHasDraftChanges(false);
+        setSubmitMessage("");
+        setLastServerSyncStatus("AUTHORIZATION_DENIED");
+        setDraftSyncState("authorization_denied");
+        setSyncResultMessage(
+          "SchoolOS denied this final submission. No attendance was accepted, and student details were cleared from this browser. Ask a school administrator to restore attendance access before starting again.",
+        );
+        return;
+      }
+
       if (canRestoreEditableAttendanceDraftAfterSyncError(error)) {
         const restoredDraft = {
           ...receiptProtectedDraft,
@@ -944,8 +1491,11 @@ export function AttendanceForm() {
             : undefined,
         };
 
+        if (!isSubmissionScopeCurrent()) return;
         try {
-          await storeAttendanceDraft(submissionDraftKey, restoredDraft);
+          await storeAttendanceDraft(submissionDraftKey, restoredDraft, {
+            ticket: submissionStorageTicket,
+          });
         } catch {
           if (isSubmissionScopeCurrent()) {
             setLastServerSyncStatus("PROCESSING");
@@ -982,8 +1532,11 @@ export function AttendanceForm() {
       };
 
       let persistedAmbiguousStatus = "PROCESSING";
+      if (!isSubmissionScopeCurrent()) return;
       try {
-        await storeAttendanceDraft(submissionDraftKey, ambiguousDraft);
+        await storeAttendanceDraft(submissionDraftKey, ambiguousDraft, {
+          ticket: submissionStorageTicket,
+        });
         persistedAmbiguousStatus = "TRANSPORT_AMBIGUOUS";
       } catch {
         // The already committed PROCESSING marker remains the durable fallback.
@@ -1001,14 +1554,57 @@ export function AttendanceForm() {
     }
   };
 
-  const keepServerVersion = () => {
-    void clearAttendanceDraft(draftKey);
-    setDraftClientSubmissionId(null);
-    setDraftSavedAt(null);
-    setLastServerSyncStatus(null);
-    setDraftSyncState("synced");
-    setConflictMessage("");
-    void queryClient.invalidateQueries({ queryKey: ["attendance-roster"] });
+  const keepServerVersion = async () => {
+    if (keepServerVersionInFlightRef.current) return;
+    keepServerVersionInFlightRef.current = true;
+    setIsKeepingServerVersion(true);
+    try {
+      await clearAttendanceDraft(draftKey, {
+        ticket: draftStorageAuthorityRef.current!.ticket,
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["attendance-roster"],
+      });
+      setDraftClientSubmissionId(null);
+      setDraftSavedAt(null);
+      setLastServerSyncStatus(null);
+      setDraftSyncState("synced");
+      setConflictMessage("");
+    } catch {
+      setDraftSyncState("conflict");
+      setConflictMessage(
+        "The local draft could not be discarded safely. It remains on this browser; retry before treating the server version as selected.",
+      );
+    } finally {
+      keepServerVersionInFlightRef.current = false;
+      setIsKeepingServerVersion(false);
+    }
+  };
+
+  const requestFinalSubmission = () => {
+    if (serverDraftSaveInFlightRef.current || !draftScopeHydrated) return;
+    if (
+      rosterQuery.isLoading ||
+      rosterQuery.isError ||
+      roster.length === 0 ||
+      futureDateBlocked
+    ) {
+      setSyncResultMessage(
+        "Reload a current, non-empty assigned roster before final submission.",
+      );
+      return;
+    }
+    if (
+      ["queued", "server_check", "authorization_denied"].includes(
+        visibleDraftSyncState,
+      )
+    ) {
+      void syncDraftSubmission();
+      return;
+    }
+
+    setAllPresentAcknowledged(false);
+    setIsConfirmOpen(true);
   };
 
   reconnectActionRef.current = () => {
@@ -1044,7 +1640,7 @@ export function AttendanceForm() {
 
   return (
     <div className="space-y-8 animate-fade-in pb-24">
-      {submitMessage && (
+      {draftScopeHydrated && submitMessage && (
         <div
           className="animate-in slide-in-from-top-4 flex items-center gap-4 rounded-xl border border-success-100 bg-success-50 p-4 text-sm font-bold text-success-800 duration-500"
           role="status"
@@ -1058,7 +1654,7 @@ export function AttendanceForm() {
         </div>
       )}
 
-      {draftSyncState !== "idle" && (
+      {visibleDraftSyncState !== "idle" && (
         <div
           ref={submissionFeedbackRef}
           role={submissionFeedbackIsAlert ? "alert" : "status"}
@@ -1072,17 +1668,23 @@ export function AttendanceForm() {
               "recorded_conflict",
               "server_check",
               "queued",
-            ].includes(draftSyncState)
+            ].includes(visibleDraftSyncState)
               ? "border-warning-200 bg-warning-50 text-warning-900"
-              : ["failed", "rejected"].includes(draftSyncState)
+              : [
+                    "failed",
+                    "rejected",
+                    "authorization_denied",
+                    "access_revoked",
+                    "storage_unavailable",
+                  ].includes(visibleDraftSyncState)
                 ? "border-danger-100 bg-danger-50 text-danger-800"
-                : draftSyncState === "accepted"
+                : visibleDraftSyncState === "accepted"
                   ? "border-success-100 bg-success-50 text-success-800"
                   : "border-info-100 bg-info-50 text-info-800",
           )}
         >
           <div className="flex items-center gap-3">
-            {draftSyncState === "accepted" ? (
+            {visibleDraftSyncState === "accepted" ? (
               <CheckCircle2 size={18} aria-hidden />
             ) : submissionFeedbackIsAlert ? (
               <AlertCircle size={18} aria-hidden />
@@ -1091,11 +1693,11 @@ export function AttendanceForm() {
             )}
             <div>
               <p className="text-xs font-black uppercase tracking-wide">
-                {getDraftSyncHeading(draftSyncState)}
+                {getDraftSyncHeading(visibleDraftSyncState)}
               </p>
               <p className="mt-0.5 font-semibold">
                 {getDraftSyncLabel(
-                  draftSyncState,
+                  visibleDraftSyncState,
                   draftSavedAt,
                   conflictMessage,
                   syncResultMessage,
@@ -1103,15 +1705,16 @@ export function AttendanceForm() {
               </p>
             </div>
           </div>
-          {draftSyncState === "conflict" ? (
+          {visibleDraftSyncState === "conflict" ? (
             <div className="flex items-center gap-2">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={keepServerVersion}
+                onClick={() => void keepServerVersion()}
+                disabled={isKeepingServerVersion}
               >
-                Keep server version
+                {isKeepingServerVersion ? "Discarding local draft…" : "Keep server version"}
               </Button>
               <Button
                 type="button"
@@ -1126,23 +1729,37 @@ export function AttendanceForm() {
                 Review local draft
               </Button>
             </div>
-          ) : draftSyncState === "rejected" ? (
+          ) : visibleDraftSyncState === "rejected" ? (
             <span className="max-w-xs text-right text-xs font-semibold">
               Change the draft below to prepare a new submission.
+            </span>
+          ) : rosterDisclosureBlocked ? (
+            <span className="max-w-xs text-right text-xs font-semibold">
+              Roster actions are unavailable in this state.
             </span>
           ) : hasPendingLocalDraft ? (
             <Button
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => void syncDraftSubmission()}
-              disabled={syncMutation.isPending || isReceiptSyncPending}
+              onClick={requestFinalSubmission}
+              disabled={
+                syncMutation.isPending ||
+                isReceiptSyncPending ||
+                saveDraftMutation.isPending ||
+                rosterQuery.isLoading ||
+                rosterQuery.isError ||
+                roster.length === 0 ||
+                futureDateBlocked
+              }
             >
-              {draftSyncState === "server_check"
-                ? "Check server again"
-                : draftSyncState === "queued"
-                  ? "Try queued submission"
-                  : "Sync now"}
+              {visibleDraftSyncState === "authorization_denied"
+                ? "Retry after access is restored"
+                : visibleDraftSyncState === "server_check"
+                  ? "Check server again"
+                  : visibleDraftSyncState === "queued"
+                    ? "Try queued submission"
+                    : "Sync now"}
             </Button>
           ) : null}
         </div>
@@ -1150,7 +1767,7 @@ export function AttendanceForm() {
 
       {/* Roster state strip appears only once a real roster is loaded;
           rendering zeros before class selection reads as fake data. */}
-      {roster.length > 0 ? (
+      {roster.length > 0 && draftScopeHydrated && !rosterDisclosureBlocked ? (
         <AttendanceHeader
           total={totals.total}
           presentPercent={presentPercent}
@@ -1158,126 +1775,128 @@ export function AttendanceForm() {
         />
       ) : null}
 
-      <FilterBar
-        label="Attendance Filters"
-        description="Choose the school date and assigned class context before marking attendance."
-      >
-        <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <div className="space-y-2">
-            <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
-              Academic Year
-            </label>
-            {yearListUnavailable ? (
-              <input
-                type="text"
-                readOnly
-                disabled={scopeSelectionDisabled}
-                value={
-                  rosterQuery.data?.academicYear?.name ??
-                  "Current academic year"
-                }
-                title="Attendance is marked in the school's current academic year."
-                className="premium-input bg-slate-50 text-slate-600"
-                aria-label="Academic Year (current year, set by the school)"
-              />
-            ) : (
+      {!rosterDisclosureBlocked ? (
+        <FilterBar
+          label="Attendance Filters"
+          description="Choose the school date and assigned class context before marking attendance."
+        >
+          <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <div className="space-y-2">
+              <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
+                Academic Year
+              </label>
+              {yearListUnavailable ? (
+                <input
+                  type="text"
+                  readOnly
+                  disabled={scopeSelectionDisabled}
+                  value={
+                    rosterQuery.data?.academicYear?.name ??
+                    "Current academic year"
+                  }
+                  title="Attendance is marked in the school's current academic year."
+                  className="premium-input bg-slate-50 text-slate-600"
+                  aria-label="Academic Year (current year, set by the school)"
+                />
+              ) : (
+                <select
+                  value={academicYearId}
+                  disabled={scopeSelectionDisabled}
+                  onChange={(e) => setAcademicYearId(e.target.value)}
+                  className="premium-input bg-white focus:border-[var(--color-mod-attendance-accent)] focus:ring-[var(--color-mod-attendance-border)]"
+                  aria-label="Academic Year"
+                >
+                  <option value="">Select Year</option>
+                  {academicYearsQuery.data?.map((y) => (
+                    <option key={y.id} value={y.id}>
+                      {y.name}
+                      {y.isCurrent ? " (Current)" : ""}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
+                Class
+              </label>
               <select
-                value={academicYearId}
+                value={classId}
                 disabled={scopeSelectionDisabled}
-                onChange={(e) => setAcademicYearId(e.target.value)}
+                onChange={(e) => {
+                  setClassId(e.target.value);
+                  setSectionId("");
+                }}
                 className="premium-input bg-white focus:border-[var(--color-mod-attendance-accent)] focus:ring-[var(--color-mod-attendance-border)]"
-                aria-label="Academic Year"
+                aria-label="Class"
               >
-                <option value="">Select Year</option>
-                {academicYearsQuery.data?.map((y) => (
-                  <option key={y.id} value={y.id}>
-                    {y.name}
-                    {y.isCurrent ? " (Current)" : ""}
+                <option value="">Select Class</option>
+                {availableClasses.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
                   </option>
                 ))}
               </select>
-            )}
-          </div>
+            </div>
 
-          <div className="space-y-2">
-            <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
-              Class
-            </label>
-            <select
-              value={classId}
-              disabled={scopeSelectionDisabled}
-              onChange={(e) => {
-                setClassId(e.target.value);
-                setSectionId("");
-              }}
-              className="premium-input bg-white focus:border-[var(--color-mod-attendance-accent)] focus:ring-[var(--color-mod-attendance-border)]"
-              aria-label="Class"
-            >
-              <option value="">Select Class</option>
-              {availableClasses.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
+            <div className="space-y-2">
+              <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
+                Section
+              </label>
+              <select
+                value={sectionId}
+                disabled={scopeSelectionDisabled}
+                onChange={(e) => setSectionId(e.target.value)}
+                className="premium-input bg-white focus:border-[var(--color-mod-attendance-accent)] focus:ring-[var(--color-mod-attendance-border)]"
+                aria-label="Section"
+              >
+                <option value="">All Sections</option>
+                {availableSections.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          <div className="space-y-2">
-            <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
-              Section
-            </label>
-            <select
-              value={sectionId}
-              disabled={scopeSelectionDisabled}
-              onChange={(e) => setSectionId(e.target.value)}
-              className="premium-input bg-white focus:border-[var(--color-mod-attendance-accent)] focus:ring-[var(--color-mod-attendance-border)]"
-              aria-label="Section"
-            >
-              <option value="">All Sections</option>
-              {availableSections.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
+            <div className="space-y-2">
+              <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
+                Date
+              </label>
+              <input
+                type="date"
+                value={attendanceDate}
+                disabled={scopeSelectionDisabled}
+                max={today}
+                onChange={(e) => setAttendanceDate(e.target.value)}
+                className="premium-input bg-white focus:border-[var(--color-mod-attendance-accent)] focus:ring-[var(--color-mod-attendance-border)]"
+                aria-label="Date"
+              />
+            </div>
 
-          <div className="space-y-2">
-            <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
-              Date
-            </label>
-            <input
-              type="date"
-              value={attendanceDate}
-              disabled={scopeSelectionDisabled}
-              max={today}
-              onChange={(e) => setAttendanceDate(e.target.value)}
-              className="premium-input bg-white focus:border-[var(--color-mod-attendance-accent)] focus:ring-[var(--color-mod-attendance-border)]"
-              aria-label="Date"
-            />
+            <div className="space-y-2">
+              <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
+                Status
+              </label>
+              <select
+                value={statusFilter}
+                onChange={(e) =>
+                  setStatusFilter(e.target.value as AttendanceStatusFilter)
+                }
+                className="premium-input bg-white focus:border-[var(--color-mod-attendance-accent)] focus:ring-[var(--color-mod-attendance-border)]"
+                aria-label="Status"
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="PRESENT">Present</option>
+                <option value="ABSENT">Absent</option>
+                <option value="LATE">Late</option>
+                <option value="LEAVE">Leave / Excused</option>
+              </select>
+            </div>
           </div>
-
-          <div className="space-y-2">
-            <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
-              Status
-            </label>
-            <select
-              value={statusFilter}
-              onChange={(e) =>
-                setStatusFilter(e.target.value as AttendanceStatusFilter)
-              }
-              className="premium-input bg-white focus:border-[var(--color-mod-attendance-accent)] focus:ring-[var(--color-mod-attendance-border)]"
-              aria-label="Status"
-            >
-              <option value="ALL">All Statuses</option>
-              <option value="PRESENT">Present</option>
-              <option value="ABSENT">Absent</option>
-              <option value="LATE">Late</option>
-              <option value="LEAVE">Leave / Excused</option>
-            </select>
-          </div>
-        </div>
-      </FilterBar>
+        </FilterBar>
+      ) : null}
 
       <SectionCard
         title="Attendance Roster"
@@ -1294,36 +1913,63 @@ export function AttendanceForm() {
                 className="h-6"
               />
             </div>
-            {roster.length > 0 && !awaitingServerReceipt && (
-              <ActionMenu
-                label="Open attendance roster actions"
-                items={[
-                  {
-                    label: "Mark all present",
-                    icon: <CheckSquare size={16} />,
-                    onClick: markAllPresent,
-                  },
-                  {
-                    label: "Clear exceptions",
-                    icon: <Eraser size={16} />,
-                    onClick: clearAll,
-                  },
-                ]}
-                trigger={
-                  <button
-                    type="button"
-                    className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50"
-                  >
-                    <MoreHorizontal size={14} />
-                    More Actions
-                  </button>
-                }
-              />
-            )}
+            {roster.length > 0 &&
+              !awaitingServerReceipt &&
+              !saveDraftMutation.isPending && (
+                <ActionMenu
+                  label="Open attendance roster actions"
+                  items={[
+                    {
+                      label: "Mark all present",
+                      icon: <CheckSquare size={16} />,
+                      onClick: markAllPresent,
+                    },
+                    {
+                      label: "Clear exceptions",
+                      icon: <Eraser size={16} />,
+                      onClick: clearAll,
+                    },
+                  ]}
+                  trigger={
+                    <button
+                      type="button"
+                      className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50"
+                    >
+                      <MoreHorizontal size={14} />
+                      More Actions
+                    </button>
+                  }
+                />
+              )}
           </div>
         }
       >
-        {rosterQuery.isLoading ? (
+        {visibleDraftSyncState === "storage_unavailable" ? (
+          <ErrorState
+            title="Saved attendance state is unavailable"
+            message="SchoolOS could not read the saved browser state for this scope. The roster stays hidden because an unconfirmed final receipt may be stored here."
+            onRetry={() => {
+              setHydratedDraftKey(null);
+              setDraftHydrationAttempt((attempt) => attempt + 1);
+            }}
+            retryLabel="Retry browser storage"
+          />
+        ) : visibleDraftSyncState === "access_revoked" ? (
+          <PermissionDenied
+            title="Attendance access must be revalidated"
+            description="SchoolOS denied saving this attendance draft. Student details were cleared from this browser. Ask a school administrator to restore attendance access before starting again."
+            resource="Attendance roster"
+            showNavigation={false}
+          />
+        ) : visibleDraftSyncState === "authorization_denied" ? (
+          <PermissionDenied
+            title="Final attendance submission denied"
+            description="SchoolOS did not accept this attendance. Student details were cleared from this browser. Ask a school administrator to restore the required attendance access before starting again."
+            resource="Attendance submission"
+            showNavigation={false}
+          />
+        ) : rosterQuery.isLoading ||
+          (Boolean(draftKey) && hydratedDraftKey !== draftKey) ? (
           <LoadingState label="Loading roster..." />
         ) : rosterQuery.isError ? (
           rosterQuery.error instanceof ApiRequestError &&
@@ -1456,7 +2102,7 @@ export function AttendanceForm() {
                   remark={remarks[student.id] ?? ""}
                   disabled={rosterEditingDisabled}
                   onStatusChange={(status) => {
-                    beginDraftEdit();
+                    if (!beginDraftEdit()) return;
                     setExceptions((current) => {
                       const next = { ...current };
                       if (status === "PRESENT") {
@@ -1468,7 +2114,7 @@ export function AttendanceForm() {
                     });
                   }}
                   onRemarkChange={(remark) => {
-                    beginDraftEdit();
+                    if (!beginDraftEdit()) return;
                     setRemarks((current) => ({
                       ...current,
                       [student.id]: remark,
@@ -1487,7 +2133,7 @@ export function AttendanceForm() {
       </SectionCard>
 
       {/* Summary Floating Bar */}
-      {roster.length > 0 && (
+      {roster.length > 0 && draftScopeHydrated && !rosterDisclosureBlocked && (
         <div className="animate-in slide-in-from-bottom-8 fixed bottom-8 left-1/2 z-50 flex -translate-x-1/2 items-center gap-8 rounded-xl border border-white/10 bg-[var(--color-mod-attendance-text)]/95 p-6 text-white shadow-[0_20px_50px_rgba(15,23,42,0.28)] backdrop-blur-xl duration-700">
           <div className="flex items-center gap-8 px-4">
             <SummaryStat
@@ -1523,12 +2169,12 @@ export function AttendanceForm() {
                 setIsOverrideConfirmOpen(true);
                 return;
               }
-              setAllPresentAcknowledged(false);
-              setIsConfirmOpen(true);
+              requestFinalSubmission();
             }}
             disabled={
               syncMutation.isPending ||
               isReceiptSyncPending ||
+              saveDraftMutation.isPending ||
               overrideMutation.isPending ||
               roster.length === 0 ||
               futureDateBlocked ||
@@ -1537,16 +2183,18 @@ export function AttendanceForm() {
                   overrideReason.trim().length < lockOverrideMinReasonLength
                 : isLocked || isSubmitted) ||
               finalizationReadOnly ||
-              draftSyncState === "rejected"
+              visibleDraftSyncState === "rejected"
             }
             isLoading={
               syncMutation.isPending ||
               isReceiptSyncPending ||
+              saveDraftMutation.isPending ||
               overrideMutation.isPending
             }
           >
             {!syncMutation.isPending &&
             !isReceiptSyncPending &&
+            !saveDraftMutation.isPending &&
             !overrideMutation.isPending ? (
               <Save size={20} />
             ) : null}
@@ -1554,13 +2202,13 @@ export function AttendanceForm() {
               ? "Apply Override"
               : isLocked
                 ? "Day Locked"
-                : isSubmitted || draftSyncState === "accepted"
+                : isSubmitted || visibleDraftSyncState === "accepted"
                   ? "Attendance Submitted"
-                  : draftSyncState === "recorded_conflict"
+                  : visibleDraftSyncState === "recorded_conflict"
                     ? "Conflict Recorded"
-                    : draftSyncState === "queued"
+                    : visibleDraftSyncState === "queued"
                       ? "Submission Queued"
-                      : draftSyncState === "server_check"
+                      : visibleDraftSyncState === "server_check"
                         ? "Checking Server"
                         : "Submit Attendance"}
           </Button>
@@ -1584,57 +2232,62 @@ export function AttendanceForm() {
         </div>
       ) : null}
 
-      <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-6 shadow-sm">
-        <div className="flex items-center gap-4 text-slate-600">
-          <div className="h-10 w-10 rounded-2xl bg-white border border-slate-200 flex items-center justify-center">
-            <Download size={20} className="text-slate-400" />
+      {!rosterDisclosureBlocked ? (
+        <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-6 shadow-sm">
+          <div className="flex items-center gap-4 text-slate-600">
+            <div className="h-10 w-10 rounded-2xl bg-white border border-slate-200 flex items-center justify-center">
+              <Download size={20} className="text-slate-400" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-slate-900">Offline sync</p>
+              <p className="text-[0.65rem] mt-0.5">
+                Sync offline draft and review conflicts before final submission.
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-xs font-bold text-slate-900">Offline sync</p>
-            <p className="text-[0.65rem] mt-0.5">
-              Sync offline draft and review conflicts before final submission.
-            </p>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void saveDraftToServer()}
+              disabled={
+                saveDraftMutation.isPending ||
+                roster.length === 0 ||
+                !hasPendingLocalDraft ||
+                awaitingServerReceipt ||
+                visibleDraftSyncState === "rejected"
+              }
+            >
+              <Save size={14} />
+              Save Draft
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={requestFinalSubmission}
+              disabled={
+                syncMutation.isPending ||
+                isReceiptSyncPending ||
+                saveDraftMutation.isPending ||
+                roster.length === 0 ||
+                !hasPendingLocalDraft ||
+                visibleDraftSyncState === "rejected"
+              }
+            >
+              <CheckCircle2 size={14} />
+              {visibleDraftSyncState === "authorization_denied"
+                ? "Retry After Access Is Restored"
+                : visibleDraftSyncState === "queued"
+                  ? "Try Queued Submission"
+                  : awaitingServerReceipt
+                    ? "Check Server"
+                    : "Submit Saved Draft"}
+            </Button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => void saveDraftToServer()}
-            disabled={
-              saveDraftMutation.isPending ||
-              roster.length === 0 ||
-              !hasPendingLocalDraft ||
-              awaitingServerReceipt ||
-              draftSyncState === "rejected"
-            }
-          >
-            <Save size={14} />
-            Save Draft
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => void syncDraftSubmission()}
-            disabled={
-              syncMutation.isPending ||
-              isReceiptSyncPending ||
-              roster.length === 0 ||
-              !hasPendingLocalDraft ||
-              draftSyncState === "rejected"
-            }
-          >
-            <CheckCircle2 size={14} />
-            {draftSyncState === "queued"
-              ? "Try Queued Submission"
-              : awaitingServerReceipt
-                ? "Check Server"
-                : "Submit Saved Draft"}
-          </Button>
-        </div>
-      </div>
+      ) : null}
 
       <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex items-center gap-4 text-slate-500">
@@ -1669,7 +2322,9 @@ export function AttendanceForm() {
               "csv",
             );
           }}
-          disabled={!academicYearId || !classId}
+          disabled={
+            !academicYearId || !classId || unresolvedFinalizationReadOnly
+          }
         >
           <Download size={14} />
           Export CSV
@@ -1696,8 +2351,12 @@ export function AttendanceForm() {
         cancelLabel="Review roster"
         variant={isAllPresentSubmission ? "warning" : "default"}
         isConfirming={isReceiptSyncPending}
-        confirmDisabled={isAllPresentSubmission && !allPresentAcknowledged}
+        confirmDisabled={
+          saveDraftMutation.isPending ||
+          (isAllPresentSubmission && !allPresentAcknowledged)
+        }
         onConfirm={() => {
+          if (serverDraftSaveInFlightRef.current) return;
           setIsConfirmOpen(false);
           void syncDraftSubmission();
         }}
@@ -1831,6 +2490,23 @@ function normalizeStatus(status: string | null | undefined): AttendanceStatus {
   return "PRESENT";
 }
 
+function normalizeDraftScopeId(value: string | undefined) {
+  const normalized = value?.trim();
+  return normalized && normalized.length <= 128 ? normalized : null;
+}
+
+function normalizeDraftRecoveryDate(value: string | undefined) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value) || value > today) {
+    return today;
+  }
+
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(parsed.getTime()) &&
+    parsed.toISOString().slice(0, 10) === value
+    ? value
+    : today;
+}
+
 function isFutureDate(value: string) {
   return value > today;
 }
@@ -1878,6 +2554,21 @@ function getDraftSyncLabel(
       syncResultMessage ||
       "SchoolOS did not accept this attendance. Review the local draft."
     );
+  if (state === "authorization_denied")
+    return (
+      syncResultMessage ||
+      "SchoolOS denied this final submission. Student details were cleared from this browser."
+    );
+  if (state === "access_revoked")
+    return (
+      syncResultMessage ||
+      "Attendance access must be revalidated. Student details were cleared from this browser."
+    );
+  if (state === "storage_unavailable")
+    return (
+      syncResultMessage ||
+      "The saved browser state is unavailable. The roster remains hidden."
+    );
   if (state === "server_check")
     return (
       syncResultMessage ||
@@ -1899,6 +2590,9 @@ function getDraftSyncHeading(state: DraftSyncState) {
   if (state === "recorded_conflict" || state === "conflict")
     return "Attendance conflict";
   if (state === "rejected") return "Submission rejected";
+  if (state === "authorization_denied") return "Attendance access denied";
+  if (state === "access_revoked") return "Attendance access revalidation";
+  if (state === "storage_unavailable") return "Browser state unavailable";
   if (state === "failed") return "Attendance sync failed";
   if (state === "syncing" || state === "retrying") return "Sync in progress";
   if (state === "synced") return "Draft saved to SchoolOS";

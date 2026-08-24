@@ -1,4 +1,5 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import {
   AssessmentType,
   TeacherAssignmentComponentScope,
@@ -98,6 +99,30 @@ export interface TeacherAssignmentScope {
 
 const DENIAL_MESSAGE = 'You are not authorized for this teaching scope';
 export const TEACHER_SCOPE_DENIED_CODE = 'TEACHER_SCOPE_DENIED';
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableJson(item)).join(',')}]`;
+  }
+  if (value !== null && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function teacherScopeFingerprint(value: unknown): string {
+  const digest = createHash('sha256')
+    .update('schoolos:teacher-scope:v1\0')
+    .update(stableJson(value))
+    .digest('hex');
+
+  // Keep the existing decimal-string wire shape while making the value an
+  // opaque fingerprint rather than a timestamp that clients can order.
+  return BigInt(`0x${digest}`).toString(10);
+}
 
 export function createTeacherScopeDeniedException() {
   return new ForbiddenException({
@@ -681,40 +706,125 @@ export class TeacherScopeService {
   }
 
   /**
-   * Monotonic scope version for mobile offline cache invalidation (P0-03).
-   * Bumps when assignments or active delegations change for the caller.
+   * Opaque scope fingerprint for mobile offline cache invalidation (P0-03).
+   * It represents the caller's current effective authority, so an assignment
+   * or delegation crossing its effective-date boundary changes the value even
+   * when no database row was updated at that moment.
    */
   async getScopeVersion(actor: AuthContext): Promise<{ scopeVersion: string }> {
-    const staffId = await this.resolveActiveStaffId(actor);
-    if (!staffId) {
-      return { scopeVersion: '0' };
-    }
-
-    // Include revoked/expired rows so revocation bumps the version. Filtering
-    // to ACTIVE-only can hide a cutover because the revoked row drops out of
-    // the aggregation while the replacement may belong to another staff.
-    const [assignmentMax, delegationMax] = await Promise.all([
-      this.prisma.teacherAssignment.aggregate({
-        where: {
-          tenantId: actor.tenantId,
-          staffId,
+    const now = new Date();
+    const staff = await this.prisma.staff.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+      },
+      select: {
+        id: true,
+        status: true,
+        teacherAssignmentRecords: {
+          where: {
+            tenantId: actor.tenantId,
+            status: 'ACTIVE',
+            effectiveFrom: { lte: now },
+            OR: [{ effectiveUntil: null }, { effectiveUntil: { gte: now } }],
+          },
+          select: {
+            id: true,
+            tenantId: true,
+            academicYearId: true,
+            staffId: true,
+            assignmentType: true,
+            classId: true,
+            sectionId: true,
+            subjectId: true,
+            componentScope: true,
+            isPrimary: true,
+            effectiveFrom: true,
+            effectiveUntil: true,
+            status: true,
+          },
+          orderBy: { id: 'asc' },
         },
-        _max: { updatedAt: true },
-      }),
-      this.prisma.teacherDelegation.aggregate({
-        where: {
-          tenantId: actor.tenantId,
-          recipientStaffId: staffId,
+        delegationsReceived: {
+          where: {
+            tenantId: actor.tenantId,
+            status: 'ACTIVE',
+            effectiveFrom: { lte: now },
+            effectiveUntil: { gte: now },
+          },
+          select: {
+            id: true,
+            tenantId: true,
+            academicYearId: true,
+            grantorStaffId: true,
+            recipientStaffId: true,
+            sourceAssignmentId: true,
+            classId: true,
+            sectionId: true,
+            subjectId: true,
+            componentScope: true,
+            allowedCapabilities: true,
+            timetableSubstitutionId: true,
+            effectiveFrom: true,
+            effectiveUntil: true,
+            status: true,
+          },
+          orderBy: { id: 'asc' },
         },
-        _max: { updatedAt: true },
+      },
+    });
+
+    const isActive = staff?.status === 'ACTIVE';
+    const assignments = isActive
+      ? staff.teacherAssignmentRecords
+          .map((assignment) => ({
+            id: assignment.id,
+            tenantId: assignment.tenantId,
+            academicYearId: assignment.academicYearId,
+            staffId: assignment.staffId,
+            assignmentType: assignment.assignmentType,
+            classId: assignment.classId,
+            sectionId: assignment.sectionId,
+            subjectId: assignment.subjectId,
+            componentScope: assignment.componentScope,
+            isPrimary: assignment.isPrimary,
+            effectiveFrom: assignment.effectiveFrom.toISOString(),
+            effectiveUntil: assignment.effectiveUntil?.toISOString() ?? null,
+            status: assignment.status,
+          }))
+          .sort((left, right) => left.id.localeCompare(right.id))
+      : [];
+    const delegations = isActive
+      ? staff.delegationsReceived
+          .map((delegation) => ({
+            id: delegation.id,
+            tenantId: delegation.tenantId,
+            academicYearId: delegation.academicYearId,
+            grantorStaffId: delegation.grantorStaffId,
+            recipientStaffId: delegation.recipientStaffId,
+            sourceAssignmentId: delegation.sourceAssignmentId,
+            classId: delegation.classId,
+            sectionId: delegation.sectionId,
+            subjectId: delegation.subjectId,
+            componentScope: delegation.componentScope,
+            allowedCapabilities: [...delegation.allowedCapabilities].sort(),
+            timetableSubstitutionId: delegation.timetableSubstitutionId,
+            effectiveFrom: delegation.effectiveFrom.toISOString(),
+            effectiveUntil: delegation.effectiveUntil.toISOString(),
+            status: delegation.status,
+          }))
+          .sort((left, right) => left.id.localeCompare(right.id))
+      : [];
+
+    return {
+      scopeVersion: teacherScopeFingerprint({
+        schemaVersion: 1,
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        staff: staff ? { id: staff.id, status: staff.status } : null,
+        assignments,
+        delegations,
       }),
-    ]);
-
-    const version = Math.max(
-      assignmentMax._max.updatedAt?.getTime() ?? 0,
-      delegationMax._max.updatedAt?.getTime() ?? 0,
-    );
-
-    return { scopeVersion: String(version) };
+    };
   }
 }

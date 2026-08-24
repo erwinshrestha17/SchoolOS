@@ -733,32 +733,343 @@ describe('TeacherScopeService — assignment-based authorization', () => {
   });
 
   describe('getScopeVersion', () => {
-    it('includes revoked assignment updates in the monotonic scope version', async () => {
+    interface ScopeAssignmentFixture {
+      id: string;
+      tenantId: string;
+      academicYearId: string;
+      staffId: string;
+      assignmentType: TeacherAssignmentType;
+      classId: string;
+      sectionId: string;
+      subjectId: string | null;
+      componentScope: null;
+      isPrimary: boolean;
+      effectiveFrom: Date;
+      effectiveUntil: Date | null;
+      status: string;
+      updatedAt: Date;
+    }
+
+    interface ScopeDelegationFixture {
+      id: string;
+      tenantId: string;
+      academicYearId: string;
+      grantorStaffId: string;
+      recipientStaffId: string;
+      sourceAssignmentId: string | null;
+      classId: string;
+      sectionId: string;
+      subjectId: string | null;
+      componentScope: null;
+      allowedCapabilities: TeacherCapability[];
+      timetableSubstitutionId: string | null;
+      effectiveFrom: Date;
+      effectiveUntil: Date;
+      status: string;
+      updatedAt: Date;
+    }
+
+    interface ScopeStaffFixture {
+      id: string;
+      status: string;
+      teacherAssignmentRecords: ScopeAssignmentFixture[];
+      delegationsReceived: ScopeDelegationFixture[];
+    }
+
+    interface ScopeVersionFindFirstArgs {
+      where: {
+        tenantId: string;
+        userId: string;
+        status?: string;
+      };
+      select: {
+        teacherAssignmentRecords: {
+          where: {
+            tenantId: string;
+            status: string;
+            effectiveFrom: { lte: Date };
+          };
+          select: Record<string, boolean>;
+        };
+        delegationsReceived: {
+          where: {
+            tenantId: string;
+            status: string;
+            effectiveFrom: { lte: Date };
+          };
+          select: Record<string, boolean>;
+        };
+      };
+    }
+
+    type ScopeStaffFindFirst = (
+      args: ScopeVersionFindFirstArgs,
+    ) => Promise<ScopeStaffFixture | null>;
+
+    const scopeStaffFindFirst = (prisma: unknown) =>
+      (
+        prisma as {
+          staff: { findFirst: jest.MockedFunction<ScopeStaffFindFirst> };
+        }
+      ).staff.findFirst;
+
+    const scopeAssignment = (
+      overrides: Partial<ScopeAssignmentFixture> = {},
+    ): ScopeAssignmentFixture => ({
+      id: 'scope-assignment-1',
+      tenantId: TENANT,
+      academicYearId: YEAR,
+      staffId: STAFF,
+      assignmentType: TeacherAssignmentType.CLASS_TEACHER,
+      classId: CLASS_1,
+      sectionId: SECTION_1A,
+      subjectId: null,
+      componentScope: null,
+      isPrimary: true,
+      effectiveFrom: new Date('2026-08-01T00:00:00.000Z'),
+      effectiveUntil: null,
+      status: 'ACTIVE',
+      updatedAt: new Date('2026-08-01T00:00:00.000Z'),
+      ...overrides,
+    });
+
+    const scopeDelegation = (
+      overrides: Partial<ScopeDelegationFixture> = {},
+    ): ScopeDelegationFixture => ({
+      id: 'scope-delegation-1',
+      tenantId: TENANT,
+      academicYearId: YEAR,
+      grantorStaffId: OTHER_STAFF,
+      recipientStaffId: STAFF,
+      sourceAssignmentId: null,
+      classId: CLASS_2,
+      sectionId: SECTION_2A,
+      subjectId: MATHS,
+      componentScope: null,
+      allowedCapabilities: [TeacherCapability.CLASS_ROSTER_READ],
+      timetableSubstitutionId: null,
+      effectiveFrom: new Date('2026-08-01T00:00:00.000Z'),
+      effectiveUntil: new Date('2026-08-31T23:59:59.999Z'),
+      status: 'ACTIVE',
+      updatedAt: new Date('2026-08-01T00:00:00.000Z'),
+      ...overrides,
+    });
+
+    const scopeStaff = (
+      status: string,
+      assignments: ScopeAssignmentFixture[] = [],
+      delegations: ScopeDelegationFixture[] = [],
+    ): ScopeStaffFixture => ({
+      id: STAFF,
+      status,
+      teacherAssignmentRecords: assignments,
+      delegationsReceived: delegations,
+    });
+
+    it('distinguishes missing, inactive, and active staff authority', async () => {
       const { service, prisma } = buildService();
-      (prisma as any).teacherAssignment.aggregate.mockResolvedValue({
-        _max: { updatedAt: new Date('2026-07-31T15:00:00.000Z') },
-      });
-      (prisma as any).teacherDelegation.aggregate.mockResolvedValue({
-        _max: { updatedAt: new Date('2026-07-31T14:00:00.000Z') },
-      });
+      const assignmentRow = scopeAssignment();
+      const delegationRow = scopeDelegation();
+      const findFirst = scopeStaffFindFirst(prisma);
+      findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(
+          scopeStaff('INACTIVE', [assignmentRow], [delegationRow]),
+        )
+        .mockResolvedValueOnce(
+          scopeStaff('ACTIVE', [assignmentRow], [delegationRow]),
+        );
 
-      const result = await service.getScopeVersion(actor);
+      const missing = await service.getScopeVersion(actor);
+      const inactive = await service.getScopeVersion(actor);
+      const active = await service.getScopeVersion(actor);
 
-      expect(result.scopeVersion).toBe(
-        String(new Date('2026-07-31T15:00:00.000Z').getTime()),
-      );
-      expect((prisma as any).teacherAssignment.aggregate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            tenantId: TENANT,
-            staffId: STAFF,
-          }),
-        }),
-      );
+      expect(missing.scopeVersion).toMatch(/^\d+$/);
+      expect(inactive.scopeVersion).toMatch(/^\d+$/);
+      expect(active.scopeVersion).toMatch(/^\d+$/);
       expect(
-        (prisma as any).teacherAssignment.aggregate.mock.calls[0][0].where
-          .status,
-      ).toBeUndefined();
+        new Set([
+          missing.scopeVersion,
+          inactive.scopeVersion,
+          active.scopeVersion,
+        ]).size,
+      ).toBe(3);
+
+      const query = findFirst.mock.calls[0][0];
+      expect(query.where).toEqual({ tenantId: TENANT, userId: actor.userId });
+      expect(query.where.status).toBeUndefined();
+      expect(query.select.teacherAssignmentRecords.where).toEqual(
+        expect.objectContaining({ tenantId: TENANT, status: 'ACTIVE' }),
+      );
+      expect(query.select.delegationsReceived.where).toEqual(
+        expect.objectContaining({ tenantId: TENANT, status: 'ACTIVE' }),
+      );
+    });
+
+    it('changes solely as the same rows activate and expire naturally', async () => {
+      const { service, prisma } = buildService();
+      const assignmentRows = [
+        scopeAssignment({
+          id: 'scope-assignment-early',
+          effectiveFrom: new Date('2026-08-24T09:00:00.000Z'),
+          effectiveUntil: new Date('2026-08-24T10:00:00.000Z'),
+        }),
+        scopeAssignment({
+          id: 'scope-assignment-late',
+          effectiveFrom: new Date('2026-08-24T11:15:00.000Z'),
+          effectiveUntil: null,
+        }),
+      ];
+      const delegationRows = [
+        scopeDelegation({
+          effectiveFrom: new Date('2026-08-24T10:15:00.000Z'),
+          effectiveUntil: new Date('2026-08-24T11:00:00.000Z'),
+        }),
+      ];
+
+      scopeStaffFindFirst(prisma).mockImplementation(({ select }) => {
+        const assignmentAt: Date =
+          select.teacherAssignmentRecords.where.effectiveFrom.lte;
+        const delegationAt: Date =
+          select.delegationsReceived.where.effectiveFrom.lte;
+        return Promise.resolve(
+          scopeStaff(
+            'ACTIVE',
+            assignmentRows.filter(
+              (row) =>
+                row.status === 'ACTIVE' &&
+                row.effectiveFrom <= assignmentAt &&
+                (row.effectiveUntil === null ||
+                  row.effectiveUntil >= assignmentAt),
+            ),
+            delegationRows.filter(
+              (row) =>
+                row.status === 'ACTIVE' &&
+                row.effectiveFrom <= delegationAt &&
+                row.effectiveUntil >= delegationAt,
+            ),
+          ),
+        );
+      });
+
+      jest.useFakeTimers();
+      try {
+        jest.setSystemTime(new Date('2026-08-24T09:30:00.000Z'));
+        const before = await service.getScopeVersion(actor);
+        jest.setSystemTime(new Date('2026-08-24T10:30:00.000Z'));
+        const during = await service.getScopeVersion(actor);
+        jest.setSystemTime(new Date('2026-08-24T11:30:00.000Z'));
+        const after = await service.getScopeVersion(actor);
+
+        expect(
+          new Set([
+            before.scopeVersion,
+            during.scopeVersion,
+            after.scopeVersion,
+          ]).size,
+        ).toBe(3);
+      } finally {
+        jest.useRealTimers();
+      }
+
+      expect(assignmentRows.map((row) => row.updatedAt)).toEqual([
+        new Date('2026-08-01T00:00:00.000Z'),
+        new Date('2026-08-01T00:00:00.000Z'),
+      ]);
+      expect(delegationRows[0].updatedAt).toEqual(
+        new Date('2026-08-01T00:00:00.000Z'),
+      );
+    });
+
+    it('is unchanged when only non-authority update timestamps change', async () => {
+      const { service, prisma } = buildService();
+      const assignmentRow = scopeAssignment();
+      const delegationRow = scopeDelegation();
+      const findFirst = scopeStaffFindFirst(prisma);
+      findFirst
+        .mockResolvedValueOnce(
+          scopeStaff('ACTIVE', [assignmentRow], [delegationRow]),
+        )
+        .mockResolvedValueOnce(
+          scopeStaff(
+            'ACTIVE',
+            [
+              {
+                ...assignmentRow,
+                updatedAt: new Date('2026-08-24T10:00:00.000Z'),
+              },
+            ],
+            [
+              {
+                ...delegationRow,
+                updatedAt: new Date('2026-08-24T11:00:00.000Z'),
+              },
+            ],
+          ),
+        );
+
+      const before = await service.getScopeVersion(actor);
+      const after = await service.getScopeVersion(actor);
+
+      expect(after.scopeVersion).toBe(before.scopeVersion);
+      const query = findFirst.mock.calls[0][0];
+      expect(query.select.teacherAssignmentRecords.select).not.toHaveProperty(
+        'updatedAt',
+      );
+      expect(query.select.delegationsReceived.select).not.toHaveProperty(
+        'updatedAt',
+      );
+    });
+
+    it('is deterministic across row and capability ordering', async () => {
+      const { service, prisma } = buildService();
+      const firstAssignment = scopeAssignment({ id: 'assignment-a' });
+      const secondAssignment = scopeAssignment({
+        id: 'assignment-b',
+        classId: CLASS_2,
+        sectionId: SECTION_2A,
+      });
+      const firstDelegation = scopeDelegation({
+        id: 'delegation-a',
+        allowedCapabilities: [
+          TeacherCapability.HOMEROOM_ATTENDANCE_MARK,
+          TeacherCapability.CLASS_ROSTER_READ,
+        ],
+      });
+      const secondDelegation = scopeDelegation({
+        id: 'delegation-b',
+        classId: CLASS_3,
+        sectionId: SECTION_3B,
+      });
+      scopeStaffFindFirst(prisma)
+        .mockResolvedValueOnce(
+          scopeStaff(
+            'ACTIVE',
+            [firstAssignment, secondAssignment],
+            [firstDelegation, secondDelegation],
+          ),
+        )
+        .mockResolvedValueOnce(
+          scopeStaff(
+            'ACTIVE',
+            [secondAssignment, firstAssignment],
+            [
+              secondDelegation,
+              {
+                ...firstDelegation,
+                allowedCapabilities: [
+                  TeacherCapability.CLASS_ROSTER_READ,
+                  TeacherCapability.HOMEROOM_ATTENDANCE_MARK,
+                ],
+              },
+            ],
+          ),
+        );
+
+      const first = await service.getScopeVersion(actor);
+      const reordered = await service.getScopeVersion(actor);
+
+      expect(first.scopeVersion).toBe(reordered.scopeVersion);
     });
   });
 
