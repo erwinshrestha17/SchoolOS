@@ -112,7 +112,7 @@ A page may contain supporting evidence, but it must have one primary purpose.
 
 Examples:
 
-- Executive Dashboard: prioritize the day.
+- Principal Home: prioritize the day.
 - Approval Centre: decide requests.
 - Attendance Oversight: resolve attendance risk.
 - Finance Overview: understand financial position and exceptions.
@@ -124,7 +124,7 @@ Examples:
 
 ```text
 Leadership
-  Executive Dashboard
+  Principal Home
   Attention Centre
   Approval Centre
 
@@ -345,7 +345,7 @@ Avoid decorative pie charts with no action.
 
 # 6. Page-by-page design
 
-## Page 1 — Executive Dashboard
+## Page 1 — Principal Home
 
 ### Route
 
@@ -358,7 +358,7 @@ Prioritize the Principal's day and expose only the most important school-wide de
 ### Header
 
 - Eyebrow: `Executive oversight`
-- Title: `Executive Dashboard`
+- Title: `Principal Home`
 - Description: `Critical decisions, school readiness, and exceptions requiring leadership attention.`
 - Metadata:
   - School day.

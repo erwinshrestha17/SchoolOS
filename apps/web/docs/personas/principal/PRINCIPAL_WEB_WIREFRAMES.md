@@ -37,14 +37,14 @@ All desktop frames assume the authenticated SchoolOS shell:
 
 ---
 
-# 2. Executive Dashboard
+# 2. Principal Home
 
 **Route:** `/dashboard`
 
 ```text
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │ Executive oversight                                                         │
-│ Executive Dashboard                                      [Review 6 items →] │
+│ Principal Home                                           [Review 6 items →] │
 │ Critical decisions, school readiness, and leadership exceptions.            │
 │ School day: 18 Shrawan 2083 | Partial | Updated 10:12 [Refresh]             │
 ├──────────────────────────────────────────────────────────────────────────────┤

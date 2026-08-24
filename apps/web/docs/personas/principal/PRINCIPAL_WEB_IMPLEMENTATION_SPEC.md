@@ -227,7 +227,7 @@ export const principalNavGroups: NavGroup[] = [
   {
     label: 'Leadership',
     items: [
-      { href: '/dashboard', label: 'Executive Dashboard' },
+      { href: '/dashboard', label: 'Principal Home' },
       { href: '/dashboard/attention', label: 'Attention Centre' },
       { href: '/dashboard/approvals', label: 'Approval Centre' },
     ],
@@ -760,7 +760,7 @@ Update `apps/web/test/sidebar-navigation.test.mjs`.
 Assert Principal shows:
 
 ```text
-Executive Dashboard
+Principal Home
 Attention Centre
 Approval Centre
 Enrollment Overview
@@ -821,7 +821,7 @@ Recommended journey:
 
 ```text
 Sign in as Principal
-→ Executive Dashboard loads server-projected data
+→ Principal Home loads server-projected data
 → Open Attention Centre
 → Filter Academics / High severity
 → Open item evidence

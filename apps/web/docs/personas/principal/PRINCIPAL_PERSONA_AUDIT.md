@@ -111,7 +111,7 @@ The current navigation is defined in `principalNavGroups`.
 
 ```text
 Leadership
-  Executive Dashboard
+  Principal Home
   Attention Items
   Approvals
 
@@ -144,7 +144,7 @@ This is directionally correct, but several labels are attached to operational pa
 
 | Area | Current route | Current implementation | Principal audit result |
 |---|---|---|---|
-| Executive Dashboard | `/dashboard` | Persona-specific dashboard composition with attention, operations, readiness, and recent activity | **Keep and improve** |
+| Principal Home | `/dashboard` | Persona-specific dashboard composition with attention, operations, readiness, and recent activity | **Keep and improve** |
 | Attention Items | `/dashboard#needs-attention` | In-page bounded list; no filters, ownership, history, or dedicated URL state | **Insufficient** |
 | Approvals | `/dashboard/notices/approvals` | Notice approval queue only | **Too narrow** |
 | Students | `/dashboard/students` | Full student directory plus new admission, document issues, duplicates, iEMIS export, QR/ID, roster export | **Over-privileged** |
@@ -482,7 +482,7 @@ The Principal preset should use an explicit allowlist grouped by purpose.
 
 ```text
 Leadership
-  Executive Dashboard
+  Principal Home
   Attention Centre
   Approval Centre
 
@@ -535,7 +535,7 @@ Open chat / conversations
 
 The companion design documents specify these pages:
 
-1. Executive Dashboard.
+1. Principal Home.
 2. Attention Centre.
 3. Approval Centre.
 4. Enrollment Overview.

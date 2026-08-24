@@ -22,7 +22,7 @@ The Principal does not become a substitute Admin, Teacher, HR operator, or Accou
 
 ```text
 Leadership
-  Executive Dashboard
+  Principal Home
   Attention Centre
   Approval Centre
 
