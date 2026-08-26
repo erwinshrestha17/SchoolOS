@@ -2955,6 +2955,9 @@ export class StudentsService {
     studentId: string,
     dto: ArchiveStudentDto,
     actor: AuthContext,
+    options: {
+      auditAction?: 'archive_alumni' | 'graduate_to_alumni';
+    } = {},
   ) {
     const student = await this.findTenantStudent(studentId, actor);
     ensureAllowedLifecycleTransition(
@@ -3015,7 +3018,7 @@ export class StudentsService {
     });
 
     await this.auditService.record({
-      action: 'archive_alumni',
+      action: options.auditAction ?? 'archive_alumni',
       resource: 'student',
       tenantId: actor.tenantId,
       userId: actor.userId,

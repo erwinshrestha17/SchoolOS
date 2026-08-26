@@ -464,11 +464,9 @@ describe('M1AdmissionsHardeningService', () => {
     );
   });
 
-  it('moves graduated students into alumni state and exits active enrollments tenant-safely', async () => {
+  it('delegates graduation to the canonical tenant-safe alumni transition', async () => {
     const prisma = buildPrisma();
-    const tx = buildTransaction();
-    prisma.$transaction.mockImplementation(async (callback) => callback(tx));
-    const { service, auditService } = buildService(prisma);
+    const { service, auditService, studentsService } = buildService(prisma);
 
     const result = await service.graduateStudent(
       'student-1',
@@ -479,36 +477,15 @@ describe('M1AdmissionsHardeningService', () => {
       actor,
     );
 
-    expect(tx.enrollment.updateMany).toHaveBeenCalledWith({
-      where: {
-        tenantId: actor.tenantId,
-        studentId: 'student-1',
-        status: EnrollmentStatus.ACTIVE,
-      },
-      data: { status: EnrollmentStatus.EXITED },
-    });
-    expect(tx.studentLifecycleTransition.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        tenantId: actor.tenantId,
-        studentId: 'student-1',
-        toStatus: StudentLifecycleStatus.ALUMNI,
-      }),
-    });
-    expect(tx.student.update).toHaveBeenCalledWith({
-      where: { id: 'student-1' },
-      data: expect.objectContaining({
-        lifecycleStatus: StudentLifecycleStatus.ALUMNI,
-        exitReason: 'SEE completed',
-      }),
-    });
-    expect(result.alumniState).toBe('ALUMNI');
-    expect(auditService.record).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: 'graduate_to_alumni',
-        tenantId: actor.tenantId,
-        resourceId: 'student-1',
-      }),
+    expect(studentsService.archiveAlumni).toHaveBeenCalledWith(
+      'student-1',
+      { reason: 'SEE completed', exitedAt: '2026-04-30' },
+      actor,
+      { auditAction: 'graduate_to_alumni' },
     );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(result.alumniState).toBe('ALUMNI');
+    expect(auditService.record).not.toHaveBeenCalled();
   });
 });
 
@@ -517,6 +494,12 @@ function buildService(prisma = buildPrisma()) {
   const studentsService = {
     generateStudentDocumentPdf: jest.fn().mockResolvedValue(undefined),
     requestTransfer: jest.fn().mockResolvedValue(undefined),
+    archiveAlumni: jest.fn().mockResolvedValue({
+      id: 'student-1',
+      studentSystemId: 'SCH-2026-0001',
+      lifecycleStatus: StudentLifecycleStatus.ALUMNI,
+      exitedAt: new Date('2026-04-30T00:00:00.000Z'),
+    }),
   };
   const service = new M1AdmissionsHardeningService(
     prisma as unknown as PrismaService,

@@ -693,52 +693,15 @@ export class M1AdmissionsHardeningService {
     dto: GraduateStudentDto,
     actor: AuthContext,
   ) {
-    const student = await this.findTenantStudent(studentId, actor);
-    const graduatedAt = dto.graduatedAt
-      ? new Date(dto.graduatedAt)
-      : new Date();
-    const updated = await this.prisma.$transaction(async (tx) => {
-      await tx.enrollment.updateMany({
-        where: {
-          tenantId: actor.tenantId,
-          studentId,
-          status: EnrollmentStatus.ACTIVE,
-        },
-        data: { status: EnrollmentStatus.EXITED },
-      });
-      await tx.studentLifecycleTransition.create({
-        data: {
-          tenantId: actor.tenantId,
-          studentId,
-          fromStatus: student.lifecycleStatus,
-          toStatus: StudentLifecycleStatus.ALUMNI,
-          reason: dto.reason ?? 'Graduated and moved to alumni state',
-          changedById: actor.userId,
-          metadata: { graduatedAt: graduatedAt.toISOString() },
-        },
-      });
-      return tx.student.update({
-        where: { id: student.id },
-        data: {
-          lifecycleStatus: StudentLifecycleStatus.ALUMNI,
-          exitReason: dto.reason ?? 'Graduated',
-          exitedAt: graduatedAt,
-        },
-      });
-    });
-
-    await this.auditService.record({
-      action: 'graduate_to_alumni',
-      resource: 'student',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: student.id,
-      before: { lifecycleStatus: student.lifecycleStatus },
-      after: {
-        lifecycleStatus: updated.lifecycleStatus,
-        exitedAt: updated.exitedAt,
+    const updated = await this.studentsService.archiveAlumni(
+      studentId,
+      {
+        reason: dto.reason ?? 'Graduated and moved to alumni state',
+        ...(dto.graduatedAt ? { exitedAt: dto.graduatedAt } : {}),
       },
-    });
+      actor,
+      { auditAction: 'graduate_to_alumni' },
+    );
 
     return {
       id: updated.id,
