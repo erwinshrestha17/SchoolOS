@@ -108,8 +108,13 @@ describe('AdmissionsService production hardening', () => {
     const tx = buildTransaction();
     prisma.$transaction.mockImplementation(async (callback) => callback(tx));
 
-    const { service, financeService, notificationsService, eventEmitter } =
-      buildService(prisma);
+    const {
+      service,
+      financeService,
+      notificationsService,
+      eventEmitter,
+      studentsService,
+    } = buildService(prisma);
 
     const result = await service.createAdmission(buildAdmissionDto(), actor);
 
@@ -196,6 +201,12 @@ describe('AdmissionsService production hardening', () => {
     });
 
     expect(notificationsService.sendSms).not.toHaveBeenCalled();
+    expect(studentsService.generateStudentDocumentPdf).toHaveBeenCalledWith(
+      'student-1',
+      'ID_CARD',
+      actor,
+      { idempotencyKey: 'admission:enrollment-1:id-card' },
+    );
 
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       'student.admitted',
@@ -1187,6 +1198,7 @@ function buildService(prisma = buildPrisma()) {
     auditService,
     eventEmitter,
     studentRecordsService,
+    studentsService,
   };
 }
 

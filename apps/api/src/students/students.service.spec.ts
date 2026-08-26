@@ -2514,6 +2514,7 @@ describe('students lifecycle hardening', () => {
       student.id,
       'enrollment-confirmation',
       actor,
+      { idempotencyKey: 'admission:enrollment-1:id-card' },
     );
 
     expect(pdf).toEqual({
@@ -2557,6 +2558,8 @@ describe('students lifecycle hardening', () => {
       data: expect.objectContaining({
         tenantId: actor.tenantId,
         studentId: student.id,
+        fileId: 'generated-file-asset',
+        idempotencyKey: 'admission:enrollment-1:id-card',
         kind: 'enrollment-confirmation',
         generatedById: actor.userId,
         pdfUrl: '/api/v1/files/generated-file-asset/preview',
@@ -2573,6 +2576,71 @@ describe('students lifecycle hardening', () => {
         retentionUntil: expect.any(Date),
       }),
     });
+  });
+
+  it('replays a generated student document without regenerating its file', async () => {
+    const prisma = buildPrisma({
+      generatedStudentDocumentFindUniqueResult: {
+        id: 'generated-document-1',
+        studentId: 'student-1',
+        kind: 'id-card',
+        fileId: 'generated-file-asset-existing',
+        fileName: 'SCH-2026-0001-id-card.pdf',
+      },
+    });
+    const { service, fileRegistryService } = buildService(prisma);
+
+    const result = await service.generateStudentDocumentPdf(
+      'student-1',
+      'ID_CARD',
+      actor,
+      { idempotencyKey: 'admission:enrollment-1:id-card' },
+    );
+
+    expect(result).toEqual({
+      fileAssetId: 'generated-file-asset-existing',
+      fileName: 'SCH-2026-0001-id-card.pdf',
+      mimeType: 'application/pdf',
+      fileAvailable: true,
+    });
+    expect(prisma.student.findFirst).not.toHaveBeenCalled();
+    expect(fileRegistryService.registerGeneratedFile).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('cleans up a losing generated file and returns the concurrent replay', async () => {
+    const student = buildStudent({ guardianLinks: [] });
+    const concurrentDocument = {
+      id: 'generated-document-concurrent',
+      studentId: student.id,
+      kind: 'id-card',
+      fileId: 'generated-file-asset-existing',
+      fileName: `${student.studentSystemId}-id-card.pdf`,
+    };
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      generatedStudentDocumentFindFirstQueue: [null],
+    });
+    prisma.generatedStudentDocument.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(concurrentDocument);
+    prisma.$transaction.mockRejectedValueOnce({ code: 'P2002' });
+    const { service, fileRegistryService } = buildService(prisma);
+
+    const result = await service.generateStudentDocumentPdf(
+      student.id,
+      'id-card',
+      actor,
+      { idempotencyKey: 'admission:enrollment-1:id-card' },
+    );
+
+    expect(result.fileAssetId).toBe('generated-file-asset-existing');
+    expect(fileRegistryService.softDeleteFile).toHaveBeenCalledWith(
+      actor.tenantId,
+      'generated-file-asset',
+      actor.userId,
+    );
+    expect(prisma.generatedStudentDocument.findUnique).toHaveBeenCalledTimes(2);
   });
 
   it('generates student ID cards without accepting credential secrets from callers', async () => {
@@ -4104,6 +4172,7 @@ function buildService(
     listFilesByEntity: jest.fn().mockResolvedValue([]),
     getFileMetadata: jest.fn(),
     getProtectedDownload: jest.fn(),
+    softDeleteFile: jest.fn(),
   };
   const usageService = {
     verifyLimit: jest.fn(),
@@ -4174,6 +4243,7 @@ function buildPrisma(options: {
   sectionFindFirstResult?: unknown;
   enrollmentFindFirstResult?: unknown;
   generatedStudentDocumentFindFirstQueue?: unknown[];
+  generatedStudentDocumentFindUniqueResult?: unknown;
   generatedStudentDocumentFindManyResult?: unknown[];
   guardianIdentityVerificationCreateResult?: unknown;
   guardianIdentityVerificationFindManyResult?: unknown[];
@@ -4488,6 +4558,11 @@ function buildPrisma(options: {
         ),
     },
     generatedStudentDocument: {
+      findUnique: jest
+        .fn()
+        .mockResolvedValue(
+          options.generatedStudentDocumentFindUniqueResult ?? null,
+        ),
       findFirst: jest
         .fn()
         .mockImplementation(

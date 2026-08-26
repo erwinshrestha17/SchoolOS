@@ -8033,6 +8033,8 @@ model GeneratedStudentDocument {
   id                String    @id @default(uuid())
   tenantId          String
   studentId         String
+  fileId            String?   @unique
+  idempotencyKey    String?
   kind              String
   title             String
   fileName          String
@@ -8053,7 +8055,9 @@ model GeneratedStudentDocument {
 
   tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  file    FileAsset? @relation("GeneratedStudentDocumentFile", fields: [fileId], references: [id], onDelete: SetNull)
 
+  @@unique([tenantId, idempotencyKey])
   @@index([tenantId, studentId, kind])
 }
 
@@ -8607,6 +8611,7 @@ model FileAsset {
   homeworkAttachments HomeworkAttachment[]
   studentPhoto        Student?             @relation("StudentPhoto")
   studentDocuments    StudentDocument[]    @relation("DocumentFile")
+  generatedStudentDocument GeneratedStudentDocument? @relation("GeneratedStudentDocumentFile")
   reportCards         ReportCard[]         @relation("ReportCardFile")
   reportCardHistories ReportCardHistory[]  @relation("ReportCardHistoryFile")
   learningResources   LearningResource[]

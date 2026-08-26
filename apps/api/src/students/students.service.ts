@@ -4589,8 +4589,27 @@ export class StudentsService {
     studentId: string,
     documentKind: string,
     actor: AuthContext,
+    options: { idempotencyKey?: string } = {},
   ) {
     const normalizedKind = normalizeStudentDocumentKind(documentKind);
+    const idempotencyKey = options.idempotencyKey?.trim() || null;
+    if (idempotencyKey) {
+      const replay = await this.prisma.generatedStudentDocument.findUnique({
+        where: {
+          tenantId_idempotencyKey: {
+            tenantId: actor.tenantId,
+            idempotencyKey,
+          },
+        },
+      });
+      if (replay) {
+        return this.generatedStudentDocumentReplay(replay, {
+          studentId,
+          kind: normalizedKind,
+        });
+      }
+    }
+
     const student = await this.prisma.student.findFirst({
       where: {
         id: studentId,
@@ -4681,59 +4700,90 @@ export class StudentsService {
       generatedFileAsset.id,
     )}/preview`;
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.generatedStudentDocument.updateMany({
-        where: {
-          tenantId: actor.tenantId,
-          studentId: student.id,
-          kind: normalizedKind,
-          revokedAt: null,
-        },
-        data: {
-          revokedAt: signedAt,
-          revokedById: actor.userId,
-        },
-      });
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.generatedStudentDocument.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            studentId: student.id,
+            kind: normalizedKind,
+            revokedAt: null,
+          },
+          data: {
+            revokedAt: signedAt,
+            revokedById: actor.userId,
+          },
+        });
 
-      await tx.generatedStudentDocument.create({
-        data: {
-          tenantId: actor.tenantId,
-          studentId: student.id,
-          kind: normalizedKind,
-          title: getStudentDocumentTitle(normalizedKind),
-          fileName,
-          sizeBytes: Number(generatedFileAsset.sizeBytes),
-          pdfUrl,
-          generatedById: actor.userId,
-          storageObjectKey: generatedFileAsset.objectKey,
-          checksumSha256,
-          signedAt,
-          signatureMetadata: {
-            issuerUserId: actor.userId,
-            tenantSlug: actor.tenantSlug,
-            generatedAt: signedAt.toISOString(),
-            mode: 'internal-issued',
-            storageProvider: generatedFileAsset.storageProvider,
+        await tx.generatedStudentDocument.create({
+          data: {
+            tenantId: actor.tenantId,
+            studentId: student.id,
+            fileId: generatedFileAsset.id,
+            idempotencyKey,
+            kind: normalizedKind,
+            title: getStudentDocumentTitle(normalizedKind),
+            fileName,
+            sizeBytes: Number(generatedFileAsset.sizeBytes),
+            pdfUrl,
+            generatedById: actor.userId,
             storageObjectKey: generatedFileAsset.objectKey,
-            signerName: actor.email ?? actor.userId,
-            signerRole: actor.roles[0] ?? 'school_official',
-            layoutVersion: 'certificate-v2',
-          },
-          version,
-          retentionUntil: resolveDocumentRetentionUntil(
-            normalizedKind,
+            checksumSha256,
             signedAt,
-          ),
-          metadata: {
-            studentSystemId: student.studentSystemId,
-            className: student.class.name,
-            sectionName: student.sectionRef?.name ?? student.section ?? null,
-            storageProvider: generatedFileAsset.storageProvider,
-            layoutVersion: 'certificate-v2',
+            signatureMetadata: {
+              issuerUserId: actor.userId,
+              tenantSlug: actor.tenantSlug,
+              generatedAt: signedAt.toISOString(),
+              mode: 'internal-issued',
+              storageProvider: generatedFileAsset.storageProvider,
+              storageObjectKey: generatedFileAsset.objectKey,
+              signerName: actor.email ?? actor.userId,
+              signerRole: actor.roles[0] ?? 'school_official',
+              layoutVersion: 'certificate-v2',
+            },
+            version,
+            retentionUntil: resolveDocumentRetentionUntil(
+              normalizedKind,
+              signedAt,
+            ),
+            metadata: {
+              studentSystemId: student.studentSystemId,
+              className: student.class.name,
+              sectionName: student.sectionRef?.name ?? student.section ?? null,
+              storageProvider: generatedFileAsset.storageProvider,
+              layoutVersion: 'certificate-v2',
+            },
           },
-        },
+        });
       });
-    });
+    } catch (error) {
+      if (!idempotencyKey || !isPrismaUniqueConstraintError(error)) {
+        throw error;
+      }
+
+      const concurrentReplay =
+        await this.prisma.generatedStudentDocument.findUnique({
+          where: {
+            tenantId_idempotencyKey: {
+              tenantId: actor.tenantId,
+              idempotencyKey,
+            },
+          },
+        });
+      if (!concurrentReplay) {
+        throw error;
+      }
+
+      await this.fileRegistryService.softDeleteFile(
+        actor.tenantId,
+        generatedFileAsset.id,
+        actor.userId,
+      );
+      return this.generatedStudentDocumentReplay(concurrentReplay, {
+        studentId,
+        kind: normalizedKind,
+      });
+    }
 
     await this.auditService.record({
       action: 'generate',
@@ -4750,6 +4800,33 @@ export class StudentsService {
     return {
       fileAssetId: generatedFileAsset.id,
       fileName,
+      mimeType: 'application/pdf',
+      fileAvailable: true as const,
+    };
+  }
+
+  private generatedStudentDocumentReplay(
+    document: {
+      studentId: string;
+      kind: string;
+      fileId: string | null;
+      fileName: string;
+    },
+    expected: { studentId: string; kind: GeneratedStudentDocumentKind },
+  ) {
+    if (
+      document.studentId !== expected.studentId ||
+      document.kind !== expected.kind ||
+      !document.fileId
+    ) {
+      throw new ConflictException(
+        'Generated document idempotency key is linked to different or incomplete document data.',
+      );
+    }
+
+    return {
+      fileAssetId: document.fileId,
+      fileName: document.fileName,
       mimeType: 'application/pdf',
       fileAvailable: true as const,
     };
@@ -7103,4 +7180,13 @@ function validateIemisStudent(
   }
 
   return issues;
+}
+
+function isPrismaUniqueConstraintError(error: unknown) {
+  return (
+    error !== null &&
+    typeof error === 'object' &&
+    'code' in error &&
+    error.code === 'P2002'
+  );
 }

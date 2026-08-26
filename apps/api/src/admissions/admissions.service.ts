@@ -1366,6 +1366,7 @@ export class AdmissionsService {
         core.student.id,
         'ID_CARD',
         actor,
+        { idempotencyKey: `admission:${core.enrollment.id}:id-card` },
       );
     } catch {
       // Best effort generation during admission to avoid blocking enrollment

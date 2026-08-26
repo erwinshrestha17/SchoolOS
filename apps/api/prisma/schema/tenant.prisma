@@ -294,6 +294,7 @@ model FileAsset {
   homeworkAttachments HomeworkAttachment[]
   studentPhoto        Student?             @relation("StudentPhoto")
   studentDocuments    StudentDocument[]    @relation("DocumentFile")
+  generatedStudentDocument GeneratedStudentDocument? @relation("GeneratedStudentDocumentFile")
   reportCards         ReportCard[]         @relation("ReportCardFile")
   reportCardHistories ReportCardHistory[]  @relation("ReportCardHistoryFile")
   learningResources   LearningResource[]
