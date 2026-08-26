@@ -1209,26 +1209,64 @@ export class ActivityFeedService {
     studentName: string;
     actor: AuthContext;
   }) {
-    const post = await this.prisma.activityPost.create({
-      data: {
+    const clientSubmissionId = `student-admitted:${event.studentId}`;
+    const replay = await this.prisma.activityPost.findFirst({
+      where: {
         tenantId: event.tenantId,
-        classId: event.classId,
-        sectionId: event.sectionId ?? null,
         createdById: event.actor.userId,
-        title: 'New Student Welcome',
-        caption: `Please welcome ${event.studentName} to the class!`,
-        category: ActivityCategory.GENERAL,
-        audienceType: event.sectionId
-          ? AudienceType.SECTION
-          : AudienceType.CLASS,
-        publishedAt: new Date(),
-        studentTags: {
-          create: [{ tenantId: event.tenantId, studentId: event.studentId }],
-        },
+        clientSubmissionId,
       },
       include: { attachments: true, studentTags: true },
     });
+    if (replay) {
+      return replay;
+    }
+
+    let post: Prisma.ActivityPostGetPayload<{
+      include: { attachments: true; studentTags: true };
+    }>;
+    try {
+      post = await this.prisma.activityPost.create({
+        data: {
+          tenantId: event.tenantId,
+          classId: event.classId,
+          sectionId: event.sectionId ?? null,
+          createdById: event.actor.userId,
+          clientSubmissionId,
+          title: 'New Student Welcome',
+          caption: `Please welcome ${event.studentName} to the class!`,
+          category: ActivityCategory.GENERAL,
+          audienceType: event.sectionId
+            ? AudienceType.SECTION
+            : AudienceType.CLASS,
+          publishedAt: new Date(),
+          studentTags: {
+            create: [{ tenantId: event.tenantId, studentId: event.studentId }],
+          },
+        },
+        include: { attachments: true, studentTags: true },
+      });
+    } catch (error) {
+      if (!isDatabaseErrorCode(error, 'P2002')) {
+        throw error;
+      }
+
+      const concurrentReplay = await this.prisma.activityPost.findFirst({
+        where: {
+          tenantId: event.tenantId,
+          createdById: event.actor.userId,
+          clientSubmissionId,
+        },
+        include: { attachments: true, studentTags: true },
+      });
+      if (!concurrentReplay) {
+        throw error;
+      }
+      return concurrentReplay;
+    }
+
     this.eventEmitter.emit('feed.post.created', post);
+    return post;
   }
 
   @OnEvent('homework.assigned')

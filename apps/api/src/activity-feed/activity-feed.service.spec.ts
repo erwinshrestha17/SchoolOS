@@ -30,6 +30,7 @@ describe('ActivityFeedService', () => {
   let fileRegistry: any;
   let mediaQueue: any;
   let teacherScopeService: any;
+  let eventEmitter: any;
   let service: ActivityFeedService;
   let actor: AuthContext;
 
@@ -112,6 +113,7 @@ describe('ActivityFeedService', () => {
       auditAccess: jest.fn(),
     };
     mediaQueue = { add: jest.fn() };
+    eventEmitter = { emit: jest.fn() };
     teacherScopeService = {
       listActiveAssignments: jest.fn().mockResolvedValue([]),
       requireActorAccess: jest.fn().mockResolvedValue({
@@ -153,11 +155,93 @@ describe('ActivityFeedService', () => {
       storageService,
       communicationsService,
       auditService,
-      { emit: jest.fn() } as any,
+      eventEmitter,
       fileRegistry,
       mediaQueue,
       teacherScopeService,
     );
+  });
+
+  it('creates one idempotent welcome post for a student admission', async () => {
+    const createdPost = {
+      id: 'post-welcome-1',
+      attachments: [],
+      studentTags: [{ studentId: 'student-1' }],
+    };
+    prisma.activityPost.findFirst.mockResolvedValue(null);
+    prisma.activityPost.create.mockResolvedValue(createdPost);
+
+    const result = await service.handleStudentAdmitted({
+      tenantId: actor.tenantId,
+      classId: 'class-1',
+      sectionId: 'section-1',
+      studentId: 'student-1',
+      studentName: 'Asha Rai',
+      actor,
+    });
+
+    expect(result).toBe(createdPost);
+    expect(prisma.activityPost.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: actor.tenantId,
+        createdById: actor.userId,
+        clientSubmissionId: 'student-admitted:student-1',
+        studentTags: {
+          create: [{ tenantId: actor.tenantId, studentId: 'student-1' }],
+        },
+      }),
+      include: { attachments: true, studentTags: true },
+    });
+    expect(eventEmitter.emit).toHaveBeenCalledWith(
+      'feed.post.created',
+      createdPost,
+    );
+  });
+
+  it('returns the existing welcome post without emitting another feed event', async () => {
+    const existingPost = {
+      id: 'post-welcome-existing',
+      attachments: [],
+      studentTags: [{ studentId: 'student-1' }],
+    };
+    prisma.activityPost.findFirst.mockResolvedValue(existingPost);
+
+    const result = await service.handleStudentAdmitted({
+      tenantId: actor.tenantId,
+      classId: 'class-1',
+      sectionId: 'section-1',
+      studentId: 'student-1',
+      studentName: 'Asha Rai',
+      actor,
+    });
+
+    expect(result).toBe(existingPost);
+    expect(prisma.activityPost.create).not.toHaveBeenCalled();
+    expect(eventEmitter.emit).not.toHaveBeenCalled();
+  });
+
+  it('returns the concurrent welcome post after a uniqueness race', async () => {
+    const concurrentPost = {
+      id: 'post-welcome-concurrent',
+      attachments: [],
+      studentTags: [{ studentId: 'student-1' }],
+    };
+    prisma.activityPost.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(concurrentPost);
+    prisma.activityPost.create.mockRejectedValueOnce({ code: 'P2002' });
+
+    const result = await service.handleStudentAdmitted({
+      tenantId: actor.tenantId,
+      classId: 'class-1',
+      studentId: 'student-1',
+      studentName: 'Asha Rai',
+      actor,
+    });
+
+    expect(result).toBe(concurrentPost);
+    expect(prisma.activityPost.findFirst).toHaveBeenCalledTimes(2);
+    expect(eventEmitter.emit).not.toHaveBeenCalled();
   });
 
   it('returns milestone templates filtered by stage aliases and domain', () => {
