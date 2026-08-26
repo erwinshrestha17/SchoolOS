@@ -2962,25 +2962,57 @@ export class StudentsService {
       StudentLifecycleStatus.ALUMNI,
     );
     const exitedAt = dto.exitedAt ? new Date(dto.exitedAt) : new Date();
-    const updated = await this.prisma.student.update({
-      where: { id: student.id },
-      data: {
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const claim = await tx.student.updateMany({
+        where: {
+          id: student.id,
+          tenantId: actor.tenantId,
+          lifecycleStatus: student.lifecycleStatus,
+        },
+        data: {
+          lifecycleStatus: StudentLifecycleStatus.ALUMNI,
+          exitReason: dto.reason,
+          exitedAt,
+        },
+      });
+      if (claim.count !== 1) {
+        throw new ConflictException(
+          'Student lifecycle changed while archiving to alumni. Refresh and retry.',
+        );
+      }
+
+      await tx.enrollment.updateMany({
+        where: {
+          tenantId: actor.tenantId,
+          studentId,
+          status: EnrollmentStatus.ACTIVE,
+        },
+        data: {
+          status: EnrollmentStatus.EXITED,
+          effectiveUntil: exitedAt,
+        },
+      });
+
+      await tx.studentLifecycleTransition.create({
+        data: {
+          tenantId: actor.tenantId,
+          studentId: student.id,
+          fromStatus: student.lifecycleStatus,
+          toStatus: StudentLifecycleStatus.ALUMNI,
+          reason: dto.reason,
+          changedById: actor.userId,
+          feeClearanceWaived: false,
+          metadata: { exitedAt: exitedAt.toISOString() },
+        },
+      });
+
+      return {
+        ...student,
         lifecycleStatus: StudentLifecycleStatus.ALUMNI,
         exitReason: dto.reason,
         exitedAt,
-      },
+      };
     });
-
-    await this.recordLifecycleTransition(
-      student.id,
-      student.lifecycleStatus,
-      StudentLifecycleStatus.ALUMNI,
-      dto.reason,
-      actor,
-      {
-        exitedAt: exitedAt.toISOString(),
-      },
-    );
 
     await this.auditService.record({
       action: 'archive_alumni',
@@ -2988,6 +3020,7 @@ export class StudentsService {
       tenantId: actor.tenantId,
       userId: actor.userId,
       resourceId: student.id,
+      before: { lifecycleStatus: student.lifecycleStatus },
       after: {
         lifecycleStatus: updated.lifecycleStatus,
         exitedAt: updated.exitedAt,

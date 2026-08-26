@@ -824,6 +824,97 @@ describe('students lifecycle hardening', () => {
     ).rejects.toThrow(ConflictException);
   });
 
+  it('archives alumni with enrollment closure and lifecycle history in one transaction', async () => {
+    const student = buildStudent({
+      lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+    });
+    const { service, auditService } = buildService(prisma);
+
+    const result = await service.archiveAlumni(
+      student.id,
+      {
+        reason: 'SEE completed',
+        exitedAt: '2026-04-30',
+      },
+      actor,
+    );
+
+    expect(prisma.transaction.student.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: student.id,
+        tenantId: actor.tenantId,
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+      },
+      data: {
+        lifecycleStatus: StudentLifecycleStatus.ALUMNI,
+        exitReason: 'SEE completed',
+        exitedAt: new Date('2026-04-30T00:00:00.000Z'),
+      },
+    });
+    expect(prisma.transaction.enrollment.updateMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        studentId: student.id,
+        status: EnrollmentStatus.ACTIVE,
+      },
+      data: {
+        status: EnrollmentStatus.EXITED,
+        effectiveUntil: new Date('2026-04-30T00:00:00.000Z'),
+      },
+    });
+    expect(
+      prisma.transaction.studentLifecycleTransition.create,
+    ).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: actor.tenantId,
+        studentId: student.id,
+        fromStatus: StudentLifecycleStatus.ACTIVE,
+        toStatus: StudentLifecycleStatus.ALUMNI,
+        reason: 'SEE completed',
+        changedById: actor.userId,
+      }),
+    });
+    expect(prisma.studentLifecycleTransition.create).not.toHaveBeenCalled();
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'archive_alumni',
+        before: { lifecycleStatus: StudentLifecycleStatus.ACTIVE },
+        after: expect.objectContaining({
+          lifecycleStatus: StudentLifecycleStatus.ALUMNI,
+        }),
+      }),
+    );
+    expect(result.lifecycleStatus).toBe(StudentLifecycleStatus.ALUMNI);
+  });
+
+  it('rejects a stale concurrent alumni transition before closing enrollments', async () => {
+    const student = buildStudent({
+      lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      transactionStudentUpdateManyCount: 0,
+    });
+    const { service, auditService } = buildService(prisma);
+
+    await expect(
+      service.archiveAlumni(
+        student.id,
+        { reason: 'SEE completed', exitedAt: '2026-04-30' },
+        actor,
+      ),
+    ).rejects.toThrow(ConflictException);
+
+    expect(prisma.transaction.enrollment.updateMany).not.toHaveBeenCalled();
+    expect(
+      prisma.transaction.studentLifecycleTransition.create,
+    ).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
   it('soft deletes students without removing finance or document history', async () => {
     const student = buildStudent({
       lifecycleStatus: StudentLifecycleStatus.ACTIVE,
@@ -4018,6 +4109,7 @@ function buildPrisma(options: {
   activityPostFindManyResult?: unknown[];
   transactionGuardianIdentityVerificationUpdateResult?: unknown;
   transactionStudentUpdateResult?: unknown;
+  transactionStudentUpdateManyCount?: number;
   attendanceRecordFindManyResult?: unknown[];
   studentDocumentExpiryTemplateFindManyResult?: unknown[];
   studentDocumentExpiryTemplateUpsertResult?: unknown;
@@ -4051,7 +4143,9 @@ function buildPrisma(options: {
       update: jest
         .fn()
         .mockResolvedValue(options.transactionStudentUpdateResult ?? null),
-      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      updateMany: jest.fn().mockResolvedValue({
+        count: options.transactionStudentUpdateManyCount ?? 1,
+      }),
     },
     studentGuardian: {
       create: jest.fn().mockImplementation(async ({ data }) => ({
