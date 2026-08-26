@@ -746,17 +746,9 @@ describe('students lifecycle hardening', () => {
     const student = buildStudent({
       lifecycleStatus: StudentLifecycleStatus.ACTIVE,
     });
-    const updatedStudent = {
-      ...student,
-      lifecycleStatus: StudentLifecycleStatus.TRANSFERRED,
-      exitedAt: new Date('2026-04-27T00:00:00.000Z'),
-      destinationSchool: 'New Horizon School',
-      conductRemark: 'Good standing',
-    };
     const prisma = buildPrisma({
       studentFindFirstQueue: [student],
       invoiceFindManyQueue: [[]],
-      transactionStudentUpdateResult: updatedStudent,
     });
     const { service, auditService } = buildService(prisma);
 
@@ -772,6 +764,20 @@ describe('students lifecycle hardening', () => {
     );
 
     expect(prisma.$transaction).toHaveBeenCalled();
+    expect(prisma.transaction.student.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: student.id,
+        tenantId: actor.tenantId,
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+      },
+      data: {
+        lifecycleStatus: StudentLifecycleStatus.TRANSFERRED,
+        exitReason: 'Family relocation',
+        exitedAt: new Date('2026-04-27T00:00:00.000Z'),
+        destinationSchool: 'New Horizon School',
+        conductRemark: 'Good standing',
+      },
+    });
     expect(prisma.transaction.enrollment.updateMany).toHaveBeenCalledWith({
       where: {
         tenantId: actor.tenantId,
@@ -783,7 +789,9 @@ describe('students lifecycle hardening', () => {
         effectiveUntil: expect.any(Date),
       },
     });
-    expect(prisma.studentLifecycleTransition.create).toHaveBeenCalledWith({
+    expect(
+      prisma.transaction.studentLifecycleTransition.create,
+    ).toHaveBeenCalledWith({
       data: expect.objectContaining({
         tenantId: actor.tenantId,
         studentId: student.id,
@@ -794,6 +802,7 @@ describe('students lifecycle hardening', () => {
         feeClearanceWaived: false,
       }),
     });
+    expect(prisma.studentLifecycleTransition.create).not.toHaveBeenCalled();
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'transfer',
@@ -915,20 +924,67 @@ describe('students lifecycle hardening', () => {
     expect(auditService.record).not.toHaveBeenCalled();
   });
 
+  it('archives an exited student with enrollment closure and lifecycle history atomically', async () => {
+    const student = buildStudent({
+      lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      invoiceFindManyQueue: [[]],
+    });
+    const { service } = buildService(prisma);
+
+    const result = await service.archiveStudent(
+      student.id,
+      { reason: 'Family relocation', exitedAt: '2026-04-30' },
+      actor,
+    );
+
+    expect(prisma.transaction.student.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: student.id,
+        tenantId: actor.tenantId,
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+      },
+      data: {
+        lifecycleStatus: StudentLifecycleStatus.EXITED,
+        exitReason: 'Family relocation',
+        exitedAt: new Date('2026-04-30T00:00:00.000Z'),
+      },
+    });
+    expect(prisma.transaction.enrollment.updateMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        studentId: student.id,
+        status: EnrollmentStatus.ACTIVE,
+      },
+      data: {
+        status: EnrollmentStatus.EXITED,
+        effectiveUntil: new Date('2026-04-30T00:00:00.000Z'),
+      },
+    });
+    expect(
+      prisma.transaction.studentLifecycleTransition.create,
+    ).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: actor.tenantId,
+        studentId: student.id,
+        fromStatus: StudentLifecycleStatus.ACTIVE,
+        toStatus: StudentLifecycleStatus.EXITED,
+        reason: 'Family relocation',
+      }),
+    });
+    expect(prisma.studentLifecycleTransition.create).not.toHaveBeenCalled();
+    expect(result.lifecycleStatus).toBe(StudentLifecycleStatus.EXITED);
+  });
+
   it('soft deletes students without removing finance or document history', async () => {
     const student = buildStudent({
       lifecycleStatus: StudentLifecycleStatus.ACTIVE,
     });
-    const deletedStudent = {
-      ...student,
-      lifecycleStatus: StudentLifecycleStatus.DELETED,
-      exitedAt: new Date('2026-04-27T00:00:00.000Z'),
-      exitReason: 'Merged duplicate record',
-    };
     const prisma = buildPrisma({
       studentFindFirstQueue: [student],
       invoiceFindManyQueue: [[]],
-      transactionStudentUpdateResult: deletedStudent,
     });
     const { service } = buildService(prisma);
 
@@ -941,14 +997,30 @@ describe('students lifecycle hardening', () => {
       actor,
     );
 
-    expect(prisma.transaction.student.update).toHaveBeenCalledWith({
-      where: { id: student.id },
+    expect(prisma.transaction.student.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: student.id,
+        tenantId: actor.tenantId,
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+      },
       data: {
         lifecycleStatus: StudentLifecycleStatus.DELETED,
         exitReason: 'Merged duplicate record',
         exitedAt: new Date('2026-04-27T00:00:00.000Z'),
       },
     });
+    expect(
+      prisma.transaction.studentLifecycleTransition.create,
+    ).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: actor.tenantId,
+        studentId: student.id,
+        fromStatus: StudentLifecycleStatus.ACTIVE,
+        toStatus: StudentLifecycleStatus.DELETED,
+        reason: 'Merged duplicate record',
+      }),
+    });
+    expect(prisma.studentLifecycleTransition.create).not.toHaveBeenCalled();
     expect('delete' in prisma.student).toBe(false);
     expect(result.lifecycleStatus).toBe(StudentLifecycleStatus.DELETED);
   });

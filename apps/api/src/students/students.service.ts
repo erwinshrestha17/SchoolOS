@@ -2811,49 +2811,48 @@ export class StudentsService {
     }
 
     const exitedAt = dto.exitedAt ? new Date(dto.exitedAt) : new Date();
-    const updated = await this.prisma.$transaction(async (tx) => {
-      await tx.enrollment.updateMany({
-        where: {
-          tenantId: actor.tenantId,
-          studentId,
-          status: EnrollmentStatus.ACTIVE,
-        },
-        data: {
-          status: EnrollmentStatus.TRANSFERRED,
-          effectiveUntil: exitedAt,
-        },
-      });
-
-      return tx.student.update({
-        where: { id: student.id },
-        data: {
-          lifecycleStatus: StudentLifecycleStatus.TRANSFERRED,
-          exitReason: dto.reason,
-          exitedAt,
-          destinationSchool: dto.destinationSchool ?? null,
-          conductRemark: dto.conductRemark ?? null,
-          ...(dto.waiveFeeClearance
-            ? {
-                feeClearanceWaivedAt: new Date(),
-                feeClearanceWaivedById: actor.userId,
-              }
-            : {}),
-        },
-      });
-    });
-    await this.recordLifecycleTransition(
-      student.id,
-      student.lifecycleStatus,
-      StudentLifecycleStatus.TRANSFERRED,
-      dto.reason,
+    const feeClearanceWaivedAt = dto.waiveFeeClearance ? new Date() : null;
+    await this.commitStudentLifecycleTransition({
+      student,
+      toStatus: StudentLifecycleStatus.TRANSFERRED,
+      enrollmentStatus: EnrollmentStatus.TRANSFERRED,
+      reason: dto.reason,
+      effectiveUntil: exitedAt,
       actor,
-      {
+      studentData: {
+        lifecycleStatus: StudentLifecycleStatus.TRANSFERRED,
+        exitReason: dto.reason,
+        exitedAt,
+        destinationSchool: dto.destinationSchool ?? null,
+        conductRemark: dto.conductRemark ?? null,
+        ...(feeClearanceWaivedAt
+          ? {
+              feeClearanceWaivedAt,
+              feeClearanceWaivedById: actor.userId,
+            }
+          : {}),
+      },
+      metadata: {
         destinationSchool: dto.destinationSchool ?? null,
         conductRemark: dto.conductRemark ?? null,
         exitedAt: exitedAt.toISOString(),
       },
-      dto.waiveFeeClearance ?? false,
-    );
+      feeClearanceWaived: dto.waiveFeeClearance ?? false,
+    });
+    const updated = {
+      ...student,
+      lifecycleStatus: StudentLifecycleStatus.TRANSFERRED,
+      exitReason: dto.reason,
+      exitedAt,
+      destinationSchool: dto.destinationSchool ?? null,
+      conductRemark: dto.conductRemark ?? null,
+      ...(feeClearanceWaivedAt
+        ? {
+            feeClearanceWaivedAt,
+            feeClearanceWaivedById: actor.userId,
+          }
+        : {}),
+    };
 
     await this.auditService.record({
       action: dto.waiveFeeClearance ? 'transfer_with_fee_waiver' : 'transfer',
@@ -2898,38 +2897,28 @@ export class StudentsService {
     }
 
     const exitedAt = dto.exitedAt ? new Date(dto.exitedAt) : new Date();
-    const updated = await this.prisma.$transaction(async (tx) => {
-      await tx.enrollment.updateMany({
-        where: {
-          tenantId: actor.tenantId,
-          studentId,
-          status: EnrollmentStatus.ACTIVE,
-        },
-        data: {
-          status: EnrollmentStatus.EXITED,
-          effectiveUntil: exitedAt,
-        },
-      });
-
-      return tx.student.update({
-        where: { id: student.id },
-        data: {
-          lifecycleStatus: StudentLifecycleStatus.EXITED,
-          exitReason: dto.reason,
-          exitedAt,
-        },
-      });
-    });
-    await this.recordLifecycleTransition(
-      student.id,
-      student.lifecycleStatus,
-      StudentLifecycleStatus.EXITED,
-      dto.reason,
+    await this.commitStudentLifecycleTransition({
+      student,
+      toStatus: StudentLifecycleStatus.EXITED,
+      enrollmentStatus: EnrollmentStatus.EXITED,
+      reason: dto.reason,
+      effectiveUntil: exitedAt,
       actor,
-      {
+      studentData: {
+        lifecycleStatus: StudentLifecycleStatus.EXITED,
+        exitReason: dto.reason,
+        exitedAt,
+      },
+      metadata: {
         exitedAt: exitedAt.toISOString(),
       },
-    );
+    });
+    const updated = {
+      ...student,
+      lifecycleStatus: StudentLifecycleStatus.EXITED,
+      exitReason: dto.reason,
+      exitedAt,
+    };
 
     await this.auditService.record({
       action: 'exit',
@@ -2965,57 +2954,28 @@ export class StudentsService {
       StudentLifecycleStatus.ALUMNI,
     );
     const exitedAt = dto.exitedAt ? new Date(dto.exitedAt) : new Date();
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const claim = await tx.student.updateMany({
-        where: {
-          id: student.id,
-          tenantId: actor.tenantId,
-          lifecycleStatus: student.lifecycleStatus,
-        },
-        data: {
-          lifecycleStatus: StudentLifecycleStatus.ALUMNI,
-          exitReason: dto.reason,
-          exitedAt,
-        },
-      });
-      if (claim.count !== 1) {
-        throw new ConflictException(
-          'Student lifecycle changed while archiving to alumni. Refresh and retry.',
-        );
-      }
-
-      await tx.enrollment.updateMany({
-        where: {
-          tenantId: actor.tenantId,
-          studentId,
-          status: EnrollmentStatus.ACTIVE,
-        },
-        data: {
-          status: EnrollmentStatus.EXITED,
-          effectiveUntil: exitedAt,
-        },
-      });
-
-      await tx.studentLifecycleTransition.create({
-        data: {
-          tenantId: actor.tenantId,
-          studentId: student.id,
-          fromStatus: student.lifecycleStatus,
-          toStatus: StudentLifecycleStatus.ALUMNI,
-          reason: dto.reason,
-          changedById: actor.userId,
-          feeClearanceWaived: false,
-          metadata: { exitedAt: exitedAt.toISOString() },
-        },
-      });
-
-      return {
-        ...student,
+    await this.commitStudentLifecycleTransition({
+      student,
+      toStatus: StudentLifecycleStatus.ALUMNI,
+      enrollmentStatus: EnrollmentStatus.EXITED,
+      reason: dto.reason,
+      effectiveUntil: exitedAt,
+      actor,
+      studentData: {
         lifecycleStatus: StudentLifecycleStatus.ALUMNI,
         exitReason: dto.reason,
         exitedAt,
-      };
+      },
+      metadata: {
+        exitedAt: exitedAt.toISOString(),
+      },
     });
+    const updated = {
+      ...student,
+      lifecycleStatus: StudentLifecycleStatus.ALUMNI,
+      exitReason: dto.reason,
+      exitedAt,
+    };
 
     await this.auditService.record({
       action: options.auditAction ?? 'archive_alumni',
@@ -3075,39 +3035,28 @@ export class StudentsService {
     }
 
     const deletedAt = dto.deletedAt ? new Date(dto.deletedAt) : new Date();
-    const updated = await this.prisma.$transaction(async (tx) => {
-      await tx.enrollment.updateMany({
-        where: {
-          tenantId: actor.tenantId,
-          studentId,
-          status: EnrollmentStatus.ACTIVE,
-        },
-        data: {
-          status: EnrollmentStatus.EXITED,
-          effectiveUntil: deletedAt,
-        },
-      });
-
-      return tx.student.update({
-        where: { id: student.id },
-        data: {
-          lifecycleStatus: StudentLifecycleStatus.DELETED,
-          exitReason: dto.reason,
-          exitedAt: deletedAt,
-        },
-      });
-    });
-
-    await this.recordLifecycleTransition(
-      student.id,
-      student.lifecycleStatus,
-      StudentLifecycleStatus.DELETED,
-      dto.reason,
+    await this.commitStudentLifecycleTransition({
+      student,
+      toStatus: StudentLifecycleStatus.DELETED,
+      enrollmentStatus: EnrollmentStatus.EXITED,
+      reason: dto.reason,
+      effectiveUntil: deletedAt,
       actor,
-      {
+      studentData: {
+        lifecycleStatus: StudentLifecycleStatus.DELETED,
+        exitReason: dto.reason,
+        exitedAt: deletedAt,
+      },
+      metadata: {
         deletedAt: deletedAt.toISOString(),
       },
-    );
+    });
+    const updated = {
+      ...student,
+      lifecycleStatus: StudentLifecycleStatus.DELETED,
+      exitReason: dto.reason,
+      exitedAt: deletedAt,
+    };
 
     await this.auditService.record({
       action: 'delete',
@@ -5312,6 +5261,62 @@ export class StudentsService {
         feeClearanceWaived,
         metadata: metadata as Prisma.InputJsonValue,
       },
+    });
+  }
+
+  private async commitStudentLifecycleTransition(input: {
+    student: {
+      id: string;
+      lifecycleStatus: StudentLifecycleStatus;
+    };
+    toStatus: StudentLifecycleStatus;
+    enrollmentStatus: EnrollmentStatus;
+    reason: string;
+    effectiveUntil: Date;
+    actor: AuthContext;
+    studentData: Prisma.StudentUpdateManyMutationInput;
+    metadata: Record<string, unknown>;
+    feeClearanceWaived?: boolean;
+  }) {
+    await this.prisma.$transaction(async (tx) => {
+      const claim = await tx.student.updateMany({
+        where: {
+          id: input.student.id,
+          tenantId: input.actor.tenantId,
+          lifecycleStatus: input.student.lifecycleStatus,
+        },
+        data: input.studentData,
+      });
+      if (claim.count !== 1) {
+        throw new ConflictException(
+          'Student lifecycle changed while this action was being finalized. Refresh and retry.',
+        );
+      }
+
+      await tx.enrollment.updateMany({
+        where: {
+          tenantId: input.actor.tenantId,
+          studentId: input.student.id,
+          status: EnrollmentStatus.ACTIVE,
+        },
+        data: {
+          status: input.enrollmentStatus,
+          effectiveUntil: input.effectiveUntil,
+        },
+      });
+
+      await tx.studentLifecycleTransition.create({
+        data: {
+          tenantId: input.actor.tenantId,
+          studentId: input.student.id,
+          fromStatus: input.student.lifecycleStatus,
+          toStatus: input.toStatus,
+          reason: input.reason,
+          changedById: input.actor.userId,
+          feeClearanceWaived: input.feeClearanceWaived ?? false,
+          metadata: input.metadata as Prisma.InputJsonValue,
+        },
+      });
     });
   }
 
