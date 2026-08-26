@@ -41,6 +41,8 @@ export type OfflineOutboxStatus =
   | "revoked";
 
 export type OfflineOutboxRecord = OfflineSyncEnvelope & {
+  tenantId: string;
+  userId: string;
   module: OfflineOutboxModule;
   status: OfflineOutboxStatus;
   replayed?: boolean;

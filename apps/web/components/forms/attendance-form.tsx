@@ -1414,17 +1414,21 @@ export function AttendanceForm({
       }
 
       if (!isSubmissionScopeCurrent()) return true;
-      void upsertOfflineOutboxRecord({
-        ...toOfflineSyncEnvelope({
-          operationId: draftClientSubmissionId,
-          authorizationVersion: resolvedAuthorizationVersion,
-          authorityNodeId: authorityQuery.data?.authorityNodeId,
-          authorityEpoch: authorityQuery.data?.authorityEpoch,
-        }),
-        module: "attendance",
-        status: "queued",
-        rejectionReason: null,
-      });
+      if (session) {
+        void upsertOfflineOutboxRecord({
+          ...toOfflineSyncEnvelope({
+            operationId: draftClientSubmissionId,
+            authorizationVersion: resolvedAuthorizationVersion,
+            authorityNodeId: authorityQuery.data?.authorityNodeId,
+            authorityEpoch: authorityQuery.data?.authorityEpoch,
+          }),
+          tenantId: session.tenant.id,
+          userId: session.user.id,
+          module: "attendance",
+          status: "queued",
+          rejectionReason: null,
+        }).catch(() => undefined);
+      }
       setDraftSavedAt(receiptSavedAt);
       setHasDraftChanges(true);
       setLastServerSyncStatus("QUEUED");
@@ -1511,20 +1515,24 @@ export function AttendanceForm({
       });
 
       const syncStatus = String(result?.syncStatus ?? "").toUpperCase();
-      void upsertOfflineOutboxRecord({
-        ...toOfflineSyncEnvelope({
-          operationId: draftClientSubmissionId,
-          authorizationVersion: resolvedAuthorizationVersion,
-          authorityNodeId: authorityQuery.data?.authorityNodeId,
-          authorityEpoch: authorityQuery.data?.authorityEpoch,
-        }),
-        module: "attendance",
-        status: isAttendanceScopeRevokedRejection(result?.rejectionReason)
-          ? "revoked"
-          : outboxStatusFromSyncReceipt(syncStatus),
-        replayed: Boolean(result?.replayed),
-        rejectionReason: result?.rejectionReason ?? null,
-      });
+      if (session) {
+        void upsertOfflineOutboxRecord({
+          ...toOfflineSyncEnvelope({
+            operationId: draftClientSubmissionId,
+            authorizationVersion: resolvedAuthorizationVersion,
+            authorityNodeId: authorityQuery.data?.authorityNodeId,
+            authorityEpoch: authorityQuery.data?.authorityEpoch,
+          }),
+          tenantId: session.tenant.id,
+          userId: session.user.id,
+          module: "attendance",
+          status: isAttendanceScopeRevokedRejection(result?.rejectionReason)
+            ? "revoked"
+            : outboxStatusFromSyncReceipt(syncStatus),
+          replayed: Boolean(result?.replayed),
+          rejectionReason: result?.rejectionReason ?? null,
+        }).catch(() => undefined);
+      }
 
       if (
         syncStatus === "REJECTED" &&

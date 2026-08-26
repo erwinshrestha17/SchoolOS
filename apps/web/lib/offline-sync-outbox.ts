@@ -9,8 +9,22 @@ const DB_NAME = "schoolos-offline-outbox";
 const DB_VERSION = 1;
 const STORE_NAME = "records";
 
-function recordKey(record: Pick<OfflineOutboxRecord, "module" | "operationId">) {
-  return `${record.module}:${record.operationId}`;
+export function offlineOutboxRecordKey(
+  record: Pick<
+    OfflineOutboxRecord,
+    "tenantId" | "userId" | "module" | "operationId"
+  >,
+) {
+  return `${record.tenantId}:${record.userId}:${record.module}:${record.operationId}`;
+}
+
+export function isOfflineOutboxRecordOwnedBy(
+  record: Pick<OfflineOutboxRecord, "tenantId" | "userId">,
+  identity: { tenantId: string; userId: string },
+) {
+  return (
+    record.tenantId === identity.tenantId && record.userId === identity.userId
+  );
 }
 
 function openOutboxDb() {
@@ -60,12 +74,13 @@ export async function upsertOfflineOutboxRecord(
     transaction.onerror = () => reject(transaction.error);
     transaction.objectStore(STORE_NAME).put({
       ...record,
-      key: recordKey(record),
+      key: offlineOutboxRecordKey(record),
     });
   });
 }
 
 export async function listOfflineOutboxRecords(
+  identity: { tenantId: string; userId: string },
   module?: OfflineOutboxModule,
 ): Promise<OfflineOutboxRecord[]> {
   if (typeof indexedDB === "undefined") {
@@ -82,7 +97,11 @@ export async function listOfflineOutboxRecords(
     },
   );
   return records
-    .filter((record) => !module || record.module === module)
+    .filter(
+      (record) =>
+        isOfflineOutboxRecordOwnedBy(record, identity) &&
+        (!module || record.module === module),
+    )
     .map(({ key: _key, ...record }) => record);
 }
 

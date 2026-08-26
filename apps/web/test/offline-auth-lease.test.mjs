@@ -6,7 +6,11 @@ import {
   isOfflineAuthLeaseValid,
 } from "../lib/offline-auth-lease.ts";
 import { isAttendanceScopeRevokedRejection } from "../lib/attendance-draft-access-revocation.ts";
-import { outboxStatusFromSyncReceipt } from "../lib/offline-sync-outbox.ts";
+import {
+  isOfflineOutboxRecordOwnedBy,
+  offlineOutboxRecordKey,
+  outboxStatusFromSyncReceipt,
+} from "../lib/offline-sync-outbox.ts";
 import { authorityFenceFields } from "../lib/school-authority-discovery.ts";
 
 describe("offline auth lease", () => {
@@ -86,6 +90,33 @@ describe("attendance scope-revoked receipts", () => {
     assert.equal(isAttendanceScopeRevokedRejection("UNASSIGNED_TEACHER"), true);
     assert.equal(isAttendanceScopeRevokedRejection("LOCKED_SESSION"), false);
     assert.equal(outboxStatusFromSyncReceipt("AUTHORIZATION_DENIED"), "revoked");
+  });
+
+  it("scopes outbox records to the exact tenant and user", () => {
+    const record = {
+      tenantId: "tenant-1",
+      userId: "teacher-1",
+      module: "attendance",
+      operationId: "operation-1",
+    };
+    assert.equal(
+      offlineOutboxRecordKey(record),
+      "tenant-1:teacher-1:attendance:operation-1",
+    );
+    assert.equal(
+      isOfflineOutboxRecordOwnedBy(record, {
+        tenantId: "tenant-1",
+        userId: "teacher-1",
+      }),
+      true,
+    );
+    assert.equal(
+      isOfflineOutboxRecordOwnedBy(record, {
+        tenantId: "tenant-1",
+        userId: "teacher-2",
+      }),
+      false,
+    );
   });
 });
 
