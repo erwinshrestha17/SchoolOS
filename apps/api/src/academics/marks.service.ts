@@ -18,6 +18,7 @@ import { ListMarksDto } from './dto/list-marks.dto';
 import { UpdateMarkDto } from './dto/update-mark.dto';
 import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 import { TeacherCapability } from '../teacher-scope/teacher-capability';
+import { assertClientAuthorityFence } from '../sync/authority-fence';
 
 /**
  * Roles that retain the pre-existing coarse permission-gated access to marks
@@ -146,6 +147,7 @@ export class MarksService {
   }
 
   async bulkUpsert(dto: BulkUpsertMarksDto, actor: AuthContext) {
+    await assertClientAuthorityFence(this.prisma, actor.tenantId, dto);
     const examTerm = await this.prisma.examTerm.findFirst({
       where: { id: dto.examTermId, tenantId: actor.tenantId },
     });
@@ -292,6 +294,21 @@ export class MarksService {
         studentId: { in: authorizedStudentIdList },
       },
     });
+
+    for (const entry of entries) {
+      const expectedVersion = entry.expectedVersion?.trim();
+      if (!expectedVersion) {
+        continue;
+      }
+      const existing = existingMarks.find(
+        (mark) => mark.studentId === entry.studentId,
+      );
+      if (!existing || existing.updatedAt.toISOString() !== expectedVersion) {
+        throw new ConflictException(
+          `Mark version conflict for student ${entry.studentId}`,
+        );
+      }
+    }
 
     if (existingMarks.length > 0) {
       const activeRetake = await this.prisma.assessmentRetake.findFirst({

@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthMethod, MarkEntryStatus, Prisma } from '@prisma/client';
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, ConflictException } from '@nestjs/common';
 import { MarksService } from './marks.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -62,6 +62,13 @@ describe('MarksService', () => {
       permissions: ['academics:marks'],
     };
     const prisma = {
+      tenantAuthorityFence: {
+        findUnique: jest.fn().mockResolvedValue({
+          tenantId: actor.tenantId,
+          authorityNodeId: 'cloud',
+          authorityEpoch: 1,
+        }),
+      },
       examTerm: {
         findFirst: jest.fn().mockResolvedValue({
           id: 'term-1',
@@ -198,6 +205,101 @@ describe('MarksService', () => {
     );
   });
 
+  it('rejects mark capture when expectedVersion does not match the stored mark', async () => {
+    const actor: AuthContext = {
+      tenantId: 'tenant-1',
+      tenantSlug: 'tenant-one',
+      userId: 'teacher-1',
+      email: 'teacher@schoolos.test',
+      authMethod: AuthMethod.PASSWORD,
+      roles: ['teacher'],
+      permissions: ['academics:marks'],
+    };
+    const storedUpdatedAt = new Date('2026-08-25T03:00:00.000Z');
+    const prisma = {
+      tenantAuthorityFence: {
+        findUnique: jest.fn().mockResolvedValue({
+          tenantId: actor.tenantId,
+          authorityNodeId: 'cloud',
+          authorityEpoch: 1,
+        }),
+      },
+      examTerm: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'term-1',
+          tenantId: actor.tenantId,
+          isLocked: false,
+        }),
+      },
+      assessmentComponent: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'component-1',
+          tenantId: actor.tenantId,
+          examTermId: 'term-1',
+          subjectId: 'subject-1',
+          maxMarks: new Prisma.Decimal(100),
+          subject: {
+            id: 'subject-1',
+            classId: 'class-1',
+            class: { id: 'class-1', name: 'Class 1' },
+          },
+        }),
+      },
+      student: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'student-draft',
+            tenantId: actor.tenantId,
+            sectionId: 'section-1',
+          },
+        ]),
+      },
+      reportCardCorrectionRequest: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      markEntry: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'mark-1',
+            studentId: 'student-draft',
+            updatedAt: storedUpdatedAt,
+            isLocked: false,
+          },
+        ]),
+        upsert: jest.fn(),
+      },
+      $transaction: jest.fn((operations: Promise<unknown>[]) =>
+        Promise.all(operations),
+      ),
+    };
+    const auditService = { record: jest.fn().mockResolvedValue(undefined) };
+    const marksService = new MarksService(
+      prisma as unknown as PrismaService,
+      auditService as unknown as AuditService,
+      makeAllowingTeacherScopeService() as unknown as TeacherScopeService,
+    );
+
+    await expect(
+      marksService.bulkUpsert(
+        {
+          examTermId: 'term-1',
+          assessmentComponentId: 'component-1',
+          subjectId: 'subject-1',
+          classId: 'class-1',
+          entries: [
+            {
+              studentId: 'student-draft',
+              isDraft: true,
+              expectedVersion: '2026-08-25T02:00:00.000Z',
+            },
+          ],
+        },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.markEntry.upsert).not.toHaveBeenCalled();
+  });
+
   it('rejects direct retest flags so lifecycle records cannot be bypassed', async () => {
     const actor = {
       tenantId: 'tenant-1',
@@ -209,6 +311,13 @@ describe('MarksService', () => {
       permissions: ['academics:enter_marks'],
     } as AuthContext;
     const prisma = {
+      tenantAuthorityFence: {
+        findUnique: jest.fn().mockResolvedValue({
+          tenantId: actor.tenantId,
+          authorityNodeId: 'cloud',
+          authorityEpoch: 1,
+        }),
+      },
       examTerm: {
         findFirst: jest.fn().mockResolvedValue({
           id: 'term-1',

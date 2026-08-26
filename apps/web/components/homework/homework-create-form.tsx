@@ -1,11 +1,22 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle, Info } from 'lucide-react';
 import { formatBsDate, getNepalSchoolDay } from '@schoolos/core';
 import { api } from '@/lib/api';
+import { OfflineMutationError } from '@/lib/offline-policy';
+import { useSession } from '@/components/session-provider';
+import {
+  deleteOfflineModuleDraft,
+  listOfflineModuleDrafts,
+  upsertOfflineModuleDraft,
+} from '@/lib/offline-module-drafts';
+import {
+  authorityFenceFields,
+  readSchoolAuthorityFence,
+} from '@/lib/school-authority-discovery';
 import type { HomeworkPublishNotifyChoice } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { SectionCard } from '@/components/ui/section-card';
@@ -44,6 +55,11 @@ function todayDateInputValue() {
 export function HomeworkCreateForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { session } = useSession();
+  const clientOperationId = useRef(
+    typeof crypto !== 'undefined' ? crypto.randomUUID() : `hw-${Date.now()}`,
+  );
+  const [queuedLocally, setQueuedLocally] = useState(false);
 
   const [formData, setFormData] = useState({
     academicYearId: '',
@@ -124,6 +140,11 @@ export function HomeworkCreateForm() {
 
   const createMutation = useMutation({
     mutationFn: async ({ publish }: { publish: boolean }) => {
+      if (publish && typeof navigator !== 'undefined' && navigator.onLine === false) {
+        throw new Error(
+          'Publishing homework needs an internet connection. Save a local draft instead.',
+        );
+      }
       const dueDateIso = new Date(formData.dueDate).toISOString();
       const assignedDateIso = formData.assignedDate
         ? new Date(formData.assignedDate).toISOString()
@@ -145,6 +166,8 @@ export function HomeworkCreateForm() {
         dueAt: dueDateIso,
         maxScore: formData.maxScore,
         attachmentFileIds: formData.attachmentFileIds,
+        clientOperationId: clientOperationId.current,
+        ...authorityFenceFields(readSchoolAuthorityFence()),
         // No dedicated backend field for chapter/lesson yet - carried in the
         // same generic JSON metadata bag already used for template bookkeeping.
         attachmentMetadata: formData.chapter.trim() ? { chapter: formData.chapter.trim() } : undefined,
@@ -185,10 +208,85 @@ export function HomeworkCreateForm() {
       }
       router.push('/dashboard/homework');
     },
-    onError: (error: any) => {
-      setErrors({ submit: error.message || 'Failed to create homework' });
+    onError: async (error: unknown) => {
+      if (error instanceof OfflineMutationError) {
+        if (!session?.tenant.id || !session.user.id) {
+          setErrors({ submit: 'Sign in again before saving a local homework draft.' });
+          return;
+        }
+        await upsertOfflineModuleDraft({
+          module: 'homework',
+          operationId: clientOperationId.current,
+          tenantId: session.tenant.id,
+          userId: session.user.id,
+          status: 'queued',
+          savedAt: new Date().toISOString(),
+          payload: {
+            academicYearId: formData.academicYearId,
+            classId: formData.classId,
+            sectionId: formData.sectionId || undefined,
+            subjectId: formData.subjectId,
+            title: formData.title.trim(),
+            instructions: formData.instructions.trim(),
+            description: formData.description.trim() || undefined,
+            parentInstructions: formData.parentInstructions.trim() || undefined,
+            submissionMethod: formData.submissionMethod,
+            submissionRequired: formData.submissionMethod !== 'NO_SUBMISSION_REQUIRED',
+            assignedDate: formData.assignedDate,
+            dueDate: formData.dueDate,
+            maxScore: formData.maxScore,
+            attachmentFileIds: formData.attachmentFileIds,
+            clientOperationId: clientOperationId.current,
+          },
+        });
+        setQueuedLocally(true);
+        setErrors({
+          submit:
+            'Homework draft queued on this browser. It is not published. Reconnect to sync the draft.',
+        });
+        return;
+      }
+      const message =
+        error instanceof Error ? error.message : 'Failed to create homework';
+      setErrors({ submit: message });
     },
   });
+
+  useEffect(() => {
+    const drain = async () => {
+      if (
+        typeof navigator === 'undefined' ||
+        navigator.onLine === false ||
+        !session?.tenant.id ||
+        !session.user.id
+      ) {
+        return;
+      }
+      const drafts = await listOfflineModuleDrafts('homework', {
+        tenantId: session.tenant.id,
+        userId: session.user.id,
+      });
+      for (const draft of drafts) {
+        if (draft.status !== 'queued') continue;
+        try {
+          await api.createHomework({
+            ...draft.payload,
+            clientOperationId: draft.operationId,
+            ...authorityFenceFields(readSchoolAuthorityFence()),
+          });
+          await deleteOfflineModuleDraft('homework', draft.operationId);
+        } catch {
+          // Keep queued until a later reconnect.
+        }
+      }
+    };
+    const handleOnline = () => {
+      void drain();
+    };
+    window.addEventListener('online', handleOnline);
+    void drain();
+    return () => window.removeEventListener('online', handleOnline);
+  }, [session?.tenant.id, session?.user.id]);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -246,6 +344,11 @@ export function HomeworkCreateForm() {
           {errors.submit && (
             <div className="p-4 rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 text-sm font-bold">
               {errors.submit}
+            </div>
+          )}
+          {queuedLocally && !errors.submit && (
+            <div className="p-4 rounded-2xl bg-[var(--color-warning-soft)] border border-[var(--color-warning)]/20 text-[var(--color-warning)] text-sm font-bold">
+              Homework draft queued on this browser. It is not published.
             </div>
           )}
 

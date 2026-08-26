@@ -417,6 +417,8 @@ describe('SchoolOS web production contracts', () => {
       'listCashierCloses',
       'finalizeCashierClose',
       'getAttendanceRoster',
+      'getAttendanceScopeVersion',
+      'getSyncAuthority',
       'syncAttendance',
       'reviewAttendanceConflict',
       'sendDefaulterReminders',
@@ -754,6 +756,8 @@ describe('SchoolOS web production contracts', () => {
     for (const file of files) {
       if (
         file === 'lib/session.ts' ||
+        file === 'lib/offline-auth-lease.ts' ||
+        file === 'lib/school-authority-discovery.ts' ||
         file.startsWith('test/') ||
         file.startsWith('e2e/')
       ) {

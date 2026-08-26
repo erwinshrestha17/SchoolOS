@@ -74,6 +74,8 @@ async function listStaffAttendanceRoster(
 
 export const attendanceApi = {
   listStaffAttendanceRoster,
+  getAttendanceScopeVersion: () =>
+    request<{ scopeVersion: string }>("/attendance/scope-version"),
   getAttendanceRoster: (params: {
     /** Omitted = the backend resolves the tenant's current academic year. */
     academicYearId?: string;

@@ -348,6 +348,81 @@ describe('Homework Hardening', () => {
       expect(p.subjectTeacherAssignment.findFirst).not.toHaveBeenCalled();
     });
 
+    it('replays a draft create with the same clientOperationId', async () => {
+      const p = prisma as any;
+      const teacherActor: AuthContext = {
+        ...actor,
+        roles: ['subject_teacher'],
+      };
+
+      p.academicYear.findFirst.mockResolvedValue({
+        id: 'year-1',
+        tenantId: 'tenant-a',
+      });
+      p.class.findFirst.mockResolvedValue({
+        id: 'class-1',
+        tenantId: 'tenant-a',
+      });
+      p.subject.findFirst.mockResolvedValue({
+        id: 'sub-1',
+        tenantId: 'tenant-a',
+        classId: 'class-1',
+      });
+      p.staff.findFirst.mockResolvedValue({
+        id: 'teacher-1',
+        tenantId: 'tenant-a',
+        userId: 'user-1',
+      });
+      teacherAssignments.push(
+        teacherAssignmentFixture({
+          assignmentType: 'SUBJECT_TEACHER',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: 'sub-1',
+        }),
+      );
+
+      const first = (await homeworkService.createAssignment(
+        {
+          academicYearId: 'year-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: 'sub-1',
+          title: 'Fractions',
+          instructions: 'Complete exercise 2.',
+          dueDate: '2026-12-31',
+          clientOperationId: 'hw-op-1',
+        },
+        teacherActor,
+      )) as { id: string };
+      const stored = prisma.__state.homeworkAssignments.find(
+        (item) => item.id === first.id,
+      );
+      if (stored) {
+        stored.status = HomeworkAssignmentStatus.ASSIGNED;
+        stored.attachments = [];
+        stored.submissions = [];
+      }
+
+      const createCalls = p.homeworkAssignment.create.mock.calls.length;
+      const replayed = (await homeworkService.createAssignment(
+        {
+          academicYearId: 'year-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: 'sub-1',
+          title: 'Fractions revised',
+          instructions: 'Complete exercise 2.',
+          dueDate: '2026-12-31',
+          clientOperationId: 'hw-op-1',
+        },
+        teacherActor,
+      )) as { id: string };
+
+      expect(replayed.id).toBe(first.id);
+      expect(p.homeworkAssignment.create.mock.calls.length).toBe(createCalls);
+    });
+
     it('DENIES a homeroom class teacher with no subject assignment: homework is subject-owned', async () => {
       // HomeworkAssignment.subjectId is non-null, so every homework row is a
       // subject-owned record. Being the homeroom Class Teacher must not

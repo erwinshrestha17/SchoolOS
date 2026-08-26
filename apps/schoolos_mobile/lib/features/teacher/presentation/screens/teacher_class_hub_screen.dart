@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/constants/app_routes.dart';
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../core/errors/app_exception.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/app_exception_view.dart';
 import '../../../../shared/widgets/app_card.dart';
@@ -245,7 +248,20 @@ Future<void> _showStudentSummary(
 ) {
   final future = ref
       .read(attendanceRepositoryProvider)
-      .getTeacherStudentSummary(classSection, entry.studentId);
+      .getTeacherStudentSummary(classSection, entry.studentId)
+      .onError((error, stackTrace) {
+        if (error is PermissionException || error is ModuleLockedException) {
+          unawaited(
+            ref
+                .read(teacherAttendanceControllerProvider.notifier)
+                .load(requestedClassSectionId: classSection.id),
+          );
+        }
+        Error.throwWithStackTrace(
+          error ?? StateError('Student summary failed without an error.'),
+          stackTrace,
+        );
+      });
 
   return showModalBottomSheet<void>(
     context: context,

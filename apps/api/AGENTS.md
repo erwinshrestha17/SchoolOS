@@ -2,6 +2,27 @@
 
 Scoped rules for `apps/api`. Root `AGENTS.md` applies first.
 
+## Current concentration
+
+Owner (2026-08-25): production-harden the existing core operational path. Do not add peripheral modules or new endpoints unless a listed P0 flow cannot complete correctly without them.
+
+Follow the backend execution order in root `AGENTS.md` §4:
+
+```text
+P0-1 CI green
+→ P0-2 auth / tenant isolation
+→ P0-3 offline sync foundation
+→ P0-4 attendance
+→ P0-5 student/guardian lifecycle
+→ P0-6 fees/receipts
+→ P0-7 immutable M11 ledger
+→ P0-8 M3/M7 → M11 posting
+→ P0-9 financial + authorization audit
+→ P0-10 critical notifications
+```
+
+Every change must make an existing flow correct under multi-tenant concurrency, retries/duplicates, authorization changes, weak/no internet, financial corrections, restarts, queue failures, or partial provider failure.
+
 ## Read
 
 Before API work, read relevant parts of root `AGENTS.md`, the PRD, SRS, SDD, MDD, release policy, Prisma schema, touched controller/service/DTO/tests, and OpenAPI/shared contracts. Use GitHub Issues, Milestones, or Projects for current status and sequencing.
@@ -99,6 +120,7 @@ pnpm verify:openapi
 pnpm --filter @schoolos/api typecheck
 pnpm --filter @schoolos/api test
 pnpm test:e2e
+pnpm test:integration
 pnpm typecheck
 pnpm build
 pnpm verify:production

@@ -350,6 +350,13 @@ class PrivateReadCache {
         return resourceKey == 'notice_feed' ? const Duration(hours: 12) : null;
       case MobileRole.principal:
       case MobileRole.admin:
+        if (resourceKey == 'principal_dashboard') {
+          return const Duration(hours: 8);
+        }
+        if (resourceKey.startsWith('principal_attention_')) {
+          return const Duration(hours: 8);
+        }
+        return null;
       case MobileRole.student:
         return null;
       default:

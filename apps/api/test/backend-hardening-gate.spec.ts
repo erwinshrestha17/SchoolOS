@@ -235,4 +235,159 @@ describe('backend hardening gate', () => {
 
     expect(violations.map(normalizePath)).toEqual([]);
   });
+
+  it('requires BullMQ processors to run under runTenantScopedJob', () => {
+    const processorFiles = listFiles(API_SRC_ROOT).filter(
+      (file) => file.endsWith('.processor.ts') && !file.endsWith('.spec.ts'),
+    );
+
+    const violations = processorFiles.filter(
+      (file) => !read(file).includes('runTenantScopedJob'),
+    );
+
+    expect(violations.map(normalizePath)).toEqual([]);
+  });
+
+  it('keeps cron user lookups inside a tenant scope helper', () => {
+    const cronFiles = listFiles(API_SRC_ROOT).filter((file) =>
+      file.endsWith('.cron.ts'),
+    );
+
+    const violations = cronFiles.filter((file) => {
+      const source = read(file);
+      if (
+        !source.includes('user.findFirst') &&
+        !source.includes('user.findMany')
+      ) {
+        return false;
+      }
+
+      return (
+        !source.includes('runWithTenantScope') &&
+        !source.includes('runWithoutTenantScope')
+      );
+    });
+
+    expect(violations.map(normalizePath)).toEqual([]);
+  });
+
+  it('inventories TENANT_SCOPE_EXCLUDED_MODELS as platform/global reference data only', () => {
+    const source = read(join(API_SRC_ROOT, 'prisma', 'prisma.service.ts'));
+    const match = source.match(
+      /export const TENANT_SCOPE_EXCLUDED_MODELS = \[([\s\S]*?)\];/,
+    );
+
+    expect(match).not.toBeNull();
+
+    const models = (match?.[1] ?? '')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.startsWith("'"))
+      .map((line) => line.replace(/',?$/, '').replace(/^'/, ''));
+
+    expect(models).toEqual([
+      'Tenant',
+      'Permission',
+      'RefreshToken',
+      'OtpCode',
+      'RolePermission',
+      'ProviderConfig',
+      'PlatformPlan',
+      'PlatformPlanFeature',
+      'NepalProvince',
+      'NepalDistrict',
+      'NepalLocalLevelType',
+      'NepalLocalLevel',
+      'ReferenceDatasetVersion',
+    ]);
+  });
+
+  it('keeps runWithoutTenantScope on an inventoried allowlist with a stated reason', () => {
+    const allowlist = new Set([
+      '/tenants/tenants.service.ts',
+      '/finance/finance.cron.ts',
+      '/audit/audit.service.ts',
+      '/platform/platform-billing-lifecycle.service.ts',
+      '/auth/authz-cache.service.ts',
+      '/auth/auth.service.ts',
+      '/students/student-document-retention.cron.ts',
+      '/platform/platform.service.ts',
+      '/auth/guards/jwt-auth.guard.ts',
+      '/homework/homework.cron.ts',
+      '/communications/notice-lifecycle.cron.ts',
+    ]);
+    const expectedReasons = [
+      'audit: append with caller-supplied tenantId, including pre-authentication events',
+      'authenticate: resolve a purpose-limited support override before target tenant context exists',
+      'authenticate: resolve token subject before tenant context exists',
+      'authentication: read home identity while presenting an effective support tenant',
+      'authentication: user lookup before tenant context is established',
+      'authorize: resolve role/permission set while establishing tenant context',
+      'daily fee due-schedule sweep across all tenants',
+      'daily homework reminder sweep across all active tenants',
+      'notice lifecycle: discover tenants with due notices',
+      'platform billing lifecycle across all tenants',
+      'platform dashboard: aggregate authorized SaaS invoice balances',
+      'platform dashboard: aggregate authorized subscription lifecycle counts',
+      'platform dashboard: correlate authorized tenant usage with subscription limits',
+      'platform: issue purpose-limited support override for target tenant',
+      'platform: provision a new school tenant and its first administrator',
+      'platform: read purpose-limited support override history',
+      'platform: revoke purpose-limited support override with audit',
+      'student document retention and expiry review across all tenants',
+    ];
+
+    const productionFiles = listFiles(API_SRC_ROOT).filter(
+      (file) => !file.endsWith('.spec.ts') && !file.endsWith('.test.ts'),
+    );
+    const uninventoried: string[] = [];
+    const missingReason: string[] = [];
+    const foundReasons: string[] = [];
+
+    for (const file of productionFiles) {
+      const source = read(file);
+      if (!/this\.prisma\.runWithoutTenantScope\s*\(/.test(source)) {
+        continue;
+      }
+
+      const normalized = normalizePath(file);
+      if (!allowlist.has(normalized)) {
+        uninventoried.push(normalized);
+      }
+
+      const reasons = [
+        ...source.matchAll(
+          /this\.prisma\.runWithoutTenantScope\(\s*'([^']+)'/g,
+        ),
+      ].map((match) => match[1]);
+      const callCount = [
+        ...source.matchAll(/this\.prisma\.runWithoutTenantScope\s*\(/g),
+      ].length;
+
+      if (reasons.length !== callCount) {
+        missingReason.push(normalized);
+      }
+
+      foundReasons.push(...reasons);
+    }
+
+    expect(uninventoried).toEqual([]);
+    expect(missingReason).toEqual([]);
+    expect([...new Set(foundReasons)].sort()).toEqual(expectedReasons);
+  });
+
+  it('enforces teacher assignment at attendance, homework, marks, and file-registry writes', () => {
+    expect(
+      read(join(API_SRC_ROOT, 'attendance', 'attendance.service.ts')),
+    ).toContain('canActorAccess');
+    expect(
+      read(join(API_SRC_ROOT, 'homework', 'homework.service.ts')),
+    ).toContain('requireActorAccess');
+    expect(read(join(API_SRC_ROOT, 'academics', 'marks.service.ts'))).toContain(
+      'requireActorAccess',
+    );
+    expect(
+      read(join(API_SRC_ROOT, 'file-registry', 'file-registry.service.ts')),
+    ).toContain('requireActorAccess');
+  });
 });

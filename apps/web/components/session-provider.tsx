@@ -30,6 +30,17 @@ import {
   storeSession,
   toBrowserSession,
 } from "../lib/session";
+import {
+  clearOfflineAuthLease,
+  createOfflineAuthLease,
+  isOfflineAuthLeaseValid,
+  readOfflineAuthLease,
+  storeOfflineAuthLease,
+} from "../lib/offline-auth-lease";
+import { clearOfflineOutbox } from "../lib/offline-sync-outbox";
+import { clearOfflineModuleDrafts } from "../lib/offline-module-drafts";
+import { clearOfflineReadCache } from "../lib/offline-read-cache";
+import { clearSchoolAuthorityFence } from "../lib/school-authority-discovery";
 
 type SessionStatus =
   | "loading"
@@ -59,10 +70,26 @@ export function isConfirmedSessionFailure(error: unknown) {
 
 function statusForUnconfirmedSessionError(
   error: unknown,
-): Extract<SessionStatus, "offline_locked" | "verification_failed"> {
-  return error instanceof ApiRequestError
-    ? "verification_failed"
-    : "offline_locked";
+  existingSession: BrowserSession | null,
+): SessionStatus {
+  if (error instanceof ApiRequestError) {
+    return "verification_failed";
+  }
+
+  if (
+    existingSession &&
+    isOfflineAuthLeaseValid(readOfflineAuthLease(), {
+      tenantId: existingSession.tenant.id,
+      userId: existingSession.user.id,
+      securityDomain: existingSession.user.securityDomain,
+      permissions: existingSession.user.permissions ?? [],
+      roles: existingSession.user.roles ?? [],
+    })
+  ) {
+    return "authenticated";
+  }
+
+  return "offline_locked";
 }
 
 function browserSessionFromProfile(
@@ -142,7 +169,14 @@ export function SessionProvider({ children }: PropsWithChildren) {
     queryClient.clear();
     clearSupportOverride();
     clearRecentlyViewed();
+    clearOfflineAuthLease();
+    clearSchoolAuthorityFence();
     await clearAllAttendanceDrafts();
+    await Promise.all([
+      clearOfflineOutbox(),
+      clearOfflineModuleDrafts(),
+      clearOfflineReadCache(),
+    ]);
   }, [queryClient]);
 
   const performRealSessionTeardown = useCallback(async () => {
@@ -199,6 +233,15 @@ export function SessionProvider({ children }: PropsWithChildren) {
       if (!confirmedSupportTransition) {
         storeSession(nextSession);
       }
+      storeOfflineAuthLease(
+        createOfflineAuthLease({
+          tenantId: nextSession.tenant.id,
+          userId: nextSession.user.id,
+          securityDomain: nextSession.user.securityDomain,
+          permissions: nextSession.user.permissions ?? [],
+          roles: nextSession.user.roles ?? [],
+        }),
+      );
       setCurrentSession(nextSession);
       setStatus("authenticated");
       return nextSession;
@@ -266,10 +309,10 @@ export function SessionProvider({ children }: PropsWithChildren) {
         }
 
         // A missing network response is not proof that the cookie-backed
-        // session has expired. Preserve metadata and local attendance drafts,
-        // but do not render private workspaces until the server revalidates it.
+        // session has expired. A valid offline auth lease keeps the last
+        // trusted school shell available; otherwise lock until revalidation.
         setCurrentSession(existingSession);
-        setStatus(statusForUnconfirmedSessionError(error));
+        setStatus(statusForUnconfirmedSessionError(error, existingSession));
       }
     }
 
@@ -327,7 +370,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
         }
 
         setCurrentSession(existingSession);
-        setStatus(statusForUnconfirmedSessionError(error));
+        setStatus(statusForUnconfirmedSessionError(error, existingSession));
         return null;
       }
     })();
@@ -458,10 +501,10 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
       if (existingSession) {
         setCurrentSession(existingSession);
-        setStatus(statusForUnconfirmedSessionError(error));
+        setStatus(statusForUnconfirmedSessionError(error, existingSession));
       } else {
         setCurrentSession(null);
-        setStatus(statusForUnconfirmedSessionError(error));
+        setStatus(statusForUnconfirmedSessionError(error, null));
       }
 
       return null;

@@ -287,6 +287,7 @@ export function createPrismaMock() {
     refreshTokens: [] as Record<string, unknown>[],
     auditLogs: [] as Record<string, unknown>[],
     tenantSettings: [] as Record<string, unknown>[],
+    tenantAuthorityFences: [] as Record<string, unknown>[],
     fileAssets: [] as Record<string, unknown>[],
     studentDocuments: [] as Record<string, unknown>[],
     timetableVersions: [] as Record<string, unknown>[],
@@ -1353,6 +1354,33 @@ export function createPrismaMock() {
         return Promise.resolve(item);
       }),
     },
+    tenantAuthorityFence: {
+      findUnique: jest.fn((q: PrismaQuery) => {
+        const existing = state.tenantAuthorityFences.find(
+          (item) => item.tenantId === q.where?.tenantId,
+        );
+        if (existing) {
+          return Promise.resolve(existing);
+        }
+        const created = {
+          tenantId: q.where?.tenantId,
+          authorityNodeId: 'cloud',
+          authorityEpoch: 1,
+        };
+        state.tenantAuthorityFences.push(created);
+        return Promise.resolve(created);
+      }),
+      create: jest.fn((q: PrismaQuery) => {
+        const item = {
+          tenantId: q.data?.tenantId,
+          authorityNodeId: q.data?.authorityNodeId ?? 'cloud',
+          authorityEpoch: q.data?.authorityEpoch ?? 1,
+          updatedAt: new Date(),
+        };
+        state.tenantAuthorityFences.push(item);
+        return Promise.resolve(item);
+      }),
+    },
     studentDocument: {
       create: jest.fn((q: PrismaQuery) => {
         const data = q.data ?? {};
@@ -2248,7 +2276,9 @@ export function createPrismaMock() {
           state.homeworkAssignments.find(
             (item) =>
               (!q.where?.tenantId || item.tenantId === q.where.tenantId) &&
-              (!q.where?.id || item.id === q.where.id),
+              (!q.where?.id || item.id === q.where.id) &&
+              (!q.where?.clientOperationId ||
+                item.clientOperationId === q.where.clientOperationId),
           ),
         ),
       ),

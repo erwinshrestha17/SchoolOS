@@ -28,6 +28,7 @@ import { StaffModule } from './staff/staff.module';
 import { StorageModule } from './storage/storage.module';
 import { StudentRecordsModule } from './student-records/student-records.module';
 import { AttendanceModule } from './attendance/attendance.module';
+import { SyncModule } from './sync/sync.module';
 import { FinanceModule } from './finance/finance.module';
 import { NoticesModule } from './notices/notices.module';
 import { TimetableModule } from './timetable/timetable.module';
@@ -112,6 +113,7 @@ import { AppThrottlerGuard } from './auth/guards/app-throttler.guard';
     ClassesModule,
     GradesModule,
     AttendanceModule,
+    SyncModule,
     FinanceModule,
     ActivityFeedModule,
     NoticesModule,

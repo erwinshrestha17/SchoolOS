@@ -1,8 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import {
-  ApprovalRequestStatus,
-  ApprovalStepStatus,
-} from '@prisma/client';
+import { ApprovalRequestStatus, ApprovalStepStatus } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -14,10 +11,7 @@ const SCAN_MULTIPLIER = 4;
 export class PrincipalApprovalQueueService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(
-    actor: AuthContext,
-    input: { cursor?: string; limit?: number },
-  ) {
+  async list(actor: AuthContext, input: { cursor?: string; limit?: number }) {
     const limit = Math.max(
       1,
       Math.min(input.limit ?? DEFAULT_LIMIT, MAX_LIMIT),
@@ -29,9 +23,7 @@ export class PrincipalApprovalQueueService {
         status: ApprovalRequestStatus.PENDING,
         OR: [{ delegatedToId: null }, { delegatedToId: actor.userId }],
       },
-      ...(input.cursor
-        ? { cursor: { id: input.cursor }, skip: 1 }
-        : {}),
+      ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: scanTake,
       select: {
@@ -78,8 +70,7 @@ export class PrincipalApprovalQueueService {
     const mightHaveMoreRawRows = rows.length === scanTake;
     const unscannedReturnedRows = lastScannedIndex < rows.length - 1;
     const hasMore =
-      lastScannedIndex >= 0 &&
-      (unscannedReturnedRows || mightHaveMoreRawRows);
+      lastScannedIndex >= 0 && (unscannedReturnedRows || mightHaveMoreRawRows);
 
     return {
       items,
@@ -116,8 +107,8 @@ export class PrincipalApprovalQueueService {
 
     return Boolean(
       (step.approverRole && actor.roles.includes(step.approverRole)) ||
-        (step.approverPermission &&
-          actor.permissions.includes(step.approverPermission)),
+      (step.approverPermission &&
+        actor.permissions.includes(step.approverPermission)),
     );
   }
 }

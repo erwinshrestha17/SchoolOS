@@ -37,7 +37,7 @@ interface TenantScopedArgs {
   data?: Record<string, unknown> | Array<Record<string, unknown>>;
 }
 
-const TENANT_SCOPE_EXCLUDED_MODELS = [
+export const TENANT_SCOPE_EXCLUDED_MODELS = [
   'Tenant',
   'Permission',
   'RefreshToken',

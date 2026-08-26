@@ -319,6 +319,16 @@ class _PeriodRow extends StatelessWidget {
             ],
           ),
         ),
+        if (_periodCoverageLabel(period) case final coverageLabel?)
+          Text(
+            coverageLabel,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: AppColors.warning,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         const SizedBox(width: AppSpacing.sm),
         StatusChip(
           status: highlighted ? AppStatusType.present : AppStatusType.pending,
@@ -377,6 +387,16 @@ String _periodStatus(TeacherTodayPeriod period) {
   if (nowMinutes < start) return 'Upcoming';
   return 'Done';
 }
+
+String? _periodCoverageLabel(TeacherTodayPeriod period) =>
+    switch (period.coverageStatus) {
+      TeacherPeriodCoverageStatus.substituting =>
+        'You are substituting for this period',
+      TeacherPeriodCoverageStatus.covered =>
+        'A substitute is covering this period',
+      TeacherPeriodCoverageStatus.scheduled ||
+      TeacherPeriodCoverageStatus.unknown => null,
+    };
 
 int? _minutes(String value) {
   final parts = value.split(':');

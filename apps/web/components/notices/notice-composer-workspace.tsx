@@ -5,6 +5,13 @@ import { AlertTriangle, Eye, FileText, Save } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
+import { OfflineMutationError } from "@/lib/offline-policy";
+import { useSession } from "@/components/session-provider";
+import {
+  deleteOfflineModuleDraft,
+  listOfflineModuleDrafts,
+  upsertOfflineModuleDraft,
+} from "@/lib/offline-module-drafts";
 import { usersApi } from "@/lib/api/users";
 import {
   communicationsApi,
@@ -96,6 +103,7 @@ function parseIdList(text: string): string[] {
 export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { session } = useSession();
   const { isTeacherPersona } = useTeacherAccess();
   const noticeCaps = useNoticeCapabilities({ isTeacherPersona });
   const canCreate = noticeCaps.canCreate;
@@ -256,11 +264,73 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
       ]);
       router.push(`/dashboard/notices/${saved.id}`);
     },
-    onError: () =>
+    onError: async (error: unknown) => {
+      if (error instanceof OfflineMutationError) {
+        if (!session?.tenant.id || !session.user.id) {
+          setFormError(
+            "Sign in again before saving a local notice draft.",
+          );
+          return;
+        }
+        const operationId = idempotencyKey.current ?? crypto.randomUUID();
+        idempotencyKey.current = operationId;
+        await upsertOfflineModuleDraft({
+          module: "notices",
+          operationId,
+          tenantId: session.tenant.id,
+          userId: session.user.id,
+          status: "queued",
+          savedAt: new Date().toISOString(),
+          payload: {
+            ...payload(form),
+            idempotencyKey: operationId,
+          },
+        });
+        setFormError(
+          "Notice draft queued on this browser. It is not published. Reconnect to sync the draft.",
+        );
+        return;
+      }
       setFormError(
         "The draft could not be saved. Your valid form entries have been preserved.",
-      ),
+      );
+    },
   });
+
+  useEffect(() => {
+    const drain = async () => {
+      if (
+        typeof navigator === "undefined" ||
+        navigator.onLine === false ||
+        !session?.tenant.id ||
+        !session.user.id
+      ) {
+        return;
+      }
+      const drafts = await listOfflineModuleDrafts("notices", {
+        tenantId: session.tenant.id,
+        userId: session.user.id,
+      });
+      for (const draft of drafts) {
+        if (draft.status !== "queued") continue;
+        try {
+          await communicationsApi.createNoticeDraft({
+            ...draft.payload,
+            idempotencyKey: draft.operationId,
+          } as never);
+          await deleteOfflineModuleDraft("notices", draft.operationId);
+        } catch {
+          // Keep queued until a later reconnect.
+        }
+      }
+    };
+    const handleOnline = () => {
+      void drain();
+    };
+    window.addEventListener("online", handleOnline);
+    void drain();
+    return () => window.removeEventListener("online", handleOnline);
+  }, [session?.tenant.id, session?.user.id]);
 
   if (noticeCaps.resolution === "loading") {
     return <LoadingState label="Checking notice permissions…" />;

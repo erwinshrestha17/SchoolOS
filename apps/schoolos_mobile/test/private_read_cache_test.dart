@@ -127,7 +127,7 @@ void main() {
         isFalse,
       );
       expect(
-        await principal.write('principal_dashboard', {'total': 1}),
+        await principal.write('principal_fees_summary', {'total': 1}),
         isFalse,
       );
       expect(storage.values, isEmpty);
@@ -155,6 +155,31 @@ void main() {
       );
     },
   );
+
+  test('allowlists principal dashboard and attention reads', () async {
+    final principal = PrivateReadCache(
+      storage,
+      scope: PrivateReadCacheScope(
+        tenantId: 'tenant-1',
+        userId: 'principal-1',
+        role: MobileRole.principal,
+      ),
+      now: () => now,
+    );
+
+    expect(
+      await principal.write('principal_dashboard', {'attentionCount': 2}),
+      isTrue,
+    );
+    expect(
+      await principal.write('principal_attention_all', {'items': []}),
+      isTrue,
+    );
+    expect(
+      await principal.write('principal_fees_summary', {'total': 1}),
+      isFalse,
+    );
+  });
 
   test('expires records using the current allowlist TTL', () async {
     final cache = parentCache();

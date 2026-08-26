@@ -136,6 +136,14 @@ describe('Homework Workflow', () => {
             Promise.resolve({ id: 'batch-1', ...q.create }),
           ),
       },
+      tenantAuthorityFence: {
+        findUnique: jest.fn().mockResolvedValue({
+          tenantId: 'tenant-1',
+          authorityNodeId: 'cloud',
+          authorityEpoch: 1,
+        }),
+        create: jest.fn(),
+      },
       $transaction: jest.fn((cb) => cb(prisma)),
     };
 

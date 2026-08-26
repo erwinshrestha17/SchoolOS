@@ -8,6 +8,7 @@ import '../../../core/network/connectivity_provider.dart';
 import '../../../core/storage/private_read_cache.dart';
 import '../../../core/storage/teacher_attendance_draft_store.dart';
 import '../../../core/storage/teacher_attendance_scope_version_store.dart';
+import '../../../core/sync/school_authority_discovery.dart';
 import '../data/attendance_repository.dart';
 import '../domain/attendance_models.dart';
 
@@ -17,6 +18,7 @@ final attendanceRepositoryProvider = Provider<AttendanceRepository>((ref) {
     cache: ref.watch(privateReadCacheProvider),
     draftStore: ref.watch(teacherAttendanceDraftStoreProvider),
     scopeVersionStore: ref.watch(teacherAttendanceScopeVersionStoreProvider),
+    authorityDiscovery: ref.watch(schoolAuthorityDiscoveryProvider),
   );
 });
 
@@ -159,6 +161,8 @@ class TeacherAttendanceState {
     this.error,
     this.draftClientSubmissionId,
     this.draftReceiptState,
+    this.rosterVersion,
+    this.requiresRosterReview = false,
   });
 
   final bool isLoading;
@@ -181,12 +185,15 @@ class TeacherAttendanceState {
   final Object? error;
   final String? draftClientSubmissionId;
   final AttendanceDraftReceiptState? draftReceiptState;
+  final String? rosterVersion;
+  final bool requiresRosterReview;
 
   bool get isReadOnly =>
       attendance.isSubmitted ||
       attendance.isLocked ||
       attendance.hasConflict ||
-      !isWorkingDay;
+      !isWorkingDay ||
+      requiresRosterReview;
 
   bool get isReceiptPending => draftReceiptState?.locksContent ?? false;
 
@@ -238,6 +245,9 @@ class TeacherAttendanceState {
     bool clearDraftClientSubmissionId = false,
     AttendanceDraftReceiptState? draftReceiptState,
     bool clearDraftReceiptState = false,
+    String? rosterVersion,
+    bool clearRosterVersion = false,
+    bool? requiresRosterReview,
   }) {
     return TeacherAttendanceState(
       isLoading: isLoading ?? this.isLoading,
@@ -267,6 +277,10 @@ class TeacherAttendanceState {
       draftReceiptState: clearDraftReceiptState
           ? null
           : draftReceiptState ?? this.draftReceiptState,
+      rosterVersion: clearRosterVersion
+          ? null
+          : rosterVersion ?? this.rosterVersion,
+      requiresRosterReview: requiresRosterReview ?? this.requiresRosterReview,
     );
   }
 }
@@ -361,6 +375,8 @@ class TeacherAttendanceController
           classes: const [],
           entries: const [],
           originalEntries: const [],
+          clearRosterVersion: true,
+          requiresRosterReview: false,
           isOffline: !_isOnline || today.fromCache,
           todayPeriods: today.periods,
           pendingAttendanceCount: today.pendingAttendanceCount,
@@ -385,6 +401,8 @@ class TeacherAttendanceController
           classes: classes,
           entries: const [],
           originalEntries: const [],
+          clearRosterVersion: true,
+          requiresRosterReview: false,
           todayPeriods: today.periods,
           pendingAttendanceCount: today.pendingAttendanceCount,
           hasTeachingScope: today.hasTeachingScope,
@@ -395,6 +413,10 @@ class TeacherAttendanceController
           message: 'This class is not assigned to you.',
         );
         return;
+      }
+      if (_isOnline) {
+        await _drainQueuedAttendance(classes);
+        if (generation != _loadGeneration) return;
       }
       final draft = await _repository.loadDraftAttendance(
         selectedClassId,
@@ -411,6 +433,15 @@ class TeacherAttendanceController
       );
       if (generation != _loadGeneration) return;
       final sheet = draft?.entries ?? roster.entries;
+      final draftHasRosterProof =
+          draft == null ||
+          isValidAttendanceRosterVersion(draft.expectedRosterVersion);
+      final draftRosterMatches =
+          draft == null || draft.expectedRosterVersion == roster.rosterVersion;
+      final requiresRosterReview =
+          draft != null &&
+          (!draftHasRosterProof ||
+              (!draftRosterMatches && !draft.receiptState.locksContent));
 
       state = state.copyWith(
         isLoading: false,
@@ -433,8 +464,12 @@ class TeacherAttendanceController
         clearDraftClientSubmissionId: draft == null,
         draftReceiptState: draft?.receiptState,
         clearDraftReceiptState: draft == null,
+        rosterVersion: roster.rosterVersion,
+        requiresRosterReview: requiresRosterReview,
         message: scopeRefresh.purgedLocalData
             ? 'Any older local attendance data was cleared after your teaching access was revalidated. The current assigned roster is now shown.'
+            : requiresRosterReview
+            ? 'The saved attendance draft was created from an older or unverifiable roster. It cannot be submitted. Discard it, review the current roster, and create a new draft.'
             : draft != null
             ? _draftLoadMessage(draft, isOnline: _isOnline)
             : (!_isOnline || roster.fromCache || today.fromCache)
@@ -511,6 +546,14 @@ class TeacherAttendanceController
     }
   }
 
+  Future<void> _drainQueuedAttendance(List<TeacherClassSection> classes) async {
+    try {
+      await _repository.syncQueuedAttendanceDrafts(classes);
+    } catch (_) {
+      // Drain is best-effort. Failure must not replace a loaded roster.
+    }
+  }
+
   Future<void> selectClass(String classSectionId) async {
     await load(requestedClassSectionId: classSectionId);
   }
@@ -565,6 +608,7 @@ class TeacherAttendanceController
       syncStatus: AttendanceSyncStatus.synced,
       clearDraftClientSubmissionId: true,
       clearDraftReceiptState: true,
+      requiresRosterReview: false,
       clearError: true,
       message: 'Draft discarded. The last server roster is shown.',
     );
@@ -573,8 +617,18 @@ class TeacherAttendanceController
   Future<void> submit() async {
     final classId = state.selectedClassId;
     final date = state.date;
+    if (state.requiresRosterReview) {
+      state = state.copyWith(
+        syncStatus: AttendanceSyncStatus.failed,
+        message:
+            'This draft cannot be submitted against the current roster. Discard it, review the current roster, and create a new draft.',
+      );
+      return;
+    }
+    final rosterVersion = state.rosterVersion;
     if (classId == null ||
         date == null ||
+        !isValidAttendanceRosterVersion(rosterVersion) ||
         state.isSubmitting ||
         !state.hasUnsavedChanges ||
         state.isReadOnly) {
@@ -595,10 +649,18 @@ class TeacherAttendanceController
       }
       state = state.copyWith(isSubmitting: true);
       try {
-        final draft = await _repository.saveDraftAttendanceLocally(
+        final localDraft = await _repository.saveDraftAttendanceLocally(
           classId,
           date,
           state.entries,
+          expectedRosterVersion: rosterVersion!,
+        );
+        final draft = await _repository.markDraftReceiptState(
+          classId,
+          date,
+          state.entries,
+          clientSubmissionId: localDraft.clientSubmissionId,
+          receiptState: AttendanceDraftReceiptState.queued,
         );
         state = state.copyWith(
           isSubmitting: false,
@@ -625,19 +687,33 @@ class TeacherAttendanceController
       message: 'Syncing attendance...',
     );
     try {
-      final draft = await _repository.saveDraftAttendanceLocally(
-        classId,
-        date,
-        state.entries,
-      );
-      state = state.copyWith(
-        draftClientSubmissionId: draft.clientSubmissionId,
-        draftReceiptState: draft.receiptState,
-      );
       final selectedClass = state.selectedClass;
       if (selectedClass == null) {
         state = state.copyWith(isSubmitting: false);
         return;
+      }
+      late final TeacherAttendanceDraft draft;
+      if (state.isReceiptPending && state.draftClientSubmissionId != null) {
+        // Replay the exact protected receipt already on disk. Re-saving it
+        // against the freshly loaded roster would either overwrite the
+        // original precondition or block the durable server reconciliation.
+        draft = TeacherAttendanceDraft(
+          clientSubmissionId: state.draftClientSubmissionId!,
+          savedAt: DateTime.now(),
+          entries: state.entries,
+          receiptState: state.draftReceiptState!,
+        );
+      } else {
+        draft = await _repository.saveDraftAttendanceLocally(
+          classId,
+          date,
+          state.entries,
+          expectedRosterVersion: rosterVersion!,
+        );
+        state = state.copyWith(
+          draftClientSubmissionId: draft.clientSubmissionId,
+          draftReceiptState: draft.receiptState,
+        );
       }
       final result = await _repository.submitAttendance(
         selectedClass,
@@ -678,12 +754,15 @@ class TeacherAttendanceController
             ? AttendanceDraftReceiptState.transportAmbiguous
             : result.draftReceiptState,
         clearDraftReceiptState: serverOwnsResult,
+        requiresRosterReview: result.isRosterMismatch,
         message: receiptPersistencePending
             ? 'SchoolOS returned a receipt, but this phone could not save it safely. Keep this locked draft and check again.'
             : result.status == AttendanceSyncStatus.conflict
             ? 'Attendance reached the server but needs conflict review.'
             : result.serverStatus == AttendanceServerSyncStatus.rejected
-            ? 'SchoolOS did not accept this attendance. The draft remains on this phone for review.'
+            ? result.isRosterMismatch
+                  ? 'The class roster changed before SchoolOS accepted this attendance. Discard the saved draft, review the current roster, and create a new submission.'
+                  : 'SchoolOS did not accept this attendance. The draft remains on this phone for review.'
             : result.status == AttendanceSyncStatus.serverChecking
             ? 'SchoolOS is still checking this attendance. The draft remains on this phone.'
             : result.replayed
@@ -761,13 +840,21 @@ class TeacherAttendanceController
   void _scheduleLocalDraftSave() {
     final classId = state.selectedClassId;
     final date = state.date;
-    if (classId == null || date == null || state.isEditingLocked) return;
+    final rosterVersion = state.rosterVersion;
+    if (classId == null ||
+        date == null ||
+        !isValidAttendanceRosterVersion(rosterVersion) ||
+        state.isEditingLocked) {
+      return;
+    }
 
     final entries = List<AttendanceStudentEntry>.unmodifiable(state.entries);
     _draftSaveTimer?.cancel();
     _draftSaveTimer = Timer(
       draftSaveDelay,
-      () => unawaited(_saveLocalDraftSnapshot(classId, date, entries)),
+      () => unawaited(
+        _saveLocalDraftSnapshot(classId, date, entries, rosterVersion!),
+      ),
     );
   }
 
@@ -775,29 +862,31 @@ class TeacherAttendanceController
     String classId,
     DateTime date,
     List<AttendanceStudentEntry> entries,
+    String expectedRosterVersion,
   ) async {
     try {
       final draft = await _repository.saveDraftAttendanceLocally(
         classId,
         date,
         entries,
+        expectedRosterVersion: expectedRosterVersion,
       );
-      if (state.selectedClassId != classId || state.date != date) return;
+      if (state.selectedClassId != classId ||
+          state.date != date ||
+          state.rosterVersion != expectedRosterVersion) {
+        return;
+      }
 
       state = state.copyWith(
         draftClientSubmissionId: draft.clientSubmissionId,
         draftReceiptState: draft.receiptState,
-        syncStatus: draft.receiptState == AttendanceDraftReceiptState.local
-            ? (_isOnline
-                  ? AttendanceSyncStatus.draft
-                  : AttendanceSyncStatus.queued)
-            : draft.receiptState.syncStatus,
+        syncStatus: draft.receiptState.syncStatus,
         isOffline: !_isOnline,
         message: draft.receiptState == AttendanceDraftReceiptState.rejected
             ? 'SchoolOS did not accept this attendance. Change the draft to create a new submission, or discard it.'
             : _isOnline
             ? 'Draft saved on this phone. Submit when ready.'
-            : 'Draft queued on this device. Reconnect to sync it.',
+            : 'Draft saved on this phone — not queued or submitted.',
       );
     } catch (_) {
       if (state.selectedClassId != classId || state.date != date) return;
@@ -845,6 +934,8 @@ TeacherAttendanceState _withoutSensitiveAttendanceData(
     clearError: error == null,
     clearDraftClientSubmissionId: true,
     clearDraftReceiptState: true,
+    clearRosterVersion: true,
+    requiresRosterReview: false,
     message: message,
   );
 }
@@ -856,8 +947,12 @@ String _draftLoadMessage(
   return switch (draft.receiptState) {
     AttendanceDraftReceiptState.local =>
       isOnline
-          ? 'Attendance draft is ready to sync.'
-          : 'Attendance draft is queued on this device.',
+          ? 'Attendance draft is ready to submit.'
+          : 'Attendance draft is saved on this device — not queued or submitted.',
+    AttendanceDraftReceiptState.queued =>
+      isOnline
+          ? 'Attendance is queued on this device and ready to send.'
+          : 'Attendance is queued on this device — not submitted.',
     AttendanceDraftReceiptState.rejected =>
       'SchoolOS did not accept this attendance. Review the draft before creating a new submission.',
     AttendanceDraftReceiptState.processing ||

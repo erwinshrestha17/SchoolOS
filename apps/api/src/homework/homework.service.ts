@@ -30,6 +30,7 @@ import {
   SendHomeworkReminderDto,
 } from './dto/reminder.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import { assertClientAuthorityFence } from '../sync/authority-fence';
 import { CreateHomeworkDto } from './dto/create-homework.dto';
 import { HomeworkQueryDto } from './dto/homework-query.dto';
 import { HomeworkTemplateQueryDto } from './dto/homework-template-query.dto';
@@ -841,6 +842,45 @@ export class HomeworkService {
   }
 
   async createAssignment(dto: CreateHomeworkDto, actor: AuthContext) {
+    await assertClientAuthorityFence(this.prisma, actor.tenantId, dto);
+    const clientOperationId = dto.clientOperationId?.trim();
+    if (clientOperationId && dto.recurrence) {
+      throw new ConflictException(
+        'Offline homework drafts cannot use recurrence',
+      );
+    }
+    if (clientOperationId) {
+      const existing = await this.prisma.homeworkAssignment.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          clientOperationId,
+        },
+      });
+      if (existing) {
+        if (existing.status !== HomeworkAssignmentStatus.DRAFT) {
+          return this.findAssignmentOrThrow(actor, existing.id);
+        }
+        const updated = await this.updateAssignment(
+          existing.id,
+          {
+            title: dto.title,
+            instructions: dto.instructions,
+            description: dto.description,
+            assignedDate: dto.assignedDate,
+            dueDate: dto.dueDate,
+            dueAt: dto.dueAt,
+            submissionRequired: dto.submissionRequired,
+            submissionMethod: dto.submissionMethod,
+            parentInstructions: dto.parentInstructions,
+            attachmentFileIds: dto.attachmentFileIds,
+            maxScore: dto.maxScore,
+          },
+          actor,
+        );
+        return this.findAssignmentOrThrow(actor, updated.id);
+      }
+    }
+
     // 1. Validate Dates
     const assignedDate = dto.assignedDate
       ? new Date(dto.assignedDate)
@@ -919,6 +959,7 @@ export class HomeworkService {
         const assignment = await tx.homeworkAssignment.create({
           data: {
             tenantId: actor.tenantId,
+            clientOperationId: clientOperationId || undefined,
             academicYearId: dto.academicYearId,
             classId: dto.classId,
             sectionId: dto.sectionId,

@@ -78,7 +78,10 @@ export function validateSchoolSettingValue(
     case 'salary_payment_methods':
     case 'payment_methods_enabled':
     case 'attendance_working_days':
-      if (!Array.isArray(value) || !value.every((item) => typeof item === 'string')) {
+      if (
+        !Array.isArray(value) ||
+        !value.every((item) => typeof item === 'string')
+      ) {
         throw new BadRequestException(
           `Invalid value for ${key}. Expected a string array.`,
         );

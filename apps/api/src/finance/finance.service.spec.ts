@@ -3092,6 +3092,14 @@ function buildService(options: {
     accountingPeriod: {
       findFirst: jest.fn().mockResolvedValue(options.closedPeriod ?? null),
     },
+    tenantAuthorityFence: {
+      findUnique: jest.fn().mockResolvedValue({
+        tenantId: actor.tenantId,
+        authorityNodeId: 'cloud',
+        authorityEpoch: 1,
+      }),
+      create: jest.fn(),
+    },
     $queryRaw: jest.fn().mockResolvedValue([]),
     $transaction: jest.fn(async (callback) => callback(prisma)),
   };

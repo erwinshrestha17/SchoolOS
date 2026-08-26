@@ -476,6 +476,8 @@ enum AttendanceSyncRejectionReason {
   CROSS_TENANT
   STALE_DRAFT
   UNASSIGNED_TEACHER
+  SCOPE_REVOKED
+  AUTHORITY_FENCED
 }
 
 enum AttendanceCorrectionStatus {

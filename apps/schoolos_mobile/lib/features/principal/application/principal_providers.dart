@@ -2,11 +2,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/network/connectivity_provider.dart';
+import '../../../core/storage/private_read_cache.dart';
 import '../data/principal_repository.dart';
 import '../../learning_support/domain/learning_support_models.dart';
 
 final principalRepositoryProvider = Provider<PrincipalRepository>((ref) {
-  return PrincipalRepository(ref.watch(apiClientProvider));
+  return PrincipalRepository(
+    ref.watch(apiClientProvider),
+    cache: ref.watch(privateReadCacheProvider),
+  );
 });
 
 final principalDashboardProvider =

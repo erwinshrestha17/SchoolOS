@@ -168,6 +168,7 @@ void main() {
       instructions: 'Complete exercise 2.',
       dueDate: DateTime.utc(2026, 6, 20),
       submissionRequired: true,
+      clientOperationId: 'hw-op-1',
       attachments: [
         TeacherHomeworkDraftAttachment(
           fileName: 'worksheet.jpg',
@@ -189,6 +190,7 @@ void main() {
     expect(captured['classId'], 'class-1');
     expect(captured['subjectId'], 'subject-1');
     expect(captured['status'], 'DRAFT');
+    expect(captured['clientOperationId'], 'hw-op-1');
     expect(captured['attachmentFileIds'], ['file-1']);
     final upload =
         verify(

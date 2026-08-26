@@ -36,20 +36,30 @@ enum AttendanceServerSyncStatus {
 
 enum AttendanceDraftReceiptState {
   local,
+  queued,
   processing,
   unknown,
   transportAmbiguous,
   rejected,
 }
 
+enum TeacherPeriodCoverageStatus { scheduled, substituting, covered, unknown }
+
+final RegExp _attendanceRosterVersionPattern = RegExp(r'^[a-f0-9]{64}$');
+
+bool isValidAttendanceRosterVersion(Object? value) =>
+    value is String && _attendanceRosterVersionPattern.hasMatch(value);
+
 extension AttendanceDraftReceiptStatePolicy on AttendanceDraftReceiptState {
   bool get locksContent =>
+      this == AttendanceDraftReceiptState.queued ||
       this == AttendanceDraftReceiptState.processing ||
       this == AttendanceDraftReceiptState.unknown ||
       this == AttendanceDraftReceiptState.transportAmbiguous;
 
   AttendanceSyncStatus get syncStatus => switch (this) {
-    AttendanceDraftReceiptState.local => AttendanceSyncStatus.queued,
+    AttendanceDraftReceiptState.local => AttendanceSyncStatus.draft,
+    AttendanceDraftReceiptState.queued => AttendanceSyncStatus.queued,
     AttendanceDraftReceiptState.processing ||
     AttendanceDraftReceiptState.unknown ||
     AttendanceDraftReceiptState.transportAmbiguous =>
@@ -260,6 +270,7 @@ class TeacherRosterSnapshot {
     required this.entries,
     required this.attendance,
     required this.isWorkingDay,
+    required this.rosterVersion,
     this.fromCache = false,
     required this.lastUpdated,
   });
@@ -267,6 +278,7 @@ class TeacherRosterSnapshot {
   final List<AttendanceStudentEntry> entries;
   final TeacherAttendanceMeta attendance;
   final bool isWorkingDay;
+  final String rosterVersion;
   final bool fromCache;
   final DateTime lastUpdated;
 }
@@ -276,12 +288,14 @@ class TeacherAttendanceDraft {
     required this.clientSubmissionId,
     required this.savedAt,
     required this.entries,
+    this.expectedRosterVersion,
     this.receiptState = AttendanceDraftReceiptState.local,
   });
 
   final String clientSubmissionId;
   final DateTime savedAt;
   final List<AttendanceStudentEntry> entries;
+  final String? expectedRosterVersion;
   final AttendanceDraftReceiptState receiptState;
 }
 
@@ -298,10 +312,15 @@ class TeacherAttendanceSubmitResult {
   final bool deviceReceiptPersisted;
   final String? rejectionReason;
 
+  bool get isRosterMismatch =>
+      serverStatus == AttendanceServerSyncStatus.rejected &&
+      rejectionReason == 'ROSTER_MISMATCH';
+
   bool get isAuthorizationRevoked =>
       serverStatus == AttendanceServerSyncStatus.rejected &&
       (rejectionReason == 'UNASSIGNED_TEACHER' ||
-          rejectionReason == 'TEACHER_SCOPE_DENIED');
+          rejectionReason == 'TEACHER_SCOPE_DENIED' ||
+          rejectionReason == 'SCOPE_REVOKED');
 
   AttendanceSyncStatus get status => switch (serverStatus) {
     AttendanceServerSyncStatus.accepted ||
@@ -336,6 +355,7 @@ class TeacherTodayPeriod {
     required this.subjectName,
     required this.startsAt,
     required this.endsAt,
+    this.coverageStatus = TeacherPeriodCoverageStatus.unknown,
   });
 
   final String id;
@@ -344,6 +364,7 @@ class TeacherTodayPeriod {
   final String subjectName;
   final String startsAt;
   final String endsAt;
+  final TeacherPeriodCoverageStatus coverageStatus;
 
   factory TeacherTodayPeriod.fromJson(Map<String, dynamic> json) {
     final academicYearId = json['academicYearId'] as String? ?? '';
@@ -356,6 +377,12 @@ class TeacherTodayPeriod {
       subjectName: json['subjectName'] as String? ?? 'Class period',
       startsAt: json['startsAt'] as String? ?? '',
       endsAt: json['endsAt'] as String? ?? '',
+      coverageStatus: switch (json['coverageStatus']) {
+        'SCHEDULED' => TeacherPeriodCoverageStatus.scheduled,
+        'SUBSTITUTING' => TeacherPeriodCoverageStatus.substituting,
+        'COVERED' => TeacherPeriodCoverageStatus.covered,
+        _ => TeacherPeriodCoverageStatus.unknown,
+      },
     );
   }
 }

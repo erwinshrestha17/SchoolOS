@@ -6,10 +6,12 @@ import {
   IsDateString,
   IsDecimal,
   IsEnum,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
   MaxLength,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -69,4 +71,14 @@ export class CollectPaymentDto {
   @IsNotEmpty()
   @MaxLength(150)
   idempotencyKey!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  authorityNodeId?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  authorityEpoch?: number;
 }

@@ -4,6 +4,16 @@ import React, { useEffect, useRef, useState } from "react";
 import { CollectionCounter } from "./collection-counter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { OfflineMutationError } from "@/lib/offline-policy";
+import {
+  authorityFenceFields,
+  readSchoolAuthorityFence,
+} from "@/lib/school-authority-discovery";
+import {
+  deleteOfflineModuleDraft,
+  listOfflineModuleDrafts,
+  upsertOfflineModuleDraft,
+} from "@/lib/offline-module-drafts";
 import type { CollectedPaymentResult } from "@/lib/api/finance";
 import type { InvoiceSummary, StudentCollectionContext } from "@schoolos/core";
 import { CheckCircle2, AlertCircle, Printer, X } from "lucide-react";
@@ -66,12 +76,13 @@ export function CollectionSection({
   total = 0,
   onPageChange,
 }: CollectionSectionProps) {
-  const { hasPermissions } = useSession();
+  const { hasPermissions, session } = useSession();
   const canCollect = hasPermissions(["payments:collect"]);
   const queryClient = useQueryClient();
   const [lastReceipt, setLastReceipt] = useState<CollectedPaymentResult | null>(
     null,
   );
+  const [queuedIntent, setQueuedIntent] = useState<string | null>(null);
   const [receiptError, setReceiptError] = useState<string | null>(null);
   const paymentAttemptRef = useRef<{ fingerprint: string; key: string } | null>(
     null,
@@ -92,10 +103,12 @@ export function CollectionSection({
       return api.collectPayment({
         ...payload,
         idempotencyKey: paymentAttemptRef.current.key,
+        ...authorityFenceFields(readSchoolAuthorityFence()),
       });
     },
     onSuccess: (result) => {
       paymentAttemptRef.current = null;
+      setQueuedIntent(null);
       setLastReceipt(result);
       void queryClient.invalidateQueries({ queryKey: ["invoices"] });
       if (studentCollectionContext?.student.id) {
@@ -113,6 +126,29 @@ export function CollectionSection({
       void queryClient.invalidateQueries({
         queryKey: ["finance-dashboard-summary"],
       });
+    },
+    onError: async (error, payload) => {
+      if (!(error instanceof OfflineMutationError)) {
+        return;
+      }
+      if (!session?.tenant.id || !session.user.id || !paymentAttemptRef.current) {
+        return;
+      }
+      await upsertOfflineModuleDraft({
+        module: "fees",
+        operationId: paymentAttemptRef.current.key,
+        tenantId: session.tenant.id,
+        userId: session.user.id,
+        status: "queued",
+        savedAt: new Date().toISOString(),
+        payload: {
+          ...payload,
+          idempotencyKey: paymentAttemptRef.current.key,
+        },
+      });
+      setQueuedIntent(
+        "Payment intent queued. It is not collected, issued, or fiscally confirmed. Reconnect to submit this same intent.",
+      );
     },
   });
 
@@ -137,6 +173,38 @@ export function CollectionSection({
       block: "nearest",
     });
   }, [paymentMutation.isError]);
+
+  useEffect(() => {
+    const drain = async () => {
+      if (
+        typeof navigator === "undefined" ||
+        navigator.onLine === false ||
+        !session?.tenant.id ||
+        !session.user.id
+      ) {
+        return;
+      }
+      const drafts = await listOfflineModuleDrafts("fees", {
+        tenantId: session.tenant.id,
+        userId: session.user.id,
+      });
+      for (const draft of drafts) {
+        if (draft.status !== "queued") continue;
+        try {
+          await api.collectPayment(draft.payload);
+          await deleteOfflineModuleDraft("fees", draft.operationId);
+        } catch {
+          // Keep queued; never treat a local intent as collected.
+        }
+      }
+    };
+    const handleOnline = () => {
+      void drain();
+    };
+    window.addEventListener("online", handleOnline);
+    void drain();
+    return () => window.removeEventListener("online", handleOnline);
+  }, [session?.tenant.id, session?.user.id]);
 
   const visibleInvoices = isStudentContextMode
     ? (studentCollectionContext?.invoices ?? [])
@@ -228,7 +296,23 @@ export function CollectionSection({
         </div>
       ) : null}
 
-      {paymentMutation.isError && (
+      {queuedIntent ? (
+        <div
+          role="status"
+          className="flex items-center gap-4 rounded-xl border border-warning-100 bg-warning-50 p-6 text-sm font-semibold text-warning-900"
+        >
+          <AlertCircle size={24} className="text-warning-700" />
+          <div>
+            <p className="text-[0.65rem] font-black uppercase tracking-widest text-warning-800">
+              Queued · pending connectivity
+            </p>
+            <p className="mt-1">{queuedIntent}</p>
+          </div>
+        </div>
+      ) : null}
+
+      {paymentMutation.isError &&
+        !(paymentMutation.error instanceof OfflineMutationError) && (
         <div
           ref={paymentErrorRef}
           className="animate-fade-in flex items-center gap-4 rounded-xl border border-danger-100 bg-danger-50 p-6 text-sm font-bold text-danger-800"

@@ -43,16 +43,16 @@ export class NoticeLifecycleCron {
     );
 
     for (const { tenantId } of tenantRows) {
-      const actor = await this.resolveSystemActor(tenantId);
-      if (!actor) {
-        this.logger.warn(
-          `Skipping due notice lifecycle for tenant ${tenantId}: no active user`,
-        );
-        continue;
-      }
-
       try {
         await this.prisma.runWithTenantScope(tenantId, async () => {
+          const actor = await this.resolveSystemActor(tenantId);
+          if (!actor) {
+            this.logger.warn(
+              `Skipping due notice lifecycle for tenant ${tenantId}: no active user`,
+            );
+            return;
+          }
+
           await this.communicationsService.processScheduledNotices(actor);
           await this.communicationsService.processExpiredNotices(actor);
         });

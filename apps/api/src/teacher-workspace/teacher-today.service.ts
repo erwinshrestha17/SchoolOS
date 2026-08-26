@@ -19,6 +19,7 @@ interface TodayPeriod {
   // just a recurring weekly time -- see prisma/schema/timetable.prisma).
   startsAt: string;
   endsAt: string;
+  coverageStatus: 'SCHEDULED' | 'SUBSTITUTING' | 'COVERED';
 }
 
 /** "HH:mm" for the given instant in Asia/Kathmandu, matching TimetableSlot's storage format. */

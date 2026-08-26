@@ -195,6 +195,41 @@ class TeacherAttendanceDraftStore {
     });
   }
 
+  Future<List<TeacherAttendanceDraftRecord>> listCurrentScope() {
+    return _synchronized(() async {
+      final activeScope = scope;
+      if (activeScope == null || !activeScope.isValid) {
+        return const [];
+      }
+      try {
+        await _purgeLegacyPreferences();
+        final values = await _storage.readAll();
+        final records = <TeacherAttendanceDraftRecord>[];
+        final now = _now().toUtc();
+        for (final entry in values.entries) {
+          if (!entry.key.startsWith(_recordPrefix)) continue;
+          final decoded = _decode(entry.value);
+          if (decoded == null ||
+              decoded.namespace != activeScope.namespace ||
+              !now.isBefore(decoded.expiresAt)) {
+            continue;
+          }
+          records.add(
+            TeacherAttendanceDraftRecord(
+              classSectionId: decoded.classSectionId,
+              date: decoded.date,
+              authorizationScopeVersion: decoded.authorizationScopeVersion,
+              payload: decoded.payload,
+            ),
+          );
+        }
+        return records;
+      } catch (_) {
+        return const [];
+      }
+    });
+  }
+
   /// Strictly deletes every attendance draft in the current teacher's secure
   /// tenant/user namespace while preserving drafts belonging to other scopes.
   Future<void> clearCurrentScopeStrict() {
@@ -376,4 +411,18 @@ class _DraftRecord {
   final Map<String, dynamic> payload;
   final DateTime savedAt;
   final DateTime expiresAt;
+}
+
+class TeacherAttendanceDraftRecord {
+  const TeacherAttendanceDraftRecord({
+    required this.classSectionId,
+    required this.date,
+    required this.authorizationScopeVersion,
+    required this.payload,
+  });
+
+  final String classSectionId;
+  final String date;
+  final String? authorizationScopeVersion;
+  final Map<String, dynamic> payload;
 }

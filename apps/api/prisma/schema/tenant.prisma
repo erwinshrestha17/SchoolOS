@@ -239,6 +239,16 @@ model Tenant {
   teacherReplacements           TeacherReplacement[]
   teacherReplacementPendingWork TeacherReplacementPendingWork[]
   teacherHandoverNotes          TeacherHandoverNote[]
+  authorityFence                TenantAuthorityFence?
+}
+
+model TenantAuthorityFence {
+  tenantId         String   @id
+  authorityNodeId  String   @default("cloud")
+  authorityEpoch   Int      @default(1)
+  updatedAt        DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 }
 
 model TenantSetting {

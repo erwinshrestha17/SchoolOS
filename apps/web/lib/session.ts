@@ -30,6 +30,7 @@ import {
   resolveAccessRevocationReceipt,
   type AttendanceAccessRevocationStatus,
 } from "./attendance-draft-access-revocation";
+import { ATTENDANCE_ROSTER_VERSION_PATTERN } from "./attendance-roster-version";
 
 export const SESSION_STORAGE_KEY = "schoolos.auth-session";
 const ATTENDANCE_DRAFT_KEY_PREFIX = "schoolos.attendance-draft:";
@@ -60,6 +61,10 @@ export type AttendanceDraftStorageValue = {
   serverSessionId: string | null;
   serverSubmittedAt: string | null;
   lastSyncStatus?: string;
+  rejectionReason?: string | null;
+  authorizationVersion?: string;
+  /** Original opaque server roster snapshot for replay-safe finalization. */
+  expectedRosterVersion?: string;
 };
 
 export type StoredAttendanceDraft = AttendanceDraftStorageValue & {
@@ -1019,7 +1024,19 @@ function assertAttendanceDraftStorageShapeAndSize(
     Array.isArray(draft.exceptions) ||
     !draft.remarks ||
     typeof draft.remarks !== "object" ||
-    Array.isArray(draft.remarks)
+    Array.isArray(draft.remarks) ||
+    (draft.authorizationVersion !== undefined &&
+      (typeof draft.authorizationVersion !== "string" ||
+        !draft.authorizationVersion.trim())) ||
+    (draft.expectedRosterVersion !== undefined &&
+      (typeof draft.expectedRosterVersion !== "string" ||
+        !ATTENDANCE_ROSTER_VERSION_PATTERN.test(
+          draft.expectedRosterVersion,
+        ))) ||
+    (draft.rejectionReason !== undefined &&
+      draft.rejectionReason !== null &&
+      (typeof draft.rejectionReason !== "string" ||
+        draft.rejectionReason.length > 128))
   ) {
     throw new Error("Attendance draft is not valid for browser storage");
   }

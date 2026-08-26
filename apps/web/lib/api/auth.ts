@@ -64,6 +64,10 @@ export const authApi = {
     }),
   getProfile: (options?: RequestOptions) =>
     request<AuthProfile>('/auth/me', options),
+  getSyncAuthority: () =>
+    request<{ authorityNodeId: string; authorityEpoch: number }>(
+      '/sync/authority',
+    ),
   forgotPassword: (body: JsonBody) =>
     request<{ success: true }>('/auth/forgot-password', {
       method: 'POST',

@@ -342,6 +342,28 @@ describe('P0-01 guardian scoping (real database)', () => {
   });
 
   describe('relationship state', () => {
+    it('revoking a previously granted guardian link denies the next write', async () => {
+      await expect(
+        requireGuardianCapability(
+          prisma,
+          parentActor(),
+          childOneId,
+          GuardianCapability.ACADEMICS_VIEW,
+        ),
+      ).resolves.toMatchObject({ studentId: childOneId });
+
+      await resetChildOne({ status: 'REVOKED' });
+
+      await expect(
+        requireGuardianCapability(
+          prisma,
+          parentActor(),
+          childOneId,
+          GuardianCapability.ACADEMICS_VIEW,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
     it.each([
       ['SUSPENDED', { status: 'SUSPENDED' }],
       ['REVOKED', { status: 'REVOKED' }],

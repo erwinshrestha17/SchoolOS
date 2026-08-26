@@ -92,6 +92,8 @@ export type AttendanceRoster = {
   class: ClassSummary;
   section: SectionSummary | null;
   attendanceDate: string;
+  /** Opaque server snapshot used to fence offline attendance submissions. */
+  rosterVersion: string;
   calendarDay: AttendanceCalendarDayView;
   attendanceState: {
     submittedAt: string | null;

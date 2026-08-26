@@ -2,10 +2,12 @@ import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
+  IsInt,
   IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -39,6 +41,10 @@ export class BulkUpsertMarksEntryDto {
   @IsOptional()
   @IsString()
   remarks?: string;
+
+  @IsOptional()
+  @IsString()
+  expectedVersion?: string;
 }
 
 export class BulkUpsertMarksDto {
@@ -66,4 +72,14 @@ export class BulkUpsertMarksDto {
   @ValidateNested({ each: true })
   @Type(() => BulkUpsertMarksEntryDto)
   entries!: BulkUpsertMarksEntryDto[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  authorityNodeId?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  authorityEpoch?: number;
 }

@@ -28,6 +28,7 @@ model HomeworkReminderBatch {
 model HomeworkAssignment {
   id                 String                   @id @default(uuid())
   tenantId           String
+  clientOperationId  String?
   academicYearId     String
   classId            String
   sectionId          String?
@@ -58,6 +59,7 @@ model HomeworkAssignment {
   reminderBatches HomeworkReminderBatch[]
   attachments     HomeworkAttachment[]
 
+  @@unique([tenantId, clientOperationId])
   @@index([tenantId, academicYearId, classId, sectionId, status])
   @@index([tenantId, status, dueDate])
   @@index([tenantId, classId, sectionId])

@@ -9,6 +9,11 @@ import 'package:schoolos_mobile/features/attendance/domain/attendance_models.dar
 
 class MockAttendanceRepository extends Mock implements AttendanceRepository {}
 
+const rosterVersionA =
+    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const rosterVersionB =
+    'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+
 void main() {
   late MockAttendanceRepository repository;
 
@@ -33,6 +38,7 @@ void main() {
     registerFallbackValue(DateTime(2026));
     registerFallbackValue(assignedClass);
     registerFallbackValue(<AttendanceStudentEntry>[]);
+    registerFallbackValue(<TeacherClassSection>[]);
     registerFallbackValue(AttendanceDraftReceiptState.local);
   });
 
@@ -65,9 +71,13 @@ void main() {
           conflictStatus: 'NONE',
         ),
         isWorkingDay: true,
+        rosterVersion: rosterVersionA,
         lastUpdated: DateTime(2026, 6, 18, 8),
       ),
     );
+    when(
+      () => repository.syncQueuedAttendanceDrafts(any()),
+    ).thenAnswer((_) async {});
   });
 
   test(
@@ -244,6 +254,7 @@ void main() {
             conflictStatus: 'NONE',
           ),
           isWorkingDay: true,
+          rosterVersion: rosterVersionA,
           lastUpdated: DateTime(2026, 6, 18, 8),
         ),
       );
@@ -265,7 +276,12 @@ void main() {
     () async {
       final submitCompleter = Completer<TeacherAttendanceSubmitResult>();
       when(
-        () => repository.saveDraftAttendanceLocally(any(), any(), any()),
+        () => repository.saveDraftAttendanceLocally(
+          any(),
+          any(),
+          any(),
+          expectedRosterVersion: any(named: 'expectedRosterVersion'),
+        ),
       ).thenAnswer(
         (_) async => TeacherAttendanceDraft(
           clientSubmissionId: 'mobile-submit-1',
@@ -305,7 +321,12 @@ void main() {
 
   test('offline submit queues a draft without calling the server', () async {
     when(
-      () => repository.saveDraftAttendanceLocally(any(), any(), any()),
+      () => repository.saveDraftAttendanceLocally(
+        any(),
+        any(),
+        any(),
+        expectedRosterVersion: any(named: 'expectedRosterVersion'),
+      ),
     ).thenAnswer(
       (_) async => TeacherAttendanceDraft(
         clientSubmissionId: 'mobile-offline-1',
@@ -316,6 +337,23 @@ void main() {
     when(
       () => repository.discardDraftAttendance(any(), any()),
     ).thenAnswer((_) async {});
+    when(
+      () => repository.markDraftReceiptState(
+        any(),
+        any(),
+        any(),
+        clientSubmissionId: any(named: 'clientSubmissionId'),
+        receiptState: AttendanceDraftReceiptState.queued,
+      ),
+    ).thenAnswer(
+      (_) async => TeacherAttendanceDraft(
+        clientSubmissionId: 'mobile-offline-1',
+        savedAt: DateTime(2026, 6, 18, 8),
+        entries: entries,
+        expectedRosterVersion: rosterVersionA,
+        receiptState: AttendanceDraftReceiptState.queued,
+      ),
+    );
     final controller = TeacherAttendanceController(
       repository: repository,
       isOnline: false,
@@ -332,13 +370,19 @@ void main() {
     );
 
     await controller.discardDraft();
-    expect(controller.state.hasUnsavedChanges, isFalse);
-    expect(controller.state.entries.single.status, AttendanceStatus.present);
+    expect(controller.state.hasUnsavedChanges, isTrue);
+    expect(controller.state.entries.single.status, AttendanceStatus.absent);
+    verifyNever(() => repository.discardDraftAttendance(any(), any()));
   });
 
   test('attendance changes autosave to a stable device draft', () async {
     when(
-      () => repository.saveDraftAttendanceLocally(any(), any(), any()),
+      () => repository.saveDraftAttendanceLocally(
+        any(),
+        any(),
+        any(),
+        expectedRosterVersion: any(named: 'expectedRosterVersion'),
+      ),
     ).thenAnswer(
       (_) async => TeacherAttendanceDraft(
         clientSubmissionId: 'mobile-autosave-1',
@@ -357,17 +401,27 @@ void main() {
     await _waitForDraft(controller);
 
     verify(
-      () => repository.saveDraftAttendanceLocally(any(), any(), any()),
+      () => repository.saveDraftAttendanceLocally(
+        any(),
+        any(),
+        any(),
+        expectedRosterVersion: rosterVersionA,
+      ),
     ).called(1);
     expect(controller.state.hasUnsavedChanges, isTrue);
-    expect(controller.state.syncStatus, AttendanceSyncStatus.queued);
+    expect(controller.state.syncStatus, AttendanceSyncStatus.draft);
     expect(controller.state.draftClientSubmissionId, 'mobile-autosave-1');
-    expect(controller.state.message, contains('Reconnect'));
+    expect(controller.state.message, contains('not queued or submitted'));
   });
 
   test('online sync failure keeps the saved draft retryable', () async {
     when(
-      () => repository.saveDraftAttendanceLocally(any(), any(), any()),
+      () => repository.saveDraftAttendanceLocally(
+        any(),
+        any(),
+        any(),
+        expectedRosterVersion: any(named: 'expectedRosterVersion'),
+      ),
     ).thenAnswer(
       (_) async => TeacherAttendanceDraft(
         clientSubmissionId: 'mobile-retry-1',
@@ -424,7 +478,12 @@ void main() {
     'PROCESSING receipt exposes a server-check state and keeps draft',
     () async {
       when(
-        () => repository.saveDraftAttendanceLocally(any(), any(), any()),
+        () => repository.saveDraftAttendanceLocally(
+          any(),
+          any(),
+          any(),
+          expectedRosterVersion: any(named: 'expectedRosterVersion'),
+        ),
       ).thenAnswer(
         (_) async => TeacherAttendanceDraft(
           clientSubmissionId: 'mobile-processing-1',
@@ -472,7 +531,12 @@ void main() {
     'REJECTED receipt keeps the draft in a reviewable failed state',
     () async {
       when(
-        () => repository.saveDraftAttendanceLocally(any(), any(), any()),
+        () => repository.saveDraftAttendanceLocally(
+          any(),
+          any(),
+          any(),
+          expectedRosterVersion: any(named: 'expectedRosterVersion'),
+        ),
       ).thenAnswer(
         (_) async => TeacherAttendanceDraft(
           clientSubmissionId: 'mobile-rejected-1',
@@ -512,7 +576,12 @@ void main() {
       controller.markStudent('student-1', AttendanceStatus.late);
       expect(controller.state.entries.single.status, AttendanceStatus.late);
       when(
-        () => repository.saveDraftAttendanceLocally(any(), any(), any()),
+        () => repository.saveDraftAttendanceLocally(
+          any(),
+          any(),
+          any(),
+          expectedRosterVersion: any(named: 'expectedRosterVersion'),
+        ),
       ).thenAnswer(
         (_) async => TeacherAttendanceDraft(
           clientSubmissionId: 'mobile-rejected-2',
@@ -557,7 +626,12 @@ void main() {
     'receipt persistence failure remains locked despite a REJECTED response',
     () async {
       when(
-        () => repository.saveDraftAttendanceLocally(any(), any(), any()),
+        () => repository.saveDraftAttendanceLocally(
+          any(),
+          any(),
+          any(),
+          expectedRosterVersion: any(named: 'expectedRosterVersion'),
+        ),
       ).thenAnswer(
         (_) async => TeacherAttendanceDraft(
           clientSubmissionId: 'mobile-receipt-storage-1',
@@ -604,6 +678,7 @@ void main() {
         (_) async => TeacherAttendanceDraft(
           clientSubmissionId: 'mobile-processing-reload-1',
           savedAt: DateTime(2026, 6, 18, 8),
+          expectedRosterVersion: rosterVersionA,
           entries: const [
             AttendanceStudentEntry(
               studentId: 'student-1',
@@ -616,11 +691,17 @@ void main() {
         ),
       );
       when(
-        () => repository.saveDraftAttendanceLocally(any(), any(), any()),
+        () => repository.saveDraftAttendanceLocally(
+          any(),
+          any(),
+          any(),
+          expectedRosterVersion: any(named: 'expectedRosterVersion'),
+        ),
       ).thenAnswer(
         (_) async => TeacherAttendanceDraft(
           clientSubmissionId: 'mobile-processing-reload-1',
           savedAt: DateTime(2026, 6, 18, 8),
+          expectedRosterVersion: rosterVersionA,
           entries: const [
             AttendanceStudentEntry(
               studentId: 'student-1',
@@ -718,7 +799,12 @@ void main() {
       '${denial.runtimeType} learned during sync strictly purges local scope',
       () async {
         when(
-          () => repository.saveDraftAttendanceLocally(any(), any(), any()),
+          () => repository.saveDraftAttendanceLocally(
+            any(),
+            any(),
+            any(),
+            expectedRosterVersion: any(named: 'expectedRosterVersion'),
+          ),
         ).thenAnswer(
           (_) async => TeacherAttendanceDraft(
             clientSubmissionId: 'mobile-denied-1',
@@ -754,6 +840,97 @@ void main() {
         expect(controller.state.classes, isEmpty);
         expect(controller.state.entries, isEmpty);
         expect(controller.state.draftClientSubmissionId, isNull);
+      },
+    );
+  }
+
+  for (final draftRosterVersion in <String?>[null, rosterVersionB]) {
+    test(
+      '${draftRosterVersion == null ? 'legacy' : 'stale'} draft is locked for explicit discard and recreated with a new roster-bound ID',
+      () async {
+        when(() => repository.loadDraftAttendance(any(), any())).thenAnswer(
+          (_) async => TeacherAttendanceDraft(
+            clientSubmissionId: 'mobile-old-roster-1',
+            savedAt: DateTime(2026, 6, 18, 7),
+            expectedRosterVersion: draftRosterVersion,
+            entries: const [
+              AttendanceStudentEntry(
+                studentId: 'student-1',
+                studentName: 'Asha Sharma',
+                rollNumber: '7',
+                status: AttendanceStatus.absent,
+              ),
+            ],
+          ),
+        );
+        when(
+          () => repository.discardDraftAttendance(any(), any()),
+        ).thenAnswer((_) async {});
+        when(
+          () => repository.saveDraftAttendanceLocally(
+            any(),
+            any(),
+            any(),
+            expectedRosterVersion: any(named: 'expectedRosterVersion'),
+          ),
+        ).thenAnswer(
+          (_) async => TeacherAttendanceDraft(
+            clientSubmissionId: 'mobile-new-roster-2',
+            savedAt: DateTime(2026, 6, 18, 8),
+            expectedRosterVersion: rosterVersionA,
+            entries: const [
+              AttendanceStudentEntry(
+                studentId: 'student-1',
+                studentName: 'Asha Sharma',
+                rollNumber: '7',
+                status: AttendanceStatus.absent,
+              ),
+            ],
+          ),
+        );
+
+        final controller = TeacherAttendanceController(
+          repository: repository,
+          isOnline: true,
+          draftSaveDelay: Duration.zero,
+        );
+        await _waitForLoad(controller);
+
+        expect(controller.state.requiresRosterReview, isTrue);
+        expect(controller.state.isEditingLocked, isTrue);
+        expect(controller.state.message, contains('Discard'));
+        controller.markStudent('student-1', AttendanceStatus.late);
+        expect(controller.state.entries.single.status, AttendanceStatus.absent);
+
+        await controller.submit();
+        verifyNever(
+          () => repository.submitAttendance(any(), any(), any(), any(), any()),
+        );
+
+        await controller.discardDraft();
+        expect(controller.state.requiresRosterReview, isFalse);
+        expect(controller.state.draftClientSubmissionId, isNull);
+        expect(
+          controller.state.entries.single.status,
+          AttendanceStatus.present,
+        );
+
+        controller.markStudent('student-1', AttendanceStatus.absent);
+        await _waitForDraft(controller);
+
+        verify(
+          () => repository.saveDraftAttendanceLocally(
+            any(),
+            any(),
+            any(),
+            expectedRosterVersion: rosterVersionA,
+          ),
+        ).called(1);
+        expect(controller.state.draftClientSubmissionId, 'mobile-new-roster-2');
+        expect(
+          controller.state.draftClientSubmissionId,
+          isNot('mobile-old-roster-1'),
+        );
       },
     );
   }

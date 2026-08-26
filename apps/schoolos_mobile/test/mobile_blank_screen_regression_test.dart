@@ -39,10 +39,16 @@ import 'package:schoolos_mobile/shared/widgets/app_card.dart';
 
 class _MockAttendanceRepository extends Mock implements AttendanceRepository {}
 
+const _attendanceRosterVersion =
+    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+
 void _stubTeacherAttendanceScope(_MockAttendanceRepository repository) {
   when(
     () => repository.refreshTeacherAttendanceScope(),
   ).thenAnswer((_) async => TeacherAttendanceScopeRefresh.unchanged);
+  when(
+    () => repository.syncQueuedAttendanceDrafts(any()),
+  ).thenAnswer((_) async {});
 }
 
 class _MockConnectivity extends Mock implements Connectivity {}
@@ -139,6 +145,7 @@ void main() {
   setUpAll(() {
     registerFallbackValue(DateTime(2026));
     registerFallbackValue(assignedClass);
+    registerFallbackValue(<TeacherClassSection>[]);
   });
 
   setUp(() {
@@ -706,6 +713,7 @@ void main() {
           conflictStatus: 'NONE',
         ),
         isWorkingDay: true,
+        rosterVersion: _attendanceRosterVersion,
         lastUpdated: DateTime(2026, 6, 19, 8),
       ),
     );
@@ -762,6 +770,7 @@ void main() {
           conflictStatus: 'NONE',
         ),
         isWorkingDay: true,
+        rosterVersion: _attendanceRosterVersion,
         lastUpdated: DateTime(2026, 6, 19, 8),
       ),
     );
@@ -825,6 +834,7 @@ void main() {
           conflictStatus: 'NONE',
         ),
         isWorkingDay: true,
+        rosterVersion: _attendanceRosterVersion,
         lastUpdated: DateTime(2026, 6, 19, 8),
       ),
     );
@@ -927,6 +937,7 @@ void main() {
           conflictStatus: 'NONE',
         ),
         isWorkingDay: true,
+        rosterVersion: _attendanceRosterVersion,
         lastUpdated: DateTime(2026, 6, 19, 8),
       ),
     );
@@ -1020,6 +1031,7 @@ void main() {
             conflictStatus: 'NONE',
           ),
           isWorkingDay: true,
+          rosterVersion: _attendanceRosterVersion,
           lastUpdated: DateTime(2026, 6, 19, 8),
         ),
       );
@@ -1130,6 +1142,7 @@ void main() {
             conflictStatus: 'NONE',
           ),
           isWorkingDay: true,
+          rosterVersion: _attendanceRosterVersion,
           lastUpdated: DateTime(2026, 6, 19, 8),
         );
       });
@@ -1458,12 +1471,12 @@ void main() {
 
     expect(
       find.text(
-        'You are offline. Homework is read-only until the connection returns.',
+        'You are offline. Homework drafts can be queued on this phone. Publishing still needs a connection.',
       ),
       findsOneWidget,
     );
-    expect(find.byType(FloatingActionButton), findsNothing);
-    expect(find.text('Create homework'), findsNothing);
+    expect(find.byType(FloatingActionButton), findsOneWidget);
+    expect(find.text('Create homework'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -1706,6 +1719,7 @@ void main() {
               subjectName: 'Science',
               startsAt: '09:00',
               endsAt: '09:45',
+              coverageStatus: TeacherPeriodCoverageStatus.substituting,
             ),
           ],
           classes: const [],
@@ -1759,6 +1773,7 @@ void main() {
 
       expect(find.text('Grade 8 - B'), findsWidgets);
       expect(find.textContaining('Science'), findsWidgets);
+      expect(find.text('You are substituting for this period'), findsWidgets);
       expect(find.text('No classes are assigned'), findsNothing);
       expect(find.text('Attendance classes'), findsNothing);
       expect(tester.takeException(), isNull);

@@ -24,6 +24,7 @@ describe("attendance draft access revocation receipt", () => {
         serverSessionId: "session-1",
         serverSubmittedAt: "2026-08-24T08:01:00.000Z",
         lastSyncStatus: "PROCESSING",
+        authorizationVersion: "7",
       },
       "AUTHORIZATION_DENIED",
     );
@@ -40,6 +41,7 @@ describe("attendance draft access revocation receipt", () => {
       serverSessionId: null,
       serverSubmittedAt: null,
       lastSyncStatus: "AUTHORIZATION_DENIED",
+      authorizationVersion: "7",
     });
     assert.equal("academicYearLabel" in receipt, false);
     assert.equal("classLabel" in receipt, false);

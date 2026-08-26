@@ -151,15 +151,18 @@ jobs:
       - name: API e2e tests
         run: pnpm test:e2e
 
+      - name: Migrate database
+        run: pnpm --filter @schoolos/api exec prisma migrate deploy
+
+      - name: API integration tests
+        run: pnpm test:integration
+
       - name: Build
         run: pnpm build
 
-      - name: Migrate and seed e2e database
+      - name: Seed e2e database
         if: steps.changes.outputs.web == 'true'
-        run: |
-          pnpm db:generate
-          pnpm --filter @schoolos/api exec prisma migrate deploy
-          pnpm db:seed
+        run: pnpm db:seed
 
       - name: Start API server for e2e
         if: steps.changes.outputs.web == 'true'

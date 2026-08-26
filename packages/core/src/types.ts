@@ -1080,6 +1080,7 @@ export type MarkEntrySummary = {
     | "RETEST";
   remarks: string | null;
   isLocked: boolean;
+  updatedAt?: string;
   student?: StudentProfile;
   subject?: SubjectSummary;
   assessmentComponent?: AssessmentComponentSummary;
@@ -2018,6 +2019,8 @@ export type AttendanceRoster = {
   class: ClassSummary;
   section: SectionSummary | null;
   attendanceDate: string;
+  /** Opaque server snapshot used to fence offline attendance submissions. */
+  rosterVersion: string;
   calendarDay: AttendanceCalendarDayView;
   attendanceState: {
     submittedAt: string | null;
@@ -6341,6 +6344,62 @@ export type SiblingGroup = {
     studentId: string;
     relationLabel: string | null;
   }>;
+};
+
+
+// ─── Compiled from types/sync.ts ───
+/**
+ * Shared offline mutation envelope. Domain payloads sit beside these fields.
+ * Attendance uses `clientSubmissionId` as `operationId` and teacher
+ * `scopeVersion` as `authorizationVersion`.
+ */
+export type OfflineSyncEnvelope = {
+  operationId: string;
+  authorizationVersion?: string;
+  expectedVersion?: string;
+  authorityNodeId?: string;
+  authorityEpoch?: number;
+};
+
+export type OfflineSyncReceiptStatus =
+  | "PROCESSING"
+  | "ACCEPTED"
+  | "SYNCED"
+  | "CONFLICTED"
+  | "REJECTED";
+
+export type OfflineSyncReceipt = {
+  operationId: string;
+  syncStatus: OfflineSyncReceiptStatus;
+  replayed: boolean;
+  rejectionReason: string | null;
+};
+
+export type OfflineOutboxModule =
+  | "attendance"
+  | "homework"
+  | "notices"
+  | "fees"
+  | "marks";
+
+export type OfflineOutboxStatus =
+  | "queued"
+  | "syncing"
+  | "accepted"
+  | "rejected"
+  | "conflicted"
+  | "revoked";
+
+export type OfflineOutboxRecord = OfflineSyncEnvelope & {
+  module: OfflineOutboxModule;
+  status: OfflineOutboxStatus;
+  replayed?: boolean;
+  rejectionReason?: string | null;
+};
+
+export type SchoolAuthorityFence = {
+  authorityNodeId: string;
+  authorityEpoch: number;
 };
 
 

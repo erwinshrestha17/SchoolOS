@@ -35,6 +35,7 @@ function createController() {
     reviewLeaveRequest: jest.fn(),
     submitAttendance: jest.fn(),
     syncAttendance: jest.fn(),
+    getScopeVersion: jest.fn(),
     overrideLockedSession: jest.fn(),
     reviewConflict: jest.fn(),
     createCorrectionRequest: jest.fn(),
@@ -231,5 +232,15 @@ describe('AttendanceController M2 contracts', () => {
 
     expect(service.syncAttendance).toHaveBeenCalledWith(dto, actor);
     expect(result).toEqual({ clientSubmissionId: 'draft-1' });
+  });
+
+  it('delegates teacher attendance scope-version reads', () => {
+    const { controller, service } = createController();
+    service.getScopeVersion.mockReturnValue({ scopeVersion: '7' });
+
+    const result = controller.getScopeVersion(actor);
+
+    expect(service.getScopeVersion).toHaveBeenCalledWith(actor);
+    expect(result).toEqual({ scopeVersion: '7' });
   });
 });

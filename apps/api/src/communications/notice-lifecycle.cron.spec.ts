@@ -84,6 +84,10 @@ describe('NoticeLifecycleCron', () => {
     expect(communicationsService.processExpiredNotices).toHaveBeenCalledWith(
       expect.objectContaining({ userId: 'user-1', tenantId: 'tenant-1' }),
     );
+    expect(prisma.runWithTenantScope).toHaveBeenCalledWith(
+      'tenant-1',
+      expect.any(Function),
+    );
   });
 
   it('skips a tenant with no active user without throwing', async () => {

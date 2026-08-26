@@ -36,7 +36,19 @@ import {
 import {
   createAccessRevocationReceipt,
   createPurposeLimitedAttendanceReceipt,
+  isAttendanceScopeRevokedRejection,
 } from "@/lib/attendance-draft-access-revocation";
+import {
+  outboxStatusFromSyncReceipt,
+  toOfflineSyncEnvelope,
+  upsertOfflineOutboxRecord,
+} from "@/lib/offline-sync-outbox";
+import { withOfflineReadCache } from "@/lib/offline-read-cache";
+import { storeSchoolAuthorityFence } from "@/lib/school-authority-discovery";
+import {
+  decideAttendanceRosterReplay,
+  normalizeAttendanceRosterVersion,
+} from "@/lib/attendance-roster-version";
 import { SectionCard } from "@/components/ui/section-card";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { AttendanceHeader } from "@/components/attendance/attendance-header";
@@ -150,6 +162,15 @@ export function AttendanceForm({
   const [draftClientSubmissionId, setDraftClientSubmissionId] = useState<
     string | null
   >(null);
+  const [draftAuthorizationVersion, setDraftAuthorizationVersion] = useState<
+    string | null
+  >(null);
+  const [draftRosterVersion, setDraftRosterVersion] = useState<string | null>(
+    null,
+  );
+  const [draftRejectionReason, setDraftRejectionReason] = useState<
+    string | null
+  >(null);
   const [conflictMessage, setConflictMessage] = useState("");
   const [syncResultMessage, setSyncResultMessage] = useState("");
   const [lastServerSyncStatus, setLastServerSyncStatus] = useState<
@@ -256,18 +277,62 @@ export function AttendanceForm({
       attendanceDate,
     ],
     queryFn: () =>
-      api.getAttendanceRoster({
-        academicYearId: academicYearId || undefined,
-        classId,
-        sectionId: sectionId || null,
-        attendanceDate: new Date(attendanceDate).toISOString(),
-      }),
+      withOfflineReadCache(
+        [
+          "attendance-roster",
+          session?.tenant?.id ?? "",
+          session?.user.id ?? "",
+          academicYearId,
+          classId,
+          sectionId,
+          attendanceDate,
+        ].join(":"),
+        session?.tenant?.id && session.user.id
+          ? { tenantId: session.tenant.id, userId: session.user.id }
+          : null,
+        () =>
+          api.getAttendanceRoster({
+            academicYearId: academicYearId || undefined,
+            classId,
+            sectionId: sectionId || null,
+            attendanceDate: new Date(attendanceDate).toISOString(),
+          }),
+      ),
     enabled: Boolean(
       (academicYearId || yearListUnavailable) &&
       classId &&
       !isFutureDate(attendanceDate),
     ),
   });
+
+  const scopeVersionQuery = useQuery({
+    queryKey: ["attendance-scope-version"],
+    queryFn: api.getAttendanceScopeVersion,
+    enabled: Boolean(session?.user.id),
+    staleTime: 60_000,
+  });
+
+  const authorityQuery = useQuery({
+    queryKey: ["sync-authority"],
+    queryFn: api.getSyncAuthority,
+    enabled: Boolean(session?.user.id),
+    staleTime: 60_000,
+  });
+  useEffect(() => {
+    if (authorityQuery.data) {
+      storeSchoolAuthorityFence(authorityQuery.data);
+    }
+  }, [authorityQuery.data]);
+  const resolvedAuthorizationVersion =
+    draftAuthorizationVersion ??
+    scopeVersionQuery.data?.scopeVersion ??
+    null;
+
+  useEffect(() => {
+    if (!draftAuthorizationVersion && scopeVersionQuery.data?.scopeVersion) {
+      setDraftAuthorizationVersion(scopeVersionQuery.data.scopeVersion);
+    }
+  }, [draftAuthorizationVersion, scopeVersionQuery.data?.scopeVersion]);
 
   const draftKey = useMemo(() => {
     if (
@@ -490,6 +555,11 @@ export function AttendanceForm({
           }
           if (cancelled) return;
           setDraftClientSubmissionId(sanitizedReceipt.clientSubmissionId);
+          setDraftAuthorizationVersion(
+            sanitizedReceipt.authorizationVersion ?? null,
+          );
+          setDraftRosterVersion(null);
+          setDraftRejectionReason(null);
           setExceptions({});
           setRemarks({});
           setBaselineExceptions({});
@@ -516,6 +586,8 @@ export function AttendanceForm({
 
         if (["ACCEPTED", "SYNCED", "CONFLICTED"].includes(storedSyncStatus)) {
           setDraftClientSubmissionId(null);
+          setDraftRosterVersion(null);
+          setDraftRejectionReason(null);
           setExceptions({});
           setRemarks({});
           setBaselineExceptions({});
@@ -541,6 +613,12 @@ export function AttendanceForm({
         }
 
         setDraftClientSubmissionId(localDraft.clientSubmissionId);
+        setDraftAuthorizationVersion(localDraft.authorizationVersion ?? null);
+        const storedRosterVersion = normalizeAttendanceRosterVersion(
+          localDraft.expectedRosterVersion,
+        );
+        setDraftRosterVersion(storedRosterVersion);
+        setDraftRejectionReason(localDraft.rejectionReason ?? null);
         setExceptions(
           localDraft.exceptions as Record<string, AttendanceStatus>,
         );
@@ -551,7 +629,30 @@ export function AttendanceForm({
           isReceiptProtectedFinalSubmissionStatus(storedSyncStatus) &&
             navigator.onLine !== false,
         );
-        if (storedSyncStatus === "REJECTED") {
+        const restoredRosterDecision = decideAttendanceRosterReplay({
+          draftRosterVersion: storedRosterVersion,
+          currentRosterVersion: rosterQuery.data?.rosterVersion,
+          isProtectedReceiptReplay:
+            isReceiptProtectedFinalSubmissionStatus(storedSyncStatus),
+        });
+        if (
+          !restoredRosterDecision.allowed ||
+          localDraft.rejectionReason === "ROSTER_MISMATCH"
+        ) {
+          setDraftSyncState("conflict");
+          setConflictMessage(
+            restoredRosterDecision.allowed
+              ? "SchoolOS rejected this submission because the class roster changed. Review its local changes, then use the current server roster to create a new submission."
+              : restoredRosterDecision.reason === "missing_draft_version"
+              ? "This saved draft predates roster verification. Review its local changes, then use the current server roster to create a new submission."
+                : restoredRosterDecision.reason === "current_roster_unavailable"
+                  ? "SchoolOS cannot verify the current class roster. Reconnect and reload before creating a new submission."
+                  : "The class roster changed after this draft was saved. Review the local changes, then use the current server roster to create a new submission.",
+          );
+          setSyncResultMessage(
+            "SchoolOS will not reinterpret this draft against a different class roster.",
+          );
+        } else if (storedSyncStatus === "REJECTED") {
           setDraftSyncState("rejected");
           setSyncResultMessage(
             "SchoolOS did not accept this attendance. Review and change the local draft before sending a revised submission.",
@@ -559,7 +660,7 @@ export function AttendanceForm({
         } else if (storedSyncStatus === "QUEUED") {
           setDraftSyncState("queued");
           setSyncResultMessage(
-            "Final submission queued on this browser. It is not submitted yet. Keep this class and date open for automatic retry, or return to this saved draft later.",
+            "Queued on this browser — not submitted. Keep this class and date open for automatic retry, or return to this saved draft later.",
           );
         } else if (
           storedSyncStatus &&
@@ -586,10 +687,24 @@ export function AttendanceForm({
         return;
       }
 
+      const currentRosterVersion = normalizeAttendanceRosterVersion(
+        rosterQuery.data.rosterVersion,
+      );
       setDraftClientSubmissionId(createAttendanceDraftSubmissionId());
+      setDraftRosterVersion(currentRosterVersion);
+      setDraftRejectionReason(null);
       setDraftSavedAt(null);
-      setDraftSyncState("idle");
-      setSyncResultMessage("");
+      setDraftSyncState(currentRosterVersion ? "idle" : "conflict");
+      setConflictMessage(
+        currentRosterVersion
+          ? ""
+          : "SchoolOS cannot verify this roster snapshot. Reconnect and reload before saving or submitting attendance.",
+      );
+      setSyncResultMessage(
+        currentRosterVersion
+          ? ""
+          : "The roster remains visible for review, but no final submission can be created without a server roster version.",
+      );
       setLastServerSyncStatus(null);
       setShouldReplayRecoveredFinalSubmission(false);
 
@@ -668,6 +783,9 @@ export function AttendanceForm({
       serverSubmittedAt:
         rosterQuery.data?.existingSession?.submittedAt ?? null,
       lastSyncStatus: "ACCESS_REVALIDATION_REQUIRED",
+      ...(draftRosterVersion
+        ? { expectedRosterVersion: draftRosterVersion }
+        : {}),
     };
 
     setLastServerSyncStatus("ACCESS_REVALIDATION_REQUIRED");
@@ -710,6 +828,7 @@ export function AttendanceForm({
     draftClientSubmissionId,
     draftKey,
     draftSavedAt,
+    draftRosterVersion,
     exceptions,
     purgeRevokedRosterData,
     remarks,
@@ -759,6 +878,13 @@ export function AttendanceForm({
       serverSessionId: rosterQuery.data?.existingSession?.id ?? null,
       serverSubmittedAt: rosterQuery.data?.existingSession?.submittedAt ?? null,
       lastSyncStatus: lastServerSyncStatus ?? undefined,
+      rejectionReason: draftRejectionReason,
+      ...(resolvedAuthorizationVersion
+        ? { authorizationVersion: resolvedAuthorizationVersion }
+        : {}),
+      ...(draftRosterVersion
+        ? { expectedRosterVersion: draftRosterVersion }
+        : {}),
     };
 
     let cancelled = false;
@@ -824,6 +950,8 @@ export function AttendanceForm({
     draftClientSubmissionId,
     draftScopeHydrated,
     draftSyncState,
+    draftRejectionReason,
+    draftRosterVersion,
     exceptions,
     hasDraftChanges,
     isReceiptSyncPending,
@@ -835,6 +963,7 @@ export function AttendanceForm({
     rosterQuery.data?.existingSession?.id,
     rosterQuery.data?.existingSession?.submittedAt,
     rosterQuery.data?.section?.name,
+    resolvedAuthorizationVersion,
     sectionId,
   ]);
 
@@ -1034,6 +1163,7 @@ export function AttendanceForm({
     }
     if (draftSyncState === "rejected") {
       setDraftClientSubmissionId(createAttendanceDraftSubmissionId());
+      setDraftRejectionReason(null);
       setDraftSyncState("saved_local");
       setSyncResultMessage("");
       setLastServerSyncStatus(null);
@@ -1066,6 +1196,7 @@ export function AttendanceForm({
       })),
       savedAt: draftSavedAt ?? new Date().toISOString(),
       rosterCount: roster.length,
+      expectedRosterVersion: draftRosterVersion,
     },
   });
 
@@ -1125,6 +1256,9 @@ export function AttendanceForm({
             savedAt: draftSavedAt,
             serverSessionId: null,
             serverSubmittedAt: null,
+            ...(draftRosterVersion
+              ? { expectedRosterVersion: draftRosterVersion }
+              : {}),
           },
           "ACCESS_REVALIDATION_REQUIRED",
         );
@@ -1190,6 +1324,25 @@ export function AttendanceForm({
     const isReceiptReplay = isReceiptProtectedFinalSubmissionStatus(
       previousLastServerSyncStatus,
     );
+    const rosterReplayDecision = decideAttendanceRosterReplay({
+      draftRosterVersion,
+      currentRosterVersion: rosterQuery.data?.rosterVersion,
+      isProtectedReceiptReplay: isReceiptReplay,
+    });
+    if (!rosterReplayDecision.allowed) {
+      setDraftSyncState("conflict");
+      setConflictMessage(
+        rosterReplayDecision.reason === "missing_draft_version"
+          ? "This saved draft has no verified roster snapshot. Review its local changes, then use the current server roster to create a new submission."
+          : rosterReplayDecision.reason === "current_roster_unavailable"
+            ? "SchoolOS cannot verify the current class roster. Reconnect and reload before creating a new submission."
+            : "The class roster changed after this draft was saved. Review its local changes, then use the current server roster to create a new submission.",
+      );
+      setSyncResultMessage(
+        "SchoolOS did not send this draft because its original roster no longer matches the current roster.",
+      );
+      return;
+    }
     if (
       !isReceiptReplay &&
       hasReconnectConflict(rosterQuery.data?.existingSession, draftSavedAt)
@@ -1230,6 +1383,13 @@ export function AttendanceForm({
       serverSessionId: rosterQuery.data?.existingSession?.id ?? null,
       serverSubmittedAt: rosterQuery.data?.existingSession?.submittedAt ?? null,
       lastSyncStatus: "PROCESSING",
+      rejectionReason: null,
+      ...(resolvedAuthorizationVersion
+        ? { authorizationVersion: resolvedAuthorizationVersion }
+        : {}),
+      ...(draftRosterVersion
+        ? { expectedRosterVersion: draftRosterVersion }
+        : {}),
     };
 
     const persistQueuedFinalSubmission = async () => {
@@ -1254,13 +1414,24 @@ export function AttendanceForm({
       }
 
       if (!isSubmissionScopeCurrent()) return true;
+      void upsertOfflineOutboxRecord({
+        ...toOfflineSyncEnvelope({
+          operationId: draftClientSubmissionId,
+          authorizationVersion: resolvedAuthorizationVersion,
+          authorityNodeId: authorityQuery.data?.authorityNodeId,
+          authorityEpoch: authorityQuery.data?.authorityEpoch,
+        }),
+        module: "attendance",
+        status: "queued",
+        rejectionReason: null,
+      });
       setDraftSavedAt(receiptSavedAt);
       setHasDraftChanges(true);
       setLastServerSyncStatus("QUEUED");
       setDraftSyncState("queued");
       setSubmitMessage("");
       setSyncResultMessage(
-        "Final submission queued on this browser. It is not submitted yet. Keep this class and date open for automatic retry, or return to this saved draft later.",
+        "Queued on this browser — not submitted. Keep this class and date open for automatic retry, or return to this saved draft later.",
       );
       return true;
     };
@@ -1315,19 +1486,95 @@ export function AttendanceForm({
     try {
       const result = await syncMutation.mutateAsync({
         clientSubmissionId: draftClientSubmissionId,
-        deviceTimestamp: new Date().toISOString(),
+        deviceTimestamp: receiptSavedAt,
         academicYearId,
         classId,
         sectionId: sectionId || null,
         attendanceDate: new Date(attendanceDate).toISOString(),
+        ...(draftRosterVersion
+          ? { expectedRosterVersion: draftRosterVersion }
+          : {}),
         exceptions: Object.entries(exceptions).map(([studentId, status]) => ({
           studentId,
           status,
           remark: remarks[studentId]?.trim() || null,
         })),
+        ...(resolvedAuthorizationVersion
+          ? { authorizationVersion: resolvedAuthorizationVersion }
+          : {}),
+        ...(authorityQuery.data?.authorityNodeId
+          ? { authorityNodeId: authorityQuery.data.authorityNodeId }
+          : {}),
+        ...(authorityQuery.data?.authorityEpoch != null
+          ? { authorityEpoch: authorityQuery.data.authorityEpoch }
+          : {}),
       });
 
       const syncStatus = String(result?.syncStatus ?? "").toUpperCase();
+      void upsertOfflineOutboxRecord({
+        ...toOfflineSyncEnvelope({
+          operationId: draftClientSubmissionId,
+          authorizationVersion: resolvedAuthorizationVersion,
+          authorityNodeId: authorityQuery.data?.authorityNodeId,
+          authorityEpoch: authorityQuery.data?.authorityEpoch,
+        }),
+        module: "attendance",
+        status: isAttendanceScopeRevokedRejection(result?.rejectionReason)
+          ? "revoked"
+          : outboxStatusFromSyncReceipt(syncStatus),
+        replayed: Boolean(result?.replayed),
+        rejectionReason: result?.rejectionReason ?? null,
+      });
+
+      if (
+        syncStatus === "REJECTED" &&
+        isAttendanceScopeRevokedRejection(result?.rejectionReason)
+      ) {
+        if (!isSubmissionScopeCurrent()) return;
+        const deniedDraft = createAccessRevocationReceipt(
+          receiptProtectedDraft,
+          "AUTHORIZATION_DENIED",
+        );
+        setLastServerSyncStatus("AUTHORIZATION_DENIED");
+        setDraftSyncState("authorization_denied");
+        setSyncResultMessage(
+          "SchoolOS denied this final submission. No attendance was accepted. Student details were cleared while the browser saves a purpose-limited denial receipt.",
+        );
+        purgeRevokedRosterData();
+
+        try {
+          const storedDeniedDraft =
+            await sanitizeAttendanceDraftForAccessRevocation(
+              submissionDraftKey,
+              deniedDraft,
+              "AUTHORIZATION_DENIED",
+              { ticket: submissionStorageTicket },
+            );
+          if (!isSubmissionScopeCurrent()) return;
+          setDraftClientSubmissionId(storedDeniedDraft.clientSubmissionId);
+          setDraftAuthorizationVersion(
+            storedDeniedDraft.authorizationVersion ?? null,
+          );
+          setDraftSavedAt(storedDeniedDraft.savedAt);
+        } catch {
+          if (isSubmissionScopeCurrent()) {
+            setLastServerSyncStatus("AUTHORIZATION_DENIED");
+            setDraftSyncState("authorization_denied");
+            setSyncResultMessage(
+              "SchoolOS denied this final submission. No attendance was accepted, but the browser could not safely retain the purpose-limited denial receipt. Do not edit or resubmit this roster.",
+            );
+          }
+          return;
+        }
+
+        if (!isSubmissionScopeCurrent()) return;
+        setHasDraftChanges(false);
+        setSubmitMessage("");
+        setLastServerSyncStatus("AUTHORIZATION_DENIED");
+        setDraftSyncState("authorization_denied");
+        return;
+      }
+
       if (shouldClearLocalAttendanceDraft(syncStatus)) {
         if (!isSubmissionScopeCurrent()) return;
         let terminalReceiptPersisted = true;
@@ -1370,6 +1617,7 @@ export function AttendanceForm({
         const retainedDraft = {
           ...receiptProtectedDraft,
           lastSyncStatus: syncStatus || "UNKNOWN",
+          rejectionReason: result?.rejectionReason ?? null,
         };
 
         if (!isSubmissionScopeCurrent()) return;
@@ -1395,10 +1643,21 @@ export function AttendanceForm({
         setSubmitMessage("");
         setLastServerSyncStatus(syncStatus || "UNKNOWN");
         if (syncStatus === "REJECTED") {
-          setDraftSyncState("rejected");
-          setSyncResultMessage(
-            "SchoolOS rejected this final submission. No authoritative attendance was accepted. Review and change the local draft before sending a revised submission.",
-          );
+          setDraftRejectionReason(result?.rejectionReason ?? null);
+          if (result?.rejectionReason === "ROSTER_MISMATCH") {
+            setDraftSyncState("conflict");
+            setConflictMessage(
+              "SchoolOS rejected this submission because the class roster changed. Review the local changes, then use the current server roster to create a new submission.",
+            );
+            setSyncResultMessage(
+              "No authoritative attendance was accepted, and this draft will not be reinterpreted against the changed roster.",
+            );
+          } else {
+            setDraftSyncState("rejected");
+            setSyncResultMessage(
+              "SchoolOS rejected this final submission. No authoritative attendance was accepted. Review and change the local draft before sending a revised submission.",
+            );
+          }
         } else {
           setDraftSyncState("server_check");
           setSyncResultMessage(
@@ -1566,10 +1825,15 @@ export function AttendanceForm({
         queryKey: ["attendance-roster"],
       });
       setDraftClientSubmissionId(null);
+      setDraftRosterVersion(null);
+      setDraftRejectionReason(null);
       setDraftSavedAt(null);
       setLastServerSyncStatus(null);
-      setDraftSyncState("synced");
+      setDraftSyncState("idle");
       setConflictMessage("");
+      setSyncResultMessage("");
+      setHydratedDraftKey(null);
+      setDraftHydrationAttempt((attempt) => attempt + 1);
     } catch {
       setDraftSyncState("conflict");
       setConflictMessage(
@@ -1782,12 +2046,16 @@ export function AttendanceForm({
         >
           <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
             <div className="space-y-2">
-              <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
+              <label
+                htmlFor="attendance-academic-year"
+                className="ml-2 text-xs font-bold uppercase tracking-wider text-slate-700"
+              >
                 Academic Year
               </label>
               {yearListUnavailable ? (
                 <input
                   type="text"
+                  id="attendance-academic-year"
                   readOnly
                   disabled={scopeSelectionDisabled}
                   value={
@@ -1800,6 +2068,7 @@ export function AttendanceForm({
                 />
               ) : (
                 <select
+                  id="attendance-academic-year"
                   value={academicYearId}
                   disabled={scopeSelectionDisabled}
                   onChange={(e) => setAcademicYearId(e.target.value)}
@@ -1818,10 +2087,14 @@ export function AttendanceForm({
             </div>
 
             <div className="space-y-2">
-              <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
+              <label
+                htmlFor="attendance-class"
+                className="ml-2 text-xs font-bold uppercase tracking-wider text-slate-700"
+              >
                 Class
               </label>
               <select
+                id="attendance-class"
                 value={classId}
                 disabled={scopeSelectionDisabled}
                 onChange={(e) => {
@@ -1841,10 +2114,14 @@ export function AttendanceForm({
             </div>
 
             <div className="space-y-2">
-              <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
+              <label
+                htmlFor="attendance-section"
+                className="ml-2 text-xs font-bold uppercase tracking-wider text-slate-700"
+              >
                 Section
               </label>
               <select
+                id="attendance-section"
                 value={sectionId}
                 disabled={scopeSelectionDisabled}
                 onChange={(e) => setSectionId(e.target.value)}
@@ -1861,10 +2138,14 @@ export function AttendanceForm({
             </div>
 
             <div className="space-y-2">
-              <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
+              <label
+                htmlFor="attendance-date"
+                className="ml-2 text-xs font-bold uppercase tracking-wider text-slate-700"
+              >
                 Date
               </label>
               <input
+                id="attendance-date"
                 type="date"
                 value={attendanceDate}
                 disabled={scopeSelectionDisabled}
@@ -1876,10 +2157,14 @@ export function AttendanceForm({
             </div>
 
             <div className="space-y-2">
-              <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
+              <label
+                htmlFor="attendance-status-filter"
+                className="ml-2 text-xs font-bold uppercase tracking-wider text-slate-700"
+              >
                 Status
               </label>
               <select
+                id="attendance-status-filter"
                 value={statusFilter}
                 onChange={(e) =>
                   setStatusFilter(e.target.value as AttendanceStatusFilter)
@@ -1968,9 +2253,6 @@ export function AttendanceForm({
             resource="Attendance submission"
             showNavigation={false}
           />
-        ) : rosterQuery.isLoading ||
-          (Boolean(draftKey) && hydratedDraftKey !== draftKey) ? (
-          <LoadingState label="Loading roster..." />
         ) : rosterQuery.isError ? (
           rosterQuery.error instanceof ApiRequestError &&
           rosterQuery.error.statusCode === 403 ? (
@@ -1990,6 +2272,9 @@ export function AttendanceForm({
               onRetry={() => void rosterQuery.refetch()}
             />
           )
+        ) : rosterQuery.isLoading ||
+          (Boolean(draftKey) && hydratedDraftKey !== draftKey) ? (
+          <LoadingState label="Loading roster..." />
         ) : futureDateBlocked ? (
           <EmptyState
             title="Date Not Allowed"
@@ -2134,8 +2419,8 @@ export function AttendanceForm({
 
       {/* Summary Floating Bar */}
       {roster.length > 0 && draftScopeHydrated && !rosterDisclosureBlocked && (
-        <div className="animate-in slide-in-from-bottom-8 fixed bottom-8 left-1/2 z-50 flex -translate-x-1/2 items-center gap-8 rounded-xl border border-white/10 bg-[var(--color-mod-attendance-text)]/95 p-6 text-white shadow-[0_20px_50px_rgba(15,23,42,0.28)] backdrop-blur-xl duration-700">
-          <div className="flex items-center gap-8 px-4">
+        <div className="animate-in slide-in-from-bottom-8 fixed inset-x-4 bottom-4 z-50 flex max-w-4xl flex-col items-stretch gap-4 rounded-xl border border-white/10 bg-[var(--color-mod-attendance-text)]/95 p-4 text-white shadow-[0_20px_50px_rgba(15,23,42,0.28)] backdrop-blur-xl duration-700 sm:bottom-8 sm:left-1/2 sm:right-auto sm:w-[calc(100%-2rem)] sm:-translate-x-1/2 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-5 lg:w-auto lg:max-w-none lg:gap-8 lg:p-6">
+          <div className="grid grid-cols-4 items-center gap-3 sm:flex sm:gap-6 sm:px-2 lg:gap-8 lg:px-4">
             <SummaryStat
               label="Present"
               value={totals.present}
@@ -2151,9 +2436,9 @@ export function AttendanceForm({
               value={totals.late}
               color="text-warning-400"
             />
-            <div className="h-10 w-px bg-white/10 mx-2" />
+            <div className="hidden h-10 w-px bg-white/20 sm:block sm:mx-1 lg:mx-2" />
             <div className="flex flex-col">
-              <span className="text-[0.6rem] font-bold text-slate-500 uppercase tracking-[0.2em]">
+              <span className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-200">
                 Completion
               </span>
               <span className="text-xl font-black">{presentPercent}%</span>
@@ -2163,7 +2448,7 @@ export function AttendanceForm({
           <Button
             type="button"
             size="lg"
-            className="gap-3 bg-[var(--color-mod-attendance-accent)] px-10 shadow-lg shadow-[var(--color-mod-attendance-border)]/40 hover:bg-[var(--color-mod-attendance-text)] hover:scale-105 active:scale-95 disabled:hover:scale-100"
+            className="w-full gap-3 bg-[var(--color-mod-attendance-accent)] px-5 shadow-lg shadow-[var(--color-mod-attendance-border)]/40 hover:bg-[var(--color-mod-attendance-text)] active:scale-95 disabled:hover:scale-100 sm:w-auto sm:px-8 lg:px-10"
             onClick={() => {
               if (isOverrideMode) {
                 setIsOverrideConfirmOpen(true);
@@ -2207,7 +2492,7 @@ export function AttendanceForm({
                   : visibleDraftSyncState === "recorded_conflict"
                     ? "Conflict Recorded"
                     : visibleDraftSyncState === "queued"
-                      ? "Submission Queued"
+                      ? "Queued — Not Submitted"
                       : visibleDraftSyncState === "server_check"
                         ? "Checking Server"
                         : "Submit Attendance"}
@@ -2447,7 +2732,7 @@ function SummaryStat({
 }) {
   return (
     <div className="flex flex-col">
-      <span className="text-[0.6rem] font-bold text-slate-500 uppercase tracking-[0.2em]">
+      <span className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-200">
         {label}
       </span>
       <span className={cn("text-xl font-black", color)}>{value}</span>
@@ -2537,7 +2822,7 @@ function getDraftSyncLabel(
   if (state === "queued")
     return (
       syncResultMessage ||
-      "Final submission queued on this browser. It is not submitted yet."
+      "Queued on this browser — not submitted."
     );
   if (state === "syncing") return "Syncing attendance draft...";
   if (state === "retrying") return "Retrying attendance sync...";
@@ -2585,7 +2870,7 @@ function getDraftSyncLabel(
 
 function getDraftSyncHeading(state: DraftSyncState) {
   if (state === "accepted") return "Attendance submitted";
-  if (state === "queued") return "Queued on this browser";
+  if (state === "queued") return "Queued on this browser — not submitted";
   if (state === "server_check") return "Server confirmation required";
   if (state === "recorded_conflict" || state === "conflict")
     return "Attendance conflict";

@@ -273,6 +273,7 @@ export type MarkEntrySummary = {
     | "RETEST";
   remarks: string | null;
   isLocked: boolean;
+  updatedAt?: string;
   student?: StudentProfile;
   subject?: SubjectSummary;
   assessmentComponent?: AssessmentComponentSummary;

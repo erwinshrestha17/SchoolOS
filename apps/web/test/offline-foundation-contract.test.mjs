@@ -28,6 +28,7 @@ describe("offline-safe web foundation", () => {
     assert.match(session, /crypto\.randomUUID|crypto\?\.randomUUID/);
     assert.doesNotMatch(attendance, /Math\.random/);
     assert.match(attendance, /clientSubmissionId: draftClientSubmissionId/);
+    assert.match(attendance, /authorizationVersion: resolvedAuthorizationVersion/);
   });
 
   it("clears browser-private attendance drafts with the session", () => {
@@ -77,8 +78,8 @@ describe("offline-safe web foundation", () => {
       "components/platform/SupportOverrideBanner.tsx",
     );
 
-    assert.match(provider, /isConfirmedSessionFailure\(error\)/);
-    assert.match(provider, /statusForUnconfirmedSessionError/);
+    assert.match(provider, /isOfflineAuthLeaseValid/);
+    assert.match(provider, /storeOfflineAuthLease/);
     assert.match(provider, /"offline_locked"/);
     assert.match(provider, /"verification_failed"/);
     assert.match(provider, /window\.addEventListener\("online"/);
@@ -134,7 +135,7 @@ describe("offline-safe web foundation", () => {
     assert.match(workspace, /search\.set\("sectionId", draft\.sectionId\)/);
     assert.match(workspace, /Open saved scope/);
     assert.match(workspace, /draft\.academicYearLabel/);
-    assert.match(workspace, /Final submission queued/);
+    assert.match(workspace, /Queued — not submitted/);
     assert.match(workspace, /Pending confirmation/);
     assert.match(workspace, /Access denied/);
     assert.match(workspace, /Saved locally/);
@@ -256,7 +257,7 @@ describe("offline-safe web foundation", () => {
     const submissionFlow = sourceBetween(
       attendance,
       "const syncDraftSubmission = async () =>",
-      "const keepServerVersion = () =>",
+      "const keepServerVersion = async () =>",
     );
 
     assert.match(attendance, /const draftScopeHydrated = Boolean/);
@@ -282,7 +283,7 @@ describe("offline-safe web foundation", () => {
     const submissionFlow = sourceBetween(
       attendance,
       "const syncDraftSubmission = async () =>",
-      "const keepServerVersion = () =>",
+      "const keepServerVersion = async () =>",
     );
 
     assert.match(saveFlow, /serverDraftSaveInFlightRef\.current/);
@@ -323,10 +324,11 @@ describe("offline-safe web foundation", () => {
 
   it("routes the primary attendance confirmation through receipt-safe sync with one stable id", () => {
     const attendance = read("components/forms/attendance-form.tsx");
+    const attendanceApi = read("lib/api/attendance.ts");
     const submissionFlow = sourceBetween(
       attendance,
       "const syncDraftSubmission = async () =>",
-      "const keepServerVersion = () =>",
+      "const keepServerVersion = async () =>",
     );
     const primaryConfirmation = sourceBetween(
       attendance,
@@ -335,7 +337,8 @@ describe("offline-safe web foundation", () => {
     );
 
     assert.doesNotMatch(attendance, /api\.submitAttendance/);
-    assert.match(attendance, /mutationFn: api\.syncAttendance/);
+    assert.match(attendance, /getAttendanceScopeVersion/);
+    assert.match(attendanceApi, /getAttendanceScopeVersion/);
     assert.match(primaryConfirmation, /void syncDraftSubmission\(\)/);
     assert.doesNotMatch(primaryConfirmation, /\.mutate\(/);
     const receiptDraft = sourceBetween(
@@ -350,6 +353,7 @@ describe("offline-safe web foundation", () => {
     );
     assert.match(receiptDraft, /clientSubmissionId: draftClientSubmissionId/);
     assert.match(syncRequest, /clientSubmissionId: draftClientSubmissionId/);
+    assert.match(syncRequest, /authorizationVersion: resolvedAuthorizationVersion/);
     const receiptPersistIndex = submissionFlow.search(
       /await storeAttendanceDraft\(submissionDraftKey, receiptProtectedDraft, \{[\s\S]{0,100}ticket: submissionStorageTicket/,
     );
@@ -385,7 +389,7 @@ describe("offline-safe web foundation", () => {
     const submissionFlow = sourceBetween(
       attendance,
       "const syncDraftSubmission = async () =>",
-      "const keepServerVersion = () =>",
+      "const keepServerVersion = async () =>",
     );
     const reconnectFlow = sourceBetween(
       attendance,
@@ -420,7 +424,7 @@ describe("offline-safe web foundation", () => {
     const submissionFlow = sourceBetween(
       attendance,
       "const syncDraftSubmission = async () =>",
-      "const keepServerVersion = () =>",
+      "const keepServerVersion = async () =>",
     );
     const scopeControls = sourceBetween(
       attendance,
@@ -435,7 +439,7 @@ describe("offline-safe web foundation", () => {
     );
     assert.match(
       submissionFlow,
-      /clearAttendanceDraft\(submissionDraftKey, \{[\s\S]{0,80}ticket: submissionStorageTicket/,
+      /storeAttendanceDraft\(submissionDraftKey, terminalReceipt, \{[\s\S]{0,80}ticket: submissionStorageTicket/,
     );
     assert.ok(
       (submissionFlow.match(/isSubmissionScopeCurrent\(\)/g) ?? []).length >= 6,
@@ -501,7 +505,7 @@ describe("offline-safe web foundation", () => {
     const submissionFlow = sourceBetween(
       attendance,
       "const syncDraftSubmission = async () =>",
-      "const keepServerVersion = () =>",
+      "const keepServerVersion = async () =>",
     );
     const denialIndex = submissionFlow.indexOf(
       "error instanceof ApiRequestError && error.statusCode === 403",
@@ -534,7 +538,7 @@ describe("offline-safe web foundation", () => {
       "const draftRead = await readAttendanceDraft",
     );
     const rosterFallback = attendance.indexOf(
-      "if (!rosterQuery.data) return;",
+      "if (!rosterQuery.data) {",
       hydrationStart,
     );
 
@@ -547,6 +551,13 @@ describe("offline-safe web foundation", () => {
       attendance.slice(hydrationStart, rosterFallback),
       /setHydratedDraftKey\(draftKey\)/,
     );
+  });
+
+  it("preserves the original device timestamp while replaying attendance intent", () => {
+    const attendanceForm = read("components/forms/attendance-form.tsx");
+
+    assert.match(attendanceForm, /const receiptSavedAt = draftSavedAt \?\? new Date\(\)\.toISOString\(\)/);
+    assert.match(attendanceForm, /deviceTimestamp: receiptSavedAt/);
   });
 
   it("keeps recovered scope in the route and hides revoked scope state", () => {
@@ -589,6 +600,43 @@ describe("offline-safe web foundation", () => {
     assert.match(attendance, /submissionFeedbackRef\.current\?\.focus\(\)/);
     assert.match(attendance, /Attendance accepted by SchoolOS at/);
     assert.match(attendance, /recorded a conflict for office review/);
+    assert.match(attendance, /isAttendanceScopeRevokedRejection/);
     assert.match(attendance, /No authoritative attendance was accepted/);
+  });
+
+  it("keeps homework, notices, fees, and marks queued without fake success", () => {
+    const homework = read("components/homework/homework-create-form.tsx");
+    const notices = read("components/notices/notice-composer-workspace.tsx");
+    const review = read("components/notices/notice-review-workspace.tsx");
+    const fees = read("components/finance/collection-section.tsx");
+    const marks = read("components/academics/tabs/marks-entry-tab.tsx");
+
+    assert.match(homework, /clientOperationId: clientOperationId.current/);
+    assert.match(homework, /Publishing homework needs an internet connection/);
+    assert.match(homework, /It is not published/);
+    assert.match(notices, /module: "notices"/);
+    assert.match(notices, /It is not published/);
+    assert.match(
+      review,
+      /Publishing, scheduling, or requesting approval needs a connection/,
+    );
+    assert.match(fees, /Queued · pending connectivity/);
+    assert.match(fees, /It is not collected, issued, or fiscally confirmed/);
+    assert.doesNotMatch(fees, /setLastReceipt\(.*queued/);
+    assert.match(marks, /expectedVersion: String\(existing.updatedAt\)/);
+    assert.match(marks, /Queued · not published/);
+    assert.match(marks, /It is not published/);
+  });
+
+  it("discovers the school authority fence without treating Edge as implemented", () => {
+    const discovery = read("lib/school-authority-discovery.ts");
+    const attendance = read("components/forms/attendance-form.tsx");
+    const authApi = read("lib/api/auth.ts");
+
+    assert.match(authApi, /getSyncAuthority/);
+    assert.match(attendance, /storeSchoolAuthorityFence/);
+    assert.match(discovery, /authorityNodeId/);
+    assert.match(discovery, /authorityEpoch/);
+    assert.doesNotMatch(discovery, /fully offline/);
   });
 });

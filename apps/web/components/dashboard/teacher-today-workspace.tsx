@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import { useSession } from '@/components/session-provider';
+import { withOfflineReadCache } from '@/lib/offline-read-cache';
 import type {
   TeacherTodayAssignedClass,
   TeacherTodayPeriod,
@@ -40,9 +42,17 @@ function ModuleUnavailableNotice({ moduleName }: { moduleName: string }) {
  * school-wide figures.
  */
 export function TeacherTodayWorkspace() {
+  const { session } = useSession();
   const todayQuery = useQuery({
     queryKey: ['teacher-today'],
-    queryFn: () => api.getTeacherToday(),
+    queryFn: () =>
+      withOfflineReadCache(
+        `teacher-today:${session?.tenant.id ?? ''}:${session?.user.id ?? ''}`,
+        session?.tenant.id && session.user.id
+          ? { tenantId: session.tenant.id, userId: session.user.id }
+          : null,
+        () => api.getTeacherToday(),
+      ),
     staleTime: 30_000,
     refetchInterval: 60_000,
   });
@@ -72,7 +82,11 @@ export function TeacherTodayWorkspace() {
   }
 
   const data = todayQuery.data;
-  const hasAssignments = data.assignedClasses.length > 0;
+  const hasAttendanceClasses = data.assignedClasses.length > 0;
+  const hasTeachingWork =
+    hasAttendanceClasses ||
+    data.todaysPeriods.length > 0 ||
+    Boolean(data.substitutions?.length);
 
   return (
     <div className="space-y-6">
@@ -94,7 +108,7 @@ export function TeacherTodayWorkspace() {
         </button>
       </div>
 
-      {!hasAssignments ? (
+      {!hasTeachingWork ? (
         <SectionCard title="No active teaching assignments">
           <div className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-4">
             <ClipboardList className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
@@ -113,31 +127,40 @@ export function TeacherTodayWorkspace() {
 
           <div className="grid gap-4 lg:grid-cols-2">
             <SectionCard
-              title="My Classes Today"
-              description="Assigned homeroom and subject sections."
+              title="Attendance Classes"
+              description="Assigned homeroom sections available for attendance."
               headerAction={
-                data.pendingAttendanceCount > 0 ? (
+                hasAttendanceClasses && data.pendingAttendanceCount > 0 ? (
                   <span className="inline-flex items-center rounded-full border border-warning-100 bg-warning-50 px-2.5 py-1 text-xs font-bold text-warning-700">
                     {data.pendingAttendanceCount} pending
                   </span>
-                ) : (
+                ) : hasAttendanceClasses ? (
                   <CheckCircle2 className="h-5 w-5 text-success-600" aria-hidden="true" />
-                )
+                ) : null
               }
               footer={
-                <Link
-                  href="/dashboard/attendance"
-                  className="text-sm font-bold text-[var(--primary)] transition hover:text-[var(--primary-dark)]"
-                >
-                  Go to Attendance
-                </Link>
+                hasAttendanceClasses ? (
+                  <Link
+                    href="/dashboard/attendance"
+                    className="text-sm font-bold text-[var(--primary)] transition hover:text-[var(--primary-dark)]"
+                  >
+                    Go to Attendance
+                  </Link>
+                ) : undefined
               }
             >
-              <ul className="space-y-2">
-                {data.assignedClasses.map((item) => (
-                  <ClassRow key={item.id} item={item} />
-                ))}
-              </ul>
+              {hasAttendanceClasses ? (
+                <ul className="space-y-2">
+                  {data.assignedClasses.map((item) => (
+                    <ClassRow key={item.id} item={item} />
+                  ))}
+                </ul>
+              ) : (
+                <p className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-sm leading-5 text-slate-600">
+                  Your subject or substitution periods are shown above. No homeroom attendance
+                  class is assigned for this day.
+                </p>
+              )}
             </SectionCard>
 
             <SectionCard
@@ -280,6 +303,13 @@ function PeriodCard({
               <p className="truncate text-xs font-medium text-slate-600">
                 {period.className} • {period.startsAt}-{period.endsAt}
               </p>
+              {['SUBSTITUTING', 'COVERED'].includes(period.coverageStatus ?? '') ? (
+                <p className="mt-1 text-xs font-bold text-warning-700">
+                  {period.coverageStatus === 'SUBSTITUTING'
+                    ? 'You are substituting for this period'
+                    : 'A substitute is covering this period'}
+                </p>
+              ) : null}
             </>
           ) : (
             <p className="text-sm text-slate-500">{emptyText}</p>

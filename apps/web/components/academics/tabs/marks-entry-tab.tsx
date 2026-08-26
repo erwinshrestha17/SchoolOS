@@ -4,7 +4,18 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useMemo } from 'react';
 import type { MarkEntrySummary } from '@schoolos/core';
 import { api } from '../../../lib/api';
+import { OfflineMutationError } from '../../../lib/offline-policy';
+import { useSession } from '../../../components/session-provider';
+import {
+  deleteOfflineModuleDraft,
+  listOfflineModuleDrafts,
+  upsertOfflineModuleDraft,
+} from '../../../lib/offline-module-drafts';
 import { schoolFacingErrorMessage } from '../../../lib/school-facing-error';
+import {
+  authorityFenceFields,
+  readSchoolAuthorityFence,
+} from '../../../lib/school-authority-discovery';
 import { 
   Trophy, 
   Search, 
@@ -80,6 +91,8 @@ type Props = {
 
 export function MarksEntryTab({ academicYears, classes, allSections, exams }: Props) {
   const queryClient = useQueryClient();
+  const { session } = useSession();
+  const [queuedMarksMessage, setQueuedMarksMessage] = useState<string | null>(null);
   // Class/section/subject options come from the shared assignment-scope
   // resolver so a teacher never sees -- or can select -- a class, section or
   // subject they are not assigned to (P0.4). The backend re-validates each id
@@ -119,18 +132,74 @@ export function MarksEntryTab({ academicYears, classes, allSections, exams }: Pr
   });
 
   const batchMut = useMutation({
-    mutationFn: (payload: any) => api.batchEnterMarks(payload),
+    mutationFn: (payload: any) =>
+      api.batchEnterMarks({
+        ...payload,
+        ...authorityFenceFields(readSchoolAuthorityFence()),
+      }),
     onSuccess: (data) => {
       setSaveSuccess(data.updated);
+      setQueuedMarksMessage(null);
       void queryClient.invalidateQueries({ queryKey: ['marks', filters] });
       setMarks({});
       setStatuses({});
       setRemarks({});
       setTimeout(() => setSaveSuccess(null), 5000);
     },
+    onError: async (error, payload) => {
+      if (!(error instanceof OfflineMutationError) || !session?.tenant.id || !session.user.id) {
+        return;
+      }
+      const operationId = crypto.randomUUID();
+      await upsertOfflineModuleDraft({
+        module: 'marks',
+        operationId,
+        tenantId: session.tenant.id,
+        userId: session.user.id,
+        status: 'queued',
+        savedAt: new Date().toISOString(),
+        payload,
+      });
+      setQueuedMarksMessage(
+        'Marks capture queued on this browser. It is not published. Reconnect to sync against the locked session version.',
+      );
+    },
   });
 
-  const saveErrorMessage = batchMut.isError
+  useEffect(() => {
+    const drain = async () => {
+      if (
+        typeof navigator === 'undefined' ||
+        navigator.onLine === false ||
+        !session?.tenant.id ||
+        !session.user.id
+      ) {
+        return;
+      }
+      const drafts = await listOfflineModuleDrafts('marks', {
+        tenantId: session.tenant.id,
+        userId: session.user.id,
+      });
+      for (const draft of drafts) {
+        if (draft.status !== 'queued') continue;
+        try {
+          await api.batchEnterMarks(draft.payload);
+          await deleteOfflineModuleDraft('marks', draft.operationId);
+        } catch {
+          // Quarantine by leaving the queued record; never last-write-wins.
+        }
+      }
+    };
+    const handleOnline = () => {
+      void drain();
+    };
+    window.addEventListener('online', handleOnline);
+    void drain();
+    return () => window.removeEventListener('online', handleOnline);
+  }, [session?.tenant.id, session?.user.id]);
+
+  const saveErrorMessage =
+    batchMut.isError && !(batchMut.error instanceof OfflineMutationError)
     ? schoolFacingErrorMessage(batchMut.error, {
         fallback:
           'These marks could not be saved. No entries were changed.',
@@ -227,7 +296,15 @@ export function MarksEntryTab({ academicYears, classes, allSections, exams }: Pr
       classId: filters.classId,
       sectionId: filters.sectionId || undefined,
       subjectId: filters.subjectId,
-      entries: changedEntries,
+      entries: changedEntries.map((entry) => {
+        const existing = getExistingMark(existingMarksQuery.data, entry.studentId);
+        return {
+          ...entry,
+          ...(existing?.updatedAt
+            ? { expectedVersion: String(existing.updatedAt) }
+            : {}),
+        };
+      }),
     });
   };
 
@@ -388,6 +465,18 @@ export function MarksEntryTab({ academicYears, classes, allSections, exams }: Pr
            </Button>
         </div>
       )}
+
+      {queuedMarksMessage ? (
+        <div
+          role="status"
+          className="p-6 bg-amber-50 border border-amber-100 rounded-2xl text-sm font-semibold text-amber-950"
+        >
+          <p className="text-[10px] font-black uppercase tracking-widest text-amber-800">
+            Queued · not published
+          </p>
+          <p className="mt-1">{queuedMarksMessage}</p>
+        </div>
+      ) : null}
 
       {saveErrorMessage ? (
         <div

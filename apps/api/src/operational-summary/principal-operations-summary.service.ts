@@ -90,46 +90,52 @@ export class PrincipalOperationsSummaryService {
   ): Promise<PrincipalOperationsModuleSummary> {
     const now = new Date();
     const staleGpsAt = new Date(now.getTime() - 15 * 60_000);
-    const thirtyDays = new Date(day.endExclusiveUtc.getTime() + 30 * 86_400_000);
-    const [activeTripsToday, delayedTrips, tripsWithStaleGps, vehicleDocumentRisks] =
-      await Promise.all([
-        safe(() =>
-          this.prisma.transportTrip.count({
-            where: {
-              tenantId,
-              status: 'ACTIVE',
-              startedAt: { gte: day.startUtc, lt: day.endExclusiveUtc },
-            },
-          }),
-        ),
-        safe(() =>
-          this.prisma.transportTrip.count({
-            where: { tenantId, status: 'ACTIVE', isDelayed: true },
-          }),
-        ),
-        safe(() =>
-          this.prisma.transportTrip.count({
-            where: {
-              tenantId,
-              status: 'ACTIVE',
-              locationPings: { none: { recordedAt: { gte: staleGpsAt } } },
-            },
-          }),
-        ),
-        safe(() =>
-          this.prisma.transportVehicle.count({
-            where: {
-              tenantId,
-              OR: [
-                { insuranceExpiry: { lte: thirtyDays } },
-                { fitnessCertificateExp: { lte: thirtyDays } },
-                { registrationExpiry: { lte: thirtyDays } },
-                { documentExpiry: { lte: thirtyDays } },
-              ],
-            },
-          }),
-        ),
-      ]);
+    const thirtyDays = new Date(
+      day.endExclusiveUtc.getTime() + 30 * 86_400_000,
+    );
+    const [
+      activeTripsToday,
+      delayedTrips,
+      tripsWithStaleGps,
+      vehicleDocumentRisks,
+    ] = await Promise.all([
+      safe(() =>
+        this.prisma.transportTrip.count({
+          where: {
+            tenantId,
+            status: 'ACTIVE',
+            startedAt: { gte: day.startUtc, lt: day.endExclusiveUtc },
+          },
+        }),
+      ),
+      safe(() =>
+        this.prisma.transportTrip.count({
+          where: { tenantId, status: 'ACTIVE', isDelayed: true },
+        }),
+      ),
+      safe(() =>
+        this.prisma.transportTrip.count({
+          where: {
+            tenantId,
+            status: 'ACTIVE',
+            locationPings: { none: { recordedAt: { gte: staleGpsAt } } },
+          },
+        }),
+      ),
+      safe(() =>
+        this.prisma.transportVehicle.count({
+          where: {
+            tenantId,
+            OR: [
+              { insuranceExpiry: { lte: thirtyDays } },
+              { fitnessCertificateExp: { lte: thirtyDays } },
+              { registrationExpiry: { lte: thirtyDays } },
+              { documentExpiry: { lte: thirtyDays } },
+            ],
+          },
+        }),
+      ),
+    ]);
 
     return moduleSummary({
       activeTripsToday,
@@ -143,40 +149,44 @@ export class PrincipalOperationsSummaryService {
     tenantId: string,
     day: ReturnType<typeof getNepalSchoolDay>,
   ): Promise<PrincipalOperationsModuleSummary> {
-    const [completedSalesToday, servingsToday, outOfStockItems, salesTodayAmount] =
-      await Promise.all([
-        safe(() =>
-          this.prisma.canteenPosSale.count({
-            where: {
-              tenantId,
-              completedAt: { gte: day.startUtc, lt: day.endExclusiveUtc },
-            },
-          }),
-        ),
-        safe(() =>
-          this.prisma.canteenMealServing.count({
-            where: {
-              tenantId,
-              mealDate: { gte: day.startUtc, lt: day.endExclusiveUtc },
-            },
-          }),
-        ),
-        safe(() =>
-          this.prisma.canteenInventoryItem.count({
-            where: { tenantId, currentStock: { lte: 0 }, isActive: true },
-          }),
-        ),
-        safe(async () => {
-          const result = await this.prisma.canteenPosSale.aggregate({
-            where: {
-              tenantId,
-              completedAt: { gte: day.startUtc, lt: day.endExclusiveUtc },
-            },
-            _sum: { totalAmount: true },
-          });
-          return result._sum.totalAmount?.toString() ?? '0';
+    const [
+      completedSalesToday,
+      servingsToday,
+      outOfStockItems,
+      salesTodayAmount,
+    ] = await Promise.all([
+      safe(() =>
+        this.prisma.canteenPosSale.count({
+          where: {
+            tenantId,
+            completedAt: { gte: day.startUtc, lt: day.endExclusiveUtc },
+          },
         }),
-      ]);
+      ),
+      safe(() =>
+        this.prisma.canteenMealServing.count({
+          where: {
+            tenantId,
+            mealDate: { gte: day.startUtc, lt: day.endExclusiveUtc },
+          },
+        }),
+      ),
+      safe(() =>
+        this.prisma.canteenInventoryItem.count({
+          where: { tenantId, currentStock: { lte: 0 }, isActive: true },
+        }),
+      ),
+      safe(async () => {
+        const result = await this.prisma.canteenPosSale.aggregate({
+          where: {
+            tenantId,
+            completedAt: { gte: day.startUtc, lt: day.endExclusiveUtc },
+          },
+          _sum: { totalAmount: true },
+        });
+        return result._sum.totalAmount?.toString() ?? '0';
+      }),
+    ]);
 
     return moduleSummary({
       completedSalesToday,
@@ -187,7 +197,9 @@ export class PrincipalOperationsSummaryService {
   }
 }
 
-async function safe<T extends number | string>(work: () => Promise<T>): Promise<T | null> {
+async function safe<T extends number | string>(
+  work: () => Promise<T>,
+): Promise<T | null> {
   try {
     return await work();
   } catch {

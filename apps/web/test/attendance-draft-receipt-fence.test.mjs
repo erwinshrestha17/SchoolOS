@@ -44,16 +44,15 @@ describe("attendance draft receipt transaction fence", () => {
       );
     }
 
-    for (const status of [
-      undefined,
-      "",
-      "DRAFT",
-      "SAVED_LOCAL",
-      "REJECTED",
-      "ACCEPTED",
-      "SYNCED",
-      "CONFLICTED",
-    ]) {
+    for (const status of ["ACCEPTED", "SYNCED", "CONFLICTED"]) {
+      assert.equal(
+        isAttendanceDraftReceiptProtected(draft("submission-1", status)),
+        true,
+        status,
+      );
+    }
+
+    for (const status of [undefined, "", "DRAFT", "SAVED_LOCAL", "REJECTED"]) {
       assert.equal(
         isAttendanceDraftReceiptProtected(draft("submission-1", status)),
         false,
@@ -154,32 +153,52 @@ describe("attendance draft receipt transaction fence", () => {
     });
   });
 
-  it("clears a protected receipt only with matching authoritative proof", () => {
+  it("replaces a protected receipt with a purpose-limited tombstone only with matching authoritative proof", () => {
     const protectedDraft = draft("submission-1", "PROCESSING");
+    const tombstone = (syncStatus) => ({
+      ...draft("submission-1", syncStatus),
+      exceptions: {},
+      remarks: {},
+    });
 
     for (const syncStatus of ["ACCEPTED", "SYNCED", "CONFLICTED"]) {
       assert.deepEqual(
-        decideAttendanceDraftReceiptDelete(protectedDraft, {
-          clientSubmissionId: "submission-1",
-          syncStatus,
-        }),
+        decideAttendanceDraftReceiptWrite(
+          protectedDraft,
+          tombstone(syncStatus),
+          {
+            clientSubmissionId: "submission-1",
+            syncStatus,
+          },
+        ),
         { allowed: true },
       );
     }
 
     assert.deepEqual(
-      decideAttendanceDraftReceiptDelete(protectedDraft, {
-        clientSubmissionId: "different-submission",
-        syncStatus: "ACCEPTED",
-      }),
-      { allowed: false, reason: "different_submission" },
+      decideAttendanceDraftReceiptWrite(protectedDraft, tombstone("ACCEPTED")),
+      { allowed: false, reason: "authoritative_outcome_required" },
     );
     assert.deepEqual(
-      decideAttendanceDraftReceiptDelete(protectedDraft, {
-        clientSubmissionId: "submission-1",
-        syncStatus: "PROCESSING",
-      }),
-      { allowed: false, reason: "non_authoritative_status" },
+      decideAttendanceDraftReceiptWrite(
+        protectedDraft,
+        tombstone("ACCEPTED"),
+        {
+          clientSubmissionId: "different-submission",
+          syncStatus: "ACCEPTED",
+        },
+      ),
+      { allowed: false, reason: "authoritative_outcome_required" },
+    );
+    assert.deepEqual(
+      decideAttendanceDraftReceiptDelete(protectedDraft),
+      { allowed: false, reason: "authoritative_receipt_required" },
+    );
+    assert.deepEqual(
+      decideAttendanceDraftReceiptDelete(
+        tombstone("ACCEPTED"),
+      ),
+      { allowed: false, reason: "authoritative_receipt_required" },
     );
   });
 
@@ -234,7 +253,11 @@ describe("attendance draft receipt transaction fence", () => {
     assert.ok(clearableStart >= 0 && retainedStart > clearableStart);
     assert.match(
       clearableSource,
-      /clearAttendanceDraft\(submissionDraftKey, \{[\s\S]*authoritativeReceipt: \{[\s\S]*clientSubmissionId: draftClientSubmissionId,[\s\S]*syncStatus/,
+      /createPurposeLimitedAttendanceReceipt\(\s*receiptProtectedDraft,\s*syncStatus as "ACCEPTED" \| "SYNCED" \| "CONFLICTED",\s*\)/,
+    );
+    assert.match(
+      clearableSource,
+      /storeAttendanceDraft\(submissionDraftKey, terminalReceipt, \{[\s\S]*authoritativeReceipt: \{[\s\S]*clientSubmissionId: draftClientSubmissionId,[\s\S]*syncStatus/,
     );
   });
 

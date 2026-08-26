@@ -3,14 +3,16 @@ import 'dart:convert';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/storage/private_read_cache.dart';
+import '../../../core/sync/school_authority_discovery.dart';
 import '../domain/teacher_models.dart';
 import '../../learning_support/domain/learning_support_models.dart';
 
 class TeacherRepository {
-  const TeacherRepository(this._client, {this.cache});
+  const TeacherRepository(this._client, {this.cache, this.authorityDiscovery});
 
   final ApiClient _client;
   final PrivateReadCache? cache;
+  final SchoolAuthorityDiscovery? authorityDiscovery;
 
   Future<TeacherNoticeSummary> getNoticeSummary() async {
     final response = await _client.get('/mobile/me/notifications/unread-count');
@@ -177,6 +179,7 @@ class TeacherRepository {
     required String instructions,
     required DateTime dueDate,
     required bool submissionRequired,
+    String? clientOperationId,
     List<TeacherHomeworkDraftAttachment> attachments = const [],
   }) async {
     final attachmentFileIds = <String>[];
@@ -184,6 +187,7 @@ class TeacherRepository {
       attachmentFileIds.add(await _uploadHomeworkAttachment(attachment));
     }
 
+    await authorityDiscovery?.refresh();
     await _client.post(
       '/mobile/teacher/homework',
       data: {
@@ -196,8 +200,11 @@ class TeacherRepository {
         'dueDate': dueDate.toUtc().toIso8601String(),
         'status': 'DRAFT',
         'submissionRequired': submissionRequired,
+        if (clientOperationId != null && clientOperationId.trim().isNotEmpty)
+          'clientOperationId': clientOperationId.trim(),
         if (attachmentFileIds.isNotEmpty)
           'attachmentFileIds': attachmentFileIds,
+        ...?authorityDiscovery?.fields(),
       },
     );
   }

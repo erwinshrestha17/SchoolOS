@@ -176,7 +176,10 @@ describe('school operations sidebar', () => {
 
   it('holds the menu stable and fail-closed until entitlements resolve', () => {
     assert.match(sidebar, /loading: entitlementsLoading/);
-    assert.match(sidebar, /const groupsToRender = entitlementsLoading\s*\? \[\]/);
+    assert.match(
+      sidebar,
+      /const groupsToRender = useMemo\(\s*\(\) =>\s*entitlementsLoading\s*\? \[\]/,
+    );
     assert.match(sidebar, /SidebarNavigationSkeleton/);
     assert.match(sidebar, /aria-busy=\{navigationLoading \|\| undefined\}/);
     assert.match(sidebar, /disabled=\{navigationLoading\}/);

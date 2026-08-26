@@ -62,6 +62,12 @@ export class AttendanceController {
     return this.attendanceService.listAttendance(auth);
   }
 
+  @Get('scope-version')
+  @Permissions('attendance:read')
+  getScopeVersion(@CurrentAuth() auth: AuthContext) {
+    return this.attendanceService.getScopeVersion(auth);
+  }
+
   @Get('rosters')
   @Permissions('attendance:read')
   getRoster(

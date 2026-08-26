@@ -35,4 +35,33 @@ describe('FinanceCron', () => {
       }),
     );
   });
+
+  it('looks up the tenant actor inside runWithTenantScope', async () => {
+    const { cron, prisma, financeService } = buildCron();
+    prisma.feeDueSchedule.findMany.mockResolvedValue([
+      { id: 'schedule-1', name: 'April fees', tenantId: 'tenant-1' },
+    ]);
+    prisma.user.findFirst.mockResolvedValue({
+      id: 'user-1',
+      email: 'admin@school.test',
+      authMethod: 'PASSWORD',
+    });
+
+    await cron.processDueSchedules();
+
+    expect(prisma.runWithTenantScope).toHaveBeenCalledWith(
+      'tenant-1',
+      expect.any(Function),
+    );
+    expect(prisma.user.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ tenantId: 'tenant-1' }),
+      }),
+    );
+    expect(financeService.processDueSchedule).toHaveBeenCalledWith(
+      'schedule-1',
+      expect.any(Object),
+      expect.objectContaining({ userId: 'user-1', tenantId: 'tenant-1' }),
+    );
+  });
 });

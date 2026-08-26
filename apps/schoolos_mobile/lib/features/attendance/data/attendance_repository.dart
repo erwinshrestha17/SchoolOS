@@ -6,6 +6,8 @@ import 'package:dio/dio.dart';
 
 import '../../../core/errors/app_exception.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/sync/attendance_sync_adapter.dart';
+import '../../../core/sync/school_authority_discovery.dart';
 import '../../../core/storage/private_read_cache.dart';
 import '../../../core/storage/teacher_attendance_draft_store.dart';
 import '../../../core/storage/teacher_attendance_scope_version_store.dart';
@@ -25,12 +27,14 @@ class AttendanceRepository {
     this.cache,
     this.draftStore,
     this.scopeVersionStore,
+    this.authorityDiscovery,
   });
 
   final ApiClient _client;
   final PrivateReadCache? cache;
   final TeacherAttendanceDraftStore? draftStore;
   final TeacherAttendanceScopeVersionStore? scopeVersionStore;
+  final SchoolAuthorityDiscovery? authorityDiscovery;
   Future<void> _scopeRefreshFence = Future<void>.value();
   Future<void> _scopeFence = Future<void>.value();
   int _scopeEpoch = 0;
@@ -73,6 +77,8 @@ class AttendanceRepository {
       }
       Error.throwWithStackTrace(error, stackTrace);
     }
+
+    unawaited(authorityDiscovery?.refresh() ?? Future<void>.value());
 
     final data = response.data;
     final scopeVersion = data is Map<String, dynamic>
@@ -572,6 +578,7 @@ class AttendanceRepository {
         },
       );
       data = Map<String, dynamic>.from(response.data as Map<String, dynamic>);
+      _requireAttendanceRosterVersion(data);
       data['_mobileLastUpdated'] = DateTime.now().toIso8601String();
       await _writeTeacherAttendanceCache(cacheKey, data, scopeTicket);
     } on AppException catch (error) {
@@ -580,6 +587,7 @@ class AttendanceRepository {
       if (cached == null) rethrow;
       data = cached.withMetadata();
     }
+    final rosterVersion = _requireAttendanceRosterVersion(data);
     final attendance = data['attendanceState'] is Map<String, dynamic>
         ? TeacherAttendanceMeta.fromJson(
             data['attendanceState'] as Map<String, dynamic>,
@@ -599,6 +607,7 @@ class AttendanceRepository {
           .toList(),
       attendance: attendance,
       isWorkingDay: calendar['isWorkingDay'] as bool? ?? true,
+      rosterVersion: rosterVersion,
       lastUpdated:
           DateTime.tryParse(data['_mobileLastUpdated'] as String? ?? '') ??
           DateTime.now(),
@@ -611,14 +620,26 @@ class AttendanceRepository {
     String studentId,
   ) async {
     final scopeTicket = await _captureTeacherAttendanceScopeTicket();
-    final response = await _client.get(
-      '/mobile/teacher/students/$studentId/summary',
-      queryParameters: {
-        'academicYearId': classSection.academicYearId,
-        'classId': classSection.classId,
-        if (classSection.sectionId != null) 'sectionId': classSection.sectionId,
-      },
-    );
+    late final Response<dynamic> response;
+    try {
+      response = await _client.get(
+        '/mobile/teacher/students/$studentId/summary',
+        queryParameters: {
+          'academicYearId': classSection.academicYearId,
+          'classId': classSection.classId,
+          if (classSection.sectionId != null)
+            'sectionId': classSection.sectionId,
+        },
+      );
+    } on AppException catch (error, stackTrace) {
+      if (error is PermissionException || error is ModuleLockedException) {
+        await clearTeacherAttendanceScopeStrict(
+          clearVersion: true,
+          quarantine: true,
+        );
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    }
     final data = response.data is Map<String, dynamic>
         ? response.data as Map<String, dynamic>
         : const <String, dynamic>{};
@@ -646,9 +667,20 @@ class AttendanceRepository {
         !_sameAttendanceContent(existing.entries, entries)) {
       throw const ConflictAppException();
     }
+    final expectedRosterVersion = existing.expectedRosterVersion;
+    if (!isValidAttendanceRosterVersion(expectedRosterVersion) &&
+        !existing.receiptState.locksContent) {
+      throw const ValidationException(
+        message:
+            'This saved attendance draft does not include a verified roster. Discard it and review the current roster before creating a new submission.',
+        code: 'ATTENDANCE_ROSTER_REVIEW_REQUIRED',
+      );
+    }
 
     final priorReceiptState = existing.receiptState;
-    if (!priorReceiptState.locksContent) {
+    if (priorReceiptState == AttendanceDraftReceiptState.local ||
+        priorReceiptState == AttendanceDraftReceiptState.queued ||
+        priorReceiptState == AttendanceDraftReceiptState.rejected) {
       await _markDraftReceiptStateWithTicket(
         classSection.id,
         date,
@@ -661,25 +693,36 @@ class AttendanceRepository {
 
     late final Response<dynamic> response;
     try {
+      await authorityDiscovery?.refresh();
+      final fence = authorityDiscovery?.current;
       response = await _client.post(
         '/mobile/teacher/attendance/sync',
-        data: {
-          'academicYearId': classSection.academicYearId,
-          'classId': classSection.classId,
-          if (classSection.sectionId != null)
-            'sectionId': classSection.sectionId,
-          'attendanceDate': _dateOnly(date),
-          'exceptions': [
-            for (final entry in entries)
-              if (entry.status != AttendanceStatus.present)
-                {
-                  'studentId': entry.studentId,
-                  'status': _statusToApi(entry.status),
-                },
-          ],
-          'clientSubmissionId': clientSubmissionId,
-          'deviceTimestamp': deviceTimestamp.toUtc().toIso8601String(),
-        },
+        data: withAttendanceSyncEnvelope(
+          body: {
+            'academicYearId': classSection.academicYearId,
+            'classId': classSection.classId,
+            if (classSection.sectionId != null)
+              'sectionId': classSection.sectionId,
+            'attendanceDate': _dateOnly(date),
+            if (isValidAttendanceRosterVersion(expectedRosterVersion))
+              'expectedRosterVersion': expectedRosterVersion,
+            'exceptions': [
+              for (final entry in entries)
+                if (entry.status != AttendanceStatus.present)
+                  {
+                    'studentId': entry.studentId,
+                    'status': _statusToApi(entry.status),
+                  },
+            ],
+            // Replay the timestamp captured with the durable draft. A screen
+            // reload must not make the same client submission look new.
+            'deviceTimestamp': existing.savedAt.toUtc().toIso8601String(),
+          },
+          clientSubmissionId: clientSubmissionId,
+          authorizationVersion: scopeTicket?.scopeVersion,
+          authorityNodeId: fence?.authorityNodeId,
+          authorityEpoch: fence?.authorityEpoch,
+        ),
       );
     } on AppException catch (error) {
       if (!priorReceiptState.locksContent && !_isAmbiguousSubmission(error)) {
@@ -748,14 +791,30 @@ class AttendanceRepository {
   Future<TeacherAttendanceDraft> saveDraftAttendanceLocally(
     String classSectionId,
     DateTime date,
-    List<AttendanceStudentEntry> entries,
-  ) async {
+    List<AttendanceStudentEntry> entries, {
+    required String expectedRosterVersion,
+  }) async {
+    if (!isValidAttendanceRosterVersion(expectedRosterVersion)) {
+      throw const ValidationException(
+        message:
+            'SchoolOS could not verify the roster used for this attendance draft. Refresh the roster and try again.',
+        code: 'INVALID_ATTENDANCE_ROSTER_VERSION',
+      );
+    }
     final scopeTicket = await _captureTeacherAttendanceScopeTicket();
     final existing = await _loadDraftAttendanceWithTicket(
       classSectionId,
       date,
       scopeTicket,
     );
+    if (existing != null &&
+        existing.expectedRosterVersion != expectedRosterVersion) {
+      throw const ValidationException(
+        message:
+            'This saved attendance draft belongs to an older roster. Discard it and review the current roster before creating a new submission.',
+        code: 'ATTENDANCE_ROSTER_REVIEW_REQUIRED',
+      );
+    }
     final contentChanged =
         existing != null && !_sameAttendanceContent(existing.entries, entries);
     if (contentChanged && existing.receiptState.locksContent) {
@@ -773,6 +832,8 @@ class AttendanceRepository {
           ? DateTime.now()
           : existing?.savedAt ?? DateTime.now(),
       entries: entries,
+      expectedRosterVersion:
+          existing?.expectedRosterVersion ?? expectedRosterVersion,
       receiptState: rotateRejectedSubmission
           ? AttendanceDraftReceiptState.local
           : existing?.receiptState ?? AttendanceDraftReceiptState.local,
@@ -822,6 +883,7 @@ class AttendanceRepository {
       clientSubmissionId: existing.clientSubmissionId,
       savedAt: existing.savedAt,
       entries: existing.entries,
+      expectedRosterVersion: existing.expectedRosterVersion,
       receiptState: receiptState,
     );
     await _writeDraft(classSectionId, date, draft, scopeTicket);
@@ -844,6 +906,7 @@ class AttendanceRepository {
           'clientSubmissionId': draft.clientSubmissionId,
           'savedAt': draft.savedAt.toIso8601String(),
           'entries': [for (final entry in draft.entries) entry.toJson()],
+          'expectedRosterVersion': draft.expectedRosterVersion,
           'receiptState': draft.receiptState.name,
         },
       );
@@ -861,6 +924,7 @@ class AttendanceRepository {
             'clientSubmissionId': draft.clientSubmissionId,
             'savedAt': draft.savedAt.toIso8601String(),
             'entries': [for (final entry in draft.entries) entry.toJson()],
+            'expectedRosterVersion': draft.expectedRosterVersion,
             'receiptState': draft.receiptState.name,
           },
           authorizationScopeVersion: scopeTicket.scopeVersion,
@@ -955,6 +1019,10 @@ class AttendanceRepository {
         clientSubmissionId: clientSubmissionId,
         savedAt: savedAt,
         entries: entries,
+        expectedRosterVersion:
+            isValidAttendanceRosterVersion(data['expectedRosterVersion'])
+            ? data['expectedRosterVersion'] as String
+            : null,
         receiptState: _parseDraftReceiptState(data['receiptState']),
       );
     } catch (_) {
@@ -1001,6 +1069,63 @@ class AttendanceRepository {
     final scopeTicket = await _captureTeacherAttendanceScopeTicket();
     await _removeDraft(classSectionId, date, scopeTicket: scopeTicket);
   }
+
+  Future<void> syncQueuedAttendanceDrafts(
+    List<TeacherClassSection> classes,
+  ) async {
+    final activeDraftStore = draftStore;
+    if (activeDraftStore == null || classes.isEmpty) {
+      return;
+    }
+    final records = await activeDraftStore.listCurrentScope();
+    for (final record in records) {
+      final receiptState = _parseDraftReceiptState(
+        record.payload['receiptState'],
+      );
+      if (receiptState != AttendanceDraftReceiptState.queued &&
+          receiptState != AttendanceDraftReceiptState.transportAmbiguous) {
+        continue;
+      }
+      TeacherClassSection? classSection;
+      for (final item in classes) {
+        if (item.id == record.classSectionId) {
+          classSection = item;
+          break;
+        }
+      }
+      if (classSection == null) {
+        continue;
+      }
+      final date = DateTime.tryParse(record.date);
+      final clientSubmissionId =
+          record.payload['clientSubmissionId'] as String?;
+      final savedAt = DateTime.tryParse(
+        record.payload['savedAt'] as String? ?? '',
+      );
+      final entries = (record.payload['entries'] as List<dynamic>? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(AttendanceStudentEntry.fromJson)
+          .toList();
+      if (date == null ||
+          clientSubmissionId == null ||
+          clientSubmissionId.isEmpty ||
+          savedAt == null ||
+          entries.isEmpty) {
+        continue;
+      }
+      try {
+        await submitAttendance(
+          classSection,
+          date,
+          entries,
+          clientSubmissionId,
+          savedAt,
+        );
+      } catch (_) {
+        // Leave the queued draft for a later reconnect or explicit retry.
+      }
+    }
+  }
 }
 
 class _TeacherAttendanceScopeDependencies {
@@ -1038,12 +1163,25 @@ AttendanceDraftReceiptState _parseDraftReceiptState(Object? value) {
 
   return switch (value.trim()) {
     'local' => AttendanceDraftReceiptState.local,
+    'queued' => AttendanceDraftReceiptState.queued,
     'processing' => AttendanceDraftReceiptState.processing,
     'unknown' => AttendanceDraftReceiptState.unknown,
     'transportAmbiguous' => AttendanceDraftReceiptState.transportAmbiguous,
     'rejected' => AttendanceDraftReceiptState.rejected,
     _ => AttendanceDraftReceiptState.unknown,
   };
+}
+
+String _requireAttendanceRosterVersion(Map<String, dynamic> data) {
+  final rosterVersion = data['rosterVersion'];
+  if (!isValidAttendanceRosterVersion(rosterVersion)) {
+    throw const ServerException(
+      message:
+          'SchoolOS could not verify the attendance roster. Refresh and try again.',
+      code: 'INVALID_ATTENDANCE_ROSTER_VERSION',
+    );
+  }
+  return rosterVersion as String;
 }
 
 bool _sameAttendanceContent(

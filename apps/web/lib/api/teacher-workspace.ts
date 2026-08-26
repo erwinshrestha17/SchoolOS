@@ -9,6 +9,7 @@ export interface TeacherTodayPeriod {
   subjectName: string;
   startsAt: string;
   endsAt: string;
+  coverageStatus?: 'SCHEDULED' | 'SUBSTITUTING' | 'COVERED';
 }
 
 export interface TeacherTodayAssignedClass {

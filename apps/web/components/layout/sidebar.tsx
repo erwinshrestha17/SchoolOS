@@ -98,30 +98,51 @@ export function Sidebar({
   const settingsCaps = useSettingsCapabilities();
   const personalOnly = isRestricted(TeacherCapability.SCHOOL_SETTINGS_ADMIN);
 
-  const personaGroups = isSupportOverride
-    ? buildSupportOverrideNavGroups(session?.user.supportOverrideScopes ?? [])
-    : navGroupsForPersona(schoolWebPersona, capabilities);
+  const personaGroups = useMemo(
+    () =>
+      isSupportOverride
+        ? buildSupportOverrideNavGroups(
+            session?.user.supportOverrideScopes ?? [],
+          )
+        : navGroupsForPersona(schoolWebPersona, capabilities),
+    [
+      isSupportOverride,
+      session?.user.supportOverrideScopes,
+      schoolWebPersona,
+      capabilities,
+    ],
+  );
 
   // Fail closed while entitlements are unresolved. SidebarContent renders a
   // stable skeleton instead of first showing a partial menu and then popping
   // module workspaces into place after login.
-  const groupsToRender = entitlementsLoading
-    ? []
-    : personaGroups
-        .map((group) => ({
-          ...group,
-          items: group.items
-            .filter((item) => canDisplayNavItem(item, session, hasModule))
-            .map((item) =>
-              item.href === '/dashboard/notifications'
-                ? {
-                    ...item,
-                    badge: unreadNotificationsBadge,
-                  }
-                : item,
-            ),
-        }))
-        .filter((group) => group.items.length > 0);
+  const groupsToRender = useMemo(
+    () =>
+      entitlementsLoading
+        ? []
+        : personaGroups
+            .map((group) => ({
+              ...group,
+              items: group.items
+                .filter((item) => canDisplayNavItem(item, session, hasModule))
+                .map((item) =>
+                  item.href === '/dashboard/notifications'
+                    ? {
+                        ...item,
+                        badge: unreadNotificationsBadge,
+                      }
+                    : item,
+                ),
+            }))
+            .filter((group) => group.items.length > 0),
+    [
+      entitlementsLoading,
+      personaGroups,
+      session,
+      hasModule,
+      unreadNotificationsBadge,
+    ],
+  );
 
   const showSettingsHub = shouldShowSettingsHub(
     settingsCaps,

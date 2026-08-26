@@ -1483,6 +1483,9 @@ function getAttendanceSyncNextStep(
       return "The class, section, year, or student scope is no longer available.";
     case "VALIDATION_ERROR":
       return "Review the school day and attendance entries before creating a revised draft.";
+    case "SCOPE_REVOKED":
+    case "UNASSIGNED_TEACHER":
+      return "This teacher's assignment changed. Do not resend this draft; create a new one only if access is restored.";
     default:
       return "Keep the device draft and ask the office to check the official roster.";
   }
@@ -2601,7 +2604,7 @@ function BrowserAttendanceDraftStatus({ status }: { status?: string }) {
     return <Badge variant="warning">Conflict recorded</Badge>;
   }
   if (normalizedStatus === "QUEUED") {
-    return <Badge variant="warning">Final submission queued</Badge>;
+    return <Badge variant="warning">Queued — not submitted</Badge>;
   }
   if (normalizedStatus) {
     return <Badge variant="warning">Pending confirmation</Badge>;

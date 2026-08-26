@@ -87,7 +87,7 @@ Local tests/builds/demos are not staging, pilot, RC, or GA evidence.
 
 P0 is the default implementation scope. Do not start P1/P2 feature expansion while unresolved P0 blockers remain unless explicitly instructed.
 
-P0 execution order:
+Product P0 safety themes (keep these invariants; do not treat them as a permission to add modules):
 
 1. P0-01 — fail-closed entitlements, tenant isolation, teacher assignment authorization, guardian scoping, cache invalidation, authorization matrix.
 2. P0-02 — attendance correctness, locking, idempotency, correction history.
@@ -99,6 +99,42 @@ P0 execution order:
 8. P0-08 — offline-first web/mobile operation, School Edge continuity, synchronization, conflict recovery, and no-internet resilience.
 9. Nepal localization correctness: Nepali Unicode, NPR, Nepal timezone, Nepal address hierarchy, BS/AD presentation with canonical date storage.
 10. Backup/restore, clean migrations, observability, provider/storage readiness, and controlled-pilot evidence.
+
+### Backend production-hardening (owner, 2026-08-25)
+
+The main backend work concentrates on production-hardening the existing core operational path. Do not add peripheral modules, Library/Transport/Canteen expansion, or new endpoints unless a listed flow cannot complete correctly without them.
+
+The backend does not primarily need more endpoints. Existing core flows must behave correctly under:
+
+```text
+multiple tenants
++ concurrent users
++ weak/no internet
++ retries
++ duplicate requests
++ authorization changes
++ financial corrections
++ server restarts
++ queue failures
++ partial external-provider failures
+```
+
+Backend execution order for API work (overrides product P0 numbering above when sequencing backend slices):
+
+| Priority | Work |
+|---|---|
+| **P0-1** | CI/build baseline completely green |
+| **P0-2** | Auth, RBAC, tenant isolation, Platform vs school vs support context, assignment-scoped Teacher access, guardian-linked-student-only access, suspended-tenant fail-closed, same authorization on files |
+| **P0-3** | Offline sync foundation: idempotent mutations, client operation IDs, replay-safe APIs, conflict/version/epoch checks, revoked-scope rejection, deterministic sync receipts, partial-sync recovery |
+| **P0-4** | M2 Attendance correctness: assignment enforcement, device/session trust, offline draft → sync → confirmation, stale/revoked assignment rejection, conflict/correction, audit history |
+| **P0-5** | Student + Guardian lifecycle: admission → enrollment → class/section, link verification, duplicate/merge, transfer/archive, document retention, iEMIS export/readiness boundary, no orphaned guardian links |
+| **P0-6** | M3 Fees and Receipts: billing runs, student fee ledger, invoices, allocation, partial payments, discounts/scholarships, refunds, reversals, cashier close, receipt sequencing, receivables aging; every financial mutation transactional and idempotent |
+| **P0-7** | Immutable M11 ledger: journal engine, double-entry validation, posting batches, account mappings, fiscal periods, close/reopen, reversal journals, bank reconciliation, trial balance, GL, balance sheet, income/expenditure; no destructive edits to posted records |
+| **P0-8** | M3/M7 → M11 integration: source event → idempotent posting → M11; reconciliation reports for failed or incomplete postings |
+| **P0-9** | Financial + authorization audit trail |
+| **P0-10** | Critical notifications: event → delivery, retry/dedup, guardian-recipient isolation, delivery status, emergency path, deterministic replay of offline-created events |
+| **P1** | Payroll depth, IRD/CBMS integration, reporting, operational hardening (transactions, constraints, indexes, pagination, N+1, cache, queues/DLQ, timeouts, request IDs, structured logs, metrics, health/readiness, rate limiting, backup/restore) |
+| **Later** | Library, Transport, Canteen expansion |
 
 UI normalization during P0 is allowed only when it directly improves active P0 safety, comprehension, accessibility, authorization feedback, offline recovery, or task completion.
 

@@ -131,4 +131,19 @@ export class CreateHomeworkDto {
   @ValidateNested()
   @Type(() => HomeworkRecurrenceDto)
   recurrence?: HomeworkRecurrenceDto;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  clientOperationId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  authorityNodeId?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  authorityEpoch?: number;
 }

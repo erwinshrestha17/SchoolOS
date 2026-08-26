@@ -492,6 +492,8 @@ enum AttendanceSyncRejectionReason {
   CROSS_TENANT
   STALE_DRAFT
   UNASSIGNED_TEACHER
+  SCOPE_REVOKED
+  AUTHORITY_FENCED
 }
 
 enum AttendanceCorrectionStatus {
@@ -5510,6 +5512,7 @@ model HomeworkReminderBatch {
 model HomeworkAssignment {
   id                 String                   @id @default(uuid())
   tenantId           String
+  clientOperationId  String?
   academicYearId     String
   classId            String
   sectionId          String?
@@ -5540,6 +5543,7 @@ model HomeworkAssignment {
   reminderBatches HomeworkReminderBatch[]
   attachments     HomeworkAttachment[]
 
+  @@unique([tenantId, clientOperationId])
   @@index([tenantId, academicYearId, classId, sectionId, status])
   @@index([tenantId, status, dueDate])
   @@index([tenantId, classId, sectionId])
@@ -8543,6 +8547,16 @@ model Tenant {
   teacherReplacements           TeacherReplacement[]
   teacherReplacementPendingWork TeacherReplacementPendingWork[]
   teacherHandoverNotes          TeacherHandoverNote[]
+  authorityFence                TenantAuthorityFence?
+}
+
+model TenantAuthorityFence {
+  tenantId         String   @id
+  authorityNodeId  String   @default("cloud")
+  authorityEpoch   Int      @default(1)
+  updatedAt        DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 }
 
 model TenantSetting {

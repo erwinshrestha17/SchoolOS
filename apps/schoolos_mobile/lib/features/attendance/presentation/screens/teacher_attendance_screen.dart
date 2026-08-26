@@ -573,7 +573,7 @@ String _statusTitle(TeacherAttendanceState state) {
   }
   return switch (state.syncStatus) {
     AttendanceSyncStatus.draft => 'Draft not submitted',
-    AttendanceSyncStatus.queued => 'Saved on this phone',
+    AttendanceSyncStatus.queued => 'Queued — not submitted',
     AttendanceSyncStatus.syncing => 'Syncing with SchoolOS',
     AttendanceSyncStatus.serverChecking => 'Checking server receipt',
     AttendanceSyncStatus.synced => 'Synced with SchoolOS',

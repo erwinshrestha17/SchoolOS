@@ -1,0 +1,1 @@
+ALTER TYPE "AttendanceSyncRejectionReason" ADD VALUE IF NOT EXISTS 'SCOPE_REVOKED';

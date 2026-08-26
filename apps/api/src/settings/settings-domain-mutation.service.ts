@@ -247,7 +247,8 @@ export class SettingsDomainMutationService {
     domain: SchoolSettingsDomain,
     requestFingerprint: string,
   ): UpdateSchoolSettingsDomainResult | null {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    if (!value || typeof value !== 'object' || Array.isArray(value))
+      return null;
     const record = value as Record<string, Prisma.JsonValue>;
     const version = record.version;
     const changedKeys = record.changedKeys;

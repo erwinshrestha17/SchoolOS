@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { UserStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { FinanceService } from './finance.service';
-import { NotificationChannel } from '@prisma/client';
 
 @Injectable()
 export class FinanceCron {
@@ -40,17 +40,21 @@ export class FinanceCron {
       );
 
       try {
-        // Construct a system-level auth context since this is automated
-        const adminUser = await this.prisma.user.findFirst({
-          where: { tenantId: schedule.tenantId }, // Ideally find the tenant principal or admin
-        });
-
-        if (!adminUser) continue;
-
         const result = await this.prisma.runWithTenantScope(
           schedule.tenantId,
-          () =>
-            this.financeService.processDueSchedule(
+          async () => {
+            const adminUser = await this.prisma.user.findFirst({
+              where: {
+                tenantId: schedule.tenantId,
+                status: UserStatus.ACTIVE,
+              },
+            });
+
+            if (!adminUser) {
+              return null;
+            }
+
+            return this.financeService.processDueSchedule(
               schedule.id,
               {
                 message: `Automated reminder: Please clear your pending fee balance for ${schedule.name}.`,
@@ -64,8 +68,13 @@ export class FinanceCron {
                 roles: ['platform_super_admin'],
                 permissions: [],
               },
-            ),
+            );
+          },
         );
+
+        if (!result) {
+          continue;
+        }
 
         this.logger.log(
           `Schedule ${schedule.id} processed successfully. Reminded ${result.reminderResult?.reminded ?? 0} defaulters.`,

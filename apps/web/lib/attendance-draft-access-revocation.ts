@@ -1,5 +1,11 @@
 import type { AttendanceDraftStorageValue } from "./session";
 
+export const ATTENDANCE_SCOPE_REVOKED_REASONS = new Set([
+  "SCOPE_REVOKED",
+  "UNASSIGNED_TEACHER",
+  "TEACHER_SCOPE_DENIED",
+]);
+
 export type AttendanceAccessRevocationStatus =
   | "AUTHORIZATION_DENIED"
   | "ACCESS_REVALIDATION_REQUIRED";
@@ -9,6 +15,13 @@ export type AttendancePurposeLimitedReceiptStatus =
   | "ACCEPTED"
   | "SYNCED"
   | "CONFLICTED";
+
+export function isAttendanceScopeRevokedRejection(reason: unknown) {
+  return (
+    typeof reason === "string" &&
+    ATTENDANCE_SCOPE_REVOKED_REASONS.has(reason.trim().toUpperCase())
+  );
+}
 
 /**
  * Retains only the opaque receipt identity and scope needed to keep a denial
@@ -31,6 +44,9 @@ export function createPurposeLimitedAttendanceReceipt(
     serverSessionId: null,
     serverSubmittedAt: null,
     lastSyncStatus: status,
+    ...(draft.authorizationVersion
+      ? { authorizationVersion: draft.authorizationVersion }
+      : {}),
   };
 }
 

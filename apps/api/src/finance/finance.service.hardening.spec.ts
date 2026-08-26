@@ -139,6 +139,14 @@ describe('FinanceService - Hardening', () => {
       academicYear: {
         findFirst: jest.fn().mockResolvedValue(null),
       },
+      tenantAuthorityFence: {
+        findUnique: jest.fn().mockResolvedValue({
+          tenantId: actor.tenantId,
+          authorityNodeId: 'cloud',
+          authorityEpoch: 1,
+        }),
+        create: jest.fn(),
+      },
       student: {
         findFirst: jest.fn().mockResolvedValue(null),
       },

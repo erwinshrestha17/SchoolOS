@@ -22,35 +22,40 @@ export class AttendanceCron {
     });
 
     for (const tenant of tenants) {
-      const actorUser = await this.prisma.user.findFirst({
-        where: {
-          tenantId: tenant.id,
-          status: 'ACTIVE',
-        },
-        orderBy: [{ createdAt: 'asc' }],
-      });
-
-      if (!actorUser) {
-        this.logger.warn(
-          `Skipping attendance escalations for tenant ${tenant.slug}: no active user found`,
-        );
-        continue;
-      }
-
       try {
-        // Per-tenant work runs under that tenant's Prisma scope, matching how
-        // an authenticated request would be filtered.
-        const result = await this.prisma.runWithTenantScope(tenant.id, () =>
-          this.attendanceService.processDailyEscalationWarnings({
-            userId: actorUser.id,
-            tenantId: tenant.id,
-            tenantSlug: tenant.slug,
-            email: actorUser.email,
-            authMethod: actorUser.authMethod,
-            roles: ['platform_super_admin'],
-            permissions: [],
-          }),
+        const result = await this.prisma.runWithTenantScope(
+          tenant.id,
+          async () => {
+            const actorUser = await this.prisma.user.findFirst({
+              where: {
+                tenantId: tenant.id,
+                status: 'ACTIVE',
+              },
+              orderBy: [{ createdAt: 'asc' }],
+            });
+
+            if (!actorUser) {
+              this.logger.warn(
+                `Skipping attendance escalations for tenant ${tenant.slug}: no active user found`,
+              );
+              return null;
+            }
+
+            return this.attendanceService.processDailyEscalationWarnings({
+              userId: actorUser.id,
+              tenantId: tenant.id,
+              tenantSlug: tenant.slug,
+              email: actorUser.email,
+              authMethod: actorUser.authMethod,
+              roles: ['platform_super_admin'],
+              permissions: [],
+            });
+          },
         );
+
+        if (!result) {
+          continue;
+        }
 
         this.logger.log(
           `Attendance escalations processed for tenant ${tenant.slug}: ${result.warningCount} warnings`,

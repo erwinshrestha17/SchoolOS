@@ -97,6 +97,7 @@ describe('MobileTeacherAttendanceController', () => {
       class: { id: 'class-1', name: 'Grade 3' },
       section: { id: 'section-1', name: 'A' },
       attendanceDate: new Date('2026-06-02T00:00:00.000Z'),
+      rosterVersion: 'a'.repeat(64),
       attendanceState: {
         submittedAt: null,
         lockAt: new Date('2026-06-03T00:00:00.000Z'),
@@ -133,6 +134,7 @@ describe('MobileTeacherAttendanceController', () => {
       sectionId: 'section-1',
       sectionName: 'A',
       attendanceDate: new Date('2026-06-02T00:00:00.000Z'),
+      rosterVersion: 'a'.repeat(64),
       attendanceState: {
         submittedAt: null,
         lockAt: new Date('2026-06-03T00:00:00.000Z'),

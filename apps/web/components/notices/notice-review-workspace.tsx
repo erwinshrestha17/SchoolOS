@@ -80,6 +80,11 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
 
   const actionMutation = useMutation({
     mutationFn: async (action: ReviewAction) => {
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        throw new Error(
+          "Publishing, scheduling, or requesting approval needs a connection. The draft stays unpublished.",
+        );
+      }
       if (action === "publish") {
         return communicationsApi.publishNotice(noticeId);
       }

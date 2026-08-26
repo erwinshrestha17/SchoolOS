@@ -7,6 +7,7 @@ import {
   Optional,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import {
   BS_MONTH_NAMES_EN,
   BS_WEEKDAY_NAMES_EN,
@@ -45,7 +46,10 @@ import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
+import {
+  TEACHER_SCOPE_DENIED_CODE,
+  TeacherScopeService,
+} from '../teacher-scope/teacher-scope.service';
 import { TeacherCapability } from '../teacher-scope/teacher-capability';
 import { AdjustLeaveBalanceDto } from './dto/adjust-leave-balance.dto';
 import { CorrectStaffAttendanceDto } from './dto/correct-staff-attendance.dto';
@@ -91,10 +95,16 @@ import { UpsertAttendanceDraftDto } from './dto/upsert-attendance-draft.dto';
 import { buildRosterPdf } from '../common/pdf/simple-pdf';
 import { loadSchoolLogoForPdf } from '../common/pdf/school-logo-loader';
 import { FileRegistryService } from '../file-registry/file-registry.service';
+import {
+  AUTHORITY_FENCED_CODE,
+  assertClientAuthorityFence,
+} from '../sync/authority-fence';
 
 const M2_ATTENDANCE_HARDENING_POLICY_KEY = 'attendance.m2.hardeningPolicy';
 const ATTENDANCE_SYNC_PROCESSING_LEASE_MS = 2 * 60 * 1000;
 const ATTENDANCE_SYNC_ABANDONED_RETRY_MS = 15 * 60 * 1000;
+export const ATTENDANCE_SCOPE_REVOKED_CODE = 'SCOPE_REVOKED';
+export const ATTENDANCE_ROSTER_CHANGED_CODE = 'ATTENDANCE_ROSTER_CHANGED';
 const DEFAULT_M2_ATTENDANCE_POLICY = {
   lockOverrideMinReasonLength: 8,
   correctionReviewMinReasonLength: 8,
@@ -125,11 +135,13 @@ interface TeacherTodayTimetablePeriodRow {
   academicYearId: string;
   classId: string;
   sectionId: string | null;
+  staffId: string | null;
   startsAt: string;
   endsAt: string;
   class: { name: string };
   section: { name: string } | null;
   subject: { name: string };
+  substitutions: Array<{ substituteTeacherId: string | null }>;
 }
 
 @Injectable()
@@ -144,6 +156,10 @@ export class AttendanceService {
     @Optional()
     private readonly fileRegistryService?: FileRegistryService,
   ) {}
+
+  getScopeVersion(actor: AuthContext) {
+    return this.teacherScopeService.getScopeVersion(actor);
+  }
 
   async listTeacherMobileClassSections(
     actor: AuthContext,
@@ -437,11 +453,21 @@ export class AttendanceService {
               academicYearId: true,
               classId: true,
               sectionId: true,
+              staffId: true,
               startsAt: true,
               endsAt: true,
               class: { select: { name: true } },
               section: { select: { name: true } },
               subject: { select: { name: true } },
+              substitutions: {
+                where: {
+                  tenantId: actor.tenantId,
+                  date: getNepalBusinessDateRange(date),
+                  status: TimetableSubstitutionStatus.ASSIGNED,
+                },
+                select: { substituteTeacherId: true },
+                take: 1,
+              },
             },
             orderBy: [{ startsAt: 'asc' }],
             take: 30,
@@ -478,18 +504,31 @@ export class AttendanceService {
 
     return {
       date: date.toISOString(),
-      periods: periods.map((period) => ({
-        id: period.id,
-        academicYearId: period.academicYearId,
-        classId: period.classId,
-        sectionId: period.sectionId,
-        className: period.section?.name
-          ? `${period.class.name} - ${period.section.name}`
-          : period.class.name,
-        subjectName: period.subject.name,
-        startsAt: period.startsAt,
-        endsAt: period.endsAt,
-      })),
+      periods: periods.map((period) => {
+        const activeSubstitution = (period.substitutions ?? []).find(
+          (substitution) => Boolean(substitution.substituteTeacherId),
+        );
+        const coverageStatus =
+          activeSubstitution?.substituteTeacherId === staffId
+            ? 'SUBSTITUTING'
+            : activeSubstitution && period.staffId === staffId
+              ? 'COVERED'
+              : 'SCHEDULED';
+
+        return {
+          id: period.id,
+          academicYearId: period.academicYearId,
+          classId: period.classId,
+          sectionId: period.sectionId,
+          className: period.section?.name
+            ? `${period.class.name} - ${period.section.name}`
+            : period.class.name,
+          subjectName: period.subject.name,
+          startsAt: period.startsAt,
+          endsAt: period.endsAt,
+          coverageStatus,
+        };
+      }),
       classes,
       hasTeachingScope: classes.length > 0 || periodScopes.length > 0,
       pendingAttendanceCount: classes.filter((item) => {
@@ -744,21 +783,12 @@ export class AttendanceService {
     }
 
     const students = await this.prisma.student.findMany({
-      where: {
+      where: buildAttendanceRosterStudentWhere({
         tenantId: actor.tenantId,
-        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+        academicYearId: dto.academicYearId,
         classId: dto.classId,
-        ...(dto.sectionId ? { sectionId: dto.sectionId } : {}),
-        enrollments: {
-          some: {
-            tenantId: actor.tenantId,
-            academicYearId: dto.academicYearId,
-            classId: dto.classId,
-            sectionId: dto.sectionId ?? null,
-            status: EnrollmentStatus.ACTIVE,
-          },
-        },
-      },
+        sectionId: dto.sectionId,
+      }),
       orderBy: [{ rollNumber: 'asc' }, { firstNameEn: 'asc' }],
     });
 
@@ -766,6 +796,28 @@ export class AttendanceService {
       throw new NotFoundException(
         'No students found for the selected class/section',
       );
+    }
+
+    // An offline sync is an operation against the exact roster the teacher
+    // reviewed. Never reinterpret an old draft after a student is enrolled,
+    // transferred, archived, or moved between sections. Direct online submits
+    // and the legacy server-side draft endpoint retain their existing contract;
+    // the replay-safe sync envelope is the version-fenced path.
+    if ('deviceTimestamp' in dto) {
+      const syncDto = dto as SyncAttendanceDto;
+      const currentRosterVersion = buildAttendanceRosterVersion(
+        {
+          tenantId: actor.tenantId,
+          academicYearId: dto.academicYearId,
+          classId: dto.classId,
+          sectionId: dto.sectionId,
+          attendanceDate,
+        },
+        students.map((student) => student.id),
+      );
+      if (syncDto.expectedRosterVersion !== currentRosterVersion) {
+        throw createAttendanceRosterChangedException();
+      }
     }
 
     const exceptionMap = new Map(
@@ -1142,6 +1194,22 @@ export class AttendanceService {
     );
   }
 
+  private async assertAttendanceSyncAuthorization(
+    dto: SyncAttendanceDto,
+    actor: AuthContext,
+  ) {
+    const provided = dto.authorizationVersion?.trim();
+    if (!provided) {
+      return;
+    }
+
+    const { scopeVersion } =
+      await this.teacherScopeService.getScopeVersion(actor);
+    if (provided !== scopeVersion) {
+      throw createAttendanceScopeRevokedException();
+    }
+  }
+
   private async processAttendanceSyncReservation(
     reservation: AttendanceSyncSubmission,
     dto: SyncAttendanceDto,
@@ -1149,6 +1217,8 @@ export class AttendanceService {
     trustMetadata: Record<string, unknown>,
   ) {
     try {
+      await this.assertAttendanceSyncAuthorization(dto, actor);
+      await assertClientAuthorityFence(this.prisma, actor.tenantId, dto);
       const result = await this.submitAttendance(dto, actor, {
         source: 'sync_submission',
         clientSubmissionId: dto.clientSubmissionId,
@@ -4645,21 +4715,12 @@ export class AttendanceService {
 
     const [students, existingSession, approvedLeaves] = await Promise.all([
       this.prisma.student.findMany({
-        where: {
+        where: buildAttendanceRosterStudentWhere({
           tenantId: actor.tenantId,
-          lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+          academicYearId: resolvedAcademicYearId,
           classId,
-          ...(sectionId ? { sectionId } : {}),
-          enrollments: {
-            some: {
-              tenantId: actor.tenantId,
-              academicYearId: resolvedAcademicYearId,
-              classId,
-              sectionId: sectionId ?? null,
-              status: EnrollmentStatus.ACTIVE,
-            },
-          },
-        },
+          sectionId,
+        }),
         select: {
           id: true,
           studentSystemId: true,
@@ -4711,6 +4772,16 @@ export class AttendanceService {
       class: classroom,
       section,
       attendanceDate: parsedAttendanceDate,
+      rosterVersion: buildAttendanceRosterVersion(
+        {
+          tenantId: actor.tenantId,
+          academicYearId: resolvedAcademicYearId,
+          classId,
+          sectionId,
+          attendanceDate: parsedAttendanceDate,
+        },
+        students.map((student) => student.id),
+      ),
       calendarDay,
       attendanceState: {
         submittedAt: existingSession?.submittedAt ?? null,
@@ -7334,10 +7405,30 @@ function isMatchingAttendanceSyncReplay(
     storedDto.academicYearId === dto.academicYearId &&
     storedDto.classId === dto.classId &&
     (storedDto.sectionId ?? null) === (dto.sectionId ?? null) &&
+    normalizeAttendanceSyncAuthorizationVersion(
+      storedDto.authorizationVersion,
+    ) ===
+      normalizeAttendanceSyncAuthorizationVersion(dto.authorizationVersion) &&
+    normalizeAttendanceRosterVersion(storedDto.expectedRosterVersion) ===
+      normalizeAttendanceRosterVersion(dto.expectedRosterVersion) &&
+    normalizeAttendanceAuthorityNodeId(storedDto.authorityNodeId) ===
+      normalizeAttendanceAuthorityNodeId(dto.authorityNodeId) &&
+    normalizeAttendanceAuthorityEpoch(storedDto.authorityEpoch) ===
+      normalizeAttendanceAuthorityEpoch(dto.authorityEpoch) &&
     storedExceptions !== null &&
     incomingExceptions !== null &&
     JSON.stringify(storedExceptions) === JSON.stringify(incomingExceptions)
   );
+}
+
+function normalizeAttendanceAuthorityNodeId(value: unknown) {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function normalizeAttendanceAuthorityEpoch(value: unknown) {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0
+    ? value
+    : null;
 }
 
 function isAttendanceSyncReservation(submission: AttendanceSyncSubmission) {
@@ -7532,6 +7623,78 @@ function getNepalWeekday(date: Date) {
   return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
 }
 
+function normalizeAttendanceSyncAuthorizationVersion(value: unknown) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function normalizeAttendanceRosterVersion(value: unknown) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function buildAttendanceRosterStudentWhere(scope: {
+  tenantId: string;
+  academicYearId: string;
+  classId: string;
+  sectionId?: string;
+}): Prisma.StudentWhereInput {
+  return {
+    tenantId: scope.tenantId,
+    lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+    classId: scope.classId,
+    ...(scope.sectionId ? { sectionId: scope.sectionId } : {}),
+    enrollments: {
+      some: {
+        tenantId: scope.tenantId,
+        academicYearId: scope.academicYearId,
+        classId: scope.classId,
+        sectionId: scope.sectionId ?? null,
+        status: EnrollmentStatus.ACTIVE,
+      },
+    },
+  };
+}
+
+function buildAttendanceRosterVersion(
+  scope: {
+    tenantId: string;
+    academicYearId: string;
+    classId: string;
+    sectionId?: string;
+    attendanceDate: Date;
+  },
+  studentIds: string[],
+) {
+  const canonicalRoster = [
+    'attendance-roster:v1',
+    scope.tenantId,
+    scope.academicYearId,
+    scope.classId,
+    scope.sectionId ?? '<none>',
+    getDateKey(scope.attendanceDate),
+    ...studentIds.slice().sort(),
+  ].join('\n');
+
+  return createHash('sha256').update(canonicalRoster).digest('hex');
+}
+
+function createAttendanceScopeRevokedException() {
+  return new ForbiddenException({
+    statusCode: 403,
+    code: ATTENDANCE_SCOPE_REVOKED_CODE,
+    message:
+      'Your teaching assignment changed. This attendance draft can no longer be submitted.',
+  });
+}
+
+function createAttendanceRosterChangedException() {
+  return new ConflictException({
+    statusCode: 409,
+    code: ATTENDANCE_ROSTER_CHANGED_CODE,
+    message:
+      'The class roster changed after this attendance draft was created. Review the current roster and create a new submission.',
+  });
+}
+
 function classifyAttendanceSyncRejection(error: unknown) {
   if (error instanceof NotFoundException) {
     return AttendanceSyncRejectionReason.REFERENCE_NOT_FOUND;
@@ -7547,8 +7710,15 @@ function classifyAttendanceSyncRejection(error: unknown) {
         ? String((exceptionResponse as { code?: unknown }).code ?? '')
         : '';
 
-    if (code === 'TEACHER_SCOPE_DENIED' || message.includes('TEACHER_SCOPE')) {
-      return AttendanceSyncRejectionReason.UNASSIGNED_TEACHER;
+    if (code === ATTENDANCE_SCOPE_REVOKED_CODE) {
+      return AttendanceSyncRejectionReason.SCOPE_REVOKED;
+    }
+
+    if (
+      code === TEACHER_SCOPE_DENIED_CODE ||
+      message.includes('TEACHER_SCOPE')
+    ) {
+      return AttendanceSyncRejectionReason.SCOPE_REVOKED;
     }
 
     if (message.includes('locked')) {
@@ -7561,6 +7731,19 @@ function classifyAttendanceSyncRejection(error: unknown) {
   }
 
   if (error instanceof ConflictException) {
+    const exceptionResponse = error.getResponse();
+    const code =
+      typeof exceptionResponse === 'object' &&
+      exceptionResponse !== null &&
+      'code' in exceptionResponse
+        ? String((exceptionResponse as { code?: unknown }).code ?? '')
+        : '';
+    if (code === AUTHORITY_FENCED_CODE) {
+      return AttendanceSyncRejectionReason.AUTHORITY_FENCED;
+    }
+    if (code === ATTENDANCE_ROSTER_CHANGED_CODE) {
+      return AttendanceSyncRejectionReason.ROSTER_MISMATCH;
+    }
     const message = String(error.message ?? '');
     if (
       message.includes('already submitted') ||

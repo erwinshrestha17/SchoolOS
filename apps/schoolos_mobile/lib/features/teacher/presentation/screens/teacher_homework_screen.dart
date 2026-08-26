@@ -1,8 +1,12 @@
+import 'dart:async' show unawaited;
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/errors/app_exception.dart';
+import '../../../../core/network/connectivity_provider.dart';
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../shared/utils/nepali_bs_calendar.dart';
@@ -15,6 +19,7 @@ import '../../../../shared/widgets/app_skeleton.dart';
 import '../../../../shared/widgets/role_shell_scaffold.dart';
 import '../../../../shared/widgets/status_chip.dart';
 import '../../application/teacher_providers.dart';
+import '../../../../core/sync/teacher_homework_draft_store.dart';
 import '../../domain/teacher_models.dart';
 import '../widgets/teacher_app_widgets.dart';
 
@@ -42,9 +47,90 @@ class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
   final _picker = ImagePicker();
   String? _status;
   bool _openedInitialCreate = false;
+  bool _didScheduleHomeworkDrain = false;
+
+  Future<void> _drainHomeworkDrafts() async {
+    try {
+      if (!ref.read(connectivityProvider)) return;
+      final store = ref.read(teacherHomeworkDraftStoreProvider);
+      final drafts = await store.listQueued();
+      for (final draft in drafts) {
+        final operationId = draft['operationId'] as String?;
+        final payload = draft['payload'];
+        if (operationId == null ||
+            operationId.isEmpty ||
+            payload is! Map<String, dynamic>) {
+          continue;
+        }
+        final academicYearId = payload['academicYearId'] as String?;
+        final classId = payload['classId'] as String?;
+        final subjectId = payload['subjectId'] as String?;
+        final title = payload['title'] as String?;
+        final instructions = payload['instructions'] as String?;
+        final dueDateRaw = payload['dueDate'] as String?;
+        final dueDate = dueDateRaw == null
+            ? null
+            : DateTime.tryParse(dueDateRaw);
+        if (academicYearId == null ||
+            classId == null ||
+            subjectId == null ||
+            title == null ||
+            instructions == null ||
+            dueDate == null) {
+          continue;
+        }
+        try {
+          await ref
+              .read(teacherRepositoryProvider)
+              .createHomework(
+                scope: TeacherHomeworkScope(
+                  id: [
+                    academicYearId,
+                    classId,
+                    payload['sectionId'] as String? ?? '',
+                    subjectId,
+                  ].join(':'),
+                  academicYearId: academicYearId,
+                  academicYearName: '',
+                  classId: classId,
+                  className: '',
+                  sectionId: payload['sectionId'] as String?,
+                  subjectId: subjectId,
+                  subjectName: '',
+                ),
+                title: title,
+                instructions: instructions,
+                dueDate: dueDate,
+                submissionRequired:
+                    payload['submissionRequired'] as bool? ?? true,
+                clientOperationId: operationId,
+              );
+          await store.delete(operationId);
+        } catch (_) {
+          // Leave the queued draft for a later reconnect.
+        }
+      }
+      if (mounted) {
+        ref.invalidate(teacherHomeworkProvider(_currentQuery()));
+      }
+    } catch (_) {
+      // Tests and cold start may lack SharedPreferences; skip drain.
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<bool>(connectivityProvider, (previous, next) {
+      if (next) {
+        unawaited(_drainHomeworkDrafts());
+      }
+    });
+    if (!_didScheduleHomeworkDrain) {
+      _didScheduleHomeworkDrain = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_drainHomeworkDrafts());
+      });
+    }
     final query = _currentQuery();
     final provider = teacherHomeworkProvider(query);
     final homework = ref.watch(provider);
@@ -53,13 +139,12 @@ class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
       snapshot?.scopes ?? const <TeacherHomeworkScope>[],
       query,
     );
-    final writesLocked = snapshot?.fromCache ?? false;
 
     return RoleShellScaffold(
       role: 'TEACHER',
       selectedIndex: 2,
       title: 'Homework',
-      floatingActionButton: scopes.isEmpty || writesLocked
+      floatingActionButton: scopes.isEmpty
           ? null
           : FloatingActionButton.extended(
               onPressed: () => _showCreateSheet(scopes),
@@ -208,15 +293,13 @@ class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
                     message: query.reviewOnly
                         ? 'Reviewed or unsubmitted work will stay out of this queue.'
                         : snapshot.fromCache
-                        ? 'This action needs internet. Please reconnect to create homework.'
+                        ? 'Create a local draft. Publishing still needs a connection.'
                         : _status == null
                         ? 'Create a draft for one of your assigned classes.'
                         : 'Choose another filter or create a new draft.',
                     icon: Icons.assignment_outlined,
-                    actionLabel: query.reviewOnly || snapshot.fromCache
-                        ? null
-                        : 'Create homework',
-                    onActionPressed: query.reviewOnly || snapshot.fromCache
+                    actionLabel: query.reviewOnly ? null : 'Create homework',
+                    onActionPressed: query.reviewOnly
                         ? null
                         : () => _showCreateSheet(contextScopes),
                   )
@@ -486,6 +569,7 @@ class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
                             : () async {
                                 if (!formKey.currentState!.validate()) return;
                                 setSheetState(() => saving = true);
+                                final operationId = _newHomeworkOperationId();
                                 try {
                                   await ref
                                       .read(teacherRepositoryProvider)
@@ -495,6 +579,7 @@ class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
                                         instructions: instructions.text,
                                         dueDate: dueDate,
                                         submissionRequired: submissionRequired,
+                                        clientOperationId: operationId,
                                         attachments: List.unmodifiable(
                                           attachments,
                                         ),
@@ -516,7 +601,49 @@ class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
                                       ),
                                     );
                                   }
-                                } catch (error) {
+                                } on AppException catch (error) {
+                                  if (error is NetworkException ||
+                                      error is TimeoutException) {
+                                    await ref
+                                        .read(teacherHomeworkDraftStoreProvider)
+                                        .write(
+                                          operationId: operationId,
+                                          payload: {
+                                            'academicYearId':
+                                                selectedScope.academicYearId,
+                                            'classId': selectedScope.classId,
+                                            'sectionId':
+                                                selectedScope.sectionId,
+                                            'subjectId':
+                                                selectedScope.subjectId,
+                                            'title': title.text.trim(),
+                                            'instructions': instructions.text
+                                                .trim(),
+                                            'dueDate': dueDate
+                                                .toUtc()
+                                                .toIso8601String(),
+                                            'submissionRequired':
+                                                submissionRequired,
+                                            'clientOperationId': operationId,
+                                          },
+                                        );
+                                    setSheetState(() => saving = false);
+                                    if (sheetContext.mounted) {
+                                      Navigator.pop(sheetContext);
+                                    }
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(
+                                        this.context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Homework draft queued on this phone. It is not published.',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                    return;
+                                  }
                                   setSheetState(() => saving = false);
                                   // Homework create carries no idempotency key
                                   // (the DTO is shared with the web app), so a
@@ -877,7 +1004,7 @@ class _OfflineReadOnlyCard extends StatelessWidget {
             SizedBox(
               width: textWidth.toDouble(),
               child: Text(
-                'You are offline. Homework is read-only until the connection returns.',
+                'You are offline. Homework drafts can be queued on this phone. Publishing still needs a connection.',
                 style: Theme.of(
                   context,
                 ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800),
@@ -1395,3 +1522,14 @@ bool _isAmbiguousWriteFailure(Object error) =>
     error is TimeoutException ||
     error is ServerException ||
     error is UnknownException;
+
+String _newHomeworkOperationId() {
+  final random = Random.secure();
+  final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  final hex = bytes
+      .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+      .join();
+  return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
+}

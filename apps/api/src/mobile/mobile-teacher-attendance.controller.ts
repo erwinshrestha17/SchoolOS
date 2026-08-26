@@ -70,6 +70,7 @@ export class MobileTeacherAttendanceController {
       sectionId: roster.section?.id ?? null,
       sectionName: roster.section?.name ?? null,
       attendanceDate: roster.attendanceDate,
+      rosterVersion: roster.rosterVersion,
       attendanceState: roster.attendanceState,
       calendarDay: roster.calendarDay,
       students: roster.students.map((student) => ({

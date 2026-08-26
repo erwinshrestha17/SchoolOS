@@ -23,6 +23,9 @@ class MockTeacherAttendanceDraftStore extends Mock
 class MockTeacherAttendanceScopeVersionStore extends Mock
     implements TeacherAttendanceScopeVersionStore {}
 
+const attendanceRosterVersion =
+    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+
 void main() {
   group('AttendanceRepository', () {
     late MockApiClient apiClient;
@@ -505,6 +508,7 @@ void main() {
               status: AttendanceStatus.absent,
             ),
           ],
+          expectedRosterVersion: attendanceRosterVersion,
         );
         await draftWriteStarted.future;
         var refreshCompleted = false;
@@ -1108,6 +1112,7 @@ void main() {
                   'subjectName': 'Mathematics',
                   'startsAt': '09:00',
                   'endsAt': '09:45',
+                  'coverageStatus': 'SUBSTITUTING',
                 },
               ],
               'classes': [
@@ -1134,6 +1139,10 @@ void main() {
         expect(today.pendingAttendanceCount, 1);
         expect(today.hasTeachingScope, isTrue);
         expect(today.periods.single.subjectName, 'Mathematics');
+        expect(
+          today.periods.single.coverageStatus,
+          TeacherPeriodCoverageStatus.substituting,
+        );
         expect(today.classes.single.attendance?.isSubmitted, isFalse);
       },
     );
@@ -1164,6 +1173,7 @@ void main() {
             path: '/mobile/teacher/attendance/roster',
           ),
           data: {
+            'rosterVersion': attendanceRosterVersion,
             'students': [
               {
                 'studentId': 'student-1',
@@ -1207,13 +1217,14 @@ void main() {
         classSection.id,
         DateTime(2026, 6, 2),
         roster.entries,
+        expectedRosterVersion: roster.rosterVersion,
       );
       final submitResult = await repository.submitAttendance(
         classSection,
         DateTime(2026, 6, 2),
         roster.entries,
         draft.clientSubmissionId,
-        draft.savedAt,
+        DateTime(2099, 1, 1),
       );
 
       expect(roster.entries, hasLength(2));
@@ -1233,6 +1244,7 @@ void main() {
       expect(payload['sectionId'], 'section-1');
       expect(payload['attendanceDate'], '2026-06-02');
       expect(payload['clientSubmissionId'], draft.clientSubmissionId);
+      expect(payload['expectedRosterVersion'], attendanceRosterVersion);
       expect(
         payload['deviceTimestamp'],
         draft.savedAt.toUtc().toIso8601String(),
@@ -1241,6 +1253,60 @@ void main() {
         {'studentId': 'student-2', 'status': 'ABSENT'},
       ]);
     });
+
+    test(
+      'rejects an unverifiable roster response without caching it',
+      () async {
+        const classSection = TeacherClassSection(
+          id: 'year-1:class-1:section-1',
+          academicYearId: 'year-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          name: 'Grade 3 - A',
+          subject: 'Mathematics',
+        );
+        final cache = PrivateReadCache(
+          secureStore,
+          scope: PrivateReadCacheScope(
+            tenantId: 'tenant-1',
+            userId: 'teacher-1',
+            role: MobileRole.teacher,
+          ),
+        );
+        final cachedRepository = AttendanceRepository(apiClient, cache: cache);
+        when(
+          () => apiClient.get<dynamic>(
+            '/mobile/teacher/attendance/roster',
+            queryParameters: any(named: 'queryParameters'),
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(
+              path: '/mobile/teacher/attendance/roster',
+            ),
+            data: {'students': const <Map<String, dynamic>>[]},
+          ),
+        );
+
+        await expectLater(
+          cachedRepository.getClassAttendanceSheet(
+            classSection,
+            DateTime(2026, 6, 2),
+          ),
+          throwsA(
+            isA<ServerException>().having(
+              (error) => error.code,
+              'code',
+              'INVALID_ATTENDANCE_ROSTER_VERSION',
+            ),
+          ),
+        );
+        expect(
+          await cache.read('teacher_roster_${classSection.id}_2026-06-02'),
+          isNull,
+        );
+      },
+    );
 
     test(
       'loads teacher-scoped student summary with explicit class scope',
@@ -1430,6 +1496,7 @@ void main() {
           classSection.id,
           date,
           draftEntries,
+          expectedRosterVersion: attendanceRosterVersion,
         );
         final loadedDraft = await repository.loadDraftAttendance(
           classSection.id,
@@ -1440,11 +1507,13 @@ void main() {
         expect(loadedDraft!.entries, hasLength(2));
         expect(loadedDraft.entries.last.studentId, 'student-2');
         expect(loadedDraft.entries.last.status, AttendanceStatus.late);
+        expect(loadedDraft.expectedRosterVersion, attendanceRosterVersion);
 
         final updatedDraft = await repository.saveDraftAttendanceLocally(
           classSection.id,
           date,
           loadedDraft.entries,
+          expectedRosterVersion: attendanceRosterVersion,
         );
         expect(updatedDraft.clientSubmissionId, loadedDraft.clientSubmissionId);
 
@@ -1499,6 +1568,7 @@ void main() {
         classSection.id,
         date,
         draftEntries,
+        expectedRosterVersion: attendanceRosterVersion,
       );
 
       final result = await repository.submitAttendance(
@@ -1531,6 +1601,7 @@ void main() {
         classSection.id,
         date,
         changedEntries,
+        expectedRosterVersion: attendanceRosterVersion,
       );
       expect(
         rotatedDraft.clientSubmissionId,
@@ -1539,6 +1610,95 @@ void main() {
       expect(rotatedDraft.receiptState, AttendanceDraftReceiptState.local);
       expect(rotatedDraft.entries.single.status, AttendanceStatus.late);
     });
+
+    test(
+      'replays a protected legacy receipt without inventing a roster version',
+      () async {
+        const classSection = TeacherClassSection(
+          id: 'year-1:class-1:section-1',
+          academicYearId: 'year-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          name: 'Grade 3 - A',
+          subject: 'Mathematics',
+        );
+        final date = DateTime(2026, 6, 2);
+        const draftEntries = [
+          AttendanceStudentEntry(
+            studentId: 'student-1',
+            studentName: 'Asha Sharma',
+            rollNumber: '7',
+            status: AttendanceStatus.absent,
+          ),
+        ];
+        final savedAt = DateTime(2026, 6, 2, 8);
+        final legacyStore = TeacherAttendanceDraftStore(
+          secureStore,
+          scope: TeacherAttendanceDraftScope(
+            tenantId: 'tenant-1',
+            userId: 'teacher-1',
+            role: MobileRole.teacher,
+          ),
+        );
+        expect(
+          await legacyStore.write(
+            classSectionId: classSection.id,
+            date: '2026-06-02',
+            payload: {
+              'clientSubmissionId': 'legacy-protected-receipt',
+              'savedAt': savedAt.toIso8601String(),
+              'entries': [for (final entry in draftEntries) entry.toJson()],
+              'receiptState': 'queued',
+            },
+          ),
+          isTrue,
+        );
+        when(
+          () => apiClient.post<dynamic>(
+            '/mobile/teacher/attendance/sync',
+            data: any(named: 'data'),
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(
+              path: '/mobile/teacher/attendance/sync',
+            ),
+            data: const {
+              'syncStatus': 'REJECTED',
+              'replayed': false,
+              'rejectionReason': 'ROSTER_MISMATCH',
+            },
+          ),
+        );
+
+        final result = await repository.submitAttendance(
+          classSection,
+          date,
+          draftEntries,
+          'legacy-protected-receipt',
+          DateTime(2099, 1, 1),
+        );
+
+        expect(result.isRosterMismatch, isTrue);
+        final payload =
+            verify(
+                  () => apiClient.post<dynamic>(
+                    '/mobile/teacher/attendance/sync',
+                    data: captureAny(named: 'data'),
+                  ),
+                ).captured.single
+                as Map<String, dynamic>;
+        expect(payload.containsKey('expectedRosterVersion'), isFalse);
+        expect(payload['deviceTimestamp'], savedAt.toUtc().toIso8601String());
+        expect(
+          (await repository.loadDraftAttendance(
+            classSection.id,
+            date,
+          ))?.receiptState,
+          AttendanceDraftReceiptState.rejected,
+        );
+      },
+    );
 
     test(
       'turns an assignment-revocation receipt into a permission denial',
@@ -1581,6 +1741,7 @@ void main() {
           classSection.id,
           date,
           draftEntries,
+          expectedRosterVersion: attendanceRosterVersion,
         );
 
         await expectLater(
@@ -1601,6 +1762,66 @@ void main() {
         );
       },
     );
+
+    test('turns a SCOPE_REVOKED receipt into a permission denial', () async {
+      const classSection = TeacherClassSection(
+        id: 'year-1:class-1:section-1',
+        academicYearId: 'year-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        name: 'Grade 3 - A',
+        subject: 'Mathematics',
+      );
+      final date = DateTime(2026, 6, 2);
+      const draftEntries = [
+        AttendanceStudentEntry(
+          studentId: 'student-1',
+          studentName: 'Asha Sharma',
+          rollNumber: '7',
+          status: AttendanceStatus.absent,
+        ),
+      ];
+      when(
+        () => apiClient.post<dynamic>(
+          '/mobile/teacher/attendance/sync',
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(
+            path: '/mobile/teacher/attendance/sync',
+          ),
+          data: {
+            'syncStatus': 'REJECTED',
+            'replayed': false,
+            'rejectionReason': 'SCOPE_REVOKED',
+          },
+        ),
+      );
+      final draft = await repository.saveDraftAttendanceLocally(
+        classSection.id,
+        date,
+        draftEntries,
+        expectedRosterVersion: attendanceRosterVersion,
+      );
+
+      await expectLater(
+        repository.submitAttendance(
+          classSection,
+          date,
+          draftEntries,
+          draft.clientSubmissionId,
+          draft.savedAt,
+        ),
+        throwsA(
+          isA<PermissionException>().having(
+            (error) => error.code,
+            'code',
+            'TEACHER_SCOPE_DENIED',
+          ),
+        ),
+      );
+    });
 
     test('keeps the secure draft while a 2xx receipt is PROCESSING', () async {
       const classSection = TeacherClassSection(
@@ -1637,6 +1858,7 @@ void main() {
         classSection.id,
         date,
         draftEntries,
+        expectedRosterVersion: attendanceRosterVersion,
       );
 
       final result = await repository.submitAttendance(
@@ -1664,6 +1886,7 @@ void main() {
         classSection.id,
         date,
         draftEntries,
+        expectedRosterVersion: attendanceRosterVersion,
       );
       expect(sameContent.clientSubmissionId, draft.clientSubmissionId);
       expect(sameContent.receiptState, AttendanceDraftReceiptState.processing);
@@ -1676,7 +1899,7 @@ void main() {
                 rollNumber: '7',
                 status: AttendanceStatus.late,
               ),
-            ]),
+            ], expectedRosterVersion: attendanceRosterVersion),
         throwsA(isA<ConflictAppException>()),
       );
     });
@@ -1716,6 +1939,7 @@ void main() {
         classSection.id,
         date,
         draftEntries,
+        expectedRosterVersion: attendanceRosterVersion,
       );
 
       final result = await repository.submitAttendance(
@@ -1775,6 +1999,7 @@ void main() {
           classSection.id,
           date,
           draftEntries,
+          expectedRosterVersion: attendanceRosterVersion,
         );
 
         final result = await repository.submitAttendance(
@@ -1805,7 +2030,7 @@ void main() {
                   rollNumber: '7',
                   status: AttendanceStatus.late,
                 ),
-              ]),
+              ], expectedRosterVersion: attendanceRosterVersion),
           throwsA(isA<ConflictAppException>()),
         );
       },
@@ -1839,6 +2064,7 @@ void main() {
         classSection.id,
         date,
         draftEntries,
+        expectedRosterVersion: attendanceRosterVersion,
       );
 
       await expectLater(
@@ -1895,6 +2121,7 @@ void main() {
           classSection.id,
           date,
           draftEntries,
+          expectedRosterVersion: attendanceRosterVersion,
         );
 
         await expectLater(
@@ -1933,6 +2160,7 @@ void main() {
           'year-1:class-1:section-1',
           date,
           draftEntries,
+          expectedRosterVersion: attendanceRosterVersion,
         );
 
         await repository.markDraftReceiptState(
@@ -1964,6 +2192,7 @@ void main() {
                 status: AttendanceStatus.leave,
               ),
             ],
+            expectedRosterVersion: attendanceRosterVersion,
           ),
           throwsA(isA<ConflictAppException>()),
         );
@@ -1986,6 +2215,7 @@ void main() {
           'year-1:class-1:section-1',
           date,
           draftEntries,
+          expectedRosterVersion: attendanceRosterVersion,
         );
 
         expect(
@@ -2014,6 +2244,158 @@ void main() {
             receiptState: AttendanceDraftReceiptState.processing,
           ),
           throwsA(isA<ConflictAppException>()),
+        );
+      },
+    );
+
+    test(
+      'sends stored scope version as authorizationVersion on sync',
+      () async {
+        const classSection = TeacherClassSection(
+          id: 'year-1:class-1:section-1',
+          academicYearId: 'year-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          name: 'Grade 3 - A',
+          subject: 'Mathematics',
+        );
+        final date = DateTime(2026, 6, 2);
+        const draftEntries = [
+          AttendanceStudentEntry(
+            studentId: 'student-1',
+            studentName: 'Asha Sharma',
+            rollNumber: '7',
+            status: AttendanceStatus.absent,
+          ),
+        ];
+        final versions = TeacherAttendanceScopeVersionStore(
+          secureStore,
+          scope: TeacherAttendanceScopeVersionScope(
+            tenantId: 'tenant-1',
+            userId: 'teacher-1',
+            role: MobileRole.teacher,
+          ),
+        );
+        await versions.write('7');
+        final scopedRepository = AttendanceRepository(
+          apiClient,
+          draftStore: TeacherAttendanceDraftStore(
+            secureStore,
+            scope: TeacherAttendanceDraftScope(
+              tenantId: 'tenant-1',
+              userId: 'teacher-1',
+              role: MobileRole.teacher,
+            ),
+          ),
+          scopeVersionStore: versions,
+        );
+        when(
+          () => apiClient.post<dynamic>(
+            '/mobile/teacher/attendance/sync',
+            data: any(named: 'data'),
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(
+              path: '/mobile/teacher/attendance/sync',
+            ),
+            data: {
+              'attendanceSessionId': 'session-1',
+              'syncStatus': 'ACCEPTED',
+              'replayed': false,
+            },
+          ),
+        );
+
+        final draft = await scopedRepository.saveDraftAttendanceLocally(
+          classSection.id,
+          date,
+          draftEntries,
+          expectedRosterVersion: attendanceRosterVersion,
+        );
+        await scopedRepository.submitAttendance(
+          classSection,
+          date,
+          draftEntries,
+          draft.clientSubmissionId,
+          draft.savedAt,
+        );
+
+        final payload =
+            verify(
+                  () => apiClient.post<dynamic>(
+                    '/mobile/teacher/attendance/sync',
+                    data: captureAny(named: 'data'),
+                  ),
+                ).captured.single
+                as Map<String, dynamic>;
+        expect(payload['authorizationVersion'], '7');
+        expect(payload['clientSubmissionId'], draft.clientSubmissionId);
+      },
+    );
+
+    test(
+      'auto-drains explicitly queued attendance drafts on reconnect',
+      () async {
+        const classSection = TeacherClassSection(
+          id: 'year-1:class-1:section-1',
+          academicYearId: 'year-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          name: 'Grade 3 - A',
+          subject: 'Mathematics',
+        );
+        final date = DateTime(2026, 6, 2);
+        const draftEntries = [
+          AttendanceStudentEntry(
+            studentId: 'student-1',
+            studentName: 'Asha Sharma',
+            rollNumber: '7',
+            status: AttendanceStatus.absent,
+          ),
+        ];
+        when(
+          () => apiClient.post<dynamic>(
+            '/mobile/teacher/attendance/sync',
+            data: any(named: 'data'),
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(
+              path: '/mobile/teacher/attendance/sync',
+            ),
+            data: {
+              'attendanceSessionId': 'session-1',
+              'syncStatus': 'ACCEPTED',
+              'replayed': false,
+            },
+          ),
+        );
+        final draft = await repository.saveDraftAttendanceLocally(
+          classSection.id,
+          date,
+          draftEntries,
+          expectedRosterVersion: attendanceRosterVersion,
+        );
+        await repository.markDraftReceiptState(
+          classSection.id,
+          date,
+          draftEntries,
+          clientSubmissionId: draft.clientSubmissionId,
+          receiptState: AttendanceDraftReceiptState.queued,
+        );
+
+        await repository.syncQueuedAttendanceDrafts([classSection]);
+
+        verify(
+          () => apiClient.post<dynamic>(
+            '/mobile/teacher/attendance/sync',
+            data: any(named: 'data'),
+          ),
+        ).called(1);
+        expect(
+          await repository.loadDraftAttendance(classSection.id, date),
+          isNull,
         );
       },
     );

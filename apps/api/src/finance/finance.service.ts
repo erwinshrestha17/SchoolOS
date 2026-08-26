@@ -50,6 +50,7 @@ import {
 import { loadSchoolLogoForPdf } from '../common/pdf/school-logo-loader';
 import { CommunicationsService } from '../communications/communications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { assertClientAuthorityFence } from '../sync/authority-fence';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { EntitlementsService } from '../plans/entitlements.service';
 import {
@@ -6409,6 +6410,7 @@ export class FinanceService {
 
   async collectPayment(dto: CollectPaymentDto, actor: AuthContext) {
     assertFinancePermission(actor, 'payments:collect');
+    await assertClientAuthorityFence(this.prisma, actor.tenantId, dto);
     const idempotencyKey = dto.idempotencyKey.trim();
     if (!idempotencyKey) {
       throw new BadRequestException(

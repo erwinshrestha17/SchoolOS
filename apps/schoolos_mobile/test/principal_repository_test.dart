@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:schoolos_mobile/core/errors/app_exception.dart';
 import 'package:schoolos_mobile/core/network/api_client.dart';
+import 'package:schoolos_mobile/core/storage/private_read_cache.dart';
+import 'package:schoolos_mobile/core/storage/secure_storage_service.dart';
 import 'package:schoolos_mobile/features/principal/data/principal_repository.dart';
 
 class MockApiClient extends Mock implements ApiClient {}
@@ -44,7 +46,8 @@ void main() {
       },
     );
 
-    test('keeps principal dashboard network-only when offline', () async {
+    test('keeps principal dashboard network-only when offline without cache',
+        () async {
       when(
         () => apiClient.get<dynamic>('/mobile/principal/dashboard'),
       ).thenThrow(const NetworkException());
@@ -55,6 +58,43 @@ void main() {
         repository.getDashboard(),
         throwsA(isA<NetworkException>()),
       );
+    });
+
+    test('returns cached principal dashboard after a successful fetch',
+        () async {
+      when(
+        () => apiClient.get<dynamic>('/mobile/principal/dashboard'),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: '/mobile/principal/dashboard'),
+          data: {
+            'attentionCount': 2,
+            'cards': [
+              {'key': 'approvals', 'label': 'Approvals', 'value': 2},
+            ],
+          },
+        ),
+      );
+
+      final cache = PrivateReadCache(
+        _MemorySecureStore(),
+        scope: PrivateReadCacheScope(
+          tenantId: 'tenant-1',
+          userId: 'principal-1',
+          role: 'PRINCIPAL',
+        ),
+      );
+      final repository = PrincipalRepository(apiClient, cache: cache);
+      final online = await repository.getDashboard();
+      expect(online['_mobileFromCache'], isFalse);
+
+      when(
+        () => apiClient.get<dynamic>('/mobile/principal/dashboard'),
+      ).thenThrow(const NetworkException());
+
+      final offline = await repository.getDashboard();
+      expect(offline['attentionCount'], 2);
+      expect(offline['_mobileFromCache'], isTrue);
     });
 
     test('loads the purpose-limited admissions snapshot', () async {
@@ -540,4 +580,37 @@ void main() {
       },
     );
   });
+}
+
+class _MemorySecureStore implements SecureKeyValueStore {
+  final Map<String, String> values = {};
+
+  @override
+  Future<void> write(String key, String value) async {
+    values[key] = value;
+  }
+
+  @override
+  Future<String?> read(String key) async => values[key];
+
+  @override
+  Future<Map<String, String>> readAll() async => Map.of(values);
+
+  @override
+  Future<void> delete(String key) async {
+    values.remove(key);
+  }
+
+  @override
+  Future<void> clearAll() async {
+    values.clear();
+  }
+
+  @override
+  Future<bool> containsKey(String key) async => values.containsKey(key);
+
+  @override
+  Future<void> deleteByPrefix(String prefix) async {
+    values.removeWhere((key, _) => key.startsWith(prefix));
+  }
 }

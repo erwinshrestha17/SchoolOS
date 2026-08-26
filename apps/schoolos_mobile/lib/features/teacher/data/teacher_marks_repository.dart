@@ -1,9 +1,11 @@
 import '../../../core/network/api_client.dart';
+import '../../../core/sync/school_authority_discovery.dart';
 
 class TeacherMarksRepository {
-  const TeacherMarksRepository(this._client);
+  const TeacherMarksRepository(this._client, {this.authorityDiscovery});
 
   final ApiClient _client;
+  final SchoolAuthorityDiscovery? authorityDiscovery;
 
   Future<List<TeacherAssessmentComponent>> listComponents({
     String? classId,
@@ -69,6 +71,7 @@ class TeacherMarksRepository {
     required String subjectId,
     required List<TeacherMarkUpsert> entries,
   }) async {
+    await authorityDiscovery?.refresh();
     await _client.post(
       '/mobile/teacher/marks/bulk-upsert',
       data: {
@@ -78,6 +81,7 @@ class TeacherMarksRepository {
         if (sectionId != null && sectionId.isNotEmpty) 'sectionId': sectionId,
         'subjectId': subjectId,
         'entries': entries.map((entry) => entry.toJson()).toList(),
+        ...?authorityDiscovery?.fields(),
       },
     );
   }
@@ -145,6 +149,7 @@ class TeacherMarkEntry {
     this.isAbsent = false,
     this.isLocked = false,
     this.remarks,
+    this.updatedAt,
   });
 
   final String studentId;
@@ -154,6 +159,7 @@ class TeacherMarkEntry {
   final bool isAbsent;
   final bool isLocked;
   final String? remarks;
+  final String? updatedAt;
 
   factory TeacherMarkEntry.fromJson(Map<String, dynamic> json) {
     final student = json['student'] is Map
@@ -177,6 +183,9 @@ class TeacherMarkEntry {
       isAbsent: json['isAbsent'] == true,
       isLocked: json['isLocked'] == true,
       remarks: json['remarks'] as String?,
+      updatedAt: json['updatedAt'] is String
+          ? json['updatedAt'] as String
+          : json['updatedAt']?.toString(),
     );
   }
 }
@@ -188,6 +197,7 @@ class TeacherMarkUpsert {
     this.isAbsent = false,
     this.isDraft = false,
     this.remarks,
+    this.expectedVersion,
   });
 
   final String studentId;
@@ -195,6 +205,7 @@ class TeacherMarkUpsert {
   final bool isAbsent;
   final bool isDraft;
   final String? remarks;
+  final String? expectedVersion;
 
   Map<String, dynamic> toJson() => {
     'studentId': studentId,
@@ -202,5 +213,7 @@ class TeacherMarkUpsert {
     'isAbsent': isAbsent,
     'isDraft': isDraft,
     if (remarks != null && remarks!.trim().isNotEmpty) 'remarks': remarks,
+    if (expectedVersion != null && expectedVersion!.trim().isNotEmpty)
+      'expectedVersion': expectedVersion,
   };
 }

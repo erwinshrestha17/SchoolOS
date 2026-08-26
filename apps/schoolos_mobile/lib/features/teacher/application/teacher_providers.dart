@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/network/connectivity_provider.dart';
 import '../../../core/storage/private_read_cache.dart';
+import '../../../core/sync/school_authority_discovery.dart';
 import '../data/teacher_repository.dart';
 import '../domain/teacher_models.dart';
 import '../../learning_support/domain/learning_support_models.dart';
@@ -11,6 +12,7 @@ final teacherRepositoryProvider = Provider<TeacherRepository>((ref) {
   return TeacherRepository(
     ref.watch(apiClientProvider),
     cache: ref.watch(privateReadCacheProvider),
+    authorityDiscovery: ref.watch(schoolAuthorityDiscoveryProvider),
   );
 });
 
