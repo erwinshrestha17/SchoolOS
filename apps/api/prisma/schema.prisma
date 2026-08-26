@@ -7756,6 +7756,8 @@ model StudentDocument {
   tenantId     String
   studentId    String
   fileId       String?
+  idempotencyKey String?
+  contentChecksumSha256 String?
   kind         StudentDocumentKind
   status       StudentDocumentStatus @default(ACTIVE)
   title        String
@@ -7781,6 +7783,7 @@ model StudentDocument {
 
   @@index([tenantId, studentId])
   @@index([tenantId, fileId])
+  @@unique([tenantId, idempotencyKey])
 }
 
 model StudentMergeHistory {

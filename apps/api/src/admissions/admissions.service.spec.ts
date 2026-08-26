@@ -5,7 +5,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { AuthMethod, EnrollmentStatus, Gender } from '@prisma/client';
+import {
+  AuthMethod,
+  EnrollmentStatus,
+  Gender,
+  StudentDocumentKind,
+} from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { ConfigService } from '../config/config.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
@@ -201,6 +206,38 @@ describe('AdmissionsService production hardening', () => {
     );
 
     expect(result.student.studentSystemId).toBe('SCH-2026-0001');
+  });
+
+  it('uses a stable enrollment-scoped key for admission document retries', async () => {
+    const prisma = buildPrisma();
+    const tx = buildTransaction();
+    prisma.$transaction.mockImplementation(async (callback) => callback(tx));
+    const { service, studentRecordsService } = buildService(prisma);
+    const dto = buildAdmissionDto();
+    dto.documents = [
+      {
+        kind: StudentDocumentKind.BIRTH_CERTIFICATE,
+        fileName: 'birth.pdf',
+        contentType: 'application/pdf',
+        base64Content: 'aGVsbG8=',
+      },
+    ];
+
+    await service.createAdmission(dto, actor);
+
+    expect(studentRecordsService.uploadDocument).toHaveBeenCalledWith(
+      expect.objectContaining({
+        studentId: 'student-1',
+        kind: StudentDocumentKind.BIRTH_CERTIFICATE,
+        fileName: 'birth.pdf',
+      }),
+      actor,
+      {
+        idempotencyKey: expect.stringMatching(
+          /^admission:enrollment-1:document:[a-f0-9]{64}$/,
+        ),
+      },
+    );
   });
 
   it('blocks sections that do not belong to the selected class', async () => {
@@ -1149,6 +1186,7 @@ function buildService(prisma = buildPrisma()) {
     notificationsService,
     auditService,
     eventEmitter,
+    studentRecordsService,
   };
 }
 

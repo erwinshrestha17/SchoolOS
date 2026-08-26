@@ -1,10 +1,17 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { FileStatus, Prisma, StudentDocumentKind } from '@prisma/client';
+import { createHash } from 'node:crypto';
+import {
+  FileStatus,
+  Prisma,
+  StudentDocumentKind,
+  type StudentDocument,
+} from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
@@ -173,7 +180,11 @@ export class StudentRecordsService {
     }
   }
 
-  async uploadDocument(dto: UploadStudentDocumentDto, actor: AuthContext) {
+  async uploadDocument(
+    dto: UploadStudentDocumentDto,
+    actor: AuthContext,
+    options: { idempotencyKey?: string } = {},
+  ) {
     const student = await this.prisma.student.findFirst({
       where: {
         id: dto.studentId,
@@ -204,6 +215,28 @@ export class StudentRecordsService {
     }
 
     const expiryDate = parseOptionalDocumentExpiryDate(dto.expiryDate);
+    const contentChecksumSha256 = createHash('sha256')
+      .update(Buffer.from(dto.base64Content, 'base64'))
+      .digest('hex');
+    const idempotencyKey = options.idempotencyKey?.trim() || null;
+    if (idempotencyKey) {
+      const replay = await this.prisma.studentDocument.findUnique({
+        where: {
+          tenantId_idempotencyKey: {
+            tenantId: actor.tenantId,
+            idempotencyKey,
+          },
+        },
+      });
+      if (replay) {
+        this.assertDocumentReplayMatches(replay, {
+          studentId: student.id,
+          kind: dto.kind,
+          contentChecksumSha256,
+        });
+        return replay;
+      }
+    }
 
     const stored = await this.storageService.saveBase64Object({
       tenantId: actor.tenantId,
@@ -213,24 +246,53 @@ export class StudentRecordsService {
       base64Content: dto.base64Content,
     });
 
-    const document = await this.prisma.studentDocument.create({
-      data: {
-        tenantId: actor.tenantId,
+    let document: StudentDocument;
+    try {
+      document = await this.prisma.studentDocument.create({
+        data: {
+          tenantId: actor.tenantId,
+          studentId: student.id,
+          idempotencyKey,
+          contentChecksumSha256,
+          kind: dto.kind,
+          title: dto.title ?? dto.fileName,
+          fileName: dto.fileName,
+          contentType: dto.contentType,
+          sizeBytes: stored.sizeBytes,
+          provider: stored.provider,
+          objectKey: stored.objectKey,
+          publicUrl: stored.publicUrl,
+          status: 'ACTIVE',
+          uploadedById: actor.userId,
+          notes: dto.notes,
+          expiryDate,
+        },
+      });
+    } catch (error) {
+      if (!idempotencyKey || !isPrismaUniqueConstraintError(error)) {
+        throw error;
+      }
+
+      await this.storageService.deleteObject(stored.objectKey);
+      const concurrentReplay = await this.prisma.studentDocument.findUnique({
+        where: {
+          tenantId_idempotencyKey: {
+            tenantId: actor.tenantId,
+            idempotencyKey,
+          },
+        },
+      });
+      if (!concurrentReplay) {
+        throw error;
+      }
+
+      this.assertDocumentReplayMatches(concurrentReplay, {
         studentId: student.id,
         kind: dto.kind,
-        title: dto.title ?? dto.fileName,
-        fileName: dto.fileName,
-        contentType: dto.contentType,
-        sizeBytes: stored.sizeBytes,
-        provider: stored.provider,
-        objectKey: stored.objectKey,
-        publicUrl: stored.publicUrl,
-        status: 'ACTIVE',
-        uploadedById: actor.userId,
-        notes: dto.notes,
-        expiryDate,
-      },
-    });
+        contentChecksumSha256,
+      });
+      return concurrentReplay;
+    }
 
     const asset = await this.fileRegistryService.registerFile({
       tenantId: actor.tenantId,
@@ -290,6 +352,29 @@ export class StudentRecordsService {
     });
 
     return document;
+  }
+
+  private assertDocumentReplayMatches(
+    document: {
+      studentId: string;
+      kind: StudentDocumentKind;
+      contentChecksumSha256: string | null;
+    },
+    expected: {
+      studentId: string;
+      kind: StudentDocumentKind;
+      contentChecksumSha256: string;
+    },
+  ) {
+    if (
+      document.studentId !== expected.studentId ||
+      document.kind !== expected.kind ||
+      document.contentChecksumSha256 !== expected.contentChecksumSha256
+    ) {
+      throw new ConflictException(
+        'Document upload idempotency key is linked to different document content.',
+      );
+    }
   }
 
   async listSiblingGroups(actor: AuthContext) {
@@ -672,4 +757,13 @@ function parseOptionalDocumentExpiryDate(value?: string) {
   }
 
   return parsed;
+}
+
+function isPrismaUniqueConstraintError(error: unknown) {
+  return (
+    error !== null &&
+    typeof error === 'object' &&
+    'code' in error &&
+    error.code === 'P2002'
+  );
 }

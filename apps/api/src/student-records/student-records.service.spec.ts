@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
@@ -30,6 +31,7 @@ describe('StudentRecordsService', () => {
       studentDocument: {
         create: jest.fn(),
         update: jest.fn(),
+        findUnique: jest.fn(),
         findFirst: jest.fn(),
         findMany: jest.fn(),
       },
@@ -48,6 +50,7 @@ describe('StudentRecordsService', () => {
     };
     storageService = {
       saveBase64Object: jest.fn(),
+      deleteObject: jest.fn(),
     };
     auditService = {
       record: jest.fn(),
@@ -287,6 +290,101 @@ describe('StudentRecordsService', () => {
         tenantId: 'tenant-1',
       }),
     );
+  });
+
+  it('replays a matching idempotent document upload without storing another object', async () => {
+    const base64Content = 'aGVsbG8=';
+    const existing = {
+      id: 'document-existing',
+      tenantId: actor.tenantId,
+      studentId: 'student-1',
+      kind: StudentDocumentKind.BIRTH_CERTIFICATE,
+      contentChecksumSha256:
+        '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824',
+    };
+    prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+    prisma.studentDocument.findUnique.mockResolvedValue(existing);
+
+    const result = await service.uploadDocument(
+      {
+        studentId: 'student-1',
+        kind: StudentDocumentKind.BIRTH_CERTIFICATE,
+        fileName: 'birth.pdf',
+        contentType: 'application/pdf',
+        base64Content,
+      },
+      actor,
+      { idempotencyKey: 'admission:enrollment-1:document:birth' },
+    );
+
+    expect(result).toBe(existing);
+    expect(storageService.saveBase64Object).not.toHaveBeenCalled();
+    expect(prisma.studentDocument.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects reuse of a document idempotency key with different content', async () => {
+    prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+    prisma.studentDocument.findUnique.mockResolvedValue({
+      id: 'document-existing',
+      studentId: 'student-1',
+      kind: StudentDocumentKind.BIRTH_CERTIFICATE,
+      contentChecksumSha256: 'different-checksum',
+    });
+
+    await expect(
+      service.uploadDocument(
+        {
+          studentId: 'student-1',
+          kind: StudentDocumentKind.BIRTH_CERTIFICATE,
+          fileName: 'birth.pdf',
+          contentType: 'application/pdf',
+          base64Content: 'aGVsbG8=',
+        },
+        actor,
+        { idempotencyKey: 'admission:enrollment-1:document:birth' },
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(storageService.saveBase64Object).not.toHaveBeenCalled();
+  });
+
+  it('cleans up a losing stored object and returns the concurrent document replay', async () => {
+    const concurrent = {
+      id: 'document-concurrent',
+      studentId: 'student-1',
+      kind: StudentDocumentKind.BIRTH_CERTIFICATE,
+      contentChecksumSha256:
+        '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824',
+    };
+    prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+    prisma.studentDocument.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(concurrent);
+    storageService.saveBase64Object.mockResolvedValue({
+      provider: StorageProvider.LOCAL,
+      objectKey: 'tenant-1/students/student-1/documents/loser.pdf',
+      publicUrl: null,
+      sizeBytes: 5,
+    });
+    prisma.studentDocument.create.mockRejectedValue({ code: 'P2002' });
+
+    const result = await service.uploadDocument(
+      {
+        studentId: 'student-1',
+        kind: StudentDocumentKind.BIRTH_CERTIFICATE,
+        fileName: 'birth.pdf',
+        contentType: 'application/pdf',
+        base64Content: 'aGVsbG8=',
+      },
+      actor,
+      { idempotencyKey: 'admission:enrollment-1:document:birth' },
+    );
+
+    expect(result).toBe(concurrent);
+    expect(storageService.deleteObject).toHaveBeenCalledWith(
+      'tenant-1/students/student-1/documents/loser.pdf',
+    );
+    expect(fileRegistryService.registerFile).not.toHaveBeenCalled();
   });
 
   it('rejects document uploads for students outside the tenant', async () => {

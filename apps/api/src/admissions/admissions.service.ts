@@ -1376,10 +1376,18 @@ export class AdmissionsService {
     > = [];
 
     for (const documentInput of dto.documents ?? []) {
+      const documentFingerprint = createHash('sha256')
+        .update(documentInput.kind)
+        .update('\0')
+        .update(Buffer.from(documentInput.base64Content, 'base64'))
+        .digest('hex');
       documents.push(
         await this.studentRecordsService.uploadDocument(
           Object.assign({}, documentInput, { studentId: core.student.id }),
           actor,
+          {
+            idempotencyKey: `admission:${core.enrollment.id}:document:${documentFingerprint}`,
+          },
         ),
       );
     }
