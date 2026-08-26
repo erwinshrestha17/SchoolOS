@@ -1241,8 +1241,14 @@ export class AdmissionsService {
     }
 
     const guardianLinks: AdmissionCoreWrite['guardians'] = [];
+    const explicitPrimaryGuardianIndex = dto.guardians.findIndex(
+      (guardian) => guardian.isPrimary === true,
+    );
+    const primaryGuardianIndex =
+      explicitPrimaryGuardianIndex >= 0 ? explicitPrimaryGuardianIndex : 0;
+    let reusedGuardianCount = 0;
 
-    for (const guardianInput of dto.guardians) {
+    for (const [guardianIndex, guardianInput] of dto.guardians.entries()) {
       const guardianPhone = requireNepalPhone(guardianInput.primaryPhone);
       const guardianName = requirePersonName(
         guardianInput.fullName,
@@ -1255,29 +1261,26 @@ export class AdmissionsService {
           fullName: { equals: guardianName, mode: 'insensitive' },
         },
       });
-      const guardianData = {
-        fullName: guardianName,
-        relation: guardianInput.relation.trim(),
-        secondaryPhone: optionalNepalPhone(guardianInput.secondaryPhone),
-        email: optionalProfileEmail(guardianInput.email),
-        occupation: guardianInput.occupation ?? null,
-        homeAddress: guardianInput.homeAddress ?? null,
-        wardNumber: guardianInput.wardNumber ?? null,
-        receivesAlerts: guardianInput.receivesAlerts ?? false,
-        privacyConsentAt: new Date(),
-      };
-      const guardian = existingGuardian
-        ? await tx.guardian.update({
-            where: { id: existingGuardian.id },
-            data: guardianData,
-          })
-        : await tx.guardian.create({
-            data: {
-              tenantId: actor.tenantId,
-              primaryPhone: guardianPhone,
-              ...guardianData,
-            },
-          });
+      if (existingGuardian) {
+        reusedGuardianCount += 1;
+      }
+      const guardian =
+        existingGuardian ??
+        (await tx.guardian.create({
+          data: {
+            tenantId: actor.tenantId,
+            primaryPhone: guardianPhone,
+            fullName: guardianName,
+            relation: guardianInput.relation.trim(),
+            secondaryPhone: optionalNepalPhone(guardianInput.secondaryPhone),
+            email: optionalProfileEmail(guardianInput.email),
+            occupation: guardianInput.occupation ?? null,
+            homeAddress: guardianInput.homeAddress ?? null,
+            wardNumber: guardianInput.wardNumber ?? null,
+            receivesAlerts: guardianInput.receivesAlerts ?? false,
+            privacyConsentAt: new Date(),
+          },
+        }));
 
       guardianLinks.push(
         await tx.studentGuardian.create({
@@ -1286,7 +1289,7 @@ export class AdmissionsService {
             studentId: student.id,
             guardianId: guardian.id,
             relation: guardianInput.relation.trim(),
-            isPrimary: guardianInput.isPrimary ?? false,
+            isPrimary: guardianIndex === primaryGuardianIndex,
           },
           include: {
             guardian: true,
@@ -1326,6 +1329,7 @@ export class AdmissionsService {
           classId: dto.classId,
           sectionId: dto.sectionId ?? null,
           guardianCount: guardianLinks.length,
+          reusedGuardianCount,
         },
       },
     });
@@ -1439,7 +1443,7 @@ export class AdmissionsService {
     dto: CreateAdmissionDto,
     actor: AuthContext,
   ): Promise<AdmissionReferenceContext> {
-    this.assertGuardianPhoneRequirement(dto.guardians);
+    this.assertGuardianLinkIntegrity(dto.guardians);
 
     await this.usageService.checkLimit(actor.tenantId, 'students.count', 1);
 
@@ -1540,7 +1544,7 @@ export class AdmissionsService {
     return { academicYear, classroom, section };
   }
 
-  private assertGuardianPhoneRequirement(guardians: AdmissionGuardianInput[]) {
+  private assertGuardianLinkIntegrity(guardians: AdmissionGuardianInput[]) {
     const hasValidPrimaryPhone = guardians.some((guardian) => {
       const phone = guardian.primaryPhone;
       if (!phone) return false;
@@ -1552,6 +1556,28 @@ export class AdmissionsService {
       throw new BadRequestException(
         'At least one guardian with a valid primary phone number is required',
       );
+    }
+
+    if (
+      guardians.filter((guardian) => guardian.isPrimary === true).length > 1
+    ) {
+      throw new BadRequestException(
+        'Only one guardian can be the primary guardian for an admission.',
+      );
+    }
+
+    const identities = new Set<string>();
+    for (const guardian of guardians) {
+      const identity = `${requireNepalPhone(guardian.primaryPhone)}|${requirePersonName(
+        guardian.fullName,
+        'guardian.fullName',
+      ).toLocaleLowerCase('en')}`;
+      if (identities.has(identity)) {
+        throw new BadRequestException(
+          'The same guardian cannot be added more than once to an admission.',
+        );
+      }
+      identities.add(identity);
     }
   }
 

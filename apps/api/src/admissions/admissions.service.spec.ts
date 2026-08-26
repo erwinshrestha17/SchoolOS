@@ -238,6 +238,114 @@ describe('AdmissionsService production hardening', () => {
     expect(prisma.academicYear.findFirst).not.toHaveBeenCalled();
   });
 
+  it('reuses a matching tenant guardian without overwriting the shared profile', async () => {
+    const prisma = buildPrisma();
+    const tx = buildTransaction();
+    const existingGuardian = {
+      id: 'guardian-existing',
+      tenantId: actor.tenantId,
+      fullName: 'Maya Tamang',
+      relation: 'mother',
+      primaryPhone: '+9779800000000',
+      secondaryPhone: '+9779811111111',
+      email: 'existing@example.test',
+      occupation: 'Nurse',
+      homeAddress: 'Existing address',
+      wardNumber: '4',
+      receivesAlerts: true,
+      privacyConsentAt: new Date('2025-01-01T00:00:00.000Z'),
+      createdAt: new Date('2025-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2025-01-01T00:00:00.000Z'),
+      userId: null,
+    };
+    tx.guardian.findFirst.mockResolvedValue(existingGuardian);
+    tx.studentGuardian.create.mockImplementation(({ data }) =>
+      Promise.resolve({
+        relation: data.relation,
+        guardian: existingGuardian,
+      }),
+    );
+    prisma.$transaction.mockImplementation(async (callback) => callback(tx));
+    const { service } = buildService(prisma);
+    const dto = buildAdmissionDto();
+    dto.guardians[0] = {
+      ...dto.guardians[0],
+      email: 'replacement@example.test',
+      homeAddress: 'Replacement address',
+      receivesAlerts: false,
+    };
+
+    await service.createAdmission(dto, actor);
+
+    expect(tx.guardian.create).not.toHaveBeenCalled();
+    expect(tx.guardian.update).not.toHaveBeenCalled();
+    expect(tx.studentGuardian.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: actor.tenantId,
+        studentId: 'student-1',
+        guardianId: existingGuardian.id,
+        isPrimary: true,
+      }),
+      include: { guardian: true },
+    });
+    expect(tx.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        after: expect.objectContaining({ reusedGuardianCount: 1 }),
+      }),
+    });
+  });
+
+  it('defaults the first guardian to primary when no primary is supplied', async () => {
+    const prisma = buildPrisma();
+    const tx = buildTransaction();
+    prisma.$transaction.mockImplementation(async (callback) => callback(tx));
+    const { service } = buildService(prisma);
+    const dto = buildAdmissionDto();
+    dto.guardians[0] = { ...dto.guardians[0], isPrimary: undefined };
+
+    await service.createAdmission(dto, actor);
+
+    expect(tx.studentGuardian.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ isPrimary: true }),
+      include: { guardian: true },
+    });
+  });
+
+  it('rejects multiple primary or duplicate guardian links before student writes', async () => {
+    const duplicateGuardian = {
+      fullName: 'Maya Tamang',
+      relation: 'mother',
+      primaryPhone: '9800000000',
+      isPrimary: true,
+    };
+
+    for (const guardians of [
+      [
+        duplicateGuardian,
+        {
+          fullName: 'Hari Tamang',
+          relation: 'father',
+          primaryPhone: '9811111111',
+          isPrimary: true,
+        },
+      ],
+      [duplicateGuardian, { ...duplicateGuardian, isPrimary: false }],
+    ]) {
+      const prisma = buildPrisma();
+      const { service } = buildService(prisma);
+
+      await expect(
+        service.createAdmission(
+          Object.assign(buildAdmissionDto(), { guardians }),
+          actor,
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.academicYear.findFirst).not.toHaveBeenCalled();
+    }
+  });
+
   it('detects duplicates only within the actor tenant (exact name + DOB)', async () => {
     const prisma = buildPrisma({
       studentFindManyResult: [
