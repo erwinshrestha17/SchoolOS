@@ -6237,6 +6237,21 @@ export class FinanceService {
     enrollmentId: string;
     dueDate: Date;
   }) {
+    const idempotencyKey = `admission-initial:${input.enrollmentId}`;
+    const replay = await this.prisma.invoice.findUnique({
+      where: {
+        tenantId_idempotencyKey: {
+          tenantId: input.actor.tenantId,
+          idempotencyKey,
+        },
+      },
+      include: { lines: true },
+    });
+    if (replay) {
+      this.assertInitialInvoiceReplayMatches(replay, input);
+      return replay;
+    }
+
     const assignments = await this.prisma.studentFeeAssignment.findMany({
       where: {
         tenantId: input.actor.tenantId,
@@ -6281,41 +6296,89 @@ export class FinanceService {
       }
     }
 
-    return this.prisma.invoice.create({
-      data: {
-        tenantId: input.actor.tenantId,
-        studentId: input.studentId,
-        academicYearId: input.academicYearId,
-        enrollmentId: input.enrollmentId,
-        invoiceNumber,
-        fiscalYear,
-        billNumber: invoiceNumber,
-        dueDate: input.dueDate,
-        subtotal,
-        vatAmount,
-        totalAmount: subtotal.add(vatAmount),
-        lines: {
-          create: lineSeed.map((item) => {
-            const lineVat = item.feeHead.vatApplicable
-              ? item.amount.mul(0.13)
-              : new Prisma.Decimal(0);
+    try {
+      return await this.prisma.invoice.create({
+        data: {
+          tenantId: input.actor.tenantId,
+          studentId: input.studentId,
+          academicYearId: input.academicYearId,
+          enrollmentId: input.enrollmentId,
+          idempotencyKey,
+          invoiceNumber,
+          fiscalYear,
+          billNumber: invoiceNumber,
+          dueDate: input.dueDate,
+          subtotal,
+          vatAmount,
+          totalAmount: subtotal.add(vatAmount),
+          lines: {
+            create: lineSeed.map((item) => {
+              const lineVat = item.feeHead.vatApplicable
+                ? item.amount.mul(0.13)
+                : new Prisma.Decimal(0);
 
-            return {
-              tenantId: input.actor.tenantId,
-              feeHeadId: item.feeHeadId,
-              description: item.feeHead.name,
-              quantity: 1,
-              unitAmount: item.amount,
-              vatAmount: lineVat,
-              totalAmount: item.amount.add(lineVat),
-            };
-          }),
+              return {
+                tenantId: input.actor.tenantId,
+                feeHeadId: item.feeHeadId,
+                description: item.feeHead.name,
+                quantity: 1,
+                unitAmount: item.amount,
+                vatAmount: lineVat,
+                totalAmount: item.amount.add(lineVat),
+              };
+            }),
+          },
         },
-      },
-      include: {
-        lines: true,
-      },
-    });
+        include: {
+          lines: true,
+        },
+      });
+    } catch (error) {
+      if (!isPrismaUniqueConstraintError(error)) {
+        throw error;
+      }
+
+      const concurrentReplay = await this.prisma.invoice.findUnique({
+        where: {
+          tenantId_idempotencyKey: {
+            tenantId: input.actor.tenantId,
+            idempotencyKey,
+          },
+        },
+        include: { lines: true },
+      });
+      if (!concurrentReplay) {
+        throw new ConflictException(
+          'Invoice numbering changed concurrently. Retry admission finalization.',
+        );
+      }
+
+      this.assertInitialInvoiceReplayMatches(concurrentReplay, input);
+      return concurrentReplay;
+    }
+  }
+
+  private assertInitialInvoiceReplayMatches(
+    invoice: {
+      studentId: string;
+      academicYearId: string;
+      enrollmentId: string | null;
+    },
+    input: {
+      studentId: string;
+      academicYearId: string;
+      enrollmentId: string;
+    },
+  ) {
+    if (
+      invoice.studentId !== input.studentId ||
+      invoice.academicYearId !== input.academicYearId ||
+      invoice.enrollmentId !== input.enrollmentId
+    ) {
+      throw new ConflictException(
+        'Admission invoice idempotency key is linked to different enrollment data.',
+      );
+    }
   }
 
   async createCanteenMealPlanInvoice(

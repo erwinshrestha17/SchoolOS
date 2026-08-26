@@ -4911,6 +4911,7 @@ model Invoice {
   academicYearId    String
   enrollmentId      String?
   billingRunId      String?
+  idempotencyKey    String?
   invoiceNumber     String
   fiscalYear        String?
   billNumber        String?
@@ -4939,6 +4940,7 @@ model Invoice {
   schoolServiceRequests SchoolServiceRequest[]
 
   @@unique([tenantId, invoiceNumber])
+  @@unique([tenantId, idempotencyKey])
   @@index([tenantId, status, dueDate])
   @@index([tenantId, studentId, status])
   @@index([tenantId, academicYearId, studentId])

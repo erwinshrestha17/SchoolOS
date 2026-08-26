@@ -40,6 +40,139 @@ const actor = {
 };
 
 describe('finance production controls', () => {
+  it('creates an admission invoice with an enrollment-derived idempotency key', async () => {
+    const createdInvoice = {
+      id: 'invoice-admission-1',
+      tenantId: actor.tenantId,
+      studentId: 'student-1',
+      academicYearId: 'ay-1',
+      enrollmentId: 'enrollment-1',
+      invoiceNumber: 'INV-20262027-00001',
+      totalAmount: new Prisma.Decimal(1000),
+      lines: [],
+    };
+    const { service, prisma } = buildService({
+      invoice: null,
+      feeHead: null,
+      createdInvoice,
+      initialInvoiceAssignments: [
+        {
+          feePlan: {
+            items: [
+              {
+                feeHeadId: 'fee-head-1',
+                amount: new Prisma.Decimal(1000),
+                feeHead: {
+                  name: 'Admission fee',
+                  vatApplicable: false,
+                },
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    const result = await service.createInitialInvoice({
+      actor,
+      studentId: 'student-1',
+      academicYearId: 'ay-1',
+      enrollmentId: 'enrollment-1',
+      dueDate: new Date('2026-04-15T00:00:00.000Z'),
+    });
+
+    expect(result).toBe(createdInvoice);
+    expect(prisma.invoice.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: actor.tenantId,
+        studentId: 'student-1',
+        academicYearId: 'ay-1',
+        enrollmentId: 'enrollment-1',
+        idempotencyKey: 'admission-initial:enrollment-1',
+      }),
+      include: { lines: true },
+    });
+  });
+
+  it('replays the authoritative admission invoice without recalculating it', async () => {
+    const existingInvoice = {
+      id: 'invoice-admission-existing',
+      tenantId: actor.tenantId,
+      studentId: 'student-1',
+      academicYearId: 'ay-1',
+      enrollmentId: 'enrollment-1',
+      invoiceNumber: 'INV-20262027-00001',
+      totalAmount: new Prisma.Decimal(1000),
+      lines: [],
+    };
+    const { service, prisma } = buildService({
+      invoice: null,
+      feeHead: null,
+      existingIdempotentInvoice: existingInvoice,
+    });
+
+    const result = await service.createInitialInvoice({
+      actor,
+      studentId: 'student-1',
+      academicYearId: 'ay-1',
+      enrollmentId: 'enrollment-1',
+      dueDate: new Date('2026-04-20T00:00:00.000Z'),
+    });
+
+    expect(result).toBe(existingInvoice);
+    expect(prisma.studentFeeAssignment.findMany).not.toHaveBeenCalled();
+    expect(prisma.invoice.count).not.toHaveBeenCalled();
+    expect(prisma.invoice.create).not.toHaveBeenCalled();
+  });
+
+  it('returns the concurrently-created admission invoice after a unique race', async () => {
+    const concurrentInvoice = {
+      id: 'invoice-admission-concurrent',
+      tenantId: actor.tenantId,
+      studentId: 'student-1',
+      academicYearId: 'ay-1',
+      enrollmentId: 'enrollment-1',
+      invoiceNumber: 'INV-20262027-00001',
+      totalAmount: new Prisma.Decimal(1000),
+      lines: [],
+    };
+    const { service, prisma } = buildService({
+      invoice: null,
+      feeHead: null,
+      initialInvoiceAssignments: [
+        {
+          feePlan: {
+            items: [
+              {
+                feeHeadId: 'fee-head-1',
+                amount: new Prisma.Decimal(1000),
+                feeHead: {
+                  name: 'Admission fee',
+                  vatApplicable: false,
+                },
+              },
+            ],
+          },
+        },
+      ],
+    });
+    prisma.invoice.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(concurrentInvoice);
+    prisma.invoice.create.mockRejectedValueOnce({ code: 'P2002' });
+
+    const result = await service.createInitialInvoice({
+      actor,
+      studentId: 'student-1',
+      academicYearId: 'ay-1',
+      enrollmentId: 'enrollment-1',
+      dueDate: new Date('2026-04-15T00:00:00.000Z'),
+    });
+
+    expect(result).toBe(concurrentInvoice);
+    expect(prisma.invoice.findUnique).toHaveBeenCalledTimes(2);
+  });
+
   it('creates canteen meal-plan invoices through the M3 invoice and M9 posting boundary', async () => {
     const createdInvoice = {
       id: 'invoice-meal-1',
@@ -2794,6 +2927,8 @@ function buildService(options: {
   invoice: unknown;
   feeHead: unknown;
   createdInvoice?: unknown;
+  existingIdempotentInvoice?: unknown;
+  initialInvoiceAssignments?: unknown[];
   invoiceCount?: number;
   student?: unknown;
   classroom?: unknown;
@@ -2849,6 +2984,9 @@ function buildService(options: {
       findFirst: jest.fn().mockResolvedValue(options.student ?? null),
     },
     invoice: {
+      findUnique: jest
+        .fn()
+        .mockResolvedValue(options.existingIdempotentInvoice ?? null),
       findFirst: jest.fn().mockResolvedValue(options.invoice),
       findMany: jest
         .fn()
@@ -2873,6 +3011,11 @@ function buildService(options: {
       create: jest.fn().mockResolvedValue(options.createdInvoice),
       update: jest.fn().mockResolvedValue(options.updatedInvoice),
       updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    studentFeeAssignment: {
+      findMany: jest
+        .fn()
+        .mockResolvedValue(options.initialInvoiceAssignments ?? []),
     },
     discountRule: {
       create: jest.fn().mockResolvedValue(options.createdDiscount),
