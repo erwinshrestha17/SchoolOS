@@ -9,6 +9,7 @@ import {
 import { createHash } from 'node:crypto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
+  type AdmissionApplication,
   EnrollmentStatus,
   Prisma,
   StudentLifecycleStatus,
@@ -263,7 +264,7 @@ export class AdmissionsService {
       { isolationLevel: 'Serializable' },
     );
 
-    return this.completeAdmissionSideEffects(core, dto, actor);
+    return this.completeAdmissionSideEffects(core, dto, actor, 'CREATED');
   }
 
   async checkDuplicateAdmissions(
@@ -657,10 +658,30 @@ export class AdmissionsService {
     actor: AuthContext,
   ) {
     const application = await this.findTenantApplication(applicationId, actor);
-    if (application.convertedStudentId || application.status === 'ENROLLED') {
-      throw new ConflictException(
-        'Admission application is already linked to an enrolled student',
+    const admissionDto: CreateAdmissionDto = Object.assign(
+      new CreateAdmissionDto(),
+      dto,
+      { confirmDuplicate: true },
+    );
+    if (admissionDto.createLogin) {
+      throw new BadRequestException(
+        'Student login creation is not supported during application conversion. Complete enrollment first, then use the managed access workflow.',
       );
+    }
+    const conversionFingerprint =
+      buildAdmissionConversionFingerprint(admissionDto);
+
+    if (application.convertedStudentId || application.status === 'ENROLLED') {
+      if (
+        application.status !== 'ENROLLED' ||
+        !application.convertedStudentId ||
+        application.conversionFingerprint !== conversionFingerprint
+      ) {
+        throw new ConflictException(
+          'Admission application conversion state does not match this request. Review the linked student before retrying.',
+        );
+      }
+      return this.finalizeEnrolledApplication(application, admissionDto, actor);
     }
     if (application.status !== 'ACCEPTED') {
       throw new BadRequestException(
@@ -668,54 +689,72 @@ export class AdmissionsService {
       );
     }
 
-    const admissionDto: CreateAdmissionDto = Object.assign(
-      new CreateAdmissionDto(),
-      dto,
-      { confirmDuplicate: true },
-    );
     const context = await this.validateAdmissionForCreate(admissionDto, actor);
 
-    const { core, updated } = await this.prisma.$transaction(
-      async (tx) => {
-        const claimed = await tx.admissionApplication.updateMany({
-          where: {
-            id: application.id,
-            tenantId: actor.tenantId,
-            status: 'ACCEPTED',
-            convertedStudentId: null,
-          },
-          data: { updatedById: actor.userId },
-        });
-        if (claimed.count !== 1) {
-          throw new ConflictException(
-            'Admission application was already enrolled or changed while converting.',
+    let conversion: { core: AdmissionCoreWrite; updated: AdmissionApplication };
+    try {
+      conversion = await this.prisma.$transaction(
+        async (tx) => {
+          const claimed = await tx.admissionApplication.updateMany({
+            where: {
+              id: application.id,
+              tenantId: actor.tenantId,
+              status: 'ACCEPTED',
+              convertedStudentId: null,
+            },
+            data: { updatedById: actor.userId },
+          });
+          if (claimed.count !== 1) {
+            throw new ConflictException(
+              'Admission application was already enrolled or changed while converting.',
+            );
+          }
+
+          const conversionCore = await this.createAdmissionCore(
+            admissionDto,
+            actor,
+            context,
+            null,
+            tx,
           );
-        }
+          const convertedApplication = await tx.admissionApplication.update({
+            where: { id: application.id },
+            data: {
+              status: 'ENROLLED',
+              convertedStudentId: conversionCore.student.id,
+              conversionFingerprint,
+              updatedById: actor.userId,
+            },
+          });
 
-        const conversionCore = await this.createAdmissionCore(
-          admissionDto,
-          actor,
-          context,
-          null,
-          tx,
-        );
-        const convertedApplication = await tx.admissionApplication.update({
-          where: { id: application.id },
-          data: {
-            status: 'ENROLLED',
-            convertedStudentId: conversionCore.student.id,
-            updatedById: actor.userId,
-          },
-        });
+          return { core: conversionCore, updated: convertedApplication };
+        },
+        { isolationLevel: 'Serializable' },
+      );
+    } catch (error) {
+      if (!(error instanceof ConflictException)) {
+        throw error;
+      }
 
-        return { core: conversionCore, updated: convertedApplication };
-      },
-      { isolationLevel: 'Serializable' },
-    );
+      const concurrent = await this.findTenantApplication(
+        application.id,
+        actor,
+      );
+      if (
+        concurrent.status !== 'ENROLLED' ||
+        !concurrent.convertedStudentId ||
+        concurrent.conversionFingerprint !== conversionFingerprint
+      ) {
+        throw error;
+      }
+      return this.finalizeEnrolledApplication(concurrent, admissionDto, actor);
+    }
+
     const admission = await this.completeAdmissionSideEffects(
-      core,
+      conversion.core,
       admissionDto,
       actor,
+      'CREATED',
     );
 
     await this.auditService.record({
@@ -726,14 +765,112 @@ export class AdmissionsService {
       resourceId: application.id,
       before: { status: application.status },
       after: {
-        status: updated.status,
+        status: conversion.updated.status,
         studentId: admission.student.id,
+        disposition: 'CREATED',
       },
     });
 
     return {
-      application: formatAdmissionApplication(updated),
+      application: formatAdmissionApplication(conversion.updated),
       admission,
+      disposition: 'CREATED' as const,
+    };
+  }
+
+  private async finalizeEnrolledApplication(
+    application: AdmissionApplication,
+    dto: CreateAdmissionDto,
+    actor: AuthContext,
+  ) {
+    const core = await this.loadConvertedAdmissionCore(application, dto, actor);
+    const admission = await this.completeAdmissionSideEffects(
+      core,
+      dto,
+      actor,
+      'REPLAYED',
+    );
+
+    await this.auditService.record({
+      action: 'admission_application_enroll_replay',
+      resource: 'admission_application',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: application.id,
+      after: {
+        status: application.status,
+        studentId: admission.student.id,
+        disposition: 'REPLAYED',
+      },
+    });
+
+    return {
+      application: formatAdmissionApplication(application),
+      admission,
+      disposition: 'REPLAYED' as const,
+    };
+  }
+
+  private async loadConvertedAdmissionCore(
+    application: AdmissionApplication,
+    dto: CreateAdmissionDto,
+    actor: AuthContext,
+  ): Promise<AdmissionCoreWrite> {
+    if (!application.convertedStudentId) {
+      throw new ConflictException(
+        'Enrolled admission application is missing its linked student.',
+      );
+    }
+
+    const enrollment = await this.prisma.enrollment.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        studentId: application.convertedStudentId,
+        academicYearId: dto.academicYearId,
+        classId: dto.classId,
+        sectionId: dto.sectionId ?? null,
+      },
+      include: {
+        student: {
+          include: {
+            guardianLinks: {
+              include: { guardian: true },
+            },
+          },
+        },
+      },
+      orderBy: [{ createdAt: 'desc' }],
+    });
+    if (!enrollment) {
+      throw new ConflictException(
+        'The linked student enrollment does not match this admission conversion request.',
+      );
+    }
+
+    return {
+      student: {
+        id: enrollment.student.id,
+        studentSystemId: enrollment.student.studentSystemId,
+        firstNameEn: enrollment.student.firstNameEn,
+        lastNameEn: enrollment.student.lastNameEn,
+        admissionDate: enrollment.student.admissionDate,
+        classId: enrollment.student.classId,
+      },
+      enrollment: {
+        id: enrollment.id,
+        academicYearId: enrollment.academicYearId,
+        classId: enrollment.classId,
+        sectionId: enrollment.sectionId,
+        rollNumber: enrollment.rollNumber,
+      },
+      guardians: enrollment.student.guardianLinks.map((link) => ({
+        relation: link.relation,
+        guardian: {
+          id: link.guardian.id,
+          fullName: link.guardian.fullName,
+          primaryPhone: link.guardian.primaryPhone,
+        },
+      })),
     };
   }
 
@@ -1345,6 +1482,7 @@ export class AdmissionsService {
     core: AdmissionCoreWrite,
     dto: CreateAdmissionDto,
     actor: AuthContext,
+    disposition: 'CREATED' | 'REPLAYED',
   ) {
     await this.financeService.assignFeePlansForEnrollment({
       tenantId: actor.tenantId,
@@ -1394,7 +1532,10 @@ export class AdmissionsService {
     }
 
     await this.auditService.record({
-      action: 'admission_side_effects',
+      action:
+        disposition === 'CREATED'
+          ? 'admission_side_effects'
+          : 'admission_side_effects_replay',
       resource: 'admission',
       tenantId: actor.tenantId,
       userId: actor.userId,
@@ -1404,6 +1545,7 @@ export class AdmissionsService {
         invoiceId: initialInvoice?.id ?? null,
         documentCount: documents.length,
         guardianInviteCount: core.guardians.length,
+        disposition,
       },
     });
 
@@ -1415,8 +1557,6 @@ export class AdmissionsService {
       studentName: `${core.student.firstNameEn} ${core.student.lastNameEn}`,
       actor,
     });
-
-    await this.usageService.incrementUsage(actor.tenantId, 'students.count');
 
     return {
       student: {
@@ -1828,6 +1968,52 @@ function toInputJsonValue(value: unknown): Prisma.InputJsonValue {
   return value as Prisma.InputJsonValue;
 }
 
+export function buildAdmissionConversionFingerprint(dto: CreateAdmissionDto) {
+  const fields = Object.fromEntries(
+    Object.entries(dto).filter(
+      ([key]) =>
+        key !== 'password' &&
+        key !== 'confirmDuplicate' &&
+        key !== 'photo' &&
+        key !== 'documents',
+    ),
+  );
+  const payload = {
+    ...fields,
+    photoSha256: dto.photo
+      ? createHash('sha256')
+          .update(Buffer.from(dto.photo, 'base64'))
+          .digest('hex')
+      : null,
+    documents: (dto.documents ?? []).map((document) => ({
+      ...Object.fromEntries(
+        Object.entries(document).filter(([key]) => key !== 'base64Content'),
+      ),
+      contentSha256: createHash('sha256')
+        .update(Buffer.from(document.base64Content, 'base64'))
+        .digest('hex'),
+    })),
+  };
+
+  return createHash('sha256')
+    .update(JSON.stringify(canonicalizeFingerprintValue(payload)))
+    .digest('hex');
+}
+
+function canonicalizeFingerprintValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => canonicalizeFingerprintValue(item));
+  }
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, item]) => [key, canonicalizeFingerprintValue(item)]),
+    );
+  }
+  return value;
+}
+
 function formatAdmissionApplication(application: {
   id: string;
   status: string;
@@ -1849,14 +2035,17 @@ function formatAdmissionApplication(application: {
   notes: string | null;
   duplicateReview: Prisma.JsonValue | null;
   convertedStudentId: string | null;
+  conversionFingerprint: string | null;
   rejectedReason: string | null;
   createdById: string | null;
   updatedById: string | null;
   createdAt: Date;
   updatedAt: Date;
 }) {
+  const { conversionFingerprint: _conversionFingerprint, ...publicFields } =
+    application;
   return {
-    ...application,
+    ...publicFields,
     fullNameEn: `${application.firstNameEn} ${application.lastNameEn}`.trim(),
     dateOfBirth: application.dateOfBirth?.toISOString() ?? null,
     createdAt: application.createdAt.toISOString(),

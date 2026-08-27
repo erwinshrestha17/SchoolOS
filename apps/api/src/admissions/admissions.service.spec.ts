@@ -22,7 +22,10 @@ import { StudentRecordsService } from '../student-records/student-records.servic
 import { StudentsService } from '../students/students.service';
 import { UsersService } from '../users/users.service';
 import { UsageService } from '../usage/usage.service';
-import { AdmissionsService } from './admissions.service';
+import {
+  AdmissionsService,
+  buildAdmissionConversionFingerprint,
+} from './admissions.service';
 import { CreateAdmissionDto } from './dto/create-admission.dto';
 
 const actor = {
@@ -1033,7 +1036,140 @@ describe('AdmissionsService production hardening', () => {
       }),
     );
     expect(result.application.status).toBe('ENROLLED');
+    expect(result.application).not.toHaveProperty('conversionFingerprint');
     expect(result.admission.student.id).toBe('student-1');
+    expect(result.disposition).toBe('CREATED');
+  });
+
+  it('fingerprints admission content without coupling retries to the password secret', () => {
+    const first = Object.assign(new CreateAdmissionDto(), buildAdmissionDto(), {
+      createLogin: true,
+      email: 'asha@example.test',
+      password: 'first-secret',
+      documents: [
+        {
+          kind: StudentDocumentKind.BIRTH_CERTIFICATE,
+          fileName: 'birth.pdf',
+          contentType: 'application/pdf',
+          base64Content: 'aGVsbG8=',
+        },
+      ],
+    });
+    const second = Object.assign(new CreateAdmissionDto(), first, {
+      password: 'rotated-secret',
+    });
+    const changedDocument = Object.assign(new CreateAdmissionDto(), second, {
+      documents: [
+        {
+          ...second.documents?.[0],
+          kind: StudentDocumentKind.BIRTH_CERTIFICATE,
+          fileName: 'birth.pdf',
+          contentType: 'application/pdf',
+          base64Content: 'Y2hhbmdlZA==',
+        },
+      ],
+    });
+
+    expect(buildAdmissionConversionFingerprint(first)).toBe(
+      buildAdmissionConversionFingerprint(second),
+    );
+    expect(buildAdmissionConversionFingerprint(changedDocument)).not.toBe(
+      buildAdmissionConversionFingerprint(first),
+    );
+  });
+
+  it('resumes finalization for the same already-enrolled application payload', async () => {
+    const dto = buildAdmissionDto();
+    const application = {
+      ...buildApplication(),
+      status: 'ENROLLED',
+      convertedStudentId: 'student-1',
+      conversionFingerprint: buildAdmissionConversionFingerprint(
+        Object.assign(new CreateAdmissionDto(), dto, {
+          confirmDuplicate: true,
+        }),
+      ),
+    };
+    const prisma = buildPrisma({
+      admissionApplicationFindFirstResult: application,
+      enrollmentFindFirstResult: buildConvertedEnrollment(),
+    });
+    const { service, financeService, auditService, usageService } =
+      buildService(prisma);
+
+    const result = await service.enrollApplication(application.id, dto, actor);
+
+    expect(result.disposition).toBe('REPLAYED');
+    expect(result.admission.student.id).toBe('student-1');
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.academicYear.findFirst).not.toHaveBeenCalled();
+    expect(usageService.checkLimit).not.toHaveBeenCalled();
+    expect(usageService.incrementUsage).not.toHaveBeenCalled();
+    expect(financeService.createInitialInvoice).toHaveBeenCalledWith(
+      expect.objectContaining({ enrollmentId: 'enrollment-1' }),
+    );
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'admission_application_enroll_replay',
+        after: expect.objectContaining({ disposition: 'REPLAYED' }),
+      }),
+    );
+  });
+
+  it('rejects an enrolled application retry with a changed payload', async () => {
+    const dto = buildAdmissionDto();
+    const prisma = buildPrisma({
+      admissionApplicationFindFirstResult: {
+        ...buildApplication(),
+        status: 'ENROLLED',
+        convertedStudentId: 'student-1',
+        conversionFingerprint: 'different-payload',
+      },
+    });
+    const { service, financeService } = buildService(prisma);
+
+    await expect(
+      service.enrollApplication('application-1', dto, actor),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(prisma.enrollment.findFirst).not.toHaveBeenCalled();
+    expect(financeService.createInitialInvoice).not.toHaveBeenCalled();
+  });
+
+  it('recovers a concurrent conversion claim through the winning application link', async () => {
+    const dto = buildAdmissionDto();
+    const conversionFingerprint = buildAdmissionConversionFingerprint(
+      Object.assign(new CreateAdmissionDto(), dto, {
+        confirmDuplicate: true,
+      }),
+    );
+    const accepted = { ...buildApplication(), status: 'ACCEPTED' };
+    const enrolled = {
+      ...buildApplication(),
+      status: 'ENROLLED',
+      convertedStudentId: 'student-1',
+      conversionFingerprint,
+    };
+    const prisma = buildPrisma({
+      admissionApplicationFindFirstResult: accepted,
+      enrollmentFindFirstResult: buildConvertedEnrollment(),
+    });
+    prisma.admissionApplication.findFirst
+      .mockResolvedValueOnce(accepted)
+      .mockResolvedValueOnce(enrolled);
+    prisma.enrollment.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(buildConvertedEnrollment());
+    const tx = buildTransaction();
+    tx.admissionApplication.updateMany.mockResolvedValueOnce({ count: 0 });
+    prisma.$transaction.mockImplementation(async (callback) => callback(tx));
+    const { service } = buildService(prisma);
+
+    const result = await service.enrollApplication(accepted.id, dto, actor);
+
+    expect(result.disposition).toBe('REPLAYED');
+    expect(tx.student.create).not.toHaveBeenCalled();
+    expect(prisma.admissionApplication.findFirst).toHaveBeenCalledTimes(2);
   });
 
   it('rejects missing tenant-owned references before writing', async () => {
@@ -1095,11 +1231,43 @@ function buildApplication() {
     notes: null,
     duplicateReview: null,
     convertedStudentId: null,
+    conversionFingerprint: null,
     rejectedReason: null,
     createdById: actor.userId,
     updatedById: actor.userId,
     createdAt: new Date('2026-04-01T00:00:00.000Z'),
     updatedAt: new Date('2026-04-01T00:00:00.000Z'),
+  };
+}
+
+function buildConvertedEnrollment() {
+  return {
+    id: 'enrollment-1',
+    tenantId: actor.tenantId,
+    studentId: 'student-1',
+    academicYearId: 'ay-1',
+    classId: 'class-1',
+    sectionId: 'section-1',
+    rollNumber: 4,
+    createdAt: new Date('2026-04-15T00:00:00.000Z'),
+    student: {
+      id: 'student-1',
+      studentSystemId: 'SCH-2026-0001',
+      firstNameEn: 'Asha',
+      lastNameEn: 'Tamang',
+      admissionDate: new Date('2026-04-15T00:00:00.000Z'),
+      classId: 'class-1',
+      guardianLinks: [
+        {
+          relation: 'mother',
+          guardian: {
+            id: 'guardian-1',
+            fullName: 'Maya Tamang',
+            primaryPhone: '+9779800000000',
+          },
+        },
+      ],
+    },
   };
 }
 
@@ -1199,6 +1367,7 @@ function buildService(prisma = buildPrisma()) {
     eventEmitter,
     studentRecordsService,
     studentsService,
+    usageService,
   };
 }
 
@@ -1363,11 +1532,10 @@ function buildTransaction() {
     },
     admissionApplication: {
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-      update: jest.fn().mockResolvedValue({
+      update: jest.fn().mockImplementation(async ({ data }) => ({
         ...buildApplication(),
-        status: 'ENROLLED',
-        convertedStudentId: 'student-1',
-      }),
+        ...data,
+      })),
     },
   };
 }

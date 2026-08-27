@@ -432,6 +432,7 @@ model AdmissionApplication {
   notes               String?
   duplicateReview     Json?
   convertedStudentId  String?
+  conversionFingerprint String?
   rejectedReason      String?
   policyVersionId        String?
   policyResolutionReason String?
@@ -448,6 +449,7 @@ model AdmissionApplication {
   @@index([tenantId, classId, status])
   @@index([tenantId, guardianPhone])
   @@index([tenantId, convertedStudentId])
+  @@index([tenantId, conversionFingerprint])
   @@index([tenantId, policyVersionId])
 }
 
