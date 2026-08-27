@@ -48,17 +48,21 @@ describe('StudentRecordsService', () => {
         findFirst: jest.fn(),
       },
     };
+    prisma.$transaction = jest.fn(async (callback: (tx: any) => unknown) =>
+      callback(prisma),
+    );
     storageService = {
       saveBase64Object: jest.fn(),
-      deleteObject: jest.fn(),
+      deleteObject: jest.fn().mockResolvedValue(undefined),
     };
     auditService = {
       record: jest.fn(),
     };
     fileRegistryService = {
       registerFile: jest.fn().mockResolvedValue({ id: 'asset-1' }),
+      markUploaded: jest.fn().mockResolvedValue({ id: 'asset-1' }),
       getSignedUrl: jest.fn(),
-      softDeleteFile: jest.fn(),
+      softDeleteFile: jest.fn().mockResolvedValue(undefined),
       auditAccess: jest.fn(),
       linkToEntityInTransaction: jest.fn(),
     };
@@ -255,6 +259,10 @@ describe('StudentRecordsService', () => {
     });
     prisma.studentDocument.create.mockImplementation(async ({ data }: any) => ({
       id: 'document-1',
+      createdAt: new Date('2026-04-27T00:00:00.000Z'),
+      updatedAt: new Date('2026-04-27T00:00:00.000Z'),
+      verifiedAt: null,
+      verifiedById: null,
       ...data,
     }));
 
@@ -282,7 +290,22 @@ describe('StudentRecordsService', () => {
         prefix: 'students/student-1/documents',
       }),
     );
-    expect(result.objectKey).toContain('student-1');
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: 'document-1',
+        studentId: 'student-1',
+        fileId: 'asset-1',
+        uploadedAt: '2026-04-27T00:00:00.000Z',
+      }),
+    );
+    expect(result).not.toHaveProperty('objectKey');
+    expect(result).not.toHaveProperty('publicUrl');
+    expect(result).not.toHaveProperty('provider');
+    expect(fileRegistryService.markUploaded).toHaveBeenCalledWith(
+      actor.tenantId,
+      'asset-1',
+      actor.userId,
+    );
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'upload',
@@ -294,14 +317,11 @@ describe('StudentRecordsService', () => {
 
   it('replays a matching idempotent document upload without storing another object', async () => {
     const base64Content = 'aGVsbG8=';
-    const existing = {
+    const existing = buildStudentDocument({
       id: 'document-existing',
-      tenantId: actor.tenantId,
-      studentId: 'student-1',
-      kind: StudentDocumentKind.BIRTH_CERTIFICATE,
       contentChecksumSha256:
         '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824',
-    };
+    });
     prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
     prisma.studentDocument.findUnique.mockResolvedValue(existing);
 
@@ -317,7 +337,14 @@ describe('StudentRecordsService', () => {
       { idempotencyKey: 'admission:enrollment-1:document:birth' },
     );
 
-    expect(result).toBe(existing);
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: existing.id,
+        fileId: existing.fileId,
+        uploadedAt: existing.createdAt.toISOString(),
+      }),
+    );
+    expect(result).not.toHaveProperty('objectKey');
     expect(storageService.saveBase64Object).not.toHaveBeenCalled();
     expect(prisma.studentDocument.create).not.toHaveBeenCalled();
   });
@@ -349,13 +376,11 @@ describe('StudentRecordsService', () => {
   });
 
   it('cleans up a losing stored object and returns the concurrent document replay', async () => {
-    const concurrent = {
+    const concurrent = buildStudentDocument({
       id: 'document-concurrent',
-      studentId: 'student-1',
-      kind: StudentDocumentKind.BIRTH_CERTIFICATE,
       contentChecksumSha256:
         '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824',
-    };
+    });
     prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
     prisma.studentDocument.findUnique
       .mockResolvedValueOnce(null)
@@ -380,11 +405,56 @@ describe('StudentRecordsService', () => {
       { idempotencyKey: 'admission:enrollment-1:document:birth' },
     );
 
-    expect(result).toBe(concurrent);
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: concurrent.id,
+        fileId: concurrent.fileId,
+      }),
+    );
+    expect(result).not.toHaveProperty('objectKey');
     expect(storageService.deleteObject).toHaveBeenCalledWith(
       'tenant-1/students/student-1/documents/loser.pdf',
     );
-    expect(fileRegistryService.registerFile).not.toHaveBeenCalled();
+    expect(fileRegistryService.softDeleteFile).toHaveBeenCalledWith(
+      actor.tenantId,
+      'asset-1',
+      actor.userId,
+    );
+  });
+
+  it('compensates storage and registry writes when document persistence fails', async () => {
+    prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+    storageService.saveBase64Object.mockResolvedValue({
+      provider: StorageProvider.LOCAL,
+      objectKey: 'tenant-1/students/student-1/documents/failed.pdf',
+      publicUrl: null,
+      sizeBytes: 5,
+    });
+    prisma.studentDocument.create.mockRejectedValue(
+      new Error('database unavailable'),
+    );
+
+    await expect(
+      service.uploadDocument(
+        {
+          studentId: 'student-1',
+          kind: StudentDocumentKind.BIRTH_CERTIFICATE,
+          fileName: 'birth.pdf',
+          contentType: 'application/pdf',
+          base64Content: 'aGVsbG8=',
+        },
+        actor,
+      ),
+    ).rejects.toThrow('database unavailable');
+
+    expect(fileRegistryService.softDeleteFile).toHaveBeenCalledWith(
+      actor.tenantId,
+      'asset-1',
+      actor.userId,
+    );
+    expect(storageService.deleteObject).toHaveBeenCalledWith(
+      'tenant-1/students/student-1/documents/failed.pdf',
+    );
   });
 
   it('rejects document uploads for students outside the tenant', async () => {
@@ -468,6 +538,48 @@ describe('StudentRecordsService', () => {
     );
     expect(result[0]).not.toHaveProperty('objectKey');
     expect(result[0]).not.toHaveProperty('publicUrl');
+    expect(result[0]).not.toHaveProperty('provider');
+  });
+
+  it('lists document history through the bounded public contract', async () => {
+    const createdAt = new Date('2026-05-25T08:00:00.000Z');
+    prisma.studentDocumentHistory.findMany.mockResolvedValue([
+      {
+        id: 'history-1',
+        documentId: 'document-1',
+        action: 'UPLOAD_PENDING_REVIEW',
+        documentTitle: 'Birth certificate',
+        documentKind: StudentDocumentKind.BIRTH_CERTIFICATE,
+        performedBy: actor.userId,
+        reason: 'Initial upload',
+        createdAt,
+      },
+    ]);
+
+    const result = await service.listDocumentHistory(actor, 'student-1');
+
+    expect(prisma.studentDocumentHistory.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: {
+          id: true,
+          documentId: true,
+          action: true,
+          documentTitle: true,
+          documentKind: true,
+          performedBy: true,
+          reason: true,
+          createdAt: true,
+        },
+      }),
+    );
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: 'history-1',
+        createdAt: createdAt.toISOString(),
+      }),
+    ]);
+    expect(result[0]).not.toHaveProperty('tenantId');
+    expect(result[0]).not.toHaveProperty('metadata');
   });
 
   it('audits preview and download access after tenant-scoped file checks', async () => {
@@ -571,3 +683,33 @@ describe('StudentRecordsService', () => {
     );
   });
 });
+
+function buildStudentDocument(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'document-1',
+    tenantId: 'tenant-1',
+    studentId: 'student-1',
+    fileId: 'asset-1',
+    idempotencyKey: 'document-operation-1',
+    contentChecksumSha256:
+      '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824',
+    kind: StudentDocumentKind.BIRTH_CERTIFICATE,
+    status: 'ACTIVE',
+    title: 'Birth certificate',
+    fileName: 'birth.pdf',
+    contentType: 'application/pdf',
+    sizeBytes: 5,
+    provider: StorageProvider.LOCAL,
+    objectKey: 'tenant-1/students/student-1/documents/birth.pdf',
+    publicUrl: null,
+    signedUrl: null,
+    notes: null,
+    expiryDate: null,
+    verifiedAt: null,
+    verifiedById: null,
+    uploadedById: 'user-1',
+    createdAt: new Date('2026-04-27T00:00:00.000Z'),
+    updatedAt: new Date('2026-04-27T00:00:00.000Z'),
+    ...overrides,
+  };
+}

@@ -2914,7 +2914,9 @@ describe('students lifecycle hardening', () => {
         {
           id: 'document-1',
           studentId: 'student-1',
+          fileId: 'document-file-1',
           kind: 'BIRTH_CERTIFICATE',
+          status: 'ACTIVE',
           title: 'Birth certificate',
           fileName: 'birth.pdf',
           contentType: 'application/pdf',
@@ -2922,6 +2924,11 @@ describe('students lifecycle hardening', () => {
           provider: 'LOCAL',
           objectKey: 'tenant-1/students/student-1/birth.pdf',
           publicUrl: null,
+          notes: null,
+          expiryDate: null,
+          verifiedAt: null,
+          verifiedById: null,
+          uploadedById: actor.userId,
           createdAt: new Date('2026-04-27T00:00:00.000Z'),
         },
       ],
@@ -2997,9 +3004,38 @@ describe('students lifecycle hardening', () => {
     });
     const prisma = buildPrisma({
       studentFindFirstQueue: [student],
-      activityPostFindManyResult: [],
+      activityPostFindManyResult: [
+        {
+          id: 'activity-1',
+          title: 'Class activity',
+          caption: 'Reading practice',
+          category: 'ACADEMIC',
+          audienceType: 'CLASS',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          publishedAt: new Date('2026-04-27T08:00:00.000Z'),
+          attachments: [
+            {
+              id: 'attachment-1',
+              fileName: 'reading.jpg',
+              contentType: 'image/jpeg',
+              sizeBytes: 256,
+              sortOrder: 0,
+              processingStatus: 'READY',
+              fileAssetId: 'activity-file-1',
+              thumbnailFileAssetId: 'activity-thumbnail-1',
+              optimizedObjectKey: null,
+              provider: 'LOCAL',
+              objectKey: 'tenant-1/activity/reading.jpg',
+              publicUrl: '/private/activity/reading.jpg',
+            },
+          ],
+          studentTags: [],
+          reactions: [],
+        },
+      ],
     });
-    const { service } = buildService(prisma);
+    const { service, fileRegistryService } = buildService(prisma);
 
     const profile = await service.getStudentProfile(student.id, actor);
 
@@ -3014,6 +3050,27 @@ describe('students lifecycle hardening', () => {
     expect(profile.student.studentSystemId).toBe(student.studentSystemId);
     expect(profile.guardians[0].primaryPhone).toBe('9800000000');
     expect(profile.documents[0].fileName).toBe('birth.pdf');
+    expect(profile.documents[0]).not.toHaveProperty('provider');
+    expect(profile.documents[0]).not.toHaveProperty('objectKey');
+    expect(profile.documents[0]).not.toHaveProperty('publicUrl');
+    expect(profile.activityPosts[0].attachments[0]).toEqual(
+      expect.objectContaining({
+        id: 'attachment-1',
+        previewUrl: '/api/v1/activity-feed/attachments/attachment-1/preview',
+        thumbnailUrl:
+          '/api/v1/activity-feed/attachments/attachment-1/thumbnail',
+      }),
+    );
+    expect(profile.activityPosts[0].attachments[0]).not.toHaveProperty(
+      'objectKey',
+    );
+    expect(profile.activityPosts[0].attachments[0]).not.toHaveProperty(
+      'publicUrl',
+    );
+    expect(profile.activityPosts[0].attachments[0]).not.toHaveProperty(
+      'provider',
+    );
+    expect(fileRegistryService.listFilesByEntity).not.toHaveBeenCalled();
     expect(profile.generatedDocuments[0].kind).toBe('id-card');
     expect(profile.generatedDocuments[0].generatedAt).toBe(
       '2026-04-27T00:00:00.000Z',

@@ -24,6 +24,7 @@ import type {
   StudentAttendanceHistory,
   StudentAttendanceHistoryFilters,
   StudentDeletePayload,
+  StudentDocument,
   StudentDocumentHistory,
   StudentDuplicateCandidatesResult,
   StudentDuplicateConfidenceFilter,
@@ -354,7 +355,7 @@ export const studentsApi = {
       "admission-import-template.csv",
     ),
   listStudentDocuments: (studentId: string) =>
-    request<any[]>(withQuery("/student-documents", { studentId })),
+    request<StudentDocument[]>(withQuery("/student-documents", { studentId })),
   listStudentDocumentHistory: (studentId: string) =>
     request<StudentDocumentHistory[]>(
       withQuery("/student-documents/history", { studentId }),
@@ -554,7 +555,10 @@ export const studentsApi = {
       { method: "DELETE", json: body as JsonBody },
     ),
   uploadStudentDocument: (body: UploadStudentDocumentPayload) =>
-    request("/student-documents", { method: "POST", json: body as JsonBody }),
+    request<StudentDocument>("/student-documents", {
+      method: "POST",
+      json: body as JsonBody,
+    }),
   previewStudentDocument: (studentId: string, documentId: string) =>
     request<{
       documentId: string;

@@ -105,11 +105,18 @@ export type AdmissionCreationResult = {
     relation: string;
   }>;
   documents: StudentDocument[];
+  photo?: {
+    photoFileId: string;
+    fileName: string;
+    mimeType: string;
+    sizeBytes: number;
+  } | null;
   invoice: {
     id: string;
     invoiceNumber: string;
     totalAmount: number;
   } | null;
+  disposition?: "CREATED" | "REPLAYED";
 };
 
 export const LEGACY_ADMISSION_APPLICATION_STATUSES = [
@@ -6295,14 +6302,13 @@ export type StudentDuplicateCandidate = {
 export type StudentDocument = {
   id: string;
   studentId: string;
-  fileId?: string | null;
+  fileId: string | null;
   kind: string;
-  status?: string;
+  status: string;
   title: string;
   fileName: string;
   contentType: string;
   sizeBytes: number;
-  provider: string;
   notes?: string | null;
   expiryDate?: string | null;
   verifiedAt?: string | null;

@@ -56,6 +56,7 @@ import { FileRegistryService } from '../file-registry/file-registry.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
+import { toStudentDocumentResponse } from '../student-records/student-document-response';
 import { StudentPhotoService } from './student-photo.service';
 import { UsageService } from '../usage/usage.service';
 import { UsersService } from '../users/users.service';
@@ -1021,14 +1022,6 @@ export class StudentsService {
           take: 12,
         });
 
-    const registryDocuments = isSupportOverride
-      ? []
-      : (await this.fileRegistryService.listFilesByEntity(
-          actor.tenantId,
-          'students',
-          student.id,
-        )) || [];
-
     const latestEnrollment = (student.enrollments || [])[0] ?? null;
     const classTeacher = student.sectionRef?.classTeacher
       ? {
@@ -1147,47 +1140,7 @@ export class StudentsService {
         classTeacher:
           enrollment.sectionId === student.sectionId ? classTeacher : null,
       })),
-      documents: isSupportOverride
-        ? []
-        : [
-            ...(student.documents || []).map((document) => ({
-              id: document.id,
-              studentId: document.studentId,
-              kind: document.kind,
-              status: document.status,
-              title: document.title,
-              fileName: document.fileName,
-              contentType: document.contentType,
-              sizeBytes: document.sizeBytes,
-              provider: document.provider,
-              objectKey: document.objectKey,
-              publicUrl: document.publicUrl,
-              notes: document.notes,
-              expiryDate: document.expiryDate?.toISOString() ?? null,
-              verifiedAt: document.verifiedAt?.toISOString() ?? null,
-              verifiedById: document.verifiedById,
-              uploadedById: document.uploadedById,
-              uploadedAt: document.createdAt.toISOString(),
-              isLegacy: true,
-            })),
-            ...registryDocuments.map((asset) => {
-              const metadata = asset.metadata as Prisma.JsonObject;
-              return {
-                id: asset.id,
-                studentId: student.id,
-                kind: (metadata?.kind as string) || 'OTHER',
-                title: (metadata?.title as string) || asset.originalFilename,
-                fileName: asset.originalFilename,
-                contentType: asset.mimeType,
-                sizeBytes: Number(asset.sizeBytes),
-                provider: 'REGISTRY',
-                objectKey: asset.objectKey,
-                publicUrl: null,
-                uploadedAt: asset.createdAt.toISOString(),
-                isLegacy: false,
-              };
-            }),
-          ],
+      documents: student.documents.map(toStudentDocumentResponse),
       generatedDocuments: isSupportOverride
         ? []
         : (student.generatedDocuments || []).map((document) => ({
@@ -1263,9 +1216,16 @@ export class StudentsService {
           fileName: attachment.fileName,
           contentType: attachment.contentType,
           sizeBytes: attachment.sizeBytes,
-          provider: attachment.provider,
-          objectKey: attachment.objectKey,
-          publicUrl: attachment.publicUrl,
+          sortOrder: attachment.sortOrder,
+          processingStatus: attachment.processingStatus,
+          thumbnailUrl:
+            attachment.thumbnailFileAssetId || attachment.optimizedObjectKey
+              ? buildActivityAttachmentAccessPath(attachment.id, 'thumbnail')
+              : null,
+          previewUrl: attachment.fileAssetId
+            ? buildActivityAttachmentAccessPath(attachment.id, 'preview')
+            : null,
+          accessBlockedReason: null,
         })),
         studentTags: post.studentTags.map((tag) => ({
           studentId: tag.studentId,
@@ -7189,4 +7149,13 @@ function isPrismaUniqueConstraintError(error: unknown) {
     'code' in error &&
     error.code === 'P2002'
   );
+}
+
+function buildActivityAttachmentAccessPath(
+  attachmentId: string,
+  action: 'thumbnail' | 'preview',
+) {
+  return `/api/v1/activity-feed/attachments/${encodeURIComponent(
+    attachmentId,
+  )}/${action}`;
 }

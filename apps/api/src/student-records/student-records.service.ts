@@ -20,6 +20,7 @@ import { CreateSiblingGroupDto } from './dto/create-sibling-group.dto';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { UploadStudentDocumentDto } from './dto/upload-student-document.dto';
 import { assertProtectedFileAccessAllowed } from '../common/security/support-override-file-access';
+import { toStudentDocumentResponse } from './student-document-response';
 
 @Injectable()
 export class StudentRecordsService {
@@ -47,7 +48,6 @@ export class StudentRecordsService {
         fileName: true,
         contentType: true,
         sizeBytes: true,
-        provider: true,
         notes: true,
         expiryDate: true,
         verifiedAt: true,
@@ -59,29 +59,12 @@ export class StudentRecordsService {
       take: 100,
     });
 
-    return documents.map((document) => ({
-      id: document.id,
-      studentId: document.studentId,
-      fileId: document.fileId,
-      kind: document.kind,
-      status: document.status,
-      title: document.title,
-      fileName: document.fileName,
-      contentType: document.contentType,
-      sizeBytes: document.sizeBytes,
-      provider: document.provider,
-      notes: document.notes,
-      expiryDate: document.expiryDate?.toISOString() ?? null,
-      verifiedAt: document.verifiedAt?.toISOString() ?? null,
-      verifiedById: document.verifiedById,
-      uploadedById: document.uploadedById,
-      uploadedAt: document.createdAt.toISOString(),
-    }));
+    return documents.map(toStudentDocumentResponse);
   }
 
   async listDocumentHistory(actor: AuthContext, studentId?: string) {
     assertProtectedFileAccessAllowed(actor);
-    return this.prisma.studentDocumentHistory.findMany({
+    const history = await this.prisma.studentDocumentHistory.findMany({
       where: {
         tenantId: actor.tenantId,
         ...(studentId
@@ -93,9 +76,24 @@ export class StudentRecordsService {
             }
           : {}),
       },
+      select: {
+        id: true,
+        documentId: true,
+        action: true,
+        documentTitle: true,
+        documentKind: true,
+        performedBy: true,
+        reason: true,
+        createdAt: true,
+      },
       orderBy: [{ createdAt: 'desc' }],
       take: 100,
     });
+
+    return history.map((item) => ({
+      ...item,
+      createdAt: item.createdAt.toISOString(),
+    }));
   }
 
   async attachRegisteredAdmissionDocuments(
@@ -234,7 +232,7 @@ export class StudentRecordsService {
           kind: dto.kind,
           contentChecksumSha256,
         });
-        return replay;
+        return toStudentDocumentResponse(replay);
       }
     }
 
@@ -246,34 +244,91 @@ export class StudentRecordsService {
       base64Content: dto.base64Content,
     });
 
+    let assetId: string | null = null;
     let document: StudentDocument;
     try {
-      document = await this.prisma.studentDocument.create({
-        data: {
-          tenantId: actor.tenantId,
-          studentId: student.id,
-          idempotencyKey,
-          contentChecksumSha256,
+      const asset = await this.fileRegistryService.registerFile({
+        tenantId: actor.tenantId,
+        uploadedByUserId: actor.userId,
+        originalFilename: dto.fileName,
+        objectKey: stored.objectKey,
+        mimeType: dto.contentType,
+        sizeBytes: stored.sizeBytes,
+        provider: stored.provider,
+        bucket: stored.bucket,
+        checksumSha256: stored.checksumSha256,
+        module: 'students',
+        entityId: student.id,
+        metadata: {
           kind: dto.kind,
           title: dto.title ?? dto.fileName,
-          fileName: dto.fileName,
-          contentType: dto.contentType,
-          sizeBytes: stored.sizeBytes,
-          provider: stored.provider,
-          objectKey: stored.objectKey,
-          publicUrl: stored.publicUrl,
-          status: 'ACTIVE',
-          uploadedById: actor.userId,
-          notes: dto.notes,
-          expiryDate,
+          source: 'student_document',
+          idempotencyKey,
         },
       });
+      assetId = asset.id;
+      await this.fileRegistryService.markUploaded(
+        actor.tenantId,
+        asset.id,
+        actor.userId,
+      );
+
+      document = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.studentDocument.create({
+          data: {
+            tenantId: actor.tenantId,
+            studentId: student.id,
+            fileId: asset.id,
+            idempotencyKey,
+            contentChecksumSha256,
+            kind: dto.kind,
+            title: dto.title ?? dto.fileName,
+            fileName: dto.fileName,
+            contentType: dto.contentType,
+            sizeBytes: stored.sizeBytes,
+            provider: stored.provider,
+            objectKey: stored.objectKey,
+            publicUrl: stored.publicUrl,
+            status: 'ACTIVE',
+            uploadedById: actor.userId,
+            notes: dto.notes,
+            expiryDate,
+          },
+        });
+
+        await tx.studentDocumentHistory.create({
+          data: {
+            tenantId: actor.tenantId,
+            documentId: created.id,
+            action: 'UPLOAD_PENDING_REVIEW',
+            documentTitle: created.title,
+            documentKind: created.kind,
+            performedBy: actor.userId,
+            reason: dto.reason,
+            metadata: {
+              originalFilename: dto.fileName,
+              sizeBytes: stored.sizeBytes,
+              expiryDate: expiryDate?.toISOString() ?? null,
+            },
+          },
+        });
+
+        return created;
+      });
     } catch (error) {
+      if (assetId) {
+        await this.fileRegistryService
+          .softDeleteFile(actor.tenantId, assetId, actor.userId)
+          .catch(() => undefined);
+      }
+      await this.storageService
+        .deleteObject(stored.objectKey)
+        .catch(() => undefined);
+
       if (!idempotencyKey || !isPrismaUniqueConstraintError(error)) {
         throw error;
       }
 
-      await this.storageService.deleteObject(stored.objectKey);
       const concurrentReplay = await this.prisma.studentDocument.findUnique({
         where: {
           tenantId_idempotencyKey: {
@@ -282,59 +337,15 @@ export class StudentRecordsService {
           },
         },
       });
-      if (!concurrentReplay) {
-        throw error;
-      }
+      if (!concurrentReplay) throw error;
 
       this.assertDocumentReplayMatches(concurrentReplay, {
         studentId: student.id,
         kind: dto.kind,
         contentChecksumSha256,
       });
-      return concurrentReplay;
+      return toStudentDocumentResponse(concurrentReplay);
     }
-
-    const asset = await this.fileRegistryService.registerFile({
-      tenantId: actor.tenantId,
-      uploadedByUserId: actor.userId,
-      originalFilename: dto.fileName,
-      objectKey: stored.objectKey,
-      mimeType: dto.contentType,
-      sizeBytes: stored.sizeBytes,
-      provider: stored.provider,
-      bucket: stored.bucket,
-      checksumSha256: stored.checksumSha256,
-      module: 'students',
-      entityId: student.id,
-      metadata: {
-        kind: dto.kind,
-        title: dto.title ?? dto.fileName,
-        source: 'student_document',
-        sourceId: document.id,
-      },
-    });
-
-    await this.prisma.studentDocument.update({
-      where: { id: document.id },
-      data: { fileId: asset.id },
-    });
-
-    await this.prisma.studentDocumentHistory.create({
-      data: {
-        tenantId: actor.tenantId,
-        documentId: document.id,
-        action: 'UPLOAD_PENDING_REVIEW',
-        documentTitle: document.title,
-        documentKind: document.kind,
-        performedBy: actor.userId,
-        reason: dto.reason,
-        metadata: {
-          originalFilename: dto.fileName,
-          sizeBytes: stored.sizeBytes,
-          expiryDate: expiryDate?.toISOString() ?? null,
-        },
-      },
-    });
 
     await this.auditService.record({
       action: 'upload',
@@ -351,7 +362,7 @@ export class StudentRecordsService {
       },
     });
 
-    return document;
+    return toStudentDocumentResponse(document);
   }
 
   private assertDocumentReplayMatches(

@@ -110,11 +110,18 @@ export type AdmissionCreationResult = {
     relation: string;
   }>;
   documents: StudentDocument[];
+  photo?: {
+    photoFileId: string;
+    fileName: string;
+    mimeType: string;
+    sizeBytes: number;
+  } | null;
   invoice: {
     id: string;
     invoiceNumber: string;
     totalAmount: number;
   } | null;
+  disposition?: "CREATED" | "REPLAYED";
 };
 
 export const LEGACY_ADMISSION_APPLICATION_STATUSES = [
